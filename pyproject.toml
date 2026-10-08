@@ -1,5 +1,5 @@
 [project]
-name = "AssetBoard"
+name = "assetboard"
 version = "0.0.0"
 description = "A self-hosted personal finance web app"
 readme = "README.md"
@@ -17,6 +17,8 @@ dev = [
 test = [
     "pytest>=8,<9",
     "pytest-cov>=6,<7",
+    "pyyaml>=6,<7",
+    "types-pyyaml>=6,<7",
 ]
 
 [tool.uv]

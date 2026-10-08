@@ -17,9 +17,8 @@ repos:
 
       - id: block-database-and-spreadsheet-files
         name: Block unsupported data files
-        entry: python
+        entry: Do not commit database or spreadsheet files
         language: fail
-        types: [text]
         files: '(?i)\.(xlsx|xlsm|xls|db|sqlite|sqlite3|db-wal|db-shm)$'
 
   - repo: https://github.com/pre-commit/pre-commit-hooks

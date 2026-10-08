@@ -13,7 +13,6 @@ check:
 	$(UV) run pytest
 	$(UV) run pre-commit run --all-files
 
-# Keep later milestones from failing the top-level command while they are unimplemented.
 test:
 	$(UV) run pytest
 
