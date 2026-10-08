@@ -64,4 +64,4 @@ planned-vs-actual, recurring items, variable income, net worth, investments, loa
 - Small, reviewable commits using Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`).
 
 ## Branding
-The app name may change. Keep every occurrence of the name in `src/AssetBoard/branding.py` (display name, env prefix, CLI name, user-agent), `pyproject.toml`, and Docker labels. Do not hardcode the name in templates or messages — use `branding.APP_NAME`.
+The app name may change. Keep every occurrence of the name in `src/assetboard/branding.py` (display name, env prefix, CLI name, user-agent), `pyproject.toml`, and Docker labels. Do not hardcode the name in templates or messages — use `branding.APP_NAME`.

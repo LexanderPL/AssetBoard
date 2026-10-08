@@ -1,7 +1,6 @@
 .PHONY: setup dev check test css migrate revision i18n-extract i18n-update i18n-compile
 
 UV := uv
-PYTHON := python3
 
 setup:
 	$(UV) sync --all-groups

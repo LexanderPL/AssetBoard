@@ -206,9 +206,18 @@ cython_debug/
 tempCodeRunnerFile.py
 
 # Project data
+/data/
 *.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+*.xls
+*.xlsm
 *.xlsx
-data/
+
+# macOS
+.DS_Store
 
 # Environment and local tooling
 .env

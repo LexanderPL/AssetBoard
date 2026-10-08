@@ -1,14 +1,31 @@
 repos:
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.12.0
+  - repo: local
     hooks:
       - id: ruff
-        args: [--fix]
+        name: ruff
+        entry: uv run ruff check --fix
+        language: system
+        pass_filenames: true
+        types: [python]
+
       - id: ruff-format
+        name: ruff format
+        entry: uv run ruff format --check
+        language: system
+        pass_filenames: true
+        types: [python]
+
+      - id: block-database-and-spreadsheet-files
+        name: Block unsupported data files
+        entry: python
+        language: fail
+        types: [text]
+        files: '(?i)\.(xlsx|xlsm|xls|db|sqlite|sqlite3|db-wal|db-shm)$'
 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
+      - id: check-added-large-files
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml
@@ -19,16 +36,5 @@ repos:
       - id: check-symlinks
       - id: check-executables-have-shebangs
       - id: detect-private-key
-      - id: file-contents-sorter
-        args: [--unique]
       - id: check-json
       - id: mixed-line-ending
-      - id: requirements-txt-fixer
-
-  - repo: local
-    hooks:
-      - id: block-database-and-spreadsheet-files
-        name: Block .db and .xlsx files
-        entry: bash -c 'git diff --cached --name-only --diff-filter=ACMR | grep -E "\.(db|xlsx)$" && { echo "Database or spreadsheet files are not allowed."; exit 1; } || true'
-        language: system
-        pass_filenames: false
