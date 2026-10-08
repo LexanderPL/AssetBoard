@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from importlib.metadata import version
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -21,13 +22,14 @@ def create_app(
 ) -> FastAPI:
     settings = settings or Settings()
     logger = configure_logging(settings.log_level, settings.log_format)
+    settings.ensure_secret_key()
     checker = database_checker or (lambda: True)
 
-    app = FastAPI(title=APP_NAME, version="0.0.0")
+    app = FastAPI(title=APP_NAME, version=version("assetboard"))
     app.state.settings = settings
     app.state.logger = logger
     app.state.database_checker = checker
-    app.add_middleware(RequestIdMiddleware)
+    app.add_middleware(RequestIdMiddleware, logger=logger)
 
     @app.get("/healthz")
     async def healthz(request: Request) -> Any:
@@ -41,14 +43,5 @@ def create_app(
             {"status": "unavailable", "database": "unavailable"},
             status_code=503,
         )
-
-    @app.middleware("http")
-    async def log_request(request: Request, call_next):
-        response = await call_next(request)
-        logger.info(
-            "request_complete",
-            extra={"request_id": request.state.request_id},
-        )
-        return response
 
     return app

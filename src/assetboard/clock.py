@@ -21,6 +21,8 @@ class FixedClock(Clock):
 
     def __init__(self, value: str) -> None:
         self._value = datetime.fromisoformat(value)
+        if self._value.tzinfo is None or self._value.utcoffset() is None:
+            raise ValueError("FixedClock requires a timezone-aware datetime")
 
     def now(self) -> datetime:
         return self._value

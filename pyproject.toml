@@ -13,6 +13,10 @@ dependencies = [
     "uvicorn>=0.35,<1",
 ]
 
+[build-system]
+requires = ["uv_build>=0.8.22,<0.9"]
+build-backend = "uv_build"
+
 [dependency-groups]
 dev = [
     "ruff>=0.12,<1",
@@ -51,7 +55,6 @@ strict = ["src/assetboard/domain", "src/assetboard/services"]
 
 [tool.pytest.ini_options]
 addopts = "--cov=src/assetboard --cov-report=term-missing --cov-report=xml"
-pythonpath = ["src"]
 testpaths = ["tests"]
 
 [tool.coverage.run]
