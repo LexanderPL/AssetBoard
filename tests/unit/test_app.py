@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 from importlib.metadata import version
+from pathlib import Path
 
 from fastapi.testclient import TestClient
 
@@ -47,3 +49,32 @@ def test_readyz_reports_database_failure() -> None:
 
     assert response.status_code == 503
     assert response.json() == {"status": "unavailable", "database": "unavailable"}
+
+
+def test_readyz_checks_the_real_database(tmp_path: Path) -> None:
+    app = create_app(Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret"))
+
+    with TestClient(app) as client:
+        response = client.get("/readyz")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "database": "ready"}
+
+
+def test_readyz_runs_synchronous_checker_in_threadpool() -> None:
+    def check_not_on_event_loop() -> bool:
+        try:
+            asyncio.get_running_loop()
+        except RuntimeError:
+            return True
+        return False
+
+    app = create_app(
+        Settings(_env_file=None, secret_key="test-secret", auto_migrate=False),
+        database_checker=check_not_on_event_loop,
+    )
+
+    with TestClient(app) as client:
+        response = client.get("/readyz")
+
+    assert response.status_code == 200

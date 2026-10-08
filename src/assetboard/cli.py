@@ -4,6 +4,8 @@ import typer
 
 from assetboard.app import create_app
 from assetboard.branding import APP_NAME, CLI_NAME
+from assetboard.config import Settings
+from assetboard.db.migrations import upgrade_database
 
 app = typer.Typer(name=CLI_NAME, help=f"{APP_NAME} command-line interface")
 
@@ -22,8 +24,11 @@ def serve(
 @app.command()
 def migrate() -> None:
     """Run database migrations."""
-    typer.echo("Migrations are not implemented until F0.3", err=True)
-    raise typer.Exit(code=1)
+    settings = Settings()
+    if settings.database_url is None:
+        raise typer.BadParameter("DATABASE_URL was not configured")
+    upgrade_database(settings.database_url)
+    typer.echo("Database migrations applied.")
 
 
 if __name__ == "__main__":

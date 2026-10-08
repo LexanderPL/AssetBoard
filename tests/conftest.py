@@ -5,8 +5,13 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from sqlalchemy.engine import Engine
+from sqlalchemy.orm import Session
 
 from assetboard.branding import APP_NAME, ENV_PREFIX
+from assetboard.clock import FixedClock
+from assetboard.db.engine import create_database_engine
+from assetboard.db.migrations import upgrade_database
 
 
 @pytest.fixture(autouse=True)
@@ -39,3 +44,33 @@ def isolate_application_data_dir(
     for handler in tuple(logger.handlers):
         logger.removeHandler(handler)
         handler.close()
+
+
+@pytest.fixture(scope="session")
+def database_engine(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Engine]:
+    database_directory = tmp_path_factory.mktemp("assetboard-database")
+    database_url = f"sqlite:///{database_directory / 'test.db'}"
+    upgrade_database(database_url)
+    engine = create_database_engine(database_url)
+    try:
+        yield engine
+    finally:
+        engine.dispose()
+
+
+@pytest.fixture
+def db_session(database_engine: Engine) -> Iterator[Session]:
+    connection = database_engine.connect()
+    transaction = connection.begin()
+    session = Session(bind=connection, join_transaction_mode="create_savepoint")
+    try:
+        yield session
+    finally:
+        session.close()
+        transaction.rollback()
+        connection.close()
+
+
+@pytest.fixture
+def fixed_clock() -> FixedClock:
+    return FixedClock("2026-01-01T00:00:00+00:00")
