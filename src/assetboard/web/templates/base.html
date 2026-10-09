@@ -4,18 +4,19 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
+  <meta name="htmx-config" content='{"allowEval":false,"includeIndicatorStyles":false,"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":true,"error":false}]}' />
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
-  <link rel="stylesheet" href="{{ request.url_for('static', path='css/app.css') }}">
-  <script src="{{ request.url_for('static', path='js/theme.js') }}"></script>
-  <script defer src="{{ request.url_for('static', path='vendor/htmx.min.js') }}"></script>
-  <script defer src="{{ request.url_for('static', path='vendor/alpinejs-csp.min.js') }}"></script>
-  <script defer src="{{ request.url_for('static', path='js/app.js') }}"></script>
+  <link rel="stylesheet" href="{{ static_url(request, 'css/app.css') }}">
+  <script src="{{ static_url(request, 'js/theme.js') }}"></script>
+  <script defer src="{{ static_url(request, 'vendor/htmx.min.js') }}"></script>
+  <script defer src="{{ static_url(request, 'vendor/alpinejs-csp.min.js') }}"></script>
+  <script defer src="{{ static_url(request, 'js/app.js') }}"></script>
 </head>
 <body class="min-h-full">
   {% from "macros/components.html" import confirm_dialog, flashes %}
   <div class="min-h-screen lg:flex">
     <aside class="border-b border-line bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-900 lg:flex lg:w-64 lg:flex-col lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
-      <a href="/" class="flex items-center gap-3 px-2" aria-label="{{ _('Home') }}">
+      <a href="{{ request.app.url_path_for('home') }}" class="flex items-center gap-3 px-2" aria-label="{{ _('Home') }}">
         <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-lg font-bold text-white" aria-hidden="true">A</span>
         <span class="text-lg font-semibold tracking-tight">{{ app_name }}</span>
       </a>
@@ -47,7 +48,7 @@
         </button>
       </div>
     </aside>
-    <main class="min-w-0 flex-1 px-4 py-6 sm:px-7 lg:px-10 lg:py-9">
+    <main id="main-content" class="min-w-0 flex-1 px-4 py-6 sm:px-7 lg:px-10 lg:py-9">
       <div class="mx-auto max-w-6xl">
         <header class="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>

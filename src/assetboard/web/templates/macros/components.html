@@ -34,13 +34,15 @@
 </dialog>
 {%- endmacro %}
 
-{% macro toast(id, message, undo_url, undo_label) -%}
-<div id="{{ id }}" hx-swap-oob="true" role="status" aria-live="polite"
-     class="flex items-center justify-between gap-4 rounded-xl bg-ink px-4 py-3 text-sm text-white shadow-lg">
-  <span>{{ message }}</span>
-  <div class="flex items-center gap-3">
-    {% if undo_url %}<button type="button" class="font-semibold text-emerald-300" hx-post="{{ undo_url }}">{{ undo_label }}</button>{% endif %}
-    <button type="button" data-toast-dismiss aria-label="{{ _('Dismiss') }}" class="text-slate-300">×</button>
+{% macro toast(message, undo_url, undo_label) -%}
+<div hx-swap-oob="beforeend:#toast-container">
+  <div id="toast-{{ uuid4().hex }}" data-toast role="status" aria-live="polite"
+       class="flex items-center justify-between gap-4 rounded-xl bg-ink px-4 py-3 text-sm text-white shadow-lg">
+    <span>{{ message }}</span>
+    <div class="flex items-center gap-3">
+      {% if undo_url %}<button type="button" class="font-semibold text-emerald-300" hx-post="{{ undo_url }}">{{ undo_label }}</button>{% endif %}
+      <button type="button" data-toast-dismiss aria-label="{{ _('Dismiss') }}" class="text-slate-300">×</button>
+    </div>
   </div>
 </div>
 {%- endmacro %}

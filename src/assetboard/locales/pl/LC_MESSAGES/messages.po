@@ -3,7 +3,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version:  AssetBoard\n"
 "Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
-"POT-Creation-Date: 2026-10-09 14:36+0200\n"
+"POT-Creation-Date: 2026-10-09 21:53+0200\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language: pl\n"
@@ -15,119 +15,119 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: src/assetboard/app.py:75
+#: src/assetboard/app.py:76
 msgid "Access denied"
 msgstr "Brak dostępu"
 
-#: src/assetboard/app.py:76
+#: src/assetboard/app.py:77
 msgid "You do not have permission to view this page."
 msgstr "Nie masz uprawnień do wyświetlenia tej strony."
 
-#: src/assetboard/app.py:78
+#: src/assetboard/app.py:79
 msgid "Page not found"
 msgstr "Nie znaleziono strony"
 
-#: src/assetboard/app.py:79
+#: src/assetboard/app.py:80
 msgid "The page you requested could not be found."
 msgstr "Nie można znaleźć wskazanej strony."
 
-#: src/assetboard/app.py:104
+#: src/assetboard/app.py:109
 msgid "Something went wrong"
 msgstr "Coś poszło nie tak"
 
-#: src/assetboard/app.py:105
+#: src/assetboard/app.py:110
 msgid "An unexpected error occurred. Please try again."
 msgstr "Wystąpił nieoczekiwany błąd. Spróbuj ponownie."
 
-#: src/assetboard/web/numbers.py:28
+#: src/assetboard/i18n/numbers.py:31
 msgid "Enter a valid amount."
 msgstr "Podaj prawidłową kwotę."
 
-#: src/assetboard/web/templates/base.html:18
+#: src/assetboard/web/templates/base.html:19
 msgid "Home"
 msgstr "Strona główna"
 
-#: src/assetboard/web/templates/base.html:22
+#: src/assetboard/web/templates/base.html:23
 msgid "Main navigation"
 msgstr "Menu główne"
 
-#: src/assetboard/web/templates/base.html:23
+#: src/assetboard/web/templates/base.html:24
 msgid "Month"
 msgstr "Miesiąc"
 
-#: src/assetboard/web/templates/base.html:24
+#: src/assetboard/web/templates/base.html:25
 msgid "Recurring"
 msgstr "Cykliczne"
 
-#: src/assetboard/web/templates/base.html:25
+#: src/assetboard/web/templates/base.html:26
 msgid "Net worth"
 msgstr "Majątek netto"
 
-#: src/assetboard/web/templates/base.html:26
+#: src/assetboard/web/templates/base.html:27
 msgid "Investments"
 msgstr "Inwestycje"
 
-#: src/assetboard/web/templates/base.html:27
+#: src/assetboard/web/templates/base.html:28
 msgid "Loans"
 msgstr "Kredyty"
 
-#: src/assetboard/web/templates/base.html:28
+#: src/assetboard/web/templates/base.html:29
 msgid "FIRE projection"
 msgstr "Prognoza FIRE"
 
-#: src/assetboard/web/templates/base.html:28
+#: src/assetboard/web/templates/base.html:29
 msgid "Unavailable"
 msgstr "Niedostępne"
 
-#: src/assetboard/web/templates/base.html:35
+#: src/assetboard/web/templates/base.html:36
 msgid "Your account"
 msgstr "Twoje konto"
 
-#: src/assetboard/web/templates/base.html:36
+#: src/assetboard/web/templates/base.html:37
 msgid "Personal workspace"
 msgstr "Przestrzeń osobista"
 
-#: src/assetboard/web/templates/base.html:41
+#: src/assetboard/web/templates/base.html:42
 msgid "Account settings"
 msgstr "Ustawienia konta"
 
-#: src/assetboard/web/templates/base.html:42
+#: src/assetboard/web/templates/base.html:43
 msgid "Sign out"
 msgstr "Wyloguj się"
 
-#: src/assetboard/web/templates/base.html:45
+#: src/assetboard/web/templates/base.html:46
 msgid "Toggle dark mode"
 msgstr "Przełącz tryb ciemny"
 
-#: src/assetboard/web/templates/base.html:54
+#: src/assetboard/web/templates/base.html:55
 msgid "Personal finance"
 msgstr "Finanse osobiste"
 
-#: src/assetboard/web/templates/base.html:55
+#: src/assetboard/web/templates/base.html:56
 msgid "Your overview"
 msgstr "Podsumowanie"
 
-#: src/assetboard/web/templates/base.html:58
+#: src/assetboard/web/templates/base.html:59
 msgid "Workspace"
 msgstr "Przestrzeń"
 
-#: src/assetboard/web/templates/base.html:58
+#: src/assetboard/web/templates/base.html:59
 msgid "Personal"
 msgstr "Osobista"
 
-#: src/assetboard/web/templates/base.html:64
+#: src/assetboard/web/templates/base.html:65
 msgid "Are you sure?"
 msgstr "Czy na pewno?"
 
-#: src/assetboard/web/templates/base.html:64
+#: src/assetboard/web/templates/base.html:65
 msgid "This action cannot be undone."
 msgstr "Tej operacji nie można cofnąć."
 
-#: src/assetboard/web/templates/base.html:64
+#: src/assetboard/web/templates/base.html:65
 msgid "Continue"
 msgstr "Kontynuuj"
 
-#: src/assetboard/web/templates/base.html:64
+#: src/assetboard/web/templates/base.html:65
 msgid "Cancel"
 msgstr "Anuluj"
 

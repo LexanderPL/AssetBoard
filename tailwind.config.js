@@ -1,4 +1,5 @@
 module.exports = {
+  darkMode: "class",
   content: ["./src/assetboard/web/templates/**/*.html"],
   theme: {
     extend: {

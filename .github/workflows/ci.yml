@@ -31,3 +31,8 @@ jobs:
 
       - name: Run project checks
         run: uv run --locked make check
+
+      - name: Verify generated assets are fresh
+        run: |
+          uv run --locked make css i18n-compile
+          git diff --exit-code -- src/assetboard/static/css/app.css src/assetboard/locales/en/LC_MESSAGES/messages.mo src/assetboard/locales/pl/LC_MESSAGES/messages.mo

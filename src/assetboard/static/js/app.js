@@ -22,27 +22,39 @@ document.addEventListener("click", (event) => {
   if (accept) accept.closest("dialog")?.close("confirm");
 });
 
-document.addEventListener("submit", (event) => {
-  const form = event.target;
-  if (!(form instanceof HTMLFormElement) || !form.dataset.confirm) return;
-  if (form.dataset.confirmed === "true") {
-    delete form.dataset.confirmed;
+const toastTimers = new WeakSet();
+
+function startToastTimer(toast) {
+  if (!(toast instanceof Element) || !toast.matches("[data-toast]") || toastTimers.has(toast)) {
     return;
   }
+  toastTimers.add(toast);
+  window.setTimeout(() => toast.remove(), 5000);
+}
+
+document.querySelectorAll("[data-toast]").forEach(startToastTimer);
+document.addEventListener("htmx:oobAfterSwap", (event) => {
+  event.detail?.target?.querySelectorAll("[data-toast]").forEach(startToastTimer);
+});
+
+document.addEventListener("htmx:confirm", (event) => {
+  const form = event.target;
+  if (!(form instanceof HTMLFormElement) || !form.dataset.confirm) return;
   event.preventDefault();
   const dialog = document.getElementById("confirm-dialog");
   if (!(dialog instanceof HTMLDialogElement)) return;
   const message = dialog.querySelector("[data-confirm-message]");
   if (message) message.textContent = form.dataset.confirm;
+  const issueRequest = event.detail.issueRequest;
   dialog.addEventListener(
     "close",
     () => {
       if (dialog.returnValue === "confirm") {
-        form.dataset.confirmed = "true";
-        form.requestSubmit();
+        issueRequest(true);
       }
     },
     { once: true },
   );
+  dialog.returnValue = "";
   dialog.showModal();
 });

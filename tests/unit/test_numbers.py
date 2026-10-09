@@ -5,8 +5,8 @@ from decimal import Decimal
 import pytest
 
 from assetboard.domain.money import Money
-from assetboard.web.locale import resolve_locale
-from assetboard.web.numbers import format_money, parse_amount
+from assetboard.i18n.locale import resolve_locale
+from assetboard.i18n.numbers import format_money, parse_amount
 
 
 @pytest.mark.parametrize(
@@ -15,8 +15,17 @@ from assetboard.web.numbers import format_money, parse_amount
         ("1 234,56", "pl", Decimal("1234.56")),
         ("1.234,56", "de-DE", Decimal("1234.56")),
         ("1,234.56", "en-US", Decimal("1234.56")),
+        ("1.234", "en", Decimal("1.234")),
+        ("1,234", "en", Decimal("1234")),
+        ("1.234", "de-DE", Decimal("1234")),
         ("12,5", "pl", Decimal("12.5")),
         ("-3", "en", Decimal("-3")),
+        ("1 234,56", "pl", Decimal("1234.56")),
+        ("1.234,56", "pl", Decimal("1234.56")),
+        ("1,234.56", "pl", Decimal("1234.56")),
+        ("12,5", "pl", Decimal("12.5")),
+        ("+3", "pl", Decimal("3")),
+        ("−3", "pl", Decimal("-3")),
     ],
 )
 def test_parse_amount_uses_locale_separators(
@@ -27,7 +36,7 @@ def test_parse_amount_uses_locale_separators(
     assert parse_amount(text, locale) == expected
 
 
-@pytest.mark.parametrize("text", ["", " ", "abc", "12x", "1,23", "NaN", "Infinity"])
+@pytest.mark.parametrize("text", ["", " ", "abc", "12x", "1,23,4", "NaN", "Infinity", "1" * 65])
 def test_parse_amount_rejects_invalid_or_non_finite_input(text: str) -> None:
     with pytest.raises(ValueError, match="valid amount"):
         parse_amount(text, "en")

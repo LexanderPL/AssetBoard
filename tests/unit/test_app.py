@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from importlib.metadata import version
 from pathlib import Path
 
+import pytest
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from fastapi import HTTPException
@@ -121,15 +123,26 @@ def test_root_renders_translatable_shell_and_local_assets() -> None:
     assert response.status_code == 200
     assert '<html lang="pl" class="h-full">' in response.text
     assert "Podsumowanie miesiąca" in response.text
-    assert "cdn." not in response.text
+    assert '"allowEval":false' in response.text
+    assert '"includeIndicatorStyles":false' in response.text
+    assert '"code":"[45]..","swap":true,"error":false' in response.text
+    asset_urls = re.findall(r'(?:src|href)="([^"]+)"', response.text)
+    local_assets = [url for url in asset_urls if url.startswith("/static/")]
+    assert len(local_assets) == 5
+    assert all(url.startswith("/static/") for url in local_assets)
+    assert all(url.endswith(f"?v={version('assetboard')}") for url in local_assets)
+    assert 'href="/"' in response.text
+    assert response.headers["cache-control"] == "no-store"
+    assert "accept-language" in response.headers["vary"].lower()
     assert "unsafe-inline" not in response.headers["content-security-policy"]
     assert "unsafe-eval" not in response.headers["content-security-policy"]
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
     assert all(asset.status_code == 200 for asset in (htmx, alpine, charts))
+    assert "no-store" not in htmx.headers.get("cache-control", "")
 
 
-def test_error_pages_are_htmx_aware_and_have_security_headers() -> None:
+def test_http_errors_are_localized_and_htmx_aware() -> None:
     app = create_app(Settings(_env_file=None, secret_key="test-secret", auto_migrate=False))
 
     @app.get("/_test/forbidden")
@@ -140,16 +153,90 @@ def test_error_pages_are_htmx_aware_and_have_security_headers() -> None:
     async def unexpected_error() -> None:
         raise RuntimeError("Synthetic failure")
 
-    with TestClient(app, raise_server_exceptions=False) as client:
-        full_page = client.get("/_test/forbidden")
-        partial = client.get("/missing", headers={"HX-Request": "true"})
-        server_error = client.get("/_test/error")
+    @app.get("/_test/teapot")
+    async def teapot() -> None:
+        raise HTTPException(status_code=418, detail="Teapot", headers={"X-Teapot": "retained"})
 
-    assert full_page.status_code == 403
-    assert "Page not found" not in full_page.text
-    assert "<!doctype html>" in full_page.text.lower()
-    assert partial.status_code == 404
-    assert '<div role="alert"' in partial.text
-    assert "<!doctype html>" not in partial.text.lower()
+    with TestClient(app, raise_server_exceptions=False) as client:
+        forbidden_response = client.get("/_test/forbidden", headers={"accept-language": "pl"})
+        partial_response = client.get(
+            "/missing",
+            headers={"HX-Request": "true", "accept-language": "pl"},
+        )
+        boosted = client.get(
+            "/missing",
+            headers={"HX-Request": "true", "HX-Boosted": "true", "accept-language": "pl"},
+        )
+        history_restore = client.get(
+            "/missing",
+            headers={
+                "HX-Request": "true",
+                "HX-History-Restore-Request": "true",
+                "accept-language": "pl",
+            },
+        )
+        server_error = client.get(
+            "/_test/error",
+            headers={"accept-language": "pl", "x-request-id": "f0-4-error"},
+        )
+        partial_server_error = client.get(
+            "/_test/error",
+            headers={"HX-Request": "true", "accept-language": "pl"},
+        )
+        other_http_error = client.get("/_test/teapot")
+
+    assert forbidden_response.status_code == 403
+    assert "Brak dostępu" in forbidden_response.text
+    assert "Nie masz uprawnień" in forbidden_response.text
+    assert "<!doctype html>" in forbidden_response.text.lower()
+    assert partial_response.status_code == 404
+    assert '<div role="alert"' in partial_response.text
+    assert "Nie znaleziono strony" in partial_response.text
+    assert "<!doctype html>" not in partial_response.text.lower()
+    assert partial_response.headers["hx-retarget"] == "#main-content"
+    assert partial_response.headers["hx-reswap"] == "innerHTML"
+    assert "hx-request" in partial_response.headers["vary"].lower()
+    assert "accept-language" in partial_response.headers["vary"].lower()
+    assert partial_response.headers["cache-control"] == "no-store"
+    assert "<!doctype html>" in boosted.text.lower()
+    assert "<!doctype html>" in history_restore.text.lower()
     assert server_error.status_code == 500
+    assert "Coś poszło nie tak" in server_error.text
+    assert server_error.headers["x-request-id"] == "f0-4-error"
+    assert server_error.headers["cache-control"] == "no-store"
+    assert "accept-language" in server_error.headers["vary"].lower()
+    assert "<!doctype html>" in server_error.text.lower()
+    assert partial_server_error.status_code == 500
+    assert "Wystąpił nieoczekiwany błąd" in partial_server_error.text
+    assert '<div role="alert"' in partial_server_error.text
+    assert partial_server_error.headers["hx-retarget"] == "#main-content"
+    assert "<!doctype html>" not in partial_server_error.text.lower()
+    assert other_http_error.status_code == 418
+    assert other_http_error.json() == {"detail": "Teapot"}
+    assert other_http_error.headers["x-teapot"] == "retained"
     assert server_error.headers["content-security-policy"]
+
+
+def test_500_uses_plain_text_fallback_when_template_rendering_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import assetboard.app as app_module
+
+    def fail_rendering(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("Synthetic template failure")
+
+    monkeypatch.setattr(app_module, "render_template", fail_rendering)
+    app = create_app(Settings(_env_file=None, secret_key="test-secret", auto_migrate=False))
+
+    @app.get("/_test/failing-render")
+    async def failing_render() -> None:
+        raise RuntimeError("Synthetic request failure")
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.get("/_test/failing-render", headers={"x-request-id": "fallback-id"})
+
+    assert response.status_code == 500
+    assert response.text == "An unexpected error occurred."
+    assert response.headers["content-type"].startswith("text/plain")
+    assert response.headers["x-request-id"] == "fallback-id"
+    assert response.headers["cache-control"] == "no-store"

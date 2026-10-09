@@ -1,3 +1,5 @@
+exclude: ^\.vscode/
+
 repos:
   - repo: local
     hooks:
@@ -27,7 +29,9 @@ repos:
       - id: check-added-large-files
         exclude: ^src/assetboard/static/vendor/echarts\.min\.js$
       - id: trailing-whitespace
+        exclude: ^src/assetboard/static/(vendor/|css/app\.css$)|^src/assetboard/locales/.*/LC_MESSAGES/messages\.po$
       - id: end-of-file-fixer
+        exclude: ^src/assetboard/static/(vendor/|css/app\.css$)|^src/assetboard/locales/.*/LC_MESSAGES/messages\.po$
       - id: check-yaml
       - id: check-toml
       - id: check-merge-conflict
@@ -38,3 +42,4 @@ repos:
       - id: detect-private-key
       - id: check-json
       - id: mixed-line-ending
+        exclude: ^src/assetboard/static/(vendor/|css/app\.css$)|^src/assetboard/locales/.*/LC_MESSAGES/messages\.po$

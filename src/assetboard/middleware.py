@@ -8,7 +8,7 @@ from time import perf_counter
 from starlette.responses import Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-from assetboard.web.locale import resolve_locale
+from assetboard.i18n.locale import resolve_locale
 
 _REQUEST_ID_PATTERN = re.compile(r"[A-Za-z0-9._:-]{1,128}\Z")
 SECURITY_HEADERS = {
@@ -143,6 +143,24 @@ class SecurityHeadersMiddleware:
                     (key.encode("ascii"), value.encode("ascii"))
                     for key, value in SECURITY_HEADERS.items()
                 )
+                if not scope.get("path", "").startswith("/static/"):
+                    response_headers = [
+                        (name, value)
+                        for name, value in response_headers
+                        if name.lower() != b"cache-control"
+                    ]
+                    response_headers.append((b"cache-control", b"no-store"))
+                    vary = next(
+                        (value for name, value in response_headers if name.lower() == b"vary"),
+                        b"",
+                    )
+                    vary_values = [value.strip() for value in vary.split(b",") if value.strip()]
+                    if b"accept-language" not in {value.lower() for value in vary_values}:
+                        vary_values.append(b"Accept-Language")
+                    response_headers = [
+                        (name, value) for name, value in response_headers if name.lower() != b"vary"
+                    ]
+                    response_headers.append((b"vary", b", ".join(vary_values)))
                 message = {**message, "headers": response_headers}
             await send(message)
 

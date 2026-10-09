@@ -4,7 +4,7 @@ from functools import lru_cache
 from gettext import GNUTranslations, NullTranslations, translation
 from pathlib import Path
 
-from assetboard.web.locale import normalize_locale
+from assetboard.i18n.locale import normalize_locale
 
 _LOCALE_DIR = Path(__file__).resolve().parents[1] / "locales"
 

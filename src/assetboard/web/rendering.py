@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from functools import lru_cache
 from pathlib import Path
+from typing import Any, cast
+from uuid import uuid4
 
 from fastapi import Request
 from fastapi.templating import Jinja2Templates
@@ -9,7 +11,7 @@ from starlette.responses import HTMLResponse
 
 from assetboard.domain.money import Money
 from assetboard.i18n import translations_for
-from assetboard.web.numbers import format_money
+from assetboard.i18n.numbers import format_money
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
 
@@ -19,15 +21,14 @@ def templates_for(locale: str) -> Jinja2Templates:
     templates = Jinja2Templates(directory=_TEMPLATE_DIR)
     templates.env.add_extension("jinja2.ext.i18n")
     translations = translations_for(locale)
-    templates.env.globals.update(
-        _=translations.gettext,
-        gettext=translations.gettext,
-        ngettext=translations.ngettext,
-        pgettext=translations.pgettext,
-        npgettext=translations.npgettext,
-    )
+    cast(Any, templates.env).install_gettext_translations(translations, newstyle=True)
     templates.env.globals.update(Money=Money, format_money=format_money)
+    templates.env.globals.update(static_url=static_url, uuid4=uuid4)
     return templates
+
+
+def static_url(request: Request, path: str) -> str:
+    return f"{request.app.url_path_for('static', path=path)}?v={request.app.version}"
 
 
 def render_template(

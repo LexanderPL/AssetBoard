@@ -7,10 +7,11 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 from starlette.exceptions import HTTPException as StarletteHTTPException
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, PlainTextResponse, Response
 
 from assetboard.branding import APP_NAME
 from assetboard.config import Settings
@@ -69,18 +70,17 @@ def create_app(
     @app.exception_handler(StarletteHTTPException)
     async def handle_http_error(request: Request, exc: StarletteHTTPException) -> Any:
         if exc.status_code not in {403, 404}:
-            return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
-        locale = request.state.locale
+            return await http_exception_handler(request, exc)
+        locale = getattr(request.state, "locale", settings.default_locale)
         if exc.status_code == 403:
             title = gettext("Access denied", locale)
             message = gettext("You do not have permission to view this page.", locale)
         else:
             title = gettext("Page not found", locale)
             message = gettext("The page you requested could not be found.", locale)
-        template_name = (
-            "errors/fragment.html" if request.headers.get("hx-request") else "errors/page.html"
-        )
-        return render_template(
+        is_fragment = _is_htmx_fragment_request(request)
+        template_name = "errors/fragment.html" if is_fragment else "errors/page.html"
+        response = render_template(
             request,
             template_name,
             context={
@@ -91,32 +91,45 @@ def create_app(
             },
             status_code=exc.status_code,
         )
+        if exc.headers:
+            response.headers.update(exc.headers)
+        _add_error_response_headers(response, is_fragment=is_fragment)
+        return response
 
     @app.exception_handler(Exception)
     async def handle_unexpected_error(request: Request, exc: Exception) -> Any:
-        request_id = request.state.request_id
+        request_id = getattr(request.state, "request_id", "unknown")
         logger.error(
             "unhandled_request_error request_id=%s exception_type=%s",
             request_id,
             type(exc).__name__,
+            exc_info=True,
         )
-        locale = request.state.locale
+        locale = getattr(request.state, "locale", settings.default_locale)
         title = gettext("Something went wrong", locale)
         message = gettext("An unexpected error occurred. Please try again.", locale)
-        template_name = (
-            "errors/fragment.html" if request.headers.get("hx-request") else "errors/page.html"
-        )
-        response = render_template(
-            request,
-            template_name,
-            context={
-                "app_name": APP_NAME,
-                "title": title,
-                "message": message,
-                "status_code": 500,
-            },
-            status_code=500,
-        )
+        is_fragment = _is_htmx_fragment_request(request)
+        try:
+            template_name = "errors/fragment.html" if is_fragment else "errors/page.html"
+            response = render_template(
+                request,
+                template_name,
+                context={
+                    "app_name": APP_NAME,
+                    "title": title,
+                    "message": message,
+                    "status_code": 500,
+                },
+                status_code=500,
+            )
+        except Exception:
+            response = PlainTextResponse(
+                "An unexpected error occurred.",
+                status_code=500,
+                headers={"x-request-id": request_id},
+            )
+        _add_error_response_headers(response, is_fragment=is_fragment)
+        response.headers["x-request-id"] = request_id
         add_security_headers(response)
         return response
 
@@ -134,3 +147,20 @@ def create_app(
         )
 
     return app
+
+
+def _is_htmx_fragment_request(request: Request) -> bool:
+    headers = request.headers
+    return (
+        headers.get("hx-request", "").lower() == "true"
+        and headers.get("hx-boosted", "").lower() != "true"
+        and headers.get("hx-history-restore-request", "").lower() != "true"
+    )
+
+
+def _add_error_response_headers(response: Response, *, is_fragment: bool) -> None:
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Vary"] = "Accept-Language, HX-Request"
+    if is_fragment:
+        response.headers["HX-Retarget"] = "#main-content"
+        response.headers["HX-Reswap"] = "innerHTML"
