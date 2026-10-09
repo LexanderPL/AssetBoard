@@ -86,7 +86,9 @@ class Money:
             amount_minor = int(rounded.scaleb(minor_unit))
         return cls(amount_minor, currency)
 
-    def to_decimal(self, minor_unit: int = 2) -> Decimal:
+    def to_decimal(self, minor_unit: int | None = None) -> Decimal:
+        if minor_unit is None:
+            minor_unit = minor_unit_for(self.currency)
         if type(minor_unit) is not int or not 0 <= minor_unit <= 18:
             raise ValueError("minor_unit must be an integer between 0 and 18")
         return Decimal(self.amount_minor).scaleb(-minor_unit)

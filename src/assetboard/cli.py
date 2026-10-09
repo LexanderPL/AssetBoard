@@ -5,7 +5,7 @@ import typer
 from assetboard.app import create_app
 from assetboard.branding import APP_NAME, CLI_NAME
 from assetboard.config import Settings
-from assetboard.db.migrations import check_database_migrations, create_revision, upgrade_database
+from assetboard.db.migrate import check_database_migrations, create_revision, upgrade_database
 
 app = typer.Typer(name=CLI_NAME, help=f"{APP_NAME} command-line interface")
 
@@ -35,7 +35,7 @@ def check_migrations() -> None:
     check_database_migrations(Settings())
 
 
-@app.command()
+@app.command(hidden=True)
 def revision(message: str = typer.Option(..., "--message", "-m")) -> None:
     """Create an autogenerate migration after validating the current schema."""
     create_revision(Settings(), message)

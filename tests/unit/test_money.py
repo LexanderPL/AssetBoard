@@ -64,6 +64,23 @@ def test_money_supports_explicit_currency_scale_and_validates_currency() -> None
         Money(100, None)  # type: ignore[arg-type]
 
 
+@pytest.mark.parametrize(
+    ("amount", "currency"),
+    [
+        (Decimal("123.45"), "EUR"),
+        (Decimal("-123"), "JPY"),
+        (Decimal("1.234"), "KWD"),
+    ],
+)
+def test_from_decimal_to_decimal_round_trip_for_currency_minor_units(
+    amount: Decimal,
+    currency: str,
+) -> None:
+    money = Money.from_decimal(amount, currency)
+
+    assert money.to_decimal() == amount
+
+
 def test_money_rounding_uses_local_decimal_precision() -> None:
     with localcontext() as context:
         context.prec = 2

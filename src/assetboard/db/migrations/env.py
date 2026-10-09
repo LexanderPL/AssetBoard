@@ -1,31 +1,15 @@
 from __future__ import annotations
 
-from typing import Any, Literal
-
 from alembic import context
-from alembic.autogenerate.api import AutogenContext
 from sqlalchemy.engine import Connection, make_url
 
 import assetboard.db.models  # noqa: F401
 from assetboard.db.base import Base
 from assetboard.db.engine import create_database_engine
-from assetboard.db.migrations import configured_database_url
-from assetboard.db.types import DecimalType, UtcDateTime
+from assetboard.db.migrate import configured_database_url, render_item
 
 config = context.config
 target_metadata = Base.metadata
-
-
-def render_item(
-    item_type: str,
-    item: Any,
-    autogen_context: AutogenContext,
-) -> str | Literal[False]:
-    if item_type == "type" and isinstance(item, (DecimalType, UtcDateTime)):
-        type_name = type(item).__name__
-        autogen_context.imports.add(f"from assetboard.db.types import {type_name}")
-        return f"{type_name}()"
-    return False
 
 
 def run_migrations_offline() -> None:

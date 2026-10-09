@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, MetaData, Uuid, event
+from sqlalchemy import ForeignKey, MetaData, Uuid, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
 from assetboard.clock import Clock
@@ -32,7 +32,7 @@ class TimestampMixin:
 
 
 class SoftDeleteMixin:
-    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
 
 class WorkspaceScopedMixin:
@@ -65,7 +65,9 @@ def set_timestamps_from_clock(
     now = clock.now().astimezone(UTC)
 
     for obj in new_objects:
-        obj.created_at = now
-        obj.updated_at = now
+        if obj.created_at is None:
+            obj.created_at = now
+        if obj.updated_at is None:
+            obj.updated_at = now
     for obj in dirty_objects:
         obj.updated_at = now

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
+from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
 from uuid import uuid4
@@ -29,19 +30,16 @@ from assetboard.domain.money import Money
 
 
 class ScratchBase(DeclarativeBase):
-    __test__ = False
     metadata = MetaData(naming_convention=CONSTRAINT_NAMING_CONVENTION)
 
 
 class ScratchWorkspace(ScratchBase, IdMixin, TimestampMixin):
-    __test__ = False
     __tablename__ = "workspaces"
 
     name: Mapped[str] = mapped_column(String(80), nullable=False)
 
 
 class ScratchRecord(ScratchBase, IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin):
-    __test__ = False
     __tablename__ = "scratch_records"
 
     amount_minor: Mapped[int] = mapped_column(Integer, nullable=False)
@@ -132,6 +130,7 @@ def test_base_and_mixins_have_stable_constraints_and_uuid_keys(
     assert reloaded.created_at.utcoffset() is not None
     assert reloaded.updated_at.utcoffset() is not None
     assert reloaded.deleted_at is None
+    assert isinstance(ScratchRecord.__table__.c.deleted_at.type, UtcDateTime)
 
 
 def test_timestamp_updated_at_uses_injected_clock(scratch_session, fixed_clock) -> None:
@@ -158,6 +157,27 @@ def test_timestamp_updated_at_uses_injected_clock(scratch_session, fixed_clock) 
     assert reloaded.created_at == fixed_clock.now()
     assert reloaded.updated_at == later_clock.now()
     assert reloaded.updated_at > created_at
+
+
+def test_timestamp_listener_preserves_explicit_insert_timestamps(scratch_session) -> None:
+    workspace = ScratchWorkspace(name="Synthetic workspace")
+    scratch_session.add(workspace)
+    scratch_session.flush()
+    created_at = datetime.fromisoformat("2025-12-31T12:00:00+00:00")
+    updated_at = datetime.fromisoformat("2026-01-01T12:00:00+00:00")
+    record = ScratchRecord(
+        workspace_id=workspace.id,
+        amount=Money(1, "EUR"),
+        quantity=Decimal("1"),
+        created_at=created_at,
+        updated_at=updated_at,
+    )
+
+    scratch_session.add(record)
+    scratch_session.flush()
+
+    assert record.created_at == created_at
+    assert record.updated_at == updated_at
 
 
 def test_workspace_scoped_mixin_enforces_foreign_key(scratch_session) -> None:
@@ -253,10 +273,10 @@ def test_decimal_type_rejects_values_outside_portable_precision() -> None:
 def test_utc_datetime_rejects_naive_values_and_returns_aware_utc() -> None:
     utc_type = UtcDateTime()
     with pytest.raises(ValueError, match="timezone-aware"):
-        utc_type.process_bind_param(__import__("datetime").datetime(2026, 1, 1), sqlite.dialect())
+        utc_type.process_bind_param(datetime(2026, 1, 1), sqlite.dialect())
 
     loaded = utc_type.process_result_value(
-        __import__("datetime").datetime(2026, 1, 1),
+        datetime(2026, 1, 1),
         sqlite.dialect(),
     )
     assert loaded is not None

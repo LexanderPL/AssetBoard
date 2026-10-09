@@ -4,10 +4,13 @@ import asyncio
 from importlib.metadata import version
 from pathlib import Path
 
+from alembic.runtime.migration import MigrationContext
+from alembic.script import ScriptDirectory
 from fastapi.testclient import TestClient
 
 from assetboard.app import create_app
 from assetboard.config import Settings
+from assetboard.db.migrate import alembic_config
 
 
 def test_app_factory_ensures_secret_key_after_setup() -> None:
@@ -23,7 +26,8 @@ def test_app_factory_ensures_secret_key_after_setup() -> None:
 
 
 def test_app_runs_migrations_during_lifespan_not_factory(tmp_path: Path) -> None:
-    app = create_app(Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret"))
+    settings = Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret")
+    app = create_app(settings)
     engine = app.state.database_engine
 
     with engine.connect() as connection:
@@ -38,8 +42,10 @@ def test_app_runs_migrations_during_lifespan_not_factory(tmp_path: Path) -> None
         version_rows = (
             connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalars().all()
         )
+        current_heads = MigrationContext.configure(connection).get_current_heads()
 
-    assert version_rows == ["0001_f03"]
+    assert current_heads == tuple(ScriptDirectory.from_config(alembic_config(settings)).get_heads())
+    assert version_rows == list(current_heads)
 
 
 def test_health_endpoints_report_process_and_database() -> None:

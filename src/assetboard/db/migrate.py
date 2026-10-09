@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from typing import Any, Literal
 
 from alembic import command
+from alembic.autogenerate.api import AutogenContext
 from alembic.config import Config
 
 from assetboard.config import Settings
+from assetboard.db.types import DecimalType, UtcDateTime
 
 
 def alembic_config(settings: Settings) -> Config:
@@ -18,7 +21,9 @@ def alembic_config(settings: Settings) -> Config:
 
 
 def configured_database_url(config: Config) -> str:
-    settings = config.attributes["settings"]
+    settings = config.attributes.get("settings")
+    if settings is None:
+        settings = Settings()
     database_url = settings.database_url
     if database_url is None:
         raise ValueError("DATABASE_URL was not configured")
@@ -44,3 +49,15 @@ def create_revision(settings: Settings, message: str) -> None:
         )
         upgrade_database(scratch_settings)
         command.revision(alembic_config(scratch_settings), message=message, autogenerate=True)
+
+
+def render_item(
+    item_type: str,
+    item: Any,
+    autogen_context: AutogenContext,
+) -> str | Literal[False]:
+    if item_type == "type" and isinstance(item, (DecimalType, UtcDateTime)):
+        type_name = type(item).__name__
+        autogen_context.imports.add(f"from assetboard.db.types import {type_name}")
+        return f"{type_name}()"
+    return False

@@ -12,7 +12,7 @@ from assetboard.branding import APP_NAME, ENV_PREFIX
 from assetboard.clock import FixedClock
 from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine
-from assetboard.db.migrations import upgrade_database
+from assetboard.db.migrate import upgrade_database
 
 
 @pytest.fixture(autouse=True)

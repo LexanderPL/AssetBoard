@@ -24,6 +24,7 @@ def test_assetboard_console_script_help_runs() -> None:
     assert result.returncode == 0
     assert "serve" in result.stdout
     assert "migrate" in result.stdout
+    assert "revision" not in result.stdout
 
 
 def test_assetboard_module_help_runs() -> None:
@@ -37,6 +38,7 @@ def test_assetboard_module_help_runs() -> None:
     assert result.returncode == 0
     assert "serve" in result.stdout
     assert "migrate" in result.stdout
+    assert "revision" not in result.stdout
 
 
 def test_migrate_runs_upgrade_in_configured_data_directory(tmp_path: Path) -> None:

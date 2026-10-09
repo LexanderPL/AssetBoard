@@ -9,7 +9,7 @@ from sqlalchemy import inspect
 
 from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine
-from assetboard.db.migrations import (
+from assetboard.db.migrate import (
     alembic_config,
     check_database_migrations,
     create_revision,
@@ -32,7 +32,6 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
     finally:
         engine.dispose()
 
-    assert "alembic_version" in tables
     assert tables == {"alembic_version"}
     assert current_heads == tuple(ScriptDirectory.from_config(alembic_config(settings)).get_heads())
     config = alembic_config(settings)
@@ -56,7 +55,7 @@ def test_create_revision_migrates_a_temporary_database_first(tmp_path, monkeypat
         assert autogenerate
         calls.append(("revision", scratch_settings.database_url))
 
-    monkeypatch.setattr("assetboard.db.migrations.upgrade_database", fake_upgrade)
+    monkeypatch.setattr("assetboard.db.migrate.upgrade_database", fake_upgrade)
     monkeypatch.setattr(command, "revision", fake_revision)
     original_database_url = settings.database_url
 

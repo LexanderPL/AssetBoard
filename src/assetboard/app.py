@@ -12,7 +12,7 @@ from starlette.responses import JSONResponse
 from assetboard.branding import APP_NAME
 from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine, database_is_ready
-from assetboard.db.migrations import upgrade_database
+from assetboard.db.migrate import upgrade_database
 from assetboard.logging import configure_logging
 from assetboard.middleware import RequestIdMiddleware
 
