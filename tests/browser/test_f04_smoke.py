@@ -53,7 +53,7 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
     @app.post("/_smoke/plain")
     async def plain_confirmed() -> HTMLResponse:
         request_log.append("plain")
-        return HTMLResponse("Plain form confirmed")
+        return HTMLResponse("<!doctype html><html><body>Plain form confirmed</body></html>")
 
     @app.get("/_smoke/toast")
     async def toast_response() -> HTMLResponse:
@@ -106,9 +106,8 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
                       <button id="smoke-hx-submit" type="submit">Submit HX form</button>
                     </form>
                     <div id="smoke-form-result"></div>
-                    <iframe id="smoke-frame" name="smoke-frame"></iframe>
                     <form id="smoke-plain-form" method="post" action="/_smoke/plain"
-                      target="smoke-frame" data-confirm="Proceed with plain form?">
+                      target="_blank" data-confirm="Proceed with plain form?">
                       <button id="smoke-plain-submit" type="submit">Submit plain form</button>
                     </form>
                     <button id="smoke-toast-trigger" hx-get="/_smoke/toast">Toast</button>
@@ -148,10 +147,10 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
 
             page.locator("#smoke-plain-submit").click()
             expect(dialog).to_be_visible()
-            page.get_by_role("button", name="Continue").click()
-            expect(page.frame_locator("#smoke-frame").locator("body")).to_have_text(
-                "Plain form confirmed"
-            )
+            with context.expect_page() as plain_page_info:
+                page.get_by_role("button", name="Continue").click()
+            plain_page = plain_page_info.value
+            expect(plain_page.locator("body")).to_have_text("Plain form confirmed")
             assert request_log.count("plain") == 1
 
             page.evaluate(
