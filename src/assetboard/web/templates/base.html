@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light dark">
-  <meta name="htmx-config" content='{"allowEval":false,"includeIndicatorStyles":false,"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":true,"error":false}]}' />
+  <meta name="htmx-config" content='{"allowEval":false,"allowScriptTags":false,"includeIndicatorStyles":false,"responseHandling":[{"code":"204","swap":false},{"code":"[23]..","swap":true},{"code":"[45]..","swap":true,"error":true}]}' />
   <title>{% block title %}{{ app_name }}{% endblock %}</title>
   <link rel="stylesheet" href="{{ static_url(request, 'css/app.css') }}">
   <script src="{{ static_url(request, 'js/theme.js') }}"></script>
@@ -16,7 +16,7 @@
   {% from "macros/components.html" import confirm_dialog, flashes %}
   <div class="min-h-screen lg:flex">
     <aside class="border-b border-line bg-white px-4 py-4 dark:border-slate-800 dark:bg-slate-900 lg:flex lg:w-64 lg:flex-col lg:border-b-0 lg:border-r lg:px-5 lg:py-6">
-      <a href="{{ request.app.url_path_for('home') }}" class="flex items-center gap-3 px-2" aria-label="{{ _('Home') }}">
+      <a href="{{ scoped_url(request, 'home') }}" class="flex items-center gap-3 px-2" aria-label="{{ _('Home') }}">
         <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-lg font-bold text-white" aria-hidden="true">A</span>
         <span class="text-lg font-semibold tracking-tight">{{ app_name }}</span>
       </a>
@@ -61,10 +61,10 @@
         </header>
         {{ flashes() }}
         {% block content %}{% endblock %}
-        <div id="toast-container" class="fixed bottom-5 right-5 z-50 w-[min(24rem,calc(100vw-2.5rem))] space-y-2"></div>
-        {{ confirm_dialog("confirm-dialog", _("Are you sure?"), _("This action cannot be undone."), _("Continue"), _("Cancel")) }}
       </div>
     </main>
   </div>
+  <div id="toast-container" class="fixed bottom-5 right-5 z-50 w-[min(24rem,calc(100vw-2.5rem))] space-y-2"></div>
+  {{ confirm_dialog("confirm-dialog", _("Are you sure?"), _("This action cannot be undone."), _("Continue"), _("Cancel")) }}
 </body>
 </html>

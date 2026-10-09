@@ -124,8 +124,12 @@ def test_root_renders_translatable_shell_and_local_assets() -> None:
     assert '<html lang="pl" class="h-full">' in response.text
     assert "Podsumowanie miesiąca" in response.text
     assert '"allowEval":false' in response.text
+    assert '"allowScriptTags":false' in response.text
     assert '"includeIndicatorStyles":false' in response.text
-    assert '"code":"[45]..","swap":true,"error":false' in response.text
+    assert '"code":"[45]..","swap":true,"error":true' in response.text
+    assert "</main>" in response.text
+    assert response.text.index("</main>") < response.text.index('id="toast-container"')
+    assert response.text.index("</main>") < response.text.index('<dialog id="confirm-dialog"')
     asset_urls = re.findall(r'(?:src|href)="([^"]+)"', response.text)
     local_assets = [url for url in asset_urls if url.startswith("/static/")]
     assert len(local_assets) == 5
@@ -190,11 +194,11 @@ def test_http_errors_are_localized_and_htmx_aware() -> None:
     assert "Nie masz uprawnień" in forbidden_response.text
     assert "<!doctype html>" in forbidden_response.text.lower()
     assert partial_response.status_code == 404
-    assert '<div role="alert"' in partial_response.text
+    assert '<div data-toast role="alert"' in partial_response.text
     assert "Nie znaleziono strony" in partial_response.text
     assert "<!doctype html>" not in partial_response.text.lower()
-    assert partial_response.headers["hx-retarget"] == "#main-content"
-    assert partial_response.headers["hx-reswap"] == "innerHTML"
+    assert partial_response.headers["hx-retarget"] == "#toast-container"
+    assert partial_response.headers["hx-reswap"] == "beforeend"
     assert "hx-request" in partial_response.headers["vary"].lower()
     assert "accept-language" in partial_response.headers["vary"].lower()
     assert partial_response.headers["cache-control"] == "no-store"
@@ -208,8 +212,8 @@ def test_http_errors_are_localized_and_htmx_aware() -> None:
     assert "<!doctype html>" in server_error.text.lower()
     assert partial_server_error.status_code == 500
     assert "Wystąpił nieoczekiwany błąd" in partial_server_error.text
-    assert '<div role="alert"' in partial_server_error.text
-    assert partial_server_error.headers["hx-retarget"] == "#main-content"
+    assert '<div data-toast role="alert"' in partial_server_error.text
+    assert partial_server_error.headers["hx-retarget"] == "#toast-container"
     assert "<!doctype html>" not in partial_server_error.text.lower()
     assert other_http_error.status_code == 418
     assert other_http_error.json() == {"detail": "Teapot"}
@@ -240,3 +244,17 @@ def test_500_uses_plain_text_fallback_when_template_rendering_fails(
     assert response.headers["content-type"].startswith("text/plain")
     assert response.headers["x-request-id"] == "fallback-id"
     assert response.headers["cache-control"] == "no-store"
+
+
+def test_static_and_home_urls_include_root_path() -> None:
+    app = create_app(Settings(_env_file=None, secret_key="test-secret", auto_migrate=False))
+
+    with TestClient(app, root_path="/x") as client:
+        response = client.get("/")
+        missing = client.get("/missing")
+
+    assert response.status_code == 200
+    assert 'href="/x/"' in response.text
+    assert 'href="/x/static/css/app.css?v=' in response.text
+    assert missing.status_code == 404
+    assert 'href="/x/"' in missing.text

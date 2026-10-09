@@ -23,12 +23,18 @@ def templates_for(locale: str) -> Jinja2Templates:
     translations = translations_for(locale)
     cast(Any, templates.env).install_gettext_translations(translations, newstyle=True)
     templates.env.globals.update(Money=Money, format_money=format_money)
-    templates.env.globals.update(static_url=static_url, uuid4=uuid4)
+    templates.env.globals.update(static_url=static_url, scoped_url=scoped_url, uuid4=uuid4)
     return templates
 
 
+def scoped_url(request: Request, route_name: str, **path_params: str) -> str:
+    route_path = request.app.url_path_for(route_name, **path_params)
+    root_path = request.scope.get("root_path", "").rstrip("/")
+    return f"{root_path}{route_path}"
+
+
 def static_url(request: Request, path: str) -> str:
-    return f"{request.app.url_path_for('static', path=path)}?v={request.app.version}"
+    return f"{scoped_url(request, 'static', path=path)}?v={request.app.version}"
 
 
 def render_template(

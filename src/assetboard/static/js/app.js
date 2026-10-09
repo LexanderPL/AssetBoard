@@ -22,39 +22,99 @@ document.addEventListener("click", (event) => {
   if (accept) accept.closest("dialog")?.close("confirm");
 });
 
-const toastTimers = new WeakSet();
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  const dialog = document.getElementById("confirm-dialog");
+  if (!(dialog instanceof HTMLDialogElement) || !dialog.open) return;
+  event.preventDefault();
+  dialog.close("cancel");
+});
+
+const toastTimers = new WeakMap();
 
 function startToastTimer(toast) {
-  if (!(toast instanceof Element) || !toast.matches("[data-toast]") || toastTimers.has(toast)) {
+  if (!(toast instanceof HTMLElement) || !toast.matches("[data-toast]") || toastTimers.has(toast)) {
     return;
   }
-  toastTimers.add(toast);
-  window.setTimeout(() => toast.remove(), 5000);
+  const remaining = toast.querySelector("[data-toast-undo]") ? 10000 : 5000;
+  const timer = { remaining, startedAt: 0, timeoutId: 0 };
+  const pauseReasons = new Set();
+  const resume = () => {
+    if (timer.timeoutId || timer.remaining <= 0 || pauseReasons.size > 0) return;
+    timer.startedAt = Date.now();
+    timer.timeoutId = window.setTimeout(() => toast.remove(), timer.remaining);
+  };
+  const pause = (reason) => {
+    pauseReasons.add(reason);
+    if (!timer.timeoutId) return;
+    window.clearTimeout(timer.timeoutId);
+    timer.timeoutId = 0;
+    timer.remaining -= Date.now() - timer.startedAt;
+  };
+  const unpause = (reason) => {
+    pauseReasons.delete(reason);
+    resume();
+  };
+  toast.addEventListener("mouseenter", () => pause("hover"));
+  toast.addEventListener("mouseleave", () => unpause("hover"));
+  toast.addEventListener("focusin", () => pause("focus"));
+  toast.addEventListener("focusout", (event) => {
+    if (!toast.contains(event.relatedTarget)) unpause("focus");
+  });
+  toastTimers.set(toast, timer);
+  resume();
 }
 
 document.querySelectorAll("[data-toast]").forEach(startToastTimer);
-document.addEventListener("htmx:oobAfterSwap", (event) => {
-  event.detail?.target?.querySelectorAll("[data-toast]").forEach(startToastTimer);
-});
+for (const eventName of ["htmx:oobAfterSwap", "htmx:afterSwap"]) {
+  document.addEventListener(eventName, (event) => {
+    const target = event.detail?.target;
+    if (target instanceof Element && target.matches("[data-toast]")) startToastTimer(target);
+    target?.querySelectorAll("[data-toast]").forEach(startToastTimer);
+  });
+}
 
-document.addEventListener("htmx:confirm", (event) => {
-  const form = event.target;
-  if (!(form instanceof HTMLFormElement) || !form.dataset.confirm) return;
-  event.preventDefault();
+const confirmedPlainForms = new WeakSet();
+
+function showConfirmation(message, onConfirm) {
   const dialog = document.getElementById("confirm-dialog");
   if (!(dialog instanceof HTMLDialogElement)) return;
-  const message = dialog.querySelector("[data-confirm-message]");
-  if (message) message.textContent = form.dataset.confirm;
-  const issueRequest = event.detail.issueRequest;
+  const messageElement = dialog.querySelector("[data-confirm-message]");
+  if (messageElement) messageElement.textContent = message;
   dialog.addEventListener(
     "close",
     () => {
-      if (dialog.returnValue === "confirm") {
-        issueRequest(true);
-      }
+      if (dialog.returnValue === "confirm") onConfirm();
     },
     { once: true },
   );
   dialog.returnValue = "";
   dialog.showModal();
+}
+
+document.addEventListener("htmx:confirm", (event) => {
+  const trigger = event.target;
+  if (!(trigger instanceof Element)) return;
+  const message = trigger.getAttribute("data-confirm");
+  if (message === null) return;
+  event.preventDefault();
+  showConfirmation(message, () => event.detail.issueRequest(true));
+});
+
+document.addEventListener("submit", (event) => {
+  const form = event.target;
+  if (!(form instanceof HTMLFormElement) || !form.dataset.confirm) return;
+  const hasHxAttributes = Array.from(form.attributes).some(
+    ({ name }) => name.startsWith("hx-") || name.startsWith("data-hx-"),
+  );
+  if (hasHxAttributes) return;
+  if (confirmedPlainForms.has(form)) {
+    confirmedPlainForms.delete(form);
+    return;
+  }
+  event.preventDefault();
+  showConfirmation(form.dataset.confirm, () => {
+    confirmedPlainForms.add(form);
+    form.requestSubmit();
+  });
 });

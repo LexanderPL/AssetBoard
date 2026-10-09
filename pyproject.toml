@@ -34,6 +34,7 @@ test = [
     "pyyaml>=6,<7",
     "types-pyyaml>=6,<7",
     "httpx>=0.28,<1",
+    "playwright>=1.51,<2",
 ]
 
 [tool.uv]

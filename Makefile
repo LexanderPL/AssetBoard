@@ -58,13 +58,13 @@ revision:
 
 i18n-extract:
 	mkdir -p locales
-	$(UV) run pybabel extract -F babel.cfg -k _ -k gettext \
+	$(UV) run pybabel extract --no-location -F babel.cfg -k _ -k gettext \
 		-o locales/messages.pot src/assetboard
 
 i18n-update:
 	$(MAKE) i18n-extract
-	$(UV) run pybabel update -i locales/messages.pot -d src/assetboard/locales -l en
-	$(UV) run pybabel update -i locales/messages.pot -d src/assetboard/locales -l pl
+	$(UV) run pybabel update --ignore-pot-creation-date -i locales/messages.pot -d src/assetboard/locales -l en
+	$(UV) run pybabel update --ignore-pot-creation-date -i locales/messages.pot -d src/assetboard/locales -l pl
 
 i18n-compile:
 	$(UV) run pybabel compile -d src/assetboard/locales

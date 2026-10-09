@@ -1,5 +1,3 @@
-exclude: ^\.vscode/
-
 repos:
   - repo: local
     hooks:

@@ -3,35 +3,46 @@ from __future__ import annotations
 from decimal import Decimal
 
 import pytest
+from babel.numbers import format_decimal
+from hypothesis import given
+from hypothesis import strategies as st
 
 from assetboard.domain.money import Money
 from assetboard.i18n.locale import resolve_locale
 from assetboard.i18n.numbers import format_money, parse_amount
 
 
+@pytest.mark.parametrize("locale", ["en", "pl", "de"])
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("12,5", Decimal("12.5")),
+        ("12,50", Decimal("12.50")),
+        ("1 234,56", Decimal("1234.56")),
+        ("12.50", Decimal("12.50")),
+    ],
+)
+def test_parse_amount_accepts_spec_examples_for_each_locale(
+    text: str, expected: Decimal, locale: str
+) -> None:
+    assert parse_amount(text, locale) == expected
+
+
 @pytest.mark.parametrize(
     ("text", "locale", "expected"),
     [
-        ("1 234,56", "pl", Decimal("1234.56")),
         ("1.234,56", "de-DE", Decimal("1234.56")),
         ("1,234.56", "en-US", Decimal("1234.56")),
-        ("1.234", "en", Decimal("1.234")),
         ("1,234", "en", Decimal("1234")),
         ("1.234", "de-DE", Decimal("1234")),
-        ("12,5", "pl", Decimal("12.5")),
+        ("12,500", "pl", Decimal("12.500")),
         ("-3", "en", Decimal("-3")),
-        ("1 234,56", "pl", Decimal("1234.56")),
-        ("1.234,56", "pl", Decimal("1234.56")),
-        ("1,234.56", "pl", Decimal("1234.56")),
-        ("12,5", "pl", Decimal("12.5")),
         ("+3", "pl", Decimal("3")),
         ("−3", "pl", Decimal("-3")),
     ],
 )
-def test_parse_amount_uses_locale_separators(
-    text: str,
-    locale: str,
-    expected: Decimal,
+def test_parse_amount_uses_locale_separator_convention(
+    text: str, locale: str, expected: Decimal
 ) -> None:
     assert parse_amount(text, locale) == expected
 
@@ -40,6 +51,20 @@ def test_parse_amount_uses_locale_separators(
 def test_parse_amount_rejects_invalid_or_non_finite_input(text: str) -> None:
     with pytest.raises(ValueError, match="valid amount"):
         parse_amount(text, "en")
+
+
+@pytest.mark.parametrize("locale", ["en", "pl", "de"])
+@given(
+    amount=st.decimals(
+        min_value=Decimal("-9999999.99"),
+        max_value=Decimal("9999999.99"),
+        places=2,
+    )
+)
+def test_parse_amount_round_trips_babel_formatting(locale: str, amount: Decimal) -> None:
+    formatted = format_decimal(amount, locale=locale, decimal_quantization=False)
+
+    assert parse_amount(formatted, locale) == amount
 
 
 @pytest.mark.parametrize(

@@ -101,16 +101,26 @@ def parse_amount(text: str, locale: str) -> Decimal:
                 if not fraction.isascii() or not fraction.isdigit():
                     raise ValueError
                 normalized_text = integer_part + "." + fraction
-            elif separator == group_symbol:
-                if not _grouped_integer(normalized_text, separator):
+            elif count > 1:
+                if separator != group_symbol or not _grouped_integer(normalized_text, separator):
                     raise ValueError
                 normalized_text = normalized_text.replace(separator, "")
             else:
                 integer_part, fraction = normalized_text.split(separator, maxsplit=1)
                 if not fraction.isascii() or not fraction.isdigit():
                     raise ValueError
-                integer_part = _remove_space_groups(integer_part)
-                normalized_text = integer_part + "." + fraction
+                if len(fraction) == 3:
+                    if separator == group_symbol and _grouped_integer(normalized_text, separator):
+                        normalized_text = normalized_text.replace(separator, "")
+                    elif separator == decimal_symbol:
+                        normalized_text = integer_part + "." + fraction
+                    else:
+                        raise ValueError
+                elif separator == group_symbol and len(fraction) != 1 and len(fraction) != 2:
+                    raise ValueError
+                else:
+                    integer_part = _remove_space_groups(integer_part)
+                    normalized_text = integer_part + "." + fraction
         else:
             normalized_text = _remove_space_groups(normalized_text)
 

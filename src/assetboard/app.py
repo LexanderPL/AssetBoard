@@ -162,5 +162,5 @@ def _add_error_response_headers(response: Response, *, is_fragment: bool) -> Non
     response.headers["Cache-Control"] = "no-store"
     response.headers["Vary"] = "Accept-Language, HX-Request"
     if is_fragment:
-        response.headers["HX-Retarget"] = "#main-content"
-        response.headers["HX-Reswap"] = "innerHTML"
+        response.headers["HX-Retarget"] = "#toast-container"
+        response.headers["HX-Reswap"] = "beforeend"
