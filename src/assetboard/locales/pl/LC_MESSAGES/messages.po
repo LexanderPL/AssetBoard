@@ -1,0 +1,184 @@
+
+msgid ""
+msgstr ""
+"Project-Id-Version:  AssetBoard\n"
+"Report-Msgid-Bugs-To: EMAIL@ADDRESS\n"
+"POT-Creation-Date: 2026-10-09 14:36+0200\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language: pl\n"
+"Language-Team: pl <LL@li.org>\n"
+"Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && "
+"(n%100<12 || n%100>14) ? 1 : 2);\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=utf-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Generated-By: Babel 2.18.0\n"
+
+#: src/assetboard/app.py:75
+msgid "Access denied"
+msgstr "Brak dostępu"
+
+#: src/assetboard/app.py:76
+msgid "You do not have permission to view this page."
+msgstr "Nie masz uprawnień do wyświetlenia tej strony."
+
+#: src/assetboard/app.py:78
+msgid "Page not found"
+msgstr "Nie znaleziono strony"
+
+#: src/assetboard/app.py:79
+msgid "The page you requested could not be found."
+msgstr "Nie można znaleźć wskazanej strony."
+
+#: src/assetboard/app.py:104
+msgid "Something went wrong"
+msgstr "Coś poszło nie tak"
+
+#: src/assetboard/app.py:105
+msgid "An unexpected error occurred. Please try again."
+msgstr "Wystąpił nieoczekiwany błąd. Spróbuj ponownie."
+
+#: src/assetboard/web/numbers.py:28
+msgid "Enter a valid amount."
+msgstr "Podaj prawidłową kwotę."
+
+#: src/assetboard/web/templates/base.html:18
+msgid "Home"
+msgstr "Strona główna"
+
+#: src/assetboard/web/templates/base.html:22
+msgid "Main navigation"
+msgstr "Menu główne"
+
+#: src/assetboard/web/templates/base.html:23
+msgid "Month"
+msgstr "Miesiąc"
+
+#: src/assetboard/web/templates/base.html:24
+msgid "Recurring"
+msgstr "Cykliczne"
+
+#: src/assetboard/web/templates/base.html:25
+msgid "Net worth"
+msgstr "Majątek netto"
+
+#: src/assetboard/web/templates/base.html:26
+msgid "Investments"
+msgstr "Inwestycje"
+
+#: src/assetboard/web/templates/base.html:27
+msgid "Loans"
+msgstr "Kredyty"
+
+#: src/assetboard/web/templates/base.html:28
+msgid "FIRE projection"
+msgstr "Prognoza FIRE"
+
+#: src/assetboard/web/templates/base.html:28
+msgid "Unavailable"
+msgstr "Niedostępne"
+
+#: src/assetboard/web/templates/base.html:35
+msgid "Your account"
+msgstr "Twoje konto"
+
+#: src/assetboard/web/templates/base.html:36
+msgid "Personal workspace"
+msgstr "Przestrzeń osobista"
+
+#: src/assetboard/web/templates/base.html:41
+msgid "Account settings"
+msgstr "Ustawienia konta"
+
+#: src/assetboard/web/templates/base.html:42
+msgid "Sign out"
+msgstr "Wyloguj się"
+
+#: src/assetboard/web/templates/base.html:45
+msgid "Toggle dark mode"
+msgstr "Przełącz tryb ciemny"
+
+#: src/assetboard/web/templates/base.html:54
+msgid "Personal finance"
+msgstr "Finanse osobiste"
+
+#: src/assetboard/web/templates/base.html:55
+msgid "Your overview"
+msgstr "Podsumowanie"
+
+#: src/assetboard/web/templates/base.html:58
+msgid "Workspace"
+msgstr "Przestrzeń"
+
+#: src/assetboard/web/templates/base.html:58
+msgid "Personal"
+msgstr "Osobista"
+
+#: src/assetboard/web/templates/base.html:64
+msgid "Are you sure?"
+msgstr "Czy na pewno?"
+
+#: src/assetboard/web/templates/base.html:64
+msgid "This action cannot be undone."
+msgstr "Tej operacji nie można cofnąć."
+
+#: src/assetboard/web/templates/base.html:64
+msgid "Continue"
+msgstr "Kontynuuj"
+
+#: src/assetboard/web/templates/base.html:64
+msgid "Cancel"
+msgstr "Anuluj"
+
+#: src/assetboard/web/templates/home.html:3
+msgid "Overview"
+msgstr "Podsumowanie"
+
+#: src/assetboard/web/templates/home.html:5
+msgid "Monthly summary"
+msgstr "Podsumowanie miesiąca"
+
+#: src/assetboard/web/templates/home.html:7
+msgid "Income"
+msgstr "Przychody"
+
+#: src/assetboard/web/templates/home.html:9
+msgid "Planned and actual amounts will appear here."
+msgstr "Zaplanowane i rzeczywiste kwoty pojawią się tutaj."
+
+#: src/assetboard/web/templates/home.html:12
+msgid "Expenses"
+msgstr "Wydatki"
+
+#: src/assetboard/web/templates/home.html:14
+msgid "Keep your monthly spending in view."
+msgstr "Śledź miesięczne wydatki."
+
+#: src/assetboard/web/templates/home.html:17
+msgid "Available"
+msgstr "Pozostało"
+
+#: src/assetboard/web/templates/home.html:19
+msgid "Income minus regular expenses."
+msgstr "Przychody pomniejszone o regularne wydatki."
+
+#: src/assetboard/web/templates/home.html:23
+msgid "Nothing to show yet"
+msgstr "Na razie brak danych"
+
+#: src/assetboard/web/templates/home.html:23
+msgid ""
+"Your monthly plan and activity will appear here once you start adding "
+"items."
+msgstr ""
+"Twój plan miesięczny i aktywność pojawią się tutaj, gdy dodasz pierwsze "
+"pozycje."
+
+#: src/assetboard/web/templates/errors/page.html:8
+msgid "Return to overview"
+msgstr "Powrót do podsumowania"
+
+#: src/assetboard/web/templates/macros/components.html:43
+msgid "Dismiss"
+msgstr "Zamknij"

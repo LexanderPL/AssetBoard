@@ -25,6 +25,7 @@ repos:
     rev: v5.0.0
     hooks:
       - id: check-added-large-files
+        exclude: ^src/assetboard/static/vendor/echarts\.min\.js$
       - id: trailing-whitespace
       - id: end-of-file-fixer
       - id: check-yaml

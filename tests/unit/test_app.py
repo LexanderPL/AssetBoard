@@ -6,6 +6,7 @@ from pathlib import Path
 
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
+from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
 from assetboard.app import create_app
@@ -104,3 +105,51 @@ def test_readyz_runs_synchronous_checker_in_threadpool() -> None:
         response = client.get("/readyz")
 
     assert response.status_code == 200
+
+
+def test_root_renders_translatable_shell_and_local_assets() -> None:
+    app = create_app(
+        Settings(_env_file=None, secret_key="test-secret", auto_migrate=False),
+    )
+
+    with TestClient(app) as client:
+        response = client.get("/", headers={"accept-language": "pl-PL, en;q=0.8"})
+        htmx = client.get("/static/vendor/htmx.min.js")
+        alpine = client.get("/static/vendor/alpinejs-csp.min.js")
+        charts = client.get("/static/vendor/echarts.min.js")
+
+    assert response.status_code == 200
+    assert '<html lang="pl" class="h-full">' in response.text
+    assert "Podsumowanie miesiąca" in response.text
+    assert "cdn." not in response.text
+    assert "unsafe-inline" not in response.headers["content-security-policy"]
+    assert "unsafe-eval" not in response.headers["content-security-policy"]
+    assert response.headers["x-content-type-options"] == "nosniff"
+    assert response.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+    assert all(asset.status_code == 200 for asset in (htmx, alpine, charts))
+
+
+def test_error_pages_are_htmx_aware_and_have_security_headers() -> None:
+    app = create_app(Settings(_env_file=None, secret_key="test-secret", auto_migrate=False))
+
+    @app.get("/_test/forbidden")
+    async def forbidden() -> None:
+        raise HTTPException(status_code=403)
+
+    @app.get("/_test/error")
+    async def unexpected_error() -> None:
+        raise RuntimeError("Synthetic failure")
+
+    with TestClient(app, raise_server_exceptions=False) as client:
+        full_page = client.get("/_test/forbidden")
+        partial = client.get("/missing", headers={"HX-Request": "true"})
+        server_error = client.get("/_test/error")
+
+    assert full_page.status_code == 403
+    assert "Page not found" not in full_page.text
+    assert "<!doctype html>" in full_page.text.lower()
+    assert partial.status_code == 404
+    assert '<div role="alert"' in partial.text
+    assert "<!doctype html>" not in partial.text.lower()
+    assert server_error.status_code == 500
+    assert server_error.headers["content-security-policy"]

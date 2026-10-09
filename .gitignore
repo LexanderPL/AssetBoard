@@ -54,6 +54,7 @@ cover/
 
 # Translations
 *.mo
+!src/assetboard/locales/*/LC_MESSAGES/messages.mo
 *.pot
 
 # Django stuff:
@@ -226,6 +227,7 @@ tempCodeRunnerFile.py
 
 # Ruff stuff:
 .ruff_cache/
+.cache/
 
 # PyPI configuration file
 .pypirc
