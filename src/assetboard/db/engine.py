@@ -27,6 +27,7 @@ def create_database_engine(database_url: str) -> Engine:
 def _configure_sqlite_pragmas(engine: Engine) -> None:
     @event.listens_for(engine, "connect")
     def set_pragmas(connection: object, record: object) -> None:
+        connection.isolation_level = None  # type: ignore[attr-defined]
         cursor = connection.cursor()  # type: ignore[attr-defined]
         try:
             cursor.execute("PRAGMA journal_mode=WAL")
@@ -35,6 +36,10 @@ def _configure_sqlite_pragmas(engine: Engine) -> None:
             cursor.execute("PRAGMA synchronous=NORMAL")
         finally:
             cursor.close()
+
+    @event.listens_for(engine, "begin")
+    def begin_transaction(connection: object) -> None:
+        connection.exec_driver_sql("BEGIN")  # type: ignore[attr-defined]
 
 
 def database_is_ready(engine: Engine) -> bool:

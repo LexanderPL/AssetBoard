@@ -20,6 +20,7 @@ planned-vs-actual, recurring items, variable income, net worth, investments, loa
 - Layers, top to bottom: `web/` (routes, templates, form handling) → `services/` (use cases) → `db/` (models, repositories). `domain/` holds **pure** logic (no I/O, no DB, no clock access): money, taxes, recurrence, amortization, portfolio math, XIRR, FIRE projection.
 - Routes never touch ORM models or sessions directly; they call services. Services receive a `Context(user, workspace, role, clock)`.
 - Every query on workspace data goes through a repository that **enforces `workspace_id`**. Never write an unscoped query on a workspace-owned table.
+- Alembic's `env.py` imports `assetboard.db.models` so every ORM model is registered in `Base.metadata` before migrations run.
 - Authorization (role checks) happens in the service layer, not only in routes.
 - Time: never call `datetime.now()` / `date.today()` in services or domain. Use the injected `Clock`.
 - External I/O (price feeds, SMTP, OIDC, notifications) sits behind interfaces with fakes for tests. **Tests must never use the network.**

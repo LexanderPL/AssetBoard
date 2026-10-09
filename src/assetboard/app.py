@@ -31,13 +31,13 @@ def create_app(
     if database_url is None:
         raise ValueError("DATABASE_URL was not configured")
     engine = create_database_engine(database_url)
-    if settings.auto_migrate:
-        upgrade_database(database_url)
     checker = database_checker or (lambda: database_is_ready(engine))
 
     @asynccontextmanager
     async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
         try:
+            if settings.auto_migrate:
+                upgrade_database(settings)
             yield
         finally:
             engine.dispose()

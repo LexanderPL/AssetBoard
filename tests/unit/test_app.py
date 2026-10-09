@@ -22,6 +22,26 @@ def test_app_factory_ensures_secret_key_after_setup() -> None:
     assert app.version == version("assetboard")
 
 
+def test_app_runs_migrations_during_lifespan_not_factory(tmp_path: Path) -> None:
+    app = create_app(Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret"))
+    engine = app.state.database_engine
+
+    with engine.connect() as connection:
+        tables = (
+            connection.exec_driver_sql("SELECT name FROM sqlite_master WHERE type='table'")
+            .scalars()
+            .all()
+        )
+    assert "alembic_version" not in tables
+
+    with TestClient(app), engine.connect() as connection:
+        version_rows = (
+            connection.exec_driver_sql("SELECT version_num FROM alembic_version").scalars().all()
+        )
+
+    assert version_rows == ["0001_f03"]
+
+
 def test_health_endpoints_report_process_and_database() -> None:
     app = create_app(
         Settings(_env_file=None, secret_key="test-secret"),

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from assetboard.branding import APP_NAME, ENV_PREFIX
 from assetboard.clock import FixedClock
+from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine
 from assetboard.db.migrations import upgrade_database
 
@@ -50,7 +51,9 @@ def isolate_application_data_dir(
 def database_engine(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Engine]:
     database_directory = tmp_path_factory.mktemp("assetboard-database")
     database_url = f"sqlite:///{database_directory / 'test.db'}"
-    upgrade_database(database_url)
+    upgrade_database(
+        Settings(_env_file=None, data_dir=database_directory, database_url=database_url)
+    )
     engine = create_database_engine(database_url)
     try:
         yield engine
@@ -59,10 +62,14 @@ def database_engine(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Engine
 
 
 @pytest.fixture
-def db_session(database_engine: Engine) -> Iterator[Session]:
+def db_session(database_engine: Engine, fixed_clock: FixedClock) -> Iterator[Session]:
     connection = database_engine.connect()
     transaction = connection.begin()
-    session = Session(bind=connection, join_transaction_mode="create_savepoint")
+    session = Session(
+        bind=connection,
+        join_transaction_mode="create_savepoint",
+        info={"clock": fixed_clock},
+    )
     try:
         yield session
     finally:

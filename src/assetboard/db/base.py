@@ -1,10 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import DateTime, ForeignKey, MetaData, Uuid, func
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy import DateTime, ForeignKey, MetaData, Uuid, event
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
+
+from assetboard.clock import Clock
+from assetboard.db.types import UtcDateTime
 
 CONSTRAINT_NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -24,15 +27,8 @@ class IdMixin:
 
 
 class TimestampMixin:
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        server_default=func.now(),
-        onupdate=func.now(),
-    )
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
 
 
 class SoftDeleteMixin:
@@ -46,3 +42,30 @@ class WorkspaceScopedMixin:
         nullable=False,
         index=True,
     )
+
+
+@event.listens_for(Session, "before_flush")
+def set_timestamps_from_clock(
+    session: Session,
+    _flush_context: object,
+    _instances: object,
+) -> None:
+    new_objects = [obj for obj in session.new if isinstance(obj, TimestampMixin)]
+    dirty_objects = [
+        obj
+        for obj in session.dirty
+        if isinstance(obj, TimestampMixin) and session.is_modified(obj, include_collections=False)
+    ]
+    if not new_objects and not dirty_objects:
+        return
+
+    clock = session.info.get("clock")
+    if not isinstance(clock, Clock):
+        raise RuntimeError("A Clock must be injected in Session.info['clock'] to write timestamps")
+    now = clock.now().astimezone(UTC)
+
+    for obj in new_objects:
+        obj.created_at = now
+        obj.updated_at = now
+    for obj in dirty_objects:
+        obj.updated_at = now

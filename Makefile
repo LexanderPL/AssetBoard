@@ -13,8 +13,8 @@ check:
 	$(UV) run pytest
 	@temp_dir=$$(mktemp -d); \
 	trap 'rm -rf "$$temp_dir"' EXIT; \
-	ASSETBOARD_DATA_DIR="$$temp_dir" ASSETBOARD_DATABASE_URL="sqlite:///$$temp_dir/check.db" $(UV) run alembic upgrade head && \
-	ASSETBOARD_DATA_DIR="$$temp_dir" ASSETBOARD_DATABASE_URL="sqlite:///$$temp_dir/check.db" $(UV) run alembic check
+	ASSETBOARD_DATA_DIR="$$temp_dir" ASSETBOARD_DATABASE_URL="sqlite:///$$temp_dir/check.db" $(UV) run assetboard migrate && \
+	ASSETBOARD_DATA_DIR="$$temp_dir" ASSETBOARD_DATABASE_URL="sqlite:///$$temp_dir/check.db" $(UV) run assetboard check-migrations
 	$(UV) run pre-commit run --all-files
 
 test:
@@ -27,7 +27,7 @@ migrate:
 	$(UV) run assetboard migrate
 
 revision:
-	$(UV) run alembic revision --autogenerate -m "$(m)"
+	$(UV) run assetboard revision --message "$(m)"
 
 i18n-extract:
 	@echo "not yet implemented"

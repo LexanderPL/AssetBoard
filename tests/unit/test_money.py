@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, localcontext
 
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
-from assetboard.domain.money import Money
+from assetboard.domain.money import Money, minor_unit_for
 
 
 @given(
@@ -49,9 +49,27 @@ def test_money_half_up_rounds_ties_away_from_zero() -> None:
 def test_money_supports_explicit_currency_scale_and_validates_currency() -> None:
     assert Money.from_decimal(Decimal("1.234"), "KWD", minor_unit=3).amount_minor == 1234
     assert Money(100, "eur").currency == "EUR"
+    assert minor_unit_for("JPY") == 0
+    assert Money.from_decimal(Decimal("1.5"), "JPY").amount_minor == 2
 
     with pytest.raises(ValueError, match="currency"):
         Money(100, "EURO")
+
+    with pytest.raises(ValueError, match="unsupported currency"):
+        minor_unit_for("ZZZ")
+    with pytest.raises(ValueError, match="unsupported currency"):
+        Money(100, "ZZZ")
+
+    with pytest.raises(TypeError, match="currency must be a string"):
+        Money(100, None)  # type: ignore[arg-type]
+
+
+def test_money_rounding_uses_local_decimal_precision() -> None:
+    with localcontext() as context:
+        context.prec = 2
+        money = Money.from_decimal(Decimal("12345.678"), "EUR")
+
+    assert money.amount_minor == 1_234_568
 
 
 def test_money_rejects_floats_and_mixed_currency_arithmetic() -> None:

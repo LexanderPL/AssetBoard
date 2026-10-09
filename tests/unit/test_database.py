@@ -2,18 +2,19 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from decimal import Decimal
+from pathlib import Path
 from uuid import uuid4
 
 import pytest
 from hypothesis import given, settings
 from hypothesis import strategies as st
-from sqlalchemy import Integer, MetaData, String
+from sqlalchemy import Integer, MetaData, String, inspect
 from sqlalchemy.dialects import postgresql, sqlite
-from sqlalchemy.engine import Engine
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 from sqlalchemy.types import Numeric
 
+from assetboard.clock import FixedClock
 from assetboard.db.base import (
     CONSTRAINT_NAMING_CONVENTION,
     IdMixin,
@@ -23,25 +24,25 @@ from assetboard.db.base import (
 )
 from assetboard.db.engine import create_database_engine, database_is_ready
 from assetboard.db.money import money_composite
-from assetboard.db.types import DecimalType
+from assetboard.db.types import DecimalType, UtcDateTime
 from assetboard.domain.money import Money
 
 
-class TestBase(DeclarativeBase):
+class ScratchBase(DeclarativeBase):
     __test__ = False
     metadata = MetaData(naming_convention=CONSTRAINT_NAMING_CONVENTION)
 
 
-class TestWorkspace(TestBase, IdMixin, TimestampMixin):
+class ScratchWorkspace(ScratchBase, IdMixin, TimestampMixin):
     __test__ = False
     __tablename__ = "workspaces"
 
     name: Mapped[str] = mapped_column(String(80), nullable=False)
 
 
-class TestRecord(TestBase, IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin):
+class ScratchRecord(ScratchBase, IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin):
     __test__ = False
-    __tablename__ = "test_records"
+    __tablename__ = "scratch_records"
 
     amount_minor: Mapped[int] = mapped_column(Integer, nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
@@ -49,11 +50,32 @@ class TestRecord(TestBase, IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceSc
     quantity: Mapped[Decimal] = mapped_column(DecimalType(), nullable=False)
 
 
-@pytest.fixture(scope="module", autouse=True)
-def create_test_tables(database_engine: Engine) -> Iterator[None]:
-    TestBase.metadata.create_all(database_engine)
-    yield
-    TestBase.metadata.drop_all(database_engine)
+def is_supported_decimal(value: Decimal) -> bool:
+    exponent = value.as_tuple().exponent
+    return (
+        isinstance(exponent, int) and exponent >= -18 and (value.is_zero() or value.adjusted() < 20)
+    )
+
+
+@pytest.fixture
+def scratch_session(tmp_path: Path, fixed_clock) -> Iterator[Session]:
+    engine = create_database_engine(f"sqlite:///{tmp_path / 'scratch.db'}")
+    ScratchBase.metadata.create_all(engine)
+    connection = engine.connect()
+    transaction = connection.begin()
+    session = Session(
+        bind=connection,
+        join_transaction_mode="create_savepoint",
+        info={"clock": fixed_clock},
+    )
+    try:
+        yield session
+    finally:
+        session.close()
+        transaction.rollback()
+        connection.close()
+        ScratchBase.metadata.drop_all(engine)
+        engine.dispose()
 
 
 def test_sqlite_engine_sets_required_pragmas(tmp_path) -> None:
@@ -81,59 +103,93 @@ def test_database_engine_readiness_check(database_engine) -> None:
     ],
 )
 def test_base_and_mixins_have_stable_constraints_and_uuid_keys(
-    db_session,
-    fixed_clock,
-    quantity,
+    scratch_session, fixed_clock, quantity
 ) -> None:
     assert CONSTRAINT_NAMING_CONVENTION["fk"] == (
         "fk_%(table_name)s_%(column_0_name)s_%(referred_table_name)s"
     )
-    workspace = TestWorkspace(name="Synthetic workspace")
-    db_session.add(workspace)
-    db_session.flush()
+    workspace = ScratchWorkspace(name="Synthetic workspace")
+    scratch_session.add(workspace)
+    scratch_session.flush()
 
-    record = TestRecord(
+    record = ScratchRecord(
         workspace_id=workspace.id,
         amount=Money(1234, "EUR"),
         quantity=quantity,
     )
-    db_session.add(record)
-    db_session.flush()
-    db_session.expire(record)
+    scratch_session.add(record)
+    scratch_session.flush()
+    scratch_session.expire(record)
 
-    reloaded = db_session.get(TestRecord, record.id)
+    reloaded = scratch_session.get(ScratchRecord, record.id)
     assert reloaded is not None
     assert reloaded.id == record.id
     assert reloaded.workspace_id == workspace.id
     assert reloaded.amount == Money(1234, "EUR")
     assert reloaded.quantity == quantity
-    assert reloaded.created_at is not None
-    assert reloaded.updated_at is not None
+    assert reloaded.created_at == fixed_clock.now()
+    assert reloaded.updated_at == fixed_clock.now()
+    assert reloaded.created_at.utcoffset() is not None
+    assert reloaded.updated_at.utcoffset() is not None
     assert reloaded.deleted_at is None
-    assert fixed_clock.now().isoformat() == "2026-01-01T00:00:00+00:00"
 
 
-def test_workspace_scoped_mixin_enforces_foreign_key(db_session) -> None:
-    db_session.add(
-        TestRecord(
+def test_timestamp_updated_at_uses_injected_clock(scratch_session, fixed_clock) -> None:
+    workspace = ScratchWorkspace(name="Synthetic workspace")
+    scratch_session.add(workspace)
+    scratch_session.flush()
+    record = ScratchRecord(
+        workspace_id=workspace.id,
+        amount=Money(1, "EUR"),
+        quantity=Decimal("1"),
+    )
+    scratch_session.add(record)
+    scratch_session.flush()
+    created_at = record.created_at
+
+    later_clock = FixedClock("2026-01-02T03:04:05+00:00")
+    scratch_session.info["clock"] = later_clock
+    record.quantity = Decimal("2")
+    scratch_session.flush()
+    scratch_session.expire(record)
+    reloaded = scratch_session.get(ScratchRecord, record.id)
+
+    assert reloaded is not None
+    assert reloaded.created_at == fixed_clock.now()
+    assert reloaded.updated_at == later_clock.now()
+    assert reloaded.updated_at > created_at
+
+
+def test_workspace_scoped_mixin_enforces_foreign_key(scratch_session) -> None:
+    scratch_session.add(
+        ScratchRecord(
             workspace_id=uuid4(),
             amount=Money(1, "EUR"),
             quantity=Decimal("1"),
         )
     )
     with pytest.raises(IntegrityError):
-        db_session.flush()
-    db_session.rollback()
+        scratch_session.flush()
+    scratch_session.rollback()
+
+
+def test_naming_convention_generates_expected_foreign_key_and_index_names(scratch_session) -> None:
+    inspector = inspect(scratch_session.connection())
+
+    foreign_keys = inspector.get_foreign_keys("scratch_records")
+    indexes = inspector.get_indexes("scratch_records")
+
+    assert foreign_keys[0]["name"] == "fk_scratch_records_workspace_id_workspaces"
+    assert indexes[0]["name"] == "ix_scratch_records_workspace_id"
 
 
 @given(
     value=st.decimals(
         min_value=Decimal("-99999999999999999999.999999999999999999"),
         max_value=Decimal("99999999999999999999.999999999999999999"),
-        places=18,
         allow_nan=False,
         allow_infinity=False,
-    )
+    ).filter(is_supported_decimal)
 )
 @settings(max_examples=100)
 def test_decimal_type_bind_and_result_round_trip(value: Decimal) -> None:
@@ -145,6 +201,37 @@ def test_decimal_type_bind_and_result_round_trip(value: Decimal) -> None:
 
     assert isinstance(bound_value, str)
     assert result_value == value
+
+
+def test_decimal_type_persists_fixed_point_text_and_normalizes_negative_zero(
+    scratch_session,
+) -> None:
+    workspace = ScratchWorkspace(name="Synthetic workspace")
+    scratch_session.add(workspace)
+    scratch_session.flush()
+    quantities = [Decimal("0.00000001"), Decimal("1E+2"), Decimal("-0.000")]
+    scratch_session.add_all(
+        ScratchRecord(
+            workspace_id=workspace.id,
+            amount=Money(1, "EUR"),
+            quantity=quantity,
+        )
+        for quantity in quantities
+    )
+    scratch_session.flush()
+
+    stored_values = set(
+        scratch_session.connection()
+        .exec_driver_sql("SELECT quantity FROM scratch_records")
+        .scalars()
+    )
+
+    assert stored_values == {"0.00000001", "100", "0"}
+
+
+def test_decimal_type_rejects_ordering_comparisons() -> None:
+    with pytest.raises(TypeError, match="ordering comparisons"):
+        _ = ScratchRecord.quantity > Decimal("1")
 
 
 def test_decimal_type_rejects_float_input_and_uses_postgres_numeric() -> None:
@@ -161,3 +248,16 @@ def test_decimal_type_rejects_float_input_and_uses_postgres_numeric() -> None:
 def test_decimal_type_rejects_values_outside_portable_precision() -> None:
     with pytest.raises(ValueError, match="38 digits"):
         DecimalType().process_bind_param(Decimal("0.0000000000000000001"), sqlite.dialect())
+
+
+def test_utc_datetime_rejects_naive_values_and_returns_aware_utc() -> None:
+    utc_type = UtcDateTime()
+    with pytest.raises(ValueError, match="timezone-aware"):
+        utc_type.process_bind_param(__import__("datetime").datetime(2026, 1, 1), sqlite.dialect())
+
+    loaded = utc_type.process_result_value(
+        __import__("datetime").datetime(2026, 1, 1),
+        sqlite.dialect(),
+    )
+    assert loaded is not None
+    assert loaded.utcoffset() is not None
