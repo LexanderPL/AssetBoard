@@ -61,11 +61,18 @@ class CommandError(Exception):
     pass
 
 
+SQLITE_EMAIL_CONFLICT = "UNIQUE constraint failed: users.email"
+POSTGRES_EMAIL_CONSTRAINT = "uq_users_email_normalized"
+
+
 def is_email_conflict(error: IntegrityError) -> bool:
-    """True only for the users email unique constraint (SQLite names the column, PostgreSQL the
-    constraint)."""
+    """True only for the users email unique constraint.
+
+    SQLite reports the exact column (``UNIQUE constraint failed: users.email``); PostgreSQL
+    reports the constraint name.
+    """
     message = str(error.orig)
-    return "uq_users_email_normalized" in message or "users.email" in message
+    return message == SQLITE_EMAIL_CONFLICT or POSTGRES_EMAIL_CONSTRAINT in message
 
 
 def _read_password(password_stdin: bool) -> str:

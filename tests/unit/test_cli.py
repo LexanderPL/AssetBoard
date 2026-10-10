@@ -328,7 +328,15 @@ def test_only_the_users_email_unique_violation_counts_as_duplicate_email(
     db_session.flush()
     with pytest.raises(IntegrityError) as duplicate_email, db_session.begin_nested():
         db_session.add(User(email="dup@example.com", display_name="Again"))
+    assert str(duplicate_email.value.orig) == "UNIQUE constraint failed: users.email"
     assert cli.is_email_conflict(duplicate_email.value)
+    for message in (
+        "UNIQUE constraint failed: users.email_backup",
+        "NOT NULL constraint failed: users.email",
+        "CHECK constraint failed: users.email",
+    ):
+        lookalike = IntegrityError("INSERT", {}, Exception(message))
+        assert not cli.is_email_conflict(lookalike)
 
     db_session.add(Membership(workspace_id=workspace.id, user_id=user.id, role="owner"))
     db_session.flush()

@@ -51,9 +51,8 @@ migrations first, like application startup; with `false` they refuse to run unti
   registered is an error. By default it also creates a workspace owned by the new administrator,
   as first-run setup does; `--no-workspace` skips that. On an empty instance it also closes
   first-run setup. For scripts, pass `--email`, `--display-name` and `--password-stdin`.
-- `assetboard reset-password <email>` sets a new password for **any** local user, not only
-  administrators (prompted, or from stdin with `--password-stdin`), and signs that user out of
-  every session. It does not change whether the account is active. Anyone who can run commands
+- `assetboard reset-password <email>` sets a new password for any user (prompted, or from
+  stdin with `--password-stdin`) and signs that user out of every session. It does not change whether the account is active. Anyone who can run commands
   in the container can therefore take over any account; protect shell access accordingly.
 
 Both commands write an audit event with the CLI as the actor.
