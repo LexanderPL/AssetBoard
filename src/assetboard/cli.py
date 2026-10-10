@@ -20,8 +20,13 @@ def serve(
 
     try:
         settings = Settings()
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+
+    try:
         application = create_app(settings)
-    except (RuntimeError, ValueError) as exc:
+    except RuntimeError as exc:
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
     forwarded_allow_ips = ",".join(settings.trusted_proxies) or "127.0.0.1"
