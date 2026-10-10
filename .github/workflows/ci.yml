@@ -29,6 +29,11 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
 
+      - name: Verify locked dependencies and timezone data
+        run: |
+          uv lock --check
+          uv run --locked python -c 'from zoneinfo import ZoneInfo; ZoneInfo("Europe/Warsaw")'
+
       - name: Build and inspect non-editable wheel
         run: |
           uv run --locked make css i18n-compile

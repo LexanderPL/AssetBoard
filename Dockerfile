@@ -1,10 +1,10 @@
 # syntax=docker/dockerfile:1.7
 
-ARG PYTHON_BASE=python:3.13-slim-bookworm@sha256:a1165e272e578941b84abc79e4ab38a0305cd12803a5c4247979ac7655f4d641
+FROM python:3.13-slim-bookworm@sha256:a1165e272e578941b84abc79e4ab38a0305cd12803a5c4247979ac7655f4d641 AS base
 
 FROM ghcr.io/astral-sh/uv:0.8.22 AS uv
 
-FROM ${PYTHON_BASE} AS builder
+FROM --platform=$BUILDPLATFORM base AS assets
 
 COPY --from=uv /uv /uvx /bin/
 
@@ -19,14 +19,37 @@ RUN apt-get update \
     && apt-get install --no-install-recommends -y ca-certificates curl make \
     && rm -rf /var/lib/apt/lists/*
 
-COPY . .
+COPY pyproject.toml uv.lock ./
+RUN uv sync --frozen --no-default-groups --no-install-project
 
-RUN uv sync --frozen --no-default-groups --no-install-project \
-    && make css i18n-compile \
-    && uv build --wheel --out-dir /wheels \
+COPY . .
+ENV UV_NO_SYNC=1
+RUN make css i18n-compile
+
+FROM base AS builder
+
+COPY --from=uv /uv /uvx /bin/
+
+ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
+    UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    UV_NO_SYNC=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+WORKDIR /build
+
+COPY pyproject.toml uv.lock README.md LICENSE ./
+RUN UV_NO_SYNC=0 uv sync --frozen --no-default-groups --no-install-project
+
+COPY . .
+COPY --from=assets /build/src/assetboard/static/css/app.css src/assetboard/static/css/app.css
+COPY --from=assets /build/src/assetboard/locales/en/LC_MESSAGES/messages.mo src/assetboard/locales/en/LC_MESSAGES/messages.mo
+COPY --from=assets /build/src/assetboard/locales/pl/LC_MESSAGES/messages.mo src/assetboard/locales/pl/LC_MESSAGES/messages.mo
+
+RUN uv build --wheel --out-dir /wheels \
     && uv pip install --python /opt/venv/bin/python --no-deps /wheels/*.whl
 
-FROM ${PYTHON_BASE} AS runtime
+FROM base AS runtime
 
 ARG VERSION=0.0.0
 ARG SOURCE_URL
@@ -48,10 +71,16 @@ ENV PATH="/opt/venv/bin:${PATH}" \
 
 WORKDIR /app
 
-RUN mkdir -p /data \
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install --no-install-recommends -y tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /data /licenses/AssetBoard/vendor \
     && chown 10001:10001 /data
 
 COPY --from=builder --chown=10001:10001 /opt/venv /opt/venv
+COPY --from=builder /build/LICENSE /licenses/AssetBoard/LICENSE
+COPY --from=builder /build/src/assetboard/static/vendor/*-LICENSE.txt /licenses/AssetBoard/vendor/
+COPY --from=builder /build/src/assetboard/static/vendor/ECHARTS-NOTICE.txt /licenses/AssetBoard/vendor/
 
 VOLUME ["/data"]
 EXPOSE 8000

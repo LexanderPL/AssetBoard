@@ -17,10 +17,95 @@ permissions:
 
 concurrency:
   group: docker-${{ github.workflow }}-${{ github.event.pull_request.number || inputs.tag || github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ !(github.event_name == 'push' || inputs.tag != '') }}
 
 jobs:
-  build:
+  smoke:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build local smoke image (amd64, no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: assetboard:ci
+          build-args: |
+            VERSION=${{ inputs.tag || github.ref_name }}
+            SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
+            REVISION=${{ github.sha }}
+          cache-from: type=gha
+
+      - name: Smoke-test container, read-only root, readiness, restart, and data persistence
+        run: scripts/smoke_container.sh assetboard:ci
+
+      - name: Record PR smoke image tag
+        if: github.event_name == 'pull_request'
+        run: |
+          echo 'PR image tag: `assetboard:ci` (local only; no registry push).' >> "$GITHUB_STEP_SUMMARY"
+
+  detect-arm64-changes:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      needed: ${{ steps.changed.outputs.needed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: changed
+        env:
+          BASE_REF: ${{ github.base_ref }}
+        shell: bash
+        run: |
+          changed_files=$(git diff --name-only "origin/${BASE_REF}...HEAD")
+          if grep -Eq '^(Dockerfile|\.dockerignore|Makefile|pyproject\.toml|uv\.lock)$' <<< "$changed_files"; then
+            echo 'needed=true' >> "$GITHUB_OUTPUT"
+            echo 'Arm64 build required for changed build inputs.'
+          else
+            echo 'needed=false' >> "$GITHUB_OUTPUT"
+            echo 'No container build input changes; skipping arm64 build.'
+          fi
+
+  arm64-pr-build:
+    needs: detect-arm64-changes
+    if: needs.detect-arm64-changes.outputs.needed == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build arm64 image (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          push: false
+          build-args: |
+            VERSION=${{ github.event.pull_request.head.sha }}
+            SOURCE_URL=${{ github.server_url }}/${{ github.repository }}
+            REVISION=${{ github.event.pull_request.head.sha }}
+          cache-from: type=gha
+
+  publish:
+    needs: smoke
+    if: github.event_name == 'push' || inputs.tag != ''
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -31,40 +116,42 @@ jobs:
         with:
           ref: ${{ inputs.tag || github.ref }}
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
-        if: github.event_name == 'push' || github.event_name == 'workflow_call'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract Docker metadata
+      - name: Normalize GHCR image name
+        id: image-name
+        shell: bash
+        run: echo "image=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_OUTPUT"
+
+      - name: Extract release Docker metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ghcr.io/${{ github.repository }}
+          images: ${{ steps.image-name.outputs.image }}
           tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=raw,value=latest,enable=${{ github.event_name == 'push' || github.event_name == 'workflow_call' }}
-            type=raw,value=pr-{{number}},enable=${{ github.event_name == 'pull_request' }}
-            type=semver,pattern={{version}},value=${{ inputs.tag }}
-            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag }}
-            type=semver,pattern={{major}},value=${{ inputs.tag }}
+            type=semver,pattern={{version}},value=${{ inputs.tag || github.ref_name }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ inputs.tag || github.ref_name }}
+            type=semver,pattern={{major}},value=${{ inputs.tag || github.ref_name }}
+            type=raw,value=latest
 
-      - name: Build image and publish release tags
+      - name: Build and push multi-arch release image
         id: image
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: ${{ (github.event_name == 'push' || github.event_name == 'workflow_call') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
-          push: ${{ github.event_name == 'push' || github.event_name == 'workflow_call' }}
-          load: ${{ github.event_name == 'pull_request' }}
+          platforms: linux/amd64,linux/arm64
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
@@ -74,25 +161,14 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Smoke-test container health
-        if: github.event_name == 'pull_request'
-        shell: bash
+      - name: Record published tags
+        env:
+          IMAGE_TAGS: ${{ steps.meta.outputs.tags }}
         run: |
-          set -euo pipefail
-          container=assetboard-ci-smoke
-          cleanup() { docker rm --force "$container" >/dev/null 2>&1 || true; }
-          trap cleanup EXIT
-          docker run --detach --name "$container" --publish 127.0.0.1:8000:8000 \
-            ghcr.io/${{ github.repository }}:pr-${{ github.event.pull_request.number }}
-          healthy=false
-          for attempt in $(seq 1 60); do
-            if curl --fail --silent http://127.0.0.1:8000/healthz; then
-              healthy=true
-              break
-            fi
-            sleep 2
-          done
-          docker logs "$container"
-          if [ "$healthy" != true ]; then
-            exit 1
-          fi
+          {
+            echo 'Published image tags:'
+            echo '```text'
+            echo "$IMAGE_TAGS"
+            echo '```'
+            echo 'Platforms: linux/amd64, linux/arm64'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -84,6 +84,25 @@ def test_settings_validate_base_url_and_data_dir(tmp_path: Path) -> None:
         Settings(_env_file=None, data_dir=data_path)
 
 
+def test_data_directory_permission_error_has_container_guidance(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    data_dir = tmp_path / "locked-data"
+    settings = Settings(_env_file=None, data_dir=data_dir)
+
+    def fail_temporary_file(*args: object, **kwargs: object) -> None:
+        raise PermissionError("read-only mount")
+
+    monkeypatch.setattr("assetboard.config.tempfile.TemporaryFile", fail_temporary_file)
+
+    with pytest.raises(RuntimeError, match="DATA_DIR") as error:
+        settings.ensure_data_dir_writable()
+
+    assert "chown 10001:10001" in str(error.value)
+    assert "named Docker volume" in str(error.value)
+
+
 def test_settings_parse_trusted_proxies_from_environment(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

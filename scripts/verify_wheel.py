@@ -5,6 +5,7 @@ import zipfile
 from pathlib import Path
 
 SOURCE_TEMPLATES = Path(__file__).resolve().parents[1] / "src" / "assetboard" / "web" / "templates"
+SOURCE_VENDOR = Path(__file__).resolve().parents[1] / "src" / "assetboard" / "static" / "vendor"
 REQUIRED_FILES = {
     "assetboard/static/css/app.css",
     "assetboard/static/vendor/htmx.min.js",
@@ -24,6 +25,9 @@ def main() -> int:
         for path in SOURCE_TEMPLATES.rglob("*")
         if path.is_file()
     }
+    required_files |= {
+        f"assetboard/static/vendor/{path.name}" for path in SOURCE_VENDOR.glob("*-LICENSE.txt")
+    }
     with zipfile.ZipFile(wheel_path) as wheel:
         contents = set(wheel.namelist())
         print(f"Contents of {wheel_path}:")
@@ -31,6 +35,11 @@ def main() -> int:
             print(path)
 
     missing_files = sorted(required_files - contents)
+    if not any(
+        path.startswith("assetboard-") and path.endswith(".dist-info/licenses/LICENSE")
+        for path in contents
+    ):
+        missing_files.append("<dist-info>/licenses/LICENSE")
     if missing_files:
         raise SystemExit(f"Wheel is missing runtime resources: {', '.join(missing_files)}")
     print("Required templates, static assets, and locale catalogs are present in the wheel.")

@@ -5,7 +5,8 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      # Bind to loopback when a local reverse proxy publishes the public endpoint.
+      - "127.0.0.1:8000:8000"
     environment:
       ASSETBOARD_ENV: prod
       ASSETBOARD_DATA_DIR: /data
@@ -13,12 +14,15 @@ services:
       ASSETBOARD_DEFAULT_LOCALE: ${ASSETBOARD_DEFAULT_LOCALE:-en}
       ASSETBOARD_DEFAULT_CURRENCY: ${ASSETBOARD_DEFAULT_CURRENCY:-EUR}
       ASSETBOARD_LOG_FORMAT: ${ASSETBOARD_LOG_FORMAT:-json}
+      ASSETBOARD_TRUSTED_PROXIES: ${ASSETBOARD_TRUSTED_PROXIES:-}
       ASSETBOARD_AUTO_MIGRATE: "true"
     volumes:
       - assetboard-data:/data
     read_only: true
     tmpfs:
       - /tmp:mode=1777
+    cap_drop:
+      - ALL
     security_opt:
       - no-new-privileges:true
     restart: unless-stopped
@@ -39,6 +43,10 @@ services:
     #   - traefik.http.routers.assetboard.entrypoints=websecure
     #   - traefik.http.routers.assetboard.tls=true
     #   - traefik.http.services.assetboard.loadbalancer.server.port=8000
+    # Or use Caddy with a host rule in your Caddyfile:
+    # finance.example.com {
+    #     reverse_proxy assetboard:8000
+    # }
 
 volumes:
   assetboard-data:

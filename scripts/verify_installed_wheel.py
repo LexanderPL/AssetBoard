@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from importlib import resources
+from importlib import metadata, resources
 from pathlib import Path
 
 import assetboard
@@ -26,6 +26,7 @@ def main() -> int:
     package = resources.files("assetboard")
     templates = package.joinpath("web", "templates")
     source_templates = source_tree / "web" / "templates"
+    source_vendor = source_tree / "static" / "vendor"
     template_resources = [
         path.relative_to(source_templates).as_posix()
         for path in source_templates.rglob("*")
@@ -43,6 +44,19 @@ def main() -> int:
         for resource in template_resources
         if not templates.joinpath(*resource.split("/")).is_file()
     )
+    vendor = package.joinpath("static", "vendor")
+    missing_resources.extend(
+        f"static/vendor/{path.name}"
+        for path in source_vendor.glob("*-LICENSE.txt")
+        if not vendor.joinpath(path.name).is_file()
+    )
+    distribution = metadata.distribution("assetboard")
+    license_file = next(
+        (file for file in distribution.files or () if ".dist-info/licenses/LICENSE" in str(file)),
+        None,
+    )
+    if license_file is None or not distribution.locate_file(license_file).is_file():
+        missing_resources.append("<dist-info>/licenses/LICENSE")
     if missing_resources:
         raise SystemExit(f"Installed wheel is missing resources: {', '.join(missing_resources)}")
 
