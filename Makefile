@@ -67,7 +67,7 @@ i18n-update:
 	$(UV) run pybabel update --ignore-pot-creation-date -i locales/messages.pot -d src/assetboard/locales -l pl
 
 i18n-compile:
-	$(UV) run pybabel compile -d src/assetboard/locales
+	$(UV) run --no-sync pybabel compile -d src/assetboard/locales
 
 dev:
 	$(MAKE) css i18n-compile

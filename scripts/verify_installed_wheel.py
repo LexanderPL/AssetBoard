@@ -1,0 +1,60 @@
+from __future__ import annotations
+
+from importlib import resources
+from pathlib import Path
+
+import assetboard
+
+REQUIRED_RESOURCES = (
+    "static/css/app.css",
+    "static/vendor/htmx.min.js",
+    "static/vendor/alpinejs-csp.min.js",
+    "static/vendor/echarts.min.js",
+    "locales/en/LC_MESSAGES/messages.mo",
+    "locales/pl/LC_MESSAGES/messages.mo",
+)
+
+
+def main() -> int:
+    package_path = Path(assetboard.__file__).resolve()
+    source_tree = Path(__file__).resolve().parents[1] / "src" / "assetboard"
+    if package_path.is_relative_to(source_tree):
+        raise SystemExit(
+            f"AssetBoard imported from the source tree, not the installed wheel: {package_path}"
+        )
+
+    package = resources.files("assetboard")
+    templates = package.joinpath("web", "templates")
+    source_templates = source_tree / "web" / "templates"
+    template_resources = [
+        path.relative_to(source_templates).as_posix()
+        for path in source_templates.rglob("*")
+        if path.is_file()
+    ]
+    if not template_resources:
+        raise SystemExit("Installed wheel contains no templates")
+    missing_resources = [
+        resource
+        for resource in REQUIRED_RESOURCES
+        if not package.joinpath(*resource.split("/")).is_file()
+    ]
+    missing_resources.extend(
+        f"web/templates/{resource}"
+        for resource in template_resources
+        if not templates.joinpath(*resource.split("/")).is_file()
+    )
+    if missing_resources:
+        raise SystemExit(f"Installed wheel is missing resources: {', '.join(missing_resources)}")
+
+    print(f"Non-editable AssetBoard installation: {package_path}")
+    print("Installed resources:")
+    for resource in (
+        *REQUIRED_RESOURCES,
+        *(f"web/templates/{path}" for path in template_resources),
+    ):
+        print(f"{resource}: present")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

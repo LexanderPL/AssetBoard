@@ -1,0 +1,41 @@
+from __future__ import annotations
+
+import sys
+import zipfile
+from pathlib import Path
+
+SOURCE_TEMPLATES = Path(__file__).resolve().parents[1] / "src" / "assetboard" / "web" / "templates"
+REQUIRED_FILES = {
+    "assetboard/static/css/app.css",
+    "assetboard/static/vendor/htmx.min.js",
+    "assetboard/static/vendor/alpinejs-csp.min.js",
+    "assetboard/static/vendor/echarts.min.js",
+    "assetboard/locales/en/LC_MESSAGES/messages.mo",
+    "assetboard/locales/pl/LC_MESSAGES/messages.mo",
+}
+
+
+def main() -> int:
+    if len(sys.argv) != 2:
+        raise SystemExit("Usage: verify_wheel.py WHEEL")
+    wheel_path = Path(sys.argv[1])
+    required_files = REQUIRED_FILES | {
+        f"assetboard/web/templates/{path.relative_to(SOURCE_TEMPLATES).as_posix()}"
+        for path in SOURCE_TEMPLATES.rglob("*")
+        if path.is_file()
+    }
+    with zipfile.ZipFile(wheel_path) as wheel:
+        contents = set(wheel.namelist())
+        print(f"Contents of {wheel_path}:")
+        for path in sorted(contents):
+            print(path)
+
+    missing_files = sorted(required_files - contents)
+    if missing_files:
+        raise SystemExit(f"Wheel is missing runtime resources: {', '.join(missing_files)}")
+    print("Required templates, static assets, and locale catalogs are present in the wheel.")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,0 +1,44 @@
+services:
+  assetboard:
+    image: ${ASSETBOARD_IMAGE:-assetboard:local}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      ASSETBOARD_ENV: prod
+      ASSETBOARD_DATA_DIR: /data
+      ASSETBOARD_BASE_URL: ${ASSETBOARD_BASE_URL:-http://localhost:8000}
+      ASSETBOARD_DEFAULT_LOCALE: ${ASSETBOARD_DEFAULT_LOCALE:-en}
+      ASSETBOARD_DEFAULT_CURRENCY: ${ASSETBOARD_DEFAULT_CURRENCY:-EUR}
+      ASSETBOARD_LOG_FORMAT: ${ASSETBOARD_LOG_FORMAT:-json}
+      ASSETBOARD_AUTO_MIGRATE: "true"
+    volumes:
+      - assetboard-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp:mode=1777
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    # Uncomment and configure for Traefik:
+    # labels:
+    #   - traefik.enable=true
+    #   - traefik.http.routers.assetboard.rule=Host(`finance.example.com`)
+    #   - traefik.http.routers.assetboard.entrypoints=websecure
+    #   - traefik.http.routers.assetboard.tls=true
+    #   - traefik.http.services.assetboard.loadbalancer.server.port=8000
+
+volumes:
+  assetboard-data:
