@@ -29,11 +29,11 @@ the service to the LAN; there is no authentication until M1, so restrict access 
 
 ## Run a published image
 
-Set `ASSETBOARD_IMAGE` to the published GHCR image and start the Compose service without building
-locally:
+After the first release has been published and the GHCR package has been made public, set
+`ASSETBOARD_IMAGE` to a published version tag and start Compose without building locally:
 
 ```bash
-ASSETBOARD_IMAGE=ghcr.io/lexanderpl/assetboard:latest \
+ASSETBOARD_IMAGE=ghcr.io/lexanderpl/assetboard:0.1.0 \
   docker compose -f compose.example.yaml up -d --no-build
 ```
 

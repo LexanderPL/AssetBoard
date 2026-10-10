@@ -8,6 +8,8 @@ import json
 import re
 import shlex
 import subprocess
+import sys
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -15,6 +17,7 @@ FEATURE_HEADING = re.compile(r"^##\s+(F\d+\.\d+)\s+(.+?)\s*$", re.MULTILINE)
 ACCEPTANCE = re.compile(
     r"^\*\*Acceptance\*\*\s*$([\s\S]*?)(?=^\*\*[^*]+\*\*|^## |\Z)", re.MULTILINE
 )
+INLINE_ACCEPTANCE = re.compile(r"^\*\*Acceptance:\*\*\s*(.+?)\s*$", re.MULTILINE)
 
 
 @dataclass(frozen=True)
@@ -38,14 +41,16 @@ def find_features(spec_dir: Path) -> list[Feature]:
             end = matches[index + 1].start() if index + 1 < len(matches) else len(contents)
             section = contents[match.end() : end]
             acceptance_match = ACCEPTANCE.search(section)
-            bullets = (
-                tuple(
+            inline_acceptance = INLINE_ACCEPTANCE.search(section)
+            if inline_acceptance:
+                bullets = (inline_acceptance.group(1).strip(),)
+            elif acceptance_match:
+                bullets = tuple(
                     bullet.strip()
                     for bullet in re.findall(r"^\s*-\s+(.+?)\s*$", acceptance_match.group(1), re.M)
                 )
-                if acceptance_match
-                else ()
-            )
+            else:
+                bullets = ()
             milestone_match = re.match(r"^(M\d+)-", source.name)
             if milestone_match is None:
                 continue
@@ -66,7 +71,7 @@ def find_features(spec_dir: Path) -> list[Feature]:
     return features
 
 
-def command_for(feature: Feature) -> list[str]:
+def command_for(feature: Feature) -> tuple[str, list[str]]:
     title = f"{feature.spec_id} {feature.title}"
     checklist = feature.acceptance or ("Review acceptance criteria in the feature specification.",)
     body = (
@@ -86,7 +91,7 @@ def command_for(feature: Feature) -> list[str]:
     ]
     if feature.stretch:
         command.extend(["--label", "stretch"])
-    return command
+    return title, command
 
 
 def existing_issue_titles() -> set[str]:
@@ -97,6 +102,37 @@ def existing_issue_titles() -> set[str]:
         text=True,
     )
     return {item["title"] for item in json.loads(result.stdout)}
+
+
+def print_or_create(features: list[Feature], *, execute: bool) -> int:
+    try:
+        existing_titles = existing_issue_titles()
+    except Exception as exc:
+        if execute:
+            print(
+                f"Could not list existing GitHub issues; refusing to create issues: {exc}",
+                file=sys.stderr,
+            )
+            return 1
+        print(
+            f"Warning: could not list existing GitHub issues; printing all commands: {exc}",
+            file=sys.stderr,
+        )
+        existing_titles = set()
+
+    created = False
+    for feature in features:
+        title, command = command_for(feature)
+        if title in existing_titles:
+            continue
+        if execute:
+            if created:
+                time.sleep(1)
+            subprocess.run(command, check=True)
+            created = True
+        else:
+            print(shlex.join(command))
+    return 0
 
 
 def main() -> int:
@@ -113,16 +149,7 @@ def main() -> int:
     )
     args = parser.parse_args()
 
-    existing_titles = existing_issue_titles()
-    for feature in find_features(args.spec_dir):
-        command = command_for(feature)
-        if command[4] in existing_titles:
-            continue
-        if args.execute:
-            subprocess.run(command, check=True)
-        else:
-            print(shlex.join(command))
-    return 0
+    return print_or_create(find_features(args.spec_dir), execute=args.execute)
 
 
 if __name__ == "__main__":

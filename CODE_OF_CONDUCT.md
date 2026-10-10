@@ -5,5 +5,4 @@ The complete code, including its standards and enforcement guidelines, applies t
 spaces and interactions. This project adopts the Covenant by reference; its full text is maintained
 at the official link above.
 
-To report behavior that violates the Code of Conduct, contact the maintainers at
-`<CONDUCT_CONTACT>`. Please do not post sensitive details publicly.
+To report a violation, open a private security advisory and title it “Code of Conduct report”. Only the maintainer can see it, and a GitHub account is required. Reports about the maintainer’s own conduct can be sent to GitHub Support through its abuse-report form.

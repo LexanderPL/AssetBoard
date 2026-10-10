@@ -1,9 +1,9 @@
 # Architecture decision records
 
-**Status:** Accepted
-**Date:** 2026-10-10
+The template defines the required section structure. New ADRs need a Status and Date. Status values
+are `Proposed`, `Accepted`, or `Superseded by ADR-NNNN` (with the replacing ADR's number).
 
-Accepted decisions are indexed below. The template defines the required section structure.
+The decisions below are accepted unless noted otherwise.
 
 | ADR | Decision | Status |
 | --- | --- | --- |

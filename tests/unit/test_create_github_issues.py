@@ -6,6 +6,8 @@ import sys
 from pathlib import Path
 from subprocess import CompletedProcess
 
+import pytest
+
 SCRIPT = Path(__file__).resolve().parents[2] / "scripts" / "create_github_issues.py"
 SPEC = importlib.util.spec_from_file_location("create_github_issues", SCRIPT)
 assert SPEC is not None and SPEC.loader is not None
@@ -45,8 +47,9 @@ def test_command_for_includes_milestone_acceptance_and_stretch_label() -> None:
         True,
     )
 
-    command = generator.command_for(feature)
+    title, command = generator.command_for(feature)
 
+    assert title == "F1.2 (stretch) Workspace roles"
     assert command[:8] == [
         "gh",
         "issue",
@@ -63,7 +66,7 @@ def test_command_for_includes_milestone_acceptance_and_stretch_label() -> None:
     assert command[-2:] == ["--label", "stretch"]
 
 
-def test_existing_issue_titles_are_loaded_from_gh(monkeypatch) -> None:
+def test_existing_issue_titles_are_loaded_from_gh(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_run(command, **kwargs):
         assert command == [
             "gh",
@@ -84,7 +87,11 @@ def test_existing_issue_titles_are_loaded_from_gh(monkeypatch) -> None:
     assert generator.existing_issue_titles() == {"F0.1 Scaffold"}
 
 
-def test_main_skips_existing_title_and_dry_runs_new_titles(monkeypatch, tmp_path, capsys) -> None:
+def test_main_skips_existing_title_and_dry_runs_new_titles(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     (tmp_path / "M0-foundations.md").write_text(
         "## F0.1 Existing\n\n## F0.2 New\n\n**Acceptance**\n- Works\n",
         encoding="utf-8",
@@ -98,3 +105,54 @@ def test_main_skips_existing_title_and_dry_runs_new_titles(monkeypatch, tmp_path
     assert "F0.2 New" in output
     assert "--milestone M0" in output
     assert "- [ ] Works" in output
+
+
+def test_inline_acceptance_becomes_one_checklist_item(tmp_path: Path) -> None:
+    (tmp_path / "M1-identity.md").write_text(
+        "## F1.6 (stretch) TOTP\n\n**Acceptance:** optional per-user TOTP with recovery codes.\n",
+        encoding="utf-8",
+    )
+
+    feature = generator.find_features(tmp_path)[0]
+    title, command = generator.command_for(feature)
+
+    assert title == "F1.6 (stretch) TOTP"
+    assert feature.acceptance == ("optional per-user TOTP with recovery codes.",)
+    assert "- [ ] optional per-user TOTP with recovery codes." in command[8]
+
+
+def test_dry_run_without_gh_warns_and_prints_commands(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        generator.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(FileNotFoundError("gh not installed")),
+    )
+    feature = generator.Feature(
+        "F0.1", "Scaffold", Path("docs/specs/M0-foundations.md"), "M0", (), False
+    )
+
+    assert generator.print_or_create([feature], execute=False) == 0
+    captured = capsys.readouterr()
+    assert "Warning:" in captured.err
+    assert "gh not installed" in captured.err
+    assert "F0.1 Scaffold" in captured.out
+
+
+def test_execute_without_gh_fails_closed(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        generator.subprocess,
+        "run",
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(FileNotFoundError("gh not installed")),
+    )
+    feature = generator.Feature(
+        "F0.1", "Scaffold", Path("docs/specs/M0-foundations.md"), "M0", (), False
+    )
+
+    assert generator.print_or_create([feature], execute=True) == 1
+    assert "refusing to create issues" in capsys.readouterr().err

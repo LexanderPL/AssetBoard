@@ -30,7 +30,7 @@ CI also builds and inspects a non-editable wheel and builds/smoke-tests the cont
 assets and deployment behavior are checked in addition to the Python suite.
 
 For local development, `make dev` accepts `DEV_HOST` and `DEV_PORT`; for example,
-`make dev DEV_HOST=0.0.0.0 DEV_PORT=8080`.
+`make dev DEV_PORT=8080`.
 
 Architecture, security, and domain rules are in `AGENTS.md` and the overview spec. A change to an
 established technical decision should include an ADR under `docs/adr/`; see the
