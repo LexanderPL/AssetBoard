@@ -32,6 +32,19 @@ def isolate_application_data_dir(
         "DEFAULT_LOCALE",
         "DEFAULT_CURRENCY",
         "AUTO_MIGRATE",
+        "SETUP_TOKEN",
+        "ALLOW_REGISTRATION",
+        "SESSION_IDLE_TIMEOUT_DAYS",
+        "SESSION_ABSOLUTE_TIMEOUT_DAYS",
+        "AUTH_ACCOUNT_FREE_FAILURES",
+        "AUTH_IP_FREE_FAILURES",
+        "AUTH_IP_WINDOW_MINUTES",
+        "AUTH_THROTTLE_BASE_SECONDS",
+        "AUTH_THROTTLE_MAX_SECONDS",
+        "SETUP_THROTTLE_FREE_FAILURES",
+        "REGISTRATION_IP_LIMIT",
+        "REGISTRATION_WINDOW_MINUTES",
+        "AUTH_TEST_PROFILE",
     ):
         monkeypatch.delenv(f"{ENV_PREFIX}_{name}", raising=False)
 
