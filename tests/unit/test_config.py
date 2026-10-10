@@ -116,6 +116,16 @@ def test_settings_parse_trusted_proxies_from_environment(
     assert settings.trusted_proxies == ["127.0.0.1", "10.20.0.0/16"]
 
 
+def test_settings_parse_empty_trusted_proxies_from_environment(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv(f"{ENV_PREFIX}_TRUSTED_PROXIES", "")
+
+    settings = Settings(_env_file=None)
+
+    assert settings.trusted_proxies == []
+
+
 def test_settings_validate_trusted_proxy_networks() -> None:
     with pytest.raises(ValueError, match="TRUSTED_PROXIES"):
         Settings(_env_file=None, trusted_proxies=["not-a-cidr"])

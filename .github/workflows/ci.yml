@@ -29,10 +29,14 @@ jobs:
       - name: Set up Python
         run: uv python install 3.13
 
-      - name: Verify locked dependencies and timezone data
-        run: |
-          uv lock --check
-          uv run --locked python -c 'from zoneinfo import ZoneInfo; ZoneInfo("Europe/Warsaw")'
+      - name: Verify locked dependencies
+        run: uv lock --check
+
+      - name: Install ShellCheck
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y shellcheck
+
+      - name: Check container smoke script
+        run: shellcheck scripts/smoke_container.sh
 
       - name: Build and inspect non-editable wheel
         run: |

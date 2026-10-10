@@ -20,13 +20,17 @@ def main() -> int:
     if len(sys.argv) != 2:
         raise SystemExit("Usage: verify_wheel.py WHEEL")
     wheel_path = Path(sys.argv[1])
+    vendor_files = sorted(path for path in SOURCE_VENDOR.rglob("*") if path.is_file())
+    if not vendor_files:
+        raise SystemExit(f"Source vendor directory is empty: {SOURCE_VENDOR}")
     required_files = REQUIRED_FILES | {
         f"assetboard/web/templates/{path.relative_to(SOURCE_TEMPLATES).as_posix()}"
         for path in SOURCE_TEMPLATES.rglob("*")
         if path.is_file()
     }
     required_files |= {
-        f"assetboard/static/vendor/{path.name}" for path in SOURCE_VENDOR.glob("*-LICENSE.txt")
+        f"assetboard/static/vendor/{path.relative_to(SOURCE_VENDOR).as_posix()}"
+        for path in vendor_files
     }
     with zipfile.ZipFile(wheel_path) as wheel:
         contents = set(wheel.namelist())
@@ -42,7 +46,10 @@ def main() -> int:
         missing_files.append("<dist-info>/licenses/LICENSE")
     if missing_files:
         raise SystemExit(f"Wheel is missing runtime resources: {', '.join(missing_files)}")
-    print("Required templates, static assets, and locale catalogs are present in the wheel.")
+    print(
+        "All source vendor files, templates, static assets, and locale catalogs "
+        "are present in the wheel."
+    )
     return 0
 
 

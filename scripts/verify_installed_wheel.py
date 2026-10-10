@@ -27,6 +27,9 @@ def main() -> int:
     templates = package.joinpath("web", "templates")
     source_templates = source_tree / "web" / "templates"
     source_vendor = source_tree / "static" / "vendor"
+    vendor_resources = sorted(path for path in source_vendor.rglob("*") if path.is_file())
+    if not vendor_resources:
+        raise SystemExit(f"Source vendor directory is empty: {source_vendor}")
     template_resources = [
         path.relative_to(source_templates).as_posix()
         for path in source_templates.rglob("*")
@@ -44,12 +47,11 @@ def main() -> int:
         for resource in template_resources
         if not templates.joinpath(*resource.split("/")).is_file()
     )
-    vendor = package.joinpath("static", "vendor")
-    missing_resources.extend(
-        f"static/vendor/{path.name}"
-        for path in source_vendor.glob("*-LICENSE.txt")
-        if not vendor.joinpath(path.name).is_file()
-    )
+    for path in vendor_resources:
+        relative_path = path.relative_to(source_vendor)
+        installed_file = package.joinpath("static", "vendor", *relative_path.parts)
+        if not installed_file.is_file():
+            missing_resources.append(f"static/vendor/{relative_path.as_posix()}")
     distribution = metadata.distribution("assetboard")
     license_file = next(
         (file for file in distribution.files or () if ".dist-info/licenses/LICENSE" in str(file)),
@@ -64,6 +66,10 @@ def main() -> int:
     print("Installed resources:")
     for resource in (
         *REQUIRED_RESOURCES,
+        *(
+            f"static/vendor/{path.relative_to(source_vendor).as_posix()}"
+            for path in vendor_resources
+        ),
         *(f"web/templates/{path}" for path in template_resources),
     ):
         print(f"{resource}: present")

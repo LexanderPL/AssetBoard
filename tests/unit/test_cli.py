@@ -65,14 +65,37 @@ def test_serve_passes_trusted_proxies_to_uvicorn(
     monkeypatch.setattr(cli, "create_app", lambda settings: "app")
     monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: calls.update(kwargs))
 
+    monkeypatch.chdir(tmp_path)
     result = CliRunner().invoke(
         cli_app,
         ["serve"],
         env={
-            f"{ENV_PREFIX}_DATA_DIR": str(tmp_path),
+            f"{ENV_PREFIX}_DATA_DIR": str(tmp_path / "data"),
             f"{ENV_PREFIX}_TRUSTED_PROXIES": "127.0.0.1,10.20.0.0/16",
         },
     )
 
     assert result.exit_code == 0, result.output
     assert calls["forwarded_allow_ips"] == "127.0.0.1,10.20.0.0/16"
+
+
+def test_serve_reports_unwritable_data_directory(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    def fail_create_app(_settings: object) -> str:
+        raise RuntimeError("DATA_DIR is not writable; chown 10001:10001")
+
+    monkeypatch.setattr(cli, "create_app", fail_create_app)
+
+    result = CliRunner().invoke(
+        cli_app,
+        ["serve"],
+        env={f"{ENV_PREFIX}_DATA_DIR": str(tmp_path / "data")},
+    )
+
+    assert result.exit_code == 1
+    assert "DATA_DIR is not writable" in result.output
+    assert "chown 10001:10001" in result.output
