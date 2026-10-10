@@ -1,5 +1,8 @@
 # ADR-0008: Digest-pinned base images
 
+**Status:** Accepted
+**Date:** 2026-10-10
+
 ## Context
 
 Container tags can move, so a tag alone does not guarantee that a build uses the reviewed base

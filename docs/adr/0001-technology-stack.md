@@ -1,5 +1,8 @@
 # ADR-0001: Technology stack
 
+**Status:** Accepted
+**Date:** 2026-10-10
+
 ## Context
 
 AssetBoard needs a maintainable stack for a self-hosted finance application with a small operational

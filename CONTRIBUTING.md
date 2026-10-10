@@ -26,14 +26,25 @@ translation catalogs when user-facing strings change.
    and follow-ups.
 4. Run `make check` before requesting review.
 
+CI also builds and inspects a non-editable wheel and builds/smoke-tests the container, so packaged
+assets and deployment behavior are checked in addition to the Python suite.
+
+For local development, `make dev` accepts `DEV_HOST` and `DEV_PORT`; for example,
+`make dev DEV_HOST=0.0.0.0 DEV_PORT=8080`.
+
 Architecture, security, and domain rules are in `AGENTS.md` and the overview spec. A change to an
-established technical decision should include an ADR under `docs/adr/`.
+established technical decision should include an ADR under `docs/adr/`; see the
+[ADR index](docs/adr/README.md).
 
 ## Commits and pull requests
 
-Use Conventional Commit prefixes such as `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, and
-`chore:`. Keep commits and PRs small and reviewable. Fill in the pull request template, including
-the acceptance-criteria-to-tests mapping.
+Use Conventional Commit titles for PRs and squash commits, such as `feat:`, `fix:`, `refactor:`,
+`test:`, `docs:`, and `chore:`. Release Please derives versions from these commits; mark breaking
+changes with `!` after the type/scope or include a `BREAKING CHANGE:` footer. Keep commits and PRs
+small and reviewable. Fill in the pull request template, including the acceptance-criteria-to-tests
+mapping.
+
+Contributions are licensed under AGPL-3.0-or-later, consistent with the project license.
 
 ## Dependencies and licensing
 

@@ -13,4 +13,5 @@ for an undisclosed vulnerability. Include the affected commit or version, impact
 reproduce when safe to do so. The maintainers will coordinate a response and disclosure there.
 
 AssetBoard has no authentication until M1. Until then, only expose the app to trusted users and
-networks; see [deployment guidance](docs/deployment.md).
+networks; see [deployment guidance](docs/deployment.md). Missing authentication before M1 is a
+known limitation, not a vulnerability report.

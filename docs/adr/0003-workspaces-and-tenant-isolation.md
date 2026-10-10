@@ -1,5 +1,8 @@
 # ADR-0003: Workspaces and tenant isolation
 
+**Status:** Accepted
+**Date:** 2026-10-10
+
 ## Context
 
 Users need to separate financial records into workspaces, and every query must prevent records from

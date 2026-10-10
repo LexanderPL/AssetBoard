@@ -1,5 +1,8 @@
 # ADR-0004: Server-rendered user interface
 
+**Status:** Accepted
+**Date:** 2026-10-10
+
 ## Context
 
 The first version should be straightforward to host and usable without a separate JavaScript

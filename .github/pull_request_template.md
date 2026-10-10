@@ -20,3 +20,5 @@
 
 - [ ] `make check`
 - [ ] Documentation and translations updated where needed
+- [ ] ADR added/updated if a technical decision changed
+- [ ] New dependency justified (purpose, license)

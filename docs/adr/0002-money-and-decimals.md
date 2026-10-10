@@ -1,5 +1,8 @@
 # ADR-0002: Money and decimal values
 
+**Status:** Accepted
+**Date:** 2026-10-10
+
 ## Context
 
 Binary floating point cannot represent many decimal fractions exactly, and financial calculations

@@ -1,5 +1,8 @@
 # ADR-0005: AGPL license and centralized branding
 
+**Status:** Accepted
+**Date:** 2026-10-10
+
 ## Context
 
 AssetBoard is self-hosted software whose modifications should remain available to users, and the

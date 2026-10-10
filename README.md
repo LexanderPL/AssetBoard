@@ -5,9 +5,13 @@ income and expenses, comparing planned with actual spending, and planning net wo
 loans, and financial independence. It aims to give homelab users a private, user-controlled
 alternative to spreadsheets and hosted finance services.
 
+**Current state:** only the app shell and health endpoints work today; finance features arrive with
+their milestones.
+
 ## Quick start
 
-Docker Compose is the simplest way to run the current foundation:
+Docker Engine and Docker Compose v2 are required. Compose is the simplest way to run the current
+foundation:
 
 ```bash
 docker compose -f compose.example.yaml up -d --build
@@ -24,7 +28,7 @@ complete environment-variable reference.
 | `ASSETBOARD_DEFAULT_LOCALE` | `en` | Default UI language |
 | `ASSETBOARD_DEFAULT_CURRENCY` | `EUR` | Default currency |
 | `ASSETBOARD_LOG_FORMAT` | `json` in Compose | `text` or `json` logs |
-| `ASSETBOARD_TRUSTED_PROXIES` | empty | Proxy IPs/CIDRs allowed to supply forwarded headers |
+| `ASSETBOARD_TRUSTED_PROXIES` | empty | Proxy IPs/CIDRs allowed to supply forwarded headers; empty trusts loopback only |
 | `ASSETBOARD_BIND_ADDRESS` | `127.0.0.1` | Compose-only host interface |
 | `ASSETBOARD_HOST_PORT` | `8000` | Compose-only host port |
 

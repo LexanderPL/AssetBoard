@@ -1,5 +1,8 @@
 # ADR-NNNN: Short decision title
 
+**Status:** Proposed
+**Date:** YYYY-MM-DD
+
 ## Context
 
 What situation or constraint requires a decision?

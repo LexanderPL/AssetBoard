@@ -1,5 +1,8 @@
 # ADR-0009: Non-root container with read-only root filesystem
 
+**Status:** Accepted
+**Date:** 2026-10-10
+
 ## Context
 
 The app needs persistent state but should limit the impact of a compromised process and avoid
