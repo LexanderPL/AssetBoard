@@ -24,7 +24,7 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_ALLOW_REGISTRATION` | `false` | App | Allow open self-registration; each registrant gets a new empty workspace they own. |
 | `ASSETBOARD_SESSION_IDLE_TIMEOUT_DAYS` | `14` | App | Sessions expire after this many days without activity. Must not exceed the absolute timeout. |
 | `ASSETBOARD_SESSION_ABSOLUTE_TIMEOUT_DAYS` | `60` | App | Sessions expire this many days after login regardless of activity. |
-| `ASSETBOARD_AUTH_ACCOUNT_FREE_FAILURES` | `5` | App | Failed logins per account before exponential backoff starts. A successful login resets this counter. |
+| `ASSETBOARD_AUTH_ACCOUNT_FREE_FAILURES` | `5` | App | Failed logins (and wrong current passwords when changing a password) per account before exponential backoff starts. A successful login resets this counter; it also counts as zero after 24 hours without failures. |
 | `ASSETBOARD_AUTH_IP_FREE_FAILURES` | `20` | App | Failed logins per client address (IPv4 address or IPv6 /64) within the IP window before backoff starts. |
 | `ASSETBOARD_AUTH_IP_WINDOW_MINUTES` | `60` | App | Window after which per-address login and setup-token failure counters decay. Successful logins do not reset them. |
 | `ASSETBOARD_AUTH_THROTTLE_BASE_SECONDS` | `60` | App | First backoff delay; it doubles with each further failure. |
@@ -32,7 +32,6 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_SETUP_THROTTLE_FREE_FAILURES` | `5` | App | Wrong setup-token attempts per client address before backoff starts. |
 | `ASSETBOARD_REGISTRATION_IP_LIMIT` | `5` | App | Registration attempts (successful or not) allowed per client address within the registration window. |
 | `ASSETBOARD_REGISTRATION_WINDOW_MINUTES` | `60` | App | Window for the registration attempt limit. |
-| `ASSETBOARD_AUTH_TEST_PROFILE` | `false` | App | Test suites only: cheap Argon2 parameters. Refused when `ENV=prod`; never enable it on a real instance. |
 | `ASSETBOARD_BIND_ADDRESS` | `127.0.0.1` | Compose only | Host interface to publish. Use `0.0.0.0` to listen on all host interfaces. |
 | `ASSETBOARD_HOST_PORT` | `8000` | Compose only | Host port mapped to the container's port 8000. |
 | `ASSETBOARD_IMAGE` | `assetboard:local` | Compose only | Image reference interpolated by Compose. Set this when running a published image with `--no-build`. |
@@ -52,8 +51,10 @@ migrations first, like application startup; with `false` they refuse to run unti
   registered is an error. By default it also creates a workspace owned by the new administrator,
   as first-run setup does; `--no-workspace` skips that. On an empty instance it also closes
   first-run setup. For scripts, pass `--email`, `--display-name` and `--password-stdin`.
-- `assetboard reset-password <email>` sets a new password (prompted, or from stdin with
-  `--password-stdin`) and signs the user out of every session.
+- `assetboard reset-password <email>` sets a new password for **any** local user, not only
+  administrators (prompted, or from stdin with `--password-stdin`), and signs that user out of
+  every session. It does not change whether the account is active. Anyone who can run commands
+  in the container can therefore take over any account; protect shell access accordingly.
 
 Both commands write an audit event with the CLI as the actor.
 

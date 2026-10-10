@@ -20,7 +20,7 @@ from importlib import resources
 from typing import Literal
 from uuid import UUID, uuid4
 
-from argon2 import PasswordHasher
+from argon2 import Parameters, PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError
@@ -47,9 +47,11 @@ MIN_PASSWORD_LENGTH = 10
 MAX_PASSWORD_LENGTH = 1024
 MAX_NAME_LENGTH = 120
 SESSION_TOUCH_INTERVAL = timedelta(minutes=5)
-THROTTLE_RETENTION = timedelta(hours=24)
+THROTTLE_IDLE_RESET = timedelta(hours=24)
 
-_cached_dummy_hashes: dict[bool, str] = {}
+# Test-only seam: an autouse fixture swaps in cheap parameters; production never sets it.
+ARGON2_PARAMETERS: Parameters | None = None
+_cached_dummy_hashes: dict[str, str] = {}
 _process_setup_token: str | None = None
 
 
@@ -92,13 +94,6 @@ class UnknownUser(AuthError):
         super().__init__("No user has that email address")
 
 
-class InvalidCurrentPassword(AuthError):
-    code = "current_password_invalid"
-
-    def __init__(self) -> None:
-        super().__init__("Current password is incorrect")
-
-
 class RegistrationDisabled(AuthError):
     code = "registration_disabled"
 
@@ -118,12 +113,26 @@ class LoginOutcome:
         return self.user is not None and self.session_id is not None
 
 
+PasswordChangeStatus = Literal["changed", "invalid_current", "invalid_new", "throttled"]
+
+
+@dataclass(frozen=True, slots=True)
+class PasswordChangeOutcome:
+    status: PasswordChangeStatus
+    revoked_sessions: int = 0
+    error: AuthError | None = None
+
+
 RegistrationStatus = Literal["created", "invalid", "rejected", "throttled"]
 
 
 @dataclass(frozen=True, slots=True)
 class RegistrationOutcome:
-    """``rejected`` covers an already-registered email without saying so."""
+    """``rejected`` means the email is already registered.
+
+    It differs from ``created``, so registration discloses whether an address has an account.
+    This is an accepted risk: registration is off by default and limited per client address.
+    """
 
     status: RegistrationStatus
     user: User | None = None
@@ -162,31 +171,32 @@ def validate_password(password: str, email: str, display_name: str) -> None:
         )
 
 
-def password_hasher(settings: Settings) -> PasswordHasher:
-    if settings.auth_test_profile:
-        return PasswordHasher(time_cost=1, memory_cost=8192, parallelism=1)
-    return PasswordHasher()
+def password_hasher() -> PasswordHasher:
+    """Production uses argon2-cffi defaults; tests patch ``ARGON2_PARAMETERS`` only."""
+    if ARGON2_PARAMETERS is None:
+        return PasswordHasher()
+    return PasswordHasher.from_parameters(ARGON2_PARAMETERS)
 
 
-def hash_password(password: str, email: str, display_name: str, settings: Settings) -> str:
+def hash_password(password: str, email: str, display_name: str) -> str:
     validate_password(password, email, display_name)
-    encoded = password_hasher(settings).hash(password)
+    encoded = password_hasher().hash(password)
     if not encoded.startswith("$argon2id$"):
         raise RuntimeError("PasswordHasher did not produce an Argon2id hash")
     return encoded
 
 
-def _dummy_hash(settings: Settings) -> str:
-    profile = settings.auth_test_profile
-    if profile not in _cached_dummy_hashes:
+def _dummy_hash() -> str:
+    key = repr(ARGON2_PARAMETERS)
+    if key not in _cached_dummy_hashes:
         # Never a valid credential for any account; never logged.
-        _cached_dummy_hashes[profile] = password_hasher(settings).hash(secrets.token_urlsafe(32))
-    return _cached_dummy_hashes[profile]
+        _cached_dummy_hashes[key] = password_hasher().hash(secrets.token_urlsafe(32))
+    return _cached_dummy_hashes[key]
 
 
-def verify_password(password_hash: str, password: str, settings: Settings) -> bool:
+def verify_password(password_hash: str, password: str) -> bool:
     try:
-        return password_hasher(settings).verify(password_hash, password)
+        return password_hasher().verify(password_hash, password)
     except (VerifyMismatchError, VerificationError, InvalidHashError):
         return False
 
@@ -211,9 +221,13 @@ def normalize_client_host(host: str | None) -> ipaddress.IPv4Address | ipaddress
     if host is None or "," in host:
         return None
     try:
-        return ipaddress.ip_address(host)
+        address = ipaddress.ip_address(host)
     except ValueError:
         return None
+    if isinstance(address, ipaddress.IPv6Address) and address.ipv4_mapped is not None:
+        # ::ffff:a.b.c.d from dual-stack sockets is the IPv4 client a.b.c.d.
+        return address.ipv4_mapped
+    return address
 
 
 def client_ip_prefix(host: str | None, *, for_throttle: bool = False) -> str | None:
@@ -270,19 +284,38 @@ def _audit(
 # Throttling
 
 
-def _throttle_row(session: Session, scope: ThrottleScope, key: str, clock: Clock) -> AuthThrottle:
-    key_hash = _key_hash(key)
-    statement = select(AuthThrottle).where(
-        AuthThrottle.key_type == scope, AuthThrottle.key_hash == key_hash
+def _find_throttle(session: Session, scope: ThrottleScope, key: str) -> AuthThrottle | None:
+    """Read-only lookup; checking a block never creates or changes a row."""
+    return session.scalar(
+        select(AuthThrottle).where(
+            AuthThrottle.key_type == scope, AuthThrottle.key_hash == _key_hash(key)
+        )
     )
-    row = session.scalar(statement)
+
+
+def _current_count(row: AuthThrottle | None, now: datetime, window: timedelta | None) -> int:
+    """Counter value as read: rows idle for 24 h or past their window count as zero."""
+    if row is None or now - row.updated_at >= THROTTLE_IDLE_RESET:
+        return 0
+    if window is not None and now >= row.window_started_at + window:
+        return 0
+    return row.failure_count
+
+
+def _is_blocked(row: AuthThrottle | None, now: datetime) -> bool:
+    return row is not None and row.blocked_until is not None and row.blocked_until > now
+
+
+def _get_or_create_throttle(
+    session: Session, scope: ThrottleScope, key: str, now: datetime
+) -> AuthThrottle:
+    row = _find_throttle(session, scope, key)
     if row is not None:
         return row
-    now = clock.now()
     row = AuthThrottle(
         id=uuid4(),
         key_type=scope,
-        key_hash=key_hash,
+        key_hash=_key_hash(key),
         failure_count=0,
         window_started_at=now,
         updated_at=now,
@@ -292,31 +325,62 @@ def _throttle_row(session: Session, scope: ThrottleScope, key: str, clock: Clock
             session.add(row)
     except IntegrityError:
         # A concurrent request created the same key first.
-        return session.scalars(statement).one()
+        existing = _find_throttle(session, scope, key)
+        if existing is None:
+            raise
+        return existing
     return row
 
 
-def _expire_window(row: AuthThrottle, now: datetime, window: timedelta | None) -> None:
-    if window is not None and now >= row.window_started_at + window:
+def _count_attempt(
+    session: Session,
+    scope: ThrottleScope,
+    key: str,
+    *,
+    now: datetime,
+    window: timedelta | None,
+    free: int | None,
+    settings: Settings,
+) -> AuthThrottle:
+    """Record one attempt; above ``free`` attempts, back off exponentially up to the cap."""
+    row = _get_or_create_throttle(session, scope, key, now)
+    if _current_count(row, now, window) == 0:
         row.failure_count = 0
         row.window_started_at = now
-        row.updated_at = now
-
-
-def _is_blocked(row: AuthThrottle, now: datetime) -> bool:
-    return row.blocked_until is not None and row.blocked_until > now
-
-
-def _count_with_backoff(row: AuthThrottle, now: datetime, free: int, settings: Settings) -> None:
+        if not _is_blocked(row, now):
+            row.blocked_until = None
     row.failure_count += 1
     row.updated_at = now
-    if row.failure_count > free:
+    if free is not None and row.failure_count > free:
         exponent = min(row.failure_count - free - 1, 32)
         seconds = min(
             settings.auth_throttle_base_seconds * (2**exponent),
             settings.auth_throttle_max_seconds,
         )
         row.blocked_until = now + timedelta(seconds=seconds)
+    return row
+
+
+def _count_account_failure(
+    session: Session, account_key: str, now: datetime, settings: Settings
+) -> None:
+    _count_attempt(
+        session,
+        "account",
+        account_key,
+        now=now,
+        window=None,
+        free=settings.auth_account_free_failures,
+        settings=settings,
+    )
+
+
+def _reset_account(session: Session, account_key: str, now: datetime) -> None:
+    row = _find_throttle(session, "account", account_key)
+    if row is not None and (row.failure_count or row.blocked_until is not None):
+        row.failure_count = 0
+        row.blocked_until = None
+        row.updated_at = now
 
 
 def prune_auth_throttles(session: Session, clock: Clock) -> int:
@@ -325,7 +389,7 @@ def prune_auth_throttles(session: Session, clock: Clock) -> int:
     deleted = session.scalars(
         delete(AuthThrottle)
         .where(
-            AuthThrottle.updated_at < now - THROTTLE_RETENTION,
+            AuthThrottle.updated_at < now - THROTTLE_IDLE_RESET,
             or_(AuthThrottle.blocked_until.is_(None), AuthThrottle.blocked_until <= now),
         )
         .returning(AuthThrottle.id)
@@ -363,13 +427,20 @@ def verify_setup_token(
 ) -> bool:
     """Check a setup token; the caller must commit after ``False`` to keep the counter."""
     now = clock.now()
-    row = _throttle_row(session, "setup", _ip_key(host), clock)
-    _expire_window(row, now, timedelta(minutes=settings.auth_ip_window_minutes))
-    if _is_blocked(row, now):
+    key = _ip_key(host)
+    if _is_blocked(_find_throttle(session, "setup", key), now):
         return False
     if secrets.compare_digest(provided.encode("utf-8"), expected.encode("utf-8")):
         return True
-    _count_with_backoff(row, now, settings.setup_throttle_free_failures, settings)
+    _count_attempt(
+        session,
+        "setup",
+        key,
+        now=now,
+        window=timedelta(minutes=settings.auth_ip_window_minutes),
+        free=settings.setup_throttle_free_failures,
+        settings=settings,
+    )
     prune_auth_throttles(session, clock)
     return False
 
@@ -395,18 +466,27 @@ def authenticate_user(
         account_key = normalize_email(lookup)
     except InvalidEmail:
         account_key = f"invalid:{lookup}"
-    account_row = _throttle_row(session, "account", account_key, clock)
-    ip_row = _throttle_row(session, "ip", _ip_key(host), clock)
-    _expire_window(ip_row, now, timedelta(minutes=settings.auth_ip_window_minutes))
-    if _is_blocked(account_row, now) or _is_blocked(ip_row, now):
+    ip_key = _ip_key(host)
+    # Blocked attempts are answered from read-only lookups and write nothing.
+    if _is_blocked(_find_throttle(session, "ip", ip_key), now) or _is_blocked(
+        _find_throttle(session, "account", account_key), now
+    ):
         return LoginOutcome()
 
     user = session.scalar(select(User).where(User.email == lookup))
     password_hash = user.password_hash if user is not None else None
-    verified = verify_password(password_hash or _dummy_hash(settings), password, settings)
+    verified = verify_password(password_hash or _dummy_hash(), password)
     if user is None or password_hash is None or not user.is_active or not verified:
-        _count_with_backoff(account_row, now, settings.auth_account_free_failures, settings)
-        _count_with_backoff(ip_row, now, settings.auth_ip_free_failures, settings)
+        _count_account_failure(session, account_key, now, settings)
+        _count_attempt(
+            session,
+            "ip",
+            ip_key,
+            now=now,
+            window=timedelta(minutes=settings.auth_ip_window_minutes),
+            free=settings.auth_ip_free_failures,
+            settings=settings,
+        )
         prune_auth_throttles(session, clock)
         _audit(
             session,
@@ -422,10 +502,8 @@ def authenticate_user(
         return LoginOutcome()
 
     # Only the account counter resets; the per-IP counter decays with its time window.
-    account_row.failure_count = 0
-    account_row.blocked_until = None
-    account_row.updated_at = now
-    hasher = password_hasher(settings)
+    _reset_account(session, account_key, now)
+    hasher = password_hasher()
     if hasher.check_needs_rehash(password_hash):
         user.password_hash = hasher.hash(password)
     user.last_login_at = now
@@ -576,13 +654,25 @@ def change_password(
     current_session_id: str | None = None,
     host: str | None = None,
     user_agent: str | None = None,
-) -> int:
-    """Change the password and revoke every other session; returns the revoked count."""
-    if user.password_hash is None or not verify_password(
-        user.password_hash, current_password, settings
-    ):
-        raise InvalidCurrentPassword
-    user.password_hash = hash_password(new_password, user.email, user.display_name, settings)
+) -> PasswordChangeOutcome:
+    """Change the password and revoke every other session; the caller commits any outcome.
+
+    Wrong current passwords count against the same per-account throttle as login.
+    """
+    now = clock.now()
+    account_key = user.email
+    if _is_blocked(_find_throttle(session, "account", account_key), now):
+        return PasswordChangeOutcome(status="throttled")
+    if user.password_hash is None or not verify_password(user.password_hash, current_password):
+        _count_account_failure(session, account_key, now, settings)
+        prune_auth_throttles(session, clock)
+        return PasswordChangeOutcome(status="invalid_current")
+    _reset_account(session, account_key, now)
+    try:
+        new_hash = hash_password(new_password, user.email, user.display_name)
+    except PasswordPolicyError as exc:
+        return PasswordChangeOutcome(status="invalid_new", error=exc)
+    user.password_hash = new_hash
     keep_hash = session_id_hash(current_session_id) if current_session_id else None
     revoked = _delete_sessions_except(session, user.id, keep_hash)
     _audit(
@@ -597,7 +687,7 @@ def change_password(
         user_agent=user_agent,
         data={"other_sessions_revoked": revoked},
     )
-    return revoked
+    return PasswordChangeOutcome(status="changed", revoked_sessions=revoked)
 
 
 # Account creation
@@ -656,7 +746,7 @@ def _create_user_records(
         display_name, "invalid_display_name", "Display name must contain 1 to 120 characters"
     )
     normalized_email = normalize_email(email)
-    password_hash = hash_password(password, normalized_email, clean_display_name, settings)
+    password_hash = hash_password(password, normalized_email, clean_display_name)
     user = User(
         email=normalized_email,
         display_name=clean_display_name,
@@ -812,18 +902,19 @@ def register_user(
 ) -> RegistrationOutcome:
     """Open registration; every attempt counts against its own per-IP window.
 
-    Registration never touches the login throttle, so it cannot be used to clear it. The caller
-    commits whatever the outcome.
+    Registration never touches the login throttle, so it cannot be used to clear it. The
+    outcome discloses whether an email is already registered (see ``RegistrationOutcome``).
+    The caller commits whatever the outcome.
     """
     if not settings.allow_registration:
         raise RegistrationDisabled
     now = clock.now()
-    row = _throttle_row(session, "register", _ip_key(host), clock)
-    _expire_window(row, now, timedelta(minutes=settings.registration_window_minutes))
-    if row.failure_count >= settings.registration_ip_limit:
+    key = _ip_key(host)
+    window = timedelta(minutes=settings.registration_window_minutes)
+    row = _find_throttle(session, "register", key)
+    if _current_count(row, now, window) >= settings.registration_ip_limit:
         return RegistrationOutcome(status="throttled")
-    row.failure_count += 1
-    row.updated_at = now
+    _count_attempt(session, "register", key, now=now, window=window, free=None, settings=settings)
     prune_auth_throttles(session, clock)
 
     try:
@@ -844,8 +935,8 @@ def register_user(
         return RegistrationOutcome(status="invalid", error=error)
 
     if session.scalar(select(User.id).where(User.email == normalized_email)) is not None:
-        # Spend the same hashing cost as a real registration before rejecting generically.
-        password_hasher(settings).hash(password)
+        # Spend the same hashing cost as a real registration before rejecting.
+        password_hasher().hash(password)
         return RegistrationOutcome(status="rejected")
 
     user, workspace = _create_user_records(
@@ -889,7 +980,7 @@ def reset_user_password(
     user = session.scalar(select(User).where(User.email == normalized))
     if user is None:
         raise UnknownUser
-    user.password_hash = hash_password(password, user.email, user.display_name, settings)
+    user.password_hash = hash_password(password, user.email, user.display_name)
     revoked = _delete_sessions_except(session, user.id, None)
     _audit(
         session,

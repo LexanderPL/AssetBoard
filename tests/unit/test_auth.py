@@ -7,7 +7,8 @@ from threading import Event, Thread
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select
+from argon2 import extract_parameters, profiles
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -30,8 +31,8 @@ from assetboard.services import auth
 from assetboard.services.auth import (
     EmailAlreadyRegistered,
     InvalidAccountDetails,
-    InvalidCurrentPassword,
     LoginOutcome,
+    PasswordChangeOutcome,
     PasswordPolicyError,
     RegistrationDisabled,
     SetupAlreadyCompleted,
@@ -70,12 +71,12 @@ def at(**delta: float) -> FixedClock:
 
 @pytest.fixture
 def auth_settings() -> Settings:
-    return Settings(_env_file=None, auth_test_profile=True, secret_key="test-master-key")
+    return Settings(_env_file=None, secret_key="test-master-key")
 
 
 @pytest.fixture
 def registration_settings() -> Settings:
-    return Settings(_env_file=None, auth_test_profile=True, allow_registration=True)
+    return Settings(_env_file=None, allow_registration=True)
 
 
 def _create_user(
@@ -208,27 +209,37 @@ def test_password_policy_accepts_ten_characters_without_composition_rules(passwo
     validate_password(password, "alice@example.com", "Alice")
 
 
-def test_password_hash_is_argon2id_and_common_list_is_bounded(auth_settings: Settings) -> None:
-    production = Settings(_env_file=None)
-    assert hash_password(PASSWORD, "alice@example.com", "Alice", production).startswith(
-        "$argon2id$"
-    )
-    assert hash_password(PASSWORD, "alice@example.com", "Alice", auth_settings).startswith(
-        "$argon2id$"
-    )
+def test_password_hash_is_argon2id_and_common_list_is_bounded(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert hash_password(PASSWORD, "alice@example.com", "Alice").startswith("$argon2id$")
+    monkeypatch.setattr(auth, "ARGON2_PARAMETERS", None)
+    production = hash_password(PASSWORD, "alice@example.com", "Alice")
+    assert production.startswith("$argon2id$")
+    assert extract_parameters(production) == profiles.get_default_parameters()
     assert len(common_passwords()) == 10000
     assert "password" in common_passwords()
 
 
-def test_argon2_verification_and_production_profile_rehashes_test_hashes(
-    auth_settings: Settings,
+def test_production_hasher_uses_library_defaults_and_rehashes_cheap_hashes(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    encoded = hash_password(PASSWORD, "alice@example.com", "Alice", auth_settings)
-    assert auth.verify_password(encoded, PASSWORD, auth_settings)
-    assert not auth.verify_password(encoded, "incorrect password", auth_settings)
-    assert not auth.verify_password("not-a-hash", PASSWORD, auth_settings)
-    assert not auth.password_hasher(auth_settings).check_needs_rehash(encoded)
-    assert auth.password_hasher(Settings(_env_file=None)).check_needs_rehash(encoded)
+    encoded = hash_password(PASSWORD, "alice@example.com", "Alice")
+    assert extract_parameters(encoded) == profiles.CHEAPEST  # autouse test seam
+    assert auth.verify_password(encoded, PASSWORD)
+    assert not auth.verify_password(encoded, "incorrect password")
+    assert not auth.verify_password("not-a-hash", PASSWORD)
+    assert not auth.password_hasher().check_needs_rehash(encoded)
+    monkeypatch.setattr(auth, "ARGON2_PARAMETERS", None)
+    assert profiles.get_default_parameters() == profiles.RFC_9106_LOW_MEMORY
+    assert extract_parameters(auth.password_hasher().hash(PASSWORD)) == (
+        profiles.get_default_parameters()
+    )
+    assert auth.password_hasher().check_needs_rehash(encoded)
+
+
+def test_settings_have_no_password_hashing_switch() -> None:
+    assert not any("hash" in name or "profile" in name for name in Settings.model_fields)
 
 
 # Sessions
@@ -282,7 +293,6 @@ def test_idle_and_absolute_expiry_use_injected_clock_and_settings(
 ) -> None:
     settings = Settings(
         _env_file=None,
-        auth_test_profile=True,
         session_idle_timeout_days=idle_days,
         session_absolute_timeout_days=absolute_days,
     )
@@ -347,7 +357,7 @@ def test_login_rotates_session_rehashes_and_audits_success(
         db_session, user, settings=auth_settings, clock=fixed_clock, host=None
     )
     old_hash = user.password_hash
-    real_hasher = auth.password_hasher(auth_settings)
+    real_hasher = auth.password_hasher()
 
     class RehashingHasher:
         def verify(self, encoded: str, password: str) -> bool:
@@ -359,7 +369,7 @@ def test_login_rotates_session_rehashes_and_audits_success(
         def hash(self, password: str) -> str:
             return real_hasher.hash(password)
 
-    monkeypatch.setattr(auth, "password_hasher", lambda _settings: RehashingHasher())
+    monkeypatch.setattr(auth, "password_hasher", lambda: RehashingHasher())
     outcome = _login(
         db_session,
         auth_settings,
@@ -411,9 +421,9 @@ def test_unknown_user_and_user_without_password_go_through_dummy_verify(
     calls: list[str] = []
     real_verify = auth.verify_password
 
-    def recording_verify(encoded: str, password: str, settings: Settings) -> bool:
+    def recording_verify(encoded: str, password: str) -> bool:
         calls.append(encoded)
-        return real_verify(encoded, password, settings)
+        return real_verify(encoded, password)
 
     monkeypatch.setattr(auth, "verify_password", recording_verify)
     _login(db_session, auth_settings, fixed_clock, email="unknown@example.com")
@@ -443,7 +453,6 @@ def test_account_backoff_is_exponential_capped_and_configurable(
 
     custom = Settings(
         _env_file=None,
-        auth_test_profile=True,
         auth_account_free_failures=2,
         auth_throttle_base_seconds=10,
         auth_throttle_max_seconds=30,
@@ -844,7 +853,7 @@ def test_registration_creates_owner_workspace_and_one_workspace_audit_event(
     assert events[0].data == {}
 
 
-def test_registration_does_not_reveal_existing_email(
+def test_registration_rejects_existing_email_without_creating_a_user(
     db_session: Session, registration_settings: Settings, fixed_clock: FixedClock
 ) -> None:
     _create_user(db_session, registration_settings, fixed_clock, email="taken@example.com")
@@ -920,32 +929,41 @@ def test_change_password_invalidates_other_sessions_but_keeps_current(
     other = create_user_session(
         db_session, user, settings=auth_settings, clock=fixed_clock, host=None
     )
-    with pytest.raises(InvalidCurrentPassword):
-        change_password(
-            db_session,
-            user,
-            "wrong current",
-            "An even Stronger Password",
-            settings=auth_settings,
-            clock=fixed_clock,
-            current_session_id=current,
-        )
-    assert (
-        change_password(
-            db_session,
-            user,
-            PASSWORD,
-            "An even Stronger Password",
-            settings=auth_settings,
-            clock=fixed_clock,
-            current_session_id=current,
-        )
-        == 1
+    wrong = change_password(
+        db_session,
+        user,
+        "wrong current",
+        "An even Stronger Password",
+        settings=auth_settings,
+        clock=fixed_clock,
+        current_session_id=current,
     )
+    assert wrong == PasswordChangeOutcome(status="invalid_current")
+    weak = change_password(
+        db_session,
+        user,
+        PASSWORD,
+        "qwertyuiop",
+        settings=auth_settings,
+        clock=fixed_clock,
+        current_session_id=current,
+    )
+    assert weak.status == "invalid_new" and weak.error and weak.error.code == "password_too_common"
+    assert db_session.get(UserSession, session_id_hash(other)) is not None
+    changed = change_password(
+        db_session,
+        user,
+        PASSWORD,
+        "An even Stronger Password",
+        settings=auth_settings,
+        clock=fixed_clock,
+        current_session_id=current,
+    )
+    assert changed == PasswordChangeOutcome(status="changed", revoked_sessions=1)
     assert db_session.get(UserSession, session_id_hash(current)) is not None
     assert db_session.get(UserSession, session_id_hash(other)) is None
     assert user.password_hash and auth.verify_password(
-        user.password_hash, "An even Stronger Password", auth_settings
+        user.password_hash, "An even Stronger Password"
     )
     event = db_session.scalar(select(AuditEvent).where(AuditEvent.action == "auth.password_change"))
     assert event is not None and event.data == {"other_sessions_revoked": 1}
@@ -1040,7 +1058,7 @@ def test_reset_password_sets_password_revokes_all_sessions_and_audits(
         clock=fixed_clock,
     )
     assert user.password_hash and auth.verify_password(
-        user.password_hash, "Brand New Strong Password", auth_settings
+        user.password_hash, "Brand New Strong Password"
     )
     assert db_session.scalars(select(UserSession)).all() == []
     event = db_session.scalar(select(AuditEvent).where(AuditEvent.action == "cli.reset_password"))
@@ -1092,14 +1110,17 @@ def test_audit_action_set_and_failed_login_never_stores_attempted_identifier(
         password="Audit User Strong Password",
     )
     assert outcome.session_id is not None
-    change_password(
-        db_session,
-        user,
-        "Audit User Strong Password",
-        "Audit User New Strong Password",
-        settings=auth_settings,
-        clock=fixed_clock,
-        current_session_id=outcome.session_id,
+    assert (
+        change_password(
+            db_session,
+            user,
+            "Audit User Strong Password",
+            "Audit User New Strong Password",
+            settings=auth_settings,
+            clock=fixed_clock,
+            current_session_id=outcome.session_id,
+        ).status
+        == "changed"
     )
     revoke_session(db_session, outcome.session_id, clock=fixed_clock)
     cli_user, _ = create_admin_cli(
@@ -1163,3 +1184,117 @@ def test_workspace_table_scope_allowlist_for_f12() -> None:
             assert "workspace_id" not in model_table.c
             assert table in expected_global
     assert set(mapped) == set(expected_global) | {"audit_events", "memberships"}
+
+
+def test_change_password_wrong_attempts_use_the_account_throttle(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    user = _create_user(db_session, auth_settings, fixed_clock)
+
+    def attempt(current: str, clock: FixedClock) -> PasswordChangeOutcome:
+        return change_password(
+            db_session,
+            user,
+            current,
+            "Another Strong Password",
+            settings=auth_settings,
+            clock=clock,
+        )
+
+    statuses = [attempt("wrong current", fixed_clock).status for _ in range(6)]
+    assert statuses == ["invalid_current"] * 6
+    assert attempt(PASSWORD, fixed_clock).status == "throttled"
+    assert auth.verify_password(user.password_hash or "", PASSWORD)
+    # The same bucket blocks login, and the block ends with the backoff.
+    assert not _login(db_session, auth_settings, fixed_clock, password=PASSWORD).succeeded
+    assert attempt(PASSWORD, at(seconds=60)).status == "changed"
+
+
+@pytest.mark.parametrize(
+    ("host", "normal", "throttle"),
+    [
+        ("::ffff:192.0.2.7", "192.0.2.0/24", "192.0.2.7/32"),
+        ("::ffff:198.51.100.9", "198.51.100.0/24", "198.51.100.9/32"),
+    ],
+)
+def test_ipv4_mapped_ipv6_addresses_are_unwrapped(host: str, normal: str, throttle: str) -> None:
+    assert client_ip_prefix(host) == normal
+    assert client_ip_prefix(host, for_throttle=True) == throttle
+
+
+def test_ipv4_mapped_clients_get_separate_throttle_buckets(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    _login(db_session, auth_settings, fixed_clock, email="a@example.com", host="::ffff:192.0.2.7")
+    _login(db_session, auth_settings, fixed_clock, email="b@example.com", host="::ffff:192.0.2.8")
+    first = _throttle(db_session, "ip", "192.0.2.7/32")
+    second = _throttle(db_session, "ip", "192.0.2.8/32")
+    assert first is not None and second is not None and first.id != second.id
+    assert (first.failure_count, second.failure_count) == (1, 1)
+    # Same bucket whether the client arrives over IPv4 or as an IPv4-mapped IPv6 address.
+    _login(db_session, auth_settings, fixed_clock, email="c@example.com", host="192.0.2.7")
+    assert first.failure_count == 2
+
+
+def test_blocked_login_attempts_with_distinct_emails_add_no_rows(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    for index in range(auth_settings.auth_ip_free_failures + 1):
+        _login(db_session, auth_settings, fixed_clock, email=f"spray-{index}@example.com")
+    ip_row = _throttle(db_session, "ip", "192.0.2.10/32")
+    assert ip_row is not None and ip_row.blocked_until is not None
+    db_session.flush()
+    rows_before = db_session.scalars(select(AuthThrottle)).all()
+    snapshot = [(r.key_type, r.key_hash, r.failure_count, r.updated_at) for r in rows_before]
+    audits_before = len(db_session.scalars(select(AuditEvent)).all())
+    for index in range(10):
+        outcome = _login(
+            db_session, auth_settings, fixed_clock, email=f"blocked-{index}@example.com"
+        )
+        assert outcome == LoginOutcome()
+    db_session.flush()
+    rows_after = db_session.scalars(select(AuthThrottle)).all()
+    assert [(r.key_type, r.key_hash, r.failure_count, r.updated_at) for r in rows_after] == snapshot
+    assert len(db_session.scalars(select(AuditEvent)).all()) == audits_before
+
+
+@pytest.mark.parametrize("pruning", [True, False])
+def test_account_counter_idle_for_24_hours_counts_as_zero(
+    db_session: Session,
+    auth_settings: Settings,
+    fixed_clock: FixedClock,
+    monkeypatch: pytest.MonkeyPatch,
+    pruning: bool,
+) -> None:
+    if not pruning:
+        monkeypatch.setattr(auth, "prune_auth_throttles", lambda _session, _clock: 0)
+    for _ in range(auth_settings.auth_account_free_failures):
+        _login(db_session, auth_settings, fixed_clock, email="idle@example.com")
+    almost = at(hours=24, seconds=-1)
+    _login(db_session, auth_settings, almost, email="idle@example.com")
+    row = _throttle(db_session, "account", "idle@example.com")
+    assert row is not None and row.failure_count == 6 and row.blocked_until is not None
+
+    later = at(hours=48)
+    if pruning:
+        assert prune_auth_throttles(db_session, later) >= 1
+        db_session.flush()
+        assert _throttle(db_session, "account", "idle@example.com") is None
+    else:
+        assert auth.prune_auth_throttles(db_session, later) == 0
+    _login(db_session, auth_settings, later, email="idle@example.com")
+    row = _throttle(db_session, "account", "idle@example.com")
+    assert row is not None
+    assert (row.failure_count, row.blocked_until) == (1, None)
+
+
+def test_users_email_must_be_stored_lowercase(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    user = _create_user(db_session, auth_settings, fixed_clock)
+    db_session.flush()
+    with pytest.raises(IntegrityError, match="ck_users_email_lowercase"), db_session.begin_nested():
+        db_session.execute(
+            text("UPDATE users SET email = 'Mixed@Example.com' WHERE id = :id"),
+            {"id": user.id.hex},
+        )

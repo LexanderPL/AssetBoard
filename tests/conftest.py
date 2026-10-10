@@ -5,6 +5,7 @@ from collections.abc import Iterator
 from pathlib import Path
 
 import pytest
+from argon2 import profiles
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
@@ -13,6 +14,7 @@ from assetboard.clock import FixedClock
 from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine
 from assetboard.db.migrate import upgrade_database
+from assetboard.services import auth as auth_service
 
 
 @pytest.fixture(autouse=True)
@@ -44,7 +46,6 @@ def isolate_application_data_dir(
         "SETUP_THROTTLE_FREE_FAILURES",
         "REGISTRATION_IP_LIMIT",
         "REGISTRATION_WINDOW_MINUTES",
-        "AUTH_TEST_PROFILE",
     ):
         monkeypatch.delenv(f"{ENV_PREFIX}_{name}", raising=False)
 
@@ -58,6 +59,12 @@ def isolate_application_data_dir(
     for handler in tuple(logger.handlers):
         logger.removeHandler(handler)
         handler.close()
+
+
+@pytest.fixture(autouse=True)
+def cheap_password_hashing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Test-only seam: production hashing keeps argon2-cffi's default parameters."""
+    monkeypatch.setattr(auth_service, "ARGON2_PARAMETERS", profiles.CHEAPEST)
 
 
 @pytest.fixture(scope="session")

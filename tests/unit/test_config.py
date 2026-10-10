@@ -41,7 +41,6 @@ def test_settings_are_side_effect_free_and_use_spec_defaults(
     assert settings.auth_throttle_base_seconds == 60
     assert settings.auth_throttle_max_seconds == 900
     assert settings.setup_throttle_free_failures == 5
-    assert settings.auth_test_profile is False
     assert not data_dir.exists()
 
 
@@ -186,8 +185,3 @@ def test_settings_configure_auth_thresholds_timeouts_and_secret_token(
 def test_settings_reject_idle_timeout_longer_than_absolute_timeout() -> None:
     with pytest.raises(ValueError, match="SESSION_IDLE_TIMEOUT_DAYS"):
         Settings(_env_file=None, session_idle_timeout_days=30, session_absolute_timeout_days=14)
-
-
-def test_settings_refuse_auth_test_profile_in_production() -> None:
-    with pytest.raises(ValueError, match="AUTH_TEST_PROFILE"):
-        Settings(_env_file=None, env="prod", auth_test_profile=True)
