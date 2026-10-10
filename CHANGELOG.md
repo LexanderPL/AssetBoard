@@ -12,11 +12,6 @@
 * **web:** implement F0.4 UI shell, i18n, and dev server ([e69e47c](https://github.com/LexanderPL/AssetBoard/commit/e69e47c87c334242275b656a92c7cd11ef127d87))
 
 
-### Bug Fixes
-
-* address final F0.5 Docker review feedback ([a82e87b](https://github.com/LexanderPL/AssetBoard/commit/a82e87b4e15ff185f5d5e6c1f48495d38f964791))
-
-
 ### Documentation
 
 * Add specs ([956dd24](https://github.com/LexanderPL/AssetBoard/commit/956dd24420046207c00488b0b5d029b2679eee71))
