@@ -24,7 +24,10 @@ from assetboard.domain.identity import normalize_email
 
 class User(IdMixin, TimestampMixin, Base):
     __tablename__ = "users"
-    __table_args__ = (UniqueConstraint("email", name="uq_users_email_normalized"),)
+    __table_args__ = (
+        UniqueConstraint("email", name="uq_users_email_normalized"),
+        CheckConstraint("email = lower(email)", name="email_lowercase"),
+    )
 
     email: Mapped[str] = mapped_column(String(320), nullable=False)
     display_name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -100,7 +103,7 @@ class AuditEvent(Base):
     entity_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
     data: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     ts: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
-    ip_prefix: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    ip_prefix: Mapped[str | None] = mapped_column(String(64), nullable=True)
     user_agent: Mapped[str | None] = mapped_column(String(200), nullable=True)
 
 

@@ -30,6 +30,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         tables = set(inspect(engine).get_table_names())
         with engine.connect() as connection:
             current_heads = MigrationContext.configure(connection).get_current_heads()
+            setup_rows = connection.exec_driver_sql("SELECT id FROM setup_state").scalars().all()
     finally:
         engine.dispose()
 
@@ -43,8 +44,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "users",
         "workspaces",
     }
-    with engine.connect() as connection:
-        assert connection.exec_driver_sql("SELECT id FROM setup_state").scalar_one() == 1
+    assert setup_rows == [1]
     assert current_heads == tuple(ScriptDirectory.from_config(alembic_config(settings)).get_heads())
     config = alembic_config(settings)
     script_location = config.get_main_option("script_location")
