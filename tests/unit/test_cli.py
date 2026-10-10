@@ -7,11 +7,15 @@ from pathlib import Path
 
 import pytest
 import uvicorn
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
 from typer.testing import CliRunner
 
 from assetboard import cli
 from assetboard.branding import ENV_PREFIX
 from assetboard.cli import app as cli_app
+from assetboard.clock import FixedClock
+from assetboard.db.models.identity import Membership, User, Workspace
 
 
 def test_assetboard_console_script_help_runs() -> None:
@@ -65,7 +69,6 @@ def test_migrate_runs_upgrade_in_configured_data_directory(tmp_path: Path) -> No
 def _auth_env(data_dir: Path, **extra: str) -> dict[str, str]:
     env = {
         f"{ENV_PREFIX}_DATA_DIR": str(data_dir),
-        f"{ENV_PREFIX}_AUTH_TEST_PROFILE": "true",
     }
     env.update({f"{ENV_PREFIX}_{name}": value for name, value in extra.items()})
     return env
@@ -314,3 +317,34 @@ def test_create_admin_with_password_stdin_requires_identity_options(tmp_path: Pa
     )
     assert result.exit_code != 0
     assert "--display-name are required" in result.output
+
+
+def test_only_the_users_email_unique_violation_counts_as_duplicate_email(
+    db_session: Session, fixed_clock: FixedClock
+) -> None:
+    user = User(email="dup@example.com", display_name="Dup")
+    workspace = Workspace(name="Home")
+    db_session.add_all([user, workspace])
+    db_session.flush()
+    with pytest.raises(IntegrityError) as duplicate_email, db_session.begin_nested():
+        db_session.add(User(email="dup@example.com", display_name="Again"))
+    assert cli.is_email_conflict(duplicate_email.value)
+
+    db_session.add(Membership(workspace_id=workspace.id, user_id=user.id, role="owner"))
+    db_session.flush()
+    with pytest.raises(IntegrityError) as duplicate_membership, db_session.begin_nested():
+        db_session.add(Membership(workspace_id=workspace.id, user_id=user.id, role="viewer"))
+    assert not cli.is_email_conflict(duplicate_membership.value)
+
+
+def test_create_admin_does_not_mask_other_integrity_errors(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise IntegrityError("INSERT", {}, Exception("FOREIGN KEY constraint failed"))
+
+    monkeypatch.setattr(cli, "create_admin_cli", fail)
+    result = _create_admin(_auth_env(tmp_path / "auth-data"), "cli@example.com")
+    assert result.exit_code != 0
+    assert "already exists" not in result.output
+    assert isinstance(result.exception, IntegrityError)

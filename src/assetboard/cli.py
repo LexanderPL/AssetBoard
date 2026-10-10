@@ -61,6 +61,13 @@ class CommandError(Exception):
     pass
 
 
+def is_email_conflict(error: IntegrityError) -> bool:
+    """True only for the users email unique constraint (SQLite names the column, PostgreSQL the
+    constraint)."""
+    message = str(error.orig)
+    return "uq_users_email_normalized" in message or "users.email" in message
+
+
 def _read_password(password_stdin: bool) -> str:
     if password_stdin:
         password = sys.stdin.read().rstrip("\r\n")
@@ -141,6 +148,9 @@ def create_admin_command(
             ),
         )
     except IntegrityError as exc:
+        # The service checks first; this covers a concurrent insert of the same email.
+        if not is_email_conflict(exc):
+            raise
         typer.echo(EmailAlreadyRegistered().args[0], err=True)
         raise typer.Exit(code=1) from exc
     except (CommandError, ValueError, OSError) as exc:
