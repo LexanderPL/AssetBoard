@@ -99,3 +99,20 @@ def test_serve_reports_unwritable_data_directory(
     assert result.exit_code == 1
     assert "DATA_DIR is not writable" in result.output
     assert "chown 10001:10001" in result.output
+
+
+def test_serve_reports_settings_error(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    def fail_settings() -> object:
+        raise ValueError("Invalid configuration")
+
+    monkeypatch.setattr(cli, "Settings", fail_settings)
+    result = CliRunner().invoke(cli_app, ["serve"])
+
+    assert result.exit_code == 1
+    assert "Invalid configuration" in result.output
+    assert "Traceback" not in result.output
