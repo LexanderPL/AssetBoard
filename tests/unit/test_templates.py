@@ -53,6 +53,28 @@ def test_vendored_javascript_matches_documented_hashes() -> None:
         assert actual_hash == expected_hash
 
 
+def test_each_vendored_javascript_has_a_documented_license() -> None:
+    repository = Path(__file__).parents[2]
+    vendor_directory = repository / "src/assetboard/static/vendor"
+    manifest = (vendor_directory / "README.md").read_text(encoding="utf-8")
+    javascript_files = sorted(vendor_directory.glob("*.js"))
+
+    assert javascript_files
+    for javascript_file in javascript_files:
+        asset_rows = [
+            line
+            for line in manifest.splitlines()
+            if line.startswith("|") and f"`{javascript_file.name}`" in line
+        ]
+        assert len(asset_rows) == 1, f"README must list {javascript_file.name} once"
+        columns = [column.strip() for column in asset_rows[0].strip("|").split("|")]
+        assert len(columns) >= 5
+        assert columns[2], f"README must name a license for {javascript_file.name}"
+        license_file_name = columns[4].strip("`")
+        assert license_file_name.endswith("-LICENSE.txt")
+        assert (vendor_directory / license_file_name).is_file()
+
+
 def test_built_css_uses_class_based_dark_mode() -> None:
     css_path = Path(__file__).parents[2] / "src/assetboard/static/css/app.css"
     css = css_path.read_text(encoding="utf-8")
