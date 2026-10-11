@@ -357,3 +357,18 @@ def test_csrf_key_is_a_subkey_of_the_persisted_secret_and_survives_restart(
     )
     explicit.state.database_engine.dispose()
     assert explicit.state.csrf_key == derive_subkey("operator-secret", "csrf")
+
+
+def test_dummy_hash_is_computed_once_at_startup_before_any_request(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from assetboard.services import auth
+
+    monkeypatch.setattr(auth, "_cached_dummy_hashes", {})
+    app = create_app(Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret"))
+    with TestClient(app):
+        cached = dict(auth._cached_dummy_hashes)  # pyright: ignore[reportPrivateUsage]
+        assert len(cached) == 1
+        assert next(iter(cached.values())).startswith("$argon2id$")
+        auth.prepare_dummy_hash()  # later callers reuse it
+        assert auth._cached_dummy_hashes == cached  # pyright: ignore[reportPrivateUsage]

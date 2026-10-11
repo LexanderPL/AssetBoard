@@ -8,7 +8,10 @@ import httpx
 import pytest
 
 from assetboard.app import create_app
+from assetboard.clock import Clock
 from assetboard.config import Settings
+from assetboard.db.migrate import upgrade_database
+from assetboard.services import auth
 from assetboard.services.hash_gate import HashGate, HashGateBusy
 
 
@@ -131,3 +134,70 @@ def test_healthz_stays_responsive_while_hashing_is_saturated(tmp_path: Path) -> 
         asyncio.run(scenario())
     finally:
         app.state.database_engine.dispose()
+
+
+def test_saturated_logins_starve_neither_sync_routes_nor_queued_requests(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """40 real logins at AUTH_MAX_CONCURRENT_HASHES=8: 8 hash, 16 wait, 16 are told to retry.
+
+    Flow threads parked behind the gate hold default-limiter tokens; the dedicated hashing
+    limiter and the 16-waiter cap leave enough of the 40 default tokens for sync routes.
+    """
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, secret_key="test-secret", auth_max_concurrent_hashes=8
+    )
+    upgrade_database(settings)
+    app = create_app(settings)
+    app.add_api_route("/sync-probe", lambda: {"ok": True})  # a plain def route: runs in a thread
+    blocker = Blocker()
+    real_verify = auth.verify_password
+
+    def slow_verify(password_hash: str, password: str) -> bool:
+        blocker()
+        return real_verify(password_hash, password)
+
+    monkeypatch.setattr(auth, "verify_password", slow_verify)
+    auth.prepare_dummy_hash()
+    gate: HashGate = app.state.hash_gate
+
+    async def login(index: int) -> object:
+        try:
+            return await auth.authenticate_user_async(
+                app.state.session_factory,
+                gate,
+                email=f"user-{index}@example.com",
+                password="Correct Horse Battery!",
+                settings=settings,
+                clock=Clock(),
+                host=f"192.0.2.{index + 1}",
+            )
+        except HashGateBusy as exc:
+            return exc
+
+    async def scenario() -> list[object]:
+        logins = [asyncio.create_task(login(index)) for index in range(40)]
+        busy = lambda: sum(  # noqa: E731
+            1 for task in logins if task.done() and isinstance(task.result(), HashGateBusy)
+        )
+        await _until(lambda: blocker.running == 8 and gate.waiting == 16 and busy() == 16, 15)
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+            async with asyncio.timeout(3):
+                responses = [
+                    await client.get("/healthz"),
+                    await client.get("/sync-probe"),
+                    await client.get("/readyz"),
+                ]
+        assert [response.status_code for response in responses] == [200, 200, 200]
+        blocker.release.set()
+        async with asyncio.timeout(20):  # every queued request still completes
+            return await asyncio.gather(*logins)
+
+    try:
+        results = asyncio.run(scenario())
+    finally:
+        app.state.database_engine.dispose()
+    assert sum(isinstance(result, HashGateBusy) for result in results) == 16
+    assert sum(isinstance(result, auth.LoginOutcome) for result in results) == 24
+    assert blocker.peak == 8

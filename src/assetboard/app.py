@@ -27,7 +27,12 @@ from assetboard.middleware import (
     SecurityHeadersMiddleware,
     add_security_headers,
 )
-from assetboard.services.auth import derive_subkey, setup_is_open, setup_token_at_startup
+from assetboard.services.auth import (
+    derive_subkey,
+    prepare_dummy_hash,
+    setup_is_open,
+    setup_token_at_startup,
+)
 from assetboard.services.hash_gate import HashGate
 from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
@@ -66,6 +71,8 @@ def create_app(
                 app.state.setup_token = setup_token_at_startup(
                     settings, setup_open=setup_open, logger=logger
                 )
+            # Unknown-user logins verify against this; compute it once, before any request.
+            await run_in_threadpool(prepare_dummy_hash)
             yield
         finally:
             engine.dispose()

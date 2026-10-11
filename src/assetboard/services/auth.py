@@ -19,6 +19,7 @@ import hmac
 import ipaddress
 import logging
 import secrets
+import threading
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -48,7 +49,7 @@ from assetboard.db.models.identity import (
     Workspace,
 )
 from assetboard.domain.identity import MAX_EMAIL_LENGTH, InvalidEmail, normalize_email
-from assetboard.services.hash_gate import HashGate
+from assetboard.services.hash_gate import HashGate, HashGateBusy
 from assetboard.services.workspace_options import WorkspaceOptions, validate_workspace_options
 
 ActorType = Literal["user", "cli", "system"]
@@ -63,6 +64,7 @@ THROTTLE_IDLE_RESET = timedelta(hours=24)
 # Test-only seam: an autouse fixture swaps in cheap parameters; production never sets it.
 ARGON2_PARAMETERS: Parameters | None = None
 _cached_dummy_hashes: dict[str, str] = {}
+_dummy_hash_lock = threading.Lock()
 
 Verifier = Callable[[str, str], bool]
 Hasher = Callable[[str], str]
@@ -72,6 +74,10 @@ class TransactionRunner(Protocol):
     """Runs one unit of work in a transaction and returns its result."""
 
     def __call__[T](self, operation: Callable[[Session], T], /) -> T: ...
+
+    def read[T](self, operation: Callable[[Session], T], /) -> T:
+        """Run a read-only step; it must not write."""
+        ...
 
 
 class SameSession:
@@ -83,15 +89,25 @@ class SameSession:
     def __call__[T](self, operation: Callable[[Session], T], /) -> T:
         return operation(self._session)
 
+    def read[T](self, operation: Callable[[Session], T], /) -> T:
+        return operation(self._session)
+
 
 class ImmediateTransactions:
-    """Runs every step in its own committed ``BEGIN IMMEDIATE`` transaction (web)."""
+    """Runs every write step in its own committed ``BEGIN IMMEDIATE`` transaction (web).
+
+    Read-only steps use an ordinary deferred transaction, so they never take the write lock.
+    """
 
     def __init__(self, factory: sessionmaker[Session]) -> None:
         self._factory = factory
 
     def __call__[T](self, operation: Callable[[Session], T], /) -> T:
         return run_immediate(self._factory, operation)
+
+    def read[T](self, operation: Callable[[Session], T], /) -> T:
+        with self._factory() as session:
+            return operation(session)
 
 
 class AuthError(ValueError):
@@ -231,11 +247,25 @@ def hash_password(password: str, email: str, display_name: str) -> str:
 
 
 def _dummy_hash() -> str:
+    """The hash verified for unknown users; computed once per process, never recomputed.
+
+    ``prepare_dummy_hash`` runs at startup, so requests normally only read the cache. The lock
+    makes concurrent cold callers (CLI, tests) compute it exactly once.
+    """
     key = repr(ARGON2_PARAMETERS)
-    if key not in _cached_dummy_hashes:
-        # Never a valid credential for any account; never logged.
-        _cached_dummy_hashes[key] = password_hasher().hash(secrets.token_urlsafe(32))
-    return _cached_dummy_hashes[key]
+    cached = _cached_dummy_hashes.get(key)
+    if cached is not None:
+        return cached
+    with _dummy_hash_lock:
+        if key not in _cached_dummy_hashes:
+            # Never a valid credential for any account; never logged.
+            _cached_dummy_hashes[key] = password_hasher().hash(secrets.token_urlsafe(32))
+        return _cached_dummy_hashes[key]
+
+
+def prepare_dummy_hash() -> None:
+    """Compute the dummy hash at startup so no request pays for it."""
+    _dummy_hash()
 
 
 def verify_password(password_hash: str, password: str) -> bool:
@@ -579,6 +609,7 @@ def _login_flow(
     user_agent: str | None,
     existing_session_id: str | None,
     verify: Verifier | None,
+    hasher: Hasher | None,
 ) -> LoginOutcome:
     lookup, account_key = _login_keys(email)
     slots = (
@@ -601,12 +632,33 @@ def _login_flow(
             reserved, user.id if user else None, user.password_hash if user else None
         )
 
+    def blocked(session: Session) -> bool:
+        now = clock.now()
+        return any(_is_blocked(_find_throttle(session, s.scope, s.key), now) for s in slots)
+
+    # A deferred read first, so a flood of blocked requests never takes the write lock;
+    # ``reserve`` checks again under the lock.
+    if run.read(blocked):
+        return LoginOutcome()
     candidate = run(reserve)
     if candidate is None:
         return LoginOutcome()
+    rehashed: str | None = None
     try:
         check = verify or verify_password
         verified = check(candidate.password_hash or _dummy_hash(), password)
+        # Decided right after verification and hashed before ``finish``: no hashing ever
+        # runs inside the write transaction.
+        if (
+            verified
+            and candidate.password_hash is not None
+            and password_hasher().check_needs_rehash(candidate.password_hash)
+        ):
+            try:
+                rehashed = (hasher or argon2_hash)(password)
+            except HashGateBusy:
+                # Best effort: the login still succeeds; the next login retries the rehash.
+                rehashed = None
     except BaseException:
         run(lambda session: release_attempts(session, candidate.reserved))
         raise
@@ -640,9 +692,9 @@ def _login_flow(
         # and otherwise decays with its time window.
         _reset_account(session, account_key, now)
         release_attempts(session, [item for item in candidate.reserved if item.scope == "ip"])
-        hasher = password_hasher()
-        if hasher.check_needs_rehash(user.password_hash):
-            user.password_hash = hasher.hash(password)
+        if rehashed is not None:
+            # Safe: ``succeeded`` above means the stored hash is still the verified one.
+            user.password_hash = rehashed
         user.last_login_at = now
         if existing_session_id:
             session.execute(
@@ -691,6 +743,7 @@ def authenticate_user(
         user_agent=user_agent,
         existing_session_id=existing_session_id,
         verify=None,
+        hasher=None,
     )
 
 
@@ -705,6 +758,7 @@ def authenticate_with_factory(
     user_agent: str | None = None,
     existing_session_id: str | None = None,
     verify: Verifier | None = None,
+    hasher: Hasher | None = None,
 ) -> LoginOutcome:
     """Authenticate with the reservation committed before ``verify`` runs (blocking)."""
     return _login_flow(
@@ -717,6 +771,7 @@ def authenticate_with_factory(
         user_agent=user_agent,
         existing_session_id=existing_session_id,
         verify=verify,
+        hasher=hasher,
     )
 
 
@@ -752,7 +807,7 @@ async def authenticate_user_async(
 
     Raises ``HashGateBusy`` (after releasing the reserved attempt) when hashing is saturated.
     """
-    verify = _gate_verifier(gate)
+    verify, hasher = _gate_verifier(gate), _gate_hasher(gate)
     return await anyio.to_thread.run_sync(
         lambda: authenticate_with_factory(
             factory,
@@ -764,6 +819,7 @@ async def authenticate_user_async(
             user_agent=user_agent,
             existing_session_id=existing_session_id,
             verify=verify,
+            hasher=hasher,
         )
     )
 
@@ -914,6 +970,15 @@ def _change_password_flow(
             return None
         return Candidate(reserved, user.password_hash, user.email, user.display_name)
 
+    def blocked(session: Session) -> bool:
+        user = session.get(User, user_id)
+        if user is None:
+            raise UnknownUser
+        return _is_blocked(_find_throttle(session, "account", user.email), clock.now())
+
+    # Deferred read first; ``reserve`` checks again under the write lock.
+    if run.read(blocked):
+        return PasswordChangeOutcome(status="throttled")
     candidate = run(reserve)
     if candidate is None:
         return PasswordChangeOutcome(status="throttled")

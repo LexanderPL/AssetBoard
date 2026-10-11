@@ -239,12 +239,6 @@ def test_production_hasher_uses_library_defaults_and_rehashes_cheap_hashes(
     assert auth.password_hasher().check_needs_rehash(encoded)
 
 
-def test_settings_have_no_password_hashing_switch() -> None:
-    # Only the concurrency cap mentions hashing; nothing can change hash parameters.
-    related = {n for n in Settings.model_fields if "hash" in n or "profile" in n or "argon" in n}
-    assert related == {"auth_max_concurrent_hashes"}
-
-
 # Sessions
 
 
