@@ -202,7 +202,9 @@ class AccessGateMiddleware:
         scope.setdefault("state", {})["web_session"] = current
         if current is None and path not in SIGNED_OUT_PATHS:
             target = "/login"
-            if scope.get("method") == "GET":  # ``next`` only for navigations
+            # ``next`` only for full-page GET navigations: an HTMX fragment's path is not a page
+            # to return to, so htmx is sent to plain /login.
+            if scope.get("method") == "GET" and not is_htmx_fragment_request(request):
                 original = path + (f"?{request.url.query}" if request.url.query else "")
                 target += "?next=" + quote(original, safe="")
             await _redirect(request, target)(scope, receive, send)

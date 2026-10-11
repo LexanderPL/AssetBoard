@@ -146,7 +146,10 @@ request. Make sure the proxy passes the original `Host` header and scheme.
 **Rate limiting.** In addition to the built-in throttling, rate-limit `POST /login` and
 `POST /register` at the reverse proxy (for example nginx `limit_req`, the Traefik `RateLimit`
 middleware, or a Caddy rate-limit module), such as a few requests per minute per client address.
-This keeps password-guessing floods from reaching the app at all.
+This keeps password-guessing floods from reaching the app at all. Also cap the request body size
+at the proxy (for example nginx `client_max_body_size 1m;`, the Traefik `Buffering` middleware's
+`maxRequestBodyBytes`, or Caddy `request_body { max_size 1MB }`): the app does not yet limit body
+sizes itself, and its forms need only a few kilobytes.
 
 ## Image tags
 

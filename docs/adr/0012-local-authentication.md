@@ -62,6 +62,9 @@ Neither middleware reads a request body; forms are parsed once, by FastAPI.
   memory, so the app must run as a single Uvicorn worker.
 - No user enumeration through sign-in: unknown email, wrong password and throttled attempts get
   the same response.
+- A failed sign-in returns 401 without `WWW-Authenticate`: no HTTP authentication scheme is
+  offered (the form is the only way in), and the 401 lets log-based tools such as fail2ban or
+  proxy rules count failures without parsing the page.
 - Accepted risks:
   - **Account lockout** by an attacker is bounded by the 15-minute backoff cap.
   - **Registration discloses existing emails** ("cannot be registered"); registration is off by
@@ -75,6 +78,15 @@ Neither middleware reads a request body; forms are parsed once, by FastAPI.
     proxy or Docker port publishing share one per-address budget.
   - **Throttled responses are fast**, which reveals that throttling applies (not whether the
     account exists).
+  - **Cookie injection over plain HTTP.** On an `http://` `BASE_URL`, cookies have no `__Host-`
+    protection, so a network attacker (or a sibling host on the same domain) can plant an
+    anonymous CSRF cookie and forge a matching token, which fixes the anonymous token. This only
+    reaches signed-out forms: login CSRF (signing a victim into the attacker's account) and
+    registration. Signed-in forms use session-bound tokens. Use HTTPS to remove this risk.
+  - **Blocked setup attempts take the write lock.** `POST /setup` checks its throttle inside a
+    short `BEGIN IMMEDIATE`, so even a blocked attempt briefly takes SQLite's write lock (no
+    read-only pre-check as for login). Setup is only reachable until the first administrator
+    exists, and the token check is cheap, so this is accepted.
   - **Host is not validated** (DNS rebinding). The Origin check accepts the origin a request was
     addressed to, so a rebinding page could post same-origin forms; it would still need a valid
     CSRF token, and host-scoped cookies (no `Domain`, `__Host-` on https) are never sent to the

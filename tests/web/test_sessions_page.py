@@ -90,6 +90,7 @@ def test_login_failures_are_identical(web: WebHarness) -> None:
             _login(client, web, web.admin_email, "wrong password")
         throttled = _login(client, web, web.admin_email, web.admin_password)
     assert unknown.status_code == wrong.status_code == throttled.status_code == 401
+    assert all("www-authenticate" not in r.headers for r in (unknown, wrong, throttled))
     assert _strip_tokens(unknown.text).replace("nobody@example.com", "X") == _strip_tokens(
         wrong.text
     ).replace(web.admin_email, "X")

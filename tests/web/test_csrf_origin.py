@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import timedelta
 from html.parser import HTMLParser
 from pathlib import Path
@@ -65,9 +66,45 @@ def test_every_state_changing_route_requires_a_valid_csrf_token(
     assert signed_in.get("/").status_code == 200  # still signed in
 
 
-def test_htmx_requests_send_the_token_in_a_header(signed_in: TestClient, web: WebHarness) -> None:
+def test_signed_out_forms_require_the_anonymous_token_and_its_cookie(web: WebHarness) -> None:
+    app = web.app(allow_registration=True)
+    with TestClient(app) as client:
+        web.complete_setup(app)
+        signed_out_routes = {path for _, path in _unsafe_routes(app)} & {
+            "/login",
+            "/register",
+            "/setup",
+        }
+        assert signed_out_routes == {"/login", "/register", "/setup"}
+        with TestClient(app) as other_browser:
+            foreign_token = web.csrf(other_browser.get("/login").text)
+        for path in sorted(signed_out_routes):
+            client.cookies.clear()
+            cases = {
+                "no cookie, no token": {},
+                "no cookie, another browser's token": {"csrf_token": foreign_token},
+            }
+            for case, data in cases.items():
+                response = client.post(path, data=data, follow_redirects=False)
+                assert response.status_code == 403, (path, case)
+            web.csrf(client.get("/login").text)  # now this browser has its own cookie
+            for case, data in {
+                "cookie, no token": {},
+                "cookie, wrong token": {"csrf_token": "wrong-token"},
+                "cookie, another browser's token": {"csrf_token": foreign_token},
+            }.items():
+                response = client.post(path, data=data, follow_redirects=False)
+                assert response.status_code == 403, (path, case)
+                assert "This form has expired" in response.text
+
+
+def test_htmx_requests_send_the_meta_tag_token_in_a_header(
+    signed_in: TestClient, web: WebHarness
+) -> None:
     page = signed_in.get("/account/password")
-    meta = web.csrf(page.text.split('name="csrf_token"')[0] + page.text)  # meta tag or input
+    meta = re.search(r'<meta name="csrf-token" content="([^"]+)"', page.text)
+    assert meta is not None
+    meta = meta.group(1)
     ok = signed_in.post(
         "/account/logout-others", headers={"HX-Request": "true", "X-CSRF-Token": meta}
     )

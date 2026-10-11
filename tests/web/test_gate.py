@@ -55,6 +55,25 @@ def test_next_is_added_only_for_get_navigations(web: WebHarness) -> None:
         assert (post.status_code, post.headers["location"]) == (303, "/login")
 
 
+def test_signed_out_htmx_fragment_is_sent_to_plain_login(web: WebHarness) -> None:
+    app = web.app()
+    with TestClient(app) as client:
+        web.complete_setup(app)
+        response = client.get(
+            "/account/password?tab=1", headers={"HX-Request": "true"}, follow_redirects=False
+        )
+        assert response.status_code == 204
+        assert response.headers["hx-redirect"] == "/login"
+        assert "location" not in response.headers
+        # A boosted navigation is a full page: it keeps ``next``.
+        boosted = client.get(
+            "/account/password",
+            headers={"HX-Request": "true", "HX-Boosted": "true"},
+            follow_redirects=False,
+        )
+        assert boosted.headers["location"] == "/login?next=%2Faccount%2Fpassword"
+
+
 def test_registration_page_is_404_when_disabled(web: WebHarness) -> None:
     app = web.app()
     with TestClient(app) as client:

@@ -99,6 +99,7 @@ def test_deployment_guide_covers_proxy_rate_limits_and_trusted_proxies() -> None
     first_paragraphs = section.split("\n\n", maxsplit=3)[:3]
     assert any("ASSETBOARD_TRUSTED_PROXIES" in part for part in first_paragraphs)
     assert "/login" in section and "/register" in section and "rate limit" in section.lower()
+    assert "client_max_body_size" in section  # body-size cap at the proxy
     assert "## Upgrading" in text and "TRUSTED_PROXIES" in text.split("## Upgrading", 1)[1]
     assert "https" in text and "BASE_URL" in text
 
