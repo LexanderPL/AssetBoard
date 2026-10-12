@@ -22,10 +22,12 @@ SECURITY_HEADERS = {
     "x-frame-options": "DENY",
 }
 _SECURITY_HEADER_NAMES = frozenset(name.encode("ascii") for name in SECURITY_HEADERS)
-# Pages whose URL can carry a secret never send a Referer (ADR-0013): invitation pages
+# Pages whose URL can carry a secret send no Referer to other sites (ADR-0013): invitation pages
 # (``/invite/<token>``), and sign-in and registration, whose ``next`` may be ``/invite/<token>``.
-NO_REFERRER_PREFIXES = ("/invite/",)
-NO_REFERRER_PATHS = frozenset({"/login", "/register"})
+# "same-origin", not "no-referrer": under "no-referrer" browsers send ``Origin: null`` on form
+# POSTs, which the Origin check (rightly) refuses.
+SAME_ORIGIN_REFERRER_PREFIXES = ("/invite/",)
+SAME_ORIGIN_REFERRER_PATHS = frozenset({"/login", "/register"})
 _INVITE_TOKEN = re.compile(r"(/invite/)[^/?#]+")
 
 
@@ -165,9 +167,11 @@ class SecurityHeadersMiddleware:
                     for key, value in SECURITY_HEADERS.items()
                 )
                 path = route_path(scope)
-                if path in NO_REFERRER_PATHS or path.startswith(NO_REFERRER_PREFIXES):
+                if path in SAME_ORIGIN_REFERRER_PATHS or path.startswith(
+                    SAME_ORIGIN_REFERRER_PREFIXES
+                ):
                     response_headers = [
-                        (name, b"no-referrer" if name == b"referrer-policy" else value)
+                        (name, b"same-origin" if name == b"referrer-policy" else value)
                         for name, value in response_headers
                     ]
                 if not scope.get("path", "").startswith("/static/"):

@@ -321,7 +321,7 @@ def test_invalid_invitations_look_the_same(roomy: OwnerApp, state: str) -> None:
             assert _alert(response.text) == reference
 
 
-def test_invite_pages_send_no_referrer_and_no_store(roomy: OwnerApp) -> None:
+def test_invite_pages_keep_referrers_same_origin_and_no_store(roomy: OwnerApp) -> None:
     token = create_link(roomy)
     with anonymous(roomy) as client:
         responses = [
@@ -330,12 +330,12 @@ def test_invite_pages_send_no_referrer_and_no_store(roomy: OwnerApp) -> None:
             register(client, roomy.web, token, password="short"),
         ]
     for response in responses:
-        assert response.headers["referrer-policy"] == "no-referrer"
+        assert response.headers["referrer-policy"] == "same-origin"
         assert response.headers["cache-control"] == "no-store"
-        assert '<meta name="referrer" content="no-referrer">' in response.text
+        assert '<meta name="referrer" content="same-origin">' in response.text
 
 
-def test_sign_in_and_registration_pages_send_no_referrer(web: WebHarness) -> None:
+def test_sign_in_and_registration_pages_keep_referrers_same_origin(web: WebHarness) -> None:
     # Their "next" can carry an invitation token.
     app = web.app(allow_registration=True)
     with TestClient(app) as client:
@@ -352,10 +352,9 @@ def test_sign_in_and_registration_pages_send_no_referrer(web: WebHarness) -> Non
         pages.append(failed_login)
         other = client.get("/setup")  # a 404 page once setup is closed
     for response in pages:
-        assert response.headers["referrer-policy"] == "no-referrer", response.request.url
-        assert '<meta name="referrer" content="no-referrer">' in response.text
+        assert response.headers["referrer-policy"] == "same-origin", response.request.url
+        assert '<meta name="referrer" content="same-origin">' in response.text
     assert other.headers["referrer-policy"] == "strict-origin-when-cross-origin"
-    assert '<meta name="referrer" content="same-origin">' in other.text
 
 
 def _locked() -> OperationalError:
@@ -425,3 +424,39 @@ def test_invite_page_renders_in_english_and_polish(roomy: OwnerApp, locale: str)
         assert "Zaproszenie" in page and "Edytor" in page
     else:
         assert "You are invited to join Home as Editor." in page
+
+
+def test_pages_with_post_forms_never_use_no_referrer(roomy: OwnerApp) -> None:
+    """Under "no-referrer" browsers send ``Origin: null`` on POSTs; the Origin check refuses it."""
+    token = create_link(roomy)
+    pages = [roomy.client.get(path) for path in ("/", "/workspace/members", "/account/password")]
+    pages.append(roomy.client.get(f"/invite/{token}"))
+    with anonymous(roomy) as client:
+        pages += [client.get("/login"), client.get(f"/invite/{token}")]
+    for page in pages:
+        assert 'method="post"' in page.text, page.request.url
+        assert page.headers["referrer-policy"] != "no-referrer", page.request.url
+        assert 'content="no-referrer"' not in page.text, page.request.url
+
+
+def test_invite_forms_pass_the_origin_check_with_a_browser_origin(roomy: OwnerApp) -> None:
+    token = create_link(roomy)
+    origin = {"Origin": roomy.app.state.settings.base_url.rstrip("/")}
+    with anonymous(roomy) as client:
+        csrf = roomy.web.csrf(client.get("/login").text)
+        response = client.post(
+            f"/invite/{token}/register",
+            data={
+                "csrf_token": csrf,
+                "email": "newbie@example.com",
+                "display_name": "Newbie",
+                "password": ADMIN_PASSWORD,
+            },
+            headers=origin,
+            follow_redirects=False,
+        )
+        assert response.status_code == 303
+        null_origin = client.post(
+            f"/invite/{token}/accept", data={"csrf_token": csrf}, headers={"Origin": "null"}
+        )
+        assert null_origin.status_code == 403  # what "no-referrer" pages would trigger

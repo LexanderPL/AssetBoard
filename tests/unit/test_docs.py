@@ -133,7 +133,14 @@ def test_adr_0013_exists_and_upgrading_mentions_the_access_log() -> None:
     adr_dir = DEPLOYMENT.parents[0] / "adr"
     adr = (adr_dir / "0013-invitation-links.md").read_text(encoding="utf-8")
     assert "0013-invitation-links.md" in (adr_dir / "README.md").read_text(encoding="utf-8")
-    for required in ("SHA-256", "no-referrer", "access log", "not proof of ownership", "5 wrong"):
+    for required in (
+        "SHA-256",
+        "same-origin",
+        "Origin: null",
+        "access log",
+        "not proof of ownership",
+        "5 wrong",
+    ):
         assert required in adr
     assert "burn it with 5 wrong attempts" in adr
     upgrading = DEPLOYMENT.read_text(encoding="utf-8").split("## Upgrading", 1)[1]

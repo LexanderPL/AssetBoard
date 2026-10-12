@@ -87,7 +87,7 @@ def test_invitation_token_is_absent_from_every_log(
     assert reused.status_code == 404 and missing.status_code == 404
     assert login.status_code == 200
     for response in (page, reused):
-        assert response.headers["referrer-policy"] == "no-referrer"
+        assert response.headers["referrer-policy"] == "same-origin"
         assert response.headers["cache-control"] == "no-store"
     assert "path=/invite/[redacted]" in output  # the app's own request log ran
     assert "path=/invite/[redacted]/register" in output

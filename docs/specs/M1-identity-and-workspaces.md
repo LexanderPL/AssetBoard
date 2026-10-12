@@ -107,7 +107,8 @@ In the plan, list each acceptance criterion with the test that will prove it, an
   - An existing member is told so; the role is unchanged and the invitation not consumed.
   - Invalid links (expired, revoked, used, unknown or malformed) all look the same.
   - The token is in the URL path. The request log redacts it, uvicorn's access log is off, and
-    invite pages send `Referrer-Policy: no-referrer` and `Cache-Control: no-store`.
+    invite, sign-in and registration pages send `Referrer-Policy: same-origin`, and every page
+    sends `Cache-Control: no-store`.
 
 **Agent prompt**
 ```

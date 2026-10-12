@@ -1,7 +1,5 @@
 {% extends "auth_base.html" %}
 {% from "macros/components.html" import field, csrf_input, primary_button with context %}
-{# "next" may carry an invitation token (ADR-0013). #}
-{% block referrer %}no-referrer{% endblock %}
 {% block title %}{{ _("Sign in") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Sign in") }}{% endblock %}
 {% block content %}

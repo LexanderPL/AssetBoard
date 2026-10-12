@@ -2,7 +2,7 @@
 
 ``/invite/<token>`` is reachable signed out. The token is in the URL path, so the request log
 redacts it (``assetboard.middleware.redact_path``), uvicorn's access log is off, and these pages
-send ``Referrer-Policy: no-referrer`` and ``Cache-Control: no-store``. Every POST is protected by
+send ``Referrer-Policy: same-origin`` and ``Cache-Control: no-store``. Every POST is protected by
 the router-level ``require_csrf`` dependency.
 """
 
