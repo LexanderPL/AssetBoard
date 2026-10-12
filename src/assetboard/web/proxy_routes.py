@@ -77,7 +77,10 @@ FAILURES: dict[str, tuple[int, str]] = {
     ),
     "account_exists": (
         409,
-        _("An account with this email address already exists. Sign in with your password."),
+        _(
+            "An account with this email address already exists. Sign in with your password, "
+            "then link it from your profile."
+        ),
     ),
     "email_unverified": (
         403,

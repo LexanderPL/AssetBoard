@@ -39,6 +39,7 @@ from assetboard.services.hash_gate import RETRY_AFTER_SECONDS, HashGate, HashGat
 from assetboard.services.oidc import OidcClient, UrllibTransport
 from assetboard.services.oidc_flow import ConsumedStates
 from assetboard.services.proxy_auth import RecentKeys
+from assetboard.web.account_routes import router as account_router
 from assetboard.web.auth_routes import router as auth_router
 from assetboard.web.errors import add_error_response_headers, error_response
 from assetboard.web.errors import is_htmx_fragment_request as _is_htmx_fragment_request
@@ -156,6 +157,7 @@ def create_app(
     app.mount("/static", StaticFiles(directory=static_directory), name="static")
     app.include_router(web_router)
     app.include_router(auth_router)
+    app.include_router(account_router)
     app.include_router(workspace_router)
     app.include_router(invite_router)
     app.include_router(oidc_router)

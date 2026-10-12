@@ -1234,7 +1234,8 @@ def _create_user_records(
         email=normalized_email,
         display_name=clean_display_name,
         password_hash=password_hash,
-        locale=options.locale if options else settings.default_locale,
+        # No language until the user picks one in the profile: the browser's applies (F1.5).
+        locale=None,
         is_active=True,
         is_instance_admin=is_admin,
     )
@@ -2080,12 +2081,13 @@ class WebSession:
     user_id: UUID
     email: str
     display_name: str
-    locale: str
+    locale: str | None
     is_instance_admin: bool
     expires_at: datetime
     needs_touch: bool
     current_workspace_id: UUID | None = None
     auth_method: str = "password"
+    theme: str = "system"
 
 
 def read_web_session(
@@ -2113,6 +2115,7 @@ def read_web_session(
         needs_touch=now - row.last_seen_at >= SESSION_TOUCH_INTERVAL,
         current_workspace_id=row.current_workspace_id,
         auth_method=row.auth_method,
+        theme=user.theme,
     )
 
 
