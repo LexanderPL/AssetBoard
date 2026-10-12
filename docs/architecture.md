@@ -44,7 +44,8 @@ toast).
   another workspace.
 - `delete(obj)` re-reads the object through the scope before deleting it.
 - A repository can declare `unsupported` operations. Audit events, for example, are
-  append-only: no update, no delete.
+  append-only: no update, no delete. Models marked `AppendOnly` are also guarded at flush:
+  changing or deleting a loaded row raises `AppendOnlyViolationError`.
 - A row's `workspace_id` never changes. A `before_flush` guard raises
   `WorkspaceReassignmentError` if code changes it, including from `NULL` to a value. Bulk
   `update()` and `delete()` statements are not used for workspace data.
@@ -76,18 +77,22 @@ workspace is known.
    ones, add an entry to `EXTRA_METHOD_COVERAGE` in `tests/tenant/coverage.py` naming the test in
    `tests/integration/test_tenant_isolation.py` that proves it stays in its workspace.
 7. **Services only through the repository.** Do not reference the model in `select()`,
-   `session.get()`, attribute access or instantiation outside `db/repositories/`.
+   `session.get()`, attribute access or instantiation outside `db/repositories/`. Outside
+   `db/`, do not name its table in raw SQL (`text()`, `exec_driver_sql()`, `execute("...")`).
+8. **No relationships into it from unowned models.** A relationship such as `Workspace.items`
+   or `User.items` would load rows without the repository's scope. Relationships from one
+   workspace-owned model to another, or to an unowned model, are fine.
 
 What fails if a step is missing:
 
 | Missing | Failing test |
 |---|---|
-| `WorkspaceOwned` marker, or `workspace_id` column | `test_discovery_finds_workspace_owned_models` |
-| Repository or tenant factory | `test_every_workspace_owned_model_has_a_repository_and_a_factory`, `test_registry_keys_equal_the_discovered_set` |
+| `WorkspaceOwned` marker or `workspace_id` column, repository or tenant factory | `test_discovery_finds_every_workspace_owned_model_with_repository_and_factory` |
 | Scoping in a repository query | `test_user_b_cannot_read_update_or_delete_user_a_rows[<Model>]` |
 | Coverage entry for a new public method | `test_every_public_repository_method_is_covered` |
 | Composite foreign key | `test_workspace_owned_foreign_keys_include_workspace_id` |
-| Model used outside a repository | `test_no_unscoped_queries_outside_repositories` |
+| Model or table used outside a repository | `test_no_unscoped_queries_outside_repositories` |
+| Relationship from an unowned model | `test_no_relationship_from_unowned_models_into_workspace_owned_models` |
 
 The only exceptions to the last rule are listed with a reason in `BOOTSTRAP_ALLOWLIST`
 (`tests/tenant/static_scan.py`), keyed by module and function. They are first-run setup and

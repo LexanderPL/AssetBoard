@@ -3,7 +3,7 @@
 A factory builds an unsaved row for the requested workspace (creating any non-workspace rows it
 needs, such as users). ``update_values`` is a valid change for the cross-tenant update check.
 Adding a workspace-owned model without an entry here fails
-``test_every_workspace_owned_model_has_a_repository_and_a_factory``.
+``test_discovery_finds_every_workspace_owned_model_with_repository_and_factory``.
 """
 
 from __future__ import annotations

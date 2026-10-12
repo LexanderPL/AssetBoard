@@ -5,17 +5,18 @@ from pathlib import Path
 import pytest
 
 import assetboard
-from assetboard.db.base import Base
-from assetboard.db.repositories.base import models_with_workspace_column
+from tests.tenant.harness import owned_models
 from tests.tenant.static_scan import (
+    ALLOWED_PACKAGES,
     BOOTSTRAP_ALLOWLIST,
+    in_package,
     scan_source,
     scan_tree,
     split_allowed,
 )
 
 SRC = Path(assetboard.__file__).parent.parent
-MODELS = models_with_workspace_column(Base)
+MODELS = owned_models()
 
 
 def test_no_unscoped_queries_outside_repositories() -> None:
@@ -75,6 +76,22 @@ SEEDED = {
         "    return select(User).where(Membership.workspace_id == workspace_id)\n",
         "attribute",
     ),
+    "raw_sql_text": (
+        "import sqlalchemy as sa\n"
+        "def leak(session):\n"
+        "    return session.execute(sa.text('SELECT * FROM memberships WHERE 1'))\n",
+        "raw_sql",
+    ),
+    "raw_sql_exec_driver_sql": (
+        "def leak(connection):\n"
+        "    return connection.exec_driver_sql('DELETE FROM audit_events')\n",
+        "raw_sql",
+    ),
+    "raw_sql_execute_literal": (
+        "def leak(cursor, workspace):\n"
+        "    return cursor.execute(f'SELECT role FROM memberships WHERE id = {workspace}')\n",
+        "raw_sql",
+    ),
     "instantiation": (
         "from assetboard.db.models import Membership\n"
         "def leak(session, workspace_id, user_id):\n"
@@ -108,3 +125,24 @@ def test_allowlisted_bootstrap_is_keyed_by_module_and_function() -> None:
     violations = scan_source(source, "assetboard.services.auth", MODELS)
     remaining, used = split_allowed(violations, {("assetboard.services.auth", "other"): "x"})
     assert remaining == violations and used == set()
+
+
+def test_raw_sql_is_allowed_inside_the_db_package_and_ignores_other_strings() -> None:
+    source, _kind = SEEDED["raw_sql_exec_driver_sql"]
+    assert scan_source(source, "assetboard.db.engine", MODELS) == []
+    harmless = (
+        "from sqlalchemy import text\n"
+        "def fine(session, gettext):\n"
+        "    gettext('Members of memberships')\n"
+        "    session.execute(text('SELECT 1'))\n"
+        "    session.execute(text('SELECT * FROM users'))\n"
+        "    return 'memberships'\n"
+    )
+    assert scan_source(harmless, "assetboard.services.seeded", MODELS) == []
+
+
+def test_allowed_packages_match_exactly() -> None:
+    assert in_package("assetboard.db.models", "assetboard.db.models")
+    assert in_package("assetboard.db.models.identity", "assetboard.db.models")
+    assert not in_package("assetboard.db.models_extra", "assetboard.db.models")
+    assert not any(in_package("assetboard.db.repositoriesx", p) for p in ALLOWED_PACKAGES)

@@ -5,21 +5,28 @@ violation: in a query (``select(M)``, ``session.get(M, ...)``, ``join(M)``, ...)
 access (``M.workspace_id == x``), or as instantiation (``M(...)``). Import aliases
 (``import ... as``, ``from ... import M as X``, module aliases like ``models.M``) are resolved.
 Imports and annotations are not references.
+
+Outside ``assetboard.db``, raw SQL that names a workspace-owned table is a violation too:
+``text(...)``, ``exec_driver_sql(...)`` and ``execute("...")`` with a string literal.
 """
 
 from __future__ import annotations
 
 import ast
 import importlib
+import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-Kind = Literal["instantiation", "attribute", "query"]
+import sqlalchemy
 
-# Modules where workspace-owned models may be used freely.
-ALLOWED_MODULE_PREFIXES = (
+Kind = Literal["instantiation", "attribute", "query", "raw_sql"]
+
+# Packages (or modules) where workspace-owned models may be used freely; matched exactly or as
+# a parent package, never as a bare string prefix.
+ALLOWED_PACKAGES = (
     "assetboard.db.base",
     "assetboard.db.models",
     "assetboard.db.repositories",
@@ -37,6 +44,13 @@ BOOTSTRAP_ALLOWLIST: dict[tuple[str, str], str] = {
         "workspace_id NULL (instance-level); workspace events use AuditEventRepository"
     ),
 }
+
+# Raw SQL is checked outside this package.
+RAW_SQL_EXEMPT_PACKAGE = "assetboard.db"
+
+
+def in_package(module: str, package: str) -> bool:
+    return module == package or module.startswith(f"{package}.")
 
 
 @dataclass(frozen=True)
@@ -70,6 +84,12 @@ class _Scanner(ast.NodeVisitor):
     def __init__(self, module: str, models: Mapping[str, type[Any]]) -> None:
         self.module = module
         self.models = models  # dotted path of each model's definition -> class
+        self.check_raw_sql = not in_package(module, RAW_SQL_EXEMPT_PACKAGE)
+        tables = {model.__tablename__: model for model in models.values()}
+        self.tables = tables
+        self.table_pattern = re.compile(
+            r"\b(" + "|".join(re.escape(name) for name in sorted(tables)) + r")\b"
+        )
         self.aliases: dict[str, str] = {}  # local name -> dotted path
         self.functions: list[str] = []
         self.violations: list[Violation] = []
@@ -142,7 +162,24 @@ class _Scanner(ast.NodeVisitor):
         model = self._model_for(node.func)
         if model is not None:
             self._report(node.func, model, "instantiation")
+        if self.check_raw_sql and self.tables and self._is_raw_sql(node):
+            for literal in ast.walk(node):
+                if isinstance(literal, ast.Constant) and isinstance(literal.value, str):
+                    match = self.table_pattern.search(literal.value)
+                    if match:
+                        self._report(literal, self.tables[match.group(1)], "raw_sql")
         self.generic_visit(node)
+
+    def _is_raw_sql(self, node: ast.Call) -> bool:
+        dotted = self._dotted(node.func)
+        if dotted is not None and _resolve_dotted(dotted) is sqlalchemy.text:
+            return True
+        if isinstance(node.func, ast.Attribute):
+            if node.func.attr == "exec_driver_sql":
+                return True
+            if node.func.attr == "execute" and node.args:
+                return isinstance(node.args[0], ast.Constant | ast.JoinedStr)
+        return False
 
     def visit_Attribute(self, node: ast.Attribute) -> None:
         model = self._model_for(node)  # ``models.Membership``: the model itself
@@ -180,7 +217,7 @@ def scan_tree(src_root: Path, models: Iterable[type[Any]]) -> list[Violation]:
     violations: list[Violation] = []
     for path in sorted(src_root.rglob("*.py")):
         module = _module_name(path, src_root)
-        if module.startswith(ALLOWED_MODULE_PREFIXES):
+        if any(in_package(module, package) for package in ALLOWED_PACKAGES):
             continue
         violations.extend(scan_source(path.read_text(encoding="utf-8"), module, models))
     return violations

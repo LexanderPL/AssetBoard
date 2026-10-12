@@ -57,24 +57,36 @@ class WorkspaceScopedMixin(WorkspaceOwned):
     )
 
 
+class AppendOnly:
+    """Marker for rows that are written once and never changed or deleted through the ORM."""
+
+
+class AppendOnlyViolationError(RuntimeError):
+    """An append-only row was modified or deleted."""
+
+
 class WorkspaceReassignmentError(RuntimeError):
     """A persistent row's ``workspace_id`` was changed; rows never move between workspaces."""
 
 
 @event.listens_for(Session, "before_flush")
-def reject_workspace_reassignment(
+def reject_forbidden_changes(
     session: Session,
     _flush_context: object,
     _instances: object,
 ) -> None:
+    for obj in session.deleted:
+        if isinstance(obj, AppendOnly):
+            raise AppendOnlyViolationError(f"{type(obj).__name__} rows cannot be deleted")
     for obj in session.dirty:
-        if not isinstance(obj, WorkspaceOwned):
-            continue
-        history = instance_state(obj).attrs["workspace_id"].history
-        if history.added and list(history.added) != list(history.deleted):
-            raise WorkspaceReassignmentError(
-                f"workspace_id of a persistent {type(obj).__name__} row cannot change"
-            )
+        if isinstance(obj, WorkspaceOwned):
+            history = instance_state(obj).attrs["workspace_id"].history
+            if history.added and list(history.added) != list(history.deleted):
+                raise WorkspaceReassignmentError(
+                    f"workspace_id of a persistent {type(obj).__name__} row cannot change"
+                )
+        if isinstance(obj, AppendOnly) and session.is_modified(obj, include_collections=False):
+            raise AppendOnlyViolationError(f"{type(obj).__name__} rows cannot be changed")
 
 
 @event.listens_for(Session, "before_flush")

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import timedelta
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy.orm import Session
@@ -101,7 +101,7 @@ def _web_session(session: Session, user: User, clock: FixedClock) -> tuple[WebSe
 
 
 def _as_web_session(
-    user: User, session_hash: str, selected: object, clock: FixedClock
+    user: User, session_hash: str, selected: UUID | None, clock: FixedClock
 ) -> WebSession:
     return WebSession(
         session_hash=session_hash,
@@ -112,7 +112,7 @@ def _as_web_session(
         is_instance_admin=False,
         expires_at=clock.now() + timedelta(days=1),
         needs_touch=False,
-        current_workspace_id=selected,  # type: ignore[arg-type]
+        current_workspace_id=selected,
     )
 
 

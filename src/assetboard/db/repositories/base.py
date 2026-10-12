@@ -7,13 +7,13 @@ queries on ``_scoped_select()``; each extra public method needs an entry in the 
 coverage registry (``tests/tenant/coverage.py``).
 
 Updates go through ``update`` (or by changing attributes of rows returned by ``get``); a row's
-``workspace_id`` can never change (see ``reject_workspace_reassignment``). Bulk ``update()`` and
+``workspace_id`` can never change (see ``reject_forbidden_changes``). Bulk ``update()`` and
 ``delete()`` statements are not offered.
 """
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, ClassVar, Literal
+from typing import Any, ClassVar, Literal, Protocol
 from uuid import UUID
 
 from sqlalchemy import Select, inspect, select
@@ -22,11 +22,20 @@ from sqlalchemy.orm.attributes import instance_state
 
 from assetboard.db.base import WorkspaceOwned
 
-if TYPE_CHECKING:
-    from assetboard.services.context import Context
-
 Operation = Literal["update", "delete"]
 IMMUTABLE_COLUMNS = frozenset({"id", "workspace_id"})
+
+
+class _HasId(Protocol):
+    @property
+    def id(self) -> UUID: ...
+
+
+class WorkspaceScope(Protocol):
+    """What a repository needs from ``services.context.Context``: the current workspace."""
+
+    @property
+    def workspace(self) -> _HasId: ...
 
 
 class RepositoryError(Exception):
@@ -62,7 +71,7 @@ class ScopedRepository[T: WorkspaceOwned]:
             raise TypeError(f"{model.__name__} already has a repository: {existing.__name__}")
         _REGISTRY[model] = cls
 
-    def __init__(self, session: Session, ctx: Context) -> None:
+    def __init__(self, session: Session, ctx: WorkspaceScope) -> None:
         self._session = session
         self._workspace_id: UUID = ctx.workspace.id
 

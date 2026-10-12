@@ -13,13 +13,13 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import ForeignKeyConstraint, MetaData, String, Uuid
-from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
+from sqlalchemy import ForeignKey, ForeignKeyConstraint, MetaData, String, Uuid
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
 
-import assetboard.db.repositories  # noqa: F401 - registers every repository
 from assetboard.clock import FixedClock
 from assetboard.db.base import (
     CONSTRAINT_NAMING_CONVENTION,
+    AppendOnlyViolationError,
     Base,
     IdMixin,
     TimestampMixin,
@@ -36,11 +36,7 @@ from assetboard.db.repositories import (
     ScopedRepository,
     UserMembershipReader,
 )
-from assetboard.db.repositories.base import (
-    models_marked_workspace_owned,
-    models_with_workspace_column,
-    repositories_for,
-)
+from assetboard.db.repositories.base import models_marked_workspace_owned, repositories_for
 from tests.tenant.coverage import (
     BASE_METHOD_COVERAGE,
     EXTRA_METHOD_COVERAGE,
@@ -48,15 +44,17 @@ from tests.tenant.coverage import (
 )
 from tests.tenant.factories import TENANT_CASES
 from tests.tenant.harness import (
+    ARCHITECTURE_HINT,
     check_isolation,
     context_for,
+    discovery_problems,
     non_composite_workspace_fks,
+    owned_models,
     public_methods,
     raw_row,
+    relationships_into_owned_models,
     uncovered_methods,
 )
-
-ARCHITECTURE_HINT = "see docs/architecture.md, 'How to add a new workspace-owned model'"
 
 
 def _workspace(session: Session, name: str) -> Workspace:
@@ -73,35 +71,18 @@ def two_workspaces(db_session: Session, fixed_clock: FixedClock) -> tuple[Any, A
     return context_for(first.id, fixed_clock), context_for(second.id, fixed_clock)
 
 
-def _owned_models() -> list[type[Any]]:
-    return sorted(models_with_workspace_column(Base), key=lambda model: model.__name__)
+OWNED_MODELS = owned_models()
 
 
 # Discovery and registries
 
 
-def test_discovery_finds_workspace_owned_models() -> None:
-    by_column = models_with_workspace_column(Base)
-    by_marker = models_marked_workspace_owned(Base)
-    assert by_column == by_marker, "a model has workspace_id without WorkspaceOwned, or vice versa"
-    assert {Membership, AuditEvent} <= by_column
+def test_discovery_finds_every_workspace_owned_model_with_repository_and_factory() -> None:
+    assert {Membership, AuditEvent} <= set(OWNED_MODELS)
+    assert discovery_problems(Base, repositories_for(Base), TENANT_CASES) == []
 
 
-@pytest.mark.parametrize("model", _owned_models(), ids=lambda model: model.__name__)
-def test_every_workspace_owned_model_has_a_repository_and_a_factory(model: type[Any]) -> None:
-    assert model in repositories_for(Base), (
-        f"{model.__name__} has no repository; {ARCHITECTURE_HINT}"
-    )
-    assert model in TENANT_CASES, f"{model.__name__} has no tenant factory; {ARCHITECTURE_HINT}"
-
-
-def test_registry_keys_equal_the_discovered_set() -> None:
-    discovered = models_with_workspace_column(Base)
-    assert set(repositories_for(Base)) == discovered
-    assert set(TENANT_CASES) == discovered
-
-
-@pytest.mark.parametrize("model", _owned_models(), ids=lambda model: model.__name__)
+@pytest.mark.parametrize("model", OWNED_MODELS, ids=lambda model: model.__name__)
 def test_factories_build_rows_for_the_requested_workspace(
     db_session: Session, two_workspaces: tuple[Any, Any], model: type[Any]
 ) -> None:
@@ -117,7 +98,7 @@ def test_factories_build_rows_for_the_requested_workspace(
 # The cross-tenant check
 
 
-@pytest.mark.parametrize("model", _owned_models(), ids=lambda model: model.__name__)
+@pytest.mark.parametrize("model", OWNED_MODELS, ids=lambda model: model.__name__)
 def test_user_b_cannot_read_update_or_delete_user_a_rows(
     db_session: Session, two_workspaces: tuple[Any, Any], model: type[Any]
 ) -> None:
@@ -153,7 +134,7 @@ def test_add_refuses_rows_of_another_workspace_or_type(
     assert MembershipRepository(db_session, ctx_b).add(unscoped).workspace_id == ctx_b.workspace.id
 
 
-@pytest.mark.parametrize("model", _owned_models(), ids=lambda model: model.__name__)
+@pytest.mark.parametrize("model", OWNED_MODELS, ids=lambda model: model.__name__)
 def test_moving_a_row_between_workspaces_fails_at_flush(
     db_session: Session, two_workspaces: tuple[Any, Any], model: type[Any]
 ) -> None:
@@ -200,6 +181,31 @@ def test_instance_audit_events_are_invisible_to_workspace_repositories(
         repository = AuditEventRepository(db_session, ctx)
         assert repository.get(instance_event.id) is None
         assert instance_event.id not in {event.id for event in repository.list()}
+
+
+def test_audit_events_cannot_be_changed_at_flush(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx = two_workspaces[0]
+    repository = AuditEventRepository(db_session, ctx)
+    event = repository.add(TENANT_CASES[AuditEvent].factory(db_session, ctx.workspace.id))
+    db_session.expire_all()
+    loaded = repository.get_or_raise(event.id)
+    loaded.action = "test.tampered"
+    with pytest.raises(AppendOnlyViolationError, match="cannot be changed"):
+        db_session.flush()
+
+
+def test_audit_events_cannot_be_deleted_at_flush(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx = two_workspaces[0]
+    repository = AuditEventRepository(db_session, ctx)
+    event = repository.add(TENANT_CASES[AuditEvent].factory(db_session, ctx.workspace.id))
+    db_session.expire_all()
+    db_session.delete(repository.get_or_raise(event.id))
+    with pytest.raises(AppendOnlyViolationError, match="cannot be deleted"):
+        db_session.flush()
 
 
 def test_user_membership_reader_returns_only_its_users_rows(
@@ -329,33 +335,47 @@ def _note(session: Session, workspace_id: UUID) -> ScratchNote:
     return ScratchNote(workspace_id=workspace_id, text="note")
 
 
-def test_isolation_harness_detects_missing_repository() -> None:
-    by_column = models_with_workspace_column(ScratchBase)
-    assert ScratchUnmarked in by_column
-    assert by_column != models_marked_workspace_owned(ScratchBase)  # the marker check fires
-    # ScratchChild has no repository: the registry check fires for it.
-    assert ScratchChild in by_column and ScratchChild not in repositories_for(ScratchBase)
-    assert repositories_for(ScratchBase) == {
-        ScratchNote: LeakyNoteRepository,
-        ScratchTag: ChattyTagRepository,
-    }
+def _tag(session: Session, workspace_id: UUID) -> ScratchTag:
+    return ScratchTag(workspace_id=workspace_id, label="tag")
+
+
+def test_isolation_harness_detects_discovery_problems() -> None:
+    cases = {ScratchNote: object(), ScratchTag: object(), ScratchWorkspace: object()}
+    assert discovery_problems(ScratchBase, repositories_for(ScratchBase), cases) == [
+        "ScratchUnmarked has workspace_id but not the WorkspaceOwned marker",
+        f"ScratchChild has no repository; {ARCHITECTURE_HINT}",
+        f"ScratchChild has no tenant factory; {ARCHITECTURE_HINT}",
+        f"ScratchUnmarked has no repository; {ARCHITECTURE_HINT}",
+        f"ScratchUnmarked has no tenant factory; {ARCHITECTURE_HINT}",
+        "tenant factory for ScratchWorkspace, which is not workspace-owned",
+    ]
+
+
+def _scratch_contexts(session: Session, clock: FixedClock) -> tuple[Any, Any]:
+    first, second = ScratchWorkspace(name="A"), ScratchWorkspace(name="B")
+    session.add_all([first, second])
+    session.flush()
+    return context_for(first.id, clock), context_for(second.id, clock)
+
+
+def test_isolation_harness_passes_a_correctly_scoped_repository(
+    scratch_session: Session, fixed_clock: FixedClock
+) -> None:
+    ctx_a, ctx_b = _scratch_contexts(scratch_session, fixed_clock)
+    check_isolation(
+        scratch_session, ScratchTag, ChattyTagRepository, _tag, {"label": "x"}, ctx_a, ctx_b
+    )
 
 
 def test_isolation_harness_detects_unscoped_repository(
     scratch_session: Session, fixed_clock: FixedClock
 ) -> None:
-    first, second = ScratchWorkspace(name="A"), ScratchWorkspace(name="B")
-    scratch_session.add_all([first, second])
-    scratch_session.flush()
-    with pytest.raises(AssertionError):
+    ctx_a, ctx_b = _scratch_contexts(scratch_session, fixed_clock)
+    with pytest.raises(
+        AssertionError, match="ScratchNote: could read a row of another workspace through list"
+    ):
         check_isolation(
-            scratch_session,
-            ScratchNote,
-            LeakyNoteRepository,
-            _note,
-            {"text": "changed"},
-            context_for(first.id, fixed_clock),
-            context_for(second.id, fixed_clock),
+            scratch_session, ScratchNote, LeakyNoteRepository, _note, {"text": "x"}, ctx_a, ctx_b
         )
 
 
@@ -395,3 +415,28 @@ def test_composite_foreign_keys_pass_the_check() -> None:
 
     assert {Parent, Child} == models_marked_workspace_owned(CompositeBase)
     assert non_composite_workspace_fks(CompositeBase) == []
+
+
+# Relationships into workspace-owned models
+
+
+def test_no_relationship_from_unowned_models_into_workspace_owned_models() -> None:
+    assert relationships_into_owned_models(Base) == []
+
+
+def test_relationship_check_detects_a_seeded_relationship() -> None:
+    class RelationshipBase(DeclarativeBase):
+        pass
+
+    class Home(IdMixin, RelationshipBase):
+        __tablename__ = "homes"
+
+        notes: Mapped[list[Note]] = relationship()
+
+    class Note(IdMixin, WorkspaceOwned, RelationshipBase):
+        __tablename__ = "notes"
+
+        workspace_id: Mapped[UUID] = mapped_column(ForeignKey("homes.id"), nullable=False)
+        home: Mapped[Home] = relationship(viewonly=True)  # owned -> unowned is fine
+
+    assert relationships_into_owned_models(RelationshipBase) == ["Home.notes -> Note"]

@@ -113,8 +113,12 @@ def test_0003_round_trip(tmp_path: Path) -> None:
         _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'f12.db'}"
     )
     upgrade_database(settings)
-    heads = ScriptDirectory.from_config(alembic_config(settings)).get_heads()
-    assert heads == ["0003_f12"]
+    script = ScriptDirectory.from_config(alembic_config(settings))
+    revision = script.get_revision("0003_f12")
+    assert revision is not None and revision.down_revision == "0002_f11"
+    # Reachable from every head, so later migrations keep it in the chain.
+    for head in script.get_heads():
+        assert "0003_f12" in {rev.revision for rev in script.iterate_revisions(head, "base")}
     engine = create_database_engine(settings.database_url or "")
     try:
         columns = {column["name"] for column in inspect(engine).get_columns("user_sessions")}

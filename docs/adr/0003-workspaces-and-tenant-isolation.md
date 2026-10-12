@@ -34,9 +34,12 @@ models directly.
 - Every public repository method is mapped to the test that covers it.
 - A `before_flush` guard rejects any change of a persistent row's `workspace_id`, including
   `NULL` to a value.
+  The same guard rejects changing or deleting a row marked `AppendOnly` (audit events).
 - Foreign keys between workspace-owned tables must include `workspace_id` (composite).
+- Models that are not workspace-owned have no ORM relationships into workspace-owned models.
 - A static scan of `src/` rejects references to workspace-owned models outside
   `db/repositories/`: queries, attribute access and instantiation, with import aliases resolved.
+  Outside `db/` it also rejects raw SQL that names a workspace-owned table.
   The only exceptions are a bootstrap allowlist keyed by `(module, function)`, each entry with a
   reason, and stale entries fail. Today the entries are workspace creation during setup and
   registration, and the auth audit writer.

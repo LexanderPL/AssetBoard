@@ -17,7 +17,14 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column, validates
 
-from assetboard.db.base import Base, IdMixin, TimestampMixin, WorkspaceOwned, WorkspaceScopedMixin
+from assetboard.db.base import (
+    AppendOnly,
+    Base,
+    IdMixin,
+    TimestampMixin,
+    WorkspaceOwned,
+    WorkspaceScopedMixin,
+)
 from assetboard.db.types import UtcDateTime
 from assetboard.domain.identity import normalize_email
 
@@ -90,8 +97,11 @@ class UserSession(Base):
     )
 
 
-class AuditEvent(WorkspaceOwned, Base):
-    """Append-only. ``workspace_id`` is NULL for instance-level (auth and admin) events."""
+class AuditEvent(AppendOnly, WorkspaceOwned, Base):
+    """Append-only (enforced at flush).
+
+    ``workspace_id`` is NULL for instance-level (auth and admin) events.
+    """
 
     __tablename__ = "audit_events"
     __table_args__ = (
