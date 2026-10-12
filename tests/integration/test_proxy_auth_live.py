@@ -40,8 +40,12 @@ pytestmark = pytest.mark.skipif(
 
 
 def _browser(source: str) -> httpx.Client:
+    # A browser loading pages: only navigations are sent to /auth/proxy.
     return httpx.Client(
-        transport=httpx.HTTPTransport(local_address=source), follow_redirects=True, timeout=10
+        transport=httpx.HTTPTransport(local_address=source),
+        follow_redirects=True,
+        timeout=10,
+        headers={"Accept": "text/html", "Sec-Fetch-Dest": "document", "Sec-Fetch-Mode": "navigate"},
     )
 
 

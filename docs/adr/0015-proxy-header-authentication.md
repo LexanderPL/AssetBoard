@@ -68,15 +68,15 @@ request came from the proxy, was lost.
   is off (the rows stay). A subject whose `ExternalIdentity` row was deleted counts as a
   different subject. Password and OIDC sessions are never affected by proxy headers, so
   break-glass `/login/local` and OIDC keep working.
-- **Sign-in route.** Signed-out GET and HEAD page loads (and htmx requests, via `HX-Redirect`)
-  from a trusted peer with valid headers are sent to `/auth/proxy?next=…`; `/login` and
-  invitation pages link there ("Continue as <user>", the escaped header value). A browser that
-  already has a proxy session for the same subject is sent on to `next` unchanged; in every
-  other case (no session, a password or OIDC session, another subject) the session is rotated.
-  An untrusted peer, missing headers and repeated or invalid headers all get the same failure
-  page, so the answer tells nothing about which check failed. `/login` and invitation pages
-  can name the proxy's user, so they rely on `Cache-Control: no-store`, which every page sends. Every `/auth/proxy*`
-  route answers 404 while proxy authentication is off, and sends no Referer (`next` can be
+- **Sign-in route.** Signed-out GET and HEAD page loads (and htmx requests, via `HX-Redirect`) from
+  a trusted peer with valid headers are sent to `/auth/proxy?next=…`; `/login` and invitation pages
+  link there ("Continue as <user>", the escaped header value). A browser that already has a proxy
+  session for the same subject is sent on to `next` unchanged; in every other case (no session, a
+  password or OIDC session, another subject) the session is rotated. An untrusted peer, missing
+  headers and repeated or invalid headers all get the same failure page, so the answer tells
+  nothing about which check failed. `/login` and invitation pages can name the proxy's user, so
+  they rely on `Cache-Control: no-store`, which every page sends. Every `/auth/proxy*` route
+  answers 404 while proxy authentication is off, and sends no Referer (`next` can be
   `/invite/<token>`).
 - **No redirect loop.** A new proxy session is first sent to `/auth/proxy/continue`, which
   goes on to `next` only if the session cookie came back. A browser that drops the cookie (an

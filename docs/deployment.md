@@ -107,9 +107,10 @@ migrations first, like application startup; with `false` they refuse to run unti
   registered is an error. By default it also creates a workspace owned by the new administrator,
   as first-run setup does; `--no-workspace` skips that. On an empty instance it also closes
   first-run setup. For scripts, pass `--email`, `--display-name` and `--password-stdin`.
-- `assetboard reset-password <email>` sets a new password for any user (prompted, or from
-  stdin with `--password-stdin`) and signs that user out of every session. It does not change whether the account is active. Anyone who can run commands
-  in the container can therefore take over any account; protect shell access accordingly.
+- `assetboard reset-password <email>` sets a new password for any user (prompted, or from stdin
+  with `--password-stdin`) and signs that user out of every session. It does not change whether the
+  account is active. Anyone who can run commands in the container can therefore take over any
+  account; protect shell access accordingly.
 
 Both commands write an audit event with the CLI as the actor.
 
@@ -164,8 +165,8 @@ Compose. The startup check reports this command when `DATA_DIR` is not writable.
 The Compose file binds the service to loopback by default. Configure a reverse proxy on the same
 Docker network and set `ASSETBOARD_BASE_URL` to the public URL.
 
-**HTTPS.** When `ASSETBOARD_BASE_URL` starts with `https://`, cookies are marked `Secure` and use the
-`__Host-` prefix, so the app must then be reached over HTTPS only: browsers do not send those
+**HTTPS.** When `ASSETBOARD_BASE_URL` starts with `https://`, cookies are marked `Secure` and use
+the `__Host-` prefix, so the app must then be reached over HTTPS only: browsers do not send those
 cookies over plain HTTP (for example to a LAN address), and sign-in fails there. Use an `http://`
 `BASE_URL` only for local or LAN-only setups.
 
@@ -174,13 +175,14 @@ request was addressed to (scheme plus `Host`), and never when the browser report
 request. Make sure the proxy passes the original `Host` header and scheme.
 
 **Rate limiting.** In addition to the built-in throttling, rate-limit `POST /login`,
-`POST /register`, `/invite/` (invitation sign-up), `/auth/oidc/` (OIDC sign-in, which can
-create accounts) and `/auth/proxy` (proxy sign-in, which can too) at the reverse proxy (for example nginx `limit_req`, the Traefik `RateLimit`
-middleware, or a Caddy rate-limit module), such as a few requests per minute per client address.
-This keeps password-guessing floods from reaching the app at all. Also cap the request body size
-at the proxy (for example nginx `client_max_body_size 1m;`, the Traefik `Buffering` middleware's
-`maxRequestBodyBytes`, or Caddy `request_body { max_size 1MB }`): the app does not yet limit body
-sizes itself, and its forms need only a few kilobytes.
+`POST /register`, `/invite/` (invitation sign-up), `/auth/oidc/` (OIDC sign-in, which can create
+accounts) and `/auth/proxy` (proxy sign-in, which can too) at the reverse proxy (for example nginx
+`limit_req`, the Traefik `RateLimit` middleware, or a Caddy rate-limit module), such as a few
+requests per minute per client address. This keeps password-guessing floods from reaching the app
+at all. Also cap the request body size at the proxy (for example nginx `client_max_body_size 1m;`,
+the Traefik `Buffering` middleware's `maxRequestBodyBytes`, or Caddy
+`request_body { max_size 1MB }`): the app does not yet limit body sizes itself, and its forms need
+only a few kilobytes.
 
 ## Image tags
 

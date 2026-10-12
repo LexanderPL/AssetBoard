@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import io
 import logging
+import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -19,6 +20,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx import Response
 from sqlalchemy import delete, select, update
+from sqlalchemy.exc import OperationalError
 
 from assetboard.cli import serve_app
 from assetboard.db.models.identity import (
@@ -33,6 +35,7 @@ from assetboard.services.auth import argon2_hash, session_id_hash
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
 from assetboard.services.external_identity import PROXY_PROVIDER
 from assetboard.services.workspaces import create_invitation
+from assetboard.web import gate
 from assetboard.web.security import session_cookie_name
 
 if TYPE_CHECKING:
@@ -43,6 +46,12 @@ OUTSIDE = "198.51.100.20"
 OLA = {"Remote-User": "ola", "Remote-Email": "ola@example.com", "Remote-Name": "Ola Nowak"}
 BOB = {"Remote-User": "bob", "Remote-Email": "bob@example.com"}
 LOCAL_PASSWORD = "Local Account Password"
+# What a browser sends when it loads a page; only such requests are sent to /auth/proxy.
+NAVIGATION = {
+    "Accept": "text/html,application/xhtml+xml,*/*;q=0.8",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+}
 
 
 def proxy_settings(**overrides: object) -> dict[str, object]:
@@ -64,10 +73,13 @@ class Proxy:
     web: WebHarness
     clients: list[TestClient]
 
-    def client(self, peer: str = PROXY, **options: Any) -> TestClient:
+    def client(self, peer: str = PROXY, *, navigate: bool = True, **options: Any) -> TestClient:
         """Another browser behind ``peer`` (the lifespan already ran for the first one)."""
         client = TestClient(
-            serve_app(self.app, self.app.state.settings), client=(peer, 40000), **options
+            serve_app(self.app, self.app.state.settings),
+            client=(peer, 40000),
+            headers=NAVIGATION if navigate else None,
+            **options,
         )
         self.clients.append(client)
         return client
@@ -259,9 +271,59 @@ def test_proxy_pages_send_no_referrer(proxy: Proxy, path: str) -> None:
 
 
 def test_head_requests_are_sent_to_proxy_sign_in(proxy: Proxy) -> None:
-    response = proxy.client().head("/", headers=OLA, follow_redirects=False)
+    client = proxy.client()
+    response = client.head("/", headers=OLA, follow_redirects=False)
     assert response.status_code == 303
     assert response.headers["location"] == "/auth/proxy"
+    # Pin: /auth/proxy is GET only, so HEAD there signs nobody in.
+    assert client.head("/auth/proxy", headers=OLA).status_code == 405 and proxy.sessions() == []
+
+
+def audit_count(p: Proxy) -> int:
+    with p.db() as session:
+        return len(session.scalars(select(AuditEvent.id)).all())
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"Accept": "*/*"},  # curl, monitors
+        {"Accept": "application/json"},
+        {"Accept": "text/html", "Sec-Fetch-Dest": "image", "Sec-Fetch-Mode": "no-cors"},
+        {"Accept": "text/html", "Sec-Fetch-Dest": "empty", "Sec-Fetch-Mode": "cors"},
+    ],
+    ids=["any", "json", "image", "fetch"],
+)
+def test_requests_that_are_not_page_loads_get_login_and_write_nothing(
+    proxy: Proxy, headers: dict[str, str]
+) -> None:
+    client = proxy.client(navigate=False)
+    audits = audit_count(proxy)
+    for method in ("GET", "HEAD"):
+        response = client.request(method, "/", headers={**OLA, **headers}, follow_redirects=False)
+        assert response.status_code == 303
+        # ``next`` only for GET, as before.
+        assert response.headers["location"] == ("/login?next=%2F" if method == "GET" else "/login")
+    assert proxy.sessions() == [] and audit_count(proxy) == audits
+    with proxy.db() as session:
+        assert session.scalars(select(User).where(User.email == "ola@example.com")).first() is None
+
+
+@pytest.mark.parametrize(
+    "headers",
+    [
+        {"Accept": "text/html"},  # no Fetch Metadata (older browsers)
+        {"Sec-Fetch-Mode": "navigate", "Sec-Fetch-Dest": "iframe"},
+        {"Sec-Fetch-Dest": "document"},
+    ],
+    ids=["accept-html", "mode-navigate", "dest-document"],
+)
+def test_page_navigations_still_sign_in(proxy: Proxy, headers: dict[str, str]) -> None:
+    client = proxy.client(navigate=False)
+    response = client.get("/", headers={**OLA, **headers}, follow_redirects=False)
+    assert response.headers["location"] == "/auth/proxy"
+    assert sign_in(proxy.client(), OLA).status_code == 200
+    assert proxy.sessions() == [("ola@example.com", "proxy")]
 
 
 def test_htmx_requests_get_hx_redirect(proxy: Proxy) -> None:
@@ -322,6 +384,31 @@ def test_another_proxy_user_ends_the_session_and_signs_in_again(proxy: Proxy) ->
     assert proxy.audits("auth.logout")
     sign_in(client, BOB)
     assert proxy.sessions() == [("bob@example.com", "proxy")]
+
+
+def test_a_busy_database_does_not_fail_the_revoke(
+    proxy: Proxy, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = proxy.client()
+    sign_in(client, OLA)
+
+    def locked(*_args: object, **_kwargs: object) -> None:
+        raise OperationalError(
+            "BEGIN IMMEDIATE", {}, sqlite3.OperationalError("database is locked")
+        )
+
+    monkeypatch.setattr(gate, "revoke_session", locked)
+    with captured_log(proxy.app) as log:
+        response = client.get("/", headers=BOB, follow_redirects=False)
+    # Signed out for this request all the same; the session ends on the next try.
+    assert response.status_code == 303 and response.headers["location"] == "/auth/proxy"
+    assert proxy.sessions() == [("ola@example.com", "proxy")]
+    assert "database is busy" in log.getvalue()
+    monkeypatch.undo()
+    assert client.get("/", headers=BOB, follow_redirects=False).headers["location"] == (
+        "/auth/proxy"
+    )
+    assert proxy.sessions() == []
 
 
 def test_another_proxy_user_on_a_post_is_signed_out_without_revoking(proxy: Proxy) -> None:

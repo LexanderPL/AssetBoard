@@ -32,8 +32,8 @@ ASSETBOARD_PROXY_AUTH_USER_HEADER=Remote-User      # the stable user name
 ASSETBOARD_PROXY_AUTH_EMAIL_HEADER=Remote-Email    # treated as verified
 ASSETBOARD_PROXY_AUTH_NAME_HEADER=Remote-Name      # optional: names new accounts
 ASSETBOARD_TRUSTED_PROXIES=172.30.0.2              # the proxy's own address
-ASSETBOARD_PROXY_AUTH_AUTO_CREATE=false            # true: anyone the proxy lets in gets an account
-ASSETBOARD_PROXY_AUTH_LINK_BY_EMAIL=false          # true: link to an existing account after its password
+ASSETBOARD_PROXY_AUTH_AUTO_CREATE=false            # true: anyone let in gets an account
+ASSETBOARD_PROXY_AUTH_LINK_BY_EMAIL=false          # true: link after the account's password
 ```
 
 AssetBoard refuses to start with proxy authentication on when the user or email header is not
@@ -116,7 +116,7 @@ proxy_set_header Remote-Name  $name;
 ```
 
 `proxy_set_header` redefines the header for the backend, and an empty value means the header
-is not passed at all ([nginx documentation](https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_set_header)),
+is not passed at all ([nginx documentation][nginx-proxy-set-header]),
 so whatever the browser sent is dropped. Keep these lines in the same block as your other
 `proxy_set_header` lines: nginx inherits them from an outer level only if the current level
 sets none.
@@ -135,7 +135,7 @@ money.example.com {
 
 **Use Caddy 2.11.2 or later.** From 2.10.0 up to 2.11.1, `copy_headers` passed the browser's
 own header through when the authentication service did not return one
-([GHSA-7r4p-vjf4-gxv4](https://github.com/caddyserver/caddy/security/advisories/GHSA-7r4p-vjf4-gxv4));
+([GHSA-7r4p-vjf4-gxv4][caddy-ghsa]);
 2.11.2 deletes those headers first. See the
 [`forward_auth` documentation](https://caddyserver.com/docs/caddyfile/directives/forward_auth)
 and [Authelia's Caddy guide](https://www.authelia.com/integration/proxies/caddy/).
@@ -151,10 +151,10 @@ http:
         authResponseHeadersRegex: ^Remote-
 ```
 
-Traefik's `authResponseHeaders` replaces headers only when the authentication response
-contains them. `authResponseHeadersRegex` first strips every request header that matches the
-expression, then copies the matching headers from the response
-([Traefik `forwardAuth` reference](https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/forwardauth/)),
+Traefik documents `authResponseHeaders` as copying the listed headers "replacing any existing
+conflicting headers"; it does not say that a header the authentication response lacks is removed.
+`authResponseHeadersRegex` sets the matching headers "after stripping all headers that match the
+regex" ([Traefik `forwardAuth` reference][traefik-forwardauth]),
 so prefer it.
 
 ### Authentik (proxy provider or forward auth)
@@ -228,9 +228,24 @@ If the browser does not keep the session cookie (for example `ASSETBOARD_BASE_UR
 `https://` but the site was opened over `http://`), sign-in stops at a page that says so instead
 of redirecting in a loop.
 
+## Monitors, scripts and other clients
+
+Only a browser loading a page (`Sec-Fetch-Dest: document` or `Sec-Fetch-Mode: navigate`, or
+`Accept: text/html` when the browser sends neither) is signed in through `/auth/proxy`. Other
+requests without a session, such as `curl` or an image, get the plain redirect to `/login`
+and create no session.
+
+- **Point uptime monitors at `/healthz`** (or `/readyz`), which need no sign-in.
+- **Do not send clients that cannot keep cookies to other pages** through the proxy: every
+  page they load as a browser would start a new sign-in.
+
 ## Logs and audit
 
 Refused proxy sign-ins (no account, deactivated, …) are audited as `auth.proxy_failure` with a
 reason, at most once per user and reason every 10 minutes; repeats are logged only. These
 counters live in memory and restart with the application. Rate-limit `/auth/proxy` at the proxy
 as described in [docs/deployment.md](../deployment.md#reverse-proxies).
+
+[nginx-proxy-set-header]: https://nginx.org/en/docs/http/ngx_http_proxy_module.html#proxy_set_header
+[caddy-ghsa]: https://github.com/caddyserver/caddy/security/advisories/GHSA-7r4p-vjf4-gxv4
+[traefik-forwardauth]: https://doc.traefik.io/traefik/reference/routing-configuration/http/middlewares/forwardauth/

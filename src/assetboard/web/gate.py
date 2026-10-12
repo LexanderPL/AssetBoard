@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 from urllib.parse import quote, urlsplit
 
+from sqlalchemy.exc import OperationalError
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import Headers
 from starlette.requests import Request
@@ -18,7 +19,7 @@ from starlette.responses import Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from assetboard.branding import APP_NAME, CLI_NAME
-from assetboard.db.engine import run_immediate
+from assetboard.db.engine import is_database_locked, run_immediate
 from assetboard.i18n import gettext
 from assetboard.middleware import route_path
 from assetboard.services.auth import (
@@ -161,6 +162,21 @@ async def _setup_open(app: Any) -> bool:
     return is_open
 
 
+def is_page_navigation(request: Request) -> bool:
+    """A browser loading a page: ``Sec-Fetch-Dest: document`` or ``Sec-Fetch-Mode: navigate``.
+
+    Clients that send no Fetch Metadata count when they accept ``text/html``.
+    """
+    headers = request.headers
+    dest = headers.get("sec-fetch-dest")
+    mode = headers.get("sec-fetch-mode")
+    if dest is not None or mode is not None:
+        return (dest or "").strip().lower() == "document" or (
+            mode or ""
+        ).strip().lower() == "navigate"
+    return "text/html" in headers.get("accept", "").lower()
+
+
 async def _load_session(request: Request, proxy: ProxyRequest | None) -> WebSession | None:
     """The signed-in session, if any. Proxy sessions are bound to the proxy (ADR-0015).
 
@@ -192,18 +208,26 @@ async def _load_session(request: Request, proxy: ProxyRequest | None) -> WebSess
 
     current, other_subject = await run_in_threadpool(read)
     if other_subject and request.method in SAFE_NAVIGATION:
-        await run_in_threadpool(
-            run_immediate,
-            state.session_factory,
-            lambda session: revoke_session(
-                session,
-                session_id,
-                clock=state.clock,
-                host=client_host(request),
-                user_agent=request.headers.get("user-agent"),
-            ),
-        )
-        state.logger.info("proxy session ended: the proxy presents a different user")
+        # Best effort: the request is already signed out, and the next navigation retries
+        # (``/auth/proxy`` also replaces the old session when it signs the new user in).
+        try:
+            await run_in_threadpool(
+                run_immediate,
+                state.session_factory,
+                lambda session: revoke_session(
+                    session,
+                    session_id,
+                    clock=state.clock,
+                    host=client_host(request),
+                    user_agent=request.headers.get("user-agent"),
+                ),
+            )
+        except OperationalError as exc:
+            if not is_database_locked(exc):
+                raise
+            state.logger.warning("proxy session not ended yet: the database is busy")
+        else:
+            state.logger.info("proxy session ended: the proxy presents a different user")
     if current is not None and current.needs_touch:
         # Best effort with a short lock wait: a busy database never fails the request.
         await run_in_threadpool(
@@ -250,10 +274,12 @@ class AccessGateMiddleware:
                 proxy is not None
                 and proxy.subject is not None
                 and request.method in SAFE_NAVIGATION
+                and (is_htmx_fragment_request(request) or is_page_navigation(request))
             ):
                 # The trusted proxy vouches for someone: sign in through /auth/proxy. Its
                 # redirect back goes through /auth/proxy/continue, so a browser that drops the
-                # session cookie ends on a page instead of looping.
+                # session cookie ends on a page instead of looping. Other requests (monitors,
+                # scripts, images) get the plain /login redirect and write nothing.
                 if is_htmx_fragment_request(request):
                     target = proxy_start_url()
                 else:
