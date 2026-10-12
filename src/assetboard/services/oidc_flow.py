@@ -54,7 +54,11 @@ def seal(
 ) -> str:
     issued = int(now.timestamp())
     data = {**payload, "iat": issued, "exp": issued + int(lifetime.total_seconds())}
-    body = _b64(json.dumps(data, separators=(",", ":"), sort_keys=True).encode("utf-8"))
+    # UTF-8, not \\uXXXX escapes: a non-ASCII subject then costs at most 4 bytes per character,
+    # which keeps the worst case (255-character subject, 512-character issuer, 320-character
+    # email, 512-character next) under MAX_COOKIE_LENGTH.
+    text = json.dumps(data, separators=(",", ":"), sort_keys=True, ensure_ascii=False)
+    body = _b64(text.encode("utf-8"))
     value = f"{body}.{_mac(key, purpose, body)}"
     if len(value) > MAX_COOKIE_LENGTH:
         raise ValueError("payload too large for a cookie")

@@ -86,3 +86,19 @@ def test_missing_fields_are_refused() -> None:
 def test_oversized_payloads_cannot_be_sealed() -> None:
     with pytest.raises(ValueError):
         seal(KEY, FLOW_PURPOSE, {"next": "x" * 4000}, now=NOW, lifetime=FLOW_LIFETIME)
+
+
+def test_the_worst_case_pending_link_fits_in_a_cookie() -> None:
+    pending = PendingLink(
+        user_id=uuid4(),
+        issuer="https://idp.example.test/" + "i" * (512 - 25),
+        subject="\U0001f600" * 255,  # 4 bytes each in UTF-8
+        email=("e" * 64 + "@" + "d" * 251 + ".test")[:320],
+        admin=False,
+        next_path="/" + "n" * 511,
+    )
+    assert len(pending.issuer) == 512 and len(pending.subject) == 255
+    assert len(pending.email) == 320 and len(pending.next_path) == 512
+    value = pending.seal(KEY, now=NOW)
+    assert len(value) <= 3800
+    assert PendingLink.unseal(KEY, value, now=NOW) == pending

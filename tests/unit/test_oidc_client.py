@@ -497,3 +497,20 @@ def test_provider_text_cannot_forge_log_lines(
     assert "request_complete" in messages[0]  # kept, but inside the one line
     assert error.value.detail == "access_denied"
     assert OidcError("x", "a\nb\x1b").detail == "a b"
+
+
+def test_the_urllib_transport_honours_proxy_variables_and_never_redirects(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    import urllib.request
+
+    from assetboard.services.oidc import UrllibTransport
+
+    monkeypatch.setenv("HTTPS_PROXY", "http://proxy.internal:3128")
+    transport = UrllibTransport()
+    opener: Any = transport._opener  # pyright: ignore[reportPrivateUsage]
+    handlers: list[object] = list(opener.handlers)
+    proxies: list[Any] = [h for h in handlers if isinstance(h, urllib.request.ProxyHandler)]
+    assert proxies and proxies[0].proxies.get("https") == "http://proxy.internal:3128"
+    redirects = [h for h in handlers if isinstance(h, urllib.request.HTTPRedirectHandler)]
+    assert len(redirects) == 1 and type(redirects[0]).__name__ == "_NoRedirects"
