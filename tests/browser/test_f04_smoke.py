@@ -94,9 +94,11 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             page.get_by_label("Email").fill("admin@example.com")
             page.get_by_label("Display name").fill("Browser Admin")
             page.get_by_label("Password").fill("Correct Horse Battery!")
+            page.get_by_label("Workspace name").fill("Browser Home")
             page.get_by_role("button", name="Create administrator").click()
             page.wait_for_url(f"{base}/")
             expect(page.get_by_text("Browser Admin")).to_be_visible()
+            expect(page.locator("[data-current-workspace]")).to_have_text("Browser Home")
 
             # HTMX sends the CSRF token in a header; a bad token becomes an error toast.
             page.goto(f"{base}/account/password", wait_until="networkidle")
