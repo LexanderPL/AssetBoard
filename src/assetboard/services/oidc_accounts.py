@@ -53,29 +53,11 @@ from assetboard.services.auth import (
     revoke_all_sessions,
     session_id_hash,
 )
+from assetboard.services.external_identity import PROXY_PROVIDER, SignInIdentity
 from assetboard.services.hash_gate import HashGate
 from assetboard.services.oidc_flow import PendingLink
 
 logger = logging.getLogger(f"{APP_NAME.lower()}.oidc")
-
-# ``ExternalIdentity.provider`` for reverse-proxy identities. OIDC providers are stored by their
-# issuer URL, which always has a scheme, so the two never collide.
-PROXY_PROVIDER = "proxy"
-
-
-@dataclass(frozen=True, slots=True)
-class SignInIdentity:
-    """What a validated sign-in tells us. ``groups`` is None when the claim is unusable.
-
-    ``issuer`` is the provider: the OIDC issuer URL, or ``PROXY_PROVIDER``.
-    """
-
-    issuer: str
-    subject: str
-    email: str | None
-    email_verified: bool
-    display_name: str
-    groups: tuple[str, ...] | None
 
 
 @dataclass(frozen=True, slots=True)

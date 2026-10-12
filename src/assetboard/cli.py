@@ -53,6 +53,16 @@ def serve_app(application: ASGIApp, settings: Settings) -> ASGIApp:
     return PeerMiddleware(application, settings.trusted_proxies)
 
 
+def dev_app() -> ASGIApp:
+    """``make dev``'s factory (uvicorn ``--reload`` needs one): wired exactly as ``serve``.
+
+    The Makefile also passes ``--no-proxy-headers`` and ``--no-access-log``, the command-line
+    equivalents of ``server_options``.
+    """
+    settings = Settings()
+    return serve_app(create_app(settings), settings)
+
+
 def server_options(settings: Settings) -> dict[str, Any]:
     """Uvicorn options for ``serve``.
 

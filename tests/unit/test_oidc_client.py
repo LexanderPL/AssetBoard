@@ -9,6 +9,7 @@ from urllib.parse import parse_qs, urlsplit
 import pytest
 
 from assetboard.config import Settings
+from assetboard.services.external_identity import SignInIdentity
 from assetboard.services.oidc import (
     ALLOWED_ALGORITHMS,
     AuthorizationRequest,
@@ -17,7 +18,6 @@ from assetboard.services.oidc import (
     create_s256_code_challenge,
     email_verified_claim,
 )
-from assetboard.services.oidc_accounts import SignInIdentity
 from tests.oidc.fake_idp import (
     BASE_URL,
     CLIENT_ID,

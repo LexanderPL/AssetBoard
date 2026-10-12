@@ -26,7 +26,7 @@ from assetboard.cli import serve_app, server_options
 from assetboard.config import Settings
 from assetboard.middleware import PEER_SCOPE_KEY, PeerMiddleware
 from assetboard.services.auth import client_ip_prefix
-from assetboard.services.oidc_accounts import PROXY_PROVIDER, SignInIdentity
+from assetboard.services.external_identity import PROXY_PROVIDER, SignInIdentity
 from assetboard.services.proxy_auth import (
     ProxyHeaders,
     identity_header_names,
@@ -75,7 +75,12 @@ def app_log() -> Iterator[Records]:
 # Peer trust: CIDR edges, IPv6 and peers that are not IP addresses
 
 
-NETWORKS = (ip_network("172.20.0.0/24"), ip_network("fd00:20::/64"), ip_network("127.0.0.1/32"))
+NETWORKS = (
+    ip_network("172.20.0.0/24"),
+    ip_network("fd00:20::/64"),
+    ip_network("127.0.0.1/32"),
+    ip_network("fe80::/64"),
+)
 
 
 @pytest.mark.parametrize(
@@ -93,6 +98,9 @@ NETWORKS = (ip_network("172.20.0.0/24"), ip_network("fd00:20::/64"), ip_network(
         ("fd00:20::ffff:ffff:ffff:ffff", True),
         ("fd00:20:0:1::", False),
         ("::1", False),  # loopback over IPv6 is not 127.0.0.1/32
+        ("fe80::1", True),
+        ("fe80::1%eth0", False),  # a zone: the address may be another host on each interface
+        ("fe80::1%2", False),
         ("2001:db8::1", False),
         (None, False),  # no peer (for example a Unix socket)
         ("", False),
@@ -176,6 +184,12 @@ def test_header_names_are_matched_case_insensitively(tmp_path: Path) -> None:
         ({"remote_user": "ola\x00admin"}, ProxyHeaders("invalid", header="remote-user")),
         ({"remote_user": "ola‮admin"}, ProxyHeaders("invalid", header="remote-user")),
         ({"remote_user": "x" * 256}, ProxyHeaders("invalid", header="remote-user")),
+        ({"remote_user": "ola\u2028admin"}, ProxyHeaders("invalid", header="remote-user")),  # Zl
+        ({"remote_user": "ola\u2029admin"}, ProxyHeaders("invalid", header="remote-user")),  # Zp
+        ({"remote_user": "ola\ue000"}, ProxyHeaders("invalid", header="remote-user")),  # Co
+        ({"remote_user": "ola\U000f0001"}, ProxyHeaders("invalid", header="remote-user")),  # Co
+        ({"remote_user": "ola\u0378"}, ProxyHeaders("invalid", header="remote-user")),  # Cn
+        ({"remote_user": "Żaneta"}, None),  # letters outside ASCII are fine
     ],
 )
 def test_absent_duplicate_and_invalid_headers(
@@ -189,7 +203,16 @@ def test_absent_duplicate_and_invalid_headers(
 
 
 @pytest.mark.parametrize(
-    "email", ["", "not-an-email", "ola@", b"ola@exa\xffmple.com", "ola\x00@example.com"]
+    "email",
+    [
+        "",
+        "not-an-email",
+        "ola@",
+        b"ola@exa\xffmple.com",
+        "ola\x00@example.com",
+        "ola\u2029@example.com",
+        "ola\ue000@example.com",
+    ],
 )
 def test_a_missing_or_malformed_email_counts_as_unverified(
     tmp_path: Path, email: str | bytes
@@ -207,6 +230,8 @@ def test_a_missing_or_malformed_email_counts_as_unverified(
         ({"remote_name": "Żaneta Łęcka"}, "Żaneta Łęcka"),  # UTF-8 bytes are decoded
         ({"remote_name": "x" * 200}, "x" * 120),
         ({"remote_name": "Bad\x07Name"}, "ola"),  # control characters: the subject instead
+        ({"remote_name": "Line\u2028Break"}, "ola"),
+        ({"remote_name": "Private\ue000"}, "ola"),
         ({"remote_name": b"\xff"}, "ola"),
         ({}, "ola"),
     ],

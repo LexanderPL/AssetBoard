@@ -20,13 +20,13 @@ from __future__ import annotations
 import unicodedata
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
-from ipaddress import IPv4Network, IPv6Network
+from ipaddress import IPv4Network, IPv6Address, IPv6Network
 from typing import Literal
 
 from assetboard.config import Settings
 from assetboard.domain.identity import InvalidEmail, normalize_email
 from assetboard.services.auth import normalize_client_host
-from assetboard.services.oidc_accounts import PROXY_PROVIDER, SignInIdentity
+from assetboard.services.external_identity import PROXY_PROVIDER, SignInIdentity
 
 MAX_SUBJECT_LENGTH = 255
 MAX_DISPLAY_NAME_LENGTH = 120
@@ -47,10 +47,14 @@ def peer_is_trusted(peer: str | None, networks: Sequence[IPv4Network | IPv6Netwo
     """Whether the TCP peer is inside ``TRUSTED_PROXIES``.
 
     ``::ffff:a.b.c.d`` (dual-stack sockets) is compared as the IPv4 address ``a.b.c.d``. No
-    peer, a Unix socket path or anything else that is not an IP address is never trusted.
+    peer, a Unix socket path or anything else that is not an IP address is never trusted, and
+    neither is a peer with an IPv6 zone (``fe80::1%eth0``): the same link-local address can be a
+    different host on each interface.
     """
     address = normalize_client_host(peer)
     if address is None:
+        return False
+    if isinstance(address, IPv6Address) and address.scope_id is not None:
         return False
     return any(address.version == network.version and address in network for network in networks)
 
@@ -60,13 +64,18 @@ def _values(headers: Iterable[tuple[bytes, bytes]], name: str) -> list[bytes]:
     return [value.strip() for key, value in headers if key.lower() == wanted and value.strip()]
 
 
+# Control and format characters, line and paragraph separators, private-use and unassigned
+# code points: none belongs in a user name, email or display name.
+_REJECTED_CATEGORIES = frozenset({"Cc", "Cf", "Zl", "Zp", "Co", "Cn"})
+
+
 def _text(value: bytes) -> str | None:
-    """UTF-8 without control or format characters; None otherwise."""
+    """UTF-8 without characters from ``_REJECTED_CATEGORIES``; None otherwise."""
     try:
         text = value.decode("utf-8")
     except UnicodeDecodeError:
         return None
-    if any(unicodedata.category(character) in {"Cc", "Cf"} for character in text):
+    if any(unicodedata.category(character) in _REJECTED_CATEGORIES for character in text):
         return None
     return text
 

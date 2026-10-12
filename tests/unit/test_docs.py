@@ -82,9 +82,12 @@ def _reserved_header_names(tree: ast.Module) -> set[int]:
 
 
 def test_no_source_reads_forwarded_headers() -> None:
-    """Only request.client.host is used; forwarded headers are uvicorn's job (TRUSTED_PROXIES).
+    """No app code reads forwarded headers itself.
 
-    The one exception is config.py refusing these names for proxy identity headers (F1.4).
+    ``PeerMiddleware`` (used by ``serve``) applies them for ``TRUSTED_PROXIES`` through uvicorn's
+    ``ProxyHeadersMiddleware``, after recording the TCP peer; the app then sees only
+    ``request.client``. The one exception here is config.py's list of names that proxy identity
+    headers may not use (F1.4).
     """
     offenders: list[str] = []
     for path in _source_files():

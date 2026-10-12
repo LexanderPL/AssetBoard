@@ -13,8 +13,9 @@ from assetboard.db.models.identity import ExternalIdentity, Invitation, SetupSta
 from assetboard.db.repositories import NotFound
 from assetboard.services import invitations, workspaces
 from assetboard.services.auth import RegistrationOutcome, register_with_invitation
+from assetboard.services.external_identity import SignInIdentity
 from assetboard.services.invitations import InvitationInvalid, accept_invitation
-from assetboard.services.oidc_accounts import SignInIdentity, SignInOutcome, sign_in_external
+from assetboard.services.oidc_accounts import SignInOutcome, sign_in_external
 from assetboard.services.workspaces import (
     MAX_PENDING_INVITATIONS,
     TooManyInvitations,

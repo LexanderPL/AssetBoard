@@ -30,9 +30,12 @@ request came from the proxy, was lost.
   `X-Forwarded-For` never makes a peer trusted.
   - Comparison: the peer is parsed as an IP address; `::ffff:a.b.c.d` from dual-stack sockets
     is compared as IPv4 `a.b.c.d`; IPv4 peers match only IPv4 networks and IPv6 peers only IPv6
-    networks. No peer, a Unix socket or anything that is not an IP address is never trusted.
+    networks. No peer, a Unix socket or anything that is not an IP address is never trusted,
+    and neither is a peer with an IPv6 zone (`fe80::1%eth0`): the same link-local address can
+    be a different host on each interface.
   - Without the recorded peer (the app was started some other way than `serve`), nothing is
-    trusted and one ERROR per process says to use `assetboard serve`.
+    trusted and one ERROR per process says to use `assetboard serve`. `make dev` runs the same
+    wiring through the `assetboard.cli:dev_app` factory (uvicorn `--reload` needs a factory).
 - **Startup refuses unsafe settings** when proxy auth is on: a missing user or email header
   name; header names that repeat (compared case-insensitively) or that are not HTTP tokens or
   are reserved for something else (`Host`, `Cookie`, `Authorization`, `Origin`, `Forwarded`,
@@ -46,8 +49,8 @@ request came from the proxy, was lost.
   email (the proxy vouches for it); a missing or malformed email counts as unverified. The name
   header only names a new account. Groups are not read: proxy sign-in never changes instance
   administrator status. A header that occurs more than once is refused; an empty value counts
-  as absent; values must be UTF-8 without control characters and the subject at most 255
-  characters.
+  as absent; values must be UTF-8 without control or format characters, line or paragraph
+  separators, private-use or unassigned code points, and the subject at most 255 characters.
 - **One account-mapping implementation.** OIDC and the proxy share `sign_in_external`; a
   `MappingPolicy` per provider carries what differs: `PROXY_AUTH_AUTO_CREATE` and
   `PROXY_AUTH_LINK_BY_EMAIL` (both off by default), no domain allow-list, no admin group,

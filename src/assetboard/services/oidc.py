@@ -40,7 +40,7 @@ from assetboard.branding import APP_NAME
 from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.domain.identity import InvalidEmail, normalize_email
-from assetboard.services.oidc_accounts import SignInIdentity
+from assetboard.services.external_identity import SignInIdentity
 
 logger = logging.getLogger(f"{APP_NAME.lower()}.oidc")
 

@@ -29,11 +29,10 @@ from assetboard.services.auth import (
     read_web_session,
     session_id_hash,
 )
+from assetboard.services.external_identity import PROXY_PROVIDER, SignInIdentity
 from assetboard.services.invitations import MAX_FAILED_EMAIL_ATTEMPTS, hash_token
 from assetboard.services.oidc import OidcClient
 from assetboard.services.oidc_accounts import (
-    PROXY_PROVIDER,
-    SignInIdentity,
     SignInOutcome,
     invitation_token,
     link_identity,

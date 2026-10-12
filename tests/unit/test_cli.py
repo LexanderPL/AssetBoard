@@ -274,6 +274,20 @@ def test_serve_applies_trusted_proxies_in_peer_middleware(
     assert calls["forwarded_allow_ips"] == ""
 
 
+def test_make_dev_runs_the_app_wired_like_serve(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(cli, "create_app", lambda settings: "app")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv(f"{ENV_PREFIX}_DATA_DIR", str(tmp_path / "data"))
+    served = cli.dev_app()
+    assert isinstance(served, PeerMiddleware) and served.app == "app"
+    makefile = (Path(__file__).resolve().parents[2] / "Makefile").read_text(encoding="utf-8")
+    dev = makefile.split("\ndev:\n", 1)[1].split("\n\n", 1)[0]
+    assert "assetboard.cli:dev_app --factory" in dev
+    assert "--no-proxy-headers" in dev and "--no-access-log" in dev
+
+
 def test_serve_trusts_no_proxy_when_trusted_proxies_is_empty(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
