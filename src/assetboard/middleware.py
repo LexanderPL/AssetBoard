@@ -22,6 +22,22 @@ SECURITY_HEADERS = {
     "x-frame-options": "DENY",
 }
 _SECURITY_HEADER_NAMES = frozenset(name.encode("ascii") for name in SECURITY_HEADERS)
+# Pages whose URL carries a secret (invitation tokens) never send a Referer (ADR-0013).
+NO_REFERRER_PREFIXES = ("/invite/",)
+_INVITE_TOKEN = re.compile(r"(/invite/)[^/?#]+")
+
+
+def redact_path(path: str) -> str:
+    """The request path as logged: invitation tokens are replaced with ``[redacted]``."""
+    return _INVITE_TOKEN.sub(r"\1[redacted]", path)
+
+
+def _route_path(scope: Scope) -> str:
+    path: str = scope.get("path", "")
+    root_path: str = scope.get("root_path", "")
+    if root_path and path.startswith(root_path):
+        path = path[len(root_path) :] or "/"
+    return path
 
 
 class RequestIdMiddleware:
@@ -52,17 +68,19 @@ class RequestIdMiddleware:
             else:
                 log_level = logging.INFO
             duration_ms = (perf_counter() - started_at) * 1000
+            # Only the path is logged, never the query string (it may carry ``next=/invite/…``).
+            logged_path = redact_path(scope.get("path", ""))
             self.logger.log(
                 log_level,
                 "request_complete method=%s path=%s status_code=%d duration_ms=%.3f",
                 scope.get("method", ""),
-                scope.get("path", ""),
+                logged_path,
                 status_code,
                 duration_ms,
                 extra={
                     "request_id": request_id,
                     "method": scope.get("method", ""),
-                    "path": scope.get("path", ""),
+                    "path": logged_path,
                     "status_code": status_code,
                     "duration_ms": duration_ms,
                 },
@@ -143,6 +161,11 @@ class SecurityHeadersMiddleware:
                     (key.encode("ascii"), value.encode("ascii"))
                     for key, value in SECURITY_HEADERS.items()
                 )
+                if _route_path(scope).startswith(NO_REFERRER_PREFIXES):
+                    response_headers = [
+                        (name, b"no-referrer" if name == b"referrer-policy" else value)
+                        for name, value in response_headers
+                    ]
                 if not scope.get("path", "").startswith("/static/"):
                     response_headers = [
                         (name, value)

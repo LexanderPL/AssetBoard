@@ -31,6 +31,8 @@ from assetboard.web.security import session_cookie_name
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 ALWAYS_OPEN = frozenset({"/healthz", "/readyz"})
 SIGNED_OUT_PATHS = frozenset({"/login", "/register", "/setup"})
+# Invitation links work signed out: the invitee may still need to create an account.
+SIGNED_OUT_PREFIXES = ("/invite/",)
 
 
 def _route_path(scope: Scope) -> str:
@@ -200,7 +202,11 @@ class AccessGateMiddleware:
             return
         current = await _load_session(request)
         scope.setdefault("state", {})["web_session"] = current
-        if current is None and path not in SIGNED_OUT_PATHS:
+        if (
+            current is None
+            and path not in SIGNED_OUT_PATHS
+            and not path.startswith(SIGNED_OUT_PREFIXES)
+        ):
             target = "/login"
             # ``next`` only for full-page GET navigations: an HTMX fragment's path is not a page
             # to return to, so htmx is sent to plain /login.
