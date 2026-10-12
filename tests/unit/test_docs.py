@@ -237,9 +237,14 @@ def test_proxy_auth_guide_opens_with_the_warning_and_links_each_proxy() -> None:
         "### Traefik": "https://doc.traefik.io/",
         "### Authentik": "https://docs.goauthentik.io/",
     }
+    references = dict(re.findall(r"^\[([a-z-]+)\]: (\S+)$", guide, re.MULTILINE))
     for heading, link in sections.items():
         body = guide.split(heading, 1)[1].split("\n### ", 1)[0].split("\n## ", 1)[0]
-        assert link in body, heading
+        # Inline links, or reference links resolved through their definitions.
+        targets = re.findall(r"\]\((https?://[^)]+)\)", body) + [
+            references[label] for label in re.findall(r"\]\[([a-z-]+)\]", body)
+        ]
+        assert any(target.startswith(link) for target in targets), heading
     assert "https://www.authelia.com/" in guide
     test_it = guide.split("## Test it", 1)[1].split("\n## ", 1)[0]
     assert "challenged" in test_it and "overwritten" in test_it and "another host" in test_it
