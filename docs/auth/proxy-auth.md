@@ -136,7 +136,7 @@ money.example.com {
 **Use Caddy 2.11.2 or later.** From 2.10.0 up to 2.11.1, `copy_headers` passed the browser's
 own header through when the authentication service did not return one
 ([GHSA-7r4p-vjf4-gxv4][caddy-ghsa]);
-2.11.2 deletes those headers first. See the
+2.11.2 is the patched version. See the
 [`forward_auth` documentation](https://caddyserver.com/docs/caddyfile/directives/forward_auth)
 and [Authelia's Caddy guide](https://www.authelia.com/integration/proxies/caddy/).
 
