@@ -67,8 +67,12 @@ msgstr "Jasny"
 msgid "Dark"
 msgstr "Ciemny"
 
-msgid "Enter a display name of at most 120 characters."
-msgstr "Podaj wyświetlaną nazwę o długości najwyżej 120 znaków."
+msgid ""
+"Enter a display name of 1 to 120 characters, without control or invisible"
+" characters."
+msgstr ""
+"Podaj wyświetlaną nazwę o długości od 1 do 120 znaków, bez znaków "
+"sterujących i niewidocznych."
 
 msgid "Choose one of the listed languages."
 msgstr "Wybierz jeden z języków z listy."
@@ -144,9 +148,6 @@ msgstr "To hasło jest zbyt popularne. Wybierz inne."
 
 msgid "The password must differ from your email name and your display name."
 msgstr "Hasło musi się różnić od nazwy w adresie e-mail i od wyświetlanej nazwy."
-
-msgid "Enter a display name of 1 to 120 characters."
-msgstr "Podaj wyświetlaną nazwę o długości od 1 do 120 znaków."
 
 msgid "Enter a workspace name of 1 to 120 characters."
 msgstr "Podaj nazwę obszaru roboczego o długości od 1 do 120 znaków."
@@ -881,4 +882,7 @@ msgstr ""
 
 msgid "Save settings"
 msgstr "Zapisz ustawienia"
+
+#~ msgid "Enter a display name of at most 120 characters."
+#~ msgstr "Podaj wyświetlaną nazwę o długości najwyżej 120 znaków."
 

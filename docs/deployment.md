@@ -209,6 +209,11 @@ when you intend to upload the image and its release tags.
   one a sign-in from the last 10 minutes ([docs/accounts.md](accounts.md)).
 - **Migrations on SQLite** now run with foreign-key enforcement off and verify all references
   before committing (the locale change rebuilds the `users` table).
+- **Stricter display names.** Setup, registration, invitation sign-up and the profile now refuse
+  names with control or invisible characters: tabs and newlines inside a name, and zero-width
+  characters such as ZWNJ and ZWJ (which some Persian and emoji names use), and characters the
+  Unicode data does not know yet. Existing names are unchanged; names from an identity provider
+  are cleaned, or fall back to the email's local part.
 
 ### F1.4: reverse-proxy header authentication (part 2)
 

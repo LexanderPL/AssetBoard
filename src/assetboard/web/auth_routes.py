@@ -47,7 +47,7 @@ from assetboard.services.workspace_options import (
 )
 from assetboard.web.confirm import BUSY as CONFIRM_BUSY
 from assetboard.web.confirm import CONFIRM_FAILED, CONFIRM_STALE, confirm_view, run_confirmed
-from assetboard.web.errors import error_response, is_htmx_fragment_request
+from assetboard.web.errors import BUSY_RETRY_AFTER, error_response, is_htmx_fragment_request
 from assetboard.web.rendering import render_template
 from assetboard.web.security import (
     clear_csrf_cookie,
@@ -82,7 +82,9 @@ ERROR_MESSAGES = {
     "password_matches_identity": _(
         "The password must differ from your email name and your display name."
     ),
-    "invalid_display_name": _("Enter a display name of 1 to 120 characters."),
+    "invalid_display_name": _(
+        "Enter a display name of 1 to 120 characters, without control or invisible characters."
+    ),
     "invalid_workspace_name": _("Enter a workspace name of 1 to 120 characters."),
     "invalid_workspace_settings": _(
         "Choose a supported currency, country, time zone and language."
@@ -748,7 +750,7 @@ async def logout_others(request: Request, confirm_password: FormStr = "") -> Res
         else:
             response = await _password_page(request, errors={"confirm": key}, status_code=status)
         if status == 503:
-            response.headers["Retry-After"] = "5"
+            response.headers["Retry-After"] = BUSY_RETRY_AFTER
         return response
     notice = gettext("Other sessions signed out: %(count)d.", request.state.locale) % {
         "count": outcome.value

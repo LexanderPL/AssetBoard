@@ -35,6 +35,7 @@ from assetboard.services.profile import (
 )
 from assetboard.services.proxy_auth import proxy_identity_owner
 from assetboard.web.confirm import BUSY, CONFIRM_FAILED, CONFIRM_STALE, confirm_view, run_confirmed
+from assetboard.web.errors import BUSY_RETRY_AFTER
 from assetboard.web.rendering import render_template
 from assetboard.web.security import (
     client_host,
@@ -58,7 +59,9 @@ def _(message: str) -> str:
 LANGUAGE_NAMES = {"en": "English", "pl": "Polski"}
 THEME_NAMES = {"system": _("Same as the system"), "light": _("Light"), "dark": _("Dark")}
 PROFILE_ERRORS = {
-    "display_name": _("Enter a display name of at most 120 characters."),
+    "display_name": _(
+        "Enter a display name of 1 to 120 characters, without control or invisible characters."
+    ),
     "locale": _("Choose one of the listed languages."),
     "theme": _("Choose one of the listed themes."),
 }
@@ -90,7 +93,6 @@ UNLINK_LAST = _(
     "This is your last way to sign in, so it cannot be removed. Link another sign-in method "
     "or set a password first."
 )
-RETRY_AFTER_SECONDS = "5"
 
 
 def _state(request: Request) -> Any:
@@ -228,7 +230,7 @@ async def _refused(request: Request, status: str) -> Response:
     """The profile page for a confirmation that did not go through."""
     if status == "busy":
         response = await _profile_page(request, error=_t(request, BUSY), status_code=503)
-        response.headers["Retry-After"] = RETRY_AFTER_SECONDS
+        response.headers["Retry-After"] = BUSY_RETRY_AFTER
         return response
     if status == "stale":
         return await _profile_page(request, error=_t(request, CONFIRM_STALE), status_code=403)

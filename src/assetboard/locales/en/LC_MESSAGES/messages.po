@@ -64,7 +64,9 @@ msgstr ""
 msgid "Dark"
 msgstr ""
 
-msgid "Enter a display name of at most 120 characters."
+msgid ""
+"Enter a display name of 1 to 120 characters, without control or invisible"
+" characters."
 msgstr ""
 
 msgid "Choose one of the listed languages."
@@ -130,9 +132,6 @@ msgid "This password is too common. Choose another one."
 msgstr ""
 
 msgid "The password must differ from your email name and your display name."
-msgstr ""
-
-msgid "Enter a display name of 1 to 120 characters."
 msgstr ""
 
 msgid "Enter a workspace name of 1 to 120 characters."
@@ -829,5 +828,11 @@ msgstr ""
 #~ "An account with this email address "
 #~ "already exists. Sign in with your "
 #~ "password."
+#~ msgstr ""
+
+#~ msgid "Enter a display name of at most 120 characters."
+#~ msgstr ""
+
+#~ msgid "Enter a display name of 1 to 120 characters."
 #~ msgstr ""
 

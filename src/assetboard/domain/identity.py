@@ -31,7 +31,9 @@ class InvalidDisplayName(ValueError):
     code = "invalid_display_name"
 
     def __init__(self) -> None:
-        super().__init__("Display name must contain 1 to 120 characters")
+        super().__init__(
+            "Display name must contain 1 to 120 characters, without control or invisible characters"
+        )
 
 
 def normalize_display_name(value: str) -> str:

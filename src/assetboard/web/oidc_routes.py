@@ -39,6 +39,7 @@ from assetboard.services.oidc_accounts import (
 from assetboard.services.oidc_flow import FlowState, PendingLink
 from assetboard.services.profile import link_identity_to_user
 from assetboard.web.auth_routes import signed_in_redirect
+from assetboard.web.errors import BUSY_RETRY_AFTER
 from assetboard.web.invite_routes import (
     BUSY,
     EMAIL_MISMATCH,
@@ -61,7 +62,6 @@ from assetboard.web.security import (
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
 FormStr = Annotated[str, Form()]
-RETRY_AFTER_SECONDS = "5"
 
 
 def _(message: str) -> str:
@@ -364,7 +364,7 @@ async def oidc_failed(request: Request, reason: str) -> Response:
         status_code=status,
     )
     if status == 503:
-        response.headers["Retry-After"] = RETRY_AFTER_SECONDS
+        response.headers["Retry-After"] = BUSY_RETRY_AFTER
     return response
 
 
@@ -515,7 +515,7 @@ async def link_submit(request: Request, password: FormStr = "") -> Response:
         if not is_database_locked(exc):
             raise
         response = _link_page(request, pending, error=BUSY, status_code=503)
-        response.headers["Retry-After"] = RETRY_AFTER_SECONDS
+        response.headers["Retry-After"] = BUSY_RETRY_AFTER
         return response
     if outcome.status != "linked" or outcome.session_id is None or outcome.expires_at is None:
         # Wrong password, throttled, linking turned off meanwhile: one message for all.

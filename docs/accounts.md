@@ -6,7 +6,7 @@ are on "Account security".
 
 ## Details, language and theme
 
-- **Display name**: 1 to 120 characters.
+- **Display name**: 1 to 120 characters, no control or invisible characters.
 - **Language**: "Browser language" (the default) follows your browser's language setting;
   English or Polish pins that language on every device.
 - **Theme**: the saved theme applies on every device. The dark-mode button in the menu changes
@@ -17,7 +17,10 @@ are on "Account security".
 The profile lists the identity providers (OIDC) and the proxy sign-in linked to your account.
 
 - **Link your identity provider**: choose "Link <provider>", confirm, and sign in at the
-  provider. You come back to the profile; nothing else about your session changes.
+  provider. You come back to the profile; nothing else about your session changes. The profile
+  does not link a second account of a provider that is already linked: remove the old link
+  first. (Linking by email at sign-in can still add one; the list shows every linked account
+  and each can be removed.)
 - **Link the proxy sign-in**: shown when you browse through a reverse proxy that signs you in
   (see [docs/auth/proxy-auth.md](auth/proxy-auth.md)) and that proxy user is not linked yet.
 - **Remove a method**: allowed only if another way to sign in remains: a password the current

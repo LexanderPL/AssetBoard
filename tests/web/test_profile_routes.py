@@ -751,6 +751,7 @@ def test_profile_display_name_refuses_control_and_format_characters(h: Harness, 
         },
     )
     assert response.status_code == 400 and 'id="display_name-error"' in response.text
+    assert "without control or invisible characters" in response.text
     assert h.user(h.web.admin_email).display_name == "Admin"
 
 
