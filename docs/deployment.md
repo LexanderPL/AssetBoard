@@ -46,7 +46,7 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_OIDC_ONLY` | `false` | App | Hide password sign-in and registration. Needs `OIDC_ISSUER`; refuses to start with `ALLOW_REGISTRATION`. |
 | `ASSETBOARD_ALLOW_LOCAL_ADMIN_LOGIN` | `false` | App | Break-glass: with `OIDC_ONLY`, keep password sign-in at `/login/local` for instance administrators. No effect otherwise. |
 | `ASSETBOARD_OIDC_RP_LOGOUT` | `false` | App | Signing out of an OIDC session also signs out at the provider (RP-initiated logout), if it publishes an `end_session_endpoint`. Register `<BASE_URL>/login` as the post-logout redirect URI. |
-| `ASSETBOARD_PROXY_AUTH_ENABLED` | `false` | App | Reverse-proxy header authentication ([ADR-0015](adr/0015-proxy-header-authentication.md)). Requires `PROXY_AUTH_USER_HEADER`, `PROXY_AUTH_EMAIL_HEADER` and `TRUSTED_PROXIES` with no entry wider than IPv4 /24 or IPv6 /64. Settings are validated now; sign-in through the headers arrives with the second part of F1.4. |
+| `ASSETBOARD_PROXY_AUTH_ENABLED` | `false` | App | Reverse-proxy header authentication ([ADR-0015](adr/0015-proxy-header-authentication.md)). Requires `PROXY_AUTH_USER_HEADER`, `PROXY_AUTH_EMAIL_HEADER` and `TRUSTED_PROXIES` with no entry wider than IPv4 /24 or IPv6 /64. Read [docs/auth/proxy-auth.md](auth/proxy-auth.md) first. |
 | `ASSETBOARD_PROXY_AUTH_USER_HEADER` | unset | App | Header with the proxy's stable user name (for example `Remote-User`), read only from `TRUSTED_PROXIES` peers. |
 | `ASSETBOARD_PROXY_AUTH_EMAIL_HEADER` | unset | App | Header with the user's email (for example `Remote-Email`). Treated as verified: the proxy must only send verified addresses. |
 | `ASSETBOARD_PROXY_AUTH_NAME_HEADER` | unset | App | Optional header with a display name, used only when an account is created. |
@@ -174,8 +174,8 @@ request was addressed to (scheme plus `Host`), and never when the browser report
 request. Make sure the proxy passes the original `Host` header and scheme.
 
 **Rate limiting.** In addition to the built-in throttling, rate-limit `POST /login`,
-`POST /register`, `/invite/` (invitation sign-up) and `/auth/oidc/` (OIDC sign-in, which can
-create accounts) at the reverse proxy (for example nginx `limit_req`, the Traefik `RateLimit`
+`POST /register`, `/invite/` (invitation sign-up), `/auth/oidc/` (OIDC sign-in, which can
+create accounts) and `/auth/proxy` (proxy sign-in, which can too) at the reverse proxy (for example nginx `limit_req`, the Traefik `RateLimit`
 middleware, or a Caddy rate-limit module), such as a few requests per minute per client address.
 This keeps password-guessing floods from reaching the app at all. Also cap the request body size
 at the proxy (for example nginx `client_max_body_size 1m;`, the Traefik `Buffering` middleware's
@@ -196,6 +196,14 @@ architectures without logging in to GHCR or publishing. Check **Publish the imag
 when you intend to upload the image and its release tags.
 
 ## Upgrading
+
+### F1.4: reverse-proxy header authentication (part 2)
+
+- **Proxy sign-in works** with `ASSETBOARD_PROXY_AUTH_ENABLED=true`: read
+  [docs/auth/proxy-auth.md](auth/proxy-auth.md), including its test steps, before turning it on.
+  Nothing changes while it is off; every `/auth/proxy*` URL answers 404.
+- **The account-linking page** (`/login/link`) no longer names the OIDC provider, and its
+  "Start over" link goes to the sign-in page.
 
 ### F1.4: reverse-proxy header authentication (part 1)
 

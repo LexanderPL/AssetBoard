@@ -18,23 +18,35 @@ from starlette.responses import Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 
 from assetboard.branding import APP_NAME, CLI_NAME
+from assetboard.db.engine import run_immediate
 from assetboard.i18n import gettext
 from assetboard.middleware import route_path
 from assetboard.services.auth import (
     WebSession,
     read_web_session,
+    revoke_session,
     setup_is_open,
     touch_session_best_effort,
 )
+from assetboard.services.proxy_auth import proxy_identity_owner
 from assetboard.web.errors import error_response, is_htmx_fragment_request
-from assetboard.web.security import session_cookie_name
+from assetboard.web.security import (
+    ProxyRequest,
+    client_host,
+    proxy_request,
+    proxy_start_url,
+    session_cookie_name,
+)
 
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 ALWAYS_OPEN = frozenset({"/healthz", "/readyz"})
-SIGNED_OUT_PATHS = frozenset({"/login", "/register", "/setup", "/login/link", "/login/local"})
+SIGNED_OUT_PATHS = frozenset(
+    {"/login", "/register", "/setup", "/login/link", "/login/local", "/auth/proxy"}
+)
 # Invitation links work signed out: the invitee may still need to create an account. OIDC
 # sign-in (start, callback and its failure pages) happens before there is a session.
-SIGNED_OUT_PREFIXES = ("/invite/", "/auth/oidc/")
+SIGNED_OUT_PREFIXES = ("/invite/", "/auth/oidc/", "/auth/proxy/")
+SAFE_NAVIGATION = frozenset({"GET", "HEAD"})
 
 
 def _always_open(path: str) -> bool:
@@ -149,17 +161,49 @@ async def _setup_open(app: Any) -> bool:
     return is_open
 
 
-async def _load_session(request: Request) -> WebSession | None:
+async def _load_session(request: Request, proxy: ProxyRequest | None) -> WebSession | None:
+    """The signed-in session, if any. Proxy sessions are bound to the proxy (ADR-0015).
+
+    A ``proxy`` session counts only while the trusted proxy presents the subject linked to the
+    session's user. Without that (proxy auth off, an untrusted peer, missing, repeated or
+    invalid headers) the request is signed out and the session stays. A different subject (or
+    one no longer linked) ends the session on GET and HEAD; other methods only count as signed
+    out. Password and OIDC sessions are never affected by proxy headers.
+    """
     state = request.app.state
     session_id = request.cookies.get(session_cookie_name(state.settings))
     if not session_id:
         return None
+    subject = proxy.subject if proxy is not None else None
 
-    def read() -> WebSession | None:
+    def read() -> tuple[WebSession | None, bool]:
+        """The session, and whether it is a proxy session now presented by someone else."""
         with state.session_factory() as session:
-            return read_web_session(session, session_id, settings=state.settings, clock=state.clock)
+            current = read_web_session(
+                session, session_id, settings=state.settings, clock=state.clock
+            )
+            if current is None or current.auth_method != "proxy":
+                return current, False
+            if subject is None:
+                return None, False
+            if proxy_identity_owner(session, subject) == current.user_id:
+                return current, False
+            return None, True
 
-    current = await run_in_threadpool(read)
+    current, other_subject = await run_in_threadpool(read)
+    if other_subject and request.method in SAFE_NAVIGATION:
+        await run_in_threadpool(
+            run_immediate,
+            state.session_factory,
+            lambda session: revoke_session(
+                session,
+                session_id,
+                clock=state.clock,
+                host=client_host(request),
+                user_agent=request.headers.get("user-agent"),
+            ),
+        )
+        state.logger.info("proxy session ended: the proxy presents a different user")
     if current is not None and current.needs_touch:
         # Best effort with a short lock wait: a busy database never fails the request.
         await run_in_threadpool(
@@ -194,13 +238,29 @@ class AccessGateMiddleware:
                 return
             await self.app(scope, receive, send)
             return
-        current = await _load_session(request)
+        proxy = proxy_request(request)
+        current = await _load_session(request, proxy)
         scope.setdefault("state", {})["web_session"] = current
         if (
             current is None
             and path not in SIGNED_OUT_PATHS
             and not path.startswith(SIGNED_OUT_PREFIXES)
         ):
+            if (
+                proxy is not None
+                and proxy.subject is not None
+                and request.method in SAFE_NAVIGATION
+            ):
+                # The trusted proxy vouches for someone: sign in through /auth/proxy. Its
+                # redirect back goes through /auth/proxy/continue, so a browser that drops the
+                # session cookie ends on a page instead of looping.
+                if is_htmx_fragment_request(request):
+                    target = proxy_start_url()
+                else:
+                    original = path + (f"?{request.url.query}" if request.url.query else "")
+                    target = proxy_start_url(original)
+                await _redirect(request, target)(scope, receive, send)
+                return
             target = "/login"
             # ``next`` only for full-page GET navigations: an HTMX fragment's path is not a page
             # to return to, so htmx is sent to plain /login.
