@@ -5,15 +5,17 @@ The order is fixed, and every step after the first needs what the earlier ones r
 1. Domain allow-list (``OIDC_ALLOWED_DOMAINS``): a verified email in a listed domain, checked
    on every sign-in, linked identities included.
 2. ``ExternalIdentity(issuer, subject)``: that user signs in (refused if inactive).
-3. A user with the same email exists. With ``OIDC_LINK_BY_EMAIL`` and a verified email, and
-   only if that user has a password, the visitor must confirm the password (``link_identity``).
-   Otherwise: "an account with this email exists".
+   From here on the email must be verified ("email unverified" otherwise, before any local
+   account is looked at, so an unverified claim reveals nothing).
+3. A user with the same email exists. With ``OIDC_LINK_BY_EMAIL``, and only if that user has a
+   password, the visitor must confirm the password (``link_identity``). Otherwise: "an account
+   with this email exists".
 4. ``next`` is an invitation: an account is created and joins that workspace (even without
    ``OIDC_AUTO_CREATE``), under the invitation's email lock and the registration throttle.
 5. ``OIDC_AUTO_CREATE``: an account with its own workspace, under the registration throttle.
 6. Otherwise: "no account".
 
-Creating an account (4, 5) needs a verified email. Every refusal is audited as
+Every refusal is audited as
 ``auth.oidc_failure`` with a reason code and nothing from the provider.
 """
 
@@ -282,17 +284,22 @@ def sign_in_with_oidc(
 
         return run_immediate(factory, sign_in)
 
+    # Everything below needs a verified email. Checked before looking at local accounts, so an
+    # unverified claim learns nothing about which addresses are registered.
+    if identity.email is None or not identity.email_verified:
+        return refuse("email_unverified")
+    email = identity.email
+
     # 3. The email belongs to an existing account.
-    if known.email_user_id is not None and identity.email is not None:
-        linkable = settings.oidc_link_by_email and identity.email_verified
-        if linkable and known.email_user_has_password:
+    if known.email_user_id is not None:
+        if settings.oidc_link_by_email and known.email_user_has_password:
             return OidcSignIn(
                 status="confirm_link",
                 pending_link=PendingLink(
                     user_id=known.email_user_id,
                     issuer=identity.issuer,
                     subject=identity.subject,
-                    email=identity.email,
+                    email=email,
                     admin=admin,
                     next_path=next_path,
                 ),
@@ -303,9 +310,6 @@ def sign_in_with_oidc(
     token = invitation_token(next_path)
     if token is None and not settings.oidc_auto_create:
         return refuse("no_account")
-    if identity.email is None or not identity.email_verified:
-        return refuse("email_unverified")
-    email = identity.email
     if token is not None:
         try:
             invitations.check_for_sign_up(factory, token, email=email, clock=clock)

@@ -147,11 +147,11 @@ test = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.14,<2" },
     { name = "argon2-cffi", specifier = ">=25.1,<26" },
-    { name = "authlib", specifier = "==1.8.0" },
+    { name = "authlib", specifier = ">=1.8,<2" },
     { name = "babel", specifier = ">=2.16,<3" },
     { name = "fastapi", specifier = ">=0.116,<1" },
     { name = "jinja2", specifier = ">=3.1,<4" },
-    { name = "joserfc", specifier = "==1.7.5" },
+    { name = "joserfc", specifier = ">=1.7,<2" },
     { name = "pydantic-settings", specifier = ">=2.10,<3" },
     { name = "python-multipart", specifier = ">=0.0.32,<0.1" },
     { name = "sqlalchemy", specifier = ">=2.0,<2.2" },

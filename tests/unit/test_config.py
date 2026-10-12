@@ -249,6 +249,7 @@ def test_oidc_settings_from_the_environment(
         ({"oidc_issuer": "http://idp.example.test"}, "OIDC_ISSUER must use https"),
         ({"oidc_issuer": "https://idp.example.test/?x=1"}, "without query"),
         ({"oidc_issuer": "idp.example.test"}, "absolute URL"),
+        ({"oidc_issuer": "https://idp.example.test/" + "a" * 490}, "at most 512"),
         ({"base_url": "http://money.example.test"}, "BASE_URL must use https"),
         ({"base_url": None}, "BASE_URL must be set"),
         ({"oidc_only": True, "allow_registration": True}, "cannot be combined"),

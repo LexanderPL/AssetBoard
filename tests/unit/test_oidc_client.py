@@ -453,3 +453,47 @@ def test_end_session_url(tmp_path: Path, idp: FakeIdp, clock: StepClock) -> None
     assert query == {"client_id": [CLIENT_ID], "post_logout_redirect_uri": [f"{BASE_URL}/login"]}
     idp.discovery_overrides = {"end_session_endpoint": None}
     assert make_client(tmp_path, idp, clock).end_session_url() is None
+
+
+@pytest.mark.parametrize(
+    ("claims", "expected"),
+    [
+        ({"name": "Ola\nNordmann"}, "Ola Nordmann"),
+        ({"name": "\u202eanmdroN alO"}, "anmdroN alO"),  # RTL override removed
+        ({"name": "Ola\u200b  \t Nordmann "}, "Ola Nordmann"),
+        ({"name": "", "preferred_username": "ola"}, "ola"),
+        ({"name": "\u200b\x00", "preferred_username": "\u202e"}, "ola"),  # email local part
+        ({"name": "x" * 300}, "x" * 120),
+    ],
+)
+def test_display_names_are_cleaned(
+    tmp_path: Path, idp: FakeIdp, clock: StepClock, claims: dict[str, Any], expected: str
+) -> None:
+    idp.claims.update(claims)
+    assert sign_in(make_client(tmp_path, idp, clock), idp).display_name == expected
+
+
+def test_display_name_falls_back_to_user(tmp_path: Path, idp: FakeIdp, clock: StepClock) -> None:
+    idp.claims = {"name": "\u202e"}
+    idp.userinfo = {"sub": "user-123"}
+    assert sign_in(make_client(tmp_path, idp, clock), idp).display_name == "User"
+
+
+def test_provider_text_cannot_forge_log_lines(
+    tmp_path: Path, idp: FakeIdp, clock: StepClock, caplog: pytest.LogCaptureFixture
+) -> None:
+    client = make_client(tmp_path, idp, clock)
+    request = client.begin()
+    forged = "nope\n2026-05-01 INFO request_complete path=/admin status_code=200\r\u2028x"
+    with caplog.at_level(logging.WARNING), pytest.raises(OidcError) as error:
+        complete(
+            client,
+            request,
+            {"state": request.state, "error": "access_denied", "error_description": forged},
+        )
+    messages = [record.getMessage() for record in caplog.records]
+    assert messages and all("\n" not in m and "\r" not in m for m in messages)
+    assert all("\u2028" not in m for m in messages)
+    assert "request_complete" in messages[0]  # kept, but inside the one line
+    assert error.value.detail == "access_denied"
+    assert OidcError("x", "a\nb\x1b").detail == "a b"

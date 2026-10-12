@@ -226,9 +226,9 @@ def test_an_inactive_user_is_refused(db: WorkspaceDb, tmp_path: Path) -> None:
     ("flag", "verified", "status"),
     [
         (True, True, "confirm_link"),
-        (True, False, "account_exists"),
+        (True, False, "email_unverified"),
         (False, True, "account_exists"),
-        (False, False, "account_exists"),
+        (False, False, "email_unverified"),
     ],
 )
 def test_link_by_email_needs_the_flag_and_a_verified_email(
@@ -244,7 +244,7 @@ def test_link_by_email_needs_the_flag_and_a_verified_email(
             user_id, ISSUER, "sub-ola", "ola@example.com", None, "/"
         )
     else:
-        assert events(db, "auth.oidc_failure") == [{"reason": "account_exists"}]
+        assert events(db, "auth.oidc_failure") == [{"reason": status}]
 
 
 def test_an_account_without_a_password_is_never_linked_by_email(
@@ -327,7 +327,7 @@ def test_pre_hijacking_through_an_unverified_provider_email_is_refused(
     settings = oidc_settings(tmp_path, oidc_auto_create=True, oidc_link_by_email=True)
     victim = add_user(db, "ola@example.com")
     attacker = identity(subject="attacker", email_verified=False)
-    assert sign_in(db, settings, attacker).status == "account_exists"
+    assert sign_in(db, settings, attacker).status == "email_unverified"
     # And no account is created for an unverified email that is still free.
     free = identity(subject="attacker", email="later-victim@example.com", email_verified=False)
     assert sign_in(db, settings, free).status == "email_unverified"
@@ -691,3 +691,66 @@ def test_the_web_session_reports_how_it_was_started(db: WorkspaceDb, tmp_path: P
         local = read_web_session(session, password_session, settings=settings, clock=db.clock)
     assert oidc is not None and oidc.auth_method == "oidc"
     assert local is not None and local.auth_method == "password"
+
+
+@pytest.mark.parametrize(
+    "flags",
+    [
+        {},
+        {"oidc_auto_create": True},
+        {"oidc_link_by_email": True},
+        {"oidc_auto_create": True, "oidc_link_by_email": True},
+    ],
+)
+@pytest.mark.parametrize("with_invitation", [False, True])
+def test_an_unverified_email_reveals_nothing_about_local_accounts(
+    db: WorkspaceDb, tmp_path: Path, flags: dict[str, bool], with_invitation: bool
+) -> None:
+    """Same answer whether or not the claimed address is registered here."""
+    settings = oidc_settings(tmp_path, **flags)
+    add_user(db, "taken@example.com")
+    next_path = f"/invite/{invite(db)}" if with_invitation else "/"
+    answers = {
+        sign_in(
+            db,
+            settings,
+            identity(subject=email, email=email, email_verified=False),
+            next_path=next_path,
+        ).status
+        for email in ("taken@example.com", "free@example.com")
+    }
+    assert answers == {"email_unverified"}
+    assert identities(db) == []
+
+
+def test_a_linked_identity_does_not_need_a_verified_email(db: WorkspaceDb, tmp_path: Path) -> None:
+    settings = oidc_settings(tmp_path)
+    user_id = add_user(db, "ola@example.com", password=None)
+    link(db, user_id)
+    assert sign_in(db, settings, identity(email_verified=False)).status == "signed_in"
+
+
+@pytest.mark.parametrize(
+    "name",
+    ["Ola\nadmin@example.com 200 OK", "\u202eOla", "\u200b\u200b", "", "   ", "\x00\x1b[31m"],
+)
+def test_awkward_provider_names_never_break_account_creation(
+    db: WorkspaceDb, tmp_path: Path, name: str
+) -> None:
+    clock = StepClock(db.clock.now().isoformat())
+    idp = FakeIdp(clock)
+    idp.claims["name"] = name
+    settings = oidc_settings(tmp_path, oidc_auto_create=True)
+    client = OidcClient(settings, idp, clock)
+    request = client.begin()
+    who = client.complete(
+        idp.authorize(request.url),
+        state=request.state,
+        nonce=request.nonce,
+        code_verifier=request.code_verifier,
+    )
+    outcome = sign_in(db, settings, who)
+    assert outcome.status == "signed_in" and outcome.user_id is not None
+    stored = user(db, outcome.user_id).display_name
+    assert stored and stored == stored.strip()
+    assert all(character.isprintable() for character in stored)

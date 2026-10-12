@@ -183,6 +183,8 @@ class Settings(BaseSettings):
         # Kept exactly as given (trailing slash included): discovery must return the same string.
         if value is None:
             return None
+        if len(value) > 512:
+            raise ValueError("OIDC_ISSUER must be at most 512 characters")
         try:
             parsed = urlsplit(value)
             valid = (

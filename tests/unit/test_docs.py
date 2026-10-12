@@ -162,6 +162,8 @@ def test_adr_0014_records_the_oidc_decisions_and_risks() -> None:
         "Referrer-Policy: no-referrer",
         "form-action 'self'",
         "SSL_CERT_FILE",
+        "assetboard reset-password <email>",
+        "cannot probe for accounts",
     ):
         assert required in adr, required
     for amended in ("0012-local-authentication.md", "0013-invitation-links.md"):

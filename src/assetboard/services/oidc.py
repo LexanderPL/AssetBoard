@@ -21,6 +21,7 @@ import re
 import secrets
 import ssl
 import threading
+import unicodedata
 import urllib.error
 import urllib.request
 from collections.abc import Callable, Mapping
@@ -82,7 +83,8 @@ class OidcError(Exception):
     def __init__(self, reason: str, detail: str | None = None) -> None:
         super().__init__(reason)
         self.reason = reason
-        self.detail = detail
+        # Safe to log: may echo provider text (an error code), never with control characters.
+        self.detail = log_safe(detail) if detail else None
 
 
 # Transport
@@ -390,9 +392,9 @@ class OidcClient:
             code = params["error"] if _ERROR_CODE.fullmatch(params["error"]) else "invalid"
             # Logged, never shown: the description is provider-controlled text.
             logger.warning(
-                "OIDC provider returned an error: %s (%s)",
+                "OIDC provider returned an error: %s (%r)",
                 code,
-                params.get("error_description", "")[:200],
+                log_safe(params.get("error_description", "")),
             )
             raise OidcError("access_denied" if code == "access_denied" else "idp_error", code)
         code = params.get("code")
@@ -609,12 +611,31 @@ def _add_params(url: str, params: Mapping[str, str]) -> str:
     return f"{url}{separator}{urlencode(params)}"
 
 
+def clean_text(value: str, limit: int) -> str:
+    """Drop control and format characters (Unicode Cc, Cf) and collapse whitespace."""
+    kept = "".join(
+        " " if character.isspace() else character
+        for character in value
+        if unicodedata.category(character) not in {"Cc", "Cf"} or character.isspace()
+    )
+    return " ".join(kept.split())[:limit].strip()
+
+
+def log_safe(value: str, limit: int = 200) -> str:
+    """Provider text for a log line: never a newline or other control character."""
+    return clean_text(value, limit)
+
+
 def _display_name(claims: Mapping[str, Any], userinfo: Mapping[str, Any], email: str | None) -> str:
-    for source in (claims, userinfo):
-        for name in ("name", "preferred_username"):
-            value = source.get(name)
-            if isinstance(value, str) and value.strip():
-                return value.strip()[:120]
+    """Always 1 to 120 printable characters, so account creation cannot reject it."""
+    candidates: list[object] = [
+        source.get(name) for source in (claims, userinfo) for name in ("name", "preferred_username")
+    ]
     if email:
-        return email.split("@", 1)[0][:120] or "User"
+        candidates.append(email.split("@", 1)[0])
+    for value in candidates:
+        if isinstance(value, str):
+            cleaned = clean_text(value, 120)
+            if cleaned:
+                return cleaned
     return "User"

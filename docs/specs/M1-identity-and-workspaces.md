@@ -139,11 +139,12 @@ Also add a short docs/architecture.md section "How to add a new workspace-owned 
   the OIDC client, the signed flow and pending-link payloads, account mapping, password
   confirmation, the fake provider and service tests. **Part B:** routes, templates,
   `OIDC_ONLY`/break-glass, RP logout, translations, the browser test and `docs/auth/oidc.md`.
-- Linking by email also needs the existing account's password, entered once (login throttle,
-  dummy verify, generic error), and revokes that account's other sessions. Accounts without a
+- Linking by email needs the flag and the existing account's password, entered once (login
+  throttle, dummy verify, generic error), and revokes that account's other sessions. Accounts without a
   password are never linked by email; the visitor is told the account exists.
-- Creating an account through OIDC (auto-create or invitation) needs a verified email and uses
-  the registration throttle. An invitation creates the account even without
+- Apart from signing in with an already linked identity, OIDC needs a verified email, checked
+  before any local account is looked at (an unverified claim cannot probe for accounts).
+  Creating an account (auto-create or invitation) uses the registration throttle. An invitation creates the account even without
   `OIDC_AUTO_CREATE`. The domain allow-list needs a verified email and is checked at every
   sign-in.
 - `email_verified` counts only as `true` or `"true"`; userinfo claims are used only when its
