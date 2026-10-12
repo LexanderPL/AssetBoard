@@ -78,7 +78,7 @@ workspace is known.
    `tests/integration/test_tenant_isolation.py` that proves it stays in its workspace.
 7. **Services only through the repository.** Do not reference the model in `select()`,
    `session.get()`, attribute access or instantiation outside `db/repositories/`. Outside
-   `db/`, do not name its table in raw SQL (`text()`, `exec_driver_sql()`, `execute("...")`).
+   `db/`, raw SQL (`text()`, `exec_driver_sql()`, `execute("...")`) is not allowed at all.
 8. **No relationships into it from unowned models.** A relationship such as `Workspace.items`
    or `User.items` would load rows without the repository's scope. Relationships from one
    workspace-owned model to another, or to an unowned model, are fine.
@@ -94,7 +94,7 @@ What fails if a step is missing:
 | Model or table used outside a repository | `test_no_unscoped_queries_outside_repositories` |
 | Relationship from an unowned model | `test_no_relationship_from_unowned_models_into_workspace_owned_models` |
 
-The only exceptions to the last rule are listed with a reason in `BOOTSTRAP_ALLOWLIST`
+The only exceptions to the unscoped-query rule are listed with a reason in `BOOTSTRAP_ALLOWLIST`
 (`tests/tenant/static_scan.py`), keyed by module and function. They are first-run setup and
 registration, which create a workspace before any Context exists, and the auth audit writer. An
 entry that no longer matches any code fails the test.

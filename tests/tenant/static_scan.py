@@ -6,15 +6,18 @@ access (``M.workspace_id == x``), or as instantiation (``M(...)``). Import alias
 (``import ... as``, ``from ... import M as X``, module aliases like ``models.M``) are resolved.
 Imports and annotations are not references.
 
-Outside ``assetboard.db``, raw SQL that names a workspace-owned table is a violation too:
-``text(...)``, ``exec_driver_sql(...)`` and ``execute("...")`` with a string literal.
+Outside ``assetboard.db``, raw SQL is banned outright, whatever it names: any call to
+``sqlalchemy.text(...)`` (aliases resolved) or ``.exec_driver_sql(...)``, and any
+``.execute(...)`` whose first argument is a string literal or f-string. SQLAlchemy 2's
+``execute`` refuses plain strings, so raw SQL through SQLAlchemy needs one of the first two.
+Limitation: a DB-API cursor's ``execute(sql)`` with SQL built in a variable is not detected;
+cursors are only used inside ``assetboard.db``.
 """
 
 from __future__ import annotations
 
 import ast
 import importlib
-import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -45,7 +48,7 @@ BOOTSTRAP_ALLOWLIST: dict[tuple[str, str], str] = {
     ),
 }
 
-# Raw SQL is checked outside this package.
+# Raw SQL is banned outside this package.
 RAW_SQL_EXEMPT_PACKAGE = "assetboard.db"
 
 
@@ -85,11 +88,6 @@ class _Scanner(ast.NodeVisitor):
         self.module = module
         self.models = models  # dotted path of each model's definition -> class
         self.check_raw_sql = not in_package(module, RAW_SQL_EXEMPT_PACKAGE)
-        tables = {model.__tablename__: model for model in models.values()}
-        self.tables = tables
-        self.table_pattern = re.compile(
-            r"\b(" + "|".join(re.escape(name) for name in sorted(tables)) + r")\b"
-        )
         self.aliases: dict[str, str] = {}  # local name -> dotted path
         self.functions: list[str] = []
         self.violations: list[Violation] = []
@@ -151,23 +149,19 @@ class _Scanner(ast.NodeVisitor):
             return f"{parent}.{node.attr}" if parent else None
         return None
 
-    def _report(self, node: ast.expr, model: type[Any], kind: Kind) -> None:
+    def _report(self, node: ast.expr, subject: str, kind: Kind) -> None:
         if id(node) in self._counted:
             return
         self._counted.add(id(node))
         function = ".".join(self.functions) or "<module>"
-        self.violations.append(Violation(self.module, function, node.lineno, model.__name__, kind))
+        self.violations.append(Violation(self.module, function, node.lineno, subject, kind))
 
     def visit_Call(self, node: ast.Call) -> None:
         model = self._model_for(node.func)
         if model is not None:
-            self._report(node.func, model, "instantiation")
-        if self.check_raw_sql and self.tables and self._is_raw_sql(node):
-            for literal in ast.walk(node):
-                if isinstance(literal, ast.Constant) and isinstance(literal.value, str):
-                    match = self.table_pattern.search(literal.value)
-                    if match:
-                        self._report(literal, self.tables[match.group(1)], "raw_sql")
+            self._report(node.func, model.__name__, "instantiation")
+        if self.check_raw_sql and self._is_raw_sql(node):
+            self._report(node, "raw SQL", "raw_sql")
         self.generic_visit(node)
 
     def _is_raw_sql(self, node: ast.Call) -> bool:
@@ -184,18 +178,18 @@ class _Scanner(ast.NodeVisitor):
     def visit_Attribute(self, node: ast.Attribute) -> None:
         model = self._model_for(node)  # ``models.Membership``: the model itself
         if model is not None:
-            self._report(node, model, "query")
+            self._report(node, model.__name__, "query")
             return
         model = self._model_for(node.value)  # ``Membership.workspace_id``
         if model is not None:
-            self._report(node.value, model, "attribute")
+            self._report(node.value, model.__name__, "attribute")
             return
         self.generic_visit(node)
 
     def visit_Name(self, node: ast.Name) -> None:
         model = self._model_for(node)
         if model is not None:
-            self._report(node, model, "query")
+            self._report(node, model.__name__, "query")
 
 
 def scan_source(source: str, module: str, models: Iterable[type[Any]]) -> list[Violation]:

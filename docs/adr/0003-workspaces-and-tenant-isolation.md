@@ -39,7 +39,8 @@ models directly.
 - Models that are not workspace-owned have no ORM relationships into workspace-owned models.
 - A static scan of `src/` rejects references to workspace-owned models outside
   `db/repositories/`: queries, attribute access and instantiation, with import aliases resolved.
-  Outside `db/` it also rejects raw SQL that names a workspace-owned table.
+  Outside `db/` it also rejects raw SQL outright (`text()`, `exec_driver_sql()`, `execute()`
+  with a literal).
   The only exceptions are a bootstrap allowlist keyed by `(module, function)`, each entry with a
   reason, and stale entries fail. Today the entries are workspace creation during setup and
   registration, and the auth audit writer.

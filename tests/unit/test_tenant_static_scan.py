@@ -127,15 +127,26 @@ def test_allowlisted_bootstrap_is_keyed_by_module_and_function() -> None:
     assert remaining == violations and used == set()
 
 
-def test_raw_sql_is_allowed_inside_the_db_package_and_ignores_other_strings() -> None:
+def test_raw_sql_is_banned_outside_the_db_package_whatever_it_names() -> None:
     source, _kind = SEEDED["raw_sql_exec_driver_sql"]
     assert scan_source(source, "assetboard.db.engine", MODELS) == []
+    unowned = (
+        "from sqlalchemy import text as sql\n"
+        "def leak(session):\n"
+        "    return session.execute(sql('SELECT 1'))\n"
+    )
+    violations = scan_source(unowned, "assetboard.services.seeded", MODELS)
+    assert [(violation.kind, violation.function) for violation in violations] == [
+        ("raw_sql", "leak")
+    ]
+
+
+def test_strings_outside_sql_calls_are_not_raw_sql() -> None:
     harmless = (
-        "from sqlalchemy import text\n"
-        "def fine(session, gettext):\n"
+        "from sqlalchemy import select\n"
+        "def fine(session, gettext, query):\n"
         "    gettext('Members of memberships')\n"
-        "    session.execute(text('SELECT 1'))\n"
-        "    session.execute(text('SELECT * FROM users'))\n"
+        "    session.execute(query)\n"
         "    return 'memberships'\n"
     )
     assert scan_source(harmless, "assetboard.services.seeded", MODELS) == []

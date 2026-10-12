@@ -320,6 +320,34 @@ class LeakyNoteRepository(ScopedRepository[ScratchNote]):
         return select(ScratchNote)
 
 
+class ScratchLetter(IdMixin, WorkspaceScopedMixin, ScratchBase):
+    __tablename__ = "scratch_letters"
+
+    text: Mapped[str] = mapped_column(String(80), nullable=False)
+
+
+class ScratchMemo(IdMixin, WorkspaceScopedMixin, ScratchBase):
+    __tablename__ = "scratch_memos"
+
+    text: Mapped[str] = mapped_column(String(80), nullable=False)
+
+
+class UnscopedGetRepository(ScopedRepository[ScratchLetter]):
+    model = ScratchLetter
+
+    def get(self, row_id: UUID) -> ScratchLetter | None:  # bypasses the workspace filter
+        return self._session.get(ScratchLetter, row_id)
+
+
+class UnscopedDeleteRepository(ScopedRepository[ScratchMemo]):
+    model = ScratchMemo
+
+    def delete(self, target: ScratchMemo | UUID) -> None:  # deletes whatever it is given
+        row_id = target if isinstance(target, UUID) else target.id
+        self._session.delete(self._session.get(ScratchMemo, row_id))
+        self._session.flush()
+
+
 @pytest.fixture
 def scratch_session(tmp_path: Path, fixed_clock: FixedClock) -> Iterator[Session]:
     engine = create_database_engine(f"sqlite:///{tmp_path / 'scratch.db'}")
@@ -340,7 +368,10 @@ def _tag(session: Session, workspace_id: UUID) -> ScratchTag:
 
 
 def test_isolation_harness_detects_discovery_problems() -> None:
-    cases = {ScratchNote: object(), ScratchTag: object(), ScratchWorkspace: object()}
+    cases = {
+        model: object()
+        for model in (ScratchNote, ScratchTag, ScratchLetter, ScratchMemo, ScratchWorkspace)
+    }
     assert discovery_problems(ScratchBase, repositories_for(ScratchBase), cases) == [
         "ScratchUnmarked has workspace_id but not the WorkspaceOwned marker",
         f"ScratchChild has no repository; {ARCHITECTURE_HINT}",
@@ -377,6 +408,38 @@ def test_isolation_harness_detects_unscoped_repository(
         check_isolation(
             scratch_session, ScratchNote, LeakyNoteRepository, _note, {"text": "x"}, ctx_a, ctx_b
         )
+
+
+@pytest.mark.parametrize(
+    ("model", "repository", "message"),
+    [
+        (
+            ScratchLetter,
+            UnscopedGetRepository,
+            "ScratchLetter: could read a row of another workspace through get",
+        ),
+        (
+            ScratchMemo,
+            UnscopedDeleteRepository,
+            "ScratchMemo: could change a row of another workspace through delete by id",
+        ),
+    ],
+    ids=["get_without_scope", "delete_without_scope"],
+)
+def test_isolation_harness_detects_unscoped_methods(
+    scratch_session: Session,
+    fixed_clock: FixedClock,
+    model: type[Any],
+    repository: type[ScopedRepository[Any]],
+    message: str,
+) -> None:
+    ctx_a, ctx_b = _scratch_contexts(scratch_session, fixed_clock)
+
+    def factory(_session: Session, workspace_id: UUID) -> Any:
+        return model(workspace_id=workspace_id, text="x")
+
+    with pytest.raises(AssertionError, match=message):
+        check_isolation(scratch_session, model, repository, factory, {"text": "y"}, ctx_a, ctx_b)
 
 
 def test_isolation_harness_detects_uncovered_methods() -> None:
