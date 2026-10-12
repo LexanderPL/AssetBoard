@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import ForeignKey, MetaData, Uuid, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
+from sqlalchemy.orm.attributes import instance_state
 
 from assetboard.clock import Clock
 from assetboard.db.types import UtcDateTime
@@ -35,13 +36,45 @@ class SoftDeleteMixin:
     deleted_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
 
-class WorkspaceScopedMixin:
+class WorkspaceOwned:
+    """Marker for rows that belong to a workspace.
+
+    Every mapped class with a ``workspace_id`` column carries this marker (the tenant-isolation
+    test asserts both sets are equal) and is read and written only through its repository in
+    ``assetboard.db.repositories``. See docs/architecture.md.
+    """
+
+
+class WorkspaceScopedMixin(WorkspaceOwned):
+    # ``active_history`` loads the old value before a change, so the flush guard below always
+    # sees what a row's workspace was.
     workspace_id: Mapped[UUID] = mapped_column(
         Uuid(as_uuid=True),
         ForeignKey("workspaces.id"),
         nullable=False,
         index=True,
+        active_history=True,
     )
+
+
+class WorkspaceReassignmentError(RuntimeError):
+    """A persistent row's ``workspace_id`` was changed; rows never move between workspaces."""
+
+
+@event.listens_for(Session, "before_flush")
+def reject_workspace_reassignment(
+    session: Session,
+    _flush_context: object,
+    _instances: object,
+) -> None:
+    for obj in session.dirty:
+        if not isinstance(obj, WorkspaceOwned):
+            continue
+        history = instance_state(obj).attrs["workspace_id"].history
+        if history.added and list(history.added) != list(history.deleted):
+            raise WorkspaceReassignmentError(
+                f"workspace_id of a persistent {type(obj).__name__} row cannot change"
+            )
 
 
 @event.listens_for(Session, "before_flush")
