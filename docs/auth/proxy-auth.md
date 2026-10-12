@@ -235,9 +235,11 @@ Only a browser loading a page (`Sec-Fetch-Dest: document` or `Sec-Fetch-Mode: na
 requests without a session, such as `curl` or an image, get the plain redirect to `/login`
 and create no session.
 
-- **Point uptime monitors at `/healthz`** (or `/readyz`), which need no sign-in.
-- **Do not send clients that cannot keep cookies to other pages** through the proxy: every
-  page they load as a browser would start a new sign-in.
+- **Point uptime monitors at `/healthz`** (the process is up) or `/readyz` (the database is
+  ready; it answers 503 otherwise). Both need no sign-in.
+- **Keep clients that cannot store cookies on those two URLs.** If such a client requests any
+  other page with the headers a browser sends (`Accept: text/html`) and follows redirects,
+  every request goes through `/auth/proxy` and creates a new session.
 
 ## Logs and audit
 

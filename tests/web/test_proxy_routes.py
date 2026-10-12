@@ -397,14 +397,13 @@ def test_a_busy_database_does_not_fail_the_revoke(
             "BEGIN IMMEDIATE", {}, sqlite3.OperationalError("database is locked")
         )
 
-    monkeypatch.setattr(gate, "revoke_session", locked)
-    with captured_log(proxy.app) as log:
+    with monkeypatch.context() as m, captured_log(proxy.app) as log:
+        m.setattr(gate, "revoke_session", locked)
         response = client.get("/", headers=BOB, follow_redirects=False)
     # Signed out for this request all the same; the session ends on the next try.
     assert response.status_code == 303 and response.headers["location"] == "/auth/proxy"
     assert proxy.sessions() == [("ola@example.com", "proxy")]
     assert "database is busy" in log.getvalue()
-    monkeypatch.undo()
     assert client.get("/", headers=BOB, follow_redirects=False).headers["location"] == (
         "/auth/proxy"
     )
