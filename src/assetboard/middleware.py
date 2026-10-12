@@ -22,8 +22,10 @@ SECURITY_HEADERS = {
     "x-frame-options": "DENY",
 }
 _SECURITY_HEADER_NAMES = frozenset(name.encode("ascii") for name in SECURITY_HEADERS)
-# Pages whose URL carries a secret (invitation tokens) never send a Referer (ADR-0013).
+# Pages whose URL can carry a secret never send a Referer (ADR-0013): invitation pages
+# (``/invite/<token>``), and sign-in and registration, whose ``next`` may be ``/invite/<token>``.
 NO_REFERRER_PREFIXES = ("/invite/",)
+NO_REFERRER_PATHS = frozenset({"/login", "/register"})
 _INVITE_TOKEN = re.compile(r"(/invite/)[^/?#]+")
 
 
@@ -32,7 +34,8 @@ def redact_path(path: str) -> str:
     return _INVITE_TOKEN.sub(r"\1[redacted]", path)
 
 
-def _route_path(scope: Scope) -> str:
+def route_path(scope: Scope) -> str:
+    """The request path without the ASGI ``root_path`` (for matching app routes)."""
     path: str = scope.get("path", "")
     root_path: str = scope.get("root_path", "")
     if root_path and path.startswith(root_path):
@@ -161,7 +164,8 @@ class SecurityHeadersMiddleware:
                     (key.encode("ascii"), value.encode("ascii"))
                     for key, value in SECURITY_HEADERS.items()
                 )
-                if _route_path(scope).startswith(NO_REFERRER_PREFIXES):
+                path = route_path(scope)
+                if path in NO_REFERRER_PATHS or path.startswith(NO_REFERRER_PREFIXES):
                     response_headers = [
                         (name, b"no-referrer" if name == b"referrer-policy" else value)
                         for name, value in response_headers

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import sqlite3
 from collections.abc import Iterator
 from datetime import timedelta
 from typing import Any
@@ -12,9 +13,11 @@ import pytest
 from fastapi.testclient import TestClient
 from httpx import Response
 from sqlalchemy import select, update
+from sqlalchemy.exc import OperationalError
 
 from assetboard.db.models.identity import Invitation, Membership, User
-from assetboard.services.invitations import MAX_FAILED_EMAIL_ATTEMPTS, hash_token
+from assetboard.services.invitations import MAX_FAILED_EMAIL_ATTEMPTS, AlreadyMember, hash_token
+from assetboard.web import invite_routes
 from tests.conftest import ADMIN_PASSWORD, OwnerApp, WebHarness
 
 TOKEN_IN_LINK = re.compile(r'value="[^"]*/invite/([A-Za-z0-9_-]{43})"')
@@ -82,6 +85,9 @@ def test_owner_invitation_requires_an_email_lock(owner: OwnerApp) -> None:
     ("form", "message"),
     [
         ({"expires_in_days": "2"}, "Choose how long the link stays valid."),
+        ({"expires_in_days": "²"}, "Choose how long the link stays valid."),
+        ({"expires_in_days": "9" * 5000}, "Choose how long the link stays valid."),
+        ({"expires_in_days": "-7"}, "Choose how long the link stays valid."),
         ({"role": "admin"}, "Choose a role."),
         ({"email": "nope"}, "Enter a valid email address."),
     ],
@@ -323,13 +329,91 @@ def test_invite_pages_send_no_referrer_and_no_store(roomy: OwnerApp) -> None:
             client.get("/invite/" + "Z" * 43),
             register(client, roomy.web, token, password="short"),
         ]
-        login = client.get("/login")
     for response in responses:
         assert response.headers["referrer-policy"] == "no-referrer"
         assert response.headers["cache-control"] == "no-store"
         assert '<meta name="referrer" content="no-referrer">' in response.text
-    assert login.headers["referrer-policy"] == "strict-origin-when-cross-origin"
-    assert '<meta name="referrer" content="same-origin">' in login.text
+
+
+def test_sign_in_and_registration_pages_send_no_referrer(web: WebHarness) -> None:
+    # Their "next" can carry an invitation token.
+    app = web.app(allow_registration=True)
+    with TestClient(app) as client:
+        web.complete_setup(app)
+        pages = [
+            client.get("/login"),
+            client.get("/login?next=%2Finvite%2F" + "Z" * 43),
+            client.get("/register"),
+        ]
+        csrf = web.csrf(pages[0].text)
+        failed_login = client.post(
+            "/login", data={"csrf_token": csrf, "email": "x@example.com", "password": "nope"}
+        )
+        pages.append(failed_login)
+        other = client.get("/setup")  # a 404 page once setup is closed
+    for response in pages:
+        assert response.headers["referrer-policy"] == "no-referrer", response.request.url
+        assert '<meta name="referrer" content="no-referrer">' in response.text
+    assert other.headers["referrer-policy"] == "strict-origin-when-cross-origin"
+    assert '<meta name="referrer" content="same-origin">' in other.text
+
+
+def _locked() -> OperationalError:
+    return OperationalError("BEGIN IMMEDIATE", {}, sqlite3.OperationalError("database is locked"))
+
+
+@pytest.mark.parametrize("path", ["accept", "register"])
+def test_database_lock_is_503_and_leaves_the_invitation_usable(
+    roomy: OwnerApp, monkeypatch: pytest.MonkeyPatch, path: str
+) -> None:
+    token = create_link(roomy)
+
+    def locked(*_args: object, **_kwargs: object) -> object:
+        raise _locked()
+
+    if path == "accept":
+        monkeypatch.setattr(invite_routes, "accept_invitation", locked)
+        page = roomy.client.get(f"/invite/{token}")
+        response = roomy.client.post(
+            f"/invite/{token}/accept", data={"csrf_token": roomy.web.csrf(page.text)}
+        )
+    else:
+
+        async def locked_async(*_args: object, **_kwargs: object) -> object:
+            raise _locked()
+
+        monkeypatch.setattr(invite_routes, "register_with_invitation_async", locked_async)
+        with anonymous(roomy) as client:
+            response = register(client, roomy.web, token)
+    assert response.status_code == 503
+    assert response.headers["retry-after"] == "5"
+    assert "The server is busy. Try again in a few seconds." in response.text
+    assert INVALID not in response.text
+    monkeypatch.undo()
+    with anonymous(roomy) as client:
+        assert "You are invited to join Home" in client.get(f"/invite/{token}").text
+
+
+def test_already_member_page_renders_without_a_preview(
+    owner: OwnerApp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    token = create_link(owner)
+    page = owner.client.get(f"/invite/{token}")
+
+    def already(*_args: object, **_kwargs: object) -> object:
+        raise AlreadyMember
+
+    async def no_preview(*_args: object) -> None:
+        return None
+
+    monkeypatch.setattr(invite_routes, "accept_invitation", already)
+    monkeypatch.setattr(invite_routes, "_preview", no_preview)
+    response = owner.client.post(
+        f"/invite/{token}/accept", data={"csrf_token": owner.web.csrf(page.text)}
+    )
+    assert response.status_code == 200
+    assert "You are already a member of this workspace." in response.text
+    assert "data-invite-summary" not in response.text
 
 
 @pytest.mark.parametrize("locale", ["en", "pl"])

@@ -1717,6 +1717,39 @@ async def register_user_async(
     )
 
 
+def register_with_invitation(
+    factory: sessionmaker[Session],
+    *,
+    token: str,
+    email: str,
+    display_name: str,
+    password: str,
+    settings: Settings,
+    clock: Clock,
+    host: str | None,
+    user_agent: str | None = None,
+    hasher: Hasher | None = None,
+) -> RegistrationOutcome:
+    """Invitation sign-up (allowed even when open registration is off); same throttle and gate."""
+    return _register_flow(
+        ImmediateTransactions(factory),
+        email=email,
+        display_name=display_name,
+        password=password,
+        workspace_name="",
+        settings=settings,
+        clock=clock,
+        host=host,
+        user_agent=user_agent,
+        base_currency=None,
+        country_code=None,
+        timezone=None,
+        workspace_locale=None,
+        hasher=hasher,
+        invitation=InvitationSignUp(factory, token, clock),
+    )
+
+
 async def register_with_invitation_async(
     factory: sessionmaker[Session],
     gate: HashGate,
@@ -1730,25 +1763,20 @@ async def register_with_invitation_async(
     host: str | None,
     user_agent: str | None = None,
 ) -> RegistrationOutcome:
-    """Invitation sign-up (allowed even when open registration is off); same throttle and gate."""
+    """Web entry point; raises ``HashGateBusy`` after releasing the counted attempt."""
     hasher = _gate_hasher(gate)
     return await anyio.to_thread.run_sync(
-        lambda: _register_flow(
-            ImmediateTransactions(factory),
+        lambda: register_with_invitation(
+            factory,
+            token=token,
             email=email,
             display_name=display_name,
             password=password,
-            workspace_name="",
             settings=settings,
             clock=clock,
             host=host,
             user_agent=user_agent,
-            base_currency=None,
-            country_code=None,
-            timezone=None,
-            workspace_locale=None,
             hasher=hasher,
-            invitation=InvitationSignUp(factory, token, clock),
         )
     )
 

@@ -183,8 +183,12 @@ when you intend to upload the image and its release tags.
   path and in `/login?next=…`. The application's own `request_complete` log line still records
   every request, with invitation tokens replaced by `[redacted]` and without query strings.
   There is no setting to turn the access log back on. If you parse access lines, switch to
-  `request_complete`. Your reverse proxy's access log may still record invitation URLs; restrict
-  who can read it, or exclude `/invite/` from it.
+  `request_complete`.
+- **Reverse-proxy logs may still record invitation tokens.** A token can appear in the
+  `/invite/<token>` path and in the query of `/login?next=%2Finvite%2F<token>`. Excluding `/invite/`
+  from the proxy's access log is not enough: also exclude or strip query strings for `/login`
+  and `/register`, or restrict who can read the proxy log. Invitations are single-use and expire,
+  which limits the damage of a leaked token.
 
 ### F1.1: local accounts
 

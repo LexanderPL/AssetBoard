@@ -1,7 +1,7 @@
 """Invitation links: preview, accept (signed in) and sign-up (signed out). See ADR-0013.
 
 ``/invite/<token>`` is reachable signed out. The token is in the URL path, so the request log
-redacts it (``assetboard.logging.redact_path``), uvicorn's access log is off, and these pages
+redacts it (``assetboard.middleware.redact_path``), uvicorn's access log is off, and these pages
 send ``Referrer-Policy: no-referrer`` and ``Cache-Control: no-store``. Every POST is protected by
 the router-level ``require_csrf`` dependency.
 """
@@ -63,6 +63,7 @@ EMAIL_MISMATCH_REVOKED = _(
     "many attempts; ask the workspace owner for a new link."
 )
 ALREADY_MEMBER = _("You are already a member of this workspace.")
+BUSY = _("The server is busy. Try again in a few seconds.")
 ROLE_NAMES = {"owner": _("Owner"), "editor": _("Editor"), "viewer": _("Viewer")}
 
 
@@ -110,6 +111,13 @@ async def _preview(request: Request, token: str) -> InvitationPreview | None:
         return None
 
 
+def _busy(request: Request, token: str) -> Response:
+    """The database stayed locked: the invitation is unchanged, so the visitor can retry."""
+    response = _invite_page(request, token, None, error=BUSY, status_code=503)
+    response.headers["Retry-After"] = "5"
+    return response
+
+
 async def _invalid(request: Request, token: str, message: str = INVALID) -> Response:
     return _invite_page(request, token, None, error=message, status_code=404)
 
@@ -150,7 +158,7 @@ async def invite_accept(request: Request, token: str) -> Response:
     except OperationalError as exc:
         if not is_database_locked(exc):
             raise
-        return await _invalid(request, token)
+        return _busy(request, token)
     await run_in_threadpool(
         run_immediate,
         state.session_factory,
@@ -196,18 +204,23 @@ async def invite_register(
             status_code=400,
         )
     host = client_host(request)
-    outcome = await register_with_invitation_async(
-        state.session_factory,
-        state.hash_gate,
-        token=token,
-        email=email,
-        display_name=display_name,
-        password=password,
-        settings=state.settings,
-        clock=state.clock,
-        host=host,
-        user_agent=request.headers.get("user-agent"),
-    )
+    try:
+        outcome = await register_with_invitation_async(
+            state.session_factory,
+            state.hash_gate,
+            token=token,
+            email=email,
+            display_name=display_name,
+            password=password,
+            settings=state.settings,
+            clock=state.clock,
+            host=host,
+            user_agent=request.headers.get("user-agent"),
+        )
+    except OperationalError as exc:
+        if not is_database_locked(exc):
+            raise
+        return _busy(request, token)
     if outcome.status == "invitation_invalid":
         return await _invalid(request, token)
     if outcome.status == "email_mismatch":

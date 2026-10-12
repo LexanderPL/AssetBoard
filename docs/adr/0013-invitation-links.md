@@ -34,7 +34,8 @@ account otherwise. A link that grants access is a bearer secret: it must not lea
     which may carry `/login?next=/invite/<token>`.
   - Uvicorn's access log, which prints full URLs, is turned off in `assetboard serve`. The app's
     own request log already records every request.
-  - `/invite/*` responses send `Referrer-Policy: no-referrer` (also as a meta tag) and
+  - `/invite/*`, `/login` and `/register` responses send `Referrer-Policy: no-referrer` (also as
+    a meta tag); sign-in and registration can carry `next=/invite/<token>`. Every page is
     `Cache-Control: no-store`.
   - Reverse-proxy logs remain outside our control; that is an accepted risk.
 - **Invitation-only sign-up.** On `/invite/<token>`, a signed-out visitor can sign in (and is
@@ -57,6 +58,8 @@ account otherwise. A link that grants access is a bearer secret: it must not lea
 ## Consequences
 
 - An owner who loses a link revokes it and creates a new one.
+- Anyone who holds an email-locked link can burn it with 5 wrong attempts. The owner then
+  creates a new link.
 - Anyone who holds an unlocked link can join with its role until it expires or is used. Owners
   should prefer short expiries and email locks, and share links privately.
 - Turning off uvicorn's access log changes the log output for existing deployments. This is

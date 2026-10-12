@@ -135,6 +135,9 @@ def test_adr_0013_exists_and_upgrading_mentions_the_access_log() -> None:
     assert "0013-invitation-links.md" in (adr_dir / "README.md").read_text(encoding="utf-8")
     for required in ("SHA-256", "no-referrer", "access log", "not proof of ownership", "5 wrong"):
         assert required in adr
+    assert "burn it with 5 wrong attempts" in adr
     upgrading = DEPLOYMENT.read_text(encoding="utf-8").split("## Upgrading", 1)[1]
     assert "access log is off" in upgrading.lower()
     assert "[redacted]" in upgrading
+    # Excluding /invite/ from the proxy log is not enough: /login?next= carries the token too.
+    assert "is not enough" in upgrading and "/login?next=" in upgrading

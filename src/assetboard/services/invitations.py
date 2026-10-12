@@ -235,6 +235,7 @@ def consume_for_new_user(
 ) -> UUID:
     """Inside the sign-up transaction: re-check the invitation, then join and mark it used."""
     found = _find_pending(session, token, now)
+    _checkpoint("sign_up")
     if found.email is not None and found.email != email:
         raise InvitationInvalid  # the pre-check counted it; the lock changed meanwhile
     _consume(session, found, user_id=user_id, now=now)

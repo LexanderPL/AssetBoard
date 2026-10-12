@@ -313,7 +313,10 @@ async def invitation_create(
     elif role not in {r.value for r in Role}:
         field, code = "role", "invalid_role"
     else:
-        days = int(expires_in_days) if expires_in_days.isdigit() else 0
+        try:
+            days = int(expires_in_days)
+        except ValueError:  # includes "²" and strings longer than int()'s digit limit
+            days = 0
         try:
             created = await run_in_threadpool(
                 lambda: create_invitation(
