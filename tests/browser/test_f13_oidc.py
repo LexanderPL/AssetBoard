@@ -137,25 +137,28 @@ def test_f13_oidc_sign_in_and_provider_logout(tmp_path: Path) -> None:
             browser = playwright.chromium.launch()
 
             # Static files loaded by /login and by an invite page carry no Referer (the page
-            # URL can hold the invitation token), with the OIDC button on both pages.
-            visitor = browser.new_page()
-            static_requests: list[tuple[str, str | None]] = []
-            visitor.on(
-                "request",
-                lambda request: (
-                    static_requests.append((request.url, request.all_headers().get("referer")))
-                    if "/static/" in request.url
-                    else None
-                ),
-            )
+            # URL can hold the invitation token), with the OIDC button on both pages. Each page
+            # gets a fresh page and context (browser.new_page), so nothing comes from a cache.
             for path in ("/login", f"/invite/{token}"):
+                visitor = browser.new_page()
+                static_requests: list[tuple[str, str | None]] = []
+                visitor.on(
+                    "request",
+                    lambda request, seen=static_requests: (
+                        seen.append((request.url, request.all_headers().get("referer")))
+                        if "/static/" in request.url
+                        else None
+                    ),
+                )
                 visitor.goto(f"{base}{path}", wait_until="networkidle")
                 expect(visitor.get_by_role("link", name="Continue with Fake IdP")).to_be_visible()
-            assert len(static_requests) >= 4, static_requests  # css and js on both pages
-            # Absent, or empty when Chromium serves the file from its memory cache.
-            assert all(not referer for _url, referer in static_requests), static_requests
-            assert all(token not in (referer or "") for _url, referer in static_requests)
-            visitor.close()
+                urls = {url.split("?")[0].removeprefix(base) for url, _referer in static_requests}
+                assert urls >= {"/static/css/app.css", "/static/js/theme.js"}, (path, urls)
+                assert all(referer is None for _url, referer in static_requests), (
+                    path,
+                    static_requests,
+                )
+                visitor.close()
 
             page = browser.new_page()
             callback_responses: list[int] = []

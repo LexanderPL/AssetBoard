@@ -85,9 +85,10 @@ class OidcError(Exception):
         self.reason = reason
         # Safe to log: may echo provider text (an error code), never with control characters.
         self.detail = log_safe(detail) if detail else None
-        # Raised before the code was sent to the provider: anyone can trigger these with a
-        # crafted callback URL, so they are logged but not audited.
-        self.pre_exchange = False
+        # False when raised before the provider accepted the code (callback checks and token
+        # endpoint errors included): anyone can trigger those with a crafted callback URL, so
+        # they are logged but not audited.
+        self.auditable = True
 
 
 # Transport
@@ -382,15 +383,15 @@ class OidcClient:
     ) -> OidcIdentity:
         """Check the callback against the flow cookie's values, then exchange and validate.
 
-        Errors raised before the token request carry ``pre_exchange=True``.
+        Errors raised before the provider accepted the code carry ``auditable=False``: the
+        callback checks and the token request (``invalid_grant`` for a junk code, for example).
         """
         try:
             metadata = self._check_callback(params, state)
+            tokens = self._exchange(metadata, params["code"], code_verifier)
         except OidcError as error:
-            error.pre_exchange = True
+            error.auditable = False
             raise
-        code = params["code"]
-        tokens = self._exchange(metadata, code, code_verifier)
         claims = self._validate_id_token(metadata, tokens["id_token"], nonce)
         return self._identity(metadata, claims, tokens.get("access_token"))
 

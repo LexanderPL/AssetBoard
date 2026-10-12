@@ -237,9 +237,10 @@ async def oidc_callback(request: Request) -> Response:
         )
     except OidcError as error:
         _log(request, error.reason, error.detail)
-        if not error.pre_exchange:
-            # Only failures after the code went to the provider are audited; earlier ones
-            # (state, iss, provider errors) come from URLs anyone can craft.
+        if error.auditable:
+            # Only failures after the provider accepted the code are audited; earlier ones
+            # (state, iss, provider errors, token endpoint errors) come from URLs anyone can
+            # craft.
             await _audit(request, error.reason)
         return _failed(request, _PROTOCOL_PAGES.get(error.reason, "failed"))
 

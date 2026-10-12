@@ -324,7 +324,18 @@ def test_a_provider_error_callback_is_logged_not_audited(oidc: Oidc) -> None:
     assert audit_reasons(oidc) == []
 
 
-def test_failures_after_the_code_exchange_are_audited(oidc: Oidc) -> None:
+def test_a_junk_code_is_logged_not_audited(oidc: Oidc) -> None:
+    start = oidc.start()
+    params = {**oidc.idp.authorize(start.headers["location"]), "code": "junk"}
+    with captured_log(oidc.app) as output:
+        response = oidc.client.get("/auth/oidc/callback", params=params, follow_redirects=False)
+    assert response.headers["location"] == "/auth/oidc/failed/failed"
+    assert "reason=token_error" in output.getvalue()
+    assert audit_reasons(oidc) == []
+    assert len(oidc.idp.token_requests) == 1
+
+
+def test_failures_after_the_provider_accepted_the_code_are_audited(oidc: Oidc) -> None:
     oidc.idp.id_token_overrides = {"aud": "someone-else"}
     response = oidc.sign_in()
     assert response.headers["location"] == "/auth/oidc/failed/failed"

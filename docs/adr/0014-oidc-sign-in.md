@@ -75,12 +75,13 @@ need the provider at startup.
   Creating an account (4, 5) counts against the per-address registration limit. Accounts
   created through OIDC have no password. Provider display names are cleaned (control and
   format characters removed, whitespace collapsed, at most 120 characters, `User` if nothing
-  is left), and provider text in logs never contains a line break. Refusals after the code
-  was sent to the provider (token, ID token, userinfo, account mapping) are audited as
+  is left), and provider text in logs never contains a line break. Refusals after the
+  provider accepted the code (ID token, userinfo, account mapping) are audited as
   `auth.oidc_failure` with a reason code, never with tokens, codes or claims. Refusals before
-  it (missing or replayed flow, state, `iss`, provider `error=` responses) can be triggered by
-  anyone with a crafted URL, so they go to the application log only, not the append-only audit
-  table.
+  the provider accepted the code (token endpoint errors included: missing or replayed flow,
+  state, `iss`, provider `error=` responses, `invalid_grant` for a junk code) can be triggered
+  by anyone with a crafted URL, so they go to the application log only, not the append-only
+  audit table.
 - **Admin group.** With `ASSETBOARD_OIDC_ADMIN_GROUP`, each OIDC sign-in sets
   `is_instance_admin` from the groups claim. A present claim is authoritative, even when empty;
   an absent or malformed claim changes nothing and logs a WARNING. The last active instance
