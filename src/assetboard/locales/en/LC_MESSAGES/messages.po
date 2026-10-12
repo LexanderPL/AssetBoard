@@ -148,10 +148,25 @@ msgstr ""
 msgid "The application is starting. Try again in a moment."
 msgstr ""
 
+msgid "Choose a supported currency."
+msgstr ""
+
+msgid "Choose a country from the list."
+msgstr ""
+
+msgid "Choose a time zone from the list."
+msgstr ""
+
+msgid "Choose a supported language."
+msgstr ""
+
 msgid "A workspace needs at least one owner. Make another member an owner first."
 msgstr ""
 
 msgid "You cannot remove yourself from the workspace."
+msgstr ""
+
+msgid "The change could not be made. Reload the page and try again."
 msgstr ""
 
 msgid "Owner"

@@ -17,7 +17,7 @@ from sqlalchemy import event
 
 from assetboard.services import workspaces
 from assetboard.services.context import PermissionDenied, Role
-from assetboard.services.workspaces import change_role
+from assetboard.services.workspaces import LastOwnerError, change_role
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 
@@ -114,3 +114,23 @@ def test_demoted_owner_cannot_promote_with_a_stale_context(
     assert outcomes["first"] is None
     assert isinstance(outcomes["second"], PermissionDenied)
     assert db.roles() == {"ann": "owner", "bob": "viewer", "cat": "viewer"}
+
+
+def test_concurrent_self_demotions_leave_one_owner(
+    db: WorkspaceDb, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db.add_member("ann", "owner")
+    db.add_member("bob", "owner")
+    outcomes = run_serialized(
+        db,
+        monkeypatch,
+        lambda: change_role(
+            db.factory, db.ctx("ann", "owner"), membership_id=db.memberships["ann"], role="editor"
+        ),
+        lambda: change_role(
+            db.factory, db.ctx("bob", "owner"), membership_id=db.memberships["bob"], role="editor"
+        ),
+    )
+    assert outcomes["first"] is None
+    assert isinstance(outcomes["second"], LastOwnerError)
+    assert db.roles() == {"ann": "editor", "bob": "owner"}

@@ -11,6 +11,8 @@ from sqlalchemy import delete, select
 
 from assetboard.db.models.identity import Membership, UserSession, Workspace
 from assetboard.services.auth import session_id_hash
+from assetboard.services.workspaces import WorkspaceError
+from assetboard.web import workspace_routes
 from assetboard.web.security import session_cookie_name
 from tests.conftest import OwnerApp
 
@@ -132,6 +134,28 @@ def test_owner_updates_workspace_settings(owner: OwnerApp) -> None:
         )
 
 
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("base_currency", "XYZ", "Choose a supported currency."),
+        ("country_code", "ZZ", "Choose a country from the list."),
+        ("timezone", "Mars/Base", "Choose a time zone from the list."),
+        ("locale", "xx", "Choose a supported language."),
+    ],
+)
+def test_settings_option_errors_name_the_field(
+    owner: OwnerApp, field: str, value: str, message: str
+) -> None:
+    form = {"name": "Home", "base_currency": "EUR", "timezone": "UTC", "locale": "en"}
+    response = owner.post(
+        "/workspace/settings", form | {field: value}, token_from="/workspace/settings"
+    )
+    assert response.status_code == 400
+    assert f'aria-describedby="{field}-error"' in response.text
+    assert message in response.text
+    assert response.text.count('aria-invalid="true"') == 1
+
+
 def test_settings_validation_errors_are_shown_on_the_field(owner: OwnerApp) -> None:
     response = owner.post(
         "/workspace/settings",
@@ -251,3 +275,17 @@ def test_workspace_pages_render_in_english_and_polish(owner: OwnerApp, locale: s
     else:
         assert "Workspace settings" in settings
         assert "Members" in members
+
+
+def test_unexpected_member_errors_use_the_generic_message(
+    owner: OwnerApp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    def fail(*_args: object, **_kwargs: object) -> None:
+        raise WorkspaceError
+
+    monkeypatch.setattr(workspace_routes, "change_role", fail)
+    mine = owner.membership_id(owner.admin_id)
+    response = owner.post(f"/workspace/members/{mine}/role", {"role": "owner"})
+    assert response.status_code == 409
+    assert "The change could not be made. Reload the page and try again." in response.text
+    assert LAST_OWNER not in response.text

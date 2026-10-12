@@ -94,20 +94,26 @@ def test_service_functions_require_owner(team: WorkspaceDb, name: str, member: s
     assert _events(team) == []
 
 
+@pytest.mark.parametrize("change", ["demoted", "removed"])
 @pytest.mark.parametrize("name", sorted(SERVICE_CALLS))
-def test_service_writes_recheck_the_role_in_the_transaction(team: WorkspaceDb, name: str) -> None:
-    # Olga's Context still says "owner", but meanwhile Ed demoted her to editor.
+def test_service_writes_recheck_the_role_in_the_transaction(
+    team: WorkspaceDb, name: str, change: str
+) -> None:
+    # Olga's Context still says "owner", but meanwhile Ed demoted or removed her.
     olga, ed = team.ctx("olga", "owner"), team.ctx("ed", "owner")
     change_role(team.factory, olga, membership_id=team.memberships["ed"], role=Role.OWNER)
-    change_role(team.factory, ed, membership_id=team.memberships["olga"], role=Role.EDITOR)
-    stale = olga
-    roles_before = team.roles()
+    if change == "demoted":
+        change_role(team.factory, ed, membership_id=team.memberships["olga"], role=Role.EDITOR)
+    else:
+        remove_member(team.factory, ed, membership_id=team.memberships["olga"])
+    roles_before, events_before = team.roles(), _events(team)
     if name in {"workspace_settings", "list_members"}:
-        SERVICE_CALLS[name](team, stale)  # reads use the request's Context
+        SERVICE_CALLS[name](team, olga)  # reads use the request's Context
         return
     with pytest.raises(PermissionDenied):
-        SERVICE_CALLS[name](team, stale)
+        SERVICE_CALLS[name](team, olga)
     assert team.roles() == roles_before
+    assert _events(team) == events_before
 
 
 # Settings
@@ -138,9 +144,10 @@ def test_update_settings_changes_the_workspace_and_audits_field_names(team: Work
     [
         ({"name": "   "}, "name", "invalid_workspace_name"),
         ({"name": "x" * 121}, "name", "invalid_workspace_name"),
-        ({"base_currency": "XYZ"}, "base_currency", "invalid_workspace_settings"),
-        ({"timezone": "Mars/Base"}, "base_currency", "invalid_workspace_settings"),
-        ({"country_code": "ZZ"}, "base_currency", "invalid_workspace_settings"),
+        ({"base_currency": "XYZ"}, "base_currency", "invalid_base_currency"),
+        ({"timezone": "Mars/Base"}, "timezone", "invalid_timezone"),
+        ({"country_code": "ZZ"}, "country_code", "invalid_country_code"),
+        ({"locale": "xx"}, "locale", "invalid_locale"),
     ],
 )
 def test_update_settings_validates_input(
@@ -163,7 +170,12 @@ def test_owner_changes_roles_and_it_is_audited(team: WorkspaceDb) -> None:
         role="editor",
     )
     assert team.roles()["vic"] == "editor"
-    assert _events(team) == [("member.role_changed", {"from": "viewer", "to": "editor"})]
+    assert _events(team) == [
+        (
+            "member.role_changed",
+            {"user_id": str(team.users["vic"]), "from": "viewer", "to": "editor"},
+        )
+    ]
 
 
 def test_last_owner_cannot_demote_themselves(team: WorkspaceDb) -> None:
@@ -213,7 +225,9 @@ def test_unknown_role_is_rejected_before_any_write(team: WorkspaceDb) -> None:
 def test_owner_removes_a_member_and_it_is_audited(team: WorkspaceDb) -> None:
     remove_member(team.factory, team.ctx("olga", "owner"), membership_id=team.memberships["vic"])
     assert "vic" not in team.roles()
-    assert _events(team) == [("member.removed", {"role": "viewer"})]
+    assert _events(team) == [
+        ("member.removed", {"user_id": str(team.users["vic"]), "role": "viewer"})
+    ]
 
 
 def test_owners_cannot_remove_themselves(team: WorkspaceDb) -> None:

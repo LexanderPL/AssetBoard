@@ -159,6 +159,18 @@ msgstr "Uruchamianie"
 msgid "The application is starting. Try again in a moment."
 msgstr "Aplikacja się uruchamia. Spróbuj ponownie za chwilę."
 
+msgid "Choose a supported currency."
+msgstr "Wybierz obsługiwaną walutę."
+
+msgid "Choose a country from the list."
+msgstr "Wybierz kraj z listy."
+
+msgid "Choose a time zone from the list."
+msgstr "Wybierz strefę czasową z listy."
+
+msgid "Choose a supported language."
+msgstr "Wybierz obsługiwany język."
+
 msgid "A workspace needs at least one owner. Make another member an owner first."
 msgstr ""
 "Obszar roboczy musi mieć co najmniej jednego właściciela. Najpierw nadaj "
@@ -166,6 +178,9 @@ msgstr ""
 
 msgid "You cannot remove yourself from the workspace."
 msgstr "Nie możesz usunąć siebie z obszaru roboczego."
+
+msgid "The change could not be made. Reload the page and try again."
+msgstr "Nie udało się wprowadzić zmiany. Odśwież stronę i spróbuj ponownie."
 
 msgid "Owner"
 msgstr "Właściciel"
@@ -234,7 +249,7 @@ msgid "Your overview"
 msgstr "Podsumowanie"
 
 msgid "Workspace"
-msgstr "Przestrzeń"
+msgstr "Obszar roboczy"
 
 msgid "Switch"
 msgstr "Przełącz"

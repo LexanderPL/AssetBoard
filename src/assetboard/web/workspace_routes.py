@@ -51,14 +51,16 @@ def _(message: str) -> str:
 
 SETTINGS_ERRORS = {
     "invalid_workspace_name": _("Enter a workspace name of 1 to 120 characters."),
-    "invalid_workspace_settings": _(
-        "Choose a supported currency, country, time zone and language."
-    ),
+    "invalid_base_currency": _("Choose a supported currency."),
+    "invalid_country_code": _("Choose a country from the list."),
+    "invalid_timezone": _("Choose a time zone from the list."),
+    "invalid_locale": _("Choose a supported language."),
 }
 MEMBER_ERRORS = {
     "last_owner": _("A workspace needs at least one owner. Make another member an owner first."),
     "self_removal": _("You cannot remove yourself from the workspace."),
 }
+MEMBER_ERROR_FALLBACK = _("The change could not be made. Reload the page and try again.")
 ROLE_LABELS = {
     Role.OWNER: _("Owner"),
     Role.EDITOR: _("Editor"),
@@ -211,7 +213,7 @@ def _members_redirect(request: Request) -> Response:
 
 
 async def _member_error(request: Request, ctx: CurrentContext, exc: WorkspaceError) -> Response:
-    message = MEMBER_ERRORS.get(exc.code, MEMBER_ERRORS["last_owner"])
+    message = MEMBER_ERRORS.get(exc.code, MEMBER_ERROR_FALLBACK)
     return await run_in_threadpool(
         lambda: _members_page(request, ctx, error=message, status_code=409)
     )

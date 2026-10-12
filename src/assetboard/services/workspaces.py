@@ -19,10 +19,10 @@ from assetboard.db.repositories import (
     AuditEventRepository,
     CurrentWorkspaceRepository,
     MembershipRepository,
-    MemberView,
+    WorkspaceMember,
 )
 from assetboard.services.context import Context, PermissionDenied, Role, require_role
-from assetboard.services.workspace_options import validate_workspace_options
+from assetboard.services.workspace_options import WorkspaceOptionError, validate_workspace_options
 
 MAX_WORKSPACE_NAME_LENGTH = 120
 
@@ -106,8 +106,8 @@ def update_settings(
             timezone=timezone,
             locale=locale,
         )
-    except ValueError as exc:
-        raise InvalidWorkspaceSettings("base_currency", "invalid_workspace_settings") from exc
+    except WorkspaceOptionError as exc:
+        raise InvalidWorkspaceSettings(exc.field, f"invalid_{exc.field}") from exc
     wanted = WorkspaceSettings(
         name=clean_name,
         base_currency=options.base_currency,
@@ -147,7 +147,7 @@ def update_settings(
     return run_immediate(factory, write)
 
 
-def list_members(factory: sessionmaker[Session], ctx: Context) -> list[MemberView]:
+def list_members(factory: sessionmaker[Session], ctx: Context) -> list[WorkspaceMember]:
     require_role(ctx, Role.OWNER)
     with factory() as session:
         return MembershipRepository(session, ctx).members()
@@ -177,7 +177,11 @@ def change_role(
             entity_type="membership",
             entity_id=str(target.id),
             ts=ctx.clock.now(),
-            data={"from": old_role.value, "to": new_role.value},
+            data={
+                "user_id": str(target.user_id),
+                "from": old_role.value,
+                "to": new_role.value,
+            },
         )
 
     run_immediate(factory, write)
@@ -204,7 +208,7 @@ def remove_member(factory: sessionmaker[Session], ctx: Context, *, membership_id
             entity_type="membership",
             entity_id=str(target.id),
             ts=ctx.clock.now(),
-            data={"role": removed_role},
+            data={"user_id": str(target.user_id), "role": removed_role},
         )
 
     run_immediate(factory, write)

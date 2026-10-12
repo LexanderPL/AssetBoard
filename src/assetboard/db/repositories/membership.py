@@ -11,7 +11,7 @@ from assetboard.db.repositories.base import ScopedRepository
 
 
 @dataclass(frozen=True, slots=True)
-class MemberView:
+class WorkspaceMember:
     membership_id: UUID
     user_id: UUID
     display_name: str
@@ -25,7 +25,7 @@ class MembershipRepository(ScopedRepository[Membership]):
 
     model = Membership
 
-    def members(self) -> list[MemberView]:
+    def members(self) -> list[WorkspaceMember]:
         """The workspace's members with their names, oldest membership first."""
         statement = (
             self._scoped_select()
@@ -34,7 +34,7 @@ class MembershipRepository(ScopedRepository[Membership]):
             .order_by(Membership.created_at, Membership.id)
         )
         return [
-            MemberView(
+            WorkspaceMember(
                 membership_id=membership.id,
                 user_id=membership.user_id,
                 display_name=display_name,

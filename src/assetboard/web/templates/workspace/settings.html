@@ -12,9 +12,9 @@
     {{ csrf_input() }}
     <div class="sm:col-span-2">{{ field("name", _("Workspace name"), value=values.name, error=errors.get("name"), required=true, maxlength=max_name_length) }}</div>
     {{ select("base_currency", _("Base currency"), currency_options, selected=values.base_currency, error=errors.get("base_currency")) }}
-    {{ select("country_code", _("Country"), country_options, selected=values.country_code or "", blank=_("Not set")) }}
-    {{ select("timezone", _("Time zone"), timezone_options, selected=values.timezone) }}
-    {{ select("locale", _("Formatting default"), locales, selected=values.locale) }}
+    {{ select("country_code", _("Country"), country_options, selected=values.country_code or "", error=errors.get("country_code"), blank=_("Not set")) }}
+    {{ select("timezone", _("Time zone"), timezone_options, selected=values.timezone, error=errors.get("timezone")) }}
+    {{ select("locale", _("Formatting default"), locales, selected=values.locale, error=errors.get("locale")) }}
     <p class="text-xs text-muted dark:text-slate-400 sm:col-span-2">{{ _("The formatting default is used for numbers and dates where no personal preference applies. Your interface language follows your account and browser.") }}</p>
     <div class="sm:col-span-2">{{ primary_button(_("Save settings")) }}</div>
   </form>
