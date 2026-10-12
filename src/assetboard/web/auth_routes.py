@@ -441,14 +441,12 @@ async def logout(request: Request) -> Response:
     session_id = request.cookies.get(session_cookie_name(state.settings))
     current = web_session(request)
     # RP-initiated logout (ADR-0014): only for sessions that started at the provider.
-    provider_logout_url: str | None = None
-    if (
+    provider_logout = (
         state.oidc is not None
         and state.settings.oidc_rp_logout
         and current is not None
         and current.auth_method == "oidc"
-    ):
-        provider_logout_url = await run_in_threadpool(state.oidc.end_session_url)
+    )
     if session_id:
         await run_in_threadpool(
             run_immediate,
@@ -461,6 +459,11 @@ async def logout(request: Request) -> Response:
                 user_agent=_user_agent(request),
             ),
         )
+    # Computed only after the local session is gone: a slow or failing provider never keeps
+    # anyone signed in here.
+    provider_logout_url: str | None = None
+    if provider_logout and state.oidc is not None:
+        provider_logout_url = await run_in_threadpool(state.oidc.end_session_url)
     if provider_logout_url is not None:
         # A page, not a redirect: Chromium applies CSP form-action to redirects after a form
         # POST, and the provider is another origin. The local session is already gone.

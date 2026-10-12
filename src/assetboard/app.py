@@ -37,6 +37,7 @@ from assetboard.services.auth import (
 from assetboard.services.context import NoWorkspace, PermissionDenied, WorkspaceNotAvailable
 from assetboard.services.hash_gate import RETRY_AFTER_SECONDS, HashGate, HashGateBusy
 from assetboard.services.oidc import OidcClient, UrllibTransport
+from assetboard.services.oidc_flow import ConsumedStates
 from assetboard.web.auth_routes import router as auth_router
 from assetboard.web.errors import add_error_response_headers, error_response
 from assetboard.web.errors import is_htmx_fragment_request as _is_htmx_fragment_request
@@ -127,6 +128,7 @@ def create_app(
     )
     app.state.oidc_flow_key = derive_subkey(secret_key, "oidc-flow")
     app.state.oidc_link_key = derive_subkey(secret_key, "oidc-link")
+    app.state.oidc_consumed_states = ConsumedStates()
     app.state.setup_token = None
     app.state.database_checker = checker
     # Added innermost first; see ADR-0012 for the resulting order.

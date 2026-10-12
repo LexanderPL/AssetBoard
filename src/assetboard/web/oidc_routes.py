@@ -93,10 +93,8 @@ FAILURES: dict[str, tuple[int, str]] = {
     ),
     "account_exists": (
         409,
-        _(
-            "An account with this email address already exists. Sign in with your password, "
-            "then link %(provider)s from your profile."
-        ),
+        # F1.5 adds "then link it from your profile" once that page exists.
+        _("An account with this email address already exists. Sign in with your password."),
     ),
     "email_unverified": (
         403,
@@ -222,9 +220,13 @@ async def oidc_callback(request: Request) -> Response:
         now=state.clock.now(),
     )
     if flow is None:
-        # No flow from this browser (expired, or a callback URL someone else started).
+        # No flow from this browser (expired, or a callback URL someone else started). Anyone
+        # can cause this with a crafted URL, so it is logged, never audited.
         _log(request, "flow_missing")
-        await _audit(request, "flow_missing")
+        return _failed(request, "start_over")
+    # Single use, decided before any provider call or database write.
+    if not state.oidc_consumed_states.consume(flow.state, now=state.clock.now()):
+        _log(request, "flow_replayed")
         return _failed(request, "start_over")
     params = dict(request.query_params.items())
     try:
@@ -235,7 +237,10 @@ async def oidc_callback(request: Request) -> Response:
         )
     except OidcError as error:
         _log(request, error.reason, error.detail)
-        await _audit(request, error.reason)
+        if not error.pre_exchange:
+            # Only failures after the code went to the provider are audited; earlier ones
+            # (state, iss, provider errors) come from URLs anyone can craft.
+            await _audit(request, error.reason)
         return _failed(request, _PROTOCOL_PAGES.get(error.reason, "failed"))
 
     # Validated again: the cookie is ours, but the rule must hold for every redirect target.

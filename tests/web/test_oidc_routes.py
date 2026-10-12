@@ -289,24 +289,64 @@ def test_callback_without_the_flow_cookie_is_refused(oidc: Oidc) -> None:
     """Login CSRF: a callback URL the victim's browser did not start."""
     start = oidc.start()
     params = oidc.idp.authorize(start.headers["location"])
-    with TestClient(oidc.app, base_url=BASE_URL) as victim:
+    with (
+        TestClient(oidc.app, base_url=BASE_URL) as victim,
+        captured_log(oidc.app) as output,
+    ):
         response = victim.get("/auth/oidc/callback", params=params, follow_redirects=False)
         assert (response.status_code, response.headers["location"]) == (
             303,
             "/auth/oidc/failed/start_over",
         )
         assert victim.get("/", follow_redirects=False).status_code == 303  # not signed in
-    assert "flow_missing" in audit_reasons(oidc)
+    # Decided before the code exchange: logged, not audited.
+    assert "reason=flow_missing" in output.getvalue()
+    assert audit_reasons(oidc) == []
     assert oidc.idp.token_requests == []
 
 
 def test_callback_with_a_wrong_state_is_refused(oidc: Oidc) -> None:
     start = oidc.start()
     params = oidc.idp.authorize(start.headers["location"], state="forged-state")
-    response = oidc.client.get("/auth/oidc/callback", params=params, follow_redirects=False)
+    with captured_log(oidc.app) as output:
+        response = oidc.client.get("/auth/oidc/callback", params=params, follow_redirects=False)
     assert response.headers["location"] == "/auth/oidc/failed/start_over"
     assert flow_cookie_deleted(response)
-    assert "state_mismatch" in audit_reasons(oidc)
+    assert "reason=state_mismatch" in output.getvalue()
+    assert audit_reasons(oidc) == []
+
+
+def test_a_provider_error_callback_is_logged_not_audited(oidc: Oidc) -> None:
+    with captured_log(oidc.app) as output:
+        response = oidc.sign_in(error="access_denied", error_description="no")
+    assert response.headers["location"] == "/auth/oidc/failed/cancelled"
+    assert "reason=access_denied" in output.getvalue()
+    assert audit_reasons(oidc) == []
+
+
+def test_failures_after_the_code_exchange_are_audited(oidc: Oidc) -> None:
+    oidc.idp.id_token_overrides = {"aud": "someone-else"}
+    response = oidc.sign_in()
+    assert response.headers["location"] == "/auth/oidc/failed/failed"
+    assert audit_reasons(oidc) == ["id_token_invalid"]
+
+
+def test_a_replayed_callback_is_refused_before_any_provider_call(oidc: Oidc) -> None:
+    start = oidc.start()
+    flow_cookie = cookie_named(start, "__Host-assetboard_oidc_flow").split(";")[0].split("=", 1)[1]
+    params = oidc.idp.authorize(start.headers["location"])
+    first = oidc.client.get("/auth/oidc/callback", params=params, follow_redirects=False)
+    assert first.headers["location"] == "/"
+    assert len(oidc.idp.token_requests) == 1
+    # The same cookie and the same callback URL again (for example captured and replayed).
+    with TestClient(oidc.app, base_url=BASE_URL) as replay, captured_log(oidc.app) as output:
+        replay.cookies.set("__Host-assetboard_oidc_flow", flow_cookie)
+        again = replay.get("/auth/oidc/callback", params=params, follow_redirects=False)
+        assert again.headers["location"] == "/auth/oidc/failed/start_over"
+        assert replay.get("/", follow_redirects=False).status_code == 303  # not signed in
+    assert len(oidc.idp.token_requests) == 1  # no second code exchange
+    assert "reason=flow_replayed" in output.getvalue()
+    assert audit_reasons(oidc) == []
 
 
 def test_a_second_tab_replaces_the_flow_and_the_first_tab_starts_over(oidc: Oidc) -> None:
@@ -442,6 +482,11 @@ def test_failure_pages_send_no_referrer_and_have_no_forms(oidc: Oidc, reason: st
     assert ("retry-after" in response.headers) is (FAILURES[reason][0] == 503)
 
 
+def test_no_failure_message_mentions_the_profile_yet() -> None:
+    # Linking from the profile arrives with F1.5, which restores that sentence.
+    assert all("profile" not in message.lower() for _status, message in FAILURES.values())
+
+
 def test_unknown_failure_reasons_are_404(oidc: Oidc) -> None:
     assert oidc.client.get("/auth/oidc/failed/whatever").status_code == 404
 
@@ -469,20 +514,20 @@ def link_cookie(response: Response) -> str:
     return cookie_named(response, "__Host-assetboard_oidc_link")
 
 
-def start_link(web: WebHarness, **overrides: object) -> Any:
-    harness = oidc_app(web, oidc_link_by_email=True, **overrides)
-    o = harness.__enter__()
-    o.idp.claims["email"] = o.web.admin_email
-    response = o.sign_in("/workspace/members")
-    assert response.headers["location"] == "/login/link"
-    assert flow_cookie_deleted(response)
-    link_cookie(response)
-    return harness, o
+@contextmanager
+def start_link(web: WebHarness, **overrides: object) -> Iterator[Oidc]:
+    """An app where the provider's verified email matches the administrator's account."""
+    with oidc_app(web, oidc_link_by_email=True, **overrides) as o:
+        o.idp.claims["email"] = o.web.admin_email
+        response = o.sign_in("/workspace/members")
+        assert response.headers["location"] == "/login/link"
+        assert flow_cookie_deleted(response)
+        link_cookie(response)
+        yield o
 
 
 def test_linking_confirms_the_password_on_a_same_origin_page(web: WebHarness) -> None:
-    harness, o = start_link(web)
-    try:
+    with start_link(web) as o:
         page = o.client.get("/login/link")
         assert page.status_code == 200
         assert page.headers["referrer-policy"] == "same-origin"
@@ -500,13 +545,10 @@ def test_linking_confirms_the_password_on_a_same_origin_page(web: WebHarness) ->
         assert "max-age=0" in link_cookie(right).lower()
         with o.db() as session:
             assert session.scalars(select(ExternalIdentity.subject)).all() == ["user-123"]
-    finally:
-        harness.__exit__(None, None, None)
 
 
 def test_linking_after_the_flag_was_turned_off_fails_generically(web: WebHarness) -> None:
-    harness, o = start_link(web)
-    try:
+    with start_link(web) as o:
         page = o.client.get("/login/link")
         o.app.state.settings.oidc_link_by_email = False
         response = o.client.post(
@@ -517,8 +559,6 @@ def test_linking_after_the_flag_was_turned_off_fails_generically(web: WebHarness
         assert "The password is not correct, or there were too many attempts" in response.text
         with o.db() as session:
             assert session.scalars(select(ExternalIdentity)).all() == []
-    finally:
-        harness.__exit__(None, None, None)
 
 
 def test_link_page_without_a_pending_link_asks_to_start_over(oidc: Oidc) -> None:
@@ -533,8 +573,7 @@ def test_link_page_without_a_pending_link_asks_to_start_over(oidc: Oidc) -> None
 def test_link_confirmation_handles_a_locked_database(
     web: WebHarness, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    harness, o = start_link(web)
-    try:
+    with start_link(web) as o:
         page = o.client.get("/login/link")
 
         async def locked(*_args: object, **_kwargs: object) -> object:
@@ -546,13 +585,10 @@ def test_link_confirmation_handles_a_locked_database(
         )
         assert response.status_code == 503 and response.headers["retry-after"] == "5"
         assert "The server is busy. Try again in a few seconds." in response.text
-    finally:
-        harness.__exit__(None, None, None)
 
 
 def test_link_confirmation_handles_busy_hashing(web: WebHarness) -> None:
-    harness, o = start_link(web)
-    try:
+    with start_link(web) as o:
         page = o.client.get("/login/link")
 
         class BusyGate:
@@ -565,8 +601,6 @@ def test_link_confirmation_handles_busy_hashing(web: WebHarness) -> None:
             data={"csrf_token": o.web.csrf(page.text), "password": o.web.admin_password},
         )
         assert response.status_code == 503 and response.headers["retry-after"] == "5"
-    finally:
-        harness.__exit__(None, None, None)
 
 
 # Invitations

@@ -56,7 +56,8 @@ for those steps.
      linked by email.
 6. **Try it:** sign out, choose "Continue with <provider>" on the sign-in page, and check the
    audit log (`auth.oidc_failure` events carry a reason such as `email_unverified`) if it does
-   not work.
+   not work. Reasons decided before the code is exchanged (an expired or replayed flow, a state
+   or issuer mismatch, an error returned by the provider) are in the application log only.
 7. **Optionally turn off passwords** with `ASSETBOARD_OIDC_ONLY=true` (see below).
 
 ## Administrators from a group

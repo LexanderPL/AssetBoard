@@ -85,6 +85,9 @@ class OidcError(Exception):
         self.reason = reason
         # Safe to log: may echo provider text (an error code), never with control characters.
         self.detail = log_safe(detail) if detail else None
+        # Raised before the code was sent to the provider: anyone can trigger these with a
+        # crafted callback URL, so they are logged but not audited.
+        self.pre_exchange = False
 
 
 # Transport
@@ -377,7 +380,21 @@ class OidcClient:
         nonce: str,
         code_verifier: str,
     ) -> OidcIdentity:
-        """Check the callback against the flow cookie's values, then exchange and validate."""
+        """Check the callback against the flow cookie's values, then exchange and validate.
+
+        Errors raised before the token request carry ``pre_exchange=True``.
+        """
+        try:
+            metadata = self._check_callback(params, state)
+        except OidcError as error:
+            error.pre_exchange = True
+            raise
+        code = params["code"]
+        tokens = self._exchange(metadata, code, code_verifier)
+        claims = self._validate_id_token(metadata, tokens["id_token"], nonce)
+        return self._identity(metadata, claims, tokens.get("access_token"))
+
+    def _check_callback(self, params: Mapping[str, str], state: str) -> ProviderMetadata:
         metadata = self.metadata()
         returned_state = params.get("state", "")
         if not hmac.compare_digest(returned_state.encode(), state.encode()):
@@ -400,9 +417,7 @@ class OidcClient:
         code = params.get("code")
         if not code or len(code) > 2048:
             raise OidcError("missing_code")
-        tokens = self._exchange(metadata, code, code_verifier)
-        claims = self._validate_id_token(metadata, tokens["id_token"], nonce)
-        return self._identity(metadata, claims, tokens.get("access_token"))
+        return metadata
 
     def _exchange(self, metadata: ProviderMetadata, code: str, verifier: str) -> dict[str, str]:
         secret = self._settings.oidc_client_secret

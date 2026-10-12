@@ -27,7 +27,9 @@ from playwright.sync_api import expect, sync_playwright
 from assetboard.app import create_app
 from assetboard.config import Settings
 from assetboard.services.auth import run_initial_setup
+from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
 from assetboard.services.oidc import OidcClient
+from assetboard.services.workspaces import create_invitation
 from tests.oidc.fake_idp import CLIENT_ID, CLIENT_SECRET, FakeIdp, StepClock
 
 pytestmark = pytest.mark.skipif(
@@ -106,7 +108,7 @@ def test_f13_oidc_sign_in_and_provider_logout(tmp_path: Path) -> None:
     logouts: list[dict[str, list[str]]] = []
 
     with _serve(app, app_listener), _serve(_provider_front(idp, logouts), idp_listener):
-        run_initial_setup(
+        admin, workspace = run_initial_setup(
             app.state.session_factory,
             email="admin@example.com",
             display_name="Admin",
@@ -115,8 +117,46 @@ def test_f13_oidc_sign_in_and_provider_logout(tmp_path: Path) -> None:
             settings=app.state.settings,
             clock=app.state.clock,
         )
+        owner = Context(
+            user=UserRef(admin.id, admin.email, admin.display_name, "en", True),
+            workspace=WorkspaceRef(
+                workspace.id,
+                workspace.name,
+                workspace.base_currency,
+                workspace.locale,
+                workspace.timezone,
+                workspace.country_code,
+            ),
+            role=Role.OWNER,
+            clock=app.state.clock,
+        )
+        token = create_invitation(
+            app.state.session_factory, owner, role="viewer", email=None, expires_in_days=7
+        ).token
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch()
+
+            # Static files loaded by /login and by an invite page carry no Referer (the page
+            # URL can hold the invitation token), with the OIDC button on both pages.
+            visitor = browser.new_page()
+            static_requests: list[tuple[str, str | None]] = []
+            visitor.on(
+                "request",
+                lambda request: (
+                    static_requests.append((request.url, request.all_headers().get("referer")))
+                    if "/static/" in request.url
+                    else None
+                ),
+            )
+            for path in ("/login", f"/invite/{token}"):
+                visitor.goto(f"{base}{path}", wait_until="networkidle")
+                expect(visitor.get_by_role("link", name="Continue with Fake IdP")).to_be_visible()
+            assert len(static_requests) >= 4, static_requests  # css and js on both pages
+            # Absent, or empty when Chromium serves the file from its memory cache.
+            assert all(not referer for _url, referer in static_requests), static_requests
+            assert all(token not in (referer or "") for _url, referer in static_requests)
+            visitor.close()
+
             page = browser.new_page()
             callback_responses: list[int] = []
             page.on(

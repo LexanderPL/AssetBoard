@@ -203,10 +203,9 @@ msgid ""
 "for an invitation."
 msgstr ""
 
-#, python-format
 msgid ""
 "An account with this email address already exists. Sign in with your "
-"password, then link %(provider)s from your profile."
+"password."
 msgstr ""
 
 #, python-format
@@ -629,5 +628,12 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Personal"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "An account with this email address "
+#~ "already exists. Sign in with your "
+#~ "password, then link %(provider)s from "
+#~ "your profile."
 #~ msgstr ""
 

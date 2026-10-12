@@ -164,6 +164,9 @@ Also add a short docs/architecture.md section "How to add a new workspace-owned 
   redirect. `next` is at most 512 ASCII characters. `/login/local` (break-glass) treats a
   non-administrator's correct password exactly like a wrong one. RP logout ends the local session,
   then shows a page that continues to the provider (meta refresh and a link).
+- Part B review: failures before the code exchange are logged, not audited (anyone can craft
+  them); each flow state is accepted once (in-memory, per process, 10 minutes); the
+  "account exists" page no longer mentions the profile until F1.5 adds linking there.
 
 **Agent prompt**
 ```

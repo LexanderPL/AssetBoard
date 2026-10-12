@@ -514,3 +514,26 @@ def test_the_urllib_transport_honours_proxy_variables_and_never_redirects(
     assert proxies and proxies[0].proxies.get("https") == "http://proxy.internal:3128"
     redirects = [h for h in handlers if isinstance(h, urllib.request.HTTPRedirectHandler)]
     assert len(redirects) == 1 and type(redirects[0]).__name__ == "_NoRedirects"
+
+
+def test_errors_before_the_code_exchange_are_marked(
+    tmp_path: Path, idp: FakeIdp, clock: StepClock
+) -> None:
+    client = make_client(tmp_path, idp, clock)
+    request = client.begin()
+    params = idp.authorize(request.url)
+    cases = [
+        {**params, "state": "forged"},
+        {**params, "iss": "https://evil.test"},
+        {"state": request.state, "error": "access_denied"},
+        {"state": request.state},
+    ]
+    for case in cases:
+        with pytest.raises(OidcError) as error:
+            complete(client, request, case)
+        assert error.value.pre_exchange, case
+    assert idp.token_requests == []
+    idp.id_token_overrides = {"aud": "someone-else"}
+    with pytest.raises(OidcError) as late:
+        complete(client, request, params)
+    assert late.value.reason == "id_token_invalid" and not late.value.pre_exchange

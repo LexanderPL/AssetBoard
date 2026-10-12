@@ -229,13 +229,10 @@ msgstr ""
 "Z Twoim logowaniem przez %(provider)s nie jest powiązane żadne konto. "
 "Poproś administratora o zaproszenie."
 
-#, python-format
 msgid ""
 "An account with this email address already exists. Sign in with your "
-"password, then link %(provider)s from your profile."
-msgstr ""
-"Konto z tym adresem e-mail już istnieje. Zaloguj się hasłem, a następnie "
-"połącz %(provider)s w swoim profilu."
+"password."
+msgstr "Konto z tym adresem e-mail już istnieje. Zaloguj się hasłem."
 
 #, python-format
 msgid ""

@@ -45,7 +45,11 @@ need the provider at startup.
   HttpOnly, `SameSite=Lax` cookie (`__Host-` on https) signed with a subkey of `SECRET_KEY`,
   with `iat` and `exp` (10 minutes) inside the signed payload and checked by the server. No
   table is needed and an invitation token in `next` never reaches the database. The callback
-  deletes the cookie, so a flow is used once; the provider's single-use code backs this up.
+  deletes the cookie, and the flow's state is recorded as used right after the cookie is read,
+  before any provider call or database write, so a replayed cookie and callback URL go to
+  "start over". That record lives in memory (only state hashes, for 10 minutes, at most 10,000
+  entries with the oldest evicted first): it is per process and lost on restart, which the
+  single worker (ADR-0012) makes acceptable; the provider's single-use code backs it up.
   Because the cookie binds the callback to the browser that started the flow, a callback URL
   planted by someone else fails (login CSRF). Starting a second flow in another tab replaces
   the cookie, and the first tab's callback then asks the user to start over.
@@ -71,8 +75,12 @@ need the provider at startup.
   Creating an account (4, 5) counts against the per-address registration limit. Accounts
   created through OIDC have no password. Provider display names are cleaned (control and
   format characters removed, whitespace collapsed, at most 120 characters, `User` if nothing
-  is left), and provider text in logs never contains a line break. Each refusal is audited
-  as `auth.oidc_failure` with a reason code, never with tokens, codes or claims.
+  is left), and provider text in logs never contains a line break. Refusals after the code
+  was sent to the provider (token, ID token, userinfo, account mapping) are audited as
+  `auth.oidc_failure` with a reason code, never with tokens, codes or claims. Refusals before
+  it (missing or replayed flow, state, `iss`, provider `error=` responses) can be triggered by
+  anyone with a crafted URL, so they go to the application log only, not the append-only audit
+  table.
 - **Admin group.** With `ASSETBOARD_OIDC_ADMIN_GROUP`, each OIDC sign-in sets
   `is_instance_admin` from the groups claim. A present claim is authoritative, even when empty;
   an absent or malformed claim changes nothing and logs a WARNING. The last active instance
