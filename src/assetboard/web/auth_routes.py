@@ -45,6 +45,7 @@ from assetboard.services.workspace_options import (
     locale_codes,
     timezone_names,
 )
+from assetboard.web.confirm import BUSY as CONFIRM_BUSY
 from assetboard.web.confirm import CONFIRM_FAILED, CONFIRM_STALE, confirm_view, run_confirmed
 from assetboard.web.errors import error_response, is_htmx_fragment_request
 from assetboard.web.rendering import render_template
@@ -733,17 +734,22 @@ async def logout_others(request: Request, confirm_password: FormStr = "") -> Res
     )
     fragment = is_htmx_fragment_request(request)
     if outcome.status != "confirmed" or outcome.value is None:
-        message = _t(request, CONFIRM_STALE if outcome.status == "stale" else CONFIRM_FAILED)
-        status = 403 if outcome.status == "stale" else 401
+        key, status = {
+            "busy": (CONFIRM_BUSY, 503),
+            "stale": (CONFIRM_STALE, 403),
+        }.get(outcome.status, (CONFIRM_FAILED, 401))
         if fragment:
-            return render_template(
+            response = render_template(
                 request,
                 "auth/notice_fragment.html",
-                context={"notice": message, "failed": True},
+                context={"notice": _t(request, key), "failed": True},
                 status_code=status,
             )
-        key = CONFIRM_STALE if outcome.status == "stale" else CONFIRM_FAILED
-        return await _password_page(request, errors={"confirm": key}, status_code=status)
+        else:
+            response = await _password_page(request, errors={"confirm": key}, status_code=status)
+        if status == 503:
+            response.headers["Retry-After"] = "5"
+        return response
     notice = gettext("Other sessions signed out: %(count)d.", request.state.locale) % {
         "count": outcome.value
     }

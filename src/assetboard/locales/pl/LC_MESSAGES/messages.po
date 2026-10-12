@@ -76,6 +76,21 @@ msgstr "Wybierz jeden z języków z listy."
 msgid "Choose one of the listed themes."
 msgstr "Wybierz jeden z motywów z listy."
 
+#, python-format
+msgid ""
+"Your account is already linked to %(provider)s. Remove that link first to"
+" link a different %(provider)s account."
+msgstr ""
+"Twoje konto jest już powiązane z %(provider)s. Najpierw usuń to "
+"powiązanie, aby powiązać inne konto %(provider)s."
+
+msgid ""
+"Your account is already linked to a proxy user. Remove that link first to"
+" link a different one."
+msgstr ""
+"Twoje konto jest już powiązane z użytkownikiem serwera proxy. Najpierw "
+"usuń to powiązanie, aby powiązać innego."
+
 msgid "The sign-in method is linked to your account."
 msgstr "Metoda logowania została powiązana z Twoim kontem."
 
@@ -108,9 +123,6 @@ msgid ""
 msgstr ""
 "To Twój ostatni sposób logowania, więc nie można go usunąć. Najpierw "
 "powiąż inną metodę logowania albo ustaw hasło."
-
-msgid "The server is busy. Try again in a moment."
-msgstr "Serwer jest zajęty. Spróbuj ponownie za chwilę."
 
 msgid "Browser language"
 msgstr "Język przeglądarki"
@@ -201,6 +213,9 @@ msgid ""
 msgstr ""
 "Hasło jest nieprawidłowe albo było zbyt wiele prób. Spróbuj ponownie "
 "później."
+
+msgid "The server is busy. Try again in a moment."
+msgstr "Serwer jest zajęty. Spróbuj ponownie za chwilę."
 
 msgid ""
 "Sign in again to confirm this change: without a password, it needs a "

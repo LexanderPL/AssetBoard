@@ -215,7 +215,6 @@ A person who already has an account (for example with a password) can link the p
 from the profile page while browsing through the proxy; see
 [docs/accounts.md](../accounts.md#sign-in-methods).
 
-
 Opening any page while the proxy presents a user signs in through `/auth/proxy`. The sign-in
 page and invitation pages also show "Continue as <user>". An invitation link opened through the
 proxy joins that workspace, even without `ASSETBOARD_PROXY_AUTH_AUTO_CREATE`.

@@ -160,7 +160,7 @@ def _failed(request: Request, reason: str) -> Response:
     return response
 
 
-async def _audit(request: Request, reason: str) -> None:
+async def _audit(request: Request, reason: str, *, via: str | None = None) -> None:
     """Best effort: a busy database must not turn a refused sign-in into an error."""
     state = _state(request)
     try:
@@ -171,6 +171,7 @@ async def _audit(request: Request, reason: str) -> None:
                 clock=state.clock,
                 host=client_host(request),
                 user_agent=_user_agent(request),
+                via=via,
             )
         )
     except OperationalError as exc:
@@ -370,7 +371,9 @@ async def oidc_failed(request: Request, reason: str) -> Response:
 # Linking from the profile (F1.5)
 
 # Outcome codes for ``/account?link=…``: an allowlist, never free text.
-LINK_CODES = frozenset({"linked", "already_linked", "failed", "cancelled", "unavailable", "busy"})
+LINK_CODES = frozenset(
+    {"linked", "already_linked", "one_per_provider", "failed", "cancelled", "unavailable", "busy"}
+)
 
 
 def _link_result(request: Request, code: str) -> Response:
@@ -402,7 +405,7 @@ async def _finish_link(
     except OidcError as error:
         _log(request, error.reason, error.detail)
         if error.auditable:
-            await _audit(request, error.reason)
+            await _audit(request, error.reason, via="profile")
         code = {
             "access_denied": "cancelled",
             "provider_unreachable": "unavailable",
@@ -437,7 +440,8 @@ async def _finish_link(
             raise
         return _link_result(request, "busy")
     # "refused" (linked to someone else) is the generic failure: no oracle.
-    return _link_result(request, status if status in {"linked", "already_linked"} else "failed")
+    known = {"linked", "already_linked", "one_per_provider"}
+    return _link_result(request, status if status in known else "failed")
 
 
 # Password confirmation before linking (``/login/link``, same-origin like ``/login``). Shared

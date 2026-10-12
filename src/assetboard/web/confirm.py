@@ -13,10 +13,12 @@ from datetime import datetime
 from typing import Any
 
 import anyio.to_thread
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from starlette.requests import Request
 
+from assetboard.db.engine import is_database_locked
 from assetboard.db.models.identity import User
 from assetboard.services.auth import WebSession, gate_verifier
 from assetboard.services.profile import (
@@ -35,6 +37,7 @@ def _(message: str) -> str:
 
 
 CONFIRM_FAILED = _("The password is not correct, or there were too many attempts. Try again later.")
+BUSY = _("The server is busy. Try again in a moment.")
 CONFIRM_STALE = _(
     "Sign in again to confirm this change: without a password, it needs a sign-in from the "
     "last 10 minutes."
@@ -76,9 +79,29 @@ async def run_confirmed[T](
     password: str,
     action: Callable[[Session, User, ConfirmMethod], T],
 ) -> ConfirmOutcome[T]:
-    """Confirm the signed-in user, then run ``action`` in the same write transaction."""
+    """Confirm the signed-in user, then run ``action`` in the same write transaction.
+
+    A locked database is handled here, once, as ``busy`` (the routes answer 503).
+    """
     state: Any = request.app.state
     verify = gate_verifier(state.hash_gate)
+    try:
+        return await _confirm_in_thread(request, current, state, verify, purpose, password, action)
+    except OperationalError as exc:
+        if not is_database_locked(exc):
+            raise
+        return ConfirmOutcome("busy")
+
+
+async def _confirm_in_thread[T](
+    request: Request,
+    current: WebSession,
+    state: Any,
+    verify: Any,
+    purpose: str,
+    password: str,
+    action: Callable[[Session, User, ConfirmMethod], T],
+) -> ConfirmOutcome[T]:
     return await anyio.to_thread.run_sync(
         lambda: confirm_sensitive(
             state.session_factory,

@@ -29,6 +29,7 @@ from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.identity import ExternalIdentity, User, UserSession
+from assetboard.domain.identity import InvalidDisplayName, normalize_display_name
 from assetboard.i18n.locale import SUPPORTED_LOCALES
 from assetboard.services.auth import (
     Verifier,
@@ -40,16 +41,16 @@ from assetboard.services.external_identity import PROXY_PROVIDER
 FRESH_SESSION = timedelta(minutes=10)
 THEMES = ("system", "light", "dark")
 BROWSER_LOCALE = "browser"  # the profile's "Browser language" choice (stored as NULL)
-MAX_DISPLAY_NAME = 120
 
 ConfirmMethod = Literal["password", "fresh_session", "none"]
-ConfirmStatus = Literal["confirmed", "failed", "stale"]
+ConfirmStatus = Literal["confirmed", "failed", "stale", "busy"]
 
 
 @dataclass(frozen=True, slots=True)
 class ConfirmOutcome[T]:
     """``failed``: wrong password or throttled (audited by the primitive). ``stale``: no
-    password and no fresh external session (nothing written)."""
+    password and no fresh external session (nothing written). ``busy``: the database was
+    locked (set by the web entry point)."""
 
     status: ConfirmStatus
     value: T | None = None
@@ -153,13 +154,15 @@ def update_profile(
     locale: str,
     theme: str,
 ) -> ProfileError | None:
-    """Display name (1 to 120 characters after trimming), locale and theme.
+    """Display name (``normalize_display_name``), locale and theme.
 
     ``locale`` is a supported language, or ``""`` / ``"browser"`` for none (stored as NULL:
     the browser's ``Accept-Language`` applies).
     """
-    name = " ".join(display_name.split())
-    if not name or len(name) > MAX_DISPLAY_NAME:
+    try:
+        # The same rule as setup, registration and invitation sign-up.
+        name = normalize_display_name(display_name)
+    except InvalidDisplayName:
         return "display_name"
     saved_locale: str | None = None if locale in {"", BROWSER_LOCALE} else locale
     if saved_locale is not None and saved_locale not in SUPPORTED_LOCALES:
@@ -239,7 +242,7 @@ def has_current_oidc_identity(session: Session, user_id: UUID, settings: Setting
     )
 
 
-LinkStatus = Literal["linked", "already_linked", "refused"]
+LinkStatus = Literal["linked", "already_linked", "refused", "one_per_provider"]
 
 
 def link_identity_to_user(
@@ -268,6 +271,15 @@ def link_identity_to_user(
         return "already_linked"
     if owner is not None or not user.is_active:
         return "refused"
+    # One identity per provider: the configured OIDC issuer, or the proxy. Identities of an
+    # earlier issuer have a different provider string, so they never count here.
+    same_provider = session.scalar(
+        select(ExternalIdentity.id).where(
+            ExternalIdentity.user_id == user.id, ExternalIdentity.provider == provider
+        )
+    )
+    if same_provider is not None:
+        return "one_per_provider"
     session.add(
         ExternalIdentity(user_id=user.id, provider=provider, subject=subject, email_at_link=email)
     )

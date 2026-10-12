@@ -47,8 +47,11 @@ def run_migrations_online() -> None:
                     if sqlite:
                         broken = connection.exec_driver_sql("PRAGMA foreign_key_check").fetchall()
                         if broken:
+                            # Rows: (table, rowid, referenced table, foreign key index).
+                            pairs = sorted({f"{row[0]} -> {row[2]}" for row in broken})
                             raise RuntimeError(
-                                f"migration left {len(broken)} broken foreign key reference(s)"
+                                f"migration left {len(broken)} broken foreign key reference(s): "
+                                + ", ".join(pairs)
                             )
             finally:
                 if sqlite:

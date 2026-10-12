@@ -73,6 +73,17 @@ msgstr ""
 msgid "Choose one of the listed themes."
 msgstr ""
 
+#, python-format
+msgid ""
+"Your account is already linked to %(provider)s. Remove that link first to"
+" link a different %(provider)s account."
+msgstr ""
+
+msgid ""
+"Your account is already linked to a proxy user. Remove that link first to"
+" link a different one."
+msgstr ""
+
 msgid "The sign-in method is linked to your account."
 msgstr ""
 
@@ -98,9 +109,6 @@ msgstr ""
 msgid ""
 "This is your last way to sign in, so it cannot be removed. Link another "
 "sign-in method or set a password first."
-msgstr ""
-
-msgid "The server is busy. Try again in a moment."
 msgstr ""
 
 msgid "Browser language"
@@ -183,6 +191,9 @@ msgstr ""
 msgid ""
 "The password is not correct, or there were too many attempts. Try again "
 "later."
+msgstr ""
+
+msgid "The server is busy. Try again in a moment."
 msgstr ""
 
 msgid ""

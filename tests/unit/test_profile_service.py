@@ -326,3 +326,33 @@ def test_two_unlinks_at_once_keep_one_method(
     assert sorted(results.values()) == ["last_method", "unlinked"]
     with db.factory() as session:
         assert len(session.scalars(select(ExternalIdentity.id)).all()) == 1
+
+
+def test_one_identity_per_provider(db: WorkspaceDb, tmp_path: Path) -> None:
+    user_id = add_user(db)
+    add_identity(db, user_id, ISSUER, "first")
+    add_identity(db, user_id, OLD_ISSUER, "old")  # an earlier issuer never counts
+
+    def link(provider: str, subject: str) -> str:
+        def run(session: Any) -> str:
+            user = session.get(User, user_id)
+            return profile.link_identity_to_user(
+                session,
+                user,
+                provider=provider,
+                subject=subject,
+                email=None,
+                confirmed="password",
+                clock=db.clock,
+                host=None,
+                user_agent=None,
+            )
+
+        return run_immediate(db.factory, run)
+
+    assert link(ISSUER, "first") == "already_linked"  # checked before the per-provider rule
+    assert link(ISSUER, "second") == "one_per_provider"
+    assert link(PROXY_PROVIDER, "ola") == "linked"
+    assert link(PROXY_PROVIDER, "other") == "one_per_provider"
+    assert audits(db, "auth.oidc_linked") == []
+    assert audits(db, "auth.proxy_linked") == [{"via": "profile", "confirmed": "password"}]

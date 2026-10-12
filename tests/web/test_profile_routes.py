@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import html
 import re
+import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -15,12 +16,16 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx import Response
 from sqlalchemy import select, update
+from sqlalchemy.exc import OperationalError
 
 from assetboard.cli import serve_app
 from assetboard.db.models.identity import AuditEvent, ExternalIdentity, User, UserSession
+from assetboard.i18n.locale import SUPPORTED_LOCALES
 from assetboard.services.auth import argon2_hash
 from assetboard.services.external_identity import PROXY_PROVIDER
 from assetboard.services.oidc import OidcClient
+from assetboard.web import confirm
+from assetboard.web.account_routes import LANGUAGE_NAMES
 from assetboard.web.security import session_cookie_name
 from tests.oidc.fake_idp import BASE_URL, CLIENT_ID, CLIENT_SECRET, ISSUER, FakeIdp, StepClock
 
@@ -32,6 +37,7 @@ OUTSIDE = "198.51.100.20"
 NAVIGATION = {"Accept": "text/html", "Sec-Fetch-Dest": "document", "Sec-Fetch-Mode": "navigate"}
 OLA_PROXY = {"Remote-User": "ola", "Remote-Email": "ola@example.com"}
 LOCAL_PASSWORD = "Local Account Password"
+OLD_ISSUER = "https://old-idp.example.test"
 
 
 def settings(**overrides: object) -> dict[str, object]:
@@ -312,8 +318,9 @@ def test_saved_theme_is_the_server_rendered_default(h: Harness, theme: str) -> N
 
 
 def sensitive_posts(h: Harness, client: TestClient) -> dict[str, tuple[str, dict[str, str]]]:
-    oidc_id = add_identity(h, h.web.admin_email, ISSUER, "admin-oidc")
-    add_identity(h, h.web.admin_email, PROXY_PROVIDER, "admin-proxy")
+    # An earlier issuer's identity: a current-issuer one would refuse link_oidc before any
+    # confirmation (one identity per provider).
+    oidc_id = add_identity(h, h.web.admin_email, OLD_ISSUER, "admin-oidc")
     return {
         "link_oidc": ("/account/identities/oidc", {}),
         "link_proxy": ("/account/identities/proxy", OLA_PROXY),
@@ -456,8 +463,8 @@ def test_link_callback_in_another_session_of_the_same_user_links_nothing(h: Harn
 
 def test_linking_an_identity_already_linked_to_this_user(h: Harness) -> None:
     client = admin(h)
-    add_identity(h, h.web.admin_email, ISSUER, "user-123")
     params = start_link(h, client)
+    add_identity(h, h.web.admin_email, ISSUER, "user-123")  # linked meanwhile
     done = client.get("/auth/oidc/callback", params=params, follow_redirects=False)
     assert done.headers["location"] == "/account?link=already_linked"
     assert "already linked to your account" in client.get(done.headers["location"]).text
@@ -634,3 +641,127 @@ def test_new_accounts_follow_the_browser_language(h: Harness) -> None:
         ("oidc@example.com", None),
         ("ola@example.com", None),
     ]
+
+
+# One identity per provider
+
+
+def test_link_oidc_is_refused_up_front_when_the_issuer_is_already_linked(h: Harness) -> None:
+    client = admin(h)
+    add_identity(h, h.web.admin_email, ISSUER, "admin-oidc")
+    page = client.get("/account")
+    assert "data-link-oidc" not in page.text
+    response = client.post(
+        "/account/identities/oidc",
+        data={"csrf_token": h.web.csrf(page.text), "confirm_password": "not even checked"},
+    )
+    assert response.status_code == 409
+    assert "already linked to Authentik" in response.text
+    assert "data-provider-link" not in response.text
+    assert not any("oidc_flow" in c for c in response.headers.get_list("set-cookie"))
+    assert h.audits("auth.password_confirm_failure") == []  # refused before confirming
+
+
+def test_an_earlier_issuers_identity_does_not_block_linking(h: Harness) -> None:
+    client = admin(h)
+    add_identity(h, h.web.admin_email, OLD_ISSUER, "old")
+    params = start_link(h, client)
+    done = client.get("/auth/oidc/callback", params=params, follow_redirects=False)
+    assert done.headers["location"] == "/account?link=linked"
+
+
+def test_the_callback_refuses_a_second_identity_of_the_issuer(h: Harness) -> None:
+    client = admin(h)
+    params = start_link(h, client)
+    add_identity(h, h.web.admin_email, ISSUER, "another-subject")  # linked meanwhile
+    done = client.get("/auth/oidc/callback", params=params, follow_redirects=False)
+    assert done.headers["location"] == "/account?link=one_per_provider"
+    assert "already linked to Authentik" in client.get(done.headers["location"]).text
+    assert h.identities() == [(h.web.admin_email, ISSUER, "another-subject")]
+
+
+def test_a_second_proxy_identity_is_refused(h: Harness) -> None:
+    client = admin(h)
+    add_identity(h, h.web.admin_email, PROXY_PROVIDER, "admin-proxy")
+    page = client.get("/account", headers=OLA_PROXY)
+    assert "data-link-proxy" not in page.text
+    response = client.post(
+        "/account/identities/proxy",
+        data={"csrf_token": h.web.csrf(page.text), "confirm_password": h.web.admin_password},
+        headers=OLA_PROXY,
+    )
+    assert response.status_code == 409 and "already linked to a proxy user" in response.text
+    assert h.identities() == [(h.web.admin_email, PROXY_PROVIDER, "admin-proxy")]
+
+
+# A locked database is handled once, in run_confirmed
+
+
+def _locked(*_args: object, **_kwargs: object) -> None:
+    raise OperationalError("BEGIN IMMEDIATE", {}, sqlite3.OperationalError("database is locked"))
+
+
+def test_link_oidc_answers_503_when_the_database_is_busy(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = admin(h)
+    token = h.token(client)
+    with monkeypatch.context() as m:
+        m.setattr(confirm, "confirm_sensitive", _locked)
+        response = client.post(
+            "/account/identities/oidc",
+            data={"csrf_token": token, "confirm_password": h.web.admin_password},
+        )
+    assert response.status_code == 503 and response.headers["retry-after"] == "5"
+    assert "The server is busy" in response.text and "data-provider-link" not in response.text
+
+
+@pytest.mark.parametrize("htmx", [False, True])
+def test_logout_others_answers_503_when_the_database_is_busy(
+    h: Harness, monkeypatch: pytest.MonkeyPatch, htmx: bool
+) -> None:
+    client = admin(h)
+    token = h.token(client, "/account/password")
+    headers = {"HX-Request": "true"} if htmx else {}
+    with monkeypatch.context() as m:
+        m.setattr(confirm, "confirm_sensitive", _locked)
+        response = client.post(
+            "/account/logout-others",
+            data={"csrf_token": token, "confirm_password": h.web.admin_password},
+            headers=headers,
+        )
+    assert response.status_code == 503 and response.headers["retry-after"] == "5"
+    assert "The server is busy" in response.text
+    assert ("<html" in response.text) == (not htmx)
+
+
+# Display names and the link flow's audit
+
+
+@pytest.mark.parametrize("name", ["Ola\x07", "Ola\u202eadmin", "Ola\nAdmin", "\u2028"])
+def test_profile_display_name_refuses_control_and_format_characters(h: Harness, name: str) -> None:
+    client = admin(h)
+    response = client.post(
+        "/account/profile",
+        data={
+            "display_name": name,
+            "locale": "en",
+            "theme": "system",
+            "csrf_token": h.token(client),
+        },
+    )
+    assert response.status_code == 400 and 'id="display_name-error"' in response.text
+    assert h.user(h.web.admin_email).display_name == "Admin"
+
+
+def test_audited_link_flow_errors_say_via_profile(h: Harness) -> None:
+    client = admin(h)
+    params = start_link(h, client)
+    h.idp.id_token_overrides = {"aud": "someone-else"}  # refused after the code was accepted
+    done = client.get("/auth/oidc/callback", params=params, follow_redirects=False)
+    assert done.headers["location"] == "/account?link=failed"
+    assert h.audits("auth.oidc_failure") == [{"reason": "id_token_invalid", "via": "profile"}]
+
+
+def test_every_supported_language_has_a_name() -> None:
+    assert set(LANGUAGE_NAMES) == set(SUPPORTED_LOCALES)

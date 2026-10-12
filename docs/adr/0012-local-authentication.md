@@ -128,7 +128,9 @@ ADR-0015 adds reverse-proxy header authentication. For local authentication this
   external session instead: the current session started through OIDC or the proxy at most
   10 minutes ago (`UserSession.created_at`, not its last activity). **This is weaker than a
   password: whoever holds the session cookie in those 10 minutes after the sign-in can confirm.**
-  Outside that window the action is refused ("sign in again") and nothing is written. Successful
+  Outside that window the action is refused ("sign in again") and nothing is written. For an
+  OIDC link the window applies to **starting** it: the provider round trip may then finish up to
+  10 minutes later, the lifetime of the signed flow cookie. Successful
   actions record how they were confirmed: `{"via": "profile", "confirmed": "password"}` or
   `"fresh_session"`.
 - **Never without a way to sign in.** Unlinking checks, in the same `BEGIN IMMEDIATE`

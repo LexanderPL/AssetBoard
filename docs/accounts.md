@@ -34,5 +34,7 @@ Linking, removing a sign-in method and signing out other devices ask for confirm
   - with an identity provider: sign out, then "Continue with <provider>" on the sign-in page;
   - through a proxy: sign out, then open any page; the proxy signs you in again.
 
-  You then have 10 minutes for the change. This is weaker than a password: anyone holding your
-  signed-in browser during those minutes could make the change.
+  You then have 10 minutes for the change. For linking an identity provider, the 10 minutes
+  are for starting the link; finishing the sign-in at the provider may take up to 10 more
+  minutes. This is weaker than a password: anyone holding your signed-in browser during those
+  minutes could make the change.

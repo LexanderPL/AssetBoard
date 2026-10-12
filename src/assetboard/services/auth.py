@@ -48,7 +48,13 @@ from assetboard.db.models.identity import (
     UserSession,
     Workspace,
 )
-from assetboard.domain.identity import MAX_EMAIL_LENGTH, InvalidEmail, normalize_email
+from assetboard.domain.identity import (
+    MAX_EMAIL_LENGTH,
+    InvalidDisplayName,
+    InvalidEmail,
+    normalize_display_name,
+    normalize_email,
+)
 from assetboard.services import invitations
 from assetboard.services.hash_gate import HashGate, HashGateBusy
 from assetboard.services.workspace_options import WorkspaceOptions, validate_workspace_options
@@ -1185,6 +1191,13 @@ def _clean_name(value: str, code: str, message: str) -> str:
     return cleaned
 
 
+def _clean_display_name(value: str) -> str:
+    try:
+        return normalize_display_name(value)
+    except InvalidDisplayName as exc:
+        raise InvalidAccountDetails(exc.code, str(exc)) from exc
+
+
 def _workspace_options(
     settings: Settings,
     *,
@@ -1221,9 +1234,7 @@ def _create_user_records(
     ``password_hash`` lets the caller hash outside the transaction; the policy is checked here
     either way. ``password=None`` creates a user without a password (OIDC, F1.3).
     """
-    clean_display_name = _clean_name(
-        display_name, "invalid_display_name", "Display name must contain 1 to 120 characters"
-    )
+    clean_display_name = _clean_display_name(display_name)
     normalized_email = normalize_email(email)
     if password is not None:
         validate_password(password, normalized_email, clean_display_name)
@@ -1341,9 +1352,7 @@ def run_initial_setup(
     with factory() as session:
         if not setup_is_open(session):
             raise SetupAlreadyCompleted
-    clean_display_name = _clean_name(
-        display_name, "invalid_display_name", "Display name must contain 1 to 120 characters"
-    )
+    clean_display_name = _clean_display_name(display_name)
     normalized_email = normalize_email(email)
     validate_password(password, normalized_email, clean_display_name)
     _workspace_options(
@@ -1571,9 +1580,7 @@ def _register_flow(
 
     try:
         normalized_email = normalize_email(email)
-        clean_display_name = _clean_name(
-            display_name, "invalid_display_name", "Display name must contain 1 to 120 characters"
-        )
+        clean_display_name = _clean_display_name(display_name)
         validate_password(password, normalized_email, clean_display_name)
         options: WorkspaceOptions | None = None
         if invitation is None:

@@ -12,12 +12,10 @@ from urllib.parse import urlsplit
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import Response
 
-from assetboard.db.engine import is_database_locked
 from assetboard.db.models.identity import User
 from assetboard.i18n import gettext
 from assetboard.i18n.locale import SUPPORTED_LOCALES
@@ -36,7 +34,7 @@ from assetboard.services.profile import (
     update_profile,
 )
 from assetboard.services.proxy_auth import proxy_identity_owner
-from assetboard.web.confirm import CONFIRM_FAILED, CONFIRM_STALE, confirm_view, run_confirmed
+from assetboard.web.confirm import BUSY, CONFIRM_FAILED, CONFIRM_STALE, confirm_view, run_confirmed
 from assetboard.web.rendering import render_template
 from assetboard.web.security import (
     client_host,
@@ -64,6 +62,17 @@ PROFILE_ERRORS = {
     "locale": _("Choose one of the listed languages."),
     "theme": _("Choose one of the listed themes."),
 }
+# One linked identity per provider (the configured OIDC issuer, or the proxy).
+ONE_PER_PROVIDER = {
+    "oidc": _(
+        "Your account is already linked to %(provider)s. Remove that link first to link a "
+        "different %(provider)s account."
+    ),
+    "proxy": _(
+        "Your account is already linked to a proxy user. Remove that link first to link a "
+        "different one."
+    ),
+}
 # ``/account?link=<code>`` after the OIDC round trip: an allowlist (oidc_routes.LINK_CODES).
 LINK_MESSAGES: dict[str, tuple[bool, str]] = {
     "linked": (True, _("The sign-in method is linked to your account.")),
@@ -75,12 +84,13 @@ LINK_MESSAGES: dict[str, tuple[bool, str]] = {
     "cancelled": (False, _("Linking failed: it was cancelled at %(provider)s.")),
     "unavailable": (False, _("Linking failed: %(provider)s cannot be reached right now.")),
     "busy": (False, _("Linking failed: the server is busy. Try again in a moment.")),
+    "one_per_provider": (False, ONE_PER_PROVIDER["oidc"]),
 }
 UNLINK_LAST = _(
     "This is your last way to sign in, so it cannot be removed. Link another sign-in method "
     "or set a password first."
 )
-BUSY = _("The server is busy. Try again in a moment.")
+RETRY_AFTER_SECONDS = "5"
 
 
 def _state(request: Request) -> Any:
@@ -97,6 +107,12 @@ def _require_session(request: Request) -> WebSession:
     if current is None:  # the gate redirects first; this guards direct use
         raise HTTPException(status_code=404)
     return current
+
+
+def _has_current_oidc(request: Request, user_id: UUID) -> bool:
+    state = _state(request)
+    with state.session_factory() as session:
+        return has_current_oidc_identity(session, user_id, state.settings)
 
 
 def _proxy_subject(request: Request) -> str | None:
@@ -131,8 +147,11 @@ async def _profile_page(
                 and not has_current_oidc_identity(session, user.id, settings),
                 # Offered only for a subject linked to nobody: one linked to another account
                 # shows nothing at all.
+                # One proxy identity per account: none offered while one is linked.
                 "proxy_link_subject": proxy_subject
-                if proxy_subject is not None and proxy_owner is None
+                if proxy_subject is not None
+                and proxy_owner is None
+                and not any(identity.kind == "proxy" for identity in identities)
                 else None,
                 "has_password": user.password_hash is not None,
             }
@@ -205,10 +224,15 @@ async def profile_submit(
     return Response(status_code=303, headers={"Location": "/account"})
 
 
-def _confirm_refusal(request: Request, status: str) -> tuple[str, int]:
+async def _refused(request: Request, status: str) -> Response:
+    """The profile page for a confirmation that did not go through."""
+    if status == "busy":
+        response = await _profile_page(request, error=_t(request, BUSY), status_code=503)
+        response.headers["Retry-After"] = RETRY_AFTER_SECONDS
+        return response
     if status == "stale":
-        return _t(request, CONFIRM_STALE), 403
-    return _t(request, CONFIRM_FAILED), 401
+        return await _profile_page(request, error=_t(request, CONFIRM_STALE), status_code=403)
+    return await _profile_page(request, error=_t(request, CONFIRM_FAILED), status_code=401)
 
 
 # Linking
@@ -221,6 +245,11 @@ async def link_oidc(request: Request, confirm_password: FormStr = "") -> Respons
     client = state.oidc
     if client is None:
         raise HTTPException(status_code=404)
+    # One identity per configured issuer: refused before any confirmation or provider call.
+    if await run_in_threadpool(_has_current_oidc, request, current.user_id):
+        return await _profile_page(
+            request, error=_t(request, ONE_PER_PROVIDER["oidc"]), status_code=409
+        )
     outcome = await run_confirmed(
         request,
         current,
@@ -229,8 +258,7 @@ async def link_oidc(request: Request, confirm_password: FormStr = "") -> Respons
         action=lambda _session, _user, method: method,
     )
     if outcome.status != "confirmed" or outcome.value is None:
-        message, status = _confirm_refusal(request, outcome.status)
-        return await _profile_page(request, error=message, status_code=status)
+        return await _refused(request, outcome.status)
     try:
         authorization = await run_in_threadpool(client.begin)
     except OidcError:
@@ -272,7 +300,7 @@ async def link_proxy(request: Request, confirm_password: FormStr = "") -> Respon
     # The subject comes from the trusted proxy's headers on this very request, never from a
     # form field.
     proxy = proxy_request(request)
-    identity = proxy.headers.identity if proxy is not None and proxy.headers else None
+    identity = proxy.identity if proxy is not None else None  # None unless the peer is trusted
     if identity is None:
         return await _profile_page(
             request, error=_t(request, LINK_MESSAGES["failed"][1]), status_code=400
@@ -291,17 +319,15 @@ async def link_proxy(request: Request, confirm_password: FormStr = "") -> Respon
             user_agent=request.headers.get("user-agent"),
         )
 
-    try:
-        outcome = await run_confirmed(
-            request, current, purpose="profile_link_proxy", password=confirm_password, action=link
-        )
-    except OperationalError as exc:
-        if not is_database_locked(exc):
-            raise
-        return await _profile_page(request, error=_t(request, BUSY), status_code=503)
+    outcome = await run_confirmed(
+        request, current, purpose="profile_link_proxy", password=confirm_password, action=link
+    )
     if outcome.status != "confirmed":
-        message, status = _confirm_refusal(request, outcome.status)
-        return await _profile_page(request, error=message, status_code=status)
+        return await _refused(request, outcome.status)
+    if outcome.value == "one_per_provider":
+        return await _profile_page(
+            request, error=_t(request, ONE_PER_PROVIDER["proxy"]), status_code=409
+        )
     if outcome.value in {"linked", "already_linked"}:
         key = "linked" if outcome.value == "linked" else "already_linked"
         return await _profile_page(request, notice=_t(request, LINK_MESSAGES[key][1]))
@@ -336,17 +362,11 @@ async def unlink(request: Request, identity_id: str, confirm_password: FormStr =
             user_agent=request.headers.get("user-agent"),
         )
 
-    try:
-        outcome = await run_confirmed(
-            request, current, purpose="profile_unlink", password=confirm_password, action=remove
-        )
-    except OperationalError as exc:
-        if not is_database_locked(exc):
-            raise
-        return await _profile_page(request, error=_t(request, BUSY), status_code=503)
+    outcome = await run_confirmed(
+        request, current, purpose="profile_unlink", password=confirm_password, action=remove
+    )
     if outcome.status != "confirmed":
-        message, status = _confirm_refusal(request, outcome.status)
-        return await _profile_page(request, error=message, status_code=status)
+        return await _refused(request, outcome.status)
     if outcome.value == "not_found":
         raise HTTPException(status_code=404)
     if outcome.value == "last_method":
