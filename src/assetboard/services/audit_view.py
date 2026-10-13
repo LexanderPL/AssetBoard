@@ -359,9 +359,10 @@ def _filter(query: AuditQuery) -> AuditFilter:
             raise BadAuditRequest("group")
         actions = groups[query.group]
     since = datetime.combine(query.since, time(), tzinfo=UTC) if query.since else None
+    # The day after the last day; date.max has none, so it leaves the range open-ended.
     until = (
         datetime.combine(query.until + timedelta(days=1), time(), tzinfo=UTC)
-        if query.until
+        if query.until is not None and query.until < date.max
         else None
     )
     return AuditFilter(actions=actions, since=since, until=until, before=query.cursor)

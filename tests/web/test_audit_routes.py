@@ -14,6 +14,8 @@ from sqlalchemy import select
 
 from assetboard.db.models.identity import AuditEvent, ExternalIdentity, Membership, User, Workspace
 from assetboard.services.audit_view import ACTION_LABELS, DATA_KEYS, KEY_LABELS
+from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
+from assetboard.services.workspaces import create_invitation
 from tests.oidc.fake_idp import ISSUER
 from tests.web.test_profile_routes import (
     LOCAL_PASSWORD,
@@ -428,3 +430,90 @@ def test_a_bare_audit_opens_the_scope_the_user_may_see(h: Harness) -> None:
     assert "Audit log: instance" in signed_in(h, "admin2@example.com").get("/audit").text
     member(h, "viewer@example.com", "viewer")
     assert signed_in(h, "viewer@example.com").get("/audit").status_code == 403
+
+
+# Delta review
+
+
+def test_the_last_representable_day_leaves_the_range_open(h: Harness) -> None:
+    event(h, "admin.user_activated")
+    client = admin(h)
+    page = client.get("/audit?scope=instance&group=accounts&to=9999-12-31")
+    assert page.status_code == 200 and len(planted(page.text)) == 1
+    far = client.get("/audit?scope=instance&from=9999-12-31&to=9999-12-31")
+    assert far.status_code == 200 and "data-audit-empty" in far.text
+    assert client.get("/audit?scope=instance&from=0001-01-01").status_code == 200
+
+
+def test_the_member_column_with_the_real_writers(h: Harness) -> None:
+    changed = member(h, "changed@example.com", "viewer")
+    removed = member(h, "removed@example.com", "viewer")
+    client = admin(h)
+    with h.db() as session:
+        memberships = {
+            m.user_id: m.id
+            for m in session.scalars(select(Membership).where(Membership.workspace_id == home(h)))
+        }
+    token = h.token(client, "/workspace/members")
+    role = client.post(
+        f"/workspace/members/{memberships[changed]}/role",
+        data={"role": "editor", "csrf_token": token},
+    )
+    assert role.status_code in {200, 303}
+    gone = client.post(
+        f"/workspace/members/{memberships[removed]}/remove", data={"csrf_token": token}
+    )
+    assert gone.status_code in {200, 303}
+    # A real invitation, accepted by a signed-in account.
+    with h.db() as session:
+        workspace = session.get(Workspace, home(h))
+        assert workspace is not None
+        admin_user = h.user(h.web.admin_email)
+        ctx = Context(
+            user=UserRef(admin_user.id, admin_user.email, admin_user.display_name, None, True),
+            workspace=WorkspaceRef(
+                workspace.id,
+                workspace.name,
+                workspace.base_currency,
+                workspace.locale,
+                workspace.timezone,
+                workspace.country_code,
+            ),
+            role=Role.OWNER,
+            clock=h.app.state.clock,
+        )
+    invite = create_invitation(
+        h.app.state.session_factory, ctx, role="viewer", email=None, expires_in_days=7
+    ).token
+    add_user(h, "joiner@example.com")
+    joiner = signed_in(h, "joiner@example.com")
+    page = joiner.get(f"/invite/{invite}")
+    accepted = joiner.post(
+        f"/invite/{invite}/accept",
+        data={"csrf_token": h.web.csrf(page.text)},
+        follow_redirects=False,
+    )
+    assert accepted.status_code == 303
+
+    found = rows(client.get("/audit?scope=workspace&group=members").text)
+    by_label = {
+        label: row
+        for row in found
+        for label in ("Member role changed", "Member removed")
+        if label in row
+    }
+    assert re.search(r"data-audit-target>\s*changed\s*<", by_label["Member role changed"])
+    assert re.search(r"data-audit-target>\s*removed\s*<", by_label["Member removed"])
+    invitations = rows(client.get("/audit?scope=workspace&group=invitations").text)
+    (accepted_row,) = [row for row in invitations if "Invitation accepted" in row]
+    assert re.search(r"data-audit-target>\s*joiner\s*<", accepted_row)
+    for row in (*by_label.values(), accepted_row):
+        assert "@example.com" not in row  # display names only
+
+
+def test_no_dangling_separator_on_your_own_row(h: Harness) -> None:
+    page = admin(h).get("/admin/users").text
+    own = page.split(f'data-user="{h.web.admin_email}"')[1].split("</tr>")[0]
+    actions = re.sub(r"<[^>]+>", " ", own.split('text-right whitespace-nowrap">')[1])
+    words = actions.split()
+    assert words == ["History", "You"], words

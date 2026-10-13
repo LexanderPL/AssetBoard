@@ -87,6 +87,8 @@ instance administrator.
   workspace's events: those are only in that workspace's log.
 
 Filters: the kind of event and a date range in UTC (both days included). In the instance log,
-"History" next to an account on the Users page shows only the events about that account. Details are shown only for known events and known fields:
-reasons, methods, roles and counts. Identity-provider subjects, tokens and the email addresses a
-provider reported are never recorded, so they never appear.
+"History" next to an account on the Users page shows only the events about that account.
+Details are shown only for known events and known fields: reasons, methods, roles and counts.
+Names are shown as they are now, not as they were when the event happened. Identity-provider
+subjects, tokens and the email addresses a provider reported are never recorded, so they never
+appear.
