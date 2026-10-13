@@ -71,18 +71,22 @@ if your account has none.
 
 ## Audit log
 
-The audit log lists who did what and when, newest first, in pages of 50.
+The audit log lists who did what and when (in UTC, to the second), newest first, in pages of
+50. Each log has its own entry in the account menu; the address `/audit` on its own opens the
+workspace log for the owner of the current workspace, otherwise the instance log for an
+instance administrator.
 
 - **Workspace** ("Audit log: workspace", for the owner of the current workspace): that
   workspace's events: setup, member role changes and removals, invitations, settings. Each row
-  shows who acted (display name only).
+  shows who acted and which member it is about, by display name only ("Former member" if that
+  account no longer exists).
 - **Instance** ("Audit log: instance", for instance administrators): sign-ins and sign-outs,
   failed and refused sign-ins, linked and removed sign-in methods, password changes and account
   administration. Each row also shows the account it is about, the acting account's email and
   the network (an IPv4 /24 or IPv6 /48 prefix, never the full address). It never shows any
   workspace's events: those are only in that workspace's log.
 
-Filters: the kind of event, a date range in UTC (both days included) and, in the instance log,
-the affected account's email. Details are shown only for known events and known fields:
+Filters: the kind of event and a date range in UTC (both days included). In the instance log,
+"History" next to an account on the Users page shows only the events about that account. Details are shown only for known events and known fields:
 reasons, methods, roles and counts. Identity-provider subjects, tokens and the email addresses a
 provider reported are never recorded, so they never appear.

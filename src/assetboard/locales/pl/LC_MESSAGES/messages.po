@@ -199,35 +199,14 @@ msgstr "Stały adres e-mail"
 msgid "Valid for days"
 msgstr "Ważne dni"
 
-msgid "password"
-msgstr "hasło"
+msgid "owner"
+msgstr "właściciel"
 
-msgid "identity provider"
-msgstr "dostawca tożsamości"
+msgid "editor"
+msgstr "edytor"
 
-msgid "proxy"
-msgstr "serwer proxy"
-
-msgid "the profile"
-msgstr "profil"
-
-msgid "an invitation"
-msgstr "zaproszenie"
-
-msgid "an invitation, through the identity provider"
-msgstr "zaproszenie, przez dostawcę tożsamości"
-
-msgid "an invitation, through the proxy"
-msgstr "zaproszenie, przez serwer proxy"
-
-msgid "a recent sign-in"
-msgstr "niedawne logowanie"
-
-msgid "other devices"
-msgstr "inne urządzenia"
-
-msgid "the identity provider's group"
-msgstr "grupa u dostawcy tożsamości"
+msgid "viewer"
+msgstr "obserwator"
 
 msgid "not an instance administrator"
 msgstr "nie jest administratorem instancji"
@@ -289,6 +268,36 @@ msgstr "zbyt wiele prób z innym adresem e-mail"
 msgid "by an owner"
 msgstr "przez właściciela"
 
+msgid "password"
+msgstr "hasło"
+
+msgid "identity provider"
+msgstr "dostawca tożsamości"
+
+msgid "proxy"
+msgstr "serwer proxy"
+
+msgid "the profile"
+msgstr "profil"
+
+msgid "an invitation"
+msgstr "zaproszenie"
+
+msgid "an invitation, through the identity provider"
+msgstr "zaproszenie, przez dostawcę tożsamości"
+
+msgid "an invitation, through the proxy"
+msgstr "zaproszenie, przez serwer proxy"
+
+msgid "a recent sign-in"
+msgstr "niedawne logowanie"
+
+msgid "other devices"
+msgstr "inne urządzenia"
+
+msgid "the identity provider's group"
+msgstr "grupa u dostawcy tożsamości"
+
 msgid "linking an identity provider"
 msgstr "powiązanie dostawcy tożsamości"
 
@@ -315,12 +324,6 @@ msgstr "odebranie uprawnień administratora"
 
 msgid "creating an account"
 msgstr "utworzenie konta"
-
-msgid "viewer"
-msgstr "obserwator"
-
-msgid "editor"
-msgstr "edytor"
 
 msgid "name"
 msgstr "nazwa"
@@ -501,6 +504,9 @@ msgstr "Wiersz poleceń"
 
 msgid "System"
 msgstr "System"
+
+msgid "Former member"
+msgstr "Były członek"
 
 msgid "yes"
 msgstr "tak"
@@ -1076,6 +1082,9 @@ msgstr "(od dostawcy tożsamości)"
 msgid "Never"
 msgstr "Nigdy"
 
+msgid "History"
+msgstr "Historia"
+
 msgid "Deactivate"
 msgstr "Dezaktywuj"
 
@@ -1106,8 +1115,11 @@ msgstr "Od (UTC)"
 msgid "To (UTC)"
 msgstr "Do (UTC)"
 
-msgid "Affected account (email)"
-msgstr "Dotyczy konta (e-mail)"
+msgid "One account only."
+msgstr "Tylko jedno konto."
+
+msgid "Show all accounts"
+msgstr "Pokaż wszystkie konta"
 
 msgid "Filter"
 msgstr "Filtruj"
@@ -1120,6 +1132,9 @@ msgstr "Zdarzenie"
 
 msgid "By"
 msgstr "Kto"
+
+msgid "Member"
+msgstr "Członek"
 
 msgid "Network"
 msgstr "Sieć"
@@ -1398,4 +1413,7 @@ msgstr "Zapisz ustawienia"
 
 #~ msgid "Enter a display name of at most 120 characters."
 #~ msgstr "Podaj wyświetlaną nazwę o długości najwyżej 120 znaków."
+
+#~ msgid "Affected account (email)"
+#~ msgstr "Dotyczy konta (e-mail)"
 

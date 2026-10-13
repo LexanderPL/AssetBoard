@@ -48,19 +48,14 @@ def plant(db: WorkspaceDb, *, workspace_id: UUID | None, actor: UUID, entity: st
         )
 
 
-def test_workspace_rows_carry_no_ip_email_or_affected_account(db: WorkspaceDb) -> None:
+def test_workspace_rows_carry_names_only_no_ip_or_emails(db: WorkspaceDb) -> None:
     db.add_member("olga", "owner")
     db.add_member("kim", "viewer")
     plant(db, workspace_id=db.workspace_id, actor=db.users["olga"], entity=str(db.users["kim"]))
     page = workspace_page(db.factory, db.ctx("olga", "owner"), AuditQuery(scope="workspace"))
     (row,) = page.rows
-    assert row.actor_name is not None
-    assert (row.ip_prefix, row.actor_email, row.target_name, row.target_email) == (
-        None,
-        None,
-        None,
-        None,
-    )
+    assert row.actor_name == "Olga" and row.target_name == "Kim"  # display names only
+    assert (row.ip_prefix, row.actor_email, row.target_email) == (None, None, None)
     assert row.details == (("role", "viewer"),)
 
 

@@ -197,7 +197,7 @@ def test_subjects_tokens_and_provider_emails_never_appear(h: Harness) -> None:
 def test_an_unknown_action_shows_time_and_a_generic_label_only(h: Harness) -> None:
     event(h, "something.unknown", data={"reason": "throttled", "via": "profile"})
     (row,) = planted(admin(h).get("/audit?scope=instance").text)
-    assert "Other event" in row and "2026-09-01 12:00 UTC" in row
+    assert "Other event" in row and "2026-09-01 12:00:00 UTC" in row
     assert "Reason" not in row and "too many attempts" not in row
 
 
@@ -209,7 +209,7 @@ def test_link_flow_failures_read_as_link_failures(h: Harness) -> None:
     assert "Identity provider sign-in refused" in sign_in
 
 
-def test_instance_rows_show_the_affected_user_and_ip_prefix_workspace_rows_do_not(
+def test_instance_rows_show_emails_and_ip_prefix_workspace_rows_show_the_member_name_only(
     h: Harness,
 ) -> None:
     add_user(h, "ola@example.com")
@@ -232,6 +232,8 @@ def test_instance_rows_show_the_affected_user_and_ip_prefix_workspace_rows_do_no
     assert h.web.admin_email in instance_row  # actor with email in the instance scope
     (workspace_row,) = planted(client.get("/audit?scope=workspace").text)
     assert "Admin" in workspace_row  # the actor's display name
+    # The affected member by display name only (from data["user_id"]): no email, no IP.
+    assert re.search(r"data-audit-target>\s*ola\s*<", workspace_row)
     for hidden in ("ola@example.com", "203.0.113.0/24", h.web.admin_email, target):
         assert hidden not in workspace_row
     assert "Role: viewer" in workspace_row
@@ -287,17 +289,24 @@ def test_date_range_filter_includes_both_days(h: Harness) -> None:
     assert client.get("/audit?scope=instance&from=2026-13-01").status_code == 400
 
 
-def test_affected_user_filter_in_the_instance_scope(h: Harness) -> None:
+def test_account_filter_in_the_instance_scope(h: Harness) -> None:
     add_user(h, "ola@example.com")
     add_user(h, "kim@example.com")
-    event(h, "admin.user_activated", entity=str(h.user("ola@example.com").id))
+    ola = h.user("ola@example.com").id
+    event(h, "admin.user_activated", entity=str(ola))
     event(h, "admin.user_deactivated", entity=str(h.user("kim@example.com").id))
     client = admin(h)
-    page = client.get("/audit?scope=instance&group=accounts&user=OLA@example.com").text
+    # The Users page links each account's history by id; no email ever goes into a URL.
+    users = client.get("/admin/users").text
+    assert f"/audit?scope=instance&amp;account={ola}" in users
+    page = client.get(f"/audit?scope=instance&group=accounts&account={ola}").text
     assert "Account activated" in page and "Account deactivated" not in page
-    assert "data-audit-empty" in client.get("/audit?scope=instance&user=nobody@example.com").text
+    assert "data-audit-account" in page and "Show all accounts" in page
+    unknown = "00000000-0000-0000-0000-000000000000"
+    assert "data-audit-empty" in client.get(f"/audit?scope=instance&account={unknown}").text
+    assert client.get("/audit?scope=instance&account=ola@example.com").status_code == 400
     # The workspace scope has no such filter; the parameter is ignored there.
-    assert client.get("/audit?scope=workspace&user=ola@example.com").status_code == 200
+    assert client.get(f"/audit?scope=workspace&account={ola}").status_code == 200
 
 
 # Pagination
@@ -351,3 +360,71 @@ def test_malformed_requests_are_400(h: Harness, query: str) -> None:
 def test_every_allowlisted_key_and_action_has_a_label() -> None:
     assert {key for keys in DATA_KEYS.values() for key in keys} <= set(KEY_LABELS)
     assert set(DATA_KEYS) == set(ACTION_LABELS)
+
+
+# Review follow-ups
+
+
+def test_owner_as_a_role_and_as_a_revocation_reason_read_differently(h: Harness) -> None:
+    event(h, "member.role_changed", workspace_id=home(h), data={"from": "editor", "to": "owner"})
+    event(
+        h,
+        "invitation.revoked",
+        workspace_id=home(h),
+        data={"reason": "owner"},
+        ts=BASE - timedelta(minutes=1),  # older: listed second
+    )
+    page = admin(h).get("/audit?scope=workspace").text
+    role_change, revoked = planted(page)
+    assert "From: editor" in role_change and "To: owner" in role_change
+    assert "by an owner" not in role_change
+    assert "Reason: by an owner" in revoked
+
+
+def test_a_member_who_no_longer_resolves_reads_former_member(h: Harness) -> None:
+    gone = str(uuid4())
+    event(h, "member.removed", workspace_id=home(h), data={"role": "viewer", "user_id": gone})
+    (row,) = planted(admin(h).get("/audit?scope=workspace").text)
+    assert "Former member" in row and gone not in row
+
+
+def test_times_show_seconds(h: Harness) -> None:
+    event(h, "admin.user_activated", ts=BASE + timedelta(seconds=7))
+    (row,) = planted(admin(h).get("/audit?scope=instance&group=accounts").text)
+    assert "2026-09-01 12:00:07 UTC" in row
+
+
+def test_an_unknown_action_still_shows_actor_target_and_network_but_no_details(
+    h: Harness,
+) -> None:
+    add_user(h, "ola@example.com")
+    target = str(h.user("ola@example.com").id)
+    event(
+        h,
+        "something.unknown",
+        actor=admin_id(h),
+        entity=target,
+        data={"reason": "throttled", "sessions_revoked": 3},
+    )
+    (row,) = planted(admin(h).get("/audit?scope=instance").text)
+    assert "Other event" in row
+    assert "Admin" in row and h.web.admin_email in row  # actor
+    assert "ola@example.com" in row  # affected account
+    assert "203.0.113.0/24" in row  # network
+    # The details cell stays empty: no key of an unknown action is rendered.
+    details = re.findall(r'<td class="px-5 py-3 text-xs">(.*?)</td>', row, flags=re.S)
+    assert [cell.strip() for cell in details] == [""]
+    assert "Reason" not in row and "Sessions ended" not in row
+
+
+def test_a_bare_audit_opens_the_scope_the_user_may_see(h: Harness) -> None:
+    owner_and_admin = admin(h)
+    assert "Audit log: workspace" in owner_and_admin.get("/audit").text
+    member(h, "admin2@example.com", "viewer")
+    with h.app.state.session_factory.begin() as session:
+        user = session.get(User, h.user("admin2@example.com").id)
+        assert user is not None
+        user.is_instance_admin = True
+    assert "Audit log: instance" in signed_in(h, "admin2@example.com").get("/audit").text
+    member(h, "viewer@example.com", "viewer")
+    assert signed_in(h, "viewer@example.com").get("/audit").status_code == 403

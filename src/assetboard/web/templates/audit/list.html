@@ -19,11 +19,9 @@
     <label for="audit-to" class="block text-sm font-medium">{{ _("To (UTC)") }}</label>
     <input id="audit-to" name="to" type="date" value="{{ filters.get('to', '') }}" class="rounded-xl border border-line bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
   </div>
-  {% if scope == "instance" %}
-  <div class="space-y-1.5">
-    <label for="audit-user" class="block text-sm font-medium">{{ _("Affected account (email)") }}</label>
-    <input id="audit-user" name="user" type="email" value="{{ filters.get('user', '') }}" class="rounded-xl border border-line bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950">
-  </div>
+  {% if filters.get("account") %}
+  <input type="hidden" name="account" value="{{ filters.account }}">
+  <p class="text-sm" data-audit-account>{{ _("One account only.") }} <a class="text-accent" href="{{ all_accounts_url }}">{{ _("Show all accounts") }}</a></p>
   {% endif %}
   <button type="submit" class="rounded-xl border border-line px-4 py-2 text-sm font-semibold hover:bg-canvas dark:border-slate-700 dark:hover:bg-slate-800">{{ _("Filter") }}</button>
 </form>
@@ -35,7 +33,8 @@
         <th scope="col" class="px-5 py-3">{{ _("Time") }}</th>
         <th scope="col" class="px-5 py-3">{{ _("Event") }}</th>
         <th scope="col" class="px-5 py-3">{{ _("By") }}</th>
-        {% if scope == "instance" %}<th scope="col" class="px-5 py-3">{{ _("Account") }}</th><th scope="col" class="px-5 py-3">{{ _("Network") }}</th>{% endif %}
+        <th scope="col" class="px-5 py-3">{% if scope == "instance" %}{{ _("Account") }}{% else %}{{ _("Member") }}{% endif %}</th>
+        {% if scope == "instance" %}<th scope="col" class="px-5 py-3">{{ _("Network") }}</th>{% endif %}
         <th scope="col" class="px-5 py-3">{{ _("Details") }}</th>
       </tr>
     </thead>
@@ -45,10 +44,8 @@
         <td class="whitespace-nowrap px-5 py-3 text-muted dark:text-slate-400">{{ row.when }}</td>
         <td class="px-5 py-3 font-medium">{{ row.label }}</td>
         <td class="px-5 py-3">{{ row.actor or "–" }}{% if row.actor_email %}<span class="block text-xs text-muted dark:text-slate-400">{{ row.actor_email }}</span>{% endif %}</td>
-        {% if scope == "instance" %}
-        <td class="px-5 py-3">{% if row.target_name %}{{ row.target_name }}<span class="block text-xs text-muted dark:text-slate-400">{{ row.target_email }}</span>{% else %}–{% endif %}</td>
-        <td class="px-5 py-3 font-mono text-xs">{{ row.ip_prefix or "–" }}</td>
-        {% endif %}
+        <td class="px-5 py-3" data-audit-target>{{ row.target or "–" }}{% if row.target_email %}<span class="block text-xs text-muted dark:text-slate-400">{{ row.target_email }}</span>{% endif %}</td>
+        {% if scope == "instance" %}<td class="px-5 py-3 font-mono text-xs">{{ row.ip_prefix or "–" }}</td>{% endif %}
         <td class="px-5 py-3 text-xs">{% for key, value in row.details %}<span class="block">{{ key }}: {{ value }}</span>{% endfor %}</td>
       </tr>
       {% endfor %}

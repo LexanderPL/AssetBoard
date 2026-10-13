@@ -1,7 +1,8 @@
 """The audit log page (F1.5 part C): two scopes, keyset pages, allowlisted data.
 
 * **Workspace scope** (owner of the current workspace): that workspace's events, read through
-  ``AuditEventRepository`` (``workspace_id`` = the current workspace). Actors by display name.
+  ``AuditEventRepository`` (``workspace_id`` = the current workspace). Actors and affected
+  members by display name only ("Former member" when the account no longer resolves).
 * **Instance scope** (instance administrator): events with ``workspace_id IS NULL`` only, read
   through ``InstanceAuditReader``: sign-ins, sign-in failures, linking, account administration.
   An instance administrator never sees a workspace's events here. IP prefixes and the affected
@@ -131,20 +132,15 @@ KEY_LABELS: dict[str, str] = {
     "expires_in_days": _("Valid for days"),
 }
 
-# Codes stored as values, with their texts. A code without a text is shown as the code.
-VALUE_LABELS: dict[str, str] = {
-    # sign-in methods and paths
-    "password": _("password"),
-    "oidc": _("identity provider"),
-    "proxy": _("proxy"),
-    "profile": _("the profile"),
-    "invitation": _("an invitation"),
-    "oidc_invitation": _("an invitation, through the identity provider"),
-    "proxy_invitation": _("an invitation, through the proxy"),
-    "fresh_session": _("a recent sign-in"),
-    "other_devices": _("other devices"),
-    "oidc_group": _("the identity provider's group"),
-    # failure reasons
+# Codes stored as values, with their texts, per kind of key: the same code can mean different
+# things ("owner" as a role, or as who revoked an invitation). A code without a text in its
+# table is shown as the code.
+ROLE_LABELS: dict[str, str] = {
+    "owner": _("owner"),
+    "editor": _("editor"),
+    "viewer": _("viewer"),
+}
+REASON_LABELS: dict[str, str] = {
     "not_instance_admin": _("not an instance administrator"),
     "no_account": _("no account for this sign-in"),
     "account_exists": _("an account with this email address already exists"),
@@ -165,7 +161,20 @@ VALUE_LABELS: dict[str, str] = {
     "headers_invalid": _("the proxy sent an invalid identity header"),
     "failed_email_attempts": _("too many attempts with another email address"),
     "owner": _("by an owner"),
-    # password confirmation purposes
+}
+METHOD_LABELS: dict[str, str] = {
+    "password": _("password"),
+    "oidc": _("identity provider"),
+    "proxy": _("proxy"),
+    "profile": _("the profile"),
+    "invitation": _("an invitation"),
+    "oidc_invitation": _("an invitation, through the identity provider"),
+    "proxy_invitation": _("an invitation, through the proxy"),
+    "fresh_session": _("a recent sign-in"),
+    "other_devices": _("other devices"),
+    "oidc_group": _("the identity provider's group"),
+}
+PURPOSE_LABELS: dict[str, str] = {
     "oidc_link": _("linking an identity provider"),
     "proxy_link": _("linking a proxy sign-in"),
     "profile_link_oidc": _("linking an identity provider"),
@@ -177,15 +186,33 @@ VALUE_LABELS: dict[str, str] = {
     "admin_promote": _("granting the administrator role"),
     "admin_demote": _("removing the administrator role"),
     "admin_create_user": _("creating an account"),
-    # roles and workspace fields
-    "viewer": _("viewer"),
-    "editor": _("editor"),
+}
+FIELD_LABELS: dict[str, str] = {
     "name": _("name"),
     "base_currency": _("currency"),
     "country_code": _("country"),
     "timezone": _("time zone"),
     "locale": _("language"),
 }
+VALUE_TABLES: dict[str, dict[str, str]] = {
+    "role": ROLE_LABELS,
+    "from": ROLE_LABELS,
+    "to": ROLE_LABELS,
+    "reason": REASON_LABELS,
+    "method": METHOD_LABELS,
+    "via": METHOD_LABELS,
+    "confirmed": METHOD_LABELS,
+    "source": METHOD_LABELS,
+    "scope": METHOD_LABELS,
+    "purpose": PURPOSE_LABELS,
+    "fields": FIELD_LABELS,
+}
+
+
+def value_label(key: str, code: str) -> str | None:
+    """The message id for a code under ``key`` (None: show the code itself)."""
+    return VALUE_TABLES.get(key, {}).get(code)
+
 
 # Filters: action groups per scope (explicit action lists, so a group never grows by prefix).
 GROUPS: dict[Scope, dict[str, tuple[str, ...]]] = {
@@ -267,13 +294,22 @@ def parse_day(value: str) -> date | None:
         raise BadAuditRequest("date") from exc
 
 
+def parse_account(value: str) -> UUID | None:
+    if not value:
+        return None
+    try:
+        return UUID(value)
+    except ValueError as exc:
+        raise BadAuditRequest("account") from exc
+
+
 @dataclass(frozen=True, slots=True)
 class AuditQuery:
     scope: Scope
     group: str | None = None
     since: date | None = None  # first day included (UTC)
     until: date | None = None  # last day included (UTC)
-    user_email: str | None = None  # instance scope: the affected user
+    account: UUID | None = None  # instance scope: the affected account
     cursor: AuditCursor | None = None
     limit: int = PAGE_SIZE
 
@@ -286,8 +322,9 @@ class AuditRow:
     actor_name: str | None
     actor_email: str | None  # instance scope only
     actor_kind: str  # "user", "cli", "system"
-    target_name: str | None  # instance scope only
+    target_name: str | None  # the affected account (workspace scope: a member)
     target_email: str | None  # instance scope only
+    target_missing: bool  # an affected user that no longer resolves ("Former member")
     ip_prefix: str | None  # instance scope only
     details: tuple[tuple[str, str | int | bool], ...]  # (key, value), allowlisted
 
@@ -345,19 +382,32 @@ def _as_uuid(value: str | None) -> UUID | None:
         return None
 
 
+def _affected_user(event: AuditEvent, *, instance: bool) -> UUID | None:
+    """The account an event is about, if any.
+
+    Instance events are about ``entity_id`` when it is a user. Workspace member events point at
+    the membership row (gone after a removal); the member is ``data["user_id"]``.
+    """
+    if not instance:
+        member = event.data.get("user_id")
+        if isinstance(member, str):
+            return _as_uuid(member)
+    return _as_uuid(event.entity_id) if event.entity_type == "user" else None
+
+
 def _page(session: Session, query: AuditQuery, events: list[AuditEvent], limit: int) -> AuditPage:
     more = len(events) > limit
     events = events[:limit]
     instance = query.scope == "instance"
     actor_ids = {event.actor_user_id for event in events if event.actor_user_id}
-    target_ids: set[UUID] = set()
-    if instance:
-        target_ids = {uid for event in events if (uid := _as_uuid(event.entity_id)) is not None}
+    target_ids = {
+        uid for event in events if (uid := _affected_user(event, instance=instance)) is not None
+    }
     people = _users(session, actor_ids | target_ids)
     rows: list[AuditRow] = []
     for event in events:
         actor = people.get(event.actor_user_id) if event.actor_user_id else None
-        target_id = _as_uuid(event.entity_id) if instance else None
+        target_id = _affected_user(event, instance=instance)
         target = people.get(target_id) if target_id is not None else None
         rows.append(
             AuditRow(
@@ -368,7 +418,8 @@ def _page(session: Session, query: AuditQuery, events: list[AuditEvent], limit: 
                 actor_email=actor.email if actor and instance else None,
                 actor_kind=event.actor_type,
                 target_name=target.display_name if target else None,
-                target_email=target.email if target else None,
+                target_email=target.email if target and instance else None,
+                target_missing=target_id is not None and target is None,
                 ip_prefix=event.ip_prefix if instance else None,
                 details=_details(event),
             )
@@ -393,14 +444,7 @@ def instance_page(
     limit = max(1, min(query.limit, MAX_PAGE_SIZE))
     with factory() as session:
         require_instance_admin(session, actor_id)
-        entity_id: str | None = None
-        if query.user_email:
-            user = session.scalar(
-                select(User).where(User.email == query.user_email.strip().lower())
-            )
-            if user is None:
-                return AuditPage((), None)
-            entity_id = str(user.id)
+        entity_id = str(query.account) if query.account is not None else None
         events = InstanceAuditReader(session).page(
             _filter(query), limit=limit + 1, entity_id=entity_id
         )

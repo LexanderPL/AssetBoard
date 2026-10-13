@@ -196,34 +196,13 @@ msgstr ""
 msgid "Valid for days"
 msgstr ""
 
-msgid "password"
+msgid "owner"
 msgstr ""
 
-msgid "identity provider"
+msgid "editor"
 msgstr ""
 
-msgid "proxy"
-msgstr ""
-
-msgid "the profile"
-msgstr ""
-
-msgid "an invitation"
-msgstr ""
-
-msgid "an invitation, through the identity provider"
-msgstr ""
-
-msgid "an invitation, through the proxy"
-msgstr ""
-
-msgid "a recent sign-in"
-msgstr ""
-
-msgid "other devices"
-msgstr ""
-
-msgid "the identity provider's group"
+msgid "viewer"
 msgstr ""
 
 msgid "not an instance administrator"
@@ -286,6 +265,36 @@ msgstr ""
 msgid "by an owner"
 msgstr ""
 
+msgid "password"
+msgstr ""
+
+msgid "identity provider"
+msgstr ""
+
+msgid "proxy"
+msgstr ""
+
+msgid "the profile"
+msgstr ""
+
+msgid "an invitation"
+msgstr ""
+
+msgid "an invitation, through the identity provider"
+msgstr ""
+
+msgid "an invitation, through the proxy"
+msgstr ""
+
+msgid "a recent sign-in"
+msgstr ""
+
+msgid "other devices"
+msgstr ""
+
+msgid "the identity provider's group"
+msgstr ""
+
 msgid "linking an identity provider"
 msgstr ""
 
@@ -311,12 +320,6 @@ msgid "removing the administrator role"
 msgstr ""
 
 msgid "creating an account"
-msgstr ""
-
-msgid "viewer"
-msgstr ""
-
-msgid "editor"
 msgstr ""
 
 msgid "name"
@@ -478,6 +481,9 @@ msgid "Command line"
 msgstr ""
 
 msgid "System"
+msgstr ""
+
+msgid "Former member"
 msgstr ""
 
 msgid "yes"
@@ -996,6 +1002,9 @@ msgstr ""
 msgid "Never"
 msgstr ""
 
+msgid "History"
+msgstr ""
+
 msgid "Deactivate"
 msgstr ""
 
@@ -1026,7 +1035,10 @@ msgstr ""
 msgid "To (UTC)"
 msgstr ""
 
-msgid "Affected account (email)"
+msgid "One account only."
+msgstr ""
+
+msgid "Show all accounts"
 msgstr ""
 
 msgid "Filter"
@@ -1039,6 +1051,9 @@ msgid "Event"
 msgstr ""
 
 msgid "By"
+msgstr ""
+
+msgid "Member"
 msgstr ""
 
 msgid "Network"
@@ -1330,5 +1345,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Enter a display name of 1 to 120 characters."
+#~ msgstr ""
+
+#~ msgid "Affected account (email)"
 #~ msgstr ""
 
