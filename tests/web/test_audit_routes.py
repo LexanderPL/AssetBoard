@@ -14,8 +14,6 @@ from sqlalchemy import select
 
 from assetboard.db.models.identity import AuditEvent, ExternalIdentity, Membership, User, Workspace
 from assetboard.services.audit_view import ACTION_LABELS, DATA_KEYS, KEY_LABELS
-from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
-from assetboard.services.workspaces import create_invitation
 from tests.oidc.fake_idp import ISSUER
 from tests.web.test_profile_routes import (
     LOCAL_PASSWORD,
@@ -464,27 +462,20 @@ def test_the_member_column_with_the_real_writers(h: Harness) -> None:
         f"/workspace/members/{memberships[removed]}/remove", data={"csrf_token": token}
     )
     assert gone.status_code in {200, 303}
-    # A real invitation, accepted by a signed-in account.
-    with h.db() as session:
-        workspace = session.get(Workspace, home(h))
-        assert workspace is not None
-        admin_user = h.user(h.web.admin_email)
-        ctx = Context(
-            user=UserRef(admin_user.id, admin_user.email, admin_user.display_name, None, True),
-            workspace=WorkspaceRef(
-                workspace.id,
-                workspace.name,
-                workspace.base_currency,
-                workspace.locale,
-                workspace.timezone,
-                workspace.country_code,
-            ),
-            role=Role.OWNER,
-            clock=h.app.state.clock,
-        )
-    invite = create_invitation(
-        h.app.state.session_factory, ctx, role="viewer", email=None, expires_in_days=7
-    ).token
+    # A real invitation: created by the owner through the members page, accepted by a
+    # signed-in account.
+    created = client.post(
+        "/workspace/invitations",
+        data={
+            "role": "viewer",
+            "email": "",
+            "expires_in_days": "7",
+            "csrf_token": h.token(client, "/workspace/members"),
+        },
+    )
+    link = re.search(r'value="[^"]*/invite/([A-Za-z0-9_-]{43})"', created.text)
+    assert link is not None
+    invite = link.group(1)
     add_user(h, "joiner@example.com")
     joiner = signed_in(h, "joiner@example.com")
     page = joiner.get(f"/invite/{invite}")
