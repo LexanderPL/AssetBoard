@@ -41,3 +41,22 @@ Linking, removing a sign-in method and signing out other devices ask for confirm
   are for starting the link; finishing the sign-in at the provider may take up to 10 more
   minutes. This is weaker than a password: anyone holding your signed-in browser during those
   minutes could make the change.
+
+## Managing accounts (instance administrators)
+
+"Users" in the account menu lists every account with its sign-in methods (password, identity
+provider, proxy), its status and its last sign-in. Each change has its own confirmation page
+and is confirmed like a profile change: your password, or a sign-in from the last 10 minutes
+if your account has none.
+
+- **Deactivate**: the person can no longer sign in, and every session of the account ends at
+  once (password, identity provider and proxy sessions alike). **Activate** undoes it.
+- **Make administrator / Remove administrator**: instance administrators manage every account.
+- You cannot deactivate yourself or remove your own administrator role, and the last active
+  administrator always stays.
+- **Create an account** (not under `ASSETBOARD_OIDC_ONLY`): enter an email and a display name.
+  A temporary password is generated and shown **once**, on the page that confirms the account;
+  it is not stored in readable form, logged or sent anywhere. Give it to the person. At the
+  first sign-in they can only change it (or sign out) until they choose a new password. The
+  new account has no workspace: until a workspace owner invites it, it sees "Your account is
+  not a member of any workspace".
