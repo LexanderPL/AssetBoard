@@ -22,7 +22,7 @@
         <td class="px-5 py-3"><span class="block font-medium">{{ user.display_name }}</span><span class="text-muted dark:text-slate-400">{{ user.email }}</span></td>
         <td class="px-5 py-3">{% for method in user.methods %}{% if not loop.first %}, {% endif %}{% if method == "password" %}{{ _("Password") }}{% elif method == "oidc" %}{{ _("Identity provider") }}{% else %}{{ _("Proxy") }}{% endif %}{% endfor %}</td>
         <td class="px-5 py-3">
-          {% if user.is_active %}{{ _("Active") }}{% else %}{{ _("Deactivated") }}{% endif %}{% if user.is_instance_admin %} · {{ _("Administrator") }}{% endif %}{% if user.must_change_password %} · {{ _("Temporary password") }}{% endif %}
+          {% if user.is_active %}{{ _("Active") }}{% else %}{{ _("Deactivated") }}{% endif %}{% if group_decides_admin and "oidc" in user.methods %} · {% if user.is_instance_admin %}{{ _("Administrator") }}{% else %}{{ _("Not an administrator") }}{% endif %} <span class="text-xs text-muted dark:text-slate-400" data-admin-from-provider>{{ _("(from the identity provider)") }}</span>{% elif user.is_instance_admin %} · {{ _("Administrator") }}{% endif %}{% if user.must_change_password %} · {{ _("Temporary password") }}{% endif %}
         </td>
         <td class="px-5 py-3 text-muted dark:text-slate-400">{{ user.last_login_at.date().isoformat() if user.last_login_at else _("Never") }}</td>
         <td class="px-5 py-3 text-right whitespace-nowrap">

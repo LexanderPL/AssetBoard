@@ -163,6 +163,11 @@ msgstr ""
 msgid "This is the last active administrator, so this would leave none."
 msgstr ""
 
+msgid ""
+"The identity provider decides this at each sign-in; to change it, change "
+"the group there."
+msgstr ""
+
 msgid "Enter a valid email address."
 msgstr ""
 
@@ -660,6 +665,12 @@ msgid "Deactivated"
 msgstr ""
 
 msgid "Administrator"
+msgstr ""
+
+msgid "Not an administrator"
+msgstr ""
+
+msgid "(from the identity provider)"
 msgstr ""
 
 msgid "Temporary password"

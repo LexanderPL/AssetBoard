@@ -183,6 +183,13 @@ msgstr ""
 msgid "This is the last active administrator, so this would leave none."
 msgstr "To ostatni aktywny administrator; po tej zmianie nie zostałby żaden."
 
+msgid ""
+"The identity provider decides this at each sign-in; to change it, change "
+"the group there."
+msgstr ""
+"Decyduje o tym dostawca tożsamości przy każdym logowaniu; aby to zmienić,"
+" zmień tam grupę."
+
 msgid "Enter a valid email address."
 msgstr "Podaj prawidłowy adres e-mail."
 
@@ -739,6 +746,12 @@ msgstr "Dezaktywowane"
 
 msgid "Administrator"
 msgstr "Administrator"
+
+msgid "Not an administrator"
+msgstr "Nie jest administratorem"
+
+msgid "(from the identity provider)"
+msgstr "(od dostawcy tożsamości)"
 
 msgid "Temporary password"
 msgstr "Hasło tymczasowe"

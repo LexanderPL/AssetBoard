@@ -500,3 +500,33 @@ def test_a_full_hash_gate_answers_503_and_creates_nothing(
     assert response.status_code == 503 and response.headers["retry-after"] == "5"
     with h.db() as session:
         assert session.scalars(select(User).where(User.email == "new@example.com")).first() is None
+
+
+# OIDC_ADMIN_GROUP: the provider decides the administrator role at each sign-in
+
+
+@pytest.mark.parametrize("group", [None, "assetboard-admins"])
+def test_promote_and_demote_say_when_the_provider_decides(
+    web: WebHarness, group: str | None
+) -> None:
+    with harness(web, oidc_admin_group=group) as g:
+        add_user(g, OLA)
+        add_identity(g, OLA, ISSUER, "ola-subject")
+        add_user(g, "local@example.com")
+        client = admin(g)
+        target = user_id(g, OLA)
+        notice = "The identity provider decides this at each sign-in"
+        for action in ("promote", "demote"):
+            page = client.get(f"/admin/users/{target}/{action}")
+            assert ("data-group-notice" in page.text) == (group is not None), action
+            done = act(g, client, target, action)
+            assert "Done." in done.text
+            assert (notice in done.text) == (group is not None), action
+        # Deactivation never carries the notice: it does not depend on the group.
+        assert "data-group-notice" not in client.get(f"/admin/users/{target}/deactivate").text
+        assert notice not in act(g, client, target, "deactivate").text
+        listing = client.get("/admin/users").text
+        ola_row = listing.split(f'data-user="{OLA}"')[1].split("</tr>")[0]
+        local_row = listing.split('data-user="local@example.com"')[1].split("</tr>")[0]
+        assert ("(from the identity provider)" in ola_row) == (group is not None)
+        assert "(from the identity provider)" not in local_row  # no OIDC identity

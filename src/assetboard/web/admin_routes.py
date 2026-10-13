@@ -86,6 +86,12 @@ ACTION_RESULTS: dict[str, str] = {
     "self": _("You cannot deactivate your own account or remove your own administrator role."),
     "last_admin": _("This is the last active administrator, so this would leave none."),
 }
+# With OIDC_ADMIN_GROUP set, the provider's group decides the role again at each OIDC sign-in
+# (``oidc_accounts._sync_admin``), so promote and demote never claim a durable result.
+GROUP_DECIDES = _(
+    "The identity provider decides this at each sign-in; to change it, change the group there."
+)
+ROLE_ACTIONS = frozenset({"promote", "demote"})
 CREATE_ERRORS = {
     "email": _("Enter a valid email address."),
     "email_taken": _("An account with this email address already exists."),
@@ -114,6 +120,10 @@ def _require_admin(request: Request) -> WebSession:
     if not current.is_instance_admin:
         raise NotInstanceAdmin
     return current
+
+
+def _group_decides(request: Request, action: str) -> bool:
+    return action in ROLE_ACTIONS and _state(request).settings.oidc_admin_group is not None
 
 
 def _creation_allowed(request: Request) -> None:
@@ -145,6 +155,7 @@ async def _users_page(
         context={
             "users": users,
             "can_create": not state.settings.oidc_only,
+            "group_decides_admin": state.settings.oidc_admin_group is not None,
             "notice": notice,
             "error": error,
         },
@@ -198,6 +209,7 @@ async def _confirm_page(
             "action": action,
             "title": _t(request, ACTION_TITLES[action]),
             "explanation": _t(request, ACTION_EXPLANATIONS[action], user=target.email),
+            "group_notice": _t(request, GROUP_DECIDES) if _group_decides(request, action) else None,
             "target": target,
             "confirm": await confirm_view(request, current),
             "error": error,
@@ -247,6 +259,8 @@ async def action_submit(
     if outcome.value == "not_found":
         raise HTTPException(status_code=404)
     message = _t(request, ACTION_RESULTS[outcome.value])
+    if outcome.value == "done" and _group_decides(request, chosen):
+        message = f"{message} {_t(request, GROUP_DECIDES)}"
     if outcome.value in {"self", "last_admin"}:
         return await _confirm_page(request, current, chosen, target, error=message, status_code=409)
     return await _users_page(request, current, notice=message)

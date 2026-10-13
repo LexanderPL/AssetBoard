@@ -56,7 +56,9 @@ if your account has none.
 - **Make administrator / Remove administrator**: instance administrators manage every account.
   With `ASSETBOARD_OIDC_ADMIN_GROUP` set, the provider's group decides again at each OIDC
   sign-in of that person ([docs/auth/oidc.md](auth/oidc.md#administrators-from-a-group)), so a
-  change made here lasts only until then.
+  change made here lasts only until then; the Users page says so and marks those accounts
+  "(from the identity provider)". Deactivation does not depend on the group: a deactivated
+  account stays deactivated whatever the provider says.
 - You cannot deactivate yourself or remove your own administrator role, and the last active
   administrator always stays.
 - **Create an account** (not under `ASSETBOARD_OIDC_ONLY`): enter an email and a display name.
