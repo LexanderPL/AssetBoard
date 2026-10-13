@@ -68,3 +68,21 @@ if your account has none.
   must differ from the temporary one. An unused temporary password stays valid until it is
   used or the account is deactivated. The new account has no workspace: until a workspace
   owner invites it, it sees "Your account is not a member of any workspace".
+
+## Audit log
+
+The audit log lists who did what and when, newest first, in pages of 50.
+
+- **Workspace** ("Audit log: workspace", for the owner of the current workspace): that
+  workspace's events: setup, member role changes and removals, invitations, settings. Each row
+  shows who acted (display name only).
+- **Instance** ("Audit log: instance", for instance administrators): sign-ins and sign-outs,
+  failed and refused sign-ins, linked and removed sign-in methods, password changes and account
+  administration. Each row also shows the account it is about, the acting account's email and
+  the network (an IPv4 /24 or IPv6 /48 prefix, never the full address). It never shows any
+  workspace's events: those are only in that workspace's log.
+
+Filters: the kind of event, a date range in UTC (both days included) and, in the instance log,
+the affected account's email. Details are shown only for known events and known fields:
+reasons, methods, roles and counts. Identity-provider subjects, tokens and the email addresses a
+provider reported are never recorded, so they never appear.
