@@ -1043,6 +1043,11 @@ def _change_password_flow(
         return PasswordChangeOutcome(status="invalid_current")
 
     try:
+        if new_password == current_password:
+            # Never "changed" to itself; this matters most for a temporary password (F1.5).
+            raise PasswordPolicyError(
+                "password_unchanged", "The new password must differ from the current one"
+            )
         validate_password(new_password, candidate.email, candidate.display_name)
     except PasswordPolicyError as exc:
         run(lambda session: _reset_account(session, candidate.email, clock.now()))

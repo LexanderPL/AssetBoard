@@ -196,6 +196,9 @@ msgstr ""
 msgid "The new passwords do not match."
 msgstr ""
 
+msgid "Choose a new password that differs from the current one."
+msgstr ""
+
 msgid "The current password is not correct."
 msgstr ""
 

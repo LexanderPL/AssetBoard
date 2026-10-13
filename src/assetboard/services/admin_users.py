@@ -50,6 +50,7 @@ AdminAction = Literal["activate", "deactivate", "promote", "demote"]
 ADMIN_ACTIONS: tuple[AdminAction, ...] = ("activate", "deactivate", "promote", "demote")
 ActionStatus = Literal["done", "unchanged", "self", "last_admin", "not_found"]
 TEMPORARY_PASSWORD_BYTES = 12  # token_urlsafe(12): 16 characters, 96 bits
+TEMPORARY_PASSWORD_ATTEMPTS = 20
 
 
 class NotInstanceAdmin(Exception):
@@ -133,6 +134,27 @@ def _other_active_admins(session: Session, user_id: UUID) -> int:
     )
 
 
+def _protection(
+    session: Session, actor: User, target: User, action: AdminAction
+) -> ActionStatus | None:
+    """Self and last-administrator protection, decided in the action's transaction.
+
+    With the actor checked first, the actor is itself another active administrator, so the
+    last-administrator rule cannot trigger through ``apply_admin_action``; it stays as a second
+    line of defence (and is tested on its own).
+    """
+    if target.id == actor.id and action in {"deactivate", "demote"}:
+        return "self"
+    removes_admin = target.is_instance_admin and target.is_active
+    if (
+        action in {"deactivate", "demote"}
+        and removes_admin
+        and not _other_active_admins(session, target.id)
+    ):
+        return "last_admin"
+    return None
+
+
 def apply_admin_action(
     session: Session,
     actor: User,
@@ -149,9 +171,10 @@ def apply_admin_action(
     target = session.get(User, target_id)
     if target is None:
         return "not_found"
-    if target.id == actor.id and action in {"deactivate", "demote"}:
-        return "self"
     _checkpoint("admin_action")
+    refusal = _protection(session, actor, target, action)
+    if refusal is not None:
+        return refusal
     data: dict[str, str | int | bool] = {}
     if action == "activate":
         if target.is_active:
@@ -161,8 +184,6 @@ def apply_admin_action(
     elif action == "deactivate":
         if not target.is_active:
             return "unchanged"
-        if target.is_instance_admin and not _other_active_admins(session, target.id):
-            return "last_admin"
         target.is_active = False
         # Every session ends, password, OIDC and proxy alike; sign-in already refuses
         # inactive accounts on every path.
@@ -176,8 +197,6 @@ def apply_admin_action(
     else:
         if not target.is_instance_admin:
             return "unchanged"
-        if not _other_active_admins(session, target.id):
-            return "last_admin"
         target.is_instance_admin = False
         audit = "admin.admin_revoked"
     record_auth_event(
@@ -194,14 +213,19 @@ def apply_admin_action(
 
 
 def generate_temporary_password(email: str, display_name: str) -> str:
-    """16 random URL-safe characters that pass the password policy (shown once, never kept)."""
-    while True:
+    """16 random URL-safe characters that pass the password policy (shown once, never kept).
+
+    A random 16-character string practically always passes; after ``TEMPORARY_PASSWORD_ATTEMPTS``
+    failures something else is wrong, so this raises instead of looping.
+    """
+    for _attempt in range(TEMPORARY_PASSWORD_ATTEMPTS):
         password = secrets.token_urlsafe(TEMPORARY_PASSWORD_BYTES)
         try:
             validate_password(password, email, display_name)
         except PasswordPolicyError:
             continue
         return password
+    raise RuntimeError("could not generate a temporary password that passes the policy")
 
 
 def record_user_created(

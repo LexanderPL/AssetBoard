@@ -51,12 +51,18 @@ if your account has none.
 
 - **Deactivate**: the person can no longer sign in, and every session of the account ends at
   once (password, identity provider and proxy sessions alike). **Activate** undoes it.
+  Deactivating the only owner of a workspace leaves that workspace without an active owner
+  until the account is activated again.
 - **Make administrator / Remove administrator**: instance administrators manage every account.
+  With `ASSETBOARD_OIDC_ADMIN_GROUP` set, the provider's group decides again at each OIDC
+  sign-in of that person ([docs/auth/oidc.md](auth/oidc.md#administrators-from-a-group)), so a
+  change made here lasts only until then.
 - You cannot deactivate yourself or remove your own administrator role, and the last active
   administrator always stays.
 - **Create an account** (not under `ASSETBOARD_OIDC_ONLY`): enter an email and a display name.
   A temporary password is generated and shown **once**, on the page that confirms the account;
   it is not stored in readable form, logged or sent anywhere. Give it to the person. At the
-  first sign-in they can only change it (or sign out) until they choose a new password. The
-  new account has no workspace: until a workspace owner invites it, it sees "Your account is
-  not a member of any workspace".
+  first sign-in they can only change it (or sign out) until they choose a new password, which
+  must differ from the temporary one. An unused temporary password stays valid until it is
+  used or the account is deactivated. The new account has no workspace: until a workspace
+  owner invites it, it sees "Your account is not a member of any workspace".

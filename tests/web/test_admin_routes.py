@@ -22,6 +22,7 @@ from assetboard.db.models.identity import (
     Workspace,
 )
 from assetboard.services.external_identity import PROXY_PROVIDER
+from assetboard.services.hash_gate import HashGateBusy
 from assetboard.web import confirm
 from tests.oidc.fake_idp import ISSUER
 from tests.web.test_profile_routes import (
@@ -428,3 +429,74 @@ def test_the_temporary_password_rule_applies_to_password_sessions_only(h: Harnes
     client = h.client()
     h.proxy_sign_in(client, OLA_PROXY)  # a proxy session for the same account
     assert client.get("/account", headers=OLA_PROXY, follow_redirects=False).status_code == 200
+
+
+def test_a_temporary_password_cannot_be_changed_to_itself(h: Harness) -> None:
+    client, password = signed_in_with_temporary_password(h)
+    page = client.get("/account/password")
+    response = client.post(
+        "/account/password",
+        data={
+            "csrf_token": h.web.csrf(page.text),
+            "current_password": password,
+            "new_password": password,
+            "confirm_password": password,
+        },
+    )
+    assert response.status_code == 400
+    assert "differs from the current one" in response.text
+    assert h.user("new@example.com").must_change_password
+    assert client.get("/", follow_redirects=False).headers["location"] == "/account/password"
+
+
+def test_the_temporary_password_is_hashed_through_the_hash_gate(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = admin(h)
+    gate = h.app.state.hash_gate
+    real_run = gate.run
+    calls: list[str] = []
+
+    async def counting(operation: Any) -> Any:
+        calls.append("hash")
+        return await real_run(operation)
+
+    monkeypatch.setattr(gate, "run", counting)
+    token = h.token(client, "/admin/users/new")
+    calls.clear()  # the page load above verified nothing
+    response = client.post(
+        "/admin/users/new",
+        data={
+            "csrf_token": token,
+            "email": "new@example.com",
+            "display_name": "New",
+            "confirm_password": h.web.admin_password,
+        },
+    )
+    assert response.status_code == 200
+    # One hash for the new account, one verification of the administrator's password.
+    assert len(calls) == 2
+
+
+def test_a_full_hash_gate_answers_503_and_creates_nothing(
+    h: Harness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    client = admin(h)
+    token = h.token(client, "/admin/users/new")
+
+    async def busy(_operation: Any) -> Any:
+        raise HashGateBusy
+
+    monkeypatch.setattr(h.app.state.hash_gate, "run", busy)
+    response = client.post(
+        "/admin/users/new",
+        data={
+            "csrf_token": token,
+            "email": "new@example.com",
+            "display_name": "New",
+            "confirm_password": h.web.admin_password,
+        },
+    )
+    assert response.status_code == 503 and response.headers["retry-after"] == "5"
+    with h.db() as session:
+        assert session.scalars(select(User).where(User.email == "new@example.com")).first() is None

@@ -216,6 +216,9 @@ msgstr "Token konfiguracji jest nieprawidłowy."
 msgid "The new passwords do not match."
 msgstr "Nowe hasła nie są takie same."
 
+msgid "Choose a new password that differs from the current one."
+msgstr "Wybierz nowe hasło, inne niż obecne."
+
 msgid "The current password is not correct."
 msgstr "Obecne hasło jest nieprawidłowe."
 

@@ -314,7 +314,8 @@ async def new_user_submit(
 
     # Generated and hashed outside the write transaction; shown once below, kept nowhere.
     password = generate_temporary_password(clean_email, clean_name)
-    password_hash = await run_in_threadpool(argon2_hash, password)
+    # Through the hash gate like every other hash (a full gate is the usual 503).
+    password_hash = await state.hash_gate.run(lambda: argon2_hash(password))
 
     def create(session: Session, actor: User, _method: ConfirmMethod) -> str:
         if not actor.is_active or not actor.is_instance_admin:

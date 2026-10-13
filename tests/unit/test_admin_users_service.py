@@ -19,7 +19,7 @@ from assetboard.services.admin_users import (
     apply_admin_action,
     generate_temporary_password,
 )
-from assetboard.services.auth import validate_password
+from assetboard.services.auth import PasswordPolicyError, validate_password
 from tests.tenant.serialize import serialize_at_checkpoint
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
@@ -134,3 +134,32 @@ def test_temporary_passwords_pass_the_policy_and_differ() -> None:
     for password in passwords:
         assert len(password) >= 16
         validate_password(password, "new@example.com", "New")
+
+
+def test_temporary_password_generation_gives_up_after_twenty_attempts(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    attempts: list[str] = []
+
+    def always_refuse(password: str, _email: str, _name: str) -> None:
+        attempts.append(password)
+        raise PasswordPolicyError("password_too_common", "refused")
+
+    monkeypatch.setattr(admin_users, "validate_password", always_refuse)
+    with pytest.raises(RuntimeError, match="temporary password"):
+        generate_temporary_password("new@example.com", "New")
+    assert len(attempts) == 20
+
+
+@pytest.mark.parametrize("action", ["deactivate", "demote"])
+def test_the_last_administrator_guard_on_its_own(db: WorkspaceDb, action: Any) -> None:
+    # The guard behind apply_admin_action's actor check: an actor that is no longer an active
+    # administrator (for example demoted meanwhile) must still not remove the last one.
+    former = add_user(db, "former@example.com", admin=False)
+    last = add_user(db, "last@example.com", admin=True)
+    with db.factory() as session:
+        actor, target = session.get(User, former), session.get(User, last)
+        assert actor is not None and target is not None
+        assert admin_users._protection(session, actor, target, action) == "last_admin"
+        assert admin_users._protection(session, target, target, action) == "self"
+        assert admin_users._protection(session, actor, target, "promote") is None
