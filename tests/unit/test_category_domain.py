@@ -126,3 +126,22 @@ def test_seed_set_matches_the_spec() -> None:
     for seed in SEED:
         assert clean_color(seed.color) == seed.color
         assert clean_name(seed.name) == seed.name
+
+
+def test_a_name_whose_key_would_not_fit_its_column_is_refused() -> None:
+    # U+FDFA is one character that NFKC expands to 18: 80 of them would make a 1440-character key.
+    with pytest.raises(InvalidCategoryName):
+        clean_name("ﷺ" * MAX_CATEGORY_NAME_LENGTH)
+    fits = "ﷺ" * (MAX_NAME_KEY_LENGTH // 18)
+    assert len(name_key(clean_name(fits))) <= MAX_NAME_KEY_LENGTH
+
+
+@pytest.mark.parametrize("name", ["👨‍👩‍👧", "❤️ Charity", "Hobbies 🏳️‍🌈"])
+def test_emoji_joiners_are_allowed(name: str) -> None:
+    assert clean_name(name) == name
+
+
+@pytest.mark.parametrize("name", ["a​b", "a⁠b", "‮evil", "a‌b"])
+def test_other_format_characters_are_still_refused(name: str) -> None:
+    with pytest.raises(InvalidCategoryName):
+        clean_name(name)

@@ -19,8 +19,10 @@ Each category has a **kind** and a **treatment**:
 
 Names are unique per kind among active categories, ignoring upper and lower case (also for
 letters such as "Ż" and "ż"): you can have an expense "Other" and an income "Other", but not two
-active expense categories "Food" and "FOOD". Names have 1 to 80 characters. Each category also
-has a colour.
+active expense categories "Food" and "FOOD". Names have 1 to 80 characters, without control or
+invisible characters; emoji, including joined ones such as "👨‍👩‍👧", are fine. A few
+characters expand a lot when names are compared (for example "ﷺ"), so a name made of many of
+them can be refused. Each category also has a colour.
 
 ## Suggested categories
 
