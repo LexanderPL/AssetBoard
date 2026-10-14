@@ -2,7 +2,9 @@
 
 Your money is tracked month by month. Open "Month" in the main navigation: it shows the current
 month. Every month has its own address, such as `/m/2026-10` for October 2026, so you can
-bookmark a month or share its link with other members of the workspace.
+bookmark it. The address names only the month, not the workspace: whoever opens the link sees
+that month in the workspace they currently have selected. A member who belongs only to your
+workspace sees your month; a member of several workspaces may need to switch first.
 
 "The current month" is the month of today's date in the workspace's time zone (Workspace
 settings → Time zone). Just after midnight on the 1st, the new month begins at that time in that
@@ -30,5 +32,7 @@ When a month is done, close it so nothing in it changes by accident:
   Every member sees it, viewers included.
 - **Reopen month** is offered to owners only. After reopening, the month's entries and planned
   values can change again.
+- If someone else closed or reopened the month in the meantime (another tab, a double click),
+  the page says the month was already closed, or is already open, and nothing changes.
 
 Closing and reopening are recorded in the workspace audit log under "Closing months".

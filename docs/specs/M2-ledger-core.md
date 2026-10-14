@@ -149,11 +149,14 @@ Property tests: totals equal the sum of rows; transfers never appear; difference
   server also accepts `2026/10`, `10.2026`, `10/2026`; an invalid value redirects back with an
   error. F2.2-F2.4 fill the `month_body` block of `templates/months/page.html`.
 - "Today" is `ctx.clock.today(ctx.workspace.timezone)`: the workspace time zone setting (there is
-  no per-user time zone). Month names come from Babel's CLDR data (`i18n.dates.format_month`).
+  no per-user time zone). Month names come from Babel's CLDR data: `i18n.dates.format_month`
+  keeps CLDR's case for running text ("listopad 2026"); `format_month_heading` capitalises the
+  first letter for the page heading and title only.
 - `domain.months.YearMonth`: parse/format, prev/next, first/last day, bounds.
 - `MonthState` rows are created on the first close. Reopening clears `closed_at` and
   `closed_by_user_id` and keeps the row; rows are never deleted. Closing a closed month or
-  reopening an open one changes nothing and records nothing.
+  reopening an open one changes nothing and records nothing; the page then says "already
+  closed" / "already open".
 - **Product decisions (owner, 2026-10-14):** a closed month is read-only for **everyone, owners
   included** (an owner reopens it explicitly, audited); only the **current and past** months can
   be closed (`MonthInFuture`, judged in the workspace time zone; the Close button is hidden on
