@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.2.1](https://github.com/LexanderPL/AssetBoard/compare/v0.2.0...v0.2.1) (2026-10-14)
+
+
+### Features
+
+* **auth:** lower the minimum password length to 8 ([#107](https://github.com/LexanderPL/AssetBoard/issues/107)) ([d83de3d](https://github.com/LexanderPL/AssetBoard/commit/d83de3d9d69a33cbd66b1a198a8e47adf901f198))
+* **db:** log one line when startup migrations apply ([#104](https://github.com/LexanderPL/AssetBoard/issues/104)) ([1b3407c](https://github.com/LexanderPL/AssetBoard/commit/1b3407cd2802c309f5e790a99135759e131cd73d))
+* **ledger:** add categories with inline edit, reorder, archive and seed set (F2.1) ([#108](https://github.com/LexanderPL/AssetBoard/issues/108)) ([166b010](https://github.com/LexanderPL/AssetBoard/commit/166b010ba6f3be7ac27cc9e01d3c695644498606))
+* **ledger:** add month pages with navigation, closing and the closed-month guard (F2.5) ([#109](https://github.com/LexanderPL/AssetBoard/issues/109)) ([403ff2d](https://github.com/LexanderPL/AssetBoard/commit/403ff2d96014409abf0a05a29c0d5109110bc39a))
+
+
+### Documentation
+
+* write up the post-1.0 backlog and reword the published-image intro ([#105](https://github.com/LexanderPL/AssetBoard/issues/105)) ([d7413f4](https://github.com/LexanderPL/AssetBoard/commit/d7413f440022f4f43a4ff123a5465662dd8d1c07))
+
 ## [0.2.0](https://github.com/LexanderPL/AssetBoard/compare/v0.1.0...v0.2.0) (2026-10-14)
 
 
