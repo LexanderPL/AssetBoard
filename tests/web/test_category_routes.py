@@ -278,3 +278,19 @@ def test_category_events_appear_in_the_audit_log_translated(owner: OwnerApp) -> 
     owner.client.headers["Accept-Language"] = "pl"
     page = owner.client.get("/audit?scope=workspace&group=categories").text
     assert "Dodano kategorię" in page and "Poprzednie traktowanie: zwykłe" in page
+
+
+def test_the_page_never_opens_an_edit_form_for_an_archived_category(owner: OwnerApp) -> None:
+    food = _create(owner, "Food")
+    owner.post(f"/categories/{food}/archive", token_from="/categories")
+    page = owner.client.get(f"/categories?edit={food}")
+    assert page.status_code == 200
+    assert "data-editing" not in page.text and "data-restore" in page.text
+
+
+def test_an_unknown_move_direction_is_400(owner: OwnerApp) -> None:
+    _create(owner, "A")
+    b = _create(owner, "B")
+    response = owner.post(f"/categories/{b}/move", {"direction": "left"}, token_from="/categories")
+    assert response.status_code == 400
+    assert _names(owner.client.get("/categories").text, "expense") == ["A", "B"]

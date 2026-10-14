@@ -161,8 +161,10 @@ def _done(request: Request, ctx: Context, notice: str) -> Response:
     )
 
 
-def _failed(request: Request, ctx: Context, exc: CategoryError) -> Response:
-    return _render(request, ctx, status_code=409, error=ERRORS.get(exc.code, FALLBACK_ERROR))
+def _failed(request: Request, ctx: Context, exc: CategoryError, status_code: int = 409) -> Response:
+    return _render(
+        request, ctx, status_code=status_code, error=ERRORS.get(exc.code, FALLBACK_ERROR)
+    )
 
 
 @router.get("/categories", name="categories")
@@ -176,7 +178,10 @@ async def categories_page(
         category = await run_in_threadpool(
             get_category, request.app.state.session_factory, ctx, editing
         )
-        values = _values(category)
+        if category.archived:  # archived categories are restored, not edited
+            editing = None
+        else:
+            values = _values(category)
     return await run_in_threadpool(
         lambda: _render(request, ctx, notice=notice or None, editing=editing, edit_values=values)
     )
@@ -302,11 +307,10 @@ async def category_move(
     target = _parse_uuid(category_id)
     factory = request.app.state.session_factory
     try:
-        await run_in_threadpool(
-            lambda: move_category(factory, ctx, target, "up" if direction == "up" else "down")
-        )
+        await run_in_threadpool(lambda: move_category(factory, ctx, target, direction))
     except CategoryError as exc:
-        return await run_in_threadpool(_failed, request, ctx, exc)
+        status_code = 400 if exc.code == "invalid_direction" else 409
+        return await run_in_threadpool(_failed, request, ctx, exc, status_code)
     if is_htmx_fragment_request(request):
         return await run_in_threadpool(lambda: _render(request, ctx))
     return RedirectResponse(request.url_for("categories").path, status_code=303)

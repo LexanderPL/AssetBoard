@@ -124,6 +124,7 @@ class CategoryList:
 
 
 DeleteOutcome = Literal["deleted", "archived"]
+DIRECTIONS: frozenset[str] = frozenset({"up", "down"})
 
 
 def usage_by_category(
@@ -369,12 +370,13 @@ def update_category(
 
 
 def move_category(
-    factory: sessionmaker[Session], ctx: Context, category_id: UUID, direction: Direction
+    factory: sessionmaker[Session], ctx: Context, category_id: UUID, direction: str
 ) -> None:
     """Swap an active category with its neighbour in its kind's list (not audited)."""
     require_role(ctx, Role.EDITOR)
-    if direction not in ("up", "down"):
+    if direction not in DIRECTIONS:
         raise InvalidCategory("direction", "invalid_direction")
+    step: Direction = "up" if direction == "up" else "down"
 
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.EDITOR)
@@ -383,7 +385,7 @@ def move_category(
         if category.archived_at is not None:
             raise CategoryArchived
         siblings = _active(repository.ordered(category.kind))
-        for position, sibling in enumerate(move(siblings, category, direction)):
+        for position, sibling in enumerate(move(siblings, category, step)):
             if sibling.sort_order != position:
                 sibling.sort_order = position
         session.flush()
@@ -391,14 +393,21 @@ def move_category(
     run_immediate(factory, write)
 
 
-def archive_category(factory: sessionmaker[Session], ctx: Context, category_id: UUID) -> None:
+def archive_category(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    category_id: UUID,
+    *,
+    usage_sources: Iterable[UsageSource] | None = None,
+) -> None:
     require_role(ctx, Role.EDITOR)
 
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.EDITOR)
         category = CategoryRepository(session, ctx).get_or_raise(category_id)
         if category.archived_at is None:
-            _archive(session, ctx, category, in_use=False)
+            used = usage_by_category(session, ctx, usage_sources).get(category.id)
+            _archive(session, ctx, category, in_use=used is not None and used.references > 0)
 
     run_immediate(factory, write)
 
@@ -491,4 +500,8 @@ def seed_categories(factory: sessionmaker[Session], ctx: Context, *, locale: str
         )
         return len(SEED)
 
-    return _write(factory, write)
+    try:
+        return run_immediate(factory, write)
+    except IntegrityError as exc:
+        # A concurrent seed (PostgreSQL does not queue writers at BEGIN) won the race.
+        raise AlreadySeeded from exc

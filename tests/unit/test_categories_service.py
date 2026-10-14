@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 
 from assetboard.clock import FixedClock
 from assetboard.db.models.identity import AuditEvent
-from assetboard.db.repositories import NotFound
+from assetboard.db.repositories import CategoryRepository, NotFound
 from assetboard.domain.categories import SEED, Kind, Treatment
 from assetboard.services import categories as service
 from assetboard.services.categories import (
@@ -502,3 +502,41 @@ def test_the_role_is_checked_before_any_database_work(
     with pytest.raises(PermissionDenied) as caught:
         WRITES[write](team, team.ctx("vic", "viewer"), uuid4())
     assert caught.value.required is Role.EDITOR
+
+
+# Review follow-ups
+
+
+def test_archive_records_whether_the_category_is_in_use(team: WorkspaceDb) -> None:
+    used, unused = _create(team, "Used"), _create(team, "Unused")
+    ctx = team.ctx("ed", "editor")
+    archive_category(team.factory, ctx, used.id, usage_sources=_used(used.id))
+    archive_category(team.factory, ctx, unused.id, usage_sources=_used(used.id))
+    archived = {e.data["name"]: e.data["in_use"] for e in _events(team, "category.archived")}
+    assert archived == {"Used": True, "Unused": False}
+
+
+@pytest.mark.parametrize("direction", ["", "left", "UP", "sideways"])
+def test_move_refuses_unknown_directions(team: WorkspaceDb, direction: str) -> None:
+    food = _create(team, "Food")
+    with pytest.raises(InvalidCategory) as caught:
+        move_category(team.factory, team.ctx("ed", "editor"), food.id, direction)
+    assert caught.value.code == "invalid_direction"
+
+
+def test_a_concurrent_seed_that_loses_the_race_reads_as_already_seeded(
+    team: WorkspaceDb, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Another seed committed "Food" after this one counted zero categories.
+    _create(team, "Food")
+    monkeypatch.setattr(CategoryRepository, "count", lambda _self: 0)
+    with pytest.raises(AlreadySeeded):
+        seed_categories(team.factory, team.ctx("ed", "editor"), locale="en")
+    monkeypatch.undo()
+    assert _names(team) == ["Food"]
+    assert _events(team, "category.seeded") == []
+
+
+def test_emoji_names_with_joiners_are_accepted(team: WorkspaceDb) -> None:
+    family = _create(team, "👨‍👩‍👧")
+    assert family.name == "👨‍👩‍👧"
