@@ -25,8 +25,15 @@ def _locale(locale: str) -> str:
 
 
 def format_month(month: YearMonth, locale: str) -> str:
-    """The month and year as a heading: "October 2026", "Październik 2026"."""
-    text = format_skeleton("yMMMM", month.first_day, locale=_locale(locale))
+    """The month and year as CLDR writes them in running text: "October 2026",
+    "październik 2026"."""
+    return format_skeleton("yMMMM", month.first_day, locale=_locale(locale))
+
+
+def format_month_heading(month: YearMonth, locale: str) -> str:
+    """``format_month`` with a capital first letter, for a heading or page title only:
+    "Październik 2026"."""
+    text = format_month(month, locale)
     return text[:1].upper() + text[1:]
 
 

@@ -18,7 +18,7 @@ from starlette.responses import RedirectResponse, Response
 from assetboard.db.repositories import NotFound
 from assetboard.domain.months import InvalidMonth, YearMonth
 from assetboard.i18n import gettext
-from assetboard.i18n.dates import format_day, format_month
+from assetboard.i18n.dates import format_day, format_month, format_month_heading
 from assetboard.services.months import (
     MonthError,
     close_month,
@@ -52,6 +52,8 @@ ERRORS = {
 NOTICES = {
     "closed": _("Month closed."),
     "reopened": _("Month reopened."),
+    "already_closed": _("This month was already closed."),
+    "already_open": _("This month is already open."),
 }
 
 
@@ -106,7 +108,8 @@ async def month_page(
         closed_on = format_day(local, locale)
     context: dict[str, object] = {
         "view": view,
-        "month_name": format_month(view.month, locale),
+        "month_heading": format_month_heading(view.month, locale),  # heading and title
+        "month_name": format_month(view.month, locale),  # in sentences (confirmations)
         "prev_name": format_month(view.prev, locale) if view.prev else None,
         "next_name": format_month(view.next, locale) if view.next else None,
         "closed_on": closed_on,
@@ -120,14 +123,18 @@ async def month_page(
 async def month_close(request: Request, ctx: CurrentContext, month: str) -> Response:
     target = _parse(month)
     try:
-        await run_in_threadpool(close_month, request.app.state.session_factory, ctx, target)
+        changed = await run_in_threadpool(
+            close_month, request.app.state.session_factory, ctx, target
+        )
     except MonthError as exc:
         return RedirectResponse(_month_path(request, target, f"error={exc.code}"), status_code=303)
-    return RedirectResponse(_month_path(request, target, "notice=closed"), status_code=303)
+    notice = "closed" if changed else "already_closed"  # a no-op says so instead
+    return RedirectResponse(_month_path(request, target, f"notice={notice}"), status_code=303)
 
 
 @router.post("/m/{month}/reopen", name="month_reopen")
 async def month_reopen(request: Request, ctx: CurrentContext, month: str) -> Response:
     target = _parse(month)
-    await run_in_threadpool(reopen_month, request.app.state.session_factory, ctx, target)
-    return RedirectResponse(_month_path(request, target, "notice=reopened"), status_code=303)
+    changed = await run_in_threadpool(reopen_month, request.app.state.session_factory, ctx, target)
+    notice = "reopened" if changed else "already_open"  # a no-op says so instead
+    return RedirectResponse(_month_path(request, target, f"notice={notice}"), status_code=303)

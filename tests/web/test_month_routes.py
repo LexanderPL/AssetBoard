@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import select
 
 from assetboard.clock import FixedClock
-from assetboard.db.models.identity import AuditEvent
+from assetboard.db.models.identity import AuditEvent, User
 from assetboard.services.months import MonthClosed
 from tests.conftest import OwnerApp
 
@@ -112,8 +112,27 @@ def test_empty_and_future_months_render(months: OwnerApp) -> None:
 def test_the_month_name_follows_the_language(months: OwnerApp) -> None:
     months.client.headers["Accept-Language"] = "pl"
     page = _page(months, "/m/2026-10")
-    assert "Październik 2026" in page and "Dzisiaj" in page
-    assert 'aria-label="Następny miesiąc: Listopad 2026"' in page
+    # Capitalised only as a heading and title; CLDR's lowercase form in running text.
+    heading = re.search(r"<h1[^>]*>\s*([^<]+?)\s*<", page)
+    assert heading is not None and heading.group(1) == "Październik 2026"
+    assert "<title>Październik 2026 · " in page and "Dzisiaj" in page
+    assert 'aria-label="Następny miesiąc: listopad 2026"' in page
+    assert 'aria-label="Poprzedni miesiąc: wrzesień 2026"' in page
+    assert 'data-confirm="Zamknąć miesiąc październik 2026? ' in page
+    assert 'placeholder="RRRR-MM"' in page
+    _close(months, "2026-10")
+    assert 'data-confirm="Otworzyć ponownie miesiąc październik 2026? ' in _page(
+        months, "/m/2026-10"
+    )
+    months.client.headers["Accept-Language"] = "en"
+    assert 'placeholder="YYYY-MM"' in _page(months, "/m/2026-09")
+
+
+def test_the_nav_month_link_needs_a_workspace_page(months: OwnerApp) -> None:
+    """Like "Categories": pages without a workspace Context (account pages) do not show it."""
+    account = _page(months, "/account")
+    assert "data-month-link" not in account and "data-categories-link" not in account
+    assert "data-month-link" in _page(months, "/")
 
 
 def test_the_nav_month_link_points_to_the_current_month(months: OwnerApp) -> None:
@@ -191,6 +210,52 @@ def test_an_owner_closes_and_reopens_a_month(months: OwnerApp) -> None:
             .order_by(AuditEvent.ts)
         ).all()
     assert actions == ["month.closed", "month.reopened"]
+
+
+def test_a_no_op_close_or_reopen_says_so(months: OwnerApp) -> None:
+    response = months.post("/m/2026-10/reopen", token_from="/m/2026-10")  # never closed
+    assert response.headers["location"] == "/m/2026-10?notice=already_open"
+    page = _page(months, "/m/2026-10?notice=already_open")
+    assert "This month is already open." in page and "Month reopened." not in page
+    _close(months, "2026-10")
+    response = _close(months, "2026-10")  # a second tab, a double click
+    assert response.headers["location"] == "/m/2026-10?notice=already_closed"  # type: ignore[attr-defined]
+    page = _page(months, "/m/2026-10?notice=already_closed")
+    assert "This month was already closed." in page and "Month closed." not in page
+    with months.db() as session:
+        actions = session.scalars(
+            select(AuditEvent.action).where(AuditEvent.action.startswith("month."))
+        ).all()
+    assert actions == ["month.closed"]
+
+
+def test_closed_on_is_the_date_in_the_workspace_time_zone(months: OwnerApp) -> None:
+    token = months.token("/workspace/settings")
+    form = {"name": "Home", "base_currency": "EUR", "country_code": "", "timezone": "Europe/Warsaw"}
+    assert (
+        months.client.post(
+            "/workspace/settings", data=form | {"locale": "en", "csrf_token": token}
+        ).status_code
+        == 200
+    )
+    # 23:30 UTC on 30 September is 01:30 on 1 October in Warsaw (a past instant: see the fixture).
+    months.app.state.clock = FixedClock("2026-09-30T23:30:00+00:00")
+    assert _close(months, "2026-09").status_code == 303  # type: ignore[attr-defined]
+    page = _page(months, "/m/2026-09")
+    assert "Closed on Oct 1, 2026 by Admin." in page and "Sep 30, 2026" not in page
+
+
+def test_the_closers_name_is_escaped_in_the_banner(months: OwnerApp) -> None:
+    with months.db() as session, session.begin():
+        admin = session.get(User, months.admin_id)
+        assert admin is not None
+        admin.display_name = '<b onmouseover="x()">Ann & Co</b>'
+    _close(months, "2026-09")
+    page = _page(months, "/m/2026-09")
+    banner = re.search(r"data-closed-banner>.*?</section>", page, re.S)
+    assert banner is not None
+    assert "<b onmouseover" not in banner.group(0) and 'onmouseover="' not in banner.group(0)
+    assert "&lt;b onmouseover=&#34;x()&#34;&gt;Ann &amp; Co&lt;/b&gt;" in banner.group(0)
 
 
 def test_close_and_reopen_ask_for_confirmation(months: OwnerApp) -> None:

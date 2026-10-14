@@ -907,6 +907,12 @@ msgstr "Miesiąc zamknięty."
 msgid "Month reopened."
 msgstr "Miesiąc otwarty ponownie."
 
+msgid "This month was already closed."
+msgstr "Ten miesiąc był już zamknięty."
+
+msgid "This month is already open."
+msgstr "Ten miesiąc jest już otwarty."
+
 msgid ""
 "This sign-in expired, or another sign-in was started in a different tab. "
 "Start over."
@@ -1649,6 +1655,9 @@ msgstr "Dzisiaj"
 
 msgid "Go to month"
 msgstr "Przejdź do miesiąca"
+
+msgid "YYYY-MM"
+msgstr "RRRR-MM"
 
 msgid "Go"
 msgstr "Przejdź"
