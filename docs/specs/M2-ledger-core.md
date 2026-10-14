@@ -59,10 +59,13 @@ Tests: service rules (kind change blocked when used), role checks, tenant isolat
 - Direction must match category kind (an income category cannot be used in the expense table).
 - Closed months are read-only (F2.5). Viewers see no entry row.
 - Writes create `AuditEvent`s.
-- **Closed-month guard (from F2.5).** Every transaction write calls
-  `services.months.ensure_date_open` (or `ensure_month_open`) inside its write transaction, after
-  `require_role_now` and before any change: create; edit (the old date's month **and** the new
-  date's month when the date moves); soft delete; undo. Map `MonthClosed` to the closed-month
+- **Closed-month guard (from F2.5).** Every transaction write, inside its write transaction and
+  after `require_role_now`, first calls `services.months.lock_month_writes(session, ctx)`
+  **before reading any row whose date it checks**, then `ensure_date_open` (or
+  `ensure_month_open`) for every month it touches, before any change: create (the new date);
+  edit (the stored row's old date **and** the new date when the date moves); soft delete and undo
+  (the stored date). Reading the old date before taking the lock would let a concurrent move and
+  close both pass on PostgreSQL. Map `MonthClosed` to the closed-month
   message (`web.month_routes.MONTH_CLOSED_MESSAGE`); the app-wide handler answers 409 otherwise.
   Fill the month page through `templates/months/page.html`'s `month_body` block and hide the
   entry rows when `view.closed`.
@@ -160,10 +163,11 @@ Property tests: totals equal the sum of rows; transfers never appear; difference
   `require_role_now` inside their `BEGIN IMMEDIATE` transaction.
 - Guard: `services.months.ensure_month_open(session, ctx, month)` /
   `ensure_date_open(session, ctx, day)` raise `MonthClosed`; see F2.2 and F2.3 for the call
-  sites. Concurrency: on SQLite all writes are serialised by `BEGIN IMMEDIATE`. On PostgreSQL the
-  guard takes `FOR SHARE` on the workspace row and close/reopen take `FOR UPDATE`
-  (`CurrentWorkspaceRepository.lock`), always before any other row, so a close waits for writes
-  in flight and later writes see the month closed.
+  sites (F2.2, F2.3, F2.6). Concurrency: on SQLite all writes are serialised by `BEGIN IMMEDIATE`.
+  On PostgreSQL the guard takes `FOR SHARE` on the workspace row (`lock_month_writes`) and
+  close/reopen take `FOR UPDATE` (`CurrentWorkspaceRepository.lock`), always before any other
+  row, so a close waits for writes in flight and later writes see the month closed. A write that
+  reads stored rows to find its months calls `lock_month_writes` before those reads.
 - Audit: `month.closed`, `month.reopened` (data `month`: `YYYY-MM`; entity: the MonthState row),
   group "Closing months" in the workspace audit log.
 
@@ -182,6 +186,11 @@ read-only enforcement in the service layer (not only the UI). Tests for enforcem
 - `/transactions` list across all months: filters (date range, direction, categories, text in description, amount range), sorting, pagination (50/page).
 - Export the filtered result as CSV (UTF-8 with BOM option for Excel, delimiter and decimal-separator options); amounts as plain decimals.
 - Editors can bulk-recategorize the filtered/selected rows (with confirmation and audit event).
+- **Closed-month guard (from F2.5).** Bulk recategorize takes
+  `services.months.lock_month_writes` before reading the selected rows, then refuses the **whole
+  operation** if any selected row lies in a closed month, and the error lists those months. No
+  row changes in that case. (F2.1's treatment change still applies to every month, closed ones
+  included: it changes the category, not the transactions.)
 
 **Agent prompt**
 ```

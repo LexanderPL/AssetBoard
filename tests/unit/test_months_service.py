@@ -33,6 +33,7 @@ from assetboard.services.months import (
     ensure_date_open,
     ensure_month_open,
     get_month,
+    lock_month_writes,
     reopen_month,
 )
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
@@ -398,6 +399,23 @@ def _locks(team: WorkspaceDb, operation: Callable[[], Any]) -> list[str]:
     finally:
         event.remove(Session, "do_orm_execute", record)
     return seen
+
+
+def test_lock_month_writes_takes_the_share_lock_and_can_be_taken_again(
+    team: WorkspaceDb,
+) -> None:
+    """The lock a write takes before reading the rows whose months it then checks (F2.2 edits)."""
+    editor = team.ctx("ed", "editor")
+
+    def twice_then_guard(session: Session) -> None:
+        lock_month_writes(session, editor)
+        lock_month_writes(session, editor)  # harmless in the same transaction
+        ensure_month_open(session, editor, OCTOBER)  # takes it a third time
+
+    statements = _locks(team, lambda: run_immediate(team.factory, twice_then_guard))
+    locks = [s for s in statements if "FROM workspaces" in s]
+    assert len(locks) == 3 and all(s.rstrip().endswith("FOR SHARE") for s in locks)
+    assert statements.index(locks[0]) == 0  # nothing is read before the first lock
 
 
 def test_the_workspace_row_is_locked_before_month_states_are_read(team: WorkspaceDb) -> None:

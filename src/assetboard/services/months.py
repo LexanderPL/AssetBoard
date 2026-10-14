@@ -10,7 +10,9 @@ and records nothing.
 
 **The guard.** Every write to a month's data (F2.2 transactions, F2.3 budget lines, ...) calls
 ``ensure_month_open`` (or ``ensure_date_open``) inside its own write transaction, after
-``require_role_now`` and before changing anything. It raises ``MonthClosed``.
+``require_role_now`` and before changing anything. It raises ``MonthClosed``. A write that reads
+a stored row to learn its month (editing a transaction reads the old date) calls
+``lock_month_writes`` before that read.
 
 **Concurrency.** On SQLite every write runs under ``BEGIN IMMEDIATE``, so writers are serialised
 and the guard sees every committed close. PostgreSQL does not queue writers at ``BEGIN``, so
@@ -99,13 +101,26 @@ def current_month(ctx: Context) -> YearMonth:
 # The guard (called by other services inside their write transactions)
 
 
+def lock_month_writes(session: Session, ctx: Context) -> None:
+    """Take the shared workspace lock that orders month writes against close and reopen.
+
+    A write whose month depends on a stored row (editing a transaction reads its old date) calls
+    this **before reading that row**, then ``ensure_month_open`` for the old and the new month.
+    Otherwise, on PostgreSQL, a concurrent move and close could both pass. Taking the lock again
+    in the same transaction (as ``ensure_month_open`` does) is harmless. On SQLite the
+    transaction's ``BEGIN IMMEDIATE`` already serialises writers.
+    """
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=False)
+
+
 def ensure_month_open(session: Session, ctx: Context, month: YearMonth) -> None:
     """Raise ``MonthClosed`` if ``month`` is closed in the current workspace.
 
     Call inside the write transaction (``run_immediate``), after ``require_role_now`` and before
-    any change. Takes the shared workspace lock (see the module docstring).
+    any change. Takes the shared workspace lock (``lock_month_writes``) first; a write that reads
+    rows to find its months must take that lock before those reads.
     """
-    CurrentWorkspaceRepository(session, ctx).lock(exclusive=False)
+    lock_month_writes(session, ctx)
     state = MonthStateRepository(session, ctx).for_month(month)
     if state is not None and state.closed_at is not None:
         raise MonthClosed(month)

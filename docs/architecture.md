@@ -87,9 +87,12 @@ A write to a month's data (transactions, planned values) calls
 its write transaction, right after `require_role_now` and before changing anything; it raises
 `MonthClosed` for a closed month (the app answers 409 if a route does not handle it). Writers are
 serialised on SQLite by `BEGIN IMMEDIATE`. PostgreSQL does not queue writers at `BEGIN`, so the
-guard takes a shared lock on the workspace row and closing or reopening takes an exclusive one
-(`CurrentWorkspaceRepository.lock`). **Lock order:** the workspace row first, before any other
-row, in every transaction that takes it.
+guard takes a shared lock on the workspace row (`services.months.lock_month_writes`) and closing
+or reopening takes an exclusive one (`CurrentWorkspaceRepository.lock`). **Lock order:** the
+workspace row first, before any other row, in every transaction that takes it. A write that
+reads stored rows to learn which months it touches (editing a transaction reads its old date;
+bulk changes read the selected rows) calls `lock_month_writes` **before** those reads, then the
+guard for every month; taking the lock again is harmless.
 
 ## How to add a new workspace-owned model
 
