@@ -202,6 +202,12 @@ when you intend to upload the image and its release tags.
 
 ## Upgrading
 
+### Unreleased: categories (F2.1)
+
+- **Categories page** at "Categories" in the main navigation; see
+  [docs/categories.md](categories.md). The migration adds the `categories` table and changes no
+  existing data. No new setting.
+
 ### Upgrading from 0.1.0 to 0.2.0
 
 - **`ASSETBOARD_TRUSTED_PROXIES` empty now trusts no proxy.** 0.1.0 trusted forwarded headers
