@@ -208,6 +208,11 @@ when you intend to upload the image and its release tags.
   [docs/categories.md](categories.md). The migration adds the `categories` table and changes no
   existing data. No new setting.
 
+### Minimum password length 8
+
+- **Passwords need at least 8 characters**, down from 10. Existing passwords keep working; the
+  rule applies when a password is set or changed. Common passwords are still refused.
+
 ### Upgrading from 0.1.0 to 0.2.0
 
 - **`ASSETBOARD_TRUSTED_PROXIES` empty now trusts no proxy.** 0.1.0 trusted forwarded headers
