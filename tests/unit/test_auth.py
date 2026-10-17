@@ -392,11 +392,20 @@ def test_unknown_email_and_wrong_password_are_indistinguishable(
     db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
 ) -> None:
     _create_user(db_session, auth_settings, fixed_clock)
-    outcomes: list[LoginOutcome] = []
+    free = auth_settings.auth_account_free_failures
+    outcomes: dict[str, list[LoginOutcome]] = {}
     for email in ("test@example.com", "unknown@example.com"):
-        for _ in range(auth_settings.auth_account_free_failures + 2):
-            outcomes.append(_login(db_session, auth_settings, fixed_clock, email=email))
-    assert outcomes == [LoginOutcome()] * len(outcomes)
+        outcomes[email] = [
+            _login(db_session, auth_settings, fixed_clock, email=email) for _ in range(free + 3)
+        ]
+    # The same sequence for both: free + 1 plain failures (the last one sets the block), then
+    # throttled attempts with the same wait. Throttling is reported, the account never is.
+    assert outcomes["test@example.com"] == outcomes["unknown@example.com"]
+    blocked_until = fixed_clock.now() + timedelta(seconds=auth_settings.auth_throttle_base_seconds)
+    assert (
+        outcomes["unknown@example.com"]
+        == [LoginOutcome()] * (free + 1) + [LoginOutcome(throttled_until=blocked_until)] * 2
+    )
     known = _throttle(db_session, "account", "test@example.com")
     unknown = _throttle(db_session, "account", "unknown@example.com")
     assert known is not None and unknown is not None
@@ -433,6 +442,58 @@ def test_unknown_user_and_user_without_password_go_through_dummy_verify(
     assert len(calls) == 3
     assert all(encoded.startswith("$argon2id$") for encoded in calls)
     assert calls[0] == calls[2] != calls[1]
+
+
+def test_throttled_attempts_are_never_verified_for_known_or_unknown_emails(
+    db_session: Session,
+    auth_settings: Settings,
+    fixed_clock: FixedClock,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user = _create_user(db_session, auth_settings, fixed_clock)
+    calls: dict[str, int] = {}
+    real_verify = auth.verify_password
+    current = {"email": ""}
+
+    def counting_verify(encoded: str, password: str) -> bool:
+        calls[current["email"]] = calls.get(current["email"], 0) + 1
+        return real_verify(encoded, password)
+
+    monkeypatch.setattr(auth, "verify_password", counting_verify)
+    free = auth_settings.auth_account_free_failures
+    for email in (user.email, "unknown@example.com"):
+        current["email"] = email
+        for index in range(free + 4):
+            # Distinct addresses: only the account bucket is involved.
+            _login(db_session, auth_settings, fixed_clock, email=email, host=f"192.0.2.{index}")
+    # The same timing path for both: free + 1 verifications (dummy for the unknown email),
+    # then fast refusals that verify nothing.
+    assert calls == {user.email: free + 1, "unknown@example.com": free + 1}
+
+
+def test_throttled_until_is_the_longest_wait_of_the_blocked_buckets(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    # The address bucket: the 21st failure (at 20 s) blocks it until 80 s.
+    for index in range(auth_settings.auth_ip_free_failures + 1):
+        _login(db_session, auth_settings, at(seconds=index), email=f"spray-{index}@example.com")
+    ip_row = _throttle(db_session, "ip", "192.0.2.10/32")
+    assert ip_row is not None and ip_row.blocked_until == at(seconds=80).now()
+    # An account bucket, from elsewhere: blocked at 30 s until 90 s.
+    for _ in range(auth_settings.auth_account_free_failures + 1):
+        _login(db_session, auth_settings, at(seconds=30), email="x@example.com", host="192.0.2.99")
+    both = _login(db_session, auth_settings, at(seconds=40), email="x@example.com")
+    assert both == LoginOutcome(throttled_until=at(seconds=90).now())
+    address_only = _login(db_session, auth_settings, at(seconds=40), email="y@example.com")
+    assert address_only == LoginOutcome(throttled_until=at(seconds=80).now())
+
+
+def test_oversized_credentials_are_a_plain_failure_without_throttle_details(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    outcome = _login(db_session, auth_settings, fixed_clock, password="x" * 5000)
+    assert outcome == LoginOutcome()
+    assert db_session.scalars(select(AuthThrottle)).all() == []
 
 
 def test_account_backoff_is_exponential_capped_and_configurable(
@@ -1252,7 +1313,7 @@ def test_blocked_login_attempts_with_distinct_emails_add_no_rows(
         outcome = _login(
             db_session, auth_settings, fixed_clock, email=f"blocked-{index}@example.com"
         )
-        assert outcome == LoginOutcome()
+        assert outcome == LoginOutcome(throttled_until=ip_row.blocked_until)
     db_session.flush()
     rows_after = db_session.scalars(select(AuthThrottle)).all()
     assert [(r.key_type, r.key_hash, r.failure_count, r.updated_at) for r in rows_after] == snapshot

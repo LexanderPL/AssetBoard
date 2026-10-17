@@ -261,11 +261,17 @@ def test_parallel_login_burst_verifies_at_most_free_plus_one_per_account(
     _run_threads(20, attempt)
     # Reservations are serialised, so exactly free + 1 requests get to verify a password.
     assert overlap.verifications == settings.auth_account_free_failures + 1
-    assert outcomes == [LoginOutcome()] * 20
     account = _throttle(factory, "account", "admin@example.com")
     assert account is not None
     assert account.failure_count == overlap.verifications
     assert account.blocked_until is not None
+    # Verified attempts fail plainly; only the attempts the block refused say so.
+    verified = [o for o in outcomes if o.throttled_until is None]
+    assert verified == [LoginOutcome()] * overlap.verifications
+    throttled = [o for o in outcomes if o.throttled_until is not None]
+    assert throttled == [LoginOutcome(throttled_until=account.blocked_until)] * (
+        20 - overlap.verifications
+    )
 
 
 def test_parallel_login_burst_verifies_at_most_free_plus_one_per_ip(
@@ -292,9 +298,16 @@ def test_parallel_login_burst_verifies_at_most_free_plus_one_per_ip(
 
     _run_threads(30, attempt)
     assert overlap.verifications == settings.auth_ip_free_failures + 1
-    assert outcomes == [LoginOutcome()] * 30
     ip_row = _throttle(factory, "ip", "198.51.100.7/32")
     assert ip_row is not None and ip_row.failure_count == overlap.verifications
+    assert [o for o in outcomes if o.throttled_until is None] == [
+        LoginOutcome()
+    ] * overlap.verifications
+    assert all(
+        o == LoginOutcome(throttled_until=ip_row.blocked_until)
+        for o in outcomes
+        if o.throttled_until is not None
+    )
 
 
 def test_parallel_wrong_current_passwords_verify_at_most_free_plus_one(
@@ -361,7 +374,10 @@ def test_blocked_requests_never_take_the_write_lock(database: Connect, settings:
         clock=CLOCK,
     )
 
-    assert login == LoginOutcome() and change.status == "throttled"
+    account = _throttle(factory, "account", "admin@example.com")
+    assert account is not None and account.blocked_until is not None
+    assert login == LoginOutcome(throttled_until=account.blocked_until)
+    assert change.status == "throttled" and change.throttled_until == account.blocked_until
     assert "BEGIN" in statements
     assert "BEGIN IMMEDIATE" not in statements
     assert not any(

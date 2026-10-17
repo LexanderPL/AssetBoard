@@ -109,7 +109,9 @@ def test_change_password_is_throttled(signed_in: TestClient, web: WebHarness) ->
     for _ in range(6):
         _change(signed_in, web, "wrong current", NEW_PASSWORD)
     throttled = _change(signed_in, web, web.admin_password, NEW_PASSWORD)
-    assert throttled.status_code == 429 and "Too many attempts" in throttled.text
+    assert throttled.status_code == 429
+    assert "Too many attempts. Try again in 1 minute." in throttled.text
+    assert throttled.headers["retry-after"] == "60"
 
 
 def test_no_password_session_id_or_csrf_token_is_logged(

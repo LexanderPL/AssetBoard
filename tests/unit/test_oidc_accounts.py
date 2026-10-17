@@ -287,11 +287,14 @@ def test_a_wrong_password_is_counted_like_a_failed_login(db: WorkspaceDb, tmp_pa
     assert identities(db) == []
     assert len(events(db, "auth.password_confirm_failure")) == 6
     assert events(db, "auth.password_confirm_failure")[0] == {"purpose": "oidc_link"}
-    # The account bucket is the login one: the right password is now throttled too.
-    assert do_link(db, settings, pending).status == "failed"
+    # The account bucket is the login one: the right password is now throttled too, and the
+    # outcome says until when (the page already names the account, so this discloses nothing).
+    throttled = do_link(db, settings, pending)
+    assert throttled.status == "throttled"
     with db.factory() as session:
-        counts = {row.key_type: row.failure_count for row in session.scalars(select(AuthThrottle))}
-    assert counts["account"] == 6
+        rows = {row.key_type: row for row in session.scalars(select(AuthThrottle))}
+    assert rows["account"].failure_count == 6
+    assert throttled.throttled_until == rows["account"].blocked_until is not None
     assert identities(db) == [] and sessions(db, user_id) == []
 
 

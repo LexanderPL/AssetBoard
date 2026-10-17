@@ -165,11 +165,25 @@ class RegistrationDisabled(AuthError):
 
 
 @dataclass(frozen=True, slots=True)
+class Throttled:
+    """An attempt refused, unverified, because a throttle bucket blocks until ``until``."""
+
+    until: datetime
+
+
+@dataclass(frozen=True, slots=True)
 class LoginOutcome:
-    """A failed login never says why: unknown email, wrong password and throttling look alike."""
+    """A failed login never says whether the account exists.
+
+    Unknown email and wrong password look alike. ``throttled_until`` is set only when the
+    attempt was refused by a blocked bucket; the account bucket is keyed by the normalized
+    email and counted the same way whether or not an account has it, so this does not reveal
+    accounts either (ADR-0012, amendment 2026-10-17).
+    """
 
     user: User | None = None
     session_id: str | None = None
+    throttled_until: datetime | None = None
 
     @property
     def succeeded(self) -> bool:
@@ -186,6 +200,7 @@ class PasswordChangeOutcome:
     status: PasswordChangeStatus
     revoked_sessions: int = 0
     error: AuthError | None = None
+    throttled_until: datetime | None = None
 
 
 RegistrationStatus = Literal[
@@ -393,6 +408,21 @@ def _current_count(row: AuthThrottle | None, now: datetime, window: timedelta | 
 
 def _is_blocked(row: AuthThrottle | None, now: datetime) -> bool:
     return row is not None and row.blocked_until is not None and row.blocked_until > now
+
+
+def _blocked_until(
+    session: Session, keys: Sequence[tuple[ThrottleScope, str]], now: datetime
+) -> datetime | None:
+    """The latest time any of these buckets blocks until, or ``None`` if none is blocked.
+
+    Read-only, like ``_find_throttle``. The longest wait is the one that matters.
+    """
+    until: datetime | None = None
+    for scope, key in keys:
+        row = _find_throttle(session, scope, key)
+        if row is not None and row.blocked_until is not None and row.blocked_until > now:
+            until = row.blocked_until if until is None else max(until, row.blocked_until)
+    return until
 
 
 def _get_or_create_throttle(
@@ -644,11 +674,14 @@ def _login_flow(
         ),
     )
 
-    def reserve(session: Session) -> _LoginCandidate | None:
+    keys: list[tuple[ThrottleScope, str]] = [(slot.scope, slot.key) for slot in slots]
+
+    def reserve(session: Session) -> _LoginCandidate | Throttled:
         # Blocked attempts are answered from read-only lookups and write nothing.
-        reserved = reserve_attempts(session, slots, clock.now(), settings)
+        now = clock.now()
+        reserved = reserve_attempts(session, slots, now, settings)
         if reserved is None:
-            return None
+            return Throttled(_blocked_until(session, keys, now) or now)
         user = session.scalar(select(User).where(User.email == lookup))
         return _LoginCandidate(
             reserved,
@@ -657,17 +690,18 @@ def _login_flow(
             bool(user and user.is_instance_admin),
         )
 
-    def blocked(session: Session) -> bool:
-        now = clock.now()
-        return any(_is_blocked(_find_throttle(session, s.scope, s.key), now) for s in slots)
+    def blocked(session: Session) -> datetime | None:
+        return _blocked_until(session, keys, clock.now())
 
     # A deferred read first, so a flood of blocked requests never takes the write lock;
-    # ``reserve`` checks again under the lock.
-    if run.read(blocked):
-        return LoginOutcome()
+    # ``reserve`` checks again under the lock. Neither looks at the user: a blocked attempt
+    # is answered the same way whether or not the account exists.
+    until = run.read(blocked)
+    if until is not None:
+        return LoginOutcome(throttled_until=until)
     candidate = run(reserve)
-    if candidate is None:
-        return LoginOutcome()
+    if isinstance(candidate, Throttled):
+        return LoginOutcome(throttled_until=candidate.until)
     rehashed: str | None = None
     try:
         check = verify or verify_password
@@ -996,23 +1030,25 @@ def _change_password_flow(
         email: str
         display_name: str
 
-    def reserve(session: Session) -> Candidate | None:
+    def reserve(session: Session) -> Candidate | Throttled:
         user = session.get(User, user_id)
         if user is None:
             raise UnknownUser
         slot = ThrottleSlot("account", user.email, None, settings.auth_account_free_failures)
-        reserved = reserve_attempts(session, (slot,), clock.now(), settings)
+        now = clock.now()
+        reserved = reserve_attempts(session, (slot,), now, settings)
         if reserved is None:
-            return None
+            return Throttled(_blocked_until(session, [("account", user.email)], now) or now)
         return Candidate(reserved, user.password_hash, user.email, user.display_name)
 
-    def blocked(session: Session) -> bool | None:
+    def blocked(session: Session) -> Throttled | bool | None:
         user = session.get(User, user_id)
         if user is None:
             raise UnknownUser
         if user.password_hash is None:
             return None
-        return _is_blocked(_find_throttle(session, "account", user.email), clock.now())
+        until = _blocked_until(session, [("account", user.email)], clock.now())
+        return Throttled(until) if until is not None else False
 
     # Deferred read first; ``reserve`` checks again under the write lock.
     is_blocked = run.read(blocked)
@@ -1020,11 +1056,11 @@ def _change_password_flow(
         # A user without a password (OIDC, F1.3) has nothing to change: no attempt is counted.
         # Setting a first password is the CLI's ``reset-password`` (F1.5 adds a page).
         return PasswordChangeOutcome(status="no_password")
-    if is_blocked:
-        return PasswordChangeOutcome(status="throttled")
+    if isinstance(is_blocked, Throttled):
+        return PasswordChangeOutcome(status="throttled", throttled_until=is_blocked.until)
     candidate = run(reserve)
-    if candidate is None:
-        return PasswordChangeOutcome(status="throttled")
+    if isinstance(candidate, Throttled):
+        return PasswordChangeOutcome(status="throttled", throttled_until=candidate.until)
 
     def release(session: Session) -> None:
         release_attempts(session, candidate.reserved)
@@ -1969,7 +2005,7 @@ def _confirm_password_flow[T](
     user_agent: str | None,
     verify: Verifier | None,
     on_success: Callable[[Session, User], T],
-) -> T | None:
+) -> T | Throttled | None:
     if len(password) > MAX_PASSWORD_LENGTH:
         return None
 
@@ -1984,31 +2020,37 @@ def _confirm_password_flow[T](
             ),
         )
 
-    def blocked(session: Session) -> bool:
+    def keys(email: str) -> list[tuple[ThrottleScope, str]]:
+        return [(slot.scope, slot.key) for slot in slots(email)]
+
+    def blocked(session: Session) -> Throttled | bool:
         user = session.get(User, user_id)
         if user is None:
             return True
-        now = clock.now()
-        return any(
-            _is_blocked(_find_throttle(session, slot.scope, slot.key), now)
-            for slot in slots(user.email)
-        )
+        until = _blocked_until(session, keys(user.email), clock.now())
+        return Throttled(until) if until is not None else False
 
-    def reserve(session: Session) -> _ConfirmCandidate | None:
+    def reserve(session: Session) -> _ConfirmCandidate | Throttled | None:
         user = session.get(User, user_id)
         if user is None:
             return None
-        reserved = reserve_attempts(session, slots(user.email), clock.now(), settings)
+        now = clock.now()
+        reserved = reserve_attempts(session, slots(user.email), now, settings)
         if reserved is None:
-            return None
+            return Throttled(_blocked_until(session, keys(user.email), now) or now)
         return _ConfirmCandidate(reserved, user.email, user.password_hash)
 
-    # As for login: a deferred read first, then the reservation under the write lock.
-    if run.read(blocked):
+    # As for login: a deferred read first, then the reservation under the write lock. The
+    # account is already known here (a signed-in user, or one the identity provider named),
+    # so saying that it is throttled discloses nothing.
+    is_blocked = run.read(blocked)
+    if isinstance(is_blocked, Throttled):
+        return is_blocked
+    if is_blocked:
         return None
     candidate = run(reserve)
-    if candidate is None:
-        return None
+    if candidate is None or isinstance(candidate, Throttled):
+        return candidate
     try:
         # A user without a password costs the same dummy verify and fails like a wrong one.
         verified = (verify or verify_password)(candidate.password_hash or _dummy_hash(), password)
@@ -2059,13 +2101,14 @@ def confirm_password_with_factory[T](
     host: str | None = None,
     user_agent: str | None = None,
     verify: Verifier | None = None,
-) -> T | None:
+) -> T | Throttled | None:
     """Re-check a known user's password, then run ``on_success`` in the same transaction.
 
-    Used to link an OIDC identity to an account that has a password (F1.3) and meant for F1.5's
+    Used to link an OIDC identity to an account that has a password (F1.3) and for F1.5's
     sensitive profile actions. It shares login's throttle (the user's account bucket and the
-    client address) and its dummy verify. Every failure is the same ``None``: wrong password,
-    no password, inactive user, throttled, or a password changed meanwhile.
+    client address) and its dummy verify. A refused attempt returns ``Throttled``; every other
+    failure is the same ``None``: wrong password, no password, inactive user, or a password
+    changed meanwhile.
     """
     return _confirm_password_flow(
         ImmediateTransactions(factory),
@@ -2093,7 +2136,7 @@ async def confirm_password_async[T](
     on_success: Callable[[Session, User], T],
     host: str | None = None,
     user_agent: str | None = None,
-) -> T | None:
+) -> T | Throttled | None:
     """Web entry point: verifies through the hashing limit (``HashGateBusy`` when saturated)."""
     verify = gate_verifier(gate)
     return await anyio.to_thread.run_sync(
