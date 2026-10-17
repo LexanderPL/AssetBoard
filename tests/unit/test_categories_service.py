@@ -37,6 +37,7 @@ from assetboard.services.categories import (
     usage_by_category,
 )
 from assetboard.services.context import Context, PermissionDenied, Role
+from assetboard.services.transactions import category_usage as transaction_usage
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 
@@ -266,6 +267,7 @@ def test_treatment_change_is_allowed_when_in_use_and_records_affected_count(
         "previous_treatment": "regular",
         "treatment": "savings",
         "affected_transactions": 7,
+        "closed_months_affected": 0,
     }
 
 
@@ -361,7 +363,7 @@ def test_usage_sources_are_summed_and_shown(team: WorkspaceDb) -> None:
     assert totals == {food.id: CategoryUsage(references=5, active_transactions=1)}
     listed = list_categories(team.factory, team.ctx("vic", "viewer"), usage_sources=sources)
     assert listed.expense[0].in_use and listed.expense[0].references == 5
-    assert service.USAGE_SOURCES == []  # F2.1 registers none
+    assert [transaction_usage] == service.USAGE_SOURCES  # F2.2 transactions
 
 
 # Seed
