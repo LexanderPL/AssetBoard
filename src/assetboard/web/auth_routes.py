@@ -638,9 +638,12 @@ async def _password_page(
     request: Request,
     *,
     errors: dict[str, str] | None = None,
+    translated_errors: dict[str, str] | None = None,
     notice: str | None = None,
     status_code: int = 200,
 ) -> Response:
+    """``errors`` holds message keys (translated here); ``translated_errors`` and ``notice`` are
+    already in the request's language (for example a message with the throttle wait)."""
     current = _require_session(request)
     has_password = await run_in_threadpool(
         user_has_password, _state(request).session_factory, current.user_id
@@ -649,7 +652,10 @@ async def _password_page(
         request,
         "auth/password.html",
         context={
-            "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
+            "errors": {
+                **{field: _t(request, message) for field, message in (errors or {}).items()},
+                **(translated_errors or {}),
+            },
             "notice": notice,
             "no_password": None if has_password else _t(request, NO_PASSWORD),
             "confirm": await confirm_view(request, current),
@@ -712,7 +718,7 @@ async def password_submit(
         now = state.clock.now()
         response = await _password_page(
             request,
-            errors={
+            translated_errors={
                 "current_password": throttled_message(
                     outcome.throttled_until, now, request.state.locale
                 )
@@ -769,7 +775,9 @@ async def logout_others(request: Request, confirm_password: FormStr = "") -> Res
             )
         else:
             response = await _password_page(
-                request, errors={"confirm": refused.message}, status_code=refused.status_code
+                request,
+                translated_errors={"confirm": refused.message},
+                status_code=refused.status_code,
             )
         if refused.retry_after is not None:
             response.headers["Retry-After"] = refused.retry_after
