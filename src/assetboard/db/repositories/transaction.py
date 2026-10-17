@@ -153,7 +153,7 @@ class TransactionRepository(ScopedRepository[Transaction]):
         return list(self._session.scalars(statement))
 
     def description_details(self, *, direction: str, keys: Sequence[str]) -> list[DescriptionMatch]:
-        """For each of ``keys``: every (spelling, category) pair with its use count and last date."""
+        """For each of ``keys``: every (spelling, category) pair, its use count and last date."""
         if not keys:
             return []
         statement = (
