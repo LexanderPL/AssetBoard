@@ -521,9 +521,11 @@ def test_transaction_queries_stay_in_their_workspace(
     assert in_b.counts_by_category() == {}
     assert in_a.active_months_by_category() == {food_a.id: frozenset({october})}
     assert in_b.active_months_by_category() == {}
-    assert [m.description for m in in_a.description_matches(
-        direction="expense", key_prefix="li", limit=10)] == ["Lidl"]  # fmt: skip
-    assert in_b.description_matches(direction="expense", key_prefix="li", limit=10) == []
+    assert in_a.description_keys(direction="expense", key_prefix="li", limit=10) == ["lidl"]
+    assert in_b.description_keys(direction="expense", key_prefix="li", limit=10) == []
+    assert [m.description for m in in_a.description_details(
+        direction="expense", keys=["lidl"])] == ["Lidl"]  # fmt: skip
+    assert in_b.description_details(direction="expense", keys=["lidl"]) == []
     b_row = make(in_b, food_b.id, "Lidl")
     assert b_row.workspace_id == ctx_b.workspace.id
     assert [r.id for r in in_b.for_month(october)] == [b_row.id]

@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import Integer, case, cast, exists, extract, func, select
+from sqlalchemy import ColumnElement, Integer, case, cast, exists, extract, func, select
 
 from assetboard.db.models.ledger import Transaction
 from assetboard.db.repositories.base import ScopedRepository
@@ -124,32 +125,47 @@ class TransactionRepository(ScopedRepository[Transaction]):
         statement = select(exists().where(Transaction.workspace_id == self._workspace_id))
         return bool(self._session.execute(statement).scalar_one())
 
-    def description_matches(
-        self, *, direction: str, key_prefix: str, limit: int
-    ) -> list[DescriptionMatch]:
-        """Non-deleted rows of ``direction`` whose description key starts with ``key_prefix``.
+    def _described(self, direction: str) -> tuple[ColumnElement[bool], ...]:
+        return (
+            Transaction.workspace_id == self._workspace_id,
+            Transaction.deleted_at.is_(None),
+            Transaction.direction == direction,
+        )
 
-        Grouped by (key, spelling, category), most used first; ``%`` and ``_`` are literal.
+    def description_keys(self, *, direction: str, key_prefix: str, limit: int) -> list[str]:
+        """Description keys of non-deleted ``direction`` rows starting with ``key_prefix``.
+
+        Ranked in SQL over all matching rows: most used first, then most recently dated, then
+        the key. ``%`` and ``_`` in the prefix are literal. The caller passes a non-empty prefix.
         """
-        uses = func.count().label("uses")
+        uses = func.count()
+        last = func.max(Transaction.date)
+        statement = (
+            select(Transaction.description_key)
+            .where(
+                *self._described(direction),
+                Transaction.description_key.startswith(key_prefix, autoescape=True),
+            )
+            .group_by(Transaction.description_key)
+            .order_by(uses.desc(), last.desc(), Transaction.description_key)
+            .limit(limit)
+        )
+        return list(self._session.scalars(statement))
+
+    def description_details(self, *, direction: str, keys: Sequence[str]) -> list[DescriptionMatch]:
+        """For each of ``keys``: every (spelling, category) pair with its use count and last date."""
+        if not keys:
+            return []
         statement = (
             select(
                 Transaction.description_key,
                 Transaction.description,
                 Transaction.category_id,
-                uses,
+                func.count(),
                 func.max(Transaction.date),
             )
-            .where(
-                Transaction.workspace_id == self._workspace_id,
-                Transaction.deleted_at.is_(None),
-                Transaction.direction == direction,
-                Transaction.description_key != "",
-                Transaction.description_key.startswith(key_prefix, autoescape=True),
-            )
+            .where(*self._described(direction), Transaction.description_key.in_(list(keys)))
             .group_by(Transaction.description_key, Transaction.description, Transaction.category_id)
-            .order_by(uses.desc(), Transaction.description_key, Transaction.category_id)
-            .limit(limit)
         )
         return [
             DescriptionMatch(key, description, category_id, int(count), last)

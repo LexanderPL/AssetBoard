@@ -583,9 +583,7 @@ def test_category_writes_lock_the_workspace_before_reading_categories_or_usage(
     food = _create(team, "Food")
     if write == "restore":
         archive_category(team.factory, team.ctx("ed", "editor"), food.id)
-    statements = _statements(
-        lambda: LOCKING_WRITES[write](team, team.ctx("ed", "editor"), food.id)
-    )
+    statements = _statements(lambda: LOCKING_WRITES[write](team, team.ctx("ed", "editor"), food.id))
     lock = next(i for i, s in enumerate(statements) if "FROM workspaces" in s)
     assert statements[lock].rstrip().endswith("FOR UPDATE")
     reads = [

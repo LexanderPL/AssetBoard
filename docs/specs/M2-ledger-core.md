@@ -108,7 +108,8 @@ Tests: service rules (kind change blocked when used), role checks, tenant isolat
   and the row stays deleted (the window is checked first).
 - Autocomplete: prefix match on `description_key` (NFKC + Unicode casefold, so "ż" finds
   "Żabka"; `%` and `_` are literal), per direction, non-deleted rows only, at most 8
-  suggestions, most used first (ties: most recently dated). The shown spelling is the most used
+  suggestions. Keys are ranked in SQL over every matching row (most used, then most recently
+  dated, then the key); the spellings and categories are then read for those keys only. The shown spelling is the most used
   one; the suggested category is the most used **active** category (ties: most recently dated,
   then category order), or none.
 - Audit: `transaction.created`, `.updated`, `.deleted`, `.restored` with `date`, `direction`,

@@ -708,6 +708,25 @@ def test_the_suggested_category_is_the_most_frequent_active_one(team: WorkspaceD
     ]
 
 
+def test_keys_are_ranked_over_all_rows_not_a_cut_of_grouped_rows(team: WorkspaceDb) -> None:
+    """A key used often with many spellings and categories still ranks first.
+
+    "Shop" is used 4 times, but as 4 different (spelling, category) pairs used once each;
+    "Shoes" twice as one pair. Ranking a capped list of grouped pairs (the first version)
+    would have put "Shoes" first; keys are now ranked in SQL over every row.
+    """
+    a, b = _category(team, "A"), _category(team, "B")
+    for spelling, category in (("Shop", a), ("SHOP", a), ("Shop", b), ("shop", b)):
+        _add(team, category, description=spelling, day="1")
+    for _ in range(2):
+        _add(team, a, description="Shoes", day="20")
+    viewer = team.ctx("vic", "viewer")
+    found = suggest_descriptions(team.factory, viewer, direction="expense", prefix="sho", limit=1)
+    assert found == [Suggestion("Shop", a)]  # spelling: 2 uses; category: tie, A first in order
+    found = suggest_descriptions(team.factory, viewer, direction="expense", prefix="sho")
+    assert [s.description for s in found] == ["Shop", "Shoes"]
+
+
 def test_like_wildcards_in_the_prefix_are_literal(team: WorkspaceDb) -> None:
     food = _category(team, "Food")
     _add(team, food, description="50% off")

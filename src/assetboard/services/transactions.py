@@ -61,8 +61,6 @@ from assetboard.services.context import Context, Role, require_role, require_rol
 from assetboard.services.months import ensure_date_open, lock_month_writes
 
 SUGGESTION_LIMIT = 8
-# Grouped (description, category) rows read per autocomplete request, most used first.
-_MATCH_ROWS = 500
 
 
 class TransactionError(Exception):
@@ -314,15 +312,15 @@ def suggest_descriptions(
     if not key or limit <= 0:
         return []
     with factory() as session:
-        matches = TransactionRepository(session, ctx).description_matches(
-            direction=wanted.value, key_prefix=key, limit=_MATCH_ROWS
-        )
+        repository = TransactionRepository(session, ctx)
+        keys = repository.description_keys(direction=wanted.value, key_prefix=key, limit=limit)
+        details = repository.description_details(direction=wanted.value, keys=keys)
         order = {
             c.id: c.sort_order
             for c in CategoryRepository(session, ctx).ordered(wanted.value)
             if c.archived_at is None
         }
-    return _suggestions(matches, order)[:limit]
+    return _suggestions(keys, details, order)
 
 
 def _rank(uses: int, last: date) -> tuple[int, int]:
@@ -330,30 +328,31 @@ def _rank(uses: int, last: date) -> tuple[int, int]:
     return (-uses, -last.toordinal())
 
 
-def _suggestions(matches: list[DescriptionMatch], order: Mapping[UUID, int]) -> list[Suggestion]:
-    groups: dict[str, list[DescriptionMatch]] = {}
-    for match in matches:
-        groups.setdefault(match.description_key, []).append(match)
-    ranked: list[tuple[tuple[int, int], str, Suggestion]] = []
-    for key, group in groups.items():
-        spellings: dict[str, tuple[int, date]] = {}
-        categories: dict[UUID, tuple[int, date]] = {}
-        for match in group:
-            uses, last = spellings.get(match.description, (0, date.min))
-            spellings[match.description] = (uses + match.uses, max(last, match.last_date))
-            if match.category_id in order:  # active categories of the direction only
-                uses, last = categories.get(match.category_id, (0, date.min))
-                categories[match.category_id] = (uses + match.uses, max(last, match.last_date))
-        spelling = min(spellings, key=lambda text: (_rank(*spellings[text]), text))
-        category = (
-            min(categories, key=lambda cid: (_rank(*categories[cid]), order[cid]))
-            if categories
-            else None
+def _suggestions(
+    keys: list[str], details: list[DescriptionMatch], order: Mapping[UUID, int]
+) -> list[Suggestion]:
+    """One suggestion per key, in the ranked order of ``keys``."""
+    spellings: dict[str, dict[str, tuple[int, date]]] = {key: {} for key in keys}
+    categories: dict[str, dict[UUID, tuple[int, date]]] = {key: {} for key in keys}
+    for match in details:
+        uses, last = spellings[match.description_key].get(match.description, (0, date.min))
+        spellings[match.description_key][match.description] = (
+            uses + match.uses,
+            max(last, match.last_date),
         )
-        total = _rank(sum(m.uses for m in group), max(m.last_date for m in group))
-        ranked.append((total, key, Suggestion(spelling, category)))
-    ranked.sort(key=lambda item: (item[0], item[1]))
-    return [suggestion for _, _, suggestion in ranked]
+        if match.category_id in order:  # active categories of the direction only
+            used = categories[match.description_key]
+            uses, last = used.get(match.category_id, (0, date.min))
+            used[match.category_id] = (uses + match.uses, max(last, match.last_date))
+    suggestions: list[Suggestion] = []
+    for key in keys:
+        texts, used = spellings[key], categories[key]
+        if not texts:
+            continue
+        spelling = min(texts, key=lambda text: (_rank(*texts[text]), text))
+        category = min(used, key=lambda cid: (_rank(*used[cid]), order[cid])) if used else None
+        suggestions.append(Suggestion(spelling, category))
+    return suggestions
 
 
 # Writes (editors and owners)

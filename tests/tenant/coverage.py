@@ -50,7 +50,8 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "counts_by_category",
             "active_months_by_category",
             "any_exists",
-            "description_matches",
+            "description_keys",
+            "description_details",
         )
     },
     **{
