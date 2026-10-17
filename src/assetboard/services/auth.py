@@ -177,8 +177,9 @@ class LoginOutcome:
 
     Unknown email and wrong password look alike. ``throttled_until`` is set only when the
     attempt was refused by a blocked bucket; the account bucket is keyed by the normalized
-    email and counted the same way whether or not an account has it, so this does not reveal
-    accounts either (ADR-0012, amendment 2026-10-17).
+    email and counted the same way whether or not an account has it. A reset by the owner's
+    activity can still hint that an account exists: an accepted risk, see ADR-0012 (amendment
+    of 2026-10-17).
     """
 
     user: User | None = None

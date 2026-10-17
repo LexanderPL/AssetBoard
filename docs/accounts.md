@@ -8,9 +8,10 @@ are on "Account security".
 
 - A wrong email or password shows "The email or password is not correct." The page never says
   whether an account exists.
-- After 5 failed attempts for an email (or 20 from one network address), sign-in for it pauses:
-  the page says "Too many attempts. Try again in N minutes." The pause starts at 1 minute and
-  doubles with each further failure, up to 15 minutes. A successful sign-in resets the count for
+- By default, 5 failed attempts for an email (or 20 from one network address) are free; the
+  6th (or the 21st) starts a pause, and attempts during it say "Too many attempts. Try again in
+  N minutes." The pause starts at 1 minute and doubles with each further failure, up to 15
+  minutes. Your administrator can change these limits. A successful sign-in resets the count for
   your account. Wrong passwords when changing your password or confirming a change count too.
 
 ## Details, language and theme

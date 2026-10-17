@@ -63,7 +63,9 @@ Neither middleware reads a request body; forms are parsed once, by FastAPI.
 - No user enumeration through sign-in: unknown email and wrong password get the same response.
   A throttled attempt says so, with the wait ("Too many attempts. Try again in N minutes."); the
   account bucket is keyed by the normalized email and counted the same way whether or not an
-  account has it, so this reveals no account either (amendment of 2026-10-17).
+  account has it, so an attacker's own attempts look the same for every email. A bucket reset by
+  the owner's activity can still hint that an account exists; this is an accepted risk pending
+  owner confirmation (amendment of 2026-10-17).
 - A failed sign-in returns 401 without `WWW-Authenticate`: no HTTP authentication scheme is
   offered (the form is the only way in), and the 401 lets log-based tools such as fail2ban or
   proxy rules count failures without parsing the page.
@@ -179,7 +181,7 @@ and someone who had to wait nothing about how long. Now:
   rounded up to whole minutes; "Try again later" if it cannot be computed. The attempt that
   sets the block was verified, so it still gets the ordinary message.
 
-Why this does not enable enumeration:
+What keeps unknown and known emails alike:
 
 - The account bucket is keyed by the normalized email (or `invalid:<input>` for malformed
   input) and reserved before the user is looked up. An unknown email is counted, backed off and
@@ -189,13 +191,26 @@ Why this does not enable enumeration:
 - The address bucket does not depend on any account.
 - A blocked attempt is answered from read-only lookups of both buckets, before the user table
   is read, and verifies nothing, for every email alike.
-- Only a correct password resets an account bucket, so a reset is no oracle.
+What is still visible (**accepted risk, pending owner confirmation**):
 
-What is still visible, and accepted: whether an email's bucket is blocked right now and for how
-long. Password-change and password-confirmation failures (possible only for existing,
-signed-in accounts) count in the same account bucket, so a bucket blocked without the observer's
-own attempts hints that someone failed against that email. The fast throttled response already
-showed that a block applied; the message adds only the remaining wait.
+- **Resets reveal activity on an existing account.** A successful sign-in, password change or
+  password confirmation by the account's owner resets its bucket; that can only happen for an
+  account that exists. An attacker can build up an email's counter, wait for the block to
+  expire, and try once more: if the bucket was not reset, that attempt blocks again with a
+  doubled wait; if the owner signed in meanwhile, it gets the ordinary message. The difference
+  shows that the account exists (and was used).
+- **Other people's failures.** Password-change and password-confirmation failures (possible
+  only for existing, signed-in accounts) count in the same account bucket, so a bucket blocked
+  without the observer's own attempts hints that someone failed against that email.
+- **This was already observable through timing**: a blocked attempt answers fast, an unblocked
+  one costs an Argon2 verify. The explicit message and `Retry-After` make it easier to read,
+  not newly possible.
+- **Why it is accepted for this app**: it is self-hosted, usually with a handful of accounts;
+  the signal needs repeated, targeted attempts against one email spread over the backoff
+  windows, and it depends on the owner happening to sign in between them; and the per-address
+  bucket (20 failures per hour) limits how many emails one client can probe this way. Removing
+  it would mean going back to one message for every failure, which is what users found
+  confusing. If the owner does not accept it, that is the fallback.
 
 The status stays **401** (not 429) with a `Retry-After` header in seconds: the 401 is what
 log-based tools such as fail2ban count, and a 429 would let a throttled attacker's continued
