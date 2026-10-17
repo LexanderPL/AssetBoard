@@ -515,6 +515,8 @@ def test_transaction_queries_stay_in_their_workspace(
     assert (in_a.any_exists(), in_b.any_exists()) == (True, False)
     assert [r.id for r in in_a.for_month(october)] == [a_row.id]
     assert in_b.for_month(october) == []
+    assert in_a.get_for_update(a_row.id) is a_row
+    assert in_b.get_for_update(a_row.id) is None  # another workspace's row is not found
     assert set(in_a.counts_by_category()) == {food_a.id}
     assert in_b.counts_by_category() == {}
     assert in_a.active_months_by_category() == {food_a.id: frozenset({october})}

@@ -45,6 +45,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         ("TransactionRepository", method): "test_transaction_queries_stay_in_their_workspace"
         for method in (
             "create",
+            "get_for_update",
             "for_month",
             "counts_by_category",
             "active_months_by_category",

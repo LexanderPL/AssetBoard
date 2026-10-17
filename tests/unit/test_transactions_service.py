@@ -618,6 +618,9 @@ def test_writes_on_stored_rows_lock_before_reading_them(team: WorkspaceDb, write
     food, target = _target(team, write)
     statements = _statements(lambda: WRITES[write](team, team.ctx("ed", "editor"), food, target))
     _assert_lock_then_read_then_guard(statements)
+    # The stored row itself is read with a row lock, so writes to it are serialised.
+    first_read = next(s for s in statements if "FROM transactions" in s)
+    assert first_read.rstrip().endswith("FOR UPDATE")
 
 
 def test_the_update_guards_the_old_and_the_new_month_after_reading_the_row(

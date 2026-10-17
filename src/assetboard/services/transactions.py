@@ -9,6 +9,9 @@ follows the closed-month guard of F2.5 before changing anything:
   its old date and, when the month changes, for the new one;
 * soft delete and undo: ``lock_month_writes``, read the row, ``ensure_date_open`` for its date.
 
+Edit, delete and undo read the stored row with ``get_for_update`` (``FOR UPDATE`` on
+PostgreSQL, after the workspace lock), so concurrent writes to the same row are serialised.
+
 Amounts are positive minor units in the workspace's base currency, read from the workspace row
 inside the write (after the lock), not from the possibly stale ``Context``. Once any
 transaction exists (soft-deleted ones included) the base currency cannot change
@@ -253,9 +256,11 @@ def _audit(
     )
 
 
-def _live_row(repository: TransactionRepository, transaction_id: UUID) -> Transaction:
+def _live_row(
+    repository: TransactionRepository, transaction_id: UUID, *, lock: bool = False
+) -> Transaction:
     """A non-deleted row of this workspace; ``NotFound`` otherwise."""
-    row = repository.get(transaction_id)
+    row = repository.get_for_update(transaction_id) if lock else repository.get(transaction_id)
     if row is None or row.deleted_at is not None:
         raise NotFound
     return row
@@ -437,7 +442,7 @@ def update_transaction(
         # The lock comes before reading the row whose date the guard checks (F2.5).
         lock_month_writes(session, ctx)
         repository = TransactionRepository(session, ctx)
-        row = _live_row(repository, transaction_id)
+        row = _live_row(repository, transaction_id, lock=True)
         ensure_date_open(session, ctx, row.date)
         if YearMonth.from_date(entry.day) != YearMonth.from_date(row.date):
             ensure_date_open(session, ctx, entry.day)
@@ -491,7 +496,7 @@ def delete_transaction(
         require_role_now(session, ctx, Role.EDITOR)
         lock_month_writes(session, ctx)
         repository = TransactionRepository(session, ctx)
-        row = repository.get(transaction_id)
+        row = repository.get_for_update(transaction_id)  # serialises writes to this row
         if row is None:
             raise NotFound
         if row.deleted_at is None:
@@ -523,7 +528,7 @@ def undo_delete(
         require_role_now(session, ctx, Role.EDITOR)
         lock_month_writes(session, ctx)
         repository = TransactionRepository(session, ctx)
-        row = repository.get(transaction_id)
+        row = repository.get_for_update(transaction_id)  # serialises writes to this row
         if row is None:
             raise NotFound
         category = CategoryRepository(session, ctx).get_or_raise(row.category_id)

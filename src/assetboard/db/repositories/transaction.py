@@ -68,6 +68,15 @@ class TransactionRepository(ScopedRepository[Transaction]):
             )
         )
 
+    def get_for_update(self, row_id: UUID) -> Transaction | None:
+        """``get`` with a row lock (``FOR UPDATE`` on PostgreSQL) until the transaction ends.
+
+        Serialises concurrent edits, deletes and undos of the same row. SQLite has no row locks;
+        there ``BEGIN IMMEDIATE`` already serialises writers and the clause is left out.
+        """
+        statement = self._scoped_select().where(Transaction.id == row_id).with_for_update()
+        return self._session.scalars(statement).one_or_none()
+
     def for_month(self, month: YearMonth, direction: str | None = None) -> list[Transaction]:
         """Non-deleted rows dated in ``month``, by date and then entry order."""
         statement = self._scoped_select().where(
