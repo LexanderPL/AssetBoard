@@ -17,6 +17,12 @@ each feature adds its source here:
 A category with ``references > 0`` cannot change its kind, and deleting it archives it instead.
 A treatment change is allowed; the edit form lists the **closed** months among
 ``active_months``, whose totals the change alters (owner decision, F2.2).
+
+**Concurrency.** Writes that read usage or change a category's kind or archived state (update,
+archive, restore, delete) take the exclusive workspace lock (``CurrentWorkspaceRepository.lock``)
+right after the role check, before reading anything else. Transaction writes take the shared one
+before reading the category, so on PostgreSQL a transaction can never land on a category that
+just changed kind or was archived, and a kind change always sees every transaction.
 """
 
 from __future__ import annotations
@@ -34,6 +40,7 @@ from assetboard.db.models.ledger import Category
 from assetboard.db.repositories import (
     AuditEventRepository,
     CategoryRepository,
+    CurrentWorkspaceRepository,
     MonthStateRepository,
 )
 from assetboard.domain.categories import (
@@ -161,6 +168,11 @@ def _view(
         active_transactions=used.active_transactions,
         closed_months_affected=tuple(sorted(used.active_months & closed)),
     )
+
+
+def _lock_categories(session: Session, ctx: Context) -> None:
+    """The exclusive workspace lock, before any read (see "Concurrency" above)."""
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
 
 
 def _closed_months(session: Session, ctx: Context) -> frozenset[YearMonth]:
@@ -335,6 +347,7 @@ def update_category(
 
     def write(session: Session) -> CategoryView:
         require_role_now(session, ctx, Role.EDITOR)
+        _lock_categories(session, ctx)
         repository = CategoryRepository(session, ctx)
         category = repository.get_or_raise(category_id)
         if category.archived_at is not None:
@@ -418,6 +431,7 @@ def archive_category(
 
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.EDITOR)
+        _lock_categories(session, ctx)
         category = CategoryRepository(session, ctx).get_or_raise(category_id)
         if category.archived_at is None:
             used = usage_by_category(session, ctx, usage_sources).get(category.id)
@@ -440,6 +454,7 @@ def restore_category(factory: sessionmaker[Session], ctx: Context, category_id: 
 
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.EDITOR)
+        _lock_categories(session, ctx)
         repository = CategoryRepository(session, ctx)
         category = repository.get_or_raise(category_id)
         if category.archived_at is None:
@@ -467,6 +482,7 @@ def delete_category(
 
     def write(session: Session) -> DeleteOutcome:
         require_role_now(session, ctx, Role.EDITOR)
+        _lock_categories(session, ctx)
         repository = CategoryRepository(session, ctx)
         category = repository.get_or_raise(category_id)
         used = usage_by_category(session, ctx, usage_sources).get(category.id, CategoryUsage())

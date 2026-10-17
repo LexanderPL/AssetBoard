@@ -8,8 +8,10 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy import event, select
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import ORMExecuteState, Session
+from sqlalchemy.sql import ClauseElement
 
 from assetboard.clock import FixedClock
 from assetboard.db.models.identity import AuditEvent
@@ -542,3 +544,51 @@ def test_a_concurrent_seed_that_loses_the_race_reads_as_already_seeded(
 def test_emoji_names_with_joiners_are_accepted(team: WorkspaceDb) -> None:
     family = _create(team, "👨‍👩‍👧")
     assert family.name == "👨‍👩‍👧"
+
+
+# Concurrency with transaction writes (F2.2 review)
+
+
+def _statements(operation: Callable[[], object]) -> list[str]:
+    """The statements ``operation`` runs, compiled for PostgreSQL (where the locks apply)."""
+    seen: list[str] = []
+
+    def record(state: ORMExecuteState) -> None:
+        statement = state.statement
+        assert isinstance(statement, ClauseElement)
+        seen.append(str(statement.compile(dialect=postgresql.dialect())))
+
+    event.listen(Session, "do_orm_execute", record)
+    try:
+        operation()
+    finally:
+        event.remove(Session, "do_orm_execute", record)
+    return seen
+
+
+LOCKING_WRITES = {
+    "update": lambda db, ctx, cid: update_category(
+        db.factory, ctx, cid, name="Food", kind="income", treatment="regular", color="#16a34a"
+    ),
+    "archive": lambda db, ctx, cid: archive_category(db.factory, ctx, cid),
+    "restore": lambda db, ctx, cid: restore_category(db.factory, ctx, cid),
+    "delete": lambda db, ctx, cid: delete_category(db.factory, ctx, cid),
+}
+
+
+@pytest.mark.parametrize("write", sorted(LOCKING_WRITES))
+def test_category_writes_lock_the_workspace_before_reading_categories_or_usage(
+    team: WorkspaceDb, write: str
+) -> None:
+    food = _create(team, "Food")
+    if write == "restore":
+        archive_category(team.factory, team.ctx("ed", "editor"), food.id)
+    statements = _statements(
+        lambda: LOCKING_WRITES[write](team, team.ctx("ed", "editor"), food.id)
+    )
+    lock = next(i for i, s in enumerate(statements) if "FROM workspaces" in s)
+    assert statements[lock].rstrip().endswith("FOR UPDATE")
+    reads = [
+        i for i, s in enumerate(statements) if "FROM categories" in s or "FROM transactions" in s
+    ]
+    assert reads and lock < min(reads)
