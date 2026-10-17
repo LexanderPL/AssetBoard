@@ -71,7 +71,7 @@
     <span>{{ message }}</span>
     <div class="flex items-center gap-3">
       {% if undo_url %}<button type="button" data-toast-undo class="font-semibold text-inverse-link" hx-post="{{ undo_url }}">{{ undo_label }}</button>{% endif %}
-      <button type="button" data-toast-dismiss aria-label="{{ _('Dismiss') }}" class="text-on-inverse opacity-70 hover:opacity-100">×</button>
+      <button type="button" data-toast-dismiss aria-label="{{ _('Dismiss') }}" class="text-on-inverse">×</button>
     </div>
   </div>
 </div>
