@@ -222,7 +222,8 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             page.goto(f"{base}/workspace/members", wait_until="networkidle")
             assert page.locator("html").evaluate("el => el.classList.contains('dark')")
             forced = page.locator("#expires_in_days").evaluate(
-                "el => { const s = getComputedStyle(el); return [s.appearance, s.backgroundImage]; }"
+                "el => { const s = getComputedStyle(el);"
+                " return [s.appearance, s.backgroundImage]; }"
             )
             assert forced == ["auto", "none"], forced
             page.emulate_media(forced_colors="none")
