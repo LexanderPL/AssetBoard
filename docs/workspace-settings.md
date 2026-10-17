@@ -16,9 +16,10 @@ changed, not their values).
 ## The base currency is locked once amounts exist
 
 Amounts are stored in the base currency and are never converted. So the base currency can be
-changed only while the workspace has no transactions or planned values. Once one exists, the
-field is shown locked with the reason, and a change is refused. Deleted transactions count too:
-they still hold an amount in that currency and can be restored.
+changed only while the workspace has no transactions. Once one exists, the field is shown locked
+with the reason, and a change is refused. Deleted transactions count too: they still hold an
+amount in that currency and can be restored. (When planned values arrive, they will lock the
+currency in the same way.)
 
 Choose the base currency before you start entering amounts. All other settings can still be
 changed at any time.

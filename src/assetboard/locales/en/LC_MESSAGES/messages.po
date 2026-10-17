@@ -1726,8 +1726,8 @@ msgid "General"
 msgstr ""
 
 msgid ""
-"Locked: transactions or planned values exist (deleted ones included), and"
-" their amounts are stored in this currency."
+"Locked: transactions exist (deleted ones included), and their amounts are"
+" stored in this currency."
 msgstr ""
 
 msgid "Formatting default"

@@ -11,6 +11,7 @@ import pytest
 from sqlalchemy import select
 
 from assetboard.db.models.ledger import Category, MonthState, Transaction
+from assetboard.domain.months import YearMonth
 from assetboard.services import categories as category_service
 from assetboard.services.categories import CategoryUsage
 from tests.conftest import OwnerApp
@@ -357,6 +358,19 @@ def test_one_closed_month_and_long_lists(owner: OwnerApp) -> None:
     assert "2025-12, …." in edit and "2026-01" not in edit
 
 
+def test_the_closed_months_warning_alone_describes_the_treatment_field(
+    owner: OwnerApp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """``aria-describedby`` follows the warnings actually shown, each on its own."""
+    food = _create(owner, "Food")
+    _close(owner, date(2026, 9, 1))
+    usage = CategoryUsage(references=1, active_months=frozenset({YearMonth(2026, 9)}))
+    monkeypatch.setattr(category_service, "USAGE_SOURCES", [lambda _s, _c: {food: usage}])
+    edit = owner.client.get(f"/categories/{food}/edit", headers={"HX-Request": "true"}).text
+    assert f'aria-describedby="treatment-{food}-closed"' in edit
+    assert "data-affected" not in edit and "data-closed-months" in edit
+
+
 def test_no_warning_without_transactions_in_closed_months(owner: OwnerApp) -> None:
     food = _create(owner, "Food")
     _spend(owner, food, date(2026, 10, 5))
@@ -364,3 +378,4 @@ def test_no_warning_without_transactions_in_closed_months(owner: OwnerApp) -> No
     edit = owner.client.get(f"/categories/{food}/edit", headers={"HX-Request": "true"}).text
     assert "data-closed-months" not in edit
     assert "A treatment change applies to 1 transaction." in edit
+    assert f'aria-describedby="treatment-{food}-help"' in edit
