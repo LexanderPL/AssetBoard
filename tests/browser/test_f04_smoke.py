@@ -217,6 +217,16 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             assert page.locator("html").evaluate("element => element.classList.contains('dark')")
             assert page.evaluate("localStorage.getItem('theme')") == "dark"
             assert page.evaluate(body_background) == "rgb(17, 17, 17)"
+            # In forced-colors mode only the system arrow shows, in the dark theme too.
+            page.emulate_media(forced_colors="active")
+            page.goto(f"{base}/workspace/members", wait_until="networkidle")
+            assert page.locator("html").evaluate("el => el.classList.contains('dark')")
+            forced = page.locator("#expires_in_days").evaluate(
+                "el => { const s = getComputedStyle(el); return [s.appearance, s.backgroundImage]; }"
+            )
+            assert forced == ["auto", "none"], forced
+            page.emulate_media(forced_colors="none")
+            page.goto(f"{base}/", wait_until="networkidle")
             page.reload(wait_until="networkidle")
             assert page.locator("html").evaluate("element => element.classList.contains('dark')")
 
