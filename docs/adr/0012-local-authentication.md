@@ -60,8 +60,10 @@ Neither middleware reads a request body; forms are parsed once, by FastAPI.
 
 - One process only: the setup token, the hashing limit and the "setup closed" cache live in
   memory, so the app must run as a single Uvicorn worker.
-- No user enumeration through sign-in: unknown email, wrong password and throttled attempts get
-  the same response.
+- No user enumeration through sign-in: unknown email and wrong password get the same response.
+  A throttled attempt says so, with the wait ("Too many attempts. Try again in N minutes."); the
+  account bucket is keyed by the normalized email and counted the same way whether or not an
+  account has it, so this reveals no account either (amendment of 2026-10-17).
 - A failed sign-in returns 401 without `WWW-Authenticate`: no HTTP authentication scheme is
   offered (the form is the only way in), and the 401 lets log-based tools such as fail2ban or
   proxy rules count failures without parsing the page.
@@ -76,8 +78,8 @@ Neither middleware reads a request body; forms are parsed once, by FastAPI.
     entries have 8 or more characters (51 had 10 or more under the original minimum).
   - **Shared address bucket**: without a correct `ASSETBOARD_TRUSTED_PROXIES`, clients behind a
     proxy or Docker port publishing share one per-address budget.
-  - **Throttled responses are fast**, which reveals that throttling applies (not whether the
-    account exists).
+  - **Throttled responses are fast and say so**, which reveals that throttling applies (not
+    whether the account exists; see the amendment of 2026-10-17).
   - **Cookie injection over plain HTTP.** On an `http://` `BASE_URL`, cookies have no `__Host-`
     protection, so a network attacker (or a sibling host on the same domain) can plant an
     anonymous CSRF cookie and forge a matching token, which fixes the anonymous token. This only
@@ -163,3 +165,44 @@ user-chosen passwords that are checked against a list of commonly used ones. The
 common-password list, the identity check (not the email name or display name) and the
 throttles are unchanged. Existing passwords are unaffected; the rule applies when a password is
 set or changed. Temporary passwords are still 16 characters.
+
+## Amendment (2026-10-17): a separate message for throttled attempts
+
+Sign-in used one message for every failure ("The email or password is not correct, or there
+were too many attempts"), which told someone who had simply mistyped their password to wait,
+and someone who had to wait nothing about how long. Now:
+
+- An ordinary failure (unknown email, wrong password, a non-administrator at `/login/local`)
+  says "The email or password is not correct."
+- Only an attempt that a blocked bucket refused says "Too many attempts. Try again in N
+  minutes." N is the longest remaining block of the buckets involved, from the injected clock,
+  rounded up to whole minutes; "Try again later" if it cannot be computed. The attempt that
+  sets the block was verified, so it still gets the ordinary message.
+
+Why this does not enable enumeration:
+
+- The account bucket is keyed by the normalized email (or `invalid:<input>` for malformed
+  input) and reserved before the user is looked up. An unknown email is counted, backed off and
+  blocked exactly like a known one, and unknown users go through the same dummy verify, so the
+  sequence of responses, the wait and the timing are the same whether or not the account
+  exists (tests compare them).
+- The address bucket does not depend on any account.
+- A blocked attempt is answered from read-only lookups of both buckets, before the user table
+  is read, and verifies nothing, for every email alike.
+- Only a correct password resets an account bucket, so a reset is no oracle.
+
+What is still visible, and accepted: whether an email's bucket is blocked right now and for how
+long. Password-change and password-confirmation failures (possible only for existing,
+signed-in accounts) count in the same account bucket, so a bucket blocked without the observer's
+own attempts hints that someone failed against that email. The fast throttled response already
+showed that a block applied; the message adds only the remaining wait.
+
+The status stays **401** (not 429) with a `Retry-After` header in seconds: the 401 is what
+log-based tools such as fail2ban count, and a 429 would let a throttled attacker's continued
+attempts drop out of those filters. Change-password keeps its existing 429.
+
+The same split applies where the account is already known, so nothing is disclosed: password
+confirmation of sensitive actions (profile, administration, signing out other devices) and the
+password step of linking an identity provider or proxy sign-in by email. They return 401 with
+`Retry-After` when throttled. Registration and invitation sign-up keep their own per-address
+message.

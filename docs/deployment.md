@@ -202,6 +202,19 @@ when you intend to upload the image and its release tags.
 
 ## Upgrading
 
+### Unreleased: new look and sign-in messages (0.2 polish)
+
+- **New colours.** The interface uses neutral greys with a blue primary colour and an orange
+  accent, in both the light and the dark theme; the green brand colour is gone. Dropdowns have
+  more room around their arrow. Theme choices (saved and per device) are kept. No setting or
+  migration.
+- **Separate sign-in messages.** A wrong email or password now says "The email or password is
+  not correct."; only a throttled attempt says "Too many attempts. Try again in N minutes." The
+  response is still `401`, now with a `Retry-After` header when throttled, so fail2ban or proxy
+  rules that count 401s on `POST /login` keep working. Rules that match the old page text ("or
+  there were too many attempts") need updating. This does not reveal which accounts exist
+  ([ADR-0012](adr/0012-local-authentication.md), amendment of 2026-10-17).
+
 ### Unreleased: month pages (F2.5)
 
 - **Month pages** at "Month" in the main navigation (`/m`, `/m/YYYY-MM`); see

@@ -4,6 +4,15 @@ The profile page (`/account`, "Profile" in the account menu) holds your details,
 language and theme, and the ways you sign in. Password changes and signing out other devices
 are on "Account security".
 
+## Signing in
+
+- A wrong email or password shows "The email or password is not correct." The page never says
+  whether an account exists.
+- After 5 failed attempts for an email (or 20 from one network address), sign-in for it pauses:
+  the page says "Too many attempts. Try again in N minutes." The pause starts at 1 minute and
+  doubles with each further failure, up to 15 minutes. A successful sign-in resets the count for
+  your account. Wrong passwords when changing your password or confirming a change count too.
+
 ## Details, language and theme
 
 - **Display name**: 1 to 120 characters, no control or invisible characters.
@@ -31,7 +40,8 @@ The profile lists the identity providers (OIDC) and the proxy sign-in linked to 
 
 Linking, removing a sign-in method and signing out other devices ask for confirmation:
 
-- **With a password**, you enter it. Wrong passwords count like failed sign-ins.
+- **With a password**, you enter it. Wrong passwords count like failed sign-ins; after too
+  many, the page says how many minutes to wait.
 - **Without a password** (your account was created through an identity provider or the proxy),
   a sign-in from the last 10 minutes confirms it. After that, the page says "sign in again":
   - with an identity provider: sign out, then "Continue with <provider>" on the sign-in page;
