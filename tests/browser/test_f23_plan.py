@@ -41,10 +41,13 @@ class SlowPosts:
     def __init__(self, app: Any) -> None:
         self.app = app
         self.delay = 0.0
+        self.plan_delay = 0.0  # planned-value saves only
 
     async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
-        if scope["type"] == "http" and scope["method"] == "POST" and self.delay:
-            await asyncio.sleep(self.delay)
+        if scope["type"] == "http" and scope["method"] == "POST":
+            delay = self.plan_delay if "/plan/" in scope["path"] else self.delay
+            if delay:
+                await asyncio.sleep(delay)
         await self.app(scope, receive, send)
 
 
@@ -164,6 +167,22 @@ def test_f23_plan_in_a_browser(tmp_path: Path) -> None:
             expect(status).to_have_text("Planned value saved.")
             page.reload()
             expect(food).to_have_value("42.00")
+
+            # A cell's save that finishes after a transaction write replaced the summary lands
+            # in the new block's row (not the detached old one).
+            slow.plan_delay = 1.0
+            food.fill("77")
+            page.keyboard.press("Tab")  # the save is on its way, slowly
+            page.locator("#entry-expense-day").fill("4")
+            page.locator("#entry-expense-amount").fill("1")
+            page.locator("#entry-expense-category").select_option(label="Food")
+            page.locator("#entry-expense-amount").press("Enter")
+            expect(page.locator("#ledger-expense [data-amount]")).to_have_count(2)
+            expect(food).to_have_value("77.00")
+            expect(food).to_have_attribute("data-saved-value", "77.00")
+            slow.plan_delay = 0
+            page.reload()
+            expect(food).to_have_value("77.00")
 
             # The workspace setting copies the plan when a later month is first opened.
             page.goto(f"{base}/workspace/settings")

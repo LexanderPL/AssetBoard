@@ -23,7 +23,7 @@
       {% if r.error %}<p id="{{ row_id }}-error" class="mt-1 text-xs text-danger" data-field-error>{{ r.error }}</p>{% endif %}
     </form>
     {% else %}
-    <span class="tabular-nums" data-planned>{% if r.display %}{{ r.display }}{% else %}<span class="text-muted" aria-label="{{ _('Not planned') }}">—</span>{% endif %}</span>
+    <span class="tabular-nums" data-planned>{% if r.display %}{{ r.display }}{% else %}<span class="text-muted" aria-hidden="true">—</span><span class="sr-only">{{ _("Not planned") }}</span>{% endif %}</span>
     {% endif %}
   </td>
 </tr>
@@ -40,4 +40,14 @@
   </form>
   {% endif %}
 </div>
+{%- endmacro %}
+
+
+{# The result of a copy, shown in the block and announced on the status line. #}
+{% macro copied_text(c) -%}
+{% if c.count == 0 %}{{ _("Nothing was copied: every category that can take a planned value already has one.") }}{% elif c.automatic %}{{ ngettext("%(num)d planned value was copied from %(month)s (workspace setting).", "%(num)d planned values were copied from %(month)s (workspace setting).", c.count, month=c.source) }}{% else %}{{ ngettext("Copied %(num)d planned value from %(month)s.", "Copied %(num)d planned values from %(month)s.", c.count, month=c.source) }}{% endif %}
+{%- endmacro %}
+
+{% macro skipped_text(c) -%}
+{{ ngettext("%(num)d planned value of an archived or transfer category was not copied.", "%(num)d planned values of archived or transfer categories were not copied.", c.skipped) }}
 {%- endmacro %}

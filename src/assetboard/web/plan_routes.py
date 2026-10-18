@@ -5,10 +5,13 @@ outcomes to pages. Every state-changing route is covered by the router-level ``r
 dependency (HTMX sends the token in the ``X-CSRF-Token`` header).
 
 HTMX requests get one planned row back (with the copy banner and the screen-reader status line
-out of band), or the whole ``#month-summary`` after a copy. Plain form posts redirect (303) to
+out of band), or the whole ``#month-summary`` after a copy (its result also goes to the status
+line). Plain form posts redirect (303) to
 the month page, which re-renders a refused value with its message, so everything works without
 JavaScript. A write refused because the month was closed meanwhile reloads the page with the
-closed-month message (303, or ``HX-Redirect`` for HTMX): the page in the browser is stale.
+closed-month message (303, or ``HX-Redirect`` for HTMX): the page in the browser is stale. So
+does a new value for a category that was archived or turned into a transfer meanwhile (its row
+has left the plan): ``?error=plan_category_archived`` / ``plan_category_transfer``.
 """
 
 from __future__ import annotations
@@ -111,7 +114,7 @@ def _summary(
     summary = build_summary(
         factory, ctx, request, get_month(factory, ctx, month), copied=copied, focus_first=True
     )
-    response = render_template(request, "months/_summary.html", context=summary_context(summary))
+    response = render_template(request, "months/_plan_copy.html", context=summary_context(summary))
     response.headers["Vary"] = "HX-Request"
     return response
 
@@ -138,7 +141,11 @@ async def plan_set(
     except MonthClosed:
         return _redirect(request, target, "error=month_closed", status_code=409)
     except InvalidPlannedValue as exc:
-        message = plan_error(request, exc.code, ctx.workspace.base_currency)
+        if exc.code in ("category_archived", "category_transfer"):
+            # The category left the plan meanwhile (archived or turned into a transfer in
+            # another tab): its row is gone, so the page is stale. Reload it with the message.
+            return _redirect(request, target, f"error=plan_{exc.code}", status_code=409)
+        message = plan_error(request, exc.code, exc.currency or ctx.workspace.base_currency)
         if is_htmx_fragment_request(request):
             # No focus: the user may already be typing in the next cell.
             cell = CellState(category, amount, message)

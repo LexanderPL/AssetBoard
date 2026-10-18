@@ -1775,12 +1775,6 @@ msgstr ""
 msgid "Copy plan from %(month)s"
 msgstr ""
 
-msgid "Undo"
-msgstr ""
-
-msgid "Plan"
-msgstr ""
-
 msgid ""
 "Nothing was copied: every category that can take a planned value already "
 "has one."
@@ -1803,6 +1797,12 @@ msgid "%(num)d planned value of an archived or transfer category was not copied.
 msgid_plural "%(num)d planned values of archived or transfer categories were not copied."
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "Undo"
+msgstr ""
+
+msgid "Plan"
+msgstr ""
 
 msgid "Planned"
 msgstr ""

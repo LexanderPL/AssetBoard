@@ -76,6 +76,7 @@
   </form>
   {% endif %}
   <p id="ledger-status" class="sr-only" role="status" data-ledger-status></p>
+  <p id="plan-status" class="sr-only" role="status" data-plan-status></p>
   {% include "months/_summary.html" %}
   {% for s in ledger.sections %}{{ section(s) }}{% endfor %}
   {% endblock %}

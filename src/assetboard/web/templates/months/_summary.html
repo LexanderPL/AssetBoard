@@ -3,22 +3,13 @@
    and bars. ``summary`` is web.plan.SummaryView (web.plan.summary_context). Every transaction
    write sends this block out of band (``summary_oob``); app.js keeps a half-typed planned value
    and its focus across that swap. #}
-{% from "months/_plan.html" import plan_row, banner with context %}
+{% from "months/_plan.html" import plan_row, banner, copied_text, skipped_text with context %}
 <section id="month-summary" class="panel p-4 sm:p-6" aria-labelledby="month-summary-heading" data-month-summary{% if summary_oob %} hx-swap-oob="outerHTML"{% endif %}>
   <h2 id="month-summary-heading" class="text-base font-semibold">{{ _("Plan") }}</h2>
-  <p id="plan-status" class="sr-only" role="status" data-plan-status></p>
   {% if summary.copied %}
-  <div class="mt-2 text-sm" role="status" data-plan-copied>
-    {% if summary.copied.count == 0 %}
-    <p>{{ _("Nothing was copied: every category that can take a planned value already has one.") }}</p>
-    {% elif summary.copied.automatic %}
-    <p>{{ ngettext("%(num)d planned value was copied from %(month)s (workspace setting).", "%(num)d planned values were copied from %(month)s (workspace setting).", summary.copied.count, month=summary.copied.source) }}</p>
-    {% else %}
-    <p>{{ ngettext("Copied %(num)d planned value from %(month)s.", "Copied %(num)d planned values from %(month)s.", summary.copied.count, month=summary.copied.source) }}</p>
-    {% endif %}
-    {% if summary.copied.skipped %}
-    <p class="text-muted">{{ ngettext("%(num)d planned value of an archived or transfer category was not copied.", "%(num)d planned values of archived or transfer categories were not copied.", summary.copied.skipped) }}</p>
-    {% endif %}
+  <div class="mt-2 text-sm" data-plan-copied>
+    <p>{{ copied_text(summary.copied) }}</p>
+    {% if summary.copied.skipped %}<p class="text-muted">{{ skipped_text(summary.copied) }}</p>{% endif %}
   </div>
   {% endif %}
   {{ banner() }}

@@ -158,7 +158,7 @@ def build_summary(
     if can_write and not plan.has_lines and plan.copyable_from_previous and plan.previous:
         banner = format_month_after_from(plan.previous, locale)
     notice = None
-    if copied is not None:
+    if copied is not None and can_write:
         notice = CopiedNotice(
             count=copied.copied,
             skipped=copied.skipped,

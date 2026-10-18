@@ -154,13 +154,24 @@ def test_archived_and_transfer_lines_stay_editable_but_take_no_new_value(plan: O
     _set(plan, food, "10")
     form = {"name": "Rent", "kind": "expense", "treatment": "transfer", "color": "#16a34a"}
     assert plan.post(f"/categories/{rent}", form, token_from="/categories").status_code == 303
+    # The category left the plan (a stale page): reload with the message, HTMX or not.
     refused = _htmx(plan, f"{MONTH}/plan/{rent}", {"amount": "5"})
-    assert refused.status_code == 400  # not in the plan: the row is empty
+    assert refused.status_code == 409
+    assert refused.headers["HX-Redirect"] == f"{MONTH}?error=plan_category_transfer"
+    plain = _set(plan, rent, "5")
+    assert plain.headers["location"] == f"{MONTH}?error=plan_category_transfer"
+    page = _page(plan, plain.headers["location"])
+    assert re.search(r"data-error>Transfers are not counted in the plan", page)
+    assert _planned(plan) == {food: 1000}
     assert plan.post(f"/categories/{food}/archive", {}, token_from="/categories").status_code == 303
     summary = _summary(_page(plan))
     assert "archived" in _row(summary, food)
     removed = _htmx(plan, f"{MONTH}/plan/{food}", {"amount": ""})
     assert removed.status_code == 200 and f'<tr id="plan-{food}"' not in removed.text
+    archived = _htmx(plan, f"{MONTH}/plan/{food}", {"amount": "3"})  # no line any more
+    assert archived.headers["HX-Redirect"] == f"{MONTH}?error=plan_category_archived"
+    page = _page(plan, f"{MONTH}?error=plan_category_archived")
+    assert "This category is archived: it takes no new planned values." in page
     assert "transfer" not in re.findall(r'data-plan-group="([a-z]+)"', _summary(_page(plan)))
 
 
@@ -210,6 +221,11 @@ def test_copy_never_overwrites_and_reports_skipped_lines(plan: OwnerApp) -> None
     assert plan.post(f"/categories/{old}/archive", {}, token_from="/categories").status_code == 303
     htmx = _htmx(plan, f"{MONTH}/plan/copy")
     assert htmx.status_code == 200
+    # The result is announced on the status line, which sits outside the block.
+    assert (
+        '<p id="plan-status" hx-swap-oob="innerHTML">Copied 1 planned value from September 2026.'
+        " 1 planned value of an archived or transfer category was not copied.</p>"
+    ) in htmx.text
     summary = _summary(htmx.text)
     assert "Copied 1 planned value from September 2026." in summary
     assert "1 planned value of an archived or transfer category was not copied." in summary
@@ -243,7 +259,9 @@ def test_viewers_see_planned_values_read_only_and_cannot_write(plan: OwnerApp) -
     summary = _summary(_page(plan))
     assert "data-plan-input" not in summary and "data-plan-banner" not in summary
     assert re.search(r"data-planned>€1,234.50<", _row(summary, food))
-    assert 'aria-label="Not planned"' in _row(summary, rent)
+    assert '<span class="sr-only">Not planned</span>' in _row(summary, rent)
+    assert "aria-label" not in _row(summary, rent)
+    assert "Copied" not in _page(plan, f"{MONTH}?plan_copied=2")  # not for viewers
     response = plan.post(f"{MONTH}/plan/{food}", {"amount": "1"}, token_from=MONTH)
     assert response.status_code == 403
     assert plan.post(f"{MONTH}/plan/copy", token_from=MONTH).status_code == 403
@@ -257,7 +275,7 @@ def test_opening_a_month_copies_the_plan_once_when_the_setting_is_on(plan: Owner
     _set(plan, food, "550", SEPTEMBER)
     assert "data-plan-banner" in _page(plan) and _planned(plan) == {}  # off by default
     _auto(plan)
-    assert plan.client.head(MONTH).status_code in (200, 405) and _planned(plan) == {}
+    assert plan.client.head(MONTH).status_code == 405 and _planned(plan) == {}  # no HEAD
     page = _page(plan)
     assert "1 planned value was copied from September 2026 (workspace setting)." in page
     assert _planned(plan) == {food: 55000}
@@ -299,3 +317,17 @@ def test_a_transaction_write_sends_the_plan_out_of_band(plan: OwnerApp) -> None:
     summary = _summary(html)
     assert 'hx-swap-oob="outerHTML"' in summary.split(">")[0]
     assert 'value="550.00"' in _row(summary, food)
+
+
+@pytest.mark.parametrize("value", ["²", "9" * 5000, "-1", "1.5", ""])
+def test_a_malformed_copy_report_is_ignored(plan: OwnerApp, value: str) -> None:
+    page = _page(plan, f"{MONTH}?plan_copied={value}&plan_skipped=0")
+    assert "data-plan-copied" not in page
+    page = _page(plan, f"{MONTH}?plan_copied=1&plan_skipped={value or 'x'}")
+    assert "data-plan-copied" not in page
+
+
+def test_the_status_line_stays_outside_the_summary(plan: OwnerApp) -> None:
+    _category(plan, "Food")
+    page = _page(plan)
+    assert 'id="plan-status"' in page and 'id="plan-status"' not in _summary(page)

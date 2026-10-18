@@ -522,6 +522,16 @@ document.addEventListener("keydown", (event) => {
   }
 });
 
+// A carried-over value that the browser does report as changed is saved by that change
+// (hx-trigger), so the focusout below must not submit it a second time.
+document.addEventListener(
+  "change",
+  (event) => {
+    if (event.target instanceof HTMLInputElement) restoredPlanInputs.delete(event.target);
+  },
+  true,
+);
+
 document.addEventListener("focusout", (event) => {
   const input = event.target;
   if (!(input instanceof HTMLInputElement) || !restoredPlanInputs.has(input)) return;
@@ -563,3 +573,23 @@ function restorePlanInput() {
 }
 document.addEventListener("htmx:oobAfterSwap", restorePlanInput);
 document.addEventListener("htmx:afterSwap", restorePlanInput);
+
+// A cell's save can finish after a transaction write replaced the whole summary out of band:
+// its target row is then detached, and HTMX fires htmx:beforeSwap on that detached row (the
+// event never reaches the document). So the listener sits on the row itself, added when the
+// request starts, and swaps into the row of the same id in the new block instead.
+document.addEventListener("htmx:beforeRequest", (event) => {
+  const form = event.detail?.elt;
+  const row = event.detail?.target;
+  if (!(form instanceof HTMLFormElement) || !form.matches("[data-plan-form]")) return;
+  if (!(row instanceof HTMLElement) || !row.matches("[data-plan-row]")) return;
+  row.addEventListener(
+    "htmx:beforeSwap",
+    (swap) => {
+      if (row.isConnected) return;
+      const live = document.getElementById(row.id);
+      if (live) swap.detail.target = live;
+    },
+    { once: true },
+  );
+});

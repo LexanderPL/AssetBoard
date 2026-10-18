@@ -12,6 +12,7 @@ by the router-level ``require_csrf`` dependency.
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import replace
 from typing import Annotated
@@ -44,7 +45,7 @@ from assetboard.web.ledger import (
     build_ledger,
     edit_values,
 )
-from assetboard.web.plan import CellState, build_summary, summary_context
+from assetboard.web.plan import PLAN_ERRORS, CellState, build_summary, summary_context
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
 
@@ -69,6 +70,8 @@ ERRORS = {
     "transaction_gone": _("This entry no longer exists. It may have been deleted elsewhere."),
     "undo_expired": _("Too late to undo: the entry stays deleted."),
     "plan_category_gone": _("This category no longer exists. It may have been deleted elsewhere."),
+    "plan_category_archived": PLAN_ERRORS["category_archived"],
+    "plan_category_transfer": PLAN_ERRORS["category_transfer"],
 }
 NOTICES = {
     "closed": _("Month closed."),
@@ -185,16 +188,22 @@ def _optional_uuid(value: str) -> UUID | None:
         return None
 
 
+_COUNT = re.compile(r"[0-9]{1,6}")  # ASCII digits only: str.isdigit() also accepts "²"
+
+
 def _copied(month: YearMonth, copied: str, skipped: str) -> CopyResult | None:
-    """The copy reported after a plain form post (``?plan_copied=N&plan_skipped=M``)."""
+    """The copy reported after a plain form post (``?plan_copied=N&plan_skipped=M``); anything
+    malformed is ignored."""
     source = month.prev()
-    if source is None or not copied.isdigit() or not (skipped or "0").isdigit():
+    skipped = skipped or "0"
+    if source is None or not _COUNT.fullmatch(copied) or not _COUNT.fullmatch(skipped):
         return None
-    return CopyResult(source=source, copied=int(copied), skipped=int(skipped or "0"), kept=0)
+    return CopyResult(source=source, copied=int(copied), skipped=int(skipped), kept=0)
 
 
 def _auto_copy(request: Request, ctx: Context, month: YearMonth) -> CopyResult | None:
-    """The automatic plan copy (F2.3) for a full page view; never for HEAD (blocking)."""
+    """The automatic plan copy (F2.3) for a full page view (blocking). HEAD never gets here
+    (405); the check keeps a future HEAD route from writing."""
     if request.method != "GET":
         return None
     return auto_copy_on_open(request.app.state.session_factory, ctx, month)

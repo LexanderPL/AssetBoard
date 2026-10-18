@@ -287,12 +287,23 @@ part B)**
   after "from" use `i18n.dates.format_month_after_from` (CLDR's format-context name: "z
   września 2026"). After a copy: "Copied N planned values from …" (or "… (workspace setting)"
   for the automatic copy), and how many were not copied.
-- The month page GET (not HEAD) calls `services.budget.auto_copy_on_open` before rendering.
+- The month page GET calls `services.budget.auto_copy_on_open` before rendering (HEAD answers
+  405: FastAPI's GET routes do not take HEAD). `?plan_copied=`/`plan_skipped=` are read only as
+  1-6 ASCII digits (anything else is ignored), and the copy result is shown to writers only.
+- A new value for a category that left the plan meanwhile (archived or turned into a transfer
+  in another tab, no line) reloads the page with the message (`?error=plan_category_archived` /
+  `plan_category_transfer`; HTMX: 409 with `HX-Redirect`), since its row is gone. The
+  too-many-decimals message names the stored currency the value was judged in.
+- The screen-reader line `#plan-status` sits outside `#month-summary` (a transaction write's
+  out-of-band summary never clears it); a copy announces its result there. A cell's save that
+  completes after a transaction write replaced the block swaps into the new block's row of the
+  same id (`app.js` listens on the row itself: HTMX fires `htmx:beforeSwap` on the detached
+  row). Empty read-only cells show "—" with "Not planned" as screen-reader text.
 - Every transaction write renders the whole block out of band. `app.js` (delegated listeners):
   Enter in a planned cell moves to the next cell (the change saves the one left; on the last
   cell Enter saves in place), Esc restores the saved value (`data-saved-value`) and clears the
   message; a planned value being typed when a transaction write swaps the block keeps its text,
-  focus and selection and is saved when the field is left; the server's `data-autofocus` of the
+  focus and selection and is saved once when the field is left; the server's `data-autofocus` of the
   transaction table does not pull the focus out of a planned cell.
 
 **Agent prompt**

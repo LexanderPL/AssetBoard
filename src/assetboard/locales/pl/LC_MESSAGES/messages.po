@@ -1886,12 +1886,6 @@ msgstr "Ten miesiąc nie ma jeszcze planu."
 msgid "Copy plan from %(month)s"
 msgstr "Kopiuj plan z %(month)s"
 
-msgid "Undo"
-msgstr "Cofnij"
-
-msgid "Plan"
-msgstr "Plan"
-
 msgid ""
 "Nothing was copied: every category that can take a planned value already "
 "has one."
@@ -1931,6 +1925,12 @@ msgstr[1] ""
 msgstr[2] ""
 "Nie skopiowano %(num)d wartości planowanych kategorii zarchiwizowanych "
 "lub przelewów własnych."
+
+msgid "Undo"
+msgstr "Cofnij"
+
+msgid "Plan"
+msgstr "Plan"
 
 msgid "Planned"
 msgstr "Plan"
