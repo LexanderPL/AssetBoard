@@ -74,7 +74,7 @@ MEMBER_ERRORS = {
 }
 INVITATION_ERRORS = {
     "invalid_email": _("Enter a valid email address."),
-    "owner_requires_email": _("Owner invitations must be locked to an email address."),
+    "email_required": _("Enter the email address of the person you invite."),
     "invalid_expiry": _("Choose how long the link stays valid."),
     "invalid_role": _("Choose a role."),
     "too_many_invitations": _(
@@ -167,13 +167,16 @@ async def settings_submit(
     country_code: FormStr = "",
     timezone: FormStr = "",
     locale: FormStr = "",
+    auto_copy_plan: FormStr = "",
 ) -> Response:
+    copy_plan = auto_copy_plan == "1"  # an unchecked box sends nothing
     submitted = WorkspaceSettings(
         name=name,
         base_currency=base_currency,
         country_code=country_code or None,
         timezone=timezone,
         locale=locale,
+        auto_copy_plan=copy_plan,
     )
     try:
         await run_in_threadpool(
@@ -185,6 +188,7 @@ async def settings_submit(
                 country_code=country_code or None,
                 timezone=timezone,
                 locale=locale,
+                auto_copy_plan=copy_plan,
             )
         )
     except InvalidWorkspaceSettings as exc:
@@ -330,7 +334,7 @@ async def invitation_create(
         try:
             created = await run_in_threadpool(
                 lambda: create_invitation(
-                    factory, ctx, role=role, email=email or None, expires_in_days=days
+                    factory, ctx, role=role, email=email, expires_in_days=days
                 )
             )
         except InvalidInvitation as exc:

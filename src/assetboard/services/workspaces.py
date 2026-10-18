@@ -8,7 +8,8 @@ each sees the previous one's result.
 
 **Base currency.** Stored amounts are in the base currency and are never converted, so the
 currency is locked once any amount exists (soft-deleted rows included). Each feature that stores
-amounts adds a check to ``BASE_CURRENCY_LOCKS``: F2.2 transactions now, F2.3 budget lines next.
+amounts adds a check to ``BASE_CURRENCY_LOCKS``: F2.2 transactions (soft-deleted ones included)
+and F2.3 budget lines (the lines that exist now: a removed planned value holds no amount).
 The settings write takes the exclusive workspace lock first, so on PostgreSQL a currency change
 and a concurrent first transaction (which takes the shared lock) cannot both pass.
 """
@@ -31,6 +32,7 @@ from assetboard.db.repositories import (
     WorkspaceMember,
 )
 from assetboard.domain.identity import InvalidEmail, normalize_email
+from assetboard.services.budget import workspace_has_budget_lines
 from assetboard.services.context import Context, PermissionDenied, Role, require_role
 from assetboard.services.invitations import new_token
 from assetboard.services.transactions import workspace_has_transactions
@@ -42,7 +44,10 @@ DEFAULT_INVITATION_EXPIRY_DAYS = 7
 MAX_PENDING_INVITATIONS = 50
 
 # Checks that lock the base currency: each returns True while amounts exist in the workspace.
-BASE_CURRENCY_LOCKS: list[Callable[[Session, Context], bool]] = [workspace_has_transactions]
+BASE_CURRENCY_LOCKS: list[Callable[[Session, Context], bool]] = [
+    workspace_has_transactions,
+    workspace_has_budget_lines,
+]
 
 
 class WorkspaceError(Exception):
@@ -88,7 +93,7 @@ class CreatedInvitation:
     id: UUID
     token: str
     role: str
-    email: str | None
+    email: str
     expires_at: datetime
 
 
@@ -96,7 +101,7 @@ class CreatedInvitation:
 class PendingInvitation:
     id: UUID
     role: str
-    email: str | None
+    email: str | None  # None only for invitations created before the lock became mandatory
     expires_at: datetime
     created_at: datetime
 
@@ -108,6 +113,8 @@ class WorkspaceSettings:
     country_code: str | None
     timezone: str
     locale: str
+    # F2.3: copy the previous month's plan when a month is first opened.
+    auto_copy_plan: bool = False
     # True once amounts are stored in the base currency (it can no longer change).
     base_currency_locked: bool = False
 
@@ -145,6 +152,7 @@ def workspace_settings(factory: sessionmaker[Session], ctx: Context) -> Workspac
             country_code=workspace.country_code,
             timezone=workspace.timezone,
             locale=workspace.locale,
+            auto_copy_plan=workspace.auto_copy_plan,
             base_currency_locked=_base_currency_locked(session, ctx),
         )
 
@@ -158,6 +166,7 @@ def update_settings(
     country_code: str | None,
     timezone: str,
     locale: str,
+    auto_copy_plan: bool,
 ) -> WorkspaceSettings:
     """Change the workspace's settings; the audit event lists changed fields, not values."""
     require_role(ctx, Role.OWNER)
@@ -179,6 +188,7 @@ def update_settings(
         country_code=options.country_code,
         timezone=options.timezone,
         locale=options.locale,
+        auto_copy_plan=auto_copy_plan,
     )
 
     def write(session: Session) -> WorkspaceSettings:
@@ -195,6 +205,7 @@ def update_settings(
                 ("country_code", wanted.country_code),
                 ("timezone", wanted.timezone),
                 ("locale", wanted.locale),
+                ("auto_copy_plan", wanted.auto_copy_plan),
             )
             if getattr(workspace, field) != value
         }
@@ -305,22 +316,26 @@ def create_invitation(
     ctx: Context,
     *,
     role: Role | str,
-    email: str | None,
+    email: str,
     expires_in_days: int,
 ) -> CreatedInvitation:
-    """Create a single-use invitation link. Owner invitations must be locked to an email."""
+    """Create a single-use invitation link, locked to an email address (every role).
+
+    Invitations created before the lock became mandatory may have no email; they stay usable
+    until they expire, are used or are revoked (``services.invitations`` accepts them). No
+    account is looked up here, so creating an invitation reveals nothing about which addresses
+    are registered.
+    """
     require_role(ctx, Role.OWNER)
     invited_role = Role(role)
     if expires_in_days not in INVITATION_EXPIRY_DAYS:
         raise InvalidInvitation("expires_in_days", "invalid_expiry")
-    locked_email: str | None = None
-    if email and email.strip():
-        try:
-            locked_email = normalize_email(email)
-        except InvalidEmail as exc:
-            raise InvalidInvitation("email", "invalid_email") from exc
-    if invited_role is Role.OWNER and locked_email is None:
-        raise InvalidInvitation("email", "owner_requires_email")
+    if not email.strip():
+        raise InvalidInvitation("email", "email_required")
+    try:
+        locked_email = normalize_email(email)
+    except InvalidEmail as exc:
+        raise InvalidInvitation("email", "invalid_email") from exc
     token, token_hash = new_token()
     now = ctx.clock.now()
     expires_at = now + timedelta(days=expires_in_days)
@@ -346,7 +361,7 @@ def create_invitation(
             ts=now,
             data={
                 "role": invited_role.value,
-                "email_locked": locked_email is not None,
+                "email_locked": True,  # always, since pre-release A
                 "expires_in_days": expires_in_days,
             },
         )

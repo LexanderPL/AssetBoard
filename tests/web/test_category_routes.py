@@ -293,11 +293,11 @@ def test_the_automatic_seed_appears_in_the_audit_log_translated(owner: OwnerApp)
     # Setup seeded "Home" (the autouse fixture removed the categories, not the event).
     page = owner.client.get("/audit?scope=workspace&group=categories").text
     assert "Suggested categories added" in page
-    assert "Added with the new workspace: yes" in page
+    assert "Automatic: yes" in page
     owner.client.headers["Accept-Language"] = "pl"
     page = owner.client.get("/audit?scope=workspace&group=categories").text
     assert "Dodano proponowane kategorie" in page
-    assert "Dodane z nowym obszarem roboczym: tak" in page
+    assert "Automatycznie: tak" in page
 
 
 def test_the_page_never_opens_an_edit_form_for_an_archived_category(owner: OwnerApp) -> None:

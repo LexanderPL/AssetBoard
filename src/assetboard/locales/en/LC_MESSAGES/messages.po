@@ -238,6 +238,18 @@ msgstr ""
 msgid "Deleted transaction restored"
 msgstr ""
 
+msgid "Planned value added"
+msgstr ""
+
+msgid "Planned value changed"
+msgstr ""
+
+msgid "Planned value removed"
+msgstr ""
+
+msgid "Plan copied from the previous month"
+msgstr ""
+
 msgid "Other event"
 msgstr ""
 
@@ -319,9 +331,6 @@ msgstr ""
 msgid "Number"
 msgstr ""
 
-msgid "Added with the new workspace"
-msgstr ""
-
 msgid "Month"
 msgstr ""
 
@@ -347,6 +356,15 @@ msgid "Previous amount"
 msgstr ""
 
 msgid "Currency"
+msgstr ""
+
+msgid "Copied from"
+msgstr ""
+
+msgid "Not copied"
+msgstr ""
+
+msgid "Automatic"
 msgstr ""
 
 msgid "owner"
@@ -542,6 +560,9 @@ msgid "Closing months"
 msgstr ""
 
 msgid "Transactions"
+msgstr ""
+
+msgid "Planned values"
 msgstr ""
 
 msgid "Sign-ins"
@@ -1117,7 +1138,7 @@ msgstr ""
 msgid "You cannot remove yourself from the workspace."
 msgstr ""
 
-msgid "Owner invitations must be locked to an email address."
+msgid "Enter the email address of the person you invite."
 msgstr ""
 
 msgid "Choose how long the link stays valid."
@@ -1806,9 +1827,6 @@ msgstr ""
 msgid "Copy"
 msgstr ""
 
-msgid "Email (optional)"
-msgstr ""
-
 msgid "Valid for"
 msgstr ""
 
@@ -1818,10 +1836,7 @@ msgid_plural "%(num)d days"
 msgstr[0] ""
 msgstr[1] ""
 
-msgid ""
-"With an email, only an account with that address can accept. Owner "
-"invitations must have one: an owner can change everything, including "
-"members."
+msgid "Only an account with this email address can accept the invitation."
 msgstr ""
 
 msgid ""
@@ -1833,6 +1848,14 @@ msgid "Create invitation link"
 msgstr ""
 
 msgid "Pending invitations"
+msgstr ""
+
+msgid "Anyone with the link"
+msgstr ""
+
+msgid ""
+"Created before invitations required an email; anyone with the link can "
+"use it until it expires."
 msgstr ""
 
 #, python-format
@@ -1852,11 +1875,20 @@ msgid "General"
 msgstr ""
 
 msgid ""
-"Locked: transactions exist (deleted ones included), and their amounts are"
-" stored in this currency."
+"Locked: transactions (deleted ones included) or planned values exist, and"
+" their amounts are stored in this currency."
 msgstr ""
 
 msgid "Formatting default"
+msgstr ""
+
+msgid "Copy the previous month's plan when a month is opened for the first time"
+msgstr ""
+
+msgid ""
+"Applies to the current and later months that have never had planned "
+"values, when an editor or owner opens them. Existing planned values are "
+"never overwritten."
 msgstr ""
 
 msgid ""
@@ -1937,9 +1969,31 @@ msgstr ""
 #~ "again later, or start over."
 #~ msgstr ""
 
+#~ msgid "Owner invitations must be locked to an email address."
+#~ msgstr ""
+
+#~ msgid "Email (optional)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "With an email, only an account "
+#~ "with that address can accept. Owner "
+#~ "invitations must have one: an owner "
+#~ "can change everything, including members."
+#~ msgstr ""
+
 #~ msgid "Nothing in this month yet"
 #~ msgstr ""
 
 #~ msgid "Entries and planned values for this month will appear here."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Locked: transactions exist (deleted ones "
+#~ "included), and their amounts are stored"
+#~ " in this currency."
+#~ msgstr ""
+
+#~ msgid "Added with the new workspace"
 #~ msgstr ""
 
