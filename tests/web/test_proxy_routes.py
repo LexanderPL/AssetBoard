@@ -31,7 +31,6 @@ from assetboard.db.models.identity import (
     UserSession,
     Workspace,
 )
-from assetboard.db.models.ledger import Category
 from assetboard.domain.categories import SEED
 from assetboard.i18n import gettext
 from assetboard.services.auth import argon2_hash, session_id_hash
@@ -40,6 +39,7 @@ from assetboard.services.external_identity import PROXY_PROVIDER
 from assetboard.services.workspaces import create_invitation
 from assetboard.web import gate
 from assetboard.web.security import session_cookie_name
+from tests.conftest import owned_workspace_category_names
 
 if TYPE_CHECKING:
     from conftest import WebHarness
@@ -699,24 +699,11 @@ def test_session_ids_in_rows_are_hashes(proxy: Proxy) -> None:
     assert hashes == [session_id_hash(client.cookies[proxy.cookie])]
 
 
-def _seeded_names(factory: Any, email: str) -> list[str]:
-    """Category names of the workspace ``email`` owns (every new workspace is seeded)."""
-    with factory() as session:
-        workspace_id = session.scalars(
-            select(Membership.workspace_id)
-            .join(User, User.id == Membership.user_id)
-            .where(User.email == email, Membership.role == "owner")
-        ).one()
-        return list(
-            session.scalars(select(Category.name).where(Category.workspace_id == workspace_id))
-        )
-
-
 def test_auto_create_seeds_the_new_workspace_in_the_request_language(proxy: Proxy) -> None:
     client = proxy.client()
     headers = OLA | {"accept-language": "pl"}
     first = client.get("/", headers=headers, follow_redirects=False)
     signed_in = client.get(first.headers["location"], headers=headers, follow_redirects=False)
     assert signed_in.status_code == 303
-    names = _seeded_names(proxy.app.state.session_factory, "ola@example.com")
+    names = owned_workspace_category_names(proxy.app.state.session_factory, "ola@example.com")
     assert len(names) == len(SEED) and gettext("Food", "pl") in names
