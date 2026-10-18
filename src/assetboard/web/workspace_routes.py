@@ -330,7 +330,7 @@ async def invitation_create(
         try:
             created = await run_in_threadpool(
                 lambda: create_invitation(
-                    factory, ctx, role=role, email=email or None, expires_in_days=days
+                    factory, ctx, role=role, email=email, expires_in_days=days
                 )
             )
         except InvalidInvitation as exc:

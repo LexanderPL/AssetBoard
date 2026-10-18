@@ -305,7 +305,7 @@ def create_invitation(
     ctx: Context,
     *,
     role: Role | str,
-    email: str | None,
+    email: str,
     expires_in_days: int,
 ) -> CreatedInvitation:
     """Create a single-use invitation link, locked to an email address (every role).
@@ -319,7 +319,7 @@ def create_invitation(
     invited_role = Role(role)
     if expires_in_days not in INVITATION_EXPIRY_DAYS:
         raise InvalidInvitation("expires_in_days", "invalid_expiry")
-    if email is None or not email.strip():
+    if not email.strip():
         raise InvalidInvitation("email", "email_required")
     try:
         locked_email = normalize_email(email)

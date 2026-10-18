@@ -132,9 +132,8 @@ def test_create_invitation_stores_only_the_token_hash(team: WorkspaceDb) -> None
 @pytest.mark.parametrize(
     ("kwargs", "field", "code"),
     [
-        ({"role": "owner", "email": None}, "email", "email_required"),
+        ({"role": "owner", "email": ""}, "email", "email_required"),
         ({"role": "owner", "email": "  "}, "email", "email_required"),
-        ({"role": "editor", "email": None}, "email", "email_required"),
         ({"role": "editor", "email": ""}, "email", "email_required"),
         ({"role": "viewer", "email": " \t "}, "email", "email_required"),
         ({"role": "editor", "email": "not-an-email"}, "email", "invalid_email"),
