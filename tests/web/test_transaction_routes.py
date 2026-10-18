@@ -182,7 +182,10 @@ def test_a_full_date_in_another_month_is_saved_there_and_linked(ledger: OwnerApp
     response = _add(ledger, _form(food, "07.09.2026"))
     assert response.headers["location"] == f"{MONTH}?saved_in=2026-09#ledger-expense"
     page = _page(ledger, f"{MONTH}?saved_in=2026-09")
-    assert '<a href="/m/2026-09" class="font-medium underline">Entry saved in September 2026.</a>' in page
+    assert (
+        '<a href="/m/2026-09" class="font-medium underline">Entry saved in September 2026.</a>'
+        in page
+    )
     assert _descriptions(page, "expense") == []
     html = _htmx(ledger, f"{MONTH}/transactions", _form(food, "2026-11-02")).text
     assert '<a href="/m/2026-11"' in html and "Entry saved in November 2026." in html
@@ -213,7 +216,12 @@ def test_day_errors_are_shown_on_the_day_field(ledger: OwnerApp, day: str, messa
 
 @pytest.mark.parametrize(
     ("amount", "locale", "minor"),
-    [("1 234,56", "pl", 123456), ("1,234.56", "en", 123456), ("12,5", "pl", 1250), ("7", "en", 700)],
+    [
+        ("1 234,56", "pl", 123456),
+        ("1,234.56", "en", 123456),
+        ("12,5", "pl", 1250),
+        ("7", "en", 700),
+    ],
 )
 def test_amounts_are_read_in_the_locale_format(
     ledger: OwnerApp, amount: str, locale: str, minor: int
@@ -263,7 +271,10 @@ def test_description_and_category_errors(ledger: OwnerApp) -> None:
     cases = [
         (_form(food, description="bad\u0000text"), "not allowed"),
         (_form(salary), "Choose an expense category."),
-        (_form(salary, direction="income") | {"category_id": str(food)}, "Choose an income category."),
+        (
+            _form(salary, direction="income") | {"category_id": str(food)},
+            "Choose an income category.",
+        ),
         (_form("not-a-uuid"), "Choose one of the listed categories."),
         (_form(UUID(int=7)), "Choose one of the listed categories."),
     ]
@@ -338,9 +349,12 @@ def test_edit_without_javascript_uses_the_page(ledger: OwnerApp) -> None:
     assert response.headers["location"] == f"{MONTH}?edit={row_id}#tx-{row_id}"
     page = _page(ledger, f"{MONTH}?edit={row_id}")
     assert "data-edit-row" in page and f'href="{MONTH}#tx-{row_id}"' in page
-    assert ledger.client.get(f"{MONTH}/transactions/{row_id}/row", follow_redirects=False).headers[
-        "location"
-    ] == MONTH
+    assert (
+        ledger.client.get(f"{MONTH}/transactions/{row_id}/row", follow_redirects=False).headers[
+            "location"
+        ]
+        == MONTH
+    )
     assert "data-edit-row" not in _page(ledger, f"{MONTH}?edit=nonsense")
 
 
@@ -417,7 +431,9 @@ def test_undo_after_ten_seconds_is_too_late(ledger: OwnerApp) -> None:
     assert response.headers["HX-Retarget"] == "#toast-container"
     plain = ledger.post(f"{MONTH}/transactions/{row_id}/undo", token_from=MONTH)
     assert plain.headers["location"] == f"{MONTH}?error=undo_expired"
-    assert "Too late to undo: the entry stays deleted." in _page(ledger, f"{MONTH}?error=undo_expired")
+    assert "Too late to undo: the entry stays deleted." in _page(
+        ledger, f"{MONTH}?error=undo_expired"
+    )
     assert _rows(ledger)[0].deleted_at is not None
 
 
