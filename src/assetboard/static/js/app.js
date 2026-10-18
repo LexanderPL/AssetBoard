@@ -51,7 +51,10 @@ function startToastTimer(toast) {
   if (!(toast instanceof HTMLElement) || !toast.matches("[data-toast]") || toastTimers.has(toast)) {
     return;
   }
-  const remaining = toast.querySelector("[data-toast-undo]") ? 10000 : 5000;
+  // An undo toast is strict: the server's undo window does not pause, so neither does it.
+  const strict = toast.hasAttribute("data-toast-strict");
+  const seconds = Number(toast.dataset.toastSeconds) || 10;
+  const remaining = strict || toast.querySelector("[data-toast-undo]") ? seconds * 1000 : 5000;
   const timer = { remaining, startedAt: 0, timeoutId: 0 };
   const pauseReasons = new Set();
   const resume = () => {
@@ -70,12 +73,23 @@ function startToastTimer(toast) {
     pauseReasons.delete(reason);
     resume();
   };
-  toast.addEventListener("mouseenter", () => pause("hover"));
-  toast.addEventListener("mouseleave", () => unpause("hover"));
-  toast.addEventListener("focusin", () => pause("focus"));
-  toast.addEventListener("focusout", (event) => {
-    if (!toast.contains(event.relatedTarget)) unpause("focus");
-  });
+  if (strict) {
+    const countdown = toast.querySelector("[data-toast-countdown]");
+    const end = Date.now() + remaining;
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+      if (countdown) countdown.textContent = String(left);
+      if (left > 0 && toast.isConnected) window.setTimeout(tick, 250);
+    };
+    tick();
+  } else {
+    toast.addEventListener("mouseenter", () => pause("hover"));
+    toast.addEventListener("mouseleave", () => unpause("hover"));
+    toast.addEventListener("focusin", () => pause("focus"));
+    toast.addEventListener("focusout", (event) => {
+      if (!toast.contains(event.relatedTarget)) unpause("focus");
+    });
+  }
   toastTimers.set(toast, timer);
   resume();
 }
@@ -165,3 +179,4 @@ document.addEventListener("click", async (event) => {
     // Without clipboard access the selected text can still be copied by hand.
   }
 });
+
