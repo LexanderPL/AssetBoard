@@ -206,16 +206,19 @@ when you intend to upload the image and its release tags.
 
 - **New colours.** The interface uses neutral greys with a blue primary colour, in both the
   light and the dark theme; the green brand colour is gone. An orange accent colour is defined
-  but reserved for future highlights. Dropdowns have
-  more room around their arrow. Theme choices (saved and per device) are kept. No setting or
-  migration.
+  but reserved for future highlights. Dropdowns have more room around their arrow. Theme
+  choices (saved and per device) are kept. No setting or migration.
 - **Separate sign-in messages.** A wrong email or password now says "The email or password is
   not correct."; only a throttled attempt says "Too many attempts. Try again in N minutes." The
   response is still `401`, now with a `Retry-After` header when throttled, so fail2ban or proxy
   rules that count 401s on `POST /login` keep working. Rules that match the old page text ("or
-  there were too many attempts") need updating. Unknown and known emails are throttled alike;
-  what the throttled message can still hint at is an accepted risk described in
-  [ADR-0012](adr/0012-local-authentication.md) (amendment of 2026-10-17).
+  there were too many attempts") need updating.
+- **Sign-in counting changed.** The per-email sign-in count now covers attempts within a window
+  equal to `ASSETBOARD_AUTH_IP_WINDOW_MINUTES` (60 by default) and is no longer cleared by a
+  successful sign-in, so it reveals nothing about which accounts exist. Wrong passwords on
+  password change and confirmation pages have their own per-user count and no longer block
+  sign-in. Existing counters carry over; no migration
+  ([ADR-0012](adr/0012-local-authentication.md), amendment of 2026-10-17).
 
 ### Unreleased: transactions, data layer (F2.2 part A)
 

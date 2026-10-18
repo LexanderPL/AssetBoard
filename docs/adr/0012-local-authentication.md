@@ -62,10 +62,9 @@ Neither middleware reads a request body; forms are parsed once, by FastAPI.
   memory, so the app must run as a single Uvicorn worker.
 - No user enumeration through sign-in: unknown email and wrong password get the same response.
   A throttled attempt says so, with the wait ("Too many attempts. Try again in N minutes."); the
-  account bucket is keyed by the normalized email and counted the same way whether or not an
-  account has it, so an attacker's own attempts look the same for every email. A bucket reset by
-  the owner's activity can still hint that an account exists; this is an accepted risk pending
-  owner confirmation (amendment of 2026-10-17).
+  sign-in bucket is keyed by the normalized email, counted the same way whether or not an
+  account has it, and decays with time only; nothing the account's owner does resets it, so it
+  looks the same for every email (amendment of 2026-10-17).
 - A failed sign-in returns 401 without `WWW-Authenticate`: no HTTP authentication scheme is
   offered (the form is the only way in), and the 401 lets log-based tools such as fail2ban or
   proxy rules count failures without parsing the page.
@@ -109,7 +108,8 @@ ADR-0014 adds OIDC sign-in. For local authentication this means:
   administrators.
 - **Password confirmation.** Linking an OIDC identity to an account that has a password needs
   that password once. The check reuses login's per-account and per-address throttle and dummy
-  verify; F1.5 reuses it for sensitive profile actions.
+  verify; F1.5 reuses it for sensitive profile actions. (Since 2026-10-17 the per-account part
+  is a separate per-user `confirm` bucket; see that amendment.)
 - **Sessions record how they started** (`auth_method`: `password` or `oidc`).
 
 ## Amendment (2026-10-12): proxy header authentication (F1.4)
@@ -127,7 +127,8 @@ ADR-0015 adds reverse-proxy header authentication. For local authentication this
 - **One confirmation entry point.** Linking or unlinking a sign-in method and signing out other
   devices are confirmed through `services.profile.confirm_sensitive`. An account with a password
   always confirms with it, through the existing `confirm_password_with_factory` primitive
-  (login's throttle, dummy verify, audited failures), unchanged.
+  (login's throttle, dummy verify, audited failures), unchanged. (Since 2026-10-17 it uses the
+  per-user `confirm` bucket instead of the sign-in one.)
 - **Accounts without a password** (created through OIDC or the proxy) confirm with a fresh
   external session instead: the current session started through OIDC or the proxy at most
   10 minutes ago (`UserSession.created_at`, not its last activity). **This is weaker than a
@@ -181,36 +182,54 @@ and someone who had to wait nothing about how long. Now:
   rounded up to whole minutes; "Try again later" if it cannot be computed. The attempt that
   sets the block was verified, so it still gets the ordinary message.
 
-What keeps unknown and known emails alike:
+### Buckets
 
-- The account bucket is keyed by the normalized email (or `invalid:<input>` for malformed
-  input) and reserved before the user is looked up. An unknown email is counted, backed off and
-  blocked exactly like a known one, and unknown users go through the same dummy verify, so the
-  sequence of responses, the wait and the timing are the same whether or not the account
-  exists (tests compare them).
-- The address bucket does not depend on any account.
-- A blocked attempt is answered from read-only lookups of both buckets, before the user table
-  is read, and verifies nothing, for every email alike.
-What is still visible (**accepted risk, pending owner confirmation**):
+- **Sign-in (`account`)**, per normalized email (or `invalid:<input>` for malformed input):
+  5 free failures by default, then the usual backoff. It counts in a fixed window, the
+  address bucket's (`ASSETBOARD_AUTH_IP_WINDOW_MINUTES`, 60 minutes by default): when the
+  window has passed, the next attempt starts a new count. **Nothing resets it.** A successful
+  sign-in only takes back its own reserved attempt, as the address bucket always did, which
+  leaves the bucket exactly as if that sign-in had not happened.
+- **Password re-check (`confirm`)**, per user id: password change, password confirmation of
+  sensitive actions (profile, administration, signing out other devices) and the password step
+  of linking an identity provider or proxy sign-in by email. Same free failures and backoff, no
+  window (it expires when idle for 24 hours, like every row), and reset by a correct password.
+  These flows are reachable only by a signed-in user or for an email the identity provider
+  proved, which the page already names, so this bucket's state discloses nothing. They never
+  touch the sign-in bucket.
+- **Address (`ip`)**, unchanged: login and password confirmation count there.
 
-- **Resets reveal activity on an existing account.** A successful sign-in, password change or
-  password confirmation by the account's owner resets its bucket; that can only happen for an
-  account that exists. An attacker can build up an email's counter, wait for the block to
-  expire, and try once more: if the bucket was not reset, that attempt blocks again with a
-  doubled wait; if the owner signed in meanwhile, it gets the ordinary message. The difference
-  shows that the account exists (and was used).
-- **Other people's failures.** Password-change and password-confirmation failures (possible
-  only for existing, signed-in accounts) count in the same account bucket, so a bucket blocked
-  without the observer's own attempts hints that someone failed against that email.
-- **This was already observable through timing**: a blocked attempt answers fast, an unblocked
-  one costs an Argon2 verify. The explicit message and `Retry-After` make it easier to read,
-  not newly possible.
-- **Why it is accepted for this app**: it is self-hosted, usually with a handful of accounts;
-  the signal needs repeated, targeted attempts against one email spread over the backoff
-  windows, and it depends on the owner happening to sign in between them; and the per-address
-  bucket (20 failures per hour) limits how many emails one client can probe this way. Removing
-  it would mean going back to one message for every failure, which is what users found
-  confusing. If the owner does not accept it, that is the fallback.
+The window is the address bucket's rather than the 15-minute backoff cap: with a 15-minute
+window an attacker would get 5 fresh guesses per email every 15 minutes (20 an hour); with 60
+minutes it is 5 an hour plus the backoff, the same rate the address bucket allows per network.
+Reusing the setting keeps one sign-in window to explain and tune.
+
+### Why the throttled message reveals no account
+
+- The sign-in bucket is reserved before the user is looked up, unknown users go through the
+  same dummy verify, and a blocked attempt is answered from read-only lookups of the buckets
+  before the user table is read. An unknown email is counted, backed off and blocked exactly
+  like a known one.
+- Its state depends only on the sign-in attempts made against that email and on time. The
+  owner's successful sign-ins leave no trace in it; password changes and confirmations go to
+  the `confirm` bucket. So the earlier signal is gone: an attacker who builds up an email's
+  counter, waits out the block and tries again gets the same answer whether or not the owner
+  signed in meanwhile, and whether or not the account exists. A property test drives random
+  sequences of attacker attempts and owner actions and checks that outcomes and bucket state
+  are identical for a known and an unknown email; the build-wait-retry case has its own test.
+- What remains visible is that *someone* made sign-in attempts against an email (a block the
+  observer did not cause). Anyone can make those against any address, existing or not, so this
+  says nothing about the account. Timing tells the same thing as before: a blocked attempt is
+  fast, an unblocked one costs one Argon2 verify, for every email alike.
+
+### Trade-off
+
+An owner's own mistyped passwords are no longer cleared by signing in successfully: they
+expire with the window. Someone who mistypes a few times, signs in, and later mistypes again
+within the hour reaches the backoff sooner than before. With 5 free failures per hour this is
+rare, and the wait is shown. A deliberate lockout by an attacker is bounded by the 15-minute
+backoff cap as before (and, as before, a correct password does not get through while the
+email is blocked).
 
 The status stays **401** (not 429) with a `Retry-After` header in seconds: the 401 is what
 log-based tools such as fail2ban count, and a 429 would let a throttled attacker's continued

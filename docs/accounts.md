@@ -11,8 +11,12 @@ are on "Account security".
 - By default, 5 failed attempts for an email (or 20 from one network address) are free; the
   6th (or the 21st) starts a pause, and attempts during it say "Too many attempts. Try again in
   N minutes." The pause starts at 1 minute and doubles with each further failure, up to 15
-  minutes. Your administrator can change these limits. A successful sign-in resets the count for
-  your account. Wrong passwords when changing your password or confirming a change count too.
+  minutes. The count covers every sign-in attempt for that email in the last hour (from the
+  first failure) and is not cleared by signing in successfully: earlier mistakes expire after
+  the hour. Your administrator can change these limits.
+- Wrong passwords when changing your password or confirming a change are counted separately
+  (5 free, then the same pause); they never block signing in, and a correct password clears
+  them.
 
 ## Details, language and theme
 
@@ -41,8 +45,8 @@ The profile lists the identity providers (OIDC) and the proxy sign-in linked to 
 
 Linking, removing a sign-in method and signing out other devices ask for confirmation:
 
-- **With a password**, you enter it. Wrong passwords count like failed sign-ins; after too
-  many, the page says how many minutes to wait.
+- **With a password**, you enter it. Wrong passwords are counted (separately from sign-in);
+  after too many, the page says how many minutes to wait.
 - **Without a password** (your account was created through an identity provider or the proxy),
   a sign-in from the last 10 minutes confirms it. After that, the page says "sign in again":
   - with an identity provider: sign out, then "Continue with <provider>" on the sign-in page;
