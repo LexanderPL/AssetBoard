@@ -62,7 +62,12 @@ def update_settings(
     host: str | None,
     user_agent: str | None,
 ) -> UpdateStatus:
-    """Change the settings, inside the confirming transaction (``actor`` confirmed)."""
+    """Change the settings, inside the confirming transaction (``actor`` confirmed).
+
+    Migration 0013 creates the row, so it always exists; the insert below only covers a
+    database where it was deleted by hand. Two administrators inserting it at once could then
+    collide on PostgreSQL (a primary-key error, nothing lost); that race is theoretical.
+    """
     if not actor.is_active or not actor.is_instance_admin:
         raise NotInstanceAdmin
     row = session.get(InstanceSettings, ROW_ID, with_for_update=True)
