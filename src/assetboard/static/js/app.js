@@ -353,7 +353,13 @@ function moveSuggestion(input, step) {
   const next = current < 0 ? (step > 0 ? 0 : options.length - 1) : (current + step + options.length) % options.length;
   options.forEach((option, index) => option.setAttribute("aria-selected", String(index === next)));
   input.setAttribute("aria-activedescendant", options[next].id);
-  options[next].scrollIntoView({ block: "nearest" });
+  // Scroll the list only: scrollIntoView would also scroll the table's wrapper.
+  const option = options[next];
+  const list = suggestionList(input);
+  if (list && option.offsetTop < list.scrollTop) list.scrollTop = option.offsetTop;
+  else if (list && option.offsetTop + option.offsetHeight > list.scrollTop + list.clientHeight) {
+    list.scrollTop = option.offsetTop + option.offsetHeight - list.clientHeight;
+  }
 }
 
 // Picking a suggestion sets the description and pre-selects its most used category.
@@ -425,6 +431,7 @@ function clearEntryRow(row) {
     }
   });
   row.querySelectorAll("[data-field-error]").forEach((message) => message.remove());
+  row.closest("[data-ledger]")?.querySelector("[data-ledger-error]")?.remove();
   row.querySelector("[name='day']")?.focus();
 }
 
