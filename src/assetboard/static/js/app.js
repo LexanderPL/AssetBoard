@@ -180,3 +180,173 @@ document.addEventListener("click", async (event) => {
   }
 });
 
+// Month page transaction tables (F2.2): entry and edit rows, focus after a swap, and the
+// description autocomplete (an ARIA combobox). Everything hangs off data-* attributes, so it
+// keeps working after HTMX swaps without any set-up; the forms also work without this script.
+
+// The server marks the element to focus after a swap (or on a page with a refused form).
+function focusRequested() {
+  const element = document.querySelector("[data-autofocus]");
+  if (!(element instanceof HTMLElement)) return;
+  element.removeAttribute("data-autofocus");
+  element.focus();
+  if (element instanceof HTMLInputElement) element.select();
+}
+document.addEventListener("htmx:load", focusRequested);
+
+function suggestionList(input) {
+  return document.getElementById(input.getAttribute("aria-controls") ?? "");
+}
+
+function suggestionOptions(list) {
+  return Array.from(list?.querySelectorAll("[role='option']") ?? []);
+}
+
+function closeSuggestions(input) {
+  const list = suggestionList(input);
+  input.setAttribute("aria-expanded", "false");
+  input.removeAttribute("aria-activedescendant");
+  if (!list) return;
+  list.hidden = true;
+  suggestionOptions(list).forEach((option) => option.setAttribute("aria-selected", "false"));
+}
+
+function openSuggestions(input) {
+  const list = suggestionList(input);
+  if (!list || suggestionOptions(list).length === 0) {
+    closeSuggestions(input);
+    return;
+  }
+  list.hidden = false;
+  input.setAttribute("aria-expanded", "true");
+}
+
+function moveSuggestion(input, step) {
+  const options = suggestionOptions(suggestionList(input));
+  if (options.length === 0) return;
+  openSuggestions(input);
+  const current = options.findIndex((option) => option.getAttribute("aria-selected") === "true");
+  const next = current < 0 ? (step > 0 ? 0 : options.length - 1) : (current + step + options.length) % options.length;
+  options.forEach((option, index) => option.setAttribute("aria-selected", String(index === next)));
+  input.setAttribute("aria-activedescendant", options[next].id);
+  options[next].scrollIntoView({ block: "nearest" });
+}
+
+// Picking a suggestion sets the description and pre-selects its most used category.
+function pickSuggestion(input, option) {
+  input.value = option.dataset.description ?? option.textContent ?? "";
+  input.dataset.picked = input.value;
+  const select = input.form?.elements.namedItem("category_id");
+  const categoryId = option.dataset.categoryId;
+  if (
+    select instanceof HTMLSelectElement &&
+    categoryId &&
+    Array.from(select.options).some((choice) => choice.value === categoryId)
+  ) {
+    select.value = categoryId;
+  }
+  closeSuggestions(input);
+  input.focus();
+}
+
+document.addEventListener("htmx:afterSwap", (event) => {
+  const list = event.detail?.target;
+  if (!(list instanceof HTMLElement) || !list.matches("[data-suggestions]")) return;
+  const input = document.querySelector(`[aria-controls="${list.id}"]`);
+  if (!(input instanceof HTMLInputElement)) return;
+  // Show the list only while the field has focus and was not just filled from it.
+  if (document.activeElement === input && input.dataset.picked !== input.value) {
+    input.removeAttribute("aria-activedescendant");
+    openSuggestions(input);
+  } else {
+    closeSuggestions(input);
+  }
+});
+
+document.addEventListener("focusout", (event) => {
+  const input = event.target;
+  if (input instanceof HTMLInputElement && input.matches("[data-suggest-input]")) {
+    closeSuggestions(input);
+  }
+});
+
+// mousedown would move the focus away (and close the list) before the click lands.
+document.addEventListener("mousedown", (event) => {
+  if (event.target instanceof Element && event.target.closest("[data-suggestions] [role='option']")) {
+    event.preventDefault();
+  }
+});
+
+document.addEventListener("click", (event) => {
+  if (!(event.target instanceof Element)) return;
+  const option = event.target.closest("[data-suggestions] [role='option']");
+  if (!(option instanceof HTMLElement)) return;
+  const list = option.closest("[data-suggestions]");
+  const input = document.querySelector(`[aria-controls="${list?.id}"]`);
+  if (input instanceof HTMLInputElement) pickSuggestion(input, option);
+});
+
+// Esc in the entry row clears it (fields and messages); the row keeps the focus.
+function clearEntryRow(row) {
+  row.querySelectorAll("[data-ledger-field]").forEach((field) => {
+    if (field instanceof HTMLSelectElement) field.selectedIndex = 0;
+    else if (field instanceof HTMLInputElement) field.value = "";
+    field.removeAttribute("aria-invalid");
+    const hint = field.getAttribute("data-describedby");
+    if (hint) field.setAttribute("aria-describedby", hint);
+    else field.removeAttribute("aria-describedby");
+    if (field instanceof HTMLInputElement && field.matches("[data-suggest-input]")) {
+      delete field.dataset.picked;
+      closeSuggestions(field);
+    }
+  });
+  row.querySelectorAll("[data-field-error]").forEach((message) => message.remove());
+  row.querySelector("[name='day']")?.focus();
+}
+
+function handleSuggestionKey(input, event) {
+  const expanded = input.getAttribute("aria-expanded") === "true";
+  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+    if (suggestionOptions(suggestionList(input)).length === 0) return false;
+    event.preventDefault();
+    moveSuggestion(input, event.key === "ArrowDown" ? 1 : -1);
+    return true;
+  }
+  if (!expanded) return false;
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeSuggestions(input);
+    return true;
+  }
+  if (event.key === "Enter") {
+    const active = document.getElementById(input.getAttribute("aria-activedescendant") ?? "");
+    if (!active) return false; // nothing chosen: Enter saves the row
+    event.preventDefault();
+    pickSuggestion(input, active);
+    return true;
+  }
+  return false;
+}
+
+document.addEventListener("keydown", (event) => {
+  const field = event.target;
+  if (!(field instanceof HTMLElement)) return;
+  const row = field.closest("[data-ledger-row-form]");
+  if (!row) return;
+  if (field instanceof HTMLInputElement && field.matches("[data-suggest-input]")) {
+    if (handleSuggestionKey(field, event)) return;
+  }
+  if (event.key === "Enter" && field instanceof HTMLSelectElement) {
+    // A select does not submit on Enter by itself; text fields do (implicit submission).
+    event.preventDefault();
+    field.form?.requestSubmit();
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    if (row.hasAttribute("data-edit-row")) {
+      const cancel = row.querySelector("[data-edit-cancel]");
+      if (cancel instanceof HTMLElement) cancel.click();
+    } else {
+      clearEntryRow(row);
+    }
+  }
+});
