@@ -1325,6 +1325,13 @@ def _workspace_options(
         raise InvalidAccountDetails("invalid_workspace_settings", str(exc)) from exc
 
 
+class WorkspaceCreationFailed(RuntimeError):
+    """Creating a new account's workspace or its categories failed on a constraint.
+
+    Not an ``IntegrityError``, so it is never mistaken for a duplicate email or identity.
+    """
+
+
 @dataclass(frozen=True, slots=True)
 class WorkspaceSeed:
     """Every new workspace gets the suggested categories (pre-release A): their language and
@@ -1385,25 +1392,30 @@ def _create_user_records(
     session.flush()
     if options is None or seed is None or workspace_name_clean is None:
         return user, None
-    workspace, scope = create_owned_workspace(
-        session,
-        name=workspace_name_clean,
-        base_currency=options.base_currency,
-        country_code=options.country_code,
-        timezone=options.timezone,
-        locale=options.locale,
-        owner_user_id=user.id,
-    )
-    categories.seed_into(
-        session,
-        scope,
-        locale=seed.locale,
-        actor_user_id=user.id if seed.actor_type == "user" else None,
-        actor_type=seed.actor_type,
-        now=seed.now,
-        automatic=True,
-    )
-    session.flush()
+    try:
+        workspace, scope = create_owned_workspace(
+            session,
+            name=workspace_name_clean,
+            base_currency=options.base_currency,
+            country_code=options.country_code,
+            timezone=options.timezone,
+            locale=options.locale,
+            owner_user_id=user.id,
+        )
+        categories.seed_into(
+            session,
+            scope,
+            locale=seed.locale,
+            actor_user_id=user.id if seed.actor_type == "user" else None,
+            actor_type=seed.actor_type,
+            now=seed.now,
+            automatic=True,
+        )
+        session.flush()
+    except IntegrityError as exc:
+        # Callers read an IntegrityError around this call as "the email (or identity) is
+        # taken"; only the user insert above can mean that. Anything else is a bug.
+        raise WorkspaceCreationFailed from exc
     return user, workspace
 
 
