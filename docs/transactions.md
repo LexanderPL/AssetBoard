@@ -25,12 +25,15 @@ you would type into a spreadsheet:
 Keys:
 
 - **Tab** moves to the next field (Shift+Tab to the previous one).
-- **Enter** saves the row, from any field. A new, empty entry row appears and the cursor is
-  back in its Day field, ready for the next entry.
-- **Esc** clears the entry row.
+- **Enter** saves the row, from any field. The row is ready for the next entry at once: it
+  keeps the day (as a day of the month, or the full date you typed if the entry went to another
+  month), the other fields are empty, and the cursor is in the Day field with the day selected.
+  Type a new day to replace it, or press Tab to keep it. You can go on typing while the entry
+  is being saved; nothing you type is lost. Each table keeps its own day.
+- **Esc** clears the entry row, the day included.
 
 If something is wrong, nothing is saved: every field with a problem is marked and explained,
-and the cursor goes to the first one. What you typed stays in the row.
+and the cursor goes to the first one. The row shows what you had entered for that entry.
 
 A table without any active category of its kind shows a link to the Categories page instead of
 an entry row.
@@ -52,7 +55,8 @@ Suggestions need JavaScript; without it, type the description and choose the cat
   entry there.
 - **Delete** removes the entry at once. A message at the bottom of the page offers **Undo** for
   ten seconds and counts them down; after that the deletion stays. Anyone who can edit can undo,
-  not only the person who deleted.
+  not only the person who deleted. An entry you are typing in the entry row meanwhile stays
+  there.
 
 ## Closed months and viewers
 
@@ -66,7 +70,8 @@ Viewers see the tables but no entry row, Edit or Delete.
 ## Without JavaScript
 
 Every form also works as a plain web form: saving, editing and deleting reload the page. After a
-deletion the page offers Undo for the same ten seconds.
+save the entry row keeps the day, as with JavaScript. After a deletion the page offers Undo
+while the ten seconds have not passed.
 
 ## Audit log
 

@@ -151,12 +151,24 @@ Tests: service rules (kind change blocked when used), role checks, tenant isolat
   a save or delete, the first invalid field after a refusal, the edit row's day, the row's Edit
   button after a save or cancel). The description input is an ARIA combobox; arrows move the
   active option, Enter or a click picks it and pre-selects its category.
-- **Product decisions (owner, 2026-10-18):** the entry row after a save is empty (prefilling
-  the day later is a one-line change in `transaction_create`); no delete confirmation (undo
-  replaces it); no totals in part B (F2.4); the undo toast is **strict** (`data-toast-strict`:
-  no pause on hover or focus, since the server window does not pause) and counts the seconds
-  down; after a delete the focus goes to the table's entry day field. A click after the window
-  says "Too late to undo".
+- **Product decisions (owner, 2026-10-18):** after a save the next entry row **keeps the day**
+  of the entry just saved (per table): as a day number when it is in the viewed month, else as
+  typed; the focus is in the day field with its text selected, so typing replaces it and Tab
+  keeps it. Without JavaScript the 303 carries it as `?entry=<direction>&day=<day>` (validated
+  against the day forms `parse_entry_date` reads; anything else is ignored). No delete
+  confirmation (undo replaces it); no totals in part B (F2.4); the undo toast is **strict**
+  (`data-toast-strict`: no pause on hover or focus, since the server window does not pause) and
+  counts down the time the server still allows (from `undo_until`); after a delete the focus
+  goes to the table's entry day field (its heading when the table has no entry row). A click
+  after the window says "Too late to undo". The no-JS Undo form is shown only for a row of this
+  month whose deletion can still be undone (`services.transactions.pending_undo`).
+- **Typing on during a save (review, 2026-10-18):** on `htmx:beforeRequest` from an entry form
+  (its values are already serialised) `app.js` resets the entry row at once (the day kept by the
+  rule above) and focuses the day field; before a 2xx swap of a table section (also an
+  out-of-band one, as after an undo) it keeps the entry row's values, focused field and
+  selection, and puts them into the new row after the swap instead of the server's
+  `data-autofocus`. On a 4xx the server's echo of the submitted values and messages wins; if
+  sending fails, the submitted values come back.
 
 **Agent prompt**
 ```
