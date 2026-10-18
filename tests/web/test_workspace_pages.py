@@ -220,7 +220,8 @@ def test_the_settings_page_shows_why_the_base_currency_is_locked(
 def test_a_planned_value_locks_the_base_currency_on_the_settings_page(owner: OwnerApp) -> None:
     with owner.db() as session, session.begin():
         category = Category(
-            workspace_id=owner.home_id, name="Food", name_key="food", kind="expense",
+            workspace_id=owner.home_id, name="Planned groceries",
+            name_key="planned groceries", kind="expense",
             treatment="regular", color="#16a34a", sort_order=0,
         )  # fmt: skip
         session.add(category)
