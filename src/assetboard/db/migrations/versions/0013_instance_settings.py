@@ -1,13 +1,12 @@
 """instance settings
 
 Revision ID: 0013_instance_settings
-Revises: 0011_f22
+Revises: 0012_f23
 Create Date: 2026-10-18 12:00:00.000000
 
 ``instance_settings`` (pre-release A): one row (``id = 1``) of settings an instance
 administrator changes in the UI. ``allow_workspace_creation`` (default true) lets any signed-in
-user create a workspace. Numbered 0013 because F2.3 adds 0012; ``down_revision`` is repointed
-to F2.3's revision when that merges.
+user create a workspace.
 """
 
 from __future__ import annotations
@@ -18,7 +17,7 @@ from alembic import op
 from assetboard.db.types import UtcDateTime
 
 revision = "0013_instance_settings"
-down_revision = "0011_f22"
+down_revision = "0012_f23"
 branch_labels = None
 depends_on = None
 

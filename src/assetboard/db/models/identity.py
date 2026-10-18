@@ -87,6 +87,10 @@ class Workspace(IdMixin, TimestampMixin, Base):
     locale: Mapped[str] = mapped_column(String(8), nullable=False, default="en")
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="UTC")
     country_code: Mapped[str | None] = mapped_column(String(2), nullable=True)
+    # F2.3: copy the previous month's plan when a month is first opened (off by default).
+    auto_copy_plan: Mapped[bool] = mapped_column(
+        Boolean(), nullable=False, default=False, server_default=false()
+    )
 
 
 class Membership(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
@@ -117,6 +121,9 @@ class Invitation(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
 
     token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     role: Mapped[str] = mapped_column(String(16), nullable=False)
+    # The email lock. Required for every new invitation (pre-release A, checked in
+    # services.workspaces); NULL only on invitations created before, which stay usable by any
+    # account until they expire.
     email: Mapped[str | None] = mapped_column(String(320), nullable=True)
     expires_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
     used_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)

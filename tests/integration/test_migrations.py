@@ -40,6 +40,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "alembic_version",
         "audit_events",
         "auth_throttles",
+        "budget_lines",
         "categories",
         "external_identities",
         "instance_settings",
@@ -636,7 +637,7 @@ def test_0013_round_trip_creates_the_instance_settings_row(tmp_path: Path) -> No
             connection.exec_driver_sql(
                 "INSERT INTO instance_settings (id, allow_workspace_creation) VALUES (2, 1)"
             )
-        command.downgrade(alembic_config(settings), "0011_f22")
+        command.downgrade(alembic_config(settings), "0012_f23")
         assert "instance_settings" not in inspect(engine).get_table_names()
         upgrade_database(settings)
         assert database_is_at_head(settings)

@@ -247,6 +247,18 @@ msgstr "Usunięto transakcję"
 msgid "Deleted transaction restored"
 msgstr "Przywrócono usuniętą transakcję"
 
+msgid "Planned value added"
+msgstr "Dodano wartość planowaną"
+
+msgid "Planned value changed"
+msgstr "Zmieniono wartość planowaną"
+
+msgid "Planned value removed"
+msgstr "Usunięto wartość planowaną"
+
+msgid "Plan copied from the previous month"
+msgstr "Skopiowano plan z poprzedniego miesiąca"
+
 msgid "Other event"
 msgstr "Inne zdarzenie"
 
@@ -328,9 +340,6 @@ msgstr "W użyciu"
 msgid "Number"
 msgstr "Liczba"
 
-msgid "Added with the new workspace"
-msgstr "Dodane z nowym obszarem roboczym"
-
 msgid "Every signed-in user can create workspaces"
 msgstr "Każdy zalogowany użytkownik może tworzyć obszary robocze"
 
@@ -360,6 +369,15 @@ msgstr "Poprzednia kwota"
 
 msgid "Currency"
 msgstr "Waluta"
+
+msgid "Copied from"
+msgstr "Skopiowano z"
+
+msgid "Not copied"
+msgstr "Nie skopiowano"
+
+msgid "Automatic"
+msgstr "Automatycznie"
 
 msgid "owner"
 msgstr "właściciel"
@@ -558,6 +576,9 @@ msgstr "Zamykanie miesięcy"
 
 msgid "Transactions"
 msgstr "Transakcje"
+
+msgid "Planned values"
+msgstr "Wartości planowane"
 
 msgid "Sign-ins"
 msgstr "Logowania"
@@ -1208,8 +1229,8 @@ msgstr ""
 msgid "You cannot remove yourself from the workspace."
 msgstr "Nie możesz usunąć siebie z obszaru roboczego."
 
-msgid "Owner invitations must be locked to an email address."
-msgstr "Zaproszenia dla właścicieli muszą być powiązane z adresem e-mail."
+msgid "Enter the email address of the person you invite."
+msgstr "Podaj adres e-mail osoby, którą zapraszasz."
 
 msgid "Choose how long the link stays valid."
 msgstr "Wybierz, jak długo link ma być ważny."
@@ -1978,9 +1999,6 @@ msgstr "Link z zaproszeniem"
 msgid "Copy"
 msgstr "Kopiuj"
 
-msgid "Email (optional)"
-msgstr "E-mail (opcjonalnie)"
-
 msgid "Valid for"
 msgstr "Ważny przez"
 
@@ -1991,14 +2009,8 @@ msgstr[0] "%(num)d dzień"
 msgstr[1] "%(num)d dni"
 msgstr[2] "%(num)d dni"
 
-msgid ""
-"With an email, only an account with that address can accept. Owner "
-"invitations must have one: an owner can change everything, including "
-"members."
-msgstr ""
-"Z adresem e-mail zaproszenie może przyjąć tylko konto z tym adresem. "
-"Zaproszenia dla właścicieli muszą go mieć: właściciel może zmienić "
-"wszystko, łącznie z członkami."
+msgid "Only an account with this email address can accept the invitation."
+msgstr "Zaproszenie może przyjąć tylko konto z tym adresem e-mail."
 
 msgid ""
 "The email is not verified, so share the link only with the person you "
@@ -2012,6 +2024,16 @@ msgstr "Utwórz link z zaproszeniem"
 
 msgid "Pending invitations"
 msgstr "Oczekujące zaproszenia"
+
+msgid "Anyone with the link"
+msgstr "Każdy, kto ma link"
+
+msgid ""
+"Created before invitations required an email; anyone with the link can "
+"use it until it expires."
+msgstr ""
+"Utworzone, zanim zaproszenia wymagały adresu e-mail; każdy, kto ma link, "
+"może go użyć do czasu wygaśnięcia."
 
 #, python-format
 msgid "Expires %(date)s"
@@ -2037,14 +2059,26 @@ msgid "General"
 msgstr "Ogólne"
 
 msgid ""
-"Locked: transactions exist (deleted ones included), and their amounts are"
-" stored in this currency."
+"Locked: transactions (deleted ones included) or planned values exist, and"
+" their amounts are stored in this currency."
 msgstr ""
-"Zablokowana: istnieją transakcje (także usunięte), a ich kwoty są "
-"zapisane w tej walucie."
+"Zablokowana: istnieją transakcje (także usunięte) lub wartości planowane,"
+" a ich kwoty są zapisane w tej walucie."
 
 msgid "Formatting default"
 msgstr "Domyślne formatowanie"
+
+msgid "Copy the previous month's plan when a month is opened for the first time"
+msgstr "Kopiuj plan z poprzedniego miesiąca przy pierwszym otwarciu miesiąca"
+
+msgid ""
+"Applies to the current and later months that have never had planned "
+"values, when an editor or owner opens them. Existing planned values are "
+"never overwritten."
+msgstr ""
+"Dotyczy bieżącego i późniejszych miesięcy, które nigdy nie miały wartości"
+" planowanych, gdy otworzy je edytor lub właściciel. Istniejące wartości "
+"planowane nigdy nie są nadpisywane."
 
 msgid ""
 "The formatting default is used for numbers and dates where no personal "
@@ -2079,9 +2113,30 @@ msgstr ""
 #~ "Hasło jest nieprawidłowe albo było zbyt"
 #~ " wiele prób. Spróbuj ponownie później."
 
+#~ msgid "Owner invitations must be locked to an email address."
+#~ msgstr "Zaproszenia dla właścicieli muszą być powiązane z adresem e-mail."
+
+#~ msgid "Email (optional)"
+#~ msgstr "E-mail (opcjonalnie)"
+
+#~ msgid ""
+#~ "With an email, only an account "
+#~ "with that address can accept. Owner "
+#~ "invitations must have one: an owner "
+#~ "can change everything, including members."
+#~ msgstr ""
+#~ "Z adresem e-mail zaproszenie może "
+#~ "przyjąć tylko konto z tym adresem. "
+#~ "Zaproszenia dla właścicieli muszą go "
+#~ "mieć: właściciel może zmienić wszystko, "
+#~ "łącznie z członkami."
+
 #~ msgid "Entries and planned values for this month will appear here."
 #~ msgstr "Tutaj pojawią się wpisy i wartości planowane na ten miesiąc."
 
 #~ msgid "Nothing in this month yet"
 #~ msgstr "W tym miesiącu nic jeszcze nie ma"
+
+#~ msgid "Added with the new workspace"
+#~ msgstr "Dodane z nowym obszarem roboczym"
 
