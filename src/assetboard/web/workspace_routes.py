@@ -21,12 +21,6 @@ from assetboard.domain.identity import MAX_EMAIL_LENGTH
 from assetboard.i18n import gettext
 from assetboard.services.context import Role, WorkspaceNotAvailable, select_workspace
 from assetboard.services.instance_settings import workspace_creation_allowed
-from assetboard.services.workspace_options import (
-    country_names,
-    currency_codes,
-    locale_codes,
-    timezone_names,
-)
 from assetboard.services.workspaces import (
     DEFAULT_INVITATION_EXPIRY_DAYS,
     INVITATION_EXPIRY_DAYS,
@@ -52,11 +46,11 @@ from assetboard.services.workspaces import (
 from assetboard.web.context import CurrentContext
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf, web_session
+from assetboard.web.workspace_forms import workspace_form_options
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
 FormStr = Annotated[str, Form()]
-LOCALE_NAMES = {"en": "English", "pl": "Polski"}
 
 
 def _(message: str) -> str:
@@ -127,16 +121,6 @@ async def switch(request: Request, workspace_id: FormStr = "") -> Response:
     return RedirectResponse(request.url_for("home").path, status_code=303)
 
 
-def workspace_form_options(locale: str) -> dict[str, list[tuple[str, str]]]:
-    """The lists of the workspace fields (first-run setup and "Create workspace")."""
-    return {
-        "currency_options": [(code, code) for code in currency_codes()],
-        "country_options": list(country_names(locale).items()),
-        "timezone_options": [(zone, zone) for zone in timezone_names()],
-        "locales": [(code, LOCALE_NAMES.get(code, code)) for code in locale_codes()],
-    }
-
-
 # Settings
 
 
@@ -155,10 +139,7 @@ def _settings_page(
             "values": values,
             "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
             "notice": notice,
-            "currency_options": [(code, code) for code in currency_codes()],
-            "country_options": list(country_names(request.state.locale).items()),
-            "timezone_options": [(zone, zone) for zone in timezone_names()],
-            "locales": [(code, LOCALE_NAMES.get(code, code)) for code in locale_codes()],
+            **workspace_form_options(request.state.locale),
             "max_name_length": MAX_WORKSPACE_NAME_LENGTH,
         },
         status_code=status_code,
@@ -402,7 +383,6 @@ def _new_workspace_page(
     values: dict[str, str],
     *,
     errors: dict[str, str] | None = None,
-    error: str | None = None,
     status_code: int = 200,
 ) -> Response:
     return render_template(
@@ -411,7 +391,6 @@ def _new_workspace_page(
         context={
             "values": values,
             "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
-            "error": _t(request, error) if error else None,
             "options": workspace_form_options(request.state.locale),
         },
         status_code=status_code,

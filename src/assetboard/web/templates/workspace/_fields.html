@@ -1,5 +1,5 @@
 {# The workspace part of first-run setup and of "Create workspace" (pre-release A). The
-   options come from web.workspace_routes.workspace_form_options. #}
+   options come from web.workspace_forms.workspace_form_options. #}
 {% from "macros/components.html" import field, select with context %}
 {% macro workspace_fields(values, errors, options) -%}
 <div class="sm:col-span-2">{{ field("workspace_name", _("Workspace name"), value=values.workspace_name, error=errors.get("workspace_name"), maxlength=120, help=_("Defaults to your display name.")) }}</div>

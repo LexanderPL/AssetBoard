@@ -56,7 +56,7 @@ from assetboard.web.security import (
     web_session,
 )
 from assetboard.web.throttle import retry_after, throttled_message
-from assetboard.web.workspace_routes import workspace_form_options
+from assetboard.web.workspace_forms import workspace_form_options
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
