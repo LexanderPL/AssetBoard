@@ -30,7 +30,7 @@ from uuid import UUID, uuid4
 
 import anyio.from_thread
 import anyio.to_thread
-from argon2 import Parameters, PasswordHasher
+from argon2 import Parameters, PasswordHasher, Type
 from argon2.exceptions import InvalidHashError, VerificationError, VerifyMismatchError
 from sqlalchemy import delete, or_, select, update
 from sqlalchemy.exc import IntegrityError, OperationalError
@@ -72,6 +72,20 @@ SESSION_TOUCH_INTERVAL = timedelta(minutes=5)
 THROTTLE_IDLE_RESET = timedelta(hours=24)
 
 # Test-only seam: an autouse fixture swaps in cheap parameters; production never sets it.
+# The production Argon2id parameters, pinned (argon2-cffi's RFC 9106 low-memory profile as of
+# 25.1): a library upgrade must not change them silently, because hashes made with other
+# parameters would then verify in a different time than the dummy hash. Changing them is a
+# deliberate migration (ADR-0012): stored hashes are rehashed at their next sign-in.
+PRODUCTION_ARGON2_PARAMETERS = Parameters(
+    type=Type.ID,
+    version=19,
+    salt_len=16,
+    hash_len=32,
+    time_cost=3,
+    memory_cost=65536,
+    parallelism=4,
+)
+# Test-only override; production leaves it ``None``.
 ARGON2_PARAMETERS: Parameters | None = None
 _cached_dummy_hashes: dict[str, str] = {}
 _dummy_hash_lock = threading.Lock()
@@ -259,11 +273,14 @@ def validate_password(password: str, email: str, display_name: str) -> None:
         )
 
 
+def argon2_parameters() -> Parameters:
+    """The parameters in effect: the pinned production ones unless a test overrides them."""
+    return ARGON2_PARAMETERS or PRODUCTION_ARGON2_PARAMETERS
+
+
 def password_hasher() -> PasswordHasher:
-    """Production uses argon2-cffi defaults; tests patch ``ARGON2_PARAMETERS`` only."""
-    if ARGON2_PARAMETERS is None:
-        return PasswordHasher()
-    return PasswordHasher.from_parameters(ARGON2_PARAMETERS)
+    """The one hasher for passwords and the dummy hash, with the pinned parameters."""
+    return PasswordHasher.from_parameters(argon2_parameters())
 
 
 def argon2_hash(password: str) -> str:
@@ -285,7 +302,7 @@ def _dummy_hash() -> str:
     ``prepare_dummy_hash`` runs at startup, so requests normally only read the cache. The lock
     makes concurrent cold callers (CLI, tests) compute it exactly once.
     """
-    key = repr(ARGON2_PARAMETERS)
+    key = repr(argon2_parameters())
     cached = _cached_dummy_hashes.get(key)
     if cached is not None:
         return cached
@@ -514,7 +531,8 @@ def _account_slot(account_key: str, settings: Settings) -> ThrottleSlot:
     """Sign-in attempts for one normalized email: a fixed window, like the address bucket.
 
     The window is the address bucket's (``auth_ip_window_minutes``, 60 minutes by default):
-    after it the count starts again, and nothing else resets it.
+    after it the count starts again, and nothing else resets it. Every attempt counts,
+    successful ones included, so its state never depends on whether a password was right.
     """
     return ThrottleSlot(
         "account",
@@ -659,11 +677,20 @@ def verify_setup_token(
 
 
 def _login_keys(email: str) -> tuple[str, str]:
-    lookup = email.strip().lower()[:MAX_EMAIL_LENGTH]
+    """The user lookup value and the throttle key, normalized once.
+
+    A valid address is normalized and used for both. Anything else cannot match an account
+    (stored emails are normalized and valid); it is truncated and keyed as ``invalid:``.
+    """
     try:
-        return lookup, normalize_email(lookup)
+        normalized = normalize_email(email)
     except InvalidEmail:
+        lookup = email.strip().lower()[:MAX_EMAIL_LENGTH]
         return lookup, f"invalid:{lookup}"
+    return normalized, normalized
+
+
+_NO_USER = UUID(int=0)  # matches no account
 
 
 @dataclass(frozen=True, slots=True)
@@ -733,6 +760,7 @@ def _login_flow(
     if isinstance(candidate, Throttled):
         return LoginOutcome(throttled_until=candidate.until)
     rehashed: str | None = None
+    verified: bool | None = None
     try:
         check = verify or verify_password
         verified = check(candidate.password_hash or _dummy_hash(), password)
@@ -750,12 +778,18 @@ def _login_flow(
                 # Best effort: the login still succeeds; the next login retries the rehash.
                 rehashed = None
     except BaseException:
-        run(lambda session: release_attempts(session, candidate.reserved))
+        # Before a verify outcome exists (``HashGateBusy`` from a saturated gate, any error),
+        # nothing account-specific has happened: take the whole attempt back. After it (an
+        # error while rehashing, which only a correct password reaches), the account attempt
+        # stays counted, as it would on success.
+        taken_back = [item for item in candidate.reserved if verified is None or item.scope == "ip"]
+        run(lambda session: release_attempts(session, taken_back))
         raise
 
     def finish(session: Session) -> LoginOutcome:
         now = clock.now()
-        user = session.get(User, candidate.user_id) if candidate.user_id else None
+        # The same query whether or not the account exists (never the identity map).
+        user = session.scalar(select(User).where(User.id == (candidate.user_id or _NO_USER)))
         not_admin = require_instance_admin and not (user is not None and user.is_instance_admin)
         succeeded = (
             verified
@@ -782,10 +816,11 @@ def _login_flow(
                 data={"reason": "not_instance_admin"} if verified and not_admin else None,
             )
             return LoginOutcome()
-        # Both counters only take back this request's own attempt and otherwise decay with
-        # their time windows. Nothing resets the account counter: a success leaves it exactly
-        # as if this request had not been made, so it looks the same for an unknown email.
-        release_attempts(session, candidate.reserved)
+        # Every attempt counts in the account bucket, this successful one too: taking it back
+        # (or resetting the bucket) would make the outcome of a verify visible to others
+        # probing the same email, and only a known email can succeed. The address bucket,
+        # keyed by the requester, takes back this request's attempt as before.
+        release_attempts(session, [item for item in candidate.reserved if item.scope == "ip"])
         if rehashed is not None:
             # Safe: ``succeeded`` above means the stored hash is still the verified one.
             user.password_hash = rehashed

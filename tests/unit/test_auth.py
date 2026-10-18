@@ -219,7 +219,7 @@ def test_password_hash_is_argon2id_and_common_list_is_bounded(
     monkeypatch.setattr(auth, "ARGON2_PARAMETERS", None)
     production = hash_password(PASSWORD, "alice@example.com", "Alice")
     assert production.startswith("$argon2id$")
-    assert extract_parameters(production) == profiles.get_default_parameters()
+    assert extract_parameters(production) == auth.PRODUCTION_ARGON2_PARAMETERS
     assert len(common_passwords()) == 10000
     assert "password" in common_passwords()
 
@@ -234,11 +234,30 @@ def test_production_hasher_uses_library_defaults_and_rehashes_cheap_hashes(
     assert not auth.verify_password("not-a-hash", PASSWORD)
     assert not auth.password_hasher().check_needs_rehash(encoded)
     monkeypatch.setattr(auth, "ARGON2_PARAMETERS", None)
-    assert profiles.get_default_parameters() == profiles.RFC_9106_LOW_MEMORY
     assert extract_parameters(auth.password_hasher().hash(PASSWORD)) == (
-        profiles.get_default_parameters()
+        auth.PRODUCTION_ARGON2_PARAMETERS
     )
     assert auth.password_hasher().check_needs_rehash(encoded)
+
+
+def test_production_argon2_parameters_are_pinned_and_shared_by_the_dummy_hash(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The values in force when they were pinned (argon2-cffi 25.1's RFC 9106 low-memory
+    # profile). Changing them is a deliberate migration (ADR-0012), never a library upgrade.
+    assert auth.PRODUCTION_ARGON2_PARAMETERS == profiles.RFC_9106_LOW_MEMORY
+    assert (
+        auth.PRODUCTION_ARGON2_PARAMETERS.time_cost,
+        auth.PRODUCTION_ARGON2_PARAMETERS.memory_cost,
+        auth.PRODUCTION_ARGON2_PARAMETERS.parallelism,
+        auth.PRODUCTION_ARGON2_PARAMETERS.hash_len,
+        auth.PRODUCTION_ARGON2_PARAMETERS.salt_len,
+    ) == (3, 65536, 4, 32, 16)
+    monkeypatch.setattr(auth, "ARGON2_PARAMETERS", None)
+    # A library whose defaults moved on does not change what is used.
+    monkeypatch.setattr(profiles, "get_default_parameters", lambda: profiles.CHEAPEST)
+    assert extract_parameters(auth._dummy_hash()) == auth.PRODUCTION_ARGON2_PARAMETERS  # pyright: ignore[reportPrivateUsage]
+    assert extract_parameters(auth.argon2_hash(PASSWORD)) == auth.PRODUCTION_ARGON2_PARAMETERS
 
 
 # Sessions
@@ -560,7 +579,7 @@ def test_ip_threshold_allows_twenty_distinct_accounts_before_backoff(
     assert other is not None and other.failure_count == 1
 
 
-def test_login_success_takes_back_only_its_own_attempt_and_resets_nothing(
+def test_a_successful_sign_in_counts_in_the_account_bucket_and_resets_nothing(
     db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
 ) -> None:
     _create_user(db_session, auth_settings, fixed_clock)
@@ -569,9 +588,23 @@ def test_login_success_takes_back_only_its_own_attempt_and_resets_nothing(
     assert _login(db_session, auth_settings, fixed_clock, password=PASSWORD).succeeded
     account = _throttle(db_session, "account", "test@example.com")
     ip_row = _throttle(db_session, "ip", "192.0.2.10/32")
-    # Both counters stay as the failures left them: the account counter decays with time only.
-    assert account is not None and account.failure_count == 3 and account.blocked_until is None
+    # The account bucket counts every attempt (decaying with time only); the address bucket,
+    # keyed by the requester, takes back the successful one.
+    assert account is not None and account.failure_count == 4 and account.blocked_until is None
     assert ip_row is not None and ip_row.failure_count == 3
+
+
+def test_the_owners_own_sign_ins_use_the_free_attempts(
+    db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
+) -> None:
+    _create_user(db_session, auth_settings, fixed_clock)
+    free = auth_settings.auth_account_free_failures
+    outcomes = [
+        _login(db_session, auth_settings, fixed_clock, password=PASSWORD) for _ in range(free + 2)
+    ]
+    # free + 1 sign-ins succeed (the last of them starts the backoff), then the wait applies.
+    assert [o.succeeded for o in outcomes] == [True] * (free + 1) + [False]
+    assert outcomes[-1].throttled_until == at(seconds=60).now()
 
 
 def test_ip_counter_decays_only_with_its_time_window(
@@ -1541,3 +1574,17 @@ def test_change_password_refuses_the_current_password_as_the_new_one(
 def test_eight_characters_are_enough() -> None:
     # The minimum is 8 (it was 10 until 0.2.0); an uncommon 8-character password passes.
     validate_password("Zx9!q7pK", "alice@example.com", "Alice")
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        (" Test@Example.COM ", ("test@example.com", "test@example.com")),
+        ("not an email", ("not an email", "invalid:not an email")),
+        ("x" * 400, ("x" * 320, "invalid:" + "x" * 320)),
+    ],
+)
+def test_login_keys_normalize_once_for_the_lookup_and_the_bucket(
+    raw: str, expected: tuple[str, str]
+) -> None:
+    assert auth._login_keys(raw) == expected  # pyright: ignore[reportPrivateUsage]
