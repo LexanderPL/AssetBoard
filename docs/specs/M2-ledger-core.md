@@ -213,7 +213,9 @@ part B)**
   Amounts parse in the caller's locale (`i18n.numbers.parse_amount`) and convert with
   `domain.budget.planned_minor`, which refuses instead of rounding: `invalid_amount`,
   `amount_negative`, `amount_too_large`, `too_many_decimals`; `0` (also `0,00`, `-0`) and an
-  empty field mean "remove".
+  empty field mean "remove". Syntax and sign are checked before the write; the currency-specific
+  checks (decimals, size) run inside it with the currency read from the workspace row, never the
+  Context's (review, 2026-10-18).
 - Service `services.budget`: `get_plan` (every member), `set_planned` (outcome `created`,
   `updated`, `removed` or `unchanged`; saving the stored value or removing a missing line
   changes and records nothing), `copy_previous_plan`, `auto_copy_on_open`; seams
@@ -239,8 +241,8 @@ part B)**
   had a planned value**: `month_states.plan_started_at` is set by the month's first plan write
   (save, copy or automatic copy) and never cleared, so a plan emptied on purpose is not
   refilled. A read decides first, so a page view writes only when a copy is due; the write
-  checks again and swallows `PermissionDenied`/`MonthClosed` (a page view never fails because of
-  it). Nothing is written when the previous month has nothing to copy, so a later visit can
+  checks again after the exclusive lock and the month guard, and swallows `PermissionDenied`,
+  `MonthClosed` and SQLite's "database is locked" (a page view never fails because of it). Nothing is written when the previous month has nothing to copy, so a later visit can
   still copy. It is a GET that writes by design: idempotent (at most once per month, by the
   marker), race-safe (serialised write, re-checked), and without CSRF risk beyond what the
   owner's setting already does on a visit. Part B calls it from the month page GET (not HEAD).
