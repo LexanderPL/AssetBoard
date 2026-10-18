@@ -13,7 +13,7 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy import event, select
 from sqlalchemy.dialects import postgresql
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, OperationalError
 from sqlalchemy.orm import ORMExecuteState, Session
 from sqlalchemy.sql import ClauseElement
 
@@ -221,6 +221,21 @@ def test_the_currency_is_read_from_the_workspace_not_the_context(team: Workspace
     assert _invalid(lambda: _set(team, food, "1,5")) == "too_many_decimals"
 
 
+def test_currency_checks_use_the_stored_currency_even_before_the_write(
+    team: WorkspaceDb,
+) -> None:
+    """The Context says EUR (two decimals); the workspace row says KWD (three): a value with
+    three decimals is valid, and nothing is judged by the Context's currency."""
+    with team.factory.begin() as session:
+        workspace = session.get(Workspace, team.workspace_id)
+        assert workspace is not None
+        workspace.base_currency = "KWD"
+    food = _category(team, "Food")
+    assert _set(team, food, "1,234").planned == Money(1234, "KWD")
+    assert _invalid(lambda: _set(team, food, "1,2345")) == "too_many_decimals"
+    assert _invalid(lambda: _set(team, food, "-1")) == "amount_negative"  # syntax and sign: early
+
+
 def test_archived_and_transfer_categories_take_no_new_lines_but_keep_old_ones(
     team: WorkspaceDb,
 ) -> None:
@@ -317,7 +332,10 @@ def test_copy_copies_every_line_of_the_previous_month(team: WorkspaceDb) -> None
         {"month": "2026-10", "source_month": "2026-09", "count": 2, "skipped": 0,
          "automatic": False}
     ]  # fmt: skip
-    assert copied[0].entity_type == "month"
+    with team.factory() as session:
+        state = session.scalars(select(MonthState).where(MonthState.month == date(2026, 10, 1)))
+        state_id = state.one().id
+    assert (copied[0].entity_type, copied[0].entity_id) == ("month", str(state_id))
 
 
 def test_copy_never_overwrites_existing_lines(team: WorkspaceDb) -> None:
@@ -451,6 +469,70 @@ def test_an_empty_previous_month_writes_nothing_so_a_later_visit_can_copy(
     food = _september_plan(team)
     assert auto_copy_on_open(team.factory, team.ctx("ed", "editor"), OCTOBER) is not None
     assert _planned(team) == {food: 55000}
+
+
+def test_concurrent_page_views_copy_the_plan_once(team: WorkspaceDb) -> None:
+    food, rent = _category(team, "Food"), _category(team, "Rent")
+    _set(team, food, "1", month=SEPTEMBER)
+    _set(team, rent, "2", month=SEPTEMBER)
+    _auto(team)
+    results: list[CopyResult | None] = []
+    barrier = threading.Barrier(4)
+
+    def run() -> None:
+        barrier.wait()
+        results.append(auto_copy_on_open(team.factory, team.ctx("ed", "editor"), OCTOBER))
+
+    threads = [threading.Thread(target=run) for _ in range(4)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+    assert [r.copied for r in results if r is not None] == [2]
+    assert _planned(team) == {food: 100, rent: 200}
+    assert len(_events(team, "budget_line.copied")) == 1
+
+
+def test_the_automatic_copy_rechecks_after_the_lock_and_the_guard(team: WorkspaceDb) -> None:
+    _september_plan(team)
+    _auto(team)
+    statements = _statements(
+        lambda: auto_copy_on_open(team.factory, team.ctx("ed", "editor"), OCTOBER)
+    )
+    lock = next(i for i, s in enumerate(statements) if "FROM workspaces" in s and "FOR" in s)
+    assert statements[lock].rstrip().endswith("FOR UPDATE")
+    guard = next(i for i, s in enumerate(statements) if "FROM month_states" in s and i > lock)
+    # The read-only decision ran before the lock; the write decides again after the lock and
+    # the guard (the setting, the month's state and its lines are read anew), then copies: two
+    # reads of lines for the decision and two for the copy.
+    assert any("workspaces.auto_copy_plan" in s for s in statements[:lock])
+    after = statements[guard + 1 :]
+    setting = next(i for i, s in enumerate(after) if "workspaces.auto_copy_plan" in s)
+    assert "FOR" not in after[setting]
+    lines = [i for i, s in enumerate(after) if "FROM budget_lines" in s]
+    assert len(lines) == 4 and setting < lines[0]
+    assert any("FROM month_states" in s for s in after[setting : lines[0]])
+    assert _planned(team) != {}
+
+
+def test_a_busy_database_never_fails_the_page_view(
+    team: WorkspaceDb, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _september_plan(team)
+    _auto(team)
+
+    def locked(*_args: Any) -> None:
+        raise OperationalError("BEGIN IMMEDIATE", {}, Exception("database is locked"))
+
+    monkeypatch.setattr(service, "run_immediate", locked)
+    assert auto_copy_on_open(team.factory, team.ctx("ed", "editor"), OCTOBER) is None
+
+    def broken(*_args: Any) -> None:
+        raise OperationalError("SELECT", {}, Exception("no such table: budget_lines"))
+
+    monkeypatch.setattr(service, "run_immediate", broken)
+    with pytest.raises(OperationalError):  # anything else is a real error
+        auto_copy_on_open(team.factory, team.ctx("ed", "editor"), OCTOBER)
 
 
 def test_a_page_view_without_a_due_copy_does_not_write(

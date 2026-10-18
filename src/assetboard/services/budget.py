@@ -40,9 +40,10 @@ from decimal import Decimal
 from typing import Literal
 from uuid import UUID
 
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
-from assetboard.db.engine import run_immediate
+from assetboard.db.engine import is_database_locked, run_immediate
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState
 from assetboard.db.repositories import (
     AuditEventRepository,
@@ -152,16 +153,22 @@ def _plannable(category: Category) -> bool:
     return category.archived_at is None and category.treatment != Treatment.TRANSFER
 
 
-def _parse(amount: str, locale: str, currency: str) -> int:
-    """Minor units of the typed value; an empty field is zero (remove the line)."""
+def _parse(amount: str, locale: str) -> Decimal:
+    """The typed value as a Decimal; an empty field is zero (remove the line).
+
+    Only the syntax and the sign are checked here: the currency-specific checks (decimals, size)
+    need the base currency read inside the write (``_minor``), not the possibly stale Context.
+    """
     text = amount.strip()
     if not text:
-        return 0
+        return Decimal(0)
     try:
         value = parse_amount(text, locale)
     except ValueError:
         raise InvalidPlannedValue("invalid_amount") from None
-    return _minor(value, currency)
+    if value < 0:
+        raise InvalidPlannedValue("amount_negative")
+    return value
 
 
 def _minor(value: Decimal, currency: str) -> int:
@@ -291,12 +298,12 @@ def set_planned(
     ``NotFound`` for an unknown category or another workspace's.
     """
     require_role(ctx, Role.EDITOR)
-    _parse(amount, locale, ctx.workspace.base_currency)  # refuse bad input before the write
+    value = _parse(amount, locale)  # refuse malformed input before the write
 
     def write(session: Session) -> SavedLine:
         _begin_write(session, ctx, month)
         currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
-        minor = _parse(amount, locale, currency)
+        minor = _minor(value, currency)
         category = CategoryRepository(session, ctx).get(category_id)
         if category is None:
             raise NotFound
@@ -413,8 +420,9 @@ def auto_copy_on_open(
 
     Runs only for editors and owners, for the current month and later ones, while the setting
     is on, the month is open, has no line and never had a planned value. A read decides first,
-    so a page view writes only when a copy is due; the write checks everything again. Never
-    raises a refusal: a page view must not fail because of it.
+    so a page view writes only when a copy is due; the write checks everything again after the
+    exclusive lock and the month guard. Never fails a page view: a refusal, or SQLite giving up
+    on a busy database ("database is locked"), returns ``None`` (the next visit copies).
     """
     if not has_role(ctx, Role.EDITOR) or month < current_month(ctx):
         return None
@@ -435,6 +443,10 @@ def auto_copy_on_open(
         result = run_immediate(factory, write)
     except (PermissionDenied, MonthClosed):
         return None
+    except OperationalError as exc:
+        if not is_database_locked(exc):
+            raise
+        return None  # another write held the database too long: the next visit copies
     return result if result is not None and result.copied else None
 
 
