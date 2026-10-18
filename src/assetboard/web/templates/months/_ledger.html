@@ -44,7 +44,7 @@
   <div class="relative">
     <input id="{{ prefix }}-description" name="description" form="{{ form_id }}" type="text" autocomplete="off" maxlength="{{ ledger.max_description }}" value="{{ values.get('description', '') }}" placeholder="{{ _('Description') }}"
            role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="{{ prefix }}-suggestions"{{ described(prefix, "description", errors) }}{{ autofocus(s.state, kind ~ ":description") }}
-           hx-get="{{ scoped_url(request, 'transaction_suggestions') }}?direction={{ s.direction }}" hx-trigger="input changed delay:150ms" hx-target="#{{ prefix }}-suggestions" hx-swap="innerHTML" hx-sync="this:replace"
+           hx-get="{{ scoped_url(request, 'transaction_suggestions') }}?direction={{ s.direction }}" hx-trigger="input delay:150ms" hx-target="#{{ prefix }}-suggestions" hx-swap="innerHTML" hx-sync="this:replace"
            data-ledger-field data-suggest-input class="{{ input_class }}">
     <ul id="{{ prefix }}-suggestions" role="listbox" aria-label="{{ _('Earlier descriptions') }}" hidden data-suggestions class="{{ listbox_class }}"></ul>
   </div>

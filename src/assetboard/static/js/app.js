@@ -193,9 +193,21 @@ function focusRequested() {
   element.focus();
   if (element instanceof HTMLInputElement) element.select();
 }
-document.addEventListener("htmx:load", () => {
+document.addEventListener("htmx:load", (event) => {
   restoreEntryRows();
   focusRequested();
+  // HTMX sets up swapped-in content a moment after the swap: a description typed into the new
+  // row before that asks for its suggestions now.
+  const active = document.activeElement;
+  if (
+    active instanceof HTMLInputElement &&
+    active.matches("[data-suggest-input]") &&
+    active.value &&
+    event.target instanceof Element &&
+    event.target.contains(active)
+  ) {
+    active.dispatchEvent(new Event("input", { bubbles: true }));
+  }
 });
 
 // Entry rows survive swaps of their table. After Enter the row is reset at once (the request
