@@ -1819,6 +1819,13 @@ msgstr "Oczekujące zaproszenia"
 msgid "Anyone with the link"
 msgstr "Każdy, kto ma link"
 
+msgid ""
+"Created before invitations required an email; anyone with the link can "
+"use it until it expires."
+msgstr ""
+"Utworzone, zanim zaproszenia wymagały adresu e-mail; każdy, kto ma link, "
+"może go użyć do czasu wygaśnięcia."
+
 #, python-format
 msgid "Expires %(date)s"
 msgstr "Wygasa %(date)s"

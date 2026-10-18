@@ -73,6 +73,7 @@
     <li class="flex flex-wrap items-center justify-between gap-4 py-3" data-invitation="{{ invitation.id }}">
       <div class="min-w-0 text-sm">
         <p class="font-medium">{{ role_labels[invitation.role] }}{% if invitation.email %} · <span class="text-muted">{{ invitation.email }}</span>{% else %} <span class="ml-1 rounded-full bg-warning-soft px-2 py-0.5 text-xs font-semibold text-warning-strong" data-unlocked-invitation>{{ _("Anyone with the link") }}</span>{% endif %}</p>
+        {% if not invitation.email %}<p class="text-xs text-muted" data-unlocked-explanation>{{ _("Created before invitations required an email; anyone with the link can use it until it expires.") }}</p>{% endif %}
         <p class="text-xs text-muted">{{ _("Expires %(date)s", date=invitation.expires_at.strftime("%Y-%m-%d %H:%M UTC")) }}</p>
       </div>
       <form method="post" action="{{ scoped_url(request, 'workspace_invitation_revoke', invitation_id=invitation.id|string) }}" data-confirm="{{ _('Revoke this invitation link?') }}">

@@ -139,6 +139,16 @@ def test_a_legacy_unlocked_invitation_is_marked_and_still_works(owner: OwnerApp)
     members = owner.client.get("/workspace/members").text
     assert members.count("data-unlocked-invitation") == 1
     assert "Anyone with the link" in members
+    assert members.count("data-unlocked-explanation") == 1
+    assert (
+        "Created before invitations required an email; anyone with the link can use it until "
+        "it expires." in members
+    )
+    owner.client.headers["Accept-Language"] = "pl"
+    polish = owner.client.get("/workspace/members").text
+    assert "Każdy, kto ma link" in polish
+    assert "Utworzone, zanim zaproszenia wymagały adresu e-mail" in polish
+    del owner.client.headers["Accept-Language"]
     owner.add_user("bea")
     with anonymous(owner) as client:
         assert owner.web.sign_in(client, email="bea@example.com").status_code == 303

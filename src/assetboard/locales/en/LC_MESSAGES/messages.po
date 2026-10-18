@@ -1706,6 +1706,11 @@ msgstr ""
 msgid "Anyone with the link"
 msgstr ""
 
+msgid ""
+"Created before invitations required an email; anyone with the link can "
+"use it until it expires."
+msgstr ""
+
 #, python-format
 msgid "Expires %(date)s"
 msgstr ""
