@@ -64,6 +64,11 @@ def _owned(owner: OwnerApp, user_id: UUID) -> list[Workspace]:
         )
 
 
+def _workspace_count(owner: OwnerApp) -> int:
+    with owner.db() as session:
+        return len(session.scalars(select(Workspace.id)).all())
+
+
 def _csp_safe(html: str) -> None:
     assert " style=" not in html
     assert re.search(r"<script(?![^>]*\ssrc=)", html) is None
@@ -83,8 +88,9 @@ def test_a_user_without_a_workspace_is_offered_to_create_one(owner: OwnerApp) ->
 
 
 def test_the_offer_is_hidden_when_creation_is_off(owner: OwnerApp) -> None:
-    owner.add_user("bea")
+    bea = owner.add_user("bea")
     _set_allowed(owner, False)
+    before = _workspace_count(owner)
     with signed_in_as(owner, "bea") as client:
         page = client.get("/")
         assert page.status_code == 403 and NO_WORKSPACE in page.text
@@ -97,7 +103,8 @@ def test_the_offer_is_hidden_when_creation_is_off(owner: OwnerApp) -> None:
                   "timezone": "UTC", "workspace_locale": "en"},
         )  # fmt: skip
         assert response.status_code == 404
-    assert _owned(owner, owner.add_user("cid")) == []
+    assert _owned(owner, bea) == []
+    assert _workspace_count(owner) == before
 
 
 def test_an_htmx_request_without_a_workspace_still_gets_a_toast(owner: OwnerApp) -> None:
