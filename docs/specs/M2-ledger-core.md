@@ -117,6 +117,47 @@ Tests: service rules (kind change blocked when used), role checks, tenant isolat
   `previous_date` / `previous_amount` when those change. Group "Transactions" in the workspace
   audit log.
 
+**As built (F2.2 part B: the month-page UI)**
+- Templates: `months/_ledger.html` (macros; the input, button and error classes are set once
+  there), `_section.html`, `_row.html`, `_suggestions.html`, `_summary.html`; view models and
+  messages in `web.ledger`, routes in `web.transaction_routes`. The tables are real `<table>`s:
+  a form cannot wrap a row, so each entry/edit `<form>` sits in the actions cell and its inputs
+  join it with the `form` attribute. The entry row is at the bottom of each table. Day and
+  amount are text inputs (`inputmode` numeric/decimal); the amount of an edit row is written by
+  `i18n.numbers.format_amount_input` (locale decimal sign, no grouping) and read back by
+  `parse_amount`.
+- Routes: `POST /m/{month}/transactions` (create, with `direction`), `GET
+  /m/{month}/transactions/{id}/edit` and `/row` (open/cancel an edit; one-row swaps),
+  `POST /m/{month}/transactions/{id}` (update), `/delete`, `/undo`, and `GET
+  /transactions/suggestions?direction=&description=` (`role="option"` items). **Deviation from
+  "row swaps":** writes return the whole table section (`#ledger-expense` / `#ledger-income`),
+  since rows are ordered by date and an edit can move a row or send it to another month; only
+  opening and cancelling an edit swap one row. Every write response also carries, out of band,
+  `#month-summary` (an empty placeholder: **F2.4 fills `web.ledger.summary_context` and
+  `months/_summary.html`**) and the screen-reader status line `#ledger-status`.
+- Without JavaScript every form posts and redirects (303); a refused save re-renders the whole
+  page (400/409) with the values and messages; `?edit=<id>` opens a row for editing,
+  `?deleted=<id>` shows "Entry deleted." with an Undo form, `?saved_in=YYYY-MM` links an entry
+  saved to another month. Autocomplete needs JavaScript (no fallback).
+- `MonthClosed`: when the **viewed** month was closed meanwhile the page is stale, so the route
+  answers 303 (HTMX: 409 with `HX-Redirect`) to `?error=month_closed`, which shows
+  `MONTH_CLOSED_MESSAGE`; a full date in **another**, closed month is a message on the day field
+  (409) and keeps the typed values. A row that no longer exists reloads with "This entry no
+  longer exists" (`?error=transaction_gone`).
+- Keyboard and focus (`static/js/app.js`, delegated listeners on `data-*` hooks, no Alpine
+  components): Enter submits from text fields (implicit submission) and from the category
+  select; Esc closes an open suggestion list, else clears the entry row or cancels an edit. The
+  server marks the element to focus after a swap with `data-autofocus` (new entry row's day after
+  a save or delete, the first invalid field after a refusal, the edit row's day, the row's Edit
+  button after a save or cancel). The description input is an ARIA combobox; arrows move the
+  active option, Enter or a click picks it and pre-selects its category.
+- **Product decisions (owner, 2026-10-18):** the entry row after a save is empty (prefilling
+  the day later is a one-line change in `transaction_create`); no delete confirmation (undo
+  replaces it); no totals in part B (F2.4); the undo toast is **strict** (`data-toast-strict`:
+  no pause on hover or focus, since the server window does not pause) and counts the seconds
+  down; after a delete the focus goes to the table's entry day field. A click after the window
+  says "Too late to undo".
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
@@ -170,6 +211,9 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
 - Clicking a category filters the transaction tables to that category.
 - Golden example (must be a test): budget Food 550.00; transactions Food 50.00 + 500.00 → actual 550.00, difference 0.00; budget Travel 5 350.00 with 4 323.00 spent → difference 1 027.00; income Salary planned 3 000.00, actual 3 400.00 → difference +400.00.
 - Categories with actuals but no planned line are shown with planned 0.00 (never hidden).
+- **From F2.2:** render the summary in `months/_summary.html` from
+  `web.ledger.summary_context(ledger)`; every transaction write already sends `#month-summary`
+  out of band, so the totals refresh without a reload.
 
 **Agent prompt**
 ```
