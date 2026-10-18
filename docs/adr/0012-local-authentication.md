@@ -185,11 +185,12 @@ and someone who had to wait nothing about how long. Now:
 ### Buckets
 
 - **Sign-in (`account`)**, per normalized email (or `invalid:<input>` for malformed input):
-  5 free failures by default, then the usual backoff. It counts in a fixed window, the
-  address bucket's (`ASSETBOARD_AUTH_IP_WINDOW_MINUTES`, 60 minutes by default): when the
-  window has passed, the next attempt starts a new count. **Nothing resets it.** A successful
-  sign-in only takes back its own reserved attempt, as the address bucket always did, which
-  leaves the bucket exactly as if that sign-in had not happened.
+  **every attempt counts, successful ones included**; 5 free attempts by default, then the
+  usual backoff. It counts in a fixed window, the address bucket's
+  (`ASSETBOARD_AUTH_IP_WINDOW_MINUTES`, 60 minutes by default): when the window has passed,
+  the next attempt starts a new count. **Nothing resets it**, and an attempt is taken back only
+  when no verify outcome exists yet (the hashing gate was saturated, or an error came before
+  the verify), which says nothing about the account.
 - **Password re-check (`confirm`)**, per user id: password change, password confirmation of
   sensitive actions (profile, administration, signing out other devices) and the password step
   of linking an identity provider or proxy sign-in by email. Same free failures and backoff, no
@@ -197,7 +198,23 @@ and someone who had to wait nothing about how long. Now:
   These flows are reachable only by a signed-in user or for an email the identity provider
   proved, which the page already names, so this bucket's state discloses nothing. They never
   touch the sign-in bucket.
-- **Address (`ip`)**, unchanged: login and password confirmation count there.
+- **Address (`ip`)**, unchanged: login and password confirmation count there, and a
+  successful attempt is taken back. It is keyed by the requester, so that reveals nothing
+  about the account.
+
+Why successful sign-ins count: an attempt is counted when it is reserved, before its password
+is verified (ADR-0007), and stays reserved while the verify runs (about 0.1 s here, up to a
+second on small hardware, and longer if someone floods the hashing gate). If a success then
+took its attempt back, a probe of the same email during the verify would see a count, or a
+block, that vanished afterwards; only an email with an account can succeed, so that would
+reveal it. Counting every attempt makes the outcome of a verify invisible to everyone but the
+person who made it.
+
+The Argon2id parameters are pinned in code (`PRODUCTION_ARGON2_PARAMETERS`, the RFC 9106
+low-memory profile: t=3, m=64 MiB, p=4), and the dummy hash uses the same ones, so a library
+upgrade cannot make real and dummy verifies take different times. Changing them is a
+deliberate migration, documented in an ADR and the upgrade notes: existing hashes are rehashed
+at their next successful sign-in.
 
 The window is the address bucket's rather than the 15-minute backoff cap: with a 15-minute
 window an attacker would get 5 fresh guesses per email every 15 minutes (20 an hour); with 60
@@ -210,13 +227,16 @@ Reusing the setting keeps one sign-in window to explain and tune.
   same dummy verify, and a blocked attempt is answered from read-only lookups of the buckets
   before the user table is read. An unknown email is counted, backed off and blocked exactly
   like a known one.
-- Its state depends only on the sign-in attempts made against that email and on time. The
-  owner's successful sign-ins leave no trace in it; password changes and confirmations go to
-  the `confirm` bucket. So the earlier signal is gone: an attacker who builds up an email's
-  counter, waits out the block and tries again gets the same answer whether or not the owner
-  signed in meanwhile, and whether or not the account exists. A property test drives random
-  sequences of attacker attempts and owner actions and checks that outcomes and bucket state
-  are identical for a known and an unknown email; the build-wait-retry case has its own test.
+- Its state depends only on the sign-in attempts made against that email (each counted the
+  same, whatever its verify said) and on time. Password changes and confirmations go to the
+  `confirm` bucket. So an attacker who builds up an email's counter, waits out the block and
+  tries again gets the same answer whether or not the owner signed in meanwhile, and whether
+  or not the account exists, and a probe during someone's sign-in sees the same as one after
+  it. Tests send the same request sequences (attacker guesses, sign-ins with the owner's
+  password, changes and confirmations, right or wrong) for a known and an unknown email and
+  require identical outcomes and bucket state; a threaded test probes during an in-flight
+  sign-in; a mutation test checks that a reset or a take-back on success would be caught; and
+  a failed sign-in runs the same queries for both.
 - What remains visible is that *someone* made sign-in attempts against an email (a block the
   observer did not cause). Anyone can make those against any address, existing or not, so this
   says nothing about the account. Timing tells the same thing as before: a blocked attempt is
@@ -224,12 +244,18 @@ Reusing the setting keeps one sign-in window to explain and tune.
 
 ### Trade-off
 
-An owner's own mistyped passwords are no longer cleared by signing in successfully: they
-expire with the window. Someone who mistypes a few times, signs in, and later mistypes again
-within the hour reaches the backoff sooner than before. With 5 free failures per hour this is
-rare, and the wait is shown. A deliberate lockout by an attacker is bounded by the 15-minute
-backoff cap as before (and, as before, a correct password does not get through while the
-email is blocked).
+The owner's own attempts share the budget: 5 sign-in attempts per email per hour are free,
+**successful ones included**, and mistyped passwords are not cleared by a later success. A
+person who signs in more than 5 times within the hour (several devices, a script) reaches the
+backoff: the 6th attempt still goes through, then a 1-minute pause, doubling. The wait is
+shown, and the limit and window are configurable. A deliberate lockout by an attacker is
+bounded by the 15-minute backoff cap as before (and, as before, a correct password does not
+get through while the email is blocked).
+
+A possible future improvement, not part of this change: a long-lived device cookie set at a
+successful sign-in, so that attempts from a device that has signed in before use their own
+budget (as in OWASP's "device cookies" guidance) and the owner is not locked out by an
+attacker's guesses.
 
 The status stays **401** (not 429) with a `Retry-After` header in seconds: the 401 is what
 log-based tools such as fail2ban count, and a 429 would let a throttled attacker's continued

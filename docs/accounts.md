@@ -8,12 +8,14 @@ are on "Account security".
 
 - A wrong email or password shows "The email or password is not correct." The page never says
   whether an account exists.
-- By default, 5 failed attempts for an email (or 20 from one network address) are free; the
-  6th (or the 21st) starts a pause, and attempts during it say "Too many attempts. Try again in
-  N minutes." The pause starts at 1 minute and doubles with each further failure, up to 15
-  minutes. The count covers every sign-in attempt for that email in the last hour (from the
-  first failure) and is not cleared by signing in successfully: earlier mistakes expire after
-  the hour. Your administrator can change these limits.
+- By default, 5 sign-in attempts for an email per hour are free, successful ones included (and
+  20 failed attempts from one network address); the 6th (or the 21st) starts a pause, and
+  attempts during it say "Too many attempts. Try again in N minutes." The pause starts at 1
+  minute and doubles with each further attempt, up to 15 minutes. The count covers every
+  sign-in attempt for that email in the hour since the first one, and signing in successfully
+  does not clear it: it expires after the hour. If you sign in more than 5 times within an
+  hour (for example on several devices), expect a short pause. Your administrator can change
+  these limits.
 - Wrong passwords when changing your password or confirming a change are counted separately
   (5 free, then the same pause); they never block signing in, and a correct password clears
   them.
