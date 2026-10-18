@@ -170,6 +170,12 @@ Tests: service rules (kind change blocked when used), role checks, tenant isolat
   selection, and puts them into the new row after the swap instead of the server's
   `data-autofocus`. On a 4xx the server's echo of the submitted values and messages wins; if
   sending fails, the submitted values come back.
+- **Swaps settle at once (fix, 2026-10-18):** `base.html` sets HTMX's `defaultSettleDelay` to 0.
+  With the default 20 ms, new content was visible but not yet wired up (`hx-*`) and its
+  `data-autofocus` not yet applied: Esc right after opening an edit row clicked an inert Cancel
+  link, and a field clicked in that window lost the focus to the day field, so typing meant for
+  the amount went into the day (the intermittent F2.2 browser failure). No style depends on the
+  settling classes.
 
 **Agent prompt**
 ```
@@ -263,7 +269,6 @@ part B)**
   (not counted)" so they can be removed); removing every line with no transaction unlocks the
   base currency; every cell save is audited; copy strictly from the immediately previous month.
 
-
 **As built (F2.3 part B: the month-page UI)**
 - **Deviation from "the summary's planned cells":** F2.4 builds the summary after F2.3, so F2.3
   builds the summary block's frame: `#month-summary` (`months/_summary.html`, heading "Plan")
@@ -303,8 +308,8 @@ part B)**
   Enter in a planned cell moves to the next cell (the change saves the one left; on the last
   cell Enter saves in place), Esc restores the saved value (`data-saved-value`) and clears the
   message; a planned value being typed when a transaction write swaps the block keeps its text,
-  focus and selection and is saved once when the field is left; the server's `data-autofocus` of the
-  transaction table does not pull the focus out of a planned cell.
+  focus and selection and is saved once when the field is left; the server's `data-autofocus`
+  of the transaction table does not pull the focus out of a planned cell.
 
 **Agent prompt**
 ```
