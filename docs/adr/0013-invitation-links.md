@@ -17,7 +17,8 @@ account otherwise. A link that grants access is a bearer secret: it must not lea
   characters). Only its SHA-256 is stored, with a unique index. A full-entropy token needs no
   slow hash. The link is shown to the owner once, in the response that creates it, and cannot
   be shown again. An invitation has a role, an expiry of 1, 7 (default) or 30 days, and an
-  email lock (optional until the amendment of 2026-10-18, required since). A workspace can have at most 50 pending invitations.
+  email lock (optional until the amendment of 2026-10-18, required since). A workspace can
+  have at most 50 pending invitations.
 - **Single use.** Accepting runs in one `BEGIN IMMEDIATE` transaction. It finds the invitation by
   token hash, checks that it is pending (not used, revoked or expired), creates the membership,
   marks the invitation used and appends the audit event. Of two concurrent accepts, exactly one
@@ -105,7 +106,9 @@ lock closes that for every role, not only for owners.
   used or are revoked. The accept and sign-up paths treat a NULL email as "no lock", exactly as
   before. The members page labels them "Anyone with the link"; they are not revoked
   automatically. A database constraint is not added: one that applies only to new rows is not
-  portable between SQLite and PostgreSQL. The `owner_requires_email` check stays.
+  portable between SQLite and PostgreSQL.
+- The database CHECK constraint `owner_requires_email` (owner ⇒ email) stays; the service error
+  code of that name is replaced by `email_required`.
 - Unchanged: the invitee side never displays or pre-fills the locked address (the owner still
   sees it in the pending list), wrong emails are counted (5 revoke the invitation), and the
   lock is still not proof of ownership.

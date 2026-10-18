@@ -105,8 +105,9 @@ In the plan, list each acceptance criterion with the test that will prove it, an
     only owner invitations did). Invitations created earlier without one stay valid for any
     account until they expire, are used or are revoked; the members page marks them "Anyone
     with the link". The locked address is never displayed or pre-filled on the invitee side
-    (the owner sees it in the pending list). A wrong email is counted per invitation (`failed_email_attempts`) and the
-    invitation is revoked after 5. The lock is not proof of ownership.
+    (the owner sees it in the pending list). A wrong email is counted per invitation
+    (`failed_email_attempts`) and the invitation is revoked after 5. The lock is not proof of
+    ownership.
   - An existing member is told so; the role is unchanged and the invitation not consumed.
   - Invalid links (expired, revoked, used, unknown or malformed) all look the same.
   - The token is in the URL path. The request log redacts it, uvicorn's access log is off, and
