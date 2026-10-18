@@ -355,6 +355,16 @@ def test_blocked_requests_never_take_the_write_lock(database: Connect, settings:
             clock=CLOCK,
             host="192.0.2.1",
         )
+    # Password change has its own bucket (per user id), blocked by its own failures.
+    for _ in range(settings.auth_account_free_failures + 1):
+        change_password_with_factory(
+            factory,
+            user_id=user.id,
+            current_password="wrong",
+            new_password="Another Strong Password",
+            settings=settings,
+            clock=CLOCK,
+        )
     statements = _record_statements(engine)
 
     login = authenticate_with_factory(
@@ -375,9 +385,11 @@ def test_blocked_requests_never_take_the_write_lock(database: Connect, settings:
     )
 
     account = _throttle(factory, "account", "admin@example.com")
+    confirm = _throttle(factory, "confirm", str(user.id))
     assert account is not None and account.blocked_until is not None
+    assert confirm is not None and confirm.blocked_until is not None
     assert login == LoginOutcome(throttled_until=account.blocked_until)
-    assert change.status == "throttled" and change.throttled_until == account.blocked_until
+    assert change.status == "throttled" and change.throttled_until == confirm.blocked_until
     assert "BEGIN" in statements
     assert "BEGIN IMMEDIATE" not in statements
     assert not any(
@@ -443,8 +455,8 @@ def test_change_password_releases_its_reservation_when_hashing_fails(
             clock=CLOCK,
             hasher=broken_hasher,
         )
-    account = _throttle(factory, "account", "admin@example.com")
-    assert account is not None and account.failure_count == 0
+    confirm = _throttle(factory, "confirm", str(user.id))
+    assert confirm is not None and confirm.failure_count == 0
     with factory() as session:
         stored = session.get(User, user.id)
         assert stored is not None and auth.verify_password(stored.password_hash or "", PASSWORD)

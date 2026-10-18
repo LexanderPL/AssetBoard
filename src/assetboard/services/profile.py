@@ -4,7 +4,8 @@ Every sensitive profile action (link, unlink, sign out everywhere) is confirmed 
 ``confirm_sensitive``, the single entry point:
 
 * A user with a password always confirms with it: ``confirm_password_with_factory``, the
-  primitive behind ``/login/link`` (login's throttle, dummy verify, audited failures), unchanged.
+  primitive behind ``/login/link`` (the ``confirm`` throttle, dummy verify, audited
+  failures), unchanged.
 * A user without a password (created through OIDC or the proxy) may instead rely on a fresh
   external session: the current session started through OIDC or the proxy at most
   ``FRESH_SESSION`` ago (its ``created_at``, not its last activity). This is weaker: a stolen

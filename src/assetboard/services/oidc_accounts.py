@@ -540,7 +540,8 @@ def link_identity(
 ) -> LinkOutcome:
     """Link a verified identity to the account with the same email, after its password.
 
-    The password check is ``confirm_password_with_factory`` (login's throttle and dummy verify).
+    The password check is ``confirm_password_with_factory`` (the user's ``confirm`` throttle,
+    login's address throttle and dummy verify).
     On success every other session of that account is revoked: whoever created or used the
     account before (pre-hijacking) is signed out. Then the visitor is signed in.
     """

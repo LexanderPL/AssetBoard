@@ -560,7 +560,7 @@ def test_ip_threshold_allows_twenty_distinct_accounts_before_backoff(
     assert other is not None and other.failure_count == 1
 
 
-def test_login_success_resets_only_the_account_counter(
+def test_login_success_takes_back_only_its_own_attempt_and_resets_nothing(
     db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
 ) -> None:
     _create_user(db_session, auth_settings, fixed_clock)
@@ -569,7 +569,8 @@ def test_login_success_resets_only_the_account_counter(
     assert _login(db_session, auth_settings, fixed_clock, password=PASSWORD).succeeded
     account = _throttle(db_session, "account", "test@example.com")
     ip_row = _throttle(db_session, "ip", "192.0.2.10/32")
-    assert account is not None and account.failure_count == 0 and account.blocked_until is None
+    # Both counters stay as the failures left them: the account counter decays with time only.
+    assert account is not None and account.failure_count == 3 and account.blocked_until is None
     assert ip_row is not None and ip_row.failure_count == 3
 
 
@@ -1248,7 +1249,7 @@ def test_workspace_table_scope_allowlist_for_f12() -> None:
     assert set(mapped) == set(expected_global) | {"audit_events"} | WORKSPACE_TABLES
 
 
-def test_change_password_wrong_attempts_use_the_account_throttle(
+def test_change_password_wrong_attempts_use_the_users_own_confirm_throttle(
     db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
 ) -> None:
     user = _create_user(db_session, auth_settings, fixed_clock)
@@ -1267,9 +1268,14 @@ def test_change_password_wrong_attempts_use_the_account_throttle(
     assert statuses == ["invalid_current"] * 6
     assert attempt(PASSWORD, fixed_clock).status == "throttled"
     assert auth.verify_password(user.password_hash or "", PASSWORD)
-    # The same bucket blocks login, and the block ends with the backoff.
-    assert not _login(db_session, auth_settings, fixed_clock, password=PASSWORD).succeeded
+    # The bucket is the user's own (by id): sign-in for the email is untouched by it.
+    confirm = _throttle(db_session, "confirm", str(user.id))
+    assert confirm is not None and confirm.failure_count == 6 and confirm.blocked_until
+    assert _throttle(db_session, "account", user.email) is None
+    assert _login(db_session, auth_settings, fixed_clock, password=PASSWORD).succeeded
+    # The block ends with the backoff; a change resets the user's own bucket.
     assert attempt(PASSWORD, at(seconds=60)).status == "changed"
+    assert (confirm.failure_count, confirm.blocked_until) == (0, None)
 
 
 @pytest.mark.parametrize(
@@ -1321,7 +1327,7 @@ def test_blocked_login_attempts_with_distinct_emails_add_no_rows(
 
 
 @pytest.mark.parametrize("pruning", [True, False])
-def test_account_counter_idle_for_24_hours_counts_as_zero(
+def test_account_counter_after_its_window_or_idle_for_24_hours_counts_as_zero(
     db_session: Session,
     auth_settings: Settings,
     fixed_clock: FixedClock,
@@ -1332,10 +1338,17 @@ def test_account_counter_idle_for_24_hours_counts_as_zero(
         monkeypatch.setattr(auth, "prune_auth_throttles", lambda _session, _clock: 0)
     for _ in range(auth_settings.auth_account_free_failures):
         _login(db_session, auth_settings, fixed_clock, email="idle@example.com")
-    almost = at(hours=24, seconds=-1)
+    window = timedelta(minutes=auth_settings.auth_ip_window_minutes)
+    almost = at(seconds=window.total_seconds() - 1)
     _login(db_session, auth_settings, almost, email="idle@example.com")
     row = _throttle(db_session, "account", "idle@example.com")
     assert row is not None and row.failure_count == 6 and row.blocked_until is not None
+    # The window (the address bucket's) ends: the count starts again, the block stays.
+    after_window = at(seconds=window.total_seconds())
+    _login(db_session, auth_settings, after_window, email="idle@example.com")
+    assert row.failure_count == 6  # blocked: not counted
+    _login(db_session, auth_settings, at(hours=2), email="idle@example.com")
+    assert (row.failure_count, row.blocked_until) == (1, None)
 
     later = at(hours=48)
     if pruning:
@@ -1399,15 +1412,18 @@ def test_release_takes_back_only_this_requests_attempt(
 def test_release_is_a_no_op_after_a_reset_or_a_new_window(
     db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
 ) -> None:
-    slot = _account_slot(auth_settings)
+    user_id = uuid4()
+    slot = auth.ThrottleSlot(
+        "confirm", str(user_id), None, auth_settings.auth_account_free_failures
+    )
     reserved = auth.reserve_attempts(db_session, [slot], fixed_clock.now(), auth_settings)
     assert reserved
-    # A successful login elsewhere resets the counter and starts a new window ...
-    auth._reset_account(db_session, "test@example.com", at(seconds=1).now())  # pyright: ignore[reportPrivateUsage]
+    # A correct password re-check elsewhere resets the user's confirm counter ...
+    auth._reset_confirm(db_session, user_id, at(seconds=1).now())  # pyright: ignore[reportPrivateUsage]
     # ... and a new failure is counted in it.
     auth.reserve_attempts(db_session, [slot], at(seconds=2).now(), auth_settings)
     auth.release_attempts(db_session, reserved)
-    row = _throttle(db_session, "account", "test@example.com")
+    row = _throttle(db_session, "confirm", str(user_id))
     assert row is not None and row.failure_count == 1  # the later failure is not erased
 
     ip_slot = auth.ThrottleSlot("ip", "192.0.2.1/32", timedelta(minutes=60), 20)

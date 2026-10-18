@@ -1,8 +1,8 @@
 """The message and ``Retry-After`` for an attempt refused by the sign-in throttle.
 
 Shown only when a throttle bucket actually blocked the attempt; an ordinary failure keeps its
-own message. On sign-in the account bucket is keyed by the normalized email and counted the
-same way for unknown emails; what this still reveals is an accepted risk (ADR-0012).
+own message. On sign-in the account bucket is keyed by the normalized email, counted the same
+way for unknown emails and never reset by the owner, so it reveals no account (ADR-0012).
 """
 
 from __future__ import annotations
