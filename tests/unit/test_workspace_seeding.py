@@ -15,6 +15,7 @@ from uuid import UUID
 
 import pytest
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError
 from typer.testing import CliRunner
 
 from assetboard.branding import ENV_PREFIX
@@ -27,6 +28,7 @@ from assetboard.domain.categories import SEED
 from assetboard.i18n import gettext
 from assetboard.services import auth, categories
 from assetboard.services.auth import (
+    WorkspaceCreationFailed,
     argon2_hash,
     create_user_with_temporary_password,
     register_with_invitation,
@@ -401,3 +403,46 @@ def test_seed_into_writes_only_into_its_scope(db: WorkspaceDb) -> None:
     assert count == len(SEED)
     assert _categories(db, new_id) == _expected("en")
     assert _categories(db, db.workspace_id) == []
+
+
+def _failing_seed(*_args: object, **_kwargs: object) -> int:
+    raise IntegrityError("INSERT INTO categories", {}, Exception("UNIQUE constraint failed"))
+
+
+def test_a_seed_constraint_error_in_registration_is_not_reported_as_a_taken_email(
+    db: WorkspaceDb, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _close_setup(db)
+    monkeypatch.setattr(categories, "seed_into", _failing_seed)
+    with pytest.raises(WorkspaceCreationFailed) as failed:
+        auth.register_with_factory(
+            db.factory,
+            email="reg@example.com",
+            display_name="Registrant",
+            password=PASSWORD,
+            workspace_name="Mine",
+            settings=Settings(_env_file=None, data_dir=tmp_path, allow_registration=True),
+            clock=db.clock,
+            host="192.0.2.3",
+        )
+    assert isinstance(failed.value.__cause__, IntegrityError)
+    with db.factory() as session:
+        assert session.scalars(select(User.id)).all() == []
+
+
+def test_a_seed_constraint_error_in_auto_create_is_not_reported_as_an_existing_account(
+    db: WorkspaceDb, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _close_setup(db)
+    monkeypatch.setattr(categories, "seed_into", _failing_seed)
+    with pytest.raises(WorkspaceCreationFailed):
+        sign_in_external(
+            db.factory,
+            _identity(ISSUER, "ola", "ola@example.com"),
+            next_path="/",
+            settings=_external_settings(tmp_path),
+            clock=db.clock,
+            host="203.0.113.8",
+        )
+    with db.factory() as session:
+        assert session.scalars(select(User.id)).all() == []

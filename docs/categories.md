@@ -37,6 +37,9 @@ the instance's default language:
 - Income: Salary, Bonus, Interest, Sale of items, Other.
 - Savings withdrawal (income, treatment savings).
 
+The names follow the language the creating page was shown in, which may differ from the
+workspace's formatting default chosen in the same form.
+
 After that they are ordinary categories: rename, reorder, archive or delete them as you like.
 
 A workspace created before this, or one whose categories were all deleted, has none: while a

@@ -236,6 +236,19 @@ def argon2_calls(monkeypatch: pytest.MonkeyPatch) -> CountingHasher:
     return counter
 
 
+def owned_workspace_category_names(factory: Any, email: str) -> list[str]:
+    """Category names of the one workspace ``email`` owns (every new workspace is seeded)."""
+    with factory() as session:
+        workspace_id = session.scalars(
+            select(Membership.workspace_id)
+            .join(User, User.id == Membership.user_id)
+            .where(User.email == email, Membership.role == "owner")
+        ).one()
+        return list(
+            session.scalars(select(Category.name).where(Category.workspace_id == workspace_id))
+        )
+
+
 @dataclass
 class OwnerApp:
     """An app after first-run setup, with the administrator (owner of "Home") signed in."""
