@@ -217,6 +217,12 @@ when you intend to upload the image and its release tags.
   what the throttled message can still hint at is an accepted risk described in
   [ADR-0012](adr/0012-local-authentication.md) (amendment of 2026-10-17).
 
+### Unreleased: transactions, data layer (F2.2 part A)
+
+- The migration adds the `transactions` table and changes no existing data. No new setting. The
+  month page does not show transactions yet (part B). Once a workspace has a transaction, its
+  base currency can no longer change; see [docs/workspace-settings.md](workspace-settings.md).
+
 ### Unreleased: month pages (F2.5)
 
 - **Month pages** at "Month" in the main navigation (`/m`, `/m/YYYY-MM`); see
