@@ -67,6 +67,8 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     # Workspace scope
     "setup.create_admin": (),
     "workspace.settings_updated": ("fields",),
+    "workspace.created": (),
+    "instance.settings_updated": ("allow_workspace_creation",),
     "member.role_changed": ("from", "to"),
     "member.removed": ("role",),
     "invitation.created": ("role", "email_locked", "expires_in_days"),
@@ -127,6 +129,8 @@ ACTION_LABELS: dict[str, str] = {
     "admin.admin_granted": _("Administrator role granted"),
     "admin.admin_revoked": _("Administrator role removed"),
     "workspace.settings_updated": _("Workspace settings changed"),
+    "workspace.created": _("Workspace created"),
+    "instance.settings_updated": _("Instance settings changed"),
     "member.role_changed": _("Member role changed"),
     "member.removed": _("Member removed"),
     "invitation.created": _("Invitation created"),
@@ -178,6 +182,7 @@ KEY_LABELS: dict[str, str] = {
     "in_use": _("In use"),
     "count": _("Number"),
     "automatic": _("Added with the new workspace"),
+    "allow_workspace_creation": _("Every signed-in user can create workspaces"),
     "month": _("Month"),
     "closed_months_affected": _("Closed months affected"),
     "date": _("Date"),
@@ -243,6 +248,7 @@ PURPOSE_LABELS: dict[str, str] = {
     "admin_promote": _("granting the administrator role"),
     "admin_demote": _("removing the administrator role"),
     "admin_create_user": _("creating an account"),
+    "admin_settings": _("changing instance settings"),
 }
 FIELD_LABELS: dict[str, str] = {
     "name": _("name"),
@@ -302,7 +308,7 @@ GROUPS: dict[Scope, dict[str, tuple[str, ...]]] = {
             "invitation.accepted",
             "invitation.email_mismatch",
         ),
-        "settings": ("workspace.settings_updated",),
+        "settings": ("workspace.created", "workspace.settings_updated"),
         "categories": (
             "category.created",
             "category.updated",
@@ -341,6 +347,7 @@ GROUPS: dict[Scope, dict[str, tuple[str, ...]]] = {
             "auth.instance_admin_revoked",
             *AUDIT_DATA_KEYS,
         ),
+        "instance_settings": ("instance.settings_updated",),
     },
 }
 GROUP_LABELS: dict[str, str] = {
@@ -354,6 +361,7 @@ GROUP_LABELS: dict[str, str] = {
     "failures": _("Failures"),
     "links": _("Linked sign-in methods"),
     "accounts": _("Account administration"),
+    "instance_settings": _("Instance settings"),
 }
 
 

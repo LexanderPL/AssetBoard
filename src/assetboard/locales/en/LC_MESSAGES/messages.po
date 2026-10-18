@@ -184,6 +184,12 @@ msgstr ""
 msgid "Workspace settings changed"
 msgstr ""
 
+msgid "Workspace created"
+msgstr ""
+
+msgid "Instance settings changed"
+msgstr ""
+
 msgid "Member role changed"
 msgstr ""
 
@@ -320,6 +326,9 @@ msgid "Number"
 msgstr ""
 
 msgid "Added with the new workspace"
+msgstr ""
+
+msgid "Every signed-in user can create workspaces"
 msgstr ""
 
 msgid "Month"
@@ -475,6 +484,9 @@ msgstr ""
 msgid "creating an account"
 msgstr ""
 
+msgid "changing instance settings"
+msgstr ""
+
 msgid "name"
 msgstr ""
 
@@ -554,6 +566,9 @@ msgid "Linked sign-in methods"
 msgstr ""
 
 msgid "Account administration"
+msgstr ""
+
+msgid "Instance settings"
 msgstr ""
 
 msgid "Same as the system"
@@ -667,6 +682,15 @@ msgstr ""
 msgid ""
 "The identity provider decides this at each sign-in; to change it, change "
 "the group there."
+msgstr ""
+
+msgid "Instance settings saved."
+msgstr ""
+
+msgid "Nothing to change: the settings already had these values."
+msgstr ""
+
+msgid "Choose who can create workspaces."
 msgstr ""
 
 msgid "Enter a valid email address."
@@ -1091,6 +1115,9 @@ msgstr ""
 msgid "Switch"
 msgstr ""
 
+msgid "New workspace"
+msgstr ""
+
 msgid "Are you sure?"
 msgstr ""
 
@@ -1209,6 +1236,27 @@ msgid "Link this proxy sign-in"
 msgstr ""
 
 msgid "Back to users"
+msgstr ""
+
+msgid "Workspaces"
+msgstr ""
+
+msgid "Who can create workspaces"
+msgstr ""
+
+msgid "Every signed-in user"
+msgstr ""
+
+msgid "Only instance administrators"
+msgstr ""
+
+msgid ""
+"Whoever creates a workspace becomes its owner. This does not affect open "
+"registration or accounts created at the first sign-in through an identity"
+" provider or a proxy: those follow their own settings."
+msgstr ""
+
+msgid "Save settings"
 msgstr ""
 
 msgid "Account created"
@@ -1441,21 +1489,6 @@ msgstr ""
 msgid "Setup token"
 msgstr ""
 
-msgid "Defaults to your display name."
-msgstr ""
-
-msgid "Base currency"
-msgstr ""
-
-msgid "Country"
-msgstr ""
-
-msgid "Not set"
-msgstr ""
-
-msgid "Time zone"
-msgstr ""
-
 msgid "Create administrator"
 msgstr ""
 
@@ -1548,6 +1581,12 @@ msgid "Delete"
 msgstr ""
 
 msgid "Dismiss"
+msgstr ""
+
+msgid "You can also create a workspace of your own."
+msgstr ""
+
+msgid "Create workspace"
 msgstr ""
 
 msgid "Return to overview"
@@ -1661,6 +1700,21 @@ msgstr ""
 msgid "Entries and planned values for this month will appear here."
 msgstr ""
 
+msgid "Defaults to your display name."
+msgstr ""
+
+msgid "Base currency"
+msgstr ""
+
+msgid "Country"
+msgstr ""
+
+msgid "Not set"
+msgstr ""
+
+msgid "Time zone"
+msgstr ""
+
 msgid "People in this workspace"
 msgstr ""
 
@@ -1725,6 +1779,11 @@ msgstr ""
 msgid "No pending invitations."
 msgstr ""
 
+msgid ""
+"You become its owner. It starts with the suggested categories, named in "
+"your language; you can change them afterwards."
+msgstr ""
+
 msgid "General"
 msgstr ""
 
@@ -1740,9 +1799,6 @@ msgid ""
 "The formatting default is used for numbers and dates where no personal "
 "preference applies. Your interface language follows your account and "
 "browser."
-msgstr ""
-
-msgid "Save settings"
 msgstr ""
 
 #~ msgid "AssetBoard home"
