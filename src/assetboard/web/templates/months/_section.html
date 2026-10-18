@@ -6,4 +6,4 @@
 {{ section(section_view, oob=oob_section) }}
 <p id="ledger-status" hx-swap-oob="innerHTML">{{ status }}</p>
 {% with summary_oob = true %}{% include "months/_summary.html" %}{% endwith %}
-{% if toast_undo %}{{ toast(toast_message, toast_undo, _("Undo")) }}{% endif %}
+{% if toast_undo %}{{ toast(toast_message, toast_undo, _("Undo"), toast_seconds) }}{% endif %}

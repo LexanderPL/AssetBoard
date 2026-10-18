@@ -10,6 +10,7 @@ by the router-level ``require_csrf`` dependency.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Annotated
 from uuid import UUID
 from zoneinfo import ZoneInfo
@@ -30,9 +31,16 @@ from assetboard.services.months import (
     get_month,
     reopen_month,
 )
-from assetboard.services.transactions import get_transaction
+from assetboard.services.transactions import get_transaction, pending_undo
 from assetboard.web.context import CurrentContext
-from assetboard.web.ledger import SectionState, build_ledger, edit_values, summary_context
+from assetboard.web.ledger import (
+    DIRECTIONS,
+    ENTRY_DAY,
+    SectionState,
+    build_ledger,
+    edit_values,
+    summary_context,
+)
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
 
@@ -119,7 +127,8 @@ def month_context(
     saved_in: YearMonth | None = None,
 ) -> dict[str, object]:
     """The month page's context (blocking: run in a thread). ``states`` carry the transaction
-    tables' form values and messages; ``deleted`` offers Undo (pages without JavaScript)."""
+    tables' form values and messages; ``deleted`` offers Undo (pages without JavaScript) while
+    that row of this month can still be restored."""
     factory = request.app.state.session_factory
     view = get_month(factory, ctx, target)
     locale = request.state.locale
@@ -128,6 +137,11 @@ def month_context(
         local = view.closed_at.astimezone(ZoneInfo(ctx.workspace.timezone)).date()
         closed_on = format_day(local, locale)
     ledger = build_ledger(factory, ctx, request, view, states)
+    pending = None
+    if deleted is not None and ledger.can_write:
+        pending = pending_undo(factory, ctx, deleted)
+        if pending is not None and pending.month != target:
+            pending = None
     notice_text = _t(request, NOTICES[notice]) if notice in NOTICES else None
     saved_in_href = None
     if saved_in is not None and saved_in != target:
@@ -145,7 +159,7 @@ def month_context(
         "error": _t(request, ERRORS[error]) if error in ERRORS else None,
         "ledger": ledger,
         "summary": summary_context(ledger),
-        "deleted": deleted if ledger.can_write else None,
+        "deleted": pending.id if pending is not None else None,
     }
 
 
@@ -173,15 +187,23 @@ async def month_page(
     edit: str = "",
     deleted: str = "",
     saved_in: str = "",
+    entry: str = "",
+    day: str = "",
 ) -> Response:
-    """The month page. ``?edit=<id>`` opens a row for editing and ``?deleted=<id>`` offers Undo
-    (both for browsers without JavaScript); ``?saved_in=YYYY-MM`` links an entry saved to
+    """The month page. For browsers without JavaScript: ``?edit=<id>`` opens a row for
+    editing, ``?deleted=<id>`` offers Undo, ``?entry=<direction>&day=<day>`` prefills that
+    table's entry row with the day just used. ``?saved_in=YYYY-MM`` links an entry saved to
     another month."""
     target = _parse(month)
     states: dict[str, SectionState] = {}
     editing = _optional_uuid(edit)
     if editing is not None:
         states = await run_in_threadpool(edit_states, request, ctx, target, editing)
+    if entry in DIRECTIONS and ENTRY_DAY.fullmatch(day):
+        kept = SectionState(entry_values={"day": day}, focus="entry:day")
+        if entry in states:
+            kept = replace(states[entry], entry_values=kept.entry_values)
+        states[entry] = kept
     context = await run_in_threadpool(
         lambda: month_context(
             request,

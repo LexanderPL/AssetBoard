@@ -12,6 +12,7 @@ notice, and which element the browser focuses after the swap (``data-autofocus``
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from uuid import UUID
@@ -37,6 +38,13 @@ def _(message: str) -> str:
 
 DIRECTIONS = (TransactionDirection.EXPENSE.value, TransactionDirection.INCOME.value)
 FIELDS = ("day", "amount", "description", "category")
+# A day as typed into the entry row (``?day=`` keeps it after a save without JavaScript): the
+# forms ``domain.transactions.parse_entry_date`` reads, ASCII digits only.
+ENTRY_DAY = re.compile(
+    r"[0-9]{1,2}"  # a day of the viewed month
+    r"|[0-9]{4}-[0-9]{1,2}-[0-9]{1,2}"  # 2026-10-07
+    r"|[0-9]{1,2}\.[0-9]{1,2}\.[0-9]{4}"  # 07.10.2026
+)
 FALLBACK_ERROR = _("The change could not be made. Reload the page and try again.")
 
 # One message per error code of ``services.transactions.InvalidTransaction`` (part A).
@@ -139,6 +147,7 @@ class LedgerView:
     month: YearMonth
     can_write: bool  # editor or owner, and the month is open
     sections: tuple[SectionView, ...]
+    max_description: int = MAX_DESCRIPTION_LENGTH
 
     def section(self, direction: str) -> SectionView:
         return next(s for s in self.sections if s.direction == direction)

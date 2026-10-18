@@ -42,7 +42,7 @@
 <td class="py-2 pr-2 align-top">
   <label for="{{ prefix }}-description" class="sr-only">{{ _("Description") }}</label>
   <div class="relative">
-    <input id="{{ prefix }}-description" name="description" form="{{ form_id }}" type="text" autocomplete="off" maxlength="200" value="{{ values.get('description', '') }}" placeholder="{{ _('Description') }}"
+    <input id="{{ prefix }}-description" name="description" form="{{ form_id }}" type="text" autocomplete="off" maxlength="{{ ledger.max_description }}" value="{{ values.get('description', '') }}" placeholder="{{ _('Description') }}"
            role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="{{ prefix }}-suggestions"{{ described(prefix, "description", errors) }}{{ autofocus(s.state, kind ~ ":description") }}
            hx-get="{{ scoped_url(request, 'transaction_suggestions') }}?direction={{ s.direction }}" hx-trigger="input changed delay:150ms" hx-target="#{{ prefix }}-suggestions" hx-swap="innerHTML" hx-sync="this:replace"
            data-ledger-field data-suggest-input class="{{ input_class }}">
@@ -123,7 +123,9 @@
 
 {% macro section(s, oob=false) -%}
 <section id="ledger-{{ s.direction }}" class="panel p-4 sm:p-6" aria-labelledby="ledger-{{ s.direction }}-heading" data-ledger="{{ s.direction }}"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
-  <h2 id="ledger-{{ s.direction }}-heading" class="text-base font-semibold">{{ s.heading }}</h2>
+  {# Without an entry row (no category of this kind) the focus falls back to the heading. #}
+  {% set heading_focus = ledger.can_write and not s.categories and (s.state.focus or "").startswith("entry:") %}
+  <h2 id="ledger-{{ s.direction }}-heading" class="text-base font-semibold"{% if heading_focus %} tabindex="-1" data-autofocus{% endif %}>{{ s.heading }}</h2>
   {% if s.state.notice %}
   <p class="mt-2 text-sm" data-ledger-notice>{% if s.state.notice_href %}<a href="{{ s.state.notice_href }}" class="font-medium text-accent underline">{{ s.state.notice }}</a>{% else %}{{ s.state.notice }}{% endif %}</p>
   {% endif %}

@@ -1,15 +1,17 @@
-"""Transactions on the month page in Chromium (F2.2 part B): the keyboard flow of the entry row,
-autocomplete, inline edit, delete with the undo toast, a closed month, a viewer, and no CSP
-violations."""
+"""Transactions on the month page in Chromium (F2.2 part B): the keyboard flow of the entry row
+(the kept day, typing on while a save is in flight), autocomplete, inline edit, delete with the
+undo toast (a half-typed entry survives it), a closed month, a viewer, and no CSP violations."""
 
 from __future__ import annotations
 
+import asyncio
 import os
 import re
 import socket
 import threading
 import time
 from pathlib import Path
+from typing import Any
 
 import pytest
 import uvicorn
@@ -35,6 +37,25 @@ document.addEventListener("securitypolicyviolation", (event) => {
 """
 PASSWORD = "Correct Horse Battery!"
 MONTH = "2025-03"
+
+
+class SlowPosts:
+    """Delays every POST by ``delay`` seconds (network latency, without blocking the test)."""
+
+    def __init__(self, app: Any) -> None:
+        self.app = app
+        self.delay = 0.0
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] == "http" and scope["method"] == "POST" and self.delay:
+            await asyncio.sleep(self.delay)
+        await self.app(scope, receive, send)
+
+
+def _selection(page: Page) -> list[int]:
+    return page.evaluate(
+        "[document.activeElement.selectionStart, document.activeElement.selectionEnd]"
+    )
 
 
 def _descriptions(page: Page) -> list[str]:
@@ -63,7 +84,8 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
     listener.bind(("127.0.0.1", 0))
     listener.listen()
     port = listener.getsockname()[1]
-    server = uvicorn.Server(uvicorn.Config(app, log_level="error", access_log=False))
+    slow = SlowPosts(app)
+    server = uvicorn.Server(uvicorn.Config(slow, log_level="error", access_log=False))
     server_thread = threading.Thread(target=server.run, kwargs={"sockets": [listener]}, daemon=True)
     server_thread.start()
     deadline = time.monotonic() + 10
@@ -118,8 +140,12 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
             category.select_option(label="Food")
             page.keyboard.press("Enter")
             expect(page.locator("#ledger-expense [data-description]")).to_have_text(["Żabka"])
+            # The next entry row keeps the day, selected, so typing replaces it.
             expect(day).to_be_focused()
-            expect(day).to_have_value("")
+            expect(day).to_have_value("7")
+            assert _selection(page) == [0, 1]
+            expect(amount).to_have_value("")
+            expect(description).to_have_value("")
             expect(page.locator("#entry-expense-category")).to_have_value("")
             expect(page.locator("#ledger-status")).to_have_text("Entry added.")
             expect(page.locator("#ledger-expense [data-amount]")).to_have_text(["€12.50"])
@@ -213,6 +239,12 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
             expect(toast).to_contain_text("Entry deleted.")
             expect(toast.locator("[data-toast-countdown]")).to_have_text(re.compile(r"^(10|9|8)$"))
             expect(day).to_be_focused()
+            # A half-typed entry survives the undo, which replaces the whole table.
+            page.keyboard.type("21")
+            page.keyboard.press("Tab")
+            page.keyboard.type("8")
+            page.keyboard.press("Tab")
+            page.keyboard.type("Half")
             toast.hover()  # an undo toast does not pause on hover
             toast.get_by_role("button", name="Undo").click()
             expect(toast).to_have_count(0)
@@ -220,12 +252,54 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
                 ["Bread", "Żabka", "Żabka"]
             )
             expect(page.locator("#ledger-status")).to_have_text("Entry restored.")
+            expect(day).to_have_value("21")
+            expect(amount).to_have_value("8")
+            expect(description).to_have_value("Half")
+            day.click()
+            page.keyboard.press("Escape")
+            expect(description).to_have_value("")
 
             # Without Undo the toast disappears after ten seconds.
             bread.locator("[data-delete]").click()
             expect(toast).to_have_count(1)
             toast.hover()
             expect(toast).to_have_count(0, timeout=12_000)
+
+            # Typing on right after Enter, while the server is slow: nothing typed is lost, the
+            # first entry is saved with its own day and the second with the newly typed one.
+            slow.delay = 0.4
+            page.goto(f"{base}/m/2025-05")
+            day.click()
+            page.keyboard.type("7")
+            page.keyboard.press("Tab")
+            page.keyboard.type("1")
+            page.keyboard.press("Tab")
+            page.keyboard.type("First")
+            category.select_option(label="Food")
+            description.press("Enter")
+            page.keyboard.type("15", delay=40)  # replaces the kept, selected day
+            page.keyboard.press("Tab")
+            page.keyboard.type("2.5", delay=40)
+            expect(page.locator("#ledger-expense [data-description]")).to_have_text(["First"])
+            expect(day).to_have_value("15")
+            expect(amount).to_have_value("2.5")
+            expect(amount).to_be_focused()
+            page.keyboard.press("Tab")
+            page.keyboard.type("Second")
+            category.select_option(label="Food")
+            description.press("Enter")
+            page.keyboard.type("2", delay=40)
+            expect(page.locator("#ledger-expense [data-description]")).to_have_text(
+                ["First", "Second"]
+            )
+            expect(day).to_have_value("2")
+            dates = page.locator("#ledger-expense tr[data-transaction] time").evaluate_all(
+                "times => times.map(t => t.getAttribute('datetime'))"
+            )
+            assert dates == ["2025-05-07", "2025-05-15"]
+            expect(page.locator("#ledger-expense [data-amount]")).to_have_text(["€1.00", "€2.50"])
+            slow.delay = 0
+            page.goto(f"{base}/m/{MONTH}")
 
             # A closed month is read-only.
             page.locator("[data-month-close]").click()

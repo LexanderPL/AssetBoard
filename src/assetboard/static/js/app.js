@@ -53,7 +53,8 @@ function startToastTimer(toast) {
   }
   // An undo toast is strict: the server's undo window does not pause, so neither does it.
   const strict = toast.hasAttribute("data-toast-strict");
-  const seconds = Number(toast.dataset.toastSeconds) || 10;
+  const given = Number(toast.dataset.toastSeconds);
+  const seconds = toast.dataset.toastSeconds !== undefined && Number.isFinite(given) ? given : 10;
   const remaining = strict || toast.querySelector("[data-toast-undo]") ? seconds * 1000 : 5000;
   const timer = { remaining, startedAt: 0, timeoutId: 0 };
   const pauseReasons = new Set();
@@ -192,7 +193,118 @@ function focusRequested() {
   element.focus();
   if (element instanceof HTMLInputElement) element.select();
 }
-document.addEventListener("htmx:load", focusRequested);
+document.addEventListener("htmx:load", () => {
+  restoreEntryRows();
+  focusRequested();
+});
+
+// Entry rows survive swaps of their table. After Enter the row is reset at once (the request
+// already holds its values), so typing goes on; whatever is typed before the response arrives
+// is carried into the new section with the focus and the selection. The same holds when
+// another write or an undo replaces the section. A refused save (4xx) shows the server's echo
+// of the submitted values and messages instead.
+const entryStash = new Map(); // section id -> {section, values, focus, selection}
+
+function entryRowOf(section) {
+  return section instanceof Element ? section.querySelector("[data-entry-row]") : null;
+}
+
+function snapshotEntryRow(section, row) {
+  const values = {};
+  row.querySelectorAll("[data-ledger-field]").forEach((field) => {
+    if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
+      values[field.name] = field.value;
+    }
+  });
+  const active = document.activeElement;
+  const focus = active instanceof HTMLElement && row.contains(active) ? active.id : null;
+  const selection =
+    focus && active instanceof HTMLInputElement
+      ? [active.selectionStart, active.selectionEnd, active.selectionDirection]
+      : null;
+  return { section, values, focus, selection };
+}
+
+function stashSection(section) {
+  if (!(section instanceof HTMLElement) || !section.matches("[data-ledger]")) return;
+  const row = entryRowOf(section);
+  if (row) entryStash.set(section.id, snapshotEntryRow(section, row));
+}
+
+function restoreEntryRows() {
+  for (const [id, snapshot] of entryStash) {
+    const section = document.getElementById(id);
+    if (!section || section === snapshot.section) continue; // not swapped yet
+    entryStash.delete(id);
+    const row = entryRowOf(section);
+    if (!row) continue;
+    row.querySelectorAll("[data-ledger-field]").forEach((field) => {
+      const value = snapshot.values[field.getAttribute("name") ?? ""];
+      if (value !== undefined && "value" in field) field.value = value;
+    });
+    const field = snapshot.focus ? document.getElementById(snapshot.focus) : null;
+    if (!(field instanceof HTMLElement) || !row.contains(field)) continue;
+    section.querySelectorAll("[data-autofocus]").forEach((e) => e.removeAttribute("data-autofocus"));
+    field.focus();
+    if (field instanceof HTMLInputElement && snapshot.selection) {
+      try {
+        field.setSelectionRange(...snapshot.selection);
+      } catch {
+        // Not every input type has a selection.
+      }
+    }
+  }
+}
+
+document.addEventListener("htmx:beforeSwap", (event) => {
+  const section = event.detail?.target;
+  if (!(section instanceof HTMLElement) || !section.matches("[data-ledger]")) return;
+  const status = event.detail.xhr?.status ?? 0;
+  if (status >= 200 && status < 300) stashSection(section);
+  else entryStash.delete(section.id); // the server's echo wins
+});
+document.addEventListener("htmx:oobBeforeSwap", (event) => stashSection(event.detail?.target));
+document.addEventListener("htmx:afterSwap", restoreEntryRows);
+
+// The day the next entry keeps (owner decision): a full date in the viewed month becomes its
+// day number, anything else stays as typed. The server applies the same rule.
+function keptDay(text) {
+  const value = text.trim();
+  const month = document.querySelector("[data-month]")?.getAttribute("data-month") ?? "";
+  let match = /^([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})$/.exec(value);
+  let parts = match ? [match[1], match[2], match[3]] : null;
+  match = /^([0-9]{1,2})\.([0-9]{1,2})\.([0-9]{4})$/.exec(value);
+  if (match) parts = [match[3], match[2], match[1]];
+  if (parts && `${parts[0]}-${parts[1].padStart(2, "0")}` === month) return String(Number(parts[2]));
+  return value;
+}
+
+const submittedEntries = new Map(); // entry form id -> values sent (restored if sending fails)
+
+document.addEventListener("htmx:beforeRequest", (event) => {
+  const form = event.detail?.elt;
+  if (!(form instanceof HTMLFormElement) || !form.matches("[data-entry-form]")) return;
+  const row = document.getElementById(`${form.id}-row`);
+  if (!row) return;
+  submittedEntries.set(form.id, snapshotEntryRow(null, row).values);
+  const day = row.querySelector("[name='day']");
+  const kept = day instanceof HTMLInputElement ? keptDay(day.value) : "";
+  clearEntryRow(row);
+  if (day instanceof HTMLInputElement) {
+    day.value = kept;
+    day.select();
+  }
+});
+
+document.addEventListener("htmx:sendError", (event) => {
+  const form = event.detail?.elt;
+  if (!(form instanceof HTMLFormElement) || !submittedEntries.has(form.id)) return;
+  const values = submittedEntries.get(form.id);
+  document.getElementById(`${form.id}-row`)?.querySelectorAll("[data-ledger-field]").forEach((field) => {
+    const value = values[field.getAttribute("name") ?? ""];
+    if (value !== undefined && "value" in field) field.value = value;
+  });
+});
 
 function suggestionList(input) {
   return document.getElementById(input.getAttribute("aria-controls") ?? "");

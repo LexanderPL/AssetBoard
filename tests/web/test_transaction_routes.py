@@ -155,15 +155,19 @@ def test_a_category_less_table_links_the_categories_page(ledger: OwnerApp) -> No
 def test_a_day_number_is_saved_in_the_viewed_month(ledger: OwnerApp) -> None:
     food = _category(ledger, "Food")
     response = _add(ledger, _form(food, "31", "12,5"), "/m/2026-12")
-    assert response.headers["location"] == "/m/2026-12?notice=transaction_added#ledger-expense"
+    assert response.headers["location"] == (
+        "/m/2026-12?notice=transaction_added&entry=expense&day=31#ledger-expense"
+    )
     (row,) = _rows(ledger)
     assert (str(row.date), row.amount_minor, row.currency) == ("2026-12-31", 1250, "EUR")
     assert "Entry added." in _page(ledger, "/m/2026-12?notice=transaction_added")
 
 
-def test_htmx_add_returns_the_section_with_an_empty_focused_entry_row(ledger: OwnerApp) -> None:
+def test_htmx_add_returns_the_section_with_a_new_entry_row_keeping_the_day(
+    ledger: OwnerApp,
+) -> None:
     food = _category(ledger, "Food")
-    response = _htmx(ledger, f"{MONTH}/transactions", _form(food))
+    response = _htmx(ledger, f"{MONTH}/transactions", _form(food, "2026-10-07"))
     assert response.status_code == 200
     html = response.text
     assert html.lstrip().startswith('<section id="ledger-expense"')
@@ -171,7 +175,12 @@ def test_htmx_add_returns_the_section_with_an_empty_focused_entry_row(ledger: Ow
     entry = re.search(r'<tr id="entry-expense-row".*?</tr>', html, re.DOTALL)
     assert entry is not None
     assert 'value=""' in entry.group(0) and "data-autofocus" in entry.group(0)
-    assert re.search(r'id="entry-expense-day"[^>]*data-autofocus', entry.group(0))
+    # The day is kept, as a day number of the viewed month; the rest is empty.
+    assert re.search(r'id="entry-expense-day"[^>]*value="7"[^>]*data-autofocus', entry.group(0))
+    assert re.search(r'id="entry-expense-amount"[^>]*value=""', entry.group(0))
+    assert re.search(r'id="entry-expense-description"[^>]*value=""', entry.group(0))
+    assert '<option value="" selected>' not in entry.group(0)  # no category chosen
+    assert "selected>Food" not in entry.group(0)
     assert '<p id="ledger-status" hx-swap-oob="innerHTML">Entry added.</p>' in html
     assert '<div id="month-summary" data-month-summary hx-swap-oob="outerHTML"></div>' in html
     assert "HX-Request" in response.headers["Vary"]
@@ -180,7 +189,8 @@ def test_htmx_add_returns_the_section_with_an_empty_focused_entry_row(ledger: Ow
 def test_a_full_date_in_another_month_is_saved_there_and_linked(ledger: OwnerApp) -> None:
     food = _category(ledger, "Food")
     response = _add(ledger, _form(food, "07.09.2026"))
-    assert response.headers["location"] == f"{MONTH}?saved_in=2026-09#ledger-expense"
+    location = f"{MONTH}?saved_in=2026-09&entry=expense&day=07.09.2026#ledger-expense"
+    assert response.headers["location"] == location
     page = _page(ledger, f"{MONTH}?saved_in=2026-09")
     assert (
         '<a href="/m/2026-09" class="font-medium underline">Entry saved in September 2026.</a>'
@@ -620,3 +630,90 @@ def test_the_page_has_no_inline_scripts_or_styles(ledger: OwnerApp) -> None:
         assert not re.search(r"<script(?![^>]*\bsrc=)", html)
         assert " style=" not in html and "<style" not in html
         assert not re.search(r"\s(x-|@|:)[a-z]", html)
+
+
+def test_each_table_keeps_its_own_day_and_another_months_day_stays_as_typed(
+    ledger: OwnerApp,
+) -> None:
+    food = _category(ledger, "Food")
+    salary = _category(ledger, "Salary", "income")
+    html = _htmx(ledger, f"{MONTH}/transactions", _form(food, "2026-09-03")).text
+    assert re.search(r'id="entry-expense-day"[^>]*value="2026-09-03"', html)
+    income = _form(salary, "25", direction="income")
+    html = _htmx(ledger, f"{MONTH}/transactions", income).text
+    assert re.search(r'id="entry-income-day"[^>]*value="25"', html)
+    assert 'id="entry-expense-day"' not in html  # only the income table is returned
+
+
+def test_the_kept_day_prefills_the_page_without_javascript(ledger: OwnerApp) -> None:
+    _category(ledger, "Food")
+    _category(ledger, "Salary", "income")
+    page = _page(ledger, f"{MONTH}?notice=transaction_added&entry=income&day=12")
+    assert re.search(r'id="entry-income-day"[^>]*value="12"', page)
+    assert re.search(r'id="entry-expense-day"[^>]*value=""', page)
+    for query in ("entry=income&day=%3Cb%3E", "entry=income&day=123", "entry=x&day=12"):
+        page = _page(ledger, f"{MONTH}?{query}")
+        assert re.search(r'id="entry-income-day"[^>]*value=""', page), query
+        assert "<b>" not in page
+
+
+def test_the_undo_countdown_is_the_time_the_server_still_allows(
+    ledger: OwnerApp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from datetime import timedelta
+
+    from assetboard.services import transactions as service
+    from assetboard.web import transaction_routes
+
+    food = _category(ledger, "Food")
+    _add(ledger, _form(food))
+    row_id = _id(ledger, "Groceries")
+    real_delete = service.delete_transaction
+
+    def slow_delete(*args: object) -> service.DeletedTransaction:
+        deleted = real_delete(*args)  # type: ignore[arg-type]
+        return service.DeletedTransaction(
+            deleted.id, deleted.month, deleted.undo_until - timedelta(seconds=3, milliseconds=500)
+        )
+
+    monkeypatch.setattr(transaction_routes, "delete_transaction", slow_delete)
+    html = _htmx(ledger, f"{MONTH}/transactions/{row_id}/delete").text
+    assert 'data-toast-strict data-toast-seconds="7"' in html
+    assert "data-toast-countdown>7</span>" in html
+
+
+def test_undo_is_offered_without_javascript_only_for_a_pending_deletion(ledger: OwnerApp) -> None:
+    food = _category(ledger, "Food")
+    _add(ledger, _form(food))
+    _add(ledger, _form(food, "2026-09-05", description="September"))
+    row_id, september = _id(ledger, "Groceries"), _id(ledger, "September")
+    assert "data-deleted-notice" not in _page(ledger, f"{MONTH}?deleted={row_id}")  # live row
+    ledger.post(f"{MONTH}/transactions/{row_id}/delete", token_from=MONTH)
+    ledger.post(f"/m/2026-09/transactions/{september}/delete", token_from="/m/2026-09")
+    assert "data-deleted-notice" in _page(ledger, f"{MONTH}?deleted={row_id}")
+    assert "data-deleted-notice" not in _page(ledger, f"{MONTH}?deleted={september}")  # other month
+    assert "data-deleted-notice" not in _page(ledger, f"{MONTH}?deleted={UUID(int=3)}")
+    ledger.app.state.clock = FixedClock("2026-10-14T00:30:11+00:00")
+    assert "data-deleted-notice" not in _page(ledger, f"{MONTH}?deleted={row_id}")  # too late
+
+
+def test_after_a_delete_without_an_entry_row_the_heading_takes_the_focus(
+    ledger: OwnerApp,
+) -> None:
+    food = _category(ledger, "Food")
+    _add(ledger, _form(food))
+    row_id = _id(ledger, "Groceries")
+    assert ledger.post(f"/categories/{food}/archive", token_from="/categories").status_code == 303
+    html = _htmx(ledger, f"{MONTH}/transactions/{row_id}/delete").text
+    assert "Add an expense category first." in html
+    assert (
+        'id="ledger-expense-heading" class="text-base font-semibold" tabindex="-1" data-autofocus'
+        in html
+    )
+
+
+def test_the_description_limit_comes_from_the_domain(ledger: OwnerApp) -> None:
+    from assetboard.domain.transactions import MAX_DESCRIPTION_LENGTH
+
+    _category(ledger, "Food")
+    assert f'maxlength="{MAX_DESCRIPTION_LENGTH}"' in _section(_page(ledger), "expense")

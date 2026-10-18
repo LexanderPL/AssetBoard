@@ -17,8 +17,10 @@ in another, closed month is a message on the day field instead, keeping what was
 
 from __future__ import annotations
 
+import math
 import re
 from typing import Annotated, Any
+from urllib.parse import urlencode
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, Request
@@ -46,6 +48,7 @@ from assetboard.web.context import CurrentContext
 from assetboard.web.errors import error_response, is_htmx_fragment_request
 from assetboard.web.ledger import (
     DIRECTIONS,
+    ENTRY_DAY,
     FALLBACK_ERROR,
     MONTH_CLOSED_ELSEWHERE,
     NOT_SAVED,
@@ -128,6 +131,7 @@ def _section(
     *,
     status: str | None = None,
     toast_undo: str | None = None,
+    toast_seconds: int = 0,
     oob_section: bool = False,
     status_code: int = 200,
 ) -> Response:
@@ -142,6 +146,7 @@ def _section(
         "status": _t(request, STATUS[status]) if status else "",
         "toast_message": _t(request, STATUS["deleted"]) if toast_undo else None,
         "toast_undo": toast_undo,
+        "toast_seconds": toast_seconds,
         "oob_section": oob_section,
     }
     response = render_template(
@@ -242,14 +247,22 @@ async def transaction_create(
             focus="entry:day",
         )
         return await run_in_threadpool(_refused, request, ctx, target, direction, state, 409)
+    # The next entry row keeps the day (owner, 2026-10-18): as a day number when the entry is
+    # in the viewed month, else as typed; app.js selects it so typing replaces it.
+    kept_day = str(saved.date.day) if saved.month == target else day.strip()
+    if not ENTRY_DAY.fullmatch(kept_day):
+        kept_day = ""
     if not is_htmx_fragment_request(request):
         query = "notice=transaction_added"
         if saved.month != target:
             query = f"saved_in={saved.month}"
+        if kept_day:
+            query += "&" + urlencode({"entry": direction, "day": kept_day})
         path = _month_path(request, target, query)
         return RedirectResponse(f"{path}#ledger-{direction}", status_code=303)
-    # The next entry row is empty; prefilling the day later only needs ``entry_values`` here.
-    state = SectionState(focus="entry:day", **_moved(request, saved, target))
+    state = SectionState(
+        entry_values={"day": kept_day}, focus="entry:day", **_moved(request, saved, target)
+    )
     return await run_in_threadpool(
         lambda: _section(request, ctx, target, direction, state, status="added")
     )
@@ -380,7 +393,7 @@ async def transaction_delete(
     factory = request.app.state.session_factory
     try:
         row = await run_in_threadpool(get_transaction, factory, ctx, row_id)
-        await run_in_threadpool(delete_transaction, factory, ctx, row_id)
+        deleted = await run_in_threadpool(delete_transaction, factory, ctx, row_id)
     except NotFound:
         return _redirect(request, target, "error=transaction_gone", status_code=404)
     except MonthClosed:
@@ -389,10 +402,20 @@ async def transaction_delete(
         path = _month_path(request, target, f"deleted={row_id}")
         return RedirectResponse(f"{path}#ledger-{row.direction}", status_code=303)
     undo = request.url_for("transaction_undo", month=str(target), transaction_id=str(row_id))
+    # The toast counts down the time the server still allows, not a fixed ten seconds.
+    left = (deleted.undo_until - ctx.clock.now()).total_seconds()
+    seconds = max(0, math.ceil(left))
     state = SectionState(focus="entry:day")
     return await run_in_threadpool(
         lambda: _section(
-            request, ctx, target, row.direction, state, status="deleted", toast_undo=undo.path
+            request,
+            ctx,
+            target,
+            row.direction,
+            state,
+            status="deleted",
+            toast_undo=undo.path,
+            toast_seconds=seconds,
         )
     )
 
