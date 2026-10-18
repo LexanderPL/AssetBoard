@@ -319,6 +319,9 @@ msgstr ""
 msgid "Number"
 msgstr ""
 
+msgid "Added with the new workspace"
+msgstr ""
+
 msgid "Month"
 msgstr ""
 

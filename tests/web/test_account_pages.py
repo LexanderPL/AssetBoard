@@ -5,13 +5,16 @@ from __future__ import annotations
 import io
 import logging
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from assetboard.db.models.identity import Membership, User
+from assetboard.db.models.ledger import Category
+from assetboard.domain.categories import SEED
+from assetboard.i18n import gettext
 
 if TYPE_CHECKING:
     from conftest import CountingHasher, WebHarness
@@ -210,3 +213,26 @@ def test_auth_pages_render_in_english_and_polish(
         assert login in client.get("/login", headers=headers).text
         web.sign_in(client)
         assert security in client.get("/account/password", headers=headers).text
+
+
+def _seeded_names(factory: Any, email: str) -> list[str]:
+    """Category names of the workspace ``email`` owns (every new workspace is seeded)."""
+    with factory() as session:
+        workspace_id = session.scalars(
+            select(Membership.workspace_id)
+            .join(User, User.id == Membership.user_id)
+            .where(User.email == email, Membership.role == "owner")
+        ).one()
+        return list(
+            session.scalars(select(Category.name).where(Category.workspace_id == workspace_id))
+        )
+
+
+def test_registration_seeds_the_new_workspace_in_the_page_language(web: WebHarness) -> None:
+    app = web.app(allow_registration=True)
+    with TestClient(app, client=("192.0.2.61", 1000)) as client:
+        web.complete_setup(app)
+        client.headers["accept-language"] = "pl"
+        assert _register(client, web, "nowy@example.com").status_code == 303
+    names = _seeded_names(app.state.session_factory, "nowy@example.com")
+    assert len(names) == len(SEED) and gettext("Food", "pl") in names

@@ -76,10 +76,10 @@ def test_f21_categories_in_a_browser(tmp_path: Path) -> None:
 
             page.locator("[data-categories-link]").click()
             page.wait_for_url(f"{base}/categories")
-            page.get_by_role("button", name="Add suggested categories").click()
+            # Setup gave the new workspace the suggested categories; nothing to click.
             expense = page.locator('[data-section="expense"] [data-category-name]')
             expect(expense.first).to_have_text("Food")
-            assert page.url == f"{base}/categories"  # an HTMX swap, not a navigation
+            expect(page.get_by_role("button", name="Add suggested categories")).to_have_count(0)
 
             # Inline edit: the row turns into a form, saving swaps the list back in place.
             food = page.locator("li[data-category]", has_text="Food").first

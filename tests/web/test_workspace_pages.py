@@ -172,12 +172,12 @@ def test_settings_validation_errors_are_shown_on_the_field(owner: OwnerApp) -> N
 def _plant_transaction(owner: OwnerApp, *, deleted: bool) -> None:
     """A stored amount in the workspace's currency (soft-deleted or not)."""
     with owner.db() as session, session.begin():
-        category = Category(
-            workspace_id=owner.home_id, name="Food", name_key="food", kind="expense",
-            treatment="regular", color="#16a34a", sort_order=0,
-        )  # fmt: skip
-        session.add(category)
-        session.flush()
+        # "Food" is one of the categories every new workspace gets.
+        category = session.scalars(
+            select(Category).where(
+                Category.workspace_id == owner.home_id, Category.name_key == "food"
+            )
+        ).one()
         session.add(
             Transaction(
                 workspace_id=owner.home_id, direction="expense", date=date(2026, 10, 7),

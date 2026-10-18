@@ -322,6 +322,9 @@ msgstr "W użyciu"
 msgid "Number"
 msgstr "Liczba"
 
+msgid "Added with the new workspace"
+msgstr "Dodane z nowym obszarem roboczym"
+
 msgid "Month"
 msgstr "Miesiąc"
 
