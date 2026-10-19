@@ -25,7 +25,7 @@ import re
 from collections.abc import Collection, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import date
-from typing import BinaryIO
+from typing import Protocol
 from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -279,12 +279,16 @@ def _row(row: Transaction, category: Category, closed: Collection[YearMonth]) ->
 # Export
 
 
+class ByteSink(Protocol):
+    def write(self, data: bytes, /) -> object: ...
+
+
 def export_transactions_csv(
     factory: sessionmaker[Session],
     ctx: Context,
     where: TransactionFilter,
     options: CsvOptions,
-    out: BinaryIO,
+    out: ByteSink,
 ) -> int:
     """Write every matching row to ``out`` as UTF-8 CSV (entry order); returns the row count.
 
