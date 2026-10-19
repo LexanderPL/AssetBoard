@@ -149,9 +149,7 @@ async def summary_sort_set(
     if is_htmx_fragment_request(request):
         # The cookie arrives with this response; this render uses the chosen order directly.
         response = await run_in_threadpool(
-            lambda: _summary(
-                request, ctx, target, None, focus_first=False, sort=chosen, alone=True
-            )
+            lambda: _summary(request, ctx, target, None, focus_first=False, sort=chosen, alone=True)
         )
     else:
         path = _month_path(request, target) + "#month-summary"
