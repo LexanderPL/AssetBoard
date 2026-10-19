@@ -1735,6 +1735,15 @@ msgid ""
 "minutes."
 msgstr ""
 
+#, python-format
+msgid "Showing %(name)s only (%(num)d entry)."
+msgid_plural "Showing %(name)s only (%(num)d entries)."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Show all"
+msgstr ""
+
 msgid "Day"
 msgstr ""
 
@@ -1765,15 +1774,6 @@ msgid ""
 "Day: a day of this month (7) or a full date (2026-10-07 or 07.10.2026). "
 "Tab moves to the next field, Enter saves, Esc clears the row or cancels "
 "an edit."
-msgstr ""
-
-#, python-format
-msgid "Showing %(name)s only (%(num)d entry)."
-msgid_plural "Showing %(name)s only (%(num)d entries)."
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Show all"
 msgstr ""
 
 msgid "(favourable)"

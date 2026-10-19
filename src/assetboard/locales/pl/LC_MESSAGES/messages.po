@@ -1843,6 +1843,16 @@ msgstr ""
 "tożsamości albo otwierając dowolną stronę przez serwer proxy). Potem masz"
 " na to 10 minut."
 
+#, python-format
+msgid "Showing %(name)s only (%(num)d entry)."
+msgid_plural "Showing %(name)s only (%(num)d entries)."
+msgstr[0] "Tylko %(name)s (%(num)d wpis)."
+msgstr[1] "Tylko %(name)s (%(num)d wpisy)."
+msgstr[2] "Tylko %(name)s (%(num)d wpisów)."
+
+msgid "Show all"
+msgstr "Pokaż wszystko"
+
 msgid "Day"
 msgstr "Dzień"
 
@@ -1877,16 +1887,6 @@ msgstr ""
 "Dzień: dzień tego miesiąca (7) albo pełna data (2026-10-07 lub "
 "07.10.2026). Tab przechodzi do następnego pola, Enter zapisuje, Esc "
 "czyści wiersz lub anuluje edycję."
-
-#, python-format
-msgid "Showing %(name)s only (%(num)d entry)."
-msgid_plural "Showing %(name)s only (%(num)d entries)."
-msgstr[0] "Tylko %(name)s (%(num)d wpis)."
-msgstr[1] "Tylko %(name)s (%(num)d wpisy)."
-msgstr[2] "Tylko %(name)s (%(num)d wpisów)."
-
-msgid "Show all"
-msgstr "Pokaż wszystko"
 
 msgid "(favourable)"
 msgstr "(korzystnie)"
