@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import math
 import re
+from dataclasses import dataclass
 from typing import Annotated, Any
 from urllib.parse import urlencode
 from uuid import UUID
@@ -31,6 +32,7 @@ from assetboard.db.repositories import NotFound
 from assetboard.domain.months import YearMonth
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_month
+from assetboard.services.categories import get_category
 from assetboard.services.context import Context
 from assetboard.services.months import MonthClosed, get_month
 from assetboard.services.transactions import (
@@ -114,19 +116,46 @@ def _values(day: str, amount: str, description: str, category_id: str) -> dict[s
     return {"day": day, "amount": amount, "description": description, "category_id": category_id}
 
 
-def _use_filter(request: Request, value: str) -> None:
-    """Remember the category filter the request's page shows (F2.4: the ``filter`` form field
-    or query value), so the answer stays filtered."""
-    request.state.ledger_filter = parse_filter(value or request.query_params.get("filter", ""))
+@dataclass(frozen=True, slots=True)
+class _FilterRef:
+    category_id: UUID
+    kind: str
 
 
-def _filter(request: Request) -> UUID | None:
-    return getattr(request.state, "ledger_filter", None)
+def _resolve_filter(request: Request, ctx: Context, value: str) -> _FilterRef | None:
+    """The filter as a category of this workspace (blocking); anything else is no filter."""
+    category_id = parse_filter(value)
+    if category_id is None:
+        return None
+    try:
+        category = get_category(
+            request.app.state.session_factory, ctx, category_id, usage_sources=()
+        )
+    except NotFound:
+        return None
+    return _FilterRef(category.id, category.kind)
 
 
-def _path(request: Request, month: YearMonth, query: str = "") -> str:
+async def _use_filter(request: Request, ctx: Context, value: str) -> None:
+    """Validate and remember the category filter the request's page shows (F2.4: the
+    ``filter`` form field or query value), so the answer stays filtered. Only the validated id
+    is used afterwards (in answers and in redirects)."""
+    raw = value or request.query_params.get("filter", "")
+    request.state.ledger_filter = await run_in_threadpool(_resolve_filter, request, ctx, raw)
+
+
+def _filter(request: Request, direction: str | None = None) -> UUID | None:
+    """The validated filter; ``None`` without one or when it is another kind's (a table of
+    ``direction`` is never filtered by a category of the other kind)."""
+    ref: _FilterRef | None = getattr(request.state, "ledger_filter", None)
+    if ref is None or (direction is not None and ref.kind != direction):
+        return None
+    return ref.category_id
+
+
+def _path(request: Request, month: YearMonth, query: str = "", direction: str | None = None) -> str:
     """The month page, filtered as the request's page was."""
-    chosen = _filter(request)
+    chosen = _filter(request, direction)
     if chosen is not None:
         query = f"{query}&category={chosen}" if query else f"category={chosen}"
     return _month_path(request, month, query)
@@ -158,10 +187,9 @@ def _section(
     """One table section with the out-of-band summary, status line and toast (blocking)."""
     factory = request.app.state.session_factory
     view = get_month(factory, ctx, month)
-    chosen = _filter(request)
-    ledger = build_ledger(factory, ctx, request, view, {direction: state}, chosen)
-    if ledger.filter is not None and ledger.filter.kind != direction:  # not this table's filter
-        ledger = build_ledger(factory, ctx, request, view, {direction: state})
+    ledger = build_ledger(
+        factory, ctx, request, view, {direction: state}, _filter(request, direction)
+    )
     filter_id = ledger.filter.category_id if ledger.filter else None
     context: dict[str, object] = {
         "ledger": ledger,
@@ -190,7 +218,7 @@ def _page(
 ) -> Response:
     """The whole month page with a refused form (no JavaScript; blocking)."""
     context = month_context(
-        request, ctx, month, states={direction: state}, filter_id=_filter(request)
+        request, ctx, month, states={direction: state}, filter_id=_filter(request, direction)
     )
     return render_template(request, "months/page.html", context=context, status_code=status_code)
 
@@ -215,7 +243,7 @@ def _closed_elsewhere(request: Request, exc: MonthClosed) -> dict[str, str]:
 
 def _hidden(request: Request, saved: TransactionView, month: YearMonth) -> bool:
     """Whether a saved entry of this month is not shown because of the category filter."""
-    chosen = _filter(request)
+    chosen = _filter(request, saved.direction)
     return saved.month == month and chosen is not None and saved.category_id != chosen
 
 
@@ -243,7 +271,7 @@ async def transaction_create(
     filter: FormStr = "",
 ) -> Response:
     target = _parse(month)
-    _use_filter(request, filter)
+    await _use_filter(request, ctx, filter)
     if direction not in DIRECTIONS:
         return error_response(
             request, 400, _t(request, NOT_SAVED_TITLE), _t(request, FALLBACK_ERROR)
@@ -297,7 +325,7 @@ async def transaction_create(
             query = f"saved_in={saved.month}"
         if kept_day:
             query += "&" + urlencode({"entry": direction, "day": kept_day})
-        path = _path(request, target, query)
+        path = _path(request, target, query, direction)
         return RedirectResponse(f"{path}#ledger-{direction}", status_code=303)
     state = SectionState(
         entry_values={"day": kept_day}, focus="entry:day", **_moved(request, saved, target)
@@ -309,10 +337,11 @@ async def transaction_create(
 
 @router.get("/m/{month}/transactions/{transaction_id}/edit", name="transaction_edit")
 async def transaction_edit(
-    request: Request, ctx: CurrentContext, month: str, transaction_id: str
+    request: Request, ctx: CurrentContext, month: str, transaction_id: str, filter: str = ""
 ) -> Response:
     target = _parse(month)
     row_id = _transaction_id(transaction_id)
+    await _use_filter(request, ctx, filter)
     if not is_htmx_fragment_request(request):
         path = _path(request, target, f"edit={row_id}")
         return RedirectResponse(f"{path}#tx-{row_id}", status_code=303)
@@ -321,10 +350,11 @@ async def transaction_edit(
 
 @router.get("/m/{month}/transactions/{transaction_id}/row", name="transaction_row")
 async def transaction_row(
-    request: Request, ctx: CurrentContext, month: str, transaction_id: str
+    request: Request, ctx: CurrentContext, month: str, transaction_id: str, filter: str = ""
 ) -> Response:
     target = _parse(month)
     row_id = _transaction_id(transaction_id)
+    await _use_filter(request, ctx, filter)
     if not is_htmx_fragment_request(request):
         return RedirectResponse(_path(request, target), status_code=303)
     return await run_in_threadpool(_row, request, ctx, target, row_id, False)
@@ -341,14 +371,19 @@ def _row(request: Request, ctx: Context, month: YearMonth, row_id: UUID, editing
         state = SectionState(editing=row.id, edit_values=values, focus="edit:day")
     else:
         state = SectionState(focus=f"row:{row.id}")
-    ledger = build_ledger(
-        factory, ctx, request, get_month(factory, ctx, month), {row.direction: state}
-    )
+    view = get_month(factory, ctx, month)
+    states = {row.direction: state}
+    ledger = build_ledger(factory, ctx, request, view, states, _filter(request, row.direction))
     section = ledger.section(row.direction)
+    row_view = next((r for r in section.rows if r.t.id == row.id), None)
+    if row_view is None:  # a row outside the filter: shown unfiltered (no error)
+        ledger = build_ledger(factory, ctx, request, view, states)
+        section = ledger.section(row.direction)
+        row_view = next(r for r in section.rows if r.t.id == row.id)
     context: dict[str, object] = {
         "ledger": ledger,
         "section_view": section,
-        "row_view": next(r for r in section.rows if r.t.id == row.id),
+        "row_view": row_view,
     }
     response = render_template(request, "months/_row.html", context=context)
     response.headers["Vary"] = "HX-Request"
@@ -369,7 +404,7 @@ async def transaction_update(
 ) -> Response:
     target = _parse(month)
     row_id = _transaction_id(transaction_id)
-    _use_filter(request, filter)
+    await _use_filter(request, ctx, filter)
     values = _values(day, amount, description, category_id)
     factory = request.app.state.session_factory
     try:
@@ -417,7 +452,7 @@ async def transaction_update(
         query = "notice=transaction_saved" if saved.month == target else f"saved_in={saved.month}"
         if _hidden(request, saved, target):
             query = "notice=outside_filter"
-        path = _path(request, target, query)
+        path = _path(request, target, query, saved.direction)
         shown = saved.month == target and not _hidden(request, saved, target)
         anchor = f"tx-{saved.id}" if shown else f"ledger-{saved.direction}"
         return RedirectResponse(f"{path}#{anchor}", status_code=303)
@@ -434,7 +469,7 @@ async def transaction_delete(
     request: Request, ctx: CurrentContext, month: str, transaction_id: str, filter: FormStr = ""
 ) -> Response:
     target = _parse(month)
-    _use_filter(request, filter)
+    await _use_filter(request, ctx, filter)
     row_id = _transaction_id(transaction_id)
     factory = request.app.state.session_factory
     try:
@@ -445,10 +480,11 @@ async def transaction_delete(
     except MonthClosed:
         return _redirect(request, target, "error=month_closed", status_code=409)
     if not is_htmx_fragment_request(request):
-        path = _path(request, target, f"deleted={row_id}")
+        path = _path(request, target, f"deleted={row_id}", row.direction)
         return RedirectResponse(f"{path}#ledger-{row.direction}", status_code=303)
     undo = request.url_for("transaction_undo", month=str(target), transaction_id=str(row_id))
-    undo_path = undo.path + (f"?filter={_filter(request)}" if _filter(request) else "")
+    kept = _filter(request, row.direction)
+    undo_path = undo.path + (f"?filter={kept}" if kept else "")
     # The toast counts down the time the server still allows, not a fixed ten seconds.
     left = (deleted.undo_until - ctx.clock.now()).total_seconds()
     seconds = max(0, math.ceil(left))
@@ -472,7 +508,7 @@ async def transaction_undo(
     request: Request, ctx: CurrentContext, month: str, transaction_id: str, filter: FormStr = ""
 ) -> Response:
     target = _parse(month)
-    _use_filter(request, filter)
+    await _use_filter(request, ctx, filter)
     row_id = _transaction_id(transaction_id)
     try:
         restored = await run_in_threadpool(
@@ -489,7 +525,7 @@ async def transaction_undo(
             )
         return RedirectResponse(_path(request, target, "error=undo_expired"), status_code=303)
     if not is_htmx_fragment_request(request):
-        path = _path(request, target, "notice=transaction_restored")
+        path = _path(request, target, "notice=transaction_restored", restored.direction)
         return RedirectResponse(f"{path}#tx-{restored.id}", status_code=303)
     # The toast (the request's target) is replaced by nothing; the section comes out of band.
     focus = f"row:{restored.id}" if restored.month == target else "entry:day"

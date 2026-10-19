@@ -182,6 +182,10 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-ledger-filter-bar]")).to_contain_text(
                 "Showing Golden Food only (1 entry)."
             )
+            expect(page.locator("#ledger-status")).to_have_text(
+                "Showing Golden Food only (1 entry)."
+            )
+            expect(page.locator("#ledger-expense-heading")).to_be_focused()
             assert re.search(r"/m/2025-03\?category=[0-9a-f-]+$", page.url)
             expect(page.locator("#ledger-income")).to_have_count(0)
             expect(page.locator("#ledger-expense [data-description]")).to_have_count(1)
@@ -202,10 +206,18 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             page.go_back()
             expect(page.locator("#ledger-income")).to_be_visible()
             expect(page.locator("[data-ledger-filter-bar]")).to_have_count(0)
+            # Back loads the page afresh (no history cache): the entry added while filtered
+            # is listed, the totals are current, and nothing was kept in localStorage.
+            expect(food_row.locator("[data-actual]")).to_have_text("€57.00")
+            expect(kpis.nth(1)).to_have_text("€457.00")
+            assert page.evaluate("localStorage.getItem('htmx-history-cache')") is None
             page.locator("#month-summary [data-filter-link]", has_text="Golden Salary").click()
             expect(page.locator("#ledger-expense")).to_have_count(0)
+            expect(page.locator("#ledger-income-heading")).to_be_focused()
             page.locator("[data-ledger-show-all]").click()
             expect(page.locator("#ledger-expense")).to_be_visible()
+            expect(page.locator("#ledger-expense-heading")).to_be_focused()
+            expect(page.locator("#ledger-status")).to_have_text("Showing all entries.")
             expect(page.locator("#month-summary [aria-current='true']")).to_have_count(0)
 
             assert page.evaluate("window.__cspViolations") == []

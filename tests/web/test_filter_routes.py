@@ -5,6 +5,7 @@ filters. The tests clear the seeded categories and build their own ("Golden ..."
 from __future__ import annotations
 
 import re
+from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
@@ -118,7 +119,9 @@ def test_a_category_filter_shows_only_its_table_and_entries(
     assert other is not None and "aria-current" not in other.group(0)
     ledger.client.headers["Accept-Language"] = "pl"
     polish = ledger.client.get(f"{MONTH}?category={food}").text
-    assert "Tylko Golden Food (2 wpisy)." in polish and ">Pokaż wszystko</a>" in polish
+    assert "Pokazano tylko: Golden Food (2 wpisy)." in polish and ">Pokaż wszystko</a>" in polish
+    assert 'role="status" data-ledger-filter-bar' not in page  # announced via #ledger-status
+    assert 'data-ledger-announce="Showing Golden Food only (2 entries)."' in page
 
 
 def test_an_income_category_shows_the_income_table(
@@ -242,3 +245,110 @@ def test_viewers_and_closed_months_can_filter_read_only(
     ledger.set_admin_role("viewer")
     tables = _ledger(ledger.client.get(f"{MONTH}?category={food}").text)
     assert "Showing Golden Food only (2 entries)." in tables and "data-entry-row" not in tables
+
+
+def _htmx_get(app: OwnerApp, path: str) -> Any:
+    return app.client.get(path, headers={"HX-Request": "true"}, follow_redirects=False)
+
+
+def test_opening_and_cancelling_an_edit_keep_the_filter(
+    ledger: OwnerApp, golden: dict[str, UUID]
+) -> None:
+    food, milk = golden["food"], _id(ledger, "Milk")
+    edit = _htmx_get(ledger, f"{MONTH}/transactions/{milk}/edit?filter={food}")
+    assert edit.status_code == 200
+    assert f'<input type="hidden" name="filter" value="{food}">' in edit.text
+    assert f"/m/2026-10?category={food}#tx-{milk}" in edit.text  # Cancel without JavaScript
+    row = _htmx_get(ledger, f"{MONTH}/transactions/{milk}/row?filter={food}")
+    assert f'<input type="hidden" name="filter" value="{food}">' in row.text  # its delete form
+    # A row outside the filter (an old page, another tab) is shown unfiltered, never an error.
+    diesel = _id(ledger, "Diesel")
+    other = _htmx_get(ledger, f"{MONTH}/transactions/{diesel}/edit?filter={food}")
+    assert other.status_code == 200 and 'name="filter"' not in other.text
+    plain = ledger.client.get(f"{MONTH}/transactions/{milk}/edit?filter={food}",
+                              follow_redirects=False)  # fmt: skip
+    assert plain.headers["location"] == f"/m/2026-10?edit={milk}&category={food}#tx-{milk}"
+
+
+def test_an_htmx_edit_answers_with_the_filter_bar_and_field(
+    ledger: OwnerApp, golden: dict[str, UUID]
+) -> None:
+    food, milk = golden["food"], _id(ledger, "Milk")
+    edit = {"day": "8", "amount": "3", "description": "Milk", "category_id": str(food),
+            "filter": str(food)}  # fmt: skip
+    html = _htmx(ledger, f"{MONTH}/transactions/{milk}", edit, page=f"{MONTH}?category={food}").text
+    assert "Showing Golden Food only (2 entries)." in html
+    assert f'<input type="hidden" name="filter" value="{food}">' in html
+    assert sorted(_descriptions(html)) == ["Bread", "Milk"]
+
+
+def test_a_no_javascript_edit_keeps_the_filter_and_says_when_it_hides_the_entry(
+    ledger: OwnerApp, golden: dict[str, UUID]
+) -> None:
+    food, fuel, milk = golden["food"], golden["fuel"], _id(ledger, "Milk")
+    page = f"{MONTH}?category={food}"
+    edit = {"day": "8", "amount": "3", "description": "Milk", "category_id": str(food),
+            "filter": str(food)}  # fmt: skip
+    response = ledger.post(f"{MONTH}/transactions/{milk}", edit, token_from=page)
+    assert response.headers["location"] == (
+        f"/m/2026-10?notice=transaction_saved&category={food}#tx-{milk}"
+    )
+    moved = edit | {"category_id": str(fuel)}
+    response = ledger.post(f"{MONTH}/transactions/{milk}", moved, token_from=page)
+    assert response.headers["location"] == (
+        f"/m/2026-10?notice=outside_filter&category={food}#ledger-expense"
+    )
+
+
+def test_a_no_javascript_undo_keeps_the_filter(ledger: OwnerApp, golden: dict[str, UUID]) -> None:
+    food, bread = golden["food"], _id(ledger, "Bread")
+    page = f"{MONTH}?category={food}"
+    deleted = ledger.post(f"{MONTH}/transactions/{bread}/delete", {"filter": str(food)},
+                          token_from=page)  # fmt: skip
+    shown = ledger.client.get(deleted.headers["location"].split("#")[0]).text
+    undo_form = re.search(r"<form[^>]*/undo.*?</form>", shown, re.DOTALL)
+    assert undo_form is not None
+    assert f'<input type="hidden" name="filter" value="{food}">' in undo_form.group(0)
+    undo = ledger.post(f"{MONTH}/transactions/{bread}/undo", {"filter": str(food)},
+                       token_from=page)  # fmt: skip
+    assert undo.headers["location"] == (
+        f"/m/2026-10?notice=transaction_restored&category={food}#tx-{bread}"
+    )
+
+
+@pytest.mark.parametrize("value", ["unknown", "foreign", "injected"])
+def test_a_filter_that_is_no_category_here_is_dropped_from_answers(
+    ledger: OwnerApp, golden: dict[str, UUID], value: str
+) -> None:
+    raw = {
+        "unknown": str(uuid4()),
+        "foreign": "",
+        "injected": "x\r\nSet-Cookie: a=b&category=evil",
+    }[value]
+    if value == "foreign":
+        other = ledger.add_workspace("Other")
+        with ledger.db() as session, session.begin():
+            foreign = Category(
+                workspace_id=other, name="Golden Food", name_key="golden food", kind="expense",
+                treatment="regular", color="#16a34a", sort_order=0,
+            )  # fmt: skip
+            session.add(foreign)
+            session.flush()
+            raw = str(foreign.id)
+    form = _form(golden["fuel"], description="Petrol", filter=raw)
+    response = ledger.post(f"{MONTH}/transactions", form, token_from=MONTH)
+    location = response.headers["location"]
+    assert "category=" not in location and "outside_filter" not in location
+    assert "evil" not in location and "Set-Cookie" not in location
+    html = _htmx(ledger, f"{MONTH}/transactions", _form(golden["fuel"], filter=raw)).text
+    assert "not shown while this filter is on" not in html
+    assert 'id="ledger-expense"' in html and "data-ledger-filter-bar" not in html
+
+
+def test_an_income_filter_does_not_filter_an_expense_write(
+    ledger: OwnerApp, golden: dict[str, UUID]
+) -> None:
+    form = _form(golden["fuel"], description="Petrol", filter=str(golden["salary"]))
+    response = ledger.post(f"{MONTH}/transactions", form, token_from=MONTH)
+    assert "category=" not in response.headers["location"]
+    assert "outside_filter" not in response.headers["location"]

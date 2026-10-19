@@ -1067,7 +1067,7 @@ msgid "Entry restored."
 msgstr "Przywrócono wpis."
 
 msgid "Entry saved. Its category is not shown while this filter is on."
-msgstr "Wpis zapisany. Jego kategoria nie jest widoczna przy tym filtrze."
+msgstr "Zapisano wpis. Jego kategoria jest ukryta przez filtr."
 
 msgid "Planned value saved."
 msgstr "Zapisano wartość planowaną."
@@ -1846,9 +1846,9 @@ msgstr ""
 #, python-format
 msgid "Showing %(name)s only (%(num)d entry)."
 msgid_plural "Showing %(name)s only (%(num)d entries)."
-msgstr[0] "Tylko %(name)s (%(num)d wpis)."
-msgstr[1] "Tylko %(name)s (%(num)d wpisy)."
-msgstr[2] "Tylko %(name)s (%(num)d wpisów)."
+msgstr[0] "Pokazano tylko: %(name)s (%(num)d wpis)."
+msgstr[1] "Pokazano tylko: %(name)s (%(num)d wpisy)."
+msgstr[2] "Pokazano tylko: %(name)s (%(num)d wpisów)."
 
 msgid "Show all"
 msgstr "Pokaż wszystko"
@@ -1887,6 +1887,9 @@ msgstr ""
 "Dzień: dzień tego miesiąca (7) albo pełna data (2026-10-07 lub "
 "07.10.2026). Tab przechodzi do następnego pola, Enter zapisuje, Esc "
 "czyści wiersz lub anuluje edycję."
+
+msgid "Showing all entries."
+msgstr "Pokazano wszystkie wpisy."
 
 msgid "(favourable)"
 msgstr "(korzystnie)"

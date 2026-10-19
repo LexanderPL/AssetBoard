@@ -71,6 +71,7 @@
   {# Undo for browsers without JavaScript (with JavaScript, the undo toast offers it). #}
   <form method="post" action="{{ scoped_url(request, 'transaction_undo', month=view.month|string, transaction_id=deleted|string) }}" class="flex flex-wrap items-center gap-3 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-deleted-notice>
     {{ csrf_input() }}
+    {% if ledger.filter %}<input type="hidden" name="filter" value="{{ ledger.filter_id }}">{% endif %}
     <span>{{ _("Entry deleted.") }}</span>
     <button type="submit" data-undo class="font-semibold underline">{{ _("Undo") }}</button>
   </form>
