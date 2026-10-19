@@ -24,7 +24,7 @@ from assetboard.domain.money import Money
 from assetboard.domain.summary import SortOrder
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_month_after_from
-from assetboard.i18n.numbers import format_amount_input, format_money, format_rate_bp
+from assetboard.i18n.numbers import format_amount_input, format_money, format_rate_tenths
 from assetboard.services.budget import CopyResult, PlanCategory, get_plan
 from assetboard.services.context import Context, Role, has_role
 from assetboard.services.months import MonthView
@@ -263,14 +263,14 @@ def build_summary(
         rows = tuple(row_view(r.category, r.planned) for r in transfers.rows)
         groups.append(PlanGroupView("transfer", gettext(GROUP_HEADINGS["transfer"], locale), rows))
     kpis = summary.kpis
-    rate = kpis.savings_rate_bp
+    rate = kpis.savings_rate_tenths
     kpi_view = KpiView(
         earned=format_money(kpis.earned, locale),
         spent=format_money(kpis.spent, locale),
         saved=format_money(kpis.saved, locale),
         net=format_money(kpis.net, locale),
         net_tone=_tone(kpis.net),
-        savings_rate=format_rate_bp(rate, locale) if rate is not None else None,
+        savings_rate=format_rate_tenths(rate, locale) if rate is not None else None,
     )
     expense, income = summary.block("expense"), summary.block("income")
     bars = (

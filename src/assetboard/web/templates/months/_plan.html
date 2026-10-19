@@ -73,9 +73,9 @@
     <div data-summary-bar="{{ b.key }}">
       <p class="text-xs text-muted">{% if b.key == "expense" %}{{ _("Spent %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% else %}{{ _("Earned %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% endif %}{% if b.over %} <span class="{% if b.key == "expense" %}text-danger{% else %}text-success-strong{% endif %}">{{ _("(over plan)") }}</span>{% endif %}</p>
       <svg class="mt-1 h-3 w-full" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        <rect x="0" y="0" width="100" height="6" rx="1" class="fill-subtle"></rect>
-        <rect x="0" y="0" width="{{ b.planned_width }}" height="6" rx="1" class="fill-line-strong" data-bar-planned></rect>
-        <rect x="0" y="1.5" width="{{ b.actual_width }}" height="3" rx="1" class="{% if b.over and b.key == "expense" %}fill-danger{% else %}fill-primary{% endif %}" data-bar-actual></rect>
+        <rect x="0" y="0" width="100" height="6" class="fill-subtle"></rect>
+        <rect x="0" y="0" width="{{ b.planned_width }}" height="6" class="fill-line-strong" data-bar-planned></rect>
+        <rect x="0" y="1.5" width="{{ b.actual_width }}" height="3" class="{% if b.over and b.key == "expense" %}fill-danger{% else %}fill-primary{% endif %}" data-bar-actual></rect>
       </svg>
     </div>
     {% endfor %}
@@ -89,8 +89,8 @@
   {{ csrf_input() }}
   <span class="text-muted" id="summary-sort-label">{{ _("Order") }}</span>
   <div role="group" aria-labelledby="summary-sort-label" class="inline-flex overflow-hidden rounded-lg border border-line">
-    <button type="submit" name="sort" value="actual" aria-pressed="{{ 'true' if summary.sort == 'actual' else 'false' }}" class="px-2.5 py-1 {% if summary.sort == "actual" %}bg-primary text-on-primary{% else %}hover:bg-subtle{% endif %}">{{ _("Largest first") }}</button>
-    <button type="submit" name="sort" value="manual" aria-pressed="{{ 'true' if summary.sort == 'manual' else 'false' }}" class="px-2.5 py-1 {% if summary.sort == "manual" %}bg-primary text-on-primary{% else %}hover:bg-subtle{% endif %}">{{ _("Your order") }}</button>
+    <button id="summary-sort-actual" type="submit" name="sort" value="actual" aria-pressed="{{ 'true' if summary.sort == 'actual' else 'false' }}" class="px-2.5 py-1 {% if summary.sort == "actual" %}bg-primary text-on-primary{% else %}hover:bg-subtle{% endif %}">{{ _("Largest first") }}</button>
+    <button id="summary-sort-manual" type="submit" name="sort" value="manual" aria-pressed="{{ 'true' if summary.sort == 'manual' else 'false' }}" class="px-2.5 py-1 {% if summary.sort == "manual" %}bg-primary text-on-primary{% else %}hover:bg-subtle{% endif %}">{{ _("Your order") }}</button>
   </div>
 </form>
 {%- endmacro %}

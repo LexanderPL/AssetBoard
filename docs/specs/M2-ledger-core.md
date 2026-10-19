@@ -360,13 +360,18 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
   **P4** the sort choice is kept per browser (cookie `summary_sort`, HttpOnly, SameSite=Lax,
   one year), not per account.
 - KPIs: earned (income/regular), spent (expense/regular), saved (expense/savings), net, savings
-  rate `(earned - spent) / earned` as integer basis points rounded half away from zero, shown
-  with one decimal (`i18n.numbers.format_rate_bp`, rounded half up), "—" with "Not available:
-  nothing earned" for screen readers when nothing was earned. Golden example in
+  rate `(earned - spent) / earned`: kept as integer basis points (`savings_rate_bp`) and, for
+  display, as tenths of a percent (`savings_rate_tenths`), **each rounded once** from the exact
+  ratio, half away from zero (rounding the basis points again would show 12.3495% as 12.4%);
+  shown with one decimal (`i18n.numbers.format_rate_tenths`), "—" with "Not available: nothing
+  earned" for screen readers when nothing was earned. Golden example in
   `tests/unit/test_summary_domain.py` (net −1 473.00, rate −4 332 bp, "−43.3%").
 - Sorting: "Largest first" (actual descending, ties in the user's order; the default) or "Your
   order", via `POST /m/{month}/summary/sort` (HTMX: the block; without JavaScript 303 back).
   Every render reads the cookie, including the out-of-band summary after a transaction write.
+  The two buttons have stable ids (`summary-sort-actual`, `summary-sort-manual`), so the focus
+  stays on the pressed one after the swap; the response is the block alone (the status line
+  `#plan-status` keeps what it said).
 - Bars (expenses and income, planned vs actual): inline SVG (`viewBox` 0–100, widths as SVG
   attributes since CSP forbids inline styles; colours through `fill-*` token classes), scaled to
   max(planned, actual), floor of integer percentages; hidden from screen readers, with the
@@ -377,6 +382,9 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
   (`#summary-total-<group>`). A planned-value save answers with its row plus, out of band, every
   total row and `#summary-kpis` (KPIs and bars); rows do not move, since the order depends on
   actuals only. The heading is "Summary".
+- **Follow-up (review, 2026-10-19):** `web.plan.build_summary` reads twice per render
+  (`services.budget.get_plan` for the transfer group and the copy banner, then
+  `services.summary.month_summary`); fold them into one read when the summary grows.
 
 **Agent prompt**
 ```

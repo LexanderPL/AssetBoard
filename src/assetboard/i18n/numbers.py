@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import Decimal, InvalidOperation
 
 from babel import Locale
 from babel.core import UnknownLocaleError
@@ -159,10 +159,8 @@ def format_amount_input(money: Money, locale: str) -> str:
     return text.replace(".", decimal_symbol)
 
 
-def format_rate_bp(basis_points: int, locale: str) -> str:
-    """A rate in basis points as a percentage with one decimal: ``-43.3%`` (en),
-    ``-43,3%`` (pl). Exact: the value is a Decimal, never a float."""
-    # Round half up to one decimal of a percent first (Babel would round half to even).
-    percent = Decimal(basis_points).scaleb(-2).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
-    value = percent.scaleb(-2)
+def format_rate_tenths(tenths: int, locale: str) -> str:
+    """A rate given in tenths of a percent (already rounded once), with one decimal:
+    ``-43.3%`` (en), ``-43,3%`` (pl). Exact: the value is a Decimal, never a float."""
+    value = Decimal(tenths).scaleb(-3)
     return format_percent(value, format="#,##0.0%", locale=_normalize_number_locale(locale))

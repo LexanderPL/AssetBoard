@@ -120,13 +120,14 @@ def test_bars_show_planned_and_actual_in_svg_with_the_same_text(summary: OwnerAp
     assert expense is not None and income is not None
     assert "Spent €4,873.00 of €5,900.00 planned" in expense.group(0)
     # 4 873 / 5 900 = 82.59 %: floor 82. Planned is the scale (100).
-    assert 'width="100" height="6" rx="1" class="fill-line-strong"' in expense.group(0)
+    assert 'width="100" height="6" class="fill-line-strong"' in expense.group(0)
     assert re.search(r'width="82"[^>]*class="fill-primary"', expense.group(0))
     # Income over plan: actual is the scale, planned 3 000 / 3 400 = 88.2 %: floor 88.
     assert "Earned €3,400.00 of €3,000.00 planned" in income.group(0)
     assert "(over plan)" in income.group(0)
     assert re.search(r'width="88"[^>]*data-bar-planned', income.group(0))
     assert 'aria-hidden="true"' in expense.group(0)
+    assert " rx=" not in block  # square ends: rounded corners would stretch with the viewBox
 
 
 def test_nothing_earned_shows_a_dash_for_the_savings_rate(summary: OwnerApp) -> None:
@@ -199,6 +200,7 @@ def test_the_sort_toggle_is_kept_in_a_cookie(summary: OwnerApp) -> None:
     assert htmx.status_code == 200 and "summary_sort=actual" in htmx.headers["set-cookie"]
     assert order(htmx.text) == [str(second), str(first)]
     assert "data-autofocus" not in htmx.text
+    assert 'id="plan-status"' not in htmx.text  # a re-sort leaves the status line alone
     bogus = summary.post(f"{MONTH}/summary/sort", {"sort": "name"}, token_from=MONTH)
     assert "summary_sort=actual" in bogus.headers["set-cookie"]
 

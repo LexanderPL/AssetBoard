@@ -1983,7 +1983,7 @@ msgid "Planned"
 msgstr "Plan"
 
 msgid "Actual"
-msgstr "Faktycznie"
+msgstr "Wykonanie"
 
 msgid "Difference"
 msgstr "Różnica"

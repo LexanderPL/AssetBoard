@@ -121,13 +121,17 @@ def _summary(
     *,
     focus_first: bool = True,
     sort: SortOrder | None = None,
+    alone: bool = False,
 ) -> Response:
+    """The summary block; after a copy also its result on the status line (``alone``: only the
+    block, so a re-sort leaves the status line as it was)."""
     factory = request.app.state.session_factory
     summary = build_summary(
         factory, ctx, request, get_month(factory, ctx, month), copied=copied,
         focus_first=focus_first, sort=sort,
     )  # fmt: skip
-    response = render_template(request, "months/_plan_copy.html", context=summary_context(summary))
+    template = "months/_summary.html" if alone else "months/_plan_copy.html"
+    response = render_template(request, template, context=summary_context(summary))
     response.headers["Vary"] = "HX-Request"
     return response
 
@@ -145,7 +149,9 @@ async def summary_sort_set(
     if is_htmx_fragment_request(request):
         # The cookie arrives with this response; this render uses the chosen order directly.
         response = await run_in_threadpool(
-            lambda: _summary(request, ctx, target, None, focus_first=False, sort=chosen)
+            lambda: _summary(
+                request, ctx, target, None, focus_first=False, sort=chosen, alone=True
+            )
         )
     else:
         path = _month_path(request, target) + "#month-summary"

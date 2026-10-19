@@ -193,18 +193,19 @@ def test_format_amount_input_round_trips_through_parse_amount(
 
 
 @pytest.mark.parametrize(
-    ("basis_points", "locale", "text"),
+    ("tenths", "locale", "text"),
     [
-        (-4332, "en", "-43.3%"),
-        (-4332, "pl", "-43,3%"),
-        (10000, "en", "100.0%"),
+        (-433, "en", "-43.3%"),
+        (-433, "pl", "-43,3%"),
+        (1000, "en", "100.0%"),
         (0, "en", "0.0%"),
-        (5, "en", "0.1%"),  # 0.05 %: half up, not half to even
-        (-5, "en", "-0.1%"),
-        (15, "en", "0.2%"),
+        (1, "en", "0.1%"),
+        (123, "en", "12.3%"),
+        (-1, "en", "-0.1%"),
+        (12345, "en", "1,234.5%"),
     ],
 )
-def test_rates_in_basis_points_show_one_decimal(basis_points: int, locale: str, text: str) -> None:
-    from assetboard.i18n.numbers import format_rate_bp
+def test_rates_in_tenths_of_a_percent_show_one_decimal(tenths: int, locale: str, text: str) -> None:
+    from assetboard.i18n.numbers import format_rate_tenths
 
-    assert format_rate_bp(basis_points, locale) == text
+    assert format_rate_tenths(tenths, locale) == text

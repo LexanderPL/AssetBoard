@@ -162,6 +162,8 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             expect(page.get_by_role("button", name="Your order")).to_have_attribute(
                 "aria-pressed", "true"
             )
+            # The focus stays on the pressed button's replacement (stable ids across the swap).
+            expect(page.locator("#summary-sort-manual")).to_be_focused()
             assert _order(page) == ["Golden Food", "Golden Travel"]
             page.reload()
             assert _order(page) == ["Golden Food", "Golden Travel"]
@@ -169,6 +171,7 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             expect(page.get_by_role("button", name="Largest first")).to_have_attribute(
                 "aria-pressed", "true"
             )
+            assert page.evaluate("document.activeElement.id") == "summary-sort-actual"
             assert _order(page) == ["Golden Travel", "Golden Food"]
 
             assert page.evaluate("window.__cspViolations") == []

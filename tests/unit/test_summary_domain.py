@@ -18,6 +18,7 @@ from assetboard.domain.summary import (
     block_of,
     difference,
     savings_rate_bp,
+    savings_rate_tenths,
     summarize_month,
 )
 
@@ -68,6 +69,7 @@ def test_golden_example() -> None:
     assert (kpis.earned, kpis.spent, kpis.saved) == (_eur(340000), _eur(487300), _eur(0))
     assert kpis.net == _eur(-147300)
     assert kpis.savings_rate_bp == -4332
+    assert kpis.savings_rate_tenths == -433  # -43.3 %, rounded once from the exact ratio
 
 
 # Blocks and signs
@@ -171,6 +173,23 @@ def test_savings_rate_in_basis_points(earned: int, spent: int, rate: int | None)
     assert savings_rate_bp(earned, spent) == rate
 
 
+@pytest.mark.parametrize(
+    ("earned", "spent", "tenths"),
+    [
+        (0, 1, None),
+        (340000, 487300, -433),  # -43.32 %
+        (200000, 175301, 123),  # 12.3495 %: once, 12.3 % (the bp 1 235 would give 12.4 %)
+        (200000, 175300, 124),  # 12.35 %: half away from zero
+        (200000, 224700, -124),  # -12.35 %
+        (1000, 0, 1000),
+    ],
+)
+def test_the_displayed_rate_is_rounded_once_from_the_exact_ratio(
+    earned: int, spent: int, tenths: int | None
+) -> None:
+    assert savings_rate_tenths(earned, spent) == tenths
+
+
 def test_mixed_currencies_and_unknown_categories_are_refused() -> None:
     food = _category()
     with pytest.raises(ValueError, match="PLN"):
@@ -228,10 +247,24 @@ def test_totals_equal_the_sum_of_rows_and_transfers_never_appear(
             assert row.difference.amount_minor == difference(
                 block.key, row.planned.amount_minor, row.actual.amount_minor
             )
+            # The sign convention, independently of difference(): positive is favourable.
+            p, a, d = (row.planned.amount_minor, row.actual.amount_minor,
+                       row.difference.amount_minor)  # fmt: skip
+            assert abs(d) == abs(p - a)
+            if block.key in ("expense", "withdrawn"):
+                assert (d > 0) == (a < p)
+            else:
+                assert (d > 0) == (a > p)
             assert row.category_id not in seen
             seen.add(row.category_id)
             assert row.actual.amount_minor == counted.get(row.category_id, 0)
     assert set(counted) <= seen  # every counted actual has its row (planned 0 if no line)
+    active = {c.id for c in categories if not c.archived and c.treatment != "transfer"}
+    assert active <= seen  # every active non-transfer category has a row (to be planned)
+    if sort == "actual":
+        for block in summary.blocks:
+            actuals = [r.actual.amount_minor for r in block.rows]
+            assert actuals == sorted(actuals, reverse=True)
     kpis = summary.kpis
     assert kpis.earned == summary.block("income").actual
     assert kpis.spent == summary.block("expense").actual
