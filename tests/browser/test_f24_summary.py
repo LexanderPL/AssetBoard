@@ -1,6 +1,7 @@
 """The month summary in Chromium (F2.4): actual, difference and KPIs refresh without a reload
 after a planned value or an entry is saved, the sort toggle reorders the rows and is kept, and
-there are no CSP violations. Categories are created directly ("Golden ..."), not seeded."""
+there are no CSP violations. The test's categories are created directly ("Golden ..."); the
+suggested set that setup gives every new workspace stays in the summary with nothing in it."""
 
 from __future__ import annotations
 
@@ -54,9 +55,12 @@ class SlowPosts:
 
 
 def _order(page: Page) -> list[str]:
-    return page.locator(
+    """The expense rows of this test's categories, in page order (the seeded ones are there
+    too, with nothing in them)."""
+    names = page.locator(
         "#month-summary [data-plan-group='expense'] [data-plan-category]"
     ).all_text_contents()
+    return [name for name in names if name.startswith("Golden ")]
 
 
 def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
