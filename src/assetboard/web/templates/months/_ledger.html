@@ -180,7 +180,12 @@
    and rows, with a bar in it saying so and a way back. The month page's links in the summary swap
    this element (hx-select), and push the filtered address. #}
 {% macro tables() -%}
-<div id="ledger" class="space-y-6" data-ledger-filter="{{ ledger.filter_id }}" data-ledger-announce="{% if ledger.filter %}{{ ngettext("Showing %(name)s only (%(num)d entry).", "Showing %(name)s only (%(num)d entries).", ledger.filter.count, name=ledger.filter.name) }}{% else %}{{ _("Showing all entries.") }}{% endif %}">
+{% if ledger.filter %}
+{% set announce = ngettext("Showing %(name)s only (%(num)d entry).", "Showing %(name)s only (%(num)d entries).", ledger.filter.count, name=ledger.filter.name) %}
+{% else %}
+{% set announce = _("Showing all entries.") %}
+{% endif %}
+<div id="ledger" class="space-y-6" data-ledger-filter="{{ ledger.filter_id }}" data-ledger-announce="{{ announce }}">
   {% for s in ledger.sections %}{{ section(s) }}{% endfor %}
 </div>
 {%- endmacro %}
