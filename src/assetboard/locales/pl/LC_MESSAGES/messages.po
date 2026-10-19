@@ -1244,6 +1244,14 @@ msgid ""
 "first."
 msgstr "Za dużo wpisów na jedną zmianę (najwyżej %(max)d). Najpierw zawęź filtry."
 
+#, python-format
+msgid ""
+"Too many ticked entries (at most %(max)d at a time). Tick fewer, or "
+"change all matching entries."
+msgstr ""
+"Zaznaczono za dużo wpisów (najwyżej %(max)d naraz). Zaznacz mniej albo "
+"zmień wszystkie pasujące wpisy."
+
 msgid "Choose an active category."
 msgstr "Wybierz aktywną kategorię."
 
@@ -2196,6 +2204,13 @@ msgstr[2] "%(first)d–%(last)d z %(num)d wpisów"
 msgid "No entries match these filters."
 msgstr "Żaden wpis nie pasuje do tych filtrów."
 
+msgid "Entries matching the filters"
+msgstr "Wpisy pasujące do filtrów"
+
+#, python-format
+msgid "page %(number)d of %(pages)d"
+msgstr "strona %(number)d z %(pages)d"
+
 msgid "Select"
 msgstr "Zaznacz"
 
@@ -2277,14 +2292,17 @@ msgid "Protect against spreadsheet formulas"
 msgstr "Chroń przed formułami arkusza kalkulacyjnego"
 
 msgid ""
-"Adds an apostrophe before descriptions and category names that start with"
-" =, +, -, @ or a tab, so that a spreadsheet does not run them as "
-"formulas. Those values then differ from the stored ones when imported "
-"again."
+"Puts an apostrophe before =, +, -, @ (also their full-width forms) at the"
+" start of a description or category name, after leading spaces, or after "
+"a comma or semicolon inside it, so that a spreadsheet does not run them "
+"as formulas. Such values then differ from the stored ones, and a "
+"protected description may be too long to import again."
 msgstr ""
-"Dodaje apostrof przed opisami i nazwami kategorii zaczynającymi się od =,"
-" +, -, @ lub tabulatora, aby arkusz kalkulacyjny nie wykonał ich jako "
-"formuł. Po ponownym imporcie te wartości różnią się wtedy od zapisanych."
+"Wstawia apostrof przed =, +, -, @ (także w formach pełnej szerokości) na "
+"początku opisu lub nazwy kategorii, po początkowych spacjach albo po "
+"przecinku lub średniku w ich treści, aby arkusz kalkulacyjny nie wykonał "
+"ich jako formuł. Takie wartości różnią się wtedy od zapisanych, a "
+"chroniony opis może być za długi do ponownego importu."
 
 msgid "Download CSV"
 msgstr "Pobierz CSV"

@@ -27,6 +27,7 @@ from fastapi import APIRouter, Depends, Request
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import ImmutableMultiDict
 from starlette.responses import RedirectResponse, Response, StreamingResponse
+from starlette.types import Receive, Scope, Send
 
 from assetboard import branding
 from assetboard.domain.ledger_csv import (
@@ -44,9 +45,10 @@ from assetboard.domain.transaction_search import (
 from assetboard.i18n import gettext, ngettext
 from assetboard.i18n.dates import format_day, format_month
 from assetboard.i18n.numbers import format_money
+from assetboard.services import transaction_search as search_service
 from assetboard.services.context import Context, Role, has_role
 from assetboard.services.transaction_search import (
-    MAX_RECATEGORIZE_ROWS,
+    MAX_SELECTED_IDS,
     CategoryOption,
     FilterInput,
     InvalidFilter,
@@ -68,6 +70,26 @@ from assetboard.web.rendering import render_template, scoped_url
 from assetboard.web.security import require_csrf
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
+
+
+class SpoolResponse(StreamingResponse):
+    """Streams a spooled export file and closes it however the response ends: after the last
+    chunk, or when sending fails (the client went away mid-download)."""
+
+    def __init__(self, spool: SpooledTemporaryFile[bytes], **kwargs: Any) -> None:
+        def chunks() -> Iterator[bytes]:
+            while data := spool.read(EXPORT_CHUNK_BYTES):
+                yield data
+
+        super().__init__(chunks(), **kwargs)
+        self.spool = spool
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        try:
+            await super().__call__(scope, receive, send)
+        finally:
+            self.spool.close()
+
 
 # The export is written to a spooled file first (one consistent read), then streamed.
 EXPORT_SPOOL_BYTES = 8 * 1024 * 1024
@@ -114,6 +136,10 @@ BULK_ERRORS = {
     "nothing_selected": _("Select at least one entry."),
     "too_many_rows": _(
         "Too many entries for one change (at most %(max)d). Narrow the filters first."
+    ),
+    "too_many_ticked": _(
+        "Too many ticked entries (at most %(max)d at a time). Tick fewer, or change all "
+        "matching entries."
     ),
     "invalid_target": _("Choose an active category."),
     "kind_mismatch": _(
@@ -212,7 +238,9 @@ def _bulk_message(request: Request, error: RecategorizeError) -> str:
         months = ", ".join(format_month(m, request.state.locale) for m in error.months)
         return text % {"months": months}
     if error.code == "too_many_rows":
-        return text % {"max": MAX_RECATEGORIZE_ROWS}
+        return text % {"max": search_service.MAX_RECATEGORIZE_ROWS}
+    if error.code == "too_many_ticked":
+        return text % {"max": MAX_SELECTED_IDS}
     return text
 
 
@@ -295,6 +323,13 @@ async def _list_page(
         "export_values": export_values or {"guard": FORMULA_GUARD_DEFAULT},
         "export_error": export_error,
         "max_text": MAX_SEARCH_TEXT_LENGTH,
+        # Read at request time: the cap is a module constant tests may lower.
+        "too_many_for_bulk": (
+            _t(request, BULK_ERRORS["too_many_rows"])
+            % {"max": search_service.MAX_RECATEGORIZE_ROWS}
+            if window is not None and window.total > search_service.MAX_RECATEGORIZE_ROWS
+            else ""
+        ),
     }
     return render_template(
         request, "transactions/list.html", context=context, status_code=status_code
@@ -356,19 +391,10 @@ async def transactions_export(request: Request, ctx: CurrentContext) -> Response
         spool.close()
         raise
     spool.seek(0)
-
-    def chunks() -> Iterator[bytes]:
-        try:
-            while data := spool.read(EXPORT_CHUNK_BYTES):
-                yield data
-        finally:
-            with contextlib.suppress(Exception):
-                spool.close()
-
     stamp = ctx.clock.now().astimezone(UTC).strftime("%Y%m%d-%H%M%S")
     filename = f"{branding.CLI_NAME}-transactions-{stamp}Z.csv"
-    return StreamingResponse(
-        chunks(),
+    return SpoolResponse(
+        spool,
         media_type="text/csv; charset=utf-8",
         headers={
             "Content-Disposition": f'attachment; filename="{filename}"',
@@ -449,12 +475,11 @@ async def transactions_recategorize_preview(request: Request, ctx: CurrentContex
         return await _bulk_refused(request, ctx, form, raw, sort, page, exc.error)
     except RecategorizeError as exc:
         return await _bulk_refused(request, ctx, form, raw, sort, page, exc)
-    return _confirm_page(request, form, raw, sort, page, selection, plan)
+    return _confirm_page(request, raw, sort, page, selection, plan)
 
 
 def _confirm_page(
     request: Request,
-    form: _Params,
     raw: FilterInput,
     sort: SortOrder,
     page: int,

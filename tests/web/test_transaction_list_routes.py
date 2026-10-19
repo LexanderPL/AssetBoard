@@ -6,18 +6,23 @@ from __future__ import annotations
 import csv
 import io
 import re
+from tempfile import SpooledTemporaryFile
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
-from uuid import UUID
+from uuid import UUID, uuid4
 
+import anyio
 import pytest
 from babel.messages.pofile import read_po
 from sqlalchemy import select
+from starlette.requests import ClientDisconnect
 
 from assetboard.clock import FixedClock
 from assetboard.db.models.identity import AuditEvent
 from assetboard.db.models.ledger import Category, Transaction
 from assetboard.i18n import gettext
+from assetboard.services import transaction_search as search_service
+from assetboard.services.transaction_search import MAX_SELECTED_IDS
 from assetboard.web import transaction_list_routes as routes
 from tests.conftest import OwnerApp
 
@@ -377,6 +382,97 @@ def test_bulk_posts_need_csrf(ledger: OwnerApp, rows: dict) -> None:
     for path in ("/transactions/recategorize", "/transactions/recategorize/confirm"):
         response = ledger.client.post(path, data=data, follow_redirects=False)
         assert response.status_code == 403
+
+
+def test_change_all_is_disabled_above_the_cap(
+    ledger: OwnerApp, rows: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    html = _page(ledger, "?direction=expense")
+    assert re.search(r'value="filtered" class="[^"]*" data-bulk-filtered>', html)  # enabled
+    assert "data-bulk-too-many" not in html
+    monkeypatch.setattr(search_service, "MAX_RECATEGORIZE_ROWS", 2)
+    html = _page(ledger, "?direction=expense")  # 3 matching rows
+    button = re.search(r'<button[^>]*value="filtered"[^>]*>', html)
+    assert button is not None
+    assert " disabled " in button.group(0)
+    assert 'aria-describedby="bulk-too-many"' in button.group(0)
+    assert (
+        '<p id="bulk-too-many" class="mt-2 text-xs text-muted" data-bulk-too-many>Too many '
+        "entries for one change (at most 2). Narrow the filters first.</p>"
+    ) in html
+    # Ticked rows can still be changed.
+    assert "data-bulk-selected" in html
+
+
+def test_too_many_ticked_entries_have_their_own_refusal(ledger: OwnerApp, rows: dict) -> None:
+    ids = [("ids", str(uuid4())) for _ in range(MAX_SELECTED_IDS + 1)]
+    pairs = [*ids, ("category_id", str(rows["food"])), ("scope", "selected")]
+    response = _post_pairs(ledger, "/transactions/recategorize", pairs)
+    assert response.status_code == 400
+    assert (
+        f"Too many ticked entries (at most {MAX_SELECTED_IDS} at a time). Tick fewer, or change "
+        "all matching entries." in response.text
+    )
+
+
+def test_the_results_table_has_a_caption(ledger: OwnerApp, rows: dict) -> None:
+    assert '<caption class="sr-only">Entries matching the filters</caption>' in _page(ledger)
+
+
+def _run(response: Any, scope: dict[str, Any], receive: Any, send: Any) -> None:
+    async def call() -> None:
+        await response(scope, receive, send)
+
+    anyio.run(call)
+
+
+class _Disconnect(OSError):
+    pass
+
+
+def test_the_spool_is_closed_when_sending_fails_mid_stream() -> None:
+    spool: SpooledTemporaryFile[bytes] = SpooledTemporaryFile(max_size=1024)  # noqa: SIM115
+    spool.write(b"x" * (routes.EXPORT_CHUNK_BYTES * 3))
+    spool.seek(0)
+    response = routes.SpoolResponse(spool, media_type="text/csv")
+    sent: list[str] = []
+
+    async def receive() -> dict[str, Any]:
+        await anyio.sleep_forever()
+        raise AssertionError  # pragma: no cover
+
+    async def send(message: dict[str, Any]) -> None:
+        sent.append(message["type"])
+        if message["type"] == "http.response.body" and len(sent) > 2:
+            raise _Disconnect("client went away")
+
+    scope = {"type": "http", "asgi": {"spec_version": "2.4"}, "method": "GET"}
+    # Starlette reports a failed send as ClientDisconnect (ASGI 2.4) or re-raises it.
+    with pytest.raises((_Disconnect, ClientDisconnect, BaseExceptionGroup)):
+        _run(response, scope, receive, send)
+    assert spool.closed
+    assert sent.count("http.response.body") == 2  # stopped mid-stream
+
+
+def test_the_spool_is_closed_after_a_complete_download() -> None:
+    spool: SpooledTemporaryFile[bytes] = SpooledTemporaryFile(max_size=1024)  # noqa: SIM115
+    spool.write(b"a,b\r\n")
+    spool.seek(0)
+    response = routes.SpoolResponse(spool, media_type="text/csv")
+    body: list[bytes] = []
+
+    async def receive() -> dict[str, Any]:
+        await anyio.sleep_forever()
+        raise AssertionError  # pragma: no cover
+
+    async def send(message: dict[str, Any]) -> None:
+        body.append(message.get("body", b""))
+
+    _run(
+        response, {"type": "http", "asgi": {"spec_version": "2.4"}, "method": "GET"}, receive, send
+    )
+    assert b"".join(body) == b"a,b\r\n"
+    assert spool.closed
 
 
 # Translations

@@ -104,10 +104,13 @@ Options:
   Spreadsheets set up for Polish usually open semicolon + comma files directly.
 - **For Excel**: adds a byte order mark at the start, so that Excel reads letters such as "ż"
   correctly.
-- **Protect against spreadsheet formulas** (off unless you tick it): a description or category
-  name starting with `=`, `+`, `-`, `@` or a tab gets an apostrophe in front, so that a
-  spreadsheet shows it as text instead of running it as a formula. Use it when you open files
-  from other people in a spreadsheet; the protected values then differ from the stored ones.
+- **Protect against spreadsheet formulas** (off unless you tick it): puts an apostrophe before
+  `=`, `+`, `-` or `@` (also their full-width forms) at the start of a description or category
+  name (also after leading spaces, or when it starts with a tab), and after a comma or semicolon
+  inside it (`Rolls, -5 off` becomes `Rolls, '-5 off`), so that a spreadsheet shows such text
+  instead of running it as a formula. Use it when you open the file in a spreadsheet; the
+  protected values then differ from the stored ones, and a description near the 200-character
+  limit may become too long to import again.
 
 With the standard options the file can be imported again as a `transactions.csv`; with the
 semicolon and decimal comma, choose the same options when importing. Every member, viewers
@@ -127,7 +130,8 @@ by expenses first. If any of the entries is in a closed month, nothing changes a
 lists those months (an owner can reopen them). If the selected entries changed in the meantime
 (someone added or deleted one, or an edit moved one into or out of the filters), nothing changes
 and you review the change again. One change
-covers at most 10 000 entries.
+covers at most 10 000 entries (the **Change all** button is greyed out above that), and at most
+500 ticked entries.
 
 ## Audit log
 

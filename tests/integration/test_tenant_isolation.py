@@ -562,16 +562,18 @@ def test_transaction_search_stays_in_its_workspace(
     # The same filter (even naming the other workspace's category) sees only its own rows.
     everything = TransactionFilter(text_key="lidl")
     both = TransactionFilter(category_ids=frozenset({food_a.id, food_b.id}))
-    for repository, own in ((in_a, a_row), (in_b, b_row)):
+    for repository, own, food in ((in_a, a_row, food_a), (in_b, b_row, food_b)):
         for where in (everything, both, TransactionFilter()):
-            assert [r.id for r in repository.search(
-                where, sort=SortOrder.DATE_DESC, limit=50, offset=0)] == [own.id]  # fmt: skip
+            page = repository.search(where, sort=SortOrder.DATE_DESC, limit=50, offset=0)
+            assert [(r.id, c.id) for r, c in page] == [(own.id, food.id)]
             assert repository.count_matching(where) == 1
-            assert [r.id for r in repository.iter_matching(where)] == [own.id]
-            assert [r.id for r in repository.matching_for_update(where=where)] == [own.id]
+            assert [(r.id, c.id) for r, c in repository.iter_matching(where)] == [(own.id, food.id)]
+            for lock in (True, False):
+                found = repository.matching_for_update(where=where, lock=lock, limit=10)
+                assert [(r.id, c.id) for r, c in found] == [(own.id, food.id)]
         # Ids of the other workspace's rows are not found.
         ids = {a_row.id, b_row.id}
-        assert [r.id for r in repository.matching_for_update(ids=ids)] == [own.id]
+        assert [r.id for r, _c in repository.matching_for_update(ids=ids)] == [own.id]
     assert in_b.count_matching(TransactionFilter(category_ids=frozenset({food_a.id}))) == 0
 
 

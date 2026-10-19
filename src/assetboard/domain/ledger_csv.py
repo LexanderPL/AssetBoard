@@ -8,15 +8,17 @@ tokens, amounts as plain decimals with ``.`` and exactly the currency's minor di
 options change only what M4's lone-CSV upload also accepts (``;`` with a decimal comma) or what
 it removes (a BOM). Nothing depends on the user's locale.
 
-The formula guard (owner decision, 2026-10-19: opt-in, off by default) prefixes ``'`` to text
-cells that a spreadsheet would read as a formula. It changes those cells, so a guarded file no
-longer re-imports them exactly.
+The formula guard (owner decision, 2026-10-19: opt-in, off by default) puts ``'`` before
+anything in a text cell that a spreadsheet could run as a formula (``guard_formula``). It
+changes those cells, so a guarded file no longer re-imports them exactly, and a guarded
+description can exceed the 200 characters the import accepts.
 """
 
 from __future__ import annotations
 
 import csv
 import io
+import re
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from datetime import date
@@ -38,8 +40,14 @@ DELIMITERS = {"comma": ",", "semicolon": ";"}
 DECIMAL_SEPARATORS = {"dot": ".", "comma": ","}
 # Owner decision (2026-10-19): the guard is offered, off unless the user ticks it.
 FORMULA_GUARD_DEFAULT = False
-# Cells starting with these are formulas (or become one) in common spreadsheet programs.
-FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+# Characters that start a formula in common spreadsheet programs, with their full-width forms
+# (some programs fold those to ASCII). Tab and CR also count at the start of a cell.
+FORMULA_TRIGGERS = "=+-@＝＋－＠"
+# A value starting with a trigger after optional whitespace, or with a tab or CR.
+_LEADING_TRIGGER = re.compile(rf"\s*[{re.escape(FORMULA_TRIGGERS)}]|[\t\r]")
+# A trigger after a list separator (and optional whitespace) inside a value: opened with the
+# other delimiter, or split on its separators, that part becomes a cell of its own.
+_SEPARATED_TRIGGER = re.compile(rf"([,;]\s*)([{re.escape(FORMULA_TRIGGERS)}])")
 BOM = "﻿"
 
 
@@ -89,8 +97,17 @@ def plain_amount(amount_minor: int, currency: str, *, decimal: str = "dot") -> s
 
 
 def guard_formula(value: str) -> str:
-    """``value`` with a leading ``'`` when a spreadsheet would treat it as a formula."""
-    return f"'{value}" if value.startswith(FORMULA_PREFIXES) else value
+    """``value`` with ``'`` put before anything a spreadsheet could run as a formula.
+
+    * A value that starts with a trigger (``= + - @``, the full-width ``＝ ＋ － ＠``), also
+      after leading whitespace, or with a tab or CR, gets a leading ``'``.
+    * Inside the value, a trigger that follows ``,`` or ``;`` and optional whitespace gets ``'``
+      just before it: ``"a, =1"`` becomes ``"a, '=1"``.
+    """
+    guarded = _SEPARATED_TRIGGER.sub(r"\1'\2", value)
+    if _LEADING_TRIGGER.match(guarded):
+        guarded = f"'{guarded}"
+    return guarded
 
 
 def _cells(row: TransactionCsvRow, options: CsvOptions) -> list[str]:

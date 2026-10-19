@@ -4,14 +4,17 @@ from __future__ import annotations
 
 import csv
 import io
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import event, select
+from sqlalchemy.dialects import postgresql
+from sqlalchemy.orm import ORMExecuteState, Session
+from sqlalchemy.sql import ClauseElement
 
 from assetboard.clock import FixedClock
 from assetboard.db.models.identity import AuditEvent, Membership
@@ -34,6 +37,7 @@ from assetboard.services.transaction_search import (
     Selection,
     SelectionChanged,
     TooManySelected,
+    TooManyTicked,
     category_options,
     export_transactions_csv,
     parse_filter,
@@ -41,7 +45,11 @@ from assetboard.services.transaction_search import (
     recategorize_transactions,
     search_transactions,
 )
-from assetboard.services.transactions import create_transaction, delete_transaction
+from assetboard.services.transactions import (
+    create_transaction,
+    delete_transaction,
+    update_transaction,
+)
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 START = datetime(2026, 10, 14, 12, tzinfo=UTC)
@@ -122,6 +130,23 @@ def _errors(**fields: Any) -> dict[str, str]:
     with pytest.raises(InvalidFilter) as caught:
         parse_filter(FilterInput(**fields), locale=fields.pop("locale", "en"), currency="EUR")
     return caught.value.errors
+
+
+def _statements(operation: Callable[[], Any]) -> list[str]:
+    """The statements ``operation`` runs, compiled for PostgreSQL (where the locks apply)."""
+    seen: list[str] = []
+
+    def record(state: ORMExecuteState) -> None:
+        statement = state.statement
+        assert isinstance(statement, ClauseElement)
+        seen.append(str(statement.compile(dialect=postgresql.dialect())))
+
+    event.listen(Session, "do_orm_execute", record)
+    try:
+        operation()
+    finally:
+        event.remove(Session, "do_orm_execute", record)
+    return seen
 
 
 def _events(db: WorkspaceDb, action: str) -> list[AuditEvent]:
@@ -361,8 +386,19 @@ def test_viewers_can_export_and_nothing_is_audited(
 ) -> None:
     with team.factory() as session:
         before = session.scalars(select(AuditEvent)).all()
-    count, _data = _export(team, ctx=team.ctx("vic", "viewer"))
+    count, data = _export(team, ctx=team.ctx("vic", "viewer"))
     assert count == 5
+    rows = list(csv.DictReader(io.StringIO(data.decode("utf-8"), newline="")))
+    assert [r["id"] for r in rows] == [
+        str(ledger[k]) for k in ("aug", "sep", "sep_car", "pay", "oct")
+    ]
+    assert [(r["description"], r["category"], r["amount"]) for r in rows] == [
+        ("Bakery", "Food", "5.00"),
+        ("Żabka weekly", "Food", "1234.56"),
+        ("Fuel 100%", "Car", "80.00"),
+        ("September pay", "Salary", "3400.00"),
+        ("lidl", "Food", "12.50"),
+    ]
     with team.factory() as session:
         assert len(session.scalars(select(AuditEvent)).all()) == len(before)
     assert service.EXPORT_ROLE is Role.VIEWER
@@ -570,19 +606,79 @@ def test_empty_or_vanished_selections(team: WorkspaceDb, ledger: dict[str, UUID]
     with pytest.raises(NothingSelected):
         preview_recategorize(team.factory, _ed(team), nothing, ledger["food"])
     too_many = Selection(ids=frozenset(uuid4() for _ in range(MAX_SELECTED_IDS + 1)))
-    with pytest.raises(TooManySelected):
+    with pytest.raises(TooManyTicked) as caught:
         preview_recategorize(team.factory, _ed(team), too_many, ledger["food"])
+    assert caught.value.code == "too_many_ticked"
+    at_most = Selection(
+        ids=frozenset([ledger["sep"], *(uuid4() for _ in range(MAX_SELECTED_IDS - 1))])
+    )
+    assert preview_recategorize(team.factory, _ed(team), at_most, ledger["food"]).selected == 1
 
 
 def test_the_row_cap(
     team: WorkspaceDb, ledger: dict[str, UUID], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.setattr(service, "MAX_RECATEGORIZE_ROWS", 3)
+    expenses = Selection(where=_where(team, direction="expense"))  # 4 rows
+    with pytest.raises(TooManySelected):
+        preview_recategorize(team.factory, _ed(team), expenses, ledger["food"])
+    three = Selection(where=_where(team, direction="expense", date_from="2026-09-01"))
+    assert preview_recategorize(team.factory, _ed(team), three, ledger["food"]).selected == 3
+
+
+def _spy_reads(monkeypatch: pytest.MonkeyPatch) -> list[dict[str, Any]]:
+    calls: list[dict[str, Any]] = []
+    original = service.TransactionRepository.matching_for_update
+
+    def read(self: Any, **kwargs: Any) -> Any:
+        calls.append(kwargs)
+        return original(self, **kwargs)
+
+    monkeypatch.setattr(service.TransactionRepository, "matching_for_update", read)
+    return calls
+
+
+def test_at_most_the_cap_plus_one_rows_are_loaded(
+    team: WorkspaceDb, ledger: dict[str, UUID], monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(service, "MAX_RECATEGORIZE_ROWS", 2)
+    calls = _spy_reads(monkeypatch)
     with pytest.raises(TooManySelected):
         preview_recategorize(
             team.factory, _ed(team), Selection(where=_where(team, direction="expense")),
             ledger["food"],
         )  # fmt: skip
+    assert calls[-1]["limit"] == 3
+    statements = _statements(
+        lambda: preview_recategorize(
+            team.factory, _ed(team), _ids("sep", ledger=ledger), ledger["food"]
+        )
+    )
+    read = next(s for s in statements if "FROM transactions" in s)
+    assert "LIMIT" in read
+
+
+def test_the_preview_takes_no_row_locks_and_the_change_does(
+    team: WorkspaceDb, ledger: dict[str, UUID], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    other = _category(team, "Other")
+    selection = _ids("sep", "oct", ledger=ledger)
+    calls = _spy_reads(monkeypatch)
+    preview: list[service.RecategorizePlan] = []
+    statements = _statements(
+        lambda: preview.append(preview_recategorize(team.factory, _ed(team), selection, other))
+    )
+    assert calls[-1]["lock"] is False
+    assert not any("FOR UPDATE" in s or "FOR SHARE" in s for s in statements)
+    statements = _statements(
+        lambda: recategorize_transactions(
+            team.factory, _ed(team), selection, other, expected=preview[0].fingerprint
+        )
+    )
+    assert calls[-1]["lock"] is True
+    read = next(s for s in statements if "FROM transactions" in s and "JOIN categories" in s)
+    # Only the transactions are locked, not the categories they are joined with.
+    assert read.rstrip().endswith("FOR UPDATE OF transactions")
 
 
 def test_a_selection_that_changed_after_the_preview_is_refused(
@@ -602,6 +698,95 @@ def test_a_selection_that_changed_after_the_preview_is_refused(
     with pytest.raises(SelectionChanged):
         recategorize_transactions(team.factory, _ed(team), ids, other, expected=plan.fingerprint)
     assert _categories_of(team)[ledger["sep"]] == ledger["food"]
+
+
+def test_deleted_and_foreign_ids_are_neither_selected_nor_touched(
+    team: WorkspaceDb, ledger: dict[str, UUID]
+) -> None:
+    other = _category(team, "Other")
+    with team.factory() as session:
+        gone = session.scalars(
+            select(Transaction).where(Transaction.description == "Deleted entry")
+        ).one()
+        gone_id, gone_stamp = gone.id, gone.updated_at
+    elsewhere = team.add_workspace("Elsewhere")
+    team.add_member("ed", "editor", elsewhere)
+    there = team.ctx("ed", "editor", elsewhere)
+    foreign_food = create_category(
+        team.factory, there, name="Food", kind="expense", treatment="regular", color="#16a34a"
+    ).id
+    foreign = create_transaction(
+        team.factory, there, month=YearMonth(2026, 10), direction="expense", day="3",
+        amount="1", description="Theirs", category_id=foreign_food, locale="en",
+    ).id  # fmt: skip
+    with team.factory() as session:
+        row = session.get(Transaction, foreign)
+        assert row is not None
+        foreign_stamp = row.updated_at
+    selection = Selection(ids=frozenset({ledger["sep"], gone_id, foreign}))
+    plan = preview_recategorize(team.factory, _ed(team), selection, other)
+    assert (plan.selected, plan.changing) == (1, 1)
+    done = recategorize_transactions(
+        team.factory, _ed(team), selection, other, expected=plan.fingerprint
+    )
+    assert done.selected == 1
+    with team.factory() as session:
+        deleted_row = session.get(Transaction, gone_id)
+        foreign_row = session.get(Transaction, foreign)
+        assert deleted_row is not None and foreign_row is not None
+        assert (deleted_row.category_id, deleted_row.updated_at) == (ledger["food"], gone_stamp)
+        assert (foreign_row.category_id, foreign_row.updated_at) == (foreign_food, foreign_stamp)
+    assert _categories_of(team)[ledger["sep"]] == other
+
+
+def test_a_row_moved_out_of_the_filter_changes_the_selection(
+    team: WorkspaceDb, ledger: dict[str, UUID]
+) -> None:
+    other = _category(team, "Other")
+    selection = Selection(where=_where(team, direction="expense", date_from="2026-09-01"))
+    plan = preview_recategorize(team.factory, _ed(team), selection, other)
+    assert plan.selected == 3
+    update_transaction(
+        team.factory, _ed(team), ledger["oct"], month=YearMonth(2026, 10), day="2026-08-15",
+        amount="12.50", description="lidl", category_id=ledger["food"], locale="en",
+    )  # fmt: skip
+    with pytest.raises(SelectionChanged):
+        recategorize_transactions(
+            team.factory, _ed(team), selection, other, expected=plan.fingerprint
+        )
+    assert {_categories_of(team)[ledger[k]] for k in ("sep", "sep_car")} == {
+        ledger["food"],
+        ledger["car"],
+    }
+
+
+def test_a_category_changed_by_someone_else_after_the_preview_is_refused(
+    team: WorkspaceDb, ledger: dict[str, UUID]
+) -> None:
+    other, groceries = _category(team, "Other"), _category(team, "Groceries")
+    selection = _ids("sep", "oct", ledger=ledger)
+    plan = preview_recategorize(team.factory, _ed(team), selection, other)
+    # Someone else moves one of the rows meanwhile (same ids, so only the category differs).
+    _apply(team, _ids("oct", ledger=ledger), groceries, ctx=team.ctx("olga", "owner"))
+    with pytest.raises(SelectionChanged):
+        recategorize_transactions(
+            team.factory, _ed(team), selection, other, expected=plan.fingerprint
+        )
+    assert _categories_of(team)[ledger["oct"]] == groceries
+    assert _categories_of(team)[ledger["sep"]] == ledger["food"]
+
+
+def test_the_fingerprint_covers_id_category_and_date() -> None:
+    row, cat, day = uuid4(), uuid4(), date(2026, 10, 1)
+    base = service.fingerprint([(row, cat, day)])
+    assert service.fingerprint([(row, cat, day)]) == base
+    assert service.fingerprint([(row, uuid4(), day)]) != base
+    assert service.fingerprint([(row, cat, date(2026, 10, 2))]) != base
+    assert service.fingerprint([(uuid4(), cat, day)]) != base
+    other = (uuid4(), cat, day)
+    assert service.fingerprint([(row, cat, day), other]) == service.fingerprint(
+        [other, (row, cat, day)]
+    )
 
 
 def test_updated_at_moves_with_the_change(team: WorkspaceDb, ledger: dict[str, UUID]) -> None:

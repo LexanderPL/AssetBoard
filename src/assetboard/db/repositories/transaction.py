@@ -8,10 +8,21 @@ from datetime import date
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, Integer, Select, case, cast, exists, extract, func, select
+from sqlalchemy import (
+    ColumnElement,
+    Integer,
+    Select,
+    and_,
+    case,
+    cast,
+    exists,
+    extract,
+    func,
+    select,
+)
 from sqlalchemy.sql.elements import UnaryExpression
 
-from assetboard.db.models.ledger import Transaction
+from assetboard.db.models.ledger import Category, Transaction
 from assetboard.db.repositories.base import ScopedRepository
 from assetboard.domain.months import YearMonth
 from assetboard.domain.transaction_search import SortOrder, TransactionFilter
@@ -225,12 +236,27 @@ class TransactionRepository(ScopedRepository[Transaction]):
             statement = statement.where(Transaction.amount_minor <= where.amount_max_minor)
         return statement
 
+    def _with_category(self, where: TransactionFilter) -> Select[Transaction, Category]:
+        """Matching rows joined with their category (same workspace: composite foreign key)."""
+        return (
+            self._matching(where)
+            .add_columns(Category)
+            .join(
+                Category,
+                and_(
+                    Category.workspace_id == Transaction.workspace_id,
+                    Category.id == Transaction.category_id,
+                ),
+            )
+        )
+
     def search(
         self, where: TransactionFilter, *, sort: SortOrder, limit: int, offset: int
-    ) -> list[Transaction]:
-        """One page of matching rows in ``sort`` order (ties: entry order)."""
-        statement = self._matching(where).order_by(*_SORTS[sort]).limit(limit).offset(offset)
-        return list(self._session.scalars(statement))
+    ) -> list[tuple[Transaction, Category]]:
+        """One page of matching rows with their categories, in ``sort`` order (ties: entry
+        order). The category comes from the same statement, so a row never lacks one."""
+        statement = self._with_category(where).order_by(*_SORTS[sort]).limit(limit).offset(offset)
+        return [(row, category) for row, category in self._session.execute(statement)]
 
     def count_matching(self, where: TransactionFilter) -> int:
         statement = select(func.count()).select_from(self._matching(where).subquery())
@@ -238,24 +264,42 @@ class TransactionRepository(ScopedRepository[Transaction]):
 
     def iter_matching(
         self, where: TransactionFilter, *, batch: int = 1000
-    ) -> Iterator[Transaction]:
-        """Every matching row in entry order, fetched ``batch`` rows at a time (the export)."""
-        statement = self._matching(where).order_by(*CANONICAL_ORDER)
-        yield from self._session.scalars(statement.execution_options(yield_per=batch))
+    ) -> Iterator[tuple[Transaction, Category]]:
+        """Every matching row with its category in entry order, from one statement fetched
+        ``batch`` rows at a time (the export)."""
+        statement = self._with_category(where).order_by(*CANONICAL_ORDER)
+        rows = self._session.execute(statement.execution_options(yield_per=batch))
+        yield from ((row, category) for row, category in rows)
 
     def matching_for_update(
-        self, *, where: TransactionFilter | None = None, ids: Collection[UUID] | None = None
-    ) -> list[Transaction]:
-        """The rows a bulk change targets, locked (``FOR UPDATE`` on PostgreSQL), entry order.
+        self,
+        *,
+        where: TransactionFilter | None = None,
+        ids: Collection[UUID] | None = None,
+        limit: int | None = None,
+        lock: bool = True,
+    ) -> list[tuple[Transaction, Category]]:
+        """The rows a bulk change targets, with their categories, in entry order.
 
         Either the rows matching ``where`` or the non-deleted rows among ``ids`` (exactly one).
+        At most ``limit`` rows are loaded (the caller passes its cap + 1 to detect "too many").
+        With ``lock`` the transaction rows (not the categories) are locked until the transaction
+        ends: ``FOR UPDATE OF transactions`` on PostgreSQL; SQLite has no row locks and leaves
+        the clause out (``BEGIN IMMEDIATE`` serialises writers there). A read-only preview
+        passes ``lock=False``.
         """
         if (where is None) == (ids is None):
             raise ValueError("pass either where or ids")
         if where is not None:
-            statement = self._matching(where)
+            statement = self._with_category(where)
         else:
             assert ids is not None
-            statement = self._matching(TransactionFilter()).where(Transaction.id.in_(sorted(ids)))
-        statement = statement.order_by(*CANONICAL_ORDER).with_for_update()
-        return list(self._session.scalars(statement))
+            statement = self._with_category(TransactionFilter()).where(
+                Transaction.id.in_(sorted(ids))
+            )
+        statement = statement.order_by(*CANONICAL_ORDER)
+        if limit is not None:
+            statement = statement.limit(limit)
+        if lock:
+            statement = statement.with_for_update(of=Transaction)
+        return [(row, category) for row, category in self._session.execute(statement)]

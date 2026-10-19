@@ -469,9 +469,16 @@ read-only enforcement in the service layer (not only the UI). Tests for enforcem
 - **Viewers** may use the list **and** the CSV export (it is the filtered view of what they can
   already read). Bulk recategorize needs editor or owner. (`services.transaction_search.EXPORT_ROLE`.)
 - **Formula guard:** offered as an opt-in checkbox, **off by default**, so the default export
-  stays lossless and re-importable. When ticked, descriptions and category names that start
-  with `=`, `+`, `-`, `@`, tab or CR get a leading `'` (they then re-import with it). This
-  answers M4 open question 7. (`domain.ledger_csv.FORMULA_GUARD_DEFAULT`.)
+  stays lossless and re-importable. This answers M4 open question 7.
+  (`domain.ledger_csv.FORMULA_GUARD_DEFAULT`.) When ticked, `guard_formula` changes
+  descriptions and category names:
+  - a value that starts with a trigger (`=`, `+`, `-`, `@` or their full-width forms `＝ ＋ － ＠`),
+    also after leading whitespace, or with a tab or CR, gets a leading `'`;
+  - inside a value, a trigger after `,` or `;` and optional whitespace gets `'` just before it
+    (`a, =1` becomes `a, '=1`), for files opened with the other list separator.
+
+  Guarded values re-import with the apostrophes, and a guarded description can exceed the
+  200 characters the import accepts (that row is then refused on import).
 - **The export is not audited:** it is a read like opening the list, so it is a GET and records
   nothing (nothing about its contents is logged either).
 
@@ -493,8 +500,12 @@ read-only enforcement in the service layer (not only the UI). Tests for enforcem
   the end shows the last page. Rows in closed months are marked "closed"; each date links to
   its month page (where entries are edited).
 - **Export** (`/transactions/export.csv`, GET): every matching row, always in M4's entry order
-  (date, `created_at`, id) whatever the screen's sort, read in one session (one consistent
-  snapshot), written to a spooled temporary file and streamed. Options: delimiter comma
+  (date, `created_at`, id) whatever the screen's sort. Rows and their category names come
+  from **one** SELECT (a join, fetched in batches), so every row has the name its category had
+  in that read; what the statement sees of writes committed during a long export is left to
+  the database's default isolation (no stronger level is requested). The file is written to a
+  spooled temporary file and then streamed; the spool is closed when the response ends,
+  including when the client goes away mid-download. Options: delimiter comma
   (default) or semicolon; decimal dot (default) or comma, comma only with semicolon (as M4's
   upload options); BOM for Excel (off by default); the formula guard (off by default).
   `Content-Disposition` file name `<branding.CLI_NAME>-transactions-<YYYYMMDD-HHMMSS>Z.csv`
@@ -504,15 +515,18 @@ read-only enforcement in the service layer (not only the UI). Tests for enforcem
 - **Bulk recategorize:** rows are ticked on the current page (per-row checkboxes joined to the
   bulk form), or "Change all N matching entries" applies to every row matching the filters.
   A preview page shows the target, how many rows move, from which categories, the months and
-  how many are already in the target; it writes nothing. Confirming re-reads the selection
-  inside one `BEGIN IMMEDIATE` transaction: `require_role_now(editor)`, `lock_month_writes`,
-  then the rows (`FOR UPDATE` on PostgreSQL). Refused as a whole, with nothing changed: no
-  rows selected; more than 10 000 rows (`MAX_RECATEGORIZE_ROWS`; ticked ids at most 500); an
-  archived, unknown or foreign target; any row whose direction differs from the target's kind
-  ("filter by expenses or income first"); any row in a closed month (the message lists the
-  months, including rows already in the target); the selection differing from the previewed
-  one (a digest of the row ids, so rows added, deleted or moved meanwhile are never changed
-  unseen). Rows already in the target are left alone; rows are updated through the ORM (the
+  how many are already in the target; it writes nothing and takes no row locks. Confirming
+  re-reads the selection inside one `BEGIN IMMEDIATE` transaction: `require_role_now(editor)`,
+  `lock_month_writes`, then the rows (`FOR UPDATE OF transactions` on PostgreSQL). At most
+  `MAX_RECATEGORIZE_ROWS` + 1 rows are ever loaded. Refused as a whole, with nothing changed:
+  no rows selected; more than 500 ticked ids (`too_many_ticked`, its own message); more than
+  10 000 matching rows (`MAX_RECATEGORIZE_ROWS`; the "Change all N" button is disabled with
+  the reason when the list already shows more); an archived, unknown or foreign target; any
+  row whose direction differs from the target's kind ("filter by expenses or income first");
+  any row in a closed month (the message lists the months, including rows already in the
+  target); the selection differing from the previewed one (a digest of each row's id,
+  category and date, so rows added, deleted, moved or recategorized meanwhile are never
+  changed unseen). Ticked ids of deleted rows or of another workspace select nothing. Rows already in the target are left alone; rows are updated through the ORM (the
   timestamp listener sets `updated_at`).
 - Audit: one `transaction.recategorized` event per applied change (entity: the target
   category; data `category`, `direction`, `count`, `from_categories`, `months`; never amounts

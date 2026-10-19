@@ -232,13 +232,43 @@ def test_the_formula_guard_is_off_by_default() -> None:
         ("-5 refund", "'-5 refund"),
         ("@sum", "'@sum"),
         ("\tx", "'\tx"),
+        ("\rx", "'\rx"),
         ("Lidl", "Lidl"),
         ("a=b", "a=b"),
+        ("a-b", "a-b"),
+        ("e-mail @ home", "e-mail @ home"),
         ("", ""),
+        # Full-width triggers
+        ("\uff1dSUM(1)", "'\uff1dSUM(1)"),
+        ("\uff0b48", "'\uff0b48"),
+        ("\uff0d5", "'\uff0d5"),
+        ("\uff20x", "'\uff20x"),
+        # Leading whitespace before a trigger
+        (" =1", "' =1"),
+        ("  -5", "'  -5"),
+        ("\u3000=1", "'\u3000=1"),  # ideographic space
+        (" x", " x"),
+        # A trigger after a list separator inside the value
+        ("a,=1", "a,'=1"),
+        ("a;=1", "a;'=1"),
+        ("a, =1", "a, '=1"),
+        ("a;  +1", "a;  '+1"),
+        ("Rolls, -5 off", "Rolls, '-5 off"),
+        ("a,\uff1d1", "a,'\uff1d1"),
+        ("a, b", "a, b"),
+        ("a,b-c", "a,b-c"),
+        # Both at once, and several separators
+        ("=a, @b; -c", "'=a, '@b; '-c"),
     ],
 )
 def test_guard_formula(value: str, guarded: str) -> None:
     assert guard_formula(value) == guarded
+
+
+def test_a_guarded_value_can_exceed_the_import_length_limit() -> None:
+    description = ", -1" * 50  # 200 characters
+    assert len(description) == 200
+    assert len(guard_formula(description)) == 250
 
 
 def test_the_formula_guard_covers_description_and_category_only() -> None:

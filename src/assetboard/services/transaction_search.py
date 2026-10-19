@@ -9,9 +9,11 @@
   every matching row to one category. A preview reads what would change; the change runs in one
   ``BEGIN IMMEDIATE`` transaction that re-reads the actor's role (``require_role_now``), takes
   ``lock_month_writes`` **before** reading the rows, and refuses the whole operation when any
-  selected row lies in a closed month (``MonthsClosed`` lists them). The preview's
-  ``fingerprint`` (a digest of the selected ids) must still match, so rows deleted, added or
-  moved after the preview are never changed unseen (``SelectionChanged``). One
+  selected row lies in a closed month (``MonthsClosed`` lists them). The preview reads without
+  row locks. The preview's ``fingerprint`` (a digest of each selected row's id, category and
+  date) must still match, so rows deleted, added, moved or recategorized after the preview are
+  never changed unseen (``SelectionChanged``). At most ``MAX_RECATEGORIZE_ROWS`` rows are ever
+  loaded (one more is read to detect "too many"). One
   ``transaction.recategorized`` event is audited, without amounts or descriptions.
 
 Filters arrive as the user typed them; ``parse_filter`` validates them (amounts in the user's
@@ -255,9 +257,9 @@ def search_transactions(
         window = page_window(page, repository.count_matching(where), PAGE_SIZE)
         rows = repository.search(where, sort=sort, limit=window.size, offset=window.offset)
         categories = CategoryRepository(session, ctx).ordered()
-        by_id = {c.id: c for c in categories}
         closed = MonthStateRepository(session, ctx).closed_months()
-        views = tuple(_row(row, by_id[row.category_id], closed) for row in rows)
+        # Each row's category comes from the row's own statement (no lookup that could miss).
+        views = tuple(_row(row, category, closed) for row, category in rows)
     return SearchResult(views, window, sort, tuple(_option(c) for c in categories))
 
 
@@ -292,23 +294,25 @@ def export_transactions_csv(
 ) -> int:
     """Write every matching row to ``out`` as UTF-8 CSV (entry order); returns the row count.
 
-    One session reads all rows, so the file is one consistent snapshot.
+    The rows and their category names come from **one** SELECT statement, read in batches, so
+    every row carries the category name it had in the same read. What that statement sees of
+    writes committed while a long export runs is up to the database's isolation (no stronger
+    isolation is requested); the count and the file always agree.
     """
     require_role(ctx, EXPORT_ROLE)
     written = 0
     with factory() as session:
-        names = {c.id: c.name for c in CategoryRepository(session, ctx).ordered()}
 
         def rows() -> Iterator[TransactionCsvRow]:
             nonlocal written
-            for row in TransactionRepository(session, ctx).iter_matching(where):
+            for row, category in TransactionRepository(session, ctx).iter_matching(where):
                 written += 1
                 yield TransactionCsvRow(
                     date=row.date,
                     direction=row.direction,
                     amount_minor=row.amount_minor,
                     currency=row.currency,
-                    category=names[row.category_id],
+                    category=category.name,
                     description=row.description,
                     category_id=row.category_id,
                     id=row.id,
@@ -343,7 +347,15 @@ class NothingSelected(RecategorizeError):
 
 
 class TooManySelected(RecategorizeError):
+    """More rows than ``MAX_RECATEGORIZE_ROWS`` match."""
+
     code = "too_many_rows"
+
+
+class TooManyTicked(RecategorizeError):
+    """More than ``MAX_SELECTED_IDS`` rows were ticked."""
+
+    code = "too_many_ticked"
 
 
 class InvalidTarget(RecategorizeError):
@@ -386,55 +398,61 @@ class RecategorizePlan:
     fingerprint: str
 
 
-def fingerprint(ids: Sequence[UUID]) -> str:
-    """A digest of a set of row ids (order does not matter)."""
+def fingerprint(rows: Collection[tuple[UUID, UUID, date]]) -> str:
+    """A digest of the selected rows' (id, category id, date); order does not matter."""
     digest = hashlib.sha256()
-    for row_id in sorted(ids):
-        digest.update(row_id.bytes)
+    for row_id, category_id, day in sorted(rows):
+        digest.update(row_id.bytes + category_id.bytes + day.isoformat().encode("ascii"))
     return digest.hexdigest()[:32]
 
 
-def _selected(session: Session, ctx: Context, selection: Selection) -> list[Transaction]:
+def _fingerprint(rows: Sequence[tuple[Transaction, Category]]) -> str:
+    return fingerprint([(row.id, row.category_id, row.date) for row, _category in rows])
+
+
+def _selected(
+    session: Session, ctx: Context, selection: Selection, *, lock: bool
+) -> list[tuple[Transaction, Category]]:
     if selection.ids is not None and not selection.ids:
         raise NothingSelected
     if selection.ids is not None and len(selection.ids) > MAX_SELECTED_IDS:
-        raise TooManySelected
+        raise TooManyTicked
+    cap = MAX_RECATEGORIZE_ROWS
     rows = TransactionRepository(session, ctx).matching_for_update(
-        where=selection.where, ids=selection.ids
+        where=selection.where, ids=selection.ids, limit=cap + 1, lock=lock
     )
     if not rows:
         raise NothingSelected
-    if len(rows) > MAX_RECATEGORIZE_ROWS:
+    if len(rows) > cap:
         raise TooManySelected
     return rows
 
 
 def _plan(
-    session: Session, ctx: Context, rows: Sequence[Transaction], target_id: UUID
+    session: Session, ctx: Context, rows: Sequence[tuple[Transaction, Category]], target_id: UUID
 ) -> tuple[RecategorizePlan, Category, list[Transaction]]:
     """Check the rows against the target and the closed months (refusing as a whole)."""
-    categories = {c.id: c for c in CategoryRepository(session, ctx).ordered()}
-    target = categories.get(target_id)
+    target = CategoryRepository(session, ctx).get(target_id)
     if target is None or target.archived_at is not None:
         raise InvalidTarget
-    if any(row.direction != target.kind for row in rows):
+    if any(row.direction != target.kind for row, _category in rows):
         raise KindMismatch
     closed = MonthStateRepository(session, ctx).closed_months()
-    in_closed = sorted({YearMonth.from_date(r.date) for r in rows} & closed)
+    in_closed = sorted({YearMonth.from_date(row.date) for row, _category in rows} & closed)
     if in_closed:
         raise MonthsClosed(in_closed)
-    changing = [row for row in rows if row.category_id != target.id]
+    changing = [(row, category) for row, category in rows if row.category_id != target.id]
     plan = RecategorizePlan(
         target=_option(target),
         selected=len(rows),
         changing=len(changing),
-        months=tuple(sorted({YearMonth.from_date(r.date) for r in changing})),
+        months=tuple(sorted({YearMonth.from_date(row.date) for row, _category in changing})),
         from_categories=tuple(
-            sorted({categories[r.category_id].name for r in changing}, key=str.casefold)
+            sorted({category.name for _row, category in changing}, key=str.casefold)
         ),
-        fingerprint=fingerprint([row.id for row in rows]),
+        fingerprint=_fingerprint(rows),
     )
-    return plan, target, changing
+    return plan, target, [row for row, _category in changing]
 
 
 def preview_recategorize(
@@ -443,7 +461,7 @@ def preview_recategorize(
     """What ``recategorize_transactions`` would change; refuses as it would. Writes nothing."""
     require_role(ctx, RECATEGORIZE_ROLE)
     with factory() as session:
-        rows = _selected(session, ctx, selection)
+        rows = _selected(session, ctx, selection, lock=False)  # a read: no row locks
         return _plan(session, ctx, rows, target_id)[0]
 
 
@@ -466,8 +484,8 @@ def recategorize_transactions(
         require_role_now(session, ctx, RECATEGORIZE_ROLE)
         # The lock comes before reading the rows whose months the guard checks (F2.5).
         lock_month_writes(session, ctx)
-        rows = _selected(session, ctx, selection)
-        if fingerprint([row.id for row in rows]) != expected:
+        rows = _selected(session, ctx, selection, lock=True)
+        if _fingerprint(rows) != expected:
             raise SelectionChanged
         plan, target, changing = _plan(session, ctx, rows, target_id)
         if not changing:
