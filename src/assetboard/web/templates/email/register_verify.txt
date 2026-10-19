@@ -1,0 +1,9 @@
+{{ _("Hello,") }}
+
+{{ _("Someone, hopefully you, asked to create an account at %(app)s with this email address. To confirm the address and finish creating your account, open this link:", app=app_name) }}
+
+{{ link }}
+
+{{ _("The link works once, for 24 hours.") }}
+
+{{ _("If you did not ask for this, ignore this email: no account is created.") }}

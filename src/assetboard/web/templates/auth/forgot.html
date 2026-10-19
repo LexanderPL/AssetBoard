@@ -1,0 +1,16 @@
+{% extends "auth_base.html" %}
+{% from "macros/components.html" import field, csrf_input, primary_button with context %}
+{% block title %}{{ _("Forgot your password?") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Forgot your password?") }}{% endblock %}
+{% block content %}
+{% if notice %}
+<p class="mt-4 rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="alert">{{ notice }}</p>
+{% endif %}
+<p class="mt-4 text-sm text-muted">{{ _("Enter the email address of your account. We will send you a link to choose a new password.") }}</p>
+<form method="post" action="{{ scoped_url(request, 'password_forgot') }}" class="mt-6 space-y-4" novalidate>
+  {{ csrf_input() }}
+  {{ field("email", _("Email"), type="email", value=email, error=error, required=true, autocomplete="email", maxlength=320) }}
+  {{ primary_button(_("Send the link")) }}
+</form>
+<p class="mt-6 text-center text-sm text-muted"><a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'login') }}">{{ _("Back to sign in") }}</a></p>
+{% endblock %}

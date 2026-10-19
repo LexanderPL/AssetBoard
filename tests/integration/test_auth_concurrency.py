@@ -36,6 +36,7 @@ from assetboard.services.auth import (
     setup_is_open,
 )
 from assetboard.services.hash_gate import HashGate, HashGateBusy
+from tests.conftest import ANY_VERIFIED
 
 PASSWORD = "Correct Horse Battery!"
 CLOCK = FixedClock("2026-01-01T00:00:00+00:00")
@@ -748,7 +749,7 @@ def test_concurrent_setup_has_one_winner_and_a_setup_already_completed_loser(
 
 
 def _registration_settings() -> Settings:
-    return Settings(_env_file=None, allow_registration=True)
+    return Settings(_env_file=None)
 
 
 def test_registration_hashes_outside_any_immediate_transaction(
@@ -767,6 +768,7 @@ def test_registration_hashes_outside_any_immediate_transaction(
         settings=settings,
         clock=CLOCK,
         host="192.0.2.70",
+        verified=ANY_VERIFIED,
     )
     rejected = register_with_factory(
         factory,
@@ -777,6 +779,7 @@ def test_registration_hashes_outside_any_immediate_transaction(
         settings=settings,
         clock=CLOCK,
         host="192.0.2.70",
+        verified=ANY_VERIFIED,
     )
     assert (outcome.status, rejected.status) == ("created", "rejected")
     # One hash each, including the already-registered path (same cost), none under the lock.
@@ -800,6 +803,7 @@ def test_concurrent_registration_of_one_email_creates_one_user(database: Connect
             settings=settings,
             clock=CLOCK,
             host=f"192.0.2.{80 + index}",
+            verified=ANY_VERIFIED,
         )
         statuses.append(outcome.status)
 
@@ -828,6 +832,7 @@ def test_busy_gate_releases_the_registration_attempt(database: Connect) -> None:
             clock=CLOCK,
             host="192.0.2.90",
             hasher=busy,
+            verified=ANY_VERIFIED,
         )
     row = _throttle(factory, "register", "192.0.2.90/32")
     assert row is not None and row.failure_count == 0

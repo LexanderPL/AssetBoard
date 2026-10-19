@@ -38,6 +38,7 @@ from assetboard.services.auth import (
 from assetboard.services.context import NoWorkspace, PermissionDenied, WorkspaceNotAvailable
 from assetboard.services.hash_gate import HashGate, HashGateBusy
 from assetboard.services.instance_settings import workspace_creation_allowed
+from assetboard.services.mail import Mailer, MailOutbox, SmtpMailer
 from assetboard.services.months import MonthClosed
 from assetboard.services.oidc import OidcClient, UrllibTransport
 from assetboard.services.oidc_flow import ConsumedStates
@@ -47,6 +48,7 @@ from assetboard.web.admin_routes import router as admin_router
 from assetboard.web.audit_routes import router as audit_router
 from assetboard.web.auth_routes import router as auth_router
 from assetboard.web.category_routes import router as category_router
+from assetboard.web.email_routes import router as email_router
 from assetboard.web.errors import BUSY_RETRY_AFTER, add_error_response_headers, error_response
 from assetboard.web.errors import is_htmx_fragment_request as _is_htmx_fragment_request
 from assetboard.web.gate import AccessGateMiddleware, OriginCheckMiddleware
@@ -73,10 +75,16 @@ def create_app(
     settings: Settings | None = None,
     *,
     database_checker: DatabaseChecker | None = None,
+    mailer: Mailer | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     logger = configure_logging(settings.log_level, settings.log_format)
     settings.ensure_data_dir_writable()
+    if settings.allow_registration is False:
+        logger.warning(
+            "ALLOW_REGISTRATION is no longer used and is ignored: open registration is an "
+            "instance setting (Instance settings); remove the variable"
+        )
     if settings.proxy_auth_enabled:
         # Accepted by validation (at most /24 or /64), but every address in it can sign in as
         # anyone through the identity headers (ADR-0015).
@@ -103,6 +111,12 @@ def create_app(
         touch_engine, class_=Session, info={"clock": clock}, expire_on_commit=False
     )
     checker = database_checker or (lambda: database_is_ready(engine))
+    # Outgoing mail (ADR-0017): None without SMTP_HOST; tests pass a fake mailer.
+    outbox = (
+        MailOutbox(mailer or SmtpMailer(settings), settings, clock, logger)
+        if settings.mail_enabled
+        else None
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -138,6 +152,8 @@ def create_app(
             await run_in_threadpool(prepare_dummy_hash)
             yield
         finally:
+            if outbox is not None:
+                await run_in_threadpool(outbox.stop)
             engine.dispose()
             touch_engine.dispose()
 
@@ -163,6 +179,7 @@ def create_app(
     app.state.proxy_spoof_warnings = RecentKeys()
     app.state.proxy_audits = RecentKeys()
     app.state.setup_token = None
+    app.state.mail_outbox = outbox
     app.state.database_checker = checker
     # Added innermost first; see ADR-0012 for the resulting order.
     app.add_middleware(AccessGateMiddleware)
@@ -174,6 +191,7 @@ def create_app(
     app.mount("/static", StaticFiles(directory=static_directory), name="static")
     app.include_router(web_router)
     app.include_router(auth_router)
+    app.include_router(email_router)
     app.include_router(account_router)
     app.include_router(admin_router)
     app.include_router(audit_router)

@@ -17,6 +17,7 @@ from sqlalchemy.exc import OperationalError
 
 from assetboard.db.models.identity import AuditEvent, AuthThrottle, Invitation, Membership, User
 from assetboard.services.hash_gate import HashGateBusy
+from assetboard.services.instance_settings import get_settings
 from assetboard.services.invitations import (
     MAX_FAILED_EMAIL_ATTEMPTS,
     AlreadyMember,
@@ -305,7 +306,7 @@ def roomy(web: WebHarness) -> Iterator[OwnerApp]:
 
 
 def test_register_through_invitation_while_registration_is_disabled(roomy: OwnerApp) -> None:
-    assert roomy.app.state.settings.allow_registration is False
+    assert get_settings(roomy.app.state.session_factory).allow_registration is False
     token = create_link(roomy, role="viewer")
     with anonymous(roomy) as client:
         response = register(client, roomy.web, token)
@@ -439,13 +440,18 @@ def test_sign_in_and_registration_pages_keep_page_referrers_same_origin_subresou
     web: WebHarness,
 ) -> None:
     # Their "next" can carry an invitation token.
-    app = web.app(allow_registration=True)
+    app = web.mail_app()
     with TestClient(app) as client:
         web.complete_setup(app)
+        web.enable_registration(app)
         pages = [
             client.get("/login"),
             client.get("/login?next=%2Finvite%2F" + "Z" * 43),
             client.get("/register"),
+            # Pages of email links carry a token in their URL too (ADR-0017).
+            client.get("/password/forgot"),
+            client.get("/register/complete/" + "Z" * 43),
+            client.get("/password/reset/" + "Z" * 43),
         ]
         csrf = web.csrf(pages[0].text)
         failed_login = client.post(

@@ -54,6 +54,9 @@ def test_every_state_changing_route_requires_a_valid_csrf_token(
         "/login",
         "/logout",
         "/register",
+        "/register/complete/{token}",
+        "/password/forgot",
+        "/password/reset/{token}",
         "/account/password",
         "/account/logout-others",
         "/workspace/switch",
@@ -89,12 +92,16 @@ def test_every_state_changing_route_declares_the_csrf_dependency(signed_in: Test
 
 
 def test_signed_out_forms_require_the_anonymous_token_and_its_cookie(web: WebHarness) -> None:
-    app = web.app(allow_registration=True)
+    app = web.mail_app()
     with TestClient(app) as client:
         web.complete_setup(app)
+        web.enable_registration(app)
         expected = {
             "/login",
             "/register",
+            "/register/complete/{token}",
+            "/password/forgot",
+            "/password/reset/{token}",
             "/setup",
             "/invite/{token}/accept",
             "/invite/{token}/register",

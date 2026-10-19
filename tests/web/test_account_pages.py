@@ -8,13 +8,14 @@ import re
 from typing import TYPE_CHECKING
 
 import pytest
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from assetboard.db.models.identity import Membership, User
 from assetboard.domain.categories import SEED
 from assetboard.i18n import gettext
-from tests.conftest import owned_workspace_category_names
+from tests.conftest import mail_link, owned_workspace_category_names
 
 if TYPE_CHECKING:
     from conftest import CountingHasher, WebHarness
@@ -23,20 +24,20 @@ NEW_PASSWORD = "Another Strong Password"
 
 
 def _register(client: TestClient, web: WebHarness, email: str, password: str = NEW_PASSWORD):
-    data = {
-        "csrf_token": web.csrf(client.get("/register").text),
-        "email": email,
-        "display_name": "Newcomer",
-        "password": password,
-        "workspace_name": "Budget",
-    }
-    return client.post("/register", data=data, follow_redirects=False)
+    return web.register(
+        client, email=email, password=password, display_name="Newcomer", workspace_name="Budget"
+    )
+
+
+def _registration_app(web: WebHarness) -> FastAPI:
+    return web.mail_app()
 
 
 def test_registration_signs_the_new_user_in(web: WebHarness) -> None:
-    app = web.app(allow_registration=True)
+    app = _registration_app(web)
     with TestClient(app, client=("192.0.2.60", 1000)) as client:
         web.complete_setup(app)
+        web.enable_registration(app)
         response = _register(client, web, "New@Example.com")
         assert (response.status_code, response.headers["location"]) == (303, "/")
         cookies = response.headers.get_list("set-cookie")
@@ -51,25 +52,31 @@ def test_registration_signs_the_new_user_in(web: WebHarness) -> None:
 
 
 def test_registration_outcomes(web: WebHarness) -> None:
-    app = web.app(allow_registration=True)
+    app = _registration_app(web)
     with TestClient(app, client=("192.0.2.61", 1000)) as client:
         web.complete_setup(app)
-        existing = _register(client, web, web.admin_email)
+        web.enable_registration(app)
+        # Both steps count against the per-address limit (5 per hour by default).
         weak = _register(client, web, "weak@example.com", "qwertyuiop")
-        for index in range(3):
-            _register(client, web, f"invalid-{index}")
-        throttled = _register(client, web, "late@example.com")
-    assert existing.status_code == 400 and "cannot be registered" in existing.text
+        token = web.csrf(client.get("/register").text)
+        invalid = client.post("/register", data={"email": "invalid-0", "csrf_token": token})
+        for index in range(3):  # an invalid address is not counted
+            client.post("/register", data={"email": f"x{index}@example.com", "csrf_token": token})
+        throttled = client.post(
+            "/register", data={"email": "late@example.com", "csrf_token": token}
+        )
     assert weak.status_code == 400 and "too common" in weak.text
+    assert invalid.status_code == 400 and "Enter a valid email address." in invalid.text
     assert throttled.status_code == 429 and "Too many registration attempts" in throttled.text
 
 
 def test_oversized_registration_fields_are_refused_before_hashing(
     web: WebHarness, argon2_calls: CountingHasher
 ) -> None:
-    app = web.app(allow_registration=True)
+    app = _registration_app(web)
     with TestClient(app, client=("192.0.2.62", 1000)) as client:
         web.complete_setup(app)
+        web.enable_registration(app)
         before = argon2_calls.hashes
         response = _register(client, web, "big@example.com", "p" * 1025)
     assert response.status_code == 400 and "This value is too long." in response.text
@@ -146,7 +153,7 @@ def test_no_password_session_id_or_csrf_token_is_logged(
     web: WebHarness, caplog: pytest.LogCaptureFixture
 ) -> None:
     caplog.set_level(logging.DEBUG)
-    app = web.app(allow_registration=True)
+    app = _registration_app(web)
     # The app logger does not propagate to the root logger; capture it directly as well.
     app_log = io.StringIO()
     handler = logging.StreamHandler(app_log)
@@ -185,7 +192,9 @@ def test_no_password_session_id_or_csrf_token_is_logged(
         secrets.append(response.cookies["assetboard_session"])
         client.post("/logout", data={"csrf_token": "forged-token"})  # CSRF failure path
         client.post("/logout", data={"csrf_token": web.page_token(client)})
+        web.enable_registration(app)
         _register(client, web, "reg@example.com", "Registrant Strong Pw")
+        link = mail_link(web.sent_mail(app)[-1], "/register/complete/")
     app.state.logger.removeHandler(handler)
     logged = app_log.getvalue() + "\n".join(record.getMessage() for record in caplog.records)
     assert "request_complete method=POST path=/login" in logged  # the capture works
@@ -193,6 +202,9 @@ def test_no_password_session_id_or_csrf_token_is_logged(
     assert re.search(r"Generated first-run setup token: \S+", logged)
     for secret in secrets:
         assert secret not in logged, secret[:6]
+    # The test client logs its own URLs; the application's log redacts the link's token.
+    assert link.rsplit("/", 1)[1] not in app_log.getvalue()
+    assert "path=/register/complete/[redacted]" in app_log.getvalue()
 
 
 @pytest.mark.parametrize(
@@ -216,9 +228,10 @@ def test_auth_pages_render_in_english_and_polish(
 
 
 def test_registration_seeds_the_new_workspace_in_the_page_language(web: WebHarness) -> None:
-    app = web.app(allow_registration=True)
+    app = _registration_app(web)
     with TestClient(app, client=("192.0.2.61", 1000)) as client:
         web.complete_setup(app)
+        web.enable_registration(app)
         client.headers["accept-language"] = "pl"
         assert _register(client, web, "nowy@example.com").status_code == 303
     names = owned_workspace_category_names(app.state.session_factory, "nowy@example.com")

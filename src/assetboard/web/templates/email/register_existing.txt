@@ -1,0 +1,11 @@
+{{ _("Hello,") }}
+
+{{ _("Someone, hopefully you, asked to create an account at %(app)s with this email address. An account with this address already exists, so no new one was created.", app=app_name) }}
+
+{{ _("Sign in:") }}
+{{ sign_in_link }}
+
+{{ _("Forgot your password? Ask for a new one here:") }}
+{{ reset_link }}
+
+{{ _("If you did not ask for this, ignore this email: nothing was changed.") }}

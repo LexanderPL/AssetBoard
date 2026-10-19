@@ -29,21 +29,26 @@ _SECURITY_HEADER_NAMES = frozenset(name.encode("ascii") for name in SECURITY_HEA
 # (``/invite/<token>``), and sign-in and registration, whose ``next`` may be ``/invite/<token>``.
 # "same-origin", not "no-referrer": under "no-referrer" browsers send ``Origin: null`` on form
 # POSTs, which the Origin check (rightly) refuses.
-SAME_ORIGIN_REFERRER_PREFIXES = ("/invite/",)
-SAME_ORIGIN_REFERRER_PATHS = frozenset({"/login", "/register", "/login/link", "/login/local"})
+# Registration and password reset links (``/register/complete/<token>``,
+# ``/password/reset/<token>``, ADR-0017) carry a secret the same way.
+SAME_ORIGIN_REFERRER_PREFIXES = ("/invite/", "/register/complete/", "/password/reset/")
+SAME_ORIGIN_REFERRER_PATHS = frozenset(
+    {"/login", "/register", "/login/link", "/login/local", "/password/forgot"}
+)
 # OIDC pages (ADR-0014) have no forms, so they can send no Referer at all: the callback URL
 # carries an authorization code, and the start URL may carry ``next=/invite/<token>``. The
 # same holds for proxy sign-in (``/auth/proxy?next=…`` and its pages, ADR-0015).
 NO_REFERRER_PREFIXES = ("/auth/oidc/", "/auth/proxy")
-_INVITE_TOKEN = re.compile(r"(/invite/)[^/?#]+")
+_PATH_TOKEN = re.compile(r"(/invite/|/register/complete/|/password/reset/)[^/?#]+")
 # The TCP peer's address (or None), recorded by ``PeerMiddleware`` before forwarded headers are
 # applied. Proxy authentication trusts only this value (ADR-0015).
 PEER_SCOPE_KEY = "assetboard.peer"
 
 
 def redact_path(path: str) -> str:
-    """The request path as logged: invitation tokens are replaced with ``[redacted]``."""
-    return _INVITE_TOKEN.sub(r"\1[redacted]", path)
+    """The request path as logged: invitation, registration and reset tokens are replaced
+    with ``[redacted]``."""
+    return _PATH_TOKEN.sub(r"\1[redacted]", path)
 
 
 def route_path(scope: Scope) -> str:
