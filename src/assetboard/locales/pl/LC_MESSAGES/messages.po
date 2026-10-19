@@ -187,12 +187,6 @@ msgstr "Dezaktywowano konto"
 msgid "Workspace settings changed"
 msgstr "Zmieniono ustawienia obszaru roboczego"
 
-msgid "Workspace created"
-msgstr "Utworzono obszar roboczy"
-
-msgid "Instance settings changed"
-msgstr "Zmieniono ustawienia instancji"
-
 msgid "Member role changed"
 msgstr "Zmieniono rolę członka"
 
@@ -339,9 +333,6 @@ msgstr "W użyciu"
 
 msgid "Number"
 msgstr "Liczba"
-
-msgid "Every signed-in user can create workspaces"
-msgstr "Każdy zalogowany użytkownik może tworzyć obszary robocze"
 
 msgid "Month"
 msgstr "Miesiąc"
@@ -505,9 +496,6 @@ msgstr "odebranie uprawnień administratora"
 msgid "creating an account"
 msgstr "utworzenie konta"
 
-msgid "changing instance settings"
-msgstr "zmiana ustawień instancji"
-
 msgid "name"
 msgstr "nazwa"
 
@@ -591,9 +579,6 @@ msgstr "Powiązane metody logowania"
 
 msgid "Account administration"
 msgstr "Administracja kontami"
-
-msgid "Instance settings"
-msgstr "Ustawienia instancji"
 
 msgid "Same as the system"
 msgstr "Jak w systemie"
@@ -726,15 +711,6 @@ msgid ""
 msgstr ""
 "Decyduje o tym dostawca tożsamości przy każdym logowaniu; aby to zmienić,"
 " zmień tam grupę."
-
-msgid "Instance settings saved."
-msgstr "Zapisano ustawienia instancji."
-
-msgid "Nothing to change: the settings already had these values."
-msgstr "Nie ma nic do zmiany: ustawienia mają już te wartości."
-
-msgid "Choose who can create workspaces."
-msgstr "Wybierz, kto może tworzyć obszary robocze."
 
 msgid "Enter a valid email address."
 msgstr "Podaj prawidłowy adres e-mail."
@@ -1336,9 +1312,6 @@ msgstr "Obszar roboczy"
 msgid "Switch"
 msgstr "Przełącz"
 
-msgid "New workspace"
-msgstr "Nowy obszar roboczy"
-
 msgid "Are you sure?"
 msgstr "Czy na pewno?"
 
@@ -1459,30 +1432,6 @@ msgstr "Powiąż to logowanie przez proxy"
 
 msgid "Back to users"
 msgstr "Wróć do użytkowników"
-
-msgid "Workspaces"
-msgstr "Obszary robocze"
-
-msgid "Who can create workspaces"
-msgstr "Kto może tworzyć obszary robocze"
-
-msgid "Every signed-in user"
-msgstr "Każdy zalogowany użytkownik"
-
-msgid "Only instance administrators"
-msgstr "Tylko administratorzy instancji"
-
-msgid ""
-"Whoever creates a workspace becomes its owner. This does not affect open "
-"registration or accounts created at the first sign-in through an identity"
-" provider or a proxy: those follow their own settings."
-msgstr ""
-"Kto tworzy obszar roboczy, zostaje jego właścicielem. Nie dotyczy to "
-"otwartej rejestracji ani kont tworzonych przy pierwszym logowaniu przez "
-"dostawcę tożsamości lub serwer proxy: te mają własne ustawienia."
-
-msgid "Save settings"
-msgstr "Zapisz ustawienia"
 
 msgid "Account created"
 msgstr "Konto utworzone"
@@ -1729,6 +1678,21 @@ msgstr ""
 msgid "Setup token"
 msgstr "Token konfiguracji"
 
+msgid "Defaults to your display name."
+msgstr "Domyślnie Twoja wyświetlana nazwa."
+
+msgid "Base currency"
+msgstr "Waluta podstawowa"
+
+msgid "Country"
+msgstr "Kraj"
+
+msgid "Not set"
+msgstr "Nie ustawiono"
+
+msgid "Time zone"
+msgstr "Strefa czasowa"
+
 msgid "Create administrator"
 msgstr "Utwórz administratora"
 
@@ -1834,12 +1798,6 @@ msgstr "Usuń"
 msgid "Dismiss"
 msgstr "Zamknij"
 
-msgid "You can also create a workspace of your own."
-msgstr "Możesz też utworzyć własny obszar roboczy."
-
-msgid "Create workspace"
-msgstr "Utwórz obszar roboczy"
-
 msgid "Return to overview"
 msgstr "Powrót do podsumowania"
 
@@ -1914,12 +1872,59 @@ msgstr ""
 "07.10.2026). Tab przechodzi do następnego pola, Enter zapisuje, Esc "
 "czyści wiersz lub anuluje edycję."
 
+msgid "(favourable)"
+msgstr "(korzystnie)"
+
+msgid "(unfavourable)"
+msgstr "(niekorzystnie)"
+
 #, python-format
 msgid "Planned for %(name)s"
 msgstr "Plan dla: %(name)s"
 
-msgid "Not planned"
-msgstr "Nie zaplanowano"
+msgid "not counted"
+msgstr "nieliczone"
+
+msgid "Total"
+msgstr "Razem"
+
+msgid "Earned"
+msgstr "Zarobione"
+
+msgid "Spent"
+msgstr "Wydane"
+
+msgid "Saved"
+msgstr "Zaoszczędzone"
+
+msgid "Net"
+msgstr "Bilans"
+
+msgid "Savings rate"
+msgstr "Stopa oszczędności"
+
+msgid "Not available: nothing earned"
+msgstr "Niedostępne: brak zarobków"
+
+#, python-format
+msgid "Spent %(actual)s of %(planned)s planned"
+msgstr "Wydano %(actual)s z zaplanowanych %(planned)s"
+
+#, python-format
+msgid "Earned %(actual)s of %(planned)s planned"
+msgstr "Zarobiono %(actual)s z zaplanowanych %(planned)s"
+
+msgid "(over plan)"
+msgstr "(ponad plan)"
+
+msgid "Order"
+msgstr "Kolejność"
+
+msgid "Largest first"
+msgstr "Od największych"
+
+msgid "Your order"
+msgstr "Twoja kolejność"
 
 msgid "This month has no plan yet."
 msgstr "Ten miesiąc nie ma jeszcze planu."
@@ -1971,11 +1976,17 @@ msgstr[2] ""
 msgid "Undo"
 msgstr "Cofnij"
 
-msgid "Plan"
-msgstr "Plan"
+msgid "Summary"
+msgstr "Podsumowanie"
 
 msgid "Planned"
 msgstr "Plan"
+
+msgid "Actual"
+msgstr "Wykonanie"
+
+msgid "Difference"
+msgstr "Różnica"
 
 msgid ""
 "Enter or leaving the field saves a planned value; 0 or an empty field "
@@ -2061,21 +2072,6 @@ msgstr "Zamknięcie chroni miesiąc przed przypadkowymi zmianami."
 msgid "Future months stay open for planning."
 msgstr "Przyszłe miesiące pozostają otwarte do planowania."
 
-msgid "Defaults to your display name."
-msgstr "Domyślnie Twoja wyświetlana nazwa."
-
-msgid "Base currency"
-msgstr "Waluta podstawowa"
-
-msgid "Country"
-msgstr "Kraj"
-
-msgid "Not set"
-msgstr "Nie ustawiono"
-
-msgid "Time zone"
-msgstr "Strefa czasowa"
-
 msgid "People in this workspace"
 msgstr "Osoby w tym obszarze roboczym"
 
@@ -2149,13 +2145,6 @@ msgstr "Odwołaj"
 msgid "No pending invitations."
 msgstr "Brak oczekujących zaproszeń."
 
-msgid ""
-"You become its owner. It starts with the suggested categories, named in "
-"your language; you can change them afterwards."
-msgstr ""
-"Zostaniesz jego właścicielem. Na start otrzyma proponowane kategorie w "
-"Twoim języku; możesz je potem zmienić."
-
 msgid "General"
 msgstr "Ogólne"
 
@@ -2189,6 +2178,9 @@ msgstr ""
 "Domyślne formatowanie dotyczy liczb i dat tam, gdzie nie obowiązują "
 "ustawienia osobiste. Język interfejsu zależy od Twojego konta i "
 "przeglądarki."
+
+msgid "Save settings"
+msgstr "Zapisz ustawienia"
 
 #~ msgid "Enter a display name of at most 120 characters."
 #~ msgstr "Podaj wyświetlaną nazwę o długości najwyżej 120 znaków."
@@ -2235,6 +2227,9 @@ msgstr ""
 #~ msgid "Entries and planned values for this month will appear here."
 #~ msgstr "Tutaj pojawią się wpisy i wartości planowane na ten miesiąc."
 
-#~ msgid "Added with the new workspace"
-#~ msgstr "Dodane z nowym obszarem roboczym"
+#~ msgid "Not planned"
+#~ msgstr "Nie zaplanowano"
+
+#~ msgid "Plan"
+#~ msgstr "Plan"
 
