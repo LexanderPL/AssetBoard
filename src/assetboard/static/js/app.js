@@ -424,7 +424,11 @@ document.addEventListener("click", (event) => {
 // Esc in the entry row clears it (fields and messages); the row keeps the focus.
 function clearEntryRow(row) {
   row.querySelectorAll("[data-ledger-field]").forEach((field) => {
-    if (field instanceof HTMLSelectElement) field.selectedIndex = 0;
+    if (field instanceof HTMLSelectElement) {
+      // With a category filter (F2.4) the entry row keeps that category.
+      field.value = field.dataset.default ?? "";
+      if (field.selectedIndex < 0) field.selectedIndex = 0;
+    }
     else if (field instanceof HTMLInputElement) field.value = "";
     field.removeAttribute("aria-invalid");
     const hint = field.getAttribute("data-describedby");
@@ -593,3 +597,17 @@ document.addEventListener("htmx:beforeRequest", (event) => {
     { once: true },
   );
 });
+
+// The category filter (F2.4): the summary marks the category the tables show. A filter link
+// swaps only the tables (#ledger), so the mark moves here, after any swap.
+function markFilteredCategory() {
+  const chosen = document.getElementById("ledger")?.getAttribute("data-ledger-filter") ?? "";
+  document.querySelectorAll("[data-filter-link]").forEach((link) => {
+    if (link.getAttribute("data-filter-link") === chosen && chosen) {
+      link.setAttribute("aria-current", "true");
+    } else {
+      link.removeAttribute("aria-current");
+    }
+  });
+}
+document.addEventListener("htmx:afterSettle", markFilteredCategory);
