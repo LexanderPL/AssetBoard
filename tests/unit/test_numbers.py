@@ -190,3 +190,21 @@ def test_format_amount_input_round_trips_through_parse_amount(
 ) -> None:
     money = Money(amount, currency)
     assert parse_amount(format_amount_input(money, locale), locale) == money.to_decimal()
+
+
+@pytest.mark.parametrize(
+    ("basis_points", "locale", "text"),
+    [
+        (-4332, "en", "-43.3%"),
+        (-4332, "pl", "-43,3%"),
+        (10000, "en", "100.0%"),
+        (0, "en", "0.0%"),
+        (5, "en", "0.1%"),  # 0.05 %: half up, not half to even
+        (-5, "en", "-0.1%"),
+        (15, "en", "0.2%"),
+    ],
+)
+def test_rates_in_basis_points_show_one_decimal(basis_points: int, locale: str, text: str) -> None:
+    from assetboard.i18n.numbers import format_rate_bp
+
+    assert format_rate_bp(basis_points, locale) == text
