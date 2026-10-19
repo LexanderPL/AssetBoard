@@ -2,16 +2,47 @@
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Collection, Iterator, Sequence
 from dataclasses import dataclass
 from datetime import date
+from typing import Any
 from uuid import UUID
 
-from sqlalchemy import ColumnElement, Integer, case, cast, exists, extract, func, select
+from sqlalchemy import ColumnElement, Integer, Select, case, cast, exists, extract, func, select
+from sqlalchemy.sql.elements import UnaryExpression
 
 from assetboard.db.models.ledger import Transaction
 from assetboard.db.repositories.base import ScopedRepository
 from assetboard.domain.months import YearMonth
+from assetboard.domain.transaction_search import SortOrder, TransactionFilter
+
+# Entry order (M4's export order): date, then the order rows were entered.
+CANONICAL_ORDER = (Transaction.date, Transaction.created_at, Transaction.id)
+_SORTS: dict[SortOrder, tuple[UnaryExpression[Any], ...]] = {
+    SortOrder.DATE_DESC: (
+        Transaction.date.desc(),
+        Transaction.created_at.desc(),
+        Transaction.id.desc(),
+    ),
+    SortOrder.DATE_ASC: (
+        Transaction.date.asc(),
+        Transaction.created_at.asc(),
+        Transaction.id.asc(),
+    ),
+    # amount_minor is a BIGINT (not a DecimalType), so SQL may order by it.
+    SortOrder.AMOUNT_DESC: (
+        Transaction.amount_minor.desc(),
+        Transaction.date.desc(),
+        Transaction.created_at.desc(),
+        Transaction.id.desc(),
+    ),
+    SortOrder.AMOUNT_ASC: (
+        Transaction.amount_minor.asc(),
+        Transaction.date.asc(),
+        Transaction.created_at.asc(),
+        Transaction.id.asc(),
+    ),
+}
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,3 +202,60 @@ class TransactionRepository(ScopedRepository[Transaction]):
             DescriptionMatch(key, description, category_id, int(count), last)
             for key, description, category_id, count, last in self._session.execute(statement)
         ]
+
+    # Search (F2.6): non-deleted rows matching a ``TransactionFilter``
+
+    def _matching(self, where: TransactionFilter) -> Select[Transaction]:
+        statement = self._scoped_select().where(Transaction.deleted_at.is_(None))
+        if where.date_from is not None:
+            statement = statement.where(Transaction.date >= where.date_from)
+        if where.date_to is not None:
+            statement = statement.where(Transaction.date <= where.date_to)
+        if where.direction is not None:
+            statement = statement.where(Transaction.direction == where.direction)
+        if where.category_ids:
+            statement = statement.where(Transaction.category_id.in_(sorted(where.category_ids)))
+        if where.text_key:
+            statement = statement.where(
+                Transaction.description_key.contains(where.text_key, autoescape=True)
+            )
+        if where.amount_min_minor is not None:
+            statement = statement.where(Transaction.amount_minor >= where.amount_min_minor)
+        if where.amount_max_minor is not None:
+            statement = statement.where(Transaction.amount_minor <= where.amount_max_minor)
+        return statement
+
+    def search(
+        self, where: TransactionFilter, *, sort: SortOrder, limit: int, offset: int
+    ) -> list[Transaction]:
+        """One page of matching rows in ``sort`` order (ties: entry order)."""
+        statement = self._matching(where).order_by(*_SORTS[sort]).limit(limit).offset(offset)
+        return list(self._session.scalars(statement))
+
+    def count_matching(self, where: TransactionFilter) -> int:
+        statement = select(func.count()).select_from(self._matching(where).subquery())
+        return self._session.execute(statement).scalar_one()
+
+    def iter_matching(
+        self, where: TransactionFilter, *, batch: int = 1000
+    ) -> Iterator[Transaction]:
+        """Every matching row in entry order, fetched ``batch`` rows at a time (the export)."""
+        statement = self._matching(where).order_by(*CANONICAL_ORDER)
+        yield from self._session.scalars(statement.execution_options(yield_per=batch))
+
+    def matching_for_update(
+        self, *, where: TransactionFilter | None = None, ids: Collection[UUID] | None = None
+    ) -> list[Transaction]:
+        """The rows a bulk change targets, locked (``FOR UPDATE`` on PostgreSQL), entry order.
+
+        Either the rows matching ``where`` or the non-deleted rows among ``ids`` (exactly one).
+        """
+        if (where is None) == (ids is None):
+            raise ValueError("pass either where or ids")
+        if where is not None:
+            statement = self._matching(where)
+        else:
+            assert ids is not None
+            statement = self._matching(TransactionFilter()).where(Transaction.id.in_(sorted(ids)))
+        statement = statement.order_by(*CANONICAL_ORDER).with_for_update()
+        return list(self._session.scalars(statement))
