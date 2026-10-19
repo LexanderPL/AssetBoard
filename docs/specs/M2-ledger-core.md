@@ -340,6 +340,44 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
   every transaction write already sends `#month-summary` out of band, so the totals refresh
   without a reload.
 
+**As built (F2.4 part A: summary, totals, KPIs, bars, sort; filtering by category is part B)**
+- `domain.summary.summarize_month(transactions, budget_lines, categories, *, currency, sort)`
+  is pure and takes domain dataclasses (`Entry`, `PlanLine`, `SummaryCategory`; categories in
+  the user's order), not ORM rows; `services.summary.month_summary` reads the month's
+  non-deleted transactions, its lines and the categories and sums in Python, in integer minor
+  units (no SQL aggregates). An amount in another currency or an unknown category is a
+  `ValueError` (guards only: the base currency is locked).
+- Rows: every non-transfer category with a line or actuals, and every active non-transfer
+  category (so it can be planned); actuals without a line show planned **0.00** (read-only
+  cells show "€0.00"; editable cells stay empty with the locale's "0.00" as placeholder);
+  archived categories appear only with a line or actuals. Transfers are in no block, total or
+  KPI; F2.3's "Transfers (not counted)" group stays plan-only (no actual or difference).
+- **Product decisions (owner, 2026-10-18; the owner may still change them):**
+  **P1** positive is always favourable: expense `planned - actual`, income `actual - planned`,
+  **saved / invested `actual - planned`, withdrawn from savings `planned - actual`** (the
+  literal kind rule would invert both); **P2** `net = earned - spent - saved` as specified,
+  withdrawals are shown only as their own block total; **P3** one sort toggle for all blocks;
+  **P4** the sort choice is kept per browser (cookie `summary_sort`, HttpOnly, SameSite=Lax,
+  one year), not per account.
+- KPIs: earned (income/regular), spent (expense/regular), saved (expense/savings), net, savings
+  rate `(earned - spent) / earned` as integer basis points rounded half away from zero, shown
+  with one decimal (`i18n.numbers.format_rate_bp`, rounded half up), "—" with "Not available:
+  nothing earned" for screen readers when nothing was earned. Golden example in
+  `tests/unit/test_summary_domain.py` (net −1 473.00, rate −4 332 bp, "−43.3%").
+- Sorting: "Largest first" (actual descending, ties in the user's order; the default) or "Your
+  order", via `POST /m/{month}/summary/sort` (HTMX: the block; without JavaScript 303 back).
+  Every render reads the cookie, including the out-of-band summary after a transaction write.
+- Bars (expenses and income, planned vs actual): inline SVG (`viewBox` 0–100, widths as SVG
+  attributes since CSP forbids inline styles; colours through `fill-*` token classes), scaled to
+  max(planned, actual), floor of integer percentages; hidden from screen readers, with the
+  same numbers as text ("Spent €4,873.00 of €5,900.00 planned", "(over plan)"). ECharts was
+  not used: two bars do not justify its size and a canvas is not text.
+- Differences show their sign ("+€400.00"), a token colour (success/danger/muted) and
+  "(favourable)" / "(unfavourable)" for screen readers. Each group has a "Total" row
+  (`#summary-total-<group>`). A planned-value save answers with its row plus, out of band, every
+  total row and `#summary-kpis` (KPIs and bars); rows do not move, since the order depends on
+  actuals only. The heading is "Summary".
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
