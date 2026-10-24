@@ -420,3 +420,27 @@ def test_no_migration_line_when_automatic_migration_is_off(tmp_path: Path) -> No
         _env_file=None, data_dir=tmp_path, secret_key="test-secret", auto_migrate=False
     )
     assert _startup_migration_lines(settings) == []
+
+
+def test_recurring_scheduler_follows_the_setting_and_warns_about_workers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    disabled = create_app(Settings(_env_file=None, data_dir=tmp_path, secret_key="test-secret"))
+    with TestClient(disabled):  # the test suite sets ASSETBOARD_SCHEDULER_ENABLED=false
+        assert not disabled.state.recurring_jobs.scheduler.running
+    monkeypatch.setenv("WEB_CONCURRENCY", "2")
+    enabled = create_app(
+        Settings(
+            _env_file=None, data_dir=tmp_path, secret_key="test-secret", scheduler_enabled=True
+        )
+    )
+    logger, output, handler = _capture_app_log(enabled)
+    try:
+        with TestClient(enabled):
+            jobs = enabled.state.recurring_jobs
+            assert jobs.scheduler.running
+            assert jobs.caught_up.wait(timeout=30)
+            assert "WEB_CONCURRENCY is above 1" in output.getvalue()
+        assert not jobs.scheduler.running
+    finally:
+        logger.removeHandler(handler)

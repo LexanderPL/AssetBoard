@@ -14,8 +14,11 @@ from assetboard.db.models.identity import (
     Workspace,
 )
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
+from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 
 __all__ = [
+    "ScheduledItem",
+    "ScheduledOccurrence",
     "AuditEvent",
     "AuthThrottle",
     "BudgetLine",

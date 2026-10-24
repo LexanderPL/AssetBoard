@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import os
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from functools import partial
@@ -30,6 +31,7 @@ from assetboard.middleware import (
     SecurityHeadersMiddleware,
     add_security_headers,
 )
+from assetboard.recurring_jobs import RecurringJobs
 from assetboard.services.account_email import (
     prune_email_tokens_with_factory,
     resolve_mail_request,
@@ -66,6 +68,7 @@ from assetboard.web.plan_routes import router as plan_router
 from assetboard.web.proxy_routes import router as proxy_router
 from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
+from assetboard.web.scheduled_routes import router as scheduled_router
 from assetboard.web.security import CsrfFailed, web_session
 from assetboard.web.transaction_list_routes import router as transaction_list_router
 from assetboard.web.transaction_routes import router as transaction_router
@@ -85,6 +88,14 @@ def _is_loopback(host: str | None) -> bool:
         return ipaddress.ip_address(host.strip("[]")).is_loopback
     except ValueError:
         return False
+
+
+def _worker_count() -> int:
+    """Uvicorn's ``WEB_CONCURRENCY`` default for ``--workers``; the only cheap signal."""
+    try:
+        return int(os.environ.get("WEB_CONCURRENCY", "1"))
+    except ValueError:
+        return 1
 
 
 def create_app(
@@ -160,6 +171,8 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        recurring_jobs = RecurringJobs(session_factory, settings, lambda: app.state.clock, logger)
+        app.state.recurring_jobs = recurring_jobs
         try:
             if outbox is not None:
                 outbox.start()
@@ -193,10 +206,18 @@ def create_app(
                 logger.error("database schema is newer than this version of %s", APP_NAME)
             # Unknown-user logins verify against this; compute it once, before any request.
             await run_in_threadpool(prepare_dummy_hash)
+            if state == "current" and settings.scheduler_enabled:
+                if _worker_count() > 1:
+                    logger.warning(
+                        "WEB_CONCURRENCY is above 1: run a single worker; scheduled jobs and "
+                        "some caches live in the process"
+                    )
+                recurring_jobs.start()
             yield
         finally:
             if outbox is not None:
                 await run_in_threadpool(outbox.stop)
+            await run_in_threadpool(recurring_jobs.stop)
             engine.dispose()
             touch_engine.dispose()
 
@@ -234,6 +255,7 @@ def create_app(
     static_directory = Path(__file__).parent / "static"
     app.mount("/static", StaticFiles(directory=static_directory), name="static")
     app.include_router(web_router)
+    app.include_router(scheduled_router)
     app.include_router(auth_router)
     app.include_router(email_router)
     app.include_router(account_router)
