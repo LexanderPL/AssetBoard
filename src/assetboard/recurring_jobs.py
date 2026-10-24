@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.clock import Clock
 from assetboard.config import Settings
+from assetboard.db.repositories import NotFound
 from assetboard.db.repositories.scheduled import RecurringWorkspaceReader
 from assetboard.services.scheduled import generate_workspace
 
@@ -44,6 +45,12 @@ class RecurringJobs:
         try:
             generate_workspace(
                 self.factory, _Scope(_Workspace(workspace_id)), self.clock(), self.settings
+            )
+        except NotFound:
+            # The workspace was deleted after the last refresh (ADR-0020); the next refresh
+            # removes its job. Expected, so no error and no traceback.
+            self.logger.debug(
+                "recurring_generation_skipped workspace=%s reason=deleted", workspace_id
             )
         except Exception as exc:
             self.logger.error(
