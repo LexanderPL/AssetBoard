@@ -94,7 +94,15 @@ class UserRow:
     has_two_factor: bool
 
 
-def _row(session: Session, user: User) -> UserRow:
+def _two_factor_users(session: Session, user_ids: list[UUID] | None = None) -> set[UUID]:
+    """Users with an enabled factor, in one query (``None``: every user)."""
+    statement = select(TotpFactor.user_id).where(TotpFactor.enabled_at.is_not(None))
+    if user_ids is not None:
+        statement = statement.where(TotpFactor.user_id.in_(user_ids))
+    return set(session.scalars(statement))
+
+
+def _row(session: Session, user: User, *, has_two_factor: bool) -> UserRow:
     providers = set(
         session.scalars(
             select(ExternalIdentity.provider).where(ExternalIdentity.user_id == user.id)
@@ -107,7 +115,6 @@ def _row(session: Session, user: User) -> UserRow:
         methods.append("oidc")
     if PROXY_PROVIDER in providers:
         methods.append("proxy")
-    factor = session.get(TotpFactor, user.id)
     return UserRow(
         id=user.id,
         email=user.email,
@@ -118,7 +125,7 @@ def _row(session: Session, user: User) -> UserRow:
         last_login_at=user.last_login_at,
         created_at=user.created_at,
         methods=tuple(methods),
-        has_two_factor=factor is not None and factor.enabled_at is not None,
+        has_two_factor=has_two_factor,
     )
 
 
@@ -126,14 +133,17 @@ def list_users(factory: sessionmaker[Session], *, actor_id: UUID) -> list[UserRo
     with factory() as session:
         require_instance_admin(session, actor_id)
         users = session.scalars(select(User).order_by(User.email)).all()
-        return [_row(session, user) for user in users]
+        two_factor = _two_factor_users(session)
+        return [_row(session, user, has_two_factor=user.id in two_factor) for user in users]
 
 
 def get_user(factory: sessionmaker[Session], *, actor_id: UUID, user_id: UUID) -> UserRow | None:
     with factory() as session:
         require_instance_admin(session, actor_id)
         user = session.get(User, user_id)
-        return _row(session, user) if user is not None else None
+        if user is None:
+            return None
+        return _row(session, user, has_two_factor=bool(_two_factor_users(session, [user.id])))
 
 
 def _other_active_admins(session: Session, user_id: UUID) -> int:
