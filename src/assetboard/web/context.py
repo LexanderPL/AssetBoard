@@ -7,8 +7,15 @@ from typing import Annotated
 from fastapi import Depends, Request
 from starlette.concurrency import run_in_threadpool
 
-from assetboard.services.context import Context, WorkspaceNav, build_context, workspace_nav
+from assetboard.services.context import (
+    Context,
+    NoWorkspace,
+    WorkspaceNav,
+    build_context,
+    workspace_nav,
+)
 from assetboard.services.instance_settings import workspace_creation_allowed
+from assetboard.web.errors import is_htmx_fragment_request
 from assetboard.web.security import web_session
 
 
@@ -17,9 +24,11 @@ async def current_context(request: Request) -> Context:
 
     Raises ``NoWorkspace`` (rendered as a 403 page) when the user has no membership. Also sets
     ``request.state.workspace_nav`` for the page chrome (workspace name, switcher, owner links).
-    Pages without a Context (account, error and signed-out pages) have no ``workspace_nav``
-    and ``base.html`` renders without the workspace parts.
+    A Context already built for this request (see ``load_workspace_nav``) is reused.
     """
+    existing: Context | None = getattr(request.state, "context", None)
+    if existing is not None:
+        return existing
     signed_in = web_session(request)
     if signed_in is None:
         raise RuntimeError("current_context needs a signed-in request")
@@ -37,6 +46,21 @@ async def current_context(request: Request) -> Context:
     request.state.context = ctx
     request.state.workspace_nav = nav
     return ctx
+
+
+async def load_workspace_nav(request: Request) -> None:
+    """App-wide dependency: the page chrome of every signed-in page shows the workspace nav.
+
+    Account, admin, audit and similar pages take no Context, but ``base.html`` still shows the
+    full sidebar for the current workspace. A user without a membership keeps the reduced nav.
+    HTMX fragments do not render the chrome, so they skip the lookup.
+    """
+    if web_session(request) is None or is_htmx_fragment_request(request):
+        return
+    try:
+        await current_context(request)
+    except NoWorkspace:
+        return
 
 
 CurrentContext = Annotated[Context, Depends(current_context)]

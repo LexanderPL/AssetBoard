@@ -9,7 +9,7 @@ from importlib.metadata import version
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, Request
 from fastapi.exception_handlers import http_exception_handler
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session, sessionmaker
@@ -61,6 +61,7 @@ from assetboard.web.admin_routes import router as admin_router
 from assetboard.web.audit_routes import router as audit_router
 from assetboard.web.auth_routes import router as auth_router
 from assetboard.web.category_routes import router as category_router
+from assetboard.web.context import load_workspace_nav
 from assetboard.web.email_routes import router as email_router
 from assetboard.web.errors import BUSY_RETRY_AFTER, add_error_response_headers, error_response
 from assetboard.web.errors import is_htmx_fragment_request as _is_htmx_fragment_request
@@ -227,7 +228,13 @@ def create_app(
             engine.dispose()
             touch_engine.dispose()
 
-    app = FastAPI(title=APP_NAME, version=version("assetboard"), lifespan=lifespan)
+    app = FastAPI(
+        title=APP_NAME,
+        version=version("assetboard"),
+        lifespan=lifespan,
+        # Every signed-in page gets the workspace nav in its sidebar (base.html).
+        dependencies=[Depends(load_workspace_nav)],
+    )
     app.state.settings = settings
     app.state.app_name = APP_NAME
     app.state.logger = logger

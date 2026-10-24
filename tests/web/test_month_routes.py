@@ -128,10 +128,10 @@ def test_the_month_name_follows_the_language(months: OwnerApp) -> None:
     assert 'placeholder="YYYY-MM"' in _page(months, "/m/2026-09")
 
 
-def test_the_nav_month_link_needs_a_workspace_page(months: OwnerApp) -> None:
-    """Like "Categories": pages without a workspace Context (account pages) do not show it."""
+def test_the_nav_month_link_shows_on_every_signed_in_page(months: OwnerApp) -> None:
+    """Account pages take no workspace Context but still show the full workspace nav."""
     account = _page(months, "/account")
-    assert "data-month-link" not in account and "data-categories-link" not in account
+    assert "data-month-link" in account and "data-categories-link" in account
     assert "data-month-link" in _page(months, "/")
 
 
