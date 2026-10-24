@@ -34,6 +34,7 @@ from assetboard.db.models.totp import TotpFactor
 from assetboard.db.repositories.totp import TotpRepository
 from assetboard.services.auth import (
     PasswordPolicyError,
+    invalidate_reset_tokens,
     record_auth_event,
     revoke_all_sessions,
     validate_password,
@@ -221,16 +222,20 @@ def apply_admin_action(
         # Every session ends, password, OIDC and proxy alike; sign-in already refuses
         # inactive accounts on every path.
         data["sessions_revoked"] = revoke_all_sessions(session, target.id)
+        invalidate_reset_tokens(session, target.id)
         audit = "admin.user_deactivated"
     elif action == "promote":
         if target.is_instance_admin:
             return "unchanged"
         target.is_instance_admin = True
+        # A role change spends reset links sent earlier (ADR-0017).
+        invalidate_reset_tokens(session, target.id)
         audit = "admin.admin_granted"
     else:
         if not target.is_instance_admin:
             return "unchanged"
         target.is_instance_admin = False
+        invalidate_reset_tokens(session, target.id)
         audit = "admin.admin_revoked"
     record_auth_event(
         session,

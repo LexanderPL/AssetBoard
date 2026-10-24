@@ -1,4 +1,4 @@
-# ADR-0017: Local TOTP and workspace enforcement
+# ADR-0019: Local TOTP and workspace enforcement
 
 **Status:** Accepted (the owner accepted the full scope for 1.0 on 2026-10-24: optional TOTP,
 recovery codes, per-workspace enforcement, administrator reset and CLI reset)

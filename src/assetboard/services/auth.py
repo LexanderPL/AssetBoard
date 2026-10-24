@@ -42,6 +42,7 @@ from assetboard.db.engine import is_database_locked, run_immediate
 from assetboard.db.models.identity import (
     AuditEvent,
     AuthThrottle,
+    EmailToken,
     SetupState,
     User,
     UserSession,
@@ -56,6 +57,7 @@ from assetboard.domain.identity import (
     InvalidEmail,
     normalize_display_name,
     normalize_email,
+    normalize_new_email,
 )
 from assetboard.services import categories, invitations
 from assetboard.services.hash_gate import HashGate, HashGateBusy
@@ -64,7 +66,9 @@ from assetboard.services.workspace_options import WorkspaceOptions, validate_wor
 ActorType = Literal["user", "cli", "system"]
 # ``account``: sign-in attempts per normalized email (whether or not an account has it).
 # ``confirm``: password re-checks of a known user (change, confirm, link), per user id.
-ThrottleScope = Literal["account", "confirm", "ip", "setup", "register"]
+# ``mail_email``: emails per normalized address, counted whether or not an account has it;
+# ``mail_ip``: password reset requests per client address (pre-release B, ADR-0017).
+ThrottleScope = Literal["account", "confirm", "ip", "setup", "register", "mail_email", "mail_ip"]
 AuthMethod = Literal["password", "oidc", "proxy"]
 
 MIN_PASSWORD_LENGTH = 8
@@ -175,6 +179,26 @@ class UnknownUser(AuthError):
         super().__init__("No user has that email address")
 
 
+class SignUpLinkInvalid(AuthError):
+    code = "link_invalid"
+
+    def __init__(self) -> None:
+        super().__init__("The registration link is not valid")
+
+
+class VerifiedSignUp(Protocol):
+    """Open registration's completion: the email was proven by a link sent to it (ADR-0017).
+
+    ``check`` raises ``SignUpLinkInvalid`` before any hashing; ``consume`` spends the link
+    atomically, first thing in the transaction that creates the account, and raises it if the
+    link was used meanwhile.
+    """
+
+    def check(self, email: str) -> None: ...
+
+    def consume(self, session: Session, email: str) -> None: ...
+
+
 class RegistrationDisabled(AuthError):
     code = "registration_disabled"
 
@@ -223,7 +247,13 @@ class PasswordChangeOutcome:
 
 
 RegistrationStatus = Literal[
-    "created", "invalid", "rejected", "throttled", "invitation_invalid", "email_mismatch"
+    "created",
+    "invalid",
+    "rejected",
+    "throttled",
+    "invitation_invalid",
+    "email_mismatch",
+    "link_invalid",
 ]
 
 
@@ -231,8 +261,10 @@ RegistrationStatus = Literal[
 class RegistrationOutcome:
     """``rejected`` means the email is already registered.
 
-    It differs from ``created``, so registration discloses whether an address has an account.
-    This is an accepted risk: registration is off by default and limited per client address.
+    Only the two sign-ups that start from a secret link reach this outcome: an invitation
+    (email-locked, ADR-0013) and the completion of open registration, whose link was sent to
+    that address (ADR-0017), where the web layer shows it as an invalid link. Open
+    registration's first step never says whether an address has an account.
     """
 
     status: RegistrationStatus
@@ -389,6 +421,7 @@ def _audit(
     host: str | None = None,
     user_agent: str | None = None,
     data: dict[str, str | int | bool] | None = None,
+    ip_prefix: str | None = None,
 ) -> None:
     session.add(
         AuditEvent(
@@ -401,7 +434,8 @@ def _audit(
             entity_id=entity_id,
             data=data or {},
             ts=clock.now(),
-            ip_prefix=client_ip_prefix(host),
+            # An already truncated prefix (from the outbox) wins over ``host``.
+            ip_prefix=ip_prefix or client_ip_prefix(host),
             user_agent=user_agent[:200] if user_agent else None,
         )
     )
@@ -599,6 +633,29 @@ def release_attempts(session: Session, reserved: Sequence[ReservedAttempt]) -> N
             row.blocked_until = None
 
 
+def ip_throttle_key(host: str | None) -> str:
+    """The client-address key used by every per-address bucket."""
+    return _ip_key(host)
+
+
+def count_limited_attempt(
+    session: Session,
+    scope: ThrottleScope,
+    key: str,
+    *,
+    limit: int,
+    window: timedelta,
+    now: datetime,
+    settings: Settings,
+) -> bool:
+    """Count one attempt in a fixed-window bucket, or return False (writing nothing) once
+    ``limit`` attempts were counted in the window. Nothing resets it; it decays with time."""
+    if _current_count(_find_throttle(session, scope, key), now, window) >= limit:
+        return False
+    _count_attempt(session, scope, key, now=now, window=window, free=None, settings=settings)
+    return True
+
+
 def prune_auth_throttles(session: Session, clock: Clock) -> int:
     """Delete idle throttle rows older than 24 hours that no longer block anything."""
     now = clock.now()
@@ -790,7 +847,7 @@ def _login_flow(
             from assetboard.services.totp import verify_sign_in
 
             # Runs only after a correct password; its cost (a decryption and a few HMACs,
-            # well under a millisecond) is accepted residual timing (ADR-0017).
+            # well under a millisecond) is accepted residual timing (ADR-0019).
             succeeded, factor_verified = verify_sign_in(
                 session, user.id, code=second_factor, settings=settings, now=now
             )
@@ -953,6 +1010,11 @@ def gate_verifier(gate: HashGate) -> Verifier:
         return anyio.from_thread.run(gate.run, lambda: verify_password(password_hash, password))
 
     return verify
+
+
+def gate_hasher(gate: HashGate) -> Hasher:
+    """From a worker thread, run each hashing through the event loop's hash gate."""
+    return _gate_hasher(gate)
 
 
 def _gate_hasher(gate: HashGate) -> Hasher:
@@ -1212,6 +1274,7 @@ def _change_password_flow(
             return PasswordChangeOutcome(status="invalid_current")
         user.password_hash = new_hash
         user.must_change_password = False  # a temporary password is replaced (F1.5)
+        invalidate_reset_tokens(session, user.id)
         keep_hash = session_id_hash(current_session_id) if current_session_id else None
         revoked = _delete_sessions_except(session, user.id, keep_hash)
         _audit(
@@ -1408,7 +1471,7 @@ def _create_user_records(
     if options is not None and seed is None:
         raise RuntimeError("A new workspace needs its category seed")
     clean_display_name = _clean_display_name(display_name)
-    normalized_email = normalize_email(email)
+    normalized_email = normalize_new_email(email)
     if password is not None:
         validate_password(password, normalized_email, clean_display_name)
         password_hash = password_hash or argon2_hash(password)
@@ -1547,7 +1610,7 @@ def run_initial_setup(
         if not setup_is_open(session):
             raise SetupAlreadyCompleted
     clean_display_name = _clean_display_name(display_name)
-    normalized_email = normalize_email(email)
+    normalized_email = normalize_new_email(email)
     validate_password(password, normalized_email, clean_display_name)
     _workspace_options(
         settings,
@@ -1641,7 +1704,7 @@ def create_admin_cli(
     seed_locale: str | None = None,
 ) -> tuple[User, Workspace | None]:
     """Break-glass admin creation; works with or without existing users, never modifies one."""
-    normalized_email = normalize_email(email)
+    normalized_email = normalize_new_email(email)
     if session.scalar(select(User.id).where(User.email == normalized_email)) is not None:
         raise EmailAlreadyRegistered
     options = (
@@ -1703,6 +1766,13 @@ def _reserve_registration(
     return (ReservedAttempt("register", key, row.window_started_at, None),)
 
 
+def reserve_registration_in(
+    session: Session, *, host: str | None, settings: Settings, clock: Clock
+) -> bool:
+    """``reserve_registration_attempt`` inside the caller's write transaction."""
+    return _reserve_registration(session, _ip_key(host), settings, clock) is not None
+
+
 def reserve_registration_attempt(
     factory: sessionmaker[Session], *, host: str | None, settings: Settings, clock: Clock
 ) -> bool:
@@ -1761,9 +1831,11 @@ def _register_flow(
     seed_locale: str | None,
     hasher: Hasher | None,
     invitation: InvitationSignUp | None = None,
+    verified: VerifiedSignUp | None = None,
 ) -> RegistrationOutcome:
-    # A valid invitation allows sign-up even when open registration is off (ADR-0013).
-    if invitation is None and not settings.allow_registration:
+    # A valid invitation allows sign-up even when open registration is off (ADR-0013). Open
+    # registration creates an account only from a link sent to the address (ADR-0017).
+    if invitation is None and verified is None:
         raise RegistrationDisabled
     key = _ip_key(host)
 
@@ -1781,7 +1853,7 @@ def _register_flow(
         return RegistrationOutcome(status="throttled")
 
     try:
-        normalized_email = normalize_email(email)
+        normalized_email = normalize_new_email(email)
         clean_display_name = _clean_display_name(display_name)
         validate_password(password, normalized_email, clean_display_name)
         options: WorkspaceOptions | None = None
@@ -1813,6 +1885,11 @@ def _register_flow(
             return RegistrationOutcome(status="email_mismatch", invitation_revoked=exc.revoked)
         except invitations.InvitationInvalid:
             return RegistrationOutcome(status="invitation_invalid")
+    elif verified is not None:
+        try:
+            verified.check(details.email)
+        except SignUpLinkInvalid:
+            return RegistrationOutcome(status="link_invalid")
 
     try:
         # Hashed before the duplicate check, so an existing email takes the same time.
@@ -1822,6 +1899,10 @@ def _register_flow(
         raise
 
     def create(session: Session) -> RegistrationOutcome:
+        if verified is not None:
+            # Spent atomically before anything else (raises SignUpLinkInvalid when another
+            # request used it first, rolling this one back); an existing account spends it too.
+            verified.consume(session, details.email)
         if session.scalar(select(User.id).where(User.email == details.email)) is not None:
             return RegistrationOutcome(status="rejected")
         try:
@@ -1860,7 +1941,9 @@ def _register_flow(
             workspace_id=workspace.id if workspace is not None else None,
             host=host,
             user_agent=user_agent,
-            data={"via": "invitation"} if invitation is not None else None,
+            data={"via": "invitation"}
+            if invitation is not None
+            else ({"via": "email"} if verified is not None else None),
         )
         session.flush()
         return RegistrationOutcome(
@@ -1871,6 +1954,8 @@ def _register_flow(
         return run(create)
     except invitations.InvitationInvalid:
         return RegistrationOutcome(status="invitation_invalid")
+    except SignUpLinkInvalid:
+        return RegistrationOutcome(status="link_invalid")
 
 
 def register_user(
@@ -1889,12 +1974,14 @@ def register_user(
     timezone: str | None = None,
     workspace_locale: str | None = None,
     seed_locale: str | None = None,
+    verified: VerifiedSignUp | None = None,
 ) -> RegistrationOutcome:
-    """Open registration; every attempt counts against its own per-IP window.
+    """Open registration's account creation; every attempt counts against its own per-IP
+    window. Without ``verified`` (a link sent to the address, ADR-0017) it raises
+    ``RegistrationDisabled``.
 
     Registration never touches the login throttle, so it cannot be used to clear it. The
-    outcome discloses whether an email is already registered (see ``RegistrationOutcome``).
-    The caller commits whatever the outcome.
+    caller commits whatever the outcome.
     """
     return _register_flow(
         SameSession(session),
@@ -1911,6 +1998,7 @@ def register_user(
         timezone=timezone,
         workspace_locale=workspace_locale,
         seed_locale=seed_locale,
+        verified=verified,
         hasher=None,
     )
 
@@ -1931,6 +2019,7 @@ def register_with_factory(
     timezone: str | None = None,
     workspace_locale: str | None = None,
     seed_locale: str | None = None,
+    verified: VerifiedSignUp | None = None,
     hasher: Hasher | None = None,
 ) -> RegistrationOutcome:
     return _register_flow(
@@ -1948,6 +2037,7 @@ def register_with_factory(
         timezone=timezone,
         workspace_locale=workspace_locale,
         seed_locale=seed_locale,
+        verified=verified,
         hasher=hasher,
     )
 
@@ -1969,6 +2059,7 @@ async def register_user_async(
     timezone: str | None = None,
     workspace_locale: str | None = None,
     seed_locale: str | None = None,
+    verified: VerifiedSignUp | None = None,
 ) -> RegistrationOutcome:
     """Web entry point; raises ``HashGateBusy`` after releasing the counted attempt."""
     hasher = _gate_hasher(gate)
@@ -1988,6 +2079,7 @@ async def register_user_async(
             timezone=timezone,
             workspace_locale=workspace_locale,
             seed_locale=seed_locale,
+            verified=verified,
             hasher=hasher,
         )
     )
@@ -2071,6 +2163,7 @@ def record_auth_event(
     host: str | None = None,
     user_agent: str | None = None,
     data: dict[str, str | int | bool] | None = None,
+    ip_prefix: str | None = None,
     entity_type: str = "user",
 ) -> None:
     """An instance-level event (``workspace_id`` NULL), about a user unless ``entity_type``
@@ -2086,6 +2179,7 @@ def record_auth_event(
         host=host,
         user_agent=user_agent,
         data=data,
+        ip_prefix=ip_prefix,
     )
 
 
@@ -2166,6 +2260,16 @@ def user_has_password(factory: sessionmaker[Session], user_id: UUID) -> bool:
 
 def revoke_all_sessions(session: Session, user_id: UUID) -> int:
     return _delete_sessions_except(session, user_id, None)
+
+
+def invalidate_reset_tokens(session: Session, user_id: UUID) -> None:
+    """Delete the user's password reset links (ADR-0017): on every password change, reset
+    and deactivation, so a link sent earlier can no longer set a password."""
+    session.execute(
+        delete(EmailToken)
+        .where(EmailToken.purpose == "reset", EmailToken.user_id == user_id)
+        .execution_options(synchronize_session=False)
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -2469,6 +2573,7 @@ def reset_user_password(
     if user is None:
         raise UnknownUser
     user.password_hash = hash_password(password, user.email, user.display_name)
+    invalidate_reset_tokens(session, user.id)
     revoked = _delete_sessions_except(session, user.id, None)
     _audit(
         session,

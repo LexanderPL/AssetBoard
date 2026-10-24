@@ -151,6 +151,12 @@ msgstr "Zarejestrowano konto"
 msgid "Password changed"
 msgstr "Zmieniono hasło"
 
+msgid "Password reset link sent"
+msgstr "Wysłano link do resetu hasła"
+
+msgid "Password reset by email"
+msgstr "Hasło zresetowane przez e-mail"
+
 msgid "Two-factor authentication enabled"
 msgstr "Włączono uwierzytelnianie dwuskładnikowe"
 
@@ -361,6 +367,9 @@ msgstr "Liczba"
 msgid "Every signed-in user can create workspaces"
 msgstr "Każdy zalogowany użytkownik może tworzyć obszary robocze"
 
+msgid "Open registration"
+msgstr "Otwarta rejestracja"
+
 msgid "Month"
 msgstr "Miesiąc"
 
@@ -489,6 +498,9 @@ msgstr "profil"
 
 msgid "an invitation"
 msgstr "zaproszenie"
+
+msgid "a confirmed email address"
+msgstr "potwierdzony adres e-mail"
 
 msgid "an invitation, through the identity provider"
 msgstr "zaproszenie, przez dostawcę tożsamości"
@@ -621,6 +633,26 @@ msgstr "Administracja kontami"
 
 msgid "Instance settings"
 msgstr "Ustawienia instancji"
+
+#, python-format
+msgid "Confirm your email address for %(app)s"
+msgstr "Potwierdź adres e-mail w %(app)s"
+
+#, python-format
+msgid "You already have an account at %(app)s"
+msgstr "Masz już konto w %(app)s"
+
+#, python-format
+msgid "Reset your %(app)s password"
+msgstr "Zresetuj hasło do %(app)s"
+
+#, python-format
+msgid "About your %(app)s password"
+msgstr "W sprawie hasła do %(app)s"
+
+#, python-format
+msgid "Test email from %(app)s"
+msgstr "Testowy e-mail z %(app)s"
 
 msgid "Same as the system"
 msgstr "Jak w systemie"
@@ -781,8 +813,20 @@ msgstr "Zapisano ustawienia instancji."
 msgid "Nothing to change: the settings already had these values."
 msgstr "Nie ma nic do zmiany: ustawienia mają już te wartości."
 
-msgid "Choose who can create workspaces."
-msgstr "Wybierz, kto może tworzyć obszary robocze."
+msgid "Open registration needs an email server: set ASSETBOARD_SMTP_HOST first."
+msgstr ""
+"Otwarta rejestracja wymaga serwera poczty: najpierw ustaw "
+"ASSETBOARD_SMTP_HOST."
+
+msgid ""
+"Open registration is not available while only the identity provider signs"
+" people in (ASSETBOARD_OIDC_ONLY)."
+msgstr ""
+"Otwarta rejestracja jest niedostępna, gdy logowanie odbywa się wyłącznie "
+"przez dostawcę tożsamości (ASSETBOARD_OIDC_ONLY)."
+
+msgid "Choose a value for each setting."
+msgstr "Wybierz wartość każdego ustawienia."
 
 msgid "Enter a valid email address."
 msgstr "Podaj prawidłowy adres e-mail."
@@ -859,12 +903,6 @@ msgstr ""
 
 msgid "Setup in progress"
 msgstr "Konfiguracja w toku"
-
-msgid "Too many registration attempts from your network. Try again later."
-msgstr "Zbyt wiele prób rejestracji z Twojej sieci. Spróbuj ponownie później."
-
-msgid "This email address cannot be registered."
-msgstr "Nie można zarejestrować tego adresu e-mail."
 
 msgid ""
 "This account has no password: it signs in with your identity provider. An"
@@ -953,6 +991,50 @@ msgstr ""
 "Zaloguj się ponownie, aby potwierdzić tę zmianę: bez hasła wymaga ona "
 "logowania z ostatnich 10 minut."
 
+msgid "Check your inbox"
+msgstr "Sprawdź skrzynkę pocztową"
+
+msgid ""
+"If this address can be registered, we sent it a link to finish creating "
+"your account. The link works for 24 hours. Nothing arrived? Check your "
+"spam folder, or ask again later."
+msgstr ""
+"Jeśli ten adres można zarejestrować, wysłaliśmy na niego link do "
+"dokończenia zakładania konta. Link działa przez 24 godziny. Nic nie "
+"przyszło? Sprawdź folder ze spamem albo poproś ponownie później."
+
+msgid ""
+"If an account uses this address, we sent it an email with the next step. "
+"A password reset link works for 60 minutes. Nothing arrived? Check your "
+"spam folder, or ask again later."
+msgstr ""
+"Jeśli jakieś konto używa tego adresu, wysłaliśmy na niego e-mail z "
+"dalszymi krokami. Link do resetu hasła działa przez 60 minut. Nic nie "
+"przyszło? Sprawdź folder ze spamem albo poproś ponownie później."
+
+msgid "Link not valid"
+msgstr "Link jest nieważny"
+
+msgid ""
+"This link is not valid: it may have expired or been used already. Ask for"
+" a new one."
+msgstr ""
+"Ten link jest nieważny: mógł wygasnąć albo zostać już użyty. Poproś o "
+"nowy."
+
+msgid ""
+"Your password was changed, and every device signed in to this account was"
+" signed out. Sign in with the new password."
+msgstr ""
+"Hasło zostało zmienione, a wszystkie urządzenia zalogowane na to konto "
+"zostały wylogowane. Zaloguj się nowym hasłem."
+
+msgid "Too many registration attempts from your network. Try again later."
+msgstr "Zbyt wiele prób rejestracji z Twojej sieci. Spróbuj ponownie później."
+
+msgid "Too many requests from your network. Try again later."
+msgstr "Zbyt wiele żądań z Twojej sieci. Spróbuj ponownie później."
+
 msgid "This request came from another site and was blocked."
 msgstr "To żądanie pochodziło z innej witryny i zostało zablokowane."
 
@@ -1023,6 +1105,9 @@ msgstr "Edytor"
 
 msgid "Viewer"
 msgstr "Przeglądający"
+
+msgid "This email address cannot be registered."
+msgstr "Nie można zarejestrować tego adresu e-mail."
 
 msgid ""
 "Enter a day of the month (1-31) or a date such as 2026-10-07 or "
@@ -1712,6 +1797,27 @@ msgstr ""
 "otwartej rejestracji ani kont tworzonych przy pierwszym logowaniu przez "
 "dostawcę tożsamości lub serwer proxy: te mają własne ustawienia."
 
+msgid "Registration"
+msgstr "Rejestracja"
+
+msgid "Off: accounts come from invitations, administrators or sign-in providers"
+msgstr ""
+"Wyłączona: konta powstają z zaproszeń, przez administratorów lub "
+"dostawców logowania"
+
+msgid "On: anyone can register with a verified email address"
+msgstr "Włączona: każdy może się zarejestrować z potwierdzonym adresem e-mail"
+
+msgid ""
+"A new account must confirm its email address through a link before it is "
+"created, and gets its own workspace."
+msgstr ""
+"Nowe konto musi potwierdzić adres e-mail linkiem, zanim zostanie "
+"utworzone, i dostaje własny obszar roboczy."
+
+msgid "Registration stays closed until this is fixed."
+msgstr "Rejestracja pozostaje zamknięta, dopóki to nie zostanie naprawione."
+
 msgid "Save settings"
 msgstr "Zapisz ustawienia"
 
@@ -1856,6 +1962,23 @@ msgstr "Najnowsze"
 msgid "Older"
 msgstr "Starsze"
 
+msgid "Sign in"
+msgstr "Zaloguj się"
+
+msgid "Back to sign in"
+msgstr "Wróć do logowania"
+
+msgid "Forgot your password?"
+msgstr "Nie pamiętasz hasła?"
+
+msgid ""
+"Enter the email address of your account. We will send you a link to "
+"choose a new password."
+msgstr "Podaj adres e-mail swojego konta. Wyślemy link do ustawienia nowego hasła."
+
+msgid "Send the link"
+msgstr "Wyślij link"
+
 msgid "Link your account"
 msgstr "Połącz swoje konto"
 
@@ -1878,9 +2001,6 @@ msgstr "Pozostaw puste, jeśli uwierzytelnianie dwuskładnikowe nie jest włącz
 
 msgid "Link and sign in"
 msgstr "Połącz i zaloguj się"
-
-msgid "Sign in"
-msgstr "Zaloguj się"
 
 #, python-format
 msgid "Continue as %(user)s"
@@ -1942,11 +2062,28 @@ msgstr "Wyloguj się wszędzie poza tym urządzeniem."
 msgid "Sign out other devices"
 msgstr "Wyloguj inne urządzenia"
 
-msgid "Workspace name"
-msgstr "Nazwa obszaru roboczego"
+msgid ""
+"Enter your email address. We will send you a link to confirm it and "
+"finish creating your account."
+msgstr ""
+"Podaj swój adres e-mail. Wyślemy link, którym go potwierdzisz i "
+"dokończysz zakładanie konta."
 
 msgid "Already have an account?"
 msgstr "Masz już konto?"
+
+#, python-format
+msgid "Your email address %(email)s is confirmed. Choose your name and password."
+msgstr "Adres e-mail %(email)s jest potwierdzony. Wybierz nazwę i hasło."
+
+msgid "Workspace name"
+msgstr "Nazwa obszaru roboczego"
+
+msgid "Choose a new password"
+msgstr "Ustaw nowe hasło"
+
+msgid "Every device signed in to this account will be signed out."
+msgstr "Wszystkie urządzenia zalogowane na to konto zostaną wylogowane."
 
 msgid "First-run setup"
 msgstr "Konfiguracja początkowa"
@@ -2064,6 +2201,78 @@ msgstr "Usunąć kategorię %(name)s?"
 
 msgid "Delete"
 msgstr "Usuń"
+
+msgid "Hello,"
+msgstr "Dzień dobry,"
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to reset the password of your %(app)s "
+"account. To choose a new password, open this link:"
+msgstr ""
+"Ktoś, miejmy nadzieję, że Ty, poprosił o reset hasła do Twojego konta w "
+"%(app)s. Aby ustawić nowe hasło, otwórz ten link:"
+
+msgid ""
+"The link works once, for 60 minutes. Choosing a new password signs out "
+"every device signed in to your account."
+msgstr ""
+"Link działa raz, przez 60 minut. Ustawienie nowego hasła wyloguje "
+"wszystkie urządzenia zalogowane na Twoje konto."
+
+msgid ""
+"If you did not ask for this, ignore this email: your password stays the "
+"same."
+msgstr "Jeśli to nie Ty, zignoruj tę wiadomość: hasło pozostanie bez zmian."
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to reset the password of your %(app)s "
+"account. Your account has no password: you sign in through your identity "
+"provider or your proxy, so there is nothing to reset here."
+msgstr ""
+"Ktoś, miejmy nadzieję, że Ty, poprosił o reset hasła do Twojego konta w "
+"%(app)s. Twoje konto nie ma hasła: logujesz się przez dostawcę tożsamości"
+" albo serwer proxy, więc nie ma tu czego resetować."
+
+msgid "Sign in:"
+msgstr "Zaloguj się:"
+
+msgid "If you did not ask for this, ignore this email: nothing was changed."
+msgstr "Jeśli to nie Ty, zignoruj tę wiadomość: nic nie zostało zmienione."
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to create an account at %(app)s with this "
+"email address. An account with this address already exists, so no new one"
+" was created."
+msgstr ""
+"Ktoś, miejmy nadzieję, że Ty, poprosił o założenie konta w %(app)s z tym "
+"adresem e-mail. Konto z tym adresem już istnieje, więc nowe nie zostało "
+"utworzone."
+
+msgid "Forgot your password? Ask for a new one here:"
+msgstr "Nie pamiętasz hasła? Poproś o nowe tutaj:"
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to create an account at %(app)s with this "
+"email address. To confirm the address and finish creating your account, "
+"open this link:"
+msgstr ""
+"Ktoś, miejmy nadzieję, że Ty, poprosił o założenie konta w %(app)s z tym "
+"adresem e-mail. Aby potwierdzić adres i dokończyć zakładanie konta, "
+"otwórz ten link:"
+
+msgid "The link works once, for 24 hours."
+msgstr "Link działa raz, przez 24 godziny."
+
+msgid "If you did not ask for this, ignore this email: no account is created."
+msgstr "Jeśli to nie Ty, zignoruj tę wiadomość: konto nie zostanie utworzone."
+
+#, python-format
+msgid "This is a test email from %(app)s. Your email settings work."
+msgstr "To testowy e-mail z %(app)s. Ustawienia poczty działają."
 
 msgid "Dismiss"
 msgstr "Zamknij"
@@ -2713,4 +2922,7 @@ msgstr ""
 
 #~ msgid "Plan"
 #~ msgstr "Plan"
+
+#~ msgid "Choose who can create workspaces."
+#~ msgstr "Wybierz, kto może tworzyć obszary robocze."
 

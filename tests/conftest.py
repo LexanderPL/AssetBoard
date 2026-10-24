@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import logging
 import re
+import smtplib
 import socket
 import threading
 import time
 from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
+from email.message import EmailMessage
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -28,7 +30,7 @@ from assetboard.clock import FixedClock
 from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine
 from assetboard.db.migrate import upgrade_database
-from assetboard.db.models.identity import Membership, User, Workspace
+from assetboard.db.models.identity import InstanceSettings, Membership, User, Workspace
 from assetboard.db.models.ledger import Category
 from assetboard.services import auth as auth_service
 from assetboard.services.auth import argon2_hash, run_initial_setup
@@ -77,6 +79,16 @@ def isolate_application_data_dir(
         "OIDC_ONLY",
         "ALLOW_LOCAL_ADMIN_LOGIN",
         "OIDC_RP_LOGOUT",
+        "SMTP_HOST",
+        "SMTP_PORT",
+        "SMTP_SECURITY",
+        "SMTP_USERNAME",
+        "SMTP_PASSWORD",
+        "SMTP_FROM",
+        "SMTP_TIMEOUT_SECONDS",
+        "MAIL_EMAIL_LIMIT",
+        "MAIL_IP_LIMIT",
+        "MAIL_WINDOW_MINUTES",
     ):
         monkeypatch.delenv(f"{ENV_PREFIX}_{name}", raising=False)
 
@@ -135,6 +147,60 @@ def fixed_clock() -> FixedClock:
 
 
 ADMIN_EMAIL = "admin@example.com"
+# Email on (ADR-0017): links point at the TestClient's own origin.
+MAIL_SETTINGS: dict[str, object] = {
+    "smtp_host": "smtp.test",
+    "smtp_from": "budget@example.com",
+    "base_url": "http://testserver",
+}
+_MAIL_LINK = re.compile(r"http://testserver(/\S+)")
+
+
+class AnyVerified:
+    """Test stand-in for a used registration link (``auth.VerifiedSignUp``)."""
+
+    def check(self, email: str) -> None:
+        del email
+
+    def consume(self, session: Session, email: str) -> None:
+        del session, email
+
+
+ANY_VERIFIED = AnyVerified()
+
+
+class FakeMailer:
+    """Records messages instead of sending them; can block or fail on demand."""
+
+    def __init__(self) -> None:
+        self.sent: list[EmailMessage] = []
+        self.recipients: list[str] = []
+        self.release: threading.Event | None = None
+        self.fail = False
+
+    def send(self, message: EmailMessage, recipient: str) -> None:
+        if self.release is not None:
+            self.release.wait(10)
+        if self.fail:
+            raise smtplib.SMTPAuthenticationError(535, b"secret-reply")
+        self.sent.append(message)
+        self.recipients.append(recipient)
+
+
+def mail_body(message: EmailMessage) -> str:
+    body = message.get_body(("plain",))
+    assert body is not None
+    return body.get_content()
+
+
+def mail_link(message: EmailMessage, prefix: str = "/") -> str:
+    """The path of the first link in ``message`` that starts with ``prefix``."""
+    for path in _MAIL_LINK.findall(mail_body(message)):
+        if path.startswith(prefix):
+            return path
+    raise AssertionError(f"no {prefix} link in the message")
+
+
 ADMIN_PASSWORD = "Correct Horse Battery!"
 _CSRF_INPUT = re.compile(r'name="csrf_token" value="([^"]+)"')
 _CSRF_META = re.compile(r'<meta name="csrf-token" content="([^"]+)"')
@@ -156,6 +222,58 @@ class WebHarness:
 
     def app(self, **overrides: object) -> FastAPI:
         return create_app(self.settings(**overrides))
+
+    def mail_app(self, **overrides: object) -> FastAPI:
+        """An app with email on and a ``FakeMailer`` (``app.state.fake_mailer``)."""
+        mailer = FakeMailer()
+        app = create_app(
+            self.settings(**(MAIL_SETTINGS | overrides)), mailer=mailer, mail_delay=lambda: 0.0
+        )
+        app.state.fake_mailer = mailer
+        return app
+
+    @staticmethod
+    def enable_registration(app: FastAPI, enabled: bool = True) -> None:
+        with app.state.session_factory.begin() as session:
+            row = session.get(InstanceSettings, 1)
+            assert row is not None
+            row.allow_registration = enabled
+
+    @staticmethod
+    def sent_mail(app: FastAPI) -> list[EmailMessage]:
+        """Every message sent so far, after the outbox handled what was queued."""
+        app.state.mail_outbox.join()
+        return list(app.state.fake_mailer.sent)
+
+    def register(
+        self,
+        client: TestClient,
+        *,
+        email: str,
+        password: str = "Registrant Strong Password",
+        display_name: str = "Registrant",
+        workspace_name: str = "",
+    ) -> Response:
+        """Open registration through both steps (the link comes from the fake mailer)."""
+        app = client.app
+        before = len(self.sent_mail(app))  # type: ignore[arg-type]
+        token = self.csrf(client.get("/register").text)
+        response = client.post("/register", data={"email": email, "csrf_token": token})
+        assert response.status_code == 200, response.text
+        sent = self.sent_mail(app)[before:]  # type: ignore[arg-type]
+        assert len(sent) == 1
+        link = mail_link(sent[0], "/register/complete/")
+        token = self.csrf(client.get(link).text)
+        return client.post(
+            link,
+            data={
+                "display_name": display_name,
+                "password": password,
+                "workspace_name": workspace_name,
+                "csrf_token": token,
+            },
+            follow_redirects=False,
+        )
 
     def complete_setup(self, app: FastAPI, *, email: str = ADMIN_EMAIL) -> None:
         run_initial_setup(

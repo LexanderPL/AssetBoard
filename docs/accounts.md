@@ -20,6 +20,27 @@ are on "Account security".
   (5 free, then the same pause); they never block signing in, and a correct password clears
   them.
 
+## Creating an account and forgotten passwords
+
+These need email, which your administrator sets up ([Email](deployment.md#email)).
+
+- **Create an account** (on the sign-in page, when an instance administrator turned open
+  registration on): enter your email address. The page always says "Check your inbox", whether
+  or not the address can be registered. The email holds a link, valid for 24 hours and usable
+  once, where you choose your display name, password and workspace name; the account and its
+  workspace are created only then, and you are signed in. If the address already has an
+  account, the email says so instead and links to sign-in and to "Forgot your password?".
+  Nothing arrived? Check your spam folder, or ask again a little later.
+- **Forgot your password?** (on the sign-in page): enter your email address. The page always
+  gives the same answer. If your account has a password, the email holds a link, valid for
+  60 minutes and usable once, to choose a new one; doing so signs out every device signed in to
+  your account, and you then sign in with the new password. It does not remove two-factor
+  authentication: you still need your authenticator or a recovery code. If your account signs in through
+  an identity provider or a proxy, the email says there is no password to reset.
+- At most 3 such emails are sent to one address per hour; further requests get the same answer
+  but no email. Changing your password, or an administrator deactivating the account, makes
+  every reset link sent earlier stop working.
+
 ## Two-factor authentication
 
 Choose **Two-factor authentication** in your profile. Confirm your password, scan the QR code
@@ -143,11 +164,17 @@ to it straight away. Its log records "Workspace created".
 **Instance settings** (instance administrators, "Instance settings" in the account menu or on
 the Users page): "Who can create workspaces" is "Every signed-in user" (the default) or "Only
 instance administrators". Instance administrators can always create workspaces. The setting
-does not affect open registration (`ASSETBOARD_ALLOW_REGISTRATION`) or accounts created at the
+does not affect open registration or accounts created at the
 first sign-in through an identity provider or a proxy (`ASSETBOARD_OIDC_AUTO_CREATE`,
 `ASSETBOARD_PROXY_AUTH_AUTO_CREATE`): those keep creating their own workspace. A change is
 confirmed like the other administrator actions and appears in the instance audit log
 ("Instance settings changed").
+
+"Open registration" (Instance settings, off by default) lets anyone create an account with an
+email address they confirm through a link (see above); each such account gets its own
+workspace. It can be turned on only when email is set up and password sign-in is not turned off
+(`ASSETBOARD_OIDC_ONLY`); the page says why when it cannot. Accounts from invitations, identity
+providers, the proxy or an administrator do not depend on it.
 
 ## Audit log
 

@@ -7,7 +7,7 @@ import secrets
 import tempfile
 from ipaddress import IPv4Network, IPv6Network, ip_network
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
 
 from pydantic import Field, SecretStr, field_validator, model_validator
@@ -54,6 +54,8 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        # Validation errors never repeat the values (SMTP password, OIDC secret, ...).
+        hide_input_in_errors=True,
     )
 
     env: str = Field(default="dev")
@@ -68,7 +70,9 @@ class Settings(BaseSettings):
     default_currency: str = "EUR"
     auto_migrate: bool = True
     setup_token: SecretStr | None = None
-    allow_registration: bool = False
+    # Retired in pre-release B: open registration is an instance setting now (ADR-0017). Kept
+    # only to refuse ``true`` at startup with a clear message; ``false`` is ignored.
+    allow_registration: bool | None = None
     session_idle_timeout_days: int = Field(default=14, ge=1, le=365)
     session_absolute_timeout_days: int = Field(default=60, ge=1, le=365)
     auth_account_free_failures: int = Field(default=5, ge=1)
@@ -101,6 +105,19 @@ class Settings(BaseSettings):
     proxy_auth_name_header: str | None = None
     proxy_auth_auto_create: bool = False
     proxy_auth_link_by_email: bool = False
+    # Outgoing email (pre-release B, ADR-0017): on when ``smtp_host`` is set.
+    smtp_host: str | None = None
+    smtp_port: int | None = Field(default=None, ge=1, le=65535)
+    smtp_security: Literal["starttls", "tls", "none"] = "starttls"
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_from: str | None = None
+    smtp_timeout_seconds: int = Field(default=10, ge=1, le=120)
+    # Emails (registration, password reset) per address and requests per client address,
+    # within the window; see ADR-0017.
+    mail_email_limit: int = Field(default=3, ge=1)
+    mail_ip_limit: int = Field(default=10, ge=1)
+    mail_window_minutes: int = Field(default=60, ge=1, le=1440)
 
     def __init__(self, *, _env_file: str | Path | None = ".env", **values: Any) -> None:
         super().__init__(_env_file=_env_file, **values)
@@ -229,7 +246,36 @@ class Settings(BaseSettings):
             return None
         return value.strip() if isinstance(value, str) else value
 
-    @field_validator("oidc_client_secret", mode="before")
+    @field_validator("smtp_host", "smtp_username", "smtp_from", mode="before")
+    @classmethod
+    def blank_mail_setting_is_unset(cls, value: str | None) -> str | None:
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value.strip() if isinstance(value, str) else value
+
+    @field_validator("smtp_host")
+    @classmethod
+    def validate_smtp_host(cls, value: str | None) -> str | None:
+        if value is not None and (len(value) > 253 or any(c.isspace() for c in value)):
+            raise ValueError("SMTP_HOST must be a host name or an IP address")
+        return value
+
+    @field_validator("smtp_from")
+    @classmethod
+    def validate_smtp_from(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        local, _, domain = value.rpartition("@")
+        if (
+            not local
+            or not domain
+            or len(value) > 320
+            or any(c.isspace() or c in '<>,;"' or ord(c) < 32 for c in value)
+        ):
+            raise ValueError("SMTP_FROM must be a plain email address like budget@example.com")
+        return value
+
+    @field_validator("smtp_password", "oidc_client_secret", mode="before")
     @classmethod
     def blank_secret_is_unset(cls, value: object) -> object:
         if isinstance(value, str) and not value.strip():
@@ -371,6 +417,37 @@ class Settings(BaseSettings):
                     "(::ffff:0:0/96); write IPv4 proxies as IPv4 networks"
                 )
 
+    @property
+    def mail_enabled(self) -> bool:
+        return self.smtp_host is not None
+
+    @property
+    def smtp_effective_port(self) -> int:
+        if self.smtp_port is not None:
+            return self.smtp_port
+        return {"starttls": 587, "tls": 465, "none": 25}[self.smtp_security]
+
+    def _validate_mail(self) -> None:
+        if not self.mail_enabled:
+            return
+        if self.smtp_from is None:
+            raise ValueError("SMTP_FROM is required when SMTP_HOST is set")
+        if (self.smtp_username is None) != (self.smtp_password is None):
+            raise ValueError("SMTP_USERNAME and SMTP_PASSWORD must be set together")
+        insecure_allowed = self.env == "dev"
+        if self.smtp_password is not None and self.smtp_security == "none" and not insecure_allowed:
+            raise ValueError(
+                "SMTP_PASSWORD cannot be sent without encryption: use SMTP_SECURITY=starttls "
+                "or tls (none is allowed with a password only with ENV=dev)"
+            )
+        # Links in emails are built from BASE_URL only, never from request headers.
+        if "base_url" not in self.model_fields_set:
+            raise ValueError("BASE_URL must be set when SMTP_HOST is set (links in emails)")
+        if not insecure_allowed and urlsplit(self.base_url).scheme != "https":
+            raise ValueError(
+                "BASE_URL must use https when SMTP_HOST is set (http only with ENV=dev)"
+            )
+
     def _validate_oidc(self) -> None:
         if not self.oidc_enabled:
             if self.oidc_only:
@@ -387,8 +464,6 @@ class Settings(BaseSettings):
             raise ValueError(
                 "BASE_URL must use https when OIDC is enabled (http only with ENV=dev)"
             )
-        if self.oidc_only and self.allow_registration:
-            raise ValueError("OIDC_ONLY cannot be combined with ALLOW_REGISTRATION")
 
     @model_validator(mode="after")
     def finalize_settings(self) -> Settings:
@@ -402,8 +477,15 @@ class Settings(BaseSettings):
             raise ValueError("SESSION_IDLE_TIMEOUT_DAYS must be <= SESSION_ABSOLUTE_TIMEOUT_DAYS")
         if self.auth_throttle_max_seconds < self.auth_throttle_base_seconds:
             raise ValueError("AUTH_THROTTLE_MAX_SECONDS must be >= AUTH_THROTTLE_BASE_SECONDS")
+        if self.allow_registration:
+            raise ValueError(
+                "ALLOW_REGISTRATION was removed: an instance administrator turns open "
+                "registration on in Instance settings, and it needs SMTP for email "
+                "verification. Remove ALLOW_REGISTRATION from the environment."
+            )
         self._validate_oidc()
         self._validate_proxy_auth()
+        self._validate_mail()
         if self.database_url is None:
             database_filename = self.data_dir / "assetboard.db"
             self.database_url = f"sqlite:///{database_filename}"
