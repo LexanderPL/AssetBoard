@@ -112,3 +112,87 @@ def test_locale_amount_and_weekly_form(owner):
         item = session.scalars(select(ScheduledItem)).one()
         assert item.amount_minor == 123456 and item.weekdays == [0]
     assert _rule(data | {"weekdays": "0"}).weekdays == (0,)
+
+
+def test_field_errors_are_linked_and_number_fields_have_minimums(owner):
+    data = form(owner)
+    page = owner.client.get("/recurring/new").text
+    assert 'id="interval"' in page and 'min="1"' in page.split('id="interval"')[1].split(">")[0]
+    assert 'min="1"' in page.split('id="max_count"')[1].split(">")[0]
+    assert page.count('class="h-4 w-4 rounded border-line accent-primary"') == 8
+    response = owner.post("/recurring", data | {"interval": "0"})
+    assert response.status_code == 400
+    assert 'aria-invalid="true" aria-describedby="interval-error"' in response.text
+    assert 'id="interval-error"' in response.text
+    april = owner.post("/recurring", data | {"freq": "yearly", "month": "4", "month_day": "31"})
+    assert april.status_code == 400
+    assert 'id="month_day-error"' in april.text and "does not exist" in april.text
+    weekly = owner.post("/recurring", data | {"freq": "weekly"})
+    assert weekly.status_code == 400 and 'id="weekdays-error"' in weekly.text
+    assert 'id="name-error"' in owner.post("/recurring", data | {"name": " "}).text
+    assert 'id="amount-error"' in owner.post("/recurring", data | {"amount": "-5"}).text
+
+
+def test_preview_is_live_and_locale_formatted(owner):
+    owner.app.state.clock = FixedClock("2026-03-01T12:00:00+00:00")
+    page = owner.client.get("/recurring/new").text
+    assert 'id="schedule-preview"' in page and 'aria-live="polite"' in page
+    preview = owner.post("/recurring/preview", form(owner)).text
+    assert '<time datetime="2026-03-31">Mar 31, 2026</time>' in preview
+    owner.client.headers["accept-language"] = "pl"
+    assert '<time datetime="2026-03-31">31 mar 2026</time>' in (
+        owner.post("/recurring/preview", form(owner)).text
+    )
+
+
+def test_list_navigation_delete_confirmation_and_action_feedback(owner):
+    assert owner.post("/recurring", form(owner)).status_code == 303
+    listing = owner.client.get("/recurring").text
+    assert 'data-recurring-link aria-current="page"' in listing
+    delete_form = listing.split('/delete"')[1].split(">")[0]
+    assert 'data-confirm="Delete the recurring item Car insurance?' in delete_form
+    with owner.db() as session:
+        from sqlalchemy import select
+
+        item_id = session.scalars(select(ScheduledItem.id)).one()
+    assert owner.post(f"/recurring/{item_id}/archive").status_code == 303
+    again = owner.post(f"/recurring/{item_id}/pause")
+    assert again.headers["location"] == "/recurring?error=archived_item"
+    shown = owner.client.get(again.headers["location"]).text
+    assert "data-action-error" in shown and "is archived and cannot change" in shown
+
+
+def test_edit_form_keeps_an_archived_category_visible(owner):
+    data = form(owner)
+    assert owner.post("/recurring", data).status_code == 303
+    assert owner.post(f"/categories/{data['category_id']}/archive").status_code in (200, 303)
+    with owner.db() as session:
+        from sqlalchemy import select
+
+        item_id = session.scalars(select(ScheduledItem.id)).one()
+    page = owner.client.get(f"/recurring/{item_id}/edit").text
+    option = page.split("data-archived-category")[0].rsplit("<option", 1)[1]
+    assert data["category_id"] in option and "selected disabled" in option
+    assert "data-archived-notice" in page
+    # The disabled option is not submitted: saving asks for an active category.
+    unchanged = {key: value for key, value in data.items() if key != "category_id"}
+    response = owner.post(f"/recurring/{item_id}/edit", unchanged)
+    assert response.status_code == 400 and 'id="category_id-error"' in response.text
+
+
+def test_country_without_holiday_data_is_explained_on_the_settings_page(owner):
+    assert (
+        owner.post("/recurring", form(owner, weekend_policy="next_working_day")).status_code == 303
+    )
+    response = owner.post(
+        "/workspace/settings",
+        {
+            "name": "Home",
+            "base_currency": "EUR",
+            "country_code": "AC",
+            "timezone": "UTC",
+            "locale": "en",
+        },
+        token_from="/workspace/settings",
+    )
+    assert response.status_code == 400 and "Holiday data is not available" in response.text

@@ -1245,6 +1245,60 @@ msgstr ""
 "skonfigurowanym adresem (%(base_url)s), zezwól na pliki cookie dla niej i"
 " spróbuj ponownie."
 
+msgid "Enter a name."
+msgstr "Podaj nazwę."
+
+msgid "Choose an active category matching the direction."
+msgstr "Wybierz aktywną kategorię zgodną z kierunkiem."
+
+msgid "Enter a positive amount in the workspace currency."
+msgstr "Podaj dodatnią kwotę w walucie obszaru roboczego."
+
+msgid "Enter a valid start date."
+msgstr "Podaj prawidłową datę początkową."
+
+msgid "Enter an end date on or after the start date, or leave it empty."
+msgstr ""
+"Podaj datę końcową nie wcześniejszą niż początkowa albo pozostaw pole "
+"puste."
+
+msgid "Enter a whole number of 1 or more, or leave it empty."
+msgstr "Podaj liczbę całkowitą równą co najmniej 1 albo pozostaw pole puste."
+
+msgid "Enter a whole number of 1 or more."
+msgstr "Podaj liczbę całkowitą równą co najmniej 1."
+
+msgid "Choose at least one weekday for a weekly rule."
+msgstr "Wybierz co najmniej jeden dzień tygodnia dla reguły tygodniowej."
+
+msgid "This day does not exist in the chosen month."
+msgstr "Ten dzień nie istnieje w wybranym miesiącu."
+
+msgid "Choose a month."
+msgstr "Wybierz miesiąc."
+
+msgid ""
+"Holiday adjustments need a workspace country with holiday data, or no "
+"country."
+msgstr ""
+"Przesuwanie dat o święta wymaga kraju obszaru roboczego z danymi o "
+"świętach albo braku kraju."
+
+msgid "This recurring item is archived and cannot change."
+msgstr "Ta pozycja cykliczna jest zarchiwizowana i nie można jej zmienić."
+
+msgid ""
+"This item adjusts dates to working days, and the workspace country has no"
+" holiday data."
+msgstr ""
+"Ta pozycja przesuwa daty na dni robocze, a dla kraju obszaru roboczego "
+"brak danych o świętach."
+
+msgid "The recurring item could not be saved. Check the form and try again."
+msgstr ""
+"Nie udało się zapisać pozycji cyklicznej. Sprawdź formularz i spróbuj "
+"ponownie."
+
 msgid "Monday"
 msgstr "Poniedziałek"
 
@@ -1385,6 +1439,15 @@ msgstr "Waluty bazowej nie można zmienić: są już w niej zapisane kwoty."
 
 msgid "Choose a country from the list."
 msgstr "Wybierz kraj z listy."
+
+msgid ""
+"Holiday data is not available for this country, and recurring items "
+"adjust dates to working days. Change those items to keep their dates, or "
+"choose another country."
+msgstr ""
+"Dla tego kraju brak danych o świętach, a pozycje cykliczne przesuwają "
+"daty na dni robocze. Zmień te pozycje, aby zachować ich daty, albo "
+"wybierz inny kraj."
 
 msgid "Choose a time zone from the list."
 msgstr "Wybierz strefę czasową z listy."
@@ -2280,14 +2343,16 @@ msgstr "Edytuj pozycję cykliczną"
 msgid "New recurring item"
 msgstr "Nowa pozycja cykliczna"
 
+msgid "Check the highlighted field."
+msgstr "Sprawdź wyróżnione pole."
+
+#, python-format
 msgid ""
-"Check the name, amount, category and recurrence dates. Choose an active "
-"category matching the direction. Holiday adjustments require a supported "
-"workspace country."
+"The category %(name)s is archived, so this item creates no new dates. "
+"Choose an active category to save it."
 msgstr ""
-"Sprawdź nazwę, kwotę, kategorię i daty powtarzania. Wybierz aktywną "
-"kategorię zgodną z kierunkiem. Uwzględnianie świąt wymaga obsługiwanego "
-"kraju przestrzeni roboczej."
+"Kategoria %(name)s jest zarchiwizowana, więc ta pozycja nie tworzy nowych"
+" terminów. Wybierz aktywną kategorię, aby ją zapisać."
 
 msgid "Amount type"
 msgstr "Rodzaj kwoty"
@@ -2396,16 +2461,28 @@ msgstr "Wznów"
 msgid "Pause"
 msgstr "Wstrzymaj"
 
+#, python-format
+msgid ""
+"Delete the recurring item %(name)s? Its pending dates are removed; with "
+"posted or skipped history it is archived instead."
+msgstr ""
+"Usunąć pozycję cykliczną %(name)s? Jej oczekujące terminy zostaną "
+"usunięte; jeśli ma historię zaksięgowanych lub pominiętych terminów, "
+"zostanie zarchiwizowana."
+
 msgid "No recurring items yet."
 msgstr "Nie ma jeszcze pozycji cyklicznych."
 
 msgid ""
-"Pausing or archiving removes pending dates from today onward. Existing "
-"history is kept; deleting an item with history archives it instead."
+"Pausing removes pending dates from today onward. Archiving or deleting "
+"removes all pending dates; posted and skipped dates are history and are "
+"kept, so deleting an item with history archives it instead. Dates in "
+"closed months never change."
 msgstr ""
-"Wstrzymanie lub archiwizacja usuwa oczekujące wystąpienia od dzisiaj. "
-"Historia zostaje zachowana; usunięcie pozycji z historią powoduje jej "
-"archiwizację."
+"Wstrzymanie usuwa oczekujące terminy od dzisiaj. Archiwizacja lub "
+"usunięcie usuwa wszystkie oczekujące terminy; zaksięgowane i pominięte "
+"terminy są historią i zostają, więc usunięcie pozycji z historią ją "
+"archiwizuje. Terminy w zamkniętych miesiącach nigdy się nie zmieniają."
 
 msgid "Choose valid recurrence dates to see the preview."
 msgstr "Wybierz prawidłowe daty powtarzania, aby zobaczyć podgląd."
@@ -2754,4 +2831,17 @@ msgstr ""
 
 #~ msgid "Plan"
 #~ msgstr "Plan"
+
+#~ msgid ""
+#~ "Check the name, amount, category and "
+#~ "recurrence dates. Choose an active "
+#~ "category matching the direction. Holiday "
+#~ "adjustments require a supported workspace "
+#~ "country."
+#~ msgstr ""
+#~ "Sprawdź nazwę, kwotę, kategorię i daty"
+#~ " powtarzania. Wybierz aktywną kategorię "
+#~ "zgodną z kierunkiem. Uwzględnianie świąt "
+#~ "wymaga obsługiwanego kraju przestrzeni "
+#~ "roboczej."
 

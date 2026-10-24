@@ -1177,6 +1177,52 @@ msgid ""
 "address (%(base_url)s), allow cookies for it, and try again."
 msgstr ""
 
+msgid "Enter a name."
+msgstr ""
+
+msgid "Choose an active category matching the direction."
+msgstr ""
+
+msgid "Enter a positive amount in the workspace currency."
+msgstr ""
+
+msgid "Enter a valid start date."
+msgstr ""
+
+msgid "Enter an end date on or after the start date, or leave it empty."
+msgstr ""
+
+msgid "Enter a whole number of 1 or more, or leave it empty."
+msgstr ""
+
+msgid "Enter a whole number of 1 or more."
+msgstr ""
+
+msgid "Choose at least one weekday for a weekly rule."
+msgstr ""
+
+msgid "This day does not exist in the chosen month."
+msgstr ""
+
+msgid "Choose a month."
+msgstr ""
+
+msgid ""
+"Holiday adjustments need a workspace country with holiday data, or no "
+"country."
+msgstr ""
+
+msgid "This recurring item is archived and cannot change."
+msgstr ""
+
+msgid ""
+"This item adjusts dates to working days, and the workspace country has no"
+" holiday data."
+msgstr ""
+
+msgid "The recurring item could not be saved. Check the form and try again."
+msgstr ""
+
 msgid "Monday"
 msgstr ""
 
@@ -1304,6 +1350,12 @@ msgid "The base currency cannot change: amounts are already stored in it."
 msgstr ""
 
 msgid "Choose a country from the list."
+msgstr ""
+
+msgid ""
+"Holiday data is not available for this country, and recurring items "
+"adjust dates to working days. Change those items to keep their dates, or "
+"choose another country."
 msgstr ""
 
 msgid "Choose a time zone from the list."
@@ -2129,10 +2181,13 @@ msgstr ""
 msgid "New recurring item"
 msgstr ""
 
+msgid "Check the highlighted field."
+msgstr ""
+
+#, python-format
 msgid ""
-"Check the name, amount, category and recurrence dates. Choose an active "
-"category matching the direction. Holiday adjustments require a supported "
-"workspace country."
+"The category %(name)s is archived, so this item creates no new dates. "
+"Choose an active category to save it."
 msgstr ""
 
 msgid "Amount type"
@@ -2238,12 +2293,20 @@ msgstr ""
 msgid "Pause"
 msgstr ""
 
+#, python-format
+msgid ""
+"Delete the recurring item %(name)s? Its pending dates are removed; with "
+"posted or skipped history it is archived instead."
+msgstr ""
+
 msgid "No recurring items yet."
 msgstr ""
 
 msgid ""
-"Pausing or archiving removes pending dates from today onward. Existing "
-"history is kept; deleting an item with history archives it instead."
+"Pausing removes pending dates from today onward. Archiving or deleting "
+"removes all pending dates; posted and skipped dates are history and are "
+"kept, so deleting an item with history archives it instead. Dates in "
+"closed months never change."
 msgstr ""
 
 msgid "Choose valid recurrence dates to see the preview."
@@ -2611,5 +2674,20 @@ msgstr ""
 #~ "Locked: transactions (deleted ones included)"
 #~ " or planned values exist, and their"
 #~ " amounts are stored in this currency."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Check the name, amount, category and "
+#~ "recurrence dates. Choose an active "
+#~ "category matching the direction. Holiday "
+#~ "adjustments require a supported workspace "
+#~ "country."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Pausing or archiving removes pending "
+#~ "dates from today onward. Existing "
+#~ "history is kept; deleting an item "
+#~ "with history archives it instead."
 #~ msgstr ""
 
