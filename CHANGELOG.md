@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/LexanderPL/AssetBoard/compare/v0.3.0...v0.3.1) (2026-10-24)
+
+
+### Features
+
+* **recurring:** add F3.2 upcoming inbox ([#137](https://github.com/LexanderPL/AssetBoard/issues/137)) ([a1dba50](https://github.com/LexanderPL/AssetBoard/commit/a1dba5013ef1b7fafbcf919667b3e464fa352284))
+* **taxes:** add F3.3 tax rules and calculator ([#138](https://github.com/LexanderPL/AssetBoard/issues/138)) ([668affe](https://github.com/LexanderPL/AssetBoard/commit/668affe873b85b91097036efa7b68e79cb3b27b7))
+
 ## [0.3.0](https://github.com/LexanderPL/AssetBoard/compare/v0.2.1...v0.3.0) (2026-10-24)
 
 
