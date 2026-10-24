@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import ipaddress
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from functools import partial
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
@@ -28,6 +30,10 @@ from assetboard.middleware import (
     SecurityHeadersMiddleware,
     add_security_headers,
 )
+from assetboard.services.account_email import (
+    prune_email_tokens_with_factory,
+    resolve_mail_request,
+)
 from assetboard.services.admin_users import NotInstanceAdmin
 from assetboard.services.auth import (
     derive_subkey,
@@ -38,6 +44,7 @@ from assetboard.services.auth import (
 from assetboard.services.context import NoWorkspace, PermissionDenied, WorkspaceNotAvailable
 from assetboard.services.hash_gate import HashGate, HashGateBusy
 from assetboard.services.instance_settings import workspace_creation_allowed
+from assetboard.services.mail import Mailer, MailOutbox, SmtpMailer
 from assetboard.services.months import MonthClosed
 from assetboard.services.oidc import OidcClient, UrllibTransport
 from assetboard.services.oidc_flow import ConsumedStates
@@ -47,6 +54,7 @@ from assetboard.web.admin_routes import router as admin_router
 from assetboard.web.audit_routes import router as audit_router
 from assetboard.web.auth_routes import router as auth_router
 from assetboard.web.category_routes import router as category_router
+from assetboard.web.email_routes import router as email_router
 from assetboard.web.errors import BUSY_RETRY_AFTER, add_error_response_headers, error_response
 from assetboard.web.errors import is_htmx_fragment_request as _is_htmx_fragment_request
 from assetboard.web.gate import AccessGateMiddleware, OriginCheckMiddleware
@@ -70,14 +78,30 @@ SCHEMA_READINESS = {"behind": "schema_outdated", "ahead": "schema_newer"}
 DatabaseChecker = Callable[[], bool]
 
 
+def _is_loopback(host: str | None) -> bool:
+    if host is None or host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        return False
+
+
 def create_app(
     settings: Settings | None = None,
     *,
     database_checker: DatabaseChecker | None = None,
+    mailer: Mailer | None = None,
+    mail_delay: Callable[[], float] | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     logger = configure_logging(settings.log_level, settings.log_format)
     settings.ensure_data_dir_writable()
+    if settings.allow_registration is False:
+        logger.warning(
+            "ALLOW_REGISTRATION is no longer used and is ignored: open registration is an "
+            "instance setting (Instance settings); remove the variable"
+        )
     if settings.proxy_auth_enabled:
         # Accepted by validation (at most /24 or /64), but every address in it can sign in as
         # anyone through the identity headers (ADR-0015).
@@ -104,10 +128,41 @@ def create_app(
         touch_engine, class_=Session, info={"clock": clock}, expire_on_commit=False
     )
     checker = database_checker or (lambda: database_is_ready(engine))
+    # Keys the address hashes in mail logs (ADR-0017), from the ensured secret key.
+    mail_log_key = derive_subkey(secret_key, "mail-address-log")
+    # Outgoing mail (ADR-0017): None without SMTP_HOST; tests pass a fake mailer.
+    # Requests hand registration and reset work to the outbox; ``mail_delay`` replaces the
+    # random 0.5-3 s wait in tests.
+    outbox = (
+        MailOutbox(
+            mailer or SmtpMailer(settings),
+            settings,
+            clock,
+            logger,
+            resolver=partial(
+                resolve_mail_request, session_factory, settings, clock, log_key=mail_log_key
+            ),
+            delay=mail_delay,
+        )
+        if settings.mail_enabled
+        else None
+    )
+    if (
+        settings.mail_enabled
+        and settings.smtp_security == "none"
+        and not _is_loopback(settings.smtp_host)
+    ):
+        logger.warning(
+            "SMTP_SECURITY=none sends email unencrypted to %s; use starttls or tls unless the "
+            "server is on this host or a trusted network",
+            settings.smtp_host,
+        )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:
+            if outbox is not None:
+                outbox.start()
             # Decided once per process start; a restart picks up an upgraded database.
             state = schema_state(settings)
             if state == "behind" and settings.auto_migrate:
@@ -127,6 +182,7 @@ def create_app(
                 app.state.setup_token = setup_token_at_startup(
                     settings, setup_open=setup_open, logger=logger
                 )
+                await run_in_threadpool(prune_email_tokens_with_factory, session_factory, clock)
             elif state == "behind":
                 logger.warning(
                     "database schema is behind this version and AUTO_MIGRATE is off; "
@@ -139,6 +195,8 @@ def create_app(
             await run_in_threadpool(prepare_dummy_hash)
             yield
         finally:
+            if outbox is not None:
+                await run_in_threadpool(outbox.stop)
             engine.dispose()
             touch_engine.dispose()
 
@@ -164,6 +222,8 @@ def create_app(
     app.state.proxy_spoof_warnings = RecentKeys()
     app.state.proxy_audits = RecentKeys()
     app.state.setup_token = None
+    app.state.mail_outbox = outbox
+    app.state.mail_log_key = mail_log_key
     app.state.database_checker = checker
     # Added innermost first; see ADR-0012 for the resulting order.
     app.add_middleware(AccessGateMiddleware)
@@ -175,6 +235,7 @@ def create_app(
     app.mount("/static", StaticFiles(directory=static_directory), name="static")
     app.include_router(web_router)
     app.include_router(auth_router)
+    app.include_router(email_router)
     app.include_router(account_router)
     app.include_router(admin_router)
     app.include_router(audit_router)

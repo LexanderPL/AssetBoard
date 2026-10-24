@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import logging
 import stat
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from assetboard.branding import ENV_PREFIX
 from assetboard.config import Settings
@@ -30,7 +32,7 @@ def test_settings_are_side_effect_free_and_use_spec_defaults(
     assert settings.auto_migrate is True
     assert settings.secret_key is None
     assert settings.setup_token is None
-    assert settings.allow_registration is False
+    assert settings.allow_registration is None
     assert settings.session_idle_timeout_days == 14
     assert settings.session_absolute_timeout_days == 60
     assert settings.auth_account_free_failures == 5
@@ -252,7 +254,7 @@ def test_oidc_settings_from_the_environment(
         ({"oidc_issuer": "https://idp.example.test/" + "a" * 490}, "at most 512"),
         ({"base_url": "http://money.example.test"}, "BASE_URL must use https"),
         ({"base_url": None}, "BASE_URL must be set"),
-        ({"oidc_only": True, "allow_registration": True}, "cannot be combined"),
+        ({"allow_registration": True}, "ALLOW_REGISTRATION was removed"),
         ({"oidc_issuer": None, "oidc_only": True}, "OIDC_ONLY needs OIDC_ISSUER"),
         ({"oidc_provider_name": " "}, "1 to 40 characters"),
         ({"oidc_provider_name": "x" * 41}, "1 to 40 characters"),
@@ -393,3 +395,116 @@ def test_wide_trusted_proxies_names_every_entry_wider_than_one_address(tmp_path:
         **{**PROXY_BASE, "trusted_proxies": "172.20.0.2,172.20.1.0/24,::1,fd00::/64"},  # type: ignore[arg-type]
     )
     assert settings.wide_trusted_proxies() == ["172.20.1.0/24", "fd00::/64"]
+
+
+MAIL_BASE = {
+    "env": "prod",
+    "base_url": "https://money.example.test",
+    "smtp_host": "smtp.example.test",
+    "smtp_from": "budget@example.test",
+}
+
+
+@pytest.mark.parametrize(
+    ("overrides", "message"),
+    [
+        ({}, None),
+        ({"smtp_from": None}, "SMTP_FROM is required"),
+        ({"smtp_from": "Budget <budget@example.test>"}, "plain email address"),
+        ({"smtp_username": "mailer"}, "must be set together"),
+        ({"smtp_password": "secret"}, "must be set together"),
+        ({"smtp_security": "none", "smtp_username": "u", "smtp_password": "p"}, "encryption"),
+        ({"smtp_security": "none", "smtp_username": "u", "smtp_password": "p", "env": "dev"}, None),
+        ({"smtp_security": "none"}, None),
+        ({"base_url": None}, "BASE_URL must be set when SMTP_HOST"),
+        ({"base_url": "http://money.example.test"}, "BASE_URL must use https"),
+        ({"smtp_host": "smtp example"}, "host name"),
+        ({"smtp_security": "ssl"}, "smtp_security"),
+        ({"smtp_port": 0}, "smtp_port"),
+    ],
+)
+def test_smtp_settings_are_validated(
+    tmp_path: Path, overrides: dict[str, object], message: str | None
+) -> None:
+    values: dict[str, object] = {"data_dir": tmp_path, **MAIL_BASE, **overrides}
+    if overrides.get("base_url", "") is None:
+        del values["base_url"]
+    if message is None:
+        settings = Settings(_env_file=None, **values)  # type: ignore[arg-type]
+        assert settings.mail_enabled
+        return
+    with pytest.raises(ValueError, match=message):
+        Settings(_env_file=None, **values)  # type: ignore[arg-type]
+
+
+def test_email_is_off_by_default_and_the_password_is_never_shown(tmp_path: Path) -> None:
+    assert not Settings(_env_file=None, data_dir=tmp_path).mail_enabled
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        **{**MAIL_BASE, "smtp_username": "u", "smtp_password": "smtp-secret-value"},  # type: ignore[arg-type]
+    )
+    assert settings.smtp_effective_port == 587
+    assert "smtp-secret-value" not in repr(settings)
+
+
+def test_retired_allow_registration_false_only_warns(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from assetboard import app as app_module
+
+    logger = logging.getLogger("retired-flag-test")
+    records: list[str] = []
+    handler = logging.Handler()
+    handler.emit = lambda record: records.append(record.getMessage())  # type: ignore[method-assign]
+    logger.addHandler(handler)
+    monkeypatch.setattr(app_module, "configure_logging", lambda *_args: logger)
+    app_module.create_app(Settings(_env_file=None, data_dir=tmp_path, allow_registration=False))
+    assert any("ALLOW_REGISTRATION is no longer used" in message for message in records)
+
+
+SECRETS = ("smtp-secret-value", "oidc-secret-value")
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"allow_registration": True},  # the retired flag's error
+        {"smtp_port": "smtp-secret-value"},  # a field error repeats nothing it was given
+        {"smtp_from": "oidc-secret-value <x@example.test>"},
+        {"smtp_security": "none"},  # a model error mentioning the password setting
+    ],
+)
+def test_settings_errors_never_show_secrets(tmp_path: Path, overrides: dict[str, object]) -> None:
+    values: dict[str, object] = {
+        "data_dir": tmp_path,
+        **MAIL_BASE,
+        "smtp_username": "mailer",
+        "smtp_password": "smtp-secret-value",
+        "oidc_issuer": "https://idp.example.test/",
+        "oidc_client_id": "assetboard",
+        "oidc_client_secret": "oidc-secret-value",
+        **overrides,
+    }
+    with pytest.raises(ValidationError) as failed:
+        Settings(_env_file=None, **values)  # type: ignore[arg-type]
+    for secret in SECRETS:
+        assert secret not in str(failed.value)
+
+
+def test_cli_errors_never_show_secrets(tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+
+    from assetboard.cli import app as cli_app
+
+    env = {
+        f"{ENV_PREFIX}_DATA_DIR": str(tmp_path),
+        f"{ENV_PREFIX}_ALLOW_REGISTRATION": "true",
+        f"{ENV_PREFIX}_SMTP_PASSWORD": "smtp-secret-value",
+        f"{ENV_PREFIX}_OIDC_CLIENT_SECRET": "oidc-secret-value",
+        f"{ENV_PREFIX}_SMTP_PORT": "oidc-secret-value",
+    }
+    result = CliRunner().invoke(cli_app, ["mail-test", "me@example.com"], env=env)
+    assert result.exit_code == 1 and "smtp_port" in result.output
+    for secret in SECRETS:
+        assert secret not in result.output

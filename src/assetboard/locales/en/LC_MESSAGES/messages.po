@@ -145,6 +145,12 @@ msgstr ""
 msgid "Password changed"
 msgstr ""
 
+msgid "Password reset link sent"
+msgstr ""
+
+msgid "Password reset by email"
+msgstr ""
+
 msgid "Password confirmation failed"
 msgstr ""
 
@@ -343,6 +349,9 @@ msgstr ""
 msgid "Every signed-in user can create workspaces"
 msgstr ""
 
+msgid "Open registration"
+msgstr ""
+
 msgid "Month"
 msgstr ""
 
@@ -467,6 +476,9 @@ msgid "the profile"
 msgstr ""
 
 msgid "an invitation"
+msgstr ""
+
+msgid "a confirmed email address"
 msgstr ""
 
 msgid "an invitation, through the identity provider"
@@ -601,6 +613,26 @@ msgstr ""
 msgid "Instance settings"
 msgstr ""
 
+#, python-format
+msgid "Confirm your email address for %(app)s"
+msgstr ""
+
+#, python-format
+msgid "You already have an account at %(app)s"
+msgstr ""
+
+#, python-format
+msgid "Reset your %(app)s password"
+msgstr ""
+
+#, python-format
+msgid "About your %(app)s password"
+msgstr ""
+
+#, python-format
+msgid "Test email from %(app)s"
+msgstr ""
+
 msgid "Same as the system"
 msgstr ""
 
@@ -720,7 +752,15 @@ msgstr ""
 msgid "Nothing to change: the settings already had these values."
 msgstr ""
 
-msgid "Choose who can create workspaces."
+msgid "Open registration needs an email server: set ASSETBOARD_SMTP_HOST first."
+msgstr ""
+
+msgid ""
+"Open registration is not available while only the identity provider signs"
+" people in (ASSETBOARD_OIDC_ONLY)."
+msgstr ""
+
+msgid "Choose a value for each setting."
 msgstr ""
 
 msgid "Enter a valid email address."
@@ -795,12 +835,6 @@ msgid "Setup was already completed, or is being completed. Reload to continue."
 msgstr ""
 
 msgid "Setup in progress"
-msgstr ""
-
-msgid "Too many registration attempts from your network. Try again later."
-msgstr ""
-
-msgid "This email address cannot be registered."
 msgstr ""
 
 msgid ""
@@ -886,6 +920,40 @@ msgid ""
 "sign-in from the last 10 minutes."
 msgstr ""
 
+msgid "Check your inbox"
+msgstr ""
+
+msgid ""
+"If this address can be registered, we sent it a link to finish creating "
+"your account. The link works for 24 hours. Nothing arrived? Check your "
+"spam folder, or ask again later."
+msgstr ""
+
+msgid ""
+"If an account uses this address, we sent it an email with the next step. "
+"A password reset link works for 60 minutes. Nothing arrived? Check your "
+"spam folder, or ask again later."
+msgstr ""
+
+msgid "Link not valid"
+msgstr ""
+
+msgid ""
+"This link is not valid: it may have expired or been used already. Ask for"
+" a new one."
+msgstr ""
+
+msgid ""
+"Your password was changed, and every device signed in to this account was"
+" signed out. Sign in with the new password."
+msgstr ""
+
+msgid "Too many registration attempts from your network. Try again later."
+msgstr ""
+
+msgid "Too many requests from your network. Try again later."
+msgstr ""
+
 msgid "This request came from another site and was blocked."
 msgstr ""
 
@@ -944,6 +1012,9 @@ msgid "Editor"
 msgstr ""
 
 msgid "Viewer"
+msgstr ""
+
+msgid "This email address cannot be registered."
 msgstr ""
 
 msgid ""
@@ -1491,6 +1562,23 @@ msgid ""
 " provider or a proxy: those follow their own settings."
 msgstr ""
 
+msgid "Registration"
+msgstr ""
+
+msgid "Off: accounts come from invitations, administrators or sign-in providers"
+msgstr ""
+
+msgid "On: anyone can register with a verified email address"
+msgstr ""
+
+msgid ""
+"A new account must confirm its email address through a link before it is "
+"created, and gets its own workspace."
+msgstr ""
+
+msgid "Registration stays closed until this is fixed."
+msgstr ""
+
 msgid "Save settings"
 msgstr ""
 
@@ -1629,6 +1717,23 @@ msgstr ""
 msgid "Older"
 msgstr ""
 
+msgid "Sign in"
+msgstr ""
+
+msgid "Back to sign in"
+msgstr ""
+
+msgid "Forgot your password?"
+msgstr ""
+
+msgid ""
+"Enter the email address of your account. We will send you a link to "
+"choose a new password."
+msgstr ""
+
+msgid "Send the link"
+msgstr ""
+
 msgid "Link your account"
 msgstr ""
 
@@ -1645,9 +1750,6 @@ msgid "This signs the account out on all other devices."
 msgstr ""
 
 msgid "Link and sign in"
-msgstr ""
-
-msgid "Sign in"
 msgstr ""
 
 #, python-format
@@ -1706,10 +1808,25 @@ msgstr ""
 msgid "Sign out other devices"
 msgstr ""
 
-msgid "Workspace name"
+msgid ""
+"Enter your email address. We will send you a link to confirm it and "
+"finish creating your account."
 msgstr ""
 
 msgid "Already have an account?"
+msgstr ""
+
+#, python-format
+msgid "Your email address %(email)s is confirmed. Choose your name and password."
+msgstr ""
+
+msgid "Workspace name"
+msgstr ""
+
+msgid "Choose a new password"
+msgstr ""
+
+msgid "Every device signed in to this account will be signed out."
 msgstr ""
 
 msgid "First-run setup"
@@ -1813,6 +1930,65 @@ msgid "Delete the category %(name)s?"
 msgstr ""
 
 msgid "Delete"
+msgstr ""
+
+msgid "Hello,"
+msgstr ""
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to reset the password of your %(app)s "
+"account. To choose a new password, open this link:"
+msgstr ""
+
+msgid ""
+"The link works once, for 60 minutes. Choosing a new password signs out "
+"every device signed in to your account."
+msgstr ""
+
+msgid ""
+"If you did not ask for this, ignore this email: your password stays the "
+"same."
+msgstr ""
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to reset the password of your %(app)s "
+"account. Your account has no password: you sign in through your identity "
+"provider or your proxy, so there is nothing to reset here."
+msgstr ""
+
+msgid "Sign in:"
+msgstr ""
+
+msgid "If you did not ask for this, ignore this email: nothing was changed."
+msgstr ""
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to create an account at %(app)s with this "
+"email address. An account with this address already exists, so no new one"
+" was created."
+msgstr ""
+
+msgid "Forgot your password? Ask for a new one here:"
+msgstr ""
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to create an account at %(app)s with this "
+"email address. To confirm the address and finish creating your account, "
+"open this link:"
+msgstr ""
+
+msgid "The link works once, for 24 hours."
+msgstr ""
+
+msgid "If you did not ask for this, ignore this email: no account is created."
+msgstr ""
+
+#, python-format
+msgid "This is a test email from %(app)s. Your email settings work."
 msgstr ""
 
 msgid "Dismiss"
@@ -2434,5 +2610,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Plan"
+#~ msgstr ""
+
+#~ msgid "Choose who can create workspaces."
 #~ msgstr ""
 

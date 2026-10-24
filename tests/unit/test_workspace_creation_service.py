@@ -39,6 +39,8 @@ from assetboard.services.workspaces import (
 from tests.tenant.serialize import serialize_at_checkpoint
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
+SETTINGS_NO_MAIL = Settings(_env_file=None)
+
 
 @pytest.fixture
 def db(tmp_path: Path) -> Iterator[WorkspaceDb]:
@@ -221,6 +223,8 @@ def test_the_setting_is_read_inside_the_write_transaction(
                 session,
                 admin,
                 allow_workspace_creation=False,
+                allow_registration=False,
+                settings=SETTINGS_NO_MAIL,
                 clock=db.clock,
                 host=None,
                 user_agent=None,
@@ -271,7 +275,8 @@ def test_an_administrator_changes_the_setting_and_it_is_audited(db: WorkspaceDb)
         admin = session.get(User, ada)
         assert admin is not None
         status = update_settings(
-            session, admin, allow_workspace_creation=False, clock=db.clock,
+            session, admin, allow_workspace_creation=False, allow_registration=False,
+            settings=SETTINGS_NO_MAIL, clock=db.clock,
             host="192.0.2.1", user_agent="test",
         )  # fmt: skip
     assert status == "done"
@@ -293,7 +298,8 @@ def test_an_administrator_changes_the_setting_and_it_is_audited(db: WorkspaceDb)
         admin = session.get(User, ada)
         assert admin is not None
         again = update_settings(
-            session, admin, allow_workspace_creation=False, clock=db.clock,
+            session, admin, allow_workspace_creation=False, allow_registration=False,
+            settings=SETTINGS_NO_MAIL, clock=db.clock,
             host=None, user_agent=None,
         )  # fmt: skip
     assert again == "unchanged"
@@ -309,7 +315,8 @@ def test_only_active_administrators_change_the_setting(
         actor = session.get(User, user_id)
         assert actor is not None
         update_settings(
-            session, actor, allow_workspace_creation=False, clock=db.clock,
+            session, actor, allow_workspace_creation=False, allow_registration=False,
+            settings=SETTINGS_NO_MAIL, clock=db.clock,
             host=None, user_agent=None,
         )  # fmt: skip
     assert get_settings(db.factory).allow_workspace_creation is True

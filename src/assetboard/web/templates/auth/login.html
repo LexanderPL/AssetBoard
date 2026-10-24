@@ -21,6 +21,9 @@
   {{ field("password", _("Password"), type="password", required=true, autocomplete="current-password", maxlength=1024) }}
   {{ primary_button(_("Sign in")) }}
 </form>
+{% if forgot_password %}
+<p class="mt-4 text-center text-sm"><a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'password_forgot') }}">{{ _("Forgot your password?") }}</a></p>
+{% endif %}
 {% endif %}
 {% if registration_enabled %}
 <p class="mt-6 text-center text-sm text-muted">{{ _("No account yet?") }} <a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'register') }}">{{ _("Create an account") }}</a></p>

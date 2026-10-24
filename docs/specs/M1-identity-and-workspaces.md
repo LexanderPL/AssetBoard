@@ -27,7 +27,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 - Sessions are **server-side** (`UserSession`), cookie holds an opaque random id (stored hashed), `HttpOnly`, `SameSite=Lax`, `Secure` when `BASE_URL` is https; idle timeout 14 days, absolute 60 days (configurable); "log out other devices".
 - Login/logout, change password (invalidates other sessions), CSRF on all forms.
 - Login throttling per IP and per account (e.g., 5 failures → exponential backoff), generic error messages (no user enumeration), constant-time-ish comparison path for unknown users. Amended 2026-10-17 (ADR-0012): unknown email and wrong password share one message; only an attempt refused by a blocked bucket says "Too many attempts. Try again in N minutes." (401 with `Retry-After`). The per-account (sign-in) bucket is keyed by the normalized email, counted identically for unknown emails, and decays with time only (fixed window equal to the per-IP window, 60 min by default): every attempt counts, successful ones included, and nothing resets it (an attempt is taken back only when no verify outcome exists, e.g. a busy hashing gate). Wrong current passwords on change-password and failed password confirmations (profile, admin, link) count in a separate per-user `confirm` bucket (5 free, same backoff, reset by a correct password) and never touch the sign-in bucket. Decided in PR A: per-account 5 free failures, reset on success (amended 2026-10-17: no reset, time window instead; see below); per-IP (IPv4 address / IPv6 /64, hashed) 20 free failures in a time window that decays only with time; backoff doubles from 60 s, capped at 15 min. Registration has its own per-IP limit (5 attempts per hour, success or not) and never resets a login counter. Wrong current passwords on change-password count against the same per-account bucket (amended 2026-10-17: a separate per-user bucket). IPv4-mapped IPv6 client addresses are treated as IPv4. Stored IP prefixes on sessions and audit events are IPv4 /24 and IPv6 /48.
-- Open registration disabled by default; `ALLOW_REGISTRATION` env flag creates a new user + new workspace (with the suggested categories since pre-release A, see M2 F2.1; before, an empty one).
+- Open registration disabled by default; `ALLOW_REGISTRATION` env flag creates a new user + new workspace (with the suggested categories since pre-release A, see M2 F2.1; before, an empty one). Replaced in pre-release B (see "Email, verified registration and password reset" below): the flag is retired and open registration is an instance setting that needs SMTP and email verification.
 - Audit events: login success/failure, logout, password change.
 - CLI: `assetboard create-admin`, `assetboard reset-password <email>` (sets a new password interactively or via `--password-stdin` and revokes all sessions; the one-time-link variant is deferred to F1.5). `create-admin` is a break-glass command: it also works when users exist, never modifies an existing user (duplicate email is an error), creates an owned workspace unless `--no-workspace`, and is audited with the CLI as actor. Both respect `AUTO_MIGRATE` (off + schema not at head = non-zero exit, nothing changed).
 - Setup gate: while there are zero users, GET /setup returns 200 with a form that includes a "setup token" field. The token is ASSETBOARD_SETUP_TOKEN if set, otherwise generated per process start and logged once at WARNING. POST /setup compares it with secrets.compare_digest, throttled; it creates the admin, workspace and owner membership in ONE transaction. Two concurrent POSTs: exactly one creates the admin and the other gets a deterministic "setup already completed" response (test). /setup returns 404 once any user exists.
@@ -176,7 +176,8 @@ Also add a short docs/architecture.md section "How to add a new workspace-owned 
 - Flow state is a signed cookie with `iat`/`exp` checked by the server (10 minutes), not a
   table. The provider is reached with the standard library (no new HTTP client).
 - `BASE_URL` must be set and `https://` (as must the issuer and every discovered endpoint)
-  unless `ENV=dev`. `OIDC_ONLY` refuses to start with `ALLOW_REGISTRATION`.
+  unless `ENV=dev`. `OIDC_ONLY` refuses to start with `ALLOW_REGISTRATION` (until pre-release
+  B; since then `OIDC_ONLY` keeps open registration and password reset off).
 - `/auth/oidc/*` sends `Referrer-Policy: no-referrer` and `Cache-Control: no-store` and has no
   forms; the password confirmation page is under `/login/`.
 - Part B: the callback answers every outcome with a 303 to a URL without a query; failures go
@@ -253,6 +254,32 @@ Add a prominent warning section to docs/auth/proxy-auth.md.
   pages; data rendered only through per-action key allowlists; IP prefixes and the affected
   account only in the instance scope.
 - Deactivated users cannot log in and their sessions are revoked.
+
+**Email, verified registration and password reset (owner, pre-release B, 2026-10-19)**, see
+[ADR-0017](../adr/0017-email-and-account-recovery.md):
+- SMTP from `ASSETBOARD_SMTP_*` (host, port, security `starttls`/`tls`/`none`, user, password,
+  from, timeout); the password is never logged. Mail goes through an in-process outbox after the
+  response; failures are logged by class only. `assetboard mail-test <to>` checks the settings.
+- `ALLOW_REGISTRATION` is retired (`true` refuses to start, `false` warns). Open registration is
+  the instance setting `allow_registration` (off by default) on `/admin/settings`, next to the
+  workspace switch; it cannot be turned on without SMTP or under `OIDC_ONLY`, and is effective
+  only while both hold. Audited as `instance.settings_updated` (`allow_registration`).
+- Registration in two steps: the email form always answers the same ("check your inbox"); a
+  link (24 h, single use, SHA-256 at rest, at most 3 live per address) leads to the form that
+  creates the account, its workspace and the session; an existing active account gets a note
+  instead, a deactivated one nothing. No account exists before the link is used.
+- Forgot password: the email form always answers the same; an active account with a password
+  gets a link (60 min, single use, at most 3 live); an account without a password gets a note.
+  Setting the new password ends every session and spends every reset link; any password change
+  or deactivation spends them too. No automatic sign-in. Audited as
+  `auth.password_reset_requested` and `auth.password_reset`.
+- No account-existence signal: identical responses and the same database work in the request
+  for every address; the lookup, link, audit row and mail happen in the outbox worker after the
+  response and a random 0.5-3 s wait; emails per address are limited silently
+  (`MAIL_EMAIL_LIMIT`, counted for every address); the per-client limits (`REGISTRATION_IP_LIMIT`
+  for both registration steps, `MAIL_IP_LIMIT`) may say "try later". Invitation sign-up keeps
+  saying an address is taken (secret, email-locked link; outside the rule).
+- Invitation, OIDC, proxy and administrator-created accounts need no verification.
 
 **Agent prompt**
 ```
