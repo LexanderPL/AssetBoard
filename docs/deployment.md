@@ -62,6 +62,8 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_PROXY_AUTH_NAME_HEADER` | unset | App | Optional header with a display name, used only when an account is created. |
 | `ASSETBOARD_PROXY_AUTH_AUTO_CREATE` | `false` | App | Proxy-authenticated people without an account get one with their own workspace. |
 | `ASSETBOARD_PROXY_AUTH_LINK_BY_EMAIL` | `false` | App | A first proxy sign-in whose email matches an existing account with a password links them after that password is entered once. |
+| `ASSETBOARD_RECURRENCE_HORIZON_MONTHS` | `13` | App | Positive number of calendar months of recurring occurrences to generate ahead. |
+| `ASSETBOARD_SCHEDULER_ENABLED` | `true` | App | Run the in-process recurring-item scheduler (daily generation and startup catch-up). The test suite sets `false`. |
 | `ASSETBOARD_BIND_ADDRESS` | `127.0.0.1` | Compose only | Host interface to publish. Use `0.0.0.0` to listen on all host interfaces. |
 | `ASSETBOARD_HOST_PORT` | `8000` | Compose only | Host port mapped to the container's port 8000. |
 | `ASSETBOARD_IMAGE` | `assetboard:local` | Compose only | Image reference interpolated by Compose. Set this when running a published image with `--no-build`. |
@@ -97,6 +99,17 @@ decrypted"), while recovery codes still work. Restore the previous key, or have 
 user sign in with a recovery code, disable two-factor authentication and enroll again; an
 administrator can also reset it (**Users**, or `assetboard reset-mfa` below). A password reset
 does not remove MFA.
+
+### Recurring-item generation
+
+`ASSETBOARD_RECURRENCE_HORIZON_MONTHS` is a positive integer (default `13`). Planned occurrences
+are generated immediately on rule changes and workspace country changes, shortly after startup
+(a background catch-up job, so startup does not wait for it) and daily at 03:00 in each
+workspace's time zone. Keep one application process/worker: the scheduler lives in the process,
+and the app logs a warning at startup when `WEB_CONCURRENCY` asks for more than one worker.
+`ASSETBOARD_SCHEDULER_ENABLED=false` turns the scheduler off (generation on rule changes still
+happens). New workspaces/time-zone changes are discovered within a minute. Calendars are local;
+no external service is contacted. See [Recurring items](recurring.md).
 
 ### Invitations
 
@@ -251,6 +264,19 @@ architectures without logging in to GHCR or publishing. Check **Publish the imag
 when you intend to upload the image and its release tags.
 
 ## Upgrading
+
+### Unreleased: two-factor authentication (F1.6)
+
+- Migration `0016_f16_totp` adds the `totp_factors` and `totp_recovery_codes` tables, a session
+  flag and the `require_two_factor` workspace setting (off). Nothing changes until a user enrolls
+  or an owner turns the setting on. Back up the secret key with the database (see [Secret key and two-factor authentication](#secret-key-and-two-factor-authentication)).
+
+### Unreleased: recurring items (F3.1)
+
+- Migration `0015_f31` adds the `scheduled_items` and `scheduled_occurrences` tables.
+- The in-process scheduler generates planned occurrences at startup (in the background) and
+  daily at 03:00 workspace time. Run one worker; `ASSETBOARD_SCHEDULER_ENABLED=false` turns the
+  scheduler off. See [Recurring-item generation](#recurring-item-generation).
 
 ### Unreleased: email, verified registration and password reset (pre-release B)
 

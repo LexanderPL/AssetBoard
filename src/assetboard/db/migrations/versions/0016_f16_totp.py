@@ -1,7 +1,7 @@
 """F1.6 TOTP two-factor authentication
 
-Revision ID: 0015_f16_totp
-Revises: 0014_email_tokens
+Revision ID: 0016_f16_totp
+Revises: 0015_f31
 Create Date: 2026-10-20 21:58:50.270033
 """
 
@@ -12,8 +12,8 @@ from alembic import op
 
 from assetboard.db.types import UtcDateTime
 
-revision = "0015_f16_totp"
-down_revision = "0014_email_tokens"
+revision = "0016_f16_totp"
+down_revision = "0015_f31"
 branch_labels = None
 depends_on = None
 
