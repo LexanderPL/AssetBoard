@@ -11,6 +11,7 @@ from datetime import timedelta
 from typing import TYPE_CHECKING, Any, cast
 from uuid import uuid4
 
+import pyotp
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -29,7 +30,9 @@ from assetboard.db.models.identity import (
     User,
     UserSession,
 )
-from assetboard.services import account_email, admin_users, auth
+from assetboard.db.models.totp import TotpFactor, TotpRecoveryCode
+from assetboard.domain.totp import recovery_hash
+from assetboard.services import account_email, admin_users, auth, totp
 from assetboard.services.instance_settings import update_settings
 from assetboard.services.mail import MailRequest
 from tests.conftest import ADMIN_PASSWORD, mail_body, mail_link
@@ -301,6 +304,55 @@ def test_reset_sets_the_password_ends_every_session_and_is_audited(
     assert _events(app, "auth.password_reset_requested")
     [event] = _events(app, "auth.password_reset")
     assert event.data == {"sessions_revoked": 1}
+
+
+def test_reset_by_email_keeps_the_second_factor_and_its_mail_does_not_mention_it(
+    mail: tuple[FastAPI, TestClient], web: WebHarness
+) -> None:
+    app, client = mail
+    with app.state.session_factory.begin() as session:
+        user_id = session.scalars(select(User.id).where(User.email == web.admin_email)).one()
+        session.add(
+            TotpFactor(
+                user_id=user_id,
+                encrypted_secret=totp.encrypt_secret(
+                    app.state.settings, user_id, pyotp.random_base32(), app.state.clock.now()
+                ),
+                enabled_at=app.state.clock.now(),
+                last_step=-1,
+            )
+        )
+        session.add(TotpRecoveryCode(user_id=user_id, code_hash=recovery_hash("recovery-one")))
+    assert _forgot(client, web, web.admin_email).status_code == 200
+    [message] = web.sent_mail(app)
+    body = mail_body(message).lower()
+    for word in ("two-factor", "authenticator", "recovery", "mfa", "2fa"):
+        assert word not in body
+    link = mail_link(message, "/password/reset/")
+    page = client.get(link)
+    done = client.post(
+        link,
+        data={"csrf_token": web.csrf(page.text), "new_password": NEW_PASSWORD,
+              "confirm_password": NEW_PASSWORD},
+    )  # fmt: skip
+    assert done.status_code == 200
+    assert "assetboard_session" not in done.headers.get("set-cookie", "")
+    with app.state.session_factory() as session:
+        factor = session.get(TotpFactor, user_id)
+        assert factor is not None and factor.enabled_at is not None
+        assert session.scalars(select(UserSession)).all() == []
+
+    def sign_in(code: str) -> Response:
+        return _post(
+            client, web, "/login", "/login",
+            email=web.admin_email, password=NEW_PASSWORD, second_factor=code,
+        )  # fmt: skip
+
+    # The new password alone does not sign in: the reset did not bypass the second factor.
+    assert sign_in("").status_code == 401
+    with app.state.session_factory() as session:
+        assert session.scalars(select(UserSession)).all() == []
+    assert sign_in("recovery-one").status_code == 303
 
 
 def test_forgot_says_the_same_for_every_kind_of_address(
