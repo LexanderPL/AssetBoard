@@ -1,3 +1,4 @@
+import threading
 from datetime import UTC, datetime
 from unittest.mock import Mock
 
@@ -24,6 +25,7 @@ def test_jobs_follow_workspace_timezones_refresh_and_shutdown(db):
     jobs = RecurringJobs(db.factory, Settings(_env_file=None), lambda: db.clock, logger)
     jobs.start()
     try:
+        assert jobs.caught_up.wait(timeout=30)  # the catch-up runs as a background job
         job = jobs.scheduler.get_job(str(db.workspace_id))
         assert job is not None
         fire = job.trigger.get_next_fire_time(None, datetime(2026, 3, 28, 23, tzinfo=UTC))
@@ -51,6 +53,28 @@ def test_jobs_follow_workspace_timezones_refresh_and_shutdown(db):
     assert not jobs.scheduler.running
 
 
+def test_start_returns_before_the_catch_up_generates(db, monkeypatch):
+    started = threading.Event()
+    release = threading.Event()
+
+    def slow(*_args):
+        started.set()
+        release.wait(timeout=30)
+        return 0
+
+    monkeypatch.setattr("assetboard.recurring_jobs.generate_workspace", slow)
+    jobs = RecurringJobs(db.factory, Settings(_env_file=None), lambda: db.clock, Mock())
+    jobs.start()
+    try:
+        assert started.wait(timeout=30)
+        assert not jobs.caught_up.is_set()  # start() did not wait for generation
+        release.set()
+        assert jobs.caught_up.wait(timeout=30)
+    finally:
+        release.set()
+        jobs.stop()
+
+
 def test_failed_generation_is_logged_without_data_and_later_runs_can_retry(db, monkeypatch):
     logger = Mock()
     jobs = RecurringJobs(db.factory, Settings(_env_file=None), lambda: db.clock, logger)
@@ -60,4 +84,6 @@ def test_failed_generation_is_logged_without_data_and_later_runs_can_retry(db, m
     jobs.run(db.workspace_id)
     assert generate.call_count == 2
     assert logger.error.call_count == 1
-    assert "sensitive" not in str(logger.error.call_args)
+    message = logger.error.call_args.args[0] % logger.error.call_args.args[1:]
+    assert "sensitive" not in message and "RuntimeError" in message
+    assert logger.error.call_args.kwargs["exc_info"] is True

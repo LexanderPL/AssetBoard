@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from importlib.metadata import version
@@ -72,6 +73,14 @@ SCHEMA_READINESS = {"behind": "schema_outdated", "ahead": "schema_newer"}
 DatabaseChecker = Callable[[], bool]
 
 
+def _worker_count() -> int:
+    """Uvicorn's ``WEB_CONCURRENCY`` default for ``--workers``; the only cheap signal."""
+    try:
+        return int(os.environ.get("WEB_CONCURRENCY", "1"))
+    except ValueError:
+        return 1
+
+
 def create_app(
     settings: Settings | None = None,
     *,
@@ -110,6 +119,7 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         recurring_jobs = RecurringJobs(session_factory, settings, lambda: app.state.clock, logger)
+        app.state.recurring_jobs = recurring_jobs
         try:
             # Decided once per process start; a restart picks up an upgraded database.
             state = schema_state(settings)
@@ -140,8 +150,13 @@ def create_app(
                 logger.error("database schema is newer than this version of %s", APP_NAME)
             # Unknown-user logins verify against this; compute it once, before any request.
             await run_in_threadpool(prepare_dummy_hash)
-            if state == "current":
-                await run_in_threadpool(recurring_jobs.start)
+            if state == "current" and settings.scheduler_enabled:
+                if _worker_count() > 1:
+                    logger.warning(
+                        "WEB_CONCURRENCY is above 1: run a single worker; scheduled jobs and "
+                        "some caches live in the process"
+                    )
+                recurring_jobs.start()
             yield
         finally:
             await run_in_threadpool(recurring_jobs.stop)

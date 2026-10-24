@@ -93,6 +93,12 @@ def isolate_application_data_dir(
 
 
 @pytest.fixture(autouse=True)
+def no_background_scheduler(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Apps built by tests never start the recurring-item scheduler (its own tests drive it)."""
+    monkeypatch.setenv(f"{ENV_PREFIX}_SCHEDULER_ENABLED", "false")
+
+
+@pytest.fixture(autouse=True)
 def cheap_password_hashing(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test-only seam: production hashing keeps argon2-cffi's default parameters."""
     monkeypatch.setattr(auth_service, "ARGON2_PARAMETERS", profiles.CHEAPEST)

@@ -71,6 +71,7 @@ class Settings(BaseSettings):
     setup_token: SecretStr | None = None
     allow_registration: bool = False
     recurrence_horizon_months: int = Field(default=DEFAULT_RECURRENCE_HORIZON_MONTHS, ge=1)
+    scheduler_enabled: bool = True
     session_idle_timeout_days: int = Field(default=14, ge=1, le=365)
     session_absolute_timeout_days: int = Field(default=60, ge=1, le=365)
     auth_account_free_failures: int = Field(default=5, ge=1)

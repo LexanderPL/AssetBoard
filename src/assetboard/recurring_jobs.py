@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 from collections.abc import Callable
 from dataclasses import dataclass
 from uuid import UUID
@@ -36,18 +37,36 @@ class RecurringJobs:
         self.factory, self.settings, self.clock, self.logger = factory, settings, clock, logger
         self.scheduler = BackgroundScheduler(timezone="UTC")
         self.zones: dict[UUID, str] = {}
+        self._reconciling = threading.Lock()
+        self.caught_up = threading.Event()  # set when the startup catch-up has finished
 
     def run(self, workspace_id: UUID) -> None:
         try:
             generate_workspace(
                 self.factory, _Scope(_Workspace(workspace_id)), self.clock(), self.settings
             )
-        except Exception:
+        except Exception as exc:
             self.logger.error(
-                "Recurring generation failed for workspace %s; next run will retry", workspace_id
+                "recurring_generation_failed workspace=%s exception_type=%s; next run will retry",
+                workspace_id,
+                type(exc).__name__,
+                exc_info=True,
             )
 
     def reconcile(self) -> None:
+        with self._reconciling:
+            self._reconcile()
+
+    def catch_up(self) -> None:
+        """Startup catch-up: rebuild the daily jobs and generate every workspace's horizon."""
+        try:
+            self.reconcile()
+            for workspace_id in tuple(self.zones):
+                self.run(workspace_id)
+        finally:
+            self.caught_up.set()
+
+    def _reconcile(self) -> None:
         with self.factory() as session:
             workspaces = dict(RecurringWorkspaceReader(session).workspaces())
         for workspace_id, timezone in workspaces.items():
@@ -67,9 +86,8 @@ class RecurringJobs:
         self.zones = workspaces
 
     def start(self) -> None:
-        self.reconcile()
-        for workspace_id in self.zones:
-            self.run(workspace_id)
+        """Start without touching the database: the catch-up runs as an immediate job."""
+        self.scheduler.add_job(self.catch_up, id="startup-catch-up", misfire_grace_time=None)
         self.scheduler.add_job(self.reconcile, "interval", minutes=1, id="refresh-workspaces")
         self.scheduler.start()
 
