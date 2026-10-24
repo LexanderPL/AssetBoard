@@ -1444,6 +1444,44 @@ msgstr "Sobota"
 msgid "Sunday"
 msgstr "Niedziela"
 
+msgid "Choose a valid tax effect and base."
+msgstr "Wybierz prawidłowy rodzaj i podstawę podatku."
+
+msgid "Enter a valid effective date between 1900 and 2199."
+msgstr "Podaj prawidłową datę z zakresu od 1900 do 2199."
+
+msgid "Enter a non-negative whole-number rate in basis points."
+msgstr "Podaj nieujemną całkowitą stawkę w punktach bazowych."
+
+msgid "Enter a non-negative fixed amount in the workspace currency."
+msgstr "Podaj nieujemną kwotę w walucie obszaru roboczego."
+
+msgid "Enter a non-negative net amount in the workspace currency."
+msgstr "Podaj nieujemną kwotę netto w walucie obszaru roboczego."
+
+msgid "A new version must start after the latest existing version."
+msgstr "Nowa wersja musi obowiązywać od daty późniejszej niż najnowsza wersja."
+
+msgid "Archived tax rules cannot be changed."
+msgstr "Nie można zmieniać zarchiwizowanych reguł podatkowych."
+
+msgid "Choose how the income is recorded."
+msgstr "Wybierz sposób zapisu przychodu."
+
+msgid "The tax rule could not be saved. Check the form and try again."
+msgstr ""
+"Nie udało się zapisać reguły podatkowej. Sprawdź formularz i spróbuj "
+"ponownie."
+
+msgid "Cash received (gross)"
+msgstr "Wpływ brutto"
+
+msgid "Net"
+msgstr "Netto"
+
+msgid "Take-home"
+msgstr "Na rękę"
+
 msgid "Too many attempts. Try again later."
 msgstr "Zbyt wiele prób. Spróbuj ponownie później."
 
@@ -2539,9 +2577,6 @@ msgstr "Wydane"
 msgid "Saved"
 msgstr "Zaoszczędzone"
 
-msgid "Net"
-msgstr "Bilans"
-
 msgid "Savings rate"
 msgstr "Stopa oszczędności"
 
@@ -2937,6 +2972,134 @@ msgid "Nothing is overdue or due in the next %(days)d days."
 msgstr ""
 "Brak zaległych pozycji i pozycji z terminem w ciągu kolejnych %(days)d "
 "dni."
+
+msgid "Tax calculator"
+msgstr "Kalkulator podatków"
+
+msgid "Rates are entered by you; this is not tax advice."
+msgstr "Stawki wprowadzasz samodzielnie; to nie jest porada podatkowa."
+
+#, python-format
+msgid "Net amount (%(currency)s)"
+msgstr "Kwota netto (%(currency)s)"
+
+msgid "Calculation date"
+msgstr "Data obliczenia"
+
+msgid "Record income as"
+msgstr "Zapisz przychód jako"
+
+msgid "Calculate"
+msgstr "Oblicz"
+
+#, python-format
+msgid "No effective version on this date for: %(names)s"
+msgstr "Brak obowiązującej wersji na ten dzień dla: %(names)s"
+
+#, python-format
+msgid "Breakdown for %(date)s"
+msgstr "Zestawienie na dzień %(date)s"
+
+msgid "Added tax"
+msgstr "Podatek doliczony"
+
+msgid "Gross"
+msgstr "Brutto"
+
+msgid "Withheld"
+msgstr "Potrącono"
+
+msgid "Ledger amount"
+msgstr "Kwota w księdze"
+
+msgid "Planned tax payments"
+msgstr "Planowane płatności podatkowe"
+
+msgid "No tax payments for this recording mode."
+msgstr "Brak płatności podatkowych dla tego sposobu zapisu."
+
+msgid "Manage tax rules"
+msgstr "Zarządzaj regułami podatkowymi"
+
+msgid "Tax rules"
+msgstr "Reguły podatkowe"
+
+msgid "Calculator preview"
+msgstr "Podgląd kalkulatora"
+
+msgid "New tax rule"
+msgstr "Nowa reguła podatkowa"
+
+msgid "Effect"
+msgstr "Działanie"
+
+msgid "Added to net"
+msgstr "Doliczany do kwoty netto"
+
+msgid "Tax base"
+msgstr "Podstawa podatku"
+
+msgid "Notes (optional)"
+msgstr "Uwagi (opcjonalnie)"
+
+msgid "First version effective from"
+msgstr "Data obowiązywania pierwszej wersji"
+
+msgid "Value type"
+msgstr "Rodzaj wartości"
+
+msgid "Percent (basis points)"
+msgstr "Procent (punkty bazowe)"
+
+msgid "Fixed amount"
+msgstr "Kwota stała"
+
+msgid "Rate in basis points"
+msgstr "Stawka w punktach bazowych"
+
+#, python-format
+msgid "Fixed amount (%(currency)s)"
+msgstr "Kwota stała (%(currency)s)"
+
+msgid "Create tax rule"
+msgstr "Utwórz regułę podatkową"
+
+#, python-format
+msgid "Base: %(base)s"
+msgstr "Podstawa: %(base)s"
+
+#, python-format
+msgid "Archive the tax rule %(name)s?"
+msgstr "Zarchiwizować regułę podatkową %(name)s?"
+
+msgid "Versions"
+msgstr "Wersje"
+
+msgid "Add a new version"
+msgstr "Dodaj nową wersję"
+
+msgid "Effective from"
+msgstr "Obowiązuje od"
+
+msgid "Save version"
+msgstr "Zapisz wersję"
+
+msgid "Edit name and notes"
+msgstr "Edytuj nazwę i uwagi"
+
+msgid "Save details"
+msgstr "Zapisz szczegóły"
+
+msgid "No tax rules yet."
+msgstr "Nie ma jeszcze reguł podatkowych."
+
+msgid ""
+"Tax-rule effect and base are fixed at creation to preserve the meaning of"
+" existing rate versions. Create a separate rule to model a different tax."
+msgstr ""
+"Działanie i podstawa reguły są ustalone podczas tworzenia, aby zachować "
+"znaczenie istniejących wersji stawek. Utwórz osobną regułę dla innego "
+"podatku."
 
 msgid "Smallest amount"
 msgstr "Najmniejsza kwota"

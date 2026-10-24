@@ -164,3 +164,9 @@ def format_rate_tenths(tenths: int, locale: str) -> str:
     ``-43.3%`` (en), ``-43,3%`` (pl). Exact: the value is a Decimal, never a float."""
     value = Decimal(tenths).scaleb(-3)
     return format_percent(value, format="#,##0.0%", locale=_normalize_number_locale(locale))
+
+
+def format_rate_basis_points(rate_bp: int, locale: str) -> str:
+    """Format an integer basis-point rate with two decimal places in the given locale."""
+    value = Decimal(rate_bp).scaleb(-4)
+    return format_percent(value, format="#,##0.00%", locale=_normalize_number_locale(locale))

@@ -54,6 +54,8 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "scheduled_occurrences",
         "totp_factors",
         "totp_recovery_codes",
+        "tax_rules",
+        "tax_rule_versions",
         "user_sessions",
         "users",
         "workspaces",
@@ -65,6 +67,23 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
     assert script_location is not None
     assert Path(script_location).is_dir()
     assert config.get_main_option("sqlalchemy.url") is None
+
+
+def test_0018_tax_rules_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'tax.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        assert {"tax_rules", "tax_rule_versions"} <= set(inspect(engine).get_table_names())
+        command.downgrade(alembic_config(settings), "0017_f32")
+        assert not {"tax_rules", "tax_rule_versions"} & set(inspect(engine).get_table_names())
+        upgrade_database(settings)
+        assert {"tax_rules", "tax_rule_versions"} <= set(inspect(engine).get_table_names())
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
 
 
 def test_create_revision_migrates_a_temporary_database_first(tmp_path, monkeypatch) -> None:

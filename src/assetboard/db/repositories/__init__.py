@@ -26,6 +26,7 @@ from assetboard.db.repositories.scheduled import (
     ScheduledItemRepository,
     ScheduledOccurrenceRepository,
 )
+from assetboard.db.repositories.tax import TaxRuleRepository, TaxRuleVersionRepository
 from assetboard.db.repositories.transaction import (
     CategoryCounts,
     DescriptionMatch,
@@ -42,6 +43,8 @@ from assetboard.db.repositories.workspace import (
 __all__ = [
     "ScheduledItemRepository",
     "ScheduledOccurrenceRepository",
+    "TaxRuleRepository",
+    "TaxRuleVersionRepository",
     "UPDATABLE_FIELDS",
     "AuditCursor",
     "AuditEventRepository",

@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% block title %}{{ _("Tax rules") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Tax rules") }}{% endblock %}
+{% block content %}
+<p class="mb-5 rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong">{{ _("Rates are entered by you; this is not tax advice.") }}</p>
+<div class="mb-5 flex flex-wrap gap-3">
+  <a href="{{ scoped_url(request, 'tax_calculator') }}" class="rounded-lg border border-line px-3 py-2 text-sm">{{ _("Calculator preview") }}</a>
+</div>
+{% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
+{% if can_edit %}
+<section class="panel mb-6 p-4 sm:p-6">
+  <h2 class="font-semibold">{{ _("New tax rule") }}</h2>
+  <form method="post" action="{{ scoped_url(request, 'tax_rule_create') }}" class="mt-4 grid gap-4 sm:grid-cols-2">
+    {{ csrf_input() }}
+    <label class="grid gap-1 text-sm">{{ _("Name") }}<input name="name" maxlength="200" required class="form-control rounded-lg px-3 py-2"></label>
+    <label class="grid gap-1 text-sm">{{ _("Effect") }}<select name="effect" required class="form-select rounded-lg py-2"><option value="added">{{ _("Added to net") }}</option><option value="withheld">{{ _("Withheld") }}</option></select></label>
+    <label class="grid gap-1 text-sm">{{ _("Tax base") }}<select name="base" required class="form-select rounded-lg py-2"><option value="net">{{ _("Net") }}</option><option value="gross">{{ _("Gross") }}</option></select></label>
+    <label class="grid gap-1 text-sm">{{ _("Notes (optional)") }}<input name="notes" maxlength="200" class="form-control rounded-lg px-3 py-2"></label>
+    <label class="grid gap-1 text-sm">{{ _("First version effective from") }}<input type="date" name="effective_from" value="{{ today }}" required class="form-control rounded-lg px-3 py-2"></label>
+    <label class="grid gap-1 text-sm">{{ _("Value type") }}<select name="mode" class="form-select rounded-lg py-2"><option value="percent">{{ _("Percent (basis points)") }}</option><option value="fixed">{{ _("Fixed amount") }}</option></select></label>
+    <label class="grid gap-1 text-sm">{{ _("Rate in basis points") }}<input name="rate_bp" type="number" min="0" step="1" inputmode="numeric" class="form-control rounded-lg px-3 py-2"></label>
+    <label class="grid gap-1 text-sm">{{ _("Fixed amount (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="fixed_amount" inputmode="decimal" class="form-control rounded-lg px-3 py-2"></label>
+    <button type="submit" class="rounded-lg bg-primary px-4 py-2 font-semibold text-on-primary sm:col-span-2">{{ _("Create tax rule") }}</button>
+  </form>
+</section>
+{% endif %}
+<div class="space-y-4">
+{% for rule in rules %}
+<section class="panel p-4 sm:p-6" data-tax-rule="{{ rule.id }}">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h2 class="font-semibold">{{ rule.name }}</h2>
+      <p class="mt-1 text-sm text-muted">{{ _("Added to net") if rule.effect == "added" else _("Withheld") }} · {{ _("Base: %(base)s", base=_("Net") if rule.base == "net" else _("Gross")) }}</p>
+      {% if rule.notes %}<p class="mt-2 text-sm">{{ rule.notes }}</p>{% endif %}
+      {% if rule.archived %}<p class="mt-2 text-sm text-muted">{{ _("Archived") }}</p>{% endif %}
+    </div>
+    {% if can_edit and not rule.archived %}
+    <form method="post" action="{{ scoped_url(request, 'tax_rule_archive', rule_id=rule.id) }}" data-confirm="{{ _('Archive the tax rule %(name)s?', name=rule.name) }}">{{ csrf_input() }}<button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm text-danger">{{ _("Archive") }}</button></form>
+    {% endif %}
+  </div>
+  <h3 class="mt-4 text-sm font-semibold">{{ _("Versions") }}</h3>
+  <ul class="mt-2 space-y-1 text-sm">
+    {% for version in rule.versions %}
+    <li>{{ format_day(version.effective_from, locale) }} · {% if version.value.mode == "percent" %}{{ format_rate_basis_points(version.value.rate_bp, locale) }}{% else %}{{ format_money(version.value.fixed, locale) }}{% endif %}</li>
+    {% endfor %}
+  </ul>
+  {% if can_edit and not rule.archived %}
+  <details class="mt-4">
+    <summary class="cursor-pointer text-sm font-semibold text-primary-ink">{{ _("Add a new version") }}</summary>
+    <form method="post" action="{{ scoped_url(request, 'tax_rule_version', rule_id=rule.id) }}" class="mt-3 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-3">
+      {{ csrf_input() }}
+      <label class="grid gap-1 text-sm">{{ _("Effective from") }}<input type="date" name="effective_from" value="{{ today }}" required class="form-control rounded-lg px-3 py-2"></label>
+      <label class="grid gap-1 text-sm">{{ _("Value type") }}<select name="mode" class="form-select rounded-lg py-2"><option value="percent">{{ _("Percent (basis points)") }}</option><option value="fixed">{{ _("Fixed amount") }}</option></select></label>
+      <label class="grid gap-1 text-sm">{{ _("Rate in basis points") }}<input name="rate_bp" type="number" min="0" step="1" inputmode="numeric" class="form-control rounded-lg px-3 py-2"></label>
+      <label class="grid gap-1 text-sm">{{ _("Fixed amount (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="fixed_amount" inputmode="decimal" class="form-control rounded-lg px-3 py-2"></label>
+      <button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm font-semibold sm:col-span-3">{{ _("Save version") }}</button>
+    </form>
+  </details>
+  <details class="mt-3">
+    <summary class="cursor-pointer text-sm text-primary-ink">{{ _("Edit name and notes") }}</summary>
+    <form method="post" action="{{ scoped_url(request, 'tax_rule_update', rule_id=rule.id) }}" class="mt-3 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
+      {{ csrf_input() }}
+      <label class="grid gap-1 text-sm">{{ _("Name") }}<input name="name" value="{{ rule.name }}" maxlength="200" required class="form-control rounded-lg px-3 py-2"></label>
+      <label class="grid gap-1 text-sm">{{ _("Notes (optional)") }}<input name="notes" value="{{ rule.notes }}" maxlength="200" class="form-control rounded-lg px-3 py-2"></label>
+      <button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm font-semibold sm:col-span-2">{{ _("Save details") }}</button>
+    </form>
+  </details>
+  {% endif %}
+</section>
+{% else %}<p class="panel p-6 text-muted">{{ _("No tax rules yet.") }}</p>{% endfor %}
+</div>
+<p class="mt-5 text-sm text-muted">{{ _("Tax-rule effect and base are fixed at creation to preserve the meaning of existing rate versions. Create a separate rule to model a different tax.") }}</p>
+{% endblock %}

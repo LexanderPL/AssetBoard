@@ -959,3 +959,66 @@ def test_scheduled_queries_stay_in_their_workspace(db_session, two_workspaces) -
     assert rows.category_counts() == {item.category_id: 1}
     rows.delete(row)
     assert rows.for_item(item.id) == []
+
+
+def test_tax_rule_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    from assetboard.db.repositories import TaxRuleRepository, TaxRuleVersionRepository
+
+    ctx_a, ctx_b = two_workspaces
+    rules_a, rules_b = TaxRuleRepository(db_session, ctx_a), TaxRuleRepository(db_session, ctx_b)
+    versions_a = TaxRuleVersionRepository(db_session, ctx_a)
+    versions_b = TaxRuleVersionRepository(db_session, ctx_b)
+    rule_a = rules_a.create(name="Income tax A", effect="withheld", base="net", notes="")
+    rule_b = rules_b.create(name="Income tax B", effect="withheld", base="net", notes="")
+    version_a = versions_a.create(
+        tax_rule_id=rule_a.id,
+        effective_from=date(2026, 1, 1),
+        mode="percent",
+        rate_bp=1200,
+        fixed_minor=None,
+    )
+    versions_b.create(
+        tax_rule_id=rule_b.id,
+        effective_from=date(2026, 1, 1),
+        mode="percent",
+        rate_bp=1500,
+        fixed_minor=None,
+    )
+    fixed_version_a = versions_a.create(
+        tax_rule_id=rule_a.id,
+        effective_from=date(2027, 1, 1),
+        mode="fixed",
+        rate_bp=None,
+        fixed_minor=500,
+    )
+    assert [row.id for row in rules_a.ordered()] == [rule_a.id]
+    assert rules_a.effective_for_all(date(2026, 1, 1)) == [(rule_a, version_a)]
+    assert rules_b.effective_for_all(date(2026, 1, 1))[0][0].id == rule_b.id
+    assert versions_a.for_rule(rule_a.id) == [version_a, fixed_version_a]
+    assert versions_b.for_rule(rule_a.id) == []
+    assert versions_a.effective(rule_a.id, date(2026, 1, 1)) == version_a
+    assert versions_b.effective(rule_a.id, date(2026, 1, 1)) is None
+    assert versions_a.any_fixed_amount() and not versions_b.any_fixed_amount()
+    assert [row.id for row in versions_a.all_for_rules()] == [
+        version_a.id,
+        fixed_version_a.id,
+    ]
+    with pytest.raises(ForeignWorkspace):
+        rules_b.create(
+            workspace_id=ctx_a.workspace.id,
+            name="Cross workspace",
+            effect="withheld",
+            base="net",
+            notes="",
+        )
+    with pytest.raises(ForeignWorkspace):
+        versions_b.create(
+            workspace_id=ctx_a.workspace.id,
+            tax_rule_id=rule_a.id,
+            effective_from=date(2027, 1, 1),
+            mode="percent",
+            rate_bp=100,
+            fixed_minor=None,
+        )

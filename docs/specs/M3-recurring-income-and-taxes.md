@@ -146,6 +146,18 @@ Payment due date = `due_day` of the month `pay_date.month + due_month_offset` (c
 - **Invariant (property test):** when every rule has `generate_payment`, `ledger_amount − sum(payments) == take_home` for all three `record_as` modes and any inputs.
 - Rounding is half-up per rule; amounts are `Money`; no floats.
 
+**F3.3 implementation details**
+- F3.3's calculator accepts a manual net amount and `record_as`. Selecting an income source and
+  attaching rules is deferred to F3.4, where `IncomeSourceTaxRule` is introduced.
+- Fixed values use the workspace base currency; no currency conversion is performed.
+- The workspace base currency is locked while any fixed tax version exists; percentage-only
+  versions do not lock it.
+- Rate versions are append-only and a newly added version must have an `effective_from` later than
+  the latest existing version. Rule effect and base are fixed at creation; create a separate rule
+  to model a different effect or base. Archived rules are excluded from new calculator previews.
+- If no version is effective on the selected date, the rule is omitted from the calculation and
+  named in the preview warning.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).

@@ -1348,6 +1348,42 @@ msgstr ""
 msgid "Sunday"
 msgstr ""
 
+msgid "Choose a valid tax effect and base."
+msgstr ""
+
+msgid "Enter a valid effective date between 1900 and 2199."
+msgstr ""
+
+msgid "Enter a non-negative whole-number rate in basis points."
+msgstr ""
+
+msgid "Enter a non-negative fixed amount in the workspace currency."
+msgstr ""
+
+msgid "Enter a non-negative net amount in the workspace currency."
+msgstr ""
+
+msgid "A new version must start after the latest existing version."
+msgstr ""
+
+msgid "Archived tax rules cannot be changed."
+msgstr ""
+
+msgid "Choose how the income is recorded."
+msgstr ""
+
+msgid "The tax rule could not be saved. Check the form and try again."
+msgstr ""
+
+msgid "Cash received (gross)"
+msgstr ""
+
+msgid "Net"
+msgstr ""
+
+msgid "Take-home"
+msgstr ""
+
 msgid "Too many attempts. Try again later."
 msgstr ""
 
@@ -2343,9 +2379,6 @@ msgstr ""
 msgid "Saved"
 msgstr ""
 
-msgid "Net"
-msgstr ""
-
 msgid "Savings rate"
 msgstr ""
 
@@ -2700,6 +2733,131 @@ msgstr ""
 
 #, python-format
 msgid "Nothing is overdue or due in the next %(days)d days."
+msgstr ""
+
+msgid "Tax calculator"
+msgstr ""
+
+msgid "Rates are entered by you; this is not tax advice."
+msgstr ""
+
+#, python-format
+msgid "Net amount (%(currency)s)"
+msgstr ""
+
+msgid "Calculation date"
+msgstr ""
+
+msgid "Record income as"
+msgstr ""
+
+msgid "Calculate"
+msgstr ""
+
+#, python-format
+msgid "No effective version on this date for: %(names)s"
+msgstr ""
+
+#, python-format
+msgid "Breakdown for %(date)s"
+msgstr ""
+
+msgid "Added tax"
+msgstr ""
+
+msgid "Gross"
+msgstr ""
+
+msgid "Withheld"
+msgstr ""
+
+msgid "Ledger amount"
+msgstr ""
+
+msgid "Planned tax payments"
+msgstr ""
+
+msgid "No tax payments for this recording mode."
+msgstr ""
+
+msgid "Manage tax rules"
+msgstr ""
+
+msgid "Tax rules"
+msgstr ""
+
+msgid "Calculator preview"
+msgstr ""
+
+msgid "New tax rule"
+msgstr ""
+
+msgid "Effect"
+msgstr ""
+
+msgid "Added to net"
+msgstr ""
+
+msgid "Tax base"
+msgstr ""
+
+msgid "Notes (optional)"
+msgstr ""
+
+msgid "First version effective from"
+msgstr ""
+
+msgid "Value type"
+msgstr ""
+
+msgid "Percent (basis points)"
+msgstr ""
+
+msgid "Fixed amount"
+msgstr ""
+
+msgid "Rate in basis points"
+msgstr ""
+
+#, python-format
+msgid "Fixed amount (%(currency)s)"
+msgstr ""
+
+msgid "Create tax rule"
+msgstr ""
+
+#, python-format
+msgid "Base: %(base)s"
+msgstr ""
+
+#, python-format
+msgid "Archive the tax rule %(name)s?"
+msgstr ""
+
+msgid "Versions"
+msgstr ""
+
+msgid "Add a new version"
+msgstr ""
+
+msgid "Effective from"
+msgstr ""
+
+msgid "Save version"
+msgstr ""
+
+msgid "Edit name and notes"
+msgstr ""
+
+msgid "Save details"
+msgstr ""
+
+msgid "No tax rules yet."
+msgstr ""
+
+msgid ""
+"Tax-rule effect and base are fixed at creation to preserve the meaning of"
+" existing rate versions. Create a separate rule to model a different tax."
 msgstr ""
 
 msgid "Smallest amount"
