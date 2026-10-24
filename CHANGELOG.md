@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.3.0](https://github.com/LexanderPL/AssetBoard/compare/v0.2.1...v0.3.0) (2026-10-24)
+
+
+### Features
+
+* **auth:** add TOTP two-factor authentication (F1.6), with review fixes ([#136](https://github.com/LexanderPL/AssetBoard/issues/136)) ([1e03d02](https://github.com/LexanderPL/AssetBoard/commit/1e03d023dc68e6b7ec659a6c5e368f992cb56bd5))
+* **auth:** verified open registration and password reset by email (pre-release B) ([#133](https://github.com/LexanderPL/AssetBoard/issues/133)) ([e8bc9fc](https://github.com/LexanderPL/AssetBoard/commit/e8bc9fc84052112bb1b6da4206959dc2d78c6566))
+* **recurring:** add recurrence engine and scheduled items (F3.1), with review fixes ([#134](https://github.com/LexanderPL/AssetBoard/issues/134)) ([8da2f2c](https://github.com/LexanderPL/AssetBoard/commit/8da2f2c4bf53e2d49c37a6536d668f1471be3639))
+
+
+### Bug Fixes
+
+* **web:** full workspace sidebar on every signed-in page, sticky on desktop ([#131](https://github.com/LexanderPL/AssetBoard/issues/131)) ([963f0c1](https://github.com/LexanderPL/AssetBoard/commit/963f0c16ab800b674e3888f82ed2f53d4500cead))
+
+
+### Documentation
+
+* **specs:** add F6.11 risk tiers and target allocation ([#132](https://github.com/LexanderPL/AssetBoard/issues/132)) ([c84eeb6](https://github.com/LexanderPL/AssetBoard/commit/c84eeb6bc622f3fcacf2468cf5ef8fadc28c548b))
+
 ## [0.2.1](https://github.com/LexanderPL/AssetBoard/compare/v0.2.0...v0.2.1) (2026-10-19)
 
 
