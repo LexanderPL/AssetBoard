@@ -1,15 +1,13 @@
 from __future__ import annotations
 
-from datetime import date
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import exists, func, select
 from sqlalchemy.orm import Session
 
 from assetboard.db.models.identity import Workspace
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.repositories.base import ScopedRepository
-from assetboard.domain.scheduled import OccurrenceStatus
 
 
 class ScheduledItemRepository(ScopedRepository[ScheduledItem]):
@@ -25,6 +23,11 @@ class ScheduledItemRepository(ScopedRepository[ScheduledItem]):
                 ScheduledItem.paused_at.is_(None), ScheduledItem.archived_at.is_(None)
             )
         return list(self._session.scalars(statement))
+
+    def any_exists(self) -> bool:
+        """Whether the workspace has any item (occurrences cannot exist without one)."""
+        statement = select(exists().where(ScheduledItem.workspace_id == self._workspace_id))
+        return bool(self._session.execute(statement).scalar_one())
 
     def category_counts(self) -> dict[UUID, int]:
         rows = self._session.execute(
@@ -49,18 +52,6 @@ class ScheduledOccurrenceRepository(ScopedRepository[ScheduledOccurrence]):
                 .order_by(ScheduledOccurrence.due_date, ScheduledOccurrence.id)
             )
         )
-
-    def delete_pending_future(self, item_id: UUID, today: date) -> None:
-        rows = self._session.scalars(
-            self._scoped_select().where(
-                ScheduledOccurrence.scheduled_item_id == item_id,
-                ScheduledOccurrence.status == OccurrenceStatus.PENDING,
-                ScheduledOccurrence.due_date >= today,
-            )
-        )
-        for row in rows:
-            self._session.delete(row)
-        self._session.flush()
 
     def category_counts(self) -> dict[UUID, int]:
         rows = self._session.execute(

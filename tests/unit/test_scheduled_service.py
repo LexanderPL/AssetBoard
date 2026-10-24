@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 from sqlalchemy import select
@@ -15,13 +16,24 @@ from assetboard.db.repositories.scheduled import (
     ScheduledOccurrenceRepository,
 )
 from assetboard.domain.money import Money
+from assetboard.domain.months import YearMonth
 from assetboard.domain.recurrence import Frequency, MonthDay, RecurrenceRule, WeekendPolicy
 from assetboard.domain.scheduled import ItemAction
 from assetboard.domain.transactions import TransactionDirection
 from assetboard.services import scheduled
-from assetboard.services.categories import KindChangeBlocked, delete_category, update_category
+from assetboard.services.categories import (
+    KindChangeBlocked,
+    archive_category,
+    delete_category,
+    update_category,
+)
 from assetboard.services.context import PermissionDenied
-from assetboard.services.workspaces import BaseCurrencyLocked, update_settings
+from assetboard.services.months import close_month
+from assetboard.services.workspaces import (
+    BaseCurrencyLocked,
+    InvalidWorkspaceSettings,
+    update_settings,
+)
 from tests.tenant.factories import make_category
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
@@ -120,9 +132,13 @@ def test_pause_resume_archive_and_delete_history(team):
     assert scheduled.generate_workspace(team.factory, ctx, team.clock, settings) == 0
     scheduled.change_state(team.factory, ctx, item, ItemAction.RESUME, settings)
     assert len(rows(team, item)) > 2
+    posted = rows(team, item)[1]
+    with team.factory.begin() as session:
+        ScheduledOccurrenceRepository(session, ctx).update(posted.id, status="posted")
     scheduled.change_state(team.factory, ctx, item, ItemAction.DELETE, settings)
     assert scheduled.list_items(team.factory, ctx)[0].archived
-    assert len(rows(team, item)) == 2
+    # Only history remains: the overdue pending January row went with the item.
+    assert [row.id for row in rows(team, item)] == [posted.id]
     with team.factory() as session:
         actions = set(
             session.scalars(select(AuditEvent.action).where(AuditEvent.entity_id == str(item)))
@@ -143,6 +159,26 @@ def test_pause_resume_archive_and_delete_history(team):
             session.scalars(select(AuditEvent.action).where(AuditEvent.entity_id == str(fresh)))
         )
         assert "scheduled.delete" in actions
+
+
+def test_delete_with_only_past_pending_rows_deletes_the_item(team):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    item = scheduled.save_item(team.factory, ctx, data(team), settings, include_past=True)
+    assert rows(team, item)[0].due_date == date(2026, 1, 1)
+    scheduled.change_state(team.factory, ctx, item, ItemAction.DELETE, settings)
+    with pytest.raises(NotFound):
+        scheduled.get_item(team.factory, ctx, item)
+    assert rows(team, item) == []
+
+
+def test_archive_removes_past_pending_rows_and_keeps_skipped(team):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    item = scheduled.save_item(team.factory, ctx, data(team), settings, include_past=True)
+    skipped = rows(team, item)[0]
+    with team.factory.begin() as session:
+        ScheduledOccurrenceRepository(session, ctx).update(skipped.id, status="skipped")
+    scheduled.change_state(team.factory, ctx, item, ItemAction.ARCHIVE, settings)
+    assert [row.id for row in rows(team, item)] == [skipped.id]
 
 
 def test_roles_validation_and_tenant_isolation(team):
@@ -262,3 +298,183 @@ def test_simultaneous_generation_never_duplicates(team):
     assert sorted(counts) == [0, 1]
     dates = [row.due_date for row in rows(team, item)]
     assert len(dates) == len(set(dates))
+
+
+# Regeneration when the calendar changes (review of #128)
+
+OCTOBER = FixedClock("2026-10-24T12:00:00+00:00")
+
+
+def working_day_values(db):
+    return data(db, rule=RecurrenceRule(date(2026, 1, 1), weekend_policy=WeekendPolicy.NEXT))
+
+
+def settings_with_country(db, ctx, country):
+    return update_settings(
+        db.factory,
+        ctx,
+        name="Home",
+        base_currency="EUR",
+        country_code=country,
+        timezone="UTC",
+        locale="en",
+        auto_copy_plan=False,
+    )
+
+
+def test_country_change_regenerates_working_day_items_without_duplicates(team):
+    ctx, settings = replace(team.ctx("owner", "owner"), clock=OCTOBER), Settings(_env_file=None)
+    item = scheduled.save_item(team.factory, ctx, working_day_values(team), settings)
+    assert len(rows(team, item)) == 13
+    settings_with_country(team, ctx, "PL")
+    dates = [row.due_date for row in rows(team, item)]
+    assert len(dates) == 13
+    # Polish holidays apply at once: 1 January 2027 is a Friday holiday, so the 4th.
+    assert date(2027, 1, 4) in dates and date(2027, 1, 1) not in dates
+    assert scheduled.generate_workspace(team.factory, ctx, OCTOBER, settings) == 0
+    assert len(rows(team, item)) == 13
+
+
+def test_country_changed_outside_the_form_is_fixed_by_the_next_run(team):
+    ctx, settings = replace(team.ctx("owner", "owner"), clock=OCTOBER), Settings(_env_file=None)
+    item = scheduled.save_item(team.factory, ctx, working_day_values(team), settings)
+    with team.factory.begin() as session:
+        session.get(Workspace, team.workspace_id).country_code = "PL"
+    scheduled.generate_workspace(team.factory, ctx, OCTOBER, settings)
+    dates = [row.due_date for row in rows(team, item)]
+    assert len(dates) == 13 == len({(day.year, day.month) for day in dates})
+
+
+def test_holiday_data_change_never_duplicates(team, monkeypatch):
+    ctx, settings = replace(team.ctx("owner", "owner"), clock=OCTOBER), Settings(_env_file=None)
+    item = scheduled.save_item(team.factory, ctx, working_day_values(team), settings)
+    before = {row.due_date for row in rows(team, item)}
+    # New holiday data: every first-of-month working day (and the 2nd) is now a holiday.
+    changed = frozenset(day + timedelta(days=extra) for day in before for extra in (0, 1))
+    monkeypatch.setattr(scheduled, "_holidays", lambda country, rule: changed)
+    scheduled.generate_workspace(team.factory, ctx, OCTOBER, settings)
+    after = rows(team, item)
+    dates = [row.due_date for row in after]
+    assert len(dates) == len(set(dates)) == 13
+    assert set(dates).isdisjoint(changed)
+    assert scheduled.generate_workspace(team.factory, ctx, OCTOBER, settings) == 0
+
+
+def test_country_without_holiday_data_is_refused_while_working_day_items_exist(team):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    plain = scheduled.save_item(team.factory, ctx, data(team), settings)
+    settings_with_country(team, ctx, "AC")  # Ascension Island: no holiday data
+    settings_with_country(team, ctx, None)
+    scheduled.save_item(team.factory, ctx, working_day_values(team), settings)
+    scheduled.change_state(team.factory, ctx, plain, ItemAction.PAUSE, settings)
+    with pytest.raises(InvalidWorkspaceSettings) as refused:
+        settings_with_country(team, ctx, "AC")
+    assert refused.value.code == "country_without_holidays"
+    with team.factory() as session:
+        assert session.get(Workspace, team.workspace_id).country_code is None
+
+
+# Archived categories
+
+
+def test_generator_skips_items_whose_category_is_archived(team):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    values = data(team)
+    item = scheduled.save_item(team.factory, ctx, values, settings, include_past=True)
+    archive_category(team.factory, ctx, values.category_id)
+    later = FixedClock("2026-05-10T12:00:00+00:00")
+    assert scheduled.generate_workspace(team.factory, ctx, later, settings) == 0
+    # Past rows stay; pending rows from the run's today onward are gone, none are added.
+    assert [row.due_date for row in rows(team, item)] == [
+        date(2026, month, 1) for month in range(1, 6)
+    ]
+
+
+# Closed months (F2.5)
+
+
+def close(db, ctx, year, month):
+    close_month(db.factory, ctx, YearMonth(year, month))
+
+
+def test_backfill_skips_closed_months(team):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    close(team, ctx, 2026, 2)
+    item = scheduled.save_item(team.factory, ctx, data(team), settings, include_past=True)
+    dates = [row.due_date for row in rows(team, item)]
+    assert date(2026, 1, 1) in dates and date(2026, 2, 1) not in dates
+
+
+def test_pause_and_edit_leave_closed_month_rows_alone(team):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    values = data(team)
+    item = scheduled.save_item(team.factory, ctx, values, settings)
+    march = rows(team, item)[0]
+    assert march.due_date == date(2026, 3, 1)
+    close(team, ctx, 2026, 3)
+    scheduled.save_item(
+        team.factory,
+        ctx,
+        replace(values, amount=Money(12000, "EUR"), rule=replace(values.rule, month_day=2)),
+        settings,
+        item_id=item,
+    )
+    after = rows(team, item)
+    assert after[0].id == march.id and after[0].expected_minor == 10000
+    assert after[1].due_date == date(2026, 4, 2) and after[1].expected_minor == 12000
+    assert date(2026, 3, 2) not in {row.due_date for row in after}
+    scheduled.change_state(team.factory, ctx, item, ItemAction.PAUSE, settings)
+    assert [row.id for row in rows(team, item)] == [march.id]
+
+
+def test_archive_and_delete_keep_closed_month_rows(team):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    item = scheduled.save_item(team.factory, ctx, data(team), settings, include_past=True)
+    january = rows(team, item)[0]
+    close(team, ctx, 2026, 1)
+    scheduled.change_state(team.factory, ctx, item, ItemAction.DELETE, settings)
+    # The closed January row is history now, so Delete archives instead.
+    assert scheduled.list_items(team.factory, ctx)[0].archived
+    assert [row.id for row in rows(team, item)] == [january.id]
+    other = scheduled.save_item(team.factory, ctx, data(team), settings)
+    close(team, ctx, 2026, 3)
+    scheduled.change_state(team.factory, ctx, other, ItemAction.ARCHIVE, settings)
+    assert [row.due_date for row in rows(team, other)] == [date(2026, 3, 1)]
+
+
+def test_regeneration_leaves_closed_month_rows_alone(team, monkeypatch):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    item = scheduled.save_item(team.factory, ctx, working_day_values(team), settings)
+    march = rows(team, item)[0]
+    close(team, ctx, 2026, 3)
+    monkeypatch.setattr(scheduled, "_holidays", lambda country, rule: frozenset({march.due_date}))
+    scheduled.generate_workspace(team.factory, ctx, team.clock, settings)
+    after = rows(team, item)
+    assert after[0].id == march.id
+    assert [row.due_date for row in after if row.due_date < date(2026, 4, 1)] == [march.due_date]
+
+
+# Failure isolation
+
+
+def test_one_failing_item_does_not_stop_the_workspace_run(team, monkeypatch, caplog):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    bad = scheduled.save_item(team.factory, ctx, data(team, name="Bad"), settings)
+    good = scheduled.save_item(team.factory, ctx, data(team, name="Good"), settings)
+    original = scheduled._generate
+
+    def failing(session, scope, clock, item, *args, **kwargs):
+        if item.name == "Bad":
+            raise RuntimeError("amount 12345")
+        return original(session, scope, clock, item, *args, **kwargs)
+
+    monkeypatch.setattr(scheduled, "_generate", failing)
+    later = FixedClock("2026-06-15T12:00:00+00:00")
+    with caplog.at_level(logging.ERROR, logger="assetboard.services.scheduled"):
+        assert scheduled.generate_workspace(team.factory, ctx, later, settings) == 3
+    assert max(row.due_date for row in rows(team, good)) > max(
+        row.due_date for row in rows(team, bad)
+    )
+    [record] = caplog.records
+    assert str(bad) in record.getMessage() and "12345" not in record.getMessage()
+    assert record.exc_info is not None

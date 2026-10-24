@@ -17,6 +17,7 @@ from assetboard.branding import ENV_PREFIX
 
 # Proxy authentication (F1.4, ADR-0015): the narrowest TRUSTED_PROXIES entries allowed.
 PROXY_AUTH_MIN_PREFIX = {4: 24, 6: 64}
+DEFAULT_RECURRENCE_HORIZON_MONTHS = 13
 _IPV4_MAPPED = ip_network("::ffff:0:0/96")
 _HEADER_NAME = re.compile(r"[!#$%&'*+\-.^_`|~0-9a-z]{1,64}")
 # Headers that carry something else (the connection, forwarding, cookies, the browser's own
@@ -69,7 +70,7 @@ class Settings(BaseSettings):
     auto_migrate: bool = True
     setup_token: SecretStr | None = None
     allow_registration: bool = False
-    recurrence_horizon_months: int = Field(default=13, ge=1)
+    recurrence_horizon_months: int = Field(default=DEFAULT_RECURRENCE_HORIZON_MONTHS, ge=1)
     session_idle_timeout_days: int = Field(default=14, ge=1, le=365)
     session_absolute_timeout_days: int = Field(default=60, ge=1, le=365)
     auth_account_free_failures: int = Field(default=5, ge=1)

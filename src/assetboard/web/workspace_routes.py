@@ -63,6 +63,10 @@ SETTINGS_ERRORS = {
     "invalid_base_currency": _("Choose a supported currency."),
     "base_currency_locked": _("The base currency cannot change: amounts are already stored in it."),
     "invalid_country_code": _("Choose a country from the list."),
+    "country_without_holidays": _(
+        "Holiday data is not available for this country, and recurring items adjust dates to "
+        "working days. Change those items to keep their dates, or choose another country."
+    ),
     "invalid_timezone": _("Choose a time zone from the list."),
     "invalid_locale": _("Choose a supported language."),
 }
@@ -184,6 +188,7 @@ async def settings_submit(
                 timezone=timezone,
                 locale=locale,
                 auto_copy_plan=copy_plan,
+                recurrence_horizon_months=request.app.state.settings.recurrence_horizon_months,
             )
         )
     except InvalidWorkspaceSettings as exc:
