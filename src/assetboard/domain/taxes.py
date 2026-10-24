@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import ROUND_HALF_UP, Decimal
 from enum import StrEnum
 
 from assetboard.domain.money import Money
@@ -67,12 +66,12 @@ def _tax_amount(base: Money, value: PercentOrFixed) -> Money:
             raise ValueError("currency_mismatch")
         return value.fixed
     assert value.rate_bp is not None
-    minor = int(
-        (Decimal(base.amount_minor) * Decimal(value.rate_bp) / Decimal(10_000)).quantize(
-            Decimal("1"), rounding=ROUND_HALF_UP
-        )
-    )
-    return Money(minor, base.currency)
+    # Exact integer arithmetic at any magnitude (Decimal's default 28-digit context would
+    # round before the half-up step for very large products). Bases are never negative here.
+    quotient, remainder = divmod(base.amount_minor * value.rate_bp, 10_000)
+    if remainder * 2 >= 10_000:
+        quotient += 1
+    return Money(quotient, base.currency)
 
 
 def calculate_taxes(

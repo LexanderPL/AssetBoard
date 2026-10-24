@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from fractions import Fraction
+
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
@@ -51,6 +53,15 @@ def _golden_rules() -> tuple[TaxInput, ...]:
     ],
 )
 def test_golden_tax_breakdown(record_as, ledger_minor, payments) -> None:
+    # Oracle: the F3.3 golden example in docs/specs/M3-recurring-income-and-taxes.md.
+    # Hand computation (minor units, PLN):
+    #   net        = 2 337 000
+    #   VAT 23%    = 2 337 000 * 2300 / 10000 = 537 510 exactly          -> 5 375.10
+    #   gross      = 2 337 000 + 537 510      = 2 874 510                -> 28 745.10
+    #   income 12% = 2 337 000 * 1200 / 10000 = 280 440 exactly (on net) -> 2 804.40
+    #   levy fixed = 100 000                                              -> 1 000.00
+    #   withheld   = 280 440 + 100 000        = 380 440                  -> 3 804.40
+    #   take-home  = 2 337 000 - 380 440      = 1 956 560                -> 19 565.60
     result = calculate_taxes(Money(2_337_000, "PLN"), _golden_rules(), record_as)
     assert [(line.name, line.amount.amount_minor) for line in result.added] == [("VAT", 537_510)]
     assert [(line.name, line.amount.amount_minor) for line in result.withheld] == [
@@ -158,3 +169,59 @@ def test_percent_or_fixed_rejects_invalid_values() -> None:
         PercentOrFixed("unknown")
     with pytest.raises(ValueError, match="invalid_value"):
         PercentOrFixed.fixed_amount(Money(-1, "EUR"))
+
+
+@given(
+    net_minor=st.integers(min_value=0, max_value=10**15),
+    rates=st.lists(st.integers(min_value=0, max_value=1_000_000), max_size=5),
+    fixed=st.integers(min_value=0, max_value=10**9),
+    base=st.sampled_from(list(TaxBase)),
+)
+def test_breakdown_identities_and_monotonicity(
+    net_minor: int, rates: list[int], fixed: int, base: TaxBase
+) -> None:
+    rules = [
+        *(
+            TaxInput(f"Added {i}", TaxEffect.ADDED, TaxBase.NET, PercentOrFixed.percent(rate))
+            for i, rate in enumerate(rates)
+        ),
+        TaxInput("Withheld", TaxEffect.WITHHELD, base, PercentOrFixed.percent(1234)),
+        TaxInput(
+            "Levy", TaxEffect.WITHHELD, base, PercentOrFixed.fixed_amount(Money(fixed, "EUR"))
+        ),
+    ]
+    result = calculate_taxes(Money(net_minor, "EUR"), rules, RecordAs.NET)
+    added = sum(line.amount.amount_minor for line in result.added)
+    withheld = sum(line.amount.amount_minor for line in result.withheld)
+    assert result.gross.amount_minor == net_minor + added
+    assert result.take_home.amount_minor == net_minor - withheld
+    for line, rate in zip(result.added, rates, strict=True):
+        # Independent oracle: exact rational half-up, then compare.
+        exact = Fraction(net_minor * rate, 10_000)
+        assert line.amount.amount_minor == int(exact + Fraction(1, 2))
+    bigger = calculate_taxes(Money(net_minor + 1, "EUR"), rules, RecordAs.NET)
+    for small, large in zip(
+        result.added + result.withheld, bigger.added + bigger.withheld, strict=True
+    ):
+        assert small.amount.amount_minor <= large.amount.amount_minor
+
+
+def test_zero_net_and_negative_net() -> None:
+    rules = _golden_rules()
+    zero = calculate_taxes(Money(0, "PLN"), rules, RecordAs.CASH_RECEIVED)
+    assert zero.gross == Money(0, "PLN")
+    # The fixed levy is still due, so take-home may go negative.
+    assert zero.take_home == Money(-100_000, "PLN")
+    with pytest.raises(ValueError, match="net_must_not_be_negative"):
+        calculate_taxes(Money(-1, "PLN"), rules, RecordAs.NET)
+
+
+def test_percentage_is_exact_for_very_large_amounts() -> None:
+    # (10**40 + 5000) / 10000 = 10**36 + 0.5 needs 38 digits; Decimal's default 28 would fail.
+    net = 10**40 + 5_000
+    result = calculate_taxes(
+        Money(net, "EUR"),
+        [TaxInput("Tax", TaxEffect.ADDED, TaxBase.NET, PercentOrFixed.percent(1))],
+        RecordAs.NET,
+    )
+    assert result.added[0].amount.amount_minor == 10**36 + 1
