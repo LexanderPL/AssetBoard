@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
 from datetime import date, timedelta
 
@@ -15,8 +17,10 @@ from assetboard.db.repositories.scheduled import ScheduledOccurrenceRepository
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
 from assetboard.domain.recurrence import RecurrenceRule
+from assetboard.domain.scheduled import ItemAction
 from assetboard.domain.transactions import Source, TransactionDirection
 from assetboard.services import occurrences, scheduled
+from assetboard.services.context import PermissionDenied
 from assetboard.services.months import close_month
 from tests.tenant.factories import make_category
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
@@ -193,3 +197,123 @@ def test_auto_post_uses_workspace_clock_and_closed_month_guard(team):
     close_month(team.factory, later_ctx, YearMonth(2026, 4))
     assert occurrences.auto_post_workspace(team.factory, later_ctx, team.clock) == 0
     assert all(row.status == "pending" for row in occurrence_rows(team, later_item))
+
+
+def test_occurrence_actions_require_a_current_editor(team):
+    team.add_member("viewer", "viewer")
+    item_id = create_item(team)
+    occurrence = occurrence_rows(team, item_id)[0]
+    actions = (
+        lambda ctx: occurrences.post_occurrence(
+            team.factory, ctx, occurrence.id, amount_minor=100, day=occurrence.due_date
+        ),
+        lambda ctx: occurrences.skip_occurrence(team.factory, ctx, occurrence.id),
+        lambda ctx: occurrences.reschedule_occurrence(
+            team.factory, ctx, occurrence.id, date(2026, 3, 9)
+        ),
+        lambda ctx: occurrences.edit_occurrence_amount(team.factory, ctx, occurrence.id, 100),
+        lambda ctx: occurrences.undo_post(team.factory, ctx, occurrence.id),
+    )
+    # A viewer, and a viewer whose request still carries a stale editor role.
+    for ctx in (team.ctx("viewer", "viewer"), team.ctx("viewer", "editor")):
+        for action in actions:
+            with pytest.raises(PermissionDenied):
+                action(ctx)
+    stored = occurrence_rows(team, item_id)[0]
+    assert stored.status == "pending" and stored.due_date == occurrence.due_date
+    assert stored.expected_minor == occurrence.expected_minor
+    with team.factory() as session:
+        assert session.scalars(select(Transaction)).all() == []
+
+
+def test_concurrent_double_submit_creates_one_transaction(team):
+    ctx = team.ctx("owner", "owner")
+    item_id = create_item(team)
+    occurrence = occurrence_rows(team, item_id)[0]
+    barrier = threading.Barrier(2)
+
+    def submit() -> object:
+        barrier.wait()
+        return occurrences.post_occurrence(
+            team.factory, ctx, occurrence.id, amount_minor=10000, day=occurrence.due_date
+        )
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: submit(), range(2)))
+    assert results[0] == results[1]
+    with team.factory() as session:
+        assert len(session.scalars(select(Transaction)).all()) == 1
+
+
+def test_posted_occurrence_is_immune_to_rule_edits(team):
+    ctx = team.ctx("owner", "owner")
+    values = item_data(team)
+    item_id = scheduled.save_item(team.factory, ctx, values, Settings(_env_file=None))
+    occurrence = occurrence_rows(team, item_id)[0]
+    transaction_id = occurrences.post_occurrence(
+        team.factory, ctx, occurrence.id, amount_minor=9900, day=date(2026, 3, 2)
+    )
+
+    scheduled.save_item(
+        team.factory,
+        ctx,
+        replace(
+            values,
+            name="New rent",
+            amount=Money(20000, "EUR"),
+            rule=RecurrenceRule(date(2026, 3, 1), month_day=15),
+        ),
+        Settings(_env_file=None),
+        item_id=item_id,
+    )
+
+    rows = occurrence_rows(team, item_id)
+    posted = next(row for row in rows if row.id == occurrence.id)
+    assert posted.status == "posted" and posted.transaction_id == transaction_id
+    assert (posted.nominal_date, posted.due_date) == (date(2026, 3, 1), date(2026, 3, 1))
+    assert (posted.label, posted.expected_minor) == ("Rent", 10000)
+    assert all(row.due_date.day == 15 for row in rows if row.status == "pending")
+    with team.factory() as session:
+        transaction = session.get(Transaction, transaction_id)
+        assert transaction is not None and transaction.deleted_at is None
+        assert (transaction.amount_minor, transaction.date) == (9900, date(2026, 3, 2))
+
+
+def test_rescheduled_overdue_occurrence_survives_generation(team):
+    ctx = team.ctx("owner", "owner")
+    values = replace(item_data(team), rule=RecurrenceRule(date(2026, 1, 1), month_day=1))
+    settings = Settings(_env_file=None)
+    item_id = scheduled.save_item(team.factory, ctx, values, settings, include_past=True)
+    january = next(row for row in occurrence_rows(team, item_id) if row.due_date.month == 1)
+
+    occurrences.reschedule_occurrence(team.factory, ctx, january.id, date(2026, 3, 10))
+    scheduled.generate_workspace(team.factory, ctx, team.clock, settings)
+    scheduled.save_item(team.factory, ctx, replace(values, name="Flat"), settings, item_id=item_id)
+
+    rows = occurrence_rows(team, item_id)
+    moved = next(row for row in rows if row.id == january.id)
+    assert (moved.nominal_date, moved.due_date) == (date(2026, 1, 1), date(2026, 3, 10))
+    assert moved.status == "pending" and moved.label == "Flat"
+    assert len({row.nominal_date for row in rows}) == len(rows)
+
+
+def test_auto_post_ignores_paused_items(team):
+    ctx = team.ctx("owner", "owner")
+    item_id = scheduled.save_item(
+        team.factory,
+        ctx,
+        replace(
+            item_data(team, auto_post=True),
+            rule=RecurrenceRule(date(2026, 1, 1), month_day=1),
+        ),
+        Settings(_env_file=None),
+        include_past=True,
+    )
+    scheduled.change_state(team.factory, ctx, item_id, ItemAction.PAUSE, Settings(_env_file=None))
+    assert [row.due_date for row in occurrence_rows(team, item_id)] == [
+        date(2026, 1, 1),
+        date(2026, 2, 1),
+    ]
+
+    assert occurrences.auto_post_workspace(team.factory, ctx, team.clock) == 0
+    assert all(row.status == "pending" for row in occurrence_rows(team, item_id))
