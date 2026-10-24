@@ -228,6 +228,17 @@ def test_every_signed_in_page_shows_the_full_workspace_nav(signed: Signed, path:
     assert "data-current-workspace>Home<" in page.text
     # None of the workspace links is the current page here.
     assert not re.search(r"data-(month|transactions|categories)-link aria-current", page.text)
+    # Categories are in the user menu, not the main navigation.
+    nav = page.text[page.text.index("<nav") : page.text.index("</nav>")]
+    assert "data-categories-link" not in nav
+
+
+def test_viewers_find_categories_in_the_user_menu(signed: Signed) -> None:
+    with signed.db() as session, session.begin():
+        session.execute(update(Membership).values(role="viewer"))
+    page = signed.client.get("/").text
+    menu = page[page.index("data-user-menu") : page.index("</details>")]
+    assert "data-categories-link" in menu
 
 
 def test_error_pages_of_a_signed_in_user_show_the_workspace_nav(signed: Signed) -> None:

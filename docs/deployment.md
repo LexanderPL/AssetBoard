@@ -344,7 +344,8 @@ when you intend to upload the image and its release tags.
 
 ### Unreleased: categories (F2.1)
 
-- **Categories page** at "Categories" in the main navigation; see
+- **Categories page** at "Categories" in the account menu (in the main navigation before the
+  2026-10-24 UI polish); see
   [docs/categories.md](categories.md). The migration adds the `categories` table and changes no
   existing data. No new setting.
 

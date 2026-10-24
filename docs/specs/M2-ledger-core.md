@@ -382,6 +382,27 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
   (`#summary-total-<group>`). A planned-value save answers with its row plus, out of band, every
   total row and `#summary-kpis` (KPIs and bars); rows do not move, since the order depends on
   actuals only. The heading is "Summary".
+- **UI polish (owner, 2026-10-24), replacing the KPI cards and the bar look above:**
+  - **Flow bar** instead of the five KPI boxes: one stacked SVG bar of what was earned, split
+    into Spent (danger), Saved / invested (primary) and Left = net (success);
+    `domain.summary.flow_bar` gives the positions on 0–1000, scaled to
+    max(earned, spent + saved), each floored once from the exact ratio so the segments tile.
+    When spending and saving exceed earnings, the bar scales to their sum, the part beyond
+    earnings is hatched red (an SVG pattern) and a line marks earnings; net is then red. A
+    legend gives Earned (the total, above the bar), Spent, Saved / invested and Left with
+    their amounts (`data-kpi="earned|spent|saved|net"`), and the caption "Saved 12.3% of
+    income" the savings rate (`data-kpi="savings-rate"`; no caption when nothing was earned,
+    so the "—" is gone). Screen readers get one sentence ("Earned …: spent …, saved or
+    invested …, left …." plus "Spending and saving exceed earnings by …." when they do); the
+    bar and the visual legend are hidden from them.
+  - **Planned-vs-actual bars:** taller (16 px), an outlined track (`line-strong`, 3:1 against
+    the card in both themes), the actual as a fill (primary; danger for expenses over plan,
+    success for income over plan) and the plan as a dark `ink` line that overhangs the
+    track, with a small "Planned" key; no line when nothing is planned.
+  - **Rows above plan** are tinted: an expense category whose actual is above its plan red
+    (`danger-tint`), an income category green (`success-tint`); new tokens for both themes,
+    with every row text at AA on them (`tests/unit/test_theme_tokens.py`). Nothing marks a
+    row at or under plan, nor rows of the savings groups.
 - **Follow-up (review, 2026-10-19):** `web.plan.build_summary` reads twice per render
   (`services.budget.get_plan` for the transfer group and the copy banner, then
   `services.summary.month_summary`); fold them into one read when the summary grows.
@@ -529,6 +550,12 @@ read-only enforcement in the service layer (not only the UI). Tests for enforcem
 - Pages of 50 with "51–100 of 312" and Previous/Next links that keep the filters; a page past
   the end shows the last page. Rows in closed months are marked "closed"; each date links to
   its month page (where entries are edited).
+- **Export UI (owner, 2026-10-24):** the options are not shown on the page; an "Export CSV"
+  button in the page header opens them in a native modal `<dialog>` (`app.js`:
+  `data-dialog-open`, `data-dialog-close`, Esc; no inline script or style). The button is a
+  link to `/transactions?<filters>&export=1`, which renders the dialog open in the page flow,
+  so the export works without JavaScript; a refused option renders the page with the dialog
+  open (a modal with JavaScript). Submitting the form closes the dialog.
 - **Export** (`/transactions/export.csv`, GET): every matching row, always in M4's entry order
   (date, `created_at`, id) whatever the screen's sort. Rows and their category names come
   from **one** SELECT (a join, fetched in batches), so every row has the name its category had

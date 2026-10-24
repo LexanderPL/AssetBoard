@@ -1,4 +1,4 @@
-{# The month summary (#month-summary, F2.3 part B and F2.4): KPI cards, planned-vs-actual bars,
+{# The month summary (#month-summary, F2.3 part B and F2.4): the KPI flow bar, planned-vs-actual bars,
    and per category the planned value (editable inline), actual and difference, with a totals
    row per group (months/_plan.html). ``summary`` is web.plan.SummaryView
    (web.plan.summary_context). Every transaction write sends this block out of band
@@ -18,19 +18,21 @@
   {{ banner() }}
   {{ kpis() }}
   {% if summary.groups %}
-  <div class="mt-4 overflow-x-auto">
+  {# relative: the sr-only texts in the table are absolutely positioned, so the scroll box must
+     be their containing block, or they widen the page at phone width. #}
+  <div class="relative mt-4 overflow-x-auto">
     <table class="w-full min-w-[36rem] text-sm">
       <thead>
         <tr class="text-left text-xs text-muted">
-          <th scope="col" class="py-2 pr-2 font-medium">{{ _("Category") }}</th>
+          <th scope="col" class="py-2 pl-2 pr-2 font-medium">{{ _("Category") }}</th>
           <th scope="col" class="w-40 py-2 pr-2 text-right font-medium">{{ _("Planned") }}</th>
           <th scope="col" class="w-32 py-2 pr-2 text-right font-medium">{{ _("Actual") }}</th>
-          <th scope="col" class="w-36 py-2 text-right font-medium">{{ _("Difference") }}</th>
+          <th scope="col" class="w-36 py-2 pr-2 text-right font-medium">{{ _("Difference") }}</th>
         </tr>
       </thead>
       {% for g in summary.groups %}
       <tbody class="divide-y divide-line" data-plan-group="{{ g.key }}">
-        <tr><th scope="rowgroup" colspan="4" class="pb-1 pt-4 text-left text-xs font-semibold uppercase tracking-wide text-muted">{{ g.heading }}</th></tr>
+        <tr><th scope="rowgroup" colspan="4" class="pb-1 pl-2 pt-4 text-left text-xs font-semibold uppercase tracking-wide text-muted">{{ g.heading }}</th></tr>
         {% for r in g.rows %}{{ plan_row(r, plan_only=g.totals is none) }}{% endfor %}
         {% if g.totals %}{{ totals_row(g) }}{% endif %}
       </tbody>

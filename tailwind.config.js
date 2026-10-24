@@ -33,12 +33,14 @@ module.exports = {
           soft: token("success-soft"),
           strong: token("success-strong"),
           line: token("success-line"),
+          tint: token("success-tint"),
         },
         danger: {
           DEFAULT: token("danger"),
           soft: token("danger-soft"),
           strong: token("danger-strong"),
           line: token("danger-line"),
+          tint: token("danger-tint"),
         },
         warning: {
           soft: token("warning-soft"),

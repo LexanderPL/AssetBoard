@@ -17,7 +17,8 @@ saved ``actual - planned`` (saved more than planned), withdrawn ``planned - actu
 **KPIs**: earned = income actual, spent = expense actual, saved = saved actual,
 ``net = earned - spent - saved`` (withdrawals are shown as their own block only),
 ``savings_rate = (earned - spent) / earned`` in basis points (and, for display, in tenths of a
-percent, each rounded once from the exact ratio), ``None`` when earned is 0.
+percent, each rounded once from the exact ratio), ``None`` when earned is 0. The page draws
+them as one flow bar (``flow_bar``): earned split into spent, saved / invested and left (net).
 """
 
 from __future__ import annotations
@@ -142,6 +143,55 @@ def savings_rate_tenths(earned: int, spent: int) -> int | None:
     the exact ratio, half away from zero (rounding the basis points again would turn
     12.3495% into 12.4%). ``None`` when nothing was earned."""
     return _ratio(earned, spent, 1000)
+
+
+FLOW_SCALE = 1000
+
+
+@dataclass(frozen=True, slots=True)
+class FlowBar:
+    """The KPI flow bar (owner, 2026-10-24): earnings split into spent, saved and left.
+
+    Positions are on ``0..FLOW_SCALE``; the scale is ``max(earned, spent + saved)``, each of
+    them counted from 0 (a negative actual draws nothing). The segments are consecutive: spent
+    ``[0, spent_end)``, saved / invested ``[spent_end, saved_end)``, left
+    ``[saved_end, earned_end)`` when earnings exceed both, and the overspend
+    ``[earned_end, saved_end)`` when spending and saving exceed earnings. Every position is
+    floored from the exact cumulative ratio once, so the segments tile without gaps.
+    """
+
+    spent_end: int
+    saved_end: int
+    earned_end: int
+
+    @property
+    def empty(self) -> bool:
+        return self.saved_end == 0 and self.earned_end == 0
+
+    @property
+    def left(self) -> int:
+        return max(self.earned_end - self.saved_end, 0)
+
+    @property
+    def overspent(self) -> int:
+        return max(self.saved_end - self.earned_end, 0)
+
+
+def flow_bar(earned: int, spent: int, saved: int, scale: int = FLOW_SCALE) -> FlowBar:
+    """The flow bar of the month's KPIs (minor units in; see ``FlowBar``)."""
+    earned, spent, saved = max(earned, 0), max(spent, 0), max(saved, 0)
+    whole = max(earned, spent + saved)
+    if whole == 0:
+        return FlowBar(0, 0, 0)
+
+    def position(amount: int) -> int:
+        return amount * scale // whole
+
+    return FlowBar(
+        spent_end=position(spent),
+        saved_end=position(spent + saved),
+        earned_end=position(earned),
+    )
 
 
 def summarize_month(

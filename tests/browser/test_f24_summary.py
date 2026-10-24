@@ -126,9 +126,9 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             food_row = page.locator("#month-summary tr[data-plan-row]", has_text="Golden Food")
             travel_row = page.locator("#month-summary tr[data-plan-row]", has_text="Golden Travel")
             kpis = page.locator("#summary-kpis [data-kpi]")
-            expect(kpis).to_have_text(
-                ["€0.00", "€0.00", "€0.00", "€0.00", "—Not available: nothing earned"]
-            )
+            # Nothing earned: no savings-rate caption, and an empty flow bar.
+            expect(kpis).to_have_text(["€0.00", "€0.00", "€0.00", "€0.00"])
+            expect(page.locator("[data-flow-segment='empty']")).to_have_count(1)
 
             # A planned value updates the difference, the totals and the bar text at once.
             page.get_by_label("Planned for Golden Food").fill("550")
@@ -152,6 +152,8 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             page.locator("#entry-income-category").select_option(label="Golden Salary")
             page.locator("#entry-income-amount").press("Enter")
             expect(kpis).to_have_text(["€1,000.00", "€50.00", "€0.00", "€950.00", "95.0%"])
+            expect(page.locator("[data-savings-rate]")).to_have_text("Saved 95.0% of income")
+            expect(page.locator("[data-flow-segment]")).to_have_count(2)  # spent and left
 
             # Largest first by default; "Your order" keeps the categories' order, and is kept.
             page.locator("#entry-expense-day").fill("4")

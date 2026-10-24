@@ -13,10 +13,12 @@ from assetboard.domain.money import Money
 from assetboard.domain.summary import (
     BLOCK_ORDER,
     Entry,
+    FlowBar,
     PlanLine,
     SummaryCategory,
     block_of,
     difference,
+    flow_bar,
     savings_rate_bp,
     savings_rate_tenths,
     summarize_month,
@@ -281,3 +283,47 @@ def test_the_savings_rate_is_within_half_a_basis_point(earned: int, spent: int) 
     assert rate is not None
     exact = (earned - spent) * 10000
     assert abs(rate * earned - exact) * 2 <= earned  # |rate - exact/earned| <= 0.5
+
+
+@pytest.mark.parametrize(
+    ("earned", "spent", "saved", "expected"),
+    [
+        # Earned is the scale: spent, saved, then what is left.
+        (4000_00, 2000_00, 1000_00, FlowBar(500, 750, 1000)),
+        # Spending and saving exceed earnings: their sum is the scale.
+        (3400_00, 4873_00, 0, FlowBar(1000, 1000, 697)),
+        (1000_00, 800_00, 500_00, FlowBar(615, 1000, 769)),
+        # Nothing earned: all of it is overspend.
+        (0, 10_00, 0, FlowBar(1000, 1000, 0)),
+        (0, 0, 0, FlowBar(0, 0, 0)),
+        # Exactly balanced.
+        (100, 60, 40, FlowBar(600, 1000, 1000)),
+        # Negative actuals (refunds above spending) draw nothing.
+        (100, -50, 0, FlowBar(0, 0, 1000)),
+    ],
+)
+def test_flow_bar_segments(earned: int, spent: int, saved: int, expected: FlowBar) -> None:
+    assert flow_bar(earned, spent, saved) == expected
+
+
+def test_flow_bar_parts() -> None:
+    assert flow_bar(0, 0, 0).empty
+    bar = flow_bar(4000, 2000, 1000)
+    assert (bar.left, bar.overspent) == (250, 0)
+    over = flow_bar(1000, 800, 500)
+    assert (over.left, over.overspent) == (0, 231)
+
+
+@given(
+    earned=st.integers(min_value=-(10**12), max_value=10**12),
+    spent=st.integers(min_value=-(10**12), max_value=10**12),
+    saved=st.integers(min_value=-(10**12), max_value=10**12),
+)
+def test_flow_bar_segments_tile_the_scale(earned: int, spent: int, saved: int) -> None:
+    bar = flow_bar(earned, spent, saved)
+    assert 0 <= bar.spent_end <= bar.saved_end <= 1000
+    assert 0 <= bar.earned_end <= 1000
+    assert bar.left == 0 or bar.overspent == 0
+    if not bar.empty:
+        # The longer of earned and spent + saved fills the bar.
+        assert max(bar.earned_end, bar.saved_end) == 1000

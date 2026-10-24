@@ -94,9 +94,10 @@ def test_f25_month_page_in_a_browser(tmp_path: Path) -> None:
             page.locator("[data-month-today]").click()
             page.wait_for_url(f"{base}/m/{today}")
 
-            # The native month picker (Chromium) submits a plain GET form.
+            # The native month picker (Chromium) submits its plain GET form as soon as a month
+            # is picked (data-autosubmit); the Go button is only there without JavaScript.
+            expect(page.get_by_role("button", name="Go", exact=True)).to_have_count(0)
             page.locator("#month-picker").fill("2025-03")
-            page.get_by_role("button", name="Go", exact=True).click()
             page.wait_for_url(f"{base}/m/2025-03")
             expect(heading).to_contain_text("March 2025")
 
@@ -134,8 +135,11 @@ def test_f25_month_page_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-profile-link]")).to_be_in_viewport(ratio=1)
             page.locator("[data-profile-link]").click()
             page.wait_for_url(f"{base}/account")
-            for link in ("month", "transactions", "categories"):
+            for link in ("month", "transactions"):
                 expect(page.locator(f"[data-{link}-link]")).to_be_visible()
+            # Categories sit in the user menu.
+            page.locator("[data-user-menu] summary").click()
+            expect(page.locator("[data-categories-link]")).to_be_visible()
 
             # Phone width: no horizontal overflow, the user menu is still reachable.
             page.set_viewport_size({"width": 320, "height": 640})

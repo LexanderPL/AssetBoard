@@ -39,11 +39,58 @@
 
 {% block title %}{{ _("Transactions") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Transactions") }}{% endblock %}
+{% block header_actions %}<a href="{{ export_url }}" data-dialog-open="export-dialog" aria-haspopup="dialog" class="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium hover:bg-subtle" data-export-open>{{ _("Export CSV") }}</a>{% endblock %}
 {% block content %}
 <div class="space-y-6" data-transaction-list>
   {% if notice %}
   <p class="rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
   {% endif %}
+  {# The export options (F2.6): a dialog the header's "Export CSV" button opens as a modal
+     (app.js: data-dialog-open, data-dialog-close; Esc closes it too). Without JavaScript the
+     button is a link to ?export=1, and the dialog is rendered open in the page flow; an
+     invalid option renders it open as well. #}
+  <dialog id="export-dialog" aria-labelledby="export-heading" data-export data-dialog-modal{% if export_open %} open{% endif %}
+          class="w-[min(92vw,44rem)] rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl backdrop:bg-black/50 [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none">
+   <div class="p-4 sm:p-6">
+    <div class="flex items-start justify-between gap-4">
+      <h2 id="export-heading" class="text-base font-semibold">{{ _("Export as CSV") }}</h2>
+      <a href="{{ list_url }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" title="{{ _('Close') }}"><span aria-hidden="true">×</span><span class="sr-only">{{ _("Close") }}</span></a>
+    </div>
+    <p class="mt-1 text-sm text-muted">{{ _("Downloads every entry that matches the filters, oldest first, in the columns of the workspace archive's transactions.csv. With the standard options the file can be imported again.") }}</p>
+    {% if export_error %}<p class="mt-2 text-sm text-danger" role="alert" data-export-error>{{ export_error }}</p>{% endif %}
+    <form method="get" action="{{ scoped_url(request, 'transactions_export') }}" class="mt-4 space-y-3" data-export-form>
+      {{ hidden(filter_fields) }}
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label for="export-delimiter" class="{{ label_class }}">{{ _("Delimiter") }}</label>
+          <select id="export-delimiter" name="delimiter" class="form-select w-full rounded-lg py-1.5 pl-2.5">
+            <option value="comma"{% if export_values.get("delimiter") != "semicolon" %} selected{% endif %}>{{ _("Comma (standard)") }}</option>
+            <option value="semicolon"{% if export_values.get("delimiter") == "semicolon" %} selected{% endif %}>{{ _("Semicolon") }}</option>
+          </select>
+        </div>
+        <div>
+          <label for="export-decimal" class="{{ label_class }}">{{ _("Decimal separator") }}</label>
+          <select id="export-decimal" name="decimal" aria-describedby="export-decimal-help" class="form-select w-full rounded-lg py-1.5 pl-2.5">
+            <option value="dot"{% if export_values.get("decimal") != "comma" %} selected{% endif %}>{{ _("Dot (standard)") }}</option>
+            <option value="comma"{% if export_values.get("decimal") == "comma" %} selected{% endif %}>{{ _("Comma") }}</option>
+          </select>
+          <p id="export-decimal-help" class="mt-1 text-xs text-muted">{{ _("A decimal comma needs the semicolon delimiter.") }}</p>
+        </div>
+      </div>
+      <label class="flex items-start gap-2 text-sm">
+        <input type="checkbox" name="bom" value="1"{% if export_values.get("bom") %} checked{% endif %} class="mt-0.5 {{ check_class }}">
+        <span>{{ _("For Excel: start the file with a byte order mark, so that Excel reads it as UTF-8") }}</span>
+      </label>
+      <label class="flex items-start gap-2 text-sm">
+        <input type="checkbox" name="guard" value="1"{% if export_values.get("guard") %} checked{% endif %} aria-describedby="export-guard-help" class="mt-0.5 {{ check_class }}">
+        <span>{{ _("Protect against spreadsheet formulas") }}</span>
+      </label>
+      <p id="export-guard-help" class="text-xs text-muted">{{ _("Puts an apostrophe before =, +, -, @ (also their full-width forms) at the start of a description or category name, after leading spaces, or after a comma or semicolon inside it, so that a spreadsheet does not run them as formulas. Such values then differ from the stored ones, and a protected description may be too long to import again.") }}</p>
+      <button type="submit" class="{{ primary_class }}" data-export-download>{{ _("Download CSV") }}</button>
+    </form>
+   </div>
+  </dialog>
+
   {% if bulk_error %}
   <p class="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-bulk-error>{{ bulk_error }}</p>
   {% endif %}
@@ -118,7 +165,7 @@
     <p class="mt-1 text-sm text-muted" data-result-count>{% if window.total %}{{ ngettext("%(first)d–%(last)d of %(num)d entry", "%(first)d–%(last)d of %(num)d entries", window.total, first=window.first_item, last=window.last_item) }}{% else %}{{ _("No entries match these filters.") }}{% endif %}</p>
     {% endif %}
     {% if rows %}
-    <div class="mt-3 overflow-x-auto">
+    <div class="relative mt-3 overflow-x-auto">
       <table class="w-full min-w-[40rem] text-sm">
         <caption class="sr-only">{{ _("Entries matching the filters") }}{% if window and window.pages > 1 %}, {{ _("page %(number)d of %(pages)d", number=window.number, pages=window.pages) }}{% endif %}</caption>
         <thead>
@@ -183,40 +230,5 @@
   </section>
   {% endif %}
 
-  <section class="panel p-4 sm:p-6" aria-labelledby="export-heading" data-export>
-    <h2 id="export-heading" class="text-base font-semibold">{{ _("Export as CSV") }}</h2>
-    <p class="mt-1 text-sm text-muted">{{ _("Downloads every entry that matches the filters, oldest first, in the columns of the workspace archive's transactions.csv. With the standard options the file can be imported again.") }}</p>
-    {% if export_error %}<p class="mt-2 text-sm text-danger" role="alert" data-export-error>{{ export_error }}</p>{% endif %}
-    <form method="get" action="{{ scoped_url(request, 'transactions_export') }}" class="mt-4 space-y-3" data-export-form>
-      {{ hidden(filter_fields) }}
-      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div>
-          <label for="export-delimiter" class="{{ label_class }}">{{ _("Delimiter") }}</label>
-          <select id="export-delimiter" name="delimiter" class="form-select w-full rounded-lg py-1.5 pl-2.5">
-            <option value="comma"{% if export_values.get("delimiter") != "semicolon" %} selected{% endif %}>{{ _("Comma (standard)") }}</option>
-            <option value="semicolon"{% if export_values.get("delimiter") == "semicolon" %} selected{% endif %}>{{ _("Semicolon") }}</option>
-          </select>
-        </div>
-        <div>
-          <label for="export-decimal" class="{{ label_class }}">{{ _("Decimal separator") }}</label>
-          <select id="export-decimal" name="decimal" aria-describedby="export-decimal-help" class="form-select w-full rounded-lg py-1.5 pl-2.5">
-            <option value="dot"{% if export_values.get("decimal") != "comma" %} selected{% endif %}>{{ _("Dot (standard)") }}</option>
-            <option value="comma"{% if export_values.get("decimal") == "comma" %} selected{% endif %}>{{ _("Comma") }}</option>
-          </select>
-          <p id="export-decimal-help" class="mt-1 text-xs text-muted">{{ _("A decimal comma needs the semicolon delimiter.") }}</p>
-        </div>
-      </div>
-      <label class="flex items-start gap-2 text-sm">
-        <input type="checkbox" name="bom" value="1"{% if export_values.get("bom") %} checked{% endif %} class="mt-0.5 {{ check_class }}">
-        <span>{{ _("For Excel: start the file with a byte order mark, so that Excel reads it as UTF-8") }}</span>
-      </label>
-      <label class="flex items-start gap-2 text-sm">
-        <input type="checkbox" name="guard" value="1"{% if export_values.get("guard") %} checked{% endif %} aria-describedby="export-guard-help" class="mt-0.5 {{ check_class }}">
-        <span>{{ _("Protect against spreadsheet formulas") }}</span>
-      </label>
-      <p id="export-guard-help" class="text-xs text-muted">{{ _("Puts an apostrophe before =, +, -, @ (also their full-width forms) at the start of a description or category name, after leading spaces, or after a comma or semicolon inside it, so that a spreadsheet does not run them as formulas. Such values then differ from the stored ones, and a protected description may be too long to import again.") }}</p>
-      <button type="submit" class="{{ primary_class }}" data-export-download>{{ _("Download CSV") }}</button>
-    </form>
-  </section>
 </div>
 {% endblock %}

@@ -238,6 +238,28 @@ def test_invalid_export_options_return_the_page(ledger: OwnerApp, rows: dict) ->
     assert response.status_code == 400 and "Enter a valid amount." in response.text
 
 
+def _export_dialog(html: str) -> str:
+    match = re.search(r"<dialog id=\"export-dialog\"[^>]*>", html)
+    assert match is not None
+    return match.group(0)
+
+
+def test_the_export_options_are_a_dialog_behind_a_header_button(
+    ledger: OwnerApp, rows: dict
+) -> None:
+    html = _page(ledger, "?q=a&sort=amount")
+    header = html[html.index("<header") : html.index("</header>")]
+    button = re.search(r'<a href="([^"]+)" data-dialog-open="export-dialog"[^>]*>', header)
+    assert button is not None and "Export CSV" in header
+    # Without JavaScript the button is a link that renders the dialog open.
+    assert button.group(1) == "/transactions?q=a&amp;sort=amount&amp;export=1#export-dialog"
+    assert " open" not in _export_dialog(html)
+    assert " open" in _export_dialog(_page(ledger, "?q=a&sort=amount&export=1"))
+    # A refused option shows the dialog open, with its message.
+    refused = ledger.client.get("/transactions/export.csv?decimal=comma").text
+    assert " open" in _export_dialog(refused) and "data-export-error" in refused
+
+
 def test_the_export_form_carries_the_filters(ledger: OwnerApp, rows: dict) -> None:
     html = _page(ledger, f"?q=a&category={rows['food']}&sort=amount&page=1")
     match = re.search(r"<form method=\"get\" action=\"/transactions/export.csv\".*?</form>", html,

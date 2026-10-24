@@ -30,13 +30,14 @@
     <a href="{{ scoped_url(request, 'month', month=view.current|string) }}" class="{{ nav_link }}" data-month-today{% if view.is_current %} aria-current="date"{% endif %}>{{ _("Today") }}</a>
 
     {# Native month picker; desktop Firefox and Safari show a text box, so the server also
-       accepts 10.2026 and 10/2026, and the button submits without JavaScript. #}
+       accepts 10.2026 and 10/2026. A complete month opens on change (app.js, data-autosubmit);
+       without JavaScript the Go button submits it. #}
     <form method="get" action="{{ scoped_url(request, 'month_current') }}" class="flex items-center gap-2" data-month-picker>
       <input type="hidden" name="from" value="{{ view.month }}">
       <label for="month-picker" class="sr-only">{{ _("Go to month") }}</label>
       <input id="month-picker" name="month" type="month" value="{{ view.month }}" placeholder="{{ _('YYYY-MM') }}" min="1900-01" max="2199-12"
-             class="form-control rounded-full py-2">
-      <button type="submit" class="{{ nav_link }}">{{ _("Go") }}</button>
+             data-autosubmit class="form-control rounded-full py-2">
+      <noscript><button type="submit" class="{{ nav_link }}">{{ _("Go") }}</button></noscript>
     </form>
   </nav>
 
