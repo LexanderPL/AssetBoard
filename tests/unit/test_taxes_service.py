@@ -203,3 +203,41 @@ def test_fixed_tax_version_rejects_a_stale_workspace_currency(team: WorkspaceDb)
             effective_from=date(2026, 1, 1),
             value=PercentOrFixed.fixed_amount(Money(1000, "EUR")),
         )
+
+
+@pytest.mark.parametrize("role", ["viewer", "editor"])
+def test_every_write_refuses_viewers_and_stale_editor_contexts(
+    team: WorkspaceDb, role: str
+) -> None:
+    """A viewer is refused up front; a Context that still says editor for a member now stored
+    as viewer is refused inside the write transaction (require_role_now)."""
+    rule_id = create_rule(team)
+    ctx = team.ctx("viewer", role)
+    writes = [
+        lambda: taxes.create_rule(
+            team.factory,
+            ctx,
+            name="Forbidden",
+            effect="withheld",
+            base="net",
+            notes="",
+            effective_from=date(2026, 1, 1),
+            value=PercentOrFixed.percent(100),
+        ),
+        lambda: taxes.update_rule(team.factory, ctx, rule_id, name="Renamed", notes=""),
+        lambda: taxes.add_version(
+            team.factory,
+            ctx,
+            rule_id,
+            effective_from=date(2027, 1, 1),
+            value=PercentOrFixed.percent(100),
+        ),
+        lambda: taxes.archive_rule(team.factory, ctx, rule_id),
+    ]
+    for write in writes:
+        with pytest.raises(PermissionDenied):
+            write()
+    [rule] = taxes.list_rules(team.factory, team.ctx("owner", "owner"))
+    assert (rule.name, rule.archived, len(rule.versions)) == ("Income tax", False, 1)
+    with team.factory() as session:
+        assert session.scalar(select(func.count()).select_from(AuditEvent)) == 1
