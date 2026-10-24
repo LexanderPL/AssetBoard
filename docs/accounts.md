@@ -39,26 +39,29 @@ provider's MFA instead. Accounts without passwords configure MFA at their identi
 
 Workspace owners can select **Require two-factor authentication for password-based access to
 this workspace** in workspace settings. It applies to every member, including owners, and to
-existing password sessions immediately. A member without verified enrollment is sent to the
+existing password sessions immediately. To avoid locking yourself out, an owner signed in with a
+password must first enable two-factor authentication and sign in with it before turning this on. A member without verified enrollment is sent to the
 security page before accessing workspace data. They can still manage their account, enroll,
 sign out, or switch to an unrelated workspace. Other workspaces and OIDC/proxy sessions are
 unaffected.
 
-Disabling on the same security page requires your password, removes the authenticator and all
-recovery codes, and signs out other password sessions. A workspace requiring MFA stays protected
+Disabling on the same security page requires your password and a current authenticator code or
+an unused recovery code; it removes the authenticator and all recovery codes, and signs out other password sessions. A workspace requiring MFA stays protected
 and will ask you to enroll again. To replace a lost authenticator, sign in with a recovery code,
 disable, then enroll the replacement. You can also generate a replacement set of recovery codes
 on the security page; confirm your password and enter your current authenticator code or an
 unused recovery code. This immediately invalidates every previous recovery code, and the new
-codes are shown only once.
+codes are shown only once. Recovery codes are shown in groups such as `1a2b-3c4d-…`; you can
+type them with or without the dashes.
 
 If you lose your authenticator and every recovery code, contact an instance administrator. In
 **Users**, the administrator can reset your two-factor authentication after confirming their own
 account. This removes your authenticator and recovery codes and ends all your sessions. You can
 then sign in with your password and enroll again; a workspace that requires two-factor
 authentication remains inaccessible until you do. Administrators cannot use this action on
-their own account; use the account security page instead. A CLI password reset does not remove
-your second factor.
+their own account; use the account security page instead. An operator with shell access can
+also run `assetboard reset-mfa <email>` (see [administrator commands](deployment.md#administrator-commands)).
+A CLI password reset does not remove your second factor.
 
 ## Details, language and theme
 

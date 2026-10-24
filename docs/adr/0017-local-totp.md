@@ -1,6 +1,7 @@
 # ADR-0017: Local TOTP and workspace enforcement
 
-**Status:** Proposed
+**Status:** Accepted (the owner accepted the full scope for 1.0 on 2026-10-24: optional TOTP,
+recovery codes, per-workspace enforcement, administrator reset and CLI reset)
 **Date:** 2026-10-20
 
 ## Context
@@ -25,31 +26,52 @@ workspace's access policy. External identity providers remain responsible for th
   freshness interval); completion requires a code. Enrollment attempts have a separate per-user
   bucket using existing throttle settings, unaffected by restarting enrollment.
 - Encrypt pending and enabled secrets with Fernet using `derive_subkey(instance_secret,
-  "totp")`. The instance already persists this secret outside the database; there is no new
-  operator setting. Generate QR SVG locally through Segno; no enrollment data leaves the app.
+  "totp")`, derived once per instance secret. The plaintext is `"<user_id>|<secret>"` and
+  decryption checks the prefix, so a ciphertext copied to another account's row is refused.
+  The instance already persists this secret outside the database; there is no new operator
+  setting. A ciphertext that cannot be decrypted (the instance secret changed) logs a warning
+  without secret data that points to the key-change note; there is no key rotation
+  (`MultiFernet`). Generate QR SVG locally through Segno; no enrollment data leaves the app.
 - Generate ten 128-bit random recovery codes and show them once after enrollment. Store SHA-256
   hashes, sufficient for random high-entropy values rather than user passwords. Lock the factor
   and consume a code in the same transaction as issuing a session. Both SQLite's existing
   immediate transaction and PostgreSQL row locks serialize consumption.
 - `Workspace.require_two_factor` defaults off. Context construction checks it for password
   sessions, and write role guards re-read it. Every member, owners included, needs a verified
-  second factor to access that workspace. Profile/security routes and the workspace switcher
+  second factor to access that workspace. An owner cannot turn it on from a password session
+  without a verified second factor (that would lock them out); external sessions can. Profile/security routes and the workspace switcher
   remain available; unrelated workspaces and OIDC/proxy sessions are unaffected.
-- Enabling and password-confirmed disabling revoke other password sessions. The current local
+- Disabling requires the password and a current authenticator code or an unused recovery code,
+  checked together by the service (a wrong code is a failed confirmation). Enabling and
+  disabling revoke other password sessions. The current local
   session records whether the second factor was verified. Audit these changes without secrets.
-- Regenerating recovery codes requires the current password and TOTP or an unused recovery code;
-  old codes are invalidated and the replacement set is shown once. An instance administrator can
+- Regenerating recovery codes requires the current password and TOTP or an unused recovery code,
+  verified in the service as for disabling; old codes are invalidated and the replacement set is
+  shown once, grouped as `xxxx-xxxx-…` (dashes are ignored on input). An instance administrator can
   reset another user's factor after confirming their own account; this removes the factor and all
-  recovery codes, revokes every target session, and is audited without secret data.
+  recovery codes, revokes every target session, and is audited without secret data. An operator
+  with shell access can run `assetboard reset-mfa <email>`, which removes the factor and recovery
+  codes, revokes the user's password sessions and writes a `cli.reset_mfa` audit event.
+- A correct password with a missing or wrong code fails exactly like a wrong password (same
+  response); the `auth.login_failure` event records the internal reason `second_factor`. A stale
+  password hash is upgraded only after the whole sign-in succeeds, second factor included, so
+  rehashing time never reveals a correct password to someone without the second factor.
 
 ## Consequences
 
 Backups must preserve the persistent instance secret as well as the database. Replacing it
 makes authenticator secrets unreadable and authenticator sign-in fails closed; recovery codes
-remain usable. Changing passwords does not clear MFA. There is no CLI MFA reset: users who lose
-all recovery methods need an instance administrator to reset the factor through the Users page.
+remain usable. Changing passwords does not clear MFA. Users who lose all recovery methods need an
+instance administrator to reset the factor through the Users page, or an operator to run
+`assetboard reset-mfa`.
 
-New direct dependencies are PyOTP (MIT, the spec's maintained TOTP implementation), Segno
+Accepted residual risk: after a correct password, sign-in decrypts the secret and computes a few
+HMACs before deciding, which a wrong password skips. The difference is well under a millisecond,
+far below network and argon2 jitter, and every attempt counts in the existing sign-in throttle,
+so it is not practical to measure; it is accepted rather than padded with dummy work.
+
+New direct dependencies are PyOTP (MIT, the spec's TOTP implementation; releases are infrequent,
+the latest being 2.9.0 in 2023, which suits a small, stable RFC 6238 implementation), Segno
 (BSD-3-Clause, a maintained pure-Python QR encoder with no dependencies), and cryptography
 (Apache-2.0 OR BSD-3-Clause, maintained by PyCA and already locked transitively through
 Authlib). The standard library and existing app dependencies do not supply a TOTP provisioning

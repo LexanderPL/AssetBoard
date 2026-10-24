@@ -296,15 +296,22 @@ workspace, without affecting any other workspace or external sign-in method.
   Service Context construction and write role guards refuse password sessions that have not
   verified TOTP for that workspace. Existing sessions are affected immediately; account security,
   enrollment, sign-out and switching to another workspace remain accessible. OIDC and proxy
-  sessions are exempt. Owners are subject to the policy too, including the owner who enables it.
-- Disabling requires the password through `web.confirm.run_confirmed`. Enabling and disabling
+  sessions are exempt. Owners are subject to the policy too, including the owner who enables it:
+  an owner in a password session without a verified second factor cannot turn it on.
+- Disabling requires the password and a current TOTP or unused recovery code, verified together
+  by the service (`services.totp.disable`); recovery-code regeneration likewise. Enabling and disabling
   revoke other password sessions; the current password session is marked verified on enrollment
   and unverified on disable. Disabling can require re-enrollment to access a protected workspace.
 - An instance administrator can reset another user's enabled factor after confirming their own
   account. Remove the factor and recovery codes, revoke all target sessions, and audit the reset
   without secrets. The user can sign in with their password and re-enroll; workspace enforcement
   remains in place until then. Administrators use their own account security page for self-service.
+  `assetboard reset-mfa <email>` does the same from the shell: it removes the factor and recovery
+  codes, revokes the user's password sessions and writes a `cli.reset_mfa` audit event.
+- A correct password with a wrong code fails like a wrong password (identical response); the
+  failure's audit data records the internal reason `second_factor`. A stale password hash is
+  upgraded only after the whole sign-in, second factor included, succeeds.
 - Encrypt shared secrets using a purpose-separated key derived from the existing persistent
-  instance secret. Do not reveal an enabled secret again or log secrets/codes. Audit enable and
+  instance secret, bound to the account (`"<user_id>|<secret>"`). Do not reveal an enabled secret again or log secrets/codes. Audit enable and
   disable without secret data. Preserve the instance secret with backups; see ADR-0017.
 - English and Polish UI, CSRF-protected forms, reversible migration and updated account docs.
