@@ -119,7 +119,8 @@ def test_field_errors_are_linked_and_number_fields_have_minimums(owner):
     page = owner.client.get("/recurring/new").text
     assert 'id="interval"' in page and 'min="1"' in page.split('id="interval"')[1].split(">")[0]
     assert 'min="1"' in page.split('id="max_count"')[1].split(">")[0]
-    assert page.count('class="h-4 w-4 rounded border-line accent-primary"') == 8
+    assert page.count('class="h-4 w-4 rounded border-line accent-primary"') == 9
+    assert 'name="auto_post"' in page
     response = owner.post("/recurring", data | {"interval": "0"})
     assert response.status_code == 400
     assert 'aria-invalid="true" aria-describedby="interval-error"' in response.text

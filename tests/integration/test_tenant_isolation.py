@@ -927,6 +927,7 @@ def test_scheduled_queries_stay_in_their_workspace(db_session, two_workspaces) -
         scheduled_item_id=item.id,
         category_id=category.id,
         direction="expense",
+        nominal_date=date(2026, 3, 14),
         due_date=date(2026, 3, 14),
         expected_minor=180000,
         currency="EUR",
@@ -944,10 +945,14 @@ def test_scheduled_queries_stay_in_their_workspace(db_session, two_workspaces) -
     assert other_items.ordered() == [] and other_items.ordered(active_only=True) == []
     assert other_items.category_counts() == {} and other_rows.category_counts() == {}
     assert other_rows.for_item(item.id) == []
+    assert other_rows.upcoming(date(2026, 4, 1)) == []
+    assert rows.get_for_update(row.id) == row
+    assert other_rows.get_for_update(row.id) is None
     assert not other_items.any_exists() and items.any_exists()
     with pytest.raises(NotFound):
         other_rows.delete(row)
     assert rows.for_item(item.id)[0].id == row.id
+    assert rows.upcoming(date(2026, 4, 1))[0][0].id == row.id
     assert item.id in {value.id for value in items.ordered()}
     assert item.id in {value.id for value in items.ordered(active_only=True)}
     assert items.category_counts()[item.category_id] >= 1

@@ -136,7 +136,25 @@ def occurrences(
     limit: int | None = None,
 ) -> list[date]:
     """Inclusive effective dates. Count nominal dates before shifting and deduplication."""
+    return sorted(
+        {
+            due
+            for _, due in occurrences_with_nominal(rule, from_date, to_date, holidays, limit=limit)
+        }
+    )
+
+
+def occurrences_with_nominal(
+    rule: RecurrenceRule,
+    from_date: date,
+    to_date: date,
+    holidays: Container[date],
+    *,
+    limit: int | None = None,
+) -> list[tuple[date, date]]:
+    """Pairs of nominal and effective dates, merging dates shifted onto the same day."""
     result: set[date] = set()
+    pairs: dict[date, date] = {}
     count = 0
     if from_date > to_date:
         return []
@@ -153,6 +171,7 @@ def occurrences(
             break
         if from_date <= due:
             result.add(due)
+            pairs.setdefault(due, nominal)
             if limit is not None and len(result) >= limit:
                 break
-    return sorted(result)
+    return sorted(((nominal, due) for due, nominal in pairs.items()), key=lambda pair: pair[1])

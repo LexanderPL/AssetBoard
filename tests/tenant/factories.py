@@ -156,6 +156,7 @@ def make_scheduled_occurrence(session: Session, workspace_id: UUID) -> Scheduled
         scheduled_item_id=item.id,
         category_id=item.category_id,
         direction="expense",
+        nominal_date=date(2026, 3, 14),
         due_date=date(2026, 3, 14),
         expected_minor=180000,
         currency="EUR",

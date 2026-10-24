@@ -32,6 +32,7 @@
     <option value="fixed"{% if values.get('amount_mode') == 'fixed' %} selected{% endif %}>{{ _("Fixed") }}</option>
     <option value="estimate"{% if values.get('amount_mode') == 'estimate' %} selected{% endif %}>{{ _("Estimate") }}</option>
   </select>
+  <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="auto_post" value="1"{% if values.get('auto_post') == '1' %} checked{% endif %} class="{{ check_class }}"> {{ _("Automatically post on the due date") }}</label>
   {{ field("start_date", _("Start date"), type="date", value=values.get('start_date', ''), error=errors.get('start_date'), required=true) }}
   {{ field("end_date", _("End date (optional)"), type="date", value=values.get('end_date', ''), error=errors.get('end_date')) }}
   {{ field("max_count", _("Maximum occurrences (optional)"), type="number", value=values.get('max_count', ''), error=errors.get('max_count'), min=1) }}

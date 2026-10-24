@@ -86,6 +86,19 @@ interval/end_date/max_count, determinism. Services use the injected Clock only.
 - Posting into a closed month is blocked with a clear message (the user must reopen or reschedule).
 - A posted occurrence cannot be changed by rule edits.
 
+**Implementation details**
+- Occurrences retain a `nominal_date` identity separate from their effective `due_date`; rescheduling
+  one occurrence never changes the recurring rule or its nominal key. Shifted duplicate nominal
+  dates continue to merge.
+- `generated_by`, `transaction_id`, per-occurrence amount overrides and reschedule timestamps are
+  stored on the occurrence. `ScheduledItem.auto_post` defaults to false.
+- Undo follows the ledger's soft-delete and audit conventions: the linked transaction is soft
+  deleted and the occurrence returns to pending, within the existing 10-second undo window.
+- The inbox window defaults to 30 days and is configurable by the operator with
+  `ASSETBOARD_UPCOMING_DAYS` (1–365).
+- Auto-post jobs run at 00:05 in each workspace time zone, use the injected Clock, and leave
+  occurrences pending when their due month is closed.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
