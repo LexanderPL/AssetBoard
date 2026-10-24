@@ -1354,7 +1354,7 @@ msgstr ""
 msgid "Enter a valid effective date between 1900 and 2199."
 msgstr ""
 
-msgid "Enter a non-negative whole-number rate in basis points."
+msgid "Enter a non-negative percentage with at most two decimal places."
 msgstr ""
 
 msgid "Enter a non-negative fixed amount in the workspace currency."
@@ -2810,13 +2810,13 @@ msgstr ""
 msgid "Value type"
 msgstr ""
 
-msgid "Percent (basis points)"
+msgid "Percent"
 msgstr ""
 
 msgid "Fixed amount"
 msgstr ""
 
-msgid "Rate in basis points"
+msgid "Rate in percent"
 msgstr ""
 
 #, python-format
@@ -3221,5 +3221,14 @@ msgstr ""
 #~ "Locked: transactions (deleted ones included)"
 #~ " or planned values exist, and their"
 #~ " amounts are stored in this currency."
+#~ msgstr ""
+
+#~ msgid "Enter a non-negative whole-number rate in basis points."
+#~ msgstr ""
+
+#~ msgid "Percent (basis points)"
+#~ msgstr ""
+
+#~ msgid "Rate in basis points"
 #~ msgstr ""
 

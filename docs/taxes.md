@@ -5,8 +5,8 @@ advice: rates are entered by you, and calculator results are estimates for plann
 
 Create a rule with an effect (`added` or `withheld`), a calculation base (`net` or `gross`), and
 an initial effective-dated value. Added rules always use net as their base. A value is either a
-percentage in integer basis points (100 bp = 1%) or a fixed amount in the workspace's base
-currency.
+percentage (entered in your locale's number format with at most two decimals, e.g. `23` or
+`12,75`, and stored as integer basis points) or a fixed amount in the workspace's base currency.
 
 Rate versions are append-only. A new version must start after the latest version; old versions
 remain unchanged and the calculator uses the latest version effective on the selected date.

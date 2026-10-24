@@ -1450,8 +1450,8 @@ msgstr "Wybierz prawidłowy rodzaj i podstawę podatku."
 msgid "Enter a valid effective date between 1900 and 2199."
 msgstr "Podaj prawidłową datę z zakresu od 1900 do 2199."
 
-msgid "Enter a non-negative whole-number rate in basis points."
-msgstr "Podaj nieujemną całkowitą stawkę w punktach bazowych."
+msgid "Enter a non-negative percentage with at most two decimal places."
+msgstr "Podaj nieujemny procent z co najwyżej dwoma miejscami po przecinku."
 
 msgid "Enter a non-negative fixed amount in the workspace currency."
 msgstr "Podaj nieujemną kwotę w walucie obszaru roboczego."
@@ -3048,14 +3048,14 @@ msgstr "Data obowiązywania pierwszej wersji"
 msgid "Value type"
 msgstr "Rodzaj wartości"
 
-msgid "Percent (basis points)"
-msgstr "Procent (punkty bazowe)"
+msgid "Percent"
+msgstr "Procent"
 
 msgid "Fixed amount"
 msgstr "Kwota stała"
 
-msgid "Rate in basis points"
-msgstr "Stawka w punktach bazowych"
+msgid "Rate in percent"
+msgstr "Stawka w procentach"
 
 #, python-format
 msgid "Fixed amount (%(currency)s)"
@@ -3446,3 +3446,4 @@ msgstr ""
 
 #~ msgid "Choose who can create workspaces."
 #~ msgstr "Wybierz, kto może tworzyć obszary robocze."
+

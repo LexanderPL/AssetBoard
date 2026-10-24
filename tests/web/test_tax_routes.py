@@ -9,7 +9,7 @@ def test_tax_rule_crud_versions_and_calculator_preview(owner):
         "notes": "Standard rate",
         "effective_from": "2026-01-01",
         "mode": "percent",
-        "rate_bp": "2300",
+        "rate_percent": "23",
     }
     created = owner.post("/taxes", data)
     assert created.status_code == 303
@@ -70,7 +70,7 @@ def test_tax_rule_forms_reject_invalid_values(owner):
             "notes": "",
             "effective_from": "2026-01-01",
             "mode": "percent",
-            "rate_bp": "2300",
+            "rate_percent": "23",
         },
     )
     assert invalid.status_code == 303
@@ -83,3 +83,33 @@ def test_tax_rule_forms_reject_invalid_values(owner):
         "Choose how the income is recorded"
         in owner.client.get("/taxes/calculator?net=100&day=2026-01-01&record_as=unknown").text
     )
+
+
+def _rule_form(rate: str) -> dict[str, str]:
+    return {
+        "name": "Income tax",
+        "effect": "withheld",
+        "base": "net",
+        "notes": "",
+        "effective_from": "2026-01-01",
+        "mode": "percent",
+        "rate_percent": rate,
+    }
+
+
+def test_rates_are_entered_as_locale_aware_percentages(owner):
+    from sqlalchemy import select
+
+    from assetboard.db.models.tax import TaxRuleVersion
+
+    owner.client.headers["Accept-Language"] = "pl"
+    assert owner.post("/taxes", _rule_form("12,75")).status_code == 303
+    assert "12,75%" in owner.client.get("/taxes").text
+    with owner.db() as session:
+        assert session.scalars(select(TaxRuleVersion.rate_bp)).one() == 1275
+
+
+def test_invalid_percentages_are_refused(owner):
+    for rate in ("", "-1", "12.345", "abc", "99999999999"):
+        response = owner.post("/taxes", _rule_form(rate))
+        assert "error=invalid_rate" in response.headers["location"], rate

@@ -33,7 +33,7 @@ ERRORS = {
     "invalid_name": _("Enter a name."),
     "invalid_rule": _("Choose a valid tax effect and base."),
     "invalid_date": _("Enter a valid effective date between 1900 and 2199."),
-    "invalid_rate": _("Enter a non-negative whole-number rate in basis points."),
+    "invalid_rate": _("Enter a non-negative percentage with at most two decimal places."),
     "invalid_value": _("Enter a non-negative fixed amount in the workspace currency."),
     "invalid_amount": _("Enter a non-negative net amount in the workspace currency."),
     "version_not_newer": _("A new version must start after the latest existing version."),
@@ -59,7 +59,13 @@ def _value(values: dict[str, str], locale: str, currency: str) -> PercentOrFixed
     mode = values.get("mode")
     if mode == "percent":
         try:
-            return PercentOrFixed.percent(int(values.get("rate_bp", "")))
+            # A locale-aware percentage ("23", "12,5", "0.01") with at most two decimals,
+            # stored as integer basis points.
+            percent = parse_amount(values.get("rate_percent", ""), locale)
+            basis_points = percent.scaleb(2)
+            if percent < 0 or basis_points != basis_points.to_integral_value():
+                raise ValueError
+            return PercentOrFixed.percent(int(basis_points))
         except ValueError:
             raise taxes.TaxRuleError("invalid_rate") from None
     if mode == "fixed":
