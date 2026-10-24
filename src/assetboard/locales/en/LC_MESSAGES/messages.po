@@ -1510,9 +1510,6 @@ msgstr ""
 msgid "Choose a valid direction."
 msgstr ""
 
-msgid "invalid_direction"
-msgstr ""
-
 msgid "Choose a supported currency."
 msgstr ""
 
@@ -3230,5 +3227,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Rate in basis points"
+#~ msgstr ""
+
+#~ msgid "invalid_direction"
 #~ msgstr ""
 

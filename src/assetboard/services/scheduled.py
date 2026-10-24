@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 from calendar import monthrange
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from uuid import UUID
 
 import holidays as holiday_calendars
@@ -200,22 +200,31 @@ def _generate(
     today = clock.today(workspace.timezone)
     closed = MonthStateRepository(session, scope).closed_months()
     category = CategoryRepository(session, scope).get_or_raise(item.category_id)
+    repository = ScheduledOccurrenceRepository(session, scope)
+    rows = repository.for_item(item.id)
     wanted: dict[date, date] = {}
+    known: set[date] = set()
     if item.paused_at is None and item.archived_at is None and category.archived_at is None:
         rule = _rule(item)
-        wanted = {
-            nominal: due
-            for nominal, due in occurrences_with_nominal(
-                rule,
-                date(1900, 1, 1) if include_past else today,
-                _horizon(today, horizon_months),
-                _holidays(workspace.country_code, rule),
-            )
-            if _open(due, closed)
-        }
-    repository = ScheduledOccurrenceRepository(session, scope)
+        start = date(1900, 1, 1) if include_past else today
+        # A pending row moved forward from an earlier nominal date (an overdue bill rescheduled
+        # to next week) stays valid although that nominal date is outside today's window.
+        moved = [
+            row.nominal_date
+            for row in rows
+            if row.status == OccurrenceStatus.PENDING and row.rescheduled_at is not None
+        ]
+        lookback = max(date(1900, 1, 1), min([start, *moved]) - timedelta(days=31))
+        pairs = occurrences_with_nominal(
+            rule,
+            lookback,
+            _horizon(today, horizon_months),
+            _holidays(workspace.country_code, rule),
+        )
+        known = {nominal for nominal, _ in pairs}
+        wanted = {nominal: due for nominal, due in pairs if due >= start and _open(due, closed)}
     kept: set[date] = set()
-    for row in repository.for_item(item.id):
+    for row in rows:
         if (
             row.status != OccurrenceStatus.PENDING
             or row.due_date < today
@@ -224,13 +233,10 @@ def _generate(
             kept.add(row.nominal_date)
             continue
         due = wanted.get(row.nominal_date)
-        if due is None:
+        if due is None and (row.rescheduled_at is None or row.nominal_date not in known):
             repository.delete(row)
             continue
-        if not _open(due, closed):
-            kept.add(row.nominal_date)
-            continue
-        if row.rescheduled_at is None:
+        if due is not None and row.rescheduled_at is None:
             row.due_date = due
         row.direction = item.direction
         row.category_id = item.category_id

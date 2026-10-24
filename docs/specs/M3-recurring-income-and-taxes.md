@@ -89,7 +89,9 @@ interval/end_date/max_count, determinism. Services use the injected Clock only.
 **Implementation details**
 - Occurrences retain a `nominal_date` identity separate from their effective `due_date`; rescheduling
   one occurrence never changes the recurring rule or its nominal key. Shifted duplicate nominal
-  dates continue to merge.
+  dates continue to merge. Regeneration keeps a rescheduled pending occurrence while its nominal
+  date still belongs to the rule, even when that date is before today (an overdue item moved
+  forward).
 - `generated_by`, `transaction_id`, per-occurrence amount overrides and reschedule timestamps are
   stored on the occurrence. `ScheduledItem.auto_post` defaults to false.
 - Undo follows the ledger's soft-delete and audit conventions: the linked transaction is soft
@@ -97,7 +99,7 @@ interval/end_date/max_count, determinism. Services use the injected Clock only.
 - The inbox window defaults to 30 days and is configurable by the operator with
   `ASSETBOARD_UPCOMING_DAYS` (1–365).
 - Auto-post jobs run at 00:05 in each workspace time zone, use the injected Clock, and leave
-  occurrences pending when their due month is closed.
+  occurrences pending when their due month is closed. Paused or archived items are not posted.
 
 **Agent prompt**
 ```

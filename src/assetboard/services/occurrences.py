@@ -430,7 +430,7 @@ def auto_post_workspace(factory: sessionmaker[Session], scope: WorkspaceScope, c
         candidates = occurrences.upcoming(today)
         posted = 0
         for occurrence, item, _category_name in candidates:
-            if not item.auto_post:
+            if not item.auto_post or item.paused_at is not None or item.archived_at is not None:
                 continue
             state = MonthStateRepository(session, scope).for_month(
                 YearMonth.from_date(occurrence.due_date)

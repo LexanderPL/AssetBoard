@@ -36,8 +36,8 @@ ACTION_ERRORS = {
     "undo_expired": _("The 10-second undo window has expired."),
     "category_unavailable": _("The occurrence category is unavailable; edit the recurring rule."),
     "invalid_input": _("Check the amount and date, then try again."),
-    "invalid_direction": _("Choose a valid direction."),
 }
+INVALID_DIRECTION = _("Choose a valid direction.")
 
 
 def _id(value: str) -> UUID:
@@ -70,7 +70,7 @@ async def page(request: Request, ctx: CurrentContext) -> Response:
     if direction not in (None, "expense", "income"):
         raise HTTPException(
             status_code=400,
-            detail=gettext(ACTION_ERRORS["invalid_direction"], request.state.locale),
+            detail=gettext(INVALID_DIRECTION, request.state.locale),
         )
     category_text = request.query_params.get("category") or None
     category_id = _id(category_text) if category_text else None
