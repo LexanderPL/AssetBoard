@@ -20,7 +20,9 @@ fewer than six dates remaining.
 Working days are Monday through Friday, excluding the workspace country's national public
 holidays, including observed holidays supplied by `python-holidays`. No subdivision is selected.
 If the workspace has no country, only weekends are excluded. Unsupported countries are refused
-when the rule needs working-day calculations; ordinary unadjusted dates still work.
+when the rule needs working-day calculations; ordinary unadjusted dates still work. Changing the
+workspace country recalculates pending dates of working-day items at once; a country without
+holiday data cannot be chosen while such items exist.
 
 Choose **Keep the date**, **Previous working day**, or **Next working day**. An adjustment can
 cross a month or year boundary, or shift a date before the rule's start/after its end. The
@@ -35,20 +37,27 @@ the same day 13 calendar months ahead, inclusive (clamped at month end). Adminis
 creation also backfills dates from the start of the rule; it is off by default. Generation is
 idempotent: repeating a job never creates a second occurrence for the same item and due date.
 
-An APScheduler job runs daily at 03:00 in each workspace's time zone. Startup catches up the
-forward horizon; new workspaces and time-zone changes are picked up within one minute.
-Use one application process/worker, as required by the deployment guide. Job failures log the
-workspace identifier without financial data and can be retried by saving the rule or restarting.
+An APScheduler job runs daily at 03:00 in each workspace's time zone. Each run recalculates
+pending dates from today onward, so a changed holiday calendar moves dates instead of adding
+new ones. Startup catches up the forward horizon in the background; new workspaces and
+time-zone changes are picked up within one minute. Use one application process/worker, as
+required by the deployment guide. A failing item is logged with its identifier, without
+financial data, and does not stop the other items; the next run retries it.
 
 Editing replaces only **pending** occurrences whose due date is today or later. Overdue,
-posted and skipped occurrences keep their identity, amount and other data. Pausing or archiving
-removes pending occurrences from today onward and stops generation. Resuming regenerates the
-forward horizon without creating new overdue dates. Deleting removes an item only if no history
-remains; otherwise it archives it. Archived items remain visible for history.
+posted and skipped occurrences keep their identity, amount and other data. Pausing removes
+pending occurrences from today onward and stops generation. Archiving or deleting removes all
+pending occurrences, overdue ones included; posted and skipped occurrences are history.
+Resuming regenerates the forward horizon without creating new overdue dates. Deleting asks for
+confirmation and removes an item only if no history remains; otherwise it archives it. Archived
+items remain visible for history. Occurrences in a closed month are never created, removed or
+changed; reopen the month first.
 
 Categories referenced by rules or occurrences cannot change direction or be deleted; deleting
 the category archives it instead. Stored recurring amounts also prevent changing the workspace's
-base currency. Choose a new active category when editing a rule whose category was archived.
+base currency. An item whose category is archived creates no new dates, and its pending dates from today
+onward are removed on the next daily run. The edit form shows the archived category as the
+current, unavailable choice; choose an active category to save the rule again.
 
 These are planned dates, not posted transactions. The Upcoming inbox, payment/skip/reschedule
 actions, automatic posting and reminders belong to later M3 features (F3.2/F3.6).
