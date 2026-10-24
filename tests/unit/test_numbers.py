@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from decimal import Decimal
 
 import pytest
@@ -9,7 +10,12 @@ from hypothesis import strategies as st
 
 from assetboard.domain.money import Money
 from assetboard.i18n.locale import resolve_locale
-from assetboard.i18n.numbers import format_amount_input, format_money, parse_amount
+from assetboard.i18n.numbers import (
+    CURRENCY_HOME_LOCALES,
+    format_amount_input,
+    format_money,
+    parse_amount,
+)
 
 
 @pytest.mark.parametrize("locale", ["en", "pl", "de"])
@@ -70,9 +76,34 @@ def test_parse_amount_round_trips_babel_formatting(locale: str, amount: Decimal)
 @pytest.mark.parametrize(
     ("currency", "amount", "locale", "expected"),
     [
+        # No single home country: the interface locale.
         ("EUR", 123456, "en", "€1,234.56"),
-        ("EUR", 123456, "pl", "1 234,56 €"),
-        ("JPY", 1234, "en", "¥1,234"),
+        ("EUR", 123456, "pl", "1\u00a0234,56\u00a0€"),
+        ("EUR", 123456, "de", "1.234,56\u00a0€"),
+        ("EUR", -123456, "en", "-€1,234.56"),
+        # One home country: its style, whatever the interface language.
+        ("PLN", 123450, "en", "1\u00a0234,50\u00a0zł"),
+        ("PLN", 123450, "pl", "1\u00a0234,50\u00a0zł"),
+        ("PLN", -123450, "en", "-1\u00a0234,50\u00a0zł"),
+        ("USD", 123450, "en", "$1,234.50"),
+        ("USD", 123450, "pl", "$1,234.50"),
+        ("GBP", 123450, "pl", "£1,234.50"),
+        ("GBP", -123450, "en", "-£1,234.50"),
+        ("CZK", 123450, "en", "1\u00a0234,50\u00a0Kč"),
+        ("SEK", 123450, "en", "1\u00a0234,50\u00a0kr"),
+        ("DKK", 123450, "en", "1.234,50\u00a0kr."),
+        ("HUF", 123450, "en", "1\u00a0234,50\u00a0Ft"),
+        ("UAH", 123450, "en", "1\u00a0234,50\u00a0₴"),
+        ("JPY", 1234, "en", "￥1,234"),
+        ("JPY", 1234, "pl", "￥1,234"),
+        ("CAD", 123450, "pl", "$1,234.50"),
+        # A letter code never touches the number.
+        ("CHF", 123450, "en", "CHF\u00a01’234.50"),
+        ("CHF", -123450, "pl", "CHF\u00a0-1’234.50"),
+        ("RON", 123450, "en", "1.234,50\u00a0RON"),
+        ("THB", 123450, "en", "THB\u00a01,234.50"),
+        ("THB", -123450, "en", "-THB\u00a01,234.50"),
+        ("THB", 123450, "pl", "1\u00a0234,50\u00a0THB"),
     ],
 )
 def test_format_money_uses_locale_and_currency_digits(
@@ -82,6 +113,18 @@ def test_format_money_uses_locale_and_currency_digits(
     expected: str,
 ) -> None:
     assert format_money(Money(amount, currency), locale) == expected
+
+
+@pytest.mark.parametrize("currency", sorted(CURRENCY_HOME_LOCALES))
+def test_every_home_locale_formats_its_currency(currency: str) -> None:
+    text = format_money(Money(123456, currency), "en")
+    assert re.search(r"\d", text) and not re.search(r"[A-Z]{3}[\d-]|\d[A-Z]{3}", text)
+    assert format_money(Money(123456, currency), "pl") == text
+
+
+def test_inputs_keep_the_interface_locale() -> None:
+    assert format_amount_input(Money(123450, "PLN"), "en") == "1234.50"
+    assert parse_amount("1,234.50", "en") == Decimal("1234.50")
 
 
 def test_resolve_locale_obeys_user_workspace_header_fallback_order() -> None:

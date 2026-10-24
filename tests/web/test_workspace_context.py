@@ -122,7 +122,7 @@ def test_home_page_uses_the_workspace_currency(signed: Signed) -> None:
         session.execute(update(Workspace).values(base_currency="JPY"))
     page = signed.client.get("/")
     assert page.status_code == 200
-    assert "¥0" in page.text and "€" not in page.text
+    assert "￥0" in page.text and "€" not in page.text  # native style: ja_JP
 
 
 def test_role_change_applies_on_the_next_request(signed: Signed) -> None:
