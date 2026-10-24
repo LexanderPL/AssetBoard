@@ -123,7 +123,7 @@
 <tr id="tx-{{ row_id }}" data-transaction="{{ row_id }}">
   <td class="py-2 pr-2 tabular-nums"><time datetime="{{ r.t.date.isoformat() }}"><span aria-hidden="true">{{ r.t.date.day }}</span><span class="sr-only">{{ r.full_date }}</span></time></td>
   <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums" data-amount>{{ r.amount }}</td>
-  <td class="break-words py-2 pr-2" data-description>{{ r.t.description }}</td>
+  <td class="break-words py-2 pr-2" data-description>{{ r.t.description }}{% if r.t.source == "recurring_auto" %} <span class="text-xs {{ muted_class }}">{{ _("Automatically posted") }}</span>{% endif %}</td>
   <td class="py-2 pr-2"><span class="flex items-center gap-2">{{ swatch(r.t.category_color) }}<span data-category-name>{{ r.t.category_name }}</span>{% if r.t.category_archived %}<span class="text-xs {{ muted_class }}">{{ _("archived") }}</span>{% endif %}</span></td>
   {% if ledger.can_write %}
   <td class="whitespace-nowrap py-1 text-right">

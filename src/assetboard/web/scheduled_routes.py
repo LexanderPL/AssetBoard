@@ -146,6 +146,7 @@ def _input(values: dict[str, str], ctx: Context, locale: str) -> scheduled.Sched
         rule=_rule(values),
         amount_mode=_parse(values, "amount_mode", AmountMode, "fixed"),
         notes=values.get("notes", ""),
+        auto_post=values.get("auto_post") == "1",
     )
 
 
@@ -243,6 +244,7 @@ async def edit(request: Request, ctx: CurrentContext, item_id: str) -> Response:
             "amount": format_amount_input(item.amount, request.state.locale),
             "notes": item.notes,
             "amount_mode": item.amount_mode,
+            "auto_post": "1" if item.auto_post else "",
             "start_date": rule.start_date.isoformat(),
             "end_date": rule.end_date.isoformat() if rule.end_date else "",
             "max_count": str(rule.max_count) if rule.max_count else "",

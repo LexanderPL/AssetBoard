@@ -11,6 +11,7 @@ from assetboard.domain.recurrence import (
     RecurrenceRule,
     WeekendPolicy,
     occurrences,
+    occurrences_with_nominal,
 )
 
 
@@ -92,6 +93,10 @@ def test_shifted_duplicates_merge_but_count_nominal_dates() -> None:
     assert occurrences(rule, date(2026, 3, 1), date(2026, 4, 1), set()) == [
         date(2026, 3, 6),
         date(2026, 3, 9),
+    ]
+    assert occurrences_with_nominal(rule, date(2026, 3, 1), date(2026, 4, 1), set()) == [
+        (date(2026, 3, 6), date(2026, 3, 6)),
+        (date(2026, 3, 7), date(2026, 3, 9)),
     ]
 
 
