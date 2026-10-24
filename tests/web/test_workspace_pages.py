@@ -81,14 +81,22 @@ def test_home_shows_owner_links_only_to_owners(owner: OwnerApp) -> None:
     assert "data-owner-link" not in owner.client.get("/").text
 
 
-@pytest.mark.parametrize("page", ["account", "not_found", "no_workspace", "signed_out_login"])
+def test_account_pages_show_the_workspace_parts(owner: OwnerApp) -> None:
+    """Every signed-in page shows the current workspace's chrome (v0.2.1 sidebar bug)."""
+    second = owner.add_workspace("Second")
+    owner.join(owner.admin_id, second, "owner")
+    response = owner.client.get("/account/password")
+    assert response.status_code == 200
+    for part in WORKSPACE_PARTS:
+        assert part in response.text
+
+
+@pytest.mark.parametrize("page", ["not_found", "no_workspace", "signed_out_login"])
 def test_pages_without_a_context_render_without_workspace_parts(owner: OwnerApp, page: str) -> None:
     second = owner.add_workspace("Second")
     owner.join(owner.admin_id, second, "owner")  # the switcher would show on workspace pages
     client = owner.client
-    if page == "account":
-        response, status = client.get("/account/password"), 200
-    elif page == "not_found":
+    if page == "not_found":
         response, status = client.get("/no-such-page"), 404
     elif page == "no_workspace":
         with owner.db() as session, session.begin():

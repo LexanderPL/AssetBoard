@@ -201,3 +201,50 @@ def _alert_panel(html: str) -> str:
     match = re.search(r'<section[^>]*role="alert">.*?</section>', html, re.DOTALL)
     assert match is not None
     return match.group(0)
+
+
+# The sidebar on pages without a workspace Context (owner-reported in v0.2.1)
+
+WORKSPACE_NAV_LINKS = ("data-month-link", "data-transactions-link", "data-categories-link")
+SIGNED_IN_PAGES = (
+    "/account",
+    "/account/password",
+    "/admin/users",
+    "/admin/users/new",
+    "/admin/settings",
+    "/audit?scope=instance",
+    "/workspaces/new",
+    "/workspace/settings",
+    "/workspace/members",
+)
+
+
+@pytest.mark.parametrize("path", SIGNED_IN_PAGES)
+def test_every_signed_in_page_shows_the_full_workspace_nav(signed: Signed, path: str) -> None:
+    page = signed.client.get(path)
+    assert page.status_code == 200
+    for link in WORKSPACE_NAV_LINKS:
+        assert link in page.text
+    assert "data-current-workspace>Home<" in page.text
+    # None of the workspace links is the current page here.
+    assert not re.search(r"data-(month|transactions|categories)-link aria-current", page.text)
+
+
+def test_error_pages_of_a_signed_in_user_show_the_workspace_nav(signed: Signed) -> None:
+    page = signed.client.get(f"/probe/members/{uuid4()}")
+    assert page.status_code == 404
+    for link in WORKSPACE_NAV_LINKS:
+        assert link in page.text
+
+
+@pytest.mark.parametrize(
+    "path", ("/account", "/account/password", "/admin/users", "/admin/settings")
+)
+def test_a_user_without_a_workspace_keeps_the_reduced_nav(signed: Signed, path: str) -> None:
+    with signed.db() as session, session.begin():
+        session.execute(delete(Membership))
+    page = signed.client.get(path)
+    assert page.status_code == 200
+    for link in WORKSPACE_NAV_LINKS:
+        assert link not in page.text
+    assert "data-current-workspace" not in page.text
