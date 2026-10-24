@@ -83,9 +83,22 @@ alternative that needs no token.
 
 Sessions are stored on the server. The session cookie lasts for the absolute session lifetime
 (`ASSETBOARD_SESSION_ABSOLUTE_TIMEOUT_DAYS`); the idle timeout is enforced on the server. For MFA,
-prefer OIDC or reverse-proxy auth backed by an IdP that enforces multi-factor authentication; TOTP
-is intentionally deferred to the post-1.0 backlog. Run a single application process (one Uvicorn
-worker): the setup token, the password-hashing limit and some caches live in the process.
+users with local passwords can enroll TOTP in their profile
+(see [account security](accounts.md#two-factor-authentication)).
+OIDC and reverse-proxy sign-ins delegate MFA to their identity provider. Run a single application
+process (one Uvicorn worker): the setup token, the password-hashing limit and some caches live in
+the process.
+
+### Secret key and two-factor authentication
+
+Back up `ASSETBOARD_SECRET_KEY` or the persistent `DATA_DIR/secret_key` together with the database:
+TOTP secrets are encrypted with a key derived from it. Keep the key outside database-only exports.
+Replacing or losing this key makes existing authenticator secrets unreadable: authenticator codes
+then fail for those users (the log shows a warning "An authenticator secret could not be
+decrypted"), while recovery codes still work. Restore the previous key, or have each affected
+user sign in with a recovery code, disable two-factor authentication and enroll again; an
+administrator can also reset it (**Users**, or `assetboard reset-mfa` below). A password reset
+does not remove MFA.
 
 ### Recurring-item generation
 
@@ -156,9 +169,15 @@ migrations first, like application startup; with `false` they refuse to run unti
 - `assetboard reset-password <email>` sets a new password for any user (prompted, or from stdin
   with `--password-stdin`) and signs that user out of every session. It does not change whether the
   account is active. Anyone who can run commands in the container can therefore take over any
-  account; protect shell access accordingly.
+  account; protect shell access accordingly. It does not remove two-factor authentication.
+- `assetboard reset-mfa <email>` removes a user's two-factor authentication (authenticator and
+  recovery codes) and signs that user out of every password session; identity provider and proxy
+  sessions are unaffected. Use it when the user has lost every recovery method and no
+  administrator can reset it from **Users**. The user then signs in with their password and can
+  enroll again; a workspace that requires two-factor authentication stays inaccessible until they
+  do.
 
-Both commands write an audit event with the CLI as the actor.
+Each command writes an audit event with the CLI as the actor.
 
 ## Run a published image
 
@@ -245,6 +264,12 @@ architectures without logging in to GHCR or publishing. Check **Publish the imag
 when you intend to upload the image and its release tags.
 
 ## Upgrading
+
+### Unreleased: two-factor authentication (F1.6)
+
+- Migration `0016_f16_totp` adds the `totp_factors` and `totp_recovery_codes` tables, a session
+  flag and the `require_two_factor` workspace setting (off). Nothing changes until a user enrolls
+  or an owner turns the setting on. Back up the secret key with the database (see [Secret key and two-factor authentication](#secret-key-and-two-factor-authentication)).
 
 ### Unreleased: recurring items (F3.1)
 

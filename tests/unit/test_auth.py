@@ -1277,6 +1277,8 @@ WORKSPACE_TABLES = {
 
 def test_workspace_table_scope_allowlist_for_f12() -> None:
     expected_global = {
+        "totp_factors": "second factors belong to global users",
+        "totp_recovery_codes": "recovery codes belong to global users",
         "auth_throttles": "global authentication controls keyed by account/IP",
         "email_tokens": "registration and reset links for global addresses and users",
         "external_identities": "OIDC identities belong to global users",

@@ -148,6 +148,9 @@ msgstr ""
 msgid "Password reset on the command line"
 msgstr ""
 
+msgid "Two-factor authentication reset on the command line"
+msgstr ""
+
 msgid "Signed in"
 msgstr ""
 
@@ -167,6 +170,15 @@ msgid "Password reset link sent"
 msgstr ""
 
 msgid "Password reset by email"
+msgstr ""
+
+msgid "Two-factor authentication enabled"
+msgstr ""
+
+msgid "Two-factor authentication disabled"
+msgstr ""
+
+msgid "Two-factor recovery codes regenerated"
 msgstr ""
 
 msgid "Password confirmation failed"
@@ -203,6 +215,9 @@ msgid "Account activated"
 msgstr ""
 
 msgid "Account deactivated"
+msgstr ""
+
+msgid "Two-factor authentication reset by an administrator"
 msgstr ""
 
 msgid "Workspace settings changed"
@@ -422,6 +437,9 @@ msgid "viewer"
 msgstr ""
 
 msgid "not an instance administrator"
+msgstr ""
+
+msgid "second factor not verified"
 msgstr ""
 
 msgid "no account for this sign-in"
@@ -727,6 +745,9 @@ msgstr ""
 msgid "Remove instance administrator"
 msgstr ""
 
+msgid "Reset two-factor authentication"
+msgstr ""
+
 #, python-format
 msgid "%(user)s can sign in again."
 msgstr ""
@@ -745,6 +766,13 @@ msgstr ""
 msgid "%(user)s can no longer manage accounts on this instance."
 msgstr ""
 
+#, python-format
+msgid ""
+"Remove %(user)s's authenticator and recovery codes, end every session, "
+"and require them to enroll again before accessing workspaces that require"
+" two-factor authentication."
+msgstr ""
+
 msgid "Done."
 msgstr ""
 
@@ -754,6 +782,11 @@ msgstr ""
 msgid ""
 "You cannot deactivate your own account or remove your own administrator "
 "role."
+msgstr ""
+
+msgid ""
+"Use your own account security page to manage your two-factor "
+"authentication."
 msgstr ""
 
 msgid "This is the last active administrator, so this would leave none."
@@ -1324,6 +1357,9 @@ msgid_plural "Too many attempts. Try again in %(num)d minutes."
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "The code is not valid or enrollment has expired."
+msgstr ""
+
 msgid "Enter a date such as 2026-10-07 or 07.10.2026."
 msgstr ""
 
@@ -1433,6 +1469,12 @@ msgid "Choose a time zone from the list."
 msgstr ""
 
 msgid "Choose a supported language."
+msgstr ""
+
+msgid ""
+"Enable two-factor authentication for your own account and sign in with it"
+" before requiring it for this workspace; otherwise you would lock "
+"yourself out."
 msgstr ""
 
 msgid "A workspace needs at least one owner. Make another member an owner first."
@@ -1597,6 +1639,9 @@ msgstr ""
 msgid "This account has no password. You can still sign out other devices."
 msgstr ""
 
+msgid "Two-factor authentication"
+msgstr ""
+
 msgid "Sign-in methods"
 msgstr ""
 
@@ -1630,6 +1675,67 @@ msgid "Your proxy signs you in as %(user)s."
 msgstr ""
 
 msgid "Link this proxy sign-in"
+msgstr ""
+
+msgid ""
+"Protect password sign-ins with an authenticator app. A workspace owner "
+"may require this for access. Identity provider and proxy sign-ins use "
+"their provider's security instead."
+msgstr ""
+
+msgid "Save your recovery codes"
+msgstr ""
+
+msgid ""
+"These ten codes are shown only once. Store them safely. Each replaces an "
+"authenticator code for one sign-in."
+msgstr ""
+
+msgid "Two-factor authentication is enabled."
+msgstr ""
+
+msgid ""
+"Replace all recovery codes if they are lost or exposed. Your current "
+"password and authenticator or an unused recovery code are both required. "
+"Existing recovery codes stop working immediately."
+msgstr ""
+
+msgid "Authenticator or recovery code"
+msgstr ""
+
+msgid "Generate new recovery codes"
+msgstr ""
+
+msgid "Disable two-factor authentication"
+msgstr ""
+
+msgid "Scan with your authenticator app"
+msgstr ""
+
+msgid "Authenticator enrollment QR code"
+msgstr ""
+
+msgid "Or enter this key manually:"
+msgstr ""
+
+msgid "Enter a six-digit code to finish enrollment within ten minutes."
+msgstr ""
+
+msgid "Authenticator code"
+msgstr ""
+
+msgid "Enable two-factor authentication"
+msgstr ""
+
+msgid "Set up two-factor authentication"
+msgstr ""
+
+msgid ""
+"This account signs in through an identity provider or proxy. Configure "
+"multi-factor authentication there."
+msgstr ""
+
+msgid "Required only if your account has two-factor authentication enabled."
 msgstr ""
 
 msgid "Back to users"
@@ -1838,6 +1944,9 @@ msgid ""
 msgstr ""
 
 msgid "This signs the account out on all other devices."
+msgstr ""
+
+msgid "Leave blank if two-factor authentication is not enabled."
 msgstr ""
 
 msgid "Link and sign in"
@@ -2738,6 +2847,11 @@ msgid ""
 "Applies to the current and later months that have never had planned "
 "values, when an editor or owner opens them. Existing planned values are "
 "never overwritten."
+msgstr ""
+
+msgid ""
+"Require two-factor authentication for password-based access to this "
+"workspace"
 msgstr ""
 
 msgid ""

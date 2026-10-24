@@ -151,6 +151,9 @@ msgstr "Administrator utworzony z wiersza poleceń"
 msgid "Password reset on the command line"
 msgstr "Hasło zresetowane z wiersza poleceń"
 
+msgid "Two-factor authentication reset on the command line"
+msgstr "Uwierzytelnianie dwuskładnikowe zresetowane z wiersza poleceń"
+
 msgid "Signed in"
 msgstr "Zalogowano"
 
@@ -171,6 +174,15 @@ msgstr "Wysłano link do resetu hasła"
 
 msgid "Password reset by email"
 msgstr "Hasło zresetowane przez e-mail"
+
+msgid "Two-factor authentication enabled"
+msgstr "Włączono uwierzytelnianie dwuskładnikowe"
+
+msgid "Two-factor authentication disabled"
+msgstr "Wyłączono uwierzytelnianie dwuskładnikowe"
+
+msgid "Two-factor recovery codes regenerated"
+msgstr "Wygenerowano nowe kody odzyskiwania"
 
 msgid "Password confirmation failed"
 msgstr "Nieudane potwierdzenie hasłem"
@@ -207,6 +219,9 @@ msgstr "Aktywowano konto"
 
 msgid "Account deactivated"
 msgstr "Dezaktywowano konto"
+
+msgid "Two-factor authentication reset by an administrator"
+msgstr "Administrator zresetował uwierzytelnianie dwuskładnikowe"
 
 msgid "Workspace settings changed"
 msgstr "Zmieniono ustawienia obszaru roboczego"
@@ -426,6 +441,9 @@ msgstr "obserwator"
 
 msgid "not an instance administrator"
 msgstr "nie jest administratorem instancji"
+
+msgid "second factor not verified"
+msgstr "drugi składnik niezweryfikowany"
 
 msgid "no account for this sign-in"
 msgstr "brak konta dla tego logowania"
@@ -742,6 +760,9 @@ msgstr "Nadaj uprawnienia administratora instancji"
 msgid "Remove instance administrator"
 msgstr "Odbierz uprawnienia administratora instancji"
 
+msgid "Reset two-factor authentication"
+msgstr "Zresetuj uwierzytelnianie dwuskładnikowe"
+
 #, python-format
 msgid "%(user)s can sign in again."
 msgstr "%(user)s znów może się logować."
@@ -763,6 +784,17 @@ msgstr "%(user)s może zarządzać wszystkimi kontami w tej instancji."
 msgid "%(user)s can no longer manage accounts on this instance."
 msgstr "%(user)s nie może już zarządzać kontami w tej instancji."
 
+#, python-format
+msgid ""
+"Remove %(user)s's authenticator and recovery codes, end every session, "
+"and require them to enroll again before accessing workspaces that require"
+" two-factor authentication."
+msgstr ""
+"Usuń aplikację uwierzytelniającą i kody odzyskiwania użytkownika "
+"%(user)s, zakończ wszystkie jego sesje i wymagaj ponownej konfiguracji "
+"przed dostępem do obszarów roboczych wymagających uwierzytelniania "
+"dwuskładnikowego."
+
 msgid "Done."
 msgstr "Gotowe."
 
@@ -775,6 +807,13 @@ msgid ""
 msgstr ""
 "Nie możesz dezaktywować własnego konta ani odebrać sobie uprawnień "
 "administratora."
+
+msgid ""
+"Use your own account security page to manage your two-factor "
+"authentication."
+msgstr ""
+"Do zarządzania własnym uwierzytelnianiem dwuskładnikowym użyj strony "
+"zabezpieczeń konta."
 
 msgid "This is the last active administrator, so this would leave none."
 msgstr "To ostatni aktywny administrator; po tej zmianie nie zostałby żaden."
@@ -1415,6 +1454,9 @@ msgstr[0] "Zbyt wiele prób. Spróbuj ponownie za %(num)d minutę."
 msgstr[1] "Zbyt wiele prób. Spróbuj ponownie za %(num)d minuty."
 msgstr[2] "Zbyt wiele prób. Spróbuj ponownie za %(num)d minut."
 
+msgid "The code is not valid or enrollment has expired."
+msgstr "Kod jest nieprawidłowy lub czas konfiguracji upłynął."
+
 msgid "Enter a date such as 2026-10-07 or 07.10.2026."
 msgstr "Podaj datę, na przykład 2026-10-07 lub 07.10.2026."
 
@@ -1539,6 +1581,15 @@ msgstr "Wybierz strefę czasową z listy."
 
 msgid "Choose a supported language."
 msgstr "Wybierz obsługiwany język."
+
+msgid ""
+"Enable two-factor authentication for your own account and sign in with it"
+" before requiring it for this workspace; otherwise you would lock "
+"yourself out."
+msgstr ""
+"Zanim zaczniesz wymagać uwierzytelniania dwuskładnikowego w tym obszarze "
+"roboczym, włącz je na swoim koncie i zaloguj się z jego użyciem; inaczej "
+"stracisz do niego dostęp."
 
 msgid "A workspace needs at least one owner. Make another member an owner first."
 msgstr ""
@@ -1708,6 +1759,9 @@ msgstr "Zmień hasło albo wyloguj inne urządzenia."
 msgid "This account has no password. You can still sign out other devices."
 msgstr "To konto nie ma hasła. Nadal możesz wylogować inne urządzenia."
 
+msgid "Two-factor authentication"
+msgstr "Uwierzytelnianie dwuskładnikowe"
+
 msgid "Sign-in methods"
 msgstr "Metody logowania"
 
@@ -1744,6 +1798,82 @@ msgstr "Serwer proxy loguje Cię jako %(user)s."
 
 msgid "Link this proxy sign-in"
 msgstr "Powiąż to logowanie przez proxy"
+
+msgid ""
+"Protect password sign-ins with an authenticator app. A workspace owner "
+"may require this for access. Identity provider and proxy sign-ins use "
+"their provider's security instead."
+msgstr ""
+"Zabezpiecz logowanie hasłem za pomocą aplikacji uwierzytelniającej. "
+"Właściciel obszaru roboczego może tego wymagać. Przy logowaniu przez "
+"dostawcę tożsamości lub proxy obowiązują zabezpieczenia tego dostawcy."
+
+msgid "Save your recovery codes"
+msgstr "Zapisz kody odzyskiwania"
+
+msgid ""
+"These ten codes are shown only once. Store them safely. Each replaces an "
+"authenticator code for one sign-in."
+msgstr ""
+"Te dziesięć kodów jest wyświetlanych tylko raz. Przechowuj je "
+"bezpiecznie. Każdy zastępuje kod z aplikacji podczas jednego logowania."
+
+msgid "Two-factor authentication is enabled."
+msgstr "Uwierzytelnianie dwuskładnikowe jest włączone."
+
+msgid ""
+"Replace all recovery codes if they are lost or exposed. Your current "
+"password and authenticator or an unused recovery code are both required. "
+"Existing recovery codes stop working immediately."
+msgstr ""
+"Wygeneruj nowe kody odzyskiwania, jeśli poprzednie zostały zgubione lub "
+"ujawnione. Wymagane jest bieżące hasło oraz kod z aplikacji "
+"uwierzytelniającej lub niewykorzystany kod odzyskiwania. Dotychczasowe "
+"kody odzyskiwania przestaną działać natychmiast."
+
+msgid "Authenticator or recovery code"
+msgstr "Kod z aplikacji lub kod odzyskiwania"
+
+msgid "Generate new recovery codes"
+msgstr "Wygeneruj nowe kody odzyskiwania"
+
+msgid "Disable two-factor authentication"
+msgstr "Wyłącz uwierzytelnianie dwuskładnikowe"
+
+msgid "Scan with your authenticator app"
+msgstr "Zeskanuj w aplikacji uwierzytelniającej"
+
+msgid "Authenticator enrollment QR code"
+msgstr "Kod QR do konfiguracji aplikacji uwierzytelniającej"
+
+msgid "Or enter this key manually:"
+msgstr "Lub wprowadź ten klucz ręcznie:"
+
+msgid "Enter a six-digit code to finish enrollment within ten minutes."
+msgstr ""
+"Wprowadź sześciocyfrowy kod, aby zakończyć konfigurację w ciągu "
+"dziesięciu minut."
+
+msgid "Authenticator code"
+msgstr "Kod z aplikacji uwierzytelniającej"
+
+msgid "Enable two-factor authentication"
+msgstr "Włącz uwierzytelnianie dwuskładnikowe"
+
+msgid "Set up two-factor authentication"
+msgstr "Skonfiguruj uwierzytelnianie dwuskładnikowe"
+
+msgid ""
+"This account signs in through an identity provider or proxy. Configure "
+"multi-factor authentication there."
+msgstr ""
+"To konto korzysta z logowania przez dostawcę tożsamości lub proxy. "
+"Skonfiguruj uwierzytelnianie wieloskładnikowe u tego dostawcy."
+
+msgid "Required only if your account has two-factor authentication enabled."
+msgstr ""
+"Wymagane tylko wtedy, gdy na Twoim koncie włączono uwierzytelnianie "
+"dwuskładnikowe."
 
 msgid "Back to users"
 msgstr "Wróć do użytkowników"
@@ -1967,6 +2097,9 @@ msgstr ""
 
 msgid "This signs the account out on all other devices."
 msgstr "Spowoduje to wylogowanie konta na wszystkich innych urządzeniach."
+
+msgid "Leave blank if two-factor authentication is not enabled."
+msgstr "Pozostaw puste, jeśli uwierzytelnianie dwuskładnikowe nie jest włączone."
 
 msgid "Link and sign in"
 msgstr "Połącz i zaloguj się"
@@ -2980,6 +3113,13 @@ msgstr ""
 "Dotyczy bieżącego i późniejszych miesięcy, które nigdy nie miały wartości"
 " planowanych, gdy otworzy je edytor lub właściciel. Istniejące wartości "
 "planowane nigdy nie są nadpisywane."
+
+msgid ""
+"Require two-factor authentication for password-based access to this "
+"workspace"
+msgstr ""
+"Wymagaj uwierzytelniania dwuskładnikowego przy dostępie hasłem do tego "
+"obszaru roboczego"
 
 msgid ""
 "The formatting default is used for numbers and dates where no personal "

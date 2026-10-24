@@ -22,7 +22,12 @@ from assetboard.db.migrate import (
 )
 from assetboard.domain.identity import InvalidEmail, normalize_email
 from assetboard.middleware import PeerMiddleware
-from assetboard.services.auth import EmailAlreadyRegistered, create_admin_cli, reset_user_password
+from assetboard.services.auth import (
+    EmailAlreadyRegistered,
+    create_admin_cli,
+    reset_user_password,
+    reset_user_two_factor,
+)
 from assetboard.services.mail import Mailer, MailJob, SmtpMailer, send_now
 
 app = typer.Typer(name=CLI_NAME, help=f"{APP_NAME} command-line interface")
@@ -233,6 +238,26 @@ def reset_password_command(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
     typer.echo(f"Password reset for {user.email}.")
+
+
+@app.command("reset-mfa")
+def reset_mfa_command(
+    email: str = typer.Argument(..., help="Email address of the user."),
+) -> None:
+    """Remove a user's two-factor authentication and revoke their password sessions."""
+    try:
+        settings = Settings()
+        _ensure_schema(settings)
+        user, revoked = _with_database(
+            settings,
+            lambda session: reset_user_two_factor(
+                session, email=email, clock=session.info["clock"]
+            ),
+        )
+    except (CommandError, ValueError, OSError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"Two-factor authentication reset for {user.email}; {revoked} session(s) ended.")
 
 
 def mail_test_mailer(settings: Settings) -> Mailer:
