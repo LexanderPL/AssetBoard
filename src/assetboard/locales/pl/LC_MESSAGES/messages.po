@@ -1584,9 +1584,6 @@ msgstr "Sprawdź kwotę i datę, a następnie spróbuj ponownie."
 msgid "Choose a valid direction."
 msgstr "Wybierz prawidłowy kierunek."
 
-msgid "invalid_direction"
-msgstr "Nieprawidłowy kierunek"
-
 msgid "Choose a supported currency."
 msgstr "Wybierz obsługiwaną walutę."
 
@@ -3283,3 +3280,7 @@ msgstr ""
 
 #~ msgid "Choose who can create workspaces."
 #~ msgstr "Wybierz, kto może tworzyć obszary robocze."
+
+#~ msgid "invalid_direction"
+#~ msgstr "Nieprawidłowy kierunek"
+

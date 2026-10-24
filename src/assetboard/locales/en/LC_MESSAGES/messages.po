@@ -1474,9 +1474,6 @@ msgstr ""
 msgid "Choose a valid direction."
 msgstr ""
 
-msgid "invalid_direction"
-msgstr ""
-
 msgid "Choose a supported currency."
 msgstr ""
 
@@ -3063,5 +3060,8 @@ msgstr ""
 #~ "Locked: transactions (deleted ones included)"
 #~ " or planned values exist, and their"
 #~ " amounts are stored in this currency."
+#~ msgstr ""
+
+#~ msgid "invalid_direction"
 #~ msgstr ""
 
