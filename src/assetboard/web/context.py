@@ -10,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 from assetboard.services.context import (
     Context,
     NoWorkspace,
+    TwoFactorRequired,
     WorkspaceNav,
     build_context,
     workspace_nav,
@@ -59,7 +60,8 @@ async def load_workspace_nav(request: Request) -> None:
         return
     try:
         await current_context(request)
-    except NoWorkspace:
+    except (NoWorkspace, TwoFactorRequired):
+        # No nav when there is no usable workspace context; the routes that need one raise it.
         return
 
 
