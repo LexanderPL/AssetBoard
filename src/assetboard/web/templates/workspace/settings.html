@@ -41,4 +41,9 @@
     <div class="sm:col-span-2">{{ primary_button(_("Save settings")) }}</div>
   </form>
 </section>
+<section class="panel mt-6 max-w-2xl border-danger-line p-6 sm:p-7" aria-labelledby="danger-zone-heading" data-danger-zone>
+  <h2 id="danger-zone-heading" class="text-base font-semibold text-danger-strong">{{ _("Delete workspace") }}</h2>
+  <p class="mt-2 text-sm text-muted">{{ _("Permanently removes this workspace and all its data, for every member. You confirm on the next page by typing the workspace name.") }}</p>
+  <a href="{{ scoped_url(request, 'workspace_delete') }}" class="mt-4 inline-flex rounded-xl border border-danger-line bg-danger-soft px-4 py-2 text-sm font-semibold text-danger-strong hover:bg-danger-line" data-delete-workspace-link>{{ _("Delete workspace…") }}</a>
+</section>
 {% endblock %}

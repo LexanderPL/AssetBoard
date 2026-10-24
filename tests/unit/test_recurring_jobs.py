@@ -1,6 +1,7 @@
 import threading
 from datetime import UTC, datetime
 from unittest.mock import Mock
+from uuid import uuid4
 
 import pytest
 
@@ -87,3 +88,18 @@ def test_failed_generation_is_logged_without_data_and_later_runs_can_retry(db, m
     message = logger.error.call_args.args[0] % logger.error.call_args.args[1:]
     assert "sensitive" not in message and "RuntimeError" in message
     assert logger.error.call_args.kwargs["exc_info"] is True
+
+
+def test_a_deleted_workspace_is_skipped_quietly(db):
+    """A job that runs after its workspace was deleted (ADR-0020) logs at DEBUG only."""
+    logger = Mock()
+    jobs = RecurringJobs(db.factory, Settings(_env_file=None), lambda: db.clock, logger)
+    gone = uuid4()  # no such workspace: the generation's lock raises NotFound
+    jobs.run(gone)
+    assert logger.error.call_count == 0
+    assert logger.debug.call_count == 1
+    assert logger.debug.call_args.args == (
+        "recurring_generation_skipped workspace=%s reason=deleted",
+        gone,
+    )
+    assert "exc_info" not in logger.debug.call_args.kwargs
