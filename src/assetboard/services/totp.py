@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import base64
+import logging
 import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+from functools import lru_cache
 from uuid import UUID
 
 import pyotp
 from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy.orm import Session, sessionmaker
 
+from assetboard.branding import APP_NAME
 from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.engine import run_immediate
@@ -20,14 +23,17 @@ from assetboard.domain.totp import RECOVERY_CODE_COUNT, matching_step, recovery_
 from assetboard.services.auth import (
     Throttled,
     ThrottleSlot,
+    Verifier,
     blocked_until,
     derive_subkey,
     record_auth_event,
     reserve_attempts,
 )
 from assetboard.services.context import Role, WorkspaceChoice
+from assetboard.services.profile import ConfirmMethod, ConfirmOutcome, confirm_sensitive
 
 ENROLLMENT_LIFETIME = timedelta(minutes=10)
+logger = logging.getLogger(f"{APP_NAME.lower()}.totp")
 
 
 @dataclass(frozen=True, slots=True)
@@ -37,8 +43,39 @@ class TotpState:
     workspaces: tuple[WorkspaceChoice, ...] = ()
 
 
+@lru_cache(maxsize=4)
+def _cipher_for(secret_key: str) -> Fernet:
+    # Derived once per instance secret, like the CSRF key.
+    return Fernet(base64.urlsafe_b64encode(derive_subkey(secret_key, "totp")))
+
+
 def _cipher(settings: Settings) -> Fernet:
-    return Fernet(base64.urlsafe_b64encode(derive_subkey(settings.ensure_secret_key(), "totp")))
+    return _cipher_for(settings.ensure_secret_key())
+
+
+def encrypt_secret(settings: Settings, user_id: UUID, secret: str, now: datetime) -> str:
+    """Encrypt ``secret`` bound to its account: the plaintext is ``"<user_id>|<secret>"``."""
+    plaintext = f"{user_id}|{secret}".encode()
+    return _cipher(settings).encrypt_at_time(plaintext, int(now.timestamp())).decode()
+
+
+def decrypt_secret(settings: Settings, user_id: UUID, token: str) -> str | None:
+    """The secret, or ``None`` if it cannot be read or belongs to another account."""
+    try:
+        plaintext = _cipher(settings).decrypt(token).decode()
+    except InvalidToken:
+        logger.warning(
+            "An authenticator secret could not be decrypted: the instance secret key has "
+            "probably changed since enrollment. Authenticator codes fail for this account; "
+            "recovery codes still work. See 'Secret key and two-factor authentication' in the "
+            "deployment guide."
+        )
+        return None
+    prefix = f"{user_id}|"
+    if not plaintext.startswith(prefix):
+        logger.warning("An authenticator secret is not bound to its account; it was refused.")
+        return None
+    return plaintext.removeprefix(prefix)
 
 
 def state(
@@ -65,10 +102,7 @@ def state(
             and factor.enrollment_expires_at is not None
             and factor.enrollment_expires_at > clock.now()
         ):
-            try:
-                secret = _cipher(settings).decrypt(factor.encrypted_secret).decode()
-            except InvalidToken:
-                secret = None
+            secret = decrypt_secret(settings, user_id, factor.encrypted_secret)
             return TotpState(False, secret, workspaces)
         return TotpState(False, workspaces=workspaces)
 
@@ -87,11 +121,7 @@ def begin_enrollment(
         return False
     if factor is not None and factor.enabled_at is not None:
         return False
-    secret = (
-        _cipher(settings)
-        .encrypt_at_time(pyotp.random_base32().encode(), int(clock.now().timestamp()))
-        .decode()
-    )
+    secret = encrypt_secret(settings, user.id, pyotp.random_base32(), clock.now())
     if factor is None:
         factor = repository.add_factor(encrypted_secret=secret)
     else:
@@ -133,9 +163,8 @@ def complete_enrollment(
             return Throttled(
                 blocked_until(session, [(slot.scope, slot.key)], clock.now()) or clock.now()
             )
-        try:
-            secret = _cipher(settings).decrypt(factor.encrypted_secret).decode()
-        except InvalidToken:
+        secret = decrypt_secret(settings, user_id, factor.encrypted_secret)
+        if secret is None:
             return None
         step = matching_step(secret, code, clock.now(), factor.last_step)
         if step is None:
@@ -160,6 +189,46 @@ def complete_enrollment(
 
 
 def regenerate_recovery_codes(
+    factory: sessionmaker[Session],
+    *,
+    user_id: UUID,
+    session_hash: str,
+    password: str,
+    second_factor: str,
+    settings: Settings,
+    clock: Clock,
+    host: str | None = None,
+    user_agent: str | None = None,
+    verify: Verifier | None = None,
+) -> ConfirmOutcome[list[str] | None]:
+    """Replace every recovery code after the password and a second factor are confirmed.
+
+    The second factor (an authenticator code or an unused recovery code) is checked with the
+    password, so a wrong one counts as a failed confirmation.
+    """
+
+    def action(session: Session, user: User, method: ConfirmMethod) -> list[str] | None:
+        if method != "password":
+            return None
+        return _regenerate_recovery_codes(session, user, session_hash=session_hash, clock=clock)
+
+    return confirm_sensitive(
+        factory,
+        user_id=user_id,
+        session_hash=session_hash,
+        password=password,
+        purpose="totp_recovery_codes",
+        settings=settings,
+        clock=clock,
+        on_success=action,
+        host=host,
+        user_agent=user_agent,
+        verify=verify,
+        second_factor=second_factor,
+    )
+
+
+def _regenerate_recovery_codes(
     session: Session,
     user: User,
     *,
@@ -201,11 +270,8 @@ def verify_sign_in(
         return True, False
     if len(code) > 64:
         return False, False
-    try:
-        secret = _cipher(settings).decrypt(factor.encrypted_secret).decode()
-        step = matching_step(secret, code.strip(), now, factor.last_step)
-    except InvalidToken:
-        step = None
+    secret = decrypt_secret(settings, user_id, factor.encrypted_secret)
+    step = None if secret is None else matching_step(secret, code.strip(), now, factor.last_step)
     if step is not None:
         factor.last_step = step
         return True, True
@@ -214,6 +280,45 @@ def verify_sign_in(
 
 
 def disable(
+    factory: sessionmaker[Session],
+    *,
+    user_id: UUID,
+    session_hash: str,
+    password: str,
+    second_factor: str,
+    settings: Settings,
+    clock: Clock,
+    host: str | None = None,
+    user_agent: str | None = None,
+    verify: Verifier | None = None,
+) -> ConfirmOutcome[bool]:
+    """Remove the factor after the password and a second factor are confirmed.
+
+    As for regenerating recovery codes, a wrong second factor is a failed confirmation.
+    """
+
+    def action(session: Session, user: User, method: ConfirmMethod) -> bool:
+        return method == "password" and _disable(
+            session, user, session_hash=session_hash, clock=clock
+        )
+
+    return confirm_sensitive(
+        factory,
+        user_id=user_id,
+        session_hash=session_hash,
+        password=password,
+        purpose="totp_disable",
+        settings=settings,
+        clock=clock,
+        on_success=action,
+        host=host,
+        user_agent=user_agent,
+        verify=verify,
+        second_factor=second_factor,
+    )
+
+
+def _disable(
     session: Session,
     user: User,
     *,

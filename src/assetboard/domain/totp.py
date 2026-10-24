@@ -23,5 +23,16 @@ def matching_step(secret: str, code: str, now: datetime, last_step: int) -> int 
     return None
 
 
+RECOVERY_GROUP_LENGTH = 4
+
+
+def format_recovery_code(code: str) -> str:
+    """Group a recovery code for display (``xxxx-xxxx-…``); ``recovery_hash`` strips the dashes."""
+    return "-".join(
+        code[start : start + RECOVERY_GROUP_LENGTH]
+        for start in range(0, len(code), RECOVERY_GROUP_LENGTH)
+    )
+
+
 def recovery_hash(code: str) -> str:
     return hashlib.sha256(code.strip().replace("-", "").lower().encode()).hexdigest()

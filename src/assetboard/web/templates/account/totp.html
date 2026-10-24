@@ -23,6 +23,10 @@
   {% endif %}
   <form method="post" action="{{ scoped_url(request, 'totp_disable') }}" class="space-y-4">
     {{ csrf_input() }}
+    <div class="space-y-1.5">
+      <label for="disable-second-factor" class="block text-sm font-medium text-ink">{{ _("Authenticator or recovery code") }}</label>
+      <input id="disable-second-factor" name="second_factor" type="text" value="" required autocomplete="one-time-code" maxlength="64" class="form-control w-full">
+    </div>
     {{ confirm_block(confirm, "totp-disable", _("Disable two-factor authentication")) }}
   </form>
   {% elif factor.secret %}

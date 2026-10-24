@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Annotated
+from collections.abc import Awaitable, Callable
+from typing import Annotated, Any
 
 import pyotp
 import segno
@@ -12,11 +12,12 @@ from starlette.responses import RedirectResponse, Response
 
 from assetboard.branding import APP_NAME
 from assetboard.db.models.identity import User
+from assetboard.domain.totp import format_recovery_code
 from assetboard.i18n import gettext
 from assetboard.services import totp
 from assetboard.services.auth import MAX_PASSWORD_LENGTH, Throttled, WebSession, user_has_password
-from assetboard.services.profile import ConfirmMethod
-from assetboard.web.confirm import confirm_view, refusal, run_confirmed
+from assetboard.services.profile import ConfirmMethod, ConfirmOutcome
+from assetboard.web.confirm import confirm_view, refusal, run_confirmation, run_confirmed
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf, web_session
 from assetboard.web.throttle import retry_after, throttled_message
@@ -55,19 +56,22 @@ async def _page(
         uri = pyotp.TOTP(factor.secret).provisioning_uri(current.email, issuer_name=APP_NAME)
         qr = segno.make_qr(uri).svg_inline(scale=4, light="white")
     has_password = await run_in_threadpool(user_has_password, app.session_factory, current.user_id)
-    return render_template(
+    response = render_template(
         request,
         "account/totp.html",
         context={
             "factor": factor,
             "qr": qr,
-            "codes": codes,
+            "codes": [format_recovery_code(code) for code in codes] if codes else None,
             "error": error,
             "has_password": has_password,
             "confirm": await confirm_view(request, current),
         },
         status_code=status,
     )
+    # Recovery codes and the enrollment secret must never be stored by a cache.
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 @router.get("/account/totp", name="account_totp")
@@ -85,19 +89,36 @@ async def start(request: Request, confirm_password: FormStr = "") -> Response:
             session, user, session_hash=current.session_hash, settings=app.settings, clock=app.clock
         )
 
-    return await _confirmed(request, current, confirm_password, "totp_enable", action)
+    return await _confirmed(
+        request,
+        confirm_password,
+        lambda: run_confirmed(
+            request, current, purpose="totp_enable", password=confirm_password, action=action
+        ),
+    )
 
 
 @router.post("/account/totp/disable", name="totp_disable")
-async def disable(request: Request, confirm_password: FormStr = "") -> Response:
+async def disable(
+    request: Request, confirm_password: FormStr = "", second_factor: FormStr = ""
+) -> Response:
     current = _current(request)
+    app = request.app.state
 
-    def action(session: Session, user: User, method: ConfirmMethod) -> bool:
-        return method == "password" and totp.disable(
-            session, user, session_hash=current.session_hash, clock=request.app.state.clock
+    def confirm(**request_info: Any) -> ConfirmOutcome[bool]:
+        # The service checks the password and the second factor together.
+        return totp.disable(
+            app.session_factory,
+            user_id=current.user_id,
+            session_hash=current.session_hash,
+            password=confirm_password,
+            second_factor=second_factor,
+            settings=app.settings,
+            clock=app.clock,
+            **request_info,
         )
 
-    return await _confirmed(request, current, confirm_password, "totp_disable", action)
+    return await _confirmed(request, confirm_password, lambda: run_confirmation(request, confirm))
 
 
 @router.post("/account/totp/recovery-codes", name="totp_recovery_codes")
@@ -107,48 +128,40 @@ async def recovery_codes(
     second_factor: FormStr = "",
 ) -> Response:
     current = _current(request)
+    app = request.app.state
 
-    def action(session: Session, user: User, method: ConfirmMethod) -> bool | list[str]:
-        if method != "password":
-            return False
-        codes = totp.regenerate_recovery_codes(
-            session, user, session_hash=current.session_hash, clock=request.app.state.clock
+    def confirm(**request_info: Any) -> ConfirmOutcome[list[str] | None]:
+        return totp.regenerate_recovery_codes(
+            app.session_factory,
+            user_id=current.user_id,
+            session_hash=current.session_hash,
+            password=confirm_password,
+            second_factor=second_factor,
+            settings=app.settings,
+            clock=app.clock,
+            **request_info,
         )
-        return codes if codes is not None else False
 
     return await _confirmed(
         request,
-        current,
         confirm_password,
-        "totp_recovery_codes",
-        action,
-        second_factor=second_factor,
+        lambda: run_confirmation(request, confirm),
         show_codes=True,
     )
 
 
 async def _confirmed(
     request: Request,
-    current: WebSession,
     password: str,
-    purpose: str,
-    action: Callable[[Session, User, ConfirmMethod], bool | list[str]],
+    run: Callable[[], Awaitable[ConfirmOutcome[Any]]],
     *,
-    second_factor: str | None = None,
     show_codes: bool = False,
 ) -> Response:
     if len(password) > MAX_PASSWORD_LENGTH:
         return await _page(
             request, error=gettext("The password is not correct.", request.state.locale), status=401
         )
-    outcome = await run_confirmed(
-        request,
-        current,
-        purpose=purpose,
-        password=password,
-        second_factor=second_factor,
-        action=action,
-    )
+    outcome = await run()
     if outcome.status != "confirmed":
         failed = refusal(request, outcome)
         response = await _page(request, error=failed.message, status=failed.status_code)
