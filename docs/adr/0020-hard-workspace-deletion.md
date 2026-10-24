@@ -20,7 +20,13 @@ SQLite's foreign-key pragma or `ON DELETE SET NULL` cannot be what makes deletio
   delete_workspace` checks `require_role(owner)` on the Context, then inside one
   `BEGIN IMMEDIATE` transaction re-reads the actor's membership (`require_role_now`), takes
   the exclusive workspace lock, compares the typed name with the stored name (surrounding
-  spaces ignored, case sensitive), and deletes. The web form is a CSRF-protected POST on a
+  spaces ignored, case sensitive), and deletes. Names are not unique, so the confirmation
+  page also carries the id of the workspace it was shown for (hidden `workspace_id`); unless it
+  equals the request Context's workspace, the service refuses before any write
+  (`WorkspaceChanged`, a 409 that re-renders the page for the current workspace). This stops a
+  stale tab, after a switch in another tab, or a repeated submit, whose Context fell back to
+  another workspace, from deleting a same-named workspace. The deleted id always comes from the
+  Context, never from the form. The web form is a CSRF-protected POST on a
   separate confirmation page linked from the settings page's danger zone; it recommends the
   transaction CSV export (F2.6) first.
 - **What goes is found from the metadata.** `CurrentWorkspaceRepository.delete_with_all_data`
@@ -56,8 +62,13 @@ SQLite's foreign-key pragma or `ON DELETE SET NULL` cannot be what makes deletio
 - A request that built its Context before the deletion fails cleanly afterwards: reads find
   nothing (404), writes fail the role re-check (403), and PostgreSQL rejects inserts into the
   deleted workspace through the foreign keys. The recurring-items scheduler drops the
-  workspace's job at its next refresh (within a minute); a run in between fails its lock and is
-  logged.
+  workspace's job at its next refresh (within a minute); a run in between finds no workspace
+  and is skipped with a DEBUG log line (no error, no traceback).
+- Follow-up: on PostgreSQL, an insert that was already waiting behind the exclusive lock fails
+  with a foreign-key `IntegrityError` once the deletion commits, and the request answers 500
+  instead of a clean 404/409. It needs a race between two people in the same workspace at the
+  moment of deletion, loses no data, and is left for later (map the error, or re-check the
+  workspace after taking the shared lock in every write).
 - A future table that references `workspaces.id` without a `workspace_id` column must be
   nullable (or the deletion must be extended); the refusal and the reference test catch it.
 - Leaving a workspace and ownership transfer remain in the post-1.0 backlog.

@@ -115,6 +115,13 @@ class WorkspaceNameMismatch(WorkspaceError):
     code = "name_mismatch"
 
 
+class WorkspaceChanged(WorkspaceError):
+    """The confirmation was for another workspace than the request's current one (a stale tab
+    after a switch, or a repeated submit after the first one deleted it)."""
+
+    code = "workspace_changed"
+
+
 class InvalidInvitation(WorkspaceError):
     def __init__(self, field: str, code: str) -> None:
         super().__init__(code)
@@ -476,15 +483,27 @@ def deletion_preview(factory: sessionmaker[Session], ctx: Context) -> DeletionPr
         return DeletionPreview(name=workspace.name, other_members=others)
 
 
-def delete_workspace(factory: sessionmaker[Session], ctx: Context, *, confirm_name: str) -> None:
+def delete_workspace(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    *,
+    confirm_name: str,
+    expected_workspace_id: UUID | None,
+) -> None:
     """Delete the current workspace and all its data, permanently.
 
+    ``expected_workspace_id`` is the workspace the confirmation page was shown for; unless it is
+    the Context's workspace, nothing is written (``WorkspaceChanged``). Two workspaces may share
+    a name, so the typed name alone cannot tell them apart. The deleted id is always the
+    Context's.
     ``confirm_name`` must be the workspace's exact name (surrounding spaces ignored, case
     sensitive), compared with the stored name inside the transaction, after the actor's role
     was re-read there and the exclusive workspace lock taken. The only trace left is the
     instance-level ``workspace.delete`` event with the name; no amounts.
     """
     require_role(ctx, Role.OWNER)
+    if expected_workspace_id != ctx.workspace.id:
+        raise WorkspaceChanged
 
     def write(session: Session) -> None:
         _require_owner_now(session, ctx)

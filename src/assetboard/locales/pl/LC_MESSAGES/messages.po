@@ -1629,6 +1629,15 @@ msgstr ""
 "Aby potwierdzić, wpisz nazwę obszaru roboczego dokładnie tak, jak jest "
 "pokazana."
 
+msgid ""
+"Your current workspace changed since this page was opened (in another "
+"tab, or it was already deleted). Nothing was deleted. Check the workspace"
+" named below and confirm again."
+msgstr ""
+"Bieżący obszar roboczy zmienił się od otwarcia tej strony (w innej karcie"
+" albo został już usunięty). Nic nie usunięto. Sprawdź obszar roboczy "
+"podany poniżej i potwierdź ponownie."
+
 msgid "Home"
 msgstr "Strona główna"
 

@@ -31,6 +31,7 @@ from assetboard.services.workspaces import (
     InvalidInvitation,
     InvalidWorkspaceSettings,
     TooManyInvitations,
+    WorkspaceChanged,
     WorkspaceCreationDisabled,
     WorkspaceError,
     WorkspaceNameMismatch,
@@ -375,6 +376,10 @@ async def invitation_revoke(request: Request, ctx: CurrentContext, invitation_id
 # Deleting the current workspace (ADR-0020)
 
 NAME_MISMATCH = _("Type the workspace name exactly as shown to confirm.")
+WORKSPACE_CHANGED = _(
+    "Your current workspace changed since this page was opened (in another tab, or it was "
+    "already deleted). Nothing was deleted. Check the workspace named below and confirm again."
+)
 
 
 def _delete_page(
@@ -382,6 +387,7 @@ def _delete_page(
     ctx: CurrentContext,
     *,
     error: str | None = None,
+    notice: str | None = None,
     status_code: int = 200,
 ) -> Response:
     preview = deletion_preview(request.app.state.session_factory, ctx)
@@ -391,6 +397,9 @@ def _delete_page(
         context={
             "preview": preview,
             "error": _t(request, error) if error else None,
+            "changed": _t(request, notice) if notice else None,
+            # The page is for this workspace only; the POST is refused for any other.
+            "workspace_id": ctx.workspace.id,
             "max_name_length": MAX_WORKSPACE_NAME_LENGTH,
         },
         status_code=status_code,
@@ -404,13 +413,24 @@ async def delete_form(request: Request, ctx: CurrentContext) -> Response:
 
 @router.post("/workspace/delete")
 async def delete_submit(
-    request: Request, ctx: CurrentContext, confirm_name: FormStr = ""
+    request: Request, ctx: CurrentContext, confirm_name: FormStr = "", workspace_id: FormStr = ""
 ) -> Response:
+    try:
+        expected: UUID | None = UUID(workspace_id)
+    except ValueError:
+        expected = None
     try:
         await run_in_threadpool(
             lambda: delete_workspace(
-                request.app.state.session_factory, ctx, confirm_name=confirm_name
+                request.app.state.session_factory,
+                ctx,
+                confirm_name=confirm_name,
+                expected_workspace_id=expected,
             )
+        )
+    except WorkspaceChanged:
+        return await run_in_threadpool(
+            lambda: _delete_page(request, ctx, notice=WORKSPACE_CHANGED, status_code=409)
         )
     except WorkspaceNameMismatch:
         return await run_in_threadpool(

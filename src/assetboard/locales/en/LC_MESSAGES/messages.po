@@ -1509,6 +1509,12 @@ msgstr ""
 msgid "Type the workspace name exactly as shown to confirm."
 msgstr ""
 
+msgid ""
+"Your current workspace changed since this page was opened (in another "
+"tab, or it was already deleted). Nothing was deleted. Check the workspace"
+" named below and confirm again."
+msgstr ""
+
 msgid "Home"
 msgstr ""
 

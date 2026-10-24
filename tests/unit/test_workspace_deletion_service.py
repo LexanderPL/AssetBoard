@@ -19,8 +19,15 @@ from assetboard.db.base import Base
 from assetboard.db.models.identity import AuditEvent, UserSession, Workspace
 from assetboard.db.repositories.base import repositories_for
 from assetboard.services.auth import WebSession
-from assetboard.services.context import NoWorkspace, PermissionDenied, Role, build_context
+from assetboard.services.context import (
+    Context,
+    NoWorkspace,
+    PermissionDenied,
+    Role,
+    build_context,
+)
 from assetboard.services.workspaces import (
+    WorkspaceChanged,
     WorkspaceNameMismatch,
     delete_workspace,
     deletion_preview,
@@ -100,6 +107,11 @@ def _web_session(db: WorkspaceDb, key: str, id_hash: str) -> WebSession:
         )
 
 
+def _delete(db: WorkspaceDb, ctx: Context, name: str) -> None:
+    """As the confirmation page posts it: the name and the page's own workspace id."""
+    delete_workspace(db.factory, ctx, confirm_name=name, expected_workspace_id=ctx.workspace.id)
+
+
 def _instance_events(db: WorkspaceDb) -> list[AuditEvent]:
     with db.factory() as session:
         return list(session.scalars(select(AuditEvent).where(AuditEvent.workspace_id.is_(None))))
@@ -117,7 +129,7 @@ def test_owner_deletes_the_workspace_and_all_its_data(team: WorkspaceDb) -> None
     _fill(team, other)
     other_before = _counts(team, other)
 
-    delete_workspace(team.factory, team.ctx("olga", "owner"), confirm_name="Home")
+    _delete(team, team.ctx("olga", "owner"), "Home")
 
     assert not _workspace_exists(team, team.workspace_id)
     assert set(_counts(team, team.workspace_id).values()) == {0}
@@ -127,7 +139,7 @@ def test_owner_deletes_the_workspace_and_all_its_data(team: WorkspaceDb) -> None
 
 def test_deletion_records_one_instance_event_without_amounts(team: WorkspaceDb) -> None:
     _fill(team, team.workspace_id)
-    delete_workspace(team.factory, team.ctx("olga", "owner"), confirm_name="Home")
+    _delete(team, team.ctx("olga", "owner"), "Home")
     [recorded] = [e for e in _instance_events(team) if e.action == "workspace.delete"]
     assert recorded.workspace_id is None
     assert (recorded.entity_type, recorded.entity_id) == ("workspace", str(team.workspace_id))
@@ -141,7 +153,7 @@ def test_deletion_records_one_instance_event_without_amounts(team: WorkspaceDb) 
 def test_editors_and_viewers_cannot_delete(team: WorkspaceDb, member: str) -> None:
     role = "editor" if member == "ed" else "viewer"
     with pytest.raises(PermissionDenied):
-        delete_workspace(team.factory, team.ctx(member, role), confirm_name="Home")
+        _delete(team, team.ctx(member, role), "Home")
     with pytest.raises(PermissionDenied):
         deletion_preview(team.factory, team.ctx(member, role))
     assert _workspace_exists(team, team.workspace_id)
@@ -152,14 +164,14 @@ def test_a_wrong_name_is_refused_and_nothing_changes(team: WorkspaceDb, typed: s
     _fill(team, team.workspace_id)
     before = _counts(team, team.workspace_id)
     with pytest.raises(WorkspaceNameMismatch):
-        delete_workspace(team.factory, team.ctx("olga", "owner"), confirm_name=typed)
+        _delete(team, team.ctx("olga", "owner"), typed)
     assert _workspace_exists(team, team.workspace_id)
     assert _counts(team, team.workspace_id) == before
     assert _instance_events(team) == []
 
 
 def test_surrounding_spaces_in_the_typed_name_are_ignored(team: WorkspaceDb) -> None:
-    delete_workspace(team.factory, team.ctx("olga", "owner"), confirm_name="  Home ")
+    _delete(team, team.ctx("olga", "owner"), "  Home ")
     assert not _workspace_exists(team, team.workspace_id)
 
 
@@ -176,8 +188,8 @@ def test_the_name_is_compared_with_the_stored_name(team: WorkspaceDb) -> None:
         auto_copy_plan=False,
     )
     with pytest.raises(WorkspaceNameMismatch):
-        delete_workspace(team.factory, owner, confirm_name="Home")
-    delete_workspace(team.factory, owner, confirm_name="Family")
+        _delete(team, owner, "Home")
+    _delete(team, owner, "Family")
     assert not _workspace_exists(team, team.workspace_id)
 
 
@@ -188,7 +200,7 @@ def test_members_move_to_another_workspace_or_to_no_workspace(team: WorkspaceDb)
     ed_session = _session(team, "ed", team.workspace_id)
     ed_elsewhere = _session(team, "ed", other)
 
-    delete_workspace(team.factory, team.ctx("olga", "owner"), confirm_name="Home")
+    _delete(team, team.ctx("olga", "owner"), "Home")
 
     with team.factory() as session:
         selected = {
@@ -211,7 +223,7 @@ def test_members_move_to_another_workspace_or_to_no_workspace(team: WorkspaceDb)
 
 def test_the_last_workspace_of_the_instance_can_be_deleted(db: WorkspaceDb) -> None:
     db.add_member("olga", "owner")
-    delete_workspace(db.factory, db.ctx("olga", "owner"), confirm_name="Home")
+    _delete(db, db.ctx("olga", "owner"), "Home")
     with db.factory() as session:
         assert session.scalar(select(func.count()).select_from(Workspace)) == 0
 
@@ -239,7 +251,7 @@ def test_deletion_is_portable_sql_scoped_to_the_workspace(team: WorkspaceDb) -> 
     event.listen(team.engine, "before_cursor_execute", record)
     event.listen(Session, "do_orm_execute", record_orm)
     try:
-        delete_workspace(team.factory, team.ctx("olga", "owner"), confirm_name="Home")
+        _delete(team, team.ctx("olga", "owner"), "Home")
     finally:
         event.remove(team.engine, "before_cursor_execute", record)
         event.remove(Session, "do_orm_execute", record_orm)
@@ -253,3 +265,53 @@ def test_deletion_is_portable_sql_scoped_to_the_workspace(team: WorkspaceDb) -> 
         assert "workspace_id = ?" in statement or "workspaces.id = ?" in statement, statement
     deleted_tables = [s.split()[2] for s in writes if s.startswith("DELETE")]
     assert deleted_tables[-1] == "workspaces"
+
+
+# The confirmation names its workspace by id: two workspaces may share a name.
+
+
+def _twin(team: WorkspaceDb) -> UUID:
+    """A second workspace also called "Home", owned by Olga."""
+    twin = team.add_workspace("Home")
+    team.add_member("olga", "owner", workspace_id=twin)
+    _fill(team, twin)
+    return twin
+
+
+def test_a_stale_tab_cannot_delete_the_workspace_switched_to(team: WorkspaceDb) -> None:
+    twin = _twin(team)
+    shown_for = team.workspace_id  # the confirmation page was opened here...
+    current = team.ctx("olga", "owner", workspace_id=twin)  # ...then another tab switched
+    before = _counts(team, twin)
+    with pytest.raises(WorkspaceChanged):
+        delete_workspace(
+            team.factory, current, confirm_name="Home", expected_workspace_id=shown_for
+        )
+    assert _workspace_exists(team, team.workspace_id) and _workspace_exists(team, twin)
+    assert _counts(team, twin) == before
+    assert _instance_events(team) == []
+
+
+def test_a_repeated_submit_cannot_delete_the_fallback_workspace(team: WorkspaceDb) -> None:
+    twin = _twin(team)
+    first = team.ctx("olga", "owner")
+    delete_workspace(
+        team.factory, first, confirm_name="Home", expected_workspace_id=team.workspace_id
+    )
+    # The second POST's Context falls back to Olga's remaining workspace, also named "Home".
+    fallback = team.ctx("olga", "owner", workspace_id=twin)
+    before = _counts(team, twin)
+    with pytest.raises(WorkspaceChanged):
+        delete_workspace(
+            team.factory, fallback, confirm_name="Home", expected_workspace_id=team.workspace_id
+        )
+    assert _workspace_exists(team, twin) and _counts(team, twin) == before
+    assert len(_instance_events(team)) == 1
+
+
+def test_a_missing_workspace_id_is_refused(team: WorkspaceDb) -> None:
+    with pytest.raises(WorkspaceChanged):
+        delete_workspace(
+            team.factory, team.ctx("olga", "owner"), confirm_name="Home", expected_workspace_id=None
+        )
+    assert _workspace_exists(team, team.workspace_id)

@@ -94,7 +94,9 @@ SERVICE_CALLS: dict[str, ServiceCall] = {
     ),
     "revoke_invitation": lambda db, ctx: revoke_invitation(db.factory, ctx, invitation_id=uuid4()),
     "deletion_preview": lambda db, ctx: deletion_preview(db.factory, ctx),
-    "delete_workspace": lambda db, ctx: delete_workspace(db.factory, ctx, confirm_name="Home"),
+    "delete_workspace": lambda db, ctx: delete_workspace(
+        db.factory, ctx, confirm_name="Home", expected_workspace_id=ctx.workspace.id
+    ),
 }
 
 

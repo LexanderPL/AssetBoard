@@ -121,6 +121,9 @@ In the plan, list each acceptance criterion with the test that will prove it, an
     members lose access.
   - The service checks the role on the Context and again inside its `BEGIN IMMEDIATE`
     transaction, takes the exclusive workspace lock and compares the name with the stored one.
+    The form carries the id of the workspace it was shown for; a different current workspace
+    (stale tab after a switch, repeated submit) is refused with 409 before any write, so a
+    same-named workspace can never be deleted by mistake.
   - The workspace and every row with its `workspace_id` are deleted for good in that
     transaction (found from the metadata, children before parents), including its memberships,
     invitations and its own audit events. Sessions that had it selected fall back to the oldest
