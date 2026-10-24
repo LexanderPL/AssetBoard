@@ -76,6 +76,7 @@ from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
 from assetboard.web.scheduled_routes import router as scheduled_router
 from assetboard.web.security import CsrfFailed, web_session
+from assetboard.web.tax_routes import router as tax_router
 from assetboard.web.totp_routes import router as totp_router
 from assetboard.web.transaction_list_routes import router as transaction_list_router
 from assetboard.web.transaction_routes import router as transaction_router
@@ -271,6 +272,7 @@ def create_app(
     app.include_router(web_router)
     app.include_router(scheduled_router)
     app.include_router(upcoming_router)
+    app.include_router(tax_router)
     app.include_router(auth_router)
     app.include_router(email_router)
     app.include_router(totp_router)
