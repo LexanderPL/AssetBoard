@@ -65,6 +65,10 @@ SETTINGS_ERRORS = {
     "invalid_country_code": _("Choose a country from the list."),
     "invalid_timezone": _("Choose a time zone from the list."),
     "invalid_locale": _("Choose a supported language."),
+    "own_two_factor_required": _(
+        "Enable two-factor authentication for your own account and sign in with it before "
+        "requiring it for this workspace; otherwise you would lock yourself out."
+    ),
 }
 MEMBER_ERRORS = {
     "last_owner": _("A workspace needs at least one owner. Make another member an owner first."),

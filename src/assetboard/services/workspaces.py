@@ -203,6 +203,11 @@ def update_settings(
         )
     except WorkspaceOptionError as exc:
         raise InvalidWorkspaceSettings(exc.field, f"invalid_{exc.field}") from exc
+    if require_two_factor and ctx.auth_method == "password" and not ctx.second_factor_verified:
+        # The owner enabling the policy is subject to it: without a verified second factor in
+        # this password session, saving would lock them out of their own workspace. External
+        # (OIDC/proxy) sessions are exempt from the policy, so they may enable it.
+        raise InvalidWorkspaceSettings("require_two_factor", "own_two_factor_required")
     wanted = WorkspaceSettings(
         name=clean_name,
         base_currency=options.base_currency,
