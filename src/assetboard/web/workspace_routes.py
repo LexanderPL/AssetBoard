@@ -1,5 +1,6 @@
-"""Workspace switcher, workspace settings and members pages (F1.2 part B1), and creating a
-workspace (pre-release A: ``/workspaces/new``, for any signed-in account while allowed).
+"""Workspace switcher, workspace settings and members pages (F1.2 part B1), creating a
+workspace (pre-release A: ``/workspaces/new``, for any signed-in account while allowed), and
+deleting the current one (``/workspace/delete``, owners, ADR-0020).
 
 Every state-changing route is protected by the router-level ``require_csrf`` dependency.
 Authorization happens in ``services.workspaces`` (owners only); routes only map outcomes to
@@ -32,10 +33,13 @@ from assetboard.services.workspaces import (
     TooManyInvitations,
     WorkspaceCreationDisabled,
     WorkspaceError,
+    WorkspaceNameMismatch,
     WorkspaceSettings,
     change_role,
     create_invitation,
     create_own_workspace,
+    delete_workspace,
+    deletion_preview,
     list_invitations,
     list_members,
     remove_member,
@@ -366,6 +370,55 @@ async def invitation_revoke(request: Request, ctx: CurrentContext, invitation_id
         lambda: revoke_invitation(request.app.state.session_factory, ctx, invitation_id=target)
     )
     return _members_redirect(request)
+
+
+# Deleting the current workspace (ADR-0020)
+
+NAME_MISMATCH = _("Type the workspace name exactly as shown to confirm.")
+
+
+def _delete_page(
+    request: Request,
+    ctx: CurrentContext,
+    *,
+    error: str | None = None,
+    status_code: int = 200,
+) -> Response:
+    preview = deletion_preview(request.app.state.session_factory, ctx)
+    return render_template(
+        request,
+        "workspace/delete.html",
+        context={
+            "preview": preview,
+            "error": _t(request, error) if error else None,
+            "max_name_length": MAX_WORKSPACE_NAME_LENGTH,
+        },
+        status_code=status_code,
+    )
+
+
+@router.get("/workspace/delete", name="workspace_delete")
+async def delete_form(request: Request, ctx: CurrentContext) -> Response:
+    return await run_in_threadpool(_delete_page, request, ctx)
+
+
+@router.post("/workspace/delete")
+async def delete_submit(
+    request: Request, ctx: CurrentContext, confirm_name: FormStr = ""
+) -> Response:
+    try:
+        await run_in_threadpool(
+            lambda: delete_workspace(
+                request.app.state.session_factory, ctx, confirm_name=confirm_name
+            )
+        )
+    except WorkspaceNameMismatch:
+        return await run_in_threadpool(
+            lambda: _delete_page(request, ctx, error=NAME_MISMATCH, status_code=400)
+        )
+    # The session's selection was cleared: home shows the oldest remaining membership, or the
+    # "No workspace" page.
+    return RedirectResponse(request.url_for("home").path, status_code=303)
 
 
 # Creating a workspace (pre-release A)
