@@ -130,6 +130,9 @@ msgstr ""
 msgid "Password reset on the command line"
 msgstr ""
 
+msgid "Two-factor authentication reset on the command line"
+msgstr ""
+
 msgid "Signed in"
 msgstr ""
 
@@ -407,6 +410,9 @@ msgid "viewer"
 msgstr ""
 
 msgid "not an instance administrator"
+msgstr ""
+
+msgid "second factor not verified"
 msgstr ""
 
 msgid "no account for this sign-in"
@@ -1301,6 +1307,12 @@ msgid "Choose a time zone from the list."
 msgstr ""
 
 msgid "Choose a supported language."
+msgstr ""
+
+msgid ""
+"Enable two-factor authentication for your own account and sign in with it"
+" before requiring it for this workspace; otherwise you would lock "
+"yourself out."
 msgstr ""
 
 msgid "A workspace needs at least one owner. Make another member an owner first."
