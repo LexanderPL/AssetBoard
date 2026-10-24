@@ -273,7 +273,9 @@ Add a prominent warning section to docs/auth/proxy-auth.md.
   Setting the new password ends every session and spends every reset link; any password change
   or deactivation spends them too. No automatic sign-in. Audited as
   `auth.password_reset_requested` and `auth.password_reset`.
-- No account-existence signal: identical responses; emails per address are limited silently
+- No account-existence signal: identical responses and the same database work in the request
+  for every address; the lookup, link, audit row and mail happen in the outbox worker after the
+  response and a random 0.5-3 s wait; emails per address are limited silently
   (`MAIL_EMAIL_LIMIT`, counted for every address); the per-client limits (`REGISTRATION_IP_LIMIT`
   for both registration steps, `MAIL_IP_LIMIT`) may say "try later". Invitation sign-up keeps
   saying an address is taken (secret, email-locked link; outside the rule).

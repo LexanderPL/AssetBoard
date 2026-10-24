@@ -14,9 +14,25 @@ class InvalidEmail(ValueError):
         super().__init__("Enter a valid email address")
 
 
+# Characters with a meaning in address headers (lists, display names, quoting, routes). A new
+# address with one of them is refused, so a stored address is always one plain addr-spec.
+_UNSAFE_EMAIL_CHARACTERS = frozenset('<>()[],;:"\\')
+
+
 def normalize_email(email: str) -> str:
+    """The lookup form of an address (stripped, lowercased). Lenient, so addresses stored
+    before the stricter rule for new addresses keep working."""
     normalized = email.strip().lower()
     if len(normalized) > MAX_EMAIL_LENGTH or not _EMAIL_RE.fullmatch(normalized):
+        raise InvalidEmail
+    return normalized
+
+
+def normalize_new_email(email: str) -> str:
+    """``normalize_email`` for an address entering the system (a new account, registration,
+    a password reset request): also refuses header-special characters (ADR-0017)."""
+    normalized = normalize_email(email)
+    if any(character in _UNSAFE_EMAIL_CHARACTERS for character in normalized):
         raise InvalidEmail
     return normalized
 

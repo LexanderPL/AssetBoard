@@ -195,11 +195,14 @@ def apply_admin_action(
         if target.is_instance_admin:
             return "unchanged"
         target.is_instance_admin = True
+        # A role change spends reset links sent earlier (ADR-0017).
+        invalidate_reset_tokens(session, target.id)
         audit = "admin.admin_granted"
     else:
         if not target.is_instance_admin:
             return "unchanged"
         target.is_instance_admin = False
+        invalidate_reset_tokens(session, target.id)
         audit = "admin.admin_revoked"
     record_auth_event(
         session,

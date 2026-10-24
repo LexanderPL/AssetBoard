@@ -1,8 +1,10 @@
 """Open registration with a verified email, and password reset by email (ADR-0017).
 
-Both start from a form that takes only an email address and always answers the same way, so
-nothing tells the requester whether an account has that address. What differs is only the
-mail that goes to the address itself, after the response:
+Both start from a form that takes only an email address. The request does the same work for
+every address: it validates the input, counts the throttles and answers the same page, then
+hands a ``MailRequest`` to the outbox in a background task that runs after the response. The
+outbox worker waits a random delay and only then looks the address up, issues a link, writes
+the audit row and sends what the address itself receives (``resolve_mail_request``):
 
 * registration: a link to finish registering (no account yet), a note that an account exists
   (active account), or nothing (deactivated account);
@@ -22,6 +24,8 @@ link proved the address, so nobody can create an account with someone else's add
 from __future__ import annotations
 
 import hashlib
+import hmac
+import logging
 import re
 import secrets
 from dataclasses import dataclass, field
@@ -37,7 +41,7 @@ from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.identity import EmailToken, User
-from assetboard.domain.identity import InvalidEmail, normalize_email
+from assetboard.domain.identity import InvalidEmail, normalize_new_email
 from assetboard.services.auth import (
     Hasher,
     PasswordPolicyError,
@@ -58,13 +62,14 @@ from assetboard.services.auth import (
 )
 from assetboard.services.hash_gate import HashGate
 from assetboard.services.instance_settings import registration_open
-from assetboard.services.mail import MailJob
+from assetboard.services.mail import MailJob, MailRequest
 
 REGISTER_LINK_TTL = timedelta(hours=24)
 RESET_LINK_TTL = timedelta(minutes=60)
 MAX_LIVE_TOKENS = 3
 TokenPurpose = Literal["register", "reset"]
 _TOKEN = re.compile(r"[A-Za-z0-9_-]{43}")
+logger = logging.getLogger(__name__)
 
 
 class PasswordResetUnavailable(RuntimeError):
@@ -80,11 +85,11 @@ RequestStatus = Literal["accepted", "invalid_email", "throttled"]
 
 @dataclass(frozen=True, slots=True)
 class MailRequestOutcome:
-    """``accepted`` is the one answer for every address; ``job`` is the mail to queue, if any,
-    after the transaction committed."""
+    """``accepted`` is the one answer for every address; ``request`` goes to the outbox after
+    the response (``None`` when the per-address limit was reached)."""
 
     status: RequestStatus
-    job: MailJob | None = field(default=None, repr=False)
+    request: MailRequest | None = field(default=None, repr=False)
 
 
 def _token_hash(token: str) -> str:
@@ -105,6 +110,30 @@ def _live_token(
     )
 
 
+def _consume(session: Session, row: EmailToken, now: datetime) -> bool:
+    """Spend a link atomically: True only for the one request whose DELETE removed it, also on
+    databases that do not serialise writers like SQLite does (PostgreSQL)."""
+    result = session.execute(
+        delete(EmailToken)
+        .where(EmailToken.id == row.id, EmailToken.expires_at > now)
+        .execution_options(synchronize_session=False)
+    )
+    return getattr(result, "rowcount", 0) == 1
+
+
+def prune_email_tokens(session: Session, now: datetime) -> None:
+    """Delete expired links (on every outbox job and at startup)."""
+    session.execute(
+        delete(EmailToken)
+        .where(EmailToken.expires_at <= now)
+        .execution_options(synchronize_session=False)
+    )
+
+
+def prune_email_tokens_with_factory(factory: sessionmaker[Session], clock: Clock) -> None:
+    run_immediate(factory, lambda session: prune_email_tokens(session, clock.now()))
+
+
 def _issue_token(
     session: Session,
     *,
@@ -114,12 +143,7 @@ def _issue_token(
     locale: str | None,
     now: datetime,
 ) -> str:
-    """Store a new link's hash; drop expired links and the oldest beyond the per-owner cap."""
-    session.execute(
-        delete(EmailToken)
-        .where(EmailToken.expires_at <= now)
-        .execution_options(synchronize_session=False)
-    )
+    """Store a new link's hash; drop the oldest beyond the per-owner cap."""
     owner = EmailToken.user_id == user_id if user_id is not None else EmailToken.email == email
     live = session.scalars(
         select(EmailToken)
@@ -145,9 +169,20 @@ def _issue_token(
     return token
 
 
+def address_tag(settings: Settings, email: str) -> str:
+    """A short keyed hash of an address for logs: comparable across lines, not reversible
+    without the secret key."""
+    key = (settings.secret_key or "").encode("utf-8")
+    return hmac.new(key, email.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
+
+
 def _mail_quota(session: Session, email: str, settings: Settings, now: datetime) -> bool:
-    """Whether this address may get another mail now; counted the same for every address."""
-    return count_limited_attempt(
+    """Whether this address may get another mail now; counted the same for every address.
+
+    A refusal is silent for the requester but logged for the administrator: anyone can use up
+    an address's quota and so delay its owner's registration or reset (ADR-0017).
+    """
+    allowed = count_limited_attempt(
         session,
         "mail_email",
         email,
@@ -156,6 +191,9 @@ def _mail_quota(session: Session, email: str, settings: Settings, now: datetime)
         now=now,
         settings=settings,
     )
+    if not allowed:
+        logger.warning("mail_address_limit address=%s", address_tag(settings, email))
+    return allowed
 
 
 def _link(settings: Settings, path: str) -> str:
@@ -175,10 +213,11 @@ def start_registration(
     host: str | None,
     locale: str,
 ) -> MailRequestOutcome:
-    """Step 1: the same outcome for every address. Raises ``RegistrationDisabled`` when open
-    registration is off (or first-run setup is still open)."""
+    """Step 1, the same work for every address: validate, check that registration is open,
+    count the client and the address. Raises ``RegistrationDisabled`` when open registration
+    is off (or first-run setup is still open)."""
     try:
-        normalized = normalize_email(email)
+        normalized = normalize_new_email(email)
     except InvalidEmail:
         return MailRequestOutcome("invalid_email")
 
@@ -187,34 +226,75 @@ def start_registration(
             raise RegistrationDisabled
         if not reserve_registration_in(session, host=host, settings=settings, clock=clock):
             return MailRequestOutcome("throttled")
-        now = clock.now()
-        if not _mail_quota(session, normalized, settings, now):
+        if not _mail_quota(session, normalized, settings, clock.now()):
             return MailRequestOutcome("accepted")
-        user = session.scalar(select(User).where(User.email == normalized))
-        if user is None:
-            token = _issue_token(
-                session,
-                purpose="register",
-                email=normalized,
-                user_id=None,
-                locale=locale,
-                now=now,
-            )
-            link = _link(settings, f"/register/complete/{token}")
-            return MailRequestOutcome(
-                "accepted", MailJob("register_verify", normalized, locale, {"link": link})
-            )
-        if not user.is_active:
-            return MailRequestOutcome("accepted")
-        params = {
-            "sign_in_link": _link(settings, "/login"),
-            "reset_link": _link(settings, "/password/forgot"),
-        }
-        return MailRequestOutcome(
-            "accepted", MailJob("register_existing", normalized, user.locale or locale, params)
-        )
+        return MailRequestOutcome("accepted", MailRequest("register", normalized, locale))
 
     return run_immediate(factory, step)
+
+
+def resolve_mail_request(
+    factory: sessionmaker[Session], settings: Settings, clock: Clock, request: MailRequest
+) -> MailJob | None:
+    """The outbox worker's part, after the response: the account-dependent work in its own
+    transaction, and the mail to send (if any)."""
+
+    def step(session: Session) -> MailJob | None:
+        now = clock.now()
+        prune_email_tokens(session, now)
+        user = session.scalar(select(User).where(User.email == request.email))
+        if request.purpose == "register":
+            return _registration_mail(session, settings, request, user, now)
+        return _reset_mail(session, settings, clock, request, user, now)
+
+    return run_immediate(factory, step)
+
+
+def _registration_mail(
+    session: Session, settings: Settings, request: MailRequest, user: User | None, now: datetime
+) -> MailJob | None:
+    if user is None:
+        token = _issue_token(
+            session,
+            purpose="register",
+            email=request.email,
+            user_id=None,
+            locale=request.locale,
+            now=now,
+        )
+        link = _link(settings, f"/register/complete/{token}")
+        return MailJob("register_verify", request.email, request.locale, {"link": link})
+    if not user.is_active:
+        return None
+    params = {"sign_in_link": _link(settings, "/login")}
+    if user.password_hash is not None:
+        params["reset_link"] = _link(settings, "/password/forgot")
+    return MailJob("register_existing", request.email, user.locale or request.locale, params)
+
+
+def _reset_mail(
+    session: Session,
+    settings: Settings,
+    clock: Clock,
+    request: MailRequest,
+    user: User | None,
+    now: datetime,
+) -> MailJob | None:
+    if user is None or not user.is_active:
+        return None
+    mail_locale = user.locale or request.locale
+    if user.password_hash is None:
+        # Signs in through an identity provider or a proxy: no password is ever added here.
+        params = {"sign_in_link": _link(settings, "/login")}
+        return MailJob("password_reset_no_password", request.email, mail_locale, params)
+    token = _issue_token(
+        session, purpose="reset", email=user.email, user_id=user.id, locale=mail_locale, now=now
+    )
+    record_auth_event(
+        session, clock, action="auth.password_reset_requested", entity_id=str(user.id)
+    )
+    link = _link(settings, f"/password/reset/{token}")
+    return MailJob("password_reset", request.email, mail_locale, {"link": link})
 
 
 def registration_email(factory: sessionmaker[Session], token: str, clock: Clock) -> str | None:
@@ -237,8 +317,9 @@ class EmailLinkSignUp:
             raise SignUpLinkInvalid
 
     def consume(self, session: Session, email: str) -> None:
-        row = _live_token(session, "register", self.token, self.clock.now())
-        if row is None or row.email != email:
+        now = self.clock.now()
+        row = _live_token(session, "register", self.token, now)
+        if row is None or row.email != email or not _consume(session, row, now):
             raise SignUpLinkInvalid
         # Every registration link of this address is spent with the account's creation.
         session.execute(
@@ -303,14 +384,14 @@ def request_password_reset(
     settings: Settings,
     clock: Clock,
     host: str | None,
-    user_agent: str | None,
     locale: str,
 ) -> MailRequestOutcome:
-    """The same outcome for every address; raises ``PasswordResetUnavailable`` when off."""
+    """The same work and outcome for every address: validate, count the client and the
+    address. Raises ``PasswordResetUnavailable`` when off."""
     if not password_reset_available(settings):
         raise PasswordResetUnavailable
     try:
-        normalized = normalize_email(email)
+        normalized = normalize_new_email(email)
     except InvalidEmail:
         return MailRequestOutcome("invalid_email")
 
@@ -329,37 +410,7 @@ def request_password_reset(
         prune_auth_throttles(session, clock)
         if not _mail_quota(session, normalized, settings, now):
             return MailRequestOutcome("accepted")
-        user = session.scalar(select(User).where(User.email == normalized))
-        if user is None or not user.is_active:
-            return MailRequestOutcome("accepted")
-        mail_locale = user.locale or locale
-        if user.password_hash is None:
-            # Signs in through an identity provider or a proxy: no password is ever added here.
-            params = {"sign_in_link": _link(settings, "/login")}
-            return MailRequestOutcome(
-                "accepted",
-                MailJob("password_reset_no_password", normalized, mail_locale, params),
-            )
-        token = _issue_token(
-            session,
-            purpose="reset",
-            email=normalized,
-            user_id=user.id,
-            locale=mail_locale,
-            now=now,
-        )
-        record_auth_event(
-            session,
-            clock,
-            action="auth.password_reset_requested",
-            entity_id=str(user.id),
-            host=host,
-            user_agent=user_agent,
-        )
-        link = _link(settings, f"/password/reset/{token}")
-        return MailRequestOutcome(
-            "accepted", MailJob("password_reset", normalized, mail_locale, {"link": link})
-        )
+        return MailRequestOutcome("accepted", MailRequest("reset", normalized, locale))
 
     return run_immediate(factory, step)
 
@@ -376,7 +427,13 @@ def reset_target(factory: sessionmaker[Session], token: str, clock: Clock) -> Re
     with factory() as session:
         row = _live_token(session, "reset", token, clock.now())
         user = session.get(User, row.user_id) if row is not None and row.user_id else None
-        if user is None or not user.is_active or user.password_hash is None:
+        if (
+            row is None
+            or user is None
+            or row.email != user.email
+            or not user.is_active
+            or user.password_hash is None
+        ):
             return None
         return ResetTarget(user.id, user.email, user.display_name)
 
@@ -433,12 +490,14 @@ def reset_password(
     new_hash = (hasher or argon2_hash)(password)
 
     def apply(session: Session) -> ResetOutcome:
-        row = _live_token(session, "reset", token, clock.now())
+        now = clock.now()
+        row = _live_token(session, "reset", token, now)
+        if row is None or row.user_id != target.user_id or not _consume(session, row, now):
+            return ResetOutcome("link_invalid")
         user = session.get(User, target.user_id)
         if (
-            row is None
-            or row.user_id != target.user_id
-            or user is None
+            user is None
+            or row.email != user.email
             or not user.is_active
             or user.password_hash is None
         ):

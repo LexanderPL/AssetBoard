@@ -23,8 +23,21 @@ from assetboard.clock import FixedClock
 from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine
 from assetboard.db.migrate import upgrade_database
-from assetboard.db.models.identity import AuthThrottle, User, Workspace
+from assetboard.db.models.identity import (
+    AuditEvent,
+    AuthThrottle,
+    InstanceSettings,
+    User,
+    Workspace,
+)
 from assetboard.services import auth
+from assetboard.services.account_email import (
+    EmailLinkSignUp,
+    request_password_reset,
+    reset_password,
+    resolve_mail_request,
+    start_registration,
+)
 from assetboard.services.auth import (
     LoginOutcome,
     SetupAlreadyCompleted,
@@ -36,6 +49,7 @@ from assetboard.services.auth import (
     setup_is_open,
 )
 from assetboard.services.hash_gate import HashGate, HashGateBusy
+from assetboard.services.mail import MailRequest
 from tests.conftest import ANY_VERIFIED
 
 PASSWORD = "Correct Horse Battery!"
@@ -928,3 +942,90 @@ def test_failed_sign_ins_run_the_same_queries_for_known_and_unknown_emails(
     unknown = statements_for("nobody@example.com", "192.0.2.2")
     assert known == unknown
     assert any("FROM users" in statement for statement in known)
+
+
+# Links sent by email are used once, even by two requests at the same moment (ADR-0017)
+
+
+def _mail_settings() -> Settings:
+    return Settings(
+        _env_file=None,
+        smtp_host="smtp.example.test",
+        smtp_from="budget@example.test",
+        base_url="http://localhost:8000",
+    )
+
+
+def _link_token(factory: sessionmaker[Session], settings: Settings, request: object) -> str:
+    assert isinstance(request, MailRequest)
+    job = resolve_mail_request(factory, settings, CLOCK, request)
+    assert job is not None
+    return job.params["link"].rsplit("/", 1)[1]
+
+
+def test_two_parallel_resets_with_one_link_set_one_password(database: Connect) -> None:
+    factory = database().factory
+    settings = _mail_settings()
+    _setup_admin(factory, settings)
+    outcome = request_password_reset(
+        factory, email="admin@example.com", settings=settings, clock=CLOCK, host=None, locale="en"
+    )
+    token = _link_token(factory, settings, outcome.request)
+    statuses: list[str] = []
+
+    def attempt(index: int) -> None:
+        result = reset_password(
+            factory,
+            token=token,
+            password=f"Parallel Strong Password {index}",
+            confirm_password=f"Parallel Strong Password {index}",
+            settings=settings,
+            clock=CLOCK,
+            host=f"192.0.2.{110 + index}",
+            user_agent=None,
+        )
+        statuses.append(result.status)
+
+    _run_threads(2, attempt)
+    assert sorted(statuses) == ["done", "link_invalid"]
+    with factory() as session:
+        events = session.scalars(
+            select(AuditEvent).where(AuditEvent.action == "auth.password_reset")
+        ).all()
+        assert len(events) == 1
+
+
+def test_two_parallel_completions_of_one_registration_link_create_one_account(
+    database: Connect,
+) -> None:
+    factory = database().factory
+    settings = _mail_settings()
+    _setup_admin(factory, settings)
+    with factory.begin() as session:
+        row = session.get(InstanceSettings, 1)
+        assert row is not None
+        row.allow_registration = True
+    outcome = start_registration(
+        factory, email="new@example.com", settings=settings, clock=CLOCK, host=None, locale="en"
+    )
+    token = _link_token(factory, settings, outcome.request)
+    statuses: list[str] = []
+
+    def attempt(index: int) -> None:
+        result = register_with_factory(
+            factory,
+            email="new@example.com",
+            display_name=f"Racer {index}",
+            password="Registrant Strong Pw",
+            workspace_name="Budget",
+            settings=settings,
+            clock=CLOCK,
+            host=f"192.0.2.{120 + index}",
+            verified=EmailLinkSignUp(factory, token, CLOCK),
+        )
+        statuses.append(result.status)
+
+    _run_threads(2, attempt)
+    assert sorted(statuses) == ["created", "link_invalid"]
+    with factory() as session:
+        assert len(session.scalars(select(User).where(User.email == "new@example.com")).all()) == 1

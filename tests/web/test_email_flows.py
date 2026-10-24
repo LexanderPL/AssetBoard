@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import threading
 from collections.abc import Iterator
+from contextlib import contextmanager
 from datetime import timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
+from uuid import uuid4
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from httpx import Response
-from sqlalchemy import select
+from sqlalchemy import event, select
 from sqlalchemy.orm import Session
 
 from assetboard.clock import FixedClock
@@ -28,6 +31,7 @@ from assetboard.db.models.identity import (
 )
 from assetboard.services import account_email, admin_users, auth
 from assetboard.services.instance_settings import update_settings
+from assetboard.services.mail import MailRequest
 from tests.conftest import ADMIN_PASSWORD, mail_body, mail_link
 
 if TYPE_CHECKING:
@@ -321,7 +325,7 @@ def _issue_reset(app: FastAPI, web: WebHarness, client: TestClient) -> str:
     return mail_link(web.sent_mail(app)[-1], "/password/reset/")
 
 
-@pytest.mark.parametrize("change", ["profile", "cli", "deactivate"])
+@pytest.mark.parametrize("change", ["profile", "cli", "deactivate", "demote"])
 def test_every_password_change_or_deactivation_spends_reset_links(
     mail: tuple[FastAPI, TestClient], web: WebHarness, change: str
 ) -> None:
@@ -353,8 +357,9 @@ def test_every_password_change_or_deactivation_spends_reset_links(
             session.add(actor)
             session.flush()
             target = session.scalars(select(User.id).where(User.email == web.admin_email)).one()
+            action = "deactivate" if change == "deactivate" else "demote"
             status = admin_users.apply_admin_action(
-                session, actor, target, "deactivate", clock=clock, host=None, user_agent=None
+                session, actor, target, action, clock=clock, host=None, user_agent=None
             )
             assert status == "done"
     assert _tokens(app, "reset") == []
@@ -468,3 +473,247 @@ def test_registration_cannot_be_turned_on_under_oidc_only(
         user_agent=None,
     )
     assert status == "registration_oidc_only"
+
+
+# Enumeration safety: the request does the same work for every address (ADR-0017)
+
+
+class _RecordingOutbox:
+    """Stands in for the outbox: records requests, does no work."""
+
+    def __init__(self) -> None:
+        self.requests: list[MailRequest] = []
+
+    def enqueue(self, request: MailRequest) -> bool:
+        self.requests.append(request)
+        return True
+
+
+@contextmanager
+def _statements(app: FastAPI) -> Iterator[list[str]]:
+    seen: list[str] = []
+
+    def record(_conn: object, _cursor: object, statement: str, *_args: object) -> None:
+        seen.append(statement)
+
+    engine = app.state.database_engine
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        yield seen
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+
+
+def _kinds_of_addresses(app: FastAPI, web: WebHarness) -> tuple[str, ...]:
+    _add_user(app, "sso@example.com", password=False)
+    _add_user(app, "gone@example.com", active=False)
+    return ("nobody@example.com", web.admin_email, "gone@example.com", "sso@example.com")
+
+
+@pytest.mark.parametrize(
+    ("path", "form_page"),
+    [("/register", "/register"), ("/password/forgot", "/password/forgot")],
+)
+def test_the_request_runs_the_same_statements_for_every_kind_of_address(
+    web: WebHarness, path: str, form_page: str
+) -> None:
+    app = web.mail_app()
+    with TestClient(app) as setup_client:
+        web.complete_setup(app)
+        web.enable_registration(app)
+        emails = _kinds_of_addresses(app, web)
+        recorder = _RecordingOutbox()
+        app.state.mail_outbox = recorder
+        shapes = []
+        for index, email in enumerate(emails):
+            # A new client address each time, so every request finds the same fresh buckets.
+            with TestClient(app, client=(f"192.0.2.{20 + index}", 1000)) as client:
+                token = web.csrf(client.get(form_page).text)
+                with _statements(app) as seen:
+                    response = client.post(path, data={"csrf_token": token, "email": email})
+                assert response.status_code == 200
+                shapes.append(seen)
+        del setup_client
+    assert all(shape == shapes[0] for shape in shapes[1:])
+    assert not any("FROM users" in statement for statement in shapes[0])
+    assert not any("email_tokens" in statement for statement in shapes[0])
+    assert not any("audit_events" in statement for statement in shapes[0])
+    assert [r.email for r in recorder.requests] == list(emails)
+
+
+def test_services_run_the_same_statements_for_every_kind_of_address(web: WebHarness) -> None:
+    app = web.mail_app()
+    with TestClient(app):
+        web.complete_setup(app)
+        web.enable_registration(app)
+        emails = _kinds_of_addresses(app, web)
+        factory, settings, clock = app.state.session_factory, app.state.settings, app.state.clock
+        for start in (account_email.start_registration, account_email.request_password_reset):
+            shapes = []
+            for index, email in enumerate(emails):
+                with _statements(app) as seen:
+                    outcome = start(
+                        factory,
+                        email=email,
+                        settings=settings,
+                        clock=clock,
+                        host=f"198.51.100.{index + 1}",
+                        locale="en",
+                    )
+                assert outcome.status == "accepted" and outcome.request is not None
+                shapes.append(seen)
+            assert all(shape == shapes[0] for shape in shapes[1:]), start.__name__
+
+
+def test_the_outbox_gets_the_request_only_after_the_body_was_sent(web: WebHarness) -> None:
+    app = web.mail_app()
+    messages: list[str] = []
+
+    async def wrapper(scope: Any, receive: Any, send: Any) -> None:
+        async def recording_send(message: Any) -> None:
+            if message["type"] == "http.response.body" and not message.get("more_body"):
+                messages.append("body_complete")
+            await send(message)
+
+        await app(scope, receive, recording_send)
+
+    class _OrderingOutbox(_RecordingOutbox):
+        def enqueue(self, request: MailRequest) -> bool:
+            messages.append("enqueue")
+            return super().enqueue(request)
+
+    with TestClient(cast(Any, wrapper)) as client:
+        web.complete_setup(app)
+        app.state.mail_outbox = _OrderingOutbox()
+        token = web.csrf(client.get("/password/forgot").text)
+        messages.clear()
+        client.post("/password/forgot", data={"csrf_token": token, "email": web.admin_email})
+    assert messages == ["body_complete", "enqueue"]
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "victim@example.com,attacker@evil.test",
+        '"attacker@evil.test"@example.com',
+        "attacker@evil.test<victim@example.com>",
+    ],
+)
+def test_header_special_addresses_are_refused_and_nothing_is_sent(
+    mail: tuple[FastAPI, TestClient], web: WebHarness, address: str
+) -> None:
+    app, client = mail
+    assert _start(client, web, address).status_code == 400
+    assert _forgot(client, web, address).status_code == 400
+    assert web.sent_mail(app) == []
+
+
+def test_the_recipient_is_exactly_the_requested_address(
+    mail: tuple[FastAPI, TestClient], web: WebHarness
+) -> None:
+    app, client = mail
+    _forgot(client, web, web.admin_email)
+    web.sent_mail(app)
+    assert app.state.fake_mailer.recipients == [web.admin_email]
+
+
+def test_a_reached_address_limit_is_logged_with_a_keyed_hash(
+    web: WebHarness, caplog: pytest.LogCaptureFixture
+) -> None:
+    app = web.mail_app(mail_email_limit=1)
+    service_logger = logging.getLogger("assetboard.services.account_email")
+    service_logger.addHandler(caplog.handler)  # the app logger does not propagate to root
+    try:
+        with TestClient(app) as client:
+            web.complete_setup(app)
+            _forgot(client, web, web.admin_email)
+            _forgot(client, web, web.admin_email)
+    finally:
+        service_logger.removeHandler(caplog.handler)
+    tag = account_email.address_tag(app.state.settings, web.admin_email)
+    assert f"mail_address_limit address={tag}" in caplog.text
+    assert web.admin_email not in caplog.text and len(tag) == 16
+
+
+def test_expired_links_are_pruned_at_startup_and_by_every_outbox_job(web: WebHarness) -> None:
+    app = web.mail_app()
+
+    def add_expired(email: str) -> None:
+        now = app.state.clock.now()
+        with app.state.session_factory.begin() as session:
+            session.add(
+                EmailToken(
+                    id=uuid4(),
+                    purpose="register",
+                    token_hash=hashlib.sha256(email.encode()).hexdigest(),
+                    email=email,
+                    created_at=now - timedelta(days=2),
+                    expires_at=now - timedelta(days=1),
+                )
+            )
+
+    with TestClient(app) as client:
+        web.complete_setup(app)
+        web.enable_registration(app)
+        add_expired("old@example.com")
+        _forgot(client, web, "nobody@example.com")  # an outbox job that sends nothing
+        web.sent_mail(app)
+        assert _tokens(app, "register") == []
+        add_expired("older@example.com")
+    with TestClient(app):  # startup
+        assert _tokens(app, "register") == []
+
+
+def test_a_reset_link_for_an_address_the_account_no_longer_has_is_invalid(
+    mail: tuple[FastAPI, TestClient], web: WebHarness
+) -> None:
+    app, client = mail
+    link = _issue_reset(app, web, client)
+    with app.state.session_factory.begin() as session:
+        user = session.scalars(select(User).where(User.email == web.admin_email)).one()
+        user.email = "moved@example.com"
+    assert client.get(link).status_code == 404
+
+
+def test_a_signed_in_visitor_is_sent_home_from_a_registration_link(
+    mail: tuple[FastAPI, TestClient], web: WebHarness
+) -> None:
+    app, client = mail
+    _start(client, web, "later@example.com")
+    link = mail_link(web.sent_mail(app)[0], "/register/complete/")
+    assert web.sign_in(client).status_code == 303
+    page = client.get(link, follow_redirects=False)
+    assert (page.status_code, page.headers["location"]) == (303, "/")
+    post = client.post(
+        link,
+        data={"csrf_token": web.page_token(client), "display_name": "X", "password": NEW_PASSWORD},
+        follow_redirects=False,
+    )
+    assert (post.status_code, post.headers["location"]) == (303, "/")
+    assert len(_tokens(app, "register")) == 1  # the link is still unused
+
+
+def test_the_existing_account_mail_offers_a_reset_only_with_a_password(
+    mail: tuple[FastAPI, TestClient], web: WebHarness
+) -> None:
+    app, client = mail
+    _add_user(app, "sso@example.com", password=False)
+    _start(client, web, "sso@example.com")
+    body = mail_body(web.sent_mail(app)[0])
+    assert "http://testserver/login" in body and "/password/forgot" not in body
+
+
+def test_unencrypted_smtp_to_another_host_is_warned_at_startup(
+    web: WebHarness, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from assetboard import app as app_module
+
+    logger = logging.getLogger("smtp-none-test")
+    records: list[str] = []
+    handler = logging.Handler()
+    handler.emit = lambda record: records.append(record.getMessage())  # type: ignore[method-assign]
+    logger.addHandler(handler)
+    monkeypatch.setattr(app_module, "configure_logging", lambda *_args: logger)
+    web.mail_app(smtp_security="none")
+    web.mail_app(smtp_security="none", smtp_host="127.0.0.1")
+    assert sum("SMTP_SECURITY=none" in message for message in records) == 1

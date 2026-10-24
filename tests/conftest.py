@@ -174,15 +174,17 @@ class FakeMailer:
 
     def __init__(self) -> None:
         self.sent: list[EmailMessage] = []
+        self.recipients: list[str] = []
         self.release: threading.Event | None = None
         self.fail = False
 
-    def send(self, message: EmailMessage) -> None:
+    def send(self, message: EmailMessage, recipient: str) -> None:
         if self.release is not None:
             self.release.wait(10)
         if self.fail:
             raise smtplib.SMTPAuthenticationError(535, b"secret-reply")
         self.sent.append(message)
+        self.recipients.append(recipient)
 
 
 def mail_body(message: EmailMessage) -> str:
@@ -224,7 +226,9 @@ class WebHarness:
     def mail_app(self, **overrides: object) -> FastAPI:
         """An app with email on and a ``FakeMailer`` (``app.state.fake_mailer``)."""
         mailer = FakeMailer()
-        app = create_app(self.settings(**(MAIL_SETTINGS | overrides)), mailer=mailer)
+        app = create_app(
+            self.settings(**(MAIL_SETTINGS | overrides)), mailer=mailer, mail_delay=lambda: 0.0
+        )
         app.state.fake_mailer = mailer
         return app
 

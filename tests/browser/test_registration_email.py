@@ -67,6 +67,7 @@ def test_registration_and_password_reset_by_email(tmp_path: Path) -> None:
             smtp_from="budget@example.test",
         ),
         mailer=mailer,
+        mail_delay=lambda: 0.0,
     )
     server = uvicorn.Server(uvicorn.Config(app, log_level="error", access_log=False))
     server_thread = threading.Thread(target=server.run, kwargs={"sockets": [listener]}, daemon=True)

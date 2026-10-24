@@ -35,12 +35,12 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_AUTH_MAX_CONCURRENT_HASHES` | `2` | App | Password hashes (Argon2id, about 64 MiB of memory each) computed at the same time, 1 to 8. At most 16 further sign-in requests wait in total; when 16 are already waiting, or a wait exceeds 10 seconds, they get HTTP 503 with `Retry-After`. Health checks are not affected. |
 | `ASSETBOARD_SMTP_HOST` | unset | App | SMTP server for outgoing email (registration links, password reset). Unset turns email off: no open registration, no "Forgot your password?". With it set, `BASE_URL` must be set explicitly (links in emails are built from it) and use `https://` unless `ENV=dev`. See [Email](#email). |
 | `ASSETBOARD_SMTP_PORT` | by security | App | SMTP port; default 587 for `starttls`, 465 for `tls`, 25 for `none`. |
-| `ASSETBOARD_SMTP_SECURITY` | `starttls` | App | `starttls`, `tls` (implicit TLS) or `none`. Certificates are always verified. A password with `none` refuses to start outside `ENV=dev`. |
+| `ASSETBOARD_SMTP_SECURITY` | `starttls` | App | `starttls`, `tls` (implicit TLS) or `none`. Certificates are always verified. A password with `none` refuses to start outside `ENV=dev`; `none` to a host other than this one logs a warning at startup. |
 | `ASSETBOARD_SMTP_USERNAME` | unset | App | SMTP user name; set together with the password, or neither. |
 | `ASSETBOARD_SMTP_PASSWORD` | unset | App | SMTP password. Never logged or shown. |
 | `ASSETBOARD_SMTP_FROM` | unset | App | Sender address, required with `SMTP_HOST` (for example `budget@example.com`); the display name is the application name. |
 | `ASSETBOARD_SMTP_TIMEOUT_SECONDS` | `10` | App | Connection and command timeout, 1 to 120 seconds. |
-| `ASSETBOARD_MAIL_EMAIL_LIMIT` | `3` | App | Emails per address (registration and password reset together) within the mail window. Requests beyond it get the same answer, but no email is sent. Counted the same way whether or not an account has the address. |
+| `ASSETBOARD_MAIL_EMAIL_LIMIT` | `3` | App | Emails per address (registration and password reset together) within the mail window. Requests beyond it get the same answer, but no email is sent, and a `mail_address_limit` warning with a keyed hash of the address is logged. Counted the same way whether or not an account has the address, so anyone can use up an address's quota for one window. |
 | `ASSETBOARD_MAIL_IP_LIMIT` | `10` | App | "Forgot your password?" requests and new passwords set from a link, per client address within the mail window; beyond it the page says to try later. |
 | `ASSETBOARD_MAIL_WINDOW_MINUTES` | `60` | App | Window for the two mail limits, 1 to 1440 minutes. |
 | `ASSETBOARD_OIDC_ISSUER` | unset | App | OIDC provider's issuer URL, exactly as its discovery document states it (trailing slash included). Setting it turns OIDC sign-in on; it must be `https://` unless `ASSETBOARD_ENV=dev`, and `ASSETBOARD_BASE_URL` must then be set explicitly (and `https://` outside dev). See [docs/auth/oidc.md](auth/oidc.md). |
@@ -109,7 +109,8 @@ for two things only ([ADR-0017](adr/0017-email-and-account-recovery.md)):
   is valid for 60 minutes; setting a new password signs out every device of that account.
 
 Both forms answer the same way for every address, so they never tell whether an account exists.
-Emails are sent from a queue in the application process, after the page has answered: a send
+Emails are sent from a queue in the application process, after the page has answered and a
+random wait of 0.5 to 3 seconds: a send
 that fails is logged (`mail_send_failed`, with the error class only) and not retried, and
 emails still queued when the process stops are lost; people simply ask again. Run
 `assetboard mail-test you@example.com` to check the settings: it prints "Test email sent" or the

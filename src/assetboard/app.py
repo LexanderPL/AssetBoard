@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import ipaddress
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from functools import partial
 from importlib.metadata import version
 from pathlib import Path
 from typing import Any
@@ -27,6 +29,10 @@ from assetboard.middleware import (
     RequestIdMiddleware,
     SecurityHeadersMiddleware,
     add_security_headers,
+)
+from assetboard.services.account_email import (
+    prune_email_tokens_with_factory,
+    resolve_mail_request,
 )
 from assetboard.services.admin_users import NotInstanceAdmin
 from assetboard.services.auth import (
@@ -72,11 +78,21 @@ SCHEMA_READINESS = {"behind": "schema_outdated", "ahead": "schema_newer"}
 DatabaseChecker = Callable[[], bool]
 
 
+def _is_loopback(host: str | None) -> bool:
+    if host is None or host == "localhost":
+        return True
+    try:
+        return ipaddress.ip_address(host.strip("[]")).is_loopback
+    except ValueError:
+        return False
+
+
 def create_app(
     settings: Settings | None = None,
     *,
     database_checker: DatabaseChecker | None = None,
     mailer: Mailer | None = None,
+    mail_delay: Callable[[], float] | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     logger = configure_logging(settings.log_level, settings.log_format)
@@ -113,11 +129,30 @@ def create_app(
     )
     checker = database_checker or (lambda: database_is_ready(engine))
     # Outgoing mail (ADR-0017): None without SMTP_HOST; tests pass a fake mailer.
+    # Requests hand registration and reset work to the outbox; ``mail_delay`` replaces the
+    # random 0.5-3 s wait in tests.
     outbox = (
-        MailOutbox(mailer or SmtpMailer(settings), settings, clock, logger)
+        MailOutbox(
+            mailer or SmtpMailer(settings),
+            settings,
+            clock,
+            logger,
+            resolver=partial(resolve_mail_request, session_factory, settings, clock),
+            delay=mail_delay,
+        )
         if settings.mail_enabled
         else None
     )
+    if (
+        settings.mail_enabled
+        and settings.smtp_security == "none"
+        and not _is_loopback(settings.smtp_host)
+    ):
+        logger.warning(
+            "SMTP_SECURITY=none sends email unencrypted to %s; use starttls or tls unless the "
+            "server is on this host or a trusted network",
+            settings.smtp_host,
+        )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -141,6 +176,7 @@ def create_app(
                 app.state.setup_token = setup_token_at_startup(
                     settings, setup_open=setup_open, logger=logger
                 )
+                await run_in_threadpool(prune_email_tokens_with_factory, session_factory, clock)
             elif state == "behind":
                 logger.warning(
                     "database schema is behind this version and AUTO_MIGRATE is off; "

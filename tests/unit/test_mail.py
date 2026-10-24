@@ -17,7 +17,15 @@ from assetboard import cli
 from assetboard.branding import ENV_PREFIX
 from assetboard.clock import FixedClock
 from assetboard.config import Settings
-from assetboard.services.mail import MailJob, MailOutbox, SmtpMailer, render
+from assetboard.domain.identity import InvalidEmail, normalize_email, normalize_new_email
+from assetboard.services.mail import (
+    MailJob,
+    MailOutbox,
+    MailRequest,
+    SmtpMailer,
+    random_delay,
+    render,
+)
 from tests.conftest import FakeMailer, mail_body
 
 CLOCK = FixedClock("2026-10-19T08:30:00+00:00")
@@ -79,8 +87,8 @@ class _FakeSmtp:
     def login(self, user: str, password: str) -> None:
         self.calls.append(("login", (user, password)))
 
-    def send_message(self, message: EmailMessage) -> None:
-        self.calls.append(("send", message["To"]))
+    def send_message(self, message: EmailMessage, *, to_addrs: list[str]) -> None:
+        self.calls.append(("send", (message["To"], to_addrs)))
 
 
 class _FakeSmtpSsl(_FakeSmtp):
@@ -96,7 +104,7 @@ class _FakeSmtpSsl(_FakeSmtp):
                 ("connect", ("_FakeSmtp", "smtp.example.test", 587, ["timeout"])),
                 ("starttls", True),
                 ("login", ("mailer", "smtp-secret-value")),
-                ("send", "a@example.com"),
+                ("send", ("a@example.com", ["a@example.com"])),
                 ("quit", None),
             ],
         ),
@@ -105,7 +113,7 @@ class _FakeSmtpSsl(_FakeSmtp):
             [
                 ("connect", ("_FakeSmtpSsl", "smtp.example.test", 2465, ["context", "timeout"])),
                 ("login", ("mailer", "smtp-secret-value")),
-                ("send", "a@example.com"),
+                ("send", ("a@example.com", ["a@example.com"])),
                 ("quit", None),
             ],
         ),
@@ -113,7 +121,7 @@ class _FakeSmtpSsl(_FakeSmtp):
             {"smtp_security": "none", "smtp_username": None, "smtp_password": None},
             [
                 ("connect", ("_FakeSmtp", "smtp.example.test", 25, ["timeout"])),
-                ("send", "a@example.com"),
+                ("send", ("a@example.com", ["a@example.com"])),
                 ("quit", None),
             ],
         ),
@@ -129,7 +137,8 @@ def test_smtp_security_modes(
     monkeypatch.setattr(smtplib, "SMTP", _FakeSmtp)
     monkeypatch.setattr(smtplib, "SMTP_SSL", _FakeSmtpSsl)
     settings = _settings(tmp_path, **overrides)
-    SmtpMailer(settings).send(render(MailJob("test", "a@example.com", "en"), settings, CLOCK))
+    message = render(MailJob("test", "a@example.com", "en"), settings, CLOCK)
+    SmtpMailer(settings).send(message, "a@example.com")
     assert _FakeSmtp.calls == expected
 
 
@@ -144,7 +153,7 @@ def test_a_failed_send_logs_only_the_template_and_the_error_class(
     outbox.enqueue(MailJob("password_reset", "ola@example.com", "en", {"link": LINK}))
     outbox.join()
     outbox.stop()
-    assert "mail_send_failed template=password_reset error=SMTPAuthenticationError" in caplog.text
+    assert "mail_send_failed kind=password_reset error=SMTPAuthenticationError" in caplog.text
     for secret in ("ola@example.com", LINK, "secret-reply", "smtp-secret-value"):
         assert secret not in caplog.text
 
@@ -158,7 +167,7 @@ def test_a_full_outbox_drops_the_job_with_a_warning(
     job = MailJob("test", "a@example.com", "en")
     assert outbox.enqueue(job)
     accepted = [outbox.enqueue(job) for _ in range(3)]  # the worker holds one, the queue one
-    assert False in accepted and "mail_dropped template=test reason=queue_full" in caplog.text
+    assert False in accepted and "mail_dropped kind=test reason=queue_full" in caplog.text
     mailer.release.set()
     outbox.join()
     outbox.stop()
@@ -188,3 +197,58 @@ def test_mail_test_command_reports_success_or_only_the_error_class(
     off = CliRunner().invoke(cli.app, ["mail-test", "me@example.com"], env={
         f"{ENV_PREFIX}_DATA_DIR": str(tmp_path)})  # fmt: skip
     assert off.exit_code == 1 and "SMTP_HOST is not set" in off.output
+
+
+def test_the_envelope_names_only_the_verified_recipient(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _FakeSmtp.calls = []
+    monkeypatch.setattr(smtplib, "SMTP", _FakeSmtp)
+    settings = _settings(tmp_path)
+    message = render(MailJob("test", "ola@example.com", "en"), settings, CLOCK)
+    assert str(message["To"]) == "ola@example.com"
+    SmtpMailer(settings).send(message, "ola@example.com")
+    assert ("send", ("ola@example.com", ["ola@example.com"])) in _FakeSmtp.calls
+
+
+@pytest.mark.parametrize(
+    "address",
+    [
+        "victim@example.com,attacker@evil.test",
+        '"attacker@evil.test"@example.com',
+        "attacker@evil.test<victim@example.com>",
+    ],
+)
+def test_header_special_addresses_are_refused_for_new_input(address: str) -> None:
+    with pytest.raises(InvalidEmail):
+        normalize_new_email(address)
+    assert normalize_email("Ola@Example.com") == "ola@example.com"
+
+
+def test_requests_wait_a_random_delay_before_any_work(tmp_path: Path) -> None:
+    assert all(0.5 <= random_delay() <= 3.0 for _ in range(50))
+    delays: list[str] = []
+    resolved: list[MailRequest] = []
+
+    def resolver(request: MailRequest) -> MailJob | None:
+        resolved.append(request)
+        return MailJob("test", request.email, request.locale) if delays else None
+
+    def delay() -> float:
+        assert len(resolved) == len(delays)  # nothing was looked up before the wait
+        delays.append("waited")
+        return 0.0
+
+    mailer = FakeMailer()
+    outbox = MailOutbox(
+        mailer, _settings(tmp_path), CLOCK, logging.getLogger("t"), resolver=resolver, delay=delay
+    )
+    outbox.enqueue(MailRequest("reset", "ola@example.com", "en"))
+    outbox.join()
+    assert delays == ["waited"] and mailer.recipients == ["ola@example.com"]
+    # A stop and a new enqueue never lose a job (each worker owns its queue).
+    outbox.stop()
+    outbox.enqueue(MailRequest("reset", "bob@example.com", "en"))
+    outbox.join()
+    outbox.stop()
+    assert mailer.recipients == ["ola@example.com", "bob@example.com"]

@@ -54,6 +54,8 @@ class Settings(BaseSettings):
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
+        # Validation errors never repeat the values (SMTP password, OIDC secret, ...).
+        hide_input_in_errors=True,
     )
 
     env: str = Field(default="dev")

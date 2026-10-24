@@ -5,6 +5,7 @@ import stat
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from assetboard.branding import ENV_PREFIX
 from assetboard.config import Settings
@@ -460,3 +461,50 @@ def test_retired_allow_registration_false_only_warns(
     monkeypatch.setattr(app_module, "configure_logging", lambda *_args: logger)
     app_module.create_app(Settings(_env_file=None, data_dir=tmp_path, allow_registration=False))
     assert any("ALLOW_REGISTRATION is no longer used" in message for message in records)
+
+
+SECRETS = ("smtp-secret-value", "oidc-secret-value")
+
+
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        {"allow_registration": True},  # the retired flag's error
+        {"smtp_port": "smtp-secret-value"},  # a field error repeats nothing it was given
+        {"smtp_from": "oidc-secret-value <x@example.test>"},
+        {"smtp_security": "none"},  # a model error mentioning the password setting
+    ],
+)
+def test_settings_errors_never_show_secrets(tmp_path: Path, overrides: dict[str, object]) -> None:
+    values: dict[str, object] = {
+        "data_dir": tmp_path,
+        **MAIL_BASE,
+        "smtp_username": "mailer",
+        "smtp_password": "smtp-secret-value",
+        "oidc_issuer": "https://idp.example.test/",
+        "oidc_client_id": "assetboard",
+        "oidc_client_secret": "oidc-secret-value",
+        **overrides,
+    }
+    with pytest.raises(ValidationError) as failed:
+        Settings(_env_file=None, **values)  # type: ignore[arg-type]
+    for secret in SECRETS:
+        assert secret not in str(failed.value)
+
+
+def test_cli_errors_never_show_secrets(tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+
+    from assetboard.cli import app as cli_app
+
+    env = {
+        f"{ENV_PREFIX}_DATA_DIR": str(tmp_path),
+        f"{ENV_PREFIX}_ALLOW_REGISTRATION": "true",
+        f"{ENV_PREFIX}_SMTP_PASSWORD": "smtp-secret-value",
+        f"{ENV_PREFIX}_OIDC_CLIENT_SECRET": "oidc-secret-value",
+        f"{ENV_PREFIX}_SMTP_PORT": "oidc-secret-value",
+    }
+    result = CliRunner().invoke(cli_app, ["mail-test", "me@example.com"], env=env)
+    assert result.exit_code == 1 and "smtp_port" in result.output
+    for secret in SECRETS:
+        assert secret not in result.output

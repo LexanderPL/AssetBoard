@@ -5,7 +5,7 @@
 {{ _("Sign in:") }}
 {{ sign_in_link }}
 
-{{ _("Forgot your password? Ask for a new one here:") }}
+{% if reset_link is defined %}{{ _("Forgot your password? Ask for a new one here:") }}
 {{ reset_link }}
 
-{{ _("If you did not ask for this, ignore this email: nothing was changed.") }}
+{% endif %}{{ _("If you did not ask for this, ignore this email: nothing was changed.") }}

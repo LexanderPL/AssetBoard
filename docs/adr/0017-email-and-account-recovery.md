@@ -33,13 +33,25 @@ The owner decided (pre-release B):
   by default), `_SECURITY` (`starttls` by default, `tls`, `none`), `_USERNAME`, `_PASSWORD`,
   `_FROM`, `_TIMEOUT_SECONDS`. Certificates are verified (`ssl.create_default_context()`). A
   password over `none` refuses to start outside `ENV=dev`. No new dependency.
-- Services never send. They return a `MailJob` (template, address, locale, parameters); the
-  route queues it in the `MailOutbox` after the transaction committed. One worker thread renders
-  and sends, so responses never wait for SMTP and do not depend on whether a mail was queued.
-  A failed send is logged with the template and the exception class only (never the address, a
+- Requests never send mail and never look an address up. Registration's first step and the
+  forgot form hand a `MailRequest` (purpose, normalized address, language) to the `MailOutbox`
+  through a Starlette `BackgroundTask`, which runs only after the response body was sent. One
+  worker thread (its own queue, so a stop and a later enqueue never share one) waits a random
+  0.5 to 3 seconds (`secrets.SystemRandom`; tests inject 0), then, in its own `BEGIN
+  IMMEDIATE` transaction with the injected clock, prunes expired links, looks the address up,
+  issues the link and writes the audit row (`resolve_mail_request`), and finally renders and
+  sends. The raw token exists only in that worker's memory and in the mail.
+- A failed job is logged with its kind and the exception class only (never the address, a
   link, the password or the server's reply) and not retried; a full queue (100) drops the job
   with a warning; queued jobs are lost when the process stops. The person asks again. A
   persistent outbox and retries are follow-ups.
+- Addresses: a new address (registration, forgot form, every new account) is refused when it
+  contains whitespace or one of `<>()[],;:"\`, so it is always one plain addr-spec; addresses
+  stored earlier keep working for sign-in. `To` is built with
+  `email.headerregistry.Address(addr_spec=...)` and the SMTP envelope names exactly that one
+  recipient (`send_message(..., to_addrs=[address])`).
+- `Settings` hides input values in validation errors (`hide_input_in_errors`), so the SMTP
+  password or the OIDC secret never appear in a startup error or CLI output.
 - Emails are plain text, rendered from `web/templates/email/*.txt` with gettext in the
   recipient's language (the account's saved language, else the request's). Every link is built
   from `ASSETBOARD_BASE_URL`, never from request headers; email therefore needs an explicitly
@@ -52,12 +64,15 @@ The owner decided (pre-release B):
 - Table `email_tokens` (migration 0014): `purpose` (`register` or `reset`), the SHA-256 of a
   256-bit `secrets.token_urlsafe(32)` token (never the token itself), the normalized address,
   the user (reset only), the mail language, `created_at`, `expires_at`.
-- Single use: the row is deleted in the transaction that uses it. Registration links live 24
+- Single use: the row is deleted atomically (`DELETE ... WHERE id = ? AND expires_at > now`,
+  checked to remove exactly one row) before the user is changed or created, so two parallel
+  requests cannot both use it, on SQLite or PostgreSQL. Registration links live 24
   hours, reset links 60 minutes. At most three live links per address (registration) or per
-  account (reset); a fourth deletes the oldest. Expired rows are deleted whenever a new link is
-  issued.
-- Every password change (profile, reset, `assetboard reset-password`) and every deactivation
-  deletes the account's reset links. A reset requires an active account with a password.
+  account (reset); a fourth deletes the oldest. Expired rows are deleted by every outbox job
+  and at startup.
+- Every password change (profile, reset, `assetboard reset-password`), deactivation and change
+  of the administrator role deletes the account's reset links. A reset requires an active
+  account with a password whose address is still the one the link was sent to.
 - Links are opened with GET (a form) and used only by POST, so mail scanners that prefetch links
   cannot use them. The token is in the URL path, like invitations: the request log redacts it,
   and these pages send `Referrer-Policy: same-origin` and `Cache-Control: no-store`.
@@ -66,9 +81,10 @@ The owner decided (pre-release B):
 
 1. `/register` asks only for the email address and always answers "If this address can be
    registered, we sent it a link". The mail differs: a link to finish registering (no account
-   has the address), a note that an account exists with links to sign in and to reset the
-   password (active account), or nothing (deactivated account).
-2. `/register/complete/<token>` asks for the display name, password and workspace name and
+   has the address), a note that an account exists with a link to sign in (and to reset the
+   password when the account has one) (active account), or nothing (deactivated account).
+2. `/register/complete/<token>` (signed-in visitors are sent home, so no session is replaced)
+   asks for the display name, password and workspace name and
    creates the account, its workspace (with the suggested categories) and its owner membership
    in one transaction that also spends every registration link of the address; the account is
    signed in. An account created meanwhile spends the link too.
@@ -84,7 +100,7 @@ page disables the switch otherwise (turning it off always works), and the servic
 
 `/password/forgot` asks for the address and always answers "If an account uses this address, we
 sent it an email". An active account with a password gets a reset link (audited as
-`auth.password_reset_requested`); an active account without a password (identity provider or
+`auth.password_reset_requested` by the worker); an active account without a password (identity provider or
 proxy) gets a note that there is nothing to reset, so no password can be added to such an
 account by email; others get nothing. `/password/reset/<token>` sets the new password (policy
 checked, hashed through the hash gate outside the transaction), clears `must_change_password`,
@@ -95,12 +111,18 @@ with the number of sessions ended. It does not sign anyone in. It is not offered
 ### Enumeration safety and throttles
 
 - The first step of registration and the forgot form give the same status, page and headers for
-  every address. Each runs one write transaction of the same shape (count the client bucket,
-  count the address bucket, look the address up, maybe store a link) and queues at most one job;
-  rendering and SMTP happen after the response. Timing differs only by a small insert.
+  every address, and run the same database statements for every address: validate, count the
+  client bucket and the address bucket, answer. A test compares the statements with a
+  `before_cursor_execute` spy for unknown, existing, deactivated and passwordless addresses.
+  Everything that depends on the account happens in the worker after the response and the
+  random delay, so neither the response nor its timing carries a signal.
 - `mail_email` counts emails per normalized address (registration and reset together, default 3
   per 60 minutes), the same for every address whether or not an account has it. Past the limit
-  the answer stays the same and no mail is sent: it limits mail flooding without a signal.
+  the answer stays the same and no mail is sent: it limits mail flooding without a signal. The
+  trade-off is a denial of recovery: anyone can use up an address's quota and so delay its
+  owner's registration or password reset by up to one window. Each refusal is logged at
+  WARNING (`mail_address_limit`) with a 16-hex-digit HMAC-SHA-256 of the address under the
+  secret key, so an administrator can see a targeted address without the log holding it.
 - The client buckets are the requester's own and may say "try later": the existing `register`
   bucket (both registration steps) and `mail_ip` (forgot requests and new passwords set from a
   link, default 10 per 60 minutes). None of them is reset by success.

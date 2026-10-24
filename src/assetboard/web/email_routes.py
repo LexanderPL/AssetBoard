@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
@@ -83,11 +84,14 @@ def _user_agent(request: Request) -> str | None:
     return request.headers.get("user-agent")
 
 
-def _queue(request: Request, outcome: MailRequestOutcome) -> None:
-    """Queue the mail after the transaction committed; sending happens after the response."""
+def _accepted(request: Request, outcome: MailRequestOutcome, message: str) -> Response:
+    """The one answer for every address. The outbox gets the request in a background task,
+    which runs only after the response body was sent (ADR-0017)."""
+    response = _notice_page(request, CHECK_INBOX, message)
     outbox = _state(request).mail_outbox
-    if outcome.job is not None and outbox is not None:
-        outbox.enqueue(outcome.job)
+    if outcome.request is not None and outbox is not None:
+        response.background = BackgroundTask(outbox.enqueue, outcome.request)
+    return response
 
 
 def _notice_page(
@@ -186,8 +190,7 @@ async def register_submit(request: Request, email: FormStr = "") -> Response:
         )
     if outcome.status == "throttled":
         return _register_page(request, email=email, notice=REGISTER_THROTTLED, status_code=429)
-    _queue(request, outcome)
-    return _notice_page(request, CHECK_INBOX, REGISTER_SENT)
+    return _accepted(request, outcome, REGISTER_SENT)
 
 
 def _complete_page(
@@ -217,6 +220,9 @@ def _complete_page(
 @router.get("/register/complete/{token}", name="register_complete")
 async def register_complete_form(request: Request, token: str) -> Response:
     await _require_registration(request)
+    if web_session(request) is not None:
+        # Finishing a registration signs in; never on top of another account's session.
+        return RedirectResponse("/", status_code=303)
     state = _state(request)
     email = await run_in_threadpool(registration_email, state.session_factory, token, state.clock)
     if email is None:
@@ -233,6 +239,8 @@ async def register_complete_submit(
     workspace_name: FormStr = "",
 ) -> Response:
     await _require_registration(request)
+    if web_session(request) is not None:
+        return RedirectResponse("/", status_code=303)
     state = _state(request)
     values = {"display_name": display_name, "workspace_name": workspace_name}
     long_field = too_long(
@@ -357,7 +365,6 @@ async def forgot_submit(request: Request, email: FormStr = "") -> Response:
                 settings=state.settings,
                 clock=state.clock,
                 host=client_host(request),
-                user_agent=_user_agent(request),
                 locale=request.state.locale,
             )
         )
@@ -369,8 +376,7 @@ async def forgot_submit(request: Request, email: FormStr = "") -> Response:
         )
     if outcome.status == "throttled":
         return _forgot_page(request, email=email, notice=FORGOT_THROTTLED, status_code=429)
-    _queue(request, outcome)
-    return _notice_page(request, CHECK_INBOX, FORGOT_SENT)
+    return _accepted(request, outcome, FORGOT_SENT)
 
 
 def _reset_page(

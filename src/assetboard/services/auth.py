@@ -55,6 +55,7 @@ from assetboard.domain.identity import (
     InvalidEmail,
     normalize_display_name,
     normalize_email,
+    normalize_new_email,
 )
 from assetboard.services import categories, invitations
 from assetboard.services.hash_gate import HashGate, HashGateBusy
@@ -186,8 +187,9 @@ class SignUpLinkInvalid(AuthError):
 class VerifiedSignUp(Protocol):
     """Open registration's completion: the email was proven by a link sent to it (ADR-0017).
 
-    ``check`` raises ``SignUpLinkInvalid`` before any hashing; ``consume`` uses the link in the
-    transaction that creates the account and raises it if the link was used meanwhile.
+    ``check`` raises ``SignUpLinkInvalid`` before any hashing; ``consume`` spends the link
+    atomically, first thing in the transaction that creates the account, and raises it if the
+    link was used meanwhile.
     """
 
     def check(self, email: str) -> None: ...
@@ -1423,7 +1425,7 @@ def _create_user_records(
     if options is not None and seed is None:
         raise RuntimeError("A new workspace needs its category seed")
     clean_display_name = _clean_display_name(display_name)
-    normalized_email = normalize_email(email)
+    normalized_email = normalize_new_email(email)
     if password is not None:
         validate_password(password, normalized_email, clean_display_name)
         password_hash = password_hash or argon2_hash(password)
@@ -1562,7 +1564,7 @@ def run_initial_setup(
         if not setup_is_open(session):
             raise SetupAlreadyCompleted
     clean_display_name = _clean_display_name(display_name)
-    normalized_email = normalize_email(email)
+    normalized_email = normalize_new_email(email)
     validate_password(password, normalized_email, clean_display_name)
     _workspace_options(
         settings,
@@ -1656,7 +1658,7 @@ def create_admin_cli(
     seed_locale: str | None = None,
 ) -> tuple[User, Workspace | None]:
     """Break-glass admin creation; works with or without existing users, never modifies one."""
-    normalized_email = normalize_email(email)
+    normalized_email = normalize_new_email(email)
     if session.scalar(select(User.id).where(User.email == normalized_email)) is not None:
         raise EmailAlreadyRegistered
     options = (
@@ -1805,7 +1807,7 @@ def _register_flow(
         return RegistrationOutcome(status="throttled")
 
     try:
-        normalized_email = normalize_email(email)
+        normalized_email = normalize_new_email(email)
         clean_display_name = _clean_display_name(display_name)
         validate_password(password, normalized_email, clean_display_name)
         options: WorkspaceOptions | None = None
@@ -1851,6 +1853,10 @@ def _register_flow(
         raise
 
     def create(session: Session) -> RegistrationOutcome:
+        if verified is not None:
+            # Spent atomically before anything else (raises SignUpLinkInvalid when another
+            # request used it first, rolling this one back); an existing account spends it too.
+            verified.consume(session, details.email)
         if session.scalar(select(User.id).where(User.email == details.email)) is not None:
             return RegistrationOutcome(status="rejected")
         try:
@@ -1878,9 +1884,6 @@ def _register_flow(
             joined = invitation.consume(session, user.id, details.email)
         elif workspace is None:
             raise RuntimeError("Registration must create a workspace")
-        if verified is not None:
-            # Raises SignUpLinkInvalid (rolling the user back) if the link was used meanwhile.
-            verified.consume(session, details.email)
         _audit(
             session,
             clock,
