@@ -1,7 +1,7 @@
 """F3.1 scheduled items and occurrences
 
-Revision ID: 0014_f31
-Revises: 0013_instance_settings
+Revision ID: 0015_f31
+Revises: 0014_email_tokens
 Create Date: 2026-10-20 22:40:30.790699
 """
 
@@ -12,8 +12,8 @@ from alembic import op
 
 from assetboard.db.types import UtcDateTime
 
-revision = "0014_f31"
-down_revision = "0013_instance_settings"
+revision = "0015_f31"
+down_revision = "0014_email_tokens"
 branch_labels = None
 depends_on = None
 

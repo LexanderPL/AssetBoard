@@ -246,6 +246,13 @@ when you intend to upload the image and its release tags.
 
 ## Upgrading
 
+### Unreleased: recurring items (F3.1)
+
+- Migration `0015_f31` adds the `scheduled_items` and `scheduled_occurrences` tables.
+- The in-process scheduler generates planned occurrences at startup (in the background) and
+  daily at 03:00 workspace time. Run one worker; `ASSETBOARD_SCHEDULER_ENABLED=false` turns the
+  scheduler off. See [Recurring-item generation](#recurring-item-generation).
+
 ### Unreleased: email, verified registration and password reset (pre-release B)
 
 - **`ASSETBOARD_ALLOW_REGISTRATION` is removed.** With `true` the application refuses to start
