@@ -1,0 +1,7 @@
+{% extends "auth_base.html" %}
+{% block title %}{{ title }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ title }}{% endblock %}
+{% block content %}
+<p class="mt-4 text-sm text-muted" role="status" data-email-notice>{{ message }}</p>
+<p class="mt-6 text-center text-sm text-muted"><a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'login') }}">{{ _("Sign in") if sign_in_link else _("Back to sign in") }}</a></p>
+{% endblock %}

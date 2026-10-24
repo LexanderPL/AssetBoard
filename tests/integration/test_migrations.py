@@ -42,6 +42,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "auth_throttles",
         "budget_lines",
         "categories",
+        "email_tokens",
         "external_identities",
         "instance_settings",
         "invitations",

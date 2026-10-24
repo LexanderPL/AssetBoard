@@ -1,0 +1,3 @@
+{{ _("This is a test email from %(app)s. Your email settings work.", app=app_name) }}
+
+{{ base_url }}

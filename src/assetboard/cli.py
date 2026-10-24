@@ -20,8 +20,10 @@ from assetboard.db.migrate import (
     database_is_at_head,
     upgrade_database,
 )
+from assetboard.domain.identity import InvalidEmail, normalize_email
 from assetboard.middleware import PeerMiddleware
 from assetboard.services.auth import EmailAlreadyRegistered, create_admin_cli, reset_user_password
+from assetboard.services.mail import Mailer, MailJob, SmtpMailer, send_now
 
 app = typer.Typer(name=CLI_NAME, help=f"{APP_NAME} command-line interface")
 
@@ -231,6 +233,35 @@ def reset_password_command(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
     typer.echo(f"Password reset for {user.email}.")
+
+
+def mail_test_mailer(settings: Settings) -> Mailer:
+    """The mailer ``mail-test`` uses (tests replace it with a fake)."""
+    return SmtpMailer(settings)
+
+
+@app.command("mail-test")
+def mail_test(
+    to: str = typer.Argument(..., help="Address to send a test email to."),
+) -> None:
+    """Send a test email through the configured SMTP server (ADR-0017).
+
+    Reports success, or only the class of the error: never the server's reply or the password.
+    """
+    try:
+        settings = Settings()
+        if not settings.mail_enabled:
+            raise CommandError("SMTP_HOST is not set: email is off")
+        address = normalize_email(to)
+    except (CommandError, ValueError, InvalidEmail) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    job = MailJob("test", address, settings.default_locale)
+    error = send_now(job, mailer=mail_test_mailer(settings), settings=settings, clock=Clock())
+    if error is not None:
+        typer.echo(f"Sending failed: {error}", err=True)
+        raise typer.Exit(code=1)
+    typer.echo(f"Test email sent to {address}.")
 
 
 @app.command("check-migrations")

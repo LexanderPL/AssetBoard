@@ -135,6 +135,10 @@ def test_unhandled_exception_logs_traceback_and_returns_request_id(web: WebHarne
         ("/prefix/invite/tok/accept", "/prefix/invite/[redacted]/accept"),
         ("/workspace/invitations", "/workspace/invitations"),
         ("/login", "/login"),
+        ("/register/complete/" + "a" * 43, "/register/complete/[redacted]"),
+        ("/password/reset/" + "a" * 43, "/password/reset/[redacted]"),
+        ("/password/forgot", "/password/forgot"),
+        ("/register", "/register"),
     ],
 )
 def test_request_log_redacts_invitation_tokens(path: str, logged: str) -> None:

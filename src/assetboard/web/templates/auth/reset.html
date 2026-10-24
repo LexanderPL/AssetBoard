@@ -1,0 +1,17 @@
+{% extends "auth_base.html" %}
+{% from "macros/components.html" import field, csrf_input, primary_button with context %}
+{% block title %}{{ _("Choose a new password") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Choose a new password") }}{% endblock %}
+{% block content %}
+{% if notice %}
+<p class="mt-4 rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="alert">{{ notice }}</p>
+{% endif %}
+<p class="mt-4 text-sm text-muted">{{ _("Every device signed in to this account will be signed out.") }}</p>
+<form method="post" action="{{ scoped_url(request, 'password_reset', token=token) }}" class="mt-6 space-y-4" novalidate>
+  {{ csrf_input() }}
+  <input type="text" name="username" value="{{ email }}" autocomplete="username" hidden>
+  {{ field("new_password", _("New password"), type="password", error=errors.get("new_password"), required=true, autocomplete="new-password", maxlength=1024, help=_("At least 8 characters. Common passwords are not accepted.")) }}
+  {{ field("confirm_password", _("Repeat the new password"), type="password", error=errors.get("confirm_password"), required=true, autocomplete="new-password", maxlength=1024) }}
+  {{ primary_button(_("Change password")) }}
+</form>
+{% endblock %}

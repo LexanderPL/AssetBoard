@@ -60,6 +60,7 @@ from assetboard.services.auth import (
     validate_password,
     verify_setup_token,
 )
+from tests.conftest import ANY_VERIFIED
 
 PASSWORD = "Correct Horse Battery!"
 BASE_TIME = datetime.fromisoformat("2026-01-01T00:00:00+00:00")
@@ -76,7 +77,7 @@ def auth_settings() -> Settings:
 
 @pytest.fixture
 def registration_settings() -> Settings:
-    return Settings(_env_file=None, allow_registration=True)
+    return Settings(_env_file=None)
 
 
 def _create_user(
@@ -129,6 +130,7 @@ def _register(
     email: str = "reg@example.com",
     password: str = "Registrant Strong Password",
     host: str = "192.0.2.95",
+    verified: auth.VerifiedSignUp | None = ANY_VERIFIED,
 ) -> auth.RegistrationOutcome:
     auth._claim_setup(db_session, clock)  # pyright: ignore[reportPrivateUsage]
     return register_user(
@@ -140,6 +142,7 @@ def _register(
         settings=settings,
         clock=clock,
         host=host,
+        verified=verified,
     )
 
 
@@ -927,7 +930,7 @@ def test_registration_is_disabled_by_default(
     db_session: Session, auth_settings: Settings, fixed_clock: FixedClock
 ) -> None:
     with pytest.raises(RegistrationDisabled):
-        _register(db_session, auth_settings, fixed_clock)
+        _register(db_session, auth_settings, fixed_clock, verified=None)
     assert db_session.scalars(select(AuthThrottle)).all() == []
 
 
@@ -942,7 +945,7 @@ def test_registration_creates_owner_workspace_and_one_workspace_audit_event(
     events = db_session.scalars(select(AuditEvent).where(AuditEvent.action != "category.seeded"))
     events = events.all()
     assert [(e.action, e.workspace_id) for e in events] == [("auth.register", outcome.workspace.id)]
-    assert events[0].data == {}
+    assert events[0].data == {"via": "email"}
 
 
 def test_registration_rejects_existing_email_without_creating_a_user(
@@ -1275,6 +1278,7 @@ WORKSPACE_TABLES = {
 def test_workspace_table_scope_allowlist_for_f12() -> None:
     expected_global = {
         "auth_throttles": "global authentication controls keyed by account/IP",
+        "email_tokens": "registration and reset links for global addresses and users",
         "external_identities": "OIDC identities belong to global users",
         "setup_state": "singleton instance setup state",
         "instance_settings": "singleton instance settings changed by an administrator",
@@ -1434,6 +1438,7 @@ def test_registration_is_refused_while_setup_is_open(
             settings=registration_settings,
             clock=fixed_clock,
             host="192.0.2.5",
+            verified=ANY_VERIFIED,
         )
     assert db_session.scalars(select(User)).all() == []
 
@@ -1542,6 +1547,7 @@ def test_setup_is_open_is_the_single_definition_for_web_cli_and_registration(
             settings=registration_settings,
             clock=fixed_clock,
             host=None,
+            verified=ANY_VERIFIED,
         )
     _create_user(db_session, registration_settings, fixed_clock)  # CLI path
     assert not auth.setup_is_open(db_session)
