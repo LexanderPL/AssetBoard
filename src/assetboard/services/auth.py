@@ -47,7 +47,9 @@ from assetboard.db.models.identity import (
     UserSession,
     Workspace,
 )
+from assetboard.db.models.totp import TotpFactor
 from assetboard.db.repositories import create_owned_workspace
+from assetboard.db.repositories.totp import TotpRepository
 from assetboard.domain.identity import (
     MAX_EMAIL_LENGTH,
     InvalidDisplayName,
@@ -760,31 +762,13 @@ def _login_flow(
     candidate = run(reserve)
     if isinstance(candidate, Throttled):
         return LoginOutcome(throttled_until=candidate.until)
-    rehashed: str | None = None
-    verified: bool | None = None
     try:
         check = verify or verify_password
         verified = check(candidate.password_hash or _dummy_hash(), password)
-        # Decided right after verification and hashed before ``finish``: no hashing ever
-        # runs inside the write transaction.
-        if (
-            verified
-            and candidate.password_hash is not None
-            and (candidate.is_instance_admin or not require_instance_admin)
-            and password_hasher().check_needs_rehash(candidate.password_hash)
-        ):
-            try:
-                rehashed = (hasher or argon2_hash)(password)
-            except HashGateBusy:
-                # Best effort: the login still succeeds; the next login retries the rehash.
-                rehashed = None
     except BaseException:
         # Before a verify outcome exists (``HashGateBusy`` from a saturated gate, any error),
-        # nothing account-specific has happened: take the whole attempt back. After it (an
-        # error while rehashing, which only a correct password reaches), the account attempt
-        # stays counted, as it would on success.
-        taken_back = [item for item in candidate.reserved if verified is None or item.scope == "ip"]
-        run(lambda session: release_attempts(session, taken_back))
+        # nothing account-specific has happened: take the whole attempt back.
+        run(lambda session: release_attempts(session, candidate.reserved))
         raise
 
     def finish(session: Session) -> LoginOutcome:
@@ -801,15 +785,24 @@ def _login_flow(
             and not not_admin
         )
         factor_verified = False
+        factor_failed = False
         if succeeded and user is not None:
             from assetboard.services.totp import verify_sign_in
 
+            # Runs only after a correct password; its cost (a decryption and a few HMACs,
+            # well under a millisecond) is accepted residual timing (ADR-0017).
             succeeded, factor_verified = verify_sign_in(
                 session, user.id, code=second_factor, settings=settings, now=now
             )
+            factor_failed = not succeeded
         if not succeeded or user is None or user.password_hash is None:
             # The reservation stays: it is this failure's count.
             prune_auth_throttles(session, clock)
+            reason: dict[str, str | int | bool] | None = None
+            if verified and not_admin:
+                reason = {"reason": "not_instance_admin"}
+            elif factor_failed:
+                reason = {"reason": "second_factor"}
             _audit(
                 session,
                 clock,
@@ -821,7 +814,7 @@ def _login_flow(
                 host=host,
                 user_agent=user_agent,
                 # Internal only: the response is the same as for a wrong password.
-                data={"reason": "not_instance_admin"} if verified and not_admin else None,
+                data=reason,
             )
             return LoginOutcome()
         # Every attempt counts in the account bucket, this successful one too: taking it back
@@ -829,9 +822,6 @@ def _login_flow(
         # probing the same email, and only a known email can succeed. The address bucket,
         # keyed by the requester, takes back this request's attempt as before.
         release_attempts(session, [item for item in candidate.reserved if item.scope == "ip"])
-        if rehashed is not None:
-            # Safe: ``succeeded`` above means the stored hash is still the verified one.
-            user.password_hash = rehashed
         user.last_login_at = now
         if existing_session_id:
             session.execute(
@@ -861,7 +851,39 @@ def _login_flow(
         )
         return LoginOutcome(user=user, session_id=new_session_id)
 
-    return run(finish)
+    outcome = run(finish)
+    if outcome.succeeded and candidate.user_id is not None:
+        _rehash_after_login(run, candidate.user_id, candidate.password_hash, password, hasher)
+    return outcome
+
+
+def _rehash_after_login(
+    run: TransactionRunner,
+    user_id: UUID,
+    verified_hash: str | None,
+    password: str,
+    hasher: Hasher | None,
+) -> None:
+    """Upgrade the stored hash once the whole sign-in (second factor included) succeeded.
+
+    Never before: the extra hashing time would reveal a correct password to someone who lacks
+    the second factor. Hashed outside any write transaction; stored only if the hash verified
+    at sign-in is still the stored one (a concurrent password change wins).
+    """
+    if verified_hash is None or not password_hasher().check_needs_rehash(verified_hash):
+        return
+    try:
+        rehashed = (hasher or argon2_hash)(password)
+    except HashGateBusy:
+        # Best effort: the login already succeeded; the next login retries the rehash.
+        return
+
+    def store(session: Session) -> None:
+        user = session.get(User, user_id)
+        if user is not None and user.password_hash == verified_hash:
+            user.password_hash = rehashed
+
+    run(store)
 
 
 def authenticate_user(
@@ -2459,3 +2481,45 @@ def reset_user_password(
     )
     session.flush()
     return user
+
+
+class NoTwoFactor(AuthError):
+    code = "no_two_factor"
+
+    def __init__(self) -> None:
+        super().__init__("That user has no two-factor authentication enabled")
+
+
+def reset_user_two_factor(session: Session, *, email: str, clock: Clock) -> tuple[User, int]:
+    """CLI MFA reset: removes the authenticator and recovery codes, revokes password sessions.
+
+    The password is unchanged; external (OIDC/proxy) sessions are unaffected, as their
+    provider handles MFA. Returns the user and how many sessions ended.
+    """
+    normalized = normalize_email(email)
+    user = session.scalar(select(User).where(User.email == normalized))
+    if user is None:
+        raise UnknownUser
+    repository = TotpRepository(session, user.id)
+    factor: TotpFactor | None = repository.factor(lock=True)
+    if factor is None or factor.enabled_at is None:
+        raise NoTwoFactor
+    repository.clear()
+    rows = session.scalars(
+        select(UserSession).where(
+            UserSession.user_id == user.id, UserSession.auth_method == "password"
+        )
+    ).all()
+    for row in rows:
+        session.delete(row)
+    _audit(
+        session,
+        clock,
+        action="cli.reset_mfa",
+        entity_type="user",
+        entity_id=str(user.id),
+        actor_type="cli",
+        data={"sessions_revoked": len(rows)},
+    )
+    session.flush()
+    return user, len(rows)

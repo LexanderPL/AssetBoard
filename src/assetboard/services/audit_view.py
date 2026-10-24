@@ -49,6 +49,7 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     # Instance scope
     "cli.create_admin": (),
     "cli.reset_password": ("sessions_revoked",),
+    "cli.reset_mfa": ("sessions_revoked",),
     "auth.login_success": ("method", "created", "linked"),
     "auth.login_failure": ("reason",),
     "auth.logout": ("scope", "revoked_count"),
@@ -117,6 +118,7 @@ ACTION_LABELS: dict[str, str] = {
     "setup.create_admin": _("First administrator created at setup"),
     "cli.create_admin": _("Administrator created on the command line"),
     "cli.reset_password": _("Password reset on the command line"),
+    "cli.reset_mfa": _("Two-factor authentication reset on the command line"),
     "auth.login_success": _("Signed in"),
     "auth.login_failure": _("Sign-in failed"),
     "auth.logout": _("Signed out"),
@@ -225,6 +227,7 @@ ROLE_LABELS: dict[str, str] = {
 }
 REASON_LABELS: dict[str, str] = {
     "not_instance_admin": _("not an instance administrator"),
+    "second_factor": _("second factor not verified"),
     "no_account": _("no account for this sign-in"),
     "account_exists": _("an account with this email address already exists"),
     "email_unverified": _("email address not verified"),
@@ -370,6 +373,7 @@ GROUPS: dict[Scope, dict[str, tuple[str, ...]]] = {
         "accounts": (
             "cli.create_admin",
             "cli.reset_password",
+            "cli.reset_mfa",
             "auth.password_change",
             "auth.instance_admin_granted",
             "auth.instance_admin_revoked",
