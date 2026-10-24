@@ -59,10 +59,40 @@ class RecurrenceRule:
             not 1 <= self.month <= 12 or not isinstance(self.month_day, int) or self.month_day == -1
         ):
             raise ValueError("month")
+        if (
+            self.freq == Frequency.YEARLY
+            and isinstance(self.month_day, int)
+            and self.month_day > _longest_month(self.month)
+        ):
+            # 29 February clamps in non-leap years; 31 April never exists.
+            raise ValueError("month_day")
+
+    @property
+    def uses_working_days(self) -> bool:
+        """Whether the dates depend on weekends and the holiday calendar."""
+        return self.weekend_policy != WeekendPolicy.NONE or (
+            self.freq == Frequency.MONTHLY and isinstance(self.month_day, MonthDay)
+        )
+
+
+def _longest_month(month: int) -> int:
+    return calendar.monthrange(2000, month)[1]  # 2000 is a leap year
 
 
 def _working(day: date, holidays: Container[date]) -> bool:
     return day.weekday() < 5 and day not in holidays
+
+
+def shift(day: date, policy: WeekendPolicy, holidays: Container[date]) -> date:
+    """The effective date for a nominal ``day`` under the weekend/holiday ``policy``."""
+    if policy == WeekendPolicy.NONE:
+        return day
+    step = timedelta(days=-1 if policy == WeekendPolicy.PREVIOUS else 1)
+    while not _working(day, holidays):
+        if day in (date.min, date.max):
+            raise ValueError("date_out_of_range")
+        day += step
+    return day
 
 
 def _month_day(year: int, month: int, choice: int | MonthDay, holidays: Container[date]) -> date:
@@ -118,13 +148,7 @@ def occurrences(
         count += 1
         if rule.max_count is not None and count > rule.max_count:
             break
-        due = nominal
-        if rule.weekend_policy != WeekendPolicy.NONE:
-            step = -1 if rule.weekend_policy == WeekendPolicy.PREVIOUS else 1
-            while not _working(due, holidays):
-                if due in (date.min, date.max):
-                    raise ValueError("date_out_of_range")
-                due += timedelta(days=step)
+        due = shift(nominal, rule.weekend_policy, holidays)
         if due > to_date:
             break
         if from_date <= due:

@@ -106,6 +106,8 @@ def test_shifted_duplicates_merge_but_count_nominal_dates() -> None:
         {"freq": Frequency.WEEKLY, "weekdays": (7,)},
         {"freq": Frequency.YEARLY, "month": 13},
         {"freq": Frequency.YEARLY, "month_day": MonthDay.FIRST_WORKING},
+        {"freq": Frequency.YEARLY, "month": 4, "month_day": 31},
+        {"freq": Frequency.YEARLY, "month": 2, "month_day": 30},
     ],
 )
 def test_invalid_rules_are_refused(changes) -> None:
