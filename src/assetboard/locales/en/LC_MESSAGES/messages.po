@@ -121,6 +121,24 @@ msgstr ""
 msgid "Enter a valid amount."
 msgstr ""
 
+msgid "Recurring item created"
+msgstr ""
+
+msgid "Recurring item updated"
+msgstr ""
+
+msgid "Recurring item paused"
+msgstr ""
+
+msgid "Recurring item resumed"
+msgstr ""
+
+msgid "Recurring item archived"
+msgstr ""
+
+msgid "Recurring item deleted"
+msgstr ""
+
 msgid "First administrator created at setup"
 msgstr ""
 
@@ -143,6 +161,12 @@ msgid "Account registered"
 msgstr ""
 
 msgid "Password changed"
+msgstr ""
+
+msgid "Password reset link sent"
+msgstr ""
+
+msgid "Password reset by email"
 msgstr ""
 
 msgid "Password confirmation failed"
@@ -343,6 +367,9 @@ msgstr ""
 msgid "Every signed-in user can create workspaces"
 msgstr ""
 
+msgid "Open registration"
+msgstr ""
+
 msgid "Month"
 msgstr ""
 
@@ -467,6 +494,9 @@ msgid "the profile"
 msgstr ""
 
 msgid "an invitation"
+msgstr ""
+
+msgid "a confirmed email address"
 msgstr ""
 
 msgid "an invitation, through the identity provider"
@@ -601,6 +631,26 @@ msgstr ""
 msgid "Instance settings"
 msgstr ""
 
+#, python-format
+msgid "Confirm your email address for %(app)s"
+msgstr ""
+
+#, python-format
+msgid "You already have an account at %(app)s"
+msgstr ""
+
+#, python-format
+msgid "Reset your %(app)s password"
+msgstr ""
+
+#, python-format
+msgid "About your %(app)s password"
+msgstr ""
+
+#, python-format
+msgid "Test email from %(app)s"
+msgstr ""
+
 msgid "Same as the system"
 msgstr ""
 
@@ -720,7 +770,15 @@ msgstr ""
 msgid "Nothing to change: the settings already had these values."
 msgstr ""
 
-msgid "Choose who can create workspaces."
+msgid "Open registration needs an email server: set ASSETBOARD_SMTP_HOST first."
+msgstr ""
+
+msgid ""
+"Open registration is not available while only the identity provider signs"
+" people in (ASSETBOARD_OIDC_ONLY)."
+msgstr ""
+
+msgid "Choose a value for each setting."
 msgstr ""
 
 msgid "Enter a valid email address."
@@ -795,12 +853,6 @@ msgid "Setup was already completed, or is being completed. Reload to continue."
 msgstr ""
 
 msgid "Setup in progress"
-msgstr ""
-
-msgid "Too many registration attempts from your network. Try again later."
-msgstr ""
-
-msgid "This email address cannot be registered."
 msgstr ""
 
 msgid ""
@@ -886,6 +938,40 @@ msgid ""
 "sign-in from the last 10 minutes."
 msgstr ""
 
+msgid "Check your inbox"
+msgstr ""
+
+msgid ""
+"If this address can be registered, we sent it a link to finish creating "
+"your account. The link works for 24 hours. Nothing arrived? Check your "
+"spam folder, or ask again later."
+msgstr ""
+
+msgid ""
+"If an account uses this address, we sent it an email with the next step. "
+"A password reset link works for 60 minutes. Nothing arrived? Check your "
+"spam folder, or ask again later."
+msgstr ""
+
+msgid "Link not valid"
+msgstr ""
+
+msgid ""
+"This link is not valid: it may have expired or been used already. Ask for"
+" a new one."
+msgstr ""
+
+msgid ""
+"Your password was changed, and every device signed in to this account was"
+" signed out. Sign in with the new password."
+msgstr ""
+
+msgid "Too many registration attempts from your network. Try again later."
+msgstr ""
+
+msgid "Too many requests from your network. Try again later."
+msgstr ""
+
 msgid "This request came from another site and was blocked."
 msgstr ""
 
@@ -944,6 +1030,9 @@ msgid "Editor"
 msgstr ""
 
 msgid "Viewer"
+msgstr ""
+
+msgid "This email address cannot be registered."
 msgstr ""
 
 msgid ""
@@ -1159,6 +1248,73 @@ msgid ""
 "address (%(base_url)s), allow cookies for it, and try again."
 msgstr ""
 
+msgid "Enter a name."
+msgstr ""
+
+msgid "Choose an active category matching the direction."
+msgstr ""
+
+msgid "Enter a positive amount in the workspace currency."
+msgstr ""
+
+msgid "Enter a valid start date."
+msgstr ""
+
+msgid "Enter an end date on or after the start date, or leave it empty."
+msgstr ""
+
+msgid "Enter a whole number of 1 or more, or leave it empty."
+msgstr ""
+
+msgid "Enter a whole number of 1 or more."
+msgstr ""
+
+msgid "Choose at least one weekday for a weekly rule."
+msgstr ""
+
+msgid "This day does not exist in the chosen month."
+msgstr ""
+
+msgid "Choose a month."
+msgstr ""
+
+msgid ""
+"Holiday adjustments need a workspace country with holiday data, or no "
+"country."
+msgstr ""
+
+msgid "This recurring item is archived and cannot change."
+msgstr ""
+
+msgid ""
+"This item adjusts dates to working days, and the workspace country has no"
+" holiday data."
+msgstr ""
+
+msgid "The recurring item could not be saved. Check the form and try again."
+msgstr ""
+
+msgid "Monday"
+msgstr ""
+
+msgid "Tuesday"
+msgstr ""
+
+msgid "Wednesday"
+msgstr ""
+
+msgid "Thursday"
+msgstr ""
+
+msgid "Friday"
+msgstr ""
+
+msgid "Saturday"
+msgstr ""
+
+msgid "Sunday"
+msgstr ""
+
 msgid "Too many attempts. Try again later."
 msgstr ""
 
@@ -1265,6 +1421,12 @@ msgid "The base currency cannot change: amounts are already stored in it."
 msgstr ""
 
 msgid "Choose a country from the list."
+msgstr ""
+
+msgid ""
+"Holiday data is not available for this country, and recurring items "
+"adjust dates to working days. Change those items to keep their dates, or "
+"choose another country."
 msgstr ""
 
 msgid "Choose a time zone from the list."
@@ -1491,6 +1653,23 @@ msgid ""
 " provider or a proxy: those follow their own settings."
 msgstr ""
 
+msgid "Registration"
+msgstr ""
+
+msgid "Off: accounts come from invitations, administrators or sign-in providers"
+msgstr ""
+
+msgid "On: anyone can register with a verified email address"
+msgstr ""
+
+msgid ""
+"A new account must confirm its email address through a link before it is "
+"created, and gets its own workspace."
+msgstr ""
+
+msgid "Registration stays closed until this is fixed."
+msgstr ""
+
 msgid "Save settings"
 msgstr ""
 
@@ -1629,6 +1808,23 @@ msgstr ""
 msgid "Older"
 msgstr ""
 
+msgid "Sign in"
+msgstr ""
+
+msgid "Back to sign in"
+msgstr ""
+
+msgid "Forgot your password?"
+msgstr ""
+
+msgid ""
+"Enter the email address of your account. We will send you a link to "
+"choose a new password."
+msgstr ""
+
+msgid "Send the link"
+msgstr ""
+
 msgid "Link your account"
 msgstr ""
 
@@ -1645,9 +1841,6 @@ msgid "This signs the account out on all other devices."
 msgstr ""
 
 msgid "Link and sign in"
-msgstr ""
-
-msgid "Sign in"
 msgstr ""
 
 #, python-format
@@ -1706,10 +1899,25 @@ msgstr ""
 msgid "Sign out other devices"
 msgstr ""
 
-msgid "Workspace name"
+msgid ""
+"Enter your email address. We will send you a link to confirm it and "
+"finish creating your account."
 msgstr ""
 
 msgid "Already have an account?"
+msgstr ""
+
+#, python-format
+msgid "Your email address %(email)s is confirmed. Choose your name and password."
+msgstr ""
+
+msgid "Workspace name"
+msgstr ""
+
+msgid "Choose a new password"
+msgstr ""
+
+msgid "Every device signed in to this account will be signed out."
 msgstr ""
 
 msgid "First-run setup"
@@ -1813,6 +2021,65 @@ msgid "Delete the category %(name)s?"
 msgstr ""
 
 msgid "Delete"
+msgstr ""
+
+msgid "Hello,"
+msgstr ""
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to reset the password of your %(app)s "
+"account. To choose a new password, open this link:"
+msgstr ""
+
+msgid ""
+"The link works once, for 60 minutes. Choosing a new password signs out "
+"every device signed in to your account."
+msgstr ""
+
+msgid ""
+"If you did not ask for this, ignore this email: your password stays the "
+"same."
+msgstr ""
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to reset the password of your %(app)s "
+"account. Your account has no password: you sign in through your identity "
+"provider or your proxy, so there is nothing to reset here."
+msgstr ""
+
+msgid "Sign in:"
+msgstr ""
+
+msgid "If you did not ask for this, ignore this email: nothing was changed."
+msgstr ""
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to create an account at %(app)s with this "
+"email address. An account with this address already exists, so no new one"
+" was created."
+msgstr ""
+
+msgid "Forgot your password? Ask for a new one here:"
+msgstr ""
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to create an account at %(app)s with this "
+"email address. To confirm the address and finish creating your account, "
+"open this link:"
+msgstr ""
+
+msgid "The link works once, for 24 hours."
+msgstr ""
+
+msgid "If you did not ask for this, ignore this email: no account is created."
+msgstr ""
+
+#, python-format
+msgid "This is a test email from %(app)s. Your email settings work."
 msgstr ""
 
 msgid "Dismiss"
@@ -2081,6 +2348,149 @@ msgstr ""
 msgid "Future months stay open for planning."
 msgstr ""
 
+msgid "Recurring item"
+msgstr ""
+
+msgid "Edit recurring item"
+msgstr ""
+
+msgid "New recurring item"
+msgstr ""
+
+msgid "Check the highlighted field."
+msgstr ""
+
+#, python-format
+msgid ""
+"The category %(name)s is archived, so this item creates no new dates. "
+"Choose an active category to save it."
+msgstr ""
+
+msgid "Amount type"
+msgstr ""
+
+msgid "Fixed"
+msgstr ""
+
+msgid "Estimate"
+msgstr ""
+
+msgid "Start date"
+msgstr ""
+
+msgid "End date (optional)"
+msgstr ""
+
+msgid "Maximum occurrences (optional)"
+msgstr ""
+
+msgid "Repeat"
+msgstr ""
+
+msgid "Weekly"
+msgstr ""
+
+msgid "Monthly"
+msgstr ""
+
+msgid "Yearly"
+msgstr ""
+
+msgid "Every N weeks, months or years"
+msgstr ""
+
+msgid "Weekdays (weekly rules)"
+msgstr ""
+
+msgid "Day (monthly or yearly rules)"
+msgstr ""
+
+msgid "Last day"
+msgstr ""
+
+msgid "First working day"
+msgstr ""
+
+msgid "Last working day"
+msgstr ""
+
+msgid "Month number (yearly rules)"
+msgstr ""
+
+msgid "Weekend and holiday adjustment"
+msgstr ""
+
+msgid "Keep the date"
+msgstr ""
+
+msgid "Previous working day"
+msgstr ""
+
+msgid "Next working day"
+msgstr ""
+
+msgid "Notes"
+msgstr ""
+
+msgid "Include past occurrences"
+msgstr ""
+
+msgid ""
+"Saving a rule creates planned occurrences, never transactions. Edits "
+"replace only pending dates from today onward."
+msgstr ""
+
+msgid "Save recurring item"
+msgstr ""
+
+msgid "Next six due dates"
+msgstr ""
+
+msgid ""
+"Enable JavaScript for the live preview. You can still save this form "
+"without it."
+msgstr ""
+
+msgid "Recurring items"
+msgstr ""
+
+msgid "Archived"
+msgstr ""
+
+msgid "Paused"
+msgstr ""
+
+msgid "Edit rule"
+msgstr ""
+
+msgid "Resume"
+msgstr ""
+
+msgid "Pause"
+msgstr ""
+
+#, python-format
+msgid ""
+"Delete the recurring item %(name)s? Its pending dates are removed; with "
+"posted or skipped history it is archived instead."
+msgstr ""
+
+msgid "No recurring items yet."
+msgstr ""
+
+msgid ""
+"Pausing removes pending dates from today onward. Archiving or deleting "
+"removes all pending dates; posted and skipped dates are history and are "
+"kept, so deleting an item with history archives it instead. Dates in "
+"closed months never change."
+msgstr ""
+
+msgid "Choose valid recurrence dates to see the preview."
+msgstr ""
+
+msgid "No more occurrences match this rule."
+msgstr ""
+
 msgid "Filters"
 msgstr ""
 
@@ -2314,8 +2724,8 @@ msgid "General"
 msgstr ""
 
 msgid ""
-"Locked: transactions (deleted ones included) or planned values exist, and"
-" their amounts are stored in this currency."
+"Locked: transactions (deleted ones included) or planned values or "
+"recurring items exist, and their amounts are stored in this currency."
 msgstr ""
 
 msgid "Formatting default"
@@ -2434,5 +2844,14 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Plan"
+#~ msgstr ""
+
+#~ msgid "Choose who can create workspaces."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Locked: transactions (deleted ones included)"
+#~ " or planned values exist, and their"
+#~ " amounts are stored in this currency."
 #~ msgstr ""
 

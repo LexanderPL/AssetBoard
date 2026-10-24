@@ -6,13 +6,11 @@
 {% if notice %}
 <p class="mt-4 rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="alert">{{ notice }}</p>
 {% endif %}
+<p class="mt-4 text-sm text-muted">{{ _("Enter your email address. We will send you a link to confirm it and finish creating your account.") }}</p>
 <form method="post" action="{{ scoped_url(request, 'register') }}" class="mt-6 space-y-4" novalidate>
   {{ csrf_input() }}
-  {{ field("email", _("Email"), type="email", value=values.email, error=errors.get("email"), required=true, autocomplete="email", maxlength=320) }}
-  {{ field("display_name", _("Display name"), value=values.display_name, error=errors.get("display_name"), required=true, autocomplete="name", maxlength=120) }}
-  {{ field("password", _("Password"), type="password", error=errors.get("password"), required=true, autocomplete="new-password", maxlength=1024, help=_("At least 8 characters. Common passwords are not accepted.")) }}
-  {{ field("workspace_name", _("Workspace name"), value=values.workspace_name, error=errors.get("workspace_name"), maxlength=120) }}
-  {{ primary_button(_("Create account")) }}
+  {{ field("email", _("Email"), type="email", value=email, error=error, required=true, autocomplete="email", maxlength=320) }}
+  {{ primary_button(_("Send the link")) }}
 </form>
 <p class="mt-6 text-center text-sm text-muted">{{ _("Already have an account?") }} <a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'login') }}">{{ _("Sign in") }}</a></p>
 {% endblock %}

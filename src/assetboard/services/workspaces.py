@@ -28,6 +28,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.clock import Clock
+from assetboard.config import DEFAULT_RECURRENCE_HORIZON_MONTHS
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.identity import User
 from assetboard.db.repositories import (
@@ -50,6 +51,12 @@ from assetboard.services.context import (
 )
 from assetboard.services.instance_settings import read_settings
 from assetboard.services.invitations import new_token
+from assetboard.services.scheduled import (
+    has_working_day_items,
+    holidays_supported,
+    regenerate_working_day_items,
+    workspace_has_scheduled_amounts,
+)
 from assetboard.services.transactions import workspace_has_transactions
 from assetboard.services.workspace_options import WorkspaceOptionError, validate_workspace_options
 
@@ -62,6 +69,7 @@ MAX_PENDING_INVITATIONS = 50
 BASE_CURRENCY_LOCKS: list[Callable[[Session, Context], bool]] = [
     workspace_has_transactions,
     workspace_has_budget_lines,
+    workspace_has_scheduled_amounts,
 ]
 
 
@@ -188,8 +196,14 @@ def update_settings(
     timezone: str,
     locale: str,
     auto_copy_plan: bool,
+    recurrence_horizon_months: int = DEFAULT_RECURRENCE_HORIZON_MONTHS,
 ) -> WorkspaceSettings:
-    """Change the workspace's settings; the audit event lists changed fields, not values."""
+    """Change the workspace's settings; the audit event lists changed fields, not values.
+
+    A country change regenerates working-day recurring items (F3.1) in the same transaction.
+    It is refused for a country without holiday data while such items exist (those items could
+    no longer be computed); other workspaces keep any listed country.
+    """
     require_role(ctx, Role.OWNER)
     clean_name = name.strip()
     if not clean_name or len(clean_name) > MAX_WORKSPACE_NAME_LENGTH:
@@ -232,8 +246,17 @@ def update_settings(
         }
         if "base_currency" in changes and _base_currency_locked(session, ctx):
             raise BaseCurrencyLocked
+        country_changed = "country_code" in changes
+        if (
+            country_changed
+            and not holidays_supported(wanted.country_code)
+            and has_working_day_items(session, ctx)
+        ):
+            raise InvalidWorkspaceSettings("country_code", "country_without_holidays")
         if changes:
             repository.update(**changes)
+            if country_changed:
+                regenerate_working_day_items(session, ctx, ctx.clock, recurrence_horizon_months)
             AuditEventRepository(session, ctx).record(
                 actor_user_id=ctx.user.id,
                 action="workspace.settings_updated",

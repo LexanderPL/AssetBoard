@@ -17,6 +17,17 @@
       </select>
       <p id="allow_workspace_creation-help" class="text-xs text-muted">{{ _("Whoever creates a workspace becomes its owner. This does not affect open registration or accounts created at the first sign-in through an identity provider or a proxy: those follow their own settings.") }}</p>
     </div>
+    <h2 class="pt-2 text-base font-semibold">{{ _("Registration") }}</h2>
+    <div class="space-y-1.5" data-registration-setting>
+      <label for="allow_registration" class="block text-sm font-medium text-ink">{{ _("Open registration") }}</label>
+      {% if registration_locked %}<input type="hidden" name="allow_registration" value="off">{% endif %}
+      <select id="allow_registration" name="allow_registration" aria-describedby="allow_registration-help{% if registration_blocker %} allow_registration-blocked{% endif %}" class="form-select w-full" {% if registration_locked %}disabled{% endif %}>
+        <option value="off" {% if not allow_registration %}selected{% endif %}>{{ _("Off: accounts come from invitations, administrators or sign-in providers") }}</option>
+        <option value="on" {% if allow_registration %}selected{% endif %}>{{ _("On: anyone can register with a verified email address") }}</option>
+      </select>
+      <p id="allow_registration-help" class="text-xs text-muted">{{ _("A new account must confirm its email address through a link before it is created, and gets its own workspace.") }}</p>
+      {% if registration_blocker %}<p id="allow_registration-blocked" class="text-xs text-warning-strong" data-registration-blocked>{{ registration_blocker }}{% if allow_registration and not registration_locked %} {{ _("Registration stays closed until this is fixed.") }}{% endif %}</p>{% endif %}
+    </div>
     <div class="flex flex-wrap items-end gap-3">
       {{ confirm_block(confirm, "admin-settings", _("Save settings")) }}
     </div>

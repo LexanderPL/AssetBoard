@@ -7,8 +7,9 @@
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
 **Data model (sketch)**
-- `AssetClass(id, workspace_id, name, investable bool, color, sort_order)`. Seed (en/pl): Stocks, Bonds, Metals, Crypto, Currencies (all investable); Real estate, Primary residence (not investable); Other.
-- `Instrument(id, workspace_id, name, symbol?, type[equity|etf|bond_market|bond_model|metal|crypto|currency|real_estate|other], quote_currency, unit_label, valuation_source[provider|manual|bond_model], provider_key?, provider_symbol?, archived_at)`
+- `AssetClass(id, workspace_id, name, investable bool, color, sort_order, risk_tier[safe|growth|speculative]?)`. Seed (en/pl): Stocks, Bonds, Metals, Crypto, Currencies (all investable); Real estate, Primary residence (not investable); Other. Seeded tiers: Bonds, Metals → safe; Stocks, Currencies → growth; Crypto → speculative; non-investable classes and Other → none (F6.11).
+- `Instrument(id, workspace_id, name, symbol?, type[equity|etf|bond_market|bond_model|metal|crypto|currency|real_estate|other], quote_currency, unit_label, valuation_source[provider|manual|bond_model], provider_key?, provider_symbol?, risk_tier_override[safe|growth|speculative]?, archived_at)`
+- `RiskTargetPolicy(workspace_id PK, mode[fixed|age_scaled|age_in_bonds], safe_bp, growth_bp, speculative_bp, tolerance_bp)` (F6.11).
 - `InstrumentAllocation(instrument_id, asset_class_id, weight_bp)`; weights per instrument must sum to 10 000. A single instrument can be split across classes (e.g., an 80/20 stock/bond fund).
 - `InvestmentTransaction(id, workspace_id, instrument_id, date?, type[buy|sell|dividend|fee|split], quantity Decimal, unit_price Decimal, quote_currency, fee Money, fx_to_base Decimal?, note, import_batch_id?)`. `date` is nullable only for imported legacy lots (flagged "undated").
 - `PricePoint(instrument_id, date, price Decimal, source[provider|manual|transaction])`; unique `(instrument_id, date, source)`.
@@ -198,6 +199,38 @@ Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait 
 Implement F6.9 from docs/specs/M6-investments.md as an extension of the M4 archive (docs/specs/M4-ledger-export-import.md,
 ADR-0016): the new files with lineage ids and lossless decimals, export, restore order, standalone
 investment_transactions.csv import with instrument mapping and undated lots, emptiness checks, extended round-trip test.
+```
+
+---
+
+## F6.11 Risk tiers and target allocation
+
+Owner decision (2026-10): investments are grouped into three risk tiers so users can see whether the portfolio matches their chosen risk mix.
+
+| Tier | Name (en / pl) | Typical content |
+|---|---|---|
+| `safe` | Safe / Bezpieczne | bonds, gold and other metals, deposits |
+| `growth` | Growth / Wzrostowe | broad ETFs, currencies, funds |
+| `speculative` | Speculative / Spekulacyjne (subtitle "Play money" / "Na zabawę") | crypto, single-company stocks |
+
+**Acceptance**
+- Each asset class has an optional `risk_tier`; an instrument can override it (`risk_tier_override`), e.g. an S&P 500 ETF in the Stocks class stays `growth` while a single company's shares are set to `speculative`. Value flows to tiers through the existing `InstrumentAllocation` look-through (an 80/20 stock/bond fund contributes 80% to the Stocks class's tier and 20% to the Bonds class's tier, unless the instrument has an override, which then takes all of its value). Classes without a tier (non-investable, Other) are shown as "Unassigned" and excluded from the tier percentages.
+- Target policy per workspace (`RiskTargetPolicy`), editors/owners only:
+  - `fixed` (**default**): user-entered targets, default **50 / 40 / 10** (safe / growth / speculative); must sum to 100%.
+  - `age_scaled` (owner's rule): speculative = fixed X% (default 10%); safe = (100% − X) × age ÷ life expectancy; growth = the rest. Example: X = 10%, age 40, life expectancy 80 → 45 / 45 / 10. At or beyond life expectancy safe is capped at 100% − X.
+  - `age_in_bonds` (classic preset): safe = age%, speculative = fixed X% (default 0%, editable), growth = the rest; safe capped at 100% − X.
+  - Age and life expectancy come from the **current user's profile**: `birth_year` (optional) and `life_expectancy` (default **90**, range 50–120). Age-based modes are disabled with an explanation until the user sets a birth year. Age = current year (from the injected Clock) − birth year. Both profile fields are added here if M8 has not added them yet; M8's `horizon_age` defaults to the profile's `life_expectancy`.
+  - Percentages are stored as basis points; age-based targets are computed (not stored) and rounded half-up to whole basis points once, with the rounding remainder put on `growth` so targets always total exactly 10 000.
+- Portfolio page section "Risk balance": per tier the current value, current %, target %, the difference in percentage points and in money (base currency), and a plain-language hint ("move about €X from Growth to Safe") for the largest gap. A tier is flagged when |current − target| > tolerance (default **5 percentage points**, editable). Tier names and the speculative subtitle are translatable; users can't rename tiers in this feature (follow-up).
+- Pure domain functions: `risk_targets(policy, age, life_expectancy) -> dict[tier, bp]` and `risk_balance(class_values, tiers, overrides, targets, tolerance)`. Golden tests: the 45/45/10 example above; 50/40/10 fixed; age_in_bonds at age 35 with X = 10 → 35/55/10; capping at age ≥ life expectancy. Property tests: targets always sum to 10 000; current tier percentages sum to 10 000 when any tier has value; monotonic: an older age never lowers `safe`.
+- Not investment advice: the section shows the same "illustrative, not advice" notice as the FIRE planner.
+
+**Agent prompt**
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F6.11 from docs/specs/M6-investments.md: risk_tier on AssetClass (+ seeds), risk_tier_override on Instrument,
+RiskTargetPolicy + migration, profile birth_year/life_expectancy if missing, pure risk_targets()/risk_balance() with golden and
+property tests, the policy editor and the "Risk balance" section on the portfolio page (en/pl, tenant isolation, editors only for writes).
 ```
 
 ---

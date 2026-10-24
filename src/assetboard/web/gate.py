@@ -43,11 +43,26 @@ from assetboard.web.security import (
 UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 ALWAYS_OPEN = frozenset({"/healthz", "/readyz"})
 SIGNED_OUT_PATHS = frozenset(
-    {"/login", "/register", "/setup", "/login/link", "/login/local", "/auth/proxy"}
+    {
+        "/login",
+        "/register",
+        "/setup",
+        "/login/link",
+        "/login/local",
+        "/auth/proxy",
+        "/password/forgot",
+    }
 )
 # Invitation links work signed out: the invitee may still need to create an account. OIDC
 # sign-in (start, callback and its failure pages) happens before there is a session.
-SIGNED_OUT_PREFIXES = ("/invite/", "/auth/oidc/", "/auth/proxy/")
+# Registration and password reset links from email (ADR-0017) work signed out too.
+SIGNED_OUT_PREFIXES = (
+    "/invite/",
+    "/auth/oidc/",
+    "/auth/proxy/",
+    "/register/complete/",
+    "/password/reset/",
+)
 SAFE_NAVIGATION = frozenset({"GET", "HEAD"})
 # What a password session with a temporary password may still reach (static files and the health
 # endpoints are always open).

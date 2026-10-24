@@ -124,6 +124,24 @@ msgstr "Wypłata z oszczędności"
 msgid "Enter a valid amount."
 msgstr "Podaj prawidłową kwotę."
 
+msgid "Recurring item created"
+msgstr "Utworzono pozycję cykliczną"
+
+msgid "Recurring item updated"
+msgstr "Zaktualizowano pozycję cykliczną"
+
+msgid "Recurring item paused"
+msgstr "Wstrzymano pozycję cykliczną"
+
+msgid "Recurring item resumed"
+msgstr "Wznowiono pozycję cykliczną"
+
+msgid "Recurring item archived"
+msgstr "Zarchiwizowano pozycję cykliczną"
+
+msgid "Recurring item deleted"
+msgstr "Usunięto pozycję cykliczną"
+
 msgid "First administrator created at setup"
 msgstr "Pierwszy administrator utworzony podczas konfiguracji"
 
@@ -147,6 +165,12 @@ msgstr "Zarejestrowano konto"
 
 msgid "Password changed"
 msgstr "Zmieniono hasło"
+
+msgid "Password reset link sent"
+msgstr "Wysłano link do resetu hasła"
+
+msgid "Password reset by email"
+msgstr "Hasło zresetowane przez e-mail"
 
 msgid "Password confirmation failed"
 msgstr "Nieudane potwierdzenie hasłem"
@@ -346,6 +370,9 @@ msgstr "Liczba"
 msgid "Every signed-in user can create workspaces"
 msgstr "Każdy zalogowany użytkownik może tworzyć obszary robocze"
 
+msgid "Open registration"
+msgstr "Otwarta rejestracja"
+
 msgid "Month"
 msgstr "Miesiąc"
 
@@ -471,6 +498,9 @@ msgstr "profil"
 
 msgid "an invitation"
 msgstr "zaproszenie"
+
+msgid "a confirmed email address"
+msgstr "potwierdzony adres e-mail"
 
 msgid "an invitation, through the identity provider"
 msgstr "zaproszenie, przez dostawcę tożsamości"
@@ -603,6 +633,26 @@ msgstr "Administracja kontami"
 
 msgid "Instance settings"
 msgstr "Ustawienia instancji"
+
+#, python-format
+msgid "Confirm your email address for %(app)s"
+msgstr "Potwierdź adres e-mail w %(app)s"
+
+#, python-format
+msgid "You already have an account at %(app)s"
+msgstr "Masz już konto w %(app)s"
+
+#, python-format
+msgid "Reset your %(app)s password"
+msgstr "Zresetuj hasło do %(app)s"
+
+#, python-format
+msgid "About your %(app)s password"
+msgstr "W sprawie hasła do %(app)s"
+
+#, python-format
+msgid "Test email from %(app)s"
+msgstr "Testowy e-mail z %(app)s"
 
 msgid "Same as the system"
 msgstr "Jak w systemie"
@@ -742,8 +792,20 @@ msgstr "Zapisano ustawienia instancji."
 msgid "Nothing to change: the settings already had these values."
 msgstr "Nie ma nic do zmiany: ustawienia mają już te wartości."
 
-msgid "Choose who can create workspaces."
-msgstr "Wybierz, kto może tworzyć obszary robocze."
+msgid "Open registration needs an email server: set ASSETBOARD_SMTP_HOST first."
+msgstr ""
+"Otwarta rejestracja wymaga serwera poczty: najpierw ustaw "
+"ASSETBOARD_SMTP_HOST."
+
+msgid ""
+"Open registration is not available while only the identity provider signs"
+" people in (ASSETBOARD_OIDC_ONLY)."
+msgstr ""
+"Otwarta rejestracja jest niedostępna, gdy logowanie odbywa się wyłącznie "
+"przez dostawcę tożsamości (ASSETBOARD_OIDC_ONLY)."
+
+msgid "Choose a value for each setting."
+msgstr "Wybierz wartość każdego ustawienia."
 
 msgid "Enter a valid email address."
 msgstr "Podaj prawidłowy adres e-mail."
@@ -820,12 +882,6 @@ msgstr ""
 
 msgid "Setup in progress"
 msgstr "Konfiguracja w toku"
-
-msgid "Too many registration attempts from your network. Try again later."
-msgstr "Zbyt wiele prób rejestracji z Twojej sieci. Spróbuj ponownie później."
-
-msgid "This email address cannot be registered."
-msgstr "Nie można zarejestrować tego adresu e-mail."
 
 msgid ""
 "This account has no password: it signs in with your identity provider. An"
@@ -914,6 +970,50 @@ msgstr ""
 "Zaloguj się ponownie, aby potwierdzić tę zmianę: bez hasła wymaga ona "
 "logowania z ostatnich 10 minut."
 
+msgid "Check your inbox"
+msgstr "Sprawdź skrzynkę pocztową"
+
+msgid ""
+"If this address can be registered, we sent it a link to finish creating "
+"your account. The link works for 24 hours. Nothing arrived? Check your "
+"spam folder, or ask again later."
+msgstr ""
+"Jeśli ten adres można zarejestrować, wysłaliśmy na niego link do "
+"dokończenia zakładania konta. Link działa przez 24 godziny. Nic nie "
+"przyszło? Sprawdź folder ze spamem albo poproś ponownie później."
+
+msgid ""
+"If an account uses this address, we sent it an email with the next step. "
+"A password reset link works for 60 minutes. Nothing arrived? Check your "
+"spam folder, or ask again later."
+msgstr ""
+"Jeśli jakieś konto używa tego adresu, wysłaliśmy na niego e-mail z "
+"dalszymi krokami. Link do resetu hasła działa przez 60 minut. Nic nie "
+"przyszło? Sprawdź folder ze spamem albo poproś ponownie później."
+
+msgid "Link not valid"
+msgstr "Link jest nieważny"
+
+msgid ""
+"This link is not valid: it may have expired or been used already. Ask for"
+" a new one."
+msgstr ""
+"Ten link jest nieważny: mógł wygasnąć albo zostać już użyty. Poproś o "
+"nowy."
+
+msgid ""
+"Your password was changed, and every device signed in to this account was"
+" signed out. Sign in with the new password."
+msgstr ""
+"Hasło zostało zmienione, a wszystkie urządzenia zalogowane na to konto "
+"zostały wylogowane. Zaloguj się nowym hasłem."
+
+msgid "Too many registration attempts from your network. Try again later."
+msgstr "Zbyt wiele prób rejestracji z Twojej sieci. Spróbuj ponownie później."
+
+msgid "Too many requests from your network. Try again later."
+msgstr "Zbyt wiele żądań z Twojej sieci. Spróbuj ponownie później."
+
 msgid "This request came from another site and was blocked."
 msgstr "To żądanie pochodziło z innej witryny i zostało zablokowane."
 
@@ -984,6 +1084,9 @@ msgstr "Edytor"
 
 msgid "Viewer"
 msgstr "Przeglądający"
+
+msgid "This email address cannot be registered."
+msgstr "Nie można zarejestrować tego adresu e-mail."
 
 msgid ""
 "Enter a day of the month (1-31) or a date such as 2026-10-07 or "
@@ -1227,6 +1330,81 @@ msgstr ""
 "skonfigurowanym adresem (%(base_url)s), zezwól na pliki cookie dla niej i"
 " spróbuj ponownie."
 
+msgid "Enter a name."
+msgstr "Podaj nazwę."
+
+msgid "Choose an active category matching the direction."
+msgstr "Wybierz aktywną kategorię zgodną z kierunkiem."
+
+msgid "Enter a positive amount in the workspace currency."
+msgstr "Podaj dodatnią kwotę w walucie obszaru roboczego."
+
+msgid "Enter a valid start date."
+msgstr "Podaj prawidłową datę początkową."
+
+msgid "Enter an end date on or after the start date, or leave it empty."
+msgstr ""
+"Podaj datę końcową nie wcześniejszą niż początkowa albo pozostaw pole "
+"puste."
+
+msgid "Enter a whole number of 1 or more, or leave it empty."
+msgstr "Podaj liczbę całkowitą równą co najmniej 1 albo pozostaw pole puste."
+
+msgid "Enter a whole number of 1 or more."
+msgstr "Podaj liczbę całkowitą równą co najmniej 1."
+
+msgid "Choose at least one weekday for a weekly rule."
+msgstr "Wybierz co najmniej jeden dzień tygodnia dla reguły tygodniowej."
+
+msgid "This day does not exist in the chosen month."
+msgstr "Ten dzień nie istnieje w wybranym miesiącu."
+
+msgid "Choose a month."
+msgstr "Wybierz miesiąc."
+
+msgid ""
+"Holiday adjustments need a workspace country with holiday data, or no "
+"country."
+msgstr ""
+"Przesuwanie dat o święta wymaga kraju obszaru roboczego z danymi o "
+"świętach albo braku kraju."
+
+msgid "This recurring item is archived and cannot change."
+msgstr "Ta pozycja cykliczna jest zarchiwizowana i nie można jej zmienić."
+
+msgid ""
+"This item adjusts dates to working days, and the workspace country has no"
+" holiday data."
+msgstr ""
+"Ta pozycja przesuwa daty na dni robocze, a dla kraju obszaru roboczego "
+"brak danych o świętach."
+
+msgid "The recurring item could not be saved. Check the form and try again."
+msgstr ""
+"Nie udało się zapisać pozycji cyklicznej. Sprawdź formularz i spróbuj "
+"ponownie."
+
+msgid "Monday"
+msgstr "Poniedziałek"
+
+msgid "Tuesday"
+msgstr "Wtorek"
+
+msgid "Wednesday"
+msgstr "Środa"
+
+msgid "Thursday"
+msgstr "Czwartek"
+
+msgid "Friday"
+msgstr "Piątek"
+
+msgid "Saturday"
+msgstr "Sobota"
+
+msgid "Sunday"
+msgstr "Niedziela"
+
 msgid "Too many attempts. Try again later."
 msgstr "Zbyt wiele prób. Spróbuj ponownie później."
 
@@ -1346,6 +1524,15 @@ msgstr "Waluty bazowej nie można zmienić: są już w niej zapisane kwoty."
 
 msgid "Choose a country from the list."
 msgstr "Wybierz kraj z listy."
+
+msgid ""
+"Holiday data is not available for this country, and recurring items "
+"adjust dates to working days. Change those items to keep their dates, or "
+"choose another country."
+msgstr ""
+"Dla tego kraju brak danych o świętach, a pozycje cykliczne przesuwają "
+"daty na dni robocze. Zmień te pozycje, aby zachować ich daty, albo "
+"wybierz inny kraj."
 
 msgid "Choose a time zone from the list."
 msgstr "Wybierz strefę czasową z listy."
@@ -1582,6 +1769,27 @@ msgstr ""
 "otwartej rejestracji ani kont tworzonych przy pierwszym logowaniu przez "
 "dostawcę tożsamości lub serwer proxy: te mają własne ustawienia."
 
+msgid "Registration"
+msgstr "Rejestracja"
+
+msgid "Off: accounts come from invitations, administrators or sign-in providers"
+msgstr ""
+"Wyłączona: konta powstają z zaproszeń, przez administratorów lub "
+"dostawców logowania"
+
+msgid "On: anyone can register with a verified email address"
+msgstr "Włączona: każdy może się zarejestrować z potwierdzonym adresem e-mail"
+
+msgid ""
+"A new account must confirm its email address through a link before it is "
+"created, and gets its own workspace."
+msgstr ""
+"Nowe konto musi potwierdzić adres e-mail linkiem, zanim zostanie "
+"utworzone, i dostaje własny obszar roboczy."
+
+msgid "Registration stays closed until this is fixed."
+msgstr "Rejestracja pozostaje zamknięta, dopóki to nie zostanie naprawione."
+
 msgid "Save settings"
 msgstr "Zapisz ustawienia"
 
@@ -1726,6 +1934,23 @@ msgstr "Najnowsze"
 msgid "Older"
 msgstr "Starsze"
 
+msgid "Sign in"
+msgstr "Zaloguj się"
+
+msgid "Back to sign in"
+msgstr "Wróć do logowania"
+
+msgid "Forgot your password?"
+msgstr "Nie pamiętasz hasła?"
+
+msgid ""
+"Enter the email address of your account. We will send you a link to "
+"choose a new password."
+msgstr "Podaj adres e-mail swojego konta. Wyślemy link do ustawienia nowego hasła."
+
+msgid "Send the link"
+msgstr "Wyślij link"
+
 msgid "Link your account"
 msgstr "Połącz swoje konto"
 
@@ -1745,9 +1970,6 @@ msgstr "Spowoduje to wylogowanie konta na wszystkich innych urządzeniach."
 
 msgid "Link and sign in"
 msgstr "Połącz i zaloguj się"
-
-msgid "Sign in"
-msgstr "Zaloguj się"
 
 #, python-format
 msgid "Continue as %(user)s"
@@ -1809,11 +2031,28 @@ msgstr "Wyloguj się wszędzie poza tym urządzeniem."
 msgid "Sign out other devices"
 msgstr "Wyloguj inne urządzenia"
 
-msgid "Workspace name"
-msgstr "Nazwa obszaru roboczego"
+msgid ""
+"Enter your email address. We will send you a link to confirm it and "
+"finish creating your account."
+msgstr ""
+"Podaj swój adres e-mail. Wyślemy link, którym go potwierdzisz i "
+"dokończysz zakładanie konta."
 
 msgid "Already have an account?"
 msgstr "Masz już konto?"
+
+#, python-format
+msgid "Your email address %(email)s is confirmed. Choose your name and password."
+msgstr "Adres e-mail %(email)s jest potwierdzony. Wybierz nazwę i hasło."
+
+msgid "Workspace name"
+msgstr "Nazwa obszaru roboczego"
+
+msgid "Choose a new password"
+msgstr "Ustaw nowe hasło"
+
+msgid "Every device signed in to this account will be signed out."
+msgstr "Wszystkie urządzenia zalogowane na to konto zostaną wylogowane."
 
 msgid "First-run setup"
 msgstr "Konfiguracja początkowa"
@@ -1931,6 +2170,78 @@ msgstr "Usunąć kategorię %(name)s?"
 
 msgid "Delete"
 msgstr "Usuń"
+
+msgid "Hello,"
+msgstr "Dzień dobry,"
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to reset the password of your %(app)s "
+"account. To choose a new password, open this link:"
+msgstr ""
+"Ktoś, miejmy nadzieję, że Ty, poprosił o reset hasła do Twojego konta w "
+"%(app)s. Aby ustawić nowe hasło, otwórz ten link:"
+
+msgid ""
+"The link works once, for 60 minutes. Choosing a new password signs out "
+"every device signed in to your account."
+msgstr ""
+"Link działa raz, przez 60 minut. Ustawienie nowego hasła wyloguje "
+"wszystkie urządzenia zalogowane na Twoje konto."
+
+msgid ""
+"If you did not ask for this, ignore this email: your password stays the "
+"same."
+msgstr "Jeśli to nie Ty, zignoruj tę wiadomość: hasło pozostanie bez zmian."
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to reset the password of your %(app)s "
+"account. Your account has no password: you sign in through your identity "
+"provider or your proxy, so there is nothing to reset here."
+msgstr ""
+"Ktoś, miejmy nadzieję, że Ty, poprosił o reset hasła do Twojego konta w "
+"%(app)s. Twoje konto nie ma hasła: logujesz się przez dostawcę tożsamości"
+" albo serwer proxy, więc nie ma tu czego resetować."
+
+msgid "Sign in:"
+msgstr "Zaloguj się:"
+
+msgid "If you did not ask for this, ignore this email: nothing was changed."
+msgstr "Jeśli to nie Ty, zignoruj tę wiadomość: nic nie zostało zmienione."
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to create an account at %(app)s with this "
+"email address. An account with this address already exists, so no new one"
+" was created."
+msgstr ""
+"Ktoś, miejmy nadzieję, że Ty, poprosił o założenie konta w %(app)s z tym "
+"adresem e-mail. Konto z tym adresem już istnieje, więc nowe nie zostało "
+"utworzone."
+
+msgid "Forgot your password? Ask for a new one here:"
+msgstr "Nie pamiętasz hasła? Poproś o nowe tutaj:"
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to create an account at %(app)s with this "
+"email address. To confirm the address and finish creating your account, "
+"open this link:"
+msgstr ""
+"Ktoś, miejmy nadzieję, że Ty, poprosił o założenie konta w %(app)s z tym "
+"adresem e-mail. Aby potwierdzić adres i dokończyć zakładanie konta, "
+"otwórz ten link:"
+
+msgid "The link works once, for 24 hours."
+msgstr "Link działa raz, przez 24 godziny."
+
+msgid "If you did not ask for this, ignore this email: no account is created."
+msgstr "Jeśli to nie Ty, zignoruj tę wiadomość: konto nie zostanie utworzone."
+
+#, python-format
+msgid "This is a test email from %(app)s. Your email settings work."
+msgstr "To testowy e-mail z %(app)s. Ustawienia poczty działają."
 
 msgid "Dismiss"
 msgstr "Zamknij"
@@ -2232,6 +2543,162 @@ msgstr "Zamknięcie chroni miesiąc przed przypadkowymi zmianami."
 msgid "Future months stay open for planning."
 msgstr "Przyszłe miesiące pozostają otwarte do planowania."
 
+msgid "Recurring item"
+msgstr "Pozycja cykliczna"
+
+msgid "Edit recurring item"
+msgstr "Edytuj pozycję cykliczną"
+
+msgid "New recurring item"
+msgstr "Nowa pozycja cykliczna"
+
+msgid "Check the highlighted field."
+msgstr "Sprawdź wyróżnione pole."
+
+#, python-format
+msgid ""
+"The category %(name)s is archived, so this item creates no new dates. "
+"Choose an active category to save it."
+msgstr ""
+"Kategoria %(name)s jest zarchiwizowana, więc ta pozycja nie tworzy nowych"
+" terminów. Wybierz aktywną kategorię, aby ją zapisać."
+
+msgid "Amount type"
+msgstr "Rodzaj kwoty"
+
+msgid "Fixed"
+msgstr "Stała"
+
+msgid "Estimate"
+msgstr "Szacunkowa"
+
+msgid "Start date"
+msgstr "Data początkowa"
+
+msgid "End date (optional)"
+msgstr "Data końcowa (opcjonalnie)"
+
+msgid "Maximum occurrences (optional)"
+msgstr "Maksymalna liczba wystąpień (opcjonalnie)"
+
+msgid "Repeat"
+msgstr "Powtarzanie"
+
+msgid "Weekly"
+msgstr "Co tydzień"
+
+msgid "Monthly"
+msgstr "Co miesiąc"
+
+msgid "Yearly"
+msgstr "Co rok"
+
+msgid "Every N weeks, months or years"
+msgstr "Co ile tygodni, miesięcy lub lat"
+
+msgid "Weekdays (weekly rules)"
+msgstr "Dni tygodnia (reguły tygodniowe)"
+
+msgid "Day (monthly or yearly rules)"
+msgstr "Dzień (reguły miesięczne lub roczne)"
+
+msgid "Last day"
+msgstr "Ostatni dzień"
+
+msgid "First working day"
+msgstr "Pierwszy dzień roboczy"
+
+msgid "Last working day"
+msgstr "Ostatni dzień roboczy"
+
+msgid "Month number (yearly rules)"
+msgstr "Numer miesiąca (reguły roczne)"
+
+msgid "Weekend and holiday adjustment"
+msgstr "Przesunięcie na wypadek weekendu lub święta"
+
+msgid "Keep the date"
+msgstr "Zachowaj datę"
+
+msgid "Previous working day"
+msgstr "Poprzedni dzień roboczy"
+
+msgid "Next working day"
+msgstr "Następny dzień roboczy"
+
+msgid "Notes"
+msgstr "Notatki"
+
+msgid "Include past occurrences"
+msgstr "Uwzględnij przeszłe wystąpienia"
+
+msgid ""
+"Saving a rule creates planned occurrences, never transactions. Edits "
+"replace only pending dates from today onward."
+msgstr ""
+"Zapisanie reguły tworzy planowane wystąpienia, a nie transakcje. Edycja "
+"zastępuje tylko oczekujące wystąpienia od dzisiaj."
+
+msgid "Save recurring item"
+msgstr "Zapisz pozycję cykliczną"
+
+msgid "Next six due dates"
+msgstr "Sześć najbliższych terminów"
+
+msgid ""
+"Enable JavaScript for the live preview. You can still save this form "
+"without it."
+msgstr ""
+"Włącz JavaScript, aby zobaczyć podgląd na żywo. Bez niego nadal możesz "
+"zapisać formularz."
+
+msgid "Recurring items"
+msgstr "Pozycje cykliczne"
+
+msgid "Archived"
+msgstr "Zarchiwizowana"
+
+msgid "Paused"
+msgstr "Wstrzymana"
+
+msgid "Edit rule"
+msgstr "Edytuj regułę"
+
+msgid "Resume"
+msgstr "Wznów"
+
+msgid "Pause"
+msgstr "Wstrzymaj"
+
+#, python-format
+msgid ""
+"Delete the recurring item %(name)s? Its pending dates are removed; with "
+"posted or skipped history it is archived instead."
+msgstr ""
+"Usunąć pozycję cykliczną %(name)s? Jej oczekujące terminy zostaną "
+"usunięte; jeśli ma historię zaksięgowanych lub pominiętych terminów, "
+"zostanie zarchiwizowana."
+
+msgid "No recurring items yet."
+msgstr "Nie ma jeszcze pozycji cyklicznych."
+
+msgid ""
+"Pausing removes pending dates from today onward. Archiving or deleting "
+"removes all pending dates; posted and skipped dates are history and are "
+"kept, so deleting an item with history archives it instead. Dates in "
+"closed months never change."
+msgstr ""
+"Wstrzymanie usuwa oczekujące terminy od dzisiaj. Archiwizacja lub "
+"usunięcie usuwa wszystkie oczekujące terminy; zaksięgowane i pominięte "
+"terminy są historią i zostają, więc usunięcie pozycji z historią ją "
+"archiwizuje. Terminy w zamkniętych miesiącach nigdy się nie zmieniają."
+
+msgid "Choose valid recurrence dates to see the preview."
+msgstr "Wybierz prawidłowe daty powtarzania, aby zobaczyć podgląd."
+
+msgid "No more occurrences match this rule."
+msgstr "Brak kolejnych wystąpień pasujących do tej reguły."
+
 msgid "Filters"
 msgstr "Filtry"
 
@@ -2493,11 +2960,11 @@ msgid "General"
 msgstr "Ogólne"
 
 msgid ""
-"Locked: transactions (deleted ones included) or planned values exist, and"
-" their amounts are stored in this currency."
+"Locked: transactions (deleted ones included) or planned values or "
+"recurring items exist, and their amounts are stored in this currency."
 msgstr ""
-"Zablokowana: istnieją transakcje (także usunięte) lub wartości planowane,"
-" a ich kwoty są zapisane w tej walucie."
+"Zablokowana: istnieją transakcje (również usunięte), wartości planowane "
+"lub pozycje cykliczne, a ich kwoty są zapisane w tej walucie."
 
 msgid "Formatting default"
 msgstr "Domyślne formatowanie"
@@ -2573,4 +3040,7 @@ msgstr ""
 
 #~ msgid "Plan"
 #~ msgstr "Plan"
+
+#~ msgid "Choose who can create workspaces."
+#~ msgstr "Wybierz, kto może tworzyć obszary robocze."
 

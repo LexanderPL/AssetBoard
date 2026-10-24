@@ -38,6 +38,30 @@ Implementation order: F3.1 → F3.2 → F3.3 → F3.4 → F3.5 → F3.6 → (F3.
 - Rule edit → delete and regenerate **pending future** occurrences only.
 - APScheduler job runs the generator daily at 03:00 workspace time and on every rule change.
 
+**F3.1 implementation details**
+- Scheduled dates use the existing 1900–2199 range. Start/end are inclusive nominal-date limits;
+  query windows are inclusive effective-date limits. Weekly intervals start on Monday. Maximum
+  count applies before shifting; shifted duplicates merge. Holiday adjustments may cross the
+  nominal start/end boundary.
+- No workspace country means weekends only. National/observed holidays are used without a
+  subdivision. Unsupported countries are refused only for working-day rules; changing the
+  workspace country to one without holiday data is refused while working-day items exist.
+  A country change regenerates working-day items immediately.
+- The horizon is today through today plus `RECURRENCE_HORIZON_MONTHS` calendar months (default
+  13), inclusive. Backfill is an explicit creation option. Edits never backfill past dates.
+- Every generator run reconciles pending rows from today onward with the current rule and
+  calendar (stale pending rows are deleted), so calendar changes never duplicate.
+- Pause removes pending dates from today onward; archive/delete remove all pending dates;
+  resume generates forward. History is posted/skipped rows only. Delete physically removes an
+  item only without remaining history, otherwise archives it.
+- Rows in closed months (F2.5) are never created, deleted or changed by any of the above.
+- Items whose category is archived generate nothing; their pending rows from today onward are
+  removed on the next run.
+- Fields needed by F3.2/F3.4/F3.6 (posting, income/tax links and reminders) are added with those
+  features. F3.1 persists only rule-generated occurrences, with no transaction side effects.
+- Startup catches up the forward horizon; job definitions reconcile new workspaces/time-zone
+  changes every minute. See [user guide](../recurring.md) and [ADR-0018](../adr/0018-recurring-items.md).
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
