@@ -958,7 +958,7 @@ def _mail_settings() -> Settings:
 
 def _link_token(factory: sessionmaker[Session], settings: Settings, request: object) -> str:
     assert isinstance(request, MailRequest)
-    job = resolve_mail_request(factory, settings, CLOCK, request)
+    job = resolve_mail_request(factory, settings, CLOCK, request, log_key=b"test-key")
     assert job is not None
     return job.params["link"].rsplit("/", 1)[1]
 
@@ -968,7 +968,13 @@ def test_two_parallel_resets_with_one_link_set_one_password(database: Connect) -
     settings = _mail_settings()
     _setup_admin(factory, settings)
     outcome = request_password_reset(
-        factory, email="admin@example.com", settings=settings, clock=CLOCK, host=None, locale="en"
+        factory,
+        email="admin@example.com",
+        settings=settings,
+        clock=CLOCK,
+        host=None,
+        locale="en",
+        log_key=b"test-key",
     )
     token = _link_token(factory, settings, outcome.request)
     statuses: list[str] = []
@@ -1006,7 +1012,13 @@ def test_two_parallel_completions_of_one_registration_link_create_one_account(
         assert row is not None
         row.allow_registration = True
     outcome = start_registration(
-        factory, email="new@example.com", settings=settings, clock=CLOCK, host=None, locale="en"
+        factory,
+        email="new@example.com",
+        settings=settings,
+        clock=CLOCK,
+        host=None,
+        locale="en",
+        log_key=b"test-key",
     )
     token = _link_token(factory, settings, outcome.request)
     statuses: list[str] = []

@@ -559,6 +559,7 @@ def test_services_run_the_same_statements_for_every_kind_of_address(web: WebHarn
                         clock=clock,
                         host=f"198.51.100.{index + 1}",
                         locale="en",
+                        log_key=app.state.mail_log_key,
                     )
                 assert outcome.status == "accepted" and outcome.request is not None
                 shapes.append(seen)
@@ -604,7 +605,9 @@ def test_header_special_addresses_are_refused_and_nothing_is_sent(
 ) -> None:
     app, client = mail
     assert _start(client, web, address).status_code == 400
-    assert _forgot(client, web, address).status_code == 400
+    # The forgot form looks addresses up leniently (old accounts can recover) and answers as
+    # usual; no account has these addresses, so nothing is sent.
+    assert _forgot(client, web, address).status_code in {200, 400}
     assert web.sent_mail(app) == []
 
 
@@ -630,7 +633,7 @@ def test_a_reached_address_limit_is_logged_with_a_keyed_hash(
             _forgot(client, web, web.admin_email)
     finally:
         service_logger.removeHandler(caplog.handler)
-    tag = account_email.address_tag(app.state.settings, web.admin_email)
+    tag = account_email.address_tag(app.state.mail_log_key, web.admin_email)
     assert f"mail_address_limit address={tag}" in caplog.text
     assert web.admin_email not in caplog.text and len(tag) == 16
 
@@ -717,3 +720,35 @@ def test_unencrypted_smtp_to_another_host_is_warned_at_startup(
     web.mail_app(smtp_security="none")
     web.mail_app(smtp_security="none", smtp_host="127.0.0.1")
     assert sum("SMTP_SECURITY=none" in message for message in records) == 1
+
+
+def test_the_log_key_comes_from_the_ensured_secret_key(web: WebHarness) -> None:
+    generated = web.mail_app(secret_key=None)  # the key file under DATA_DIR, as by default
+    assert generated.state.mail_log_key != web.mail_app(secret_key="another").state.mail_log_key
+    assert generated.state.mail_log_key == web.mail_app(secret_key=None).state.mail_log_key
+
+
+def test_the_reset_request_audit_row_carries_the_requesters_network(
+    mail: tuple[FastAPI, TestClient], web: WebHarness
+) -> None:
+    app, client = mail
+    _forgot(client, web, web.admin_email)
+    web.sent_mail(app)
+    [event] = _events(app, "auth.password_reset_requested")
+    assert event.ip_prefix == auth.client_ip_prefix("192.0.2.150")
+
+
+def test_an_old_address_that_would_not_reach_itself_is_never_mailed(
+    mail: tuple[FastAPI, TestClient], web: WebHarness, caplog: pytest.LogCaptureFixture
+) -> None:
+    app, client = mail
+    _add_user(app, "ola(x)@example.com")  # stored before the stricter rule
+    service_logger = logging.getLogger("assetboard.services.account_email")
+    service_logger.addHandler(caplog.handler)
+    try:
+        assert _forgot(client, web, "ola(x)@example.com").status_code == 200
+        assert web.sent_mail(app) == []
+    finally:
+        service_logger.removeHandler(caplog.handler)
+    assert "mail_skipped reason=address" in caplog.text
+    assert _tokens(app, "reset") == []

@@ -34,22 +34,32 @@ The owner decided (pre-release B):
   `_FROM`, `_TIMEOUT_SECONDS`. Certificates are verified (`ssl.create_default_context()`). A
   password over `none` refuses to start outside `ENV=dev`. No new dependency.
 - Requests never send mail and never look an address up. Registration's first step and the
-  forgot form hand a `MailRequest` (purpose, normalized address, language) to the `MailOutbox`
-  through a Starlette `BackgroundTask`, which runs only after the response body was sent. One
-  worker thread (its own queue, so a stop and a later enqueue never share one) waits a random
-  0.5 to 3 seconds (`secrets.SystemRandom`; tests inject 0), then, in its own `BEGIN
-  IMMEDIATE` transaction with the injected clock, prunes expired links, looks the address up,
-  issues the link and writes the audit row (`resolve_mail_request`), and finally renders and
-  sends. The raw token exists only in that worker's memory and in the mail.
-- A failed job is logged with its kind and the exception class only (never the address, a
-  link, the password or the server's reply) and not retried; a full queue (100) drops the job
-  with a warning; queued jobs are lost when the process stops. The person asks again. A
-  persistent outbox and retries are follow-ups.
-- Addresses: a new address (registration, forgot form, every new account) is refused when it
-  contains whitespace or one of `<>()[],;:"\`, so it is always one plain addr-spec; addresses
-  stored earlier keep working for sign-in. `To` is built with
-  `email.headerregistry.Address(addr_spec=...)` and the SMTP envelope names exactly that one
-  recipient (`send_message(..., to_addrs=[address])`).
+  forgot form hand a `MailRequest` (purpose, normalized address, language and the already
+  truncated network prefix, the same for every address) to the `MailOutbox` through a
+  Starlette `BackgroundTask`, which runs only after the response body was sent. The request
+  becomes due after a random 0.5 to 3 seconds (`secrets.SystemRandom`; tests inject 0). The
+  delay blocks nothing: due jobs wait in a heap, a scheduler thread sleeps on a condition until
+  the earliest is due (new jobs and stop wake it), and a pool of 4 sender threads then, in its
+  own `BEGIN IMMEDIATE` transaction with the injected clock, prunes expired links, looks the
+  address up, issues the link and writes the audit row with the request's network prefix
+  (`resolve_mail_request`), and finally renders and sends. One slow SMTP server holds up only
+  its own job. The raw token exists only in that thread's memory and in the mail.
+- At most 100 jobs are pending (waiting or in flight). Beyond that a job is dropped, and a
+  `mail_dropped count=N reason=queue_full` WARNING, aggregated to one line per minute, tells the
+  administrator. A failed job is logged with its kind and the exception class only (never the
+  address, a link, the password or the server's reply) and not retried. Stopping the outbox
+  (application shutdown) refuses new jobs, drops those not yet due (logged with a count),
+  cancels those not started and waits up to 5 seconds for those in flight, so no thread
+  outlives the database engine; the next startup accepts jobs again. The person asks again for
+  anything lost. A persistent outbox and retries are follow-ups.
+- Addresses: a new address (registration, every new account) is refused when it contains
+  whitespace or one of `<>()[],;:"\`, so it is always one plain addr-spec; addresses stored
+  earlier keep working for sign-in, and the forgot form looks addresses up leniently so their
+  owners can still recover. Mail only goes to the exact stored or verified address: `To` is
+  `email.headerregistry.Address(addr_spec=...)` and must round-trip unchanged (the email
+  package drops comments, so `a(b)@x` would become `a@x`); otherwise the job is skipped and
+  logged (`mail_skipped`, with the address's keyed hash). The SMTP envelope names exactly that
+  one recipient (`send_message(..., to_addrs=[address])`).
 - `Settings` hides input values in validation errors (`hide_input_in_errors`), so the SMTP
   password or the OIDC secret never appear in a startup error or CLI output.
 - Emails are plain text, rendered from `web/templates/email/*.txt` with gettext in the
@@ -121,8 +131,14 @@ with the number of sessions ended. It does not sign anyone in. It is not offered
   the answer stays the same and no mail is sent: it limits mail flooding without a signal. The
   trade-off is a denial of recovery: anyone can use up an address's quota and so delay its
   owner's registration or password reset by up to one window. Each refusal is logged at
-  WARNING (`mail_address_limit`) with a 16-hex-digit HMAC-SHA-256 of the address under the
-  secret key, so an administrator can see a targeted address without the log holding it.
+  WARNING (`mail_address_limit`) with a 16-hex-digit HMAC-SHA-256 of the address under a
+  subkey derived from the ensured secret key (`SECRET_KEY`, or the key file under `DATA_DIR`),
+  so an administrator can see a targeted address without the log holding it.
+- Residual timing: the request path is identical, but the work it defers is not. The worker's
+  transaction for an existing account writes more (a link, an audit row) and briefly holds the
+  database write lock; a concurrent request could in principle notice that contention. The
+  random delay decorrelates it from the request that caused it, and the volume is bounded by
+  the throttles. The mail itself is observable only by the owner of the mailbox.
 - The client buckets are the requester's own and may say "try later": the existing `register`
   bucket (both registration steps) and `mail_ip` (forgot requests and new passwords set from a
   link, default 10 per 60 minutes). None of them is reset by success.

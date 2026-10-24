@@ -180,6 +180,7 @@ async def register_submit(request: Request, email: FormStr = "") -> Response:
                 clock=state.clock,
                 host=client_host(request),
                 locale=request.state.locale,
+                log_key=state.mail_log_key,
             )
         )
     except RegistrationDisabled as exc:
@@ -366,6 +367,7 @@ async def forgot_submit(request: Request, email: FormStr = "") -> Response:
                 clock=state.clock,
                 host=client_host(request),
                 locale=request.state.locale,
+                log_key=state.mail_log_key,
             )
         )
     except PasswordResetUnavailable as exc:

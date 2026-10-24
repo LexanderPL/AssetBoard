@@ -419,6 +419,7 @@ def _audit(
     host: str | None = None,
     user_agent: str | None = None,
     data: dict[str, str | int | bool] | None = None,
+    ip_prefix: str | None = None,
 ) -> None:
     session.add(
         AuditEvent(
@@ -431,7 +432,8 @@ def _audit(
             entity_id=entity_id,
             data=data or {},
             ts=clock.now(),
-            ip_prefix=client_ip_prefix(host),
+            # An already truncated prefix (from the outbox) wins over ``host``.
+            ip_prefix=ip_prefix or client_ip_prefix(host),
             user_agent=user_agent[:200] if user_agent else None,
         )
     )
@@ -2117,6 +2119,7 @@ def record_auth_event(
     host: str | None = None,
     user_agent: str | None = None,
     data: dict[str, str | int | bool] | None = None,
+    ip_prefix: str | None = None,
     entity_type: str = "user",
 ) -> None:
     """An instance-level event (``workspace_id`` NULL), about a user unless ``entity_type``
@@ -2132,6 +2135,7 @@ def record_auth_event(
         host=host,
         user_agent=user_agent,
         data=data,
+        ip_prefix=ip_prefix,
     )
 
 

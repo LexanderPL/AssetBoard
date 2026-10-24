@@ -12,14 +12,15 @@ the address, a link, the SMTP password or the server's reply.
 
 from __future__ import annotations
 
+import heapq
 import logging
-import queue
 import secrets
 import smtplib
 import ssl
 import threading
 import time
 from collections.abc import Callable, Mapping
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
 from email import policy
 from email.headerregistry import Address
@@ -46,6 +47,8 @@ MailTemplate = Literal[
 ]
 _TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "web" / "templates" / "email"
 OUTBOX_SIZE = 100
+SENDERS = 4
+DROP_WARNING_EVERY = 60.0
 STOP_TIMEOUT_SECONDS = 5.0
 
 
@@ -83,6 +86,9 @@ class MailRequest:
     purpose: Literal["register", "reset"]
     email: str
     locale: str
+    # The requester's network as audit rows store it (IPv4 /24, IPv6 /48), the same for
+    # every address.
+    ip_prefix: str | None = None
 
 
 Resolver = Callable[[MailRequest], "MailJob | None"]
@@ -111,6 +117,23 @@ def _environment(locale: str) -> Environment:
     return environment
 
 
+def recipient_address(address: str) -> Address:
+    """The ``To`` address, only when it is exactly ``address``: the email package drops
+    comments and similar syntax (``a(b)@x`` becomes ``a@x``), which would mail someone else."""
+    parsed = Address(addr_spec=address)
+    if parsed.addr_spec != address:
+        raise ValueError("The address does not round-trip as one plain addr-spec")
+    return parsed
+
+
+def is_deliverable(address: str) -> bool:
+    try:
+        recipient_address(address)
+    except Exception:  # noqa: BLE001 - any parse problem means "do not send"
+        return False
+    return True
+
+
 def render(job: MailJob, settings: Settings, clock: Clock) -> EmailMessage:
     """The message for ``job``, in its locale; every link was built from ``BASE_URL``."""
     if settings.smtp_from is None:
@@ -125,7 +148,7 @@ def render(job: MailJob, settings: Settings, clock: Clock) -> EmailMessage:
     # policy.SMTP refuses line breaks in header values (no header injection).
     message["Subject"] = gettext(SUBJECTS[job.template], locale) % {"app": APP_NAME}
     message["From"] = formataddr((APP_NAME, settings.smtp_from))
-    message["To"] = Address(addr_spec=job.to)
+    message["To"] = recipient_address(job.to)
     message["Date"] = format_datetime(clock.now())
     message["Message-ID"] = make_msgid(domain=settings.smtp_from.rpartition("@")[2])
     message["Auto-Submitted"] = "auto-generated"
@@ -172,15 +195,21 @@ def send_now(job: MailJob, *, mailer: Mailer, settings: Settings, clock: Clock) 
 
 
 class MailOutbox:
-    """A bounded in-memory queue drained by one worker thread, started on first use.
+    """A bounded in-memory outbox: a scheduler thread and a small pool of senders.
 
-    It takes two kinds of jobs. A ``MailJob`` is rendered and sent as it is (``mail-test``
-    style). A ``MailRequest`` (registration or password reset) is everything the request knew:
-    the worker first waits a random 0.5 to 3 seconds, then ``resolver`` does the
-    account-dependent work in its own transaction (lookup, link, audit) and returns the mail to
-    send, if any. So the request itself does the same work for every address (ADR-0017).
+    It takes two kinds of jobs. A ``MailJob`` is rendered and sent as it is. A ``MailRequest``
+    (registration or password reset) is everything the request knew: it becomes due after a
+    random 0.5 to 3 seconds, and only then ``resolver`` does the account-dependent work in its
+    own transaction (lookup, link, audit) and returns the mail to send, if any. So the request
+    itself does the same work for every address (ADR-0017).
 
-    Jobs still queued when the process stops are lost; people ask for a new link.
+    The delay never blocks anything: jobs wait in a heap ordered by due time, and the scheduler
+    sleeps on a condition until the earliest is due (or the outbox stops), then hands it to a
+    pool of ``SENDERS`` threads, so one slow SMTP server holds up only its own job. At most
+    ``maxsize`` jobs are pending (waiting or in flight); beyond that a job is dropped and a
+    warning, aggregated to one line per minute with a count, tells the administrator.
+
+    Jobs still pending when the process stops are lost; people ask for a new link.
     """
 
     def __init__(
@@ -193,6 +222,8 @@ class MailOutbox:
         resolver: Resolver | None = None,
         delay: Callable[[], float] | None = None,
         maxsize: int = OUTBOX_SIZE,
+        senders: int = SENDERS,
+        monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
         self._mailer = mailer
         self._settings = settings
@@ -201,64 +232,131 @@ class MailOutbox:
         self._resolver = resolver
         self._delay = delay or random_delay
         self._maxsize = maxsize
-        self._lock = threading.Lock()
-        # Each worker owns its queue, so a stop and a new enqueue never share one.
-        self._queue: queue.Queue[MailJob | MailRequest | None] = queue.Queue(maxsize=maxsize)
-        self._worker: threading.Thread | None = None
+        self._senders = senders
+        self._monotonic = monotonic
+        self._condition = threading.Condition()
+        self._heap: list[tuple[float, int, MailJob | MailRequest]] = []
+        self._sequence = 0
+        self._pending = 0  # waiting in the heap or in flight
+        self._closed = False
+        self._scheduler: threading.Thread | None = None
+        self._pool: ThreadPoolExecutor | None = None
+        self._in_flight: set[Future[None]] = set()
+        self._dropped = 0
+        self._last_drop_warning: float | None = None
+
+    def start(self) -> None:
+        """Accept jobs again (application startup); threads start on the first job."""
+        with self._condition:
+            self._closed = False
 
     def enqueue(self, job: MailJob | MailRequest) -> bool:
-        """Queue ``job``; False (and a warning) when the queue is full."""
-        with self._lock:
-            if self._worker is None or not self._worker.is_alive():
-                self._queue = queue.Queue(maxsize=self._maxsize)
-                self._worker = threading.Thread(
-                    target=self._run, args=(self._queue,), name="mail-outbox", daemon=True
-                )
-                self._worker.start()
-            try:
-                self._queue.put_nowait(job)
-            except queue.Full:
-                self._logger.warning("mail_dropped kind=%s reason=queue_full", _kind(job))
+        """Schedule ``job``; False when the outbox is stopped or full."""
+        delay = self._delay() if isinstance(job, MailRequest) else 0.0
+        with self._condition:
+            if self._closed:
+                self._logger.warning("mail_dropped kind=%s reason=stopped", _kind(job))
                 return False
+            if self._pending >= self._maxsize:
+                self._note_drop()
+                return False
+            self._ensure_threads()
+            self._sequence += 1
+            heapq.heappush(self._heap, (self._monotonic() + delay, self._sequence, job))
+            self._pending += 1
+            self._condition.notify_all()
         return True
 
-    def join(self) -> None:
-        """Wait until every queued job was handled (tests)."""
-        with self._lock:
-            current = self._queue
-        current.join()
+    def join(self, timeout: float | None = None) -> bool:
+        """Wait until nothing is pending (tests); False if ``timeout`` ran out first."""
+        with self._condition:
+            return self._condition.wait_for(lambda: self._pending == 0, timeout)
 
     def stop(self, timeout: float = STOP_TIMEOUT_SECONDS) -> None:
-        with self._lock:
-            worker, stopping = self._worker, self._queue
-            self._worker = None
-            self._queue = queue.Queue(maxsize=self._maxsize)
-        if worker is None:
-            return
-        try:
-            stopping.put(None, timeout=timeout)
-        except queue.Full:
-            self._logger.warning("mail_outbox_stop_timeout")
-            return
-        worker.join(timeout)
+        """Refuse new jobs, drop those not yet due, wait up to ``timeout`` for those in flight."""
+        with self._condition:
+            self._closed = True
+            not_due = len(self._heap)
+            self._heap.clear()
+            self._pending -= not_due
+            scheduler, self._scheduler = self._scheduler, None
+            pool, self._pool = self._pool, None
+            self._condition.notify_all()
+        if not_due:
+            self._logger.warning("mail_dropped count=%d reason=stopped", not_due)
+        if scheduler is not None:
+            scheduler.join(timeout)
+        if pool is not None:
+            with self._condition:
+                for future in list(self._in_flight):
+                    if future.cancel():  # submitted but not started: it never runs
+                        self._in_flight.discard(future)
+                        self._pending -= 1
+            pool.shutdown(wait=False)
+            with self._condition:
+                if not self._condition.wait_for(lambda: self._pending == 0, timeout):
+                    self._logger.warning("mail_outbox_stop_timeout")
 
-    def _run(self, jobs: queue.Queue[MailJob | MailRequest | None]) -> None:
-        while True:
-            job = jobs.get()
-            try:
-                if job is None:
-                    return
-                self._handle(job)
-            except Exception as exc:  # noqa: BLE001 - one bad mail never stops the worker
-                self._logger.warning(
-                    "mail_send_failed kind=%s error=%s", _kind(job), type(exc).__name__
-                )
-            finally:
-                jobs.task_done()
+    def _ensure_threads(self) -> None:
+        # Called with the condition held, never after stop (no worker on a disposed engine).
+        if self._pool is None:
+            self._pool = ThreadPoolExecutor(self._senders, thread_name_prefix="mail-sender")
+        if self._scheduler is None or not self._scheduler.is_alive():
+            self._scheduler = threading.Thread(
+                target=self._schedule, name="mail-scheduler", daemon=True
+            )
+            self._scheduler.start()
+
+    def _note_drop(self) -> None:
+        self._dropped += 1
+        now = self._monotonic()
+        if self._last_drop_warning is None or now - self._last_drop_warning >= DROP_WARNING_EVERY:
+            self._logger.warning("mail_dropped count=%d reason=queue_full", self._dropped)
+            self._dropped = 0
+            self._last_drop_warning = now
+
+    def _schedule(self) -> None:
+        with self._condition:
+            while not self._closed:
+                if not self._heap:
+                    self._condition.wait()
+                    continue
+                due = self._heap[0][0] - self._monotonic()
+                if due > 0:
+                    self._condition.wait(due)  # woken early by new jobs and by stop
+                    continue
+                _due, _sequence, job = heapq.heappop(self._heap)
+                pool = self._pool
+                if pool is None:
+                    self._pending -= 1
+                    continue
+                try:
+                    future = pool.submit(self._run_one, job)
+                except RuntimeError:  # the pool was shut down meanwhile
+                    self._pending -= 1
+                    continue
+                self._in_flight.add(future)
+                future.add_done_callback(self._forget)
+            self._condition.notify_all()
+
+    def _forget(self, future: Future[None]) -> None:
+        with self._condition:  # an RLock: safe even when called from submit's thread
+            self._in_flight.discard(future)
+
+    def _run_one(self, job: MailJob | MailRequest) -> None:
+        try:
+            self._handle(job)
+        except Exception as exc:  # noqa: BLE001 - one bad mail never stops the others
+            self._logger.warning(
+                "mail_send_failed kind=%s error=%s", _kind(job), type(exc).__name__
+            )
+        finally:
+            with self._condition:
+                self._pending -= 1
+                self._condition.notify_all()
 
     def _handle(self, job: MailJob | MailRequest) -> None:
         if isinstance(job, MailRequest):
-            time.sleep(self._delay())
             if self._resolver is None:
                 raise RuntimeError("No resolver for mail requests")
             resolved = self._resolver(job)

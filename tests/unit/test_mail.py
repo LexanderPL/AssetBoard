@@ -6,6 +6,7 @@ import logging
 import smtplib
 import ssl
 import threading
+import time
 from email.message import EmailMessage
 from pathlib import Path
 from typing import Any
@@ -18,6 +19,7 @@ from assetboard.branding import ENV_PREFIX
 from assetboard.clock import FixedClock
 from assetboard.config import Settings
 from assetboard.domain.identity import InvalidEmail, normalize_email, normalize_new_email
+from assetboard.services.account_email import address_tag
 from assetboard.services.mail import (
     MailJob,
     MailOutbox,
@@ -158,18 +160,32 @@ def test_a_failed_send_logs_only_the_template_and_the_error_class(
         assert secret not in caplog.text
 
 
-def test_a_full_outbox_drops_the_job_with_a_warning(
+def test_drops_from_a_full_outbox_are_warned_once_a_minute_with_a_count(
     tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     mailer = FakeMailer()
     mailer.release = threading.Event()
-    outbox = MailOutbox(mailer, _settings(tmp_path), CLOCK, logging.getLogger("t"), maxsize=1)
+    now = [1000.0]
+    outbox = MailOutbox(
+        mailer,
+        _settings(tmp_path),
+        CLOCK,
+        logging.getLogger("t"),
+        maxsize=1,
+        monotonic=lambda: now[0],
+    )
     job = MailJob("test", "a@example.com", "en")
-    assert outbox.enqueue(job)
-    accepted = [outbox.enqueue(job) for _ in range(3)]  # the worker holds one, the queue one
-    assert False in accepted and "mail_dropped kind=test reason=queue_full" in caplog.text
+    assert outbox.enqueue(job)  # the one pending job (its send blocks)
+    assert [outbox.enqueue(job) for _ in range(3)] == [False, False, False]
+    now[0] += 61
+    assert outbox.enqueue(job) is False
+    drops = [r.getMessage() for r in caplog.records if "mail_dropped" in r.getMessage()]
+    assert drops == [
+        "mail_dropped count=1 reason=queue_full",
+        "mail_dropped count=3 reason=queue_full",
+    ]
     mailer.release.set()
-    outbox.join()
+    assert outbox.join(timeout=5)
     outbox.stop()
 
 
@@ -227,28 +243,100 @@ def test_header_special_addresses_are_refused_for_new_input(address: str) -> Non
 
 def test_requests_wait_a_random_delay_before_any_work(tmp_path: Path) -> None:
     assert all(0.5 <= random_delay() <= 3.0 for _ in range(50))
-    delays: list[str] = []
     resolved: list[MailRequest] = []
 
     def resolver(request: MailRequest) -> MailJob | None:
         resolved.append(request)
-        return MailJob("test", request.email, request.locale) if delays else None
-
-    def delay() -> float:
-        assert len(resolved) == len(delays)  # nothing was looked up before the wait
-        delays.append("waited")
-        return 0.0
+        return MailJob("test", request.email, request.locale)
 
     mailer = FakeMailer()
     outbox = MailOutbox(
-        mailer, _settings(tmp_path), CLOCK, logging.getLogger("t"), resolver=resolver, delay=delay
+        mailer,
+        _settings(tmp_path),
+        CLOCK,
+        logging.getLogger("t"),
+        resolver=resolver,
+        delay=lambda: 0.3,
     )
+    started = time.monotonic()
     outbox.enqueue(MailRequest("reset", "ola@example.com", "en"))
-    outbox.join()
-    assert delays == ["waited"] and mailer.recipients == ["ola@example.com"]
-    # A stop and a new enqueue never lose a job (each worker owns its queue).
+    time.sleep(0.1)
+    assert resolved == []  # nothing was looked up before the delay
+    assert outbox.join(timeout=5)
+    assert time.monotonic() - started >= 0.3
+    assert mailer.recipients == ["ola@example.com"]
     outbox.stop()
-    outbox.enqueue(MailRequest("reset", "bob@example.com", "en"))
-    outbox.join()
+
+
+def test_delays_do_not_block_each_other(tmp_path: Path) -> None:
+    mailer = FakeMailer()
+    outbox = MailOutbox(
+        mailer,
+        _settings(tmp_path),
+        CLOCK,
+        logging.getLogger("t"),
+        resolver=lambda request: MailJob("test", request.email, request.locale),
+        delay=lambda: 0.2,
+    )
+    started = time.monotonic()
+    for index in range(40):
+        assert outbox.enqueue(MailRequest("reset", f"u{index}@example.com", "en"))
+    assert outbox.join(timeout=5)
+    # One blocking delay after another would take 8 seconds.
+    assert time.monotonic() - started < 3
+    assert len(mailer.recipients) == 40
     outbox.stop()
-    assert mailer.recipients == ["ola@example.com", "bob@example.com"]
+
+
+class _SlowForOne(FakeMailer):
+    def send(self, message: EmailMessage, recipient: str) -> None:
+        if recipient == "slow@example.com":
+            assert self.release is not None
+            self.release.wait(10)
+        self.sent.append(message)
+        self.recipients.append(recipient)
+
+
+def test_a_slow_send_does_not_hold_up_the_others(tmp_path: Path) -> None:
+    mailer = _SlowForOne()
+    mailer.release = threading.Event()
+    outbox = MailOutbox(mailer, _settings(tmp_path), CLOCK, logging.getLogger("t"))
+    for address in ("slow@example.com", "a@example.com", "b@example.com", "c@example.com"):
+        outbox.enqueue(MailJob("test", address, "en"))
+    deadline = time.monotonic() + 5
+    while len(mailer.recipients) < 3 and time.monotonic() < deadline:
+        time.sleep(0.01)
+    assert sorted(mailer.recipients) == ["a@example.com", "b@example.com", "c@example.com"]
+    mailer.release.set()
+    assert outbox.join(timeout=5)
+    outbox.stop()
+
+
+def test_stop_refuses_new_jobs_and_does_not_wait_out_a_delay(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    mailer = FakeMailer()
+    outbox = MailOutbox(
+        mailer,
+        _settings(tmp_path),
+        CLOCK,
+        logging.getLogger("t"),
+        resolver=lambda request: MailJob("test", request.email, request.locale),
+        delay=lambda: 30.0,
+    )
+    outbox.enqueue(MailRequest("reset", "late@example.com", "en"))
+    started = time.monotonic()
+    outbox.stop(timeout=2)
+    assert time.monotonic() - started < 1  # the wait was interrupted
+    assert "mail_dropped count=1 reason=stopped" in caplog.text
+    assert outbox.enqueue(MailJob("test", "after@example.com", "en")) is False
+    outbox.start()  # the next application start accepts jobs again
+    assert outbox.enqueue(MailJob("test", "after@example.com", "en"))
+    assert outbox.join(timeout=5)
+    outbox.stop()
+    assert mailer.recipients == ["after@example.com"]
+
+
+def test_the_log_tag_depends_on_the_key() -> None:
+    assert address_tag(b"key-one", "ola@example.com") != address_tag(b"key-two", "ola@example.com")
+    assert address_tag(b"key-one", "ola@example.com") == address_tag(b"key-one", "ola@example.com")

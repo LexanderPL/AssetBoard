@@ -41,7 +41,7 @@ from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.identity import EmailToken, User
-from assetboard.domain.identity import InvalidEmail, normalize_new_email
+from assetboard.domain.identity import InvalidEmail, normalize_email, normalize_new_email
 from assetboard.services.auth import (
     Hasher,
     PasswordPolicyError,
@@ -49,6 +49,7 @@ from assetboard.services.auth import (
     RegistrationOutcome,
     SignUpLinkInvalid,
     argon2_hash,
+    client_ip_prefix,
     count_limited_attempt,
     gate_hasher,
     invalidate_reset_tokens,
@@ -62,7 +63,7 @@ from assetboard.services.auth import (
 )
 from assetboard.services.hash_gate import HashGate
 from assetboard.services.instance_settings import registration_open
-from assetboard.services.mail import MailJob, MailRequest
+from assetboard.services.mail import MailJob, MailRequest, is_deliverable
 
 REGISTER_LINK_TTL = timedelta(hours=24)
 RESET_LINK_TTL = timedelta(minutes=60)
@@ -169,14 +170,15 @@ def _issue_token(
     return token
 
 
-def address_tag(settings: Settings, email: str) -> str:
+def address_tag(key: bytes, email: str) -> str:
     """A short keyed hash of an address for logs: comparable across lines, not reversible
-    without the secret key."""
-    key = (settings.secret_key or "").encode("utf-8")
+    without the key (a subkey of the ensured secret key, ``app.state.mail_log_key``)."""
     return hmac.new(key, email.encode("utf-8"), hashlib.sha256).hexdigest()[:16]
 
 
-def _mail_quota(session: Session, email: str, settings: Settings, now: datetime) -> bool:
+def _mail_quota(
+    session: Session, email: str, settings: Settings, now: datetime, log_key: bytes
+) -> bool:
     """Whether this address may get another mail now; counted the same for every address.
 
     A refusal is silent for the requester but logged for the administrator: anyone can use up
@@ -192,7 +194,7 @@ def _mail_quota(session: Session, email: str, settings: Settings, now: datetime)
         settings=settings,
     )
     if not allowed:
-        logger.warning("mail_address_limit address=%s", address_tag(settings, email))
+        logger.warning("mail_address_limit address=%s", address_tag(log_key, email))
     return allowed
 
 
@@ -212,6 +214,7 @@ def start_registration(
     clock: Clock,
     host: str | None,
     locale: str,
+    log_key: bytes,
 ) -> MailRequestOutcome:
     """Step 1, the same work for every address: validate, check that registration is open,
     count the client and the address. Raises ``RegistrationDisabled`` when open registration
@@ -226,15 +229,21 @@ def start_registration(
             raise RegistrationDisabled
         if not reserve_registration_in(session, host=host, settings=settings, clock=clock):
             return MailRequestOutcome("throttled")
-        if not _mail_quota(session, normalized, settings, clock.now()):
+        if not _mail_quota(session, normalized, settings, clock.now(), log_key):
             return MailRequestOutcome("accepted")
-        return MailRequestOutcome("accepted", MailRequest("register", normalized, locale))
+        request = MailRequest("register", normalized, locale, client_ip_prefix(host))
+        return MailRequestOutcome("accepted", request)
 
     return run_immediate(factory, step)
 
 
 def resolve_mail_request(
-    factory: sessionmaker[Session], settings: Settings, clock: Clock, request: MailRequest
+    factory: sessionmaker[Session],
+    settings: Settings,
+    clock: Clock,
+    request: MailRequest,
+    *,
+    log_key: bytes,
 ) -> MailJob | None:
     """The outbox worker's part, after the response: the account-dependent work in its own
     transaction, and the mail to send (if any)."""
@@ -245,7 +254,7 @@ def resolve_mail_request(
         user = session.scalar(select(User).where(User.email == request.email))
         if request.purpose == "register":
             return _registration_mail(session, settings, request, user, now)
-        return _reset_mail(session, settings, clock, request, user, now)
+        return _reset_mail(session, settings, clock, request, user, now, log_key)
 
     return run_immediate(factory, step)
 
@@ -279,22 +288,31 @@ def _reset_mail(
     request: MailRequest,
     user: User | None,
     now: datetime,
+    log_key: bytes,
 ) -> MailJob | None:
     if user is None or not user.is_active:
+        return None
+    if not is_deliverable(user.email):
+        # An address stored before the stricter rule that would not reach exactly itself.
+        logger.warning("mail_skipped reason=address address=%s", address_tag(log_key, user.email))
         return None
     mail_locale = user.locale or request.locale
     if user.password_hash is None:
         # Signs in through an identity provider or a proxy: no password is ever added here.
         params = {"sign_in_link": _link(settings, "/login")}
-        return MailJob("password_reset_no_password", request.email, mail_locale, params)
+        return MailJob("password_reset_no_password", user.email, mail_locale, params)
     token = _issue_token(
         session, purpose="reset", email=user.email, user_id=user.id, locale=mail_locale, now=now
     )
     record_auth_event(
-        session, clock, action="auth.password_reset_requested", entity_id=str(user.id)
+        session,
+        clock,
+        action="auth.password_reset_requested",
+        entity_id=str(user.id),
+        ip_prefix=request.ip_prefix,
     )
     link = _link(settings, f"/password/reset/{token}")
-    return MailJob("password_reset", request.email, mail_locale, {"link": link})
+    return MailJob("password_reset", user.email, mail_locale, {"link": link})
 
 
 def registration_email(factory: sessionmaker[Session], token: str, clock: Clock) -> str | None:
@@ -385,13 +403,16 @@ def request_password_reset(
     clock: Clock,
     host: str | None,
     locale: str,
+    log_key: bytes,
 ) -> MailRequestOutcome:
     """The same work and outcome for every address: validate, count the client and the
     address. Raises ``PasswordResetUnavailable`` when off."""
     if not password_reset_available(settings):
         raise PasswordResetUnavailable
     try:
-        normalized = normalize_new_email(email)
+        # Lenient on purpose: an address stored before the stricter rule can still recover;
+        # the mail only ever goes to the exact stored address (``is_deliverable``).
+        normalized = normalize_email(email)
     except InvalidEmail:
         return MailRequestOutcome("invalid_email")
 
@@ -408,9 +429,10 @@ def request_password_reset(
         ):
             return MailRequestOutcome("throttled")
         prune_auth_throttles(session, clock)
-        if not _mail_quota(session, normalized, settings, now):
+        if not _mail_quota(session, normalized, settings, now, log_key):
             return MailRequestOutcome("accepted")
-        return MailRequestOutcome("accepted", MailRequest("reset", normalized, locale))
+        request = MailRequest("reset", normalized, locale, client_ip_prefix(host))
+        return MailRequestOutcome("accepted", request)
 
     return run_immediate(factory, step)
 

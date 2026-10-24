@@ -128,6 +128,8 @@ def create_app(
         touch_engine, class_=Session, info={"clock": clock}, expire_on_commit=False
     )
     checker = database_checker or (lambda: database_is_ready(engine))
+    # Keys the address hashes in mail logs (ADR-0017), from the ensured secret key.
+    mail_log_key = derive_subkey(secret_key, "mail-address-log")
     # Outgoing mail (ADR-0017): None without SMTP_HOST; tests pass a fake mailer.
     # Requests hand registration and reset work to the outbox; ``mail_delay`` replaces the
     # random 0.5-3 s wait in tests.
@@ -137,7 +139,9 @@ def create_app(
             settings,
             clock,
             logger,
-            resolver=partial(resolve_mail_request, session_factory, settings, clock),
+            resolver=partial(
+                resolve_mail_request, session_factory, settings, clock, log_key=mail_log_key
+            ),
             delay=mail_delay,
         )
         if settings.mail_enabled
@@ -157,6 +161,8 @@ def create_app(
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         try:
+            if outbox is not None:
+                outbox.start()
             # Decided once per process start; a restart picks up an upgraded database.
             state = schema_state(settings)
             if state == "behind" and settings.auto_migrate:
@@ -217,6 +223,7 @@ def create_app(
     app.state.proxy_audits = RecentKeys()
     app.state.setup_token = None
     app.state.mail_outbox = outbox
+    app.state.mail_log_key = mail_log_key
     app.state.database_checker = checker
     # Added innermost first; see ADR-0012 for the resulting order.
     app.add_middleware(AccessGateMiddleware)
