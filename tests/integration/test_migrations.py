@@ -649,3 +649,68 @@ def test_0013_round_trip_creates_the_instance_settings_row(tmp_path: Path) -> No
         check_database_migrations(settings)
     finally:
         engine.dispose()
+
+
+def test_0017_round_trip_backfills_nominal_dates_and_keeps_occurrences(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'f32.db'}"
+    )
+    upgrade_database(settings)
+    command.downgrade(alembic_config(settings), "0016_f16_totp")
+    engine = create_database_engine(settings.database_url or "")
+    home, rent, item, row = "0" * 31 + "1", "0" * 31 + "c", "0" * 31 + "e", "0" * 31 + "f"
+    stamp = "'2026-01-01 00:00:00'"
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO workspaces (id, name, base_currency, locale, timezone, created_at, "
+                f"updated_at) VALUES (?, 'W', 'EUR', 'en', 'UTC', {stamp}, {stamp})",
+                (home,),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO categories (id, workspace_id, name, name_key, kind, treatment, "
+                "color, sort_order, created_at, updated_at) VALUES (?, ?, 'Rent', 'rent', "
+                f"'expense', 'regular', '#16a34a', 0, {stamp}, {stamp})",
+                (rent, home),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO scheduled_items (id, workspace_id, name, direction, category_id, "
+                "amount_mode, amount_minor, currency, start_date, freq, interval, weekdays, "
+                "month_day, month, weekend_policy, notes, created_at, updated_at) VALUES "
+                "(?, ?, 'Rent', 'expense', ?, 'fixed', 10000, 'EUR', '2026-03-01', 'monthly', "
+                f"1, '[]', '1', 1, 'none', '', {stamp}, {stamp})",
+                (item, home, rent),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO scheduled_occurrences (id, workspace_id, scheduled_item_id, "
+                "direction, category_id, due_date, expected_minor, currency, amount_state, "
+                "status, label, created_at, updated_at) VALUES (?, ?, ?, 'expense', ?, "
+                f"'2026-03-01', 10000, 'EUR', 'confirmed', 'pending', 'Rent', {stamp}, {stamp})",
+                (row, home, item, rent),
+            )
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+        with engine.connect() as connection:
+            migrated = connection.exec_driver_sql(
+                "SELECT nominal_date, due_date, generated_by, transaction_id, rescheduled_at, "
+                "amount_overridden FROM scheduled_occurrences"
+            ).all()
+            auto_post = connection.exec_driver_sql("SELECT auto_post FROM scheduled_items").all()
+        assert [tuple(value) for value in migrated] == [
+            ("2026-03-01", "2026-03-01", "rule", None, None, 0)
+        ]
+        assert [tuple(value) for value in auto_post] == [(0,)]
+
+        command.downgrade(alembic_config(settings), "0016_f16_totp")
+        columns = {
+            column["name"] for column in inspect(engine).get_columns("scheduled_occurrences")
+        }
+        assert "nominal_date" not in columns
+        with engine.connect() as connection:
+            count = connection.exec_driver_sql("SELECT COUNT(*) FROM scheduled_occurrences")
+            assert count.scalar_one() == 1
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+    finally:
+        engine.dispose()
