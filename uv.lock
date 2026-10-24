@@ -152,6 +152,7 @@ test = [
     { name = "playwright" },
     { name = "pytest" },
     { name = "pytest-cov" },
+    { name = "python-dateutil" },
     { name = "pyyaml" },
     { name = "types-pyyaml" },
 ]
@@ -187,6 +188,7 @@ test = [
     { name = "playwright", specifier = ">=1.51,<2" },
     { name = "pytest", specifier = ">=8,<10" },
     { name = "pytest-cov", specifier = ">=6,<8" },
+    { name = "python-dateutil", specifier = ">=2.8,<3" },
     { name = "pyyaml", specifier = ">=6,<7" },
     { name = "types-pyyaml", specifier = ">=6,<7" },
 ]
