@@ -35,6 +35,44 @@ from assetboard.db.models.ledger import Category
 from assetboard.services import auth as auth_service
 from assetboard.services.auth import argon2_hash, run_initial_setup
 
+LOCALES_DIR = Path(__file__).resolve().parents[1] / "src" / "assetboard" / "locales"
+
+
+def compiled_catalog_problems() -> list[str]:
+    """Each committed ``.po`` whose compiled ``.mo`` is missing or out of date.
+
+    ``.mo`` files are build output (gitignored), and gettext silently falls back to English
+    without them, so a missing or stale catalog would make translation tests fail confusingly.
+    """
+    from io import BytesIO
+
+    from babel.messages.mofile import write_mo
+    from babel.messages.pofile import read_po
+
+    problems: list[str] = []
+    for po_path in sorted(LOCALES_DIR.glob("*/LC_MESSAGES/messages.po")):
+        mo_path = po_path.with_suffix(".mo")
+        if not mo_path.is_file():
+            problems.append(f"missing {mo_path.relative_to(LOCALES_DIR.parent)}")
+            continue
+        with po_path.open("rb") as po_file:
+            catalog = read_po(po_file, locale=po_path.parents[1].name)
+        expected = BytesIO()
+        write_mo(expected, catalog)
+        if mo_path.read_bytes() != expected.getvalue():
+            problems.append(f"stale {mo_path.relative_to(LOCALES_DIR.parent)}")
+    return problems
+
+
+def pytest_sessionstart(session: pytest.Session) -> None:
+    problems = compiled_catalog_problems()
+    if problems:
+        raise pytest.UsageError(
+            "Compiled gettext catalogs are missing or stale ("
+            + "; ".join(problems)
+            + "). Run `make i18n-compile` (or `make test`, which compiles them first)."
+        )
+
 
 @pytest.fixture(autouse=True)
 def isolate_application_data_dir(
