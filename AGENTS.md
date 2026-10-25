@@ -70,4 +70,4 @@ Translation catalogs: `.po` files are committed; `.mo` files are built, never co
 - Small, reviewable commits using Conventional Commits (`feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`).
 
 ## Branding
-The app name may change. Keep every occurrence of the name in `src/assetboard/branding.py` (display name, env prefix, CLI name, user-agent), `pyproject.toml`, and Docker labels. Do not hardcode the name in templates or messages — use `branding.APP_NAME`.
+The app name may change. Keep every occurrence of the name in `src/assetboard/branding.py` (display name, env prefix, CLI name, user-agent), `pyproject.toml`, Docker labels, and the `deploy/` files (systemd unit, env example, Podman Quadlet, install and release scripts). Do not hardcode the name in templates or messages — use `branding.APP_NAME`.
