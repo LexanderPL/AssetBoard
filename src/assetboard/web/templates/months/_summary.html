@@ -8,7 +8,8 @@
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h2 id="month-summary-heading" class="text-base font-semibold">{{ _("Summary") }}</h2>
     <div class="flex flex-wrap items-center gap-3">
-      <button type="button" data-forecast-toggle aria-pressed="true" data-show-label="{{ _('Show forecast') }}" data-hide-label="{{ _('Hide forecast') }}" class="rounded-lg border border-line px-2.5 py-1 text-xs font-medium hover:bg-subtle">{{ _("Hide forecast") }}</button>
+      {# F3.5: a pressed toggle with a fixed label; app.js sets aria-pressed from this device's choice. #}
+      <button type="button" data-forecast-toggle aria-pressed="true" class="rounded-lg border border-line px-2.5 py-1 text-xs font-medium hover:bg-subtle aria-pressed:bg-subtle">{{ _("Show forecast") }}</button>
       {% if summary.groups %}{{ sort_toggle() }}{% endif %}
     </div>
   </div>
@@ -30,7 +31,7 @@
           <th scope="col" class="py-2 pl-2 pr-2 font-medium">{{ _("Category") }}</th>
           <th scope="col" class="w-40 py-2 pr-2 text-right font-medium">{{ _("Planned") }}</th>
           <th scope="col" class="w-32 py-2 pr-2 text-right font-medium">{{ _("Actual") }}</th>
-          <th scope="col" class="w-32 py-2 pr-2 text-right font-medium">{{ _("Expected (pending)") }}</th>
+          <th scope="col" data-forecast-column class="w-32 py-2 pr-2 text-right font-medium">{{ _("Expected (pending)") }}</th>
           <th scope="col" data-forecast-column class="w-32 py-2 pr-2 text-right font-medium">{{ _("Forecast") }}</th>
           <th scope="col" class="w-36 py-2 pr-2 text-right font-medium">{{ _("Difference") }}</th>
         </tr>

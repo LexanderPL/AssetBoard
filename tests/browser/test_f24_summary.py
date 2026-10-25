@@ -1,7 +1,8 @@
 """The month summary in Chromium (F2.4): actual, difference and KPIs refresh without a reload
 after a planned value or an entry (made on the Transactions page since F2.7) is saved, the sort
-toggle reorders the rows and is kept, clicking a category opens the filtered Transactions page
-(part B), and there are no CSP violations.
+toggle reorders the rows and is kept, the F3.5 forecast toggle hides the forecast columns and is
+kept, clicking a category opens the filtered Transactions page (part B), and there are no CSP
+violations.
 The test's categories are created directly ("Golden ..."); the suggested set that setup gives
 every new workspace stays in the summary with nothing in it."""
 
@@ -182,6 +183,38 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
                 "aria-pressed", "true"
             )
             assert page.evaluate("document.activeElement.id") == "summary-sort-actual"
+            assert _order(page) == ["Golden Travel", "Golden Food"]
+
+            # F3.5: the forecast toggle hides the Expected and Forecast columns and the forecast
+            # KPI line; the choice survives a row swap (planned value), a whole-summary swap
+            # (sort) and a reload, and it comes back with a second click.
+            forecast = page.get_by_role("button", name="Show forecast")
+            visible_forecast = page.locator("#month-summary [data-forecast-column]:visible")
+            expect(forecast).to_have_attribute("aria-pressed", "true")
+            expect(food_row.locator("[data-forecast-column]:visible")).to_have_count(2)
+            forecast.click()
+            expect(forecast).to_have_attribute("aria-pressed", "false")
+            expect(visible_forecast).to_have_count(0)
+            page.get_by_label("Planned for Golden Travel").fill("5350")
+            page.keyboard.press("Tab")
+            expect(travel_row.locator("[data-difference]")).to_contain_text("+€4,950.00")
+            expect(visible_forecast).to_have_count(0)
+            page.get_by_role("button", name="Your order").click()
+            expect(page.get_by_role("button", name="Your order")).to_have_attribute(
+                "aria-pressed", "true"
+            )
+            expect(visible_forecast).to_have_count(0)
+            expect(forecast).to_have_attribute("aria-pressed", "false")
+            page.get_by_role("button", name="Largest first").click()
+            expect(page.get_by_role("button", name="Largest first")).to_have_attribute(
+                "aria-pressed", "true"
+            )
+            page.reload()
+            expect(forecast).to_have_attribute("aria-pressed", "false")
+            expect(visible_forecast).to_have_count(0)
+            forecast.click()
+            expect(forecast).to_have_attribute("aria-pressed", "true")
+            expect(food_row.locator("[data-forecast-column]:visible")).to_have_count(2)
             assert _order(page) == ["Golden Travel", "Golden Food"]
 
             # The expense donut is drawn from the summary's actuals.

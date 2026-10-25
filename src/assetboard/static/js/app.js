@@ -1,3 +1,33 @@
+// F3.5: the forecast toggle of the month summary hides its Expected and Forecast columns and the
+// forecast KPI line (Home keeps them). The choice is a per-device convenience kept in browser
+// storage, and it is applied again after every htmx swap, since planned-value and transaction
+// writes replace summary rows (or the whole summary) with freshly rendered, visible cells.
+let showForecast = true;
+try {
+  showForecast = localStorage.getItem("forecast") !== "hidden";
+} catch {
+  // No storage: the forecast stays visible.
+}
+
+function applyForecast() {
+  document.querySelectorAll("[data-forecast-toggle]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(showForecast));
+  });
+  document.querySelectorAll("[data-month-summary] [data-forecast-column]").forEach((column) => {
+    column.classList.toggle("hidden", !showForecast);
+  });
+  // "not counted" spans Actual, Expected, Forecast and Difference; without the two forecast
+  // columns it spans two.
+  document.querySelectorAll("[data-month-summary] td[data-not-counted]").forEach((cell) => {
+    if (cell instanceof HTMLTableCellElement) cell.colSpan = showForecast ? 4 : 2;
+  });
+}
+
+applyForecast();
+for (const eventName of ["htmx:afterSwap", "htmx:oobAfterSwap"]) {
+  document.addEventListener(eventName, applyForecast);
+}
+
 document.addEventListener("click", (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
@@ -12,16 +42,14 @@ document.addEventListener("click", (event) => {
     }
   }
 
-  const forecastToggle = target.closest("[data-forecast-toggle]");
-  if (forecastToggle instanceof HTMLButtonElement) {
-    const show = forecastToggle.getAttribute("aria-pressed") !== "true";
-    forecastToggle.setAttribute("aria-pressed", String(show));
-    forecastToggle.textContent = show
-      ? forecastToggle.dataset.hideLabel
-      : forecastToggle.dataset.showLabel;
-    document.querySelectorAll("[data-forecast-column]").forEach((column) => {
-      column.classList.toggle("hidden", !show);
-    });
+  if (target.closest("[data-forecast-toggle]")) {
+    showForecast = !showForecast;
+    try {
+      localStorage.setItem("forecast", showForecast ? "shown" : "hidden");
+    } catch {
+      // The toggle still works for this page when browser storage is unavailable.
+    }
+    applyForecast();
   }
 
   const themeReset = target.closest("[data-theme-reset]");
