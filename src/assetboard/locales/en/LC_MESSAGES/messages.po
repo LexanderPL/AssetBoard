@@ -1085,6 +1085,9 @@ msgstr ""
 msgid "A posted tax payment uses this attachment, so it cannot be removed."
 msgstr ""
 
+msgid "This month is closed. Reopen it before changing the income estimate."
+msgstr ""
+
 msgid "Archived income sources cannot be changed."
 msgstr ""
 

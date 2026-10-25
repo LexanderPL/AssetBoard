@@ -1137,7 +1137,14 @@ msgid "This tax rule is already attached to the income source."
 msgstr "Ta reguła podatkowa jest już przypisana do źródła przychodu."
 
 msgid "A posted tax payment uses this attachment, so it cannot be removed."
-msgstr "Zaksięgowana płatność podatku korzysta z tego przypisania, więc nie można go usunąć."
+msgstr ""
+"Zaksięgowana płatność podatku korzysta z tego przypisania, więc nie można"
+" go usunąć."
+
+msgid "This month is closed. Reopen it before changing the income estimate."
+msgstr ""
+"Ten miesiąc jest zamknięty. Otwórz go ponownie, zanim zmienisz szacunek "
+"przychodu."
 
 msgid "Archived income sources cannot be changed."
 msgstr "Nie można zmieniać zarchiwizowanych źródeł przychodu."
@@ -1146,12 +1153,13 @@ msgid ""
 "The work log was saved; posted income was not changed. Adjust its "
 "transaction manually if needed."
 msgstr ""
-"Zapisano dziennik pracy; zaksięgowany przychód nie został zmieniony. W razie potrzeby "
-"skoryguj transakcję ręcznie."
+"Zapisano dziennik pracy; zaksięgowany przychód nie został zmieniony. W "
+"razie potrzeby skoryguj transakcję ręcznie."
 
 msgid "The income source could not be saved. Check the form and try again."
 msgstr ""
-"Nie udało się zapisać źródła przychodu. Sprawdź formularz i spróbuj ponownie."
+"Nie udało się zapisać źródła przychodu. Sprawdź formularz i spróbuj "
+"ponownie."
 
 msgid ""
 "This invitation link is not valid. It may have expired, been used or been"
@@ -2777,16 +2785,14 @@ msgstr "Edytuj wpis z %(date)s, %(amount)s"
 msgid "Delete the entry of %(date)s, %(amount)s"
 msgstr "Usuń wpis z %(date)s, %(amount)s"
 
-#, fuzzy
 msgid "Expected"
-msgstr "Wydatek"
+msgstr "Oczekiwane"
 
 msgid "Estimate"
 msgstr "Szacunkowa"
 
-#, fuzzy
 msgid "Confirm"
-msgstr "Potwierdzono przez"
+msgstr "Potwierdź"
 
 msgid "No entries in this category this month."
 msgstr "Brak wpisów tej kategorii w tym miesiącu."
@@ -2937,7 +2943,6 @@ msgstr "Ukryj prognozę"
 msgid "Actual"
 msgstr "Wykonanie"
 
-#, python-format
 msgid "Expected (pending)"
 msgstr "Oczekiwane (oczekujące)"
 
@@ -2962,10 +2967,9 @@ msgstr "Zamknięty"
 
 #, python-format
 msgid "Enter days worked for %(month)s for %(name)s."
-msgstr "Wprowadź liczbę przepracowanych dni w miesiącu %(month)s dla źródła %(name)s."
-
-msgid "Expected"
-msgstr "Oczekiwane"
+msgstr ""
+"Wprowadź liczbę przepracowanych dni w miesiącu %(month)s dla źródła "
+"%(name)s."
 
 #, python-format
 msgid "Previous month: %(month)s"
@@ -3804,3 +3808,4 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Not available: nothing earned"
 #~ msgstr "Niedostępne: brak zarobków"
+
