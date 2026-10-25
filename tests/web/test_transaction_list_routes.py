@@ -72,7 +72,7 @@ def _add(
 
 
 def _page(app: OwnerApp, query: str = "", status: int = 200) -> str:
-    response = app.client.get(f"/transactions{query}")
+    response = app.client.get(f"/history{query}")
     assert response.status_code == status, response.text
     return response.text
 
@@ -108,9 +108,9 @@ def test_the_list_shows_every_month_newest_first(ledger: OwnerApp, rows: dict) -
     html = _page(ledger)
     assert _descriptions(html) == ["Lidl", "Pay", "Żabka weekly", "Bakery"]
     assert "1–4 of 4 entries" in html
-    assert 'href="/m/2026-09"' in html  # each date links to its month
+    assert re.search(r"href=\"/transactions/2026-09#tx-[0-9a-f-]+\"", html)  # its month's entries
     assert "€1,234.56" in html
-    assert "data-transactions-link" in html  # in the main navigation
+    assert re.search(r"data-history-link aria-current=\"page\"", html)  # F2.7 navigation
 
 
 def test_filters_in_the_query_string(ledger: OwnerApp, rows: dict) -> None:
@@ -159,7 +159,7 @@ def test_invalid_filters_are_marked_and_show_no_rows(ledger: OwnerApp, rows: dic
 
 def test_polish_amounts_and_page(ledger: OwnerApp, rows: dict) -> None:
     ledger.client.headers["Accept-Language"] = "pl"
-    response = ledger.client.get("/transactions?min=1 234,56")
+    response = ledger.client.get("/history?min=1 234,56")
     assert response.status_code == 200
     assert set(_descriptions(response.text)) == {"Pay", "Żabka weekly"}
 
@@ -176,11 +176,11 @@ def test_viewers_list_and_export_without_bulk_controls(ledger: OwnerApp, rows: d
     assert len(_descriptions(html)) == 4
     assert 'id="bulk-form"' not in html and 'name="ids"' not in html
     assert "data-export-form" in html
-    response = ledger.client.get("/transactions/export.csv")
+    response = ledger.client.get("/history/export.csv")
     assert response.status_code == 200
     data = {"scope": "selected", "ids": str(rows["sep"]), "category_id": str(rows["food"])}
-    for path in ("/transactions/recategorize", "/transactions/recategorize/confirm"):
-        refused = ledger.post(path, data, token_from="/transactions")
+    for path in ("/history/recategorize", "/history/recategorize/confirm"):
+        refused = ledger.post(path, data, token_from="/history")
         assert refused.status_code == 403
         assert NO_PERMISSION in refused.text
 
@@ -189,7 +189,7 @@ def test_viewers_list_and_export_without_bulk_controls(ledger: OwnerApp, rows: d
 
 
 def test_the_export_downloads_the_filtered_rows(ledger: OwnerApp, rows: dict) -> None:
-    response = ledger.client.get("/transactions/export.csv?direction=expense&sort=-amount")
+    response = ledger.client.get("/history/export.csv?direction=expense&sort=-amount")
     assert response.status_code == 200
     assert response.headers["content-type"] == "text/csv; charset=utf-8"
     assert response.headers["cache-control"] == "no-store"
@@ -211,7 +211,7 @@ def test_the_export_downloads_the_filtered_rows(ledger: OwnerApp, rows: dict) ->
 
 def test_export_options(ledger: OwnerApp, rows: dict) -> None:
     response = ledger.client.get(
-        "/transactions/export.csv?q=lidl&delimiter=semicolon&decimal=comma&bom=1"
+        "/history/export.csv?q=lidl&delimiter=semicolon&decimal=comma&bom=1"
     )
     assert response.content.startswith(b"\xef\xbb\xbfdate;direction;amount;")
     assert b";12,50;EUR;Food;Lidl;" in response.content
@@ -220,8 +220,8 @@ def test_export_options(ledger: OwnerApp, rows: dict) -> None:
 def test_the_formula_guard_is_opt_in(ledger: OwnerApp, rows: dict) -> None:
     food = rows["food"]
     _add(ledger, food, "2026-10-02", "1", "=HYPERLINK(1)")
-    plain = ledger.client.get("/transactions/export.csv?q=hyperlink").content
-    guarded = ledger.client.get("/transactions/export.csv?q=hyperlink&guard=1").content
+    plain = ledger.client.get("/history/export.csv?q=hyperlink").content
+    guarded = ledger.client.get("/history/export.csv?q=hyperlink&guard=1").content
     assert b",=HYPERLINK(1)," in plain
     assert b",'=HYPERLINK(1)," in guarded
     html = _page(ledger)
@@ -229,12 +229,12 @@ def test_the_formula_guard_is_opt_in(ledger: OwnerApp, rows: dict) -> None:
 
 
 def test_invalid_export_options_return_the_page(ledger: OwnerApp, rows: dict) -> None:
-    response = ledger.client.get("/transactions/export.csv?decimal=comma")
+    response = ledger.client.get("/history/export.csv?decimal=comma")
     assert response.status_code == 400
     assert "A decimal comma needs the semicolon delimiter, so that amounts stay one column." in (
         response.text
     )
-    response = ledger.client.get("/transactions/export.csv?min=abc")
+    response = ledger.client.get("/history/export.csv?min=abc")
     assert response.status_code == 400 and "Enter a valid amount." in response.text
 
 
@@ -252,17 +252,17 @@ def test_the_export_options_are_a_dialog_behind_a_header_button(
     button = re.search(r'<a href="([^"]+)" data-dialog-open="export-dialog"[^>]*>', header)
     assert button is not None and "Export CSV" in header
     # Without JavaScript the button is a link that renders the dialog open.
-    assert button.group(1) == "/transactions?q=a&amp;sort=amount&amp;export=1#export-dialog"
+    assert button.group(1) == "/history?q=a&amp;sort=amount&amp;export=1#export-dialog"
     assert " open" not in _export_dialog(html)
     assert " open" in _export_dialog(_page(ledger, "?q=a&sort=amount&export=1"))
     # A refused option shows the dialog open, with its message.
-    refused = ledger.client.get("/transactions/export.csv?decimal=comma").text
+    refused = ledger.client.get("/history/export.csv?decimal=comma").text
     assert " open" in _export_dialog(refused) and "data-export-error" in refused
 
 
 def test_the_export_form_carries_the_filters(ledger: OwnerApp, rows: dict) -> None:
     html = _page(ledger, f"?q=a&category={rows['food']}&sort=amount&page=1")
-    match = re.search(r"<form method=\"get\" action=\"/transactions/export.csv\".*?</form>", html,
+    match = re.search(r"<form method=\"get\" action=\"/history/export.csv\".*?</form>", html,
                       re.DOTALL)  # fmt: skip
     assert match is not None
     hidden = re.findall(r'<input type="hidden" name="([^"]+)" value="([^"]*)">', match.group(0))
@@ -272,7 +272,7 @@ def test_the_export_form_carries_the_filters(ledger: OwnerApp, rows: dict) -> No
 def test_the_export_is_not_audited(ledger: OwnerApp, rows: dict) -> None:
     with ledger.db() as session:
         before = len(session.scalars(select(AuditEvent)).all())
-    assert ledger.client.get("/transactions/export.csv").status_code == 200
+    assert ledger.client.get("/history/export.csv").status_code == 200
     with ledger.db() as session:
         assert len(session.scalars(select(AuditEvent)).all()) == before
 
@@ -288,7 +288,7 @@ def _category_of(app: OwnerApp, row_id: UUID) -> UUID:
 
 
 def _confirm_fields(html: str) -> dict[str, Any]:
-    match = re.search(r'<form method="post" action="/transactions/recategorize/confirm".*?</form>',
+    match = re.search(r'<form method="post" action="/history/recategorize/confirm".*?</form>',
                       html, re.DOTALL)  # fmt: skip
     assert match is not None
     pairs = re.findall(r'<input type="hidden" name="([^"]+)" value="([^"]*)">', match.group(0))
@@ -296,7 +296,7 @@ def _confirm_fields(html: str) -> dict[str, Any]:
 
 
 def _post_pairs(app: OwnerApp, path: str, pairs: list[tuple[str, str]]) -> Any:
-    data: dict[str, list[str]] = {"csrf_token": [app.token("/transactions")]}
+    data: dict[str, list[str]] = {"csrf_token": [app.token("/history")]}
     for name, value in pairs:
         data.setdefault(name, []).append(value)
     return app.client.post(path, data=data, follow_redirects=False)
@@ -314,7 +314,7 @@ def test_recategorize_ticked_rows_with_confirmation(ledger: OwnerApp, rows: dict
         ("category_id", str(groceries)),
         ("scope", "selected"),
     ]
-    preview = _post_pairs(ledger, "/transactions/recategorize", pairs)
+    preview = _post_pairs(ledger, "/history/recategorize", pairs)
     assert preview.status_code == 200
     assert "Move 2 entries to Groceries?" in preview.text
     assert "August 2026, September 2026" in preview.text
@@ -323,9 +323,9 @@ def test_recategorize_ticked_rows_with_confirmation(ledger: OwnerApp, rows: dict
     confirm = _confirm_fields(preview.text)["pairs"]
     assert ("scope", "selected") in confirm
     assert any(name == "fingerprint" for name, _value in confirm)
-    done = _post_pairs(ledger, "/transactions/recategorize/confirm", confirm)
+    done = _post_pairs(ledger, "/history/recategorize/confirm", confirm)
     assert done.status_code == 303
-    assert done.headers["location"] == "/transactions?direction=expense&changed=2"
+    assert done.headers["location"] == "/history?direction=expense&changed=2"
     assert _category_of(ledger, rows["aug"]) == groceries
     assert _category_of(ledger, rows["sep"]) == groceries
     assert _category_of(ledger, rows["oct"]) == rows["food"]
@@ -341,9 +341,9 @@ def test_recategorize_all_matching_rows(ledger: OwnerApp, rows: dict) -> None:
     other = _category(ledger, "Other")
     pairs = [("q", "a"), ("direction", "expense"), ("category_id", str(other)),
              ("scope", "filtered")]  # fmt: skip
-    preview = _post_pairs(ledger, "/transactions/recategorize", pairs)
+    preview = _post_pairs(ledger, "/history/recategorize", pairs)
     assert "Move 2 entries to Other?" in preview.text
-    done = _post_pairs(ledger, "/transactions/recategorize/confirm",
+    done = _post_pairs(ledger, "/history/recategorize/confirm",
                        _confirm_fields(preview.text)["pairs"])  # fmt: skip
     assert done.status_code == 303
     assert _category_of(ledger, rows["aug"]) == other  # "Bakery"
@@ -354,10 +354,10 @@ def test_recategorize_all_matching_rows(ledger: OwnerApp, rows: dict) -> None:
 def test_a_closed_month_refuses_the_whole_change(ledger: OwnerApp, rows: dict) -> None:
     other = _category(ledger, "Other")
     pairs = [("direction", "expense"), ("category_id", str(other)), ("scope", "filtered")]
-    preview = _post_pairs(ledger, "/transactions/recategorize", pairs)
+    preview = _post_pairs(ledger, "/history/recategorize", pairs)
     confirm = _confirm_fields(preview.text)["pairs"]
     assert ledger.post("/m/2026-09/close", {}, token_from="/m/2026-09").status_code == 303
-    refused = _post_pairs(ledger, "/transactions/recategorize/confirm", confirm)
+    refused = _post_pairs(ledger, "/history/recategorize/confirm", confirm)
     assert refused.status_code == 409
     assert (
         "Nothing was changed: some entries are in closed months (September 2026). An owner can "
@@ -365,7 +365,7 @@ def test_a_closed_month_refuses_the_whole_change(ledger: OwnerApp, rows: dict) -
     )
     assert {_category_of(ledger, rows[k]) for k in ("aug", "sep", "oct")} == {rows["food"]}
     # The preview refuses too.
-    again = _post_pairs(ledger, "/transactions/recategorize", pairs)
+    again = _post_pairs(ledger, "/history/recategorize", pairs)
     assert again.status_code == 409 and "data-bulk-error" in again.text
 
 
@@ -382,7 +382,7 @@ def test_bulk_refusals(ledger: OwnerApp, rows: dict, change: dict, message: str)
     if change.pop("target", None):
         pairs["category_id"] = str(rows["salary"])
     pairs |= change
-    response = _post_pairs(ledger, "/transactions/recategorize", list(pairs.items()))
+    response = _post_pairs(ledger, "/history/recategorize", list(pairs.items()))
     assert response.status_code == 400
     assert message in response.text
     assert "data-bulk-error" in response.text
@@ -391,9 +391,9 @@ def test_bulk_refusals(ledger: OwnerApp, rows: dict, change: dict, message: str)
 def test_a_changed_selection_is_refused(ledger: OwnerApp, rows: dict) -> None:
     other = _category(ledger, "Other")
     pairs = [("direction", "expense"), ("category_id", str(other)), ("scope", "filtered")]
-    preview = _post_pairs(ledger, "/transactions/recategorize", pairs)
+    preview = _post_pairs(ledger, "/history/recategorize", pairs)
     _add(ledger, rows["food"], "2026-10-05", "1", "New one")
-    refused = _post_pairs(ledger, "/transactions/recategorize/confirm",
+    refused = _post_pairs(ledger, "/history/recategorize/confirm",
                           _confirm_fields(preview.text)["pairs"])  # fmt: skip
     assert refused.status_code == 409
     assert "The entries changed after you reviewed the change." in refused.text
@@ -401,7 +401,7 @@ def test_a_changed_selection_is_refused(ledger: OwnerApp, rows: dict) -> None:
 
 def test_bulk_posts_need_csrf(ledger: OwnerApp, rows: dict) -> None:
     data = {"scope": "selected", "ids": str(rows["sep"]), "category_id": str(rows["food"])}
-    for path in ("/transactions/recategorize", "/transactions/recategorize/confirm"):
+    for path in ("/history/recategorize", "/history/recategorize/confirm"):
         response = ledger.client.post(path, data=data, follow_redirects=False)
         assert response.status_code == 403
 
@@ -429,7 +429,7 @@ def test_change_all_is_disabled_above_the_cap(
 def test_too_many_ticked_entries_have_their_own_refusal(ledger: OwnerApp, rows: dict) -> None:
     ids = [("ids", str(uuid4())) for _ in range(MAX_SELECTED_IDS + 1)]
     pairs = [*ids, ("category_id", str(rows["food"])), ("scope", "selected")]
-    response = _post_pairs(ledger, "/transactions/recategorize", pairs)
+    response = _post_pairs(ledger, "/history/recategorize", pairs)
     assert response.status_code == 400
     assert (
         f"Too many ticked entries (at most {MAX_SELECTED_IDS} at a time). Tick fewer, or change "

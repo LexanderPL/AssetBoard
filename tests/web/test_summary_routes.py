@@ -257,10 +257,11 @@ def test_the_sort_toggle_is_kept_in_a_cookie(summary: OwnerApp) -> None:
     page = summary.client.get(MONTH).text
     assert order(page) == [str(first), str(second)]
     assert re.search(r'value="manual" aria-pressed="true"', page)
-    # A transaction write's out-of-band summary keeps the chosen order.
+    # After a transaction write (F2.7: from the Transactions page) the order is kept.
     form = {"direction": "expense", "day": "8", "amount": "1", "description": "",
             "category_id": str(first)}  # fmt: skip
-    assert order(_htmx(summary, f"{MONTH}/transactions", form).text) == [str(first), str(second)]
+    assert _htmx(summary, f"{MONTH}/transactions", form).status_code == 200
+    assert order(summary.client.get(MONTH).text) == [str(first), str(second)]
     htmx = _htmx(summary, f"{MONTH}/summary/sort", {"sort": "actual"})
     assert htmx.status_code == 200 and "summary_sort=actual" in htmx.headers["set-cookie"]
     assert order(htmx.text) == [str(second), str(first)]
@@ -292,7 +293,9 @@ def test_a_transaction_write_refreshes_actuals_and_kpis(summary: OwnerApp) -> No
     _plan(summary, food, "50")
     form = {"direction": "expense", "day": "7", "amount": "80", "description": "",
             "category_id": str(food)}  # fmt: skip
-    block = _summary(_htmx(summary, f"{MONTH}/transactions", form).text)
+    # F2.7: the write answers the Transactions page (no summary); the Month page shows it.
+    assert 'id="month-summary"' not in _htmx(summary, f"{MONTH}/transactions", form).text
+    block = _summary(summary.client.get(MONTH).text)
     assert _cells(_row(block, food)) == ("€80.00", "-€30.00")
     assert "text-danger" in _row(block, food) and "(unfavourable)" in _row(block, food)
     assert _kpis(block)[1] == "€80.00"

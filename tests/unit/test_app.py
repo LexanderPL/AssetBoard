@@ -124,7 +124,7 @@ def test_root_renders_translatable_shell_and_local_assets(signed_in: TestClient)
 
     assert response.status_code == 200
     assert '<html lang="pl" class="h-full">' in response.text
-    assert "Podsumowanie miesiąca" in response.text
+    assert "Wydatki według kategorii" in response.text  # F2.7: the Home dashboard
     assert '"allowEval":false' in response.text
     assert '"allowScriptTags":false' in response.text
     assert '"includeIndicatorStyles":false' in response.text
@@ -134,7 +134,7 @@ def test_root_renders_translatable_shell_and_local_assets(signed_in: TestClient)
     assert response.text.index("</main>") < response.text.index('<dialog id="confirm-dialog"')
     asset_urls = re.findall(r'(?:src|href)="([^"]+)"', response.text)
     local_assets = [url for url in asset_urls if url.startswith("/static/")]
-    assert len(local_assets) == 5
+    assert len(local_assets) == 7  # Home loads the chart scripts (F2.7)
     assert all(url.startswith("/static/") for url in local_assets)
     assert all(url.endswith(f"?v={version('assetboard')}") for url in local_assets)
     assert 'href="/"' in response.text

@@ -6,14 +6,14 @@ from savings, and the plan-only "Transfers (not counted)" while such lines exist
 planned value (F2.3: editable inline for editors and owners while the month is open), actual and
 difference (F2.4), and a totals row per group.
 
-Shared by ``web.month_routes`` (the page), ``web.transaction_routes`` (every transaction write
-sends the block out of band) and ``web.plan_routes`` (the planned-value writes). Everything here
+Shared by ``web.month_routes`` (the Month page), ``web.routes`` (Home shows the flow bar) and
+``web.plan_routes`` (the planned-value writes). Everything here
 is read-only; writes and their authorization live in ``services.budget``.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from uuid import UUID
 
 from fastapi import Request
@@ -28,7 +28,7 @@ from assetboard.i18n.numbers import format_amount_input, format_money, format_ra
 from assetboard.services.budget import CopyResult, PlanCategory, get_plan
 from assetboard.services.context import Context, Role, has_role
 from assetboard.services.months import MonthView
-from assetboard.services.summary import month_summary
+from assetboard.services.summary import SummaryData, month_summary
 from assetboard.web.security import summary_sort_cookie_name
 
 
@@ -151,6 +151,7 @@ class SummaryView:
     sort: str = "actual"
     zero_input: str = "0"  # the placeholder of an empty planned cell ("0.00", "0,00")
     filter_id: str = ""  # the category the transaction tables are filtered to (aria-current)
+    source: SummaryData | None = field(default=None, compare=False, repr=False)  # the donuts
 
     def row(self, category_id: UUID) -> PlanRowView | None:
         wanted = str(category_id)
@@ -320,6 +321,7 @@ def build_summary(
         sort=sort,
         zero_input=format_amount_input(Money(0, summary.currency), locale),
         filter_id=str(filter_id) if filter_id is not None else "",
+        source=data,
     )
 
 

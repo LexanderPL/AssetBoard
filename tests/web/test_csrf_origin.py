@@ -206,7 +206,9 @@ class _ScriptFinder(HTMLParser):
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         names = {name for name, _ in attrs}
-        if tag == "script" and "src" not in names:
+        # F2.7: a JSON data block (charts) is data, not code: allowed, no other inline script.
+        data_block = ("type", "application/json") in attrs
+        if tag == "script" and "src" not in names and not data_block:
             self.inline.append(self.get_starttag_text() or tag)
         self.handlers.extend(name for name in names if name.startswith("on"))
 
@@ -216,7 +218,8 @@ def test_templates_and_pages_have_no_inline_scripts(signed_in: TestClient) -> No
         finder = _ScriptFinder()
         finder.feed(template.read_text(encoding="utf-8"))
         assert finder.inline == [] and finder.handlers == [], template
-    pages = [signed_in.get(path) for path in ("/", "/account/password")]
+    paths = ("/", "/m/2026-10", "/transactions/2026-10", "/history", "/account/password")
+    pages = [signed_in.get(path) for path in paths]
     with TestClient(signed_in.app) as signed_out:
         pages.append(signed_out.get("/login"))
     for page in pages:

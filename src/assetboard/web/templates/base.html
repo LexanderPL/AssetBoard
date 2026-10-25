@@ -19,6 +19,7 @@
   <script defer src="{{ static_url(request, 'vendor/htmx.min.js') }}" referrerpolicy="no-referrer"></script>
   <script defer src="{{ static_url(request, 'vendor/alpinejs-csp.min.js') }}" referrerpolicy="no-referrer"></script>
   <script defer src="{{ static_url(request, 'js/app.js') }}" referrerpolicy="no-referrer"></script>
+  {% block scripts %}{% endblock %}
 </head>
 <body class="min-h-full">
   {% from "macros/components.html" import confirm_dialog, flashes %}
@@ -33,10 +34,15 @@
         <span class="text-lg font-semibold tracking-tight">{{ app_name }}</span>
       </a>
       <nav class="mt-7 grid grid-cols-2 gap-1 sm:grid-cols-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-y-auto lg:pb-4" aria-label="{{ _('Main navigation') }}">
-        <a class="nav-link" href="{{ scoped_url(request, 'home') }}" data-home-link{% if request.url.path == scoped_url(request, 'home') %} aria-current="page"{% endif %}><span aria-hidden="true">⌂</span>{{ _("Home") }}</a>
-        {% set is_month_page = request.url.path == scoped_url(request, 'month_current') or request.url.path.startswith(scoped_url(request, 'month_current') ~ '/') %}
-        {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'month_current') }}" data-month-link{% if is_month_page %} aria-current="page"{% endif %}><span aria-hidden="true">◷</span>{{ _("Month") }}</a>{% endif %}
-        {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'transactions') }}" data-transactions-link{% if request.url.path.endswith('/transactions') %} aria-current="page"{% endif %}><span aria-hidden="true">≡</span>{{ _("Transactions") }}</a>{% endif %}
+        {# F2.7: Home, Month, Transactions, History first; aria-current marks the page shown. #}
+        {% set path = request.url.path %}
+        <a class="nav-link" href="{{ scoped_url(request, 'home') }}" data-home-link{% if path == scoped_url(request, 'home') %} aria-current="page"{% endif %}><span aria-hidden="true">⌂</span>{{ _("Home") }}</a>
+        {% set month_base = scoped_url(request, 'month_current') %}
+        {% set transactions_base = scoped_url(request, 'transactions') %}
+        {% set history_base = scoped_url(request, 'history') %}
+        {% if workspace_nav %}<a class="nav-link" href="{{ month_base }}" data-month-link{% if path == month_base or path.startswith(month_base ~ '/') %} aria-current="page"{% endif %}><span aria-hidden="true">◷</span>{{ _("Month") }}</a>{% endif %}
+        {% if workspace_nav %}<a class="nav-link" href="{{ transactions_base }}" data-transactions-link{% if path == transactions_base or path.startswith(transactions_base ~ '/') %} aria-current="page"{% endif %}><span aria-hidden="true">≡</span>{{ _("Transactions") }}</a>{% endif %}
+        {% if workspace_nav %}<a class="nav-link" href="{{ history_base }}" data-history-link{% if path == history_base or path.startswith(history_base ~ '/') %} aria-current="page"{% endif %}><span aria-hidden="true">⌕</span>{{ _("History") }}</a>{% endif %}
         {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'scheduled_items') }}" data-recurring-link{% if '/recurring' in request.url.path %} aria-current="page"{% endif %}><span aria-hidden="true">↻</span>{{ _("Recurring") }}</a>{% endif %}
         {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'scheduled_upcoming') }}" data-upcoming-link{% if request.url.path.endswith('/upcoming') %} aria-current="page"{% endif %}><span aria-hidden="true">◷</span>{{ _("Upcoming") }}</a>{% endif %}
         {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'tax_rules') }}" data-taxes-link{% if '/taxes' in request.url.path %} aria-current="page"{% endif %}><span aria-hidden="true">%</span>{{ _("Taxes") }}</a>{% endif %}

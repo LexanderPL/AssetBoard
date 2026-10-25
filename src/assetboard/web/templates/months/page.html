@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% from "macros/components.html" import csrf_input with context %}
-{# The month page (F2.5): navigation, picker, closed state, close/reopen. The ``month_body``
-   block holds the summary (#month-summary: F2.3's planned values, F2.4's totals) and the
-   transaction tables (F2.2, months/_ledger.html). No inline script or style. #}
+{# The Month page (F2.5, F2.7): navigation, picker, closed state, close/reopen. The ``month_body``
+   block holds the summary (#month-summary: the flow bar, F2.3's planned values, F2.4's totals)
+   and the expense donut. Entries are made on the Transactions page. No inline script or style. #}
 {% block title %}{{ month_heading }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ month_heading }}{% if view.closed %} <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-1 align-middle text-xs font-semibold text-warning-strong" data-closed-badge>{{ _("Closed") }}</span>{% endif %}{% endblock %}
+{% block header_actions %}<a href="{{ scoped_url(request, 'transactions_month', month=view.month|string) }}" class="rounded-full bg-primary px-3.5 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-enter-transactions>{{ _("Enter transactions") }}</a>{% endblock %}
+{% block scripts %}{% include "macros/chart_scripts.html" %}{% endblock %}
 {% block content %}
-{% set nav_link = "inline-flex items-center gap-1 rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium hover:bg-subtle" %}
-{% set nav_off = "inline-flex items-center gap-1 rounded-full border border-line px-3.5 py-2 text-sm font-medium opacity-50" %}
 <div class="space-y-6" data-month="{{ view.month }}">
   {% if notice %}
   <p class="rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{% if notice_href %}<a href="{{ notice_href }}" class="font-medium underline">{{ notice }}</a>{% else %}{{ notice }}{% endif %}</p>
@@ -16,30 +16,7 @@
   <p class="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ error }}</p>
   {% endif %}
 
-  <nav class="flex flex-wrap items-center gap-3" aria-label="{{ _('Months') }}" data-month-nav>
-    {% if view.prev %}
-    <a href="{{ scoped_url(request, 'month', month=view.prev|string) }}" rel="prev" class="{{ nav_link }}" data-month-prev aria-label="{{ _('Previous month: %(month)s', month=prev_name) }}"><span aria-hidden="true">‹</span>{{ _("Previous") }}</a>
-    {% else %}
-    <span class="{{ nav_off }}" aria-disabled="true"><span aria-hidden="true">‹</span>{{ _("Previous") }}</span>
-    {% endif %}
-    {% if view.next %}
-    <a href="{{ scoped_url(request, 'month', month=view.next|string) }}" rel="next" class="{{ nav_link }}" data-month-next aria-label="{{ _('Next month: %(month)s', month=next_name) }}">{{ _("Next") }}<span aria-hidden="true">›</span></a>
-    {% else %}
-    <span class="{{ nav_off }}" aria-disabled="true">{{ _("Next") }}<span aria-hidden="true">›</span></span>
-    {% endif %}
-    <a href="{{ scoped_url(request, 'month', month=view.current|string) }}" class="{{ nav_link }}" data-month-today{% if view.is_current %} aria-current="date"{% endif %}>{{ _("Today") }}</a>
-
-    {# Native month picker; desktop Firefox and Safari show a text box, so the server also
-       accepts 10.2026 and 10/2026. A complete month opens on change (app.js, data-autosubmit);
-       without JavaScript the Go button submits it. #}
-    <form method="get" action="{{ scoped_url(request, 'month_current') }}" class="flex items-center gap-2" data-month-picker>
-      <input type="hidden" name="from" value="{{ view.month }}">
-      <label for="month-picker" class="sr-only">{{ _("Go to month") }}</label>
-      <input id="month-picker" name="month" type="month" value="{{ view.month }}" placeholder="{{ _('YYYY-MM') }}" min="1900-01" max="2199-12"
-             data-autosubmit class="form-control rounded-full py-2">
-      <noscript><button type="submit" class="{{ nav_link }}">{{ _("Go") }}</button></noscript>
-    </form>
-  </nav>
+  {% with nav_route = "month", picker_route = "month_current" %}{% include "months/_nav.html" %}{% endwith %}
 
   {% if view.closed %}
   <section class="rounded-2xl border border-warning-line bg-warning-soft px-5 py-4 text-warning-strong" role="status" data-closed-banner>
@@ -67,20 +44,12 @@
   {% endif %}
 
   {% block month_body %}
-  {% from "months/_ledger.html" import tables with context %}
-  {% if deleted %}
-  {# Undo for browsers without JavaScript (with JavaScript, the undo toast offers it). #}
-  <form method="post" action="{{ scoped_url(request, 'transaction_undo', month=view.month|string, transaction_id=deleted|string) }}" class="flex flex-wrap items-center gap-3 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-deleted-notice>
-    {{ csrf_input() }}
-    {% if ledger.filter %}<input type="hidden" name="filter" value="{{ ledger.filter_id }}">{% endif %}
-    <span>{{ _("Entry deleted.") }}</span>
-    <button type="submit" data-undo class="font-semibold underline">{{ _("Undo") }}</button>
-  </form>
-  {% endif %}
-  <p id="ledger-status" class="sr-only" role="status" data-ledger-status></p>
+  {% from "macros/charts.html" import donut with context %}
   <p id="plan-status" class="sr-only" role="status" data-plan-status></p>
   {% include "months/_summary.html" %}
-  {{ tables() }}
+  <div class="grid gap-6 lg:grid-cols-2">
+    {% for d in donuts %}{{ donut(d) }}{% endfor %}
+  </div>
   {% endblock %}
 </div>
 {% endblock %}

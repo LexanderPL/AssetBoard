@@ -37,8 +37,8 @@
 {% endif %}
 {%- endmacro %}
 
-{% block title %}{{ _("Transactions") }} · {{ app_name }}{% endblock %}
-{% block heading %}{{ _("Transactions") }}{% endblock %}
+{% block title %}{{ _("History") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("History") }}{% endblock %}
 {% block header_actions %}<a href="{{ export_url }}" data-dialog-open="export-dialog" aria-haspopup="dialog" class="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium hover:bg-subtle" data-export-open>{{ _("Export CSV") }}</a>{% endblock %}
 {% block content %}
 <div class="space-y-6" data-transaction-list>
@@ -58,7 +58,7 @@
     </div>
     <p class="mt-1 text-sm text-muted">{{ _("Downloads every entry that matches the filters, oldest first, in the columns of the workspace archive's transactions.csv. With the standard options the file can be imported again.") }}</p>
     {% if export_error %}<p class="mt-2 text-sm text-danger" role="alert" data-export-error>{{ export_error }}</p>{% endif %}
-    <form method="get" action="{{ scoped_url(request, 'transactions_export') }}" class="mt-4 space-y-3" data-export-form>
+    <form method="get" action="{{ scoped_url(request, 'history_export') }}" class="mt-4 space-y-3" data-export-form>
       {{ hidden(filter_fields) }}
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
@@ -97,7 +97,7 @@
 
   <section class="panel p-4 sm:p-6" aria-labelledby="filters-heading">
     <h2 id="filters-heading" class="text-base font-semibold">{{ _("Filters") }}</h2>
-    <form method="get" action="{{ scoped_url(request, 'transactions') }}" class="mt-4 space-y-4" novalidate data-filters>
+    <form method="get" action="{{ scoped_url(request, 'history') }}" class="mt-4 space-y-4" novalidate data-filters>
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label for="filter-from" class="{{ label_class }}">{{ _("From") }}</label>
@@ -152,7 +152,7 @@
       </details>
       <div class="flex flex-wrap items-center gap-3">
         <button type="submit" class="{{ primary_class }}" data-apply-filters>{{ _("Show entries") }}</button>
-        <a href="{{ scoped_url(request, 'transactions') }}" class="{{ secondary_class }}" data-clear-filters>{{ _("Clear filters") }}</a>
+        <a href="{{ scoped_url(request, 'history') }}" class="{{ secondary_class }}" data-clear-filters>{{ _("Clear filters") }}</a>
       </div>
     </form>
   </section>
@@ -207,7 +207,7 @@
   <section class="panel p-4 sm:p-6" aria-labelledby="bulk-heading" data-bulk>
     <h2 id="bulk-heading" class="text-base font-semibold">{{ _("Change category") }}</h2>
     <p class="mt-1 text-sm text-muted">{{ _("Tick entries in the list, or change all entries that match the filters. You confirm the change on the next page.") }}</p>
-    <form id="bulk-form" method="post" action="{{ scoped_url(request, 'transactions_recategorize_preview') }}" class="mt-4 flex flex-wrap items-end gap-3">
+    <form id="bulk-form" method="post" action="{{ scoped_url(request, 'history_recategorize_preview') }}" class="mt-4 flex flex-wrap items-end gap-3">
       {{ csrf_input() }}
       {{ hidden(state_fields) }}
       <div>
