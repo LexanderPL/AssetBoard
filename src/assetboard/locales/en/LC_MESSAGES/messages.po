@@ -2321,7 +2321,7 @@ msgid "Left"
 msgstr ""
 
 #, python-format
-msgid "Saved %(rate)s of income"
+msgid "Saved / invested %(rate)s of income"
 msgstr ""
 
 #, python-format
@@ -3007,5 +3007,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Not available: nothing earned"
+#~ msgstr ""
+
+#~ msgid "Saved %(rate)s of income"
 #~ msgstr ""
 

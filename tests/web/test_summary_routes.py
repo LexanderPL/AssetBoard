@@ -106,10 +106,21 @@ def test_the_golden_example_on_the_page(summary: OwnerApp) -> None:
     assert total is not None
     assert re.findall(r"tabular-nums\">([^<]*)<", total.group(0))[:2] == ["€5,900.00", "€4,873.00"]
     assert "+€1,027.00" in total.group(0)
-    assert _kpis(block) == ["€3,400.00", "€4,873.00", "€0.00", "-€1,473.00", "-43.3%"]
+    assert _kpis(block) == [
+        "€3,400.00",
+        "€4,873.00",
+        "€0.00",
+        "-€1,473.00",
+        "0.0%",
+    ]  # saved 0 of 3 400 earned
     summary.client.headers["Accept-Language"] = "pl"
     polish = _summary(summary.client.get(MONTH).text)
-    assert "-43,3%" in polish and ">Podsumowanie</h2>" in polish and ">Różnica</th>" in polish
+    assert (
+        "0,0%" in polish
+        and "Zaoszczędzono / zainwestowano" in polish
+        and ">Podsumowanie</h2>" in polish
+        and ">Różnica</th>" in polish
+    )
 
 
 def test_bars_show_planned_and_actual_in_svg_with_the_same_text(summary: OwnerApp) -> None:
@@ -162,9 +173,10 @@ def test_the_flow_bar_splits_earnings(summary: OwnerApp) -> None:
     _spend(summary, fund, "1000")
     block = _summary(summary.client.get(MONTH).text)
     assert _flow(block) == {"spent": (0, 500), "saved": (500, 250), "left": (750, 250)}
-    assert _kpis(block) == ["€4,000.00", "€2,000.00", "€1,000.00", "€1,000.00", "50.0%"]
-    assert re.search(r'data-savings-rate>Saved <span[^>]*data-kpi="savings-rate">50.0%</span>'
-                     r" of income</p>", block)  # fmt: skip
+    # The savings rate is saved / earned: 1 000 of 4 000 (what is left is not saved).
+    assert _kpis(block) == ["€4,000.00", "€2,000.00", "€1,000.00", "€1,000.00", "25.0%"]
+    assert re.search(r'data-savings-rate>Saved / invested <span[^>]*data-kpi="savings-rate">'
+                     r"25.0%</span> of income</p>", block)  # fmt: skip
     assert (
         "Earned €4,000.00: spent €2,000.00, saved or invested €1,000.00, left €1,000.00." in block
     )

@@ -29,9 +29,10 @@ The **Summary** block at the top of the month page shows how the month is going:
 - A **flow bar** of what you **earned**, split into what you **spent** (red), **saved /
   invested** (blue) and what is **left** (green; earned minus spent minus saved). When spending
   and saving are more than you earned, the bar grows to their total, the part beyond your
-  earnings is hatched red, a line marks what you earned and "Left" turns red. Below it, "Saved
-  12.3% of income" is the savings rate (earned minus spent, as a share of earned); it is not
-  shown when nothing was earned. Money moved between your own accounts (transfer categories)
+  earnings is hatched red, a line marks what you earned and "Left" turns red. Below it, "Saved /
+  invested 26.7% of income" is the savings rate: what you saved or invested, as a share of what
+  you earned (money merely left over is "Left", not savings); it is not shown when nothing was
+  earned. Money moved between your own accounts (transfer categories)
   counts nowhere.
 - Two bars compare what you spent and earned with what you planned; the dark line marks the
   plan.

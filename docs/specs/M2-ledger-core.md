@@ -330,7 +330,7 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
 - Pure domain function `summarize_month(transactions, budget_lines, categories) -> MonthSummary` (no I/O).
 - Expense section: rows per category with planned, actual, difference (`planned - actual`), sorted by actual desc (toggle: manual order); totals row. Income section: planned, actual, difference (`actual - planned`).
 - `treatment=savings` expense categories appear in a separate "Saved / invested" block; `transfer` is excluded; income categories with `treatment=savings` appear as "Withdrawn from savings".
-- KPIs: `earned`, `spent`, `saved`, `net = earned - spent - saved`, `savings_rate = (earned - spent)/earned` (shown as "—" when earned = 0).
+- KPIs: `earned`, `spent`, `saved`, `net = earned - spent - saved`, `savings_rate = saved / earned` (owner, 2026-10-24; it was `(earned - spent)/earned`; not shown when earned = 0).
 - Planned-vs-actual bars (ECharts or CSS bars) for total expenses and total income.
 - Clicking a category filters the transaction tables to that category.
 - Golden example (must be a test): budget Food 550.00; transactions Food 50.00 + 500.00 → actual 550.00, difference 0.00; budget Travel 5 350.00 with 4 323.00 spent → difference 1 027.00; income Salary planned 3 000.00, actual 3 400.00 → difference +400.00.
@@ -360,12 +360,14 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
   **P4** the sort choice is kept per browser (cookie `summary_sort`, HttpOnly, SameSite=Lax,
   one year), not per account.
 - KPIs: earned (income/regular), spent (expense/regular), saved (expense/savings), net, savings
-  rate `(earned - spent) / earned`: kept as integer basis points (`savings_rate_bp`) and, for
-  display, as tenths of a percent (`savings_rate_tenths`), **each rounded once** from the exact
-  ratio, half away from zero (rounding the basis points again would show 12.3495% as 12.4%);
-  shown with one decimal (`i18n.numbers.format_rate_tenths`), "—" with "Not available: nothing
-  earned" for screen readers when nothing was earned. Golden example in
-  `tests/unit/test_summary_domain.py` (net −1 473.00, rate −4 332 bp, "−43.3%").
+  rate **`saved / earned`** (owner, 2026-10-24; it was `(earned - spent) / earned`, which
+  counted money merely left over as saved): kept as integer basis points (`savings_rate_bp`)
+  and, for display, as tenths of a percent (`savings_rate_tenths`), **each rounded once** from
+  the exact ratio, half up (away from zero for a negative rate; rounding the basis points again
+  would show 12.3495% as 12.4%); shown with one decimal (`i18n.numbers.format_rate_tenths`), not
+  shown when nothing was earned. Golden example in `tests/unit/test_summary_domain.py` (net
+  −1 473.00, saved 0: rate 0 bp, "0.0%"); table tests: 800 saved of 3 000 earned "26.7%",
+  1 500 of 9 450 "15.9%".
 - Sorting: "Largest first" (actual descending, ties in the user's order; the default) or "Your
   order", via `POST /m/{month}/summary/sort` (HTMX: the block; without JavaScript 303 back).
   Every render reads the cookie, including the out-of-band summary after a transaction write.
@@ -390,8 +392,8 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
     When spending and saving exceed earnings, the bar scales to their sum, the part beyond
     earnings is hatched red (an SVG pattern) and a line marks earnings; net is then red. A
     legend gives Earned (the total, above the bar), Spent, Saved / invested and Left with
-    their amounts (`data-kpi="earned|spent|saved|net"`), and the caption "Saved 12.3% of
-    income" the savings rate (`data-kpi="savings-rate"`; no caption when nothing was earned,
+    their amounts (`data-kpi="earned|spent|saved|net"`), and the caption "Saved / invested
+    26.7% of income" the savings rate (`saved / earned`) (`data-kpi="savings-rate"`; no caption when nothing was earned,
     so the "—" is gone). Screen readers get one sentence ("Earned …: spent …, saved or
     invested …, left …." plus "Spending and saving exceed earnings by …." when they do); the
     bar and the visual legend are hidden from them.

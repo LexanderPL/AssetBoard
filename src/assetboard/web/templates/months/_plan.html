@@ -115,7 +115,7 @@
     </dl>
     {% if k.savings_rate is not none %}
     {% set rate %}<span class="font-semibold tabular-nums text-ink" data-kpi="savings-rate">{{ k.savings_rate }}</span>{% endset %}
-    <p class="mt-2 text-sm text-muted" data-savings-rate>{{ _("Saved %(rate)s of income", rate=rate) }}</p>
+    <p class="mt-2 text-sm text-muted" data-savings-rate>{{ _("Saved / invested %(rate)s of income", rate=rate) }}</p>
     {% endif %}
   </div>
   <div class="grid gap-x-6 gap-y-3 sm:grid-cols-2">

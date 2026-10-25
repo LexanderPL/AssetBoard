@@ -151,8 +151,10 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             page.locator("#entry-income-amount").fill("1000")
             page.locator("#entry-income-category").select_option(label="Golden Salary")
             page.locator("#entry-income-amount").press("Enter")
-            expect(kpis).to_have_text(["€1,000.00", "€50.00", "€0.00", "€950.00", "95.0%"])
-            expect(page.locator("[data-savings-rate]")).to_have_text("Saved 95.0% of income")
+            expect(kpis).to_have_text(["€1,000.00", "€50.00", "€0.00", "€950.00", "0.0%"])
+            expect(page.locator("[data-savings-rate]")).to_have_text(
+                "Saved / invested 0.0% of income"
+            )
             expect(page.locator("[data-flow-segment]")).to_have_count(2)  # spent and left
 
             # Largest first by default; "Your order" keeps the categories' order, and is kept.

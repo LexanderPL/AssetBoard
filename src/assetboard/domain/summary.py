@@ -16,8 +16,10 @@ saved ``actual - planned`` (saved more than planned), withdrawn ``planned - actu
 
 **KPIs**: earned = income actual, spent = expense actual, saved = saved actual,
 ``net = earned - spent - saved`` (withdrawals are shown as their own block only),
-``savings_rate = (earned - spent) / earned`` in basis points (and, for display, in tenths of a
-percent, each rounded once from the exact ratio), ``None`` when earned is 0. The page draws
+``savings_rate = saved / earned`` (owner, 2026-10-24: what went to savings and investments, as a
+share of earnings; money merely left over is "left", not saved) in basis points (and, for
+display, in tenths of a percent, each rounded once from the exact ratio, half up), ``None``
+when earned is 0. The page draws
 them as one flow bar (``flow_bar``): earned split into spent, saved / invested and left (net).
 """
 
@@ -118,31 +120,29 @@ def difference(key: BlockKey, planned: int, actual: int) -> int:
     return actual - planned
 
 
-def _ratio(earned: int, spent: int, scale: int) -> int | None:
-    """``(earned - spent) / earned * scale``, rounded once, half away from zero (exact)."""
-    if earned == 0:
+def _ratio(part: int, whole: int, scale: int) -> int | None:
+    """``part / whole * scale``, rounded once, half away from zero (exact); ``None`` for 0."""
+    if whole == 0:
         return None
-    numerator = (earned - spent) * scale
-    sign = -1 if (numerator < 0) != (earned < 0) else 1
-    quotient, remainder = divmod(abs(numerator), abs(earned))
-    if 2 * remainder >= abs(earned):
+    numerator = part * scale
+    sign = -1 if (numerator < 0) != (whole < 0) else 1
+    quotient, remainder = divmod(abs(numerator), abs(whole))
+    if 2 * remainder >= abs(whole):
         quotient += 1
     return sign * quotient
 
 
-def savings_rate_bp(earned: int, spent: int) -> int | None:
-    """``(earned - spent) / earned`` in basis points, rounded half away from zero.
-
-    Exact integer arithmetic; ``None`` when nothing was earned (the rate is undefined).
-    """
-    return _ratio(earned, spent, BASIS_POINTS)
+def savings_rate_bp(earned: int, saved: int) -> int | None:
+    """``saved / earned`` in basis points, rounded half up (away from zero for a negative
+    rate). Exact integer arithmetic; ``None`` when nothing was earned (undefined)."""
+    return _ratio(saved, earned, BASIS_POINTS)
 
 
-def savings_rate_tenths(earned: int, spent: int) -> int | None:
-    """The savings rate in tenths of a percent, for display ("-43.3%"): rounded **once**, from
-    the exact ratio, half away from zero (rounding the basis points again would turn
-    12.3495% into 12.4%). ``None`` when nothing was earned."""
-    return _ratio(earned, spent, 1000)
+def savings_rate_tenths(earned: int, saved: int) -> int | None:
+    """The savings rate in tenths of a percent, for display ("26.7%"): rounded **once**, from
+    the exact ratio, half up (rounding the basis points again would turn 12.3495% into
+    12.4%). ``None`` when nothing was earned."""
+    return _ratio(saved, earned, 1000)
 
 
 FLOW_SCALE = 1000
@@ -262,8 +262,8 @@ def summarize_month(
         spent=Money(spent, currency),
         saved=Money(saved, currency),
         net=Money(earned - spent - saved, currency),
-        savings_rate_bp=savings_rate_bp(earned, spent),
-        savings_rate_tenths=savings_rate_tenths(earned, spent),
+        savings_rate_bp=savings_rate_bp(earned, saved),
+        savings_rate_tenths=savings_rate_tenths(earned, saved),
     )
     return MonthSummary(currency=currency, blocks=tuple(blocks), kpis=kpis)
 

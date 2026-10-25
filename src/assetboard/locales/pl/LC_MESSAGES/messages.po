@@ -2517,8 +2517,8 @@ msgid "Left"
 msgstr "Zostało"
 
 #, python-format
-msgid "Saved %(rate)s of income"
-msgstr "Zaoszczędzono %(rate)s przychodu"
+msgid "Saved / invested %(rate)s of income"
+msgstr "Zaoszczędzono / zainwestowano %(rate)s przychodu"
 
 #, python-format
 msgid "Spent %(actual)s of %(planned)s planned"
