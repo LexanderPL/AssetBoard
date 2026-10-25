@@ -107,8 +107,8 @@ def test_summary_expected_and_forecast_columns_kpis_and_toggle(rent) -> None:
     # The toggle hides both forecast columns and the forecast KPI line (app.js).
     assert 'data-forecast-toggle aria-pressed="true"' in summary
     assert len(re.findall(r"<th [^>]*data-forecast-column", summary)) == 2
-    assert re.search(r'<p [^>]*data-forecast-column>[^<]*Forecast spent', summary)
-    # The forecast KPI is on Home too (shared flow bar), without the toggle.
+    assert re.search(r"<p [^>]*data-forecast-column>[^<]*Forecast spent", summary)
+    # Home shares the flow bar and its forecast line, but has no toggle.
     home = owner.client.get("/").text
     assert "data-forecast-toggle" not in home
 
