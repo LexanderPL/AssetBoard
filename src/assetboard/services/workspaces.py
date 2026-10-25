@@ -56,6 +56,11 @@ from assetboard.services.context import (
     require_role_now,
     select_workspace,
 )
+from assetboard.services.income import (
+    has_working_day_income_sources,
+    regenerate_working_day_income,
+    workspace_has_income_amounts,
+)
 from assetboard.services.instance_settings import read_settings
 from assetboard.services.invitations import new_token
 from assetboard.services.scheduled import (
@@ -78,6 +83,7 @@ BASE_CURRENCY_LOCKS: list[Callable[[Session, Context], bool]] = [
     workspace_has_transactions,
     workspace_has_budget_lines,
     workspace_has_scheduled_amounts,
+    workspace_has_income_amounts,
     workspace_has_fixed_tax_amounts,
 ]
 
@@ -279,13 +285,16 @@ def update_settings(
         if (
             country_changed
             and not holidays_supported(wanted.country_code)
-            and has_working_day_items(session, ctx)
+            and (
+                has_working_day_items(session, ctx) or has_working_day_income_sources(session, ctx)
+            )
         ):
             raise InvalidWorkspaceSettings("country_code", "country_without_holidays")
         if changes:
             repository.update(**changes)
             if country_changed:
                 regenerate_working_day_items(session, ctx, ctx.clock, recurrence_horizon_months)
+                regenerate_working_day_income(session, ctx, ctx.clock, recurrence_horizon_months)
             AuditEventRepository(session, ctx).record(
                 actor_user_id=ctx.user.id,
                 action="workspace.settings_updated",

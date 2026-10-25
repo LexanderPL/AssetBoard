@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from datetime import date
 from urllib.parse import urlencode
 from uuid import UUID
@@ -9,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.repositories import NotFound
+from assetboard.domain.months import InvalidMonth, YearMonth
 from assetboard.domain.transactions import amount_minor
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day
@@ -58,9 +60,12 @@ def _redirect(
     error: str | None = None,
     posted: UUID | None = None,
     back: str = "",
+    return_month: YearMonth | None = None,
 ) -> Response:
     """Back to the Upcoming page, or to Home after a successful action sent from there (F2.7:
-    ``back=home``; any other value means the Upcoming page). Errors are shown on Upcoming."""
+    ``back=home``; any other value means the Upcoming page). A confirm sent from an expected row
+    of the Transactions page (F3.5: ``return_month``) returns to that month's Transactions page.
+    Errors are shown on Upcoming."""
     if back == "home" and error is None:
         return RedirectResponse(request.url_for("home").path, status_code=303)
     params: dict[str, str] = {}
@@ -68,7 +73,11 @@ def _redirect(
         params["error"] = error
     if posted:
         params["posted"] = str(posted)
-    target = request.url_for("scheduled_upcoming").path
+    target = (
+        request.url_for("transactions_month", month=str(return_month)).path
+        if return_month is not None
+        else request.url_for("scheduled_upcoming").path
+    )
     return RedirectResponse(target + ("?" + urlencode(params) if params else ""), status_code=303)
 
 
@@ -154,7 +163,12 @@ async def post(request: Request, ctx: CurrentContext, occurrence_id: str) -> Res
         )
     except occurrences.OccurrenceError as exc:
         return _redirect(request, error=exc.code)
-    return _redirect(request, posted=_id(occurrence_id), back=values.get("back", ""))
+    return_month = None
+    with contextlib.suppress(InvalidMonth):
+        return_month = YearMonth.parse(values.get("return_month", ""))
+    return _redirect(
+        request, posted=_id(occurrence_id), back=values.get("back", ""), return_month=return_month
+    )
 
 
 @router.post("/upcoming/{occurrence_id}/skip", name="upcoming_skip")

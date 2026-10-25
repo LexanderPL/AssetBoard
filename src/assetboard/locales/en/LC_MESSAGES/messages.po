@@ -1058,6 +1058,59 @@ msgid ""
 " anything else."
 msgstr ""
 
+msgid "Enter valid income source details."
+msgstr ""
+
+msgid "Enter a positive amount in the workspace currency."
+msgstr ""
+
+msgid "The calculated amount is too large."
+msgstr ""
+
+msgid "The tax rules calculate a negative income amount."
+msgstr ""
+
+msgid "Enter a non-negative number of units."
+msgstr ""
+
+msgid "Enter a valid date between 1900 and 2199."
+msgstr ""
+
+msgid "Choose the first day of a work month."
+msgstr ""
+
+msgid "Choose an active income category."
+msgstr ""
+
+msgid "Working-day estimates are unavailable for this workspace country."
+msgstr ""
+
+msgid "Choose a valid tax rule and payment category."
+msgstr ""
+
+msgid "Choose an expense category that is not a transfer."
+msgstr ""
+
+msgid "This tax rule is already attached to the income source."
+msgstr ""
+
+msgid "A posted tax payment uses this attachment, so it cannot be removed."
+msgstr ""
+
+msgid "This month is closed. Reopen it before changing the income estimate."
+msgstr ""
+
+msgid "Archived income sources cannot be changed."
+msgstr ""
+
+msgid ""
+"The work log was saved; posted income was not changed. Adjust its "
+"transaction manually if needed."
+msgstr ""
+
+msgid "The income source could not be saved. Check the form and try again."
+msgstr ""
+
 msgid ""
 "This invitation link is not valid. It may have expired, been used or been"
 " revoked. Ask the workspace owner for a new link."
@@ -1305,9 +1358,6 @@ msgstr ""
 msgid "Choose an active category matching the direction."
 msgstr ""
 
-msgid "Enter a positive amount in the workspace currency."
-msgstr ""
-
 msgid "Enter a valid start date."
 msgstr ""
 
@@ -1504,9 +1554,6 @@ msgstr ""
 msgid "Not saved"
 msgstr ""
 
-msgid "Enter a valid date between 1900 and 2199."
-msgstr ""
-
 msgid "This month is closed. Reopen it or choose a date in an open month."
 msgstr ""
 
@@ -1600,6 +1647,15 @@ msgid "Recurring"
 msgstr ""
 
 msgid "Upcoming"
+msgstr ""
+
+#, python-format
+msgid "%(num)d overdue occurrence"
+msgid_plural "%(num)d overdue occurrences"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Income sources"
 msgstr ""
 
 msgid "Net worth"
@@ -2468,6 +2524,176 @@ msgstr ""
 msgid "Every selected entry is already in this category; nothing would change."
 msgstr ""
 
+msgid "New income source"
+msgstr ""
+
+msgid "Type"
+msgstr ""
+
+msgid "Variable"
+msgstr ""
+
+msgid "Fixed"
+msgstr ""
+
+msgid "Income category"
+msgstr ""
+
+#, python-format
+msgid "Fixed amount (%(currency)s)"
+msgstr ""
+
+#, python-format
+msgid "Rate per unit (%(currency)s)"
+msgstr ""
+
+msgid "Unit label"
+msgstr ""
+
+msgid "Pay day of month"
+msgstr ""
+
+msgid "Pay lag in months"
+msgstr ""
+
+msgid "Expected units"
+msgstr ""
+
+msgid "Working days"
+msgstr ""
+
+msgid "Fixed value"
+msgstr ""
+
+msgid "Average of recent months"
+msgstr ""
+
+msgid "Enter manually"
+msgstr ""
+
+msgid "Fixed expected units"
+msgstr ""
+
+msgid "Months for average"
+msgstr ""
+
+msgid "Record income as"
+msgstr ""
+
+msgid "Active from work month"
+msgstr ""
+
+msgid "Active through work month (optional)"
+msgstr ""
+
+msgid "Create income source"
+msgstr ""
+
+#, python-format
+msgid "Pay day %(day)s, lag %(lag)s months"
+msgstr ""
+
+#, python-format
+msgid "Record as: %(mode)s"
+msgstr ""
+
+#, python-format
+msgid "Archive the income source %(name)s?"
+msgstr ""
+
+msgid "Archived"
+msgstr ""
+
+msgid "Edit income source"
+msgstr ""
+
+msgid "Save income source"
+msgstr ""
+
+msgid "Next occurrences with tax preview"
+msgstr ""
+
+#, python-format
+msgid "Work month: %(month)s"
+msgstr ""
+
+msgid "Estimated"
+msgstr ""
+
+msgid "Confirmed"
+msgstr ""
+
+#, python-format
+msgid "Expected units: %(units)s"
+msgstr ""
+
+#, python-format
+msgid "Net: %(amount)s"
+msgstr ""
+
+#, python-format
+msgid "Gross: %(amount)s"
+msgstr ""
+
+#, python-format
+msgid "Take-home: %(amount)s"
+msgstr ""
+
+#, python-format
+msgid "Ledger amount: %(amount)s"
+msgstr ""
+
+#, python-format
+msgid "Planned payment: %(name)s — %(amount)s"
+msgstr ""
+
+msgid "Work logs"
+msgstr ""
+
+msgid "No work logs yet."
+msgstr ""
+
+msgid "Work month"
+msgstr ""
+
+#, python-format
+msgid "Units worked (%(unit)s)"
+msgstr ""
+
+msgid "Save work log"
+msgstr ""
+
+msgid "Attached tax rules"
+msgstr ""
+
+msgid "Tax rule"
+msgstr ""
+
+#, python-format
+msgid "Due day %(day)s, offset %(offset)s months"
+msgstr ""
+
+msgid "No tax rules attached."
+msgstr ""
+
+msgid "Payment category"
+msgstr ""
+
+msgid "Payment due day"
+msgstr ""
+
+msgid "Payment month offset"
+msgstr ""
+
+msgid "Generate a planned tax payment"
+msgstr ""
+
+msgid "Attach tax rule"
+msgstr ""
+
+msgid "No income sources yet."
+msgstr ""
+
 msgid "Invitation"
 msgstr ""
 
@@ -2526,6 +2752,12 @@ msgstr ""
 
 #, python-format
 msgid "Delete the entry of %(date)s, %(amount)s"
+msgstr ""
+
+msgid "Expected"
+msgstr ""
+
+msgid "Confirm"
 msgstr ""
 
 msgid "No entries in this category this month."
@@ -2591,6 +2823,10 @@ msgid "Spending and saving exceed earnings by %(amount)s."
 msgstr ""
 
 msgid "Earned"
+msgstr ""
+
+#, python-format
+msgid "Forecast spent %(spent)s · forecast earned %(earned)s."
 msgstr ""
 
 msgid "Spent"
@@ -2659,7 +2895,19 @@ msgstr ""
 msgid "Summary"
 msgstr ""
 
+msgid "Show forecast"
+msgstr ""
+
+msgid "Hide forecast"
+msgstr ""
+
 msgid "Actual"
+msgstr ""
+
+msgid "Expected (pending)"
+msgstr ""
+
+msgid "Forecast"
 msgstr ""
 
 msgid "Difference"
@@ -2677,6 +2925,10 @@ msgid "Closed"
 msgstr ""
 
 msgid "Enter transactions"
+msgstr ""
+
+#, python-format
+msgid "Enter days worked for %(month)s for %(name)s."
 msgstr ""
 
 msgid "This month is closed. Its entries and planned values are read-only."
@@ -2734,9 +2986,6 @@ msgid ""
 msgstr ""
 
 msgid "Amount type"
-msgstr ""
-
-msgid "Fixed"
 msgstr ""
 
 msgid "Automatically post on the due date"
@@ -2822,9 +3071,6 @@ msgid "Recurring items"
 msgstr ""
 
 msgid "Upcoming inbox"
-msgstr ""
-
-msgid "Archived"
 msgstr ""
 
 msgid "Paused"
@@ -2915,9 +3161,6 @@ msgstr ""
 msgid "Calculation date"
 msgstr ""
 
-msgid "Record income as"
-msgstr ""
-
 msgid "Calculate"
 msgstr ""
 
@@ -2984,10 +3227,6 @@ msgid "Fixed amount"
 msgstr ""
 
 msgid "Rate in percent"
-msgstr ""
-
-#, python-format
-msgid "Fixed amount (%(currency)s)"
 msgstr ""
 
 msgid "Create tax rule"

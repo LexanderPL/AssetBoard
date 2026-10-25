@@ -44,6 +44,8 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "categories",
         "email_tokens",
         "external_identities",
+        "income_source_tax_rules",
+        "income_sources",
         "instance_settings",
         "invitations",
         "memberships",
@@ -59,6 +61,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "user_sessions",
         "users",
         "workspaces",
+        "work_logs",
     }
     assert setup_rows == [1]
     assert current_heads == tuple(ScriptDirectory.from_config(alembic_config(settings)).get_heads())
@@ -82,6 +85,87 @@ def test_0018_tax_rules_migration_is_reversible(tmp_path: Path) -> None:
         upgrade_database(settings)
         assert {"tax_rules", "tax_rule_versions"} <= set(inspect(engine).get_table_names())
         check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0020_income_sources_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'income.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        assert {"income_sources", "income_source_tax_rules", "work_logs"} <= set(
+            inspector.get_table_names()
+        )
+        assert {
+            "income_source_id",
+            "work_month",
+            "parent_occurrence_id",
+            "income_source_tax_rule_id",
+        } <= {column["name"] for column in inspector.get_columns("scheduled_occurrences")}
+        command.downgrade(alembic_config(settings), "0019_f32_prev_txn")
+        assert not {
+            "income_sources",
+            "income_source_tax_rules",
+            "work_logs",
+        } & set(inspect(engine).get_table_names())
+        assert "income_source_id" not in {
+            column["name"] for column in inspect(engine).get_columns("scheduled_occurrences")
+        }
+        upgrade_database(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0020_downgrade_drops_income_occurrences(tmp_path: Path) -> None:
+    from datetime import date
+
+    from sqlalchemy.orm import Session
+
+    from assetboard.clock import FixedClock
+    from assetboard.db.models.identity import Workspace
+    from assetboard.db.models.scheduled import ScheduledOccurrence
+    from tests.tenant.factories import make_income_source
+
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'data.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        clock = FixedClock("2026-01-01T00:00:00+00:00")
+        with Session(engine, info={"clock": clock}) as session, session.begin():
+            workspace = Workspace(name="W", base_currency="EUR", locale="en", timezone="UTC")
+            session.add(workspace)
+            session.flush()
+            source = make_income_source(session, workspace.id)
+            session.add(source)
+            session.flush()
+            session.add(
+                ScheduledOccurrence(
+                    workspace_id=workspace.id,
+                    income_source_id=source.id,
+                    work_month=date(2026, 1, 1),
+                    direction="income",
+                    category_id=source.category_id,
+                    nominal_date=date(2026, 2, 10),
+                    due_date=date(2026, 2, 10),
+                    expected_minor=100,
+                    currency="EUR",
+                    amount_state="estimated",
+                    generated_by="income",
+                    label="Salary",
+                )
+            )
+        command.downgrade(alembic_config(settings), "0019_f32_prev_txn")
+        with engine.connect() as connection:
+            count = connection.exec_driver_sql("SELECT count(*) FROM scheduled_occurrences")
+            assert count.scalar_one() == 0
+        upgrade_database(settings)
     finally:
         engine.dispose()
 

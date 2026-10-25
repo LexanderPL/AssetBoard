@@ -96,7 +96,7 @@
           </form>
         </details>
         <form method="post" action="{{ scoped_url(request, 'upcoming_skip', occurrence_id=occurrence.id) }}">{{ csrf_input() }}<button type="submit" class="{{ button_class }}">{{ _("Skip") }}</button></form>
-        <a href="{{ scoped_url(request, 'scheduled_edit', item_id=occurrence.scheduled_item_id) }}" class="{{ button_class }}">{{ _("Edit rule") }}</a>
+        {% if occurrence.scheduled_item_id %}<a href="{{ scoped_url(request, 'scheduled_edit', item_id=occurrence.scheduled_item_id) }}" class="{{ button_class }}">{{ _("Edit rule") }}</a>{% elif occurrence.income_source_id %}<a href="{{ scoped_url(request, 'income_sources') }}#income-source-{{ occurrence.income_source_id }}" class="{{ button_class }}">{{ _("Edit income source") }}</a>{% endif %}
       </div>
       {% endif %}
     </div>

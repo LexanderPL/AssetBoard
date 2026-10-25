@@ -12,6 +12,18 @@ document.addEventListener("click", (event) => {
     }
   }
 
+  const forecastToggle = target.closest("[data-forecast-toggle]");
+  if (forecastToggle instanceof HTMLButtonElement) {
+    const show = forecastToggle.getAttribute("aria-pressed") !== "true";
+    forecastToggle.setAttribute("aria-pressed", String(show));
+    forecastToggle.textContent = show
+      ? forecastToggle.dataset.hideLabel
+      : forecastToggle.dataset.showLabel;
+    document.querySelectorAll("[data-forecast-column]").forEach((column) => {
+      column.classList.toggle("hidden", !show);
+    });
+  }
+
   const themeReset = target.closest("[data-theme-reset]");
   if (themeReset) {
     // Drop this device's override: the saved profile theme (or the system setting) applies.

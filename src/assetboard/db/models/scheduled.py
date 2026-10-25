@@ -72,6 +72,7 @@ class ScheduledItem(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
 class ScheduledOccurrence(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     __tablename__ = "scheduled_occurrences"
     __table_args__ = (
+        UniqueConstraint("workspace_id", "id", name="uq_scheduled_occurrences_workspace_id_id"),
         UniqueConstraint(
             "scheduled_item_id",
             "nominal_date",
@@ -81,6 +82,21 @@ class ScheduledOccurrence(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             ["workspace_id", "scheduled_item_id"],
             ["scheduled_items.workspace_id", "scheduled_items.id"],
             name="fk_scheduled_occurrences_workspace_item",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "income_source_id"],
+            ["income_sources.workspace_id", "income_sources.id"],
+            name="fk_scheduled_occurrences_workspace_income_source",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "parent_occurrence_id"],
+            ["scheduled_occurrences.workspace_id", "scheduled_occurrences.id"],
+            name="fk_scheduled_occurrences_workspace_parent",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "income_source_tax_rule_id"],
+            ["income_source_tax_rules.workspace_id", "income_source_tax_rules.id"],
+            name="fk_scheduled_occurrences_workspace_tax_attachment",
         ),
         ForeignKeyConstraint(
             ["workspace_id", "category_id"],
@@ -100,15 +116,39 @@ class ScheduledOccurrence(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         CheckConstraint("direction IN ('expense', 'income')", name="direction_valid"),
         CheckConstraint("amount_state IN ('estimated', 'confirmed')", name="amount_state_valid"),
         CheckConstraint("status IN ('pending', 'posted', 'skipped')", name="status_valid"),
-        CheckConstraint("generated_by IN ('rule', 'manual')", name="generated_by_valid"),
         CheckConstraint(
-            f"expected_minor > 0 AND expected_minor <= {MAX_AMOUNT_MINOR}", name="amount_valid"
+            "generated_by IN ('rule', 'manual', 'income', 'tax')", name="generated_by_valid"
+        ),
+        CheckConstraint(
+            "(generated_by IN ('rule', 'manual') AND scheduled_item_id IS NOT NULL "
+            "AND income_source_id IS NULL) OR "
+            "(generated_by IN ('income', 'tax') AND scheduled_item_id IS NULL)",
+            name="source_reference_valid",
+        ),
+        CheckConstraint(
+            f"expected_minor >= 0 AND expected_minor <= {MAX_AMOUNT_MINOR}", name="amount_valid"
         ),
         Index("ix_scheduled_occurrences_workspace_due", "workspace_id", "due_date"),
         Index("ix_scheduled_occurrences_workspace_category", "workspace_id", "category_id"),
+        UniqueConstraint(
+            "workspace_id",
+            "income_source_id",
+            "work_month",
+            name="uq_scheduled_occurrences_income_work_month",
+        ),
+        UniqueConstraint(
+            "workspace_id",
+            "parent_occurrence_id",
+            "income_source_tax_rule_id",
+            name="uq_scheduled_occurrences_parent_tax_attachment",
+        ),
     )
 
-    scheduled_item_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
+    scheduled_item_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
+    income_source_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
+    work_month: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    parent_occurrence_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
+    income_source_tax_rule_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
     direction: Mapped[str] = mapped_column(String(16), nullable=False)
     category_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
     nominal_date: Mapped[date] = mapped_column(Date(), nullable=False)

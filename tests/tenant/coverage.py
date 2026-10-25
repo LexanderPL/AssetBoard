@@ -31,10 +31,35 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         for method in (
             "create",
             "for_item",
+            "for_income_work_month",
+            "for_income_source",
+            "children",
+            "for_tax_attachment",
             "get_for_update",
             "linked_to_transaction_for_update",
             "upcoming",
             "category_counts",
+        )
+    },
+    **{
+        ("ScheduledOccurrenceRepository", method): "test_income_queries_stay_in_their_workspace"
+        for method in ("pending_for_month", "overdue_count")
+    },
+    **{
+        ("IncomeSourceRepository", method): "test_income_queries_stay_in_their_workspace"
+        for method in ("create", "ordered", "any_exists", "category_counts")
+    },
+    **{
+        ("WorkLogRepository", method): "test_income_queries_stay_in_their_workspace"
+        for method in ("create", "for_source", "work_months_for_sources")
+    },
+    **{
+        ("IncomeSourceTaxRuleRepository", method): "test_income_queries_stay_in_their_workspace"
+        for method in (
+            "create",
+            "for_source",
+            "for_source_and_rule",
+            "payment_category_counts",
         )
     },
     **{

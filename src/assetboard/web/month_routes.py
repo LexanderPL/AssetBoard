@@ -29,6 +29,7 @@ from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day, format_month, format_month_heading
 from assetboard.services.budget import CopyResult, auto_copy_on_open
 from assetboard.services.context import Context
+from assetboard.services.income import missing_work_logs
 from assetboard.services.months import (
     MonthError,
     MonthView,
@@ -125,7 +126,8 @@ def month_header(
     request: Request, ctx: Context, target: YearMonth, *, notice: str = "", error: str = ""
 ) -> dict[str, object]:
     """What the Month and Transactions pages share (blocking: run in a thread): the month,
-    its headings, navigation names, closed state and the notice or error of the last action."""
+    its headings, navigation names, closed state, the notice or error of the last action and
+    the F3.5 missing-work-log banner."""
     view = get_month(request.app.state.session_factory, ctx, target)
     locale = request.state.locale
     closed_on = None
@@ -142,6 +144,12 @@ def month_header(
         "notice": _t(request, NOTICES[notice]) if notice in NOTICES else None,
         "notice_href": None,
         "error": _t(request, ERRORS[error]) if error in ERRORS else None,
+        "missing_work_logs": [
+            (source_id, name, format_month(YearMonth.from_date(work_month), locale))
+            for source_id, name, work_month in missing_work_logs(
+                request.app.state.session_factory, ctx, view.month.first_day
+            )
+        ],
     }
 
 

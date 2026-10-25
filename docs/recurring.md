@@ -85,3 +85,21 @@ month is closed. Reopen it first, or reschedule to an open month.
 An occurrence's nominal scheduled date is stored separately from its effective or rescheduled
 date, so holiday-calendar changes do not change the identity of a rescheduled or posted
 occurrence.
+
+## Income sources and work logs
+
+Open **Income sources** to add a fixed salary or variable income paid per unit worked. Variable
+sources can estimate units from the workspace's working days, a fixed number, recent logged
+months, or wait for a manual work log. A work month is paid on the source's configured day in
+the month after its payment lag; days past the end of a short month are clamped to its last day.
+Log units by work month (decimal units are supported). The next pending occurrence and any
+planned tax-payment occurrences are recalculated; a posted transaction is never silently changed.
+
+Optional tax rules are attached in order to an income source. The configured `record_as` choice
+determines whether the income ledger records gross, net, or take-home money. Selected rules can
+create separate planned tax-payment expenses in an expense category. Tax rates and fixed amounts
+are user-entered models, not tax advice. Pending occurrences appear as expected rows, with a
+Confirm button, in the tables of the month's **Transactions** page; the **Month** summary shows
+pending expected amounts and a forecast alongside actuals. Missing work logs are highlighted on
+both pages when the related pay date is due within ten days or is overdue. A pending income
+occurrence you rescheduled keeps its date when its amount is recalculated.

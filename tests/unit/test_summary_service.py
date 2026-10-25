@@ -4,7 +4,8 @@ transactions count, every member may read, and nothing crosses workspaces."""
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
+from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
@@ -13,6 +14,7 @@ import pytest
 from assetboard.clock import FixedClock
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
+from assetboard.services import income
 from assetboard.services.budget import set_planned
 from assetboard.services.categories import archive_category, create_category
 from assetboard.services.context import Context
@@ -86,6 +88,37 @@ def test_only_the_months_live_transactions_count(team: WorkspaceDb) -> None:
     _spend(team, food, "1000", day="2026-09-30")  # September
     summary = month_summary(team.factory, _editor(team), OCTOBER).summary
     assert summary.block("expense").actual == Money(1000, "EUR")
+
+
+def test_pending_income_occurrence_contributes_to_month_forecast(team: WorkspaceDb) -> None:
+    salary = _category(team, "Golden Pending Salary", "income")
+    source_id = income.create_source(
+        team.factory,
+        _editor(team),
+        name="Contract",
+        kind="variable",
+        category_id=salary,
+        fixed_minor=None,
+        rate_minor=1_000,
+        unit_label="day",
+        pay_day_value=10,
+        pay_lag_months=1,
+        expected_mode="manual",
+        expected_units_value=None,
+        average_months=3,
+        record_as="net",
+        active_from=date(2026, 1, 1),
+        active_to=None,
+    )
+    income.log_work(team.factory, _editor(team), source_id, date(2026, 9, 1), Decimal("5"))
+
+    row = month_summary(team.factory, _editor(team), OCTOBER).summary.row(salary)
+    assert row is not None
+    assert (row.actual, row.expected, row.forecast) == (
+        Money(0, "EUR"),
+        Money(5_000, "EUR"),
+        Money(5_000, "EUR"),
+    )
 
 
 def test_archived_categories_appear_with_actuals_only(team: WorkspaceDb) -> None:

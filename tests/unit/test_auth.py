@@ -1274,6 +1274,9 @@ WORKSPACE_TABLES = {
     "budget_lines",
     "tax_rules",
     "tax_rule_versions",
+    "income_sources",
+    "income_source_tax_rules",
+    "work_logs",
 }
 
 

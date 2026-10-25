@@ -14,6 +14,7 @@ from assetboard.domain.summary import (
     BLOCK_ORDER,
     Entry,
     FlowBar,
+    PendingEntry,
     PlanLine,
     SummaryCategory,
     block_of,
@@ -71,6 +72,35 @@ def test_golden_example() -> None:
     assert kpis.net == _eur(-147300)
     assert kpis.savings_rate_bp == 0
     assert kpis.savings_rate_tenths == 0
+
+
+def test_pending_occurrences_extend_forecast_without_changing_actuals() -> None:
+    food, salary = _category(), _category("income")
+    summary = summarize_month(
+        [Entry(food.id, _eur(500)), Entry(salary.id, _eur(1000))],
+        [PlanLine(food.id, _eur(800))],
+        [food, salary],
+        currency="EUR",
+        pending=[PendingEntry(food.id, _eur(200)), PendingEntry(salary.id, _eur(300))],
+    )
+    expense = summary.block("expense")
+    income = summary.block("income")
+    assert (expense.actual, expense.expected, expense.forecast) == (
+        _eur(500),
+        _eur(200),
+        _eur(700),
+    )
+    assert (income.actual, income.expected, income.forecast) == (
+        _eur(1000),
+        _eur(300),
+        _eur(1300),
+    )
+    assert expense.rows[0].difference == _eur(300)
+    assert (summary.kpis.earned, summary.kpis.spent) == (_eur(1000), _eur(500))
+    assert (summary.kpis.forecast_earned, summary.kpis.forecast_spent) == (
+        _eur(1300),
+        _eur(700),
+    )
 
 
 # Blocks and signs
@@ -244,6 +274,8 @@ def test_totals_equal_the_sum_of_rows_and_transfers_never_appear(
     for block in summary.blocks:
         assert block.planned.amount_minor == sum(r.planned.amount_minor for r in block.rows)
         assert block.actual.amount_minor == sum(r.actual.amount_minor for r in block.rows)
+        assert block.expected.amount_minor == sum(r.expected.amount_minor for r in block.rows)
+        assert block.forecast.amount_minor == sum(r.forecast.amount_minor for r in block.rows)
         assert block.difference.amount_minor == sum(r.difference.amount_minor for r in block.rows)
         for row in block.rows:
             assert kinds[row.category_id][1] != "transfer"
@@ -262,6 +294,9 @@ def test_totals_equal_the_sum_of_rows_and_transfers_never_appear(
             assert row.category_id not in seen
             seen.add(row.category_id)
             assert row.actual.amount_minor == counted.get(row.category_id, 0)
+            assert row.forecast.amount_minor == (
+                row.actual.amount_minor + row.expected.amount_minor
+            )
     assert set(counted) <= seen  # every counted actual has its row (planned 0 if no line)
     active = {c.id for c in categories if not c.archived and c.treatment != "transfer"}
     assert active <= seen  # every active non-transfer category has a row (to be planned)
