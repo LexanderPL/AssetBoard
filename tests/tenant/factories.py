@@ -12,12 +12,14 @@ import itertools
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
+from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkLog
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.models.tax import TaxRule, TaxRuleVersion
@@ -191,6 +193,68 @@ def make_tax_rule_version(session: Session, workspace_id: UUID) -> TaxRuleVersio
     )
 
 
+def make_income_source(session: Session, workspace_id: UUID) -> IncomeSource:
+    category = Category(
+        workspace_id=workspace_id,
+        name="Salary",
+        name_key="salary",
+        kind="income",
+        treatment="regular",
+        color="#16a34a",
+        sort_order=0,
+    )
+    session.add(category)
+    session.flush()
+    return IncomeSource(
+        workspace_id=workspace_id,
+        name="Salary",
+        kind="variable",
+        category_id=category.id,
+        currency="EUR",
+        fixed_minor=None,
+        rate_minor=123000,
+        unit_label="day",
+        pay_day=10,
+        pay_lag_months=1,
+        expected_mode="manual",
+        expected_units=None,
+        average_months=3,
+        record_as="cash_received",
+        active_from=date(2026, 1, 1),
+        active_to=None,
+    )
+
+
+def make_work_log(session: Session, workspace_id: UUID) -> WorkLog:
+    source = make_income_source(session, workspace_id)
+    session.add(source)
+    session.flush()
+    return WorkLog(
+        workspace_id=workspace_id,
+        income_source_id=source.id,
+        work_month=date(2026, 1, 1),
+        units=Decimal("19"),
+    )
+
+
+def make_income_source_tax_rule(session: Session, workspace_id: UUID) -> IncomeSourceTaxRule:
+    source = make_income_source(session, workspace_id)
+    category = make_category(session, workspace_id)
+    rule = make_tax_rule(session, workspace_id)
+    session.add_all([source, category, rule])
+    session.flush()
+    return IncomeSourceTaxRule(
+        workspace_id=workspace_id,
+        income_source_id=source.id,
+        tax_rule_id=rule.id,
+        sort_order=0,
+        generate_payment=True,
+        payment_category_id=category.id,
+        due_day=10,
+        due_month_offset=1,
+    )
+
+
 TENANT_CASES: dict[type[Any], TenantCase] = {
     ScheduledItem: TenantCase(make_scheduled_item, update_values={"name": "Rent"}),
     ScheduledOccurrence: TenantCase(make_scheduled_occurrence, update_values={"label": "Rent"}),
@@ -218,4 +282,7 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
         make_tax_rule_version,
         unsupported=frozenset({"update", "delete"}),
     ),
+    IncomeSource: TenantCase(make_income_source, update_values={"name": "Updated salary"}),
+    WorkLog: TenantCase(make_work_log, update_values={"units": Decimal("20")}),
+    IncomeSourceTaxRule: TenantCase(make_income_source_tax_rule, update_values={"due_day": 12}),
 }

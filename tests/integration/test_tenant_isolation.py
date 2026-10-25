@@ -9,6 +9,7 @@ from __future__ import annotations
 import sys
 from collections.abc import Iterator
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
@@ -963,6 +964,10 @@ def test_scheduled_queries_stay_in_their_workspace(db_session, two_workspaces) -
     assert other_items.ordered() == [] and other_items.ordered(active_only=True) == []
     assert other_items.category_counts() == {} and other_rows.category_counts() == {}
     assert other_rows.for_item(item.id) == []
+    assert other_rows.for_income_source(uuid4()) == []
+    assert other_rows.for_income_work_month(uuid4(), date(2026, 3, 1)) is None
+    assert other_rows.children(row.id) == []
+    assert other_rows.for_tax_attachment(uuid4()) == []
     assert other_rows.upcoming(date(2026, 4, 1)) == []
     assert rows.get_for_update(row.id) == row
     assert other_rows.get_for_update(row.id) is None
@@ -977,6 +982,98 @@ def test_scheduled_queries_stay_in_their_workspace(db_session, two_workspaces) -
     assert rows.category_counts() == {item.category_id: 1}
     rows.delete(row)
     assert rows.for_item(item.id) == []
+
+
+def test_income_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    from assetboard.db.repositories import (
+        IncomeSourceRepository,
+        IncomeSourceTaxRuleRepository,
+        TaxRuleRepository,
+        WorkLogRepository,
+    )
+
+    ctx_a, ctx_b = two_workspaces
+
+    def build(ctx: Any, suffix: str) -> tuple[Any, Any, Any]:
+        category = CategoryRepository(db_session, ctx).create(
+            name=f"Income {suffix}",
+            name_key=f"income-{suffix.casefold()}",
+            kind="income",
+            treatment="regular",
+            color="#16a34a",
+            sort_order=0,
+        )
+        source = IncomeSourceRepository(db_session, ctx).create(
+            name=f"Source {suffix}",
+            kind="variable",
+            category_id=category.id,
+            currency="EUR",
+            fixed_minor=None,
+            rate_minor=100,
+            unit_label="day",
+            pay_day=10,
+            pay_lag_months=1,
+            expected_mode="manual",
+            expected_units=None,
+            average_months=3,
+            record_as="net",
+            active_from=date(2026, 1, 1),
+            active_to=None,
+        )
+        tax_rule = TaxRuleRepository(db_session, ctx).create(
+            name=f"Tax {suffix}", effect="withheld", base="net", notes=""
+        )
+        expense = CategoryRepository(db_session, ctx).create(
+            name=f"Expense {suffix}",
+            name_key=f"expense-{suffix.casefold()}",
+            kind="expense",
+            treatment="regular",
+            color="#16a34a",
+            sort_order=1,
+        )
+        attachment = IncomeSourceTaxRuleRepository(db_session, ctx).create(
+            income_source_id=source.id,
+            tax_rule_id=tax_rule.id,
+            sort_order=0,
+            generate_payment=True,
+            payment_category_id=expense.id,
+            due_day=10,
+            due_month_offset=1,
+        )
+        log = WorkLogRepository(db_session, ctx).create(
+            income_source_id=source.id,
+            work_month=date(2026, 1, 1),
+            units=Decimal("19.5"),
+        )
+        return source, attachment, log
+
+    source_a, attachment_a, log_a = build(ctx_a, "A")
+    source_b, attachment_b, log_b = build(ctx_b, "B")
+    sources_a, sources_b = (
+        IncomeSourceRepository(db_session, ctx_a),
+        IncomeSourceRepository(db_session, ctx_b),
+    )
+    attachments_a = IncomeSourceTaxRuleRepository(db_session, ctx_a)
+    attachments_b = IncomeSourceTaxRuleRepository(db_session, ctx_b)
+    logs_a, logs_b = WorkLogRepository(db_session, ctx_a), WorkLogRepository(db_session, ctx_b)
+
+    assert [row.id for row in sources_a.ordered()] == [source_a.id]
+    assert [row.id for row in sources_b.ordered(active_only=True)] == [source_b.id]
+    assert sources_a.any_exists() and sources_b.any_exists()
+    assert sources_a.category_counts() == {source_a.category_id: 1}
+    assert sources_b.category_counts() == {source_b.category_id: 1}
+    assert [row.id for row in logs_a.for_source(source_a.id)] == [log_a.id]
+    assert logs_b.for_source(source_a.id) == []
+    assert [row.id for row in attachments_a.for_source(source_a.id)] == [attachment_a.id]
+    assert attachments_b.for_source(source_a.id) == []
+    assert attachments_a.for_source_and_rule(source_a.id, attachment_a.tax_rule_id) is attachment_a
+    assert attachments_b.for_source_and_rule(source_b.id, attachment_a.tax_rule_id) is None
+    assert attachments_a.payment_category_counts() == {attachment_a.payment_category_id: 1}
+    assert attachments_b.payment_category_counts() == {attachment_b.payment_category_id: 1}
+    assert [row.id for row in logs_b.for_source(source_b.id)] == [log_b.id]
+    assert [row.id for row in attachments_b.for_source(source_b.id)] == [attachment_b.id]
 
 
 # Deleting a workspace (ADR-0020): every workspace-owned model, found by discovery

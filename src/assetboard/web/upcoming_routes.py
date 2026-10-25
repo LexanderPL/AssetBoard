@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import contextlib
 from datetime import date
 from urllib.parse import urlencode
 from uuid import UUID
@@ -9,6 +10,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.repositories import NotFound
+from assetboard.domain.months import InvalidMonth, YearMonth
 from assetboard.domain.transactions import amount_minor
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day
@@ -53,14 +55,22 @@ async def _values(request: Request) -> dict[str, str]:
 
 
 def _redirect(
-    request: Request, *, error: str | None = None, posted: UUID | None = None
+    request: Request,
+    *,
+    error: str | None = None,
+    posted: UUID | None = None,
+    return_month: YearMonth | None = None,
 ) -> Response:
     params: dict[str, str] = {}
     if error:
         params["error"] = error
     if posted:
         params["posted"] = str(posted)
-    target = request.url_for("scheduled_upcoming").path
+    target = (
+        request.url_for("month", month=str(return_month)).path
+        if return_month is not None
+        else request.url_for("scheduled_upcoming").path
+    )
     return RedirectResponse(target + ("?" + urlencode(params) if params else ""), status_code=303)
 
 
@@ -146,7 +156,10 @@ async def post(request: Request, ctx: CurrentContext, occurrence_id: str) -> Res
         )
     except occurrences.OccurrenceError as exc:
         return _redirect(request, error=exc.code)
-    return _redirect(request, posted=_id(occurrence_id))
+    return_month = None
+    with contextlib.suppress(InvalidMonth):
+        return_month = YearMonth.parse(values.get("return_month", ""))
+    return _redirect(request, posted=_id(occurrence_id), return_month=return_month)
 
 
 @router.post("/upcoming/{occurrence_id}/skip", name="upcoming_skip")

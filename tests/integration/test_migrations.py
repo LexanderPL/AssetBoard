@@ -44,6 +44,8 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "categories",
         "email_tokens",
         "external_identities",
+        "income_source_tax_rules",
+        "income_sources",
         "instance_settings",
         "invitations",
         "memberships",
@@ -59,6 +61,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "user_sessions",
         "users",
         "workspaces",
+        "work_logs",
     }
     assert setup_rows == [1]
     assert current_heads == tuple(ScriptDirectory.from_config(alembic_config(settings)).get_heads())
@@ -81,6 +84,38 @@ def test_0018_tax_rules_migration_is_reversible(tmp_path: Path) -> None:
         assert not {"tax_rules", "tax_rule_versions"} & set(inspect(engine).get_table_names())
         upgrade_database(settings)
         assert {"tax_rules", "tax_rule_versions"} <= set(inspect(engine).get_table_names())
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0019_income_sources_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'income.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        assert {"income_sources", "income_source_tax_rules", "work_logs"} <= set(
+            inspector.get_table_names()
+        )
+        assert {
+            "income_source_id",
+            "work_month",
+            "parent_occurrence_id",
+            "income_source_tax_rule_id",
+        } <= {column["name"] for column in inspector.get_columns("scheduled_occurrences")}
+        command.downgrade(alembic_config(settings), "0018_f33")
+        assert not {
+            "income_sources",
+            "income_source_tax_rules",
+            "work_logs",
+        } & set(inspect(engine).get_table_names())
+        assert "income_source_id" not in {
+            column["name"] for column in inspect(engine).get_columns("scheduled_occurrences")
+        }
+        upgrade_database(settings)
         check_database_migrations(settings)
     finally:
         engine.dispose()

@@ -16,6 +16,7 @@ from assetboard.db.repositories import (
     BudgetLineRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
+    ScheduledOccurrenceRepository,
     TransactionRepository,
 )
 from assetboard.domain.money import Money
@@ -23,6 +24,7 @@ from assetboard.domain.months import YearMonth
 from assetboard.domain.summary import (
     Entry,
     MonthSummary,
+    PendingEntry,
     PlanLine,
     SortOrder,
     SummaryCategory,
@@ -68,9 +70,18 @@ def month_summary(
             Entry(row.category_id, Money(row.amount_minor, row.currency))
             for row in TransactionRepository(session, ctx).for_month(month)
         ]
+        pending_rows = ScheduledOccurrenceRepository(session, ctx).pending_for_month(
+            month.first_day, month.last_day
+        )
+        pending = [
+            PendingEntry(row.category_id, Money(row.expected_minor, row.currency))
+            for row, _item, _category_name in pending_rows
+        ]
         lines = [
             PlanLine(line.category_id, Money(line.planned_minor, line.currency))
             for line in BudgetLineRepository(session, ctx).for_month(month)
         ]
-    summary = summarize_month(entries, lines, categories, currency=currency, sort=sort)
+    summary = summarize_month(
+        entries, lines, categories, currency=currency, pending=pending, sort=sort
+    )
     return SummaryData(summary=summary, categories=names)

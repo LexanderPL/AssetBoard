@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 
 from assetboard.clock import Clock
 from assetboard.db.models.identity import UserSession
+from assetboard.db.repositories.scheduled import ScheduledOccurrenceRepository
 from assetboard.db.repositories.user_memberships import UserMembershipReader
 
 if TYPE_CHECKING:
@@ -183,6 +184,7 @@ class WorkspaceNav:
     choices: tuple[WorkspaceChoice, ...]
     # The account may create another workspace (instance setting, or an administrator).
     can_create_workspace: bool = False
+    overdue_count: int = 0
 
     @property
     def can_switch(self) -> bool:
@@ -203,6 +205,9 @@ def workspace_nav(
         role=ctx.role,
         choices=choices,
         can_create_workspace=can_create_workspace,
+        overdue_count=ScheduledOccurrenceRepository(session, ctx).overdue_count(
+            ctx.clock.today(ctx.workspace.timezone)
+        ),
     )
 
 

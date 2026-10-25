@@ -55,6 +55,43 @@ class ScheduledOccurrenceRepository(ScopedRepository[ScheduledOccurrence]):
             )
         )
 
+    def for_income_work_month(
+        self, income_source_id: UUID, work_month: date
+    ) -> ScheduledOccurrence | None:
+        statement = self._scoped_select().where(
+            ScheduledOccurrence.income_source_id == income_source_id,
+            ScheduledOccurrence.work_month == work_month,
+            ScheduledOccurrence.generated_by == "income",
+        )
+        return self._session.scalars(statement).one_or_none()
+
+    def for_income_source(self, income_source_id: UUID) -> list[ScheduledOccurrence]:
+        return list(
+            self._session.scalars(
+                self._scoped_select().where(
+                    ScheduledOccurrence.income_source_id == income_source_id
+                )
+            )
+        )
+
+    def children(self, parent_id: UUID) -> list[ScheduledOccurrence]:
+        return list(
+            self._session.scalars(
+                self._scoped_select()
+                .where(ScheduledOccurrence.parent_occurrence_id == parent_id)
+                .order_by(ScheduledOccurrence.due_date, ScheduledOccurrence.id)
+            )
+        )
+
+    def for_tax_attachment(self, attachment_id: UUID) -> list[ScheduledOccurrence]:
+        return list(
+            self._session.scalars(
+                self._scoped_select().where(
+                    ScheduledOccurrence.income_source_tax_rule_id == attachment_id
+                )
+            )
+        )
+
     def get_for_update(self, occurrence_id: UUID) -> ScheduledOccurrence | None:
         statement = (
             self._scoped_select().where(ScheduledOccurrence.id == occurrence_id).with_for_update()
@@ -67,10 +104,10 @@ class ScheduledOccurrenceRepository(ScopedRepository[ScheduledOccurrence]):
         *,
         direction: str | None = None,
         category_id: UUID | None = None,
-    ) -> list[tuple[ScheduledOccurrence, ScheduledItem, str]]:
+    ) -> list[tuple[ScheduledOccurrence, ScheduledItem | None, str]]:
         statement = (
             select(ScheduledOccurrence, ScheduledItem, Category.name)
-            .join(
+            .outerjoin(
                 ScheduledItem,
                 and_(
                     ScheduledItem.workspace_id == self._workspace_id,
@@ -99,6 +136,43 @@ class ScheduledOccurrenceRepository(ScopedRepository[ScheduledOccurrence]):
                 statement.order_by(ScheduledOccurrence.due_date, ScheduledOccurrence.id)
             ).all()
         )
+
+    def pending_for_month(
+        self, first_day: date, last_day: date
+    ) -> list[tuple[ScheduledOccurrence, ScheduledItem | None, str]]:
+        statement = (
+            select(ScheduledOccurrence, ScheduledItem, Category.name)
+            .outerjoin(
+                ScheduledItem,
+                and_(
+                    ScheduledItem.workspace_id == self._workspace_id,
+                    ScheduledItem.id == ScheduledOccurrence.scheduled_item_id,
+                ),
+            )
+            .join(
+                Category,
+                and_(
+                    Category.workspace_id == self._workspace_id,
+                    Category.id == ScheduledOccurrence.category_id,
+                ),
+            )
+            .where(
+                ScheduledOccurrence.workspace_id == self._workspace_id,
+                ScheduledOccurrence.status == "pending",
+                ScheduledOccurrence.due_date >= first_day,
+                ScheduledOccurrence.due_date <= last_day,
+            )
+            .order_by(ScheduledOccurrence.due_date, ScheduledOccurrence.id)
+        )
+        return list(self._session.execute(statement).all())
+
+    def overdue_count(self, today: date) -> int:
+        statement = select(func.count()).where(
+            ScheduledOccurrence.workspace_id == self._workspace_id,
+            ScheduledOccurrence.status == "pending",
+            ScheduledOccurrence.due_date < today,
+        )
+        return int(self._session.execute(statement).scalar_one())
 
     def category_counts(self) -> dict[UUID, int]:
         rows = self._session.execute(

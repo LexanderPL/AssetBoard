@@ -1100,6 +1100,59 @@ msgstr ""
 "Twoje konto ma hasło tymczasowe. Zanim zrobisz cokolwiek innego, ustaw "
 "nowe hasło."
 
+msgid "Enter valid income source details."
+msgstr "Podaj prawidłowe dane źródła przychodu."
+
+msgid "Enter a positive amount in the workspace currency."
+msgstr "Podaj dodatnią kwotę w walucie obszaru roboczego."
+
+msgid "The calculated amount is too large."
+msgstr "Obliczona kwota jest za duża."
+
+msgid "The tax rules calculate a negative income amount."
+msgstr "Reguły podatkowe obliczają ujemną kwotę przychodu."
+
+msgid "Enter a non-negative number of units."
+msgstr "Podaj nieujemną liczbę jednostek."
+
+msgid "Enter a valid date between 1900 and 2199."
+msgstr "Podaj prawidłową datę z zakresu od 1900 do 2199."
+
+msgid "Choose the first day of a work month."
+msgstr "Wybierz pierwszy dzień miesiąca pracy."
+
+msgid "Choose an active income category."
+msgstr "Wybierz aktywną kategorię przychodów."
+
+msgid "Working-day estimates are unavailable for this workspace country."
+msgstr "Szacunki dni roboczych są niedostępne dla kraju tego obszaru roboczego."
+
+msgid "Choose a valid tax rule and payment category."
+msgstr "Wybierz prawidłową regułę podatkową i kategorię płatności."
+
+msgid "Choose an expense category that is not a transfer."
+msgstr "Wybierz kategorię wydatków, która nie jest przelewem własnym."
+
+msgid "This tax rule is already attached to the income source."
+msgstr "Ta reguła podatkowa jest już przypisana do źródła przychodu."
+
+msgid "A posted tax payment uses this attachment, so it cannot be removed."
+msgstr "Zaksięgowana płatność podatku korzysta z tego przypisania, więc nie można go usunąć."
+
+msgid "Archived income sources cannot be changed."
+msgstr "Nie można zmieniać zarchiwizowanych źródeł przychodu."
+
+msgid ""
+"The work log was saved; posted income was not changed. Adjust its "
+"transaction manually if needed."
+msgstr ""
+"Zapisano dziennik pracy; zaksięgowany przychód nie został zmieniony. W razie potrzeby "
+"skoryguj transakcję ręcznie."
+
+msgid "The income source could not be saved. Check the form and try again."
+msgstr ""
+"Nie udało się zapisać źródła przychodu. Sprawdź formularz i spróbuj ponownie."
+
 msgid ""
 "This invitation link is not valid. It may have expired, been used or been"
 " revoked. Ask the workspace owner for a new link."
@@ -1381,9 +1434,6 @@ msgstr "Podaj nazwę."
 msgid "Choose an active category matching the direction."
 msgstr "Wybierz aktywną kategorię zgodną z kierunkiem."
 
-msgid "Enter a positive amount in the workspace currency."
-msgstr "Podaj dodatnią kwotę w walucie obszaru roboczego."
-
 msgid "Enter a valid start date."
 msgstr "Podaj prawidłową datę początkową."
 
@@ -1602,9 +1652,6 @@ msgstr "Usunięcia nie można już cofnąć: wpis pozostaje usunięty."
 msgid "Not saved"
 msgstr "Nie zapisano"
 
-msgid "Enter a valid date between 1900 and 2199."
-msgstr "Podaj prawidłową datę z zakresu od 1900 do 2199."
-
 msgid "This month is closed. Reopen it or choose a date in an open month."
 msgstr ""
 "Ten miesiąc jest zamknięty. Otwórz go ponownie lub wybierz datę w "
@@ -1713,6 +1760,16 @@ msgstr "Cykliczne"
 
 msgid "Upcoming"
 msgstr "Nadchodzące"
+
+#, python-format
+msgid "%(num)d overdue occurrence"
+msgid_plural "%(num)d overdue occurrences"
+msgstr[0] "%(num)d zaległe wystąpienie"
+msgstr[1] "%(num)d zaległe wystąpienia"
+msgstr[2] "%(num)d zaległych wystąpień"
+
+msgid "Income sources"
+msgstr "Źródła przychodów"
 
 msgid "Net worth"
 msgstr "Majątek netto"
@@ -2475,6 +2532,176 @@ msgstr "Utwórz obszar roboczy"
 msgid "Return to overview"
 msgstr "Powrót do podsumowania"
 
+msgid "New income source"
+msgstr "Nowe źródło przychodu"
+
+msgid "Type"
+msgstr "Rodzaj"
+
+msgid "Variable"
+msgstr "Zmienny"
+
+msgid "Fixed"
+msgstr "Stała"
+
+msgid "Income category"
+msgstr "Kategoria przychodu"
+
+#, python-format
+msgid "Fixed amount (%(currency)s)"
+msgstr "Kwota stała (%(currency)s)"
+
+#, python-format
+msgid "Rate per unit (%(currency)s)"
+msgstr "Stawka za jednostkę (%(currency)s)"
+
+msgid "Unit label"
+msgstr "Nazwa jednostki"
+
+msgid "Pay day of month"
+msgstr "Dzień wypłaty w miesiącu"
+
+msgid "Pay lag in months"
+msgstr "Opóźnienie wypłaty w miesiącach"
+
+msgid "Expected units"
+msgstr "Oczekiwane jednostki"
+
+msgid "Working days"
+msgstr "Dni robocze"
+
+msgid "Fixed value"
+msgstr "Stała wartość"
+
+msgid "Average of recent months"
+msgstr "Średnia z ostatnich miesięcy"
+
+msgid "Enter manually"
+msgstr "Wprowadź ręcznie"
+
+msgid "Fixed expected units"
+msgstr "Stała liczba oczekiwanych jednostek"
+
+msgid "Months for average"
+msgstr "Liczba miesięcy do średniej"
+
+msgid "Record income as"
+msgstr "Zapisz przychód jako"
+
+msgid "Active from work month"
+msgstr "Aktywne od miesiąca pracy"
+
+msgid "Active through work month (optional)"
+msgstr "Aktywne do miesiąca pracy (opcjonalnie)"
+
+msgid "Create income source"
+msgstr "Utwórz źródło przychodu"
+
+#, python-format
+msgid "Pay day %(day)s, lag %(lag)s months"
+msgstr "Dzień wypłaty: %(day)s, opóźnienie: %(lag)s mies."
+
+#, python-format
+msgid "Record as: %(mode)s"
+msgstr "Zapisuj jako: %(mode)s"
+
+#, python-format
+msgid "Archive the income source %(name)s?"
+msgstr "Zarchiwizować źródło przychodu %(name)s?"
+
+msgid "Archived"
+msgstr "Zarchiwizowana"
+
+msgid "Edit income source"
+msgstr "Edytuj źródło przychodu"
+
+msgid "Save income source"
+msgstr "Zapisz źródło przychodu"
+
+msgid "Next occurrences with tax preview"
+msgstr "Następne wystąpienia z podglądem podatków"
+
+#, python-format
+msgid "Work month: %(month)s"
+msgstr "Miesiąc pracy: %(month)s"
+
+msgid "Estimated"
+msgstr "Szacowane"
+
+msgid "Confirmed"
+msgstr "Potwierdzone"
+
+#, python-format
+msgid "Expected units: %(units)s"
+msgstr "Oczekiwane jednostki: %(units)s"
+
+#, python-format
+msgid "Net: %(amount)s"
+msgstr "Netto: %(amount)s"
+
+#, python-format
+msgid "Gross: %(amount)s"
+msgstr "Brutto: %(amount)s"
+
+#, python-format
+msgid "Take-home: %(amount)s"
+msgstr "Na rękę: %(amount)s"
+
+#, python-format
+msgid "Ledger amount: %(amount)s"
+msgstr "Kwota księgowa: %(amount)s"
+
+#, python-format
+msgid "Planned payment: %(name)s — %(amount)s"
+msgstr "Planowana płatność: %(name)s — %(amount)s"
+
+msgid "Work logs"
+msgstr "Dzienniki pracy"
+
+msgid "No work logs yet."
+msgstr "Nie ma jeszcze dzienników pracy."
+
+msgid "Work month"
+msgstr "Miesiąc pracy"
+
+#, python-format
+msgid "Units worked (%(unit)s)"
+msgstr "Przepracowane jednostki (%(unit)s)"
+
+msgid "Save work log"
+msgstr "Zapisz dziennik pracy"
+
+msgid "Attached tax rules"
+msgstr "Przypisane reguły podatkowe"
+
+msgid "Tax rule"
+msgstr "Reguła podatkowa"
+
+#, python-format
+msgid "Due day %(day)s, offset %(offset)s months"
+msgstr "Termin: dzień %(day)s, przesunięcie o %(offset)s mies."
+
+msgid "No tax rules attached."
+msgstr "Nie przypisano reguł podatkowych."
+
+msgid "Payment category"
+msgstr "Kategoria płatności"
+
+msgid "Payment due day"
+msgstr "Dzień płatności"
+
+msgid "Payment month offset"
+msgstr "Przesunięcie miesiąca płatności"
+
+msgid "Generate a planned tax payment"
+msgstr "Utwórz planowaną płatność podatku"
+
+msgid "Attach tax rule"
+msgstr "Przypisz regułę podatkową"
+
+msgid "No income sources yet."
+msgstr "Nie ma jeszcze źródeł przychodu."
+
 msgid "Invitation"
 msgstr "Zaproszenie"
 
@@ -2550,6 +2777,17 @@ msgstr "Edytuj wpis z %(date)s, %(amount)s"
 msgid "Delete the entry of %(date)s, %(amount)s"
 msgstr "Usuń wpis z %(date)s, %(amount)s"
 
+#, fuzzy
+msgid "Expected"
+msgstr "Wydatek"
+
+msgid "Estimate"
+msgstr "Szacunkowa"
+
+#, fuzzy
+msgid "Confirm"
+msgstr "Potwierdzono przez"
+
 msgid "No entries in this category this month."
 msgstr "Brak wpisów tej kategorii w tym miesiącu."
 
@@ -2599,6 +2837,10 @@ msgstr "Wydatki i oszczędności przekraczają zarobki o %(amount)s."
 
 msgid "Earned"
 msgstr "Zarobione"
+
+#, python-format
+msgid "Forecast spent %(spent)s · forecast earned %(earned)s."
+msgstr "Prognoza wydatków %(spent)s · prognoza przychodów %(earned)s."
 
 msgid "Spent"
 msgstr "Wydane"
@@ -2686,8 +2928,21 @@ msgstr "Cofnij"
 msgid "Summary"
 msgstr "Podsumowanie"
 
+msgid "Show forecast"
+msgstr "Pokaż prognozę"
+
+msgid "Hide forecast"
+msgstr "Ukryj prognozę"
+
 msgid "Actual"
 msgstr "Wykonanie"
+
+#, python-format
+msgid "Expected (pending)"
+msgstr "Oczekiwane (oczekujące)"
+
+msgid "Forecast"
+msgstr "Prognoza"
 
 msgid "Difference"
 msgstr "Różnica"
@@ -2704,6 +2959,13 @@ msgstr "Dodaj kategorie, aby zaplanować ten miesiąc."
 
 msgid "Closed"
 msgstr "Zamknięty"
+
+#, python-format
+msgid "Enter days worked for %(month)s for %(name)s."
+msgstr "Wprowadź liczbę przepracowanych dni w miesiącu %(month)s dla źródła %(name)s."
+
+msgid "Expected"
+msgstr "Oczekiwane"
 
 #, python-format
 msgid "Previous month: %(month)s"
@@ -2796,12 +3058,6 @@ msgstr ""
 msgid "Amount type"
 msgstr "Rodzaj kwoty"
 
-msgid "Fixed"
-msgstr "Stała"
-
-msgid "Estimate"
-msgstr "Szacunkowa"
-
 msgid "Automatically post on the due date"
 msgstr "Automatycznie księguj w terminie"
 
@@ -2890,9 +3146,6 @@ msgstr "Pozycje cykliczne"
 
 msgid "Upcoming inbox"
 msgstr "Skrzynka nadchodzących"
-
-msgid "Archived"
-msgstr "Zarchiwizowana"
 
 msgid "Paused"
 msgstr "Wstrzymana"
@@ -3013,9 +3266,6 @@ msgstr "Kwota netto (%(currency)s)"
 msgid "Calculation date"
 msgstr "Data obliczenia"
 
-msgid "Record income as"
-msgstr "Zapisz przychód jako"
-
 msgid "Calculate"
 msgstr "Oblicz"
 
@@ -3083,10 +3333,6 @@ msgstr "Kwota stała"
 
 msgid "Rate in percent"
 msgstr "Stawka w procentach"
-
-#, python-format
-msgid "Fixed amount (%(currency)s)"
-msgstr "Kwota stała (%(currency)s)"
 
 msgid "Create tax rule"
 msgstr "Utwórz regułę podatkową"
@@ -3558,4 +3804,3 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Not available: nothing earned"
 #~ msgstr "Niedostępne: brak zarobków"
-

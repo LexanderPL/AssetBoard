@@ -28,7 +28,34 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     },
     **{
         ("ScheduledOccurrenceRepository", method): "test_scheduled_queries_stay_in_their_workspace"
-        for method in ("create", "for_item", "get_for_update", "upcoming", "category_counts")
+        for method in (
+            "create",
+            "for_item",
+            "for_income_work_month",
+            "for_income_source",
+            "children",
+            "for_tax_attachment",
+            "get_for_update",
+            "upcoming",
+            "category_counts",
+        )
+    },
+    **{
+        ("IncomeSourceRepository", method): "test_income_queries_stay_in_their_workspace"
+        for method in ("create", "ordered", "any_exists", "category_counts")
+    },
+    **{
+        ("WorkLogRepository", method): "test_income_queries_stay_in_their_workspace"
+        for method in ("create", "for_source")
+    },
+    **{
+        ("IncomeSourceTaxRuleRepository", method): "test_income_queries_stay_in_their_workspace"
+        for method in (
+            "create",
+            "for_source",
+            "for_source_and_rule",
+            "payment_category_counts",
+        )
     },
     **{
         ("TaxRuleRepository", method): "test_tax_rule_queries_stay_in_their_workspace"

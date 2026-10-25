@@ -29,6 +29,7 @@ from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day, format_month, format_month_heading
 from assetboard.services.budget import CopyResult, auto_copy_on_open
 from assetboard.services.context import Context
+from assetboard.services.income import missing_work_logs
 from assetboard.services.months import (
     MonthError,
     close_month,
@@ -154,6 +155,10 @@ def month_context(
         local = view.closed_at.astimezone(ZoneInfo(ctx.workspace.timezone)).date()
         closed_on = format_day(local, locale)
     ledger = build_ledger(factory, ctx, request, view, states, filter_id)
+    missing_logs = [
+        (source_id, name, format_month(YearMonth.from_date(work_month), locale))
+        for source_id, name, work_month in missing_work_logs(factory, ctx, view.month.first_day)
+    ]
     pending = None
     if deleted is not None and ledger.can_write:
         pending = pending_undo(factory, ctx, deleted)
@@ -175,6 +180,7 @@ def month_context(
         "notice_href": saved_in_href,
         "error": _t(request, ERRORS[error]) if error in ERRORS else None,
         "ledger": ledger,
+        "missing_work_logs": missing_logs,
         **summary_context(
             build_summary(
                 factory,

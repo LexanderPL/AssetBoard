@@ -51,6 +51,7 @@ from assetboard.domain.scheduled import AmountMode, AmountState, ItemAction, Occ
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR, TransactionDirection, clean_description
 from assetboard.services.category_usage import CategoryUsage
 from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.income import generate_workspace_in_session
 
 logger = logging.getLogger(__name__)
 
@@ -308,7 +309,11 @@ def generate_workspace(
     def write(session: Session) -> int:
         CurrentWorkspaceRepository(session, scope).lock(exclusive=True)
         items = ScheduledItemRepository(session, scope).ordered(active_only=True)
-        return _generate_items(session, scope, clock, settings.recurrence_horizon_months, items)
+        scheduled_created = _generate_items(
+            session, scope, clock, settings.recurrence_horizon_months, items
+        )
+        income_created = generate_workspace_in_session(session, scope, clock, settings)
+        return scheduled_created + income_created
 
     return run_immediate(factory, write)
 

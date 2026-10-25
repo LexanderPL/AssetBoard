@@ -165,7 +165,29 @@
       </thead>
       <tbody class="divide-y divide-line">
         {% for r in s.rows %}{{ row(s, r) }}{% endfor %}
-        {% if not s.rows %}<tr data-ledger-empty><td colspan="{{ 5 if ledger.can_write else 4 }}" class="py-3 {{ muted_class }}">{% if ledger.filter %}{{ _("No entries in this category this month.") }}{% else %}{{ s.empty }}{% endif %}</td></tr>{% endif %}
+        {% for r in s.pending_rows %}
+        <tr class="bg-primary-soft/40" data-pending-occurrence="{{ r.occurrence.id }}">
+          <td class="whitespace-nowrap py-2 pr-2 align-top">{{ r.full_date }}</td>
+          <td class="whitespace-nowrap py-2 pr-2 text-right align-top tabular-nums">{{ r.amount }}<span class="block text-xs text-muted">{{ _("Expected") }}{% if r.occurrence.amount_state == "estimated" %} · {{ _("Estimate") }}{% endif %}</span></td>
+          <td class="py-2 pr-2 align-top">{{ r.occurrence.label }}</td>
+          <td class="py-2 pr-2 align-top">{{ r.occurrence.category_name }}</td>
+          {% if ledger.can_write %}
+          <td class="py-2 align-top text-right">
+            <details class="text-left">
+              <summary class="{{ small_class }} cursor-pointer">{{ _("Confirm") }}</summary>
+              <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=r.occurrence.id) }}" class="mt-2 grid gap-2 rounded-lg border border-line bg-surface p-3">
+                {{ csrf_input() }}
+                <input type="hidden" name="return_month" value="{{ ledger.month }}">
+                <label class="text-xs font-medium">{{ _("Date") }}<input name="day" type="date" value="{{ r.occurrence.due_date.isoformat() }}" required class="{{ input_class }}"></label>
+                <label class="text-xs font-medium">{{ _("Amount") }}<input name="amount" type="text" inputmode="decimal" value="{{ r.amount_input }}" required class="{{ input_class }} text-right"></label>
+                <button type="submit" class="{{ primary_class }}">{{ _("Confirm") }}</button>
+              </form>
+            </details>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+        {% if not s.rows and not s.pending_rows %}<tr data-ledger-empty><td colspan="{{ 5 if ledger.can_write else 4 }}" class="py-3 {{ muted_class }}">{% if ledger.filter %}{{ _("No entries in this category this month.") }}{% else %}{{ s.empty }}{% endif %}</td></tr>{% endif %}
         {% if ledger.can_write %}{{ entry_row(s) }}{% endif %}
       </tbody>
     </table>

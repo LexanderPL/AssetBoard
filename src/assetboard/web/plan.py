@@ -92,6 +92,8 @@ class PlanRowView:
     error: str | None
     focus: bool
     actual: str = ""  # "" for the plan-only transfer group
+    expected: str = ""
+    forecast: str = ""
     difference: str = ""
     tone: str = ""  # "favourable", "unfavourable" or "even" (for the difference)
     # Actual above plan: "danger" for an expense category, "success" for an income one (the
@@ -103,6 +105,8 @@ class PlanRowView:
 class TotalsView:
     planned: str
     actual: str
+    expected: str
+    forecast: str
     difference: str
     tone: str
 
@@ -119,12 +123,16 @@ class PlanGroupView:
 class KpiView:
     earned: str
     spent: str
+    forecast_earned: str
+    forecast_spent: str
+    forecast_saved: str
     saved: str
     net: str
     net_tone: str
     savings_rate: str | None  # None: nothing earned (no caption)
     overspend: str | None = None  # spending and saving above earnings (-net), else None
     flow: FlowBar = FlowBar(0, 0, 0)  # positions on 0..flow_scale (domain.summary.flow_bar)
+    forecast_flow: FlowBar = FlowBar(0, 0, 0)
     flow_scale: int = FLOW_SCALE
 
 
@@ -257,6 +265,8 @@ def build_summary(
                 data.categories[r.category_id],
                 r.planned,
                 actual=format_money(r.actual, locale),
+                expected=format_money(r.expected, locale),
+                forecast=format_money(r.forecast, locale),
                 difference=_signed(r.difference, locale),
                 tone=_tone(r.difference),
                 over=OVER_PLAN_TINT.get(block.key, "")
@@ -270,6 +280,8 @@ def build_summary(
         totals = TotalsView(
             planned=format_money(block.planned, locale),
             actual=format_money(block.actual, locale),
+            expected=format_money(block.expected, locale),
+            forecast=format_money(block.forecast, locale),
             difference=_signed(block.difference, locale),
             tone=_tone(block.difference),
         )
@@ -284,6 +296,9 @@ def build_summary(
     kpi_view = KpiView(
         earned=format_money(kpis.earned, locale),
         spent=format_money(kpis.spent, locale),
+        forecast_earned=format_money(kpis.forecast_earned, locale),
+        forecast_spent=format_money(kpis.forecast_spent, locale),
+        forecast_saved=format_money(kpis.forecast_saved, locale),
         saved=format_money(kpis.saved, locale),
         net=format_money(kpis.net, locale),
         net_tone=_tone(kpis.net),
@@ -292,6 +307,11 @@ def build_summary(
         if kpis.net.amount_minor < 0
         else None,
         flow=flow_bar(kpis.earned.amount_minor, kpis.spent.amount_minor, kpis.saved.amount_minor),
+        forecast_flow=flow_bar(
+            kpis.forecast_earned.amount_minor,
+            kpis.forecast_spent.amount_minor,
+            kpis.forecast_saved.amount_minor,
+        ),
     )
     expense, income = summary.block("expense"), summary.block("income")
     bars = (

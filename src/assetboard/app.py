@@ -66,6 +66,7 @@ from assetboard.web.email_routes import router as email_router
 from assetboard.web.errors import BUSY_RETRY_AFTER, add_error_response_headers, error_response
 from assetboard.web.errors import is_htmx_fragment_request as _is_htmx_fragment_request
 from assetboard.web.gate import AccessGateMiddleware, OriginCheckMiddleware
+from assetboard.web.income_routes import router as income_router
 from assetboard.web.invite_routes import router as invite_router
 from assetboard.web.month_routes import MONTH_CLOSED_MESSAGE, MONTH_CLOSED_TITLE
 from assetboard.web.month_routes import router as month_router
@@ -273,6 +274,7 @@ def create_app(
     app.include_router(scheduled_router)
     app.include_router(upcoming_router)
     app.include_router(tax_router)
+    app.include_router(income_router)
     app.include_router(auth_router)
     app.include_router(email_router)
     app.include_router(totp_router)

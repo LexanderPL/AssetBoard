@@ -15,6 +15,9 @@
   {% if error %}
   <p class="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ error }}</p>
   {% endif %}
+  {% for source_id, source_name, work_month in missing_work_logs %}
+  <p class="rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="status" data-missing-work-log="{{ source_id }}">{{ _("Enter days worked for %(month)s for %(name)s.", month=work_month, name=source_name) }} <a href="{{ scoped_url(request, 'income_sources') }}#income-source-{{ source_id }}" class="font-semibold underline">{{ _("Income sources") }}</a></p>
+  {% endfor %}
 
   <nav class="flex flex-wrap items-center gap-3" aria-label="{{ _('Months') }}" data-month-nav>
     {% if view.prev %}

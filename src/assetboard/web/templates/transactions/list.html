@@ -45,6 +45,9 @@
   {% if notice %}
   <p class="rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
   {% endif %}
+  {% for source_id, source_name, work_month in missing_work_logs %}
+  <p class="rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="status" data-missing-work-log="{{ source_id }}">{{ _("Enter days worked for %(month)s for %(name)s.", month=work_month, name=source_name) }} <a href="{{ scoped_url(request, 'income_sources') }}#income-source-{{ source_id }}" class="font-semibold underline">{{ _("Income sources") }}</a></p>
+  {% endfor %}
   {# The export options (F2.6): a dialog the header's "Export CSV" button opens as a modal
      (app.js: data-dialog-open, data-dialog-close; Esc closes it too). Without JavaScript the
      button is a link to ?export=1, and the dialog is rendered open in the page flow; an

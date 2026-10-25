@@ -52,7 +52,8 @@ class UndoExpired(OccurrenceError):
 @dataclass(frozen=True, slots=True)
 class UpcomingOccurrence:
     id: UUID
-    scheduled_item_id: UUID
+    scheduled_item_id: UUID | None
+    income_source_id: UUID | None
     label: str
     direction: str
     category_id: UUID
@@ -79,11 +80,12 @@ class PostedTransaction:
 
 
 def _upcoming_view(
-    occurrence: ScheduledOccurrence, item: ScheduledItem, category_name: str
+    occurrence: ScheduledOccurrence, item: ScheduledItem | None, category_name: str
 ) -> UpcomingOccurrence:
     return UpcomingOccurrence(
         id=occurrence.id,
-        scheduled_item_id=item.id,
+        scheduled_item_id=item.id if item is not None else None,
+        income_source_id=occurrence.income_source_id,
         label=occurrence.label,
         direction=occurrence.direction,
         category_id=occurrence.category_id,
@@ -92,7 +94,7 @@ def _upcoming_view(
         due_date=occurrence.due_date,
         expected=Money(occurrence.expected_minor, occurrence.currency),
         amount_state=occurrence.amount_state,
-        auto_post=item.auto_post,
+        auto_post=item.auto_post if item is not None else False,
         rescheduled=occurrence.rescheduled_at is not None,
     )
 
@@ -119,6 +121,17 @@ def upcoming(
             monday = occurrence.due_date - timedelta(days=occurrence.due_date.weekday())
             grouped.setdefault(monday, []).append(_upcoming_view(occurrence, item, category_name))
     return [UpcomingWeek(monday, tuple(grouped[monday])) for monday in sorted(grouped)]
+
+
+def pending_for_month(
+    factory: sessionmaker[Session], ctx: Context, month: YearMonth
+) -> tuple[UpcomingOccurrence, ...]:
+    require_role(ctx, Role.VIEWER)
+    with factory() as session:
+        rows = ScheduledOccurrenceRepository(session, ctx).pending_for_month(
+            month.first_day, month.last_day
+        )
+    return tuple(_upcoming_view(occurrence, item, name) for occurrence, item, name in rows)
 
 
 def recently_posted(
@@ -180,11 +193,15 @@ def _post_in_session(
     _valid_day(day)
     _ensure_open(session, scope, occurrence.due_date)
     _ensure_open(session, scope, day)
-    item = ScheduledItemRepository(session, scope).get_or_raise(occurrence.scheduled_item_id)
+    item = (
+        ScheduledItemRepository(session, scope).get_or_raise(occurrence.scheduled_item_id)
+        if occurrence.scheduled_item_id is not None
+        else None
+    )
     category = CategoryRepository(session, scope).get_or_raise(occurrence.category_id)
     if category.archived_at is not None or category.kind != occurrence.direction:
         raise OccurrenceError("category_unavailable")
-    description = clean_description(occurrence.label or item.name)
+    description = clean_description(occurrence.label or (item.name if item else ""))
     transaction = TransactionRepository(session, scope).create(
         direction=occurrence.direction,
         day=day,
@@ -273,6 +290,9 @@ def skip_occurrence(factory: sessionmaker[Session], ctx: Context, occurrence_id:
         if occurrence.status != OccurrenceStatus.PENDING:
             raise OccurrenceError("not_pending")
         _ensure_open(session, ctx, occurrence.due_date)
+        for child in repository.children(occurrence.id):
+            if child.status == OccurrenceStatus.PENDING:
+                repository.delete(child)
         repository.update(occurrence.id, status=OccurrenceStatus.SKIPPED)
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
@@ -430,7 +450,12 @@ def auto_post_workspace(factory: sessionmaker[Session], scope: WorkspaceScope, c
         candidates = occurrences.upcoming(today)
         posted = 0
         for occurrence, item, _category_name in candidates:
-            if not item.auto_post or item.paused_at is not None or item.archived_at is not None:
+            if (
+                item is None
+                or not item.auto_post
+                or item.paused_at is not None
+                or item.archived_at is not None
+            ):
                 continue
             state = MonthStateRepository(session, scope).for_month(
                 YearMonth.from_date(occurrence.due_date)

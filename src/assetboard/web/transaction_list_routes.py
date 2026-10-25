@@ -35,6 +35,7 @@ from assetboard.domain.ledger_csv import (
     CsvOptionError,
     CsvOptions,
 )
+from assetboard.domain.months import YearMonth
 from assetboard.domain.transaction_search import (
     DEFAULT_SORT,
     MAX_SEARCH_TEXT_LENGTH,
@@ -47,6 +48,7 @@ from assetboard.i18n.dates import format_day, format_month
 from assetboard.i18n.numbers import format_money
 from assetboard.services import transaction_search as search_service
 from assetboard.services.context import Context, Role, has_role
+from assetboard.services.income import missing_work_logs
 from assetboard.services.transaction_search import (
     MAX_SELECTED_IDS,
     CategoryOption,
@@ -286,11 +288,25 @@ async def _list_page(
     except InvalidFilter as exc:
         errors = _filter_messages(request, ctx, exc.errors)
     result: SearchResult | None = None
+    missing_logs: list[tuple[UUID, str, str]] = []
     if where is not None:
         result = await run_in_threadpool(
             search_transactions, factory, ctx, where, sort=sort, page=page
         )
         options = result.categories
+        if where.date_from is not None and where.date_to is not None:
+            first = YearMonth.from_date(where.date_from)
+            if first == YearMonth.from_date(where.date_to):
+                missing_logs = [
+                    (
+                        source_id,
+                        name,
+                        format_month(YearMonth.from_date(work_month), request.state.locale),
+                    )
+                    for source_id, name, work_month in await run_in_threadpool(
+                        missing_work_logs, factory, ctx, first.first_day
+                    )
+                ]
     else:
         options = await run_in_threadpool(category_options, factory, ctx)
     pairs = _state_pairs(raw, sort)
@@ -309,6 +325,7 @@ async def _list_page(
         "filter_invalid": _t(request, FILTER_INVALID) if errors else "",
         "result": result,
         "rows": [_row_view(request, row) for row in result.rows] if result else [],
+        "missing_work_logs": missing_logs,
         "window": window,
         "pages": pages,
         "sort": sort,

@@ -15,6 +15,11 @@ from assetboard.db.repositories.base import (
 )
 from assetboard.db.repositories.budget_line import BudgetLineRepository, LineUsage
 from assetboard.db.repositories.category import CategoryRepository
+from assetboard.db.repositories.income import (
+    IncomeSourceRepository,
+    IncomeSourceTaxRuleRepository,
+    WorkLogRepository,
+)
 from assetboard.db.repositories.invitation import (
     InvitationLocation,
     InvitationRepository,
@@ -43,6 +48,9 @@ from assetboard.db.repositories.workspace import (
 __all__ = [
     "ScheduledItemRepository",
     "ScheduledOccurrenceRepository",
+    "IncomeSourceRepository",
+    "IncomeSourceTaxRuleRepository",
+    "WorkLogRepository",
     "TaxRuleRepository",
     "TaxRuleVersionRepository",
     "UPDATABLE_FIELDS",

@@ -63,10 +63,18 @@ class PlanLine:
 
 
 @dataclass(frozen=True, slots=True)
+class PendingEntry:
+    category_id: UUID
+    amount: Money
+
+
+@dataclass(frozen=True, slots=True)
 class SummaryRow:
     category_id: UUID
     planned: Money
     actual: Money
+    expected: Money
+    forecast: Money
     difference: Money
 
 
@@ -76,6 +84,8 @@ class SummaryBlock:
     rows: tuple[SummaryRow, ...]
     planned: Money
     actual: Money
+    expected: Money
+    forecast: Money
     difference: Money
 
 
@@ -83,6 +93,9 @@ class SummaryBlock:
 class Kpis:
     earned: Money
     spent: Money
+    forecast_earned: Money
+    forecast_spent: Money
+    forecast_saved: Money
     saved: Money
     net: Money
     savings_rate_bp: int | None  # None: nothing earned
@@ -200,6 +213,7 @@ def summarize_month(
     categories: Sequence[SummaryCategory],
     *,
     currency: str,
+    pending: Iterable[PendingEntry] = (),
     sort: SortOrder = "actual",
 ) -> MonthSummary:
     """The month's summary.
@@ -215,6 +229,7 @@ def summarize_month(
         raise ValueError(f"unknown sort: {sort}")
     known = {c.id: c for c in categories}
     actual: dict[UUID, int] = {}
+    expected: dict[UUID, int] = {}
     planned: dict[UUID, int] = {}
     for entry in transactions:
         _check(entry.amount, currency, entry.category_id, known)
@@ -222,19 +237,28 @@ def summarize_month(
     for line in budget_lines:
         _check(line.planned, currency, line.category_id, known)
         planned[line.category_id] = planned.get(line.category_id, 0) + line.planned.amount_minor
+    for entry in pending:
+        _check(entry.amount, currency, entry.category_id, known)
+        expected[entry.category_id] = expected.get(entry.category_id, 0) + entry.amount.amount_minor
     rows: dict[BlockKey, list[tuple[int, SummaryRow]]] = {key: [] for key in BLOCK_ORDER}
     for position, category in enumerate(categories):
         key = block_of(category.kind, category.treatment)
         if key is None:
             continue
-        has_data = category.id in actual or category.id in planned
+        has_data = category.id in actual or category.id in expected or category.id in planned
         if category.archived and not has_data:
             continue
-        p, a = planned.get(category.id, 0), actual.get(category.id, 0)
+        p, a, e = (
+            planned.get(category.id, 0),
+            actual.get(category.id, 0),
+            expected.get(category.id, 0),
+        )
         row = SummaryRow(
             category_id=category.id,
             planned=Money(p, currency),
             actual=Money(a, currency),
+            expected=Money(e, currency),
+            forecast=Money(a + e, currency),
             difference=Money(difference(key, p, a), currency),
         )
         rows[key].append((position, row))
@@ -246,20 +270,27 @@ def summarize_month(
         block_rows = tuple(row for _, row in ordered)
         p = sum(r.planned.amount_minor for r in block_rows)
         a = sum(r.actual.amount_minor for r in block_rows)
+        e = sum(r.expected.amount_minor for r in block_rows)
         blocks.append(
             SummaryBlock(
                 key=key,
                 rows=block_rows,
                 planned=Money(p, currency),
                 actual=Money(a, currency),
+                expected=Money(e, currency),
+                forecast=Money(a + e, currency),
                 difference=Money(difference(key, p, a), currency),
             )
         )
     totals = {b.key: b.actual.amount_minor for b in blocks}
+    forecast_totals = {b.key: b.forecast.amount_minor for b in blocks}
     earned, spent, saved = totals["income"], totals["expense"], totals["saved"]
     kpis = Kpis(
         earned=Money(earned, currency),
         spent=Money(spent, currency),
+        forecast_earned=Money(forecast_totals["income"], currency),
+        forecast_spent=Money(forecast_totals["expense"], currency),
+        forecast_saved=Money(forecast_totals["saved"], currency),
         saved=Money(saved, currency),
         net=Money(earned - spent - saved, currency),
         savings_rate_bp=savings_rate_bp(earned, saved),

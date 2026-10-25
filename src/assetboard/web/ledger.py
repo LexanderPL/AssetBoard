@@ -28,6 +28,7 @@ from assetboard.i18n.numbers import format_amount_input, format_money
 from assetboard.services.categories import list_categories
 from assetboard.services.context import Context, Role, has_role
 from assetboard.services.months import MonthView
+from assetboard.services.occurrences import UpcomingOccurrence, pending_for_month
 from assetboard.services.transactions import TransactionView, list_month
 
 
@@ -131,12 +132,21 @@ class RowView:
 
 
 @dataclass(frozen=True, slots=True)
+class PendingRowView:
+    occurrence: UpcomingOccurrence
+    full_date: str
+    amount: str
+    amount_input: str
+
+
+@dataclass(frozen=True, slots=True)
 class SectionView:
     direction: str
     heading: str
     empty: str
     no_categories: str
     rows: tuple[RowView, ...]
+    pending_rows: tuple[PendingRowView, ...]
     categories: tuple[tuple[str, str], ...]  # (id, name): active categories of this kind
     edit_categories: tuple[tuple[str, str], ...]  # plus the edited row's archived category
     state: SectionState
@@ -196,6 +206,7 @@ def build_ledger(
     """
     locale = request.state.locale
     transactions = list_month(factory, ctx, view.month)
+    pending = pending_for_month(factory, ctx, view.month)
     categories = list_categories(factory, ctx, usage_sources=())
     can_write = has_role(ctx, Role.EDITOR) and not view.closed
     chosen = next(
@@ -220,8 +231,23 @@ def build_ledger(
         stored = transactions.expense if direction == "expense" else transactions.income
         if ledger_filter is not None:
             stored = tuple(t for t in stored if t.category_id == ledger_filter.category_id)
+        expected = tuple(
+            occurrence
+            for occurrence in pending
+            if occurrence.direction == direction
+            and (ledger_filter is None or occurrence.category_id == ledger_filter.category_id)
+        )
         rows = tuple(
             RowView(t, format_day(t.date, locale), format_money(t.amount, locale)) for t in stored
+        )
+        pending_rows = tuple(
+            PendingRowView(
+                occurrence,
+                format_day(occurrence.due_date, locale),
+                format_money(occurrence.expected, locale),
+                format_amount_input(occurrence.expected, locale),
+            )
+            for occurrence in expected
         )
         active = categories.expense if direction == "expense" else categories.income
         options = tuple((str(c.id), c.name) for c in active)
@@ -253,6 +279,7 @@ def build_ledger(
                 empty=gettext(EMPTY[direction], locale),
                 no_categories=gettext(NO_CATEGORIES[direction], locale),
                 rows=rows,
+                pending_rows=pending_rows,
                 categories=options,
                 edit_categories=edit_options,
                 state=state,
