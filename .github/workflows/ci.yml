@@ -35,8 +35,8 @@ jobs:
       - name: Install ShellCheck
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y shellcheck
 
-      - name: Check container smoke script
-        run: shellcheck scripts/smoke_container.sh
+      - name: Check shell scripts
+        run: shellcheck scripts/smoke_container.sh deploy/install-debian.sh deploy/build-release.sh
 
       # No `make i18n-compile` first: the wheel's build hook (hatch_build.py) must compile the
       # gitignored .mo catalogs itself, and verify_wheel.py fails if they are missing.

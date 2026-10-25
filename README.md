@@ -10,8 +10,9 @@ arrive with their milestones.
 
 ## Quick start
 
-Docker Engine and Docker Compose v2 are required. Compose is the simplest way to run the current
-foundation:
+Docker Compose is the recommended way to run AssetBoard, not the only one: the
+[install guides](docs/install/README.md) also cover a native install with systemd on Debian or
+Ubuntu, a Proxmox LXC container and rootless Podman. With Docker Engine and Docker Compose v2:
 
 ```bash
 docker compose -f compose.example.yaml up -d --build

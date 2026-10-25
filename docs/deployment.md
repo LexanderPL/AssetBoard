@@ -1,5 +1,9 @@
 # Deployment guide
 
+This is the reference for running AssetBoard: settings, first run, reverse proxies, backups and
+upgrade notes. For step-by-step installation (Docker, native with systemd, Proxmox LXC, Podman),
+start with [the install guides](install/README.md).
+
 ## Environment variables
 
 Application settings use the `ASSETBOARD_` prefix in the environment. Values shown as Compose
@@ -160,7 +164,18 @@ in both cases.
 ## Administrator commands
 
 These commands run inside the container (for example `docker exec -it <container> assetboard
-create-admin`) and need no setup token. With `ASSETBOARD_AUTO_MIGRATE=true` they apply pending
+create-admin`) and need no setup token. On a [native install](install/native.md), run them as the
+service user with the service's settings:
+
+```bash
+sudo systemd-run --quiet --wait --pty --collect \
+  -p User=assetboard -p Group=assetboard -p EnvironmentFile=/etc/assetboard/assetboard.env \
+  -E ASSETBOARD_ENV=prod -E ASSETBOARD_DATA_DIR=/var/lib/assetboard \
+  /opt/assetboard/current/bin/assetboard create-admin
+```
+
+(`--pipe` instead of `--pty` for scripts that use `--password-stdin`.) Running them as root
+directly would leave root-owned files in the data directory. With `ASSETBOARD_AUTO_MIGRATE=true` they apply pending
 migrations first, like application startup; with `false` they refuse to run until
 `assetboard migrate` has brought the database to the latest schema.
 
@@ -199,7 +214,9 @@ docker compose -f compose.example.yaml up -d --no-build
 plain git checkout. The compiled translation catalogs (`messages.mo`) are not in the repository:
 the wheel's build hook (`hatch_build.py`) compiles them from the committed `.po` files, using Babel
 as a build requirement, so both the wheel and the image include them. The image build fails if
-they are missing.
+they are missing. To install from a checkout without Docker, `deploy/build-release.sh` builds
+the wheel and the other native-install files; see
+[From a git checkout](install/native.md#from-a-git-checkout).
 
 ## Release automation credentials
 
@@ -228,6 +245,57 @@ users who authenticate to GHCR with an account that has package access.
 The container runs as UID/GID `10001:10001`. A named Docker volume is initialized for this user.
 For a host bind mount, create the directory and run `chown 10001:10001` on it before starting
 Compose. The startup check reports this command when `DATA_DIR` is not writable.
+
+## Backups
+
+**What to back up:** the database `<DATA_DIR>/assetboard.db` **and** the secret key
+`<DATA_DIR>/secret_key` (or the value of `ASSETBOARD_SECRET_KEY`, if you set it), always
+together: two-factor secrets in the database can only be decrypted with that key (see
+[Secret key and two-factor authentication](#secret-key-and-two-factor-authentication)). Keep your
+settings (Compose file or env file) too. The backup holds all your financial data and the key to
+parts of it: store it encrypted, and on another machine.
+
+| Install | `DATA_DIR` |
+| --- | --- |
+| Docker Compose | `/data` in the named volume `assetboard-data` (Compose prefixes it with the project name) |
+| Native / Proxmox LXC | `/var/lib/assetboard` (the install script also keeps pre-upgrade copies in `/var/backups/assetboard`) |
+| Podman (Quadlet) | `/data` in the volume `assetboard-data` |
+
+The database uses SQLite's write-ahead log: while the app runs, recent changes can sit in
+`assetboard.db-wal`, so **never copy `assetboard.db` alone from a running app.** Use one of:
+
+- **Stop and copy** (simplest). Stop the app, copy the whole data directory (the database, any
+  `-wal`/`-shm` files and `secret_key`), start the app.
+- **Online copy with SQLite's backup API**, which gives a consistent copy while the app runs.
+  Native install:
+
+  ```bash
+  sudo runuser -u assetboard -- /opt/assetboard/current/bin/python -c \
+    'import sqlite3, sys; d = sqlite3.connect(sys.argv[2]); sqlite3.connect(sys.argv[1]).backup(d); d.close()' \
+    /var/lib/assetboard/assetboard.db /var/backups/assetboard/assetboard-manual.db
+  sudo cp -p /var/lib/assetboard/secret_key /var/backups/assetboard/assetboard-manual.db.secret_key
+  ```
+
+  Docker Compose (the copies land in the current directory):
+
+  ```bash
+  docker compose -f compose.example.yaml exec assetboard python -c \
+    'import sqlite3; d = sqlite3.connect("/data/backup.db"); sqlite3.connect("/data/assetboard.db").backup(d); d.close()'
+  docker compose -f compose.example.yaml cp assetboard:/data/backup.db ./assetboard-backup.db
+  docker compose -f compose.example.yaml cp assetboard:/data/secret_key ./assetboard-backup.secret_key
+  docker compose -f compose.example.yaml exec assetboard rm /data/backup.db
+  ```
+
+- **Whole-machine backups** work when they are taken with the app stopped: for a Proxmox
+  container, a `vzdump` backup in **stop** mode (see the
+  [Proxmox guide](install/proxmox-lxc.md#backups)).
+
+**Restoring:** stop the app, delete `assetboard.db-wal` and `assetboard.db-shm` if present, put
+the backed-up database in place as `assetboard.db` and the key as `secret_key`, owned by the
+app's user (`assetboard` for native installs, UID 10001 in the container) with mode 0600, and
+start the app. A backup from an older version is migrated at startup; a database written by a
+newer version than the one you start is refused (see
+[Database schema state](#database-schema-state)).
 
 ## Reverse proxies
 
@@ -386,7 +454,7 @@ when you intend to upload the image and its release tags.
   sign-in, account administration and the audit log; the sections below describe each part.
 - **Back up first.** Stop the app and copy `<DATA_DIR>/assetboard.db`, together with any
   `assetboard.db-wal` and `assetboard.db-shm` beside it (copying the whole data directory is
-  simplest).
+  simplest). See [Backups](#backups).
 - **Migrations run on the first start.** `ASSETBOARD_AUTO_MIGRATE` is `true` by default (and in
   `compose.example.yaml`). `/readyz` returns `{"status":"ok","database":"ready"}` once they
   have applied. 0.2.0 logs nothing for them; later versions log one line,
