@@ -28,7 +28,6 @@ def upgrade() -> None:
         sa.Column("created_at", UtcDateTime(), nullable=False),
         sa.Column("updated_at", UtcDateTime(), nullable=False),
         sa.Column("workspace_id", sa.Uuid(), nullable=False),
-        sa.CheckConstraint("units > 0 AND units <= 24", name="ck_work_days_units_valid"),
         sa.ForeignKeyConstraint(
             ["workspace_id"], ["workspaces.id"], name="fk_work_days_workspace_id_workspaces"
         ),

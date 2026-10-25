@@ -102,7 +102,11 @@ MAX_WORK_DAY_UNITS = 24
 
 
 class WorkDay(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
-    """One day of the F3.7 work calendar (variable income sources only)."""
+    """One day of the F3.7 work calendar (variable income sources only).
+
+    ``units`` (0 < units <= ``MAX_WORK_DAY_UNITS``) is validated in the service: a SQL check on a
+    ``DecimalType`` column would compare text on SQLite.
+    """
 
     __tablename__ = "work_days"
     __table_args__ = (
@@ -115,7 +119,6 @@ class WorkDay(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             name="fk_work_days_workspace_source",
             ondelete="CASCADE",
         ),
-        CheckConstraint(f"units > 0 AND units <= {MAX_WORK_DAY_UNITS}", name="units_valid"),
         Index(
             "ix_work_days_workspace_source_date", "workspace_id", "income_source_id", "work_date"
         ),
