@@ -172,6 +172,15 @@ def _working_days(country: str | None, month: date) -> int:
     )
 
 
+def _check_working_days(fields: _IncomeSourceValues, country: str | None) -> None:
+    """Refuse working-day estimates the workspace country cannot compute (generation would fail)."""
+    if (
+        fields.kind == IncomeKind.VARIABLE.value
+        and fields.expected_mode == ExpectedUnitsMode.WORKING_DAYS.value
+    ):
+        _holidays(country, fields.active_from.year)
+
+
 def _average(logs: list[WorkLog], months: int) -> Decimal | None:
     selected = [row.units for row in logs[-months:]]
     if not selected:
@@ -368,12 +377,8 @@ def _sync_work_month(
     repository = ScheduledOccurrenceRepository(session, scope)
     occurrence = repository.for_income_work_month(source.id, month)
     closed_months = MonthStateRepository(session, scope).closed_months()
-    if (
-        YearMonth.from_date(due) in closed_months
-        or (
-            occurrence is not None
-            and YearMonth.from_date(occurrence.due_date) in closed_months
-        )
+    if YearMonth.from_date(due) in closed_months or (
+        occurrence is not None and YearMonth.from_date(occurrence.due_date) in closed_months
     ):
         return occurrence
     if month < source.active_from or (source.active_to is not None and month > source.active_to):
@@ -426,7 +431,9 @@ def _sync_work_month(
         occurrence.direction = "income"
         occurrence.currency = source.currency
         occurrence.nominal_date = due
-        occurrence.due_date = due
+        if occurrence.rescheduled_at is None:
+            # A user-rescheduled occurrence keeps its chosen date (as F3.1 rule occurrences do).
+            occurrence.due_date = due
         occurrence.label = source.name
         if not occurrence.amount_overridden:
             occurrence.expected_minor = breakdown.ledger_amount.amount_minor
@@ -460,7 +467,11 @@ def _generate_workspace_in_session(
         last_work_month = _month_shift(through, -source.pay_lag_months)
         if source.active_to is not None:
             last_work_month = min(last_work_month, source.active_to)
-        first_work_month = max(today, _month_start(source.active_from))
+        # Work months before this one can still be paid in the future (pay lag); the pay-date
+        # check in _sync_work_month skips the ones already due in the past.
+        first_work_month = max(
+            _month_shift(today, -source.pay_lag_months), _month_start(source.active_from)
+        )
         if last_work_month < first_work_month:
             continue
         for month in _month_range(first_work_month, last_work_month):
@@ -468,8 +479,7 @@ def _generate_workspace_in_session(
                 source.id, month
             )
             if prior is None and (
-                _sync_work_month(session, scope, clock, source, month, allow_past=False)
-                is not None
+                _sync_work_month(session, scope, clock, source, month, allow_past=False) is not None
             ):
                 created += 1
     return created
@@ -706,6 +716,7 @@ def create_source(
         category = CategoryRepository(session, ctx).get_or_raise(category_id)
         if category.kind != "income" or category.archived_at is not None:
             raise IncomeError("invalid_category")
+        _check_working_days(fields, workspace.country_code)
         row = IncomeSourceRepository(session, ctx).create(
             **fields.as_dict(), currency=workspace.base_currency
         )
@@ -769,6 +780,7 @@ def update_source(
         category = CategoryRepository(session, ctx).get_or_raise(fields.category_id)
         if category.kind != "income" or category.archived_at is not None:
             raise IncomeError("invalid_category")
+        _check_working_days(fields, CurrentWorkspaceRepository(session, ctx).get().country_code)
         IncomeSourceRepository(session, ctx).update(source_id, **fields.as_dict())
         for occurrence in ScheduledOccurrenceRepository(session, ctx).for_income_source(source_id):
             if occurrence.status == "pending" and occurrence.work_month is not None:
@@ -868,7 +880,10 @@ def archive_source(factory: sessionmaker[Session], ctx: Context, source_id: UUID
                 children = occurrence_repository.children(occurrence.id)
                 retained_child = False
                 for child in children:
-                    if child.status != "pending" or YearMonth.from_date(child.due_date) in closed_months:
+                    if (
+                        child.status != "pending"
+                        or YearMonth.from_date(child.due_date) in closed_months
+                    ):
                         retained_child = True
                     else:
                         occurrence_repository.delete(child)
@@ -1010,6 +1025,10 @@ def missing_work_logs(
             if source.kind != "variable":
                 continue
             candidate = _month_shift(month, -source.pay_lag_months)
+            if candidate < source.active_from or (
+                source.active_to is not None and candidate > source.active_to
+            ):
+                continue
             due = pay_date(candidate, source.pay_day, source.pay_lag_months)
             if due > today + timedelta(days=within_days):
                 continue

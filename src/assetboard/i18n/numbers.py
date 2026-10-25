@@ -194,6 +194,14 @@ def format_amount_input(money: Money, locale: str) -> str:
     return text.replace(".", decimal_symbol)
 
 
+def format_quantity_input(value: Decimal, locale: str) -> str:
+    """A quantity (units worked) with the locale's decimal sign, no grouping and no trailing
+    zeros: ``7,5`` (pl), ``7.5`` (en). ``parse_amount`` reads it back unchanged."""
+    decimal_symbol = get_decimal_symbol(_normalize_number_locale(locale))
+    text = format(value.normalize(), "f")
+    return text.replace(".", decimal_symbol)
+
+
 def format_rate_tenths(tenths: int, locale: str) -> str:
     """A rate given in tenths of a percent (already rounded once), with one decimal:
     ``-43.3%`` (en), ``-43,3%`` (pl). Exact: the value is a Decimal, never a float."""

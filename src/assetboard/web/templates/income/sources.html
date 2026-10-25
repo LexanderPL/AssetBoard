@@ -33,7 +33,7 @@
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div>
       <h2 class="font-semibold">{{ source.name }}</h2>
-      <p class="mt-1 text-sm text-muted">{{ _("Fixed") if source.kind.value == "fixed" else _("Variable") }} · {{ _("Pay day %(day)s, lag %(lag)s months", day=source.pay_day, lag=source.pay_lag_months) }} · {{ _("Record as: %(mode)s", mode=source.record_as.value) }}</p>
+      <p class="mt-1 text-sm text-muted">{{ _("Fixed") if source.kind.value == "fixed" else _("Variable") }} · {{ _("Pay day %(day)s, lag %(lag)s months", day=source.pay_day, lag=source.pay_lag_months) }} · {{ _("Record as: %(mode)s", mode=(_("Cash received (gross)") if source.record_as.value == "cash_received" else _("Net") if source.record_as.value == "net" else _("Take-home"))) }}</p>
     </div>
     {% if can_edit and not source.archived %}
     <form method="post" action="{{ scoped_url(request, 'income_source_archive', source_id=source.id) }}" data-confirm="{{ _('Archive the income source %(name)s?', name=source.name) }}">{{ csrf_input() }}<button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm text-danger">{{ _("Archive") }}</button></form>
@@ -54,7 +54,7 @@
       <label class="grid gap-1 text-sm">{{ _("Pay day of month") }}<input name="pay_day" type="number" min="1" max="31" value="{{ source.pay_day }}" required class="form-control rounded-lg px-3 py-2"></label>
       <label class="grid gap-1 text-sm">{{ _("Pay lag in months") }}<input name="pay_lag_months" type="number" min="0" max="24" value="{{ source.pay_lag_months }}" required class="form-control rounded-lg px-3 py-2"></label>
       <label class="grid gap-1 text-sm">{{ _("Expected units") }}<select name="expected_mode" class="form-select rounded-lg py-2"><option value="working_days"{% if source.expected_mode.value == "working_days" %} selected{% endif %}>{{ _("Working days") }}</option><option value="fixed"{% if source.expected_mode.value == "fixed" %} selected{% endif %}>{{ _("Fixed value") }}</option><option value="average"{% if source.expected_mode.value == "average" %} selected{% endif %}>{{ _("Average of recent months") }}</option><option value="manual"{% if source.expected_mode.value == "manual" %} selected{% endif %}>{{ _("Enter manually") }}</option></select></label>
-      <label class="grid gap-1 text-sm">{{ _("Fixed expected units") }}<input name="expected_units" inputmode="decimal" value="{{ source.expected_units if source.expected_units is not none else '' }}" class="form-control rounded-lg px-3 py-2"></label>
+      <label class="grid gap-1 text-sm">{{ _("Fixed expected units") }}<input name="expected_units" inputmode="decimal" value="{{ format_quantity_input(source.expected_units, locale) if source.expected_units is not none else '' }}" class="form-control rounded-lg px-3 py-2"></label>
       <label class="grid gap-1 text-sm">{{ _("Months for average") }}<input name="average_months" type="number" min="1" max="24" value="{{ source.average_months }}" class="form-control rounded-lg px-3 py-2"></label>
       <label class="grid gap-1 text-sm">{{ _("Record income as") }}<select name="record_as" class="form-select rounded-lg py-2"><option value="cash_received"{% if source.record_as.value == "cash_received" %} selected{% endif %}>{{ _("Cash received (gross)") }}</option><option value="net"{% if source.record_as.value == "net" %} selected{% endif %}>{{ _("Net") }}</option><option value="take_home"{% if source.record_as.value == "take_home" %} selected{% endif %}>{{ _("Take-home") }}</option></select></label>
       <label class="grid gap-1 text-sm">{{ _("Active from work month") }}<input type="date" name="active_from" value="{{ source.active_from.isoformat() }}" required class="form-control rounded-lg px-3 py-2"></label>
@@ -69,7 +69,7 @@
     {% for item in source.preview %}
     <li class="rounded-lg border border-line p-3" data-income-preview>
       <p class="font-medium">{{ format_day(item.due_date, locale) }} · {{ _("Work month: %(month)s", month=format_month(item.work_month, locale)) }} · {{ _("Estimated") if item.amount_state == "estimated" else _("Confirmed") }}</p>
-      {% if item.units is not none %}<p class="mt-1 text-muted">{{ _("Expected units: %(units)s", units=item.units) }}</p>{% endif %}
+      {% if item.units is not none %}<p class="mt-1 text-muted">{{ _("Expected units: %(units)s", units=format_quantity_input(item.units, locale)) }}</p>{% endif %}
       <p class="mt-1">{{ _("Net: %(amount)s", amount=format_money(item.breakdown.net, locale)) }}</p>
       {% for line in item.breakdown.added %}<p>{{ item.tax_names.get(line.name, line.name) }} · {{ format_money(line.amount, locale) }}</p>{% endfor %}
       <p>{{ _("Gross: %(amount)s", amount=format_money(item.breakdown.gross, locale)) }}</p>
@@ -83,7 +83,7 @@
   {% endif %}
   <h3 class="mt-4 text-sm font-semibold">{{ _("Work logs") }}</h3>
   {% if source.work_logs %}
-  <ul class="mt-2 flex flex-wrap gap-3 text-sm">{% for log in source.work_logs %}<li>{{ format_month(log.work_month, locale) }} · {{ log.units }}</li>{% endfor %}</ul>
+  <ul class="mt-2 flex flex-wrap gap-3 text-sm">{% for log in source.work_logs %}<li>{{ format_month(log.work_month, locale) }} · {{ format_quantity_input(log.units, locale) }}</li>{% endfor %}</ul>
   {% else %}<p class="mt-2 text-sm text-muted">{{ _("No work logs yet.") }}</p>{% endif %}
   {% if can_edit and not source.archived and source.kind.value == "variable" %}
   <form method="post" action="{{ scoped_url(request, 'income_work_log', source_id=source.id) }}" class="mt-4 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-3">

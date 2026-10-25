@@ -11,10 +11,16 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.repositories import NotFound
+from assetboard.domain.months import YearMonth
 from assetboard.domain.transactions import amount_minor
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day, format_month
-from assetboard.i18n.numbers import format_amount_input, format_money, parse_amount
+from assetboard.i18n.numbers import (
+    format_amount_input,
+    format_money,
+    format_quantity_input,
+    parse_amount,
+)
 from assetboard.services import income, taxes
 from assetboard.services.categories import list_categories
 from assetboard.services.context import Role, has_role
@@ -115,6 +121,10 @@ def _source_input(values: dict[str, str], locale: str, currency: str) -> _Source
     }
 
 
+def _format_work_month(work_month: date, locale: str) -> str:
+    return format_month(YearMonth.from_date(work_month), locale)
+
+
 def _redirect(request: Request, error: str | None = None) -> Response:
     target = request.url_for("income_sources").path
     return RedirectResponse(
@@ -152,7 +162,8 @@ async def sources_page(request: Request, ctx: CurrentContext) -> Response:
             else None,
             "format_money": format_money,
             "format_amount_input": format_amount_input,
-            "format_month": format_month,
+            "format_quantity_input": format_quantity_input,
+            "format_month": _format_work_month,
             "format_day": format_day,
             "tax_rule_names": {rule.id: rule.name for rule in rules},
         },
@@ -190,6 +201,14 @@ async def update_source(request: Request, ctx: CurrentContext, source_id: str) -
             lambda: income.update_source(
                 request.app.state.session_factory, ctx, _id(source_id), **fields
             )
+        )
+        # New pay dates or a longer active range can bring new work months into the horizon.
+        await run_in_threadpool(
+            income.generate_workspace,
+            request.app.state.session_factory,
+            ctx,
+            ctx.clock,
+            request.app.state.settings,
         )
     except income.IncomeError as exc:
         return _redirect(request, exc.code)
