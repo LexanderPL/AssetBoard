@@ -225,7 +225,7 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
 
             # Clicking a category opens the Transactions page with only its entries (and only
             # its table); its entry row preselects it.
-            page.locator("#month-summary [data-filter-link]", has_text="Golden Food").click()
+            page.locator("#month-summary [data-plan-category]", has_text="Golden Food").click()
             page.wait_for_url(re.compile(r"/transactions/2025-03\?category=[0-9a-f-]+$"))
             expect(page.locator("[data-ledger-filter-bar]")).to_contain_text(
                 "Showing Golden Food only (1 entry)."

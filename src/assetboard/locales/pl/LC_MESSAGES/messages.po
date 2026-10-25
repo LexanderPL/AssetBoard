@@ -3198,6 +3198,14 @@ msgid "Saved / invested %(rate)s of income"
 msgstr "Zaoszczędzono / zainwestowano %(rate)s przychodu"
 
 #, python-format
+msgid "Spent %(actual)s (no plan)"
+msgstr "Wydano %(actual)s (bez planu)"
+
+#, python-format
+msgid "Earned %(actual)s (no plan)"
+msgstr "Zarobiono %(actual)s (bez planu)"
+
+#, python-format
 msgid "Spent %(actual)s of %(planned)s planned"
 msgstr "Wydano %(actual)s z zaplanowanych %(planned)s"
 

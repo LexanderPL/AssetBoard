@@ -150,6 +150,8 @@ def test_nothing_earned_shows_no_savings_rate(summary: OwnerApp) -> None:
     bars = re.findall(r'width="(\d+)"[^>]*data-bar-actual', block)
     assert bars == ["100", "0"]  # spent with no plan: actual is the scale; nothing earned
     assert "data-bar-planned" not in block  # nothing planned: no plan line
+    assert "Spent €10.00 (no plan)" in block and "Earned €0.00 (no plan)" in block
+    assert "(over plan)" not in block and "of €0.00 planned" not in block
     # Everything spent is overspend: the whole flow bar is hatched.
     assert re.search(r'x="0" y="0" width="1000"[^>]*data-flow-segment="overspent"', block)
     assert "Spending and saving exceed earnings by €10.00." in block
