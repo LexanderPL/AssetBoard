@@ -24,14 +24,17 @@ command -v uv >/dev/null || { echo "error: uv is required (see docs/install/nati
 version=$(cd "$checkout" && uv version --short)
 mkdir -p "$out"
 out=$(cd "$out" && pwd)
-wheel=$app-$version-py3-none-any.whl
 requirements=$app-$version-requirements.txt
 
 printf '==> Building %s %s into %s\n' "$app" "$version" "$out"
-rm -f "$out/$wheel"
+rm -f "$out/$app"-*-py3-none-any.whl
 # The wheel's build hook (hatch_build.py) compiles the translation catalogs; app.css is committed.
 (cd "$checkout" && uv build --wheel --out-dir "$out")
-[[ -f $out/$wheel ]] || { echo "error: uv build did not produce $wheel" >&2; exit 1; }
+# The wheel's file name carries the PEP 440 form of the version (0.4.0-rc.1 becomes 0.4.0rc1),
+# so it is found rather than derived; install-debian.sh reads it from SHA256SUMS.
+wheels=("$out/$app"-*-py3-none-any.whl)
+[[ ${#wheels[@]} -eq 1 && -f ${wheels[0]} ]] || { echo "error: uv build did not produce one wheel" >&2; exit 1; }
+wheel=$(basename "${wheels[0]}")
 (cd "$checkout" && uv run --no-project python scripts/verify_wheel.py "$out/$wheel")
 
 printf '==> Exporting locked runtime requirements\n'

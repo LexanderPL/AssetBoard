@@ -74,6 +74,27 @@ DEFAULT_NOTIFICATION_SCHEMES = (
 )
 
 
+# Settings that can also be read from a file named by ``<PREFIX>_<NAME>_FILE`` (Docker and
+# Podman secrets, systemd credentials), so the value itself stays out of the environment.
+FILE_SETTINGS = ("secret_key", "setup_token", "database_url", "oidc_client_secret", "smtp_password")
+
+
+def _settings_from_files(values: dict[str, Any]) -> dict[str, Any]:
+    for name in FILE_SETTINGS:
+        variable = f"{ENV_PREFIX}_{name.upper()}_FILE"
+        path = os.environ.get(variable)
+        if not path:
+            continue
+        if values.get(name) not in (None, ""):
+            raise ValueError(f"set either {ENV_PREFIX}_{name.upper()} or {variable}, not both")
+        try:
+            # Only the trailing newline editors and ``echo`` add; the value is never echoed.
+            values[name] = Path(path).read_text(encoding="utf-8").rstrip("\r\n")
+        except OSError as error:
+            raise ValueError(f"{variable}: cannot read the file ({error.strerror})") from None
+    return values
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix=f"{ENV_PREFIX}_",
@@ -514,6 +535,11 @@ class Settings(BaseSettings):
             raise ValueError(
                 "BASE_URL must use https when OIDC is enabled (http only with ENV=dev)"
             )
+
+    @model_validator(mode="before")
+    @classmethod
+    def read_file_settings(cls, values: Any) -> Any:
+        return _settings_from_files(dict(values)) if isinstance(values, dict) else values
 
     @model_validator(mode="after")
     def finalize_settings(self) -> Settings:

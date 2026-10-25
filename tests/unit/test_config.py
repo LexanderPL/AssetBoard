@@ -508,3 +508,39 @@ def test_cli_errors_never_show_secrets(tmp_path: Path) -> None:
     assert result.exit_code == 1 and "smtp_port" in result.output
     for secret in SECRETS:
         assert secret not in result.output
+
+
+def test_secrets_can_be_read_from_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    token = tmp_path / "setup_token"
+    token.write_text("0123456789abcdefghijkl\n", encoding="utf-8")
+    password = tmp_path / "smtp_password"
+    password.write_text("s3cret pass\n", encoding="utf-8")
+    monkeypatch.setenv(f"{ENV_PREFIX}_SETUP_TOKEN_FILE", str(token))
+    monkeypatch.setenv(f"{ENV_PREFIX}_SMTP_PASSWORD_FILE", str(password))
+    monkeypatch.setenv(f"{ENV_PREFIX}_SMTP_USERNAME", "mailer")
+
+    settings = Settings(_env_file=None, data_dir=tmp_path)
+
+    assert settings.setup_token is not None
+    assert settings.setup_token.get_secret_value() == "0123456789abcdefghijkl"
+    assert settings.smtp_password is not None
+    assert settings.smtp_password.get_secret_value() == "s3cret pass"
+
+
+def test_a_secret_file_and_a_value_together_are_refused(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    secret = tmp_path / "token"
+    secret.write_text("0123456789abcdefghijkl", encoding="utf-8")
+    monkeypatch.setenv(f"{ENV_PREFIX}_SETUP_TOKEN", "abcdefghijkl0123456789")
+    monkeypatch.setenv(f"{ENV_PREFIX}_SETUP_TOKEN_FILE", str(secret))
+    with pytest.raises(ValueError, match="not both"):
+        Settings(_env_file=None, data_dir=tmp_path)
+
+
+def test_an_unreadable_secret_file_is_refused_without_its_content(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv(f"{ENV_PREFIX}_OIDC_CLIENT_SECRET_FILE", str(tmp_path / "missing"))
+    with pytest.raises(ValueError, match="OIDC_CLIENT_SECRET_FILE: cannot read the file"):
+        Settings(_env_file=None, data_dir=tmp_path)

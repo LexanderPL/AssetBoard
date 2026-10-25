@@ -138,15 +138,24 @@ echo "Version: $version"
 release_url=${release_url:-$repo_url/releases/download/v$version}
 release_url=${release_url%/}
 
-wheel=$app-$version-py3-none-any.whl
-requirements=$app-$version-requirements.txt
-files=("$wheel" "$requirements" "$app.service" "$app.env.example")
-
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
 step "Downloading release files from $release_url"
-for file in SHA256SUMS "${files[@]}"; do
+echo "  SHA256SUMS"
+curl -fsSL --proto '=https,file' -o "$work/SHA256SUMS" "$release_url/SHA256SUMS"
+# The wheel and requirements names carry the PEP 440 form of the version (0.4.0-rc.1 becomes
+# 0.4.0rc1), so they are taken from SHA256SUMS rather than built from --version.
+listed() {
+  local names
+  mapfile -t names < <(grep -oE "  $app-[0-9A-Za-z.+_]+$1\$" "$work/SHA256SUMS" | sed 's/^  //')
+  [[ ${#names[@]} -eq 1 ]] || die "SHA256SUMS must list exactly one $app-<version>$1"
+  printf '%s' "${names[0]}"
+}
+wheel=$(listed '-py3-none-any\.whl')
+requirements=$(listed '-requirements\.txt')
+files=("$wheel" "$requirements" "$app.service" "$app.env.example")
+for file in "${files[@]}"; do
   echo "  $file"
   curl -fsSL --proto '=https,file' -o "$work/$file" "$release_url/$file"
 done
