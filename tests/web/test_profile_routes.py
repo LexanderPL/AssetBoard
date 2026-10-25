@@ -19,6 +19,7 @@ from sqlalchemy import select, update
 from sqlalchemy.exc import OperationalError
 
 from assetboard.cli import serve_app
+from assetboard.clock import FixedClock
 from assetboard.db.models.identity import AuditEvent, ExternalIdentity, User, UserSession
 from assetboard.i18n.locale import SUPPORTED_LOCALES
 from assetboard.services import profile
@@ -379,8 +380,11 @@ def test_profile_actions_show_the_throttled_wait(
 ) -> None:
     client = admin(h)
     path, headers = sensitive_posts(h, client)[action]
-    until = h.app.state.clock.now() + timedelta(seconds=150)
+    # Freeze the app clock so the wait the route computes does not depend on elapsed time.
+    frozen = FixedClock(h.app.state.clock.now().isoformat())
+    until = frozen.now() + timedelta(seconds=150)
     with monkeypatch.context() as m:
+        m.setattr(h.app.state, "clock", frozen)
         m.setattr(
             confirm,
             "confirm_sensitive",
@@ -394,7 +398,7 @@ def test_profile_actions_show_the_throttled_wait(
         )
     assert response.status_code == 401
     assert "Too many attempts. Try again in 3 minutes." in response.text
-    assert 148 <= int(response.headers["retry-after"]) <= 150
+    assert response.headers["retry-after"] == "150"
 
 
 def test_a_stale_external_session_is_refused_without_an_audit_row(h: Harness) -> None:
