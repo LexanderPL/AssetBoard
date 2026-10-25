@@ -205,6 +205,12 @@ Do not touch posted occurrences. Tests for lag 0/1/2, estimated vs confirmed, sk
 
 ## F3.5 Month page integration
 
+**After F2.7 (owner, 2026-10-25):** the month page no longer lists transactions. The pending
+"expected" rows with their Confirm button go into the tables of the **Transactions** page
+(`/transactions/YYYY-MM`); the Expected and Forecast columns and the forecast KPIs stay on the
+**Month** summary (and the shared flow bar, so Home shows them too); the missing-work-log banner
+shows on both the Month and the Transactions page.
+
 **Acceptance**
 - Month page lists **pending occurrences of that month** in each table (visually distinct "expected" rows with a Confirm button); confirming moves them into real rows.
 - Summary gets extra columns: **Expected (pending)** and **Forecast = actual + pending expected**; KPIs show "forecast spent / forecast earned" next to actuals. A toggle hides forecast columns.
