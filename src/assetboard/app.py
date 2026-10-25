@@ -72,6 +72,7 @@ from assetboard.web.income_routes import router as income_router
 from assetboard.web.invite_routes import router as invite_router
 from assetboard.web.month_routes import MONTH_CLOSED_MESSAGE, MONTH_CLOSED_TITLE
 from assetboard.web.month_routes import router as month_router
+from assetboard.web.notification_routes import router as notification_router
 from assetboard.web.oidc_routes import router as oidc_router
 from assetboard.web.plan_routes import router as plan_router
 from assetboard.web.proxy_routes import router as proxy_router
@@ -287,6 +288,7 @@ def create_app(
     app.include_router(upcoming_router)
     app.include_router(tax_router)
     app.include_router(income_router)
+    app.include_router(notification_router)
     app.include_router(auth_router)
     app.include_router(email_router)
     app.include_router(totp_router)
