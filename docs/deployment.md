@@ -193,6 +193,14 @@ export ASSETBOARD_IMAGE=ghcr.io/lexanderpl/assetboard:0.3.0 # x-release-please-v
 docker compose -f compose.example.yaml up -d --no-build
 ```
 
+## Build from source
+
+`docker compose -f compose.example.yaml build` (or `docker build .`) and `uv build` work from a
+plain git checkout. The compiled translation catalogs (`messages.mo`) are not in the repository:
+the wheel's build hook (`hatch_build.py`) compiles them from the committed `.po` files, using Babel
+as a build requirement, so both the wheel and the image include them. The image build fails if
+they are missing.
+
 ## Release automation credentials
 
 The release-please workflow uses `GITHUB_TOKEN`. Ensure repository Actions settings allow

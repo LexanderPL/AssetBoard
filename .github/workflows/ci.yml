@@ -38,9 +38,11 @@ jobs:
       - name: Check container smoke script
         run: shellcheck scripts/smoke_container.sh
 
+      # No `make i18n-compile` first: the wheel's build hook (hatch_build.py) must compile the
+      # gitignored .mo catalogs itself, and verify_wheel.py fails if they are missing.
       - name: Build and inspect non-editable wheel
         run: |
-          uv run --locked make css i18n-compile
+          uv run --locked make css
           uv build --wheel --out-dir dist
           python -m zipfile -l dist/assetboard-*.whl
           uv run --locked python scripts/verify_wheel.py dist/assetboard-*.whl
@@ -55,12 +57,15 @@ jobs:
         run: uv run --locked make check
 
       - name: Run Playwright browser tests (shell smoke and OIDC sign-in)
-        run: ASSETBOARD_RUN_BROWSER_TESTS=1 uv run --locked pytest tests/browser
+        run: |
+          uv run --locked make i18n-compile
+          ASSETBOARD_RUN_BROWSER_TESTS=1 uv run --locked pytest tests/browser
 
+      # Compiled .mo catalogs are build output (gitignored), so only app.css is checked here.
       - name: Verify generated assets are fresh
         run: |
-          uv run --locked make css i18n-compile
-          git diff --exit-code -- src/assetboard/static/css/app.css src/assetboard/locales/en/LC_MESSAGES/messages.mo src/assetboard/locales/pl/LC_MESSAGES/messages.mo
+          uv run --locked make css
+          git diff --exit-code -- src/assetboard/static/css/app.css
 
       - name: Verify translation catalogs are fresh
         run: |

@@ -17,6 +17,12 @@ make check
 must not access the network. Add or update tests for behavior changes and update English and Polish
 translation catalogs when user-facing strings change.
 
+Translations: commit the `.po` catalogs (`make i18n-update` refreshes them from the source). The
+compiled `.mo` files are build output and are gitignored: `make setup`, `make dev`, `make test` and
+`make check` run `make i18n-compile` first, and wheel and image builds compile them too. If you
+run `pytest` directly after editing a `.po` file, run `make i18n-compile` first; the test session
+refuses to start with missing or stale `.mo` files rather than silently showing English.
+
 ## Feature workflow
 
 1. Link the change to a feature ID and its specification in `docs/specs/`.

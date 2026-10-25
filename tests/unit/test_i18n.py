@@ -21,6 +21,17 @@ def test_polish_catalog_has_no_empty_or_fuzzy_translations() -> None:
         assert all(translation.strip() for translation in translations)
 
 
+def test_polish_runtime_catalog_is_compiled_rather_than_an_english_fallback() -> None:
+    # .mo files are built (`make i18n-compile` / the wheel build hook), not committed; gettext
+    # would silently fall back to English without them.
+    from gettext import GNUTranslations
+
+    from assetboard.i18n import gettext, translations_for
+
+    assert isinstance(translations_for("pl"), GNUTranslations)
+    assert gettext("Form expired", "pl") == "Formularz wygasł"
+
+
 def test_month_names_keep_cldr_case_and_capitalise_only_headings() -> None:
     from assetboard.domain.months import YearMonth
     from assetboard.i18n.dates import format_month, format_month_heading
