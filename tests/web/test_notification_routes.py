@@ -139,3 +139,9 @@ def test_recurring_items_take_their_own_reminder_lead(owner):
     )
     with owner.db() as session:
         assert session.get(ScheduledItem, item.id).reminder_lead_days is None  # type: ignore[union-attr]
+
+
+def test_the_page_is_translated(owner):
+    owner.client.headers["accept-language"] = "pl"
+    page = owner.client.get("/notifications").text
+    assert "Powiadomienia" in page and "Nowy kanał" in page and "Dołączaj kwoty" in page

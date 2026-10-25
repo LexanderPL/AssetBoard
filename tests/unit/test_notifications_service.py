@@ -458,6 +458,18 @@ def test_item_lead_days_win_over_the_channel_default(db, settings, notifier) -> 
     assert "Insurance" in message.body and "Rent" not in message.body
 
 
+def test_messages_follow_the_recipient_language(db, settings, notifier) -> None:
+    add_channel(db, settings, notifier)
+    with db.factory.begin() as session:
+        user = session.get(User, db.users["ana"])
+        assert user is not None
+        user.locale = "pl"
+    add_occurrence(db, date(2026, 3, 5), label="Czynsz")
+    run(db, settings, notifier, "2026-03-10T08:00:00+00:00")
+    [message] = notifier.sent
+    assert "Zaległe od" in message.body and "przypomnienie" in message.title
+
+
 def test_work_log_reminder_on_the_first_of_the_month(db, settings, notifier) -> None:
     add_channel(db, settings, notifier)
     with db.factory.begin() as session:
