@@ -733,6 +733,23 @@ current order.
    income split into Spent / Saved / invested / Left, overspend hatched, captioned "Saved /
    invested X% of income".
 
+**Implementation notes (2026-10-25)**
+- `category_breakdown(summary, block, max_slices=8)`: beyond eight categories the smallest are
+  grouped into one "Other" slice (theme colour, not a category colour), so a ring stays
+  readable; the slices still add up to the block's actual total. Slices are sorted by amount.
+- The donuts use ECharts pie series only, with the tooltip drawn on the canvas
+  (`renderMode: "richText"`): category names (user input) never reach an HTML formatter.
+- Home's confirm and skip forms post to the F3.2 Upcoming routes with `back=home`; a
+  successful action returns to Home, an error is shown on the Upcoming page. Any other `back`
+  value means the Upcoming page.
+- History rows link the date to the Transactions page of its month (`#tx-<id>`), where the
+  entry is edited (F2.6 linked the month page).
+- The redirects from `/transactions?...` and `/transactions/export.csv` also copy `export`
+  and the CSV options (`delimiter`, `decimal`, `bom`, `guard`); unknown parameters are dropped.
+  `/m/YYYY-MM?category=` with a malformed id redirects without the parameter.
+- The Transactions page shows the closed-month banner without close/reopen buttons (owners get
+  a link to the Month page, where those stay).
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
