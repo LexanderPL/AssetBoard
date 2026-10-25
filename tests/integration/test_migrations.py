@@ -64,6 +64,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "users",
         "workspaces",
         "work_logs",
+        "work_days",
     }
     assert setup_rows == [1]
     assert current_heads == tuple(ScriptDirectory.from_config(alembic_config(settings)).get_heads())
@@ -847,5 +848,29 @@ def test_0017_round_trip_backfills_nominal_dates_and_keeps_occurrences(tmp_path:
             assert count.scalar_one() == 1
         upgrade_database(settings)
         assert database_is_at_head(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0022_work_calendar_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'days.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        assert "work_days" in inspector.get_table_names()
+        assert "derived_from_days" in {
+            column["name"] for column in inspector.get_columns("work_logs")
+        }
+        command.downgrade(alembic_config(settings), "0021_f36")
+        assert "work_days" not in inspect(engine).get_table_names()
+        assert "derived_from_days" not in {
+            column["name"] for column in inspect(engine).get_columns("work_logs")
+        }
+        upgrade_database(settings)
+        assert "work_days" in inspect(engine).get_table_names()
+        check_database_migrations(settings)
     finally:
         engine.dispose()

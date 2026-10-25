@@ -15,6 +15,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     Uuid,
+    false,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -90,6 +91,38 @@ class WorkLog(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
 
     income_source_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
     work_month: Mapped[date] = mapped_column(Date(), nullable=False)
+    units: Mapped[Decimal] = mapped_column(DecimalType(), nullable=False)
+    # F3.7: the month's units are the sum of its WorkDay rows; read-only in the month-level form.
+    derived_from_days: Mapped[bool] = mapped_column(
+        Boolean(), nullable=False, default=False, server_default=false()
+    )
+
+
+MAX_WORK_DAY_UNITS = 24
+
+
+class WorkDay(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
+    """One day of the F3.7 work calendar (variable income sources only)."""
+
+    __tablename__ = "work_days"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id", "income_source_id", "work_date", name="uq_work_days_source_date"
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "income_source_id"],
+            ["income_sources.workspace_id", "income_sources.id"],
+            name="fk_work_days_workspace_source",
+            ondelete="CASCADE",
+        ),
+        CheckConstraint(f"units > 0 AND units <= {MAX_WORK_DAY_UNITS}", name="units_valid"),
+        Index(
+            "ix_work_days_workspace_source_date", "workspace_id", "income_source_id", "work_date"
+        ),
+    )
+
+    income_source_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
+    work_date: Mapped[date] = mapped_column(Date(), nullable=False)
     units: Mapped[Decimal] = mapped_column(DecimalType(), nullable=False)
 
 
