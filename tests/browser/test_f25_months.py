@@ -143,7 +143,8 @@ def test_f25_month_page_in_a_browser(tmp_path: Path) -> None:
 
             # Phone width: no horizontal overflow, the user menu is still reachable.
             page.set_viewport_size({"width": 320, "height": 640})
-            for path in ("/categories", "/account", "/transactions", f"/m/{today}"):
+            for path in ("/", "/categories", "/account", "/history", f"/m/{today}",
+                         f"/transactions/{today}"):  # fmt: skip
                 page.goto(f"{base}{path}")
                 assert page.evaluate(
                     "document.documentElement.scrollWidth <= document.documentElement.clientWidth"

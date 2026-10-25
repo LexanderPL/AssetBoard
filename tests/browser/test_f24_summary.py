@@ -1,6 +1,7 @@
 """The month summary in Chromium (F2.4): actual, difference and KPIs refresh without a reload
-after a planned value or an entry is saved, the sort toggle reorders the rows and is kept,
-clicking a category filters the transaction tables (part B), and there are no CSP violations.
+after a planned value or an entry (made on the Transactions page since F2.7) is saved, the sort
+toggle reorders the rows and is kept, clicking a category opens the filtered Transactions page
+(part B), and there are no CSP violations.
 The test's categories are created directly ("Golden ..."); the suggested set that setup gives
 every new workspace stays in the summary with nothing in it."""
 
@@ -139,18 +140,24 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
                 "Spent €0.00 of €550.00 planned"
             )
 
-            # An entry updates actual, difference and the KPIs without a reload.
-            page.locator("#entry-expense-day").fill("3")
-            page.locator("#entry-expense-amount").fill("50")
-            page.locator("#entry-expense-category").select_option(label="Golden Food")
-            page.locator("#entry-expense-amount").press("Enter")
+            # F2.7: entries are made on the Transactions page; the Month summary shows them.
+            def add(direction: str, day: str, amount: str, label: str) -> None:
+                page.goto(f"{base}/transactions/{MONTH}")
+                page.locator(f"#entry-{direction}-day").fill(day)
+                page.locator(f"#entry-{direction}-amount").fill(amount)
+                page.locator(f"#entry-{direction}-category").select_option(label=label)
+                count = page.locator(f"#ledger-{direction} tr[data-transaction]").count()
+                page.locator(f"#entry-{direction}-amount").press("Enter")
+                expect(page.locator(f"#ledger-{direction} tr[data-transaction]")).to_have_count(
+                    count + 1
+                )
+                page.goto(f"{base}/m/{MONTH}")
+
+            add("expense", "3", "50", "Golden Food")
             expect(food_row.locator("[data-actual]")).to_have_text("€50.00")
             expect(food_row.locator("[data-difference]")).to_contain_text("+€500.00")
             expect(kpis.nth(1)).to_have_text("€50.00")
-            page.locator("#entry-income-day").fill("1")
-            page.locator("#entry-income-amount").fill("1000")
-            page.locator("#entry-income-category").select_option(label="Golden Salary")
-            page.locator("#entry-income-amount").press("Enter")
+            add("income", "1", "1000", "Golden Salary")
             expect(kpis).to_have_text(["€1,000.00", "€50.00", "€0.00", "€950.00", "0.0%"])
             expect(page.locator("[data-savings-rate]")).to_have_text(
                 "Saved / invested 0.0% of income"
@@ -158,10 +165,7 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-flow-segment]")).to_have_count(2)  # spent and left
 
             # Largest first by default; "Your order" keeps the categories' order, and is kept.
-            page.locator("#entry-expense-day").fill("4")
-            page.locator("#entry-expense-amount").fill("400")
-            page.locator("#entry-expense-category").select_option(label="Golden Travel")
-            page.locator("#entry-expense-amount").press("Enter")
+            add("expense", "4", "400", "Golden Travel")
             expect(travel_row.locator("[data-actual]")).to_have_text("€400.00")
             assert _order(page) == ["Golden Travel", "Golden Food"]
             page.get_by_role("button", name="Your order").click()
@@ -180,22 +184,21 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             assert page.evaluate("document.activeElement.id") == "summary-sort-actual"
             assert _order(page) == ["Golden Travel", "Golden Food"]
 
-            # Clicking a category shows only its entries (and only its table); its entry row
-            # preselects it; the address is pushed, so Back shows everything again.
+            # The expense donut is drawn from the summary's actuals.
+            expect(page.locator("[data-donut='expense'] [data-chart-canvas] canvas")).to_have_count(
+                1
+            )
+            expect(page.locator("[data-donut='expense'] [data-chart-row]")).to_have_count(2)
+
+            # Clicking a category opens the Transactions page with only its entries (and only
+            # its table); its entry row preselects it.
             page.locator("#month-summary [data-filter-link]", has_text="Golden Food").click()
+            page.wait_for_url(re.compile(r"/transactions/2025-03\?category=[0-9a-f-]+$"))
             expect(page.locator("[data-ledger-filter-bar]")).to_contain_text(
                 "Showing Golden Food only (1 entry)."
             )
-            expect(page.locator("#ledger-status")).to_have_text(
-                "Showing Golden Food only (1 entry)."
-            )
-            expect(page.locator("#ledger-expense-heading")).to_be_focused()
-            assert re.search(r"/m/2025-03\?category=[0-9a-f-]+$", page.url)
             expect(page.locator("#ledger-income")).to_have_count(0)
             expect(page.locator("#ledger-expense [data-description]")).to_have_count(1)
-            expect(
-                page.locator("#month-summary [data-filter-link]", has_text="Golden Food")
-            ).to_have_attribute("aria-current", "true")
             expect(page.locator("#entry-expense-category option:checked")).to_have_text(
                 "Golden Food"
             )
@@ -207,22 +210,18 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("#entry-expense-category option:checked")).to_have_text(
                 "Golden Food"
             )
-            page.go_back()
-            expect(page.locator("#ledger-income")).to_be_visible()
-            expect(page.locator("[data-ledger-filter-bar]")).to_have_count(0)
-            # Back loads the page afresh (no history cache): the entry added while filtered
-            # is listed, the totals are current, and nothing was kept in localStorage.
-            expect(food_row.locator("[data-actual]")).to_have_text("€57.00")
-            expect(kpis.nth(1)).to_have_text("€457.00")
-            assert page.evaluate("localStorage.getItem('htmx-history-cache')") is None
-            page.locator("#month-summary [data-filter-link]", has_text="Golden Salary").click()
-            expect(page.locator("#ledger-expense")).to_have_count(0)
-            expect(page.locator("#ledger-income-heading")).to_be_focused()
+            # "Show all" swaps the tables back, announces it and focuses the heading.
             page.locator("[data-ledger-show-all]").click()
-            expect(page.locator("#ledger-expense")).to_be_visible()
+            expect(page.locator("#ledger-income")).to_be_visible()
             expect(page.locator("#ledger-expense-heading")).to_be_focused()
             expect(page.locator("#ledger-status")).to_have_text("Showing all entries.")
-            expect(page.locator("#month-summary [aria-current='true']")).to_have_count(0)
+            expect(page.locator("[data-ledger-filter-bar]")).to_have_count(0)
+            page.go_back()
+            expect(page.locator("[data-ledger-filter-bar]")).to_contain_text("(2 entries)")
+            assert page.evaluate("localStorage.getItem('htmx-history-cache')") is None
+            page.goto(f"{base}/m/{MONTH}")
+            expect(food_row.locator("[data-actual]")).to_have_text("€57.00")
+            expect(kpis.nth(1)).to_have_text("€457.00")
 
             assert page.evaluate("window.__cspViolations") == []
             assert not [e for e in console_errors if "Content Security Policy" in e]
