@@ -1333,6 +1333,9 @@ msgstr ""
 msgid "The service refused the message or could not be reached."
 msgstr ""
 
+msgid "The daily run ran out of time; the next daily run retries it."
+msgstr ""
+
 msgid "The last delivery was interrupted; the next daily run retries it."
 msgstr ""
 

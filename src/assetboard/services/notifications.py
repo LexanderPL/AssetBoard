@@ -64,7 +64,7 @@ from assetboard.i18n.locale import normalize_locale
 from assetboard.services.auth import count_limited_attempt, derive_subkey
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.notification_messages import reminder_message, test_message
-from assetboard.services.notify import InvalidNotificationUrl, Notifier
+from assetboard.services.notify import UNCERTAIN_ERRORS, InvalidNotificationUrl, Notifier
 
 logger = logging.getLogger(__name__)
 
@@ -531,7 +531,8 @@ def _claim(
 ) -> _Claim | None:
     def write(session: Session) -> _Claim | None:
         workspace_repository = CurrentWorkspaceRepository(session, scope)
-        workspace_repository.lock(exclusive=False)
+        # Exclusive: two workers (PostgreSQL) must not both re-claim the same failed slot.
+        workspace_repository.lock(exclusive=True)
         workspace = workspace_repository.get()
         local_now = _local_now(clock, workspace.timezone)
         today = local_now.date()
@@ -613,13 +614,25 @@ def _claim(
     return run_immediate(factory, write)
 
 
-def _deliver(claim: _Claim, notifier: Notifier, link: str | None) -> dict[UUID, str | None]:
-    """Send the claimed reminders; the error code (or ``None``) per log row."""
+def _deliver(
+    claim: _Claim,
+    notifier: Notifier,
+    link: str | None,
+    out_of_time: Callable[[], bool] = lambda: False,
+) -> dict[UUID, str | None]:
+    """Send the claimed reminders; the error code (or ``None``) per log row.
+
+    Messages not sent before ``out_of_time()`` are recorded as ``deferred`` (retried next run).
+    """
     if claim.url is None:
         return {}
     by_key = {reminder.key: log_id for reminder, log_id in claim.reminders}
     results: dict[UUID, str | None] = {}
     for group in batches([reminder for reminder, _ in claim.reminders], claim.mode):
+        if results and out_of_time():
+            for reminder in group:
+                results[by_key[reminder.key]] = "deferred"
+            continue
         title, body = reminder_message(
             group,
             today=claim.today,
@@ -649,7 +662,8 @@ def _record(
             row = logs.get(log_id)
             if row is None:  # the channel was deleted meanwhile
                 continue
-            row.status = LogStatus.SENT.value if error is None else LogStatus.FAILED.value
+            delivered = error is None or error in UNCERTAIN_ERRORS
+            row.status = LogStatus.SENT.value if delivered else LogStatus.FAILED.value
             row.error, row.attempted_at = error, now
             last_error = last_error or error
         channel = NotificationChannelRepository(session, scope).get(claim.channel_id)
@@ -705,7 +719,7 @@ def run_workspace(
                 continue
             if not claim.reminders:
                 continue
-            results = _deliver(claim, notifier, link)
+            results = _deliver(claim, notifier, link, out_of_time)
             _record(factory, scope, clock, claim, results)
             failed = sum(error is not None for error in results.values())
             stats.sent += len(results) - failed

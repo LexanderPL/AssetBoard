@@ -570,3 +570,30 @@ def test_log_pruning_keeps_sent_overdue_rows(db, settings, notifier) -> None:
             )
     run(db, settings, notifier, "2026-03-10T08:00:00+00:00")
     assert [(row.kind, row.status) for row in log_rows(db)] == [("overdue", "sent")]
+
+
+def test_a_timed_out_send_is_not_sent_again(db, settings, notifier) -> None:
+    # The message may have arrived after the deadline: never retry it (ADR-0021).
+    channel_id = add_channel(db, settings, notifier)
+    add_occurrence(db, date(2026, 3, 12))
+    notifier.fail_with = "timeout"
+    notifier.failing_urls = {URL}
+    run(db, settings, notifier, "2026-03-10T08:00:00+00:00")
+    assert [(row.status, row.error) for row in log_rows(db)] == [("sent", "timeout")]
+    assert stored(db, channel_id).last_error == "timeout"
+    notifier.failing_urls = set()
+    run(db, settings, notifier, "2026-03-11T08:00:00+00:00")
+    assert notifier.sent == []
+
+
+def test_messages_past_the_tick_budget_are_deferred_to_the_next_run(db, settings, notifier) -> None:
+    add_channel(db, settings, notifier, mode="per_item")
+    add_occurrence(db, date(2026, 3, 11))
+    add_occurrence(db, date(2026, 3, 12))
+    checks = iter([False, True, True, True])
+    run(db, settings, notifier, "2026-03-10T08:00:00+00:00", out_of_time=lambda: next(checks))
+    assert len(notifier.sent) == 1
+    assert sorted((row.status, row.error) for row in log_rows(db)) == [
+        ("failed", "deferred"),
+        ("sent", None),
+    ]

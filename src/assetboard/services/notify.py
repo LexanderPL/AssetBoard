@@ -28,6 +28,11 @@ class SendResult:
     error: str | None = None
 
 
+# Codes after which the message may still have been delivered. The daily run records such a
+# slot as sent (with the code), so a reminder can be lost but is never sent twice (ADR-0021).
+UNCERTAIN_ERRORS = frozenset({"timeout"})
+
+
 class Notifier(Protocol):
     def inspect(self, url: str) -> UrlInfo:
         """Parse ``url`` offline; raise ``InvalidNotificationUrl`` when it is not usable."""
