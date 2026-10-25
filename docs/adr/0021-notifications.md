@@ -74,8 +74,13 @@ Reminders work with the services people already run, without new operator settin
 instance secret must be backed up with the database, as for authenticator secrets; replacing
 it makes stored channel URLs unreadable and members re-enter them. A daily run that fails is
 retried a day later, and a reminder claimed just before a crash may be lost rather than sent
-twice. The application can be made to contact hosts on its network; the allowlist, the kill
-switch and the documentation above are the mitigation.
+twice. A send that passes its hard deadline (twice the socket timeout plus a second) may still
+have arrived, so it is recorded as sent with the code `timeout` and not retried. Messages a run
+could not send within the tick budget are recorded as `deferred` and retried on the next daily
+run. The application can be made to contact hosts on its network; the allowlist, the kill
+switch and the documentation above are the mitigation. One URL can also address several
+recipients of the same service (several mail addresses, chats or rooms), so a member can send
+messages from the server's address with their own credentials.
 
 References: [Apprise](https://github.com/caronc/apprise),
 [Fernet](https://cryptography.io/en/latest/fernet/).

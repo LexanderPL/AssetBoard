@@ -44,6 +44,7 @@ ERRORS = {
     ),
     "timeout": _("The service did not answer in time."),
     "delivery_failed": _("The service refused the message or could not be reached."),
+    "deferred": _("The daily run ran out of time; the next daily run retries it."),
     "interrupted": _("The last delivery was interrupted; the next daily run retries it."),
     "failed": _("The channel could not be saved. Check the form and try again."),
 }
@@ -97,7 +98,10 @@ async def _input(request: Request) -> ChannelInput:
 def _message(table: dict[str, str], code: str | None, locale: str) -> str | None:
     if not code:
         return None
-    return gettext(table.get(code, ERRORS["failed"]), locale)
+    # An unknown notice shows nothing; an unknown error the generic failure.
+    fallback = ERRORS["failed"] if table is ERRORS else None
+    message = table.get(code, fallback)
+    return gettext(message, locale) if message else None
 
 
 @router.get("/notifications", name="notifications")

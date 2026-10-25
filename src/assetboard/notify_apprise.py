@@ -51,11 +51,13 @@ class AppriseNotifier:
                 outcome.append(False)
 
         # A hard deadline: a service that keeps the connection busy (retries, slow replies)
-        # cannot hold the scheduler tick or a request longer than the timeout. The daemon
-        # thread ends by itself when its socket timeouts expire.
+        # cannot hold the scheduler tick or a request for long. It allows one connect plus one
+        # read at the socket timeout; past it the message may still arrive, so callers treat
+        # "timeout" as an unknown outcome (``UNCERTAIN_ERRORS``). The daemon thread ends by
+        # itself when its socket timeouts expire.
         worker = threading.Thread(target=deliver, name="notification-send", daemon=True)
         worker.start()
-        worker.join(self.timeout_seconds)
+        worker.join(2 * self.timeout_seconds + 1)
         if worker.is_alive() or not outcome:
             return SendResult(False, "timeout")
         return SendResult(True) if outcome[0] else SendResult(False, "delivery_failed")

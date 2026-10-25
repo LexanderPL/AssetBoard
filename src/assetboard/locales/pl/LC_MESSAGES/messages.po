@@ -1422,6 +1422,11 @@ msgstr "Usługa nie odpowiedziała na czas."
 msgid "The service refused the message or could not be reached."
 msgstr "Usługa odrzuciła wiadomość albo nie udało się z nią połączyć."
 
+msgid "The daily run ran out of time; the next daily run retries it."
+msgstr ""
+"Dzienne uruchomienie nie zdążyło; następne dzienne uruchomienie ponowi "
+"wysyłkę."
+
 msgid "The last delivery was interrupted; the next daily run retries it."
 msgstr ""
 "Ostatnie doręczenie zostało przerwane; następne codzienne uruchomienie "
