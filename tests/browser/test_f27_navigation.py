@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 import uvicorn
-from playwright.sync_api import Page, expect, sync_playwright
+from playwright.sync_api import Dialog, Page, expect, sync_playwright
 from sqlalchemy import select
 
 from assetboard.app import create_app
@@ -101,7 +101,12 @@ def test_f27_navigation_in_a_browser(tmp_path: Path) -> None:
                     console_errors.append(message.text) if message.type == "error" else None
                 ),
             )
-            page.on("dialog", lambda dialog: (dialogs.append(dialog.message), dialog.dismiss()))
+
+            def on_dialog(dialog: Dialog) -> None:
+                dialogs.append(dialog.message)
+                dialog.dismiss()
+
+            page.on("dialog", on_dialog)
             base = f"http://127.0.0.1:{port}"
             page.goto(f"{base}/", wait_until="networkidle")
             page.get_by_label("Setup token").fill(app.state.setup_token)
