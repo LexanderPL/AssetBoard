@@ -64,6 +64,7 @@ from assetboard.services.scheduled import (
     regenerate_working_day_items,
     workspace_has_scheduled_amounts,
 )
+from assetboard.services.taxes import workspace_has_fixed_tax_amounts
 from assetboard.services.transactions import workspace_has_transactions
 from assetboard.services.workspace_options import WorkspaceOptionError, validate_workspace_options
 
@@ -77,6 +78,7 @@ BASE_CURRENCY_LOCKS: list[Callable[[Session, Context], bool]] = [
     workspace_has_transactions,
     workspace_has_budget_lines,
     workspace_has_scheduled_amounts,
+    workspace_has_fixed_tax_amounts,
 ]
 
 

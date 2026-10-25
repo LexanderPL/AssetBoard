@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
+from assetboard.db.models.tax import TaxRule, TaxRuleVersion
 from assetboard.services.invitations import new_token
 
 
@@ -156,12 +157,37 @@ def make_scheduled_occurrence(session: Session, workspace_id: UUID) -> Scheduled
         scheduled_item_id=item.id,
         category_id=item.category_id,
         direction="expense",
+        nominal_date=date(2026, 3, 14),
         due_date=date(2026, 3, 14),
         expected_minor=180000,
         currency="EUR",
         amount_state="confirmed",
         status="pending",
         label="Insurance",
+    )
+
+
+def make_tax_rule(session: Session, workspace_id: UUID) -> TaxRule:
+    return TaxRule(
+        workspace_id=workspace_id,
+        name=f"Tax {uuid4().hex[:8]}",
+        effect="withheld",
+        base="net",
+        notes="Synthetic fixture",
+    )
+
+
+def make_tax_rule_version(session: Session, workspace_id: UUID) -> TaxRuleVersion:
+    rule = make_tax_rule(session, workspace_id)
+    session.add(rule)
+    session.flush()
+    return TaxRuleVersion(
+        workspace_id=workspace_id,
+        tax_rule_id=rule.id,
+        effective_from=date(2026, 1, 1),
+        mode="percent",
+        rate_bp=1200,
+        fixed_minor=None,
     )
 
 
@@ -187,4 +213,9 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     ),
     # A zero plan removes the line (generic delete); values change through update.
     BudgetLine: TenantCase(make_budget_line, update_values={"planned_minor": 999}),
+    TaxRule: TenantCase(make_tax_rule, update_values={"name": "Updated tax"}),
+    TaxRuleVersion: TenantCase(
+        make_tax_rule_version,
+        unsupported=frozenset({"update", "delete"}),
+    ),
 }

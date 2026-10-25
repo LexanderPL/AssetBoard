@@ -31,6 +31,12 @@ def test_jobs_follow_workspace_timezones_refresh_and_shutdown(db):
         assert job is not None
         fire = job.trigger.get_next_fire_time(None, datetime(2026, 3, 28, 23, tzinfo=UTC))
         assert fire.isoformat() == "2026-03-29T03:00:00+02:00"
+        auto_post = jobs.scheduler.get_job(f"auto-post-{db.workspace_id}")
+        assert auto_post is not None
+        auto_fire = auto_post.trigger.get_next_fire_time(
+            None, datetime(2026, 3, 28, 23, tzinfo=UTC)
+        )
+        assert auto_fire.isoformat() == "2026-03-29T00:05:00+01:00"
         other = db.add_workspace("Other")
         with db.factory.begin() as session:
             workspace = session.get(Workspace, db.workspace_id)
@@ -48,6 +54,7 @@ def test_jobs_follow_workspace_timezones_refresh_and_shutdown(db):
             session.delete(session.get(Workspace, other))
         jobs.reconcile()
         assert jobs.scheduler.get_job(str(other)) is None
+        assert jobs.scheduler.get_job(f"auto-post-{other}") is None
         logger.error.assert_not_called()
     finally:
         jobs.stop()

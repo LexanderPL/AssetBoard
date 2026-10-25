@@ -18,7 +18,7 @@ from __future__ import annotations
 import logging
 from calendar import monthrange
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from uuid import UUID
 
 import holidays as holiday_calendars
@@ -45,6 +45,7 @@ from assetboard.domain.recurrence import (
     RecurrenceRule,
     WeekendPolicy,
     occurrences,
+    occurrences_with_nominal,
 )
 from assetboard.domain.scheduled import AmountMode, AmountState, ItemAction, OccurrenceStatus
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR, TransactionDirection, clean_description
@@ -63,6 +64,7 @@ class ScheduledInput:
     rule: RecurrenceRule
     amount_mode: AmountMode = AmountMode.FIXED
     notes: str = ""
+    auto_post: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +99,7 @@ def _values(item: ScheduledItem) -> ScheduledInput:
         _rule(item),
         AmountMode(item.amount_mode),
         item.notes,
+        item.auto_post,
     )
 
 
@@ -197,45 +200,71 @@ def _generate(
     today = clock.today(workspace.timezone)
     closed = MonthStateRepository(session, scope).closed_months()
     category = CategoryRepository(session, scope).get_or_raise(item.category_id)
-    wanted: set[date] = set()
+    repository = ScheduledOccurrenceRepository(session, scope)
+    rows = repository.for_item(item.id)
+    wanted: dict[date, date] = {}
+    known: set[date] = set()
     if item.paused_at is None and item.archived_at is None and category.archived_at is None:
         rule = _rule(item)
-        wanted = {
-            day
-            for day in occurrences(
-                rule,
-                date(1900, 1, 1) if include_past else today,
-                _horizon(today, horizon_months),
-                _holidays(workspace.country_code, rule),
-            )
-            if _open(day, closed)
-        }
-    repository = ScheduledOccurrenceRepository(session, scope)
-    kept: set[date] = set()
-    for row in repository.for_item(item.id):
-        stale = (
-            row.status == OccurrenceStatus.PENDING
-            and row.due_date >= today
-            and _open(row.due_date, closed)
-            and row.due_date not in wanted
+        start = date(1900, 1, 1) if include_past else today
+        # A pending row moved forward from an earlier nominal date (an overdue bill rescheduled
+        # to next week) stays valid although that nominal date is outside today's window.
+        moved = [
+            row.nominal_date
+            for row in rows
+            if row.status == OccurrenceStatus.PENDING and row.rescheduled_at is not None
+        ]
+        lookback = max(date(1900, 1, 1), min([start, *moved]) - timedelta(days=31))
+        pairs = occurrences_with_nominal(
+            rule,
+            lookback,
+            _horizon(today, horizon_months),
+            _holidays(workspace.country_code, rule),
         )
-        if stale:
+        known = {nominal for nominal, _ in pairs}
+        wanted = {nominal: due for nominal, due in pairs if due >= start and _open(due, closed)}
+    kept: set[date] = set()
+    for row in rows:
+        if (
+            row.status != OccurrenceStatus.PENDING
+            or row.due_date < today
+            or not _open(row.due_date, closed)
+        ):
+            kept.add(row.nominal_date)
+            continue
+        due = wanted.get(row.nominal_date)
+        if due is None and (row.rescheduled_at is None or row.nominal_date not in known):
             repository.delete(row)
-        else:
-            kept.add(row.due_date)
-    missing = sorted(wanted - kept)
-    for day in missing:
+            continue
+        if due is not None and row.rescheduled_at is None:
+            row.due_date = due
+        row.direction = item.direction
+        row.category_id = item.category_id
+        row.currency = item.currency
+        row.label = item.name
+        if not row.amount_overridden:
+            row.expected_minor = item.amount_minor
+            row.amount_state = (
+                AmountState.CONFIRMED
+                if item.amount_mode == AmountMode.FIXED
+                else AmountState.ESTIMATED
+            )
+        kept.add(row.nominal_date)
+    missing = sorted(set(wanted) - kept)
+    for nominal in missing:
         repository.create(
             scheduled_item_id=item.id,
             direction=item.direction,
             category_id=item.category_id,
-            due_date=day,
+            nominal_date=nominal,
+            due_date=wanted[nominal],
             expected_minor=item.amount_minor,
             currency=item.currency,
             amount_state=AmountState.CONFIRMED
             if item.amount_mode == AmountMode.FIXED
             else AmountState.ESTIMATED,
             status=OccurrenceStatus.PENDING,
+            generated_by="rule",
             label=item.name,
         )
     return len(missing)
@@ -347,6 +376,7 @@ def save_item(
             "month_day": str(rule.month_day),
             "month": rule.month,
             "weekend_policy": rule.weekend_policy,
+            "auto_post": values.auto_post,
         }
         if item_id is None:
             item = repository.create(**fields)
@@ -355,8 +385,6 @@ def save_item(
             if item.archived_at is not None:
                 raise ValueError("archived_item")
             item = repository.update(item_id, **fields)
-            # Refresh amounts/labels of future pending rows; closed months stay as they are.
-            _remove_pending(session, ctx, item.id, since=ctx.clock.today(workspace.timezone))
         _generate(
             session,
             ctx,

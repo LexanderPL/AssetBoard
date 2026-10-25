@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable, Iterator
+from datetime import date
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -20,6 +21,7 @@ from assetboard.services import workspaces
 from assetboard.services.budget import set_planned, workspace_has_budget_lines
 from assetboard.services.categories import create_category
 from assetboard.services.context import Context, PermissionDenied, Role
+from assetboard.services.taxes import workspace_has_fixed_tax_amounts
 from assetboard.services.transactions import (
     create_transaction,
     delete_transaction,
@@ -301,11 +303,52 @@ def test_every_registered_lock_is_consulted(
         workspace_has_transactions,
         workspace_has_budget_lines,
         workspace_has_scheduled_amounts,
+        workspace_has_fixed_tax_amounts,
     ] == workspaces.BASE_CURRENCY_LOCKS
     # Any check that reports stored amounts locks it.
     monkeypatch.setattr(workspaces, "BASE_CURRENCY_LOCKS", [lambda _session, _ctx: True])
     with pytest.raises(workspaces.BaseCurrencyLocked):
         update_settings(team.factory, team.ctx("olga", "owner"), **SETTINGS)
+
+
+def test_tax_rule_versions_lock_the_base_currency(team: WorkspaceDb) -> None:
+    from assetboard.domain.money import Money
+    from assetboard.domain.percent_or_fixed import PercentOrFixed
+    from assetboard.services.taxes import create_rule
+
+    owner = team.ctx("olga", "owner")
+    create_rule(
+        team.factory,
+        owner,
+        name="Fixed levy",
+        effect="withheld",
+        base="net",
+        notes="",
+        effective_from=date(2026, 1, 1),
+        value=PercentOrFixed.fixed_amount(Money(1000, "EUR")),
+    )
+    assert workspace_settings(team.factory, owner).base_currency_locked
+    with pytest.raises(workspaces.BaseCurrencyLocked):
+        update_settings(team.factory, owner, **SETTINGS)
+
+
+def test_percentage_tax_rule_does_not_lock_the_base_currency(team: WorkspaceDb) -> None:
+    from assetboard.domain.percent_or_fixed import PercentOrFixed
+    from assetboard.services.taxes import create_rule
+
+    owner = team.ctx("olga", "owner")
+    create_rule(
+        team.factory,
+        owner,
+        name="Income tax",
+        effect="withheld",
+        base="net",
+        notes="",
+        effective_from=date(2026, 1, 1),
+        value=PercentOrFixed.percent(1200),
+    )
+    assert not workspace_settings(team.factory, owner).base_currency_locked
+    assert update_settings(team.factory, owner, **SETTINGS).base_currency == "PLN"
 
 
 def test_the_settings_write_locks_the_workspace_before_reading_it(team: WorkspaceDb) -> None:

@@ -36,6 +36,8 @@
         {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'transactions') }}" data-transactions-link{% if request.url.path.endswith('/transactions') %} aria-current="page"{% endif %}><span aria-hidden="true">≡</span>{{ _("Transactions") }}</a>{% endif %}
         {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'categories') }}" data-categories-link{% if request.url.path.endswith('/categories') %} aria-current="page"{% endif %}><span aria-hidden="true">▦</span>{{ _("Categories") }}</a>{% endif %}
         {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'scheduled_items') }}" data-recurring-link{% if '/recurring' in request.url.path %} aria-current="page"{% endif %}><span aria-hidden="true">↻</span>{{ _("Recurring") }}</a>{% endif %}
+        {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'scheduled_upcoming') }}" data-upcoming-link{% if request.url.path.endswith('/upcoming') %} aria-current="page"{% endif %}><span aria-hidden="true">◷</span>{{ _("Upcoming") }}</a>{% endif %}
+        {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'tax_rules') }}" data-taxes-link{% if '/taxes' in request.url.path %} aria-current="page"{% endif %}><span aria-hidden="true">%</span>{{ _("Taxes") }}</a>{% endif %}
         <a class="nav-link" href="#net-worth"><span aria-hidden="true">◇</span>{{ _("Net worth") }}</a>
         <a class="nav-link" href="#investments"><span aria-hidden="true">↗</span>{{ _("Investments") }}</a>
         <a class="nav-link" href="#loans"><span aria-hidden="true">▤</span>{{ _("Loans") }}</a>

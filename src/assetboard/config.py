@@ -75,6 +75,7 @@ class Settings(BaseSettings):
     # only to refuse ``true`` at startup with a clear message; ``false`` is ignored.
     allow_registration: bool | None = None
     recurrence_horizon_months: int = Field(default=DEFAULT_RECURRENCE_HORIZON_MONTHS, ge=1)
+    upcoming_days: int = Field(default=30, ge=1, le=365)
     scheduler_enabled: bool = True
     session_idle_timeout_days: int = Field(default=14, ge=1, le=365)
     session_absolute_timeout_days: int = Field(default=60, ge=1, le=365)

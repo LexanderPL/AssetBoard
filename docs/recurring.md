@@ -35,7 +35,9 @@ Saving immediately generates planned occurrences from today in the workspace tim
 the same day 13 calendar months ahead, inclusive (clamped at month end). Administrators can set
 `ASSETBOARD_RECURRENCE_HORIZON_MONTHS` to another positive number. **Include past occurrences** on
 creation also backfills dates from the start of the rule; it is off by default. Generation is
-idempotent: repeating a job never creates a second occurrence for the same item and due date.
+idempotent: repeating a job never creates a second occurrence for the same item and nominal
+scheduled date. The nominal date remains stable when its effective date changes due to a
+holiday-calendar update or a one-off reschedule.
 
 An APScheduler job runs daily at 03:00 in each workspace's time zone. Each run recalculates
 pending dates from today onward, so a changed holiday calendar moves dates instead of adding
@@ -59,5 +61,23 @@ base currency. An item whose category is archived creates no new dates, and its 
 onward are removed on the next daily run. The edit form shows the archived category as the
 current, unavailable choice; choose an active category to save the rule again.
 
-These are planned dates, not posted transactions. The Upcoming inbox, payment/skip/reschedule
-actions, automatic posting and reminders belong to later M3 features (F3.2/F3.6).
+## Upcoming occurrences
+
+Open **Upcoming** to see overdue occurrences and those due within the next 30 days, grouped by
+week. Use the direction and category filters to narrow the inbox. The operator may set
+`ASSETBOARD_UPCOMING_DAYS` to a value from 1 to 365 to change the forward window.
+
+Editors and owners can mark an occurrence paid or received, skip it, reschedule just that
+occurrence, or edit its expected amount. Marking it paid creates a linked transaction using the
+entered date and amount. The transaction can be edited from the month or transaction list; undo
+the posting from the inbox within 10 seconds to soft-delete the transaction and restore the
+occurrence to pending. Editing an occurrence's amount or date does not edit its recurring rule.
+
+Enable **Automatically post on the due date** on a recurring item to create its transaction at
+00:05 in the workspace time zone. Automatic transactions are labelled in the ledger and remain
+editable. Posting, skipping, rescheduling, and amount changes are blocked when the affected
+month is closed. Reopen it first, or reschedule to an open month.
+
+An occurrence's nominal scheduled date is stored separately from its effective or rescheduled
+date, so holiday-calendar changes do not change the identity of a rescheduled or posted
+occurrence.

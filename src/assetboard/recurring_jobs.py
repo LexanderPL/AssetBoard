@@ -14,6 +14,7 @@ from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.repositories import NotFound
 from assetboard.db.repositories.scheduled import RecurringWorkspaceReader
+from assetboard.services.occurrences import auto_post_workspace
 from assetboard.services.scheduled import generate_workspace
 
 
@@ -60,6 +61,17 @@ class RecurringJobs:
                 exc_info=True,
             )
 
+    def auto_post(self, workspace_id: UUID) -> None:
+        try:
+            auto_post_workspace(self.factory, _Scope(_Workspace(workspace_id)), self.clock())
+        except Exception as exc:
+            self.logger.error(
+                "recurring_auto_post_failed workspace=%s exception_type=%s; next run will retry",
+                workspace_id,
+                type(exc).__name__,
+                exc_info=True,
+            )
+
     def reconcile(self) -> None:
         with self._reconciling:
             self._reconcile()
@@ -70,6 +82,7 @@ class RecurringJobs:
             self.reconcile()
             for workspace_id in tuple(self.zones):
                 self.run(workspace_id)
+                self.auto_post(workspace_id)
         finally:
             self.caught_up.set()
 
@@ -88,8 +101,19 @@ class RecurringJobs:
                     max_instances=1,
                     misfire_grace_time=None,
                 )
+                self.scheduler.add_job(
+                    self.auto_post,
+                    CronTrigger(hour=0, minute=5, timezone=timezone),
+                    args=[workspace_id],
+                    id=f"auto-post-{workspace_id}",
+                    replace_existing=True,
+                    coalesce=True,
+                    max_instances=1,
+                    misfire_grace_time=None,
+                )
         for workspace_id in self.zones.keys() - workspaces.keys():
             self.scheduler.remove_job(str(workspace_id))
+            self.scheduler.remove_job(f"auto-post-{workspace_id}")
         self.zones = workspaces
 
     def start(self) -> None:

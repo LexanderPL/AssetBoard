@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import (
     JSON,
     BigInteger,
+    Boolean,
     CheckConstraint,
     Date,
     ForeignKeyConstraint,
@@ -63,6 +64,7 @@ class ScheduledItem(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     month: Mapped[int] = mapped_column(Integer(), nullable=False)
     weekend_policy: Mapped[str] = mapped_column(String(24), nullable=False)
     notes: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    auto_post: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=False)
     paused_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
@@ -70,7 +72,11 @@ class ScheduledItem(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
 class ScheduledOccurrence(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     __tablename__ = "scheduled_occurrences"
     __table_args__ = (
-        UniqueConstraint("scheduled_item_id", "due_date", name="uq_scheduled_occurrences_item_due"),
+        UniqueConstraint(
+            "scheduled_item_id",
+            "nominal_date",
+            name="uq_scheduled_occurrences_item_nominal",
+        ),
         ForeignKeyConstraint(
             ["workspace_id", "scheduled_item_id"],
             ["scheduled_items.workspace_id", "scheduled_items.id"],
@@ -81,9 +87,15 @@ class ScheduledOccurrence(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             ["categories.workspace_id", "categories.id"],
             name="fk_scheduled_occurrences_workspace_category",
         ),
+        ForeignKeyConstraint(
+            ["workspace_id", "transaction_id"],
+            ["transactions.workspace_id", "transactions.id"],
+            name="fk_scheduled_occurrences_workspace_transaction",
+        ),
         CheckConstraint("direction IN ('expense', 'income')", name="direction_valid"),
         CheckConstraint("amount_state IN ('estimated', 'confirmed')", name="amount_state_valid"),
         CheckConstraint("status IN ('pending', 'posted', 'skipped')", name="status_valid"),
+        CheckConstraint("generated_by IN ('rule', 'manual')", name="generated_by_valid"),
         CheckConstraint(
             f"expected_minor > 0 AND expected_minor <= {MAX_AMOUNT_MINOR}", name="amount_valid"
         ),
@@ -94,9 +106,14 @@ class ScheduledOccurrence(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     scheduled_item_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
     direction: Mapped[str] = mapped_column(String(16), nullable=False)
     category_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
+    nominal_date: Mapped[date] = mapped_column(Date(), nullable=False)
     due_date: Mapped[date] = mapped_column(Date(), nullable=False)
     expected_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     amount_state: Mapped[str] = mapped_column(String(16), nullable=False)
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
+    generated_by: Mapped[str] = mapped_column(String(16), nullable=False, default="rule")
+    transaction_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
+    rescheduled_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    amount_overridden: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=False)
     label: Mapped[str] = mapped_column(String(200), nullable=False)
