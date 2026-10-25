@@ -98,6 +98,8 @@ planned tax-payment occurrences are recalculated; a posted transaction is never 
 Optional tax rules are attached in order to an income source. The configured `record_as` choice
 determines whether the income ledger records gross, net, or take-home money. Selected rules can
 create separate planned tax-payment expenses in an expense category. Tax rates and fixed amounts
-are user-entered models, not tax advice. Pending occurrences appear with actual entries for their
-month; the summary shows pending expected amounts and a forecast alongside actuals. Missing work
-logs are highlighted when the related pay date is due within ten days or is overdue.
+are user-entered models, not tax advice. Pending occurrences appear as expected rows, with a
+Confirm button, in the tables of the month's **Transactions** page; the **Month** summary shows
+pending expected amounts and a forecast alongside actuals. Missing work logs are highlighted on
+both pages when the related pay date is due within ten days or is overdue. A pending income
+occurrence you rescheduled keeps its date when its amount is recalculated.

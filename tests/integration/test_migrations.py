@@ -121,6 +121,55 @@ def test_0020_income_sources_migration_is_reversible(tmp_path: Path) -> None:
         engine.dispose()
 
 
+def test_0020_downgrade_drops_income_occurrences(tmp_path: Path) -> None:
+    from datetime import date
+
+    from sqlalchemy.orm import Session
+
+    from assetboard.clock import FixedClock
+    from assetboard.db.models.identity import Workspace
+    from assetboard.db.models.scheduled import ScheduledOccurrence
+    from tests.tenant.factories import make_income_source
+
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'data.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        clock = FixedClock("2026-01-01T00:00:00+00:00")
+        with Session(engine, info={"clock": clock}) as session, session.begin():
+            workspace = Workspace(name="W", base_currency="EUR", locale="en", timezone="UTC")
+            session.add(workspace)
+            session.flush()
+            source = make_income_source(session, workspace.id)
+            session.add(source)
+            session.flush()
+            session.add(
+                ScheduledOccurrence(
+                    workspace_id=workspace.id,
+                    income_source_id=source.id,
+                    work_month=date(2026, 1, 1),
+                    direction="income",
+                    category_id=source.category_id,
+                    nominal_date=date(2026, 2, 10),
+                    due_date=date(2026, 2, 10),
+                    expected_minor=100,
+                    currency="EUR",
+                    amount_state="estimated",
+                    generated_by="income",
+                    label="Salary",
+                )
+            )
+        command.downgrade(alembic_config(settings), "0019_f32_prev_txn")
+        with engine.connect() as connection:
+            count = connection.exec_driver_sql("SELECT count(*) FROM scheduled_occurrences")
+            assert count.scalar_one() == 0
+        upgrade_database(settings)
+    finally:
+        engine.dispose()
+
+
 def test_create_revision_migrates_a_temporary_database_first(tmp_path, monkeypatch) -> None:
     settings = Settings(_env_file=None, data_dir=tmp_path)
     calls: list[tuple[str, str]] = []

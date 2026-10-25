@@ -232,6 +232,10 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    # Income and tax-payment occurrences cannot exist without income sources (and would break
+    # the restored NOT NULL scheduled_item_id): drop them, tax payments before their parents.
+    op.execute("DELETE FROM scheduled_occurrences WHERE generated_by = 'tax'")
+    op.execute("DELETE FROM scheduled_occurrences WHERE generated_by = 'income'")
     with op.batch_alter_table("scheduled_occurrences", schema=None) as batch_op:
         batch_op.drop_constraint("uq_scheduled_occurrences_workspace_id_id", type_="unique")
         batch_op.drop_constraint("uq_scheduled_occurrences_parent_tax_attachment", type_="unique")
