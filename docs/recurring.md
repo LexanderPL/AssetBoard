@@ -87,6 +87,32 @@ An occurrence's nominal scheduled date is stored separately from its effective o
 date, so holiday-calendar changes do not change the identity of a rescheduled or posted
 occurrence.
 
+## Reminders
+
+Open **Notifications** in the account menu (or from **Upcoming**) to get reminders on your
+phone or by email. Add a channel with an [Apprise](https://github.com/caronc/apprise) URL, for
+example `ntfys://ntfy.sh/your-topic` for ntfy, `gotifys://gotify.example.com/token` for Gotify,
+`tgram://bot-token/chat-id` for Telegram or `mailtos://user:password@mail.example.com` for
+email, then press **Send test**. The URL is stored encrypted and shown only as `ntfys://••••••`
+afterwards; leave the field empty when editing to keep it. Every member, viewers included, has
+their own channels in each workspace; nobody else sees them.
+
+Once a day, at the channel's time (workspace time zone), a channel gets:
+
+- **Due soon**: occurrences whose due date is within the channel's number of days (default 3).
+  A recurring item can set its own number under **Reminder: days before the due date**. Each
+  due date is reminded once; a rescheduled occurrence once more.
+- **Overdue**: occurrences past their due date, once a day and at most seven times each.
+- **Days worked**: on the first day of each month for the month just ended, and three days
+  before an estimated income occurrence, while a variable income source has no work log for
+  that month.
+
+Choose one digest a day or one message per reminder (at most ten; the rest arrive together).
+Messages name the item and its date. Amounts are left out unless you tick **Include amounts**:
+messages pass through the service you chose and any push or mail servers on the way. A failed
+delivery shows on the channel and is retried the next day. Removing a member deletes their
+channels in that workspace.
+
 ## Income sources and work logs
 
 Open **Income sources** to add a fixed salary or variable income paid per unit worked. Variable

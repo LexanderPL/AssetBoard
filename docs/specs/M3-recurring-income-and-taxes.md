@@ -20,7 +20,7 @@ Implementation order: F3.1 → F3.2 → F3.3 → F3.4 → F3.5 → F3.6 → (F3.
 - `IncomeSource(id, workspace_id, name, category_id, kind[fixed|variable], fixed_amount?, rate?, unit_label, pay_day (1..31 | -1), pay_lag_months, expected_units_mode[working_days|fixed|average|manual], expected_units_value?, expected_units_window?, record_as[cash_received|net|take_home], auto_post, active_from, active_to?)`
 - `IncomeSourceTaxRule(income_source_id, tax_rule_id, position, generate_payment, payment_category_id?, due_day, due_month_offset)`
 - `WorkLog(income_source_id, work_month, units Decimal, note)`; unique `(income_source_id, work_month)`.
-- `NotificationChannel(id, workspace_id, user_id, name, apprise_url_encrypted, enabled, digest_time, default_lead_days)`; `NotificationLog(id, channel_id, occurrence_id?, kind, sent_on, status, error?)`; unique `(channel_id, occurrence_id, kind, sent_on)`.
+- `NotificationChannel(id, workspace_id, user_id, name, apprise_url_encrypted, enabled, digest_time, default_lead_days)`; `NotificationLog(id, channel_id, occurrence_id?, kind, sent_on, status, error?)`; unique `(channel_id, occurrence_id, kind, sent_on)` (as built: `(channel_id, kind, subject_key, sent_on)`, see F3.6).
 
 ---
 
@@ -262,6 +262,31 @@ and the overdue badge. Update the golden tests from F2.4 so they still pass.
 - Digest mode (one message per day) or per-item mode.
 - Deduplication via `NotificationLog` unique key; failures logged with error, retried next run, never crash the job.
 - Tests use a fake notifier; no network.
+
+**As built (F3.6, [ADR-0021](../adr/0021-notifications.md); owner decisions of 2026-10-25):**
+- Channels are per member and workspace; every member, viewers included, manages only their
+  own; removing a member deletes their channels. Up to 10 per member and workspace.
+- "User timezone" is the **workspace** time zone (users have none). A channel runs once per
+  local day at or after `digest_time` (`last_run_on`), so a restart or downtime catches up.
+- The log's unique key is `(channel_id, kind, subject_key, sent_on)`: `subject_key` is the
+  occurrence id or `worklog:<source>:<YYYY-MM>` (a nullable `occurrence_id` would not dedupe
+  work-log reminders). `sent_on` is the slot: the due date for due-soon (one reminder per due
+  date; a rescheduled occurrence gets one more), the day for overdue, the trigger day for work
+  logs. Rows are claimed as `sending` before the send; failed slots are retried by the next
+  daily run; the overdue cap counts sent reminders only.
+- Item-specific lead days: `scheduled_items.reminder_lead_days` (0–60, optional); income and
+  tax occurrences use the channel default. All occurrence kinds are reminded, with per-kind
+  toggles on the channel.
+- Work-log reminders: on the 1st for the month just ended, and from three days before an
+  estimated income occurrence until its due date; no other catch-up.
+- Per-item mode sends at most 10 messages per run; the rest go in one more message.
+- Amounts only with the channel's **Include amounts** (default off).
+- URLs: one Apprise URL whose scheme is on the operator's allowlist
+  (`ASSETBOARD_NOTIFICATION_SCHEMES`), Fernet-encrypted bound to the channel, masked as
+  `scheme://••••••`. "Send test" is limited to 5 per 10 minutes per member. Sends time out
+  after `ASSETBOARD_NOTIFICATION_TIMEOUT_SECONDS`; a tick stops starting channels after
+  `ASSETBOARD_NOTIFICATION_TICK_SECONDS`. `ASSETBOARD_NOTIFICATIONS_ENABLED=false` turns
+  delivery off.
 
 **Agent prompt**
 ```
