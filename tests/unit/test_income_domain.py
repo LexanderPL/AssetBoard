@@ -1,7 +1,11 @@
+from calendar import monthrange
 from datetime import date
 from decimal import Decimal
+from fractions import Fraction
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from assetboard.domain.income import (
     ExpectedUnitsMode,
@@ -77,3 +81,37 @@ def test_fixed_income_is_confirmed_without_work_units() -> None:
     )
     assert estimate.net == Money(250_000, "EUR")
     assert estimate.amount_state == "confirmed"
+
+
+@given(
+    year=st.integers(1900, 2190),
+    month=st.integers(1, 12),
+    pay_day=st.integers(1, 31),
+    lag=st.integers(0, 24),
+)
+def test_pay_date_is_the_clamped_pay_day_of_the_lagged_month(
+    year: int, month: int, pay_day: int, lag: int
+) -> None:
+    result = pay_date(date(year, month, 1), pay_day, lag)
+    assert (result.year * 12 + result.month) - (year * 12 + month) == lag
+    assert result.day == min(pay_day, monthrange(result.year, result.month)[1])
+
+
+@given(
+    rate_minor=st.integers(1, 10_000_000),
+    units=st.decimals(min_value=0, max_value=1000, places=4, allow_nan=False),
+)
+def test_variable_income_is_rate_times_units_rounded_half_up_once(
+    rate_minor: int, units: Decimal
+) -> None:
+    estimate = estimate_income(
+        kind=IncomeKind.VARIABLE,
+        currency="EUR",
+        fixed_minor=None,
+        rate_minor=rate_minor,
+        units=units,
+        confirmed=True,
+    )
+    exact = Fraction(rate_minor) * Fraction(units)
+    # Independent oracle: half-up on the exact rational product.
+    assert estimate.net.amount_minor == int(exact + Fraction(1, 2))
