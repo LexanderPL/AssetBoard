@@ -43,8 +43,9 @@ A self-hosted web app that replaces a personal finance spreadsheet (monthly inco
   (also in English), USD "$1,234.50" and GBP "£1,234.50" (also in Polish). The currencies with
   one obvious home are an explicit map (`i18n.numbers.CURRENCY_HOME_LOCALES`: PLN→pl_PL,
   USD→en_US, GBP→en_GB, CHF→de_CH, CZK→cs_CZ, SEK→sv_SE, NOK→nb_NO, DKK→da_DK, HUF→hu_HU,
-  JPY→ja_JP, CAD→en_CA, AUD→en_AU, UAH→uk_UA and a few more); EUR and every currency not in
-  the map follow the interface locale. A letter code never touches the number (a no-break
+  JPY→ja_JP, UAH→uk_UA and a few more); EUR and every currency not in the map follow the
+  interface locale. CAD, AUD, NZD and MXN are left out on purpose (owner, 2026-10-24): their
+  home style is a bare "$", which could not be told apart from USD ("CA$1,234.50" in English). A letter code never touches the number (a no-break
   space is inserted: "CHF 1’234.50", "THB 1,234.50"). **Input** fields and their parsing
   (`format_amount_input`, `parse_amount`) stay in the interface locale, and so do CSV files
   (plain decimals, their own options).

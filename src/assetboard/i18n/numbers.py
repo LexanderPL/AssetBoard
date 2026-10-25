@@ -138,13 +138,12 @@ def parse_amount(text: str, locale: str) -> Decimal:
 # "Native style everywhere" (owner, 2026-10-24): a currency with one obvious home country is
 # written the way that country writes it, whatever the interface language (PLN is
 # ``1 234,50 zł`` in English too, USD ``$1,234.50`` in Polish too). Currencies shared by several
-# countries (EUR) or not listed here follow the interface locale. Input fields do not: they
-# follow the interface locale (``format_amount_input``, ``parse_amount``).
+# countries (EUR) or not listed here follow the interface locale, and so do CAD, AUD, NZD and
+# MXN, whose home style is a bare "$" that could not be told apart from USD ("CA$" in English).
+# Input fields do not: they follow the interface locale (``format_amount_input``, ``parse_amount``).
 CURRENCY_HOME_LOCALES: dict[str, str] = {
-    "AUD": "en_AU",
     "BGN": "bg_BG",
     "BRL": "pt_BR",
-    "CAD": "en_CA",
     "CHF": "de_CH",
     "CNY": "zh_CN",
     "CZK": "cs_CZ",
@@ -155,9 +154,7 @@ CURRENCY_HOME_LOCALES: dict[str, str] = {
     "ISK": "is_IS",
     "JPY": "ja_JP",
     "KRW": "ko_KR",
-    "MXN": "es_MX",
     "NOK": "nb_NO",
-    "NZD": "en_NZ",
     "PLN": "pl_PL",
     "RON": "ro_RO",
     "SEK": "sv_SE",

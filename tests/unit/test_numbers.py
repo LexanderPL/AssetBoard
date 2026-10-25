@@ -96,7 +96,12 @@ def test_parse_amount_round_trips_babel_formatting(locale: str, amount: Decimal)
         ("UAH", 123450, "en", "1\u00a0234,50\u00a0₴"),
         ("JPY", 1234, "en", "￥1,234"),
         ("JPY", 1234, "pl", "￥1,234"),
-        ("CAD", 123450, "pl", "$1,234.50"),
+        # Other dollars (and MXN) follow the interface locale, so they differ from USD.
+        ("CAD", 123450, "en", "CA$1,234.50"),
+        ("CAD", 123450, "pl", "1\u00a0234,50\u00a0CAD"),
+        ("AUD", 123450, "en", "A$1,234.50"),
+        ("NZD", 123450, "en", "NZ$1,234.50"),
+        ("MXN", 123450, "pl", "1\u00a0234,50\u00a0MXN"),
         # A letter code never touches the number.
         ("CHF", 123450, "en", "CHF\u00a01’234.50"),
         ("CHF", -123450, "pl", "CHF\u00a0-1’234.50"),
