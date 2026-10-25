@@ -12,16 +12,16 @@ from assetboard.clock import FixedClock
 from assetboard.config import Settings
 from assetboard.db.models.identity import AuditEvent
 from assetboard.db.models.ledger import Transaction
-from assetboard.db.repositories import CategoryRepository
+from assetboard.db.repositories import CategoryRepository, NotFound
 from assetboard.db.repositories.scheduled import ScheduledOccurrenceRepository
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
 from assetboard.domain.recurrence import RecurrenceRule
 from assetboard.domain.scheduled import ItemAction
 from assetboard.domain.transactions import Source, TransactionDirection
-from assetboard.services import occurrences, scheduled
+from assetboard.services import occurrences, scheduled, transactions
 from assetboard.services.context import PermissionDenied
-from assetboard.services.months import close_month
+from assetboard.services.months import MonthClosed, close_month
 from tests.tenant.factories import make_category
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
@@ -317,3 +317,151 @@ def test_auto_post_ignores_paused_items(team):
 
     assert occurrences.auto_post_workspace(team.factory, ctx, team.clock) == 0
     assert all(row.status == "pending" for row in occurrence_rows(team, item_id))
+
+
+# Deleting a posted transaction from the ledger (F3.2 fix)
+
+
+def post_first(team: WorkspaceDb, *, auto_post: bool = False):
+    ctx = team.ctx("owner", "owner")
+    item_id = create_item(team, auto_post=auto_post)
+    occurrence = occurrence_rows(team, item_id)[0]
+    if auto_post:
+        assert occurrences.auto_post_workspace(team.factory, ctx, team.clock) == 1
+        transaction_id = occurrence_rows(team, item_id)[0].transaction_id
+        assert transaction_id is not None
+    else:
+        transaction_id = occurrences.post_occurrence(
+            team.factory, ctx, occurrence.id, amount_minor=12345, day=occurrence.due_date
+        )
+    return item_id, occurrence, transaction_id
+
+
+def test_ledger_delete_returns_occurrence_to_pending_and_it_can_be_posted_again(team):
+    ctx = team.ctx("owner", "owner")
+    item_id = create_item(team)
+    occurrence = occurrence_rows(team, item_id)[0]
+    occurrences.reschedule_occurrence(team.factory, ctx, occurrence.id, date(2026, 3, 5))
+    occurrences.edit_occurrence_amount(team.factory, ctx, occurrence.id, 25000)
+    first = occurrences.post_occurrence(
+        team.factory, ctx, occurrence.id, amount_minor=25000, day=date(2026, 3, 5)
+    )
+
+    transactions.delete_transaction(team.factory, ctx, first)
+
+    stored = occurrence_rows(team, item_id)[0]
+    assert stored.status == "pending" and stored.transaction_id is None
+    assert stored.previous_transaction_id == first
+    assert stored.nominal_date == date(2026, 3, 1) and stored.due_date == date(2026, 3, 5)
+    assert stored.expected_minor == 25000 and stored.amount_overridden
+    listed = [
+        row.id
+        for week in occurrences.upcoming(team.factory, ctx, days=30)
+        for row in week.occurrences
+    ]
+    assert occurrence.id in listed
+    with team.factory() as session:
+        events = session.scalars(
+            select(AuditEvent).where(AuditEvent.action == "scheduled_occurrence.unposted")
+        ).all()
+        assert [event.entity_id for event in events] == [str(occurrence.id)]
+
+    second = occurrences.post_occurrence(
+        team.factory, ctx, occurrence.id, amount_minor=25000, day=date(2026, 3, 5)
+    )
+    assert second != first
+    stored = occurrence_rows(team, item_id)[0]
+    assert stored.status == "posted" and stored.transaction_id == second
+
+
+def test_double_delete_is_idempotent(team):
+    ctx = team.ctx("owner", "owner")
+    item_id, occurrence, transaction_id = post_first(team)
+    transactions.delete_transaction(team.factory, ctx, transaction_id)
+    occurrences.post_occurrence(
+        team.factory, ctx, occurrence.id, amount_minor=100, day=occurrence.due_date
+    )
+    # Deleting the old (already deleted) row again leaves the re-posted occurrence alone.
+    transactions.delete_transaction(team.factory, ctx, transaction_id)
+    stored = occurrence_rows(team, item_id)[0]
+    assert stored.status == "posted" and stored.transaction_id not in (None, transaction_id)
+    with team.factory() as session:
+        actions = list(
+            session.scalars(
+                select(AuditEvent.action).where(
+                    AuditEvent.action.in_(("transaction.deleted", "scheduled_occurrence.unposted"))
+                )
+            )
+        )
+        assert sorted(actions) == ["scheduled_occurrence.unposted", "transaction.deleted"]
+
+
+def test_ledger_delete_by_a_viewer_is_refused_and_changes_nothing(team):
+    team.add_member("viewer", "viewer")
+    item_id, _occurrence, transaction_id = post_first(team)
+    for ctx in (team.ctx("viewer", "viewer"), team.ctx("viewer", "editor")):
+        with pytest.raises(PermissionDenied):
+            transactions.delete_transaction(team.factory, ctx, transaction_id)
+    stored = occurrence_rows(team, item_id)[0]
+    assert stored.status == "posted" and stored.transaction_id == transaction_id
+
+
+def test_ledger_delete_is_scoped_to_the_workspace(team):
+    other = team.add_workspace("Other")
+    team.add_member("owner", "owner", other)
+    item_id, _occurrence, transaction_id = post_first(team)
+    with pytest.raises(NotFound):
+        transactions.delete_transaction(
+            team.factory, team.ctx("owner", "owner", other), transaction_id
+        )
+    stored = occurrence_rows(team, item_id)[0]
+    assert stored.status == "posted" and stored.transaction_id == transaction_id
+
+
+def test_ledger_delete_is_blocked_while_the_occurrence_month_is_closed(team):
+    ctx = team.ctx("owner", "owner")
+    item_id = create_item(team)
+    occurrence = occurrence_rows(team, item_id)[0]
+    transaction_id = occurrences.post_occurrence(
+        team.factory, ctx, occurrence.id, amount_minor=100, day=date(2026, 4, 2)
+    )
+    close_month(team.factory, ctx, YearMonth(2026, 3))
+    with pytest.raises(MonthClosed):
+        transactions.delete_transaction(team.factory, ctx, transaction_id)
+    with team.factory() as session:
+        row = session.get(Transaction, transaction_id)
+        assert row is not None and row.deleted_at is None
+    assert occurrence_rows(team, item_id)[0].status == "posted"
+
+
+def test_restore_relinks_only_a_still_pending_unlinked_occurrence(team):
+    ctx = team.ctx("owner", "owner")
+    item_id, occurrence, transaction_id = post_first(team)
+    transactions.delete_transaction(team.factory, ctx, transaction_id)
+    transactions.undo_delete(team.factory, ctx, transaction_id)
+    stored = occurrence_rows(team, item_id)[0]
+    assert stored.status == "posted" and stored.transaction_id == transaction_id
+
+    transactions.delete_transaction(team.factory, ctx, transaction_id)
+    occurrences.skip_occurrence(team.factory, ctx, occurrence.id)
+    transactions.undo_delete(team.factory, ctx, transaction_id)
+    stored = occurrence_rows(team, item_id)[0]
+    assert stored.status == "skipped" and stored.transaction_id is None
+    with team.factory() as session:
+        row = session.get(Transaction, transaction_id)
+        assert row is not None and row.deleted_at is None  # a plain transaction now
+
+
+def test_auto_post_does_not_repost_an_occurrence_returned_to_pending(team):
+    ctx = team.ctx("owner", "owner")
+    item_id, occurrence, transaction_id = post_first(team, auto_post=True)
+    transactions.delete_transaction(team.factory, ctx, transaction_id)
+
+    assert occurrences.auto_post_workspace(team.factory, ctx, team.clock) == 0
+    stored = occurrence_rows(team, item_id)[0]
+    assert stored.status == "pending" and stored.transaction_id is None
+    # The user can still post it by hand.
+    occurrences.post_occurrence(
+        team.factory, ctx, occurrence.id, amount_minor=100, day=occurrence.due_date
+    )
+    assert occurrence_rows(team, item_id)[0].status == "posted"

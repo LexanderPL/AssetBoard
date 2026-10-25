@@ -15,7 +15,7 @@ Implementation order: F3.1 → F3.2 → F3.3 → F3.4 → F3.5 → F3.6 → (F3.
 
 **Data model (sketch)**
 - `ScheduledItem(id, workspace_id, name, direction, category_id, amount_mode[fixed|estimate], amount, currency, start_date, end_date?, max_count?, freq[weekly|monthly|yearly], interval, weekdays?, month_day (1..31 | -1 last day | 'first_working_day' | 'last_working_day'), month (yearly), weekend_policy[none|previous_working_day|next_working_day], lead_days, auto_post, paused_at?, notes)`
-- `ScheduledOccurrence(id, workspace_id, scheduled_item_id?, income_source_id?, parent_occurrence_id?, direction, category_id, due_date, expected_minor, currency, amount_state[estimated|confirmed], status[pending|posted|skipped], transaction_id?, label, generated_by[rule|income|tax], created_at)`; unique `(scheduled_item_id, due_date)`; check: exactly one of `scheduled_item_id` / `income_source_id` is set (tax payments additionally set `parent_occurrence_id`).
+- `ScheduledOccurrence(id, workspace_id, scheduled_item_id?, income_source_id?, parent_occurrence_id?, direction, category_id, due_date, expected_minor, currency, amount_state[estimated|confirmed], status[pending|posted|skipped], transaction_id?, previous_transaction_id?, label, generated_by[rule|income|tax], created_at)`; unique `(scheduled_item_id, due_date)`; check: exactly one of `scheduled_item_id` / `income_source_id` is set (tax payments additionally set `parent_occurrence_id`).
 - `TaxRule(id, workspace_id, name, effect[added|withheld], base[net|gross], notes, archived_at)`; `TaxRuleVersion(tax_rule_id, effective_from, mode[percent|fixed], rate_bp?, fixed_minor?, currency?)`.
 - `IncomeSource(id, workspace_id, name, category_id, kind[fixed|variable], fixed_amount?, rate?, unit_label, pay_day (1..31 | -1), pay_lag_months, expected_units_mode[working_days|fixed|average|manual], expected_units_value?, expected_units_window?, record_as[cash_received|net|take_home], auto_post, active_from, active_to?)`
 - `IncomeSourceTaxRule(income_source_id, tax_rule_id, position, generate_payment, payment_category_id?, due_day, due_month_offset)`
@@ -96,6 +96,18 @@ interval/end_date/max_count, determinism. Services use the injected Clock only.
   stored on the occurrence. `ScheduledItem.auto_post` defaults to false.
 - Undo follows the ledger's soft-delete and audit conventions: the linked transaction is soft
   deleted and the occurrence returns to pending, within the existing 10-second undo window.
+- Deleting a posted occurrence's transaction from the ledger (month page soft delete) returns the
+  occurrence to `pending` in the same write: `transaction_id` is cleared, its nominal date,
+  reschedule and amount override are kept, and `scheduled_occurrence.unposted` is audited. The
+  delete needs the transaction's month and the occurrence's due month open (`MonthClosed`
+  otherwise), as for an undo. Deleting an already deleted transaction changes nothing.
+  Restoring the transaction (ledger undo within 10 seconds) re-links it
+  (`scheduled_occurrence.relinked`) only if the occurrence is still pending, unlinked and in an
+  open month; otherwise it stays a plain transaction.
+- An occurrence returned to pending (undo or ledger delete) remembers the transaction in
+  `previous_transaction_id`. Auto-post only touches occurrences that were never posted
+  (`previous_transaction_id IS NULL`), so a deleted auto-posted transaction is not recreated by
+  the next run; the user posts it by hand.
 - The inbox window defaults to 30 days and is configurable by the operator with
   `ASSETBOARD_UPCOMING_DAYS` (1–365).
 - Auto-post jobs run at 00:05 in each workspace time zone, use the injected Clock, and leave
@@ -204,6 +216,12 @@ Do not touch posted occurrences. Tests for lag 0/1/2, estimated vs confirmed, sk
 ---
 
 ## F3.5 Month page integration
+
+**After F2.7 (owner, 2026-10-25):** the month page no longer lists transactions. The pending
+"expected" rows with their Confirm button go into the tables of the **Transactions** page
+(`/transactions/YYYY-MM`); the Expected and Forecast columns and the forecast KPIs stay on the
+**Month** summary (and the shared flow bar, so Home shows them too); the missing-work-log banner
+shows on both the Month and the Transactions page.
 
 **Acceptance**
 - Month page lists **pending occurrences of that month** in each table (visually distinct "expected" rows with a Confirm button); confirming moves them into real rows.

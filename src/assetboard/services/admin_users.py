@@ -103,12 +103,20 @@ def _two_factor_users(session: Session, user_ids: list[UUID] | None = None) -> s
     return set(session.scalars(statement))
 
 
-def _row(session: Session, user: User, *, has_two_factor: bool) -> UserRow:
-    providers = set(
-        session.scalars(
-            select(ExternalIdentity.provider).where(ExternalIdentity.user_id == user.id)
-        ).all()
-    )
+def _providers_by_user(
+    session: Session, user_ids: list[UUID] | None = None
+) -> dict[UUID, set[str]]:
+    """Linked identity providers per user, in one query (``None``: every user)."""
+    statement = select(ExternalIdentity.user_id, ExternalIdentity.provider)
+    if user_ids is not None:
+        statement = statement.where(ExternalIdentity.user_id.in_(user_ids))
+    providers: dict[UUID, set[str]] = {}
+    for user_id, provider in session.execute(statement):
+        providers.setdefault(user_id, set()).add(provider)
+    return providers
+
+
+def _row(user: User, *, providers: set[str], has_two_factor: bool) -> UserRow:
     methods: list[Literal["password", "oidc", "proxy"]] = []
     if user.password_hash is not None:
         methods.append("password")
@@ -135,7 +143,15 @@ def list_users(factory: sessionmaker[Session], *, actor_id: UUID) -> list[UserRo
         require_instance_admin(session, actor_id)
         users = session.scalars(select(User).order_by(User.email)).all()
         two_factor = _two_factor_users(session)
-        return [_row(session, user, has_two_factor=user.id in two_factor) for user in users]
+        providers = _providers_by_user(session)
+        return [
+            _row(
+                user,
+                providers=providers.get(user.id, set()),
+                has_two_factor=user.id in two_factor,
+            )
+            for user in users
+        ]
 
 
 def get_user(factory: sessionmaker[Session], *, actor_id: UUID, user_id: UUID) -> UserRow | None:
@@ -144,7 +160,11 @@ def get_user(factory: sessionmaker[Session], *, actor_id: UUID, user_id: UUID) -
         user = session.get(User, user_id)
         if user is None:
             return None
-        return _row(session, user, has_two_factor=bool(_two_factor_users(session, [user.id])))
+        return _row(
+            user,
+            providers=_providers_by_user(session, [user.id]).get(user.id, set()),
+            has_two_factor=bool(_two_factor_users(session, [user.id])),
+        )
 
 
 def _other_active_admins(session: Session, user_id: UUID) -> int:

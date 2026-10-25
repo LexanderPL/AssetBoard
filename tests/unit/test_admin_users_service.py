@@ -8,10 +8,10 @@ from typing import Any
 from uuid import UUID
 
 import pytest
-from sqlalchemy import select, update
+from sqlalchemy import event, select, update
 
 from assetboard.db.engine import run_immediate
-from assetboard.db.models.identity import AuditEvent, SetupState, User
+from assetboard.db.models.identity import AuditEvent, ExternalIdentity, SetupState, User
 from assetboard.db.models.totp import TotpFactor, TotpRecoveryCode
 from assetboard.domain.totp import recovery_hash
 from assetboard.services import admin_users
@@ -20,8 +20,11 @@ from assetboard.services.admin_users import (
     NotInstanceAdmin,
     apply_admin_action,
     generate_temporary_password,
+    get_user,
+    list_users,
 )
 from assetboard.services.auth import PasswordPolicyError, validate_password
+from assetboard.services.external_identity import PROXY_PROVIDER
 from tests.tenant.serialize import serialize_at_checkpoint
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
@@ -197,3 +200,64 @@ def test_the_last_administrator_guard_on_its_own(db: WorkspaceDb, action: Any) -
         assert admin_users._protection(session, actor, target, action) == "last_admin"
         assert admin_users._protection(session, target, target, action) == "self"
         assert admin_users._protection(session, actor, target, "promote") is None
+
+
+def link(db: WorkspaceDb, user_id: UUID, provider: str, subject: str) -> None:
+    with db.factory.begin() as session:
+        session.add(ExternalIdentity(user_id=user_id, provider=provider, subject=subject))
+
+
+def add_users(db: WorkspaceDb, count: int) -> None:
+    """``count`` users cycling through password, OIDC, proxy and mixed sign-in methods."""
+    for index in range(count):
+        user_id = add_user(db, f"user{index:02d}@example.com")
+        if index % 4 in (0, 3):
+            with db.factory.begin() as session:
+                session.execute(update(User).where(User.id == user_id).values(password_hash="x"))
+        if index % 4 in (1, 3):
+            link(db, user_id, "https://idp.example.test", f"sub-{index}")
+        if index % 4 in (2, 3):
+            link(db, user_id, PROXY_PROVIDER, f"user{index}")
+
+
+def statements_while(db: WorkspaceDb, call: Any) -> int:
+    count = 0
+
+    def count_statement(*_args: Any) -> None:
+        nonlocal count
+        count += 1
+
+    event.listen(db.engine, "before_cursor_execute", count_statement)
+    try:
+        call()
+    finally:
+        event.remove(db.engine, "before_cursor_execute", count_statement)
+    return count
+
+
+def test_listing_users_shows_each_sign_in_method(db: WorkspaceDb) -> None:
+    actor = add_user(db, "admin@example.com", admin=True)
+    add_users(db, 4)
+    rows = {row.email: row.methods for row in list_users(db.factory, actor_id=actor)}
+    assert rows == {
+        "admin@example.com": (),
+        "user00@example.com": ("password",),
+        "user01@example.com": ("oidc",),
+        "user02@example.com": ("proxy",),
+        "user03@example.com": ("password", "oidc", "proxy"),
+    }
+    for row in list_users(db.factory, actor_id=actor):
+        assert get_user(db.factory, actor_id=actor, user_id=row.id) == row
+
+
+def test_listing_users_runs_the_same_queries_for_3_and_10_users(db: WorkspaceDb) -> None:
+    actor = add_user(db, "admin@example.com", admin=True)
+    add_users(db, 2)  # 3 users with the administrator
+    with_3 = statements_while(db, lambda: list_users(db.factory, actor_id=actor))
+    for index in range(7):  # 10 users, each with linked identities
+        user_id = add_user(db, f"more{index:02d}@example.com")
+        link(db, user_id, "https://idp.example.test", f"more-{index}")
+        link(db, user_id, PROXY_PROVIDER, f"more{index}")
+    assert len(list_users(db.factory, actor_id=actor)) == 10
+    with_10 = statements_while(db, lambda: list_users(db.factory, actor_id=actor))
+    assert with_10 == with_3
