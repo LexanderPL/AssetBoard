@@ -259,3 +259,13 @@ def test_a_user_without_a_workspace_keeps_the_reduced_nav(signed: Signed, path: 
     for link in WORKSPACE_NAV_LINKS:
         assert link not in page.text
     assert "data-current-workspace" not in page.text
+
+
+def test_the_main_navigation_starts_with_home(signed: Signed) -> None:
+    page = signed.client.get("/").text
+    nav = page[page.index("<nav") : page.index("</nav>")]
+    first = re.search(r"<a [^>]*>", nav)
+    assert first is not None and "data-home-link" in first.group(0)
+    assert 'data-home-link aria-current="page"' in nav
+    other = signed.client.get("/account").text
+    assert "data-home-link" in other and 'data-home-link aria-current="page"' not in other

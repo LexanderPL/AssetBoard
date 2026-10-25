@@ -252,7 +252,8 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
                     <button id="smoke-short-toast-trigger"
                       hx-get="/_smoke/short-toast">Short toast</button>
                     <button id="smoke-error-trigger" hx-get="/_smoke/missing">Error</button>`;
-                  document.body.append(mount);
+                  // In the content column: on desktop the fixed sidebar covers the left edge.
+                  document.getElementById("main-content").append(mount);
                   window.htmx.process(mount);
                 }"""
             )
