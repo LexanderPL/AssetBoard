@@ -15,6 +15,8 @@ User=assetboard
 Group=assetboard
 Environment=ASSETBOARD_ENV=prod
 Environment=ASSETBOARD_DATA_DIR=/var/lib/assetboard
+# One process: the recurring-item scheduler, the setup token and the sign-in limits live in it.
+Environment=WEB_CONCURRENCY=1
 EnvironmentFile=/etc/assetboard/assetboard.env
 # Loopback only: publish the app through a reverse proxy. Change the host in a drop-in when the
 # proxy runs on another machine, and set ASSETBOARD_TRUSTED_PROXIES to its address.
@@ -26,6 +28,9 @@ RestartSec=5
 StateDirectory=assetboard
 StateDirectoryMode=0700
 UMask=0077
+# The only writable path under ProtectSystem=strict (StateDirectory= implies it; stated here so a
+# drop-in that moves ASSETBOARD_DATA_DIR knows to change it too).
+ReadWritePaths=/var/lib/assetboard
 
 # Hardening.
 NoNewPrivileges=yes
