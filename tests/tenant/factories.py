@@ -194,10 +194,12 @@ def make_tax_rule_version(session: Session, workspace_id: UUID) -> TaxRuleVersio
 
 
 def make_income_source(session: Session, workspace_id: UUID) -> IncomeSource:
+    # (workspace, kind, name_key) is unique: each income source gets its own category.
+    name = f"Salary {uuid4().hex[:8]}"
     category = Category(
         workspace_id=workspace_id,
-        name="Salary",
-        name_key="salary",
+        name=name,
+        name_key=name.casefold(),
         kind="income",
         treatment="regular",
         color="#16a34a",
