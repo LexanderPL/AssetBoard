@@ -971,6 +971,22 @@ def test_scheduled_queries_stay_in_their_workspace(db_session, two_workspaces) -
     assert other_rows.upcoming(date(2026, 4, 1)) == []
     assert rows.get_for_update(row.id) == row
     assert other_rows.get_for_update(row.id) is None
+    transaction = TransactionRepository(db_session, ctx_a).create(
+        direction="expense",
+        day=date(2026, 3, 14),
+        amount_minor=180000,
+        currency="EUR",
+        category_id=category.id,
+        description="Insurance",
+        description_key="insurance",
+        source="recurring",
+        created_by_user_id=None,
+    )
+    rows.update(row.id, transaction_id=transaction.id, previous_transaction_id=transaction.id)
+    for previous in (False, True):
+        assert rows.linked_to_transaction_for_update(transaction.id, previous=previous) == [row]
+        assert other_rows.linked_to_transaction_for_update(transaction.id, previous=previous) == []
+    rows.update(row.id, transaction_id=None, previous_transaction_id=None)
     assert not other_items.any_exists() and items.any_exists()
     with pytest.raises(NotFound):
         other_rows.delete(row)

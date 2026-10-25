@@ -108,6 +108,11 @@ class ScheduledOccurrence(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             ["transactions.workspace_id", "transactions.id"],
             name="fk_scheduled_occurrences_workspace_transaction",
         ),
+        ForeignKeyConstraint(
+            ["workspace_id", "previous_transaction_id"],
+            ["transactions.workspace_id", "transactions.id"],
+            name="fk_scheduled_occurrences_workspace_previous_transaction",
+        ),
         CheckConstraint("direction IN ('expense', 'income')", name="direction_valid"),
         CheckConstraint("amount_state IN ('estimated', 'confirmed')", name="amount_state_valid"),
         CheckConstraint("status IN ('pending', 'posted', 'skipped')", name="status_valid"),
@@ -154,6 +159,10 @@ class ScheduledOccurrence(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     status: Mapped[str] = mapped_column(String(16), nullable=False, default="pending")
     generated_by: Mapped[str] = mapped_column(String(16), nullable=False, default="rule")
     transaction_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
+    # The transaction this occurrence was last posted as, kept after it returned to pending
+    # (undo or ledger delete). Set means "posted before": auto-post leaves the row alone, and a
+    # restore of that transaction may re-link it.
+    previous_transaction_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
     rescheduled_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     amount_overridden: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=False)
     label: Mapped[str] = mapped_column(String(200), nullable=False)

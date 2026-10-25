@@ -98,6 +98,23 @@ class ScheduledOccurrenceRepository(ScopedRepository[ScheduledOccurrence]):
         )
         return self._session.scalars(statement).one_or_none()
 
+    def linked_to_transaction_for_update(
+        self, transaction_id: UUID, *, previous: bool = False
+    ) -> list[ScheduledOccurrence]:
+        """Occurrences posted as ``transaction_id`` (or, with ``previous``, last posted as it)."""
+        column = (
+            ScheduledOccurrence.previous_transaction_id
+            if previous
+            else ScheduledOccurrence.transaction_id
+        )
+        statement = (
+            self._scoped_select()
+            .where(column == transaction_id)
+            .order_by(ScheduledOccurrence.id)
+            .with_for_update()
+        )
+        return list(self._session.scalars(statement))
+
     def upcoming(
         self,
         through: date,

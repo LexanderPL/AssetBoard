@@ -89,7 +89,7 @@ def test_0018_tax_rules_migration_is_reversible(tmp_path: Path) -> None:
         engine.dispose()
 
 
-def test_0019_income_sources_migration_is_reversible(tmp_path: Path) -> None:
+def test_0020_income_sources_migration_is_reversible(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'income.db'}"
     )
@@ -106,7 +106,7 @@ def test_0019_income_sources_migration_is_reversible(tmp_path: Path) -> None:
             "parent_occurrence_id",
             "income_source_tax_rule_id",
         } <= {column["name"] for column in inspector.get_columns("scheduled_occurrences")}
-        command.downgrade(alembic_config(settings), "0018_f33")
+        command.downgrade(alembic_config(settings), "0019_f32_prev_txn")
         assert not {
             "income_sources",
             "income_source_tax_rules",

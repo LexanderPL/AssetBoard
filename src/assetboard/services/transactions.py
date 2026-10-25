@@ -9,6 +9,10 @@ follows the closed-month guard of F2.5 before changing anything:
   its old date and, when the month changes, for the new one;
 * soft delete and undo: ``lock_month_writes``, read the row, ``ensure_date_open`` for its date.
 
+Deleting a transaction posted from a scheduled occurrence (F3.2) returns that occurrence to
+pending in the same write (its due month must be open too); restoring it re-links the
+occurrence only if it is still pending and unlinked (``services.occurrences``).
+
 Edit, delete and undo read the stored row with ``get_for_update`` (``FOR UPDATE`` on
 PostgreSQL, after the workspace lock), so concurrent writes to the same row are serialised.
 
@@ -56,6 +60,7 @@ from assetboard.domain.transactions import (
     parse_entry_date,
 )
 from assetboard.i18n.numbers import parse_amount
+from assetboard.services import occurrences
 from assetboard.services.category_usage import CategoryUsage
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.months import ensure_date_open, lock_month_writes
@@ -500,6 +505,7 @@ def delete_transaction(
             raise NotFound
         if row.deleted_at is None:
             ensure_date_open(session, ctx, row.date)
+            occurrences.unlink_deleted_transaction(session, ctx, row.id)
             repository.update(row.id, deleted_at=ctx.clock.now())
             category = CategoryRepository(session, ctx).get_or_raise(row.category_id)
             _audit(session, ctx, "transaction.deleted", row, category)
@@ -538,6 +544,7 @@ def undo_delete(
         ensure_date_open(session, ctx, row.date)
         repository.update(row.id, deleted_at=None)
         _audit(session, ctx, "transaction.restored", row, category)
+        occurrences.relink_restored_transaction(session, ctx, row.id)
         return _view(row, category)
 
     return run_immediate(factory, write)

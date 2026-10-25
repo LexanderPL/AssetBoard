@@ -36,6 +36,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "children",
             "for_tax_attachment",
             "get_for_update",
+            "linked_to_transaction_for_update",
             "upcoming",
             "category_counts",
         )

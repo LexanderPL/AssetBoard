@@ -1,7 +1,7 @@
 """F3.4 income sources, work logs, and generated tax payments.
 
-Revision ID: 0019_f34
-Revises: 0018_f33
+Revision ID: 0020_f34
+Revises: 0019_f32_prev_txn
 Create Date: 2026-10-25 11:45:00.000000
 """
 
@@ -12,8 +12,8 @@ from alembic import op
 
 from assetboard.db.types import DecimalType, UtcDateTime
 
-revision = "0019_f34"
-down_revision = "0018_f33"
+revision = "0020_f34"
+down_revision = "0019_f32_prev_txn"
 branch_labels = None
 depends_on = None
 

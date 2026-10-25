@@ -71,11 +71,15 @@ Editors and owners can mark an occurrence paid or received, skip it, reschedule 
 occurrence, or edit its expected amount. Marking it paid creates a linked transaction using the
 entered date and amount. The transaction can be edited from the month or transaction list; undo
 the posting from the inbox within 10 seconds to soft-delete the transaction and restore the
-occurrence to pending. Editing an occurrence's amount or date does not edit its recurring rule.
+occurrence to pending. Deleting the transaction from the month or transaction list also returns
+its occurrence to pending (keeping its date and amount changes), so it can be marked paid again;
+undoing that deletion re-links the transaction if the occurrence is still pending. Editing an
+occurrence's amount or date does not edit its recurring rule.
 
 Enable **Automatically post on the due date** on a recurring item to create its transaction at
 00:05 in the workspace time zone. Automatic transactions are labelled in the ledger and remain
-editable. Posting, skipping, rescheduling, and amount changes are blocked when the affected
+editable. An occurrence that was posted once and returned to pending (by an undo or a deleted
+transaction) is never posted automatically again; mark it paid yourself. Posting, skipping, rescheduling, and amount changes are blocked when the affected
 month is closed. Reopen it first, or reschedule to an open month.
 
 An occurrence's nominal scheduled date is stored separately from its effective or rescheduled
