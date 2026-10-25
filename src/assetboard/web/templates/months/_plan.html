@@ -36,10 +36,10 @@
     {% endif %}
   </td>
   {% if plan_only %}
-  <td colspan="4" class="py-1.5 pr-2 text-right text-xs text-muted">{{ _("not counted") }}</td>
+  <td colspan="4" class="py-1.5 pr-2 text-right text-xs text-muted" data-not-counted>{{ _("not counted") }}</td>
   {% else %}
   <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums" data-actual>{{ r.actual }}</td>
-  <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums" data-expected>{{ r.expected }}</td>
+  <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums" data-forecast-column data-expected>{{ r.expected }}</td>
   <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums" data-forecast-column data-forecast>{{ r.forecast }}</td>
   <td class="whitespace-nowrap py-1.5 pr-2 text-right" data-difference>{{ difference(r.difference, r.tone) }}</td>
   {% endif %}
@@ -51,7 +51,7 @@
   <th scope="row" class="py-2 pl-2 pr-2 text-left">{{ _("Total") }}</th>
   <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ g.totals.planned }}</td>
   <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ g.totals.actual }}</td>
-  <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ g.totals.expected }}</td>
+  <td data-forecast-column class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ g.totals.expected }}</td>
   <td data-forecast-column class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ g.totals.forecast }}</td>
   <td class="whitespace-nowrap py-2 pr-2 text-right">{{ difference(g.totals.difference, g.totals.tone) }}</td>
 </tr>

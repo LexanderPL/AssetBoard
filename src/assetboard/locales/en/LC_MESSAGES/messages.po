@@ -2898,9 +2898,6 @@ msgstr ""
 msgid "Show forecast"
 msgstr ""
 
-msgid "Hide forecast"
-msgstr ""
-
 msgid "Actual"
 msgstr ""
 
@@ -3595,5 +3592,8 @@ msgstr ""
 #~ "Your monthly plan and activity will "
 #~ "appear here once you start adding "
 #~ "items."
+#~ msgstr ""
+
+#~ msgid "Hide forecast"
 #~ msgstr ""
 

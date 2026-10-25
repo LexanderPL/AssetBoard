@@ -58,6 +58,14 @@ The **Summary** block at the top of the month page shows how the month is going:
   savings): **Planned**, **Actual** and **Difference**, and a total per group. A positive
   difference is always good news: spent less, earned more, saved more or withdrew less than
   planned. A category with entries but no plan shows a plan of 0.00.
+- Two more columns look ahead with your [recurring items and income sources](recurring.md):
+  **Expected (pending)** is what is still due this month and not yet confirmed, and
+  **Forecast** is actual plus expected. Under the flow bar, "Forecast spent … · forecast
+  earned …" and a second, thinner bar show the month as it will look once everything pending
+  is confirmed (Home shows them too). Confirming an item on the Transactions page moves its
+  amount from Expected to Actual.
+- **Show forecast** hides or shows the Expected and Forecast columns and the forecast line. This
+  browser remembers the choice.
 - **Largest first** sorts each group by the actual amount; **Your order** uses the order of
   your categories. This browser remembers the choice.
 

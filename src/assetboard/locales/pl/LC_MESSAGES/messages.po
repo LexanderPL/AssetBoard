@@ -3148,9 +3148,6 @@ msgstr "Podsumowanie"
 msgid "Show forecast"
 msgstr "Pokaż prognozę"
 
-msgid "Hide forecast"
-msgstr "Ukryj prognozę"
-
 msgid "Actual"
 msgstr "Wykonanie"
 
@@ -3843,4 +3840,7 @@ msgstr "Usuń obszar roboczy…"
 #~ "Twój plan miesięczny i aktywność pojawią"
 #~ " się tutaj, gdy dodasz pierwsze "
 #~ "pozycje."
+
+#~ msgid "Hide forecast"
+#~ msgstr "Ukryj prognozę"
 
