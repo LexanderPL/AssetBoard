@@ -9,6 +9,7 @@ from assetboard.config import Settings
 from assetboard.db.models.identity import Workspace
 from assetboard.db.repositories.scheduled import RecurringWorkspaceReader
 from assetboard.recurring_jobs import RecurringJobs
+from tests.fake_notifier import FakeNotifier
 from tests.tenant.workspace_db import workspace_db
 
 
@@ -110,3 +111,79 @@ def test_a_deleted_workspace_is_skipped_quietly(db):
         gone,
     )
     assert "exc_info" not in logger.debug.call_args.kwargs
+
+
+def test_the_reminder_tick_is_scheduled_and_runs_every_workspace(db, monkeypatch):
+    other = db.add_workspace("Other")
+    calls = []
+
+    def fake_run(_factory, scope, _clock, _settings, notifier, *, out_of_time):
+        calls.append((scope.workspace.id, notifier))
+
+    monkeypatch.setattr("assetboard.recurring_jobs.run_notifications", fake_run)
+    notifier = FakeNotifier()
+    jobs = RecurringJobs(
+        db.factory, Settings(_env_file=None), lambda: db.clock, Mock(), notifier=lambda: notifier
+    )
+    jobs.reconcile()
+    jobs.notify()
+    jobs.notify()
+    assert {workspace_id for workspace_id, _ in calls} == {db.workspace_id, other}
+    assert all(passed is notifier for _, passed in calls)
+    # The starting workspace rotates from one tick to the next.
+    assert calls[0][0] != calls[2][0]
+    jobs.start()
+    try:
+        job = jobs.scheduler.get_job("notifications")
+        assert job is not None and job.max_instances == 1
+    finally:
+        jobs.stop()
+
+
+def test_the_reminder_tick_stops_at_its_time_budget_and_obeys_the_kill_switch(db, monkeypatch):
+    db.add_workspace("Other")
+    calls = []
+    now = iter([0.0, 0.0, 100.0, 100.0, 100.0])
+
+    def fake_run(_factory, scope, _clock, _settings, _notifier, *, out_of_time):
+        calls.append(scope.workspace.id)
+
+    monkeypatch.setattr("assetboard.recurring_jobs.run_notifications", fake_run)
+    settings = Settings(_env_file=None, notification_tick_seconds=45)
+    jobs = RecurringJobs(
+        db.factory,
+        settings,
+        lambda: db.clock,
+        Mock(),
+        notifier=FakeNotifier,
+        monotonic=lambda: next(now),
+    )
+    jobs.reconcile()
+    jobs.notify()
+    assert len(calls) == 1  # the second workspace waits for the next tick
+    off = RecurringJobs(
+        db.factory,
+        Settings(_env_file=None, notifications_enabled=False),
+        lambda: db.clock,
+        Mock(),
+        notifier=FakeNotifier,
+    )
+    off.reconcile()
+    off.notify()
+    assert len(calls) == 1
+
+
+def test_a_failing_reminder_run_is_logged_without_data(db, monkeypatch):
+    def broken(*_args, **_kwargs):
+        raise RuntimeError("secret detail")
+
+    monkeypatch.setattr("assetboard.recurring_jobs.run_notifications", broken)
+    logger = Mock()
+    jobs = RecurringJobs(
+        db.factory, Settings(_env_file=None), lambda: db.clock, logger, notifier=FakeNotifier
+    )
+    jobs.reconcile()
+    jobs.notify()
+    message, *args = logger.error.call_args.args
+    assert "notification_run_failed" in message
+    assert "secret detail" not in message % tuple(args)

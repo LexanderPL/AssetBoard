@@ -68,7 +68,10 @@ ActorType = Literal["user", "cli", "system"]
 # ``confirm``: password re-checks of a known user (change, confirm, link), per user id.
 # ``mail_email``: emails per normalized address, counted whether or not an account has it;
 # ``mail_ip``: password reset requests per client address (pre-release B, ADR-0017).
-ThrottleScope = Literal["account", "confirm", "ip", "setup", "register", "mail_email", "mail_ip"]
+# ``notify_test``: reminder channel test messages per member (F3.6, ADR-0021).
+ThrottleScope = Literal[
+    "account", "confirm", "ip", "setup", "register", "mail_email", "mail_ip", "notify_test"
+]
 AuthMethod = Literal["password", "oidc", "proxy"]
 
 MIN_PASSWORD_LENGTH = 8

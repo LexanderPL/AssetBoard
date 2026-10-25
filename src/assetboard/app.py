@@ -31,6 +31,7 @@ from assetboard.middleware import (
     SecurityHeadersMiddleware,
     add_security_headers,
 )
+from assetboard.notify_apprise import AppriseNotifier
 from assetboard.recurring_jobs import RecurringJobs
 from assetboard.services.account_email import (
     prune_email_tokens_with_factory,
@@ -53,6 +54,7 @@ from assetboard.services.hash_gate import HashGate, HashGateBusy
 from assetboard.services.instance_settings import workspace_creation_allowed
 from assetboard.services.mail import Mailer, MailOutbox, SmtpMailer
 from assetboard.services.months import MonthClosed
+from assetboard.services.notify import Notifier
 from assetboard.services.oidc import OidcClient, UrllibTransport
 from assetboard.services.oidc_flow import ConsumedStates
 from assetboard.services.proxy_auth import RecentKeys
@@ -115,6 +117,7 @@ def create_app(
     database_checker: DatabaseChecker | None = None,
     mailer: Mailer | None = None,
     mail_delay: Callable[[], float] | None = None,
+    notifier: Notifier | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     logger = configure_logging(settings.log_level, settings.log_format)
@@ -182,7 +185,13 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        recurring_jobs = RecurringJobs(session_factory, settings, lambda: app.state.clock, logger)
+        recurring_jobs = RecurringJobs(
+            session_factory,
+            settings,
+            lambda: app.state.clock,
+            logger,
+            notifier=lambda: app.state.notifier,
+        )
         app.state.recurring_jobs = recurring_jobs
         try:
             if outbox is not None:
@@ -261,6 +270,8 @@ def create_app(
     app.state.proxy_audits = RecentKeys()
     app.state.setup_token = None
     app.state.mail_outbox = outbox
+    # Reminder delivery (ADR-0021); tests replace it with a fake that never uses the network.
+    app.state.notifier = notifier or AppriseNotifier(settings.notification_timeout_seconds)
     app.state.mail_log_key = mail_log_key
     app.state.database_checker = checker
     # Added innermost first; see ADR-0012 for the resulting order.

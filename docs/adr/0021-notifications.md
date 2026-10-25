@@ -20,7 +20,8 @@ worker with the in-process APScheduler of [ADR-0018](0018-recurring-items.md).
   comparable. It adds requests (Apache-2.0), requests-oauthlib (ISC), oauthlib (BSD-3-Clause),
   Markdown (BSD-3-Clause), charset-normalizer (MIT) and urllib3 (MIT); certifi, click and
   PyYAML were already locked. All are compatible with AGPL-3.0-or-later. Apprise installs about
-  13 MB (its service plugins). Only `services/notify_apprise.py` imports it; everything else
+  13 MB (its service plugins). Only the adapter `notify_apprise.py` (outside the strictly typed
+  service layer, like the scheduler adapter) imports it; everything else
   uses the `Notifier` protocol, and tests use a fake that never touches the network.
 - **Channels per member and workspace.** `NotificationChannel` belongs to one user in one
   workspace. Every member, viewers included, manages only their own channels; nobody (owners

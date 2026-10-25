@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import and_, delete, func, select
+from sqlalchemy import and_, delete, func, or_, select
 
 from assetboard.db.models.notifications import NotificationChannel, NotificationLog
 from assetboard.db.repositories.base import ScopedRepository
@@ -117,12 +117,17 @@ class NotificationLogRepository(ScopedRepository[NotificationLog]):
         return [(row, name) for row, name in self._session.execute(statement)]
 
     def prune(self, before: date) -> int:
-        """Delete this workspace's log rows with a slot before ``before`` (none are needed)."""
+        """Delete this workspace's log rows with a slot before ``before`` that no rule needs.
+
+        Sent overdue reminders stay: they count toward the overdue cap for as long as their
+        occurrence is pending (at most seven per occurrence and channel).
+        """
         result = self._session.scalars(
             delete(NotificationLog)
             .where(
                 NotificationLog.workspace_id == self._workspace_id,
                 NotificationLog.sent_on < before,
+                or_(NotificationLog.kind != "overdue", NotificationLog.status != "sent"),
             )
             .returning(NotificationLog.id)
             .execution_options(synchronize_session=False)
