@@ -66,6 +66,7 @@ current, unavailable choice; choose an active category to save the rule again.
 Open **Upcoming** to see overdue occurrences and those due within the next 30 days, grouped by
 week. Use the direction and category filters to narrow the inbox. The operator may set
 `ASSETBOARD_UPCOMING_DAYS` to a value from 1 to 365 to change the forward window.
+When occurrences are overdue, the **Upcoming** link in the navigation shows how many.
 
 Editors and owners can mark an occurrence paid or received, skip it, reschedule just that
 occurrence, or edit its expected amount. Marking it paid creates a linked transaction using the

@@ -223,6 +223,19 @@ Do not touch posted occurrences. Tests for lag 0/1/2, estimated vs confirmed, sk
 **Month** summary (and the shared flow bar, so Home shows them too); the missing-work-log banner
 shows on both the Month and the Transactions page.
 
+**As built (F3.4 PR #149 and the F3.5 follow-up):**
+- Expected rows show for every pending occurrence due in the month (recurring items, income and
+  tax payments), in the table of their direction; Confirm opens the F3.2 confirm form (date and
+  amount) and returns to the same Transactions page. Viewers see the rows without Confirm.
+- The toggle ("Show forecast", a pressed toggle) hides **both** extra columns (Expected and
+  Forecast) and the forecast KPI line on the Month summary; Home always shows its forecast line.
+  The choice is kept per browser and survives the summary's htmx swaps.
+- The banner reads "Enter days worked for <work month> for <source>." and links to the income
+  source. It is shown for the viewed month only: the relevant work month is the viewed month
+  minus the source's pay lag.
+- The overdue badge counts pending occurrences due before today (workspace time zone) and sits
+  on the Upcoming link of the sidebar.
+
 **Acceptance**
 - Month page lists **pending occurrences of that month** in each table (visually distinct "expected" rows with a Confirm button); confirming moves them into real rows.
 - Summary gets extra columns: **Expected (pending)** and **Forecast = actual + pending expected**; KPIs show "forecast spent / forecast earned" next to actuals. A toggle hides forecast columns.
