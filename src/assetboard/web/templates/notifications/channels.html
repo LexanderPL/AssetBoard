@@ -96,7 +96,7 @@
     <thead class="text-muted"><tr><th scope="col" class="py-2 pr-3 font-medium">{{ _("Date") }}</th><th scope="col" class="py-2 pr-3 font-medium">{{ _("Channel") }}</th><th scope="col" class="py-2 pr-3 font-medium">{{ _("Reminder") }}</th><th scope="col" class="py-2 font-medium">{{ _("Status") }}</th></tr></thead>
     <tbody>
     {% for row in page.log %}
-    <tr class="border-t border-line"><td class="whitespace-nowrap py-2 pr-3">{{ format_day(row.sent_on, locale) }}</td><td class="py-2 pr-3">{{ row.channel_name }}</td><td class="py-2 pr-3">{{ _(kinds.get(row.kind, row.kind)) }}</td><td class="py-2{% if row.status == 'failed' %} text-danger{% endif %}">{{ _(statuses.get(row.status, row.status)) }}</td></tr>
+    <tr class="border-t border-line"><td class="whitespace-nowrap py-2 pr-3">{{ format_day(row.sent_on, locale) }}</td><td class="py-2 pr-3">{{ row.channel_name }}</td><td class="py-2 pr-3">{{ _(kinds.get(row.kind, row.kind)) }}</td>{% if row.status == "failed" %}<td class="py-2 text-danger">{% else %}<td class="py-2">{% endif %}{{ _(statuses.get(row.status, row.status)) }}</td></tr>
     {% endfor %}
     </tbody>
   </table>
