@@ -130,3 +130,22 @@ Confirm button, in the tables of the month's **Transactions** page; the **Month*
 pending expected amounts and a forecast alongside actuals. Missing work logs are highlighted on
 both pages when the related pay date is due within ten days or is overdue. A pending income
 occurrence you rescheduled keeps its date when its amount is recalculated.
+
+### Work calendar
+
+A variable income source can also be logged day by day: choose **Open the work calendar** under
+its work logs. The calendar shows one month at a time (use **Previous month** / **Next month**);
+weekends are greyed and the workspace country's public holidays are marked (without a country,
+only weekends). Click a day, or focus it and press Space or Enter, to mark it worked with 1 unit;
+click it again to remove it. Under **Day values** you can change a marked day to a half day
+(`0.5`) or a number of hours, from just above 0 up to 24, typed the way your language writes
+numbers. **Fill working days** adds 1 for every working day that has no value yet and never
+changes values you entered; **Clear month** removes every day of the month after a confirmation.
+
+The calendar is optional. While a month has at least one marked day, its work log is the sum of
+the days: it is shown as "from the work calendar" and the month-level form refuses to change it.
+Marking the first day replaces a manual work log for that month; removing the last day (or
+clearing the month) removes the log, and the month goes back to its estimate. Every change
+recalculates the month's pending income and tax-payment occurrences, like a month-level work log,
+with the same rules: editors and owners only, nothing changes while the pay month is closed, and
+posted income is not changed.
