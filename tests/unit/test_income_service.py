@@ -415,3 +415,34 @@ def test_golden_tax_rules_through_an_income_source(team: WorkspaceDb, record_as:
         assert sorted((c.expected_minor for c in children), reverse=True) == payments
         assert all(c.due_date == date(2026, 10, 20) for c in children)
         assert all(c.generated_by == "tax" and c.direction == "expense" for c in children)
+
+
+@pytest.mark.parametrize(
+    ("pay_day", "month", "shown"),
+    [
+        (11, date(2026, 3, 1), True),  # pays 2026-03-11: exactly 10 days after today (03-01)
+        (12, date(2026, 3, 1), False),  # pays 2026-03-12: 11 days ahead, too early to ask
+        (12, date(2026, 2, 1), True),  # pays 2026-02-12: past, still missing
+        (1, date(2026, 3, 1), True),  # pays today
+    ],
+)
+def test_missing_work_log_banner_window_is_ten_days_or_past(
+    team: WorkspaceDb, pay_day: int, month: date, shown: bool
+) -> None:
+    # F3.5: the banner asks for a missing log once its pay date is within 10 days or past.
+    ctx = team.ctx("owner", "owner")
+    income_category, _expense = categories(team, ctx)
+    source_id = _source(team, ctx, income_category, pay_day_value=pay_day)
+    expected = [(source_id, "Contract work", _month_before(month))] if shown else []
+    assert income.missing_work_logs(team.factory, ctx, month) == expected
+
+
+def _month_before(month: date) -> date:
+    return date(month.year - (month.month == 1), (month.month - 2) % 12 + 1, 1)
+
+
+def test_missing_work_log_banner_skips_fixed_sources(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    income_category, _expense = categories(team, ctx)
+    _source(team, ctx, income_category, kind="fixed", fixed_minor=500_000, rate_minor=None)
+    assert income.missing_work_logs(team.factory, ctx, date(2026, 3, 1)) == []
