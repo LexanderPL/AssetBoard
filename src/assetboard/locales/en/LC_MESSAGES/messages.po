@@ -226,6 +226,9 @@ msgstr ""
 msgid "Workspace created"
 msgstr ""
 
+msgid "Workspace deleted"
+msgstr ""
+
 msgid "Instance settings changed"
 msgstr ""
 
@@ -647,6 +650,9 @@ msgid "Account administration"
 msgstr ""
 
 msgid "Instance settings"
+msgstr ""
+
+msgid "Deleted workspaces"
 msgstr ""
 
 #, python-format
@@ -1558,6 +1564,15 @@ msgid ""
 msgstr ""
 
 msgid "Workspace settings saved."
+msgstr ""
+
+msgid "Type the workspace name exactly as shown to confirm."
+msgstr ""
+
+msgid ""
+"Your current workspace changed since this page was opened (in another "
+"tab, or it was already deleted). Nothing was deleted. Check the workspace"
+" named below and confirm again."
 msgstr ""
 
 msgid "Home"
@@ -3009,6 +3024,38 @@ msgstr ""
 msgid "Time zone"
 msgstr ""
 
+msgid "Delete workspace"
+msgstr ""
+
+#, python-format
+msgid "Delete %(name)s permanently?"
+msgstr ""
+
+msgid ""
+"Every transaction, planned value, category, recurring item, closed month "
+"and invitation of this workspace is removed for good, and so is its audit"
+" log. This cannot be undone, and the app keeps no copy."
+msgstr ""
+
+#, python-format
+msgid "%(num)d other member also loses access to it."
+msgid_plural "%(num)d other members also lose access to it."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Export what you want to keep first."
+msgstr ""
+
+msgid "Export transactions as CSV"
+msgstr ""
+
+#, python-format
+msgid "To confirm, type the workspace name: %(name)s"
+msgstr ""
+
+msgid "Delete this workspace"
+msgstr ""
+
 msgid "People in this workspace"
 msgstr ""
 
@@ -3109,6 +3156,14 @@ msgid ""
 "The formatting default is used for numbers and dates where no personal "
 "preference applies. Your interface language follows your account and "
 "browser."
+msgstr ""
+
+msgid ""
+"Permanently removes this workspace and all its data, for every member. "
+"You confirm on the next page by typing the workspace name."
+msgstr ""
+
+msgid "Delete workspace…"
 msgstr ""
 
 #~ msgid "AssetBoard home"

@@ -3,8 +3,8 @@
 Work deliberately left out of 1.0. Each item keeps enough context to be planned later with the
 standard workflow (docs/specs/00-overview.md §8); none is scheduled yet.
 
-Also deferred from M1 (see M1-identity-and-workspaces.md): workspace deletion, ownership
-transfer, and leaving a workspace.
+Also deferred from M1 (see M1-identity-and-workspaces.md): ownership transfer and leaving a
+workspace. (Workspace deletion was pulled forward on 2026-10-24, see ADR-0020.)
 
 ---
 

@@ -112,7 +112,27 @@ In the plan, list each acceptance criterion with the test that will prove it, an
     workspace" next to the switcher (or the workspace name), both only when allowed. The
     service re-reads the account and the setting inside its write transaction.
   - No limit on how many workspaces an account creates.
-- Backlog: workspace deletion, ownership transfer, and leaving a workspace; revisit after 1.0 ([post-1.0 backlog](backlog-post-1.0.md)).
+- **Workspace deletion (owner decision 2026-10-24, pulled forward from the post-1.0 backlog;
+  ADR-0020).**
+  - Owners only: "Delete workspace" at the bottom of the settings page leads to a confirmation
+    page (`/workspace/delete`) where the owner types the workspace's exact name (surrounding
+    spaces ignored, case sensitive) and submits a CSRF-protected POST. The page recommends
+    exporting first and links to the transaction CSV export (F2.6), and says how many other
+    members lose access.
+  - The service checks the role on the Context and again inside its `BEGIN IMMEDIATE`
+    transaction, takes the exclusive workspace lock and compares the name with the stored one.
+    The form carries the id of the workspace it was shown for; a different current workspace
+    (stale tab after a switch, repeated submit) is refused with 409 before any write, so a
+    same-named workspace can never be deleted by mistake.
+  - The workspace and every row with its `workspace_id` are deleted for good in that
+    transaction (found from the metadata, children before parents), including its memberships,
+    invitations and its own audit events. Sessions that had it selected fall back to the oldest
+    remaining membership or the "No workspace" page.
+  - One instance-level audit event `workspace.delete` (`workspace_id` NULL) records the id and
+    name; no amounts.
+  - The instance's last workspace can be deleted too; its owner then sees the "No workspace"
+    page and can create a new workspace while creation is allowed.
+- Backlog: ownership transfer and leaving a workspace; revisit after 1.0 ([post-1.0 backlog](backlog-post-1.0.md)).
 - B2 (invitations), see ADR-0013:
   - Tokens are 256-bit, stored as SHA-256, single use; expiry is 1, 7 (default) or 30 days;
     at most 50 pending invitations per workspace.
