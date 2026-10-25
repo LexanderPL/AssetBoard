@@ -135,17 +135,52 @@ def parse_amount(text: str, locale: str) -> Decimal:
     return amount
 
 
+# "Native style everywhere" (owner, 2026-10-24): a currency with one obvious home country is
+# written the way that country writes it, whatever the interface language (PLN is
+# ``1 234,50 zł`` in English too, USD ``$1,234.50`` in Polish too). Currencies shared by several
+# countries (EUR) or not listed here follow the interface locale, and so do CAD, AUD, NZD and
+# MXN, whose home style is a bare "$" that could not be told apart from USD ("CA$" in English).
+# Input fields do not: they follow the interface locale (``format_amount_input``, ``parse_amount``).
+CURRENCY_HOME_LOCALES: dict[str, str] = {
+    "BGN": "bg_BG",
+    "BRL": "pt_BR",
+    "CHF": "de_CH",
+    "CNY": "zh_CN",
+    "CZK": "cs_CZ",
+    "DKK": "da_DK",
+    "GBP": "en_GB",
+    "HUF": "hu_HU",
+    "INR": "en_IN",
+    "ISK": "is_IS",
+    "JPY": "ja_JP",
+    "KRW": "ko_KR",
+    "NOK": "nb_NO",
+    "PLN": "pl_PL",
+    "RON": "ro_RO",
+    "SEK": "sv_SE",
+    "TRY": "tr_TR",
+    "UAH": "uk_UA",
+    "USD": "en_US",
+}
+# A letter code glued to the number ("THB1,234.50", "1,234.50THB", "CHF-1’234.50").
+_CODE_BEFORE_NUMBER = re.compile(r"(?<![A-Za-z])([A-Z]{3})(?=[\d\-\u2212])")
+_CODE_AFTER_NUMBER = re.compile(r"(?<=\d)([A-Z]{3})(?![A-Za-z])")
+
+
 def format_money(money: Money, locale: str) -> str:
+    """The amount with its currency, in the currency's native style (``CURRENCY_HOME_LOCALES``)."""
     normalized_locale = _normalize_number_locale(locale)
     try:
-        return format_currency(
+        text = format_currency(
             money.to_decimal(),
             money.currency,
-            locale=normalized_locale,
+            locale=CURRENCY_HOME_LOCALES.get(money.currency, normalized_locale),
             decimal_quantization=False,
         )
     except UnknownCurrencyError as exc:
         raise ValueError(f"Unsupported currency: {money.currency}") from exc
+    text = _CODE_BEFORE_NUMBER.sub("\\1\u00a0", text)
+    return _CODE_AFTER_NUMBER.sub("\u00a0\\1", text)
 
 
 def format_amount_input(money: Money, locale: str) -> str:

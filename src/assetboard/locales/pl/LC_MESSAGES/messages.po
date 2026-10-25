@@ -1732,6 +1732,9 @@ msgstr "Twoje konto"
 msgid "Audit log: workspace"
 msgstr "Dziennik zdarzeń: obszar roboczy"
 
+msgid "New workspace"
+msgstr "Nowy obszar roboczy"
+
 msgid "Users"
 msgstr "Użytkownicy"
 
@@ -1761,9 +1764,6 @@ msgstr "Obszar roboczy"
 
 msgid "Switch"
 msgstr "Przełącz"
-
-msgid "New workspace"
-msgstr "Nowy obszar roboczy"
 
 msgid "Are you sure?"
 msgstr "Czy na pewno?"
@@ -2585,20 +2585,30 @@ msgstr "nieliczone"
 msgid "Total"
 msgstr "Razem"
 
+#, python-format
+msgid ""
+"Earned %(earned)s: spent %(spent)s, saved or invested %(saved)s, left "
+"%(net)s."
+msgstr ""
+"Zarobiono %(earned)s: wydano %(spent)s, zaoszczędzono lub zainwestowano "
+"%(saved)s, zostało %(net)s."
+
+#, python-format
+msgid "Spending and saving exceed earnings by %(amount)s."
+msgstr "Wydatki i oszczędności przekraczają zarobki o %(amount)s."
+
 msgid "Earned"
 msgstr "Zarobione"
 
 msgid "Spent"
 msgstr "Wydane"
 
-msgid "Saved"
-msgstr "Zaoszczędzone"
+msgid "Left"
+msgstr "Zostało"
 
-msgid "Savings rate"
-msgstr "Stopa oszczędności"
-
-msgid "Not available: nothing earned"
-msgstr "Niedostępne: brak zarobków"
+#, python-format
+msgid "Saved / invested %(rate)s of income"
+msgstr "Zaoszczędzono / zainwestowano %(rate)s przychodu"
 
 #, python-format
 msgid "Spent %(actual)s of %(planned)s planned"
@@ -2610,6 +2620,9 @@ msgstr "Zarobiono %(actual)s z zaplanowanych %(planned)s"
 
 msgid "(over plan)"
 msgstr "(ponad plan)"
+
+msgid "Planned"
+msgstr "Plan"
 
 msgid "Order"
 msgstr "Kolejność"
@@ -2672,9 +2685,6 @@ msgstr "Cofnij"
 
 msgid "Summary"
 msgstr "Podsumowanie"
-
-msgid "Planned"
-msgstr "Plan"
 
 msgid "Actual"
 msgstr "Wykonanie"
@@ -3118,6 +3128,71 @@ msgstr ""
 "znaczenie istniejących wersji stawek. Utwórz osobną regułę dla innego "
 "podatku."
 
+msgid "Export CSV"
+msgstr "Eksportuj CSV"
+
+msgid "Export as CSV"
+msgstr "Eksport do CSV"
+
+msgid "Close"
+msgstr "Zamknij"
+
+msgid ""
+"Downloads every entry that matches the filters, oldest first, in the "
+"columns of the workspace archive's transactions.csv. With the standard "
+"options the file can be imported again."
+msgstr ""
+"Pobiera wszystkie wpisy pasujące do filtrów, od najstarszych, w kolumnach"
+" pliku transactions.csv z archiwum przestrzeni roboczej. Przy "
+"standardowych opcjach plik można ponownie zaimportować."
+
+msgid "Delimiter"
+msgstr "Separator pól"
+
+msgid "Comma (standard)"
+msgstr "Przecinek (standardowo)"
+
+msgid "Semicolon"
+msgstr "Średnik"
+
+msgid "Decimal separator"
+msgstr "Separator dziesiętny"
+
+msgid "Dot (standard)"
+msgstr "Kropka (standardowo)"
+
+msgid "Comma"
+msgstr "Przecinek"
+
+msgid "A decimal comma needs the semicolon delimiter."
+msgstr "Przecinek dziesiętny wymaga średnika jako separatora pól."
+
+msgid ""
+"For Excel: start the file with a byte order mark, so that Excel reads it "
+"as UTF-8"
+msgstr ""
+"Dla Excela: rozpocznij plik znacznikiem kolejności bajtów (BOM), aby "
+"Excel odczytał go jako UTF-8"
+
+msgid "Protect against spreadsheet formulas"
+msgstr "Chroń przed formułami arkusza kalkulacyjnego"
+
+msgid ""
+"Puts an apostrophe before =, +, -, @ (also their full-width forms) at the"
+" start of a description or category name, after leading spaces, or after "
+"a comma or semicolon inside it, so that a spreadsheet does not run them "
+"as formulas. Such values then differ from the stored ones, and a "
+"protected description may be too long to import again."
+msgstr ""
+"Wstawia apostrof przed =, +, -, @ (także w formach pełnej szerokości) na "
+"początku opisu lub nazwy kategorii, po początkowych spacjach albo po "
+"przecinku lub średniku w ich treści, aby arkusz kalkulacyjny nie wykonał "
+"ich jako formuł. Takie wartości różnią się wtedy od zapisanych, a "
+"chroniony opis może być za długi do ponownego importu."
+
+msgid "Download CSV"
+msgstr "Pobierz CSV"
+
 msgid "Smallest amount"
 msgstr "Najmniejsza kwota"
 
@@ -3192,65 +3267,6 @@ msgid_plural "Change all %(num)d matching entries"
 msgstr[0] "Zmień %(num)d pasujący wpis"
 msgstr[1] "Zmień wszystkie %(num)d pasujące wpisy"
 msgstr[2] "Zmień wszystkie %(num)d pasujących wpisów"
-
-msgid "Export as CSV"
-msgstr "Eksport do CSV"
-
-msgid ""
-"Downloads every entry that matches the filters, oldest first, in the "
-"columns of the workspace archive's transactions.csv. With the standard "
-"options the file can be imported again."
-msgstr ""
-"Pobiera wszystkie wpisy pasujące do filtrów, od najstarszych, w kolumnach"
-" pliku transactions.csv z archiwum przestrzeni roboczej. Przy "
-"standardowych opcjach plik można ponownie zaimportować."
-
-msgid "Delimiter"
-msgstr "Separator pól"
-
-msgid "Comma (standard)"
-msgstr "Przecinek (standardowo)"
-
-msgid "Semicolon"
-msgstr "Średnik"
-
-msgid "Decimal separator"
-msgstr "Separator dziesiętny"
-
-msgid "Dot (standard)"
-msgstr "Kropka (standardowo)"
-
-msgid "Comma"
-msgstr "Przecinek"
-
-msgid "A decimal comma needs the semicolon delimiter."
-msgstr "Przecinek dziesiętny wymaga średnika jako separatora pól."
-
-msgid ""
-"For Excel: start the file with a byte order mark, so that Excel reads it "
-"as UTF-8"
-msgstr ""
-"Dla Excela: rozpocznij plik znacznikiem kolejności bajtów (BOM), aby "
-"Excel odczytał go jako UTF-8"
-
-msgid "Protect against spreadsheet formulas"
-msgstr "Chroń przed formułami arkusza kalkulacyjnego"
-
-msgid ""
-"Puts an apostrophe before =, +, -, @ (also their full-width forms) at the"
-" start of a description or category name, after leading spaces, or after "
-"a comma or semicolon inside it, so that a spreadsheet does not run them "
-"as formulas. Such values then differ from the stored ones, and a "
-"protected description may be too long to import again."
-msgstr ""
-"Wstawia apostrof przed =, +, -, @ (także w formach pełnej szerokości) na "
-"początku opisu lub nazwy kategorii, po początkowych spacjach albo po "
-"przecinku lub średniku w ich treści, aby arkusz kalkulacyjny nie wykonał "
-"ich jako formuł. Takie wartości różnią się wtedy od zapisanych, a "
-"chroniony opis może być za długi do ponownego importu."
-
-msgid "Download CSV"
-msgstr "Pobierz CSV"
 
 #, python-format
 msgid "Move %(num)d entry to %(category)s?"
@@ -3447,6 +3463,25 @@ msgstr ""
 "ustawienia osobiste. Język interfejsu zależy od Twojego konta i "
 "przeglądarki."
 
+msgid "Categories and workspaces"
+msgstr "Kategorie i obszary robocze"
+
+msgid ""
+"The income and expense categories of this workspace, their colours and "
+"their order."
+msgstr ""
+"Kategorie przychodów i wydatków tego obszaru roboczego, ich kolory i "
+"kolejność."
+
+msgid "Manage categories"
+msgstr "Zarządzaj kategoriami"
+
+msgid "A separate budget with its own members, categories and currency."
+msgstr "Osobny budżet z własnymi członkami, kategoriami i walutą."
+
+msgid "Create a workspace"
+msgstr "Utwórz obszar roboczy"
+
 msgid ""
 "Permanently removes this workspace and all its data, for every member. "
 "You confirm on the next page by typing the workspace name."
@@ -3512,6 +3547,15 @@ msgstr "Usuń obszar roboczy…"
 #~ msgid "Choose who can create workspaces."
 #~ msgstr "Wybierz, kto może tworzyć obszary robocze."
 
-#~ msgid "invalid_direction"
-#~ msgstr "Nieprawidłowy kierunek"
+#~ msgid "Saved"
+#~ msgstr "Zaoszczędzone"
+
+#~ msgid "Net"
+#~ msgstr "Bilans"
+
+#~ msgid "Savings rate"
+#~ msgstr "Stopa oszczędności"
+
+#~ msgid "Not available: nothing earned"
+#~ msgstr "Niedostępne: brak zarobków"
 

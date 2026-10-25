@@ -275,6 +275,7 @@ async def _list_page(
     bulk_values: Mapping[str, Any] | None = None,
     export_values: Mapping[str, Any] | None = None,
     export_error: str = "",
+    export_open: bool = False,
     status_code: int = 200,
 ) -> Response:
     factory = request.app.state.session_factory
@@ -322,6 +323,10 @@ async def _list_page(
         "bulk_values": bulk_values or {},
         "export_values": export_values or {"guard": FORMULA_GUARD_DEFAULT},
         "export_error": export_error,
+        # The export options are a dialog opened by the header's "Export CSV" button (app.js);
+        # without JavaScript the button links to ?export=1, which renders the dialog open.
+        "export_open": export_open or bool(export_error),
+        "export_url": _list_url(request, [*current, ("export", "1")]) + "#export-dialog",
         "max_text": MAX_SEARCH_TEXT_LENGTH,
         # Read at request time: the cap is a module constant tests may lower.
         "too_many_for_bulk": (
@@ -350,7 +355,8 @@ async def transactions_page(request: Request, ctx: CurrentContext) -> Response:
             count,
             request.state.locale,
         ) % {"num": count}
-    return await _list_page(request, ctx, raw, sort, page, notice=notice)
+    export_open = _text(params, "export", 1) == "1"
+    return await _list_page(request, ctx, raw, sort, page, notice=notice, export_open=export_open)
 
 
 # Export

@@ -41,6 +41,25 @@
     <div class="sm:col-span-2">{{ primary_button(_("Save settings")) }}</div>
   </form>
 </section>
+<section class="panel mt-6 max-w-2xl p-6 sm:p-7" aria-labelledby="workspace-more-heading" data-settings-more>
+  <h2 id="workspace-more-heading" class="text-base font-semibold">{{ _("Categories and workspaces") }}</h2>
+  <div class="mt-4 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-line bg-subtle px-4 py-3">
+    <div class="min-w-0">
+      <p class="text-sm font-medium">{{ _("Categories") }}</p>
+      <p class="text-xs text-muted">{{ _("The income and expense categories of this workspace, their colours and their order.") }}</p>
+    </div>
+    <a href="{{ scoped_url(request, 'categories') }}" data-settings-categories-link class="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Manage categories") }}</a>
+  </div>
+  {% if workspace_nav and workspace_nav.can_create_workspace %}
+  <div class="mt-3 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-line bg-subtle px-4 py-3">
+    <div class="min-w-0">
+      <p class="text-sm font-medium">{{ _("New workspace") }}</p>
+      <p class="text-xs text-muted">{{ _("A separate budget with its own members, categories and currency.") }}</p>
+    </div>
+    <a href="{{ scoped_url(request, 'workspace_new') }}" data-settings-new-workspace-link class="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Create a workspace") }}</a>
+  </div>
+  {% endif %}
+</section>
 <section class="panel mt-6 max-w-2xl border-danger-line p-6 sm:p-7" aria-labelledby="danger-zone-heading" data-danger-zone>
   <h2 id="danger-zone-heading" class="text-base font-semibold text-danger-strong">{{ _("Delete workspace") }}</h2>
   <p class="mt-2 text-sm text-muted">{{ _("Permanently removes this workspace and all its data, for every member. You confirm on the next page by typing the workspace name.") }}</p>

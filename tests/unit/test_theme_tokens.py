@@ -25,6 +25,13 @@ CSS_TEXT_PAIRS = {
     ("muted", "field"),  # placeholders, disabled controls
     ("muted", "subtle"),  # disabled controls
     ("inverse-link", "inverse"),  # the toast's undo button sits on the toast's background
+    # A month summary row above plan is tinted (months/_plan.html, plan_row); its texts are
+    # in other class attributes than the tint.
+    *(
+        (fg, bg)
+        for fg in ("ink", "muted", "danger", "success-strong", "primary-ink")
+        for bg in ("danger-tint", "success-tint")
+    ),
 }
 # Text with no background of its own sits on the page or on a card (.panel).
 INHERITED_BACKGROUNDS = ("canvas", "surface")

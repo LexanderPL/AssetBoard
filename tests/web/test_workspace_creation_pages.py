@@ -210,7 +210,7 @@ def test_a_temporary_password_must_be_changed_first(owner: OwnerApp) -> None:
 # The switcher link
 
 
-def test_the_page_header_offers_a_new_workspace(owner: OwnerApp) -> None:
+def test_the_user_menu_offers_a_new_workspace(owner: OwnerApp) -> None:
     bea = owner.add_user("bea")
     owner.join(bea, owner.home_id, "editor")
     with signed_in_as(owner, "bea") as client:
@@ -220,6 +220,15 @@ def test_the_page_header_offers_a_new_workspace(owner: OwnerApp) -> None:
         assert "data-workspace-switcher" in page and "data-new-workspace-link" in page
         _set_allowed(owner, False)
         assert "data-new-workspace-link" not in client.get("/").text
+
+
+def test_the_new_workspace_link_left_the_header_for_the_menu_and_settings(owner: OwnerApp) -> None:
+    page = owner.client.get("/").text
+    header = page[page.index("<header") : page.index("</header>")]
+    menu = page[page.index("data-user-menu") : page.index("</details>")]
+    assert "data-new-workspace-link" not in header and "data-new-workspace-link" in menu
+    settings = owner.client.get("/workspace/settings").text
+    assert "data-settings-new-workspace-link" in settings
 
 
 # The instance setting (administrators)

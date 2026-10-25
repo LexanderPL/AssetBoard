@@ -1,6 +1,6 @@
 """The month summary block (F2.3 part B, F2.4): view models and messages.
 
-The block is ``#month-summary`` (``months/_summary.html``): KPI cards, planned-vs-actual bars
+The block is ``#month-summary`` (``months/_summary.html``): the KPI flow bar, planned-vs-actual bars
 and one row per category in the summary's groups (expenses, saved / invested, income, withdrawn
 from savings, and the plan-only "Transfers (not counted)" while such lines exist), each with its
 planned value (F2.3: editable inline for editors and owners while the month is open), actual and
@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.domain.categories import Treatment
 from assetboard.domain.money import Money
-from assetboard.domain.summary import SortOrder
+from assetboard.domain.summary import FLOW_SCALE, FlowBar, SortOrder, flow_bar
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_month_after_from
 from assetboard.i18n.numbers import format_amount_input, format_money, format_rate_tenths
@@ -94,6 +94,9 @@ class PlanRowView:
     actual: str = ""  # "" for the plan-only transfer group
     difference: str = ""
     tone: str = ""  # "favourable", "unfavourable" or "even" (for the difference)
+    # Actual above plan: "danger" for an expense category, "success" for an income one (the
+    # row's background tint); "" otherwise, and for the other groups.
+    over: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -119,7 +122,10 @@ class KpiView:
     saved: str
     net: str
     net_tone: str
-    savings_rate: str | None  # None: nothing earned ("—")
+    savings_rate: str | None  # None: nothing earned (no caption)
+    overspend: str | None = None  # spending and saving above earnings (-net), else None
+    flow: FlowBar = FlowBar(0, 0, 0)  # positions on 0..flow_scale (domain.summary.flow_bar)
+    flow_scale: int = FLOW_SCALE
 
 
 @dataclass(frozen=True, slots=True)
@@ -130,6 +136,7 @@ class BarView:
     planned_width: int  # 0-100, of max(planned, actual)
     actual_width: int
     over: bool  # actual above planned
+    has_plan: bool = True  # a planned amount above 0 (the bar shows its marker)
 
 
 @dataclass(frozen=True, slots=True)
@@ -182,7 +189,12 @@ def _bar(key: str, planned: Money, actual: Money, locale: str) -> BarView:
         planned_width=_width(planned.amount_minor, scale),
         actual_width=_width(actual.amount_minor, scale),
         over=actual.amount_minor > planned.amount_minor,
+        has_plan=planned.amount_minor > 0,
     )
+
+
+# The blocks whose rows are tinted when their actual is above plan, and the tint.
+OVER_PLAN_TINT = {"expense": "danger", "income": "success"}
 
 
 def build_summary(
@@ -247,6 +259,9 @@ def build_summary(
                 actual=format_money(r.actual, locale),
                 difference=_signed(r.difference, locale),
                 tone=_tone(r.difference),
+                over=OVER_PLAN_TINT.get(block.key, "")
+                if r.actual.amount_minor > r.planned.amount_minor
+                else "",
             )
             for r in block.rows
         )
@@ -273,6 +288,10 @@ def build_summary(
         net=format_money(kpis.net, locale),
         net_tone=_tone(kpis.net),
         savings_rate=format_rate_tenths(rate, locale) if rate is not None else None,
+        overspend=format_money(Money(-kpis.net.amount_minor, kpis.net.currency), locale)
+        if kpis.net.amount_minor < 0
+        else None,
+        flow=flow_bar(kpis.earned.amount_minor, kpis.spent.amount_minor, kpis.saved.amount_minor),
     )
     expense, income = summary.block("expense"), summary.block("income")
     bars = (

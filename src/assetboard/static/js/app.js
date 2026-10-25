@@ -149,6 +149,46 @@ document.addEventListener("submit", (event) => {
   });
 });
 
+// Dialogs marked data-dialog-modal (the transaction export): a link marked
+// data-dialog-open="<id>" opens one as a modal, a link marked data-dialog-close inside closes
+// it. Both are links, so without JavaScript they load a page that renders the dialog open (in
+// the page flow) or closed. A dialog the server rendered open becomes a modal here; a submitted
+// form inside one closes it (a download leaves the page as it is).
+function openModalDialog(dialog) {
+  if (!(dialog instanceof HTMLDialogElement) || !dialog.hasAttribute("data-dialog-modal")) {
+    return false;
+  }
+  if (dialog.open) dialog.close();
+  dialog.showModal();
+  return true;
+}
+
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const opener = target.closest("[data-dialog-open]");
+  if (opener) {
+    const dialog = document.getElementById(opener.getAttribute("data-dialog-open") || "");
+    if (openModalDialog(dialog)) event.preventDefault();
+    return;
+  }
+  const closer = target.closest("[data-dialog-close]");
+  const dialog = closer?.closest("dialog[data-dialog-modal]");
+  if (dialog instanceof HTMLDialogElement && dialog.open) {
+    event.preventDefault();
+    dialog.close();
+  }
+});
+
+document.addEventListener("submit", (event) => {
+  const form = event.target;
+  if (!(form instanceof HTMLFormElement)) return;
+  const dialog = form.closest("dialog[data-dialog-modal]");
+  if (dialog instanceof HTMLDialogElement) window.setTimeout(() => dialog.close(), 0);
+});
+
+document.querySelectorAll("dialog[data-dialog-modal][open]").forEach(openModalDialog);
+
 // HTMX requests carry the CSRF token in a header; plain forms use their hidden input.
 document.addEventListener("htmx:configRequest", (event) => {
   const meta = document.querySelector('meta[name="csrf-token"]');
@@ -157,12 +197,23 @@ document.addEventListener("htmx:configRequest", (event) => {
   }
 });
 
-// Selects marked data-autosubmit submit their form on change (the button stays for no-JS use).
+// Fields marked data-autosubmit submit their form on change; their submit button sits in
+// <noscript>, for use without JavaScript. A month field submits only a complete month in its
+// min-max range that differs from the shown one (keyboard entry changes it segment by segment);
+// where the browser shows a text box instead (10.2026), a changed, non-empty value submits.
 document.addEventListener("change", (event) => {
   const target = event.target;
-  if (target instanceof HTMLSelectElement && target.hasAttribute("data-autosubmit")) {
-    target.form?.requestSubmit();
+  if (!(target instanceof HTMLSelectElement || target instanceof HTMLInputElement)) return;
+  if (!target.hasAttribute("data-autosubmit")) return;
+  if (target instanceof HTMLInputElement) {
+    const value = target.value.trim();
+    if (!value || value === target.defaultValue) return;
+    if (target.type === "month") {
+      if (!/^\d{4}-\d{2}$/.test(value)) return;
+      if ((target.min && value < target.min) || (target.max && value > target.max)) return;
+    }
   }
+  target.form?.requestSubmit();
 });
 
 // Buttons marked data-copy-target copy the referenced input's value (invitation links).

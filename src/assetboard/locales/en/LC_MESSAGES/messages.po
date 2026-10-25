@@ -1605,6 +1605,9 @@ msgstr ""
 msgid "Audit log: workspace"
 msgstr ""
 
+msgid "New workspace"
+msgstr ""
+
 msgid "Users"
 msgstr ""
 
@@ -1633,9 +1636,6 @@ msgid "Workspace"
 msgstr ""
 
 msgid "Switch"
-msgstr ""
-
-msgid "New workspace"
 msgstr ""
 
 msgid "Are you sure?"
@@ -2382,19 +2382,27 @@ msgstr ""
 msgid "Total"
 msgstr ""
 
+#, python-format
+msgid ""
+"Earned %(earned)s: spent %(spent)s, saved or invested %(saved)s, left "
+"%(net)s."
+msgstr ""
+
+#, python-format
+msgid "Spending and saving exceed earnings by %(amount)s."
+msgstr ""
+
 msgid "Earned"
 msgstr ""
 
 msgid "Spent"
 msgstr ""
 
-msgid "Saved"
+msgid "Left"
 msgstr ""
 
-msgid "Savings rate"
-msgstr ""
-
-msgid "Not available: nothing earned"
+#, python-format
+msgid "Saved / invested %(rate)s of income"
 msgstr ""
 
 #, python-format
@@ -2406,6 +2414,9 @@ msgid "Earned %(actual)s of %(planned)s planned"
 msgstr ""
 
 msgid "(over plan)"
+msgstr ""
+
+msgid "Planned"
 msgstr ""
 
 msgid "Order"
@@ -2451,9 +2462,6 @@ msgid "Undo"
 msgstr ""
 
 msgid "Summary"
-msgstr ""
-
-msgid "Planned"
 msgstr ""
 
 msgid "Actual"
@@ -2872,6 +2880,61 @@ msgid ""
 " existing rate versions. Create a separate rule to model a different tax."
 msgstr ""
 
+msgid "Export CSV"
+msgstr ""
+
+msgid "Export as CSV"
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid ""
+"Downloads every entry that matches the filters, oldest first, in the "
+"columns of the workspace archive's transactions.csv. With the standard "
+"options the file can be imported again."
+msgstr ""
+
+msgid "Delimiter"
+msgstr ""
+
+msgid "Comma (standard)"
+msgstr ""
+
+msgid "Semicolon"
+msgstr ""
+
+msgid "Decimal separator"
+msgstr ""
+
+msgid "Dot (standard)"
+msgstr ""
+
+msgid "Comma"
+msgstr ""
+
+msgid "A decimal comma needs the semicolon delimiter."
+msgstr ""
+
+msgid ""
+"For Excel: start the file with a byte order mark, so that Excel reads it "
+"as UTF-8"
+msgstr ""
+
+msgid "Protect against spreadsheet formulas"
+msgstr ""
+
+msgid ""
+"Puts an apostrophe before =, +, -, @ (also their full-width forms) at the"
+" start of a description or category name, after leading spaces, or after "
+"a comma or semicolon inside it, so that a spreadsheet does not run them "
+"as formulas. Such values then differ from the stored ones, and a "
+"protected description may be too long to import again."
+msgstr ""
+
+msgid "Download CSV"
+msgstr ""
+
 msgid "Smallest amount"
 msgstr ""
 
@@ -2942,55 +3005,6 @@ msgid "Change all %(num)d matching entry"
 msgid_plural "Change all %(num)d matching entries"
 msgstr[0] ""
 msgstr[1] ""
-
-msgid "Export as CSV"
-msgstr ""
-
-msgid ""
-"Downloads every entry that matches the filters, oldest first, in the "
-"columns of the workspace archive's transactions.csv. With the standard "
-"options the file can be imported again."
-msgstr ""
-
-msgid "Delimiter"
-msgstr ""
-
-msgid "Comma (standard)"
-msgstr ""
-
-msgid "Semicolon"
-msgstr ""
-
-msgid "Decimal separator"
-msgstr ""
-
-msgid "Dot (standard)"
-msgstr ""
-
-msgid "Comma"
-msgstr ""
-
-msgid "A decimal comma needs the semicolon delimiter."
-msgstr ""
-
-msgid ""
-"For Excel: start the file with a byte order mark, so that Excel reads it "
-"as UTF-8"
-msgstr ""
-
-msgid "Protect against spreadsheet formulas"
-msgstr ""
-
-msgid ""
-"Puts an apostrophe before =, +, -, @ (also their full-width forms) at the"
-" start of a description or category name, after leading spaces, or after "
-"a comma or semicolon inside it, so that a spreadsheet does not run them "
-"as formulas. Such values then differ from the stored ones, and a "
-"protected description may be too long to import again."
-msgstr ""
-
-msgid "Download CSV"
-msgstr ""
 
 #, python-format
 msgid "Move %(num)d entry to %(category)s?"
@@ -3158,6 +3172,23 @@ msgid ""
 "browser."
 msgstr ""
 
+msgid "Categories and workspaces"
+msgstr ""
+
+msgid ""
+"The income and expense categories of this workspace, their colours and "
+"their order."
+msgstr ""
+
+msgid "Manage categories"
+msgstr ""
+
+msgid "A separate budget with its own members, categories and currency."
+msgstr ""
+
+msgid "Create a workspace"
+msgstr ""
+
 msgid ""
 "Permanently removes this workspace and all its data, for every member. "
 "You confirm on the next page by typing the workspace name."
@@ -3275,15 +3306,18 @@ msgstr ""
 #~ " amounts are stored in this currency."
 #~ msgstr ""
 
-#~ msgid "Enter a non-negative whole-number rate in basis points."
+#~ msgid "Saved"
 #~ msgstr ""
 
-#~ msgid "Percent (basis points)"
+#~ msgid "Net"
 #~ msgstr ""
 
-#~ msgid "Rate in basis points"
+#~ msgid "Savings rate"
 #~ msgstr ""
 
-#~ msgid "invalid_direction"
+#~ msgid "Not available: nothing earned"
+#~ msgstr ""
+
+#~ msgid "Saved %(rate)s of income"
 #~ msgstr ""
 

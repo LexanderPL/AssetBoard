@@ -95,6 +95,7 @@ def test_self_service_workspaces_in_a_browser(tmp_path: Path) -> None:
             page.get_by_role("button", name="Create workspace").click()
             page.wait_for_url(f"{base}/")
             expect(page.locator("[data-current-workspace]")).to_have_text("Bea's budget")
+            page.locator("[data-user-menu] summary").click()  # Categories sit in the user menu
             page.locator("[data-categories-link]").click()
             page.wait_for_url(f"{base}/categories")
             expense = page.locator('[data-section="expense"] [data-category-name]')

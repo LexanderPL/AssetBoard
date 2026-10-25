@@ -167,6 +167,17 @@ def test_f26_search_export_and_bulk_change_in_a_browser(tmp_path: Path) -> None:
 
             # Export the filtered rows with semicolons and a decimal comma.
             page.goto(f"{base}/transactions?min=4.2&max=12.5")
+            # The options sit in a dialog behind the header's "Export CSV" button.
+            expect(page.get_by_label("Delimiter")).to_be_hidden()
+            page.locator("[data-export-open]").click()
+            expect(page.locator("#export-dialog")).to_have_attribute("open", "")
+            assert page.evaluate("document.querySelector('#export-dialog').matches(':modal')")
+            page.keyboard.press("Escape")
+            expect(page.get_by_label("Delimiter")).to_be_hidden()
+            page.locator("[data-export-open]").click()
+            page.locator("#export-dialog [data-dialog-close]").click()
+            expect(page.get_by_label("Delimiter")).to_be_hidden()
+            page.locator("[data-export-open]").click()
             page.get_by_label("Delimiter").select_option("semicolon")
             page.get_by_label("Decimal separator").select_option("comma")
             with page.expect_download() as caught:
@@ -181,11 +192,14 @@ def test_f26_search_export_and_bulk_change_in_a_browser(tmp_path: Path) -> None:
             assert lines[3:] == [""]
             # A decimal comma with commas is refused on the page.
             page.goto(f"{base}/transactions")
+            page.locator("[data-export-open]").click()
             page.get_by_label("Decimal separator").select_option("comma")
             page.get_by_role("button", name="Download CSV").click()
             expect(page.locator("[data-export-error]")).to_contain_text(
                 "A decimal comma needs the semicolon delimiter"
             )
+            # The page with the error opens the dialog again, as a modal.
+            assert page.evaluate("document.querySelector('#export-dialog').matches(':modal')")
 
             # Bulk change: tick two entries, review, confirm.
             page.goto(f"{base}/transactions?min=4.2&max=12.5")
@@ -243,6 +257,7 @@ def test_f26_search_export_and_bulk_change_in_a_browser(tmp_path: Path) -> None:
             viewer_page.goto(f"{base}/transactions")
             expect(viewer_page.locator("[data-result-count]")).to_have_text("1–50 of 56 entries")
             expect(viewer_page.locator("[data-bulk], input[name=ids]")).to_have_count(0)
+            viewer_page.locator("[data-export-open]").click()
             with viewer_page.expect_download() as caught:
                 viewer_page.get_by_role("button", name="Download CSV").click()
             assert Path(caught.value.path()).read_bytes().count(b"\r\n") == 57

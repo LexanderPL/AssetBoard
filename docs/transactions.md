@@ -91,7 +91,8 @@ closed months are marked "closed". Deleted entries are never listed.
 
 ## Exporting as CSV
 
-**Download CSV** saves every entry that matches the filters (not only the current page), oldest
+**Export CSV** at the top of the page opens the export options; **Download CSV** there saves
+every entry that matches the filters (not only the current page), oldest
 first. The file has the columns of `transactions.csv` in the workspace archive:
 `date,direction,amount,currency,category,description,category_id,id`. Dates are `YYYY-MM-DD`,
 directions are `expense` or `income`, and amounts are plain numbers with the currency's
