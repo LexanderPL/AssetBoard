@@ -693,7 +693,7 @@ current order.
 - CSP header unchanged; no rendered page contains a `<script>` element with inline code other
   than `type="application/json"` data (template test).
 
-**Decided (owner, 2026-10-25)**
+**Decided (2026-10-25)**
 1. **Transactions URL:** `/transactions/YYYY-MM` (mirrors `/m/YYYY-MM`); filtered
    `/transactions?…` links redirect to History.
 2. **No KPI line on the Transactions page:** it is for entry only.
