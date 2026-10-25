@@ -1125,15 +1125,12 @@ def _valid_day_units(units: Decimal) -> Decimal:
     return units
 
 
-type _DayChange = Callable[[WorkDayRepository, dict[date, WorkDay], set[date]], None]
-
-
 def _change_work_days(
     factory: sessionmaker[Session],
     ctx: Context,
     source_id: UUID,
     month: date,
-    change: _DayChange,
+    change: Callable[[WorkDayRepository, dict[date, WorkDay], set[date]], None],
     action: str,
 ) -> bool:
     """Apply ``change`` to one month's day entries, then derive the month's work log and
