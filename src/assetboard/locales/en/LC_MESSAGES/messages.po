@@ -1136,6 +1136,14 @@ msgid "Archived income sources cannot be changed."
 msgstr ""
 
 msgid ""
+"This month's units come from the work calendar. Change the days in the "
+"calendar."
+msgstr ""
+
+msgid "Enter a number of units above 0 and at most 24."
+msgstr ""
+
+msgid ""
 "The work log was saved; posted income was not changed. Adjust its "
 "transaction manually if needed."
 msgstr ""
@@ -2634,6 +2642,89 @@ msgstr ""
 msgid "Every selected entry is already in this category; nothing would change."
 msgstr ""
 
+msgid "Calendar months"
+msgstr ""
+
+msgid "Previous month"
+msgstr ""
+
+msgid "Next month"
+msgstr ""
+
+#, python-format
+msgid "Month total: %(units)s (%(unit)s)"
+msgstr ""
+
+msgid ""
+"The month's work log is the sum of these days; change it here, not in the"
+" month form."
+msgstr ""
+
+#, python-format
+msgid ""
+"This month has a manual work log of %(units)s. Marking a day replaces it "
+"with the sum of the days."
+msgstr ""
+
+msgid "No days marked. The month keeps its month-level work log or estimate."
+msgstr ""
+
+#, python-format
+msgid "Days of %(month)s"
+msgstr ""
+
+msgid "holiday"
+msgstr ""
+
+msgid "weekend"
+msgstr ""
+
+#, python-format
+msgid "%(units)s %(unit)s"
+msgstr ""
+
+msgid "Holiday"
+msgstr ""
+
+msgid "Legend"
+msgstr ""
+
+msgid "Worked"
+msgstr ""
+
+msgid "Weekend"
+msgstr ""
+
+msgid "Fill working days"
+msgstr ""
+
+#, python-format
+msgid ""
+"Clear every day of %(month)s? The month work log made from them is "
+"removed too."
+msgstr ""
+
+msgid "Clear month"
+msgstr ""
+
+msgid "Day values"
+msgstr ""
+
+msgid ""
+"A marked day counts 1 by default; enter a half day (0.5) or hours "
+"instead, up to 24."
+msgstr ""
+
+msgid "Work calendar"
+msgstr ""
+
+#, python-format
+msgid "Work calendar: %(name)s"
+msgstr ""
+
+msgid "Back to income sources"
+msgstr ""
+
 msgid "New income source"
 msgstr ""
 
@@ -2760,7 +2851,13 @@ msgstr ""
 msgid "Work logs"
 msgstr ""
 
+msgid "from the work calendar"
+msgstr ""
+
 msgid "No work logs yet."
+msgstr ""
+
+msgid "Open the work calendar"
 msgstr ""
 
 msgid "Work month"
@@ -2771,6 +2868,11 @@ msgid "Units worked (%(unit)s)"
 msgstr ""
 
 msgid "Save work log"
+msgstr ""
+
+msgid ""
+"Months with days marked in the work calendar are read-only here: their "
+"units are the sum of the days."
 msgstr ""
 
 msgid "Attached tax rules"
