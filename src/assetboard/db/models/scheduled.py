@@ -20,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from assetboard.db.base import Base, IdMixin, TimestampMixin, WorkspaceScopedMixin
 from assetboard.db.types import UtcDateTime
+from assetboard.domain.notifications import MAX_LEAD_DAYS
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR
 
 
@@ -41,6 +42,10 @@ class ScheduledItem(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         CheckConstraint("interval >= 1", name="interval_valid"),
         CheckConstraint("max_count IS NULL OR max_count >= 1", name="max_count_valid"),
         CheckConstraint("end_date IS NULL OR end_date >= start_date", name="end_date_valid"),
+        CheckConstraint(
+            f"reminder_lead_days IS NULL OR reminder_lead_days BETWEEN 0 AND {MAX_LEAD_DAYS}",
+            name="reminder_lead_days_valid",
+        ),
         CheckConstraint(
             "weekend_policy IN ('none', 'previous_working_day', 'next_working_day')",
             name="weekend_policy_valid",
@@ -65,6 +70,8 @@ class ScheduledItem(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     weekend_policy: Mapped[str] = mapped_column(String(24), nullable=False)
     notes: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     auto_post: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=False)
+    # Days before the due date to send a reminder (F3.6); None: the channel's default.
+    reminder_lead_days: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     paused_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 

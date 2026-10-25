@@ -675,6 +675,38 @@ msgstr ""
 msgid "Test email from %(app)s"
 msgstr ""
 
+#, python-format
+msgid "Enter days worked for %(month)s for %(name)s."
+msgstr ""
+
+#, python-format
+msgid "Overdue since %(date)s: %(label)s"
+msgstr ""
+
+#, python-format
+msgid "Due today: %(label)s"
+msgstr ""
+
+#, python-format
+msgid "Due %(date)s: %(label)s"
+msgstr ""
+
+#, python-format
+msgid "%(app)s · %(workspace)s: %(num)d reminder"
+msgid_plural "%(app)s · %(workspace)s: %(num)d reminders"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "%(app)s · %(workspace)s: test"
+msgstr ""
+
+#, python-format
+msgid ""
+"This is a test message from %(app)s. Reminders will arrive on this "
+"channel."
+msgstr ""
+
 msgid "Same as the system"
 msgstr ""
 
@@ -1262,6 +1294,84 @@ msgstr ""
 msgid "Entry saved in %(month)s."
 msgstr ""
 
+msgid "Enter a name of up to 100 characters."
+msgstr ""
+
+msgid "Enter one valid Apprise URL, such as ntfys://ntfy.sh/your-topic."
+msgstr ""
+
+msgid "This kind of URL is not allowed on this server."
+msgstr ""
+
+msgid "Choose one digest a day or one message per reminder."
+msgstr ""
+
+msgid "Enter a number of days from 0 to 60."
+msgstr ""
+
+msgid "Enter a time such as 08:00."
+msgstr ""
+
+msgid "You have reached the limit of 10 channels in this workspace."
+msgstr ""
+
+#, fuzzy
+msgid "Too many test messages. Try again in a few minutes."
+msgstr ""
+
+msgid "The administrator has turned notifications off on this server."
+msgstr ""
+
+msgid ""
+"The saved URL can no longer be read (the server's secret key changed). "
+"Enter the URL again."
+msgstr ""
+
+msgid "The service did not answer in time."
+msgstr ""
+
+msgid "The service refused the message or could not be reached."
+msgstr ""
+
+msgid "The daily run ran out of time; the next daily run retries it."
+msgstr ""
+
+msgid "The last delivery was interrupted; the next daily run retries it."
+msgstr ""
+
+msgid "The channel could not be saved. Check the form and try again."
+msgstr ""
+
+msgid "Channel saved. Send a test message to check it."
+msgstr ""
+
+msgid "Channel saved."
+msgstr ""
+
+msgid "Channel deleted."
+msgstr ""
+
+msgid "Test message sent. Check your device."
+msgstr ""
+
+msgid "Due soon"
+msgstr ""
+
+msgid "Overdue"
+msgstr ""
+
+msgid "Work log"
+msgstr ""
+
+msgid "Sent"
+msgstr ""
+
+msgid "Failed"
+msgstr ""
+
+msgid "Sending"
+msgstr ""
+
 msgid ""
 "This sign-in expired, or another sign-in was started in a different tab. "
 "Start over."
@@ -1382,6 +1492,9 @@ msgstr ""
 msgid ""
 "Holiday adjustments need a workspace country with holiday data, or no "
 "country."
+msgstr ""
+
+msgid "Enter a number of days from 0 to 60, or leave it empty."
 msgstr ""
 
 msgid "This recurring item is archived and cannot change."
@@ -1685,6 +1798,9 @@ msgstr ""
 msgid "Audit log: instance"
 msgstr ""
 
+msgid "Notifications"
+msgstr ""
+
 msgid "Profile"
 msgstr ""
 
@@ -1731,9 +1847,6 @@ msgid "All upcoming items"
 msgstr ""
 
 msgid "Estimate"
-msgstr ""
-
-msgid "Overdue"
 msgstr ""
 
 msgid "Mark paid or received"
@@ -2924,10 +3037,6 @@ msgstr ""
 msgid "Enter transactions"
 msgstr ""
 
-#, python-format
-msgid "Enter days worked for %(month)s for %(name)s."
-msgstr ""
-
 msgid "This month is closed. Its entries and planned values are read-only."
 msgstr ""
 
@@ -2964,6 +3073,113 @@ msgstr ""
 msgid "Future months stay open for planning."
 msgstr ""
 
+msgid "Apprise URL"
+msgstr ""
+
+#, python-format
+msgid "Saved: %(url)s (%(service)s). Leave empty to keep it."
+msgstr ""
+
+msgid ""
+"For example ntfys://ntfy.sh/your-topic or tgram://bot-token/chat-id. It "
+"is stored encrypted and never shown again."
+msgstr ""
+
+msgid "Delivery"
+msgstr ""
+
+msgid "One digest a day"
+msgstr ""
+
+msgid "One message per reminder"
+msgstr ""
+
+msgid "Daily at"
+msgstr ""
+
+#, python-format
+msgid "In the workspace time zone (%(zone)s)."
+msgstr ""
+
+msgid "Remind days before the due date"
+msgstr ""
+
+msgid "Recurring items can set their own number of days."
+msgstr ""
+
+msgid "Remind me about"
+msgstr ""
+
+msgid "Items due soon"
+msgstr ""
+
+msgid "Overdue items (once a day, up to 7 times)"
+msgstr ""
+
+msgid "Entering days worked"
+msgstr ""
+
+msgid "Include amounts"
+msgstr ""
+
+msgid ""
+"Messages pass through the service you choose and any push or mail servers"
+" on the way. Without this option they name the item and its date, but no "
+"amounts."
+msgstr ""
+
+msgid "Enabled"
+msgstr ""
+
+msgid ""
+"Reminders for this workspace reach you through Apprise: ntfy, Gotify, "
+"Telegram, email and many other services. Your channels are yours alone; "
+"other members never see them."
+msgstr ""
+
+msgid ""
+"The administrator has turned notifications off on this server. Channels "
+"are kept, but nothing is sent."
+msgstr ""
+
+msgid "Disabled"
+msgstr ""
+
+msgid "Send test"
+msgstr ""
+
+#, python-format
+msgid "Delete the channel %(name)s?"
+msgstr ""
+
+msgid "Edit channel"
+msgstr ""
+
+msgid "Save channel"
+msgstr ""
+
+msgid "No notification channels yet."
+msgstr ""
+
+msgid "New channel"
+msgstr ""
+
+#, python-format
+msgid "Allowed services on this server: %(schemes)s."
+msgstr ""
+
+msgid "Add channel"
+msgstr ""
+
+msgid "Recent deliveries"
+msgstr ""
+
+msgid "Channel"
+msgstr ""
+
+msgid "Reminder"
+msgstr ""
+
 msgid "Recurring item"
 msgstr ""
 
@@ -2986,6 +3202,12 @@ msgid "Amount type"
 msgstr ""
 
 msgid "Automatically post on the due date"
+msgstr ""
+
+msgid "Reminder: days before the due date (optional)"
+msgstr ""
+
+msgid "Leave empty to use the default of each notification channel."
 msgstr ""
 
 msgid "Start date"
@@ -3102,6 +3324,9 @@ msgid "Choose valid recurrence dates to see the preview."
 msgstr ""
 
 msgid "No more occurrences match this rule."
+msgstr ""
+
+msgid "Reminders by notification"
 msgstr ""
 
 msgid "Occurrence marked paid or received."

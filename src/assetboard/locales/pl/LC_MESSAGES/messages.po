@@ -678,6 +678,43 @@ msgstr "W sprawie hasła do %(app)s"
 msgid "Test email from %(app)s"
 msgstr "Testowy e-mail z %(app)s"
 
+#, python-format
+msgid "Enter days worked for %(month)s for %(name)s."
+msgstr ""
+"Wprowadź liczbę przepracowanych dni w miesiącu %(month)s dla źródła "
+"%(name)s."
+
+#, python-format
+msgid "Overdue since %(date)s: %(label)s"
+msgstr "Zaległe od %(date)s: %(label)s"
+
+#, python-format
+msgid "Due today: %(label)s"
+msgstr "Termin dziś: %(label)s"
+
+#, python-format
+msgid "Due %(date)s: %(label)s"
+msgstr "Termin %(date)s: %(label)s"
+
+#, python-format
+msgid "%(app)s · %(workspace)s: %(num)d reminder"
+msgid_plural "%(app)s · %(workspace)s: %(num)d reminders"
+msgstr[0] "%(app)s · %(workspace)s: %(num)d przypomnienie"
+msgstr[1] "%(app)s · %(workspace)s: %(num)d przypomnienia"
+msgstr[2] "%(app)s · %(workspace)s: %(num)d przypomnień"
+
+#, python-format
+msgid "%(app)s · %(workspace)s: test"
+msgstr "%(app)s · %(workspace)s: test"
+
+#, python-format
+msgid ""
+"This is a test message from %(app)s. Reminders will arrive on this "
+"channel."
+msgstr ""
+"To wiadomość testowa z %(app)s. Przypomnienia będą przychodzić na ten "
+"kanał."
+
 msgid "Same as the system"
 msgstr "Jak w systemie"
 
@@ -1333,6 +1370,91 @@ msgstr "Usunięto wartość planowaną."
 msgid "Entry saved in %(month)s."
 msgstr "Wpis zapisano w miesiącu: %(month)s."
 
+msgid "Enter a name of up to 100 characters."
+msgstr "Podaj nazwę o długości do 100 znaków."
+
+msgid "Enter one valid Apprise URL, such as ntfys://ntfy.sh/your-topic."
+msgstr ""
+"Podaj jeden prawidłowy adres URL Apprise, na przykład ntfys://ntfy.sh"
+"/twoj-temat."
+
+msgid "This kind of URL is not allowed on this server."
+msgstr "Ten rodzaj adresu URL jest niedozwolony na tym serwerze."
+
+msgid "Choose one digest a day or one message per reminder."
+msgstr "Wybierz jedno podsumowanie dziennie albo jedną wiadomość na przypomnienie."
+
+msgid "Enter a number of days from 0 to 60."
+msgstr "Podaj liczbę dni od 0 do 60."
+
+msgid "Enter a time such as 08:00."
+msgstr "Podaj godzinę, na przykład 08:00."
+
+msgid "You have reached the limit of 10 channels in this workspace."
+msgstr "Osiągnięto limit 10 kanałów w tym obszarze roboczym."
+
+msgid "Too many test messages. Try again in a few minutes."
+msgstr "Zbyt wiele wiadomości testowych. Spróbuj ponownie za kilka minut."
+
+msgid "The administrator has turned notifications off on this server."
+msgstr "Administrator wyłączył powiadomienia na tym serwerze."
+
+msgid ""
+"The saved URL can no longer be read (the server's secret key changed). "
+"Enter the URL again."
+msgstr ""
+"Zapisanego adresu URL nie da się już odczytać (zmienił się tajny klucz "
+"serwera). Podaj adres URL ponownie."
+
+msgid "The service did not answer in time."
+msgstr "Usługa nie odpowiedziała na czas."
+
+msgid "The service refused the message or could not be reached."
+msgstr "Usługa odrzuciła wiadomość albo nie udało się z nią połączyć."
+
+msgid "The daily run ran out of time; the next daily run retries it."
+msgstr ""
+"Dzienne uruchomienie nie zdążyło; następne dzienne uruchomienie ponowi "
+"wysyłkę."
+
+msgid "The last delivery was interrupted; the next daily run retries it."
+msgstr ""
+"Ostatnie doręczenie zostało przerwane; następne codzienne uruchomienie "
+"ponowi próbę."
+
+msgid "The channel could not be saved. Check the form and try again."
+msgstr "Nie udało się zapisać kanału. Sprawdź formularz i spróbuj ponownie."
+
+msgid "Channel saved. Send a test message to check it."
+msgstr "Zapisano kanał. Wyślij wiadomość testową, aby go sprawdzić."
+
+msgid "Channel saved."
+msgstr "Zapisano kanał."
+
+msgid "Channel deleted."
+msgstr "Usunięto kanał."
+
+msgid "Test message sent. Check your device."
+msgstr "Wysłano wiadomość testową. Sprawdź swoje urządzenie."
+
+msgid "Due soon"
+msgstr "Wkrótce termin"
+
+msgid "Overdue"
+msgstr "Zaległe"
+
+msgid "Work log"
+msgstr "Dziennik pracy"
+
+msgid "Sent"
+msgstr "Wysłano"
+
+msgid "Failed"
+msgstr "Niepowodzenie"
+
+msgid "Sending"
+msgstr "Wysyłanie"
+
 msgid ""
 "This sign-in expired, or another sign-in was started in a different tab. "
 "Start over."
@@ -1483,6 +1605,9 @@ msgid ""
 msgstr ""
 "Przesuwanie dat o święta wymaga kraju obszaru roboczego z danymi o "
 "świętach albo braku kraju."
+
+msgid "Enter a number of days from 0 to 60, or leave it empty."
+msgstr "Podaj liczbę dni od 0 do 60 albo pozostaw pole puste."
 
 msgid "This recurring item is archived and cannot change."
 msgstr "Ta pozycja cykliczna jest zarchiwizowana i nie można jej zmienić."
@@ -1821,6 +1946,9 @@ msgstr "Użytkownicy"
 msgid "Audit log: instance"
 msgstr "Dziennik zdarzeń: instancja"
 
+msgid "Notifications"
+msgstr "Powiadomienia"
+
 msgid "Profile"
 msgstr "Profil"
 
@@ -1868,9 +1996,6 @@ msgstr "Wszystkie nadchodzące pozycje"
 
 msgid "Estimate"
 msgstr "Szacunkowa"
-
-msgid "Overdue"
-msgstr "Zaległe"
 
 msgid "Mark paid or received"
 msgstr "Oznacz jako opłacone lub otrzymane"
@@ -3176,12 +3301,6 @@ msgstr "Zamknięty"
 msgid "Enter transactions"
 msgstr "Wprowadź transakcje"
 
-#, python-format
-msgid "Enter days worked for %(month)s for %(name)s."
-msgstr ""
-"Wprowadź liczbę przepracowanych dni w miesiącu %(month)s dla źródła "
-"%(name)s."
-
 msgid "This month is closed. Its entries and planned values are read-only."
 msgstr ""
 "Ten miesiąc jest zamknięty. Jego wpisy i wartości planowane są tylko do "
@@ -3224,6 +3343,124 @@ msgstr "Zamknięcie chroni miesiąc przed przypadkowymi zmianami."
 msgid "Future months stay open for planning."
 msgstr "Przyszłe miesiące pozostają otwarte do planowania."
 
+msgid "Apprise URL"
+msgstr "Adres URL Apprise"
+
+#, python-format
+msgid "Saved: %(url)s (%(service)s). Leave empty to keep it."
+msgstr "Zapisano: %(url)s (%(service)s). Pozostaw puste, aby go zachować."
+
+msgid ""
+"For example ntfys://ntfy.sh/your-topic or tgram://bot-token/chat-id. It "
+"is stored encrypted and never shown again."
+msgstr ""
+"Na przykład ntfys://ntfy.sh/twoj-temat albo tgram://token-bota/id-czatu. "
+"Jest przechowywany w postaci zaszyfrowanej i nigdy więcej nie zostanie "
+"wyświetlony."
+
+msgid "Delivery"
+msgstr "Doręczanie"
+
+msgid "One digest a day"
+msgstr "Jedno podsumowanie dziennie"
+
+msgid "One message per reminder"
+msgstr "Jedna wiadomość na przypomnienie"
+
+msgid "Daily at"
+msgstr "Codziennie o"
+
+#, python-format
+msgid "In the workspace time zone (%(zone)s)."
+msgstr "W strefie czasowej obszaru roboczego (%(zone)s)."
+
+msgid "Remind days before the due date"
+msgstr "Przypominaj tyle dni przed terminem"
+
+msgid "Recurring items can set their own number of days."
+msgstr "Pozycje cykliczne mogą mieć własną liczbę dni."
+
+msgid "Remind me about"
+msgstr "Przypominaj mi o"
+
+msgid "Items due soon"
+msgstr "Pozycjach, których termin się zbliża"
+
+msgid "Overdue items (once a day, up to 7 times)"
+msgstr "Zaległych pozycjach (raz dziennie, najwyżej 7 razy)"
+
+msgid "Entering days worked"
+msgstr "Wpisaniu przepracowanych dni"
+
+msgid "Include amounts"
+msgstr "Dołączaj kwoty"
+
+msgid ""
+"Messages pass through the service you choose and any push or mail servers"
+" on the way. Without this option they name the item and its date, but no "
+"amounts."
+msgstr ""
+"Wiadomości przechodzą przez wybraną usługę oraz serwery push lub pocztowe"
+" po drodze. Bez tej opcji zawierają nazwę pozycji i jej datę, ale nie "
+"kwoty."
+
+msgid "Enabled"
+msgstr "Włączony"
+
+msgid ""
+"Reminders for this workspace reach you through Apprise: ntfy, Gotify, "
+"Telegram, email and many other services. Your channels are yours alone; "
+"other members never see them."
+msgstr ""
+"Przypomnienia z tego obszaru roboczego docierają do Ciebie przez Apprise:"
+" ntfy, Gotify, Telegram, e-mail i wiele innych usług. Twoje kanały należą"
+" tylko do Ciebie; inni członkowie ich nie widzą."
+
+msgid ""
+"The administrator has turned notifications off on this server. Channels "
+"are kept, but nothing is sent."
+msgstr ""
+"Administrator wyłączył powiadomienia na tym serwerze. Kanały zostają "
+"zachowane, ale nic nie jest wysyłane."
+
+msgid "Disabled"
+msgstr "Wyłączony"
+
+msgid "Send test"
+msgstr "Wyślij test"
+
+#, python-format
+msgid "Delete the channel %(name)s?"
+msgstr "Usunąć kanał %(name)s?"
+
+msgid "Edit channel"
+msgstr "Edytuj kanał"
+
+msgid "Save channel"
+msgstr "Zapisz kanał"
+
+msgid "No notification channels yet."
+msgstr "Nie ma jeszcze kanałów powiadomień."
+
+msgid "New channel"
+msgstr "Nowy kanał"
+
+#, python-format
+msgid "Allowed services on this server: %(schemes)s."
+msgstr "Dozwolone usługi na tym serwerze: %(schemes)s."
+
+msgid "Add channel"
+msgstr "Dodaj kanał"
+
+msgid "Recent deliveries"
+msgstr "Ostatnie doręczenia"
+
+msgid "Channel"
+msgstr "Kanał"
+
+msgid "Reminder"
+msgstr "Przypomnienie"
+
 msgid "Recurring item"
 msgstr "Pozycja cykliczna"
 
@@ -3249,6 +3486,12 @@ msgstr "Rodzaj kwoty"
 
 msgid "Automatically post on the due date"
 msgstr "Automatycznie księguj w terminie"
+
+msgid "Reminder: days before the due date (optional)"
+msgstr "Przypomnienie: dni przed terminem (opcjonalnie)"
+
+msgid "Leave empty to use the default of each notification channel."
+msgstr "Pozostaw puste, aby użyć domyślnej wartości każdego kanału powiadomień."
 
 msgid "Start date"
 msgstr "Data początkowa"
@@ -3376,6 +3619,9 @@ msgstr "Wybierz prawidłowe daty powtarzania, aby zobaczyć podgląd."
 
 msgid "No more occurrences match this rule."
 msgstr "Brak kolejnych wystąpień pasujących do tej reguły."
+
+msgid "Reminders by notification"
+msgstr "Przypomnienia przez powiadomienia"
 
 msgid "Occurrence marked paid or received."
 msgstr "Wystąpienie oznaczono jako opłacone lub otrzymane."

@@ -48,6 +48,32 @@ _RESERVED_PROXY_AUTH_HEADERS = frozenset(
 _RESERVED_PROXY_AUTH_PREFIXES = ("hx-", "sec-")
 
 
+# Apprise URL schemes members may use by default (ADR-0021): services with a fixed protocol.
+# Generic webhooks (json, xml, form) and schemes acting on the server itself are left out.
+DEFAULT_NOTIFICATION_SCHEMES = (
+    "ntfy",
+    "ntfys",
+    "gotify",
+    "gotifys",
+    "tgram",
+    "mailto",
+    "mailtos",
+    "discord",
+    "slack",
+    "matrix",
+    "matrixs",
+    "pover",
+    "signal",
+    "signals",
+    "rocket",
+    "rockets",
+    "mmost",
+    "mmosts",
+    "apprise",
+    "apprises",
+)
+
+
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_prefix=f"{ENV_PREFIX}_",
@@ -122,6 +148,13 @@ class Settings(BaseSettings):
     mail_email_limit: int = Field(default=3, ge=1)
     mail_ip_limit: int = Field(default=10, ge=1)
     mail_window_minutes: int = Field(default=60, ge=1, le=1440)
+    # Reminders through Apprise channels (F3.6, ADR-0021).
+    notifications_enabled: bool = True
+    notification_schemes: Annotated[list[str], NoDecode] = Field(
+        default_factory=lambda: list(DEFAULT_NOTIFICATION_SCHEMES)
+    )
+    notification_timeout_seconds: int = Field(default=10, ge=1, le=60)
+    notification_tick_seconds: int = Field(default=45, ge=5, le=600)
 
     def __init__(self, *, _env_file: str | Path | None = ".env", **values: Any) -> None:
         super().__init__(_env_file=_env_file, **values)
@@ -335,6 +368,19 @@ class Settings(BaseSettings):
         if not cleaned:
             raise ValueError("OIDC_GROUPS_CLAIM must not be empty")
         return cleaned
+
+    @field_validator("notification_schemes", mode="before")
+    @classmethod
+    def split_notification_schemes(cls, value: list[str] | str) -> list[str]:
+        if isinstance(value, str):
+            value = value.split(",")
+        if not isinstance(value, list):
+            raise ValueError("NOTIFICATION_SCHEMES must be a comma-separated list")
+        schemes = [scheme.strip().lower() for scheme in value if scheme.strip()]
+        for scheme in schemes:
+            if not scheme.isascii() or not scheme.replace("+", "").replace("-", "").isalnum():
+                raise ValueError("NOTIFICATION_SCHEMES must list URL schemes such as ntfys")
+        return schemes
 
     @field_validator("oidc_allowed_domains", mode="before")
     @classmethod

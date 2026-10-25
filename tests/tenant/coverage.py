@@ -70,6 +70,31 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         ("TaxRuleVersionRepository", method): "test_tax_rule_queries_stay_in_their_workspace"
         for method in ("create", "for_rule", "all_for_rules", "effective", "any_fixed_amount")
     },
+    **{
+        ("NotificationChannelRepository", method): (
+            "test_notification_queries_stay_in_their_workspace"
+        )
+        for method in (
+            "create",
+            "for_user",
+            "owned",
+            "count_for_user",
+            "enabled",
+            "delete_for_user",
+        )
+    },
+    **{
+        ("NotificationLogRepository", method): "test_notification_queries_stay_in_their_workspace"
+        for method in (
+            "create",
+            "since",
+            "overdue_sent_counts",
+            "slot",
+            "stale_sending",
+            "recent_for_user",
+            "prune",
+        )
+    },
     ("MembershipRepository", "members"): "test_membership_queries_stay_in_their_workspace",
     ("MembershipRepository", "for_user"): "test_membership_queries_stay_in_their_workspace",
     ("MembershipRepository", "count_owners"): "test_membership_queries_stay_in_their_workspace",

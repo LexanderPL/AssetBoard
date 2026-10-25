@@ -11,6 +11,7 @@ from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.repositories import NotFound
 from assetboard.domain.money import Money
+from assetboard.domain.notifications import MAX_LEAD_DAYS
 from assetboard.domain.recurrence import Frequency, MonthDay, RecurrenceRule, WeekendPolicy
 from assetboard.domain.scheduled import AmountMode, ItemAction
 from assetboard.domain.transactions import TransactionDirection, amount_minor
@@ -62,6 +63,7 @@ FIELD_ERRORS = {
     "weekend_policy": _(
         "Holiday adjustments need a workspace country with holiday data, or no country."
     ),
+    "reminder_lead_days": _("Enter a number of days from 0 to 60, or leave it empty."),
 }
 ACTION_ERRORS = {
     "archived_item": _("This recurring item is archived and cannot change."),
@@ -76,6 +78,7 @@ SERVICE_FIELDS = {
     "invalid_currency": "amount",
     "unsupported_holidays": "weekend_policy",
     "no_working_day": "month_day",
+    "invalid_reminder": "reminder_lead_days",
 }
 
 
@@ -129,6 +132,13 @@ def _rule(values: dict[str, str]) -> RecurrenceRule:
         raise InvalidField(str(exc) if str(exc) in FIELD_ERRORS else "start_date") from None
 
 
+def _reminder_lead_days(values: dict[str, str]) -> int | None:
+    lead = _optional(values, "reminder_lead_days", int)
+    if lead is not None and not 0 <= lead <= MAX_LEAD_DAYS:
+        raise InvalidField("reminder_lead_days")
+    return lead
+
+
 def _input(values: dict[str, str], ctx: Context, locale: str) -> scheduled.ScheduledInput:
     """Parse the form; raises ``InvalidField`` for the first field that is wrong."""
     if not values.get("name", "").strip():
@@ -147,6 +157,7 @@ def _input(values: dict[str, str], ctx: Context, locale: str) -> scheduled.Sched
         amount_mode=_parse(values, "amount_mode", AmountMode, "fixed"),
         notes=values.get("notes", ""),
         auto_post=values.get("auto_post") == "1",
+        reminder_lead_days=_reminder_lead_days(values),
     )
 
 
@@ -245,6 +256,9 @@ async def edit(request: Request, ctx: CurrentContext, item_id: str) -> Response:
             "notes": item.notes,
             "amount_mode": item.amount_mode,
             "auto_post": "1" if item.auto_post else "",
+            "reminder_lead_days": (
+                "" if item.reminder_lead_days is None else str(item.reminder_lead_days)
+            ),
             "start_date": rule.start_date.isoformat(),
             "end_date": rule.end_date.isoformat() if rule.end_date else "",
             "max_count": str(rule.max_count) if rule.max_count else "",

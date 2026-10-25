@@ -39,6 +39,7 @@ from assetboard.db.repositories.scheduled import (
 from assetboard.db.repositories.workspace import CurrentWorkspaceRepository
 from assetboard.domain.money import Money
 from assetboard.domain.months import MAX_YEAR, YearMonth
+from assetboard.domain.notifications import MAX_LEAD_DAYS
 from assetboard.domain.recurrence import (
     Frequency,
     MonthDay,
@@ -66,6 +67,8 @@ class ScheduledInput:
     amount_mode: AmountMode = AmountMode.FIXED
     notes: str = ""
     auto_post: bool = False
+    # Days before the due date for reminders (F3.6); None: each channel's default.
+    reminder_lead_days: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,6 +104,7 @@ def _values(item: ScheduledItem) -> ScheduledInput:
         AmountMode(item.amount_mode),
         item.notes,
         item.auto_post,
+        item.reminder_lead_days,
     )
 
 
@@ -352,6 +356,10 @@ def save_item(
     notes = clean_description(values.notes)
     if not name or not 0 < values.amount.amount_minor <= MAX_AMOUNT_MINOR:
         raise ValueError("invalid_item")
+    if values.reminder_lead_days is not None and not (
+        0 <= values.reminder_lead_days <= MAX_LEAD_DAYS
+    ):
+        raise ValueError("invalid_reminder")
 
     def write(session: Session) -> UUID:
         require_role_now(session, ctx, Role.EDITOR)
@@ -382,6 +390,7 @@ def save_item(
             "month": rule.month,
             "weekend_policy": rule.weekend_policy,
             "auto_post": values.auto_post,
+            "reminder_lead_days": values.reminder_lead_days,
         }
         if item_id is None:
             item = repository.create(**fields)

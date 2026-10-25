@@ -1277,6 +1277,8 @@ WORKSPACE_TABLES = {
     "income_sources",
     "income_source_tax_rules",
     "work_logs",
+    "notification_channels",
+    "notification_log",
 }
 
 

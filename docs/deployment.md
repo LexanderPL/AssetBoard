@@ -50,6 +50,10 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_MAIL_EMAIL_LIMIT` | `3` | App | Emails per address (registration and password reset together) within the mail window. Requests beyond it get the same answer, but no email is sent, and a `mail_address_limit` warning with a keyed hash of the address is logged. Counted the same way whether or not an account has the address, so anyone can use up an address's quota for one window. |
 | `ASSETBOARD_MAIL_IP_LIMIT` | `10` | App | "Forgot your password?" requests and new passwords set from a link, per client address within the mail window; beyond it the page says to try later. |
 | `ASSETBOARD_MAIL_WINDOW_MINUTES` | `60` | App | Window for the two mail limits, 1 to 1440 minutes. |
+| `ASSETBOARD_NOTIFICATIONS_ENABLED` | `true` | App | Send reminders to members' notification channels (F3.6). `false` keeps the channels but sends nothing, test messages included. See [Notifications](#notifications). |
+| `ASSETBOARD_NOTIFICATION_SCHEMES` | `ntfy,ntfys,gotify,gotifys,tgram,mailto,mailtos,discord,slack,matrix,matrixs,pover,signal,signals,rocket,rockets,mmost,mmosts,apprise,apprises` | App | Comma-separated Apprise URL schemes members may use. Replaces the default list; checked when a channel is saved and again before every send. |
+| `ASSETBOARD_NOTIFICATION_TIMEOUT_SECONDS` | `10` | App | Network timeout for one notification send (connect and read), 1 to 60 seconds; a send is abandoned after it. |
+| `ASSETBOARD_NOTIFICATION_TICK_SECONDS` | `45` | App | Time budget of one reminder tick (every minute), 5 to 600 seconds. Channels not reached run on the next tick. |
 | `ASSETBOARD_OIDC_ISSUER` | unset | App | OIDC provider's issuer URL, exactly as its discovery document states it (trailing slash included). Setting it turns OIDC sign-in on; it must be `https://` unless `ASSETBOARD_ENV=dev`, and `ASSETBOARD_BASE_URL` must then be set explicitly (and `https://` outside dev). See [docs/auth/oidc.md](auth/oidc.md). |
 | `ASSETBOARD_OIDC_CLIENT_ID` | unset | App | Client ID registered at the provider. Required with `OIDC_ISSUER`. The redirect URI to register is `<BASE_URL>/auth/oidc/callback`. |
 | `ASSETBOARD_OIDC_CLIENT_SECRET` | unset | App | Client secret; never logged. Unset means a public client that relies on PKCE alone. |
@@ -117,6 +121,33 @@ and the app logs a warning at startup when `WEB_CONCURRENCY` asks for more than 
 `ASSETBOARD_SCHEDULER_ENABLED=false` turns the scheduler off (generation on rule changes still
 happens). New workspaces/time-zone changes are discovered within a minute. Calendars are local;
 no external service is contacted. See [Recurring items](recurring.md).
+
+### Notifications
+
+Every member can add their own notification channels under **Notifications** (account menu):
+an [Apprise](https://github.com/caronc/apprise) URL such as `ntfys://ntfy.example.com/topic`,
+`gotifys://gotify.example.com/token` or `tgram://bot-token/chat-id`
+([ADR-0021](adr/0021-notifications.md)). Once a day, at the channel's time in the workspace
+time zone, the in-process scheduler sends reminders for occurrences due soon, overdue
+occurrences (at most once a day and seven times each) and work months that still need days
+worked. It catches up after a restart; each reminder is sent at most once, and failed ones are
+retried by the next daily run. Keep one worker, as for recurring generation.
+
+- **URLs are secrets.** They are encrypted with a key derived from the instance secret key,
+  never logged and never shown again after saving. Back up the secret key with the database;
+  if it changes, members must enter their channel URLs again (the channel shows an error).
+- **Outgoing requests.** The server connects to the hosts in these URLs, including hosts on
+  your local network (a local ntfy or Gotify is the usual setup). Only the schemes in
+  `ASSETBOARD_NOTIFICATION_SCHEMES` are accepted; generic webhooks (`json://`, `xml://`,
+  `form://`) and schemes that act on the server itself are not in the default list. Members
+  never see a service's reply. If people you do not trust can join, narrow the list or set
+  `ASSETBOARD_NOTIFICATIONS_ENABLED=false`.
+- **Content.** Messages name the item, its date and the work month; amounts only when the
+  member ticks **Include amounts**. Messages pass through the chosen service and any push or
+  mail servers on the way. A link to **Upcoming** is added when `ASSETBOARD_BASE_URL` is set.
+- Each send is abandoned after `ASSETBOARD_NOTIFICATION_TIMEOUT_SECONDS`; a tick starts no new
+  channel after `ASSETBOARD_NOTIFICATION_TICK_SECONDS`. Failures are logged with identifiers
+  and an error code (`notification_delivery_failed`), never the URL or the service's reply.
 
 ### Invitations
 
@@ -343,6 +374,14 @@ architectures without logging in to GHCR or publishing. Check **Publish the imag
 when you intend to upload the image and its release tags.
 
 ## Upgrading
+
+### Unreleased: notifications and reminders (F3.6)
+
+- Migration `0021_f36` adds the `notification_channels` and `notification_log` tables and the
+  optional `scheduled_items.reminder_lead_days`. Nothing is sent until a member adds a channel.
+- New dependency: Apprise. New settings: `ASSETBOARD_NOTIFICATIONS_ENABLED`,
+  `ASSETBOARD_NOTIFICATION_SCHEMES`, `ASSETBOARD_NOTIFICATION_TIMEOUT_SECONDS` and
+  `ASSETBOARD_NOTIFICATION_TICK_SECONDS`. See [Notifications](#notifications).
 
 ### Unreleased: two-factor authentication (F1.6)
 

@@ -1128,6 +1128,82 @@ def test_income_queries_stay_in_their_workspace(
     assert occurrences_b.for_income_work_month(source_a.id, date(2026, 1, 1)) is None
 
 
+def test_notification_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any], fixed_clock: FixedClock
+) -> None:
+    from datetime import time
+
+    from assetboard.db.repositories import (
+        NotificationChannelRepository,
+        NotificationLogRepository,
+    )
+
+    ctx_a, ctx_b = two_workspaces
+    user = User(email=f"notify-{uuid4().hex[:8]}@example.com", display_name="Notify")
+    db_session.add(user)
+    db_session.flush()
+    now = fixed_clock.now()
+
+    def build(ctx: Any) -> tuple[Any, Any]:
+        channel = NotificationChannelRepository(db_session, ctx).create(
+            user_id=user.id,
+            name="Phone",
+            url_encrypted="synthetic",
+            scheme="ntfy",
+            service_name="ntfy",
+            enabled=True,
+            mode="digest",
+            digest_time=time(8, 0),
+            default_lead_days=3,
+            notify_due_soon=True,
+            notify_overdue=True,
+            notify_work_logs=True,
+            include_amounts=False,
+        )
+        log = NotificationLogRepository(db_session, ctx).create(
+            channel_id=channel.id,
+            kind="overdue",
+            subject_key="occurrence",
+            occurrence_id=None,
+            sent_on=date(2026, 1, 5),
+            status="sending",
+            attempted_at=now - timedelta(hours=1),
+        )
+        return channel, log
+
+    channel_a, log_a = build(ctx_a)
+    channel_b, log_b = build(ctx_b)
+    channels_a = NotificationChannelRepository(db_session, ctx_a)
+    channels_b = NotificationChannelRepository(db_session, ctx_b)
+    logs_a = NotificationLogRepository(db_session, ctx_a)
+    logs_b = NotificationLogRepository(db_session, ctx_b)
+
+    assert [row.id for row in channels_a.for_user(user.id)] == [channel_a.id]
+    assert channels_b.owned(channel_a.id, user.id) is None
+    assert channels_a.owned(channel_a.id, user.id) is channel_a
+    assert channels_a.count_for_user(user.id) == 1
+    assert [row.id for row in channels_b.enabled()] == [channel_b.id]
+
+    assert logs_b.since(channel_a.id, date(2026, 1, 1)) == []
+    assert [row.id for row in logs_a.since(channel_a.id, date(2026, 1, 1))] == [log_a.id]
+    assert logs_b.slot(channel_a.id, "overdue", "occurrence", date(2026, 1, 5)) is None
+    assert logs_a.slot(channel_a.id, "overdue", "occurrence", date(2026, 1, 5)) is log_a
+    assert [row.id for row in logs_b.stale_sending(now)] == [log_b.id]
+    log_a.status = "sent"
+    db_session.flush()
+    assert logs_a.overdue_sent_counts(channel_a.id) == {"occurrence": 1}
+    assert logs_b.overdue_sent_counts(channel_a.id) == {}
+    assert [(row.id, name) for row, name in logs_b.recent_for_user(user.id, 10)] == [
+        (log_b.id, "Phone")
+    ]
+
+    assert logs_b.prune(date(2027, 1, 1)) == 1
+    assert logs_a.get(log_a.id) is not None
+    assert channels_b.delete_for_user(user.id) == 1
+    assert channels_a.get(channel_a.id) is not None
+    assert channels_b.get(channel_b.id) is None
+
+
 # Deleting a workspace (ADR-0020): every workspace-owned model, found by discovery
 
 

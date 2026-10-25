@@ -7,6 +7,7 @@
 {% block content %}
 <div class="mb-5 flex flex-wrap gap-3">
   <a href="{{ scoped_url(request, 'scheduled_items') }}" class="rounded-lg border border-line px-3 py-2 text-sm">{{ _("Recurring items") }}</a>
+  <a href="{{ scoped_url(request, 'notifications') }}" class="rounded-lg border border-line px-3 py-2 text-sm" data-notifications-shortcut>{{ _("Reminders by notification") }}</a>
 </div>
 {% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 {% if undo and can_edit %}
