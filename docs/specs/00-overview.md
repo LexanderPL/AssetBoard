@@ -1,6 +1,6 @@
 # AssetBoard — product & technical overview (working title)
 
-Status: draft v1. This file is the shared "constitution". Milestone specs (`M0`…`M9`) refer to it.
+Status: draft v1. This file is the shared "constitution". Milestone specs (`M0`…`M10`) refer to it.
 
 ## 1. Vision and principles
 
@@ -85,6 +85,7 @@ UUID primary keys (`Uuid` type). Dates are `DATE`; timestamps UTC. "Today" alway
 | M7 | Loan, LoanRateChange, ReferenceRate, ReferenceRateValue, LoanCostComponent, LoanOverpayment, LoanPayment, LoanBalanceCheckpoint, LoanScenario, InstallmentPlan |
 | M8 | FireScenario, FireContribution, FireEvent |
 | M9 | ApiToken, BackupRun, DashboardPreference |
+| M10 | none (reports read existing rows) |
 
 Key fields for the shared entities:
 - **Transaction**: id, workspace_id, direction (income|expense), date, amount (Money), category_id, description, source (manual|recurring|recurring_auto|import), scheduled_occurrence_id?, import_batch_id?, import_key?, account_id? (reserved), created_by, timestamps, deleted_at.
@@ -105,6 +106,9 @@ Key fields for the shared entities:
 | M7 | Loans and mortgage | M5, M3 | v0.7 |
 | M8 | FIRE planner | M2, M6, M7 | v0.8 |
 | M9 | Dashboard, reports, export/backup, API, hardening | all | v1.0 |
+| M10 | Reports: income vs expenses, savings rate, expenses by category over the years; later net worth and portfolio value | Phase A: M2 (after F2.7); Phase B: M5, M6 | Phase A: any minor before v1.0; Phase B: with or after M6 |
+
+The number does not set the order: M10 Phase A (ledger reports) can ship as soon as M2 and F2.7 are done, before M5/M6. F2.7 (navigation restructure: Home, Month, Transactions, History) lands before F3.5.
 
 M3 and M5–M8 each end with an "archive extension" feature that adds the module's data to the workspace archive of M4 (export, restore, and standalone CSV import where it makes sense), following [ADR-0016](../adr/0016-workspace-archive-format.md).
 
