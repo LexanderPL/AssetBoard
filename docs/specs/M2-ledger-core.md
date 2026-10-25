@@ -602,12 +602,13 @@ current order.
 **Acceptance**
 - **Home (`/`)** shows the current month (workspace time zone, from the Clock), headed with the
   month name and a link "Open month" to `/m/YYYY-MM`:
-  - the **flow bar**: F2.4's KPI block (`earned`, `spent`, `saved`, `net`, savings rate, and the
-    planned-vs-actual bars), rendered from the same partial as the Month page, not a copy;
+  - the **F2.4 flow bar** (the KPI design of PR #144): one stacked bar of the month's earned
+    income split into Spent / Saved / invested / Left, overspend hatched, captioned "Saved /
+    invested X% of income", rendered from the same partial as the Month page, not a copy;
   - a **donut of the month's expenses by category** (actuals of `kind=expense,
     treatment=regular`) next to a **donut of income by category** (actuals of `kind=income,
-    treatment=regular`). `savings` and `transfer` categories are in neither chart (savings stay
-    visible in the flow bar as "saved"). Slices use the category colour; a category with zero
+    treatment=regular`). `savings` and `transfer` categories are in neither chart: there is no
+    "Saved / invested" slice, the flow bar shows saving. Slices use the category colour; a category with zero
     actual has no slice; an empty month shows an empty state per chart ("No expenses yet this
     month"), not an empty ring;
   - **upcoming items** from F3.2: overdue occurrences (highlighted) and the next 7 days, at most
@@ -625,7 +626,8 @@ current order.
   month's income and expense tables with inline edit, delete and undo, the F2.4 part B category
   filter, and the same month navigation (Previous/Next, Today, picker) as the Month page.
   `/transactions` without a query redirects (303) to the current month. Closed months render
-  read-only as today. Planned values are not edited here. Every keyboard behaviour,
+  read-only as today. Planned values are not edited here, and the page has no flow bar or KPI
+  line (entry only). Every keyboard behaviour,
   autocomplete, HTMX swap, focus rule and no-JavaScript fallback of F2.2 and F2.4 part B keeps
   working (their tests move with the page).
 - **History (`/history`)** is F2.6's page moved as is: filters, sort, pagination, CSV export
@@ -691,16 +693,16 @@ current order.
 - CSP header unchanged; no rendered page contains a `<script>` element with inline code other
   than `type="application/json"` data (template test).
 
-**Open questions (for the owner)**
-1. **Transactions URL shape.** Proposed: `/transactions/YYYY-MM` (mirrors `/m/YYYY-MM`), with
-   filtered `/transactions?…` links redirecting to History. Alternative:
-   `/m/YYYY-MM/transactions`, which leaves `/transactions` free for a plain redirect.
-2. **Flow bar on the Transactions page.** Show a compact KPI line above the entry form (so a
-   new entry visibly moves the totals), or keep the page to entry only? Proposed: entry only.
-3. **Savings on the Home donut.** Proposed: regular expenses and regular income only, savings
-   as a KPI. Should the expense donut carry a "Saved / invested" slice instead?
-4. **Home and F9.1.** Proposed: F9.1's dashboard cards are added to this Home page later (see
-   the note in F9.1), so there is one landing page, not two.
+**Decided (owner, 2026-10-25)**
+1. **Transactions URL:** `/transactions/YYYY-MM` (mirrors `/m/YYYY-MM`); filtered
+   `/transactions?…` links redirect to History.
+2. **No KPI line on the Transactions page:** it is for entry only.
+3. **No "Saved / invested" slice** in the expense donut; the flow bar shows saving.
+4. **F9.1's dashboard cards go on this Home page** (see the note in F9.1): one landing page,
+   not two.
+5. **"Flow bar"** means the F2.4 flow bar, the KPI design of PR #144: one stacked bar of earned
+   income split into Spent / Saved / invested / Left, overspend hatched, captioned "Saved /
+   invested X% of income".
 
 **Agent prompt**
 ```
