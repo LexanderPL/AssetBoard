@@ -1,25 +1,77 @@
 {% extends "base.html" %}
-{% from "macros/components.html" import empty_state, money with context %}
-{% block title %}{{ _("Overview") }} · {{ app_name }}{% endblock %}
+{% from "macros/components.html" import csrf_input with context %}
+{% from "months/_plan.html" import kpis with context %}
+{% from "macros/charts.html" import donut with context %}
+{# Home (F2.7): the current month's flow bar (the Month page's partial), the expense and income
+   donuts and up to ten upcoming F3.2 items. No inline script or style. #}
+{% set button_class = "rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle" %}
+{% set input_class = "form-control w-full rounded-lg px-2.5 py-1.5" %}
+{% block title %}{{ _("Home") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ month_heading }}{% endblock %}
+{% block header_actions %}<a href="{{ scoped_url(request, 'month', month=view.month|string) }}" class="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium hover:bg-subtle" data-open-month>{{ _("Open month") }}</a>{% endblock %}
+{% block scripts %}{% include "macros/chart_scripts.html" %}{% endblock %}
 {% block content %}
-<section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label="{{ _('Monthly summary') }}">
-  <article class="panel p-5 sm:p-6">
-    <p class="text-sm font-medium text-muted">{{ _("Income") }}</p>
-    <p class="mt-3 text-2xl font-semibold tracking-tight">{{ money(Money(0, workspace.base_currency)) }}</p>
-    <p class="mt-2 text-xs text-muted">{{ _("Planned and actual amounts will appear here.") }}</p>
-  </article>
-  <article class="panel p-5 sm:p-6">
-    <p class="text-sm font-medium text-muted">{{ _("Expenses") }}</p>
-    <p class="mt-3 text-2xl font-semibold tracking-tight">{{ money(Money(0, workspace.base_currency)) }}</p>
-    <p class="mt-2 text-xs text-muted">{{ _("Keep your monthly spending in view.") }}</p>
-  </article>
-  <article class="panel p-5 sm:p-6 sm:col-span-2 xl:col-span-1">
-    <p class="text-sm font-medium text-muted">{{ _("Available") }}</p>
-    <p class="mt-3 text-2xl font-semibold tracking-tight">{{ money(Money(0, workspace.base_currency)) }}</p>
-    <p class="mt-2 text-xs text-muted">{{ _("Income minus regular expenses.") }}</p>
-  </article>
-</section>
-<section class="mt-7">
-  {{ empty_state(_("Nothing to show yet"), _("Your monthly plan and activity will appear here once you start adding items.")) }}
-</section>
+<div class="space-y-6" data-home data-month="{{ view.month }}">
+  <section class="panel p-4 sm:p-6" aria-labelledby="home-flow-heading" data-home-flow>
+    <h2 id="home-flow-heading" class="text-base font-semibold">{{ _("This month") }}</h2>
+    {{ kpis() }}
+  </section>
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    {% for d in donuts %}{{ donut(d) }}{% endfor %}
+  </div>
+
+  <section class="panel p-4 sm:p-6" aria-labelledby="home-upcoming-heading" data-home-upcoming>
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h2 id="home-upcoming-heading" class="text-base font-semibold">{{ _("Upcoming") }}</h2>
+      <a href="{{ scoped_url(request, 'scheduled_upcoming') }}" class="text-sm font-medium text-primary-ink underline" data-upcoming-all>{{ _("All upcoming items") }}</a>
+    </div>
+    {% if upcoming %}
+    <ul class="mt-3 divide-y divide-line">
+      {% for o in upcoming %}
+      {% set overdue = o.due_date < today %}
+      <li class="flex flex-wrap items-center justify-between gap-3 py-3{% if overdue %} -mx-2 rounded-lg bg-danger-soft px-2{% endif %}" data-occurrence="{{ o.id }}"{% if overdue %} data-overdue{% endif %}>
+        <div class="min-w-0">
+          <p class="break-words font-medium">{{ o.label }}</p>
+          <p class="text-sm text-muted">
+            <time datetime="{{ o.due_date.isoformat() }}">{{ format_day(o.due_date, locale) }}</time>
+            · {{ o.category_name }}
+            · <span class="tabular-nums">{{ format_money(o.expected, locale) }}</span>{% if o.amount_state == "estimated" %} · {{ _("Estimate") }}{% endif %}
+            {% if overdue %} · <span class="font-semibold text-danger">{{ _("Overdue") }}</span>{% endif %}
+          </p>
+        </div>
+        {% if can_edit %}
+        <div class="flex flex-wrap items-start gap-2">
+          <details>
+            <summary class="{{ button_class }} cursor-pointer">{{ _("Mark paid or received") }}</summary>
+            <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=o.id) }}" class="mt-3 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2" data-home-post>
+              {{ csrf_input() }}
+              <input type="hidden" name="back" value="home">
+              <div>
+                <label for="home-post-day-{{ o.id }}" class="mb-1 block text-xs font-medium">{{ _("Date") }}</label>
+                <input id="home-post-day-{{ o.id }}" name="day" type="date" value="{{ o.due_date.isoformat() }}" required class="{{ input_class }}">
+              </div>
+              <div>
+                <label for="home-post-amount-{{ o.id }}" class="mb-1 block text-xs font-medium">{{ _("Amount") }}</label>
+                <input id="home-post-amount-{{ o.id }}" name="amount" type="text" inputmode="decimal" value="{{ amount_input(o.expected) }}" required class="{{ input_class }}">
+              </div>
+              <button type="submit" class="{{ button_class }} sm:col-span-2">{{ _("Save transaction") }}</button>
+            </form>
+          </details>
+          <form method="post" action="{{ scoped_url(request, 'upcoming_skip', occurrence_id=o.id) }}" data-home-skip>
+            {{ csrf_input() }}
+            <input type="hidden" name="back" value="home">
+            <button type="submit" class="{{ button_class }}">{{ _("Skip") }}</button>
+          </form>
+        </div>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% if upcoming_more %}<p class="mt-3 text-sm text-muted">{{ _("More items are waiting on the Upcoming page.") }}</p>{% endif %}
+    {% else %}
+    <p class="mt-3 text-sm text-muted" data-upcoming-empty>{{ _("Nothing is overdue or due in the next %(days)d days.", days=7) }}</p>
+    {% endif %}
+  </section>
+</div>
 {% endblock %}

@@ -1,4 +1,4 @@
-"""The transaction list (F2.6): ``/transactions`` with filters, sorting, pages, CSV export and
+"""The History page (F2.6, moved to ``/history`` by F2.7): filters, sorting, pages, CSV export and
 bulk recategorize.
 
 Everything is a plain form, so the page works without JavaScript: the filters are a GET form
@@ -216,7 +216,7 @@ def _state_pairs(raw: FilterInput, sort: SortOrder, page: int = 1) -> list[tuple
 
 
 def _list_url(request: Request, pairs: list[tuple[str, str]]) -> str:
-    path = scoped_url(request, "transactions")
+    path = scoped_url(request, "history")
     return f"{path}?{urlencode(pairs)}" if pairs else path
 
 
@@ -258,7 +258,9 @@ def _row_view(request: Request, row: Any) -> dict[str, Any]:
         "t": row,
         "amount": format_money(row.amount, locale),
         "full_date": format_day(row.date, locale),
-        "month_href": scoped_url(request, "month", month=str(row.month)),
+        # F2.7: entries are edited on the Transactions page of their month.
+        "month_href": scoped_url(request, "transactions_month", month=str(row.month))
+        + f"#tx-{row.id}",
         "direction": _t(request, DIRECTION_LABELS[row.direction]),
     }
 
@@ -336,13 +338,11 @@ async def _list_page(
             else ""
         ),
     }
-    return render_template(
-        request, "transactions/list.html", context=context, status_code=status_code
-    )
+    return render_template(request, "history/list.html", context=context, status_code=status_code)
 
 
-@router.get("/transactions", name="transactions")
-async def transactions_page(request: Request, ctx: CurrentContext) -> Response:
+@router.get("/history", name="history")
+async def history_page(request: Request, ctx: CurrentContext) -> Response:
     params = request.query_params
     raw, sort, page = _filter_input(params), parse_sort(_text(params, "sort")), _page_number(params)
     notice = ""
@@ -362,8 +362,8 @@ async def transactions_page(request: Request, ctx: CurrentContext) -> Response:
 # Export
 
 
-@router.get("/transactions/export.csv", name="transactions_export")
-async def transactions_export(request: Request, ctx: CurrentContext) -> Response:
+@router.get("/history/export.csv", name="history_export")
+async def history_export(request: Request, ctx: CurrentContext) -> Response:
     params = request.query_params
     raw, sort, page = _filter_input(params), parse_sort(_text(params, "sort")), _page_number(params)
     values = {
@@ -465,8 +465,8 @@ async def _bulk_refused(
     )  # fmt: skip
 
 
-@router.post("/transactions/recategorize", name="transactions_recategorize_preview")
-async def transactions_recategorize_preview(request: Request, ctx: CurrentContext) -> Response:
+@router.post("/history/recategorize", name="history_recategorize_preview")
+async def history_recategorize_preview(request: Request, ctx: CurrentContext) -> Response:
     form = await request.form()
     raw, sort, page = _filter_input(form), parse_sort(_text(form, "sort")), _page_number(form)
     try:
@@ -509,11 +509,11 @@ def _confirm_page(
         "back_url": _list_url(request, pairs),
         "target_kind": _t(request, DIRECTION_LABELS[plan.target.kind]),
     }
-    return render_template(request, "transactions/recategorize.html", context=context)
+    return render_template(request, "history/recategorize.html", context=context)
 
 
-@router.post("/transactions/recategorize/confirm", name="transactions_recategorize")
-async def transactions_recategorize(request: Request, ctx: CurrentContext) -> Response:
+@router.post("/history/recategorize/confirm", name="history_recategorize")
+async def history_recategorize(request: Request, ctx: CurrentContext) -> Response:
     form = await request.form()
     raw, sort, page = _filter_input(form), parse_sort(_text(form, "sort")), _page_number(form)
     try:

@@ -966,6 +966,18 @@ msgstr ""
 msgid "Suggested categories added."
 msgstr ""
 
+msgid "Expenses by category"
+msgstr ""
+
+msgid "Income by category"
+msgstr ""
+
+msgid "No expenses yet this month"
+msgstr ""
+
+msgid "No income yet this month"
+msgstr ""
+
 msgid "The password is not correct."
 msgstr ""
 
@@ -1581,6 +1593,9 @@ msgstr ""
 msgid "Main navigation"
 msgstr ""
 
+msgid "History"
+msgstr ""
+
 msgid "Recurring"
 msgstr ""
 
@@ -1650,30 +1665,35 @@ msgstr ""
 msgid "Cancel"
 msgstr ""
 
-msgid "Overview"
+msgid "Open month"
 msgstr ""
 
-msgid "Monthly summary"
+msgid "This month"
 msgstr ""
 
-msgid "Planned and actual amounts will appear here."
+msgid "All upcoming items"
 msgstr ""
 
-msgid "Keep your monthly spending in view."
+msgid "Estimate"
 msgstr ""
 
-msgid "Available"
+msgid "Overdue"
 msgstr ""
 
-msgid "Income minus regular expenses."
+msgid "Mark paid or received"
 msgstr ""
 
-msgid "Nothing to show yet"
+msgid "Save transaction"
 msgstr ""
 
-msgid ""
-"Your monthly plan and activity will appear here once you start adding "
-"items."
+msgid "Skip"
+msgstr ""
+
+msgid "More items are waiting on the Upcoming page."
+msgstr ""
+
+#, python-format
+msgid "Nothing is overdue or due in the next %(days)d days."
 msgstr ""
 
 msgid "Link a sign-in method"
@@ -1918,9 +1938,6 @@ msgid "(from the identity provider)"
 msgstr ""
 
 msgid "Never"
-msgstr ""
-
-msgid "History"
 msgstr ""
 
 msgid "Deactivate"
@@ -2281,6 +2298,176 @@ msgstr ""
 msgid "Return to overview"
 msgstr ""
 
+msgid "Export CSV"
+msgstr ""
+
+msgid "Export as CSV"
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid ""
+"Downloads every entry that matches the filters, oldest first, in the "
+"columns of the workspace archive's transactions.csv. With the standard "
+"options the file can be imported again."
+msgstr ""
+
+msgid "Delimiter"
+msgstr ""
+
+msgid "Comma (standard)"
+msgstr ""
+
+msgid "Semicolon"
+msgstr ""
+
+msgid "Decimal separator"
+msgstr ""
+
+msgid "Dot (standard)"
+msgstr ""
+
+msgid "Comma"
+msgstr ""
+
+msgid "A decimal comma needs the semicolon delimiter."
+msgstr ""
+
+msgid ""
+"For Excel: start the file with a byte order mark, so that Excel reads it "
+"as UTF-8"
+msgstr ""
+
+msgid "Protect against spreadsheet formulas"
+msgstr ""
+
+msgid ""
+"Puts an apostrophe before =, +, -, @ (also their full-width forms) at the"
+" start of a description or category name, after leading spaces, or after "
+"a comma or semicolon inside it, so that a spreadsheet does not run them "
+"as formulas. Such values then differ from the stored ones, and a "
+"protected description may be too long to import again."
+msgstr ""
+
+msgid "Download CSV"
+msgstr ""
+
+msgid "Filters"
+msgstr ""
+
+msgid "Smallest amount"
+msgstr ""
+
+msgid "Largest amount"
+msgstr ""
+
+msgid "Description contains"
+msgstr ""
+
+msgid "Expenses and income"
+msgstr ""
+
+msgid "Order"
+msgstr ""
+
+msgid "None ticked: every category."
+msgstr ""
+
+msgid "Show entries"
+msgstr ""
+
+msgid "Clear filters"
+msgstr ""
+
+msgid "Entries"
+msgstr ""
+
+#, python-format
+msgid "%(first)d–%(last)d of %(num)d entry"
+msgid_plural "%(first)d–%(last)d of %(num)d entries"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "No entries match these filters."
+msgstr ""
+
+msgid "Entries matching the filters"
+msgstr ""
+
+#, python-format
+msgid "page %(number)d of %(pages)d"
+msgstr ""
+
+msgid "Select"
+msgstr ""
+
+msgid "Description"
+msgstr ""
+
+#, python-format
+msgid "Select the entry of %(date)s, %(amount)s"
+msgstr ""
+
+msgid "closed"
+msgstr ""
+
+msgid "Automatically posted"
+msgstr ""
+
+msgid "archived"
+msgstr ""
+
+msgid "Previous"
+msgstr ""
+
+#, python-format
+msgid "Page %(number)d of %(pages)d"
+msgstr ""
+
+msgid "Next"
+msgstr ""
+
+msgid "Change category"
+msgstr ""
+
+msgid ""
+"Tick entries in the list, or change all entries that match the filters. "
+"You confirm the change on the next page."
+msgstr ""
+
+msgid "New category"
+msgstr ""
+
+msgid "Choose a category"
+msgstr ""
+
+msgid "Change the ticked entries"
+msgstr ""
+
+#, python-format
+msgid "Change all %(num)d matching entry"
+msgid_plural "Change all %(num)d matching entries"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "Move %(num)d entry to %(category)s?"
+msgid_plural "Move %(num)d entries to %(category)s?"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Already in this category"
+msgstr ""
+
+msgid ""
+"The change is recorded in the workspace audit log. Monthly totals of "
+"these categories change with it."
+msgstr ""
+
+msgid "Every selected entry is already in this category; nothing would change."
+msgstr ""
+
 msgid "Invitation"
 msgstr ""
 
@@ -2300,6 +2487,9 @@ msgid "Sign in to accept"
 msgstr ""
 
 msgid "Create account and join"
+msgstr ""
+
+msgid "Share"
 msgstr ""
 
 msgid "Your password"
@@ -2327,19 +2517,7 @@ msgstr ""
 msgid "Day"
 msgstr ""
 
-msgid "Description"
-msgstr ""
-
 msgid "Earlier descriptions"
-msgstr ""
-
-msgid "Choose a category"
-msgstr ""
-
-msgid "Automatically posted"
-msgstr ""
-
-msgid "archived"
 msgstr ""
 
 #, python-format
@@ -2360,6 +2538,26 @@ msgid ""
 msgstr ""
 
 msgid "Showing all entries."
+msgstr ""
+
+#, python-format
+msgid "Previous month: %(month)s"
+msgstr ""
+
+#, python-format
+msgid "Next month: %(month)s"
+msgstr ""
+
+msgid "Today"
+msgstr ""
+
+msgid "Go to month"
+msgstr ""
+
+msgid "YYYY-MM"
+msgstr ""
+
+msgid "Go"
 msgstr ""
 
 msgid "(favourable)"
@@ -2417,9 +2615,6 @@ msgid "(over plan)"
 msgstr ""
 
 msgid "Planned"
-msgstr ""
-
-msgid "Order"
 msgstr ""
 
 msgid "Largest first"
@@ -2481,30 +2676,7 @@ msgstr ""
 msgid "Closed"
 msgstr ""
 
-#, python-format
-msgid "Previous month: %(month)s"
-msgstr ""
-
-msgid "Previous"
-msgstr ""
-
-#, python-format
-msgid "Next month: %(month)s"
-msgstr ""
-
-msgid "Next"
-msgstr ""
-
-msgid "Today"
-msgstr ""
-
-msgid "Go to month"
-msgstr ""
-
-msgid "YYYY-MM"
-msgstr ""
-
-msgid "Go"
+msgid "Enter transactions"
 msgstr ""
 
 msgid "This month is closed. Its entries and planned values are read-only."
@@ -2565,9 +2737,6 @@ msgid "Amount type"
 msgstr ""
 
 msgid "Fixed"
-msgstr ""
-
-msgid "Estimate"
 msgstr ""
 
 msgid "Automatically post on the due date"
@@ -2695,12 +2864,6 @@ msgstr ""
 msgid "Occurrence marked paid or received."
 msgstr ""
 
-msgid "Filters"
-msgstr ""
-
-msgid "Expenses and income"
-msgstr ""
-
 msgid "All categories"
 msgstr ""
 
@@ -2721,16 +2884,7 @@ msgstr ""
 msgid "Automatic posting"
 msgstr ""
 
-msgid "Overdue"
-msgstr ""
-
 msgid "Rescheduled for this occurrence"
-msgstr ""
-
-msgid "Mark paid or received"
-msgstr ""
-
-msgid "Save transaction"
 msgstr ""
 
 msgid "Reschedule this one"
@@ -2746,13 +2900,6 @@ msgid "Edit amount"
 msgstr ""
 
 msgid "Save amount"
-msgstr ""
-
-msgid "Skip"
-msgstr ""
-
-#, python-format
-msgid "Nothing is overdue or due in the next %(days)d days."
 msgstr ""
 
 msgid "Tax calculator"
@@ -2880,147 +3027,10 @@ msgid ""
 " existing rate versions. Create a separate rule to model a different tax."
 msgstr ""
 
-msgid "Export CSV"
+msgid "Month summary"
 msgstr ""
 
-msgid "Export as CSV"
-msgstr ""
-
-msgid "Close"
-msgstr ""
-
-msgid ""
-"Downloads every entry that matches the filters, oldest first, in the "
-"columns of the workspace archive's transactions.csv. With the standard "
-"options the file can be imported again."
-msgstr ""
-
-msgid "Delimiter"
-msgstr ""
-
-msgid "Comma (standard)"
-msgstr ""
-
-msgid "Semicolon"
-msgstr ""
-
-msgid "Decimal separator"
-msgstr ""
-
-msgid "Dot (standard)"
-msgstr ""
-
-msgid "Comma"
-msgstr ""
-
-msgid "A decimal comma needs the semicolon delimiter."
-msgstr ""
-
-msgid ""
-"For Excel: start the file with a byte order mark, so that Excel reads it "
-"as UTF-8"
-msgstr ""
-
-msgid "Protect against spreadsheet formulas"
-msgstr ""
-
-msgid ""
-"Puts an apostrophe before =, +, -, @ (also their full-width forms) at the"
-" start of a description or category name, after leading spaces, or after "
-"a comma or semicolon inside it, so that a spreadsheet does not run them "
-"as formulas. Such values then differ from the stored ones, and a "
-"protected description may be too long to import again."
-msgstr ""
-
-msgid "Download CSV"
-msgstr ""
-
-msgid "Smallest amount"
-msgstr ""
-
-msgid "Largest amount"
-msgstr ""
-
-msgid "Description contains"
-msgstr ""
-
-msgid "None ticked: every category."
-msgstr ""
-
-msgid "Show entries"
-msgstr ""
-
-msgid "Clear filters"
-msgstr ""
-
-msgid "Entries"
-msgstr ""
-
-#, python-format
-msgid "%(first)d–%(last)d of %(num)d entry"
-msgid_plural "%(first)d–%(last)d of %(num)d entries"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "No entries match these filters."
-msgstr ""
-
-msgid "Entries matching the filters"
-msgstr ""
-
-#, python-format
-msgid "page %(number)d of %(pages)d"
-msgstr ""
-
-msgid "Select"
-msgstr ""
-
-#, python-format
-msgid "Select the entry of %(date)s, %(amount)s"
-msgstr ""
-
-msgid "closed"
-msgstr ""
-
-#, python-format
-msgid "Page %(number)d of %(pages)d"
-msgstr ""
-
-msgid "Change category"
-msgstr ""
-
-msgid ""
-"Tick entries in the list, or change all entries that match the filters. "
-"You confirm the change on the next page."
-msgstr ""
-
-msgid "New category"
-msgstr ""
-
-msgid "Change the ticked entries"
-msgstr ""
-
-#, python-format
-msgid "Change all %(num)d matching entry"
-msgid_plural "Change all %(num)d matching entries"
-msgstr[0] ""
-msgstr[1] ""
-
-#, python-format
-msgid "Move %(num)d entry to %(category)s?"
-msgid_plural "Move %(num)d entries to %(category)s?"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "Already in this category"
-msgstr ""
-
-msgid ""
-"The change is recorded in the workspace audit log. Monthly totals of "
-"these categories change with it."
-msgstr ""
-
-msgid "Every selected entry is already in this category; nothing would change."
+msgid "Reopen it on the month page."
 msgstr ""
 
 msgid "Defaults to your display name."
@@ -3319,5 +3329,32 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Saved %(rate)s of income"
+#~ msgstr ""
+
+#~ msgid "Overview"
+#~ msgstr ""
+
+#~ msgid "Monthly summary"
+#~ msgstr ""
+
+#~ msgid "Planned and actual amounts will appear here."
+#~ msgstr ""
+
+#~ msgid "Keep your monthly spending in view."
+#~ msgstr ""
+
+#~ msgid "Available"
+#~ msgstr ""
+
+#~ msgid "Income minus regular expenses."
+#~ msgstr ""
+
+#~ msgid "Nothing to show yet"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Your monthly plan and activity will "
+#~ "appear here once you start adding "
+#~ "items."
 #~ msgstr ""
 

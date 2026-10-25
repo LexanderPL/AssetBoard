@@ -22,7 +22,7 @@
   {% else %}
   <p class="mt-4 text-sm text-muted" data-nothing>{{ _("Every selected entry is already in this category; nothing would change.") }}</p>
   {% endif %}
-  <form method="post" action="{{ scoped_url(request, 'transactions_recategorize') }}" class="mt-6 flex flex-wrap gap-3">
+  <form method="post" action="{{ scoped_url(request, 'history_recategorize') }}" class="mt-6 flex flex-wrap gap-3">
     {{ csrf_input() }}
     {% for name, value in hidden_fields %}<input type="hidden" name="{{ name }}" value="{{ value }}">{% endfor %}
     {% if plan.changing %}<button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-confirm-change>{{ _("Change category") }}</button>{% endif %}

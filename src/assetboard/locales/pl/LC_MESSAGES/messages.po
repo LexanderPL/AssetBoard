@@ -1002,6 +1002,18 @@ msgstr "Usunięto kategorię."
 msgid "Suggested categories added."
 msgstr "Dodano proponowane kategorie."
 
+msgid "Expenses by category"
+msgstr "Wydatki według kategorii"
+
+msgid "Income by category"
+msgstr "Przychody według kategorii"
+
+msgid "No expenses yet this month"
+msgstr "W tym miesiącu nie ma jeszcze wydatków"
+
+msgid "No income yet this month"
+msgstr "W tym miesiącu nie ma jeszcze przychodów"
+
 msgid "The password is not correct."
 msgstr "Hasło jest nieprawidłowe."
 
@@ -1708,6 +1720,9 @@ msgstr "Strona główna"
 msgid "Main navigation"
 msgstr "Menu główne"
 
+msgid "History"
+msgstr "Historia"
+
 msgid "Recurring"
 msgstr "Cykliczne"
 
@@ -1777,33 +1792,38 @@ msgstr "Kontynuuj"
 msgid "Cancel"
 msgstr "Anuluj"
 
-msgid "Overview"
-msgstr "Podsumowanie"
+msgid "Open month"
+msgstr "Otwórz miesiąc"
 
-msgid "Monthly summary"
-msgstr "Podsumowanie miesiąca"
+msgid "This month"
+msgstr "Ten miesiąc"
 
-msgid "Planned and actual amounts will appear here."
-msgstr "Zaplanowane i rzeczywiste kwoty pojawią się tutaj."
+msgid "All upcoming items"
+msgstr "Wszystkie nadchodzące pozycje"
 
-msgid "Keep your monthly spending in view."
-msgstr "Śledź miesięczne wydatki."
+msgid "Estimate"
+msgstr "Szacunkowa"
 
-msgid "Available"
-msgstr "Pozostało"
+msgid "Overdue"
+msgstr "Zaległe"
 
-msgid "Income minus regular expenses."
-msgstr "Przychody pomniejszone o regularne wydatki."
+msgid "Mark paid or received"
+msgstr "Oznacz jako opłacone lub otrzymane"
 
-msgid "Nothing to show yet"
-msgstr "Na razie brak danych"
+msgid "Save transaction"
+msgstr "Zapisz transakcję"
 
-msgid ""
-"Your monthly plan and activity will appear here once you start adding "
-"items."
+msgid "Skip"
+msgstr "Pomiń"
+
+msgid "More items are waiting on the Upcoming page."
+msgstr "Więcej pozycji czeka na stronie Nadchodzące."
+
+#, python-format
+msgid "Nothing is overdue or due in the next %(days)d days."
 msgstr ""
-"Twój plan miesięczny i aktywność pojawią się tutaj, gdy dodasz pierwsze "
-"pozycje."
+"Brak zaległych pozycji i pozycji z terminem w ciągu kolejnych %(days)d "
+"dni."
 
 msgid "Link a sign-in method"
 msgstr "Powiąż metodę logowania"
@@ -2078,9 +2098,6 @@ msgstr "(od dostawcy tożsamości)"
 
 msgid "Never"
 msgstr "Nigdy"
-
-msgid "History"
-msgstr "Historia"
 
 msgid "Deactivate"
 msgstr "Dezaktywuj"
@@ -2475,6 +2492,195 @@ msgstr "Utwórz obszar roboczy"
 msgid "Return to overview"
 msgstr "Powrót do podsumowania"
 
+msgid "Export CSV"
+msgstr "Eksportuj CSV"
+
+msgid "Export as CSV"
+msgstr "Eksport do CSV"
+
+msgid "Close"
+msgstr "Zamknij"
+
+msgid ""
+"Downloads every entry that matches the filters, oldest first, in the "
+"columns of the workspace archive's transactions.csv. With the standard "
+"options the file can be imported again."
+msgstr ""
+"Pobiera wszystkie wpisy pasujące do filtrów, od najstarszych, w kolumnach"
+" pliku transactions.csv z archiwum przestrzeni roboczej. Przy "
+"standardowych opcjach plik można ponownie zaimportować."
+
+msgid "Delimiter"
+msgstr "Separator pól"
+
+msgid "Comma (standard)"
+msgstr "Przecinek (standardowo)"
+
+msgid "Semicolon"
+msgstr "Średnik"
+
+msgid "Decimal separator"
+msgstr "Separator dziesiętny"
+
+msgid "Dot (standard)"
+msgstr "Kropka (standardowo)"
+
+msgid "Comma"
+msgstr "Przecinek"
+
+msgid "A decimal comma needs the semicolon delimiter."
+msgstr "Przecinek dziesiętny wymaga średnika jako separatora pól."
+
+msgid ""
+"For Excel: start the file with a byte order mark, so that Excel reads it "
+"as UTF-8"
+msgstr ""
+"Dla Excela: rozpocznij plik znacznikiem kolejności bajtów (BOM), aby "
+"Excel odczytał go jako UTF-8"
+
+msgid "Protect against spreadsheet formulas"
+msgstr "Chroń przed formułami arkusza kalkulacyjnego"
+
+msgid ""
+"Puts an apostrophe before =, +, -, @ (also their full-width forms) at the"
+" start of a description or category name, after leading spaces, or after "
+"a comma or semicolon inside it, so that a spreadsheet does not run them "
+"as formulas. Such values then differ from the stored ones, and a "
+"protected description may be too long to import again."
+msgstr ""
+"Wstawia apostrof przed =, +, -, @ (także w formach pełnej szerokości) na "
+"początku opisu lub nazwy kategorii, po początkowych spacjach albo po "
+"przecinku lub średniku w ich treści, aby arkusz kalkulacyjny nie wykonał "
+"ich jako formuł. Takie wartości różnią się wtedy od zapisanych, a "
+"chroniony opis może być za długi do ponownego importu."
+
+msgid "Download CSV"
+msgstr "Pobierz CSV"
+
+msgid "Filters"
+msgstr "Filtry"
+
+msgid "Smallest amount"
+msgstr "Najmniejsza kwota"
+
+msgid "Largest amount"
+msgstr "Największa kwota"
+
+msgid "Description contains"
+msgstr "Opis zawiera"
+
+msgid "Expenses and income"
+msgstr "Wydatki i przychody"
+
+msgid "Order"
+msgstr "Kolejność"
+
+msgid "None ticked: every category."
+msgstr "Bez zaznaczenia: wszystkie kategorie."
+
+msgid "Show entries"
+msgstr "Pokaż wpisy"
+
+msgid "Clear filters"
+msgstr "Wyczyść filtry"
+
+msgid "Entries"
+msgstr "Wpisy"
+
+#, python-format
+msgid "%(first)d–%(last)d of %(num)d entry"
+msgid_plural "%(first)d–%(last)d of %(num)d entries"
+msgstr[0] "%(first)d–%(last)d z %(num)d wpisu"
+msgstr[1] "%(first)d–%(last)d z %(num)d wpisów"
+msgstr[2] "%(first)d–%(last)d z %(num)d wpisów"
+
+msgid "No entries match these filters."
+msgstr "Żaden wpis nie pasuje do tych filtrów."
+
+msgid "Entries matching the filters"
+msgstr "Wpisy pasujące do filtrów"
+
+#, python-format
+msgid "page %(number)d of %(pages)d"
+msgstr "strona %(number)d z %(pages)d"
+
+msgid "Select"
+msgstr "Zaznacz"
+
+msgid "Description"
+msgstr "Opis"
+
+#, python-format
+msgid "Select the entry of %(date)s, %(amount)s"
+msgstr "Zaznacz wpis z %(date)s, %(amount)s"
+
+msgid "closed"
+msgstr "zamknięty"
+
+msgid "Automatically posted"
+msgstr "Automatycznie zaksięgowano"
+
+msgid "archived"
+msgstr "zarchiwizowana"
+
+msgid "Previous"
+msgstr "Poprzedni"
+
+#, python-format
+msgid "Page %(number)d of %(pages)d"
+msgstr "Strona %(number)d z %(pages)d"
+
+msgid "Next"
+msgstr "Następny"
+
+msgid "Change category"
+msgstr "Zmień kategorię"
+
+msgid ""
+"Tick entries in the list, or change all entries that match the filters. "
+"You confirm the change on the next page."
+msgstr ""
+"Zaznacz wpisy na liście albo zmień wszystkie wpisy pasujące do filtrów. "
+"Zmianę potwierdzisz na następnej stronie."
+
+msgid "New category"
+msgstr "Nowa kategoria"
+
+msgid "Choose a category"
+msgstr "Wybierz kategorię"
+
+msgid "Change the ticked entries"
+msgstr "Zmień zaznaczone wpisy"
+
+#, python-format
+msgid "Change all %(num)d matching entry"
+msgid_plural "Change all %(num)d matching entries"
+msgstr[0] "Zmień %(num)d pasujący wpis"
+msgstr[1] "Zmień wszystkie %(num)d pasujące wpisy"
+msgstr[2] "Zmień wszystkie %(num)d pasujących wpisów"
+
+#, python-format
+msgid "Move %(num)d entry to %(category)s?"
+msgid_plural "Move %(num)d entries to %(category)s?"
+msgstr[0] "Przenieść %(num)d wpis do kategorii %(category)s?"
+msgstr[1] "Przenieść %(num)d wpisy do kategorii %(category)s?"
+msgstr[2] "Przenieść %(num)d wpisów do kategorii %(category)s?"
+
+msgid "Already in this category"
+msgstr "Już w tej kategorii"
+
+msgid ""
+"The change is recorded in the workspace audit log. Monthly totals of "
+"these categories change with it."
+msgstr ""
+"Zmiana zostanie zapisana w dzienniku zdarzeń przestrzeni roboczej. "
+"Zmienią się też miesięczne sumy tych kategorii."
+
+msgid "Every selected entry is already in this category; nothing would change."
+msgstr ""
+"Wszystkie zaznaczone wpisy są już w tej kategorii; nic by się nie "
+"zmieniło."
+
 msgid "Invitation"
 msgstr "Zaproszenie"
 
@@ -2497,6 +2703,9 @@ msgstr "Zaloguj się, aby przyjąć"
 
 msgid "Create account and join"
 msgstr "Utwórz konto i dołącz"
+
+msgid "Share"
+msgstr "Udział"
 
 msgid "Your password"
 msgstr "Twoje hasło"
@@ -2527,20 +2736,8 @@ msgstr "Pokaż wszystko"
 msgid "Day"
 msgstr "Dzień"
 
-msgid "Description"
-msgstr "Opis"
-
 msgid "Earlier descriptions"
 msgstr "Wcześniejsze opisy"
-
-msgid "Choose a category"
-msgstr "Wybierz kategorię"
-
-msgid "Automatically posted"
-msgstr "Automatycznie zaksięgowano"
-
-msgid "archived"
-msgstr "zarchiwizowana"
 
 #, python-format
 msgid "Edit the entry of %(date)s, %(amount)s"
@@ -2564,6 +2761,26 @@ msgstr ""
 
 msgid "Showing all entries."
 msgstr "Pokazano wszystkie wpisy."
+
+#, python-format
+msgid "Previous month: %(month)s"
+msgstr "Poprzedni miesiąc: %(month)s"
+
+#, python-format
+msgid "Next month: %(month)s"
+msgstr "Następny miesiąc: %(month)s"
+
+msgid "Today"
+msgstr "Dzisiaj"
+
+msgid "Go to month"
+msgstr "Przejdź do miesiąca"
+
+msgid "YYYY-MM"
+msgstr "RRRR-MM"
+
+msgid "Go"
+msgstr "Przejdź"
 
 msgid "(favourable)"
 msgstr "(korzystnie)"
@@ -2623,9 +2840,6 @@ msgstr "(ponad plan)"
 
 msgid "Planned"
 msgstr "Plan"
-
-msgid "Order"
-msgstr "Kolejność"
 
 msgid "Largest first"
 msgstr "Od największych"
@@ -2705,31 +2919,8 @@ msgstr "Dodaj kategorie, aby zaplanować ten miesiąc."
 msgid "Closed"
 msgstr "Zamknięty"
 
-#, python-format
-msgid "Previous month: %(month)s"
-msgstr "Poprzedni miesiąc: %(month)s"
-
-msgid "Previous"
-msgstr "Poprzedni"
-
-#, python-format
-msgid "Next month: %(month)s"
-msgstr "Następny miesiąc: %(month)s"
-
-msgid "Next"
-msgstr "Następny"
-
-msgid "Today"
-msgstr "Dzisiaj"
-
-msgid "Go to month"
-msgstr "Przejdź do miesiąca"
-
-msgid "YYYY-MM"
-msgstr "RRRR-MM"
-
-msgid "Go"
-msgstr "Przejdź"
+msgid "Enter transactions"
+msgstr "Wprowadź transakcje"
 
 msgid "This month is closed. Its entries and planned values are read-only."
 msgstr ""
@@ -2798,9 +2989,6 @@ msgstr "Rodzaj kwoty"
 
 msgid "Fixed"
 msgstr "Stała"
-
-msgid "Estimate"
-msgstr "Szacunkowa"
 
 msgid "Automatically post on the due date"
 msgstr "Automatycznie księguj w terminie"
@@ -2938,12 +3126,6 @@ msgstr "Brak kolejnych wystąpień pasujących do tej reguły."
 msgid "Occurrence marked paid or received."
 msgstr "Wystąpienie oznaczono jako opłacone lub otrzymane."
 
-msgid "Filters"
-msgstr "Filtry"
-
-msgid "Expenses and income"
-msgstr "Wydatki i przychody"
-
 msgid "All categories"
 msgstr "Wszystkie kategorie"
 
@@ -2964,17 +3146,8 @@ msgstr "Tydzień od %(date)s"
 msgid "Automatic posting"
 msgstr "Automatyczne księgowanie"
 
-msgid "Overdue"
-msgstr "Zaległe"
-
 msgid "Rescheduled for this occurrence"
 msgstr "Zmieniono termin tego wystąpienia"
-
-msgid "Mark paid or received"
-msgstr "Oznacz jako opłacone lub otrzymane"
-
-msgid "Save transaction"
-msgstr "Zapisz transakcję"
 
 msgid "Reschedule this one"
 msgstr "Zmień termin tylko tego wystąpienia"
@@ -2990,15 +3163,6 @@ msgstr "Edytuj kwotę"
 
 msgid "Save amount"
 msgstr "Zapisz kwotę"
-
-msgid "Skip"
-msgstr "Pomiń"
-
-#, python-format
-msgid "Nothing is overdue or due in the next %(days)d days."
-msgstr ""
-"Brak zaległych pozycji i pozycji z terminem w ciągu kolejnych %(days)d "
-"dni."
 
 msgid "Tax calculator"
 msgstr "Kalkulator podatków"
@@ -3128,167 +3292,11 @@ msgstr ""
 "znaczenie istniejących wersji stawek. Utwórz osobną regułę dla innego "
 "podatku."
 
-msgid "Export CSV"
-msgstr "Eksportuj CSV"
+msgid "Month summary"
+msgstr "Podsumowanie miesiąca"
 
-msgid "Export as CSV"
-msgstr "Eksport do CSV"
-
-msgid "Close"
-msgstr "Zamknij"
-
-msgid ""
-"Downloads every entry that matches the filters, oldest first, in the "
-"columns of the workspace archive's transactions.csv. With the standard "
-"options the file can be imported again."
-msgstr ""
-"Pobiera wszystkie wpisy pasujące do filtrów, od najstarszych, w kolumnach"
-" pliku transactions.csv z archiwum przestrzeni roboczej. Przy "
-"standardowych opcjach plik można ponownie zaimportować."
-
-msgid "Delimiter"
-msgstr "Separator pól"
-
-msgid "Comma (standard)"
-msgstr "Przecinek (standardowo)"
-
-msgid "Semicolon"
-msgstr "Średnik"
-
-msgid "Decimal separator"
-msgstr "Separator dziesiętny"
-
-msgid "Dot (standard)"
-msgstr "Kropka (standardowo)"
-
-msgid "Comma"
-msgstr "Przecinek"
-
-msgid "A decimal comma needs the semicolon delimiter."
-msgstr "Przecinek dziesiętny wymaga średnika jako separatora pól."
-
-msgid ""
-"For Excel: start the file with a byte order mark, so that Excel reads it "
-"as UTF-8"
-msgstr ""
-"Dla Excela: rozpocznij plik znacznikiem kolejności bajtów (BOM), aby "
-"Excel odczytał go jako UTF-8"
-
-msgid "Protect against spreadsheet formulas"
-msgstr "Chroń przed formułami arkusza kalkulacyjnego"
-
-msgid ""
-"Puts an apostrophe before =, +, -, @ (also their full-width forms) at the"
-" start of a description or category name, after leading spaces, or after "
-"a comma or semicolon inside it, so that a spreadsheet does not run them "
-"as formulas. Such values then differ from the stored ones, and a "
-"protected description may be too long to import again."
-msgstr ""
-"Wstawia apostrof przed =, +, -, @ (także w formach pełnej szerokości) na "
-"początku opisu lub nazwy kategorii, po początkowych spacjach albo po "
-"przecinku lub średniku w ich treści, aby arkusz kalkulacyjny nie wykonał "
-"ich jako formuł. Takie wartości różnią się wtedy od zapisanych, a "
-"chroniony opis może być za długi do ponownego importu."
-
-msgid "Download CSV"
-msgstr "Pobierz CSV"
-
-msgid "Smallest amount"
-msgstr "Najmniejsza kwota"
-
-msgid "Largest amount"
-msgstr "Największa kwota"
-
-msgid "Description contains"
-msgstr "Opis zawiera"
-
-msgid "None ticked: every category."
-msgstr "Bez zaznaczenia: wszystkie kategorie."
-
-msgid "Show entries"
-msgstr "Pokaż wpisy"
-
-msgid "Clear filters"
-msgstr "Wyczyść filtry"
-
-msgid "Entries"
-msgstr "Wpisy"
-
-#, python-format
-msgid "%(first)d–%(last)d of %(num)d entry"
-msgid_plural "%(first)d–%(last)d of %(num)d entries"
-msgstr[0] "%(first)d–%(last)d z %(num)d wpisu"
-msgstr[1] "%(first)d–%(last)d z %(num)d wpisów"
-msgstr[2] "%(first)d–%(last)d z %(num)d wpisów"
-
-msgid "No entries match these filters."
-msgstr "Żaden wpis nie pasuje do tych filtrów."
-
-msgid "Entries matching the filters"
-msgstr "Wpisy pasujące do filtrów"
-
-#, python-format
-msgid "page %(number)d of %(pages)d"
-msgstr "strona %(number)d z %(pages)d"
-
-msgid "Select"
-msgstr "Zaznacz"
-
-#, python-format
-msgid "Select the entry of %(date)s, %(amount)s"
-msgstr "Zaznacz wpis z %(date)s, %(amount)s"
-
-msgid "closed"
-msgstr "zamknięty"
-
-#, python-format
-msgid "Page %(number)d of %(pages)d"
-msgstr "Strona %(number)d z %(pages)d"
-
-msgid "Change category"
-msgstr "Zmień kategorię"
-
-msgid ""
-"Tick entries in the list, or change all entries that match the filters. "
-"You confirm the change on the next page."
-msgstr ""
-"Zaznacz wpisy na liście albo zmień wszystkie wpisy pasujące do filtrów. "
-"Zmianę potwierdzisz na następnej stronie."
-
-msgid "New category"
-msgstr "Nowa kategoria"
-
-msgid "Change the ticked entries"
-msgstr "Zmień zaznaczone wpisy"
-
-#, python-format
-msgid "Change all %(num)d matching entry"
-msgid_plural "Change all %(num)d matching entries"
-msgstr[0] "Zmień %(num)d pasujący wpis"
-msgstr[1] "Zmień wszystkie %(num)d pasujące wpisy"
-msgstr[2] "Zmień wszystkie %(num)d pasujących wpisów"
-
-#, python-format
-msgid "Move %(num)d entry to %(category)s?"
-msgid_plural "Move %(num)d entries to %(category)s?"
-msgstr[0] "Przenieść %(num)d wpis do kategorii %(category)s?"
-msgstr[1] "Przenieść %(num)d wpisy do kategorii %(category)s?"
-msgstr[2] "Przenieść %(num)d wpisów do kategorii %(category)s?"
-
-msgid "Already in this category"
-msgstr "Już w tej kategorii"
-
-msgid ""
-"The change is recorded in the workspace audit log. Monthly totals of "
-"these categories change with it."
-msgstr ""
-"Zmiana zostanie zapisana w dzienniku zdarzeń przestrzeni roboczej. "
-"Zmienią się też miesięczne sumy tych kategorii."
-
-msgid "Every selected entry is already in this category; nothing would change."
-msgstr ""
-"Wszystkie zaznaczone wpisy są już w tej kategorii; nic by się nie "
-"zmieniło."
+msgid "Reopen it on the month page."
+msgstr "Można go ponownie otworzyć na stronie miesiąca."
 
 msgid "Defaults to your display name."
 msgstr "Domyślnie Twoja wyświetlana nazwa."
@@ -3558,4 +3566,31 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Not available: nothing earned"
 #~ msgstr "Niedostępne: brak zarobków"
+
+#~ msgid "Overview"
+#~ msgstr "Podsumowanie"
+
+#~ msgid "Planned and actual amounts will appear here."
+#~ msgstr "Zaplanowane i rzeczywiste kwoty pojawią się tutaj."
+
+#~ msgid "Keep your monthly spending in view."
+#~ msgstr "Śledź miesięczne wydatki."
+
+#~ msgid "Available"
+#~ msgstr "Pozostało"
+
+#~ msgid "Income minus regular expenses."
+#~ msgstr "Przychody pomniejszone o regularne wydatki."
+
+#~ msgid "Nothing to show yet"
+#~ msgstr "Na razie brak danych"
+
+#~ msgid ""
+#~ "Your monthly plan and activity will "
+#~ "appear here once you start adding "
+#~ "items."
+#~ msgstr ""
+#~ "Twój plan miesięczny i aktywność pojawią"
+#~ " się tutaj, gdy dodasz pierwsze "
+#~ "pozycje."
 

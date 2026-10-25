@@ -134,8 +134,8 @@ def test_f26_search_export_and_bulk_change_in_a_browser(tmp_path: Path) -> None:
             _seed_rows(app)
 
             # The navigation leads to the list: newest first, 50 per page.
-            page.locator("[data-transactions-link]").first.click()
-            page.wait_for_url(f"{base}/transactions")
+            page.locator("[data-history-link]").first.click()
+            page.wait_for_url(f"{base}/history")
             expect(page.locator("[data-result-count]")).to_have_text("1–50 of 56 entries")
             expect(page.locator("[data-page-number]")).to_have_text("Page 1 of 2")
             page.locator("[data-next]").click()
@@ -143,17 +143,17 @@ def test_f26_search_export_and_bulk_change_in_a_browser(tmp_path: Path) -> None:
             assert _descriptions(page)[-2:] == ["March pay", "Żabka"]
 
             # Filter by text (case and Polish letters fold) and by kind.
-            page.goto(f"{base}/transactions")
+            page.goto(f"{base}/history")
             page.get_by_label("Description contains").fill("ŻAB")
             page.get_by_role("button", name="Show entries").click()
-            expect(page).to_have_url(re.compile(r"/transactions\?.*q=%C5%BBAB"))  # bookmarkable
+            expect(page).to_have_url(re.compile(r"/history\?.*q=%C5%BBAB"))  # bookmarkable
             assert _descriptions(page) == ["Żabka"]
             page.get_by_label("Description contains").fill("")
             page.get_by_label("Kind", exact=True).select_option("income")
             page.get_by_role("button", name="Show entries").click()
             assert _descriptions(page) == ["March pay"]
             # Amount range in the user's format, smallest first.
-            page.goto(f"{base}/transactions")
+            page.goto(f"{base}/history")
             page.get_by_label("Smallest amount").fill("4.2")
             page.get_by_label("Largest amount").fill("12,5")
             page.get_by_label("Order", exact=True).select_option("amount")
@@ -166,7 +166,7 @@ def test_f26_search_export_and_bulk_change_in_a_browser(tmp_path: Path) -> None:
             expect(page.get_by_label("Largest amount")).to_have_attribute("aria-invalid", "true")
 
             # Export the filtered rows with semicolons and a decimal comma.
-            page.goto(f"{base}/transactions?min=4.2&max=12.5")
+            page.goto(f"{base}/history?min=4.2&max=12.5")
             # The options sit in a dialog behind the header's "Export CSV" button.
             expect(page.get_by_label("Delimiter")).to_be_hidden()
             page.locator("[data-export-open]").click()
@@ -191,7 +191,7 @@ def test_f26_search_export_and_bulk_change_in_a_browser(tmp_path: Path) -> None:
             assert lines[2].startswith("2025-04-02;expense;4,20;EUR;Food;Bakery;")
             assert lines[3:] == [""]
             # A decimal comma with commas is refused on the page.
-            page.goto(f"{base}/transactions")
+            page.goto(f"{base}/history")
             page.locator("[data-export-open]").click()
             page.get_by_label("Decimal separator").select_option("comma")
             page.get_by_role("button", name="Download CSV").click()
@@ -202,7 +202,7 @@ def test_f26_search_export_and_bulk_change_in_a_browser(tmp_path: Path) -> None:
             assert page.evaluate("document.querySelector('#export-dialog').matches(':modal')")
 
             # Bulk change: tick two entries, review, confirm.
-            page.goto(f"{base}/transactions?min=4.2&max=12.5")
+            page.goto(f"{base}/history?min=4.2&max=12.5")
             page.get_by_label("Select the entry of Mar 7, 2025, €12.50").check()
             page.get_by_label("Select the entry of Apr 2, 2025, €4.20").check()
             page.get_by_label("New category").select_option(label="Eating out")
@@ -217,7 +217,7 @@ def test_f26_search_export_and_bulk_change_in_a_browser(tmp_path: Path) -> None:
 
             # Changing every matching entry is refused as a whole when a month is closed
             # between the review and the confirmation.
-            page.goto(f"{base}/transactions?direction=expense&q=a")
+            page.goto(f"{base}/history?direction=expense&q=a")
             page.get_by_label("New category").select_option(label="Food")
             page.get_by_role("button", name="Change all 2 matching entries").click()
             expect(page.locator("#confirm-heading")).to_have_text("Move 2 entries to Food?")
@@ -254,7 +254,7 @@ def test_f26_search_export_and_bulk_change_in_a_browser(tmp_path: Path) -> None:
                 session.add(Membership(workspace_id=workspace.id, user_id=viewer.id, role="viewer"))
             viewer_page = browser.new_context(color_scheme="light").new_page()
             _sign_in(viewer_page, base, "viewer@example.com")
-            viewer_page.goto(f"{base}/transactions")
+            viewer_page.goto(f"{base}/history")
             expect(viewer_page.locator("[data-result-count]")).to_have_text("1–50 of 56 entries")
             expect(viewer_page.locator("[data-bulk], input[name=ids]")).to_have_count(0)
             viewer_page.locator("[data-export-open]").click()

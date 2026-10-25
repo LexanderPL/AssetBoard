@@ -53,8 +53,16 @@ async def _values(request: Request) -> dict[str, str]:
 
 
 def _redirect(
-    request: Request, *, error: str | None = None, posted: UUID | None = None
+    request: Request,
+    *,
+    error: str | None = None,
+    posted: UUID | None = None,
+    back: str = "",
 ) -> Response:
+    """Back to the Upcoming page, or to Home after a successful action sent from there (F2.7:
+    ``back=home``; any other value means the Upcoming page). Errors are shown on Upcoming."""
+    if back == "home" and error is None:
+        return RedirectResponse(request.url_for("home").path, status_code=303)
     params: dict[str, str] = {}
     if error:
         params["error"] = error
@@ -146,11 +154,12 @@ async def post(request: Request, ctx: CurrentContext, occurrence_id: str) -> Res
         )
     except occurrences.OccurrenceError as exc:
         return _redirect(request, error=exc.code)
-    return _redirect(request, posted=_id(occurrence_id))
+    return _redirect(request, posted=_id(occurrence_id), back=values.get("back", ""))
 
 
 @router.post("/upcoming/{occurrence_id}/skip", name="upcoming_skip")
 async def skip(request: Request, ctx: CurrentContext, occurrence_id: str) -> Response:
+    values = await _values(request)
     try:
         await run_in_threadpool(
             occurrences.skip_occurrence,
@@ -160,7 +169,7 @@ async def skip(request: Request, ctx: CurrentContext, occurrence_id: str) -> Res
         )
     except occurrences.OccurrenceError as exc:
         return _redirect(request, error=exc.code)
-    return _redirect(request)
+    return _redirect(request, back=values.get("back", ""))
 
 
 @router.post("/upcoming/{occurrence_id}/reschedule", name="upcoming_reschedule")

@@ -80,6 +80,7 @@ from assetboard.web.tax_routes import router as tax_router
 from assetboard.web.totp_routes import router as totp_router
 from assetboard.web.transaction_list_routes import router as transaction_list_router
 from assetboard.web.transaction_routes import router as transaction_router
+from assetboard.web.transactions_page_routes import router as transactions_page_router
 from assetboard.web.upcoming_routes import router as upcoming_router
 from assetboard.web.workspace_routes import router as workspace_router
 
@@ -285,6 +286,7 @@ def create_app(
     app.include_router(plan_router)
     app.include_router(transaction_router)
     app.include_router(transaction_list_router)
+    app.include_router(transactions_page_router)
     app.include_router(invite_router)
     app.include_router(oidc_router)
     app.include_router(proxy_router)

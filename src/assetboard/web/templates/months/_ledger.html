@@ -1,4 +1,4 @@
-{# The month page's transaction tables (F2.2 part B). ``ledger`` is web.ledger.LedgerView.
+{# The Transactions page's tables (F2.2 part B, F2.7). ``ledger`` is web.ledger.LedgerView.
    Entry and edit forms sit in the actions cell; their inputs join them with the ``form``
    attribute (a form cannot wrap a table row). Keyboard handling, focus after a swap and the
    autocomplete list are in static/js/app.js (data-* hooks); no inline script or style.
@@ -17,7 +17,7 @@
 {# The filter bar sits in the (only) table shown, so a write's section swap keeps its count. #}
 {% macro filter_bar() -%}
   {% if ledger.filter %}
-  {% set all_href = scoped_url(request, 'month', month=ledger.month|string) %}
+  {% set all_href = scoped_url(request, 'transactions_month', month=ledger.month|string) %}
   <p class="flex flex-wrap items-center gap-3 mt-2 rounded-xl border border-line bg-subtle px-4 py-3 text-sm" data-ledger-filter-bar>
     <span>{{ ngettext("Showing %(name)s only (%(num)d entry).", "Showing %(name)s only (%(num)d entries).", ledger.filter.count, name=ledger.filter.name) }}</span>
     <a href="{{ all_href }}#ledger" hx-get="{{ all_href }}" hx-select="#ledger" hx-target="#ledger" hx-swap="outerHTML" hx-push-url="true" class="font-medium text-primary-ink underline" data-ledger-show-all>{{ _("Show all") }}</a>
@@ -110,7 +110,7 @@
       {{ filter_input() }}
       <button type="submit" data-edit-save class="{{ primary_class }}">{{ _("Save") }}</button>
     </form>
-    <a href="{{ scoped_url(request, 'month', month=ledger.month|string) }}{% if ledger.filter %}?category={{ ledger.filter_id }}{% endif %}#tx-{{ row_id }}" hx-get="{{ scoped_url(request, 'transaction_row', month=ledger.month|string, transaction_id=row_id) }}" hx-target="#tx-{{ row_id }}" hx-swap="outerHTML" data-edit-cancel class="{{ small_class }}">{{ _("Cancel") }}</a>
+    <a href="{{ scoped_url(request, 'transactions_month', month=ledger.month|string) }}{% if ledger.filter %}?category={{ ledger.filter_id }}{% endif %}#tx-{{ row_id }}" hx-get="{{ scoped_url(request, 'transaction_row', month=ledger.month|string, transaction_id=row_id) }}" hx-target="#tx-{{ row_id }}" hx-swap="outerHTML" data-edit-cancel class="{{ small_class }}">{{ _("Cancel") }}</a>
   </td>
 </tr>
 {%- endmacro %}
@@ -127,7 +127,7 @@
   <td class="py-2 pr-2"><span class="flex items-center gap-2">{{ swatch(r.t.category_color) }}<span data-category-name>{{ r.t.category_name }}</span>{% if r.t.category_archived %}<span class="text-xs {{ muted_class }}">{{ _("archived") }}</span>{% endif %}</span></td>
   {% if ledger.can_write %}
   <td class="whitespace-nowrap py-1 text-right">
-    <a href="{{ scoped_url(request, 'month', month=ledger.month|string) }}?edit={{ row_id }}{% if ledger.filter %}&amp;category={{ ledger.filter_id }}{% endif %}#tx-{{ row_id }}" hx-get="{{ scoped_url(request, 'transaction_edit', month=ledger.month|string, transaction_id=row_id) }}" hx-target="#tx-{{ row_id }}" hx-swap="outerHTML"{{ autofocus(s.state, "row:" ~ row_id) }} data-edit aria-label="{{ _('Edit the entry of %(date)s, %(amount)s', date=r.full_date, amount=r.amount) }}" class="{{ small_class }}">{{ _("Edit") }}</a>
+    <a href="{{ scoped_url(request, 'transactions_month', month=ledger.month|string) }}?edit={{ row_id }}{% if ledger.filter %}&amp;category={{ ledger.filter_id }}{% endif %}#tx-{{ row_id }}" hx-get="{{ scoped_url(request, 'transaction_edit', month=ledger.month|string, transaction_id=row_id) }}" hx-target="#tx-{{ row_id }}" hx-swap="outerHTML"{{ autofocus(s.state, "row:" ~ row_id) }} data-edit aria-label="{{ _('Edit the entry of %(date)s, %(amount)s', date=r.full_date, amount=r.amount) }}" class="{{ small_class }}">{{ _("Edit") }}</a>
     {% set delete_action = scoped_url(request, 'transaction_delete', month=ledger.month|string, transaction_id=row_id) %}
     <form method="post" action="{{ delete_action }}" hx-post="{{ delete_action }}" hx-target="#ledger-{{ s.direction }}" hx-swap="outerHTML" class="inline">
       {{ csrf_input() }}
@@ -178,8 +178,8 @@
 
 
 {# The transaction tables (#ledger): with a category filter (F2.4) only that category's table
-   and rows, with a bar in it saying so and a way back. The month page's links in the summary swap
-   this element (hx-select), and push the filtered address. #}
+   and rows, with a bar in it saying so and a way back ("Show all" swaps this element). The Month
+   page's category links open this page filtered. #}
 {% macro tables() -%}
 {% if ledger.filter %}
 {% set announce = ngettext("Showing %(name)s only (%(num)d entry).", "Showing %(name)s only (%(num)d entries).", ledger.filter.count, name=ledger.filter.name) %}
