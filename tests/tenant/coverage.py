@@ -102,6 +102,7 @@ CURRENT_WORKSPACE_METHOD_COVERAGE: dict[str, str] = {
     "get": "test_current_workspace_repository_touches_only_its_workspace",
     "update": "test_current_workspace_repository_touches_only_its_workspace",
     "lock": "test_current_workspace_repository_touches_only_its_workspace",
+    "delete_with_all_data": "test_deleting_a_workspace_removes_every_owned_row_and_nothing_else",
 }
 
 # InstanceAuditReader reads only instance-level events (workspace_id IS NULL), never a

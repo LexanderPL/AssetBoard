@@ -80,6 +80,8 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     "setup.create_admin": (),
     "workspace.settings_updated": ("fields",),
     "workspace.created": (),
+    # Instance scope: the workspace and its own log are gone (ADR-0020).
+    "workspace.delete": ("name",),
     "instance.settings_updated": ("allow_workspace_creation", "allow_registration"),
     "member.role_changed": ("from", "to"),
     "member.removed": ("role",),
@@ -160,6 +162,7 @@ ACTION_LABELS: dict[str, str] = {
     "admin.totp_reset": _("Two-factor authentication reset by an administrator"),
     "workspace.settings_updated": _("Workspace settings changed"),
     "workspace.created": _("Workspace created"),
+    "workspace.delete": _("Workspace deleted"),
     "instance.settings_updated": _("Instance settings changed"),
     "member.role_changed": _("Member role changed"),
     "member.removed": _("Member removed"),
@@ -400,6 +403,7 @@ GROUPS: dict[Scope, dict[str, tuple[str, ...]]] = {
             *AUDIT_DATA_KEYS,
         ),
         "instance_settings": ("instance.settings_updated",),
+        "workspaces": ("workspace.delete",),
     },
 }
 GROUP_LABELS: dict[str, str] = {
@@ -415,6 +419,7 @@ GROUP_LABELS: dict[str, str] = {
     "links": _("Linked sign-in methods"),
     "accounts": _("Account administration"),
     "instance_settings": _("Instance settings"),
+    "workspaces": _("Deleted workspaces"),
 }
 
 

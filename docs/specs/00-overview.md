@@ -66,6 +66,7 @@ Anything the user will want a trend of is stored historically: manual valuations
 
 ### 3.9 Audit and deletion
 - Soft delete (`deleted_at`) for user-entered financial rows; UI offers undo for ~10 s and a trash view later.
+- Exception: deleting a whole workspace (owners, typed-name confirmation) removes it and all its rows, its own audit events included, for good; one instance-level `workspace.delete` event remains ([ADR-0020](../adr/0020-hard-workspace-deletion.md)).
 - `AuditEvent(workspace_id?, actor_user_id, action, entity_type, entity_id, data JSON, ts)` written by services for create/update/delete of financial data and for auth/admin events.
 
 ### 3.10 IDs and time
