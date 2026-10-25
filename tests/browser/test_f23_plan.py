@@ -1,6 +1,6 @@
 """Planned values on the month page in Chromium (F2.3 part B): typing a plan with Enter and Tab,
-Esc, a refused value, the copy banner, a half-typed planned value surviving a transaction write
-that refreshes the summary, the automatic copy setting, and no CSP violations."""
+Esc, a refused value, the copy banner, an entry from the Transactions page shown in the summary
+(F2.7), the automatic copy setting, and no CSP violations."""
 
 from __future__ import annotations
 
@@ -149,40 +149,21 @@ def test_f23_plan_in_a_browser(tmp_path: Path) -> None:
             expect(food).to_have_value("550.00")
             expect(food).to_be_focused()
 
-            # A transaction write refreshes the summary out of band: a planned value being
-            # typed keeps its text and focus, and is saved when the field is left.
-            slow.delay = 0.8
+            # F2.7: entries are made on the Transactions page (no summary there, so no
+            # out-of-band swap can disturb a planned value); the Month summary shows them.
+            food.fill("42")
+            page.keyboard.press("Tab")
+            expect(status).to_have_text("Planned value saved.")
+            page.goto(f"{base}/transactions/{MARCH}")
             page.locator("#entry-expense-day").fill("3")
             page.locator("#entry-expense-amount").fill("12.50")
             page.locator("#entry-expense-category").select_option(label="Food")
             page.locator("#entry-expense-amount").press("Enter")
-            food.click()
-            page.keyboard.press("Control+A")
-            page.keyboard.type("42")
             expect(page.locator("#ledger-expense [data-amount]")).to_have_text(["€12.50"])
-            expect(food).to_be_focused()
-            expect(food).to_have_value("42")
-            slow.delay = 0
-            page.keyboard.press("Tab")
-            expect(status).to_have_text("Planned value saved.")
-            page.reload()
+            expect(page.locator("#month-summary")).to_have_count(0)
+            page.goto(f"{base}/m/{MARCH}")
             expect(food).to_have_value("42.00")
-
-            # A cell's save that finishes after a transaction write replaced the summary lands
-            # in the new block's row (not the detached old one).
-            slow.plan_delay = 1.0
-            food.fill("77")
-            page.keyboard.press("Tab")  # the save is on its way, slowly
-            page.locator("#entry-expense-day").fill("4")
-            page.locator("#entry-expense-amount").fill("1")
-            page.locator("#entry-expense-category").select_option(label="Food")
-            page.locator("#entry-expense-amount").press("Enter")
-            expect(page.locator("#ledger-expense [data-amount]")).to_have_count(2)
-            expect(food).to_have_value("77.00")
-            expect(food).to_have_attribute("data-saved-value", "77.00")
-            slow.plan_delay = 0
-            page.reload()
-            expect(food).to_have_value("77.00")
+            expect(page.locator("[data-plan-row]", has=food)).to_contain_text("€12.50")
 
             # The workspace setting copies the plan when a later month is first opened.
             page.goto(f"{base}/workspace/settings")

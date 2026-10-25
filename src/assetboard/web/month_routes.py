@@ -1,8 +1,9 @@
 """Month pages (F2.5): ``/m/YYYY-MM`` with navigation, the month picker, closing and reopening.
 
-The page is the shell that F2.2-F2.4 fill: F2.2 adds the transaction tables
-(``web.ledger``; the writes are in ``web.transaction_routes``), F2.3 planned values and F2.4
-the summary. F2.3 fills the summary block with the planned values (``web.plan``; the writes are
+Since F2.7 the Month page is a summary: F2.3's planned values, F2.4's summary with the flow bar,
+and the expense donut (``web.charts``). The transaction tables moved to the Transactions page
+(``web.transactions_page_routes``), which shares ``month_header`` and the navigation partial.
+F2.3 fills the summary block with the planned values (``web.plan``; the writes are
 in ``web.plan_routes``) and runs the automatic plan copy when an editor opens a month page
 (``services.budget.auto_copy_on_open``: a GET that writes at most once per month, by design).
 Authorization happens in ``services.months``; plain form posts redirect (303)
@@ -13,9 +14,8 @@ by the router-level ``require_csrf`` dependency.
 from __future__ import annotations
 
 import re
-from collections.abc import Mapping
-from dataclasses import replace
-from typing import Annotated
+from typing import Annotated, cast
+from urllib.parse import urlencode
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
@@ -32,23 +32,17 @@ from assetboard.services.context import Context
 from assetboard.services.income import missing_work_logs
 from assetboard.services.months import (
     MonthError,
+    MonthView,
     close_month,
     current_month,
     get_month,
     reopen_month,
 )
-from assetboard.services.transactions import get_transaction, pending_undo
+from assetboard.web.charts import build_donut
 from assetboard.web.context import CurrentContext
-from assetboard.web.ledger import (
-    DIRECTIONS,
-    ENTRY_DAY,
-    SectionState,
-    build_ledger,
-    edit_values,
-    parse_filter,
-)
+from assetboard.web.ledger import parse_filter
 from assetboard.web.plan import PLAN_ERRORS, CellState, build_summary, summary_context
-from assetboard.web.rendering import render_template
+from assetboard.web.rendering import render_template, scoped_url
 from assetboard.web.security import require_csrf
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
@@ -128,47 +122,18 @@ async def month_current(
     return RedirectResponse(_month_path(request, target), status_code=303)
 
 
-def month_context(
-    request: Request,
-    ctx: Context,
-    target: YearMonth,
-    *,
-    notice: str = "",
-    error: str = "",
-    states: Mapping[str, SectionState] | None = None,
-    deleted: UUID | None = None,
-    saved_in: YearMonth | None = None,
-    plan_cell: CellState | None = None,
-    copied: CopyResult | None = None,
-    automatic: bool = False,
-    filter_id: UUID | None = None,
+def month_header(
+    request: Request, ctx: Context, target: YearMonth, *, notice: str = "", error: str = ""
 ) -> dict[str, object]:
-    """The month page's context (blocking: run in a thread). ``states`` carry the transaction
-    tables' form values and messages; ``deleted`` offers Undo (pages without JavaScript) while
-    that row of this month can still be restored; ``plan_cell`` is a refused planned value and
-    ``copied`` a plan copy to report."""
-    factory = request.app.state.session_factory
-    view = get_month(factory, ctx, target)
+    """What the Month and Transactions pages share (blocking: run in a thread): the month,
+    its headings, navigation names, closed state, the notice or error of the last action and
+    the F3.5 missing-work-log banner."""
+    view = get_month(request.app.state.session_factory, ctx, target)
     locale = request.state.locale
     closed_on = None
     if view.closed_at is not None:
         local = view.closed_at.astimezone(ZoneInfo(ctx.workspace.timezone)).date()
         closed_on = format_day(local, locale)
-    ledger = build_ledger(factory, ctx, request, view, states, filter_id)
-    missing_logs = [
-        (source_id, name, format_month(YearMonth.from_date(work_month), locale))
-        for source_id, name, work_month in missing_work_logs(factory, ctx, view.month.first_day)
-    ]
-    pending = None
-    if deleted is not None and ledger.can_write:
-        pending = pending_undo(factory, ctx, deleted)
-        if pending is not None and pending.month != target:
-            pending = None
-    notice_text = _t(request, NOTICES[notice]) if notice in NOTICES else None
-    saved_in_href = None
-    if saved_in is not None and saved_in != target:
-        notice_text = _t(request, SAVED_IN) % {"month": format_month(saved_in, locale)}
-        saved_in_href = _month_path(request, saved_in)
     return {
         "view": view,
         "month_heading": format_month_heading(view.month, locale),  # heading and title
@@ -176,25 +141,47 @@ def month_context(
         "prev_name": format_month(view.prev, locale) if view.prev else None,
         "next_name": format_month(view.next, locale) if view.next else None,
         "closed_on": closed_on,
-        "notice": notice_text,
-        "notice_href": saved_in_href,
+        "notice": _t(request, NOTICES[notice]) if notice in NOTICES else None,
+        "notice_href": None,
         "error": _t(request, ERRORS[error]) if error in ERRORS else None,
-        "ledger": ledger,
-        "missing_work_logs": missing_logs,
-        **summary_context(
-            build_summary(
-                factory,
-                ctx,
-                request,
-                view,
-                cell=plan_cell,
-                copied=copied,
-                automatic=automatic,
-                filter_id=ledger.filter.category_id if ledger.filter else None,
+        "missing_work_logs": [
+            (source_id, name, format_month(YearMonth.from_date(work_month), locale))
+            for source_id, name, work_month in missing_work_logs(
+                request.app.state.session_factory, ctx, view.month.first_day
             )
-        ),
-        "deleted": pending.id if pending is not None else None,
+        ],
     }
+
+
+def month_context(
+    request: Request,
+    ctx: Context,
+    target: YearMonth,
+    *,
+    notice: str = "",
+    error: str = "",
+    plan_cell: CellState | None = None,
+    copied: CopyResult | None = None,
+    automatic: bool = False,
+) -> dict[str, object]:
+    """The Month page's context (blocking: run in a thread): the summary with its flow bar
+    and planned values, and the expense donut (F2.7: no entry form, no transaction list).
+    ``plan_cell`` is a refused planned value and ``copied`` a plan copy to report."""
+    context = month_header(request, ctx, target, notice=notice, error=error)
+    view = cast(MonthView, context["view"])
+    summary = build_summary(
+        request.app.state.session_factory,
+        ctx,
+        request,
+        view,
+        cell=plan_cell,
+        copied=copied,
+        automatic=automatic,
+    )
+    donuts = ()
+    if summary.source is not None:
+        donuts = (build_donut(summary.source, "expense", request.state.locale),)
+    return {**context, **summary_context(summary), "donuts": donuts}
 
 
 def _optional_uuid(value: str) -> UUID | None:
@@ -239,32 +226,20 @@ async def month_page(
     month: str,
     notice: str = "",
     error: str = "",
-    edit: str = "",
-    deleted: str = "",
-    saved_in: str = "",
-    entry: str = "",
-    day: str = "",
     plan_copied: str = "",
     plan_skipped: str = "",
-    category: str = "",
 ) -> Response:
-    """The month page. For browsers without JavaScript: ``?edit=<id>`` opens a row for
-    editing, ``?deleted=<id>`` offers Undo, ``?entry=<direction>&day=<day>`` prefills that
-    table's entry row with the day just used. ``?saved_in=YYYY-MM`` links an entry saved to
-    another month. ``?plan_copied=N&plan_skipped=M`` reports a plan copy. ``?category=<id>``
-    shows that category's entries only (F2.4; an unknown id shows everything). Opening the
-    page may copy the previous month's plan (workspace setting,
-    ``services.budget.auto_copy_on_open``)."""
+    """The Month page (F2.7: a summary). ``?plan_copied=N&plan_skipped=M`` reports a plan
+    copy. Opening the page may copy the previous month's plan (workspace setting,
+    ``services.budget.auto_copy_on_open``). The F2.4 category filter moved to the Transactions
+    page: ``?category=<id>`` redirects there (302), keeping a valid id only."""
     target = _parse(month)
-    states: dict[str, SectionState] = {}
-    editing = _optional_uuid(edit)
-    if editing is not None:
-        states = await run_in_threadpool(edit_states, request, ctx, target, editing)
-    if entry in DIRECTIONS and ENTRY_DAY.fullmatch(day):
-        kept = SectionState(entry_values={"day": day}, focus="entry:day")
-        if entry in states:
-            kept = replace(states[entry], entry_values=kept.entry_values)
-        states[entry] = kept
+    if "category" in request.query_params:
+        location = scoped_url(request, "transactions_month", month=str(target))
+        chosen = parse_filter(request.query_params["category"])
+        if chosen is not None:
+            location += "?" + urlencode({"category": str(chosen)})
+        return RedirectResponse(location, status_code=302)
     copied, automatic = _copied(target, plan_copied, plan_skipped), False
     if copied is None:
         copied = await run_in_threadpool(_auto_copy, request, ctx, target)
@@ -276,27 +251,11 @@ async def month_page(
             target,
             notice=notice,
             error=error,
-            states=states,
-            deleted=_optional_uuid(deleted),
-            saved_in=_optional_month(saved_in),
             copied=copied,
             automatic=automatic,
-            filter_id=parse_filter(category),
         )
     )
     return render_template(request, "months/page.html", context=context)
-
-
-def edit_states(
-    request: Request, ctx: Context, month: YearMonth, transaction_id: UUID
-) -> dict[str, SectionState]:
-    """The section state that opens ``transaction_id`` for editing (none if it is gone)."""
-    try:
-        row = get_transaction(request.app.state.session_factory, ctx, transaction_id)
-    except NotFound:
-        return {}
-    values = edit_values(row, month, request.state.locale)
-    return {row.direction: SectionState(editing=row.id, edit_values=values, focus="edit:day")}
 
 
 @router.post("/m/{month}/close", name="month_close")

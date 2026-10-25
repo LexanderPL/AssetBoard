@@ -1,0 +1,4 @@
+{# The chart scripts (F2.7), loaded only by pages with a donut: the vendored ECharts and the
+   module that draws every [data-chart] element. #}
+<script defer src="{{ static_url(request, 'vendor/echarts.min.js') }}" referrerpolicy="no-referrer"></script>
+<script defer src="{{ static_url(request, 'js/charts.js') }}" referrerpolicy="no-referrer"></script>

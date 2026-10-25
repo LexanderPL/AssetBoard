@@ -19,7 +19,8 @@ from tests.conftest import OwnerApp
 
 NOW = "2026-10-14T00:30:00+00:00"
 NO_PERMISSION = "You do not have permission to view this page."
-MONTH = "/m/2026-10"
+MONTH = "/m/2026-10"  # the write endpoints stay under the month path
+PAGE = "/transactions/2026-10"  # F2.7: the entry page
 PART_A_CODES = {
     "invalid_date",
     "day_not_in_month",
@@ -99,7 +100,7 @@ def _descriptions(html: str, direction: str) -> list[str]:
     return re.findall(r"data-description>([^<]*)<", _section(html, direction))
 
 
-def _page(app: OwnerApp, path: str = MONTH) -> str:
+def _page(app: OwnerApp, path: str = PAGE) -> str:
     response = app.client.get(path)
     assert response.status_code == 200, response.text
     return response.text
@@ -122,7 +123,9 @@ def test_the_month_page_has_two_tables_with_entry_rows(ledger: OwnerApp) -> None
         assert f'aria-describedby="ledger-{direction}-hint"' in section
         assert "Enter saves, Esc clears the row or cancels an edit." in section
     assert "<h2" in page and ">Expenses</h2>" in page and ">Income</h2>" in page
-    assert 'id="month-summary"' in page and 'id="ledger-status"' in page
+    # F2.7: the entry page has no summary, flow bar or KPI line.
+    assert 'id="month-summary"' not in page and "data-summary-kpis" not in page
+    assert 'id="ledger-status"' in page and "data-transactions-link aria-current" in page
     expense = _section(page, "expense")
     assert ">Food</option>" in expense and ">Salary</option>" not in expense
     assert ">Salary</option>" in _section(page, "income")
@@ -158,11 +161,11 @@ def test_a_day_number_is_saved_in_the_viewed_month(ledger: OwnerApp) -> None:
     food = _category(ledger, "Food")
     response = _add(ledger, _form(food, "31", "12,5"), "/m/2026-12")
     assert response.headers["location"] == (
-        "/m/2026-12?notice=transaction_added&entry=expense&day=31#ledger-expense"
+        "/transactions/2026-12?notice=transaction_added&entry=expense&day=31#ledger-expense"
     )
     (row,) = _rows(ledger)
     assert (str(row.date), row.amount_minor, row.currency) == ("2026-12-31", 1250, "EUR")
-    assert "Entry added." in _page(ledger, "/m/2026-12?notice=transaction_added")
+    assert "Entry added." in _page(ledger, "/transactions/2026-12?notice=transaction_added")
 
 
 def test_htmx_add_returns_the_section_with_a_new_entry_row_keeping_the_day(
@@ -184,26 +187,24 @@ def test_htmx_add_returns_the_section_with_a_new_entry_row_keeping_the_day(
     assert '<option value="" selected>' not in entry.group(0)  # no category chosen
     assert "selected>Food" not in entry.group(0)
     assert '<p id="ledger-status" hx-swap-oob="innerHTML">Entry added.</p>' in html
-    # The summary (F2.3: the plan) comes out of band, with its planned cells.
-    summary = re.search(r'<section id="month-summary"[^>]*>', html)
-    assert summary is not None and 'hx-swap-oob="outerHTML"' in summary.group(0)
-    assert 'id="plan-' in html
+    # F2.7: the Transactions page has no summary, so none comes out of band.
+    assert 'id="month-summary"' not in html and 'id="plan-' not in html
     assert "HX-Request" in response.headers["Vary"]
 
 
 def test_a_full_date_in_another_month_is_saved_there_and_linked(ledger: OwnerApp) -> None:
     food = _category(ledger, "Food")
     response = _add(ledger, _form(food, "07.09.2026"))
-    location = f"{MONTH}?saved_in=2026-09&entry=expense&day=07.09.2026#ledger-expense"
+    location = f"{PAGE}?saved_in=2026-09&entry=expense&day=07.09.2026#ledger-expense"
     assert response.headers["location"] == location
-    page = _page(ledger, f"{MONTH}?saved_in=2026-09")
+    page = _page(ledger, f"{PAGE}?saved_in=2026-09")
     assert (
-        '<a href="/m/2026-09" class="font-medium underline">Entry saved in September 2026.</a>'
-        in page
+        '<a href="/transactions/2026-09" class="font-medium underline">'
+        "Entry saved in September 2026.</a>" in page
     )
     assert _descriptions(page, "expense") == []
     html = _htmx(ledger, f"{MONTH}/transactions", _form(food, "2026-11-02")).text
-    assert '<a href="/m/2026-11"' in html and "Entry saved in November 2026." in html
+    assert '<a href="/transactions/2026-11"' in html and "Entry saved in November 2026." in html
     assert [str(r.date) for r in _rows(ledger)] == ["2026-09-07", "2026-11-02"]
 
 
@@ -361,16 +362,16 @@ def test_edit_without_javascript_uses_the_page(ledger: OwnerApp) -> None:
     _add(ledger, _form(food))
     row_id = _id(ledger, "Groceries")
     response = ledger.client.get(f"{MONTH}/transactions/{row_id}/edit", follow_redirects=False)
-    assert response.headers["location"] == f"{MONTH}?edit={row_id}#tx-{row_id}"
-    page = _page(ledger, f"{MONTH}?edit={row_id}")
-    assert "data-edit-row" in page and f'href="{MONTH}#tx-{row_id}"' in page
+    assert response.headers["location"] == f"{PAGE}?edit={row_id}#tx-{row_id}"
+    page = _page(ledger, f"{PAGE}?edit={row_id}")
+    assert "data-edit-row" in page and f'href="{PAGE}#tx-{row_id}"' in page
     assert (
         ledger.client.get(f"{MONTH}/transactions/{row_id}/row", follow_redirects=False).headers[
             "location"
         ]
-        == MONTH
+        == PAGE
     )
-    assert "data-edit-row" not in _page(ledger, f"{MONTH}?edit=nonsense")
+    assert "data-edit-row" not in _page(ledger, f"{PAGE}?edit=nonsense")
 
 
 def test_an_update_saves_and_returns_the_section(ledger: OwnerApp) -> None:
@@ -381,12 +382,12 @@ def test_an_update_saves_and_returns_the_section(ledger: OwnerApp) -> None:
     response = _htmx(ledger, f"{MONTH}/transactions/{row_id}", data)
     assert response.status_code == 200
     assert _descriptions(response.text, "expense") == ["Bread"]
-    assert "Entry saved." in response.text and 'id="month-summary"' in response.text
+    assert "Entry saved." in response.text and 'id="month-summary"' not in response.text
     assert re.search(r"data-autofocus data-edit", response.text)
     (row,) = _rows(ledger)
     assert (str(row.date), row.amount_minor) == ("2026-10-02", 310)
     plain = ledger.post(f"{MONTH}/transactions/{row_id}", data | {"day": "3"}, token_from=MONTH)
-    assert plain.headers["location"] == f"{MONTH}?notice=transaction_saved#tx-{row_id}"
+    assert plain.headers["location"] == f"{PAGE}?notice=transaction_saved#tx-{row_id}"
 
 
 def test_a_refused_update_rerenders_the_edit_row(ledger: OwnerApp) -> None:
@@ -426,12 +427,12 @@ def test_delete_returns_the_section_and_an_undo_toast(ledger: OwnerApp) -> None:
     assert f'hx-post="{MONTH}/transactions/{row_id}/undo"' in html
     assert 'hx-target="closest [data-toast]"' in html and "Entry deleted." in html
     assert re.search(r'id="entry-expense-day"[^>]*data-autofocus', html)
-    assert 'id="month-summary"' in html
+    assert 'id="month-summary"' not in html
     undo = _htmx(ledger, f"{MONTH}/transactions/{row_id}/undo")
     assert undo.status_code == 200
     assert '<section id="ledger-expense"' in undo.text and 'hx-swap-oob="outerHTML"' in undo.text
     assert _descriptions(undo.text, "expense") == ["Groceries"]
-    assert "Entry restored." in undo.text and 'id="month-summary"' in undo.text
+    assert "Entry restored." in undo.text and 'id="month-summary"' not in undo.text
     assert _rows(ledger)[0].deleted_at is None
 
 
@@ -445,9 +446,9 @@ def test_undo_after_ten_seconds_is_too_late(ledger: OwnerApp) -> None:
     assert response.status_code == 409 and "Too late to undo" in response.text
     assert response.headers["HX-Retarget"] == "#toast-container"
     plain = ledger.post(f"{MONTH}/transactions/{row_id}/undo", token_from=MONTH)
-    assert plain.headers["location"] == f"{MONTH}?error=undo_expired"
+    assert plain.headers["location"] == f"{PAGE}?error=undo_expired"
     assert "Too late to undo: the entry stays deleted." in _page(
-        ledger, f"{MONTH}?error=undo_expired"
+        ledger, f"{PAGE}?error=undo_expired"
     )
     assert _rows(ledger)[0].deleted_at is not None
 
@@ -457,11 +458,11 @@ def test_delete_and_undo_work_without_javascript(ledger: OwnerApp) -> None:
     _add(ledger, _form(food))
     row_id = _id(ledger, "Groceries")
     response = ledger.post(f"{MONTH}/transactions/{row_id}/delete", token_from=MONTH)
-    assert response.headers["location"] == f"{MONTH}?deleted={row_id}#ledger-expense"
-    page = _page(ledger, f"{MONTH}?deleted={row_id}")
+    assert response.headers["location"] == f"{PAGE}?deleted={row_id}#ledger-expense"
+    page = _page(ledger, f"{PAGE}?deleted={row_id}")
     assert "data-deleted-notice" in page and f'action="{MONTH}/transactions/{row_id}/undo"' in page
     response = ledger.post(f"{MONTH}/transactions/{row_id}/undo", token_from=MONTH)
-    assert response.headers["location"] == f"{MONTH}?notice=transaction_restored#tx-{row_id}"
+    assert response.headers["location"] == f"{PAGE}?notice=transaction_restored#tx-{row_id}"
     assert _descriptions(_page(ledger), "expense") == ["Groceries"]
 
 
@@ -471,11 +472,11 @@ def test_a_vanished_entry_reloads_the_page_with_a_message(ledger: OwnerApp) -> N
     row_id = _id(ledger, "Groceries")
     ledger.post(f"{MONTH}/transactions/{row_id}/delete", token_from=MONTH)
     response = _htmx(ledger, f"{MONTH}/transactions/{row_id}/delete")
-    assert response.headers["HX-Redirect"] == f"{MONTH}?error=transaction_gone"
+    assert response.headers["HX-Redirect"] == f"{PAGE}?error=transaction_gone"
     data = {"day": "1", "amount": "1", "description": "", "category_id": str(food)}
     plain = ledger.post(f"{MONTH}/transactions/{row_id}", data, token_from=MONTH)
-    assert plain.headers["location"] == f"{MONTH}?error=transaction_gone"
-    assert "This entry no longer exists." in _page(ledger, f"{MONTH}?error=transaction_gone")
+    assert plain.headers["location"] == f"{PAGE}?error=transaction_gone"
+    assert "This entry no longer exists." in _page(ledger, f"{PAGE}?error=transaction_gone")
     assert _htmx_get(ledger, f"{MONTH}/transactions/{row_id}/edit").status_code == 404
     assert _htmx_get(ledger, f"{MONTH}/transactions/{UUID(int=1)}/edit").status_code == 404
     assert _htmx_get(ledger, f"{MONTH}/transactions/nonsense/edit").status_code == 404
@@ -540,20 +541,20 @@ def test_a_closed_month_is_read_only(ledger: OwnerApp) -> None:
     assert _descriptions(page, "expense") == ["Groceries"]
     for marker in ("entry-expense", "data-edit", "data-delete", ">Actions<"):
         assert marker not in page
-    assert "data-edit-row" not in _page(ledger, f"{MONTH}?edit={row_id}")
+    assert "data-edit-row" not in _page(ledger, f"{PAGE}?edit={row_id}")
     response = _add(ledger, _form(food))
-    assert response.headers["location"] == f"{MONTH}?error=month_closed"
+    assert response.headers["location"] == f"{PAGE}?error=month_closed"
     htmx = _htmx(ledger, f"{MONTH}/transactions", _form(food))
-    assert htmx.status_code == 409 and htmx.headers["HX-Redirect"] == f"{MONTH}?error=month_closed"
+    assert htmx.status_code == 409 and htmx.headers["HX-Redirect"] == f"{PAGE}?error=month_closed"
     data = {"day": "1", "amount": "1", "description": "", "category_id": str(food)}
     for path, form in (
         (f"{MONTH}/transactions/{row_id}", data),
         (f"{MONTH}/transactions/{row_id}/delete", {}),
         (f"{MONTH}/transactions/{gone}/undo", {}),
     ):
-        assert _htmx(ledger, path, form).headers["HX-Redirect"] == f"{MONTH}?error=month_closed"
+        assert _htmx(ledger, path, form).headers["HX-Redirect"] == f"{PAGE}?error=month_closed"
     assert "This month is closed. Its entries and planned values cannot change" in _page(
-        ledger, f"{MONTH}?error=month_closed"
+        ledger, f"{PAGE}?error=month_closed"
     )
     assert [r.deleted_at is None for r in _rows(ledger)] == [True, False]
 
@@ -582,7 +583,7 @@ def test_viewers_see_the_tables_without_controls_and_cannot_write(ledger: OwnerA
     assert _descriptions(page, "expense") == ["Groceries"]
     for marker in ("entry-expense", "data-edit", "data-delete", "Enter saves"):
         assert marker not in page
-    assert "data-edit-row" not in _page(ledger, f"{MONTH}?edit={row_id}")
+    assert "data-edit-row" not in _page(ledger, f"{PAGE}?edit={row_id}")
     row = _htmx_get(ledger, f"{MONTH}/transactions/{row_id}/edit").text
     assert "data-edit-row" not in row and "data-edit" not in row
     for path, form in (
@@ -620,7 +621,7 @@ def test_another_workspaces_entry_is_not_found(ledger: OwnerApp) -> None:
     assert ledger.client.post("/workspace/switch", data=switch).status_code == 200
     assert _htmx_get(ledger, f"{MONTH}/transactions/{row_id}/edit").status_code == 404
     response = ledger.post(f"{MONTH}/transactions/{row_id}/delete", token_from=MONTH)
-    assert response.headers["location"] == f"{MONTH}?error=transaction_gone"
+    assert response.headers["location"] == f"{PAGE}?error=transaction_gone"
     assert _rows(ledger)[0].deleted_at is None
 
 
@@ -629,7 +630,7 @@ def test_the_page_has_no_inline_scripts_or_styles(ledger: OwnerApp) -> None:
     _add(ledger, _form(food))
     row_id = _id(ledger, "Groceries")
     for html in (
-        _page(ledger, f"{MONTH}?edit={row_id}"),
+        _page(ledger, f"{PAGE}?edit={row_id}"),
         _htmx(ledger, f"{MONTH}/transactions/{row_id}/delete").text,
     ):
         assert not re.search(r"<script(?![^>]*\bsrc=)", html)
@@ -653,11 +654,11 @@ def test_each_table_keeps_its_own_day_and_another_months_day_stays_as_typed(
 def test_the_kept_day_prefills_the_page_without_javascript(ledger: OwnerApp) -> None:
     _category(ledger, "Food")
     _category(ledger, "Salary", "income")
-    page = _page(ledger, f"{MONTH}?notice=transaction_added&entry=income&day=12")
+    page = _page(ledger, f"{PAGE}?notice=transaction_added&entry=income&day=12")
     assert re.search(r'id="entry-income-day"[^>]*value="12"', page)
     assert re.search(r'id="entry-expense-day"[^>]*value=""', page)
     for query in ("entry=income&day=%3Cb%3E", "entry=income&day=123", "entry=x&day=12"):
-        page = _page(ledger, f"{MONTH}?{query}")
+        page = _page(ledger, f"{PAGE}?{query}")
         assert re.search(r'id="entry-income-day"[^>]*value=""', page), query
         assert "<b>" not in page
 
@@ -692,14 +693,14 @@ def test_undo_is_offered_without_javascript_only_for_a_pending_deletion(ledger: 
     _add(ledger, _form(food))
     _add(ledger, _form(food, "2026-09-05", description="September"))
     row_id, september = _id(ledger, "Groceries"), _id(ledger, "September")
-    assert "data-deleted-notice" not in _page(ledger, f"{MONTH}?deleted={row_id}")  # live row
+    assert "data-deleted-notice" not in _page(ledger, f"{PAGE}?deleted={row_id}")  # live row
     ledger.post(f"{MONTH}/transactions/{row_id}/delete", token_from=MONTH)
     ledger.post(f"/m/2026-09/transactions/{september}/delete", token_from="/m/2026-09")
-    assert "data-deleted-notice" in _page(ledger, f"{MONTH}?deleted={row_id}")
-    assert "data-deleted-notice" not in _page(ledger, f"{MONTH}?deleted={september}")  # other month
-    assert "data-deleted-notice" not in _page(ledger, f"{MONTH}?deleted={UUID(int=3)}")
+    assert "data-deleted-notice" in _page(ledger, f"{PAGE}?deleted={row_id}")
+    assert "data-deleted-notice" not in _page(ledger, f"{PAGE}?deleted={september}")  # other month
+    assert "data-deleted-notice" not in _page(ledger, f"{PAGE}?deleted={UUID(int=3)}")
     ledger.app.state.clock = FixedClock("2026-10-14T00:30:11+00:00")
-    assert "data-deleted-notice" not in _page(ledger, f"{MONTH}?deleted={row_id}")  # too late
+    assert "data-deleted-notice" not in _page(ledger, f"{PAGE}?deleted={row_id}")  # too late
 
 
 def test_after_a_delete_without_an_entry_row_the_heading_takes_the_focus(

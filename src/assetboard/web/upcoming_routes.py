@@ -59,15 +59,22 @@ def _redirect(
     *,
     error: str | None = None,
     posted: UUID | None = None,
+    back: str = "",
     return_month: YearMonth | None = None,
 ) -> Response:
+    """Back to the Upcoming page, or to Home after a successful action sent from there (F2.7:
+    ``back=home``; any other value means the Upcoming page). A confirm sent from an expected row
+    of the Transactions page (F3.5: ``return_month``) returns to that month's Transactions page.
+    Errors are shown on Upcoming."""
+    if back == "home" and error is None:
+        return RedirectResponse(request.url_for("home").path, status_code=303)
     params: dict[str, str] = {}
     if error:
         params["error"] = error
     if posted:
         params["posted"] = str(posted)
     target = (
-        request.url_for("month", month=str(return_month)).path
+        request.url_for("transactions_month", month=str(return_month)).path
         if return_month is not None
         else request.url_for("scheduled_upcoming").path
     )
@@ -159,11 +166,14 @@ async def post(request: Request, ctx: CurrentContext, occurrence_id: str) -> Res
     return_month = None
     with contextlib.suppress(InvalidMonth):
         return_month = YearMonth.parse(values.get("return_month", ""))
-    return _redirect(request, posted=_id(occurrence_id), return_month=return_month)
+    return _redirect(
+        request, posted=_id(occurrence_id), back=values.get("back", ""), return_month=return_month
+    )
 
 
 @router.post("/upcoming/{occurrence_id}/skip", name="upcoming_skip")
 async def skip(request: Request, ctx: CurrentContext, occurrence_id: str) -> Response:
+    values = await _values(request)
     try:
         await run_in_threadpool(
             occurrences.skip_occurrence,
@@ -173,7 +183,7 @@ async def skip(request: Request, ctx: CurrentContext, occurrence_id: str) -> Res
         )
     except occurrences.OccurrenceError as exc:
         return _redirect(request, error=exc.code)
-    return _redirect(request)
+    return _redirect(request, back=values.get("back", ""))
 
 
 @router.post("/upcoming/{occurrence_id}/reschedule", name="upcoming_reschedule")

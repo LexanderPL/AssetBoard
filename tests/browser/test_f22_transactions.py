@@ -1,4 +1,5 @@
-"""Transactions on the month page in Chromium (F2.2 part B): the keyboard flow of the entry row
+"""Transactions on the Transactions page in Chromium (F2.2 part B; moved there by F2.7): the
+keyboard flow of the entry row
 (the kept day, typing on while a save is in flight), autocomplete, inline edit, delete with the
 undo toast (a half-typed entry survives it), a closed month, a viewer, and no CSP violations."""
 
@@ -119,7 +120,7 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
             page.goto(f"{base}/categories")
             expect(page.locator("li[data-category]").first).to_be_visible()
 
-            page.goto(f"{base}/m/{MONTH}")
+            page.goto(f"{base}/transactions/{MONTH}")
             day = page.locator("#entry-expense-day")
             amount = page.locator("#entry-expense-amount")
             description = page.locator("#entry-expense-description")
@@ -292,7 +293,7 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
             # Typing on right after Enter, while the server is slow: nothing typed is lost, the
             # first entry is saved with its own day and the second with the newly typed one.
             slow.delay = 0.4
-            page.goto(f"{base}/m/2025-05")
+            page.goto(f"{base}/transactions/2025-05")
             day.click()
             page.keyboard.type("7")
             page.keyboard.press("Tab")
@@ -325,10 +326,12 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
             slow.delay = 0
             page.goto(f"{base}/m/{MONTH}")
 
-            # A closed month is read-only.
+            # A closed month is read-only (closed on the Month page, F2.7).
             page.locator("[data-month-close]").click()
             page.get_by_role("button", name="Continue").click()
             page.wait_for_url(f"{base}/m/{MONTH}?notice=closed")
+            page.goto(f"{base}/transactions/{MONTH}")
+            expect(page.locator("[data-closed-banner]")).to_be_visible()
             expect(page.locator("#entry-expense-row")).to_have_count(0)
             expect(page.locator("[data-edit], [data-delete]")).to_have_count(0)
             assert _descriptions(page) == ["Żabka", "Żabka"]
@@ -350,11 +353,11 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
             viewer_page = browser.new_context(color_scheme="light").new_page()
             _sign_in(viewer_page, base, "viewer@example.com")
             for month in (MONTH, "2025-04"):
-                viewer_page.goto(f"{base}/m/{month}")
+                viewer_page.goto(f"{base}/transactions/{month}")
                 expect(viewer_page.locator("#ledger-expense")).to_be_visible()
                 expect(viewer_page.locator("[data-entry-row]")).to_have_count(0)
                 expect(viewer_page.locator("[data-edit], [data-delete]")).to_have_count(0)
-            viewer_page.goto(f"{base}/m/{MONTH}")
+            viewer_page.goto(f"{base}/transactions/{MONTH}")
             assert _descriptions(viewer_page) == ["Żabka", "Żabka"]
             browser.close()
     finally:

@@ -305,7 +305,8 @@ def test_the_automatic_copy_leaves_past_months_and_viewers_alone(plan: OwnerApp)
 # Transaction writes refresh the block
 
 
-def test_a_transaction_write_sends_the_plan_out_of_band(plan: OwnerApp) -> None:
+def test_a_transaction_write_sends_no_plan_out_of_band(plan: OwnerApp) -> None:
+    """F2.7: transactions are written from the Transactions page, which has no summary."""
     food = _category(plan, "Food")
     _set(plan, food, "550")
     form = {
@@ -316,9 +317,8 @@ def test_a_transaction_write_sends_the_plan_out_of_band(plan: OwnerApp) -> None:
         "category_id": str(food),
     }
     html = _htmx(plan, f"{MONTH}/transactions", form).text
-    summary = _summary(html)
-    assert 'hx-swap-oob="outerHTML"' in summary.split(">")[0]
-    assert 'value="550.00"' in _row(summary, food)
+    assert 'id="month-summary"' not in html and 'id="ledger-expense"' in html
+    assert 'value="550.00"' in _row(_summary(_page(plan, MONTH)), food)
 
 
 @pytest.mark.parametrize("value", ["²", "9" * 5000, "-1", "1.5", ""])

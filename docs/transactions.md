@@ -1,8 +1,11 @@
 # Transactions
 
-Expenses and income are entered on the month page ("Month" in the main navigation, or an
-address such as `/m/2026-10`). The page has two tables, **Expenses** and **Income**, with one row
-per entry, ordered by date and then by the order you entered them.
+Expenses and income are entered on the Transactions page ("Transactions" in the main navigation,
+or an address such as `/transactions/2026-10`; `/transactions` opens the current month). It has
+the same month navigation as the [month page](months.md) (Previous, Next, Today and the month
+picker), and **Month summary** opens that month's summary. The page is only for entries: the
+flow bar and planned values are on the month page. The page has two tables, **Expenses** and
+**Income**, with one row per entry, ordered by date and then by the order you entered them.
 
 Every entry has a date, an amount, an optional description and a category. Amounts are in the
 workspace's base currency (Workspace settings); once an entry exists, the base currency can no
@@ -73,20 +76,30 @@ Every form also works as a plain web form: saving, editing and deleting reload t
 save the entry row keeps the day, as with JavaScript. After a deletion the page offers Undo
 while the ten seconds have not passed.
 
-## Searching all entries
+## Showing one category
 
-**Transactions** in the main navigation lists the entries of every month, newest first, 50 per
-page. Filter them by:
+Clicking a category's name in the month summary opens this page with only that category's
+entries (`/transactions/2026-10?category=...`): the other table is hidden, a bar says which
+category is shown, and new entries start with that category. **Show all** (or your browser's
+Back button) shows everything again. The address includes the category, so the filtered page
+can be bookmarked. Choosing a filter (or Show all) reloads the tables, so anything typed but not
+yet saved in an entry row is dropped.
+
+## History
+
+**History** in the main navigation (`/history`) lists the entries of every month, newest first,
+50 per page. Old links to `/transactions?...` with filters, and to the CSV export, lead here.
+Filter them by:
 
 - **From** and **To**: dates, both included (`2026-10-07` or `07.10.2026`);
-- **Smallest amount** and **Largest amount**: typed as on the month page (`12,5`, `1 234,56`),
+- **Smallest amount** and **Largest amount**: typed as on the Transactions page (`12,5`, `1 234,56`),
   both included;
 - **Description contains**: any part of the description; upper and lower case do not matter;
 - **Kind**: expenses, income or both;
 - **Categories**: tick one or more (archived categories are listed too); none ticked means all.
 
 **Order** sorts by date or by amount. The filters are part of the page address, so you can
-bookmark a search. Each date links to its month, where you edit or delete the entry. Entries in
+bookmark a search. Each date links to the Transactions page of its month, where you edit or delete the entry. Entries in
 closed months are marked "closed". Deleted entries are never listed.
 
 ## Exporting as CSV

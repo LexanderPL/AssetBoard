@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% from "months/_ledger.html" import tables with context %}
+{# The Transactions page (F2.7): F2.2's quick-add rows and the month's income and expense tables
+   (months/_ledger.html) with inline edit, delete and undo, F2.4's category filter and the month
+   navigation shared with the Month page. Entry only: no flow bar, no KPI line, no planned
+   values. No inline script or style. #}
+{% block title %}{{ _("Transactions") }}: {{ month_heading }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Transactions") }}: {{ month_heading }}{% if view.closed %} <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-1 align-middle text-xs font-semibold text-warning-strong" data-closed-badge>{{ _("Closed") }}</span>{% endif %}{% endblock %}
+{% block header_actions %}<a href="{{ scoped_url(request, 'month', month=view.month|string) }}" class="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium hover:bg-subtle" data-open-month>{{ _("Month summary") }}</a>{% endblock %}
+{% block content %}
+<div class="space-y-6" data-month="{{ view.month }}" data-transactions-page>
+  {% if notice %}
+  <p class="rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{% if notice_href %}<a href="{{ notice_href }}" class="font-medium underline">{{ notice }}</a>{% else %}{{ notice }}{% endif %}</p>
+  {% endif %}
+  {% if error %}
+  <p class="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ error }}</p>
+  {% endif %}
+
+  {% for source_id, source_name, work_month in missing_work_logs %}
+  <p class="rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="status" data-missing-work-log="{{ source_id }}">{{ _("Enter days worked for %(month)s for %(name)s.", month=work_month, name=source_name) }} <a href="{{ scoped_url(request, 'income_sources') }}#income-source-{{ source_id }}" class="font-semibold underline">{{ _("Income sources") }}</a></p>
+  {% endfor %}
+
+  {% with nav_route = "transactions_month", picker_route = "transactions" %}{% include "months/_nav.html" %}{% endwith %}
+
+  {% if view.closed %}
+  <section class="rounded-2xl border border-warning-line bg-warning-soft px-5 py-4 text-warning-strong" role="status" data-closed-banner>
+    <p class="font-semibold">{{ _("This month is closed. Its entries and planned values are read-only.") }}</p>
+    <p class="mt-1 text-sm">
+      {% if view.closed_by_name %}{{ _("Closed on %(date)s by %(name)s.", date=closed_on, name=view.closed_by_name) }}{% else %}{{ _("Closed on %(date)s by a former member.", date=closed_on) }}{% endif %}
+      {% if view.can_reopen %}<a href="{{ scoped_url(request, 'month', month=view.month|string) }}" class="font-semibold underline" data-reopen-link>{{ _("Reopen it on the month page.") }}</a>{% endif %}
+    </p>
+  </section>
+  {% endif %}
+
+  {% if deleted %}
+  {# Undo for browsers without JavaScript (with JavaScript, the undo toast offers it). #}
+  <form method="post" action="{{ scoped_url(request, 'transaction_undo', month=view.month|string, transaction_id=deleted|string) }}" class="flex flex-wrap items-center gap-3 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-deleted-notice>
+    {{ csrf_input() }}
+    {% if ledger.filter %}<input type="hidden" name="filter" value="{{ ledger.filter_id }}">{% endif %}
+    <span>{{ _("Entry deleted.") }}</span>
+    <button type="submit" data-undo class="font-semibold underline">{{ _("Undo") }}</button>
+  </form>
+  {% endif %}
+  <p id="ledger-status" class="sr-only" role="status" data-ledger-status></p>
+  {{ tables() }}
+</div>
+{% endblock %}

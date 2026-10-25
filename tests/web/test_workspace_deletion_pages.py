@@ -61,7 +61,7 @@ def test_the_confirmation_page_asks_for_the_name_and_recommends_an_export(owner:
     assert "Delete Home permanently?" in page
     assert 'name="confirm_name"' in page and 'name="csrf_token"' in page
     assert 'method="post" action="/workspace/delete"' in page
-    assert 'href="/transactions#export-heading"' in page and "data-export-link" in page
+    assert 'href="/history#export-heading"' in page and "data-export-link" in page
     assert "1 other member also loses access to it." in page
     assert _workspace_names(owner) == {"Home"}  # a GET changes nothing
 

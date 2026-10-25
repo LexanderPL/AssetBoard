@@ -341,6 +341,16 @@ when you intend to upload the image and its release tags.
   sign-in. Existing counters carry over; no migration
   ([ADR-0012](adr/0012-local-authentication.md), amendment of 2026-10-17).
 
+### Unreleased: navigation restructure (F2.7)
+
+- **Home, Month, Transactions, History.** `/` is now a dashboard of the current month (flow bar,
+  expense and income donuts, upcoming items). The month page `/m/YYYY-MM` is a summary; entries
+  are made on `/transactions/YYYY-MM`. The cross-month search and CSV export moved from
+  `/transactions` to `/history` (`/history/export.csv`). Old links redirect: a filtered
+  `/transactions?...` (302), `/transactions/export.csv` (301), the bulk recategorize posts
+  (308) and `/m/YYYY-MM?category=...` (302). Scripts that download the export should use the
+  new address. No migration, no new setting. See [docs/months.md](months.md).
+
 ### Unreleased: transactions, data layer (F2.2 part A)
 
 - The migration adds the `transactions` table and changes no existing data. No new setting. The

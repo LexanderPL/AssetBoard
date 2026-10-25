@@ -1,14 +1,16 @@
-"""Transactions on the month page (F2.2 part B): add, edit, delete, undo and autocomplete.
+"""Transactions on the Transactions page (F2.2 part B, F2.7): add, edit, delete, undo and
+autocomplete. The write paths stay under ``/m/{month}/transactions`` (not visible to the user).
 
 Authorization, validation and the closed-month guard happen in ``services.transactions``;
 routes map outcomes to pages. Every state-changing route is covered by the router-level
 ``require_csrf`` dependency (HTMX sends the token in the ``X-CSRF-Token`` header).
 
 HTMX requests get one table section (``#ledger-expense`` or ``#ledger-income``) back, with the
-month summary (``#month-summary``), the screen-reader status line (``#ledger-status``) and, after
-a deletion, the undo toast out of band. Opening and cancelling an edit swap a single row. Plain
-form posts redirect (303) to the month page, which re-renders the tables with the form's values
-and messages when a save is refused, so everything works without JavaScript.
+screen-reader status line (``#ledger-status``) and, after a deletion, the undo toast out of band
+(F2.7: the summary is not on the Transactions page, so it is not sent). Opening and cancelling an
+edit swap a single row. Plain form posts redirect (303) to the Transactions page, which
+re-renders the tables with the form's values and messages when a save is refused, so everything
+works without JavaScript.
 
 A write refused because the viewed month was closed meanwhile reloads the page with the closed
 month message (303, or ``HX-Redirect`` for HTMX): the page in the browser is stale. A full date
@@ -61,10 +63,10 @@ from assetboard.web.ledger import (
     first_invalid,
     parse_filter,
 )
-from assetboard.web.month_routes import _month_path, _parse, month_context
-from assetboard.web.plan import build_summary, summary_context
+from assetboard.web.month_routes import _parse
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
+from assetboard.web.transactions_page_routes import transactions_context, transactions_path
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
@@ -154,15 +156,15 @@ def _filter(request: Request, direction: str | None = None) -> UUID | None:
 
 
 def _path(request: Request, month: YearMonth, query: str = "", direction: str | None = None) -> str:
-    """The month page, filtered as the request's page was."""
+    """The Transactions page, filtered as the request's page was."""
     chosen = _filter(request, direction)
     if chosen is not None:
         query = f"{query}&category={chosen}" if query else f"category={chosen}"
-    return _month_path(request, month, query)
+    return transactions_path(request, month, query)
 
 
 def _redirect(request: Request, month: YearMonth, query: str, *, status_code: int) -> Response:
-    """A 303 to the month page; for HTMX, ``HX-Redirect`` (the page itself is stale)."""
+    """A 303 to the Transactions page; for HTMX, ``HX-Redirect`` (the page itself is stale)."""
     location = _path(request, month, query)
     if is_htmx_fragment_request(request):
         response = Response(status_code=status_code)
@@ -184,17 +186,16 @@ def _section(
     oob_section: bool = False,
     status_code: int = 200,
 ) -> Response:
-    """One table section with the out-of-band summary, status line and toast (blocking)."""
+    """One table section with the out-of-band status line and toast (blocking). The page has
+    no summary (F2.7), so none is sent."""
     factory = request.app.state.session_factory
     view = get_month(factory, ctx, month)
     ledger = build_ledger(
         factory, ctx, request, view, {direction: state}, _filter(request, direction)
     )
-    filter_id = ledger.filter.category_id if ledger.filter else None
     context: dict[str, object] = {
         "ledger": ledger,
         "section_view": ledger.section(direction),
-        **summary_context(build_summary(factory, ctx, request, view, filter_id=filter_id)),
         "status": _t(request, STATUS[status]) if status else "",
         "toast_message": _t(request, STATUS["deleted"]) if toast_undo else None,
         "toast_undo": toast_undo,
@@ -216,11 +217,13 @@ def _page(
     state: SectionState,
     status_code: int,
 ) -> Response:
-    """The whole month page with a refused form (no JavaScript; blocking)."""
-    context = month_context(
+    """The whole Transactions page with a refused form (no JavaScript; blocking)."""
+    context = transactions_context(
         request, ctx, month, states={direction: state}, filter_id=_filter(request, direction)
     )
-    return render_template(request, "months/page.html", context=context, status_code=status_code)
+    return render_template(
+        request, "transactions/page.html", context=context, status_code=status_code
+    )
 
 
 def _refused(
@@ -255,7 +258,7 @@ def _moved(request: Request, saved: TransactionView, month: YearMonth) -> dict[s
     if saved.month == month:
         return {}
     text = _t(request, MOVED) % {"month": format_month(saved.month, request.state.locale)}
-    return {"notice": text, "notice_href": _month_path(request, saved.month)}
+    return {"notice": text, "notice_href": transactions_path(request, saved.month)}
 
 
 @router.post("/m/{month}/transactions", name="transaction_create")
