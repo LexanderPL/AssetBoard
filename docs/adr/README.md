@@ -27,6 +27,7 @@ The decisions below are accepted unless noted otherwise.
 | [0018](0018-recurring-items.md) | Structured recurrence and in-process generation | Proposed |
 | [0019](0019-local-totp.md) | Local TOTP and workspace enforcement | Accepted |
 | [0020](0020-hard-workspace-deletion.md) | Hard workspace deletion | Accepted |
+| [0021](0021-notifications.md) | Reminders through Apprise channels | Proposed |
 
 New records should use [the ADR template](template.md), the next available number, and include
 Context, Decision, and Consequences sections.
