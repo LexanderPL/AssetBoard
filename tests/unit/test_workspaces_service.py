@@ -297,12 +297,14 @@ def test_a_planned_value_locks_the_base_currency_while_it_exists(team: Workspace
 def test_every_registered_lock_is_consulted(
     team: WorkspaceDb, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    from assetboard.services.income import workspace_has_income_amounts
     from assetboard.services.scheduled import workspace_has_scheduled_amounts
 
     assert [
         workspace_has_transactions,
         workspace_has_budget_lines,
         workspace_has_scheduled_amounts,
+        workspace_has_income_amounts,
         workspace_has_fixed_tax_amounts,
     ] == workspaces.BASE_CURRENCY_LOCKS
     # Any check that reports stored amounts locks it.

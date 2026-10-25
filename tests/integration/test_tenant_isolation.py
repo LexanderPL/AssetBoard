@@ -1006,6 +1006,7 @@ def test_income_queries_stay_in_their_workspace(
     from assetboard.db.repositories import (
         IncomeSourceRepository,
         IncomeSourceTaxRuleRepository,
+        ScheduledOccurrenceRepository,
         TaxRuleRepository,
         WorkLogRepository,
     )
@@ -1090,6 +1091,41 @@ def test_income_queries_stay_in_their_workspace(
     assert attachments_b.payment_category_counts() == {attachment_b.payment_category_id: 1}
     assert [row.id for row in logs_b.for_source(source_b.id)] == [log_b.id]
     assert [row.id for row in attachments_b.for_source(source_b.id)] == [attachment_b.id]
+    assert logs_a.work_months_for_sources([source_a.id, source_b.id]) == {
+        source_a.id: {date(2026, 1, 1)}
+    }
+    assert logs_b.work_months_for_sources([source_a.id]) == {}
+
+    # Pending income occurrences: the month list and the overdue count see only their own.
+    occurrences = {}
+    for ctx, source in ((ctx_a, source_a), (ctx_b, source_b)):
+        occurrences[ctx] = ScheduledOccurrenceRepository(db_session, ctx).create(
+            scheduled_item_id=None,
+            income_source_id=source.id,
+            work_month=date(2026, 1, 1),
+            direction="income",
+            category_id=source.category_id,
+            nominal_date=date(2026, 2, 10),
+            due_date=date(2026, 2, 10),
+            expected_minor=100,
+            currency="EUR",
+            amount_state="estimated",
+            status="pending",
+            generated_by="income",
+            label=source.name,
+        )
+    for ctx in (ctx_a, ctx_b):
+        repository = ScheduledOccurrenceRepository(db_session, ctx)
+        listed = repository.pending_for_month(date(2026, 2, 1), date(2026, 2, 28))
+        assert [row.id for row, _item, _name in listed] == [occurrences[ctx].id]
+        assert repository.overdue_count(date(2026, 3, 1)) == 1
+    occurrences_a = ScheduledOccurrenceRepository(db_session, ctx_a)
+    occurrences_b = ScheduledOccurrenceRepository(db_session, ctx_b)
+    assert [row.id for row in occurrences_a.for_income_source(source_a.id)] == [
+        occurrences[ctx_a].id
+    ]
+    assert occurrences_b.for_income_source(source_a.id) == []
+    assert occurrences_b.for_income_work_month(source_a.id, date(2026, 1, 1)) is None
 
 
 # Deleting a workspace (ADR-0020): every workspace-owned model, found by discovery

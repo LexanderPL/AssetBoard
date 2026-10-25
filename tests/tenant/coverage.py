@@ -42,12 +42,16 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         )
     },
     **{
+        ("ScheduledOccurrenceRepository", method): "test_income_queries_stay_in_their_workspace"
+        for method in ("pending_for_month", "overdue_count")
+    },
+    **{
         ("IncomeSourceRepository", method): "test_income_queries_stay_in_their_workspace"
         for method in ("create", "ordered", "any_exists", "category_counts")
     },
     **{
         ("WorkLogRepository", method): "test_income_queries_stay_in_their_workspace"
-        for method in ("create", "for_source")
+        for method in ("create", "for_source", "work_months_for_sources")
     },
     **{
         ("IncomeSourceTaxRuleRepository", method): "test_income_queries_stay_in_their_workspace"
