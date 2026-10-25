@@ -175,7 +175,10 @@ entries for each extra method.
 7. **Services only through the repository.** Do not reference the model in `select()`,
    `session.get()`, attribute access or instantiation outside `db/repositories/`. Outside
    `db/`, raw SQL (`text()`, `exec_driver_sql()`, `execute("...")`) is not allowed at all.
-8. **No relationships into it from unowned models.** A relationship such as `Workspace.items`
+8. **Workspace deletion covers it by itself** (ADR-0020): every table with a `workspace_id`
+   column is emptied of the deleted workspace's rows, children first. A column in another
+   table that references `workspaces.id` must be nullable (it is set to NULL then).
+9. **No relationships into it from unowned models.** A relationship such as `Workspace.items`
    or `User.items` would load rows without the repository's scope. Relationships from one
    workspace-owned model to another, or to an unowned model, are fine.
 
@@ -186,6 +189,7 @@ What fails if a step is missing:
 | `WorkspaceOwned` marker or `workspace_id` column, repository or tenant factory | `test_discovery_finds_every_workspace_owned_model_with_repository_and_factory` |
 | Scoping in a repository query | `test_user_b_cannot_read_update_or_delete_user_a_rows[<Model>]` |
 | Coverage entry for a new public method | `test_every_public_repository_method_is_covered` |
+| Rows left behind when a workspace is deleted | `test_deleting_a_workspace_removes_every_owned_row_and_nothing_else` |
 | Composite foreign key | `test_workspace_owned_foreign_keys_include_workspace_id` |
 | Model or table used outside a repository | `test_no_unscoped_queries_outside_repositories` |
 | Relationship from an unowned model | `test_no_relationship_from_unowned_models_into_workspace_owned_models` |

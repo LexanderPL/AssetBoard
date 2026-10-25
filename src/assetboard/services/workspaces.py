@@ -16,6 +16,12 @@ amounts adds a check to ``BASE_CURRENCY_LOCKS``: F2.2 transactions (soft-deleted
 and F2.3 budget lines (the lines that exist now: a removed planned value holds no amount).
 The settings write takes the exclusive workspace lock first, so on PostgreSQL a currency change
 and a concurrent first transaction (which takes the shared lock) cannot both pass.
+
+**Deleting a workspace** (owners, ADR-0020) is permanent: the workspace and every row that
+belongs to it, its audit log included, are removed in one transaction, after the owner typed the
+workspace's exact name. One instance-level ``workspace.delete`` event (``workspace_id`` NULL)
+keeps the name and id. Sessions that had it selected fall back to another membership, or to
+the "No workspace" page.
 """
 
 from __future__ import annotations
@@ -41,6 +47,7 @@ from assetboard.db.repositories import (
 )
 from assetboard.domain.identity import InvalidEmail, normalize_email
 from assetboard.services import categories
+from assetboard.services.auth import record_auth_event
 from assetboard.services.budget import workspace_has_budget_lines
 from assetboard.services.context import (
     Context,
@@ -102,6 +109,19 @@ class WorkspaceCreationDisabled(WorkspaceError):
     """Self-service workspace creation is off for this account (or the account is inactive)."""
 
     code = "creation_disabled"
+
+
+class WorkspaceNameMismatch(WorkspaceError):
+    """The confirmation did not repeat the workspace's exact name."""
+
+    code = "name_mismatch"
+
+
+class WorkspaceChanged(WorkspaceError):
+    """The confirmation was for another workspace than the request's current one (a stale tab
+    after a switch, or a repeated submit after the first one deleted it)."""
+
+    code = "workspace_changed"
 
 
 class InvalidInvitation(WorkspaceError):
@@ -440,6 +460,71 @@ def revoke_invitation(factory: sessionmaker[Session], ctx: Context, *, invitatio
             entity_id=str(invitation.id),
             ts=now,
             data={"reason": "owner"},
+        )
+
+    run_immediate(factory, write)
+
+
+# Deleting a workspace (ADR-0020)
+
+
+@dataclass(frozen=True, slots=True)
+class DeletionPreview:
+    """What the confirmation page shows: the name to type, and who else loses access."""
+
+    name: str
+    other_members: int
+
+
+def deletion_preview(factory: sessionmaker[Session], ctx: Context) -> DeletionPreview:
+    require_role(ctx, Role.OWNER)
+    with factory() as session:
+        workspace = CurrentWorkspaceRepository(session, ctx).get()
+        members = MembershipRepository(session, ctx).members()
+        others = sum(1 for member in members if member.user_id != ctx.user.id)
+        return DeletionPreview(name=workspace.name, other_members=others)
+
+
+def delete_workspace(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    *,
+    confirm_name: str,
+    expected_workspace_id: UUID | None,
+) -> None:
+    """Delete the current workspace and all its data, permanently.
+
+    ``expected_workspace_id`` is the workspace the confirmation page was shown for; unless it is
+    the Context's workspace, nothing is written (``WorkspaceChanged``). Two workspaces may share
+    a name, so the typed name alone cannot tell them apart. The deleted id is always the
+    Context's.
+    ``confirm_name`` must be the workspace's exact name (surrounding spaces ignored, case
+    sensitive), compared with the stored name inside the transaction, after the actor's role
+    was re-read there and the exclusive workspace lock taken. The only trace left is the
+    instance-level ``workspace.delete`` event with the name; no amounts.
+    """
+    require_role(ctx, Role.OWNER)
+    if expected_workspace_id != ctx.workspace.id:
+        raise WorkspaceChanged
+
+    def write(session: Session) -> None:
+        _require_owner_now(session, ctx)
+        _checkpoint("delete_workspace")
+        repository = CurrentWorkspaceRepository(session, ctx)
+        repository.lock(exclusive=True)
+        name = repository.get().name
+        if confirm_name.strip() != name:
+            raise WorkspaceNameMismatch
+        now = ctx.clock.now()
+        repository.delete_with_all_data(now=now)
+        record_auth_event(
+            session,
+            ctx.clock,
+            action="workspace.delete",
+            entity_type="workspace",
+            entity_id=str(ctx.workspace.id),
+            actor_user_id=ctx.user.id,
+            data={"name": name},
         )
 
     run_immediate(factory, write)

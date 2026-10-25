@@ -30,3 +30,21 @@ with no transaction and no planned value left, the currency can change again.
 
 Choose the base currency before you start entering amounts. All other settings can still be
 changed at any time.
+
+## Deleting a workspace
+
+At the bottom of the settings page, owners find "Delete workspace". It opens a confirmation
+page; type the workspace's exact name there (letter case matters) and confirm.
+
+Deleting is permanent, for every member: all transactions (deleted ones included), planned
+values, categories, recurring items, closed months, members, pending invitations and the
+workspace's own audit log are removed at once, and the app keeps no copy. Export what you want
+to keep first; the confirmation page links to the transaction export (CSV). Categories,
+planned values and recurring items are not part of that export yet.
+
+Afterwards, you and the other members continue in another workspace you belong to. If you have
+none left, you see the "No workspace" page, where you can create a new workspace (when the
+instance allows it). Deleting the only workspace of the instance is allowed.
+
+The instance's audit log keeps one entry, "Workspace deleted", with the workspace's name, the
+date and who deleted it.

@@ -229,6 +229,9 @@ msgstr "Zmieniono ustawienia obszaru roboczego"
 msgid "Workspace created"
 msgstr "Utworzono obszar roboczy"
 
+msgid "Workspace deleted"
+msgstr "Usunięto obszar roboczy"
+
 msgid "Instance settings changed"
 msgstr "Zmieniono ustawienia instancji"
 
@@ -651,6 +654,9 @@ msgstr "Administracja kontami"
 
 msgid "Instance settings"
 msgstr "Ustawienia instancji"
+
+msgid "Deleted workspaces"
+msgstr "Usunięte obszary robocze"
 
 #, python-format
 msgid "Confirm your email address for %(app)s"
@@ -1681,6 +1687,20 @@ msgstr ""
 
 msgid "Workspace settings saved."
 msgstr "Zapisano ustawienia obszaru roboczego."
+
+msgid "Type the workspace name exactly as shown to confirm."
+msgstr ""
+"Aby potwierdzić, wpisz nazwę obszaru roboczego dokładnie tak, jak jest "
+"pokazana."
+
+msgid ""
+"Your current workspace changed since this page was opened (in another "
+"tab, or it was already deleted). Nothing was deleted. Check the workspace"
+" named below and confirm again."
+msgstr ""
+"Bieżący obszar roboczy zmienił się od otwarcia tej strony (w innej karcie"
+" albo został już usunięty). Nic nie usunięto. Sprawdź obszar roboczy "
+"podany poniżej i potwierdź ponownie."
 
 msgid "Home"
 msgstr "Strona główna"
@@ -3285,6 +3305,43 @@ msgstr "Nie ustawiono"
 msgid "Time zone"
 msgstr "Strefa czasowa"
 
+msgid "Delete workspace"
+msgstr "Usuń obszar roboczy"
+
+#, python-format
+msgid "Delete %(name)s permanently?"
+msgstr "Usunąć %(name)s na zawsze?"
+
+msgid ""
+"Every transaction, planned value, category, recurring item, closed month "
+"and invitation of this workspace is removed for good, and so is its audit"
+" log. This cannot be undone, and the app keeps no copy."
+msgstr ""
+"Wszystkie transakcje, wartości planowane, kategorie, pozycje cykliczne, "
+"zamknięte miesiące i zaproszenia tego obszaru roboczego zostaną trwale "
+"usunięte, razem z jego dziennikiem zdarzeń. Tego nie można cofnąć, a "
+"aplikacja nie zachowuje kopii."
+
+#, python-format
+msgid "%(num)d other member also loses access to it."
+msgid_plural "%(num)d other members also lose access to it."
+msgstr[0] "%(num)d inna osoba również straci do niego dostęp."
+msgstr[1] "%(num)d inne osoby również stracą do niego dostęp."
+msgstr[2] "%(num)d innych osób również straci do niego dostęp."
+
+msgid "Export what you want to keep first."
+msgstr "Najpierw wyeksportuj to, co chcesz zachować."
+
+msgid "Export transactions as CSV"
+msgstr "Eksportuj transakcje do CSV"
+
+#, python-format
+msgid "To confirm, type the workspace name: %(name)s"
+msgstr "Aby potwierdzić, wpisz nazwę obszaru roboczego: %(name)s"
+
+msgid "Delete this workspace"
+msgstr "Usuń ten obszar roboczy"
+
 msgid "People in this workspace"
 msgstr "Osoby w tym obszarze roboczym"
 
@@ -3424,6 +3481,17 @@ msgstr "Osobny budżet z własnymi członkami, kategoriami i walutą."
 
 msgid "Create a workspace"
 msgstr "Utwórz obszar roboczy"
+
+msgid ""
+"Permanently removes this workspace and all its data, for every member. "
+"You confirm on the next page by typing the workspace name."
+msgstr ""
+"Trwale usuwa ten obszar roboczy i wszystkie jego dane, dla wszystkich "
+"członków. Potwierdzisz to na następnej stronie, wpisując nazwę obszaru "
+"roboczego."
+
+msgid "Delete workspace…"
+msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Enter a display name of at most 120 characters."
 #~ msgstr "Podaj wyświetlaną nazwę o długości najwyżej 120 znaków."
