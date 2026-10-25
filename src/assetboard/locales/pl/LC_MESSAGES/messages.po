@@ -1444,6 +1444,44 @@ msgstr "Sobota"
 msgid "Sunday"
 msgstr "Niedziela"
 
+msgid "Choose a valid tax effect and base."
+msgstr "Wybierz prawidłowy rodzaj i podstawę podatku."
+
+msgid "Enter a valid effective date between 1900 and 2199."
+msgstr "Podaj prawidłową datę z zakresu od 1900 do 2199."
+
+msgid "Enter a non-negative percentage with at most two decimal places."
+msgstr "Podaj nieujemny procent z co najwyżej dwoma miejscami po przecinku."
+
+msgid "Enter a non-negative fixed amount in the workspace currency."
+msgstr "Podaj nieujemną kwotę w walucie obszaru roboczego."
+
+msgid "Enter a non-negative net amount in the workspace currency."
+msgstr "Podaj nieujemną kwotę netto w walucie obszaru roboczego."
+
+msgid "A new version must start after the latest existing version."
+msgstr "Nowa wersja musi obowiązywać od daty późniejszej niż najnowsza wersja."
+
+msgid "Archived tax rules cannot be changed."
+msgstr "Nie można zmieniać zarchiwizowanych reguł podatkowych."
+
+msgid "Choose how the income is recorded."
+msgstr "Wybierz sposób zapisu przychodu."
+
+msgid "The tax rule could not be saved. Check the form and try again."
+msgstr ""
+"Nie udało się zapisać reguły podatkowej. Sprawdź formularz i spróbuj "
+"ponownie."
+
+msgid "Cash received (gross)"
+msgstr "Wpływ brutto"
+
+msgid "Net"
+msgstr "Netto"
+
+msgid "Take-home"
+msgstr "Na rękę"
+
 msgid "Too many attempts. Try again later."
 msgstr "Zbyt wiele prób. Spróbuj ponownie później."
 
@@ -1558,6 +1596,32 @@ msgstr "Usunięcia nie można już cofnąć: wpis pozostaje usunięty."
 msgid "Not saved"
 msgstr "Nie zapisano"
 
+msgid "Enter a valid date between 1900 and 2199."
+msgstr "Podaj prawidłową datę z zakresu od 1900 do 2199."
+
+msgid "This month is closed. Reopen it or choose a date in an open month."
+msgstr ""
+"Ten miesiąc jest zamknięty. Otwórz go ponownie lub wybierz datę w "
+"otwartym miesiącu."
+
+msgid "This occurrence is no longer pending."
+msgstr "To wystąpienie nie jest już oczekujące."
+
+msgid "This occurrence has no transaction to undo."
+msgstr "To wystąpienie nie ma transakcji, którą można cofnąć."
+
+msgid "The 10-second undo window has expired."
+msgstr "Upłynął 10-sekundowy limit czasu na cofnięcie."
+
+msgid "The occurrence category is unavailable; edit the recurring rule."
+msgstr "Kategoria wystąpienia jest niedostępna; edytuj regułę cykliczną."
+
+msgid "Check the amount and date, then try again."
+msgstr "Sprawdź kwotę i datę, a następnie spróbuj ponownie."
+
+msgid "Choose a valid direction."
+msgstr "Wybierz prawidłowy kierunek."
+
 msgid "Choose a supported currency."
 msgstr "Wybierz obsługiwaną walutę."
 
@@ -1626,6 +1690,9 @@ msgstr "Menu główne"
 
 msgid "Recurring"
 msgstr "Cykliczne"
+
+msgid "Upcoming"
+msgstr "Nadchodzące"
 
 msgid "Net worth"
 msgstr "Majątek netto"
@@ -2449,6 +2516,9 @@ msgstr "Wcześniejsze opisy"
 msgid "Choose a category"
 msgstr "Wybierz kategorię"
 
+msgid "Automatically posted"
+msgstr "Automatycznie zaksięgowano"
+
 msgid "archived"
 msgstr "zarchiwizowana"
 
@@ -2712,6 +2782,9 @@ msgstr "Stała"
 msgid "Estimate"
 msgstr "Szacunkowa"
 
+msgid "Automatically post on the due date"
+msgstr "Automatycznie księguj w terminie"
+
 msgid "Start date"
 msgstr "Data początkowa"
 
@@ -2795,6 +2868,9 @@ msgstr ""
 msgid "Recurring items"
 msgstr "Pozycje cykliczne"
 
+msgid "Upcoming inbox"
+msgstr "Skrzynka nadchodzących"
+
 msgid "Archived"
 msgstr "Zarchiwizowana"
 
@@ -2838,6 +2914,199 @@ msgstr "Wybierz prawidłowe daty powtarzania, aby zobaczyć podgląd."
 
 msgid "No more occurrences match this rule."
 msgstr "Brak kolejnych wystąpień pasujących do tej reguły."
+
+msgid "Occurrence marked paid or received."
+msgstr "Wystąpienie oznaczono jako opłacone lub otrzymane."
+
+msgid "Filters"
+msgstr "Filtry"
+
+msgid "Expenses and income"
+msgstr "Wydatki i przychody"
+
+msgid "All categories"
+msgstr "Wszystkie kategorie"
+
+msgid "Apply filters"
+msgstr "Zastosuj filtry"
+
+msgid "Clear"
+msgstr "Wyczyść"
+
+#, python-format
+msgid "Showing overdue items and the next %(days)d days."
+msgstr "Wyświetlane są zaległe pozycje i pozycje z kolejnych %(days)d dni."
+
+#, python-format
+msgid "Week of %(date)s"
+msgstr "Tydzień od %(date)s"
+
+msgid "Automatic posting"
+msgstr "Automatyczne księgowanie"
+
+msgid "Overdue"
+msgstr "Zaległe"
+
+msgid "Rescheduled for this occurrence"
+msgstr "Zmieniono termin tego wystąpienia"
+
+msgid "Mark paid or received"
+msgstr "Oznacz jako opłacone lub otrzymane"
+
+msgid "Save transaction"
+msgstr "Zapisz transakcję"
+
+msgid "Reschedule this one"
+msgstr "Zmień termin tylko tego wystąpienia"
+
+msgid "New due date"
+msgstr "Nowy termin"
+
+msgid "Save date"
+msgstr "Zapisz datę"
+
+msgid "Edit amount"
+msgstr "Edytuj kwotę"
+
+msgid "Save amount"
+msgstr "Zapisz kwotę"
+
+msgid "Skip"
+msgstr "Pomiń"
+
+#, python-format
+msgid "Nothing is overdue or due in the next %(days)d days."
+msgstr ""
+"Brak zaległych pozycji i pozycji z terminem w ciągu kolejnych %(days)d "
+"dni."
+
+msgid "Tax calculator"
+msgstr "Kalkulator podatków"
+
+msgid "Rates are entered by you; this is not tax advice."
+msgstr "Stawki wprowadzasz samodzielnie; to nie jest porada podatkowa."
+
+#, python-format
+msgid "Net amount (%(currency)s)"
+msgstr "Kwota netto (%(currency)s)"
+
+msgid "Calculation date"
+msgstr "Data obliczenia"
+
+msgid "Record income as"
+msgstr "Zapisz przychód jako"
+
+msgid "Calculate"
+msgstr "Oblicz"
+
+#, python-format
+msgid "No effective version on this date for: %(names)s"
+msgstr "Brak obowiązującej wersji na ten dzień dla: %(names)s"
+
+#, python-format
+msgid "Breakdown for %(date)s"
+msgstr "Zestawienie na dzień %(date)s"
+
+msgid "Added tax"
+msgstr "Podatek doliczony"
+
+msgid "Gross"
+msgstr "Brutto"
+
+msgid "Withheld"
+msgstr "Potrącono"
+
+msgid "Ledger amount"
+msgstr "Kwota w księdze"
+
+msgid "Planned tax payments"
+msgstr "Planowane płatności podatkowe"
+
+msgid "No tax payments for this recording mode."
+msgstr "Brak płatności podatkowych dla tego sposobu zapisu."
+
+msgid "Manage tax rules"
+msgstr "Zarządzaj regułami podatkowymi"
+
+msgid "Tax rules"
+msgstr "Reguły podatkowe"
+
+msgid "Calculator preview"
+msgstr "Podgląd kalkulatora"
+
+msgid "New tax rule"
+msgstr "Nowa reguła podatkowa"
+
+msgid "Effect"
+msgstr "Działanie"
+
+msgid "Added to net"
+msgstr "Doliczany do kwoty netto"
+
+msgid "Tax base"
+msgstr "Podstawa podatku"
+
+msgid "Notes (optional)"
+msgstr "Uwagi (opcjonalnie)"
+
+msgid "First version effective from"
+msgstr "Data obowiązywania pierwszej wersji"
+
+msgid "Value type"
+msgstr "Rodzaj wartości"
+
+msgid "Percent"
+msgstr "Procent"
+
+msgid "Fixed amount"
+msgstr "Kwota stała"
+
+msgid "Rate in percent"
+msgstr "Stawka w procentach"
+
+#, python-format
+msgid "Fixed amount (%(currency)s)"
+msgstr "Kwota stała (%(currency)s)"
+
+msgid "Create tax rule"
+msgstr "Utwórz regułę podatkową"
+
+#, python-format
+msgid "Base: %(base)s"
+msgstr "Podstawa: %(base)s"
+
+#, python-format
+msgid "Archive the tax rule %(name)s?"
+msgstr "Zarchiwizować regułę podatkową %(name)s?"
+
+msgid "Versions"
+msgstr "Wersje"
+
+msgid "Add a new version"
+msgstr "Dodaj nową wersję"
+
+msgid "Effective from"
+msgstr "Obowiązuje od"
+
+msgid "Save version"
+msgstr "Zapisz wersję"
+
+msgid "Edit name and notes"
+msgstr "Edytuj nazwę i uwagi"
+
+msgid "Save details"
+msgstr "Zapisz szczegóły"
+
+msgid "No tax rules yet."
+msgstr "Nie ma jeszcze reguł podatkowych."
+
+msgid ""
+"Tax-rule effect and base are fixed at creation to preserve the meaning of"
+" existing rate versions. Create a separate rule to model a different tax."
+msgstr ""
+"Działanie i podstawa reguły są ustalone podczas tworzenia, aby zachować "
+"znaczenie istniejących wersji stawek. Utwórz osobną regułę dla innego "
+"podatku."
 
 msgid "Export CSV"
 msgstr "Eksportuj CSV"
@@ -2904,9 +3173,6 @@ msgstr ""
 msgid "Download CSV"
 msgstr "Pobierz CSV"
 
-msgid "Filters"
-msgstr "Filtry"
-
 msgid "Smallest amount"
 msgstr "Najmniejsza kwota"
 
@@ -2915,9 +3181,6 @@ msgstr "Największa kwota"
 
 msgid "Description contains"
 msgstr "Opis zawiera"
-
-msgid "Expenses and income"
-msgstr "Wydatki i przychody"
 
 msgid "None ticked: every category."
 msgstr "Bez zaznaczenia: wszystkie kategorie."

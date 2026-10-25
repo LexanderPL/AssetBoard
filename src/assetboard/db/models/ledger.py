@@ -118,6 +118,7 @@ class Transaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin
 
     __tablename__ = "transactions"
     __table_args__ = (
+        UniqueConstraint("workspace_id", "id", name="uq_transactions_workspace_id_id"),
         ForeignKeyConstraint(
             ["workspace_id", "category_id"],
             ["categories.workspace_id", "categories.id"],

@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% block title %}{{ _("Tax calculator") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Tax calculator") }}{% endblock %}
+{% block content %}
+<p class="mb-5 rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong">{{ _("Rates are entered by you; this is not tax advice.") }}</p>
+{% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong">{{ error }}</p>{% endif %}
+<section class="panel p-4 sm:p-6">
+  <form method="get" action="{{ scoped_url(request, 'tax_calculator') }}" class="grid gap-4 sm:grid-cols-3">
+    <label class="grid gap-1 text-sm">{{ _("Net amount (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="net" value="{{ values.net }}" inputmode="decimal" required class="form-control rounded-lg px-3 py-2"></label>
+    <label class="grid gap-1 text-sm">{{ _("Calculation date") }}<input type="date" name="day" value="{{ values.day }}" required class="form-control rounded-lg px-3 py-2"></label>
+    <label class="grid gap-1 text-sm">{{ _("Record income as") }}<select name="record_as" class="form-select rounded-lg py-2">{% for value, label in record_as_options %}<option value="{{ value }}"{% if values.record_as == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <button type="submit" class="rounded-lg bg-primary px-4 py-2 font-semibold text-on-primary sm:col-span-3">{{ _("Calculate") }}</button>
+  </form>
+</section>
+{% if calculation %}
+{% set result = calculation.calculation %}
+{% if calculation.missing_rules %}<p class="mt-4 rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong">{{ _("No effective version on this date for: %(names)s", names=calculation.missing_rules|join(", ")) }}</p>{% endif %}
+<section class="panel mt-5 p-4 sm:p-6" aria-labelledby="tax-breakdown">
+  <h2 id="tax-breakdown" class="font-semibold">{{ _("Breakdown for %(date)s", date=format_day(calculation.day, locale)) }}</h2>
+  <dl class="mt-4 grid gap-x-6 gap-y-2 sm:grid-cols-2">
+    <dt>{{ _("Net") }}</dt><dd class="text-right font-medium">{{ format_money(result.net, locale) }}</dd>
+    {% for line in result.added %}<dt>{{ line.name }} · {{ _("Added tax") }}</dt><dd class="text-right">{{ format_money(line.amount, locale) }}</dd>{% endfor %}
+    <dt class="border-t border-line pt-2 font-semibold">{{ _("Gross") }}</dt><dd class="border-t border-line pt-2 text-right font-semibold">{{ format_money(result.gross, locale) }}</dd>
+    {% for line in result.withheld %}<dt>{{ line.name }} · {{ _("Withheld") }}</dt><dd class="text-right">{{ format_money(line.amount, locale) }}</dd>{% endfor %}
+    <dt class="border-t border-line pt-2 font-semibold">{{ _("Take-home") }}</dt><dd class="border-t border-line pt-2 text-right font-semibold">{{ format_money(result.take_home, locale) }}</dd>
+    <dt>{{ _("Ledger amount") }}</dt><dd class="text-right font-semibold">{{ format_money(result.ledger_amount, locale) }}</dd>
+  </dl>
+  <h3 class="mt-5 font-semibold">{{ _("Planned tax payments") }}</h3>
+  <ul class="mt-2 space-y-1 text-sm">{% for line in result.payments %}<li>{{ line.name }} · {{ format_money(line.amount, locale) }}</li>{% else %}<li class="text-muted">{{ _("No tax payments for this recording mode.") }}</li>{% endfor %}</ul>
+</section>
+{% endif %}
+<a href="{{ scoped_url(request, 'tax_rules') }}" class="mt-5 inline-block text-primary-ink underline">{{ _("Manage tax rules") }}</a>
+{% endblock %}

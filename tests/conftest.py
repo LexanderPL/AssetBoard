@@ -55,6 +55,7 @@ def isolate_application_data_dir(
         "AUTO_MIGRATE",
         "SETUP_TOKEN",
         "ALLOW_REGISTRATION",
+        "UPCOMING_DAYS",
         "SESSION_IDLE_TIMEOUT_DAYS",
         "SESSION_ABSOLUTE_TIMEOUT_DAYS",
         "AUTH_ACCOUNT_FREE_FAILURES",

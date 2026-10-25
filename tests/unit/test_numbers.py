@@ -257,3 +257,20 @@ def test_rates_in_tenths_of_a_percent_show_one_decimal(tenths: int, locale: str,
     from assetboard.i18n.numbers import format_rate_tenths
 
     assert format_rate_tenths(tenths, locale) == text
+
+
+@pytest.mark.parametrize(
+    ("rate_bp", "locale", "text"),
+    [
+        (2300, "en", "23.00%"),
+        (1, "en", "0.01%"),
+        (2300, "pl", "23,00%"),
+        (1, "pl", "0,01%"),
+    ],
+)
+def test_rates_in_basis_points_show_two_locale_aware_decimals(
+    rate_bp: int, locale: str, text: str
+) -> None:
+    from assetboard.i18n.numbers import format_rate_basis_points
+
+    assert format_rate_basis_points(rate_bp, locale) == text

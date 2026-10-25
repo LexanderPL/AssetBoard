@@ -1348,6 +1348,42 @@ msgstr ""
 msgid "Sunday"
 msgstr ""
 
+msgid "Choose a valid tax effect and base."
+msgstr ""
+
+msgid "Enter a valid effective date between 1900 and 2199."
+msgstr ""
+
+msgid "Enter a non-negative percentage with at most two decimal places."
+msgstr ""
+
+msgid "Enter a non-negative fixed amount in the workspace currency."
+msgstr ""
+
+msgid "Enter a non-negative net amount in the workspace currency."
+msgstr ""
+
+msgid "A new version must start after the latest existing version."
+msgstr ""
+
+msgid "Archived tax rules cannot be changed."
+msgstr ""
+
+msgid "Choose how the income is recorded."
+msgstr ""
+
+msgid "The tax rule could not be saved. Check the form and try again."
+msgstr ""
+
+msgid "Cash received (gross)"
+msgstr ""
+
+msgid "Net"
+msgstr ""
+
+msgid "Take-home"
+msgstr ""
+
 msgid "Too many attempts. Try again later."
 msgstr ""
 
@@ -1450,6 +1486,30 @@ msgstr ""
 msgid "Not saved"
 msgstr ""
 
+msgid "Enter a valid date between 1900 and 2199."
+msgstr ""
+
+msgid "This month is closed. Reopen it or choose a date in an open month."
+msgstr ""
+
+msgid "This occurrence is no longer pending."
+msgstr ""
+
+msgid "This occurrence has no transaction to undo."
+msgstr ""
+
+msgid "The 10-second undo window has expired."
+msgstr ""
+
+msgid "The occurrence category is unavailable; edit the recurring rule."
+msgstr ""
+
+msgid "Check the amount and date, then try again."
+msgstr ""
+
+msgid "Choose a valid direction."
+msgstr ""
+
 msgid "Choose a supported currency."
 msgstr ""
 
@@ -1507,6 +1567,9 @@ msgid "Main navigation"
 msgstr ""
 
 msgid "Recurring"
+msgstr ""
+
+msgid "Upcoming"
 msgstr ""
 
 msgid "Net worth"
@@ -2258,6 +2321,9 @@ msgstr ""
 msgid "Choose a category"
 msgstr ""
 
+msgid "Automatically posted"
+msgstr ""
+
 msgid "archived"
 msgstr ""
 
@@ -2489,6 +2555,9 @@ msgstr ""
 msgid "Estimate"
 msgstr ""
 
+msgid "Automatically post on the due date"
+msgstr ""
+
 msgid "Start date"
 msgstr ""
 
@@ -2568,6 +2637,9 @@ msgstr ""
 msgid "Recurring items"
 msgstr ""
 
+msgid "Upcoming inbox"
+msgstr ""
+
 msgid "Archived"
 msgstr ""
 
@@ -2603,6 +2675,194 @@ msgid "Choose valid recurrence dates to see the preview."
 msgstr ""
 
 msgid "No more occurrences match this rule."
+msgstr ""
+
+msgid "Occurrence marked paid or received."
+msgstr ""
+
+msgid "Filters"
+msgstr ""
+
+msgid "Expenses and income"
+msgstr ""
+
+msgid "All categories"
+msgstr ""
+
+msgid "Apply filters"
+msgstr ""
+
+msgid "Clear"
+msgstr ""
+
+#, python-format
+msgid "Showing overdue items and the next %(days)d days."
+msgstr ""
+
+#, python-format
+msgid "Week of %(date)s"
+msgstr ""
+
+msgid "Automatic posting"
+msgstr ""
+
+msgid "Overdue"
+msgstr ""
+
+msgid "Rescheduled for this occurrence"
+msgstr ""
+
+msgid "Mark paid or received"
+msgstr ""
+
+msgid "Save transaction"
+msgstr ""
+
+msgid "Reschedule this one"
+msgstr ""
+
+msgid "New due date"
+msgstr ""
+
+msgid "Save date"
+msgstr ""
+
+msgid "Edit amount"
+msgstr ""
+
+msgid "Save amount"
+msgstr ""
+
+msgid "Skip"
+msgstr ""
+
+#, python-format
+msgid "Nothing is overdue or due in the next %(days)d days."
+msgstr ""
+
+msgid "Tax calculator"
+msgstr ""
+
+msgid "Rates are entered by you; this is not tax advice."
+msgstr ""
+
+#, python-format
+msgid "Net amount (%(currency)s)"
+msgstr ""
+
+msgid "Calculation date"
+msgstr ""
+
+msgid "Record income as"
+msgstr ""
+
+msgid "Calculate"
+msgstr ""
+
+#, python-format
+msgid "No effective version on this date for: %(names)s"
+msgstr ""
+
+#, python-format
+msgid "Breakdown for %(date)s"
+msgstr ""
+
+msgid "Added tax"
+msgstr ""
+
+msgid "Gross"
+msgstr ""
+
+msgid "Withheld"
+msgstr ""
+
+msgid "Ledger amount"
+msgstr ""
+
+msgid "Planned tax payments"
+msgstr ""
+
+msgid "No tax payments for this recording mode."
+msgstr ""
+
+msgid "Manage tax rules"
+msgstr ""
+
+msgid "Tax rules"
+msgstr ""
+
+msgid "Calculator preview"
+msgstr ""
+
+msgid "New tax rule"
+msgstr ""
+
+msgid "Effect"
+msgstr ""
+
+msgid "Added to net"
+msgstr ""
+
+msgid "Tax base"
+msgstr ""
+
+msgid "Notes (optional)"
+msgstr ""
+
+msgid "First version effective from"
+msgstr ""
+
+msgid "Value type"
+msgstr ""
+
+msgid "Percent"
+msgstr ""
+
+msgid "Fixed amount"
+msgstr ""
+
+msgid "Rate in percent"
+msgstr ""
+
+#, python-format
+msgid "Fixed amount (%(currency)s)"
+msgstr ""
+
+msgid "Create tax rule"
+msgstr ""
+
+#, python-format
+msgid "Base: %(base)s"
+msgstr ""
+
+#, python-format
+msgid "Archive the tax rule %(name)s?"
+msgstr ""
+
+msgid "Versions"
+msgstr ""
+
+msgid "Add a new version"
+msgstr ""
+
+msgid "Effective from"
+msgstr ""
+
+msgid "Save version"
+msgstr ""
+
+msgid "Edit name and notes"
+msgstr ""
+
+msgid "Save details"
+msgstr ""
+
+msgid "No tax rules yet."
+msgstr ""
+
+msgid ""
+"Tax-rule effect and base are fixed at creation to preserve the meaning of"
+" existing rate versions. Create a separate rule to model a different tax."
 msgstr ""
 
 msgid "Export CSV"
@@ -2660,9 +2920,6 @@ msgstr ""
 msgid "Download CSV"
 msgstr ""
 
-msgid "Filters"
-msgstr ""
-
 msgid "Smallest amount"
 msgstr ""
 
@@ -2670,9 +2927,6 @@ msgid "Largest amount"
 msgstr ""
 
 msgid "Description contains"
-msgstr ""
-
-msgid "Expenses and income"
 msgstr ""
 
 msgid "None ticked: every category."

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from datetime import date
 from uuid import UUID
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import and_, exists, func, select
 from sqlalchemy.orm import Session
 
 from assetboard.db.models.identity import Workspace
+from assetboard.db.models.ledger import Category
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.repositories.base import ScopedRepository
 
@@ -51,6 +53,51 @@ class ScheduledOccurrenceRepository(ScopedRepository[ScheduledOccurrence]):
                 .where(ScheduledOccurrence.scheduled_item_id == item_id)
                 .order_by(ScheduledOccurrence.due_date, ScheduledOccurrence.id)
             )
+        )
+
+    def get_for_update(self, occurrence_id: UUID) -> ScheduledOccurrence | None:
+        statement = (
+            self._scoped_select().where(ScheduledOccurrence.id == occurrence_id).with_for_update()
+        )
+        return self._session.scalars(statement).one_or_none()
+
+    def upcoming(
+        self,
+        through: date,
+        *,
+        direction: str | None = None,
+        category_id: UUID | None = None,
+    ) -> list[tuple[ScheduledOccurrence, ScheduledItem, str]]:
+        statement = (
+            select(ScheduledOccurrence, ScheduledItem, Category.name)
+            .join(
+                ScheduledItem,
+                and_(
+                    ScheduledItem.workspace_id == self._workspace_id,
+                    ScheduledItem.id == ScheduledOccurrence.scheduled_item_id,
+                ),
+            )
+            .join(
+                Category,
+                and_(
+                    Category.workspace_id == self._workspace_id,
+                    Category.id == ScheduledOccurrence.category_id,
+                ),
+            )
+            .where(
+                ScheduledOccurrence.workspace_id == self._workspace_id,
+                ScheduledOccurrence.status == "pending",
+                ScheduledOccurrence.due_date <= through,
+            )
+        )
+        if direction is not None:
+            statement = statement.where(ScheduledOccurrence.direction == direction)
+        if category_id is not None:
+            statement = statement.where(ScheduledOccurrence.category_id == category_id)
+        return list(
+            self._session.execute(
+                statement.order_by(ScheduledOccurrence.due_date, ScheduledOccurrence.id)
+            ).all()
         )
 
     def category_counts(self) -> dict[UUID, int]:

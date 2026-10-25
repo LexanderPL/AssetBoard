@@ -185,7 +185,7 @@
             {% if can_edit %}<td class="py-2 pr-2"><input id="select-{{ row_id }}" type="checkbox" name="ids" value="{{ row_id }}" form="bulk-form"{% if row_id in bulk_values.get("ids", ()) %} checked{% endif %} class="{{ check_class }}"><label for="select-{{ row_id }}" class="sr-only">{{ _("Select the entry of %(date)s, %(amount)s", date=r.full_date, amount=r.amount) }}</label></td>{% endif %}
             <td class="whitespace-nowrap py-2 pr-2"><a href="{{ r.month_href }}" class="text-primary-ink underline" data-date><time datetime="{{ r.t.date.isoformat() }}">{{ r.full_date }}</time></a>{% if r.t.month_closed %} <span class="text-xs text-muted" data-closed>{{ _("closed") }}</span>{% endif %}</td>
             <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums" data-amount>{{ r.amount }}</td>
-            <td class="break-words py-2 pr-2" data-description>{{ r.t.description }}</td>
+            <td class="break-words py-2 pr-2" data-description>{{ r.t.description }}{% if r.t.source == "recurring_auto" %} <span class="text-xs text-muted">{{ _("Automatically posted") }}</span>{% endif %}</td>
             <td class="py-2 pr-2"><span class="flex items-center gap-2">{{ swatch(r.t.category_color) }}<span data-category-name>{{ r.t.category_name }}</span>{% if r.t.category_archived %}<span class="text-xs text-muted">{{ _("archived") }}</span>{% endif %}</span></td>
             <td class="py-2 text-muted" data-direction>{{ r.direction }}</td>
           </tr>

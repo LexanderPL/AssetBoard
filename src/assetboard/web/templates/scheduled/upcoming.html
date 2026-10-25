@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% set input_class = "form-control w-full rounded-lg px-2.5 py-1.5" %}
+{% set button_class = "rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle" %}
+{% block title %}{{ _("Upcoming") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Upcoming inbox") }}{% endblock %}
+{% block content %}
+<div class="mb-5 flex flex-wrap gap-3">
+  <a href="{{ scoped_url(request, 'scheduled_items') }}" class="rounded-lg border border-line px-3 py-2 text-sm">{{ _("Recurring items") }}</a>
+</div>
+{% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
+{% if undo and can_edit %}
+<div role="status" class="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-post-undo>
+  <span>{{ _("Occurrence marked paid or received.") }}</span>
+  <form method="post" action="{{ scoped_url(request, 'upcoming_undo', occurrence_id=undo.occurrence_id) }}">{{ csrf_input() }}<button type="submit" class="font-semibold underline">{{ _("Undo") }}</button></form>
+</div>
+{% endif %}
+<section class="panel mb-6 p-4 sm:p-6" aria-labelledby="upcoming-filters">
+  <h2 id="upcoming-filters" class="font-semibold">{{ _("Filters") }}</h2>
+  <form method="get" action="{{ scoped_url(request, 'scheduled_upcoming') }}" class="mt-4 grid gap-4 sm:grid-cols-3">
+    <div>
+      <label for="upcoming-direction" class="mb-1 block text-sm font-medium">{{ _("Direction") }}</label>
+      <select id="upcoming-direction" name="direction" class="form-select w-full rounded-lg py-1.5 pl-2.5">
+        <option value="">{{ _("Expenses and income") }}</option>
+        <option value="expense"{% if direction == "expense" %} selected{% endif %}>{{ _("Expenses") }}</option>
+        <option value="income"{% if direction == "income" %} selected{% endif %}>{{ _("Income") }}</option>
+      </select>
+    </div>
+    <div>
+      <label for="upcoming-category" class="mb-1 block text-sm font-medium">{{ _("Category") }}</label>
+      <select id="upcoming-category" name="category" class="form-select w-full rounded-lg py-1.5 pl-2.5">
+        <option value="">{{ _("All categories") }}</option>
+        {% for category in categories %}<option value="{{ category.id }}"{% if category_id == category.id|string %} selected{% endif %}>{{ category.name }}{% if category.archived %} · {{ _("archived") }}{% endif %}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="flex items-end gap-3">
+      <button type="submit" class="{{ button_class }}">{{ _("Apply filters") }}</button>
+      <a href="{{ scoped_url(request, 'scheduled_upcoming') }}" class="text-sm text-primary-ink underline">{{ _("Clear") }}</a>
+    </div>
+  </form>
+  <p class="mt-3 text-sm text-muted">{{ _("Showing overdue items and the next %(days)d days.", days=days) }}</p>
+</section>
+{% for week in weeks %}
+<section class="panel mb-5 p-4 sm:p-6" aria-labelledby="week-{{ week.monday.isoformat() }}">
+  <h2 id="week-{{ week.monday.isoformat() }}" class="font-semibold">{{ _("Week of %(date)s", date=format_day(week.monday, locale)) }}</h2>
+  <div class="mt-4 space-y-4">
+  {% for occurrence in week.occurrences %}
+  <article class="rounded-xl border border-line p-4 {% if occurrence.due_date < today %}border-danger-line bg-danger-soft {% endif %}" data-occurrence="{{ occurrence.id }}">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div class="min-w-0">
+        <h3 class="break-words font-semibold">{{ occurrence.label }}</h3>
+        <p class="mt-1 text-sm text-muted">
+          <time datetime="{{ occurrence.due_date.isoformat() }}">{{ format_day(occurrence.due_date, locale) }}</time>
+          · {{ _("Income") if occurrence.direction == "income" else _("Expense") }}
+          · {{ occurrence.category_name }}
+          · {{ format_money(occurrence.expected, locale) }}
+          {% if occurrence.amount_state == "estimated" %} · {{ _("Estimate") }}{% endif %}
+          {% if occurrence.auto_post %} · {{ _("Automatic posting") }}{% endif %}
+        </p>
+        {% if occurrence.due_date < today %}<p class="mt-2 text-sm font-semibold text-danger">{{ _("Overdue") }}</p>{% endif %}
+        {% if occurrence.rescheduled %}<p class="mt-1 text-xs text-muted">{{ _("Rescheduled for this occurrence") }}</p>{% endif %}
+      </div>
+      {% if can_edit %}
+      <div class="flex flex-wrap gap-2">
+        <details>
+          <summary class="{{ button_class }} cursor-pointer">{{ _("Mark paid or received") }}</summary>
+          <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=occurrence.id) }}" class="mt-3 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
+            {{ csrf_input() }}
+            <div>
+              <label for="post-day-{{ occurrence.id }}" class="mb-1 block text-xs font-medium">{{ _("Date") }}</label>
+              <input id="post-day-{{ occurrence.id }}" name="day" type="date" value="{{ occurrence.due_date.isoformat() }}" required class="{{ input_class }}">
+            </div>
+            <div>
+              <label for="post-amount-{{ occurrence.id }}" class="mb-1 block text-xs font-medium">{{ _("Amount") }}</label>
+              <input id="post-amount-{{ occurrence.id }}" name="amount" type="text" inputmode="decimal" value="{{ amount_input(occurrence.expected) }}" required class="{{ input_class }}">
+            </div>
+            <button type="submit" class="{{ button_class }} sm:col-span-2">{{ _("Save transaction") }}</button>
+          </form>
+        </details>
+        <details>
+          <summary class="{{ button_class }} cursor-pointer">{{ _("Reschedule this one") }}</summary>
+          <form method="post" action="{{ scoped_url(request, 'upcoming_reschedule', occurrence_id=occurrence.id) }}" class="mt-3 flex flex-wrap gap-2 rounded-lg border border-line p-3">
+            {{ csrf_input() }}
+            <label for="reschedule-{{ occurrence.id }}" class="sr-only">{{ _("New due date") }}</label>
+            <input id="reschedule-{{ occurrence.id }}" name="day" type="date" value="{{ occurrence.due_date.isoformat() }}" required class="{{ input_class }}">
+            <button type="submit" class="{{ button_class }}">{{ _("Save date") }}</button>
+          </form>
+        </details>
+        <details>
+          <summary class="{{ button_class }} cursor-pointer">{{ _("Edit amount") }}</summary>
+          <form method="post" action="{{ scoped_url(request, 'upcoming_amount', occurrence_id=occurrence.id) }}" class="mt-3 flex flex-wrap gap-2 rounded-lg border border-line p-3">
+            {{ csrf_input() }}
+            <label for="amount-{{ occurrence.id }}" class="sr-only">{{ _("Amount") }}</label>
+            <input id="amount-{{ occurrence.id }}" name="amount" type="text" inputmode="decimal" value="{{ amount_input(occurrence.expected) }}" required class="{{ input_class }}">
+            <button type="submit" class="{{ button_class }}">{{ _("Save amount") }}</button>
+          </form>
+        </details>
+        <form method="post" action="{{ scoped_url(request, 'upcoming_skip', occurrence_id=occurrence.id) }}">{{ csrf_input() }}<button type="submit" class="{{ button_class }}">{{ _("Skip") }}</button></form>
+        <a href="{{ scoped_url(request, 'scheduled_edit', item_id=occurrence.scheduled_item_id) }}" class="{{ button_class }}">{{ _("Edit rule") }}</a>
+      </div>
+      {% endif %}
+    </div>
+  </article>
+  {% endfor %}
+  </div>
+</section>
+{% else %}
+<p class="panel p-6 text-muted">{{ _("Nothing is overdue or due in the next %(days)d days.", days=days) }}</p>
+{% endfor %}
+{% endblock %}

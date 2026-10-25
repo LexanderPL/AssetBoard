@@ -5,6 +5,7 @@
 {% block content %}
 {% if error %}<p role="alert" class="mb-4 rounded-xl border border-line px-4 py-3 text-sm text-danger" data-action-error>{{ error }}</p>{% endif %}
 {% if can_edit %}<a href="{{ scoped_url(request, 'scheduled_new') }}" class="mb-6 inline-block rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary">{{ _("New recurring item") }}</a>{% endif %}
+<a href="{{ scoped_url(request, 'scheduled_upcoming') }}" class="mb-6 ml-3 inline-block rounded-xl border border-line px-4 py-2.5 text-sm font-semibold">{{ _("Upcoming inbox") }}</a>
 <div class="space-y-4">
 {% for item in items %}
 <section class="panel p-6" data-scheduled-item="{{ item.id }}">
