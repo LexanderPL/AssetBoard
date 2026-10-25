@@ -83,14 +83,18 @@
   {% endif %}
   <h3 class="mt-4 text-sm font-semibold">{{ _("Work logs") }}</h3>
   {% if source.work_logs %}
-  <ul class="mt-2 flex flex-wrap gap-3 text-sm">{% for log in source.work_logs %}<li>{{ format_month(log.work_month, locale) }} · {{ format_quantity_input(log.units, locale) }}</li>{% endfor %}</ul>
+  <ul class="mt-2 flex flex-wrap gap-3 text-sm">{% for log in source.work_logs %}<li>{{ format_month(log.work_month, locale) }} · {{ format_quantity_input(log.units, locale) }}{% if log.derived_from_days %} · <a href="{{ scoped_url(request, 'income_calendar', source_id=source.id|string) }}?month={{ log.work_month.strftime('%Y-%m') }}" class="text-primary-ink underline" data-derived-log>{{ _("from the work calendar") }}</a>{% endif %}</li>{% endfor %}</ul>
   {% else %}<p class="mt-2 text-sm text-muted">{{ _("No work logs yet.") }}</p>{% endif %}
+  {% if source.kind.value == "variable" %}
+  <p class="mt-2 text-sm"><a href="{{ scoped_url(request, 'income_calendar', source_id=source.id|string) }}" class="font-semibold text-primary-ink underline" data-work-calendar-link>{{ _("Open the work calendar") }}</a></p>
+  {% endif %}
   {% if can_edit and not source.archived and source.kind.value == "variable" %}
   <form method="post" action="{{ scoped_url(request, 'income_work_log', source_id=source.id) }}" class="mt-4 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-3">
     {{ csrf_input() }}
     <label class="grid gap-1 text-sm">{{ _("Work month") }}<input type="date" name="work_month" value="{{ today.replace(day=1).isoformat() }}" required class="form-control rounded-lg px-3 py-2"></label>
     <label class="grid gap-1 text-sm">{{ _("Units worked (%(unit)s)", unit=source.unit_label) }}<input name="units" inputmode="decimal" required class="form-control rounded-lg px-3 py-2"></label>
     <button type="submit" class="self-end rounded-lg border border-line px-3 py-2 text-sm font-semibold">{{ _("Save work log") }}</button>
+    <p class="text-xs text-muted sm:col-span-3">{{ _("Months with days marked in the work calendar are read-only here: their units are the sum of the days.") }}</p>
   </form>
   {% endif %}
   <h3 class="mt-5 text-sm font-semibold">{{ _("Attached tax rules") }}</h3>

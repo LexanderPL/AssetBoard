@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from datetime import date
 from decimal import Decimal
 from typing import TypedDict
@@ -14,7 +15,13 @@ from assetboard.db.repositories import NotFound
 from assetboard.domain.months import YearMonth
 from assetboard.domain.transactions import amount_minor
 from assetboard.i18n import gettext
-from assetboard.i18n.dates import format_day, format_month
+from assetboard.i18n.dates import (
+    format_day,
+    format_day_long,
+    format_month,
+    format_month_heading,
+    weekday_names,
+)
 from assetboard.i18n.numbers import (
     format_amount_input,
     format_money,
@@ -23,8 +30,9 @@ from assetboard.i18n.numbers import (
 )
 from assetboard.services import income, taxes
 from assetboard.services.categories import list_categories
-from assetboard.services.context import Role, has_role
+from assetboard.services.context import Context, Role, has_role
 from assetboard.web.context import CurrentContext
+from assetboard.web.errors import is_htmx_fragment_request
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
 
@@ -68,6 +76,10 @@ ERRORS = {
     "attachment_in_use": _("A posted tax payment uses this attachment, so it cannot be removed."),
     "month_closed": _("This month is closed. Reopen it before changing the income estimate."),
     "archived": _("Archived income sources cannot be changed."),
+    "derived_work_log": _(
+        "This month's units come from the work calendar. Change the days in the calendar."
+    ),
+    "invalid_day_units": _("Enter a number of units above 0 and at most 24."),
     "posted": _(
         "The work log was saved; posted income was not changed. "
         "Adjust its transaction manually if needed."
@@ -291,3 +303,145 @@ async def save_work_log(request: Request, ctx: CurrentContext, source_id: str) -
     if posted:
         return _redirect(request, "posted")
     return _redirect(request)
+
+
+# F3.7 work calendar
+
+
+def _calendar_month(value: str, ctx: Context) -> date:
+    """``YYYY-MM`` from the query or form; the workspace's current month when absent."""
+    if not value:
+        return ctx.clock.today(ctx.workspace.timezone).replace(day=1)
+    try:
+        return YearMonth.parse(value).first_day
+    except ValueError:
+        raise income.IncomeError("invalid_work_month") from None
+
+
+def _calendar_url(request: Request, source_id: UUID, month: date, error: str | None = None) -> str:
+    query = {"month": f"{month:%Y-%m}"} | ({"error": error} if error else {})
+    path = request.url_for("income_calendar", source_id=str(source_id)).path
+    return f"{path}?{urlencode(query)}"
+
+
+def _render_calendar(
+    request: Request,
+    ctx: Context,
+    source_id: UUID,
+    month: date,
+    *,
+    error: str | None = None,
+    status_code: int = 200,
+) -> Response:
+    """The whole calendar page, or only ``#work-calendar`` for an HTMX request."""
+    locale = request.state.locale
+    calendar = income.work_calendar(request.app.state.session_factory, ctx, source_id, month)
+    year_month = YearMonth.from_date(month)
+    previous_month, next_month = year_month.prev(), year_month.next()
+    template = (
+        "income/_calendar.html" if is_htmx_fragment_request(request) else "income/calendar.html"
+    )
+    response = render_template(
+        request,
+        template,
+        context={
+            "calendar": calendar,
+            "can_edit": has_role(ctx, Role.EDITOR) and calendar.editable,
+            "month_heading": format_month_heading(year_month, locale),
+            "month_value": f"{month:%Y-%m}",
+            "previous_month": str(previous_month) if previous_month else None,
+            "next_month": str(next_month) if next_month else None,
+            "leading_blanks": month.weekday(),
+            "weekday_names": weekday_names(locale),
+            "error": gettext(ERRORS.get(error, ERRORS["failed"]), locale) if error else None,
+            "format_day_long": format_day_long,
+            "format_quantity_input": format_quantity_input,
+        },
+        status_code=status_code,
+    )
+    response.headers["Vary"] = "HX-Request"
+    return response
+
+
+@router.get("/income/{source_id}/calendar", name="income_calendar")
+async def calendar_page(request: Request, ctx: CurrentContext, source_id: str) -> Response:
+    source = _id(source_id)
+    try:
+        month = _calendar_month(request.query_params.get("month", ""), ctx)
+    except income.IncomeError:
+        month = _calendar_month("", ctx)
+    error = request.query_params.get("error")
+    try:
+        return await run_in_threadpool(
+            lambda: _render_calendar(request, ctx, source, month, error=error)
+        )
+    except income.IncomeError as exc:
+        return _redirect(request, exc.code)
+
+
+async def _calendar_change(
+    request: Request, ctx: Context, source_id: UUID, month: date, change: Callable[[], bool]
+) -> Response:
+    error: str | None = None
+    try:
+        if await run_in_threadpool(change):
+            error = "posted"
+    except income.IncomeError as exc:
+        error = exc.code
+    if is_htmx_fragment_request(request):
+        status = 409 if error not in (None, "posted") else 200
+        return await run_in_threadpool(
+            lambda: _render_calendar(
+                request, ctx, source_id, month, error=error, status_code=status
+            )
+        )
+    return RedirectResponse(_calendar_url(request, source_id, month, error), status_code=303)
+
+
+@router.post("/income/{source_id}/calendar/days/{day}/toggle", name="income_calendar_toggle")
+async def toggle_day(request: Request, ctx: CurrentContext, source_id: str, day: str) -> Response:
+    source, work_date = _id(source_id), _day(day)
+    factory = request.app.state.session_factory
+    return await _calendar_change(
+        request,
+        ctx,
+        source,
+        work_date.replace(day=1),
+        lambda: income.toggle_work_day(factory, ctx, source, work_date),
+    )
+
+
+@router.post("/income/{source_id}/calendar/days/{day}", name="income_calendar_day")
+async def save_day(request: Request, ctx: CurrentContext, source_id: str, day: str) -> Response:
+    source, work_date = _id(source_id), _day(day)
+    values = await _form(request)
+    factory = request.app.state.session_factory
+
+    def change() -> bool:
+        try:
+            units = parse_amount(values.get("units", ""), request.state.locale)
+        except ValueError:
+            raise income.IncomeError("invalid_day_units") from None
+        return income.set_work_day(factory, ctx, source, work_date, units)
+
+    return await _calendar_change(request, ctx, source, work_date.replace(day=1), change)
+
+
+@router.post("/income/{source_id}/calendar/fill", name="income_calendar_fill")
+async def fill_month(request: Request, ctx: CurrentContext, source_id: str) -> Response:
+    source = _id(source_id)
+    month = _calendar_month((await _form(request)).get("month", ""), ctx)
+    factory = request.app.state.session_factory
+    return await _calendar_change(
+        request, ctx, source, month, lambda: income.fill_working_days(factory, ctx, source, month)
+    )
+
+
+@router.post("/income/{source_id}/calendar/clear", name="income_calendar_clear")
+async def clear_month(request: Request, ctx: CurrentContext, source_id: str) -> Response:
+    source = _id(source_id)
+    month = _calendar_month((await _form(request)).get("month", ""), ctx)
+    factory = request.app.state.session_factory
+    return await _calendar_change(
+        request, ctx, source, month, lambda: income.clear_work_month(factory, ctx, source, month)
+    )

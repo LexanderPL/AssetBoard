@@ -1,0 +1,86 @@
+{% from "macros/components.html" import csrf_input with context %}
+{# F3.7: the HTMX target; every action swaps this whole element. #}
+{% set source_id = calendar.source_id|string %}
+{% set page_url = scoped_url(request, 'income_calendar', source_id=source_id) %}
+{% macro htmx_post(action) -%}
+method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#work-calendar" hx-swap="outerHTML" hx-sync="closest [data-work-calendar]:drop"
+{%- endmacro %}
+<section id="work-calendar" class="panel p-4 sm:p-6" data-work-calendar aria-labelledby="work-calendar-heading">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 id="work-calendar-heading" class="text-lg font-semibold" data-calendar-month>{{ month_heading }}</h2>
+    <nav class="flex flex-wrap gap-2 text-sm" aria-label="{{ _('Calendar months') }}">
+      {% if previous_month %}<a href="{{ page_url }}?month={{ previous_month }}" hx-get="{{ page_url }}?month={{ previous_month }}" hx-target="#work-calendar" hx-swap="outerHTML" hx-push-url="true" class="rounded-lg border border-line px-3 py-2 hover:bg-subtle" data-calendar-previous>{{ _("Previous month") }}</a>{% endif %}
+      {% if next_month %}<a href="{{ page_url }}?month={{ next_month }}" hx-get="{{ page_url }}?month={{ next_month }}" hx-target="#work-calendar" hx-swap="outerHTML" hx-push-url="true" class="rounded-lg border border-line px-3 py-2 hover:bg-subtle" data-calendar-next>{{ _("Next month") }}</a>{% endif %}
+    </nav>
+  </div>
+  {% if error %}<p role="alert" class="mt-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-calendar-error>{{ error }}</p>{% endif %}
+  <p class="mt-3 text-sm font-semibold" role="status" data-calendar-total>{{ _("Month total: %(units)s (%(unit)s)", units=format_quantity_input(calendar.total, locale), unit=calendar.unit_label) }}</p>
+  {% if calendar.derived %}
+  <p class="mt-1 text-sm text-muted">{{ _("The month's work log is the sum of these days; change it here, not in the month form.") }}</p>
+  {% elif calendar.manual_units is not none %}
+  <p class="mt-1 text-sm text-muted" data-calendar-manual>{{ _("This month has a manual work log of %(units)s. Marking a day replaces it with the sum of the days.", units=format_quantity_input(calendar.manual_units, locale)) }}</p>
+  {% else %}
+  <p class="mt-1 text-sm text-muted">{{ _("No days marked. The month keeps its month-level work log or estimate.") }}</p>
+  {% endif %}
+
+  <div class="mt-4" role="group" aria-label="{{ _('Days of %(month)s', month=month_heading) }}">
+    <div class="grid grid-cols-7 gap-1 text-center text-xs font-medium text-muted" aria-hidden="true">
+      {% for name in weekday_names %}<span>{{ name }}</span>{% endfor %}
+    </div>
+    <ol class="mt-1 grid grid-cols-7 gap-1">
+      {% for blank in range(leading_blanks) %}<li aria-hidden="true"></li>{% endfor %}
+      {% for day in calendar.days %}
+      {% set worked = day.units is not none %}
+      {% set kind = _("holiday") if day.holiday else (_("weekend") if day.weekend else "") %}
+      {% set label = format_day_long(day.day, locale) ~ (", " ~ kind if kind else "") ~ (", " ~ _("%(units)s %(unit)s", units=format_quantity_input(day.units, locale), unit=calendar.unit_label) if worked else "") %}
+      {% set tone = "border-primary bg-primary text-on-primary" if worked else ("border-warning-line bg-warning-soft text-warning-strong" if day.holiday else ("border-line bg-subtle text-muted" if day.weekend else "border-line bg-surface")) %}
+      {% set inner %}<span class="block font-semibold">{{ day.day.day }}</span><span class="block min-h-4 text-xs">{% if worked %}{{ format_quantity_input(day.units, locale) }}{% elif day.holiday %}{{ _("Holiday") }}{% endif %}</span>{% endset %}
+      <li>
+        {% if can_edit %}
+        <form {{ htmx_post(scoped_url(request, 'income_calendar_toggle', source_id=source_id, day=day.day.isoformat())) }}>
+          {{ csrf_input() }}
+          <button type="submit" aria-pressed="{{ 'true' if worked else 'false' }}" aria-label="{{ label }}" data-day="{{ day.day.isoformat() }}"{% if day.holiday %} data-holiday{% endif %}{% if day.weekend %} data-weekend{% endif %} class="w-full rounded-lg border px-1 py-2 text-sm hover:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary {{ tone }}">{{ inner }}</button>
+        </form>
+        {% else %}
+        <div role="img" aria-label="{{ label }}" data-day="{{ day.day.isoformat() }}" class="rounded-lg border px-1 py-2 text-center text-sm {{ tone }}">{{ inner }}</div>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+  <ul class="mt-3 flex flex-wrap gap-4 text-xs text-muted" aria-label="{{ _('Legend') }}">
+    <li class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded border border-primary bg-primary" aria-hidden="true"></span>{{ _("Worked") }}</li>
+    <li class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded border border-line bg-subtle" aria-hidden="true"></span>{{ _("Weekend") }}</li>
+    <li class="flex items-center gap-1"><span class="inline-block h-3 w-3 rounded border border-warning-line bg-warning-soft" aria-hidden="true"></span>{{ _("Holiday") }}</li>
+  </ul>
+
+  {% if can_edit %}
+  <div class="mt-4 flex flex-wrap gap-2">
+    <form {{ htmx_post(scoped_url(request, 'income_calendar_fill', source_id=source_id)) }}>
+      {{ csrf_input() }}<input type="hidden" name="month" value="{{ month_value }}">
+      <button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm font-semibold hover:bg-subtle" data-calendar-fill>{{ _("Fill working days") }}</button>
+    </form>
+    {% if calendar.derived %}
+    <form {{ htmx_post(scoped_url(request, 'income_calendar_clear', source_id=source_id)) }} data-confirm="{{ _('Clear every day of %(month)s? The month work log made from them is removed too.', month=month_heading) }}">
+      {{ csrf_input() }}<input type="hidden" name="month" value="{{ month_value }}">
+      <button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm text-danger hover:bg-subtle" data-calendar-clear>{{ _("Clear month") }}</button>
+    </form>
+    {% endif %}
+  </div>
+  {% if calendar.derived %}
+  <h3 class="mt-5 text-sm font-semibold">{{ _("Day values") }}</h3>
+  <p class="mt-1 text-xs text-muted">{{ _("A marked day counts 1 by default; enter a half day (0.5) or hours instead, up to 24.") }}</p>
+  <ul class="mt-2 grid gap-2 sm:grid-cols-2">
+    {% for day in calendar.days if day.units is not none %}
+    <li>
+      <form {{ htmx_post(scoped_url(request, 'income_calendar_day', source_id=source_id, day=day.day.isoformat())) }} class="flex items-end gap-2" data-day-value="{{ day.day.isoformat() }}">
+        {{ csrf_input() }}
+        <label class="grid flex-1 gap-1 text-sm">{{ format_day_long(day.day, locale) }}<input name="units" inputmode="decimal" required value="{{ format_quantity_input(day.units, locale) }}" class="form-control w-full rounded-lg px-3 py-2"></label>
+        <button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm font-semibold hover:bg-subtle">{{ _("Save") }}</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+  {% endif %}
+</section>
