@@ -28,7 +28,14 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     },
     **{
         ("ScheduledOccurrenceRepository", method): "test_scheduled_queries_stay_in_their_workspace"
-        for method in ("create", "for_item", "get_for_update", "upcoming", "category_counts")
+        for method in (
+            "create",
+            "for_item",
+            "get_for_update",
+            "linked_to_transaction_for_update",
+            "upcoming",
+            "category_counts",
+        )
     },
     **{
         ("TaxRuleRepository", method): "test_tax_rule_queries_stay_in_their_workspace"

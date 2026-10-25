@@ -34,6 +34,7 @@ from assetboard.domain.transactions import (
     description_key,
 )
 from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.months import ensure_date_open
 
 logger = logging.getLogger(__name__)
 
@@ -390,6 +391,7 @@ def undo_post(factory: sessionmaker[Session], ctx: Context, occurrence_id: UUID)
             occurrence.id,
             status=OccurrenceStatus.PENDING,
             transaction_id=None,
+            previous_transaction_id=transaction.id,
         )
         audit = AuditEventRepository(session, ctx)
         audit.record(
@@ -419,6 +421,63 @@ def undo_post(factory: sessionmaker[Session], ctx: Context, occurrence_id: UUID)
     run_immediate(factory, write)
 
 
+def unlink_deleted_transaction(session: Session, ctx: Context, transaction_id: UUID) -> None:
+    """Return the occurrence posted as ``transaction_id`` to pending; the ledger soft-deletes it.
+
+    Runs inside the ledger delete's write transaction, after its role check and month lock and
+    before the row changes. The occurrence keeps its nominal and due date and any amount
+    override, and remembers the transaction (``previous_transaction_id``) so auto-post never
+    posts it again and a restore can re-link it. Its due month must be open (``MonthClosed``),
+    as for an undo of "mark paid".
+    """
+    repository = ScheduledOccurrenceRepository(session, ctx)
+    for occurrence in repository.linked_to_transaction_for_update(transaction_id):
+        ensure_date_open(session, ctx, occurrence.due_date)
+        repository.update(
+            occurrence.id,
+            status=OccurrenceStatus.PENDING,
+            transaction_id=None,
+            previous_transaction_id=transaction_id,
+        )
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=ctx.user.id,
+            action="scheduled_occurrence.unposted",
+            entity_type="scheduled_occurrence",
+            entity_id=str(occurrence.id),
+            ts=ctx.clock.now(),
+            data={"transaction_id": str(transaction_id)},
+        )
+
+
+def relink_restored_transaction(session: Session, ctx: Context, transaction_id: UUID) -> None:
+    """Re-link a restored transaction to the occurrence it was posted from.
+
+    Only when that occurrence is still pending, unlinked and in an open month; otherwise the
+    restored row stays a plain transaction. Runs inside the ledger restore's write transaction.
+    """
+    repository = ScheduledOccurrenceRepository(session, ctx)
+    for occurrence in repository.linked_to_transaction_for_update(transaction_id, previous=True):
+        if occurrence.status != OccurrenceStatus.PENDING or occurrence.transaction_id is not None:
+            continue
+        state = MonthStateRepository(session, ctx).for_month(
+            YearMonth.from_date(occurrence.due_date)
+        )
+        if state is not None and state.closed_at is not None:
+            continue
+        repository.update(
+            occurrence.id, status=OccurrenceStatus.POSTED, transaction_id=transaction_id
+        )
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=ctx.user.id,
+            action="scheduled_occurrence.relinked",
+            entity_type="scheduled_occurrence",
+            entity_id=str(occurrence.id),
+            ts=ctx.clock.now(),
+            data={"transaction_id": str(transaction_id)},
+        )
+        return
+
+
 def auto_post_workspace(factory: sessionmaker[Session], scope: WorkspaceScope, clock: Clock) -> int:
     """Post due auto-post items in one workspace; safe to rerun after a partial failure."""
 
@@ -431,6 +490,10 @@ def auto_post_workspace(factory: sessionmaker[Session], scope: WorkspaceScope, c
         posted = 0
         for occurrence, item, _category_name in candidates:
             if not item.auto_post or item.paused_at is not None or item.archived_at is not None:
+                continue
+            if occurrence.previous_transaction_id is not None:
+                # Posted before and returned to pending (undo or ledger delete): the user
+                # chose to take it off the ledger, so only they post it again.
                 continue
             state = MonthStateRepository(session, scope).for_month(
                 YearMonth.from_date(occurrence.due_date)
