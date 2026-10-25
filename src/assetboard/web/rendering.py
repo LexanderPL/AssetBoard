@@ -54,7 +54,7 @@ def render_template(
         "app_name": request.app.state.app_name,
         "default_currency": settings.default_currency,
         "web_session": web_session(request),
-        # Set only on pages that built a Context; see web/context.py.
+        # Set for every signed-in page with a workspace; see load_workspace_nav in web/context.py.
         "workspace_nav": getattr(request.state, "workspace_nav", None),
     }
     if context:

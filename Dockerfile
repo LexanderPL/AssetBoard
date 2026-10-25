@@ -2,19 +2,9 @@
 
 FROM python:3.14-slim-bookworm@sha256:48b13b003dda20b16f9442b8475aa05fe21bf6579a8c881db92ffb4d8fd20f83 AS base
 
-FROM --platform=$BUILDPLATFORM ghcr.io/astral-sh/uv:0.13.1@sha256:4a1f3666816dafadd20ceb71eac9a7d56d7ef30279f7d64048519ab901ada336 AS uv-build
-
-FROM ghcr.io/astral-sh/uv:0.13.1@sha256:4a1f3666816dafadd20ceb71eac9a7d56d7ef30279f7d64048519ab901ada336 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.5@sha256:32a7bb39b496babbd997b0a39a4d66c126bdaf5661b302bf6f06abda8deca6ff AS uv
 
 FROM --platform=$BUILDPLATFORM python:3.14-slim-bookworm@sha256:48b13b003dda20b16f9442b8475aa05fe21bf6579a8c881db92ffb4d8fd20f83 AS assets
-
-COPY --from=uv-build /uv /uvx /bin/
-
-ENV UV_PROJECT_ENVIRONMENT=/opt/venv \
-    UV_COMPILE_BYTECODE=1 \
-    UV_LINK_MODE=copy \
-    UV_NO_SYNC=1 \
-    PYTHONDONTWRITEBYTECODE=1
 
 WORKDIR /build
 
@@ -22,11 +12,8 @@ RUN apt-get update \
     && apt-get install --no-install-recommends -y ca-certificates curl make \
     && rm -rf /var/lib/apt/lists/*
 
-COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-default-groups --no-install-project
-
 COPY . .
-RUN make css i18n-compile
+RUN make css
 
 FROM base AS builder
 
@@ -44,11 +31,15 @@ RUN uv sync --frozen --no-default-groups --no-install-project
 
 COPY . .
 COPY --from=assets /build/src/assetboard/static/css/app.css src/assetboard/static/css/app.css
-COPY --from=assets /build/src/assetboard/locales/en/LC_MESSAGES/messages.mo src/assetboard/locales/en/LC_MESSAGES/messages.mo
-COPY --from=assets /build/src/assetboard/locales/pl/LC_MESSAGES/messages.mo src/assetboard/locales/pl/LC_MESSAGES/messages.mo
 
+# The wheel's build hook (hatch_build.py) compiles the gettext .mo catalogs from the committed
+# .po files, so they ship in the wheel and the runtime image; fail the build if they do not.
 RUN uv build --wheel --out-dir /wheels \
-    && uv pip install --python /opt/venv/bin/python --no-deps /wheels/*.whl
+    && uv pip install --python /opt/venv/bin/python --no-deps /wheels/*.whl \
+    && /opt/venv/bin/python -c "from importlib.resources import files; \
+locales = files('assetboard') / 'locales'; \
+missing = [lang for lang in ('en', 'pl') if not (locales / lang / 'LC_MESSAGES' / 'messages.mo').is_file()]; \
+assert not missing, f'compiled gettext catalogs missing from the image: {missing}'"
 
 FROM base AS runtime
 

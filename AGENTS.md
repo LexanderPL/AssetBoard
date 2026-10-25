@@ -54,6 +54,8 @@ planned-vs-actual, recurring items, variable income, net worth, investments, loa
 ## Commands (created in M0.F0.1; keep them working)
 `make setup` · `make dev` · `make check` (ruff, pyright, pytest, `alembic check`) · `make test` · `make css` · `make migrate` · `make revision m="message"` · `make i18n-extract` · `make i18n-update` · `make i18n-compile`
 
+Translation catalogs: `.po` files are committed; `.mo` files are built, never committed (they are gitignored). `make setup`, `make dev`, `make test` and `make check` run `make i18n-compile` first; the wheel build hook (`hatch_build.py`) and the Docker build compile them too. Running `pytest` directly with missing or stale `.mo` files stops with a message to run `make i18n-compile`.
+
 ## Definition of Done (every feature)
 1. All acceptance criteria in the spec are met and each is traceable to a test.
 2. `make check` is green; migrations are included and reversible where practical.

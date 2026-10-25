@@ -2,7 +2,7 @@
 
 **Goal:** secure multi-user foundation before any financial feature exists, so tenant scoping is never retrofitted.
 
-**Exit criteria:** first-run setup creates an admin + workspace; users can log in locally or via OIDC; roles are enforced; an automated test proves no cross-workspace data access for every workspace-owned model. TOTP MFA is explicitly out of scope for M1 and is moved to the [post-1.0 backlog](backlog-post-1.0.md); use OIDC or reverse-proxy auth backed by an IdP that supports MFA until then.
+**Exit criteria:** first-run setup creates an admin + workspace; users can log in locally or via OIDC; roles are enforced; an automated test proves no cross-workspace data access for every workspace-owned model. Optional TOTP MFA for password sign-ins is specified in F1.6 below; OIDC and proxy sign-ins delegate MFA to their identity provider.
 
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
@@ -27,7 +27,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 - Sessions are **server-side** (`UserSession`), cookie holds an opaque random id (stored hashed), `HttpOnly`, `SameSite=Lax`, `Secure` when `BASE_URL` is https; idle timeout 14 days, absolute 60 days (configurable); "log out other devices".
 - Login/logout, change password (invalidates other sessions), CSRF on all forms.
 - Login throttling per IP and per account (e.g., 5 failures → exponential backoff), generic error messages (no user enumeration), constant-time-ish comparison path for unknown users. Amended 2026-10-17 (ADR-0012): unknown email and wrong password share one message; only an attempt refused by a blocked bucket says "Too many attempts. Try again in N minutes." (401 with `Retry-After`). The per-account (sign-in) bucket is keyed by the normalized email, counted identically for unknown emails, and decays with time only (fixed window equal to the per-IP window, 60 min by default): every attempt counts, successful ones included, and nothing resets it (an attempt is taken back only when no verify outcome exists, e.g. a busy hashing gate). Wrong current passwords on change-password and failed password confirmations (profile, admin, link) count in a separate per-user `confirm` bucket (5 free, same backoff, reset by a correct password) and never touch the sign-in bucket. Decided in PR A: per-account 5 free failures, reset on success (amended 2026-10-17: no reset, time window instead; see below); per-IP (IPv4 address / IPv6 /64, hashed) 20 free failures in a time window that decays only with time; backoff doubles from 60 s, capped at 15 min. Registration has its own per-IP limit (5 attempts per hour, success or not) and never resets a login counter. Wrong current passwords on change-password count against the same per-account bucket (amended 2026-10-17: a separate per-user bucket). IPv4-mapped IPv6 client addresses are treated as IPv4. Stored IP prefixes on sessions and audit events are IPv4 /24 and IPv6 /48.
-- Open registration disabled by default; `ALLOW_REGISTRATION` env flag creates a new user + new workspace (with the suggested categories since pre-release A, see M2 F2.1; before, an empty one).
+- Open registration disabled by default; `ALLOW_REGISTRATION` env flag creates a new user + new workspace (with the suggested categories since pre-release A, see M2 F2.1; before, an empty one). Replaced in pre-release B (see "Email, verified registration and password reset" below): the flag is retired and open registration is an instance setting that needs SMTP and email verification.
 - Audit events: login success/failure, logout, password change.
 - CLI: `assetboard create-admin`, `assetboard reset-password <email>` (sets a new password interactively or via `--password-stdin` and revokes all sessions; the one-time-link variant is deferred to F1.5). `create-admin` is a break-glass command: it also works when users exist, never modifies an existing user (duplicate email is an error), creates an owned workspace unless `--no-workspace`, and is audited with the CLI as actor. Both respect `AUTO_MIGRATE` (off + schema not at head = non-zero exit, nothing changed).
 - Setup gate: while there are zero users, GET /setup returns 200 with a form that includes a "setup token" field. The token is ASSETBOARD_SETUP_TOKEN if set, otherwise generated per process start and logged once at WARNING. POST /setup compares it with secrets.compare_digest, throttled; it creates the admin, workspace and owner membership in ONE transaction. Two concurrent POSTs: exactly one creates the admin and the other gets a deterministic "setup already completed" response (test). /setup returns 404 once any user exists.
@@ -112,7 +112,27 @@ In the plan, list each acceptance criterion with the test that will prove it, an
     workspace" next to the switcher (or the workspace name), both only when allowed. The
     service re-reads the account and the setting inside its write transaction.
   - No limit on how many workspaces an account creates.
-- Backlog: workspace deletion, ownership transfer, leaving a workspace, and F1.6 TOTP second factor; revisit after 1.0 ([post-1.0 backlog](backlog-post-1.0.md)); until then use OIDC or proxy auth with an IdP that supports MFA.
+- **Workspace deletion (owner decision 2026-10-24, pulled forward from the post-1.0 backlog;
+  ADR-0020).**
+  - Owners only: "Delete workspace" at the bottom of the settings page leads to a confirmation
+    page (`/workspace/delete`) where the owner types the workspace's exact name (surrounding
+    spaces ignored, case sensitive) and submits a CSRF-protected POST. The page recommends
+    exporting first and links to the transaction CSV export (F2.6), and says how many other
+    members lose access.
+  - The service checks the role on the Context and again inside its `BEGIN IMMEDIATE`
+    transaction, takes the exclusive workspace lock and compares the name with the stored one.
+    The form carries the id of the workspace it was shown for; a different current workspace
+    (stale tab after a switch, repeated submit) is refused with 409 before any write, so a
+    same-named workspace can never be deleted by mistake.
+  - The workspace and every row with its `workspace_id` are deleted for good in that
+    transaction (found from the metadata, children before parents), including its memberships,
+    invitations and its own audit events. Sessions that had it selected fall back to the oldest
+    remaining membership or the "No workspace" page.
+  - One instance-level audit event `workspace.delete` (`workspace_id` NULL) records the id and
+    name; no amounts.
+  - The instance's last workspace can be deleted too; its owner then sees the "No workspace"
+    page and can create a new workspace while creation is allowed.
+- Backlog: ownership transfer and leaving a workspace; revisit after 1.0 ([post-1.0 backlog](backlog-post-1.0.md)).
 - B2 (invitations), see ADR-0013:
   - Tokens are 256-bit, stored as SHA-256, single use; expiry is 1, 7 (default) or 30 days;
     at most 50 pending invitations per workspace.
@@ -176,7 +196,8 @@ Also add a short docs/architecture.md section "How to add a new workspace-owned 
 - Flow state is a signed cookie with `iat`/`exp` checked by the server (10 minutes), not a
   table. The provider is reached with the standard library (no new HTTP client).
 - `BASE_URL` must be set and `https://` (as must the issuer and every discovered endpoint)
-  unless `ENV=dev`. `OIDC_ONLY` refuses to start with `ALLOW_REGISTRATION`.
+  unless `ENV=dev`. `OIDC_ONLY` refuses to start with `ALLOW_REGISTRATION` (until pre-release
+  B; since then `OIDC_ONLY` keeps open registration and password reset off).
 - `/auth/oidc/*` sends `Referrer-Policy: no-referrer` and `Cache-Control: no-store` and has no
   forms; the password confirmation page is under `/login/`.
 - Part B: the callback answers every outcome with a 303 to a URL without a query; failures go
@@ -254,6 +275,32 @@ Add a prominent warning section to docs/auth/proxy-auth.md.
   account only in the instance scope.
 - Deactivated users cannot log in and their sessions are revoked.
 
+**Email, verified registration and password reset (owner, pre-release B, 2026-10-19)**, see
+[ADR-0017](../adr/0017-email-and-account-recovery.md):
+- SMTP from `ASSETBOARD_SMTP_*` (host, port, security `starttls`/`tls`/`none`, user, password,
+  from, timeout); the password is never logged. Mail goes through an in-process outbox after the
+  response; failures are logged by class only. `assetboard mail-test <to>` checks the settings.
+- `ALLOW_REGISTRATION` is retired (`true` refuses to start, `false` warns). Open registration is
+  the instance setting `allow_registration` (off by default) on `/admin/settings`, next to the
+  workspace switch; it cannot be turned on without SMTP or under `OIDC_ONLY`, and is effective
+  only while both hold. Audited as `instance.settings_updated` (`allow_registration`).
+- Registration in two steps: the email form always answers the same ("check your inbox"); a
+  link (24 h, single use, SHA-256 at rest, at most 3 live per address) leads to the form that
+  creates the account, its workspace and the session; an existing active account gets a note
+  instead, a deactivated one nothing. No account exists before the link is used.
+- Forgot password: the email form always answers the same; an active account with a password
+  gets a link (60 min, single use, at most 3 live); an account without a password gets a note.
+  Setting the new password ends every session and spends every reset link; any password change
+  or deactivation spends them too. No automatic sign-in. Audited as
+  `auth.password_reset_requested` and `auth.password_reset`.
+- No account-existence signal: identical responses and the same database work in the request
+  for every address; the lookup, link, audit row and mail happen in the outbox worker after the
+  response and a random 0.5-3 s wait; emails per address are limited silently
+  (`MAIL_EMAIL_LIMIT`, counted for every address); the per-client limits (`REGISTRATION_IP_LIMIT`
+  for both registration steps, `MAIL_IP_LIMIT`) may say "try later". Invitation sign-up keeps
+  saying an address is taken (secret, email-locked link; outside the rule).
+- Invitation, OIDC, proxy and administrator-created accounts need no verification.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
@@ -263,3 +310,55 @@ Tests for authorization (viewer/editor cannot reach admin pages).
 ```
 
 ---
+
+## F1.6 TOTP two-factor authentication
+
+Originally deferred to the post-1.0 backlog in PR #93; this contribution implements it earlier.
+
+**Story:** A user with a local password can protect password sign-ins with an authenticator.
+A workspace owner can require a verified second factor for password-based access to that
+workspace, without affecting any other workspace or external sign-in method.
+
+**Acceptance**
+- Optional per user, using `pyotp`: six-digit SHA-1 TOTP, 30-second steps, accepting the current
+  step and one adjacent step in either direction for clock drift. A step can succeed only once;
+  accepting a future step also rejects earlier steps. The injected Clock determines the window.
+- Profile links to enrollment: confirm the password through `web.confirm.run_confirmed`, then
+  show a locally generated QR code and manual key. Pending enrollment belongs to that session,
+  expires after ten minutes, and is enabled only after a valid code. Starting again replaces
+  a pending key, never an enabled factor.
+- Ten independent 128-bit recovery codes are shown once in the successful enrollment response.
+  Store only SHA-256 hashes; each code can be consumed once, including concurrent attempts.
+- A user can regenerate recovery codes after confirming their password and a current TOTP or
+  unused recovery code. Invalidate every previous code atomically, show the new set once, and
+  audit the action without code data.
+- Enabled TOTP is checked with the password at `/login` and `/login/local`, in one form; no
+  session is issued until both factors pass. Invalid codes get the generic sign-in failure.
+  Password-confirmed linking by email (`/login/link`) also needs the factor to prevent a bypass.
+  Already-linked OIDC and proxy sign-ins skip local TOTP (the IdP's responsibility).
+- Sign-in code attempts share the existing account/address reservation and backoff. Enrollment
+  has a separate per-user bucket with the same free attempts, window and backoff, counted
+  independently of password-confirmation successes and enrollment restarts.
+- An owner can enable `Workspace.require_two_factor` (default false) in workspace settings.
+  Service Context construction and write role guards refuse password sessions that have not
+  verified TOTP for that workspace. Existing sessions are affected immediately; account security,
+  enrollment, sign-out and switching to another workspace remain accessible. OIDC and proxy
+  sessions are exempt. Owners are subject to the policy too, including the owner who enables it:
+  an owner in a password session without a verified second factor cannot turn it on.
+- Disabling requires the password and a current TOTP or unused recovery code, verified together
+  by the service (`services.totp.disable`); recovery-code regeneration likewise. Enabling and disabling
+  revoke other password sessions; the current password session is marked verified on enrollment
+  and unverified on disable. Disabling can require re-enrollment to access a protected workspace.
+- An instance administrator can reset another user's enabled factor after confirming their own
+  account. Remove the factor and recovery codes, revoke all target sessions, and audit the reset
+  without secrets. The user can sign in with their password and re-enroll; workspace enforcement
+  remains in place until then. Administrators use their own account security page for self-service.
+  `assetboard reset-mfa <email>` does the same from the shell: it removes the factor and recovery
+  codes, revokes the user's password sessions and writes a `cli.reset_mfa` audit event.
+- A correct password with a wrong code fails like a wrong password (identical response); the
+  failure's audit data records the internal reason `second_factor`. A stale password hash is
+  upgraded only after the whole sign-in, second factor included, succeeds.
+- Encrypt shared secrets using a purpose-separated key derived from the existing persistent
+  instance secret, bound to the account (`"<user_id>|<secret>"`). Do not reveal an enabled secret again or log secrets/codes. Audit enable and
+  disable without secret data. Preserve the instance secret with backups; see ADR-0019.
+- English and Polish UI, CSRF-protected forms, reversible migration and updated account docs.

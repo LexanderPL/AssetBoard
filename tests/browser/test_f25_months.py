@@ -1,5 +1,5 @@
 """Month page in Chromium (F2.5): navigation, the native month picker, close/reopen with the
-confirm dialog, and no CSP violations."""
+confirm dialog, the sticky sidebar, and no CSP violations."""
 
 from __future__ import annotations
 
@@ -94,9 +94,10 @@ def test_f25_month_page_in_a_browser(tmp_path: Path) -> None:
             page.locator("[data-month-today]").click()
             page.wait_for_url(f"{base}/m/{today}")
 
-            # The native month picker (Chromium) submits a plain GET form.
+            # The native month picker (Chromium) submits its plain GET form as soon as a month
+            # is picked (data-autosubmit); the Go button is only there without JavaScript.
+            expect(page.get_by_role("button", name="Go", exact=True)).to_have_count(0)
             page.locator("#month-picker").fill("2025-03")
-            page.get_by_role("button", name="Go", exact=True).click()
             page.wait_for_url(f"{base}/m/2025-03")
             expect(heading).to_contain_text("March 2025")
 
@@ -120,6 +121,35 @@ def test_f25_month_page_in_a_browser(tmp_path: Path) -> None:
             page.wait_for_url(f"{base}/m/2025-03?notice=reopened")
             expect(page.locator("[data-closed-banner]")).to_have_count(0)
             expect(page.locator("[data-notice]")).to_have_text("Month reopened.")
+
+            # Sidebar (v0.2.1 bug): on a long desktop page the user menu stays on screen after
+            # scrolling to the bottom, and account pages show the full workspace nav.
+            page.set_viewport_size({"width": 1280, "height": 720})
+            page.goto(f"{base}/categories")
+            assert page.evaluate("document.documentElement.scrollHeight > window.innerHeight")
+            page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
+            assert page.evaluate("window.scrollY > 0")
+            menu = page.locator("[data-user-menu] summary")
+            expect(menu).to_be_in_viewport(ratio=1)
+            menu.click()
+            expect(page.locator("[data-profile-link]")).to_be_in_viewport(ratio=1)
+            page.locator("[data-profile-link]").click()
+            page.wait_for_url(f"{base}/account")
+            for link in ("month", "transactions"):
+                expect(page.locator(f"[data-{link}-link]")).to_be_visible()
+            # Categories sit in the user menu.
+            page.locator("[data-user-menu] summary").click()
+            expect(page.locator("[data-categories-link]")).to_be_visible()
+
+            # Phone width: no horizontal overflow, the user menu is still reachable.
+            page.set_viewport_size({"width": 320, "height": 640})
+            for path in ("/categories", "/account", "/transactions", f"/m/{today}"):
+                page.goto(f"{base}{path}")
+                assert page.evaluate(
+                    "document.documentElement.scrollWidth <= document.documentElement.clientWidth"
+                ), path
+            page.evaluate("window.scrollTo(0, 0)")
+            expect(page.locator("[data-user-menu] summary")).to_be_visible()
 
             assert page.evaluate("window.__cspViolations") == []
             assert not [e for e in console_errors if "Content Security Policy" in e]

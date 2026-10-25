@@ -34,13 +34,17 @@ def test_open_gate_redirects_everything_to_setup_except_exemptions(web: WebHarne
 def test_closed_gate_lets_signed_out_visitors_reach_only_the_public_pages(
     web: WebHarness,
 ) -> None:
-    app = web.app(allow_registration=True)
+    app = web.mail_app()
     with TestClient(app) as client:
         web.complete_setup(app)
+        web.enable_registration(app)
         for path in ALWAYS_OPEN:
             assert client.get(path).status_code == 200, path
         assert client.get("/login").status_code == 200
         assert client.get("/register").status_code == 200
+        assert client.get("/password/forgot").status_code == 200
+        assert client.get("/register/complete/" + "a" * 43).status_code == 404  # invalid link
+        assert client.get("/password/reset/" + "a" * 43).status_code == 404
         assert client.get("/setup").status_code == 404
         response = client.get("/account/password?tab=1", follow_redirects=False)
         assert response.status_code == 303

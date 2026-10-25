@@ -21,7 +21,7 @@ from starlette.requests import Request
 from assetboard.db.engine import is_database_locked
 from assetboard.db.models.identity import User
 from assetboard.i18n import gettext
-from assetboard.services.auth import WebSession, gate_verifier
+from assetboard.services.auth import Verifier, WebSession, gate_verifier
 from assetboard.services.profile import (
     ConfirmMethod,
     ConfirmOutcome,
@@ -106,6 +106,7 @@ async def run_confirmed[T](
     *,
     purpose: str,
     password: str,
+    second_factor: str | None = None,
     action: Callable[[Session, User, ConfirmMethod], T],
 ) -> ConfirmOutcome[T]:
     """Confirm the signed-in user, then run ``action`` in the same write transaction.
@@ -113,26 +114,9 @@ async def run_confirmed[T](
     A locked database is handled here, once, as ``busy`` (the routes answer 503).
     """
     state: Any = request.app.state
-    verify = gate_verifier(state.hash_gate)
-    try:
-        return await _confirm_in_thread(request, current, state, verify, purpose, password, action)
-    except OperationalError as exc:
-        if not is_database_locked(exc):
-            raise
-        return ConfirmOutcome("busy")
 
-
-async def _confirm_in_thread[T](
-    request: Request,
-    current: WebSession,
-    state: Any,
-    verify: Any,
-    purpose: str,
-    password: str,
-    action: Callable[[Session, User, ConfirmMethod], T],
-) -> ConfirmOutcome[T]:
-    return await anyio.to_thread.run_sync(
-        lambda: confirm_sensitive(
+    def confirm(*, verify: Verifier, host: str | None, user_agent: str | None) -> ConfirmOutcome[T]:
+        return confirm_sensitive(
             state.session_factory,
             user_id=current.user_id,
             session_hash=current.session_hash,
@@ -141,8 +125,32 @@ async def _confirm_in_thread[T](
             settings=state.settings,
             clock=state.clock,
             on_success=action,
-            host=client_host(request),
-            user_agent=request.headers.get("user-agent"),
+            host=host,
+            user_agent=user_agent,
             verify=verify,
+            second_factor=second_factor,
         )
-    )
+
+    return await run_confirmation(request, confirm)
+
+
+async def run_confirmation[T](
+    request: Request, confirm: Callable[..., ConfirmOutcome[T]]
+) -> ConfirmOutcome[T]:
+    """Run a service that confirms the user itself (e.g. ``services.totp.disable``).
+
+    ``confirm`` receives ``verify`` (through the hashing limit), ``host`` and ``user_agent``.
+    A locked database is ``busy``, as for ``run_confirmed``.
+    """
+    state: Any = request.app.state
+    verify = gate_verifier(state.hash_gate)
+    host = client_host(request)
+    user_agent = request.headers.get("user-agent")
+    try:
+        return await anyio.to_thread.run_sync(
+            lambda: confirm(verify=verify, host=host, user_agent=user_agent)
+        )
+    except OperationalError as exc:
+        if not is_database_locked(exc):
+            raise
+        return ConfirmOutcome("busy")

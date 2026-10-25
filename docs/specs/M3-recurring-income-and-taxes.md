@@ -15,7 +15,7 @@ Implementation order: F3.1 → F3.2 → F3.3 → F3.4 → F3.5 → F3.6 → (F3.
 
 **Data model (sketch)**
 - `ScheduledItem(id, workspace_id, name, direction, category_id, amount_mode[fixed|estimate], amount, currency, start_date, end_date?, max_count?, freq[weekly|monthly|yearly], interval, weekdays?, month_day (1..31 | -1 last day | 'first_working_day' | 'last_working_day'), month (yearly), weekend_policy[none|previous_working_day|next_working_day], lead_days, auto_post, paused_at?, notes)`
-- `ScheduledOccurrence(id, workspace_id, scheduled_item_id?, income_source_id?, parent_occurrence_id?, direction, category_id, due_date, expected_minor, currency, amount_state[estimated|confirmed], status[pending|posted|skipped], transaction_id?, label, generated_by[rule|income|tax], created_at)`; unique `(scheduled_item_id, due_date)`; check: exactly one of `scheduled_item_id` / `income_source_id` is set (tax payments additionally set `parent_occurrence_id`).
+- `ScheduledOccurrence(id, workspace_id, scheduled_item_id?, income_source_id?, parent_occurrence_id?, direction, category_id, due_date, expected_minor, currency, amount_state[estimated|confirmed], status[pending|posted|skipped], transaction_id?, previous_transaction_id?, label, generated_by[rule|income|tax], created_at)`; unique `(scheduled_item_id, due_date)`; check: exactly one of `scheduled_item_id` / `income_source_id` is set (tax payments additionally set `parent_occurrence_id`).
 - `TaxRule(id, workspace_id, name, effect[added|withheld], base[net|gross], notes, archived_at)`; `TaxRuleVersion(tax_rule_id, effective_from, mode[percent|fixed], rate_bp?, fixed_minor?, currency?)`.
 - `IncomeSource(id, workspace_id, name, category_id, kind[fixed|variable], fixed_amount?, rate?, unit_label, pay_day (1..31 | -1), pay_lag_months, expected_units_mode[working_days|fixed|average|manual], expected_units_value?, expected_units_window?, record_as[cash_received|net|take_home], auto_post, active_from, active_to?)`
 - `IncomeSourceTaxRule(income_source_id, tax_rule_id, position, generate_payment, payment_category_id?, due_day, due_month_offset)`
@@ -37,6 +37,30 @@ Implementation order: F3.1 → F3.2 → F3.3 → F3.4 → F3.5 → F3.6 → (F3.
 - Generator service (idempotent): materializes occurrences for the next **13 months** (setting), never duplicates (`unique(scheduled_item_id, due_date)`), by default does not create occurrences before today unless the user ticks "include past occurrences".
 - Rule edit → delete and regenerate **pending future** occurrences only.
 - APScheduler job runs the generator daily at 03:00 workspace time and on every rule change.
+
+**F3.1 implementation details**
+- Scheduled dates use the existing 1900–2199 range. Start/end are inclusive nominal-date limits;
+  query windows are inclusive effective-date limits. Weekly intervals start on Monday. Maximum
+  count applies before shifting; shifted duplicates merge. Holiday adjustments may cross the
+  nominal start/end boundary.
+- No workspace country means weekends only. National/observed holidays are used without a
+  subdivision. Unsupported countries are refused only for working-day rules; changing the
+  workspace country to one without holiday data is refused while working-day items exist.
+  A country change regenerates working-day items immediately.
+- The horizon is today through today plus `RECURRENCE_HORIZON_MONTHS` calendar months (default
+  13), inclusive. Backfill is an explicit creation option. Edits never backfill past dates.
+- Every generator run reconciles pending rows from today onward with the current rule and
+  calendar (stale pending rows are deleted), so calendar changes never duplicate.
+- Pause removes pending dates from today onward; archive/delete remove all pending dates;
+  resume generates forward. History is posted/skipped rows only. Delete physically removes an
+  item only without remaining history, otherwise archives it.
+- Rows in closed months (F2.5) are never created, deleted or changed by any of the above.
+- Items whose category is archived generate nothing; their pending rows from today onward are
+  removed on the next run.
+- Fields needed by F3.2/F3.4/F3.6 (posting, income/tax links and reminders) are added with those
+  features. F3.1 persists only rule-generated occurrences, with no transaction side effects.
+- Startup catches up the forward horizon; job definitions reconcile new workspaces/time-zone
+  changes every minute. See [user guide](../recurring.md) and [ADR-0018](../adr/0018-recurring-items.md).
 
 **Agent prompt**
 ```
@@ -61,6 +85,33 @@ interval/end_date/max_count, determinism. Services use the injected Clock only.
 - `auto_post=true` items post automatically on the due date (job runs shortly after midnight workspace time) with `source=recurring_auto`; the transaction is clearly marked and editable.
 - Posting into a closed month is blocked with a clear message (the user must reopen or reschedule).
 - A posted occurrence cannot be changed by rule edits.
+
+**Implementation details**
+- Occurrences retain a `nominal_date` identity separate from their effective `due_date`; rescheduling
+  one occurrence never changes the recurring rule or its nominal key. Shifted duplicate nominal
+  dates continue to merge. Regeneration keeps a rescheduled pending occurrence while its nominal
+  date still belongs to the rule, even when that date is before today (an overdue item moved
+  forward).
+- `generated_by`, `transaction_id`, per-occurrence amount overrides and reschedule timestamps are
+  stored on the occurrence. `ScheduledItem.auto_post` defaults to false.
+- Undo follows the ledger's soft-delete and audit conventions: the linked transaction is soft
+  deleted and the occurrence returns to pending, within the existing 10-second undo window.
+- Deleting a posted occurrence's transaction from the ledger (month page soft delete) returns the
+  occurrence to `pending` in the same write: `transaction_id` is cleared, its nominal date,
+  reschedule and amount override are kept, and `scheduled_occurrence.unposted` is audited. The
+  delete needs the transaction's month and the occurrence's due month open (`MonthClosed`
+  otherwise), as for an undo. Deleting an already deleted transaction changes nothing.
+  Restoring the transaction (ledger undo within 10 seconds) re-links it
+  (`scheduled_occurrence.relinked`) only if the occurrence is still pending, unlinked and in an
+  open month; otherwise it stays a plain transaction.
+- An occurrence returned to pending (undo or ledger delete) remembers the transaction in
+  `previous_transaction_id`. Auto-post only touches occurrences that were never posted
+  (`previous_transaction_id IS NULL`), so a deleted auto-posted transaction is not recreated by
+  the next run; the user posts it by hand.
+- The inbox window defaults to 30 days and is configurable by the operator with
+  `ASSETBOARD_UPCOMING_DAYS` (1–365).
+- Auto-post jobs run at 00:05 in each workspace time zone, use the injected Clock, and leave
+  occurrences pending when their due month is closed. Paused or archived items are not posted.
 
 **Agent prompt**
 ```
@@ -109,6 +160,18 @@ Payment due date = `due_day` of the month `pay_date.month + due_month_offset` (c
 - **Invariant (property test):** when every rule has `generate_payment`, `ledger_amount − sum(payments) == take_home` for all three `record_as` modes and any inputs.
 - Rounding is half-up per rule; amounts are `Money`; no floats.
 
+**F3.3 implementation details**
+- F3.3's calculator accepts a manual net amount and `record_as`. Selecting an income source and
+  attaching rules is deferred to F3.4, where `IncomeSourceTaxRule` is introduced.
+- Fixed values use the workspace base currency; no currency conversion is performed.
+- The workspace base currency is locked while any fixed tax version exists; percentage-only
+  versions do not lock it.
+- Rate versions are append-only and a newly added version must have an `effective_from` later than
+  the latest existing version. Rule effect and base are fixed at creation; create a separate rule
+  to model a different effect or base. Archived rules are excluded from new calculator previews.
+- If no version is effective on the selected date, the rule is omitted from the calculation and
+  named in the preview warning.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
@@ -153,6 +216,12 @@ Do not touch posted occurrences. Tests for lag 0/1/2, estimated vs confirmed, sk
 ---
 
 ## F3.5 Month page integration
+
+**After F2.7 (owner, 2026-10-25):** the month page no longer lists transactions. The pending
+"expected" rows with their Confirm button go into the tables of the **Transactions** page
+(`/transactions/YYYY-MM`); the Expected and Forecast columns and the forecast KPIs stay on the
+**Month** summary (and the shared flow bar, so Home shows them too); the missing-work-log banner
+shows on both the Month and the Transactions page.
 
 **Acceptance**
 - Month page lists **pending occurrences of that month** in each table (visually distinct "expected" rows with a Confirm button); confirming moves them into real rows.

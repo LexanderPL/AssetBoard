@@ -42,18 +42,22 @@ from assetboard.db.engine import is_database_locked, run_immediate
 from assetboard.db.models.identity import (
     AuditEvent,
     AuthThrottle,
+    EmailToken,
     SetupState,
     User,
     UserSession,
     Workspace,
 )
+from assetboard.db.models.totp import TotpFactor
 from assetboard.db.repositories import create_owned_workspace
+from assetboard.db.repositories.totp import TotpRepository
 from assetboard.domain.identity import (
     MAX_EMAIL_LENGTH,
     InvalidDisplayName,
     InvalidEmail,
     normalize_display_name,
     normalize_email,
+    normalize_new_email,
 )
 from assetboard.services import categories, invitations
 from assetboard.services.hash_gate import HashGate, HashGateBusy
@@ -62,7 +66,9 @@ from assetboard.services.workspace_options import WorkspaceOptions, validate_wor
 ActorType = Literal["user", "cli", "system"]
 # ``account``: sign-in attempts per normalized email (whether or not an account has it).
 # ``confirm``: password re-checks of a known user (change, confirm, link), per user id.
-ThrottleScope = Literal["account", "confirm", "ip", "setup", "register"]
+# ``mail_email``: emails per normalized address, counted whether or not an account has it;
+# ``mail_ip``: password reset requests per client address (pre-release B, ADR-0017).
+ThrottleScope = Literal["account", "confirm", "ip", "setup", "register", "mail_email", "mail_ip"]
 AuthMethod = Literal["password", "oidc", "proxy"]
 
 MIN_PASSWORD_LENGTH = 8
@@ -173,6 +179,26 @@ class UnknownUser(AuthError):
         super().__init__("No user has that email address")
 
 
+class SignUpLinkInvalid(AuthError):
+    code = "link_invalid"
+
+    def __init__(self) -> None:
+        super().__init__("The registration link is not valid")
+
+
+class VerifiedSignUp(Protocol):
+    """Open registration's completion: the email was proven by a link sent to it (ADR-0017).
+
+    ``check`` raises ``SignUpLinkInvalid`` before any hashing; ``consume`` spends the link
+    atomically, first thing in the transaction that creates the account, and raises it if the
+    link was used meanwhile.
+    """
+
+    def check(self, email: str) -> None: ...
+
+    def consume(self, session: Session, email: str) -> None: ...
+
+
 class RegistrationDisabled(AuthError):
     code = "registration_disabled"
 
@@ -221,7 +247,13 @@ class PasswordChangeOutcome:
 
 
 RegistrationStatus = Literal[
-    "created", "invalid", "rejected", "throttled", "invitation_invalid", "email_mismatch"
+    "created",
+    "invalid",
+    "rejected",
+    "throttled",
+    "invitation_invalid",
+    "email_mismatch",
+    "link_invalid",
 ]
 
 
@@ -229,8 +261,10 @@ RegistrationStatus = Literal[
 class RegistrationOutcome:
     """``rejected`` means the email is already registered.
 
-    It differs from ``created``, so registration discloses whether an address has an account.
-    This is an accepted risk: registration is off by default and limited per client address.
+    Only the two sign-ups that start from a secret link reach this outcome: an invitation
+    (email-locked, ADR-0013) and the completion of open registration, whose link was sent to
+    that address (ADR-0017), where the web layer shows it as an invalid link. Open
+    registration's first step never says whether an address has an account.
     """
 
     status: RegistrationStatus
@@ -387,6 +421,7 @@ def _audit(
     host: str | None = None,
     user_agent: str | None = None,
     data: dict[str, str | int | bool] | None = None,
+    ip_prefix: str | None = None,
 ) -> None:
     session.add(
         AuditEvent(
@@ -399,7 +434,8 @@ def _audit(
             entity_id=entity_id,
             data=data or {},
             ts=clock.now(),
-            ip_prefix=client_ip_prefix(host),
+            # An already truncated prefix (from the outbox) wins over ``host``.
+            ip_prefix=ip_prefix or client_ip_prefix(host),
             user_agent=user_agent[:200] if user_agent else None,
         )
     )
@@ -430,7 +466,7 @@ def _is_blocked(row: AuthThrottle | None, now: datetime) -> bool:
     return row is not None and row.blocked_until is not None and row.blocked_until > now
 
 
-def _blocked_until(
+def blocked_until(
     session: Session, keys: Sequence[tuple[ThrottleScope, str]], now: datetime
 ) -> datetime | None:
     """The latest time any of these buckets blocks until, or ``None`` if none is blocked.
@@ -597,6 +633,29 @@ def release_attempts(session: Session, reserved: Sequence[ReservedAttempt]) -> N
             row.blocked_until = None
 
 
+def ip_throttle_key(host: str | None) -> str:
+    """The client-address key used by every per-address bucket."""
+    return _ip_key(host)
+
+
+def count_limited_attempt(
+    session: Session,
+    scope: ThrottleScope,
+    key: str,
+    *,
+    limit: int,
+    window: timedelta,
+    now: datetime,
+    settings: Settings,
+) -> bool:
+    """Count one attempt in a fixed-window bucket, or return False (writing nothing) once
+    ``limit`` attempts were counted in the window. Nothing resets it; it decays with time."""
+    if _current_count(_find_throttle(session, scope, key), now, window) >= limit:
+        return False
+    _count_attempt(session, scope, key, now=now, window=window, free=None, settings=settings)
+    return True
+
+
 def prune_auth_throttles(session: Session, clock: Clock) -> int:
     """Delete idle throttle rows older than 24 hours that no longer block anything."""
     now = clock.now()
@@ -714,6 +773,7 @@ def _login_flow(
     verify: Verifier | None,
     hasher: Hasher | None,
     require_instance_admin: bool = False,
+    second_factor: str = "",
 ) -> LoginOutcome:
     """``require_instance_admin`` (break-glass ``/login/local``): a correct password of anyone
     else fails exactly like a wrong one: same response, same counting, no rehash."""
@@ -738,7 +798,7 @@ def _login_flow(
         now = clock.now()
         reserved = reserve_attempts(session, slots, now, settings)
         if reserved is None:
-            return Throttled(_blocked_until(session, keys, now) or now)
+            return Throttled(blocked_until(session, keys, now) or now)
         user = session.scalar(select(User).where(User.email == lookup))
         return _LoginCandidate(
             reserved,
@@ -748,7 +808,7 @@ def _login_flow(
         )
 
     def blocked(session: Session) -> datetime | None:
-        return _blocked_until(session, keys, clock.now())
+        return blocked_until(session, keys, clock.now())
 
     # A deferred read first, so a flood of blocked requests never takes the write lock;
     # ``reserve`` checks again under the lock. Neither looks at the user: a blocked attempt
@@ -759,31 +819,13 @@ def _login_flow(
     candidate = run(reserve)
     if isinstance(candidate, Throttled):
         return LoginOutcome(throttled_until=candidate.until)
-    rehashed: str | None = None
-    verified: bool | None = None
     try:
         check = verify or verify_password
         verified = check(candidate.password_hash or _dummy_hash(), password)
-        # Decided right after verification and hashed before ``finish``: no hashing ever
-        # runs inside the write transaction.
-        if (
-            verified
-            and candidate.password_hash is not None
-            and (candidate.is_instance_admin or not require_instance_admin)
-            and password_hasher().check_needs_rehash(candidate.password_hash)
-        ):
-            try:
-                rehashed = (hasher or argon2_hash)(password)
-            except HashGateBusy:
-                # Best effort: the login still succeeds; the next login retries the rehash.
-                rehashed = None
     except BaseException:
         # Before a verify outcome exists (``HashGateBusy`` from a saturated gate, any error),
-        # nothing account-specific has happened: take the whole attempt back. After it (an
-        # error while rehashing, which only a correct password reaches), the account attempt
-        # stays counted, as it would on success.
-        taken_back = [item for item in candidate.reserved if verified is None or item.scope == "ip"]
-        run(lambda session: release_attempts(session, taken_back))
+        # nothing account-specific has happened: take the whole attempt back.
+        run(lambda session: release_attempts(session, candidate.reserved))
         raise
 
     def finish(session: Session) -> LoginOutcome:
@@ -799,9 +841,25 @@ def _login_flow(
             and user.password_hash == candidate.password_hash
             and not not_admin
         )
+        factor_verified = False
+        factor_failed = False
+        if succeeded and user is not None:
+            from assetboard.services.totp import verify_sign_in
+
+            # Runs only after a correct password; its cost (a decryption and a few HMACs,
+            # well under a millisecond) is accepted residual timing (ADR-0019).
+            succeeded, factor_verified = verify_sign_in(
+                session, user.id, code=second_factor, settings=settings, now=now
+            )
+            factor_failed = not succeeded
         if not succeeded or user is None or user.password_hash is None:
             # The reservation stays: it is this failure's count.
             prune_auth_throttles(session, clock)
+            reason: dict[str, str | int | bool] | None = None
+            if verified and not_admin:
+                reason = {"reason": "not_instance_admin"}
+            elif factor_failed:
+                reason = {"reason": "second_factor"}
             _audit(
                 session,
                 clock,
@@ -813,7 +871,7 @@ def _login_flow(
                 host=host,
                 user_agent=user_agent,
                 # Internal only: the response is the same as for a wrong password.
-                data={"reason": "not_instance_admin"} if verified and not_admin else None,
+                data=reason,
             )
             return LoginOutcome()
         # Every attempt counts in the account bucket, this successful one too: taking it back
@@ -821,9 +879,6 @@ def _login_flow(
         # probing the same email, and only a known email can succeed. The address bucket,
         # keyed by the requester, takes back this request's attempt as before.
         release_attempts(session, [item for item in candidate.reserved if item.scope == "ip"])
-        if rehashed is not None:
-            # Safe: ``succeeded`` above means the stored hash is still the verified one.
-            user.password_hash = rehashed
         user.last_login_at = now
         if existing_session_id:
             session.execute(
@@ -832,7 +887,13 @@ def _login_flow(
                 )
             )
         new_session_id = create_user_session(
-            session, user, settings=settings, clock=clock, host=host, user_agent=user_agent
+            session,
+            user,
+            settings=settings,
+            clock=clock,
+            host=host,
+            user_agent=user_agent,
+            second_factor_verified=factor_verified,
         )
         _audit(
             session,
@@ -847,7 +908,39 @@ def _login_flow(
         )
         return LoginOutcome(user=user, session_id=new_session_id)
 
-    return run(finish)
+    outcome = run(finish)
+    if outcome.succeeded and candidate.user_id is not None:
+        _rehash_after_login(run, candidate.user_id, candidate.password_hash, password, hasher)
+    return outcome
+
+
+def _rehash_after_login(
+    run: TransactionRunner,
+    user_id: UUID,
+    verified_hash: str | None,
+    password: str,
+    hasher: Hasher | None,
+) -> None:
+    """Upgrade the stored hash once the whole sign-in (second factor included) succeeded.
+
+    Never before: the extra hashing time would reveal a correct password to someone who lacks
+    the second factor. Hashed outside any write transaction; stored only if the hash verified
+    at sign-in is still the stored one (a concurrent password change wins).
+    """
+    if verified_hash is None or not password_hasher().check_needs_rehash(verified_hash):
+        return
+    try:
+        rehashed = (hasher or argon2_hash)(password)
+    except HashGateBusy:
+        # Best effort: the login already succeeded; the next login retries the rehash.
+        return
+
+    def store(session: Session) -> None:
+        user = session.get(User, user_id)
+        if user is not None and user.password_hash == verified_hash:
+            user.password_hash = rehashed
+
+    run(store)
 
 
 def authenticate_user(
@@ -860,6 +953,7 @@ def authenticate_user(
     host: str | None,
     user_agent: str | None = None,
     existing_session_id: str | None = None,
+    second_factor: str = "",
 ) -> LoginOutcome:
     """Authenticate inside the caller's transaction; the caller commits whatever the outcome."""
     return _login_flow(
@@ -873,6 +967,7 @@ def authenticate_user(
         existing_session_id=existing_session_id,
         verify=None,
         hasher=None,
+        second_factor=second_factor,
     )
 
 
@@ -889,6 +984,7 @@ def authenticate_with_factory(
     verify: Verifier | None = None,
     hasher: Hasher | None = None,
     require_instance_admin: bool = False,
+    second_factor: str = "",
 ) -> LoginOutcome:
     """Authenticate with the reservation committed before ``verify`` runs (blocking)."""
     return _login_flow(
@@ -903,6 +999,7 @@ def authenticate_with_factory(
         verify=verify,
         hasher=hasher,
         require_instance_admin=require_instance_admin,
+        second_factor=second_factor,
     )
 
 
@@ -913,6 +1010,11 @@ def gate_verifier(gate: HashGate) -> Verifier:
         return anyio.from_thread.run(gate.run, lambda: verify_password(password_hash, password))
 
     return verify
+
+
+def gate_hasher(gate: HashGate) -> Hasher:
+    """From a worker thread, run each hashing through the event loop's hash gate."""
+    return _gate_hasher(gate)
 
 
 def _gate_hasher(gate: HashGate) -> Hasher:
@@ -934,6 +1036,7 @@ async def authenticate_user_async(
     user_agent: str | None = None,
     existing_session_id: str | None = None,
     require_instance_admin: bool = False,
+    second_factor: str = "",
 ) -> LoginOutcome:
     """Web entry point: database work in a worker thread, hashing through ``gate``.
 
@@ -953,6 +1056,7 @@ async def authenticate_user_async(
             verify=verify,
             hasher=hasher,
             require_instance_admin=require_instance_admin,
+            second_factor=second_factor,
         )
     )
 
@@ -966,6 +1070,7 @@ def create_user_session(
     host: str | None,
     user_agent: str | None = None,
     auth_method: AuthMethod = "password",
+    second_factor_verified: bool = False,
 ) -> str:
     session_id = secrets.token_urlsafe(32)
     now = clock.now()
@@ -979,6 +1084,7 @@ def create_user_session(
             user_agent=user_agent[:200] if user_agent else None,
             ip_prefix=client_ip_prefix(host),
             auth_method=auth_method,
+            second_factor_verified=second_factor_verified,
         )
     )
     session.flush()
@@ -1103,7 +1209,7 @@ def _change_password_flow(
         now = clock.now()
         reserved = reserve_attempts(session, (slot,), now, settings)
         if reserved is None:
-            return Throttled(_blocked_until(session, [(slot.scope, slot.key)], now) or now)
+            return Throttled(blocked_until(session, [(slot.scope, slot.key)], now) or now)
         return Candidate(reserved, user.password_hash, user.email, user.display_name)
 
     def blocked(session: Session) -> Throttled | bool | None:
@@ -1113,7 +1219,7 @@ def _change_password_flow(
         if user.password_hash is None:
             return None
         slot = _confirm_slot(user_id, settings)
-        until = _blocked_until(session, [(slot.scope, slot.key)], clock.now())
+        until = blocked_until(session, [(slot.scope, slot.key)], clock.now())
         return Throttled(until) if until is not None else False
 
     # Deferred read first; ``reserve`` checks again under the write lock.
@@ -1168,6 +1274,7 @@ def _change_password_flow(
             return PasswordChangeOutcome(status="invalid_current")
         user.password_hash = new_hash
         user.must_change_password = False  # a temporary password is replaced (F1.5)
+        invalidate_reset_tokens(session, user.id)
         keep_hash = session_id_hash(current_session_id) if current_session_id else None
         revoked = _delete_sessions_except(session, user.id, keep_hash)
         _audit(
@@ -1364,7 +1471,7 @@ def _create_user_records(
     if options is not None and seed is None:
         raise RuntimeError("A new workspace needs its category seed")
     clean_display_name = _clean_display_name(display_name)
-    normalized_email = normalize_email(email)
+    normalized_email = normalize_new_email(email)
     if password is not None:
         validate_password(password, normalized_email, clean_display_name)
         password_hash = password_hash or argon2_hash(password)
@@ -1503,7 +1610,7 @@ def run_initial_setup(
         if not setup_is_open(session):
             raise SetupAlreadyCompleted
     clean_display_name = _clean_display_name(display_name)
-    normalized_email = normalize_email(email)
+    normalized_email = normalize_new_email(email)
     validate_password(password, normalized_email, clean_display_name)
     _workspace_options(
         settings,
@@ -1597,7 +1704,7 @@ def create_admin_cli(
     seed_locale: str | None = None,
 ) -> tuple[User, Workspace | None]:
     """Break-glass admin creation; works with or without existing users, never modifies one."""
-    normalized_email = normalize_email(email)
+    normalized_email = normalize_new_email(email)
     if session.scalar(select(User.id).where(User.email == normalized_email)) is not None:
         raise EmailAlreadyRegistered
     options = (
@@ -1659,6 +1766,13 @@ def _reserve_registration(
     return (ReservedAttempt("register", key, row.window_started_at, None),)
 
 
+def reserve_registration_in(
+    session: Session, *, host: str | None, settings: Settings, clock: Clock
+) -> bool:
+    """``reserve_registration_attempt`` inside the caller's write transaction."""
+    return _reserve_registration(session, _ip_key(host), settings, clock) is not None
+
+
 def reserve_registration_attempt(
     factory: sessionmaker[Session], *, host: str | None, settings: Settings, clock: Clock
 ) -> bool:
@@ -1717,9 +1831,11 @@ def _register_flow(
     seed_locale: str | None,
     hasher: Hasher | None,
     invitation: InvitationSignUp | None = None,
+    verified: VerifiedSignUp | None = None,
 ) -> RegistrationOutcome:
-    # A valid invitation allows sign-up even when open registration is off (ADR-0013).
-    if invitation is None and not settings.allow_registration:
+    # A valid invitation allows sign-up even when open registration is off (ADR-0013). Open
+    # registration creates an account only from a link sent to the address (ADR-0017).
+    if invitation is None and verified is None:
         raise RegistrationDisabled
     key = _ip_key(host)
 
@@ -1737,7 +1853,7 @@ def _register_flow(
         return RegistrationOutcome(status="throttled")
 
     try:
-        normalized_email = normalize_email(email)
+        normalized_email = normalize_new_email(email)
         clean_display_name = _clean_display_name(display_name)
         validate_password(password, normalized_email, clean_display_name)
         options: WorkspaceOptions | None = None
@@ -1769,6 +1885,11 @@ def _register_flow(
             return RegistrationOutcome(status="email_mismatch", invitation_revoked=exc.revoked)
         except invitations.InvitationInvalid:
             return RegistrationOutcome(status="invitation_invalid")
+    elif verified is not None:
+        try:
+            verified.check(details.email)
+        except SignUpLinkInvalid:
+            return RegistrationOutcome(status="link_invalid")
 
     try:
         # Hashed before the duplicate check, so an existing email takes the same time.
@@ -1778,6 +1899,10 @@ def _register_flow(
         raise
 
     def create(session: Session) -> RegistrationOutcome:
+        if verified is not None:
+            # Spent atomically before anything else (raises SignUpLinkInvalid when another
+            # request used it first, rolling this one back); an existing account spends it too.
+            verified.consume(session, details.email)
         if session.scalar(select(User.id).where(User.email == details.email)) is not None:
             return RegistrationOutcome(status="rejected")
         try:
@@ -1816,7 +1941,9 @@ def _register_flow(
             workspace_id=workspace.id if workspace is not None else None,
             host=host,
             user_agent=user_agent,
-            data={"via": "invitation"} if invitation is not None else None,
+            data={"via": "invitation"}
+            if invitation is not None
+            else ({"via": "email"} if verified is not None else None),
         )
         session.flush()
         return RegistrationOutcome(
@@ -1827,6 +1954,8 @@ def _register_flow(
         return run(create)
     except invitations.InvitationInvalid:
         return RegistrationOutcome(status="invitation_invalid")
+    except SignUpLinkInvalid:
+        return RegistrationOutcome(status="link_invalid")
 
 
 def register_user(
@@ -1845,12 +1974,14 @@ def register_user(
     timezone: str | None = None,
     workspace_locale: str | None = None,
     seed_locale: str | None = None,
+    verified: VerifiedSignUp | None = None,
 ) -> RegistrationOutcome:
-    """Open registration; every attempt counts against its own per-IP window.
+    """Open registration's account creation; every attempt counts against its own per-IP
+    window. Without ``verified`` (a link sent to the address, ADR-0017) it raises
+    ``RegistrationDisabled``.
 
     Registration never touches the login throttle, so it cannot be used to clear it. The
-    outcome discloses whether an email is already registered (see ``RegistrationOutcome``).
-    The caller commits whatever the outcome.
+    caller commits whatever the outcome.
     """
     return _register_flow(
         SameSession(session),
@@ -1867,6 +1998,7 @@ def register_user(
         timezone=timezone,
         workspace_locale=workspace_locale,
         seed_locale=seed_locale,
+        verified=verified,
         hasher=None,
     )
 
@@ -1887,6 +2019,7 @@ def register_with_factory(
     timezone: str | None = None,
     workspace_locale: str | None = None,
     seed_locale: str | None = None,
+    verified: VerifiedSignUp | None = None,
     hasher: Hasher | None = None,
 ) -> RegistrationOutcome:
     return _register_flow(
@@ -1904,6 +2037,7 @@ def register_with_factory(
         timezone=timezone,
         workspace_locale=workspace_locale,
         seed_locale=seed_locale,
+        verified=verified,
         hasher=hasher,
     )
 
@@ -1925,6 +2059,7 @@ async def register_user_async(
     timezone: str | None = None,
     workspace_locale: str | None = None,
     seed_locale: str | None = None,
+    verified: VerifiedSignUp | None = None,
 ) -> RegistrationOutcome:
     """Web entry point; raises ``HashGateBusy`` after releasing the counted attempt."""
     hasher = _gate_hasher(gate)
@@ -1944,6 +2079,7 @@ async def register_user_async(
             timezone=timezone,
             workspace_locale=workspace_locale,
             seed_locale=seed_locale,
+            verified=verified,
             hasher=hasher,
         )
     )
@@ -2027,6 +2163,7 @@ def record_auth_event(
     host: str | None = None,
     user_agent: str | None = None,
     data: dict[str, str | int | bool] | None = None,
+    ip_prefix: str | None = None,
     entity_type: str = "user",
 ) -> None:
     """An instance-level event (``workspace_id`` NULL), about a user unless ``entity_type``
@@ -2042,6 +2179,7 @@ def record_auth_event(
         host=host,
         user_agent=user_agent,
         data=data,
+        ip_prefix=ip_prefix,
     )
 
 
@@ -2124,6 +2262,16 @@ def revoke_all_sessions(session: Session, user_id: UUID) -> int:
     return _delete_sessions_except(session, user_id, None)
 
 
+def invalidate_reset_tokens(session: Session, user_id: UUID) -> None:
+    """Delete the user's password reset links (ADR-0017): on every password change, reset
+    and deactivation, so a link sent earlier can no longer set a password."""
+    session.execute(
+        delete(EmailToken)
+        .where(EmailToken.purpose == "reset", EmailToken.user_id == user_id)
+        .execution_options(synchronize_session=False)
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class _ConfirmCandidate:
     reserved: tuple[ReservedAttempt, ...]
@@ -2143,6 +2291,7 @@ def _confirm_password_flow[T](
     user_agent: str | None,
     verify: Verifier | None,
     on_success: Callable[[Session, User], T],
+    second_factor: str | None = None,
 ) -> T | Throttled | None:
     if len(password) > MAX_PASSWORD_LENGTH:
         return None
@@ -2164,7 +2313,7 @@ def _confirm_password_flow[T](
         user = session.get(User, user_id)
         if user is None:
             return True
-        until = _blocked_until(session, keys, clock.now())
+        until = blocked_until(session, keys, clock.now())
         return Throttled(until) if until is not None else False
 
     def reserve(session: Session) -> _ConfirmCandidate | Throttled | None:
@@ -2174,7 +2323,7 @@ def _confirm_password_flow[T](
         now = clock.now()
         reserved = reserve_attempts(session, slots, now, settings)
         if reserved is None:
-            return Throttled(_blocked_until(session, keys, now) or now)
+            return Throttled(blocked_until(session, keys, now) or now)
         return _ConfirmCandidate(reserved, user.email, user.password_hash)
 
     # As for login: a deferred read first, then the reservation under the write lock. The
@@ -2197,8 +2346,23 @@ def _confirm_password_flow[T](
 
     def finish(session: Session) -> T | None:
         user = session.get(User, user_id)
+        factor_ok = True
         if (
-            not verified
+            verified
+            and user is not None
+            and user.is_active
+            and user.password_hash is not None
+            and user.password_hash == candidate.password_hash
+            and second_factor is not None
+        ):
+            from assetboard.services.totp import verify_sign_in
+
+            factor_ok, _ = verify_sign_in(
+                session, user_id, code=second_factor, settings=settings, now=clock.now()
+            )
+        if (
+            not factor_ok
+            or not verified
             or user is None
             or not user.is_active
             or user.password_hash is None
@@ -2238,6 +2402,7 @@ def confirm_password_with_factory[T](
     host: str | None = None,
     user_agent: str | None = None,
     verify: Verifier | None = None,
+    second_factor: str | None = None,
 ) -> T | Throttled | None:
     """Re-check a known user's password, then run ``on_success`` in the same transaction.
 
@@ -2258,6 +2423,7 @@ def confirm_password_with_factory[T](
         user_agent=user_agent,
         verify=verify,
         on_success=on_success,
+        second_factor=second_factor,
     )
 
 
@@ -2273,6 +2439,7 @@ async def confirm_password_async[T](
     on_success: Callable[[Session, User], T],
     host: str | None = None,
     user_agent: str | None = None,
+    second_factor: str | None = None,
 ) -> T | Throttled | None:
     """Web entry point: verifies through the hashing limit (``HashGateBusy`` when saturated)."""
     verify = gate_verifier(gate)
@@ -2288,6 +2455,7 @@ async def confirm_password_async[T](
             host=host,
             user_agent=user_agent,
             verify=verify,
+            second_factor=second_factor,
         )
     )
 
@@ -2311,6 +2479,7 @@ class WebSession:
     auth_method: str = "password"
     theme: str = "system"
     must_change_password: bool = False
+    second_factor_verified: bool = False
 
 
 def read_web_session(
@@ -2340,6 +2509,7 @@ def read_web_session(
         auth_method=row.auth_method,
         theme=user.theme,
         must_change_password=user.must_change_password,
+        second_factor_verified=row.second_factor_verified,
     )
 
 
@@ -2403,6 +2573,7 @@ def reset_user_password(
     if user is None:
         raise UnknownUser
     user.password_hash = hash_password(password, user.email, user.display_name)
+    invalidate_reset_tokens(session, user.id)
     revoked = _delete_sessions_except(session, user.id, None)
     _audit(
         session,
@@ -2415,3 +2586,45 @@ def reset_user_password(
     )
     session.flush()
     return user
+
+
+class NoTwoFactor(AuthError):
+    code = "no_two_factor"
+
+    def __init__(self) -> None:
+        super().__init__("That user has no two-factor authentication enabled")
+
+
+def reset_user_two_factor(session: Session, *, email: str, clock: Clock) -> tuple[User, int]:
+    """CLI MFA reset: removes the authenticator and recovery codes, revokes password sessions.
+
+    The password is unchanged; external (OIDC/proxy) sessions are unaffected, as their
+    provider handles MFA. Returns the user and how many sessions ended.
+    """
+    normalized = normalize_email(email)
+    user = session.scalar(select(User).where(User.email == normalized))
+    if user is None:
+        raise UnknownUser
+    repository = TotpRepository(session, user.id)
+    factor: TotpFactor | None = repository.factor(lock=True)
+    if factor is None or factor.enabled_at is None:
+        raise NoTwoFactor
+    repository.clear()
+    rows = session.scalars(
+        select(UserSession).where(
+            UserSession.user_id == user.id, UserSession.auth_method == "password"
+        )
+    ).all()
+    for row in rows:
+        session.delete(row)
+    _audit(
+        session,
+        clock,
+        action="cli.reset_mfa",
+        entity_type="user",
+        entity_id=str(user.id),
+        actor_type="cli",
+        data={"sessions_revoked": len(rows)},
+    )
+    session.flush()
+    return user, len(rows)

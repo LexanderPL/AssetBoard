@@ -14,7 +14,17 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import ForeignKey, ForeignKeyConstraint, MetaData, String, Uuid
+from sqlalchemy import (
+    Column,
+    ForeignKey,
+    ForeignKeyConstraint,
+    MetaData,
+    String,
+    Table,
+    Uuid,
+    inspect,
+    select,
+)
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, relationship
 
@@ -30,7 +40,14 @@ from assetboard.db.base import (
     WorkspaceScopedMixin,
 )
 from assetboard.db.engine import create_database_engine
-from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User, Workspace
+from assetboard.db.models.identity import (
+    AuditEvent,
+    Invitation,
+    Membership,
+    User,
+    UserSession,
+    Workspace,
+)
 from assetboard.db.repositories import (
     UPDATABLE_FIELDS,
     AuditEventRepository,
@@ -51,7 +68,9 @@ from assetboard.db.repositories import (
     UserMembershipReader,
 )
 from assetboard.db.repositories.base import models_marked_workspace_owned, repositories_for
+from assetboard.db.repositories.workspace import workspace_references
 from assetboard.domain.months import YearMonth
+from assetboard.domain.transaction_search import SortOrder, TransactionFilter
 from tests.tenant.coverage import (
     BASE_METHOD_COVERAGE,
     CURRENT_WORKSPACE_METHOD_COVERAGE,
@@ -248,6 +267,11 @@ def test_user_membership_reader_returns_only_its_users_rows(
     assert alice_reader.membership_in(ctx_a.workspace.id) is not None
     assert alice_reader.membership_in(ctx_b.workspace.id) is None
     assert bob_reader.membership_in(ctx_a.workspace.id) is None
+    CurrentWorkspaceRepository(db_session, ctx_a).update(require_two_factor=True)
+    assert alice_reader.authorization_in(ctx_a.workspace.id) == ("owner", True)
+    assert alice_reader.authorization_in(ctx_b.workspace.id) is None
+    assert bob_reader.authorization_in(ctx_a.workspace.id) is None
+    assert bob_reader.authorization_in(ctx_b.workspace.id) == ("owner", False)
 
 
 def _member(session: Session, workspace_id: UUID, email: str, role: str) -> Membership:
@@ -353,7 +377,7 @@ def test_current_workspace_repository_touches_only_its_workspace(
     assert b_repo.get().id == ctx_b.workspace.id
     before_b = raw_row(db_session, Workspace, ctx_b.workspace.id)
 
-    a_repo.update(name="Renamed A", base_currency="PLN")
+    a_repo.update(name="Renamed A", base_currency="PLN", require_two_factor=True)
     db_session.expire_all()
     after_a = raw_row(db_session, Workspace, ctx_a.workspace.id)
     assert after_a is not None and (after_a["name"], after_a["base_currency"]) == (
@@ -363,7 +387,8 @@ def test_current_workspace_repository_touches_only_its_workspace(
     assert raw_row(db_session, Workspace, ctx_b.workspace.id) == before_b
 
     assert {
-        "name", "base_currency", "country_code", "timezone", "locale", "auto_copy_plan"
+        "name", "base_currency", "country_code", "timezone", "locale", "auto_copy_plan",
+        "require_two_factor"
     } == UPDATABLE_FIELDS  # fmt: skip
     for forbidden in ("id", "created_at", "updated_at", "unknown"):
         with pytest.raises(ValueError):
@@ -535,6 +560,45 @@ def test_transaction_queries_stay_in_their_workspace(
     assert b_row.workspace_id == ctx_b.workspace.id
     assert [r.id for r in in_b.for_month(october)] == [b_row.id]
     assert [r.id for r in in_a.for_month(october)] == [a_row.id]
+
+
+def test_transaction_search_stays_in_its_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    in_a, in_b = TransactionRepository(db_session, ctx_a), TransactionRepository(db_session, ctx_b)
+
+    def category(ctx: Any) -> Any:
+        return CategoryRepository(db_session, ctx).create(
+            name="Food", name_key="food", kind="expense", treatment="regular",
+            color="#16a34a", sort_order=0,
+        )  # fmt: skip
+
+    def make(repository: TransactionRepository, category_id: UUID) -> Any:
+        return repository.create(
+            direction="expense", day=date(2026, 10, 7), amount_minor=1250, currency="EUR",
+            category_id=category_id, description="Lidl", description_key="lidl",
+            source="manual", created_by_user_id=None,
+        )  # fmt: skip
+
+    food_a, food_b = category(ctx_a), category(ctx_b)
+    a_row, b_row = make(in_a, food_a.id), make(in_b, food_b.id)
+    # The same filter (even naming the other workspace's category) sees only its own rows.
+    everything = TransactionFilter(text_key="lidl")
+    both = TransactionFilter(category_ids=frozenset({food_a.id, food_b.id}))
+    for repository, own, food in ((in_a, a_row, food_a), (in_b, b_row, food_b)):
+        for where in (everything, both, TransactionFilter()):
+            page = repository.search(where, sort=SortOrder.DATE_DESC, limit=50, offset=0)
+            assert [(r.id, c.id) for r, c in page] == [(own.id, food.id)]
+            assert repository.count_matching(where) == 1
+            assert [(r.id, c.id) for r, c in repository.iter_matching(where)] == [(own.id, food.id)]
+            for lock in (True, False):
+                found = repository.matching_for_update(where=where, lock=lock, limit=10)
+                assert [(r.id, c.id) for r, c in found] == [(own.id, food.id)]
+        # Ids of the other workspace's rows are not found.
+        ids = {a_row.id, b_row.id}
+        assert [r.id for r, _c in repository.matching_for_update(ids=ids)] == [own.id]
+    assert in_b.count_matching(TransactionFilter(category_ids=frozenset({food_a.id}))) == 0
 
 
 def test_budget_line_queries_stay_in_their_workspace(
@@ -846,3 +910,262 @@ def test_relationship_check_detects_a_seeded_relationship() -> None:
         home: Mapped[Home] = relationship(viewonly=True)  # owned -> unowned is fine
 
     assert relationships_into_owned_models(RelationshipBase) == ["Home.notes -> Note"]
+
+
+def test_scheduled_queries_stay_in_their_workspace(db_session, two_workspaces) -> None:
+    from assetboard.db.models.ledger import Category
+    from assetboard.db.repositories.scheduled import (
+        ScheduledItemRepository,
+        ScheduledOccurrenceRepository,
+    )
+
+    ctx_a, ctx_b = two_workspaces
+    items = ScheduledItemRepository(db_session, ctx_a)
+    rows = ScheduledOccurrenceRepository(db_session, ctx_a)
+    category = CategoryRepository(db_session, ctx_a).add(
+        TENANT_CASES[Category].factory(db_session, ctx_a.workspace.id)
+    )
+    item = items.create(
+        name="Insurance",
+        direction="expense",
+        category_id=category.id,
+        amount_mode="fixed",
+        amount_minor=180000,
+        currency="EUR",
+        start_date=date(2026, 1, 1),
+        freq="monthly",
+        interval=1,
+        weekdays=[],
+        month_day="14",
+        month=1,
+        weekend_policy="none",
+        notes="",
+    )
+    row = rows.create(
+        scheduled_item_id=item.id,
+        category_id=category.id,
+        direction="expense",
+        nominal_date=date(2026, 3, 14),
+        due_date=date(2026, 3, 14),
+        expected_minor=180000,
+        currency="EUR",
+        amount_state="confirmed",
+        status="pending",
+        label="Insurance",
+    )
+    assert item.workspace_id == row.workspace_id == ctx_a.workspace.id
+    other_items = ScheduledItemRepository(db_session, ctx_b)
+    other_rows = ScheduledOccurrenceRepository(db_session, ctx_b)
+    with pytest.raises(ForeignWorkspace):
+        other_items.create(workspace_id=ctx_a.workspace.id)
+    with pytest.raises(ForeignWorkspace):
+        other_rows.create(workspace_id=ctx_a.workspace.id)
+    assert other_items.ordered() == [] and other_items.ordered(active_only=True) == []
+    assert other_items.category_counts() == {} and other_rows.category_counts() == {}
+    assert other_rows.for_item(item.id) == []
+    assert other_rows.upcoming(date(2026, 4, 1)) == []
+    assert rows.get_for_update(row.id) == row
+    assert other_rows.get_for_update(row.id) is None
+    transaction = TransactionRepository(db_session, ctx_a).create(
+        direction="expense",
+        day=date(2026, 3, 14),
+        amount_minor=180000,
+        currency="EUR",
+        category_id=category.id,
+        description="Insurance",
+        description_key="insurance",
+        source="recurring",
+        created_by_user_id=None,
+    )
+    rows.update(row.id, transaction_id=transaction.id, previous_transaction_id=transaction.id)
+    for previous in (False, True):
+        assert rows.linked_to_transaction_for_update(transaction.id, previous=previous) == [row]
+        assert other_rows.linked_to_transaction_for_update(transaction.id, previous=previous) == []
+    rows.update(row.id, transaction_id=None, previous_transaction_id=None)
+    assert not other_items.any_exists() and items.any_exists()
+    with pytest.raises(NotFound):
+        other_rows.delete(row)
+    assert rows.for_item(item.id)[0].id == row.id
+    assert rows.upcoming(date(2026, 4, 1))[0][0].id == row.id
+    assert item.id in {value.id for value in items.ordered()}
+    assert item.id in {value.id for value in items.ordered(active_only=True)}
+    assert items.category_counts()[item.category_id] >= 1
+    assert rows.category_counts() == {item.category_id: 1}
+    rows.delete(row)
+    assert rows.for_item(item.id) == []
+
+
+# Deleting a workspace (ADR-0020): every workspace-owned model, found by discovery
+
+
+def _owned_rows(session: Session, model: type[Any], workspace_id: UUID) -> list[dict[str, object]]:
+    table = inspect(model).local_table
+    rows = session.connection().execute(select(table).where(table.c.workspace_id == workspace_id))
+    return sorted((dict(row._mapping) for row in rows), key=lambda row: str(row["id"]))
+
+
+def _session_row(session: Session, user_id: UUID, workspace_id: UUID | None) -> str:
+    now = datetime(2026, 1, 1, tzinfo=UTC)
+    id_hash = uuid4().hex * 2
+    session.add(
+        UserSession(
+            id_hash=id_hash,
+            user_id=user_id,
+            created_at=now,
+            last_seen_at=now,
+            expires_at=now + timedelta(days=1),
+            current_workspace_id=workspace_id,
+        )
+    )
+    session.flush()
+    return id_hash
+
+
+def test_deleting_a_workspace_removes_every_owned_row_and_nothing_else(
+    db_session: Session, two_workspaces: tuple[Any, Any], fixed_clock: FixedClock
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    a_id, b_id = ctx_a.workspace.id, ctx_b.workspace.id
+    for model in OWNED_MODELS:  # discovery: a new workspace-owned model is covered by itself
+        for ctx in two_workspaces:
+            row = TENANT_CASES[model].factory(db_session, ctx.workspace.id)
+            repositories_for(Base)[model](db_session, ctx).add(row)
+    for model in OWNED_MODELS:
+        assert _owned_rows(db_session, model, a_id), f"no {model.__name__} rows to delete"
+    user = User(email="sessions@example.com", display_name="Sessions")
+    db_session.add(user)
+    db_session.add(
+        AuditEvent(
+            id=uuid4(),
+            workspace_id=None,
+            actor_type="system",
+            action="auth.logout",
+            entity_type="user",
+            entity_id=None,
+            data={},
+            ts=fixed_clock.now(),
+        )
+    )
+    db_session.flush()
+    in_a = _session_row(db_session, user.id, a_id)
+    in_b = _session_row(db_session, user.id, b_id)
+    before_b = {model: _owned_rows(db_session, model, b_id) for model in OWNED_MODELS}
+    workspace_b = raw_row(db_session, Workspace, b_id)
+    instance_events = InstanceAuditReader(db_session).page(AuditFilter(), limit=10)
+
+    CurrentWorkspaceRepository(db_session, ctx_a).delete_with_all_data(now=fixed_clock.now())
+
+    for model in OWNED_MODELS:
+        assert _owned_rows(db_session, model, a_id) == [], model.__name__
+        assert _owned_rows(db_session, model, b_id) == before_b[model], model.__name__
+    assert raw_row(db_session, Workspace, a_id) is None
+    assert raw_row(db_session, Workspace, b_id) == workspace_b
+    sessions = inspect(UserSession).local_table
+    selected = dict(
+        db_session.connection()
+        .execute(
+            select(sessions.c.id_hash, sessions.c.current_workspace_id).where(
+                sessions.c.id_hash.in_([in_a, in_b])
+            )
+        )
+        .all()
+    )
+    assert selected == {in_a: None, in_b: b_id}
+    assert InstanceAuditReader(db_session).page(AuditFilter(), limit=10) == instance_events
+    with pytest.raises(NotFound):  # already gone
+        CurrentWorkspaceRepository(db_session, ctx_a).delete_with_all_data(now=fixed_clock.now())
+
+
+def test_workspace_references_cover_every_reference_to_workspaces() -> None:
+    owned, references = workspace_references()
+    assert {table.name for table in owned} == {
+        inspect(model).local_table.name for model in OWNED_MODELS
+    }
+    assert [f"{column.table.name}.{column.name}" for column in references] == [
+        "user_sessions.current_workspace_id"
+    ]
+    # Children before parents: the composite foreign keys hold at every step.
+    order = [table.name for table in owned]
+    for child, parent in (
+        ("transactions", "categories"),
+        ("budget_lines", "categories"),
+        ("scheduled_occurrences", "scheduled_items"),
+        ("scheduled_items", "categories"),
+    ):
+        assert order.index(child) < order.index(parent)
+
+
+def test_workspace_references_refuse_a_reference_that_cannot_be_cleared() -> None:
+    metadata = MetaData()
+    Table("workspaces", metadata, Column("id", Uuid(), primary_key=True))
+    Table(
+        "pins",
+        metadata,
+        Column("id", Uuid(), primary_key=True),
+        Column("pinned_workspace_id", Uuid(), ForeignKey("workspaces.id"), nullable=False),
+    )
+    with pytest.raises(RuntimeError, match="pins.pinned_workspace_id"):
+        workspace_references(metadata)
+
+
+def test_tax_rule_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    from assetboard.db.repositories import TaxRuleRepository, TaxRuleVersionRepository
+
+    ctx_a, ctx_b = two_workspaces
+    rules_a, rules_b = TaxRuleRepository(db_session, ctx_a), TaxRuleRepository(db_session, ctx_b)
+    versions_a = TaxRuleVersionRepository(db_session, ctx_a)
+    versions_b = TaxRuleVersionRepository(db_session, ctx_b)
+    rule_a = rules_a.create(name="Income tax A", effect="withheld", base="net", notes="")
+    rule_b = rules_b.create(name="Income tax B", effect="withheld", base="net", notes="")
+    version_a = versions_a.create(
+        tax_rule_id=rule_a.id,
+        effective_from=date(2026, 1, 1),
+        mode="percent",
+        rate_bp=1200,
+        fixed_minor=None,
+    )
+    versions_b.create(
+        tax_rule_id=rule_b.id,
+        effective_from=date(2026, 1, 1),
+        mode="percent",
+        rate_bp=1500,
+        fixed_minor=None,
+    )
+    fixed_version_a = versions_a.create(
+        tax_rule_id=rule_a.id,
+        effective_from=date(2027, 1, 1),
+        mode="fixed",
+        rate_bp=None,
+        fixed_minor=500,
+    )
+    assert [row.id for row in rules_a.ordered()] == [rule_a.id]
+    assert rules_a.effective_for_all(date(2026, 1, 1)) == [(rule_a, version_a)]
+    assert rules_b.effective_for_all(date(2026, 1, 1))[0][0].id == rule_b.id
+    assert versions_a.for_rule(rule_a.id) == [version_a, fixed_version_a]
+    assert versions_b.for_rule(rule_a.id) == []
+    assert versions_a.effective(rule_a.id, date(2026, 1, 1)) == version_a
+    assert versions_b.effective(rule_a.id, date(2026, 1, 1)) is None
+    assert versions_a.any_fixed_amount() and not versions_b.any_fixed_amount()
+    assert [row.id for row in versions_a.all_for_rules()] == [
+        version_a.id,
+        fixed_version_a.id,
+    ]
+    with pytest.raises(ForeignWorkspace):
+        rules_b.create(
+            workspace_id=ctx_a.workspace.id,
+            name="Cross workspace",
+            effect="withheld",
+            base="net",
+            notes="",
+        )
+    with pytest.raises(ForeignWorkspace):
+        versions_b.create(
+            workspace_id=ctx_a.workspace.id,
+            tax_rule_id=rule_a.id,
+            effective_from=date(2027, 1, 1),
+            mode="percent",
+            rate_bp=100,
+            fixed_minor=None,
+        )

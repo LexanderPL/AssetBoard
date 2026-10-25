@@ -45,7 +45,11 @@ from assetboard.services.admin_users import (
     record_user_created,
 )
 from assetboard.services.auth import WebSession, argon2_hash, create_user_with_temporary_password
-from assetboard.services.instance_settings import get_settings, update_settings
+from assetboard.services.instance_settings import (
+    get_settings,
+    registration_blocker,
+    update_settings,
+)
 from assetboard.services.profile import ConfirmMethod
 from assetboard.web.confirm import Refusal, confirm_view, refusal, run_confirmed
 from assetboard.web.errors import BUSY_RETRY_AFTER
@@ -67,6 +71,7 @@ ACTION_TITLES: dict[str, str] = {
     "deactivate": _("Deactivate account"),
     "promote": _("Make instance administrator"),
     "demote": _("Remove instance administrator"),
+    "reset_totp": _("Reset two-factor authentication"),
 }
 ACTION_EXPLANATIONS: dict[str, str] = {
     "activate": _("%(user)s can sign in again."),
@@ -76,11 +81,18 @@ ACTION_EXPLANATIONS: dict[str, str] = {
     ),
     "promote": _("%(user)s can manage every account on this instance."),
     "demote": _("%(user)s can no longer manage accounts on this instance."),
+    "reset_totp": _(
+        "Remove %(user)s's authenticator and recovery codes, end every session, and require "
+        "them to enroll again before accessing workspaces that require two-factor authentication."
+    ),
 }
 ACTION_RESULTS: dict[str, str] = {
     "done": _("Done."),
     "unchanged": _("Nothing to change: the account is already in that state."),
     "self": _("You cannot deactivate your own account or remove your own administrator role."),
+    "self_totp_reset": _(
+        "Use your own account security page to manage your two-factor authentication."
+    ),
     "last_admin": _("This is the last active administrator, so this would leave none."),
 }
 # With OIDC_ADMIN_GROUP set, the provider's group decides the role again at each OIDC sign-in
@@ -92,8 +104,15 @@ ROLE_ACTIONS = frozenset({"promote", "demote"})
 SETTINGS_RESULTS: dict[str, str] = {
     "done": _("Instance settings saved."),
     "unchanged": _("Nothing to change: the settings already had these values."),
+    "registration_needs_mail": _(
+        "Open registration needs an email server: set ASSETBOARD_SMTP_HOST first."
+    ),
+    "registration_oidc_only": _(
+        "Open registration is not available while only the identity provider signs people in "
+        "(ASSETBOARD_OIDC_ONLY)."
+    ),
 }
-SETTINGS_INVALID = _("Choose who can create workspaces.")
+SETTINGS_INVALID = _("Choose a value for each setting.")
 CREATE_ERRORS = {
     "email": _("Enter a valid email address."),
     "email_taken": _("An account with this email address already exists."),
@@ -230,7 +249,11 @@ async def action_form(request: Request, user_id: str, action: str) -> Response:
 
 @router.post("/admin/users/{user_id}/{action}")
 async def action_submit(
-    request: Request, user_id: str, action: str, confirm_password: FormStr = ""
+    request: Request,
+    user_id: str,
+    action: str,
+    confirm_password: FormStr = "",
+    second_factor: FormStr = "",
 ) -> Response:
     current = _require_admin(request)
     chosen = _action(action)
@@ -249,7 +272,12 @@ async def action_submit(
         )
 
     outcome = await run_confirmed(
-        request, current, purpose=f"admin_{chosen}", password=confirm_password, action=apply
+        request,
+        current,
+        purpose=f"admin_{chosen}",
+        password=confirm_password,
+        second_factor=second_factor if chosen == "reset_totp" else None,
+        action=apply,
     )
     if outcome.status != "confirmed" or outcome.value is None:
         refused = refusal(request, outcome)
@@ -262,7 +290,7 @@ async def action_submit(
     message = _t(request, ACTION_RESULTS[outcome.value])
     if outcome.value == "done" and _group_decides(request, chosen):
         message = f"{message} {_t(request, GROUP_DECIDES)}"
-    if outcome.value in {"self", "last_admin"}:
+    if outcome.value in {"self", "self_totp_reset", "last_admin"}:
         return await _confirm_page(request, current, chosen, target, error=message, status_code=409)
     return await _users_page(request, current, notice=message)
 
@@ -395,20 +423,27 @@ async def _settings_page(
     request: Request,
     current: WebSession,
     *,
-    allow_workspace_creation: bool | None = None,
+    wanted: tuple[bool, bool] | None = None,
     notice: str | None = None,
     error: str | None = None,
     status_code: int = 200,
 ) -> Response:
     state = _state(request)
-    if allow_workspace_creation is None:
-        stored = await run_in_threadpool(get_settings, state.session_factory)
-        allow_workspace_creation = stored.allow_workspace_creation
+    stored = await run_in_threadpool(get_settings, state.session_factory)
+    allow_workspace_creation, allow_registration = wanted or (
+        stored.allow_workspace_creation,
+        stored.allow_registration,
+    )
+    blocker = registration_blocker(state.settings)
     response = render_template(
         request,
         "admin/settings.html",
         context={
             "allow_workspace_creation": allow_workspace_creation,
+            "allow_registration": allow_registration,
+            # Turning registration on is impossible; turning it off stays possible.
+            "registration_locked": blocker is not None and not stored.allow_registration,
+            "registration_blocker": _t(request, SETTINGS_RESULTS[blocker]) if blocker else None,
             "confirm": await confirm_view(request, current),
             "notice": notice,
             "error": error,
@@ -427,21 +462,26 @@ async def settings_form(request: Request) -> Response:
 
 @router.post("/admin/settings")
 async def settings_submit(
-    request: Request, allow_workspace_creation: FormStr = "", confirm_password: FormStr = ""
+    request: Request,
+    allow_workspace_creation: FormStr = "",
+    allow_registration: FormStr = "",
+    confirm_password: FormStr = "",
 ) -> Response:
     current = _require_admin(request)
-    if allow_workspace_creation not in {"on", "off"}:
+    if allow_workspace_creation not in {"on", "off"} or allow_registration not in {"on", "off"}:
         return await _settings_page(
             request, current, error=_t(request, SETTINGS_INVALID), status_code=400
         )
-    wanted = allow_workspace_creation == "on"
+    wanted = (allow_workspace_creation == "on", allow_registration == "on")
     state = _state(request)
 
     def apply(session: Session, actor: User, _method: ConfirmMethod) -> str:
         return update_settings(
             session,
             actor,
-            allow_workspace_creation=wanted,
+            allow_workspace_creation=wanted[0],
+            allow_registration=wanted[1],
+            settings=state.settings,
             clock=state.clock,
             host=client_host(request),
             user_agent=request.headers.get("user-agent"),
@@ -455,11 +495,19 @@ async def settings_submit(
         page = await _settings_page(
             request,
             current,
-            allow_workspace_creation=wanted,
+            wanted=wanted,
             error=refused.message,
             status_code=refused.status_code,
         )
         return _with_retry_after(page, refused)
+    if outcome.value in {"registration_needs_mail", "registration_oidc_only"}:
+        return await _settings_page(
+            request,
+            current,
+            wanted=wanted,
+            error=_t(request, SETTINGS_RESULTS[outcome.value]),
+            status_code=400,
+        )
     return await _settings_page(
         request, current, notice=_t(request, SETTINGS_RESULTS[outcome.value])
     )

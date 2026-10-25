@@ -210,7 +210,7 @@ def test_a_temporary_password_must_be_changed_first(owner: OwnerApp) -> None:
 # The switcher link
 
 
-def test_the_page_header_offers_a_new_workspace(owner: OwnerApp) -> None:
+def test_the_user_menu_offers_a_new_workspace(owner: OwnerApp) -> None:
     bea = owner.add_user("bea")
     owner.join(bea, owner.home_id, "editor")
     with signed_in_as(owner, "bea") as client:
@@ -220,6 +220,15 @@ def test_the_page_header_offers_a_new_workspace(owner: OwnerApp) -> None:
         assert "data-workspace-switcher" in page and "data-new-workspace-link" in page
         _set_allowed(owner, False)
         assert "data-new-workspace-link" not in client.get("/").text
+
+
+def test_the_new_workspace_link_left_the_header_for_the_menu_and_settings(owner: OwnerApp) -> None:
+    page = owner.client.get("/").text
+    header = page[page.index("<header") : page.index("</header>")]
+    menu = page[page.index("data-user-menu") : page.index("</details>")]
+    assert "data-new-workspace-link" not in header and "data-new-workspace-link" in menu
+    settings = owner.client.get("/workspace/settings").text
+    assert "data-settings-new-workspace-link" in settings
 
 
 # The instance setting (administrators)
@@ -239,7 +248,7 @@ def test_the_settings_page_is_for_instance_administrators(owner: OwnerApp) -> No
         response = client.post(
             "/admin/settings",
             data={"csrf_token": token, "allow_workspace_creation": "off",
-                  "confirm_password": ADMIN_PASSWORD},
+                  "allow_registration": "off", "confirm_password": ADMIN_PASSWORD},
         )  # fmt: skip
         assert response.status_code == 403
         assert "data-admin-settings-link" not in client.get("/account").text
@@ -256,7 +265,11 @@ def _allowed(owner: OwnerApp) -> bool:
 def _save(owner: OwnerApp, value: str, password: str = ADMIN_PASSWORD) -> Any:
     return owner.post(
         "/admin/settings",
-        {"allow_workspace_creation": value, "confirm_password": password},
+        {
+            "allow_workspace_creation": value,
+            "allow_registration": "off",
+            "confirm_password": password,
+        },
         token_from="/admin/settings",
     )
 
@@ -268,7 +281,7 @@ def test_changing_the_setting_needs_the_password_and_is_audited(owner: OwnerApp)
     saved = _save(owner, "off")
     assert saved.status_code == 200
     assert "Instance settings saved." in saved.text
-    assert 'value="off" selected' in saved.text
+    assert '<option value="off" selected>Only instance administrators' in saved.text
     assert _allowed(owner) is False
     unchanged = _save(owner, "off")
     assert "Nothing to change" in unchanged.text
@@ -290,7 +303,7 @@ def test_changing_the_setting_needs_the_password_and_is_audited(owner: OwnerApp)
 def test_an_unknown_setting_value_is_refused(owner: OwnerApp) -> None:
     response = _save(owner, "maybe")
     assert response.status_code == 400
-    assert "Choose who can create workspaces." in response.text
+    assert "Choose a value for each setting." in response.text
     assert _allowed(owner) is True
 
 

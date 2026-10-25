@@ -72,23 +72,38 @@ def test_switch_refuses_foreign_workspace_with_404(owner: OwnerApp, target: str)
 # Pages without a Context render base.html without the workspace parts
 
 
-WORKSPACE_PARTS = ("data-workspace-switcher", "data-current-workspace", "data-owner-link")
+WORKSPACE_PARTS = (
+    "data-workspace-switcher",
+    "data-current-workspace",
+    "data-owner-link",
+    "data-recurring-link",
+)
 
 
 def test_home_shows_owner_links_only_to_owners(owner: OwnerApp) -> None:
-    assert "data-owner-link" in owner.client.get("/").text
+    page = owner.client.get("/").text
+    assert "data-owner-link" in page
+    assert "data-recurring-link" in page
     owner.set_admin_role("viewer")
     assert "data-owner-link" not in owner.client.get("/").text
 
 
-@pytest.mark.parametrize("page", ["account", "not_found", "no_workspace", "signed_out_login"])
+def test_account_pages_show_the_workspace_parts(owner: OwnerApp) -> None:
+    """Every signed-in page shows the current workspace's chrome (v0.2.1 sidebar bug)."""
+    second = owner.add_workspace("Second")
+    owner.join(owner.admin_id, second, "owner")
+    response = owner.client.get("/account/password")
+    assert response.status_code == 200
+    for part in WORKSPACE_PARTS:
+        assert part in response.text
+
+
+@pytest.mark.parametrize("page", ["not_found", "no_workspace", "signed_out_login"])
 def test_pages_without_a_context_render_without_workspace_parts(owner: OwnerApp, page: str) -> None:
     second = owner.add_workspace("Second")
     owner.join(owner.admin_id, second, "owner")  # the switcher would show on workspace pages
     client = owner.client
-    if page == "account":
-        response, status = client.get("/account/password"), 200
-    elif page == "not_found":
+    if page == "not_found":
         response, status = client.get("/no-such-page"), 404
     elif page == "no_workspace":
         with owner.db() as session, session.begin():
@@ -189,7 +204,8 @@ def _plant_transaction(owner: OwnerApp, *, deleted: bool) -> None:
 
 
 LOCKED_HELP = (
-    "Locked: transactions (deleted ones included) or planned values exist, and their amounts "
+    "Locked: transactions (deleted ones included) or planned values or recurring items exist, "
+    "and their amounts "
     "are stored in this currency."
 )
 
@@ -212,8 +228,9 @@ def test_the_settings_page_shows_why_the_base_currency_is_locked(
     assert LOCKED_HELP in page
     polish = owner.client.get("/workspace/settings", headers={"Accept-Language": "pl"}).text
     assert (
-        "Zablokowana: istnieją transakcje (także usunięte) lub wartości planowane, a ich kwoty "
-        "są zapisane w tej walucie." in polish
+        "Zablokowana: istnieją transakcje (również usunięte), wartości planowane "
+        "lub pozycje cykliczne, "
+        "a ich kwoty są zapisane w tej walucie." in polish
     )
 
 

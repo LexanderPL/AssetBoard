@@ -14,8 +14,10 @@
 
 {% macro plan_row(r, plan_only=false) -%}
 {% set row_id = "plan-" ~ r.category_id %}
-<tr id="{{ row_id }}" data-plan-row="{{ r.category_id }}">
-  <th scope="row" class="py-1.5 pr-2 text-left font-normal">
+{# A row above plan is tinted (web.plan.OVER_PLAN_TINT): red for an expense category, green for
+   an income one. The difference beside it says the same in text. #}
+<tr id="{{ row_id }}" data-plan-row="{{ r.category_id }}"{% if r.over == "danger" %} class="bg-danger-tint" data-over-plan="expense"{% elif r.over == "success" %} class="bg-success-tint" data-over-plan="income"{% endif %}>
+  <th scope="row" class="py-1.5 pl-2 pr-2 text-left font-normal">
     {% set filter_href = scoped_url(request, 'month', month=summary.month) ~ "?category=" ~ r.category_id %}<span class="flex items-center gap-2">{{ swatch(r.color) }}<a href="{{ filter_href }}#ledger" hx-get="{{ filter_href }}" hx-select="#ledger" hx-target="#ledger" hx-swap="outerHTML" hx-push-url="true"{% if summary.filter_id == r.category_id %} aria-current="true"{% endif %} title="{{ _('Show only the entries of %(name)s', name=r.name) }}" class="rounded underline-offset-2 hover:underline aria-[current=true]:font-semibold aria-[current=true]:text-primary-ink aria-[current=true]:underline" data-plan-category data-filter-link="{{ r.category_id }}">{{ r.name }}</a>{% if r.archived %}<span class="text-xs text-muted">{{ _("archived") }}</span>{% endif %}</span>
   </th>
   <td class="py-1.5 pr-2 text-right align-top">
@@ -33,53 +35,105 @@
     {% endif %}
   </td>
   {% if plan_only %}
-  <td colspan="2" class="py-1.5 text-right text-xs text-muted">{{ _("not counted") }}</td>
+  <td colspan="2" class="py-1.5 pr-2 text-right text-xs text-muted">{{ _("not counted") }}</td>
   {% else %}
   <td class="whitespace-nowrap py-1.5 pr-2 text-right tabular-nums" data-actual>{{ r.actual }}</td>
-  <td class="whitespace-nowrap py-1.5 text-right" data-difference>{{ difference(r.difference, r.tone) }}</td>
+  <td class="whitespace-nowrap py-1.5 pr-2 text-right" data-difference>{{ difference(r.difference, r.tone) }}</td>
   {% endif %}
 </tr>
 {%- endmacro %}
 
 {% macro totals_row(g, oob=false) -%}
 <tr id="summary-total-{{ g.key }}" class="font-semibold" data-summary-total="{{ g.key }}"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
-  <th scope="row" class="py-2 pr-2 text-left">{{ _("Total") }}</th>
+  <th scope="row" class="py-2 pl-2 pr-2 text-left">{{ _("Total") }}</th>
   <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ g.totals.planned }}</td>
   <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ g.totals.actual }}</td>
-  <td class="whitespace-nowrap py-2 text-right">{{ difference(g.totals.difference, g.totals.tone) }}</td>
+  <td class="whitespace-nowrap py-2 pr-2 text-right">{{ difference(g.totals.difference, g.totals.tone) }}</td>
 </tr>
 {%- endmacro %}
 
-{# KPI cards and the planned-vs-actual bars. The bars are inline SVG (CSP forbids inline
-   styles, so widths are SVG attributes) and hidden from screen readers: the text beside them
-   says the same. #}
+{# The KPI flow bar and the planned-vs-actual bars. Both are inline SVG (CSP forbids inline
+   styles, so positions and widths are SVG attributes) hidden from screen readers: the text
+   beside them says the same, and an sr-only sentence sums the flow up.
+
+   Flow bar (domain.summary.flow_bar): what was earned, split into spent (danger), saved /
+   invested (primary) and left (success). When spending and saving exceed earnings, the bar
+   scales to their sum, the part beyond earnings is hatched red and a line marks earnings.
+   Planned-vs-actual: the actual fills an outlined track and a line marks the plan. #}
+{% macro legend_item(label, value, key, swatch_class, value_class="") -%}
+<div class="flex min-w-0 items-start gap-2">
+  <span class="mt-1 h-3 w-3 shrink-0 rounded-sm {{ swatch_class }}" aria-hidden="true"></span>
+  <div class="min-w-0">
+    <dt class="text-xs text-muted">{{ label }}</dt>
+    <dd class="font-semibold tabular-nums {{ value_class }}" data-kpi="{{ key }}">{{ value }}</dd>
+  </div>
+</div>
+{%- endmacro %}
+
 {% macro kpis(oob=false) -%}
 {% set k = summary.kpis %}
-<div id="summary-kpis" class="mt-4 space-y-4" data-summary-kpis{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
-  <dl class="grid grid-cols-2 gap-3 sm:grid-cols-5">
-    {% for label, value, extra in [(_("Earned"), k.earned, ""), (_("Spent"), k.spent, ""), (_("Saved"), k.saved, ""), (_("Net"), k.net, tone_class[k.net_tone] if k.net_tone == "unfavourable" else "")] %}
-    <div class="rounded-xl border border-line bg-subtle px-3 py-2">
-      <dt class="text-xs text-muted">{{ label }}</dt>
-      <dd class="mt-1 text-base font-semibold tabular-nums {{ extra }}" data-kpi>{{ value }}</dd>
-    </div>
-    {% endfor %}
-    <div class="rounded-xl border border-line bg-subtle px-3 py-2">
-      <dt class="text-xs text-muted">{{ _("Savings rate") }}</dt>
-      <dd class="mt-1 text-base font-semibold tabular-nums" data-kpi="savings-rate">{% if k.savings_rate is not none %}{{ k.savings_rate }}{% else %}<span aria-hidden="true">—</span><span class="sr-only">{{ _("Not available: nothing earned") }}</span>{% endif %}</dd>
-    </div>
-  </dl>
-  <div class="grid gap-3 sm:grid-cols-2">
+{% set f = k.flow %}
+{% set n = k.flow_scale %}
+{# Separators between the segments stay 2px wide however the bar stretches. #}
+{% set seg = 'stroke-width="2" vector-effect="non-scaling-stroke"' %}
+<div id="summary-kpis" class="mt-4 space-y-5" data-summary-kpis{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+  <div data-flow>
+    <p class="sr-only" data-flow-summary>{{ _("Earned %(earned)s: spent %(spent)s, saved or invested %(saved)s, left %(net)s.", earned=k.earned, spent=k.spent, saved=k.saved, net=k.net) }}{% if k.overspend %} {{ _("Spending and saving exceed earnings by %(amount)s.", amount=k.overspend) }}{% endif %}</p>
+    <dl class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1" aria-hidden="true">
+      <div class="flex items-baseline gap-2">
+        <dt class="text-sm text-muted">{{ _("Earned") }}</dt>
+        <dd class="text-xl font-semibold tabular-nums" data-kpi="earned">{{ k.earned }}</dd>
+      </div>
+    </dl>
+    <svg class="mt-2 h-6 w-full overflow-visible" viewBox="0 0 {{ n }} 24" preserveAspectRatio="none" aria-hidden="true" focusable="false" data-flow-bar>
+      {% if f.empty %}
+      <rect x="0" y="0" width="{{ n }}" height="24" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke" data-flow-segment="empty"></rect>
+      {% else %}
+      <defs>
+        <pattern id="flow-overspend-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect x="0" y="0" width="8" height="8" class="fill-danger-tint"></rect>
+          <rect x="0" y="0" width="4" height="8" class="fill-danger"></rect>
+        </pattern>
+      </defs>
+      {% if f.spent_end > 0 %}<rect x="0" y="0" width="{{ f.spent_end }}" height="24" class="fill-danger stroke-surface" {{ seg|safe }} data-flow-segment="spent"></rect>{% endif %}
+      {% if f.saved_end > f.spent_end %}<rect x="{{ f.spent_end }}" y="0" width="{{ f.saved_end - f.spent_end }}" height="24" class="fill-primary stroke-surface" {{ seg|safe }} data-flow-segment="saved"></rect>{% endif %}
+      {% if f.left > 0 %}<rect x="{{ f.saved_end }}" y="0" width="{{ f.left }}" height="24" class="fill-success stroke-surface" {{ seg|safe }} data-flow-segment="left"></rect>{% endif %}
+      {% if f.overspent > 0 %}
+      <rect x="{{ f.earned_end }}" y="0" width="{{ f.overspent }}" height="24" fill="url(#flow-overspend-hatch)" class="stroke-surface" {{ seg|safe }} data-flow-segment="overspent"></rect>
+      <line x1="{{ f.earned_end }}" x2="{{ f.earned_end }}" y1="-4" y2="28" class="stroke-ink" stroke-width="3" vector-effect="non-scaling-stroke" data-flow-earned></line>
+      {% endif %}
+      {% endif %}
+    </svg>
+    <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3" aria-hidden="true">
+      {{ legend_item(_("Spent"), k.spent, "spent", "bg-danger") }}
+      {{ legend_item(_("Saved / invested"), k.saved, "saved", "bg-primary") }}
+      {% if k.net_tone == "unfavourable" %}
+      {{ legend_item(_("Left"), k.net, "net", "border-2 border-danger bg-danger-tint", "text-danger") }}
+      {% else %}
+      {{ legend_item(_("Left"), k.net, "net", "bg-success", "text-success-strong" if k.net_tone == "favourable" else "") }}
+      {% endif %}
+    </dl>
+    {% if k.savings_rate is not none %}
+    {% set rate %}<span class="font-semibold tabular-nums text-ink" data-kpi="savings-rate">{{ k.savings_rate }}</span>{% endset %}
+    <p class="mt-2 text-sm text-muted" data-savings-rate>{{ _("Saved / invested %(rate)s of income", rate=rate) }}</p>
+    {% endif %}
+  </div>
+  <div class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
     {% for b in summary.bars %}
+    {% set fill = "fill-danger" if b.over and b.key == "expense" else ("fill-success" if b.over else "fill-primary") %}
     <div data-summary-bar="{{ b.key }}">
       <p class="text-xs text-muted">{% if b.key == "expense" %}{{ _("Spent %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% else %}{{ _("Earned %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% endif %}{% if b.over %} <span class="{% if b.key == "expense" %}text-danger{% else %}text-success-strong{% endif %}">{{ _("(over plan)") }}</span>{% endif %}</p>
-      <svg class="mt-1 h-3 w-full" viewBox="0 0 100 6" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        <rect x="0" y="0" width="100" height="6" class="fill-subtle"></rect>
-        <rect x="0" y="0" width="{{ b.planned_width }}" height="6" class="fill-line-strong" data-bar-planned></rect>
-        <rect x="0" y="1.5" width="{{ b.actual_width }}" height="3" class="{% if b.over and b.key == "expense" %}fill-danger{% else %}fill-primary{% endif %}" data-bar-actual></rect>
+      <svg class="mt-1.5 h-4 w-full overflow-visible" viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <rect x="0" y="3" width="100" height="10" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke" data-bar-track></rect>
+        <rect x="0" y="3" width="{{ b.actual_width }}" height="10" class="{{ fill }}" data-bar-actual></rect>
+        {% if b.has_plan %}<line x1="{{ b.planned_width }}" x2="{{ b.planned_width }}" y1="0" y2="16" class="stroke-ink" stroke-width="3" vector-effect="non-scaling-stroke" data-bar-planned></line>{% endif %}
       </svg>
     </div>
     {% endfor %}
   </div>
+  {% if summary.bars|selectattr("has_plan")|list %}
+  <p class="flex items-center gap-2 text-xs text-muted" aria-hidden="true"><span class="inline-block h-3.5 w-[3px] bg-ink"></span>{{ _("Planned") }}</p>
+  {% endif %}
 </div>
 {%- endmacro %}
 

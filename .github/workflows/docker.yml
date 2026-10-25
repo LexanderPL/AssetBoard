@@ -100,7 +100,7 @@ jobs:
         shell: bash
         run: |
           changed_files=$(git diff --name-only "origin/${BASE_REF}...HEAD")
-          if grep -Eq '^(Dockerfile|\.dockerignore|Makefile|pyproject\.toml|uv\.lock)$' <<< "$changed_files"; then
+          if grep -Eq '^(Dockerfile|\.dockerignore|Makefile|hatch_build\.py|pyproject\.toml|uv\.lock)$' <<< "$changed_files"; then
             echo 'needed=true' >> "$GITHUB_OUTPUT"
             echo 'Arm64 build required for changed build inputs.'
           else

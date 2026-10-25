@@ -19,17 +19,16 @@ from assetboard.db.engine import is_database_locked, run_immediate
 from assetboard.db.models.identity import User
 from assetboard.domain.identity import MAX_EMAIL_LENGTH, InvalidEmail
 from assetboard.i18n import gettext
+from assetboard.services.account_email import password_reset_available
 from assetboard.services.auth import (
     MAX_NAME_LENGTH,
     MAX_PASSWORD_LENGTH,
     AuthError,
-    RegistrationDisabled,
     SetupAlreadyCompleted,
     WebSession,
     authenticate_user_async,
     change_password_async,
     create_session_for,
-    register_user_async,
     revoke_other_sessions,
     revoke_session,
     run_initial_setup_async,
@@ -38,6 +37,7 @@ from assetboard.services.auth import (
     user_has_password,
     verify_setup_token,
 )
+from assetboard.services.instance_settings import registration_open
 from assetboard.services.profile import ConfirmMethod
 from assetboard.web.confirm import confirm_view, refusal, run_confirmed
 from assetboard.web.errors import error_response, is_htmx_fragment_request
@@ -323,7 +323,7 @@ def _login_error(request: Request, *, error: bool, throttled_until: datetime | N
     return _t(request, LOGIN_FAILED) if error else None
 
 
-def _login_page(
+async def _login_page(
     request: Request,
     *,
     email: str = "",
@@ -333,7 +333,15 @@ def _login_page(
     status: int = 200,
     break_glass: bool = False,
 ) -> Response:
-    settings = _state(request).settings
+    state = _state(request)
+    settings = state.settings
+    password_login = break_glass or not settings.oidc_only
+
+    def open_registration() -> bool:
+        with state.session_factory() as session:
+            return registration_open(session, settings)
+
+    registration = not break_glass and await run_in_threadpool(open_registration)
     # Break-glass shows only the password form; OIDC_ONLY shows only the provider's button.
     oidc = settings.oidc_enabled and not break_glass
     proxy = proxy_request(request)
@@ -345,8 +353,9 @@ def _login_page(
             "email": email,
             "next_path": safe_next(next_path, default=""),
             "error": _login_error(request, error=error, throttled_until=throttled_until),
-            "registration_enabled": settings.allow_registration and not break_glass,
-            "password_login": break_glass or not settings.oidc_only,
+            "registration_enabled": registration,
+            "password_login": password_login,
+            "forgot_password": not break_glass and password_reset_available(settings),
             "form_action": "login_local" if break_glass else "login",
             "oidc_provider": settings.oidc_provider_name if oidc else None,
             "oidc_start_url": oidc_start_url(safe_next(next_path, default="")) if oidc else None,
@@ -364,16 +373,22 @@ def _login_page(
 async def login_form(request: Request, next: str = "") -> Response:  # noqa: A002
     if web_session(request) is not None:
         return RedirectResponse(safe_next(next), status_code=303)
-    return _login_page(request, next_path=next)
+    return await _login_page(request, next_path=next)
 
 
 async def _password_sign_in(
-    request: Request, email: str, password: str, next_path: str, *, break_glass: bool
+    request: Request,
+    email: str,
+    password: str,
+    next_path: str,
+    *,
+    break_glass: bool,
+    second_factor: str = "",
 ) -> Response:
     state = _state(request)
     if len(email) > MAX_EMAIL_LENGTH or len(password) > MAX_PASSWORD_LENGTH:
         # Cannot be valid; same response as any failed login, without hashing or queries.
-        return _login_page(
+        return await _login_page(
             request,
             email=email[:MAX_EMAIL_LENGTH],
             next_path=next_path,
@@ -393,11 +408,12 @@ async def _password_sign_in(
         user_agent=_user_agent(request),
         existing_session_id=existing,
         require_instance_admin=break_glass,
+        second_factor=second_factor,
     )
     if not outcome.succeeded or outcome.session_id is None:
         # Throttled attempts keep the 401 that log-based tools count (ADR-0012), plus a
         # Retry-After; the page says how long to wait.
-        response = _login_page(
+        response = await _login_page(
             request,
             email=email,
             next_path=next_path,
@@ -423,10 +439,13 @@ async def login_submit(
     email: FormStr = "",
     password: FormStr = "",
     next: FormStr = "",  # noqa: A002
+    second_factor: FormStr = "",
 ) -> Response:
     if _state(request).settings.oidc_only:
         raise HTTPException(status_code=404)
-    return await _password_sign_in(request, email, password, next, break_glass=False)
+    return await _password_sign_in(
+        request, email, password, next, break_glass=False, second_factor=second_factor
+    )
 
 
 # Break-glass password sign-in for instance administrators under OIDC_ONLY (ADR-0014). Not
@@ -444,7 +463,7 @@ async def login_local_form(request: Request, next: str = "") -> Response:  # noq
     _require_break_glass(request)
     if web_session(request) is not None:
         return RedirectResponse(safe_next(next), status_code=303)
-    return _login_page(request, next_path=next, break_glass=True)
+    return await _login_page(request, next_path=next, break_glass=True)
 
 
 @router.post("/login/local")
@@ -453,9 +472,12 @@ async def login_local_submit(
     email: FormStr = "",
     password: FormStr = "",
     next: FormStr = "",  # noqa: A002
+    second_factor: FormStr = "",
 ) -> Response:
     _require_break_glass(request)
-    return await _password_sign_in(request, email, password, next, break_glass=True)
+    return await _password_sign_in(
+        request, email, password, next, break_glass=True, second_factor=second_factor
+    )
 
 
 @router.post("/logout", name="logout")
@@ -502,121 +524,6 @@ async def logout(request: Request) -> Response:
         response = RedirectResponse("/login", status_code=303)
     clear_session_cookie(response, state.settings)
     return response
-
-
-# Registration
-
-
-def _registration_enabled(request: Request) -> None:
-    if not _state(request).settings.allow_registration:
-        raise HTTPException(status_code=404)
-
-
-def _register_page(
-    request: Request,
-    *,
-    values: dict[str, str] | None = None,
-    errors: dict[str, str] | None = None,
-    notice: str | None = None,
-    status_code: int = 200,
-) -> Response:
-    return render_template(
-        request,
-        "auth/register.html",
-        context={
-            "values": {"email": "", "display_name": "", "workspace_name": ""} | (values or {}),
-            "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
-            "notice": _t(request, notice) if notice else None,
-        },
-        status_code=status_code,
-    )
-
-
-@router.get("/register", name="register")
-async def register_form(request: Request) -> Response:
-    _registration_enabled(request)
-    if web_session(request) is not None:
-        return RedirectResponse("/", status_code=303)
-    return _register_page(request)
-
-
-@router.post("/register")
-async def register_submit(
-    request: Request,
-    email: FormStr = "",
-    display_name: FormStr = "",
-    password: FormStr = "",
-    workspace_name: FormStr = "",
-) -> Response:
-    _registration_enabled(request)
-    state = _state(request)
-    values = {"email": email, "display_name": display_name, "workspace_name": workspace_name}
-    long_field = too_long(
-        {
-            "email": (email, MAX_EMAIL_LENGTH),
-            "display_name": (display_name, MAX_NAME_LENGTH),
-            "workspace_name": (workspace_name, MAX_NAME_LENGTH),
-            "password": (password, MAX_PASSWORD_LENGTH),
-        }
-    )
-    if long_field:
-        return _register_page(
-            request, values=values, errors={long_field: ERROR_MESSAGES["too_long"]}, status_code=400
-        )
-    host = client_host(request)
-    try:
-        outcome = await register_user_async(
-            state.session_factory,
-            state.hash_gate,
-            email=email,
-            display_name=display_name,
-            password=password,
-            workspace_name=workspace_name,
-            settings=state.settings,
-            clock=state.clock,
-            host=host,
-            user_agent=_user_agent(request),
-            workspace_locale=request.state.locale,
-            seed_locale=request.state.locale,
-        )
-    except RegistrationDisabled as exc:
-        raise HTTPException(status_code=404) from exc
-    if outcome.status == "throttled":
-        return _register_page(
-            request,
-            values=values,
-            notice=_("Too many registration attempts from your network. Try again later."),
-            status_code=429,
-        )
-    if outcome.status == "rejected":
-        return _register_page(
-            request,
-            values=values,
-            errors={"email": _("This email address cannot be registered.")},
-            status_code=400,
-        )
-    if outcome.status == "invalid" or outcome.user is None:
-        code = outcome.error.code if outcome.error else ""
-        return _register_page(
-            request,
-            values=values,
-            errors={
-                ERROR_FIELDS.get(code, "email"): ERROR_MESSAGES.get(code, ERROR_MESSAGES["invalid"])
-            },
-            status_code=400,
-        )
-    user_id = outcome.user.id
-    session_id, expires_at = await run_in_threadpool(
-        lambda: create_session_for(
-            state.session_factory,
-            user_id,
-            settings=state.settings,
-            clock=state.clock,
-            host=host,
-            user_agent=_user_agent(request),
-        )
-    )
-    return signed_in_redirect(request, "/", session_id, expires_at)
 
 
 # Account security

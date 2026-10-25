@@ -76,6 +76,8 @@ def test_f21_categories_in_a_browser(tmp_path: Path) -> None:
             page.get_by_role("button", name="Create administrator").click()
             page.wait_for_url(f"{base}/")
 
+            page.locator("[data-user-menu] summary").click()  # Categories sit in the user menu
+
             page.locator("[data-categories-link]").click()
             page.wait_for_url(f"{base}/categories")
             # Setup gave the new workspace the suggested categories; nothing to click.

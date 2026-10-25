@@ -20,6 +20,70 @@ are on "Account security".
   (5 free, then the same pause); they never block signing in, and a correct password clears
   them.
 
+## Creating an account and forgotten passwords
+
+These need email, which your administrator sets up ([Email](deployment.md#email)).
+
+- **Create an account** (on the sign-in page, when an instance administrator turned open
+  registration on): enter your email address. The page always says "Check your inbox", whether
+  or not the address can be registered. The email holds a link, valid for 24 hours and usable
+  once, where you choose your display name, password and workspace name; the account and its
+  workspace are created only then, and you are signed in. If the address already has an
+  account, the email says so instead and links to sign-in and to "Forgot your password?".
+  Nothing arrived? Check your spam folder, or ask again a little later.
+- **Forgot your password?** (on the sign-in page): enter your email address. The page always
+  gives the same answer. If your account has a password, the email holds a link, valid for
+  60 minutes and usable once, to choose a new one; doing so signs out every device signed in to
+  your account, and you then sign in with the new password. It does not remove two-factor
+  authentication: you still need your authenticator or a recovery code. If your account signs in through
+  an identity provider or a proxy, the email says there is no password to reset.
+- At most 3 such emails are sent to one address per hour; further requests get the same answer
+  but no email. Changing your password, or an administrator deactivating the account, makes
+  every reset link sent earlier stop working.
+
+## Two-factor authentication
+
+Choose **Two-factor authentication** in your profile. Confirm your password, scan the QR code
+with an authenticator app (or enter its manual key), then enter a six-digit code within ten
+minutes. Nothing is enabled until that code succeeds. Enrollment ends other password sessions.
+Save the ten recovery codes shown on completion: this is the only time they are displayed.
+Each code can replace the authenticator code for one sign-in. Store them separately from your
+password. The enrollment code has already been used; wait for the next code before signing in
+on another device.
+
+After enrollment, enter your password and an authenticator or recovery code on the sign-in
+form, including the emergency local administrator login. Missing, invalid, expired or reused
+codes show the same generic failure as an incorrect password; code attempts are throttled.
+When linking a new identity provider or proxy identity by email during sign-in, enter the code
+alongside the existing account's password too. Already-linked external sign-ins rely on their
+provider's MFA instead. Accounts without passwords configure MFA at their identity provider.
+
+Workspace owners can select **Require two-factor authentication for password-based access to
+this workspace** in workspace settings. It applies to every member, including owners, and to
+existing password sessions immediately. To avoid locking yourself out, an owner signed in with a
+password must first enable two-factor authentication and sign in with it before turning this on. A member without verified enrollment is sent to the
+security page before accessing workspace data. They can still manage their account, enroll,
+sign out, or switch to an unrelated workspace. Other workspaces and OIDC/proxy sessions are
+unaffected.
+
+Disabling on the same security page requires your password and a current authenticator code or
+an unused recovery code; it removes the authenticator and all recovery codes, and signs out other password sessions. A workspace requiring MFA stays protected
+and will ask you to enroll again. To replace a lost authenticator, sign in with a recovery code,
+disable, then enroll the replacement. You can also generate a replacement set of recovery codes
+on the security page; confirm your password and enter your current authenticator code or an
+unused recovery code. This immediately invalidates every previous recovery code, and the new
+codes are shown only once. Recovery codes are shown in groups such as `1a2b-3c4d-…`; you can
+type them with or without the dashes.
+
+If you lose your authenticator and every recovery code, contact an instance administrator. In
+**Users**, the administrator can reset your two-factor authentication after confirming their own
+account. This removes your authenticator and recovery codes and ends all your sessions. You can
+then sign in with your password and enroll again; a workspace that requires two-factor
+authentication remains inaccessible until you do. Administrators cannot use this action on
+their own account; use the account security page instead. An operator with shell access can
+also run `assetboard reset-mfa <email>` (see [administrator commands](deployment.md#administrator-commands)).
+A CLI password reset does not remove your second factor.
+
 ## Details, language and theme
 
 - **Display name**: 1 to 120 characters, no control or invisible characters.
@@ -91,7 +155,7 @@ if your account has none.
 
 Any signed-in account can create a workspace and becomes its owner, unless an instance
 administrator has turned this off. "Create workspace" appears on the "No workspace" page, and
-"New workspace" next to the workspace name at the top of every workspace page. The form asks
+"New workspace" in the account menu (bottom left) and on the workspace settings page. The form asks
 for the same details as first-run setup: a name (your display name unless you change it),
 base currency, country, time zone and language. The new workspace starts with the suggested
 categories in your language ([categories](categories.md#suggested-categories)), and you switch
@@ -100,11 +164,17 @@ to it straight away. Its log records "Workspace created".
 **Instance settings** (instance administrators, "Instance settings" in the account menu or on
 the Users page): "Who can create workspaces" is "Every signed-in user" (the default) or "Only
 instance administrators". Instance administrators can always create workspaces. The setting
-does not affect open registration (`ASSETBOARD_ALLOW_REGISTRATION`) or accounts created at the
+does not affect open registration or accounts created at the
 first sign-in through an identity provider or a proxy (`ASSETBOARD_OIDC_AUTO_CREATE`,
 `ASSETBOARD_PROXY_AUTH_AUTO_CREATE`): those keep creating their own workspace. A change is
 confirmed like the other administrator actions and appears in the instance audit log
 ("Instance settings changed").
+
+"Open registration" (Instance settings, off by default) lets anyone create an account with an
+email address they confirm through a link (see above); each such account gets its own
+workspace. It can be turned on only when email is set up and password sign-in is not turned off
+(`ASSETBOARD_OIDC_ONLY`); the page says why when it cannot. Accounts from invitations, identity
+providers, the proxy or an administrator do not depend on it.
 
 ## Audit log
 

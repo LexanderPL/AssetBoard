@@ -25,7 +25,7 @@ networth_t = net_0 + gain_0                            (t = 0)
 Computed outputs: **FIRE age/year** = first row where `expenses_t < gain_t` (returns cover inflated expenses); **% achieved (sheet definition)** = `networth_0 / networth_at_FIRE_row`.
 
 **Data model (sketch)**
-- `FireScenario(id, workspace_id, name, birth_year, start_year, inflation_bp, real_return_bp, income_growth_bp, stop_working_age, horizon_age (default 95), rule[returns_cover_expenses|swr], swr_bp?, income_mode[manual|trailing_12m], income_manual?, expenses_mode[manual|trailing_12m], expenses_manual?, portfolio_mode[manual|linked_investable], portfolio_manual?, is_default, archived_at)`
+- `FireScenario(id, workspace_id, name, birth_year, start_year, inflation_bp, real_return_bp, income_growth_bp, stop_working_age, horizon_age (default: the profile's life_expectancy, 90 if unset — owner decision 2026-10), rule[returns_cover_expenses|swr], swr_bp?, income_mode[manual|trailing_12m], income_manual?, expenses_mode[manual|trailing_12m], expenses_manual?, portfolio_mode[manual|linked_investable], portfolio_manual?, is_default, archived_at)`
 - `FireContribution(scenario_id, year, net_amount Money)` — explicit yearly net-savings overrides.
 - `FireEvent(scenario_id, year, kind[cash|expense_change|income_change], amount Money, label)` — `cash`: one-off added to net worth in that year; `expense_change` / `income_change`: annual change from that year onward, entered in today's money and inflated/grown like the base series.
 

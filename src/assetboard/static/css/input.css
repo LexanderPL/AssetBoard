@@ -27,10 +27,12 @@
     --color-success-soft: 232 245 233; /* #e8f5e9 */
     --color-success-strong: 27 94 32; /* #1b5e20 */
     --color-success-line: 200 230 201; /* #c8e6c9 */
+    --color-success-tint: 212 237 213; /* #d4edd5 summary row: income above plan */
     --color-danger: 198 40 40; /* #c62828 expense, errors */
     --color-danger-soft: 255 235 238; /* #ffebee */
     --color-danger-strong: 183 28 28; /* #b71c1c */
     --color-danger-line: 255 205 210; /* #ffcdd2 */
+    --color-danger-tint: 254 225 228; /* #fee1e4 summary row: expense above plan */
     --color-warning-soft: 255 243 224; /* #fff3e0 */
     --color-warning-strong: 138 75 0; /* #8a4b00 */
     --color-warning-line: 255 224 178; /* #ffe0b2 */
@@ -60,10 +62,12 @@
     --color-success-soft: 19 42 23; /* #132a17 */
     --color-success-strong: 165 214 167; /* #a5d6a7 */
     --color-success-line: 31 68 36; /* #1f4424 */
+    --color-success-tint: 24 58 29; /* #183a1d */
     --color-danger: 239 154 154; /* #ef9a9a */
     --color-danger-soft: 59 20 22; /* #3b1416 */
     --color-danger-strong: 255 205 210; /* #ffcdd2 */
     --color-danger-line: 92 31 34; /* #5c1f22 */
+    --color-danger-tint: 85 28 32; /* #551c20 */
     --color-warning-soft: 58 42 12; /* #3a2a0c */
     --color-warning-strong: 255 204 128; /* #ffcc80 */
     --color-warning-line: 90 65 19; /* #5a4113 */

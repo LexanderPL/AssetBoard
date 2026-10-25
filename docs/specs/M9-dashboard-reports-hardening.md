@@ -12,6 +12,11 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 
 ## F9.1 Dashboard
 
+**After F2.7 (owner, 2026-10-25):** the dashboard is the Home page (`/`) built in F2.7, which
+already shows the current month (flow bar, category donuts) and upcoming items. F9.1 adds the
+remaining module cards, hiding/reordering and privacy mode to that page; the "This month" and
+"Upcoming" cards are F2.7's blocks, not new ones.
+
 **Acceptance**
 - Cards (each links to its module and can be hidden/reordered per user): **This month** (planned vs actual, savings rate, forecast); **Upcoming 30 days** (with overdue highlighted and one-click confirm); **Net worth** (value + 12-month trend); **Portfolio** (value, gain %, allocation mini-donut); **Loans** (remaining principal, payoff date, % repaid); **FIRE** (progress, FIRE age of the default scenario); **Missing data** (stale prices, missing work logs, imports planned but not applied).
 - Cards degrade gracefully when a module has no data ("Set up investments →").
@@ -30,10 +35,15 @@ Tests: each card renders with data and without; preferences persist per user and
 
 ## F9.2 Reports
 
+**Changed (owner, 2026-10-25):** reports have their own milestone,
+[M10-reports.md](M10-reports.md), whose Phase A can ship before M5/M6. "Income vs expenses vs
+saved per month and per year" and the savings-rate trend moved to F10.1 and F10.2, and
+expenses by category over time to F10.3. The reports left here are added as sections of M10's
+`/reports` page, with its filters and aggregation rules.
+
 **Acceptance**
 - **Year overview:** grid of categories × months (actual), totals per row/column, year selector; heat-shading; CSV export.
-- **Category trends:** monthly series per selected categories, rolling 3/12-month averages.
-- **Income vs expenses vs saved** per month and per year; savings-rate trend.
+- **Category trends:** rolling 3/12-month averages on top of F10.3's category series.
 - **Year-over-year** comparison for a category or total.
 - **Planned vs actual accuracy:** how often each category exceeded its plan.
 - All reports are pure query + domain functions, paginated/streamed where large, respect closed/open months equally, and exclude `transfer` categories.
@@ -42,7 +52,7 @@ Tests: each card renders with data and without; preferences persist per user and
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
-Implement F9.2 from docs/specs/M9-dashboard-reports-hardening.md: the five reports with domain aggregation functions, URL-addressable filters, CSV export.
+Implement F9.2 from docs/specs/M9-dashboard-reports-hardening.md: the four remaining reports as sections of M10's /reports page, with domain aggregation functions, URL-addressable filters, CSV export.
 Property tests: grid totals equal transaction sums; treatment rules respected. Include an EXPLAIN-based index review in the PR.
 ```
 

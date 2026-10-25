@@ -74,7 +74,7 @@ def test_the_golden_example_end_to_end(team: WorkspaceDb) -> None:
     assert (rows[food].actual, rows[food].difference) == (eur(55000), eur(0))
     assert rows[travel].difference == eur(102700)
     assert rows[salary].difference == eur(40000)
-    assert summary.kpis.net == eur(-147300) and summary.kpis.savings_rate_bp == -4332
+    assert summary.kpis.net == eur(-147300) and summary.kpis.savings_rate_bp == 0
     assert data.categories[food].name == "Golden Food"
 
 

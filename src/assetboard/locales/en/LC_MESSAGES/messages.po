@@ -121,6 +121,24 @@ msgstr ""
 msgid "Enter a valid amount."
 msgstr ""
 
+msgid "Recurring item created"
+msgstr ""
+
+msgid "Recurring item updated"
+msgstr ""
+
+msgid "Recurring item paused"
+msgstr ""
+
+msgid "Recurring item resumed"
+msgstr ""
+
+msgid "Recurring item archived"
+msgstr ""
+
+msgid "Recurring item deleted"
+msgstr ""
+
 msgid "First administrator created at setup"
 msgstr ""
 
@@ -128,6 +146,9 @@ msgid "Administrator created on the command line"
 msgstr ""
 
 msgid "Password reset on the command line"
+msgstr ""
+
+msgid "Two-factor authentication reset on the command line"
 msgstr ""
 
 msgid "Signed in"
@@ -143,6 +164,21 @@ msgid "Account registered"
 msgstr ""
 
 msgid "Password changed"
+msgstr ""
+
+msgid "Password reset link sent"
+msgstr ""
+
+msgid "Password reset by email"
+msgstr ""
+
+msgid "Two-factor authentication enabled"
+msgstr ""
+
+msgid "Two-factor authentication disabled"
+msgstr ""
+
+msgid "Two-factor recovery codes regenerated"
 msgstr ""
 
 msgid "Password confirmation failed"
@@ -181,10 +217,16 @@ msgstr ""
 msgid "Account deactivated"
 msgstr ""
 
+msgid "Two-factor authentication reset by an administrator"
+msgstr ""
+
 msgid "Workspace settings changed"
 msgstr ""
 
 msgid "Workspace created"
+msgstr ""
+
+msgid "Workspace deleted"
 msgstr ""
 
 msgid "Instance settings changed"
@@ -242,6 +284,9 @@ msgid "Transaction deleted"
 msgstr ""
 
 msgid "Deleted transaction restored"
+msgstr ""
+
+msgid "Category of several transactions changed"
 msgstr ""
 
 msgid "Planned value added"
@@ -340,6 +385,9 @@ msgstr ""
 msgid "Every signed-in user can create workspaces"
 msgstr ""
 
+msgid "Open registration"
+msgstr ""
+
 msgid "Month"
 msgstr ""
 
@@ -367,6 +415,12 @@ msgstr ""
 msgid "Currency"
 msgstr ""
 
+msgid "Previous categories"
+msgstr ""
+
+msgid "Months"
+msgstr ""
+
 msgid "Copied from"
 msgstr ""
 
@@ -386,6 +440,9 @@ msgid "viewer"
 msgstr ""
 
 msgid "not an instance administrator"
+msgstr ""
+
+msgid "second factor not verified"
 msgstr ""
 
 msgid "no account for this sign-in"
@@ -458,6 +515,9 @@ msgid "the profile"
 msgstr ""
 
 msgid "an invitation"
+msgstr ""
+
+msgid "a confirmed email address"
 msgstr ""
 
 msgid "an invitation, through the identity provider"
@@ -592,6 +652,29 @@ msgstr ""
 msgid "Instance settings"
 msgstr ""
 
+msgid "Deleted workspaces"
+msgstr ""
+
+#, python-format
+msgid "Confirm your email address for %(app)s"
+msgstr ""
+
+#, python-format
+msgid "You already have an account at %(app)s"
+msgstr ""
+
+#, python-format
+msgid "Reset your %(app)s password"
+msgstr ""
+
+#, python-format
+msgid "About your %(app)s password"
+msgstr ""
+
+#, python-format
+msgid "Test email from %(app)s"
+msgstr ""
+
 msgid "Same as the system"
 msgstr ""
 
@@ -668,6 +751,9 @@ msgstr ""
 msgid "Remove instance administrator"
 msgstr ""
 
+msgid "Reset two-factor authentication"
+msgstr ""
+
 #, python-format
 msgid "%(user)s can sign in again."
 msgstr ""
@@ -686,6 +772,13 @@ msgstr ""
 msgid "%(user)s can no longer manage accounts on this instance."
 msgstr ""
 
+#, python-format
+msgid ""
+"Remove %(user)s's authenticator and recovery codes, end every session, "
+"and require them to enroll again before accessing workspaces that require"
+" two-factor authentication."
+msgstr ""
+
 msgid "Done."
 msgstr ""
 
@@ -695,6 +788,11 @@ msgstr ""
 msgid ""
 "You cannot deactivate your own account or remove your own administrator "
 "role."
+msgstr ""
+
+msgid ""
+"Use your own account security page to manage your two-factor "
+"authentication."
 msgstr ""
 
 msgid "This is the last active administrator, so this would leave none."
@@ -711,7 +809,15 @@ msgstr ""
 msgid "Nothing to change: the settings already had these values."
 msgstr ""
 
-msgid "Choose who can create workspaces."
+msgid "Open registration needs an email server: set ASSETBOARD_SMTP_HOST first."
+msgstr ""
+
+msgid ""
+"Open registration is not available while only the identity provider signs"
+" people in (ASSETBOARD_OIDC_ONLY)."
+msgstr ""
+
+msgid "Choose a value for each setting."
 msgstr ""
 
 msgid "Enter a valid email address."
@@ -786,12 +892,6 @@ msgid "Setup was already completed, or is being completed. Reload to continue."
 msgstr ""
 
 msgid "Setup in progress"
-msgstr ""
-
-msgid "Too many registration attempts from your network. Try again later."
-msgstr ""
-
-msgid "This email address cannot be registered."
 msgstr ""
 
 msgid ""
@@ -877,6 +977,40 @@ msgid ""
 "sign-in from the last 10 minutes."
 msgstr ""
 
+msgid "Check your inbox"
+msgstr ""
+
+msgid ""
+"If this address can be registered, we sent it a link to finish creating "
+"your account. The link works for 24 hours. Nothing arrived? Check your "
+"spam folder, or ask again later."
+msgstr ""
+
+msgid ""
+"If an account uses this address, we sent it an email with the next step. "
+"A password reset link works for 60 minutes. Nothing arrived? Check your "
+"spam folder, or ask again later."
+msgstr ""
+
+msgid "Link not valid"
+msgstr ""
+
+msgid ""
+"This link is not valid: it may have expired or been used already. Ask for"
+" a new one."
+msgstr ""
+
+msgid ""
+"Your password was changed, and every device signed in to this account was"
+" signed out. Sign in with the new password."
+msgstr ""
+
+msgid "Too many registration attempts from your network. Try again later."
+msgstr ""
+
+msgid "Too many requests from your network. Try again later."
+msgstr ""
+
 msgid "This request came from another site and was blocked."
 msgstr ""
 
@@ -935,6 +1069,9 @@ msgid "Editor"
 msgstr ""
 
 msgid "Viewer"
+msgstr ""
+
+msgid "This email address cannot be registered."
 msgstr ""
 
 msgid ""
@@ -1150,12 +1287,196 @@ msgid ""
 "address (%(base_url)s), allow cookies for it, and try again."
 msgstr ""
 
+msgid "Enter a name."
+msgstr ""
+
+msgid "Choose an active category matching the direction."
+msgstr ""
+
+msgid "Enter a positive amount in the workspace currency."
+msgstr ""
+
+msgid "Enter a valid start date."
+msgstr ""
+
+msgid "Enter an end date on or after the start date, or leave it empty."
+msgstr ""
+
+msgid "Enter a whole number of 1 or more, or leave it empty."
+msgstr ""
+
+msgid "Enter a whole number of 1 or more."
+msgstr ""
+
+msgid "Choose at least one weekday for a weekly rule."
+msgstr ""
+
+msgid "This day does not exist in the chosen month."
+msgstr ""
+
+msgid "Choose a month."
+msgstr ""
+
+msgid ""
+"Holiday adjustments need a workspace country with holiday data, or no "
+"country."
+msgstr ""
+
+msgid "This recurring item is archived and cannot change."
+msgstr ""
+
+msgid ""
+"This item adjusts dates to working days, and the workspace country has no"
+" holiday data."
+msgstr ""
+
+msgid "The recurring item could not be saved. Check the form and try again."
+msgstr ""
+
+msgid "Monday"
+msgstr ""
+
+msgid "Tuesday"
+msgstr ""
+
+msgid "Wednesday"
+msgstr ""
+
+msgid "Thursday"
+msgstr ""
+
+msgid "Friday"
+msgstr ""
+
+msgid "Saturday"
+msgstr ""
+
+msgid "Sunday"
+msgstr ""
+
+msgid "Choose a valid tax effect and base."
+msgstr ""
+
+msgid "Enter a valid effective date between 1900 and 2199."
+msgstr ""
+
+msgid "Enter a non-negative percentage with at most two decimal places."
+msgstr ""
+
+msgid "Enter a non-negative fixed amount in the workspace currency."
+msgstr ""
+
+msgid "Enter a non-negative net amount in the workspace currency."
+msgstr ""
+
+msgid "A new version must start after the latest existing version."
+msgstr ""
+
+msgid "Archived tax rules cannot be changed."
+msgstr ""
+
+msgid "Choose how the income is recorded."
+msgstr ""
+
+msgid "The tax rule could not be saved. Check the form and try again."
+msgstr ""
+
+msgid "Cash received (gross)"
+msgstr ""
+
+msgid "Net"
+msgstr ""
+
+msgid "Take-home"
+msgstr ""
+
 msgid "Too many attempts. Try again later."
 msgstr ""
 
 #, python-format
 msgid "Too many attempts. Try again in %(num)d minute."
 msgid_plural "Too many attempts. Try again in %(num)d minutes."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "The code is not valid or enrollment has expired."
+msgstr ""
+
+msgid "Enter a date such as 2026-10-07 or 07.10.2026."
+msgstr ""
+
+msgid "The end date is before the start date."
+msgstr ""
+
+msgid "Choose expenses, income or both."
+msgstr ""
+
+msgid "The amount cannot be negative."
+msgstr ""
+
+msgid "The largest amount is below the smallest."
+msgstr ""
+
+msgid "Choose one of the listed options."
+msgstr ""
+
+msgid ""
+"A decimal comma needs the semicolon delimiter, so that amounts stay one "
+"column."
+msgstr ""
+
+msgid "Select at least one entry."
+msgstr ""
+
+#, python-format
+msgid ""
+"Too many entries for one change (at most %(max)d). Narrow the filters "
+"first."
+msgstr ""
+
+#, python-format
+msgid ""
+"Too many ticked entries (at most %(max)d at a time). Tick fewer, or "
+"change all matching entries."
+msgstr ""
+
+msgid "Choose an active category."
+msgstr ""
+
+msgid ""
+"Choose a category of the same kind as the entries. To change expenses and"
+" income, filter by one of them first."
+msgstr ""
+
+msgid ""
+"The entries changed after you reviewed the change. Nothing was changed; "
+"review it again."
+msgstr ""
+
+#, python-format
+msgid ""
+"Nothing was changed: some entries are in closed months (%(months)s). An "
+"owner can reopen them."
+msgstr ""
+
+msgid "Correct the marked filters to see the entries."
+msgstr ""
+
+msgid "Newest first"
+msgstr ""
+
+msgid "Oldest first"
+msgstr ""
+
+msgid "Largest amount first"
+msgstr ""
+
+msgid "Smallest amount first"
+msgstr ""
+
+#, python-format
+msgid "Category changed for %(num)d entry."
+msgid_plural "Category changed for %(num)d entries."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -1171,6 +1492,30 @@ msgstr ""
 msgid "Not saved"
 msgstr ""
 
+msgid "Enter a valid date between 1900 and 2199."
+msgstr ""
+
+msgid "This month is closed. Reopen it or choose a date in an open month."
+msgstr ""
+
+msgid "This occurrence is no longer pending."
+msgstr ""
+
+msgid "This occurrence has no transaction to undo."
+msgstr ""
+
+msgid "The 10-second undo window has expired."
+msgstr ""
+
+msgid "The occurrence category is unavailable; edit the recurring rule."
+msgstr ""
+
+msgid "Check the amount and date, then try again."
+msgstr ""
+
+msgid "Choose a valid direction."
+msgstr ""
+
 msgid "Choose a supported currency."
 msgstr ""
 
@@ -1180,10 +1525,22 @@ msgstr ""
 msgid "Choose a country from the list."
 msgstr ""
 
+msgid ""
+"Holiday data is not available for this country, and recurring items "
+"adjust dates to working days. Change those items to keep their dates, or "
+"choose another country."
+msgstr ""
+
 msgid "Choose a time zone from the list."
 msgstr ""
 
 msgid "Choose a supported language."
+msgstr ""
+
+msgid ""
+"Enable two-factor authentication for your own account and sign in with it"
+" before requiring it for this workspace; otherwise you would lock "
+"yourself out."
 msgstr ""
 
 msgid "A workspace needs at least one owner. Make another member an owner first."
@@ -1209,6 +1566,15 @@ msgstr ""
 msgid "Workspace settings saved."
 msgstr ""
 
+msgid "Type the workspace name exactly as shown to confirm."
+msgstr ""
+
+msgid ""
+"Your current workspace changed since this page was opened (in another "
+"tab, or it was already deleted). Nothing was deleted. Check the workspace"
+" named below and confirm again."
+msgstr ""
+
 msgid "Home"
 msgstr ""
 
@@ -1216,6 +1582,9 @@ msgid "Main navigation"
 msgstr ""
 
 msgid "Recurring"
+msgstr ""
+
+msgid "Upcoming"
 msgstr ""
 
 msgid "Net worth"
@@ -1234,6 +1603,9 @@ msgid "Your account"
 msgstr ""
 
 msgid "Audit log: workspace"
+msgstr ""
+
+msgid "New workspace"
 msgstr ""
 
 msgid "Users"
@@ -1264,9 +1636,6 @@ msgid "Workspace"
 msgstr ""
 
 msgid "Switch"
-msgstr ""
-
-msgid "New workspace"
 msgstr ""
 
 msgid "Are you sure?"
@@ -1348,6 +1717,9 @@ msgstr ""
 msgid "This account has no password. You can still sign out other devices."
 msgstr ""
 
+msgid "Two-factor authentication"
+msgstr ""
+
 msgid "Sign-in methods"
 msgstr ""
 
@@ -1383,6 +1755,67 @@ msgstr ""
 msgid "Link this proxy sign-in"
 msgstr ""
 
+msgid ""
+"Protect password sign-ins with an authenticator app. A workspace owner "
+"may require this for access. Identity provider and proxy sign-ins use "
+"their provider's security instead."
+msgstr ""
+
+msgid "Save your recovery codes"
+msgstr ""
+
+msgid ""
+"These ten codes are shown only once. Store them safely. Each replaces an "
+"authenticator code for one sign-in."
+msgstr ""
+
+msgid "Two-factor authentication is enabled."
+msgstr ""
+
+msgid ""
+"Replace all recovery codes if they are lost or exposed. Your current "
+"password and authenticator or an unused recovery code are both required. "
+"Existing recovery codes stop working immediately."
+msgstr ""
+
+msgid "Authenticator or recovery code"
+msgstr ""
+
+msgid "Generate new recovery codes"
+msgstr ""
+
+msgid "Disable two-factor authentication"
+msgstr ""
+
+msgid "Scan with your authenticator app"
+msgstr ""
+
+msgid "Authenticator enrollment QR code"
+msgstr ""
+
+msgid "Or enter this key manually:"
+msgstr ""
+
+msgid "Enter a six-digit code to finish enrollment within ten minutes."
+msgstr ""
+
+msgid "Authenticator code"
+msgstr ""
+
+msgid "Enable two-factor authentication"
+msgstr ""
+
+msgid "Set up two-factor authentication"
+msgstr ""
+
+msgid ""
+"This account signs in through an identity provider or proxy. Configure "
+"multi-factor authentication there."
+msgstr ""
+
+msgid "Required only if your account has two-factor authentication enabled."
+msgstr ""
+
 msgid "Back to users"
 msgstr ""
 
@@ -1402,6 +1835,23 @@ msgid ""
 "Whoever creates a workspace becomes its owner. This does not affect open "
 "registration or accounts created at the first sign-in through an identity"
 " provider or a proxy: those follow their own settings."
+msgstr ""
+
+msgid "Registration"
+msgstr ""
+
+msgid "Off: accounts come from invitations, administrators or sign-in providers"
+msgstr ""
+
+msgid "On: anyone can register with a verified email address"
+msgstr ""
+
+msgid ""
+"A new account must confirm its email address through a link before it is "
+"created, and gets its own workspace."
+msgstr ""
+
+msgid "Registration stays closed until this is fixed."
 msgstr ""
 
 msgid "Save settings"
@@ -1542,6 +1992,23 @@ msgstr ""
 msgid "Older"
 msgstr ""
 
+msgid "Sign in"
+msgstr ""
+
+msgid "Back to sign in"
+msgstr ""
+
+msgid "Forgot your password?"
+msgstr ""
+
+msgid ""
+"Enter the email address of your account. We will send you a link to "
+"choose a new password."
+msgstr ""
+
+msgid "Send the link"
+msgstr ""
+
 msgid "Link your account"
 msgstr ""
 
@@ -1557,10 +2024,10 @@ msgstr ""
 msgid "This signs the account out on all other devices."
 msgstr ""
 
-msgid "Link and sign in"
+msgid "Leave blank if two-factor authentication is not enabled."
 msgstr ""
 
-msgid "Sign in"
+msgid "Link and sign in"
 msgstr ""
 
 #, python-format
@@ -1619,10 +2086,25 @@ msgstr ""
 msgid "Sign out other devices"
 msgstr ""
 
-msgid "Workspace name"
+msgid ""
+"Enter your email address. We will send you a link to confirm it and "
+"finish creating your account."
 msgstr ""
 
 msgid "Already have an account?"
+msgstr ""
+
+#, python-format
+msgid "Your email address %(email)s is confirmed. Choose your name and password."
+msgstr ""
+
+msgid "Workspace name"
+msgstr ""
+
+msgid "Choose a new password"
+msgstr ""
+
+msgid "Every device signed in to this account will be signed out."
 msgstr ""
 
 msgid "First-run setup"
@@ -1728,6 +2210,65 @@ msgstr ""
 msgid "Delete"
 msgstr ""
 
+msgid "Hello,"
+msgstr ""
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to reset the password of your %(app)s "
+"account. To choose a new password, open this link:"
+msgstr ""
+
+msgid ""
+"The link works once, for 60 minutes. Choosing a new password signs out "
+"every device signed in to your account."
+msgstr ""
+
+msgid ""
+"If you did not ask for this, ignore this email: your password stays the "
+"same."
+msgstr ""
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to reset the password of your %(app)s "
+"account. Your account has no password: you sign in through your identity "
+"provider or your proxy, so there is nothing to reset here."
+msgstr ""
+
+msgid "Sign in:"
+msgstr ""
+
+msgid "If you did not ask for this, ignore this email: nothing was changed."
+msgstr ""
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to create an account at %(app)s with this "
+"email address. An account with this address already exists, so no new one"
+" was created."
+msgstr ""
+
+msgid "Forgot your password? Ask for a new one here:"
+msgstr ""
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to create an account at %(app)s with this "
+"email address. To confirm the address and finish creating your account, "
+"open this link:"
+msgstr ""
+
+msgid "The link works once, for 24 hours."
+msgstr ""
+
+msgid "If you did not ask for this, ignore this email: no account is created."
+msgstr ""
+
+#, python-format
+msgid "This is a test email from %(app)s. Your email settings work."
+msgstr ""
+
 msgid "Dismiss"
 msgstr ""
 
@@ -1795,6 +2336,9 @@ msgstr ""
 msgid "Choose a category"
 msgstr ""
 
+msgid "Automatically posted"
+msgstr ""
+
 msgid "archived"
 msgstr ""
 
@@ -1838,22 +2382,27 @@ msgstr ""
 msgid "Total"
 msgstr ""
 
+#, python-format
+msgid ""
+"Earned %(earned)s: spent %(spent)s, saved or invested %(saved)s, left "
+"%(net)s."
+msgstr ""
+
+#, python-format
+msgid "Spending and saving exceed earnings by %(amount)s."
+msgstr ""
+
 msgid "Earned"
 msgstr ""
 
 msgid "Spent"
 msgstr ""
 
-msgid "Saved"
+msgid "Left"
 msgstr ""
 
-msgid "Net"
-msgstr ""
-
-msgid "Savings rate"
-msgstr ""
-
-msgid "Not available: nothing earned"
+#, python-format
+msgid "Saved / invested %(rate)s of income"
 msgstr ""
 
 #, python-format
@@ -1865,6 +2414,9 @@ msgid "Earned %(actual)s of %(planned)s planned"
 msgstr ""
 
 msgid "(over plan)"
+msgstr ""
+
+msgid "Planned"
 msgstr ""
 
 msgid "Order"
@@ -1912,9 +2464,6 @@ msgstr ""
 msgid "Summary"
 msgstr ""
 
-msgid "Planned"
-msgstr ""
-
 msgid "Actual"
 msgstr ""
 
@@ -1930,9 +2479,6 @@ msgid "Add categories to plan this month."
 msgstr ""
 
 msgid "Closed"
-msgstr ""
-
-msgid "Months"
 msgstr ""
 
 #, python-format
@@ -1997,6 +2543,486 @@ msgstr ""
 msgid "Future months stay open for planning."
 msgstr ""
 
+msgid "Recurring item"
+msgstr ""
+
+msgid "Edit recurring item"
+msgstr ""
+
+msgid "New recurring item"
+msgstr ""
+
+msgid "Check the highlighted field."
+msgstr ""
+
+#, python-format
+msgid ""
+"The category %(name)s is archived, so this item creates no new dates. "
+"Choose an active category to save it."
+msgstr ""
+
+msgid "Amount type"
+msgstr ""
+
+msgid "Fixed"
+msgstr ""
+
+msgid "Estimate"
+msgstr ""
+
+msgid "Automatically post on the due date"
+msgstr ""
+
+msgid "Start date"
+msgstr ""
+
+msgid "End date (optional)"
+msgstr ""
+
+msgid "Maximum occurrences (optional)"
+msgstr ""
+
+msgid "Repeat"
+msgstr ""
+
+msgid "Weekly"
+msgstr ""
+
+msgid "Monthly"
+msgstr ""
+
+msgid "Yearly"
+msgstr ""
+
+msgid "Every N weeks, months or years"
+msgstr ""
+
+msgid "Weekdays (weekly rules)"
+msgstr ""
+
+msgid "Day (monthly or yearly rules)"
+msgstr ""
+
+msgid "Last day"
+msgstr ""
+
+msgid "First working day"
+msgstr ""
+
+msgid "Last working day"
+msgstr ""
+
+msgid "Month number (yearly rules)"
+msgstr ""
+
+msgid "Weekend and holiday adjustment"
+msgstr ""
+
+msgid "Keep the date"
+msgstr ""
+
+msgid "Previous working day"
+msgstr ""
+
+msgid "Next working day"
+msgstr ""
+
+msgid "Notes"
+msgstr ""
+
+msgid "Include past occurrences"
+msgstr ""
+
+msgid ""
+"Saving a rule creates planned occurrences, never transactions. Edits "
+"replace only pending dates from today onward."
+msgstr ""
+
+msgid "Save recurring item"
+msgstr ""
+
+msgid "Next six due dates"
+msgstr ""
+
+msgid ""
+"Enable JavaScript for the live preview. You can still save this form "
+"without it."
+msgstr ""
+
+msgid "Recurring items"
+msgstr ""
+
+msgid "Upcoming inbox"
+msgstr ""
+
+msgid "Archived"
+msgstr ""
+
+msgid "Paused"
+msgstr ""
+
+msgid "Edit rule"
+msgstr ""
+
+msgid "Resume"
+msgstr ""
+
+msgid "Pause"
+msgstr ""
+
+#, python-format
+msgid ""
+"Delete the recurring item %(name)s? Its pending dates are removed; with "
+"posted or skipped history it is archived instead."
+msgstr ""
+
+msgid "No recurring items yet."
+msgstr ""
+
+msgid ""
+"Pausing removes pending dates from today onward. Archiving or deleting "
+"removes all pending dates; posted and skipped dates are history and are "
+"kept, so deleting an item with history archives it instead. Dates in "
+"closed months never change."
+msgstr ""
+
+msgid "Choose valid recurrence dates to see the preview."
+msgstr ""
+
+msgid "No more occurrences match this rule."
+msgstr ""
+
+msgid "Occurrence marked paid or received."
+msgstr ""
+
+msgid "Filters"
+msgstr ""
+
+msgid "Expenses and income"
+msgstr ""
+
+msgid "All categories"
+msgstr ""
+
+msgid "Apply filters"
+msgstr ""
+
+msgid "Clear"
+msgstr ""
+
+#, python-format
+msgid "Showing overdue items and the next %(days)d days."
+msgstr ""
+
+#, python-format
+msgid "Week of %(date)s"
+msgstr ""
+
+msgid "Automatic posting"
+msgstr ""
+
+msgid "Overdue"
+msgstr ""
+
+msgid "Rescheduled for this occurrence"
+msgstr ""
+
+msgid "Mark paid or received"
+msgstr ""
+
+msgid "Save transaction"
+msgstr ""
+
+msgid "Reschedule this one"
+msgstr ""
+
+msgid "New due date"
+msgstr ""
+
+msgid "Save date"
+msgstr ""
+
+msgid "Edit amount"
+msgstr ""
+
+msgid "Save amount"
+msgstr ""
+
+msgid "Skip"
+msgstr ""
+
+#, python-format
+msgid "Nothing is overdue or due in the next %(days)d days."
+msgstr ""
+
+msgid "Tax calculator"
+msgstr ""
+
+msgid "Rates are entered by you; this is not tax advice."
+msgstr ""
+
+#, python-format
+msgid "Net amount (%(currency)s)"
+msgstr ""
+
+msgid "Calculation date"
+msgstr ""
+
+msgid "Record income as"
+msgstr ""
+
+msgid "Calculate"
+msgstr ""
+
+#, python-format
+msgid "No effective version on this date for: %(names)s"
+msgstr ""
+
+#, python-format
+msgid "Breakdown for %(date)s"
+msgstr ""
+
+msgid "Added tax"
+msgstr ""
+
+msgid "Gross"
+msgstr ""
+
+msgid "Withheld"
+msgstr ""
+
+msgid "Ledger amount"
+msgstr ""
+
+msgid "Planned tax payments"
+msgstr ""
+
+msgid "No tax payments for this recording mode."
+msgstr ""
+
+msgid "Manage tax rules"
+msgstr ""
+
+msgid "Tax rules"
+msgstr ""
+
+msgid "Calculator preview"
+msgstr ""
+
+msgid "New tax rule"
+msgstr ""
+
+msgid "Effect"
+msgstr ""
+
+msgid "Added to net"
+msgstr ""
+
+msgid "Tax base"
+msgstr ""
+
+msgid "Notes (optional)"
+msgstr ""
+
+msgid "First version effective from"
+msgstr ""
+
+msgid "Value type"
+msgstr ""
+
+msgid "Percent"
+msgstr ""
+
+msgid "Fixed amount"
+msgstr ""
+
+msgid "Rate in percent"
+msgstr ""
+
+#, python-format
+msgid "Fixed amount (%(currency)s)"
+msgstr ""
+
+msgid "Create tax rule"
+msgstr ""
+
+#, python-format
+msgid "Base: %(base)s"
+msgstr ""
+
+#, python-format
+msgid "Archive the tax rule %(name)s?"
+msgstr ""
+
+msgid "Versions"
+msgstr ""
+
+msgid "Add a new version"
+msgstr ""
+
+msgid "Effective from"
+msgstr ""
+
+msgid "Save version"
+msgstr ""
+
+msgid "Edit name and notes"
+msgstr ""
+
+msgid "Save details"
+msgstr ""
+
+msgid "No tax rules yet."
+msgstr ""
+
+msgid ""
+"Tax-rule effect and base are fixed at creation to preserve the meaning of"
+" existing rate versions. Create a separate rule to model a different tax."
+msgstr ""
+
+msgid "Export CSV"
+msgstr ""
+
+msgid "Export as CSV"
+msgstr ""
+
+msgid "Close"
+msgstr ""
+
+msgid ""
+"Downloads every entry that matches the filters, oldest first, in the "
+"columns of the workspace archive's transactions.csv. With the standard "
+"options the file can be imported again."
+msgstr ""
+
+msgid "Delimiter"
+msgstr ""
+
+msgid "Comma (standard)"
+msgstr ""
+
+msgid "Semicolon"
+msgstr ""
+
+msgid "Decimal separator"
+msgstr ""
+
+msgid "Dot (standard)"
+msgstr ""
+
+msgid "Comma"
+msgstr ""
+
+msgid "A decimal comma needs the semicolon delimiter."
+msgstr ""
+
+msgid ""
+"For Excel: start the file with a byte order mark, so that Excel reads it "
+"as UTF-8"
+msgstr ""
+
+msgid "Protect against spreadsheet formulas"
+msgstr ""
+
+msgid ""
+"Puts an apostrophe before =, +, -, @ (also their full-width forms) at the"
+" start of a description or category name, after leading spaces, or after "
+"a comma or semicolon inside it, so that a spreadsheet does not run them "
+"as formulas. Such values then differ from the stored ones, and a "
+"protected description may be too long to import again."
+msgstr ""
+
+msgid "Download CSV"
+msgstr ""
+
+msgid "Smallest amount"
+msgstr ""
+
+msgid "Largest amount"
+msgstr ""
+
+msgid "Description contains"
+msgstr ""
+
+msgid "None ticked: every category."
+msgstr ""
+
+msgid "Show entries"
+msgstr ""
+
+msgid "Clear filters"
+msgstr ""
+
+msgid "Entries"
+msgstr ""
+
+#, python-format
+msgid "%(first)d–%(last)d of %(num)d entry"
+msgid_plural "%(first)d–%(last)d of %(num)d entries"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "No entries match these filters."
+msgstr ""
+
+msgid "Entries matching the filters"
+msgstr ""
+
+#, python-format
+msgid "page %(number)d of %(pages)d"
+msgstr ""
+
+msgid "Select"
+msgstr ""
+
+#, python-format
+msgid "Select the entry of %(date)s, %(amount)s"
+msgstr ""
+
+msgid "closed"
+msgstr ""
+
+#, python-format
+msgid "Page %(number)d of %(pages)d"
+msgstr ""
+
+msgid "Change category"
+msgstr ""
+
+msgid ""
+"Tick entries in the list, or change all entries that match the filters. "
+"You confirm the change on the next page."
+msgstr ""
+
+msgid "New category"
+msgstr ""
+
+msgid "Change the ticked entries"
+msgstr ""
+
+#, python-format
+msgid "Change all %(num)d matching entry"
+msgid_plural "Change all %(num)d matching entries"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "Move %(num)d entry to %(category)s?"
+msgid_plural "Move %(num)d entries to %(category)s?"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Already in this category"
+msgstr ""
+
+msgid ""
+"The change is recorded in the workspace audit log. Monthly totals of "
+"these categories change with it."
+msgstr ""
+
+msgid "Every selected entry is already in this category; nothing would change."
+msgstr ""
+
 msgid "Defaults to your display name."
 msgstr ""
 
@@ -2010,6 +3036,38 @@ msgid "Not set"
 msgstr ""
 
 msgid "Time zone"
+msgstr ""
+
+msgid "Delete workspace"
+msgstr ""
+
+#, python-format
+msgid "Delete %(name)s permanently?"
+msgstr ""
+
+msgid ""
+"Every transaction, planned value, category, recurring item, closed month "
+"and invitation of this workspace is removed for good, and so is its audit"
+" log. This cannot be undone, and the app keeps no copy."
+msgstr ""
+
+#, python-format
+msgid "%(num)d other member also loses access to it."
+msgid_plural "%(num)d other members also lose access to it."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Export what you want to keep first."
+msgstr ""
+
+msgid "Export transactions as CSV"
+msgstr ""
+
+#, python-format
+msgid "To confirm, type the workspace name: %(name)s"
+msgstr ""
+
+msgid "Delete this workspace"
 msgstr ""
 
 msgid "People in this workspace"
@@ -2087,8 +3145,8 @@ msgid "General"
 msgstr ""
 
 msgid ""
-"Locked: transactions (deleted ones included) or planned values exist, and"
-" their amounts are stored in this currency."
+"Locked: transactions (deleted ones included) or planned values or "
+"recurring items exist, and their amounts are stored in this currency."
 msgstr ""
 
 msgid "Formatting default"
@@ -2104,9 +3162,39 @@ msgid ""
 msgstr ""
 
 msgid ""
+"Require two-factor authentication for password-based access to this "
+"workspace"
+msgstr ""
+
+msgid ""
 "The formatting default is used for numbers and dates where no personal "
 "preference applies. Your interface language follows your account and "
 "browser."
+msgstr ""
+
+msgid "Categories and workspaces"
+msgstr ""
+
+msgid ""
+"The income and expense categories of this workspace, their colours and "
+"their order."
+msgstr ""
+
+msgid "Manage categories"
+msgstr ""
+
+msgid "A separate budget with its own members, categories and currency."
+msgstr ""
+
+msgid "Create a workspace"
+msgstr ""
+
+msgid ""
+"Permanently removes this workspace and all its data, for every member. "
+"You confirm on the next page by typing the workspace name."
+msgstr ""
+
+msgid "Delete workspace…"
 msgstr ""
 
 #~ msgid "AssetBoard home"
@@ -2207,5 +3295,29 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Plan"
+#~ msgstr ""
+
+#~ msgid "Choose who can create workspaces."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Locked: transactions (deleted ones included)"
+#~ " or planned values exist, and their"
+#~ " amounts are stored in this currency."
+#~ msgstr ""
+
+#~ msgid "Saved"
+#~ msgstr ""
+
+#~ msgid "Net"
+#~ msgstr ""
+
+#~ msgid "Savings rate"
+#~ msgstr ""
+
+#~ msgid "Not available: nothing earned"
+#~ msgstr ""
+
+#~ msgid "Saved %(rate)s of income"
 #~ msgstr ""
 

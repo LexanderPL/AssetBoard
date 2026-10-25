@@ -78,7 +78,7 @@ the claim must be a list of strings.
 ## Password sign-in and break-glass
 
 `ASSETBOARD_OIDC_ONLY=true` hides password sign-in and local sign-up on invite pages, and
-answers 404 to their form posts. It cannot be combined with `ASSETBOARD_ALLOW_REGISTRATION`.
+answers 404 to their form posts. Open registration and password reset by email are off with it.
 Before turning it on, make sure an administrator can sign in through the provider.
 
 `ASSETBOARD_ALLOW_LOCAL_ADMIN_LOGIN=true` keeps password sign-in for instance administrators

@@ -20,7 +20,7 @@ check: i18n-compile
 	ASSETBOARD_DATA_DIR="$$temp_dir" ASSETBOARD_DATABASE_URL="sqlite:///$$temp_dir/check.db" $(UV) run assetboard check-migrations
 	$(UV) run pre-commit run --all-files
 
-test:
+test: i18n-compile
 	$(UV) run pytest
 
 css:
@@ -66,6 +66,7 @@ i18n-update:
 	$(UV) run pybabel update --ignore-pot-creation-date -i locales/messages.pot -d src/assetboard/locales -l en
 	$(UV) run pybabel update --ignore-pot-creation-date -i locales/messages.pot -d src/assetboard/locales -l pl
 
+# Compiled .mo catalogs are build output (gitignored); recompiling is cheap and idempotent.
 i18n-compile:
 	$(UV) run pybabel compile -d src/assetboard/locales
 

@@ -83,6 +83,9 @@ class Workspace(IdMixin, TimestampMixin, Base):
     __tablename__ = "workspaces"
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
+    require_two_factor: Mapped[bool] = mapped_column(
+        Boolean(), nullable=False, default=False, server_default=false()
+    )
     base_currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
     locale: Mapped[str] = mapped_column(String(8), nullable=False, default="en")
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="UTC")
@@ -158,6 +161,9 @@ class UserSession(Base):
     # applies to "oidc" sessions only.
     auth_method: Mapped[str] = mapped_column(
         String(16), nullable=False, default="password", server_default="password"
+    )
+    second_factor_verified: Mapped[bool] = mapped_column(
+        Boolean(), nullable=False, default=False, server_default=false()
     )
     # The workspace chosen with the switcher; NULL means "the oldest membership" (F1.2).
     current_workspace_id: Mapped[UUID | None] = mapped_column(
@@ -241,7 +247,43 @@ class InstanceSettings(Base):
     allow_workspace_creation: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default=true()
     )
+    # Open self-registration with a verified email (pre-release B, ADR-0017); effective only
+    # with SMTP configured and without OIDC_ONLY.
+    allow_registration: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     updated_by_user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True
     )
+
+
+class EmailToken(Base):
+    """A link sent by email (pre-release B, ADR-0017): registration or password reset.
+
+    Only the SHA-256 of the 256-bit token is stored. A row is deleted when it is used, when a
+    newer one replaces it (at most three live per address or user) and, for ``reset``, whenever
+    the user's password changes or the account is deactivated.
+    """
+
+    __tablename__ = "email_tokens"
+    __table_args__ = (
+        UniqueConstraint("token_hash", name="uq_email_tokens_token_hash"),
+        CheckConstraint("length(token_hash) = 64", name="token_hash_sha256_length"),
+        CheckConstraint("purpose IN ('register', 'reset')", name="purpose_valid"),
+        CheckConstraint("email = lower(email)", name="email_lowercase"),
+        CheckConstraint("(purpose = 'reset') = (user_id IS NOT NULL)", name="reset_has_user"),
+        Index("ix_email_tokens_purpose_email", "purpose", "email"),
+        Index("ix_email_tokens_expires_at", "expires_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True)
+    purpose: Mapped[str] = mapped_column(String(16), nullable=False)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False)
+    email: Mapped[str] = mapped_column(String(320), nullable=False)
+    user_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    locale: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)

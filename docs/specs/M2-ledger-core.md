@@ -330,7 +330,7 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
 - Pure domain function `summarize_month(transactions, budget_lines, categories) -> MonthSummary` (no I/O).
 - Expense section: rows per category with planned, actual, difference (`planned - actual`), sorted by actual desc (toggle: manual order); totals row. Income section: planned, actual, difference (`actual - planned`).
 - `treatment=savings` expense categories appear in a separate "Saved / invested" block; `transfer` is excluded; income categories with `treatment=savings` appear as "Withdrawn from savings".
-- KPIs: `earned`, `spent`, `saved`, `net = earned - spent - saved`, `savings_rate = (earned - spent)/earned` (shown as "—" when earned = 0).
+- KPIs: `earned`, `spent`, `saved`, `net = earned - spent - saved`, `savings_rate = saved / earned` (owner, 2026-10-24; it was `(earned - spent)/earned`; not shown when earned = 0).
 - Planned-vs-actual bars (ECharts or CSS bars) for total expenses and total income.
 - Clicking a category filters the transaction tables to that category.
 - Golden example (must be a test): budget Food 550.00; transactions Food 50.00 + 500.00 → actual 550.00, difference 0.00; budget Travel 5 350.00 with 4 323.00 spent → difference 1 027.00; income Salary planned 3 000.00, actual 3 400.00 → difference +400.00.
@@ -360,12 +360,14 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
   **P4** the sort choice is kept per browser (cookie `summary_sort`, HttpOnly, SameSite=Lax,
   one year), not per account.
 - KPIs: earned (income/regular), spent (expense/regular), saved (expense/savings), net, savings
-  rate `(earned - spent) / earned`: kept as integer basis points (`savings_rate_bp`) and, for
-  display, as tenths of a percent (`savings_rate_tenths`), **each rounded once** from the exact
-  ratio, half away from zero (rounding the basis points again would show 12.3495% as 12.4%);
-  shown with one decimal (`i18n.numbers.format_rate_tenths`), "—" with "Not available: nothing
-  earned" for screen readers when nothing was earned. Golden example in
-  `tests/unit/test_summary_domain.py` (net −1 473.00, rate −4 332 bp, "−43.3%").
+  rate **`saved / earned`** (owner, 2026-10-24; it was `(earned - spent) / earned`, which
+  counted money merely left over as saved): kept as integer basis points (`savings_rate_bp`)
+  and, for display, as tenths of a percent (`savings_rate_tenths`), **each rounded once** from
+  the exact ratio, half up (away from zero for a negative rate; rounding the basis points again
+  would show 12.3495% as 12.4%); shown with one decimal (`i18n.numbers.format_rate_tenths`), not
+  shown when nothing was earned. Golden example in `tests/unit/test_summary_domain.py` (net
+  −1 473.00, saved 0: rate 0 bp, "0.0%"); table tests: 800 saved of 3 000 earned "26.7%",
+  1 500 of 9 450 "15.9%".
 - Sorting: "Largest first" (actual descending, ties in the user's order; the default) or "Your
   order", via `POST /m/{month}/summary/sort` (HTMX: the block; without JavaScript 303 back).
   Every render reads the cookie, including the out-of-band summary after a transaction write.
@@ -382,6 +384,27 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
   (`#summary-total-<group>`). A planned-value save answers with its row plus, out of band, every
   total row and `#summary-kpis` (KPIs and bars); rows do not move, since the order depends on
   actuals only. The heading is "Summary".
+- **UI polish (owner, 2026-10-24), replacing the KPI cards and the bar look above:**
+  - **Flow bar** instead of the five KPI boxes: one stacked SVG bar of what was earned, split
+    into Spent (danger), Saved / invested (primary) and Left = net (success);
+    `domain.summary.flow_bar` gives the positions on 0–1000, scaled to
+    max(earned, spent + saved), each floored once from the exact ratio so the segments tile.
+    When spending and saving exceed earnings, the bar scales to their sum, the part beyond
+    earnings is hatched red (an SVG pattern) and a line marks earnings; net is then red. A
+    legend gives Earned (the total, above the bar), Spent, Saved / invested and Left with
+    their amounts (`data-kpi="earned|spent|saved|net"`), and the caption "Saved / invested
+    26.7% of income" the savings rate (`saved / earned`) (`data-kpi="savings-rate"`; no caption when nothing was earned,
+    so the "—" is gone). Screen readers get one sentence ("Earned …: spent …, saved or
+    invested …, left …." plus "Spending and saving exceed earnings by …." when they do); the
+    bar and the visual legend are hidden from them.
+  - **Planned-vs-actual bars:** taller (16 px), an outlined track (`line-strong`, 3:1 against
+    the card in both themes), the actual as a fill (primary; danger for expenses over plan,
+    success for income over plan) and the plan as a dark `ink` line that overhangs the
+    track, with a small "Planned" key; no line when nothing is planned.
+  - **Rows above plan** are tinted: an expense category whose actual is above its plan red
+    (`danger-tint`), an income category green (`success-tint`); new tokens for both themes,
+    with every row text at AA on them (`tests/unit/test_theme_tokens.py`). Nothing marks a
+    row at or under plan, nor rows of the savings groups.
 - **Follow-up (review, 2026-10-19):** `web.plan.build_summary` reads twice per render
   (`services.budget.get_plan` for the transfer group and the copy banner, then
   `services.summary.month_summary`); fold them into one read when the summary grows.
@@ -436,7 +459,8 @@ Property tests: totals equal the sum of rows; transfers never appear; difference
 **As built (F2.5)**
 - Pages: `/m` redirects (303) to the current month; `/m/YYYY-MM` is the month page (strict
   `YYYY-MM`, ASCII digits; months 1900-01..2199-12; anything else is a 404). The nav "Month" item
-  links to `/m`; `/` stays the overview. The page header has Previous/Next (no link past the
+  links to `/m`; `/` stays the overview (changed by F2.7: `/` becomes the Home dashboard and
+  the month page a pure summary). The page header has Previous/Next (no link past the
   range ends), "Today", and a picker: a plain GET form with `<input type="month">` and a Go
   button, no JavaScript. Desktop Firefox and Safari render that input as a text box, so the
   server also accepts `2026/10`, `10.2026`, `10/2026`; an invalid value redirects back with an
@@ -495,10 +519,227 @@ read-only enforcement in the service layer (not only the UI). Tests for enforcem
   row changes in that case. (F2.1's treatment change still applies to every month, closed ones
   included: it changes the category, not the transactions.)
 
+**Product decisions (owner, 2026-10-19)**
+- **Viewers** may use the list **and** the CSV export (it is the filtered view of what they can
+  already read). Bulk recategorize needs editor or owner. (`services.transaction_search.EXPORT_ROLE`.)
+- **Formula guard:** offered as an opt-in checkbox, **off by default**, so the default export
+  stays lossless and re-importable. This answers M4 open question 7.
+  (`domain.ledger_csv.FORMULA_GUARD_DEFAULT`.) When ticked, `guard_formula` changes
+  descriptions and category names:
+  - a value that starts with a trigger (`=`, `+`, `-`, `@` or their full-width forms `＝ ＋ － ＠`),
+    also after leading whitespace, or with a tab or CR, gets a leading `'`;
+  - inside a value, a trigger after `,` or `;` and optional whitespace gets `'` just before it
+    (`a, =1` becomes `a, '=1`), for files opened with the other list separator.
+
+  Guarded values re-import with the apostrophes, and a guarded description can exceed the
+  200 characters the import accepts (that row is then refused on import).
+- **The export is not audited:** it is a read like opening the list, so it is a GET and records
+  nothing (nothing about its contents is logged either).
+
+**As built (F2.6)**
+- Page `/transactions` ("Transactions" in the main navigation). Every part is a plain form
+  (works without JavaScript): the filters are a GET form, so a result is a bookmarkable URL
+  (`from`, `to`, `direction`, `category` (repeatable), `q`, `min`, `max`, `sort`, `page`).
+  Dates are `YYYY-MM-DD` (the date input) or `DD.MM.YYYY`; amounts are typed in the user's
+  locale and refused, never rounded, when they have too many decimals; bounds are inclusive.
+  "Description contains" matches the case-folded description key (`%` and `_` are literal).
+  The category filter lists every category, archived ones included. Invalid filters are marked
+  per field and show no rows. Soft-deleted rows never appear.
+- The query object is `domain.transaction_search.TransactionFilter`;
+  `TransactionRepository.search` / `count_matching` / `iter_matching` / `matching_for_update`
+  turn it into SQL on the workspace scope. Sorts: newest first (default), oldest first,
+  largest and smallest amount first; ties in entry order (`created_at`, id). `amount_minor` is
+  a BIGINT, so ordering by it in SQL is allowed; no DecimalType column is involved.
+- Pages of 50 with "51–100 of 312" and Previous/Next links that keep the filters; a page past
+  the end shows the last page. Rows in closed months are marked "closed"; each date links to
+  its month page (where entries are edited).
+- **Export UI (owner, 2026-10-24):** the options are not shown on the page; an "Export CSV"
+  button in the page header opens them in a native modal `<dialog>` (`app.js`:
+  `data-dialog-open`, `data-dialog-close`, Esc; no inline script or style). The button is a
+  link to `/transactions?<filters>&export=1`, which renders the dialog open in the page flow,
+  so the export works without JavaScript; a refused option renders the page with the dialog
+  open (a modal with JavaScript). Submitting the form closes the dialog.
+- **Export** (`/transactions/export.csv`, GET): every matching row, always in M4's entry order
+  (date, `created_at`, id) whatever the screen's sort. Rows and their category names come
+  from **one** SELECT (a join, fetched in batches), so every row has the name its category had
+  in that read; what the statement sees of writes committed during a long export is left to
+  the database's default isolation (no stronger level is requested). The file is written to a
+  spooled temporary file and then streamed; the spool is closed when the response ends,
+  including when the client goes away mid-download. Options: delimiter comma
+  (default) or semicolon; decimal dot (default) or comma, comma only with semicolon (as M4's
+  upload options); BOM for Excel (off by default); the formula guard (off by default).
+  `Content-Disposition` file name `<branding.CLI_NAME>-transactions-<YYYYMMDD-HHMMSS>Z.csv`
+  (UTC, from the clock), `Cache-Control: no-store`. The CSV writer is `domain.ledger_csv`,
+  reusable by F4.1 (which adds `deleted_at` and the lineage id from `import_key`; until M4
+  the `id` column is the row's own id).
+- **Bulk recategorize:** rows are ticked on the current page (per-row checkboxes joined to the
+  bulk form), or "Change all N matching entries" applies to every row matching the filters.
+  A preview page shows the target, how many rows move, from which categories, the months and
+  how many are already in the target; it writes nothing and takes no row locks. Confirming
+  re-reads the selection inside one `BEGIN IMMEDIATE` transaction: `require_role_now(editor)`,
+  `lock_month_writes`, then the rows (`FOR UPDATE OF transactions` on PostgreSQL). At most
+  `MAX_RECATEGORIZE_ROWS` + 1 rows are ever loaded. Refused as a whole, with nothing changed:
+  no rows selected; more than 500 ticked ids (`too_many_ticked`, its own message); more than
+  10 000 matching rows (`MAX_RECATEGORIZE_ROWS`; the "Change all N" button is disabled with
+  the reason when the list already shows more); an archived, unknown or foreign target; any
+  row whose direction differs from the target's kind ("filter by expenses or income first");
+  any row in a closed month (the message lists the months, including rows already in the
+  target); the selection differing from the previewed one (a digest of each row's id,
+  category and date, so rows added, deleted, moved or recategorized meanwhile are never
+  changed unseen). Ticked ids of deleted rows or of another workspace select nothing. Rows already in the target are left alone; rows are updated through the ORM (the
+  timestamp listener sets `updated_at`).
+- Audit: one `transaction.recategorized` event per applied change (entity: the target
+  category; data `category`, `direction`, `count`, `from_categories`, `months`; never amounts
+  or descriptions), in the "Transactions" group. A change that moves no row records nothing.
+
+**Follow-ups**
+- Totals of the filtered rows (per direction) on the list (P7 of the F2.6 plan): not in F2.6.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
 Implement F2.6 from docs/specs/M2-ledger-core.md: cross-month transaction list with filters/sort/pagination, CSV export
 (delimiter/decimal/BOM options; columns of M4's transactions.csv), bulk recategorize with audit event. Use a query object in the repository, not ad-hoc SQL in routes.
 Add an index review note to the PR (EXPLAIN for the main filters).
+```
+
+---
+
+## F2.7 Navigation restructure: Home, Month, Transactions, History
+
+**Story:** I open the app and see how this month is going. I enter transactions in one place,
+read the month's summary in another, and search all of my history in a third.
+
+Owner decision, 2026-10-25. It changes pages built in F2.2–F2.6 (and the `/` overview kept by
+F2.5). It should land **before F3.5**, which then puts pending occurrences on the Transactions
+page instead of the month page (see the note in F3.5). No new model, no migration and no new
+finance math: every figure comes from existing services (`services.summary.month_summary`, the
+F3.2 occurrence service).
+
+**Pages and sidebar order**
+
+| Sidebar | URL | What it is |
+|---|---|---|
+| **Home** (first item) | `/` | Current-month dashboard: flow bar, expense and income charts, upcoming items |
+| **Month** | `/m`, `/m/YYYY-MM` | Summary of one month; planned values stay editable inline |
+| **Transactions** | `/transactions`, `/transactions/YYYY-MM` | Quick-add form and the month's entries (edit/delete inline) |
+| **History** (pl "Historia") | `/history` | F2.6's cross-month search, filters, CSV export and bulk recategorize |
+
+The other sidebar items (Categories, Recurring, Upcoming, Taxes, later modules) follow in their
+current order.
+
+**Acceptance**
+- **Home (`/`)** shows the current month (workspace time zone, from the Clock), headed with the
+  month name and a link "Open month" to `/m/YYYY-MM`:
+  - the **F2.4 flow bar** (the KPI design of PR #144): one stacked bar of the month's earned
+    income split into Spent / Saved / invested / Left, overspend hatched, captioned "Saved /
+    invested X% of income", rendered from the same partial as the Month page, not a copy;
+  - a **donut of the month's expenses by category** (actuals of `kind=expense,
+    treatment=regular`) next to a **donut of income by category** (actuals of `kind=income,
+    treatment=regular`). `savings` and `transfer` categories are in neither chart: there is no
+    "Saved / invested" slice, the flow bar shows saving. Slices use the category colour; a category with zero
+    actual has no slice; an empty month shows an empty state per chart ("No expenses yet this
+    month"), not an empty ring;
+  - **upcoming items** from F3.2: overdue occurrences (highlighted) and the next 7 days, at most
+    10 rows, with a link to the Upcoming page. Editors and owners get the same confirm and skip
+    actions as on the Upcoming page; viewers see plain rows;
+  - a workspace without data renders (zero KPIs, empty states), as today's placeholder does.
+- **Month (`/m/YYYY-MM`)** is a pure summary: the flow bar, the planned-vs-actual table with
+  inline planned values (F2.3/F2.4 unchanged, including the closed-month read-only state, the
+  sort toggle and the copy banner), and the same expense-by-category donut as Home. It has **no
+  entry form and no transaction list**. Month navigation and close/reopen (F2.5) stay here. A
+  link "Enter transactions" goes to `/transactions/YYYY-MM`.
+- Category names in the summary link to `/transactions/YYYY-MM?category=<id>` (F2.4 part B's
+  filter moves with the list) instead of `#ledger` on the month page.
+- **Transactions (`/transactions/YYYY-MM`)** is the entry page: F2.2's quick-add rows and the
+  month's income and expense tables with inline edit, delete and undo, the F2.4 part B category
+  filter, and the same month navigation (Previous/Next, Today, picker) as the Month page.
+  `/transactions` without a query redirects (303) to the current month. Closed months render
+  read-only as today. Planned values are not edited here, and the page has no flow bar or KPI
+  line (entry only). Every keyboard behaviour,
+  autocomplete, HTMX swap, focus rule and no-JavaScript fallback of F2.2 and F2.4 part B keeps
+  working (their tests move with the page).
+- **History (`/history`)** is F2.6's page moved as is: filters, sort, pagination, CSV export
+  (`/history/export.csv`) and bulk recategorize (`/history/recategorize`,
+  `/history/recategorize/confirm`). Heading and nav label "History" (pl "Historia"). Viewers
+  keep the list and the export (F2.6 product decision).
+- **Redirects from old URLs** (each keeps the query string):
+  - `GET /transactions?<any F2.6 filter parameter>` (`from`, `to`, `direction`, `category`,
+    `q`, `min`, `max`, `sort`, `page`) → `/history?<same query>` (302, because the path itself
+    now serves another page);
+  - `GET /transactions/export.csv` → `/history/export.csv` (301);
+  - `POST /transactions/recategorize` and `/transactions/recategorize/confirm` → 308 to the
+    `/history/...` paths (keeps method and body; the CSRF check runs at the target);
+  - `GET /m/YYYY-MM?category=<id>` → `/transactions/YYYY-MM?category=<id>` (302); `/m/YYYY-MM`
+    without `category` stays the Month page.
+  - Targets are built from route names under the app's `root_path` (`scoped_url`), never from
+    the request's `Host`, and only known parameters are copied (no open redirect).
+- The HTMX write endpoints of F2.2 (`/m/{month}/transactions/...`) and F2.3/F2.4
+  (`/m/{month}/plan/...`, `/m/{month}/summary/sort`) may keep their paths (not visible to the
+  user). Their out-of-band answers target only fragments present on the page that sent the
+  request: a transaction write from the Transactions page does not send a summary that is not
+  on that page.
+- **Sidebar:** Home first, then Month, Transactions, History; `aria-current="page"` on the
+  active item (Transactions for `/transactions/...`, History for `/history`). The brand link and
+  "Home" both go to `/`.
+- **Charts** (the Home and Month donuts):
+  - Apache ECharts from the already vendored `static/vendor/echarts.min.js` (5.6.0; licence,
+    NOTICE and SHA-256 in `static/vendor/README.md`), loaded only on pages with a chart. If a
+    newer version is vendored, the README entry, licence files and checksum change in the same
+    PR.
+  - CSP-safe under the current policy (`script-src 'self'`, `style-src 'self'`): no inline
+    scripts and no `style` attributes in markup. Data travels in a
+    `<script type="application/json">` block rendered with Jinja's `tojson` (or in `data-`
+    attributes) and is read by a static module in `static/js/` that initialises every
+    `[data-chart]` element. Amounts are passed as minor-unit integers with the currency, plus
+    labels pre-formatted by the server's locale helpers; the browser never parses or rounds
+    money.
+  - Accessible: the canvas is `aria-hidden="true"`; each chart has a visible heading and an
+    adjacent sr-only table (category, amount, share of total) with the same numbers. Shares are
+    computed server-side in integers (tenths of a percent, rounded half up once per slice;
+    they need not add up to exactly 100.0%).
+  - Themed: text, label, border and tooltip colours come from the CSS colour tokens (read with
+    `getComputedStyle` from the token custom properties), slices from the category colour.
+    Charts re-render when the light/dark theme changes (`theme.js`) and on resize.
+  - Without JavaScript the table is shown visibly in place of the chart.
+  - A pure domain helper (for example `domain.charts.category_breakdown(summary) ->
+    list[Slice]`) builds slices and shares from the existing `MonthSummary`. Tests:
+    table-driven, plus a property test (slice amounts sum to the block's actual total; no
+    transfer or savings slice).
+- All new strings through gettext; `pl` catalog updated.
+- User docs under `docs/` describe the four pages; screenshots are regenerated later by F9.7.
+
+**Tests (at least)**
+- Home with data and without; viewer vs editor on the upcoming list; chart JSON matches the
+  summary; the sr-only table is present.
+- The Month page has no entry form and no ledger tables; planned-value editing and the
+  closed-month read-only state still work.
+- Transactions page: create, edit, delete, undo, filter and closed month; F2.2's keyboard and
+  HTMX tests moved and green.
+- Every redirect above: status, `Location`, query preserved, no open redirect with a crafted
+  `Host` or extra parameters.
+- History: F2.6's tests pass at the new paths; nav `aria-current` per page.
+- CSP header unchanged; no rendered page contains a `<script>` element with inline code other
+  than `type="application/json"` data (template test).
+
+**Decided (2026-10-25)**
+1. **Transactions URL:** `/transactions/YYYY-MM` (mirrors `/m/YYYY-MM`); filtered
+   `/transactions?…` links redirect to History.
+2. **No KPI line on the Transactions page:** it is for entry only.
+3. **No "Saved / invested" slice** in the expense donut; the flow bar shows saving.
+4. **F9.1's dashboard cards go on this Home page** (see the note in F9.1): one landing page,
+   not two.
+5. **"Flow bar"** means the F2.4 flow bar, the KPI design of PR #144: one stacked bar of earned
+   income split into Spent / Saved / invested / Left, overspend hatched, captioned "Saved /
+   invested X% of income".
+
+**Agent prompt**
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F2.7 from docs/specs/M2-ledger-core.md: Home dashboard at / (flow bar, expense and income donuts, upcoming items
+from F3.2), Month page as a pure summary with the expense donut, a per-month Transactions page with the quick-add form and
+the editable list, F2.6's page moved to /history, the listed redirects and the sidebar order. ECharts from the vendored
+file, CSP-safe (JSON script tag + static module), sr-only tables, colours from tokens in both themes. No new finance math:
+reuse services.summary and the F3.2 occurrence service; add only the pure category_breakdown helper with tests.
+Move the existing route and template tests with the pages; add redirect and no-open-redirect tests.
 ```

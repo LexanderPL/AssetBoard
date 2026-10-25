@@ -1,6 +1,6 @@
 # AssetBoard — product & technical overview (working title)
 
-Status: draft v1. This file is the shared "constitution". Milestone specs (`M0`…`M9`) refer to it.
+Status: draft v1. This file is the shared "constitution". Milestone specs (`M0`…`M10`) refer to it.
 
 ## 1. Vision and principles
 
@@ -38,11 +38,22 @@ A self-hosted web app that replaces a personal finance spreadsheet (monthly inco
 - Workspace has a `base_currency` (default EUR). Reports and totals are in base currency. v1 ledger entries are entered in base currency; the schema carries `currency` everywhere so multi-currency can be added without migrations of meaning.
 - Quantities and unit prices use `DecimalType`: TEXT on SQLite, `NUMERIC(38,18)` on PostgreSQL. Because SQL aggregates on TEXT are unreliable, **aggregate quantities/prices in Python (domain layer)**, not in SQL.
 - Rates in integer basis points.
+- **Display (owner, 2026-10-24: "native style everywhere"):** an amount is shown the way the
+  home country of its currency writes it, whatever the interface language: PLN "1 234,50 zł"
+  (also in English), USD "$1,234.50" and GBP "£1,234.50" (also in Polish). The currencies with
+  one obvious home are an explicit map (`i18n.numbers.CURRENCY_HOME_LOCALES`: PLN→pl_PL,
+  USD→en_US, GBP→en_GB, CHF→de_CH, CZK→cs_CZ, SEK→sv_SE, NOK→nb_NO, DKK→da_DK, HUF→hu_HU,
+  JPY→ja_JP, UAH→uk_UA and a few more); EUR and every currency not in the map follow the
+  interface locale. CAD, AUD, NZD and MXN are left out on purpose (owner, 2026-10-24): their
+  home style is a bare "$", which could not be told apart from USD ("CA$1,234.50" in English). A letter code never touches the number (a no-break
+  space is inserted: "CHF 1’234.50", "THB 1,234.50"). **Input** fields and their parsing
+  (`format_amount_input`, `parse_amount`) stay in the interface locale, and so do CSV files
+  (plain decimals, their own options).
 
 ### 3.3 Categories and treatment
 - `kind=expense, treatment=regular`: spending. `treatment=savings`: money moved to savings/investments (counted as "saved", not "spent"). `treatment=transfer`: between own accounts (excluded from both).
 - `kind=income, treatment=regular`: earnings. `treatment=savings`: withdrawal from savings (excluded from "earned").
-- Derived KPIs: `earned`, `spent`, `saved`, `savings_rate = (earned - spent) / earned` (guard divide-by-zero).
+- Derived KPIs: `earned`, `spent`, `saved`, `savings_rate = saved / earned` (guard divide-by-zero; owner, 2026-10-24: it was `(earned - spent) / earned`, which counted money merely left over as saved).
 - Categories are flat in v1; a `parent_id` column will be added when a category hierarchy is implemented (not in F2.1). Archiving hides a category from entry but keeps history.
 
 ### 3.4 Months
@@ -66,6 +77,7 @@ Anything the user will want a trend of is stored historically: manual valuations
 
 ### 3.9 Audit and deletion
 - Soft delete (`deleted_at`) for user-entered financial rows; UI offers undo for ~10 s and a trash view later.
+- Exception: deleting a whole workspace (owners, typed-name confirmation) removes it and all its rows, its own audit events included, for good; one instance-level `workspace.delete` event remains ([ADR-0020](../adr/0020-hard-workspace-deletion.md)).
 - `AuditEvent(workspace_id?, actor_user_id, action, entity_type, entity_id, data JSON, ts)` written by services for create/update/delete of financial data and for auth/admin events.
 
 ### 3.10 IDs and time
@@ -84,6 +96,7 @@ UUID primary keys (`Uuid` type). Dates are `DATE`; timestamps UTC. "Today" alway
 | M7 | Loan, LoanRateChange, ReferenceRate, ReferenceRateValue, LoanCostComponent, LoanOverpayment, LoanPayment, LoanBalanceCheckpoint, LoanScenario, InstallmentPlan |
 | M8 | FireScenario, FireContribution, FireEvent |
 | M9 | ApiToken, BackupRun, DashboardPreference |
+| M10 | none (reports read existing rows) |
 
 Key fields for the shared entities:
 - **Transaction**: id, workspace_id, direction (income|expense), date, amount (Money), category_id, description, source (manual|recurring|recurring_auto|import), scheduled_occurrence_id?, import_batch_id?, import_key?, account_id? (reserved), created_by, timestamps, deleted_at.
@@ -104,6 +117,9 @@ Key fields for the shared entities:
 | M7 | Loans and mortgage | M5, M3 | v0.7 |
 | M8 | FIRE planner | M2, M6, M7 | v0.8 |
 | M9 | Dashboard, reports, export/backup, API, hardening | all | v1.0 |
+| M10 | Reports: income vs expenses, savings rate, expenses by category over the years; later net worth and portfolio value | Phase A: M2 (after F2.7); Phase B: M5, M6 | Phase A: any minor before v1.0; Phase B: with or after M6 |
+
+The number does not set the order: M10 Phase A (ledger reports) can ship as soon as M2 and F2.7 are done, before M5/M6. F2.7 (navigation restructure: Home, Month, Transactions, History) lands before F3.5.
 
 M3 and M5–M8 each end with an "archive extension" feature that adds the module's data to the workspace archive of M4 (export, restore, and standalone CSV import where it makes sense), following [ADR-0016](../adr/0016-workspace-archive-format.md).
 

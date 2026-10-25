@@ -122,7 +122,7 @@ def test_home_page_uses_the_workspace_currency(signed: Signed) -> None:
         session.execute(update(Workspace).values(base_currency="JPY"))
     page = signed.client.get("/")
     assert page.status_code == 200
-    assert "¥0" in page.text and "€" not in page.text
+    assert "￥0" in page.text and "€" not in page.text  # native style: ja_JP
 
 
 def test_role_change_applies_on_the_next_request(signed: Signed) -> None:
@@ -201,3 +201,71 @@ def _alert_panel(html: str) -> str:
     match = re.search(r'<section[^>]*role="alert">.*?</section>', html, re.DOTALL)
     assert match is not None
     return match.group(0)
+
+
+# The sidebar on pages without a workspace Context (owner-reported in v0.2.1)
+
+WORKSPACE_NAV_LINKS = ("data-month-link", "data-transactions-link", "data-categories-link")
+SIGNED_IN_PAGES = (
+    "/account",
+    "/account/password",
+    "/admin/users",
+    "/admin/users/new",
+    "/admin/settings",
+    "/audit?scope=instance",
+    "/workspaces/new",
+    "/workspace/settings",
+    "/workspace/members",
+)
+
+
+@pytest.mark.parametrize("path", SIGNED_IN_PAGES)
+def test_every_signed_in_page_shows_the_full_workspace_nav(signed: Signed, path: str) -> None:
+    page = signed.client.get(path)
+    assert page.status_code == 200
+    for link in WORKSPACE_NAV_LINKS:
+        assert link in page.text
+    assert "data-current-workspace>Home<" in page.text
+    # None of the workspace links is the current page here.
+    assert not re.search(r"data-(month|transactions|categories)-link aria-current", page.text)
+    # Categories are in the user menu, not the main navigation.
+    nav = page.text[page.text.index("<nav") : page.text.index("</nav>")]
+    assert "data-categories-link" not in nav
+
+
+def test_viewers_find_categories_in_the_user_menu(signed: Signed) -> None:
+    with signed.db() as session, session.begin():
+        session.execute(update(Membership).values(role="viewer"))
+    page = signed.client.get("/").text
+    menu = page[page.index("data-user-menu") : page.index("</details>")]
+    assert "data-categories-link" in menu
+
+
+def test_error_pages_of_a_signed_in_user_show_the_workspace_nav(signed: Signed) -> None:
+    page = signed.client.get(f"/probe/members/{uuid4()}")
+    assert page.status_code == 404
+    for link in WORKSPACE_NAV_LINKS:
+        assert link in page.text
+
+
+@pytest.mark.parametrize(
+    "path", ("/account", "/account/password", "/admin/users", "/admin/settings")
+)
+def test_a_user_without_a_workspace_keeps_the_reduced_nav(signed: Signed, path: str) -> None:
+    with signed.db() as session, session.begin():
+        session.execute(delete(Membership))
+    page = signed.client.get(path)
+    assert page.status_code == 200
+    for link in WORKSPACE_NAV_LINKS:
+        assert link not in page.text
+    assert "data-current-workspace" not in page.text
+
+
+def test_the_main_navigation_starts_with_home(signed: Signed) -> None:
+    page = signed.client.get("/").text
+    nav = page[page.index("<nav") : page.index("</nav>")]
+    first = re.search(r"<a [^>]*>", nav)
+    assert first is not None and "data-home-link" in first.group(0)
+    assert 'data-home-link aria-current="page"' in nav
+    other = signed.client.get("/account").text
+    assert "data-home-link" in other and 'data-home-link aria-current="page"' not in other

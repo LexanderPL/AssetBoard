@@ -35,6 +35,7 @@ def test_assetboard_console_script_help_runs() -> None:
     assert "migrate" in result.stdout
     assert "create-admin" in result.stdout
     assert "reset-password" in result.stdout
+    assert "reset-mfa" in result.stdout
     assert "revision" not in result.stdout
 
 
@@ -455,3 +456,44 @@ def test_cli_audit_events_are_instance_level_about_a_user(tmp_path: Path) -> Non
     finally:
         connection.close()
     assert rows == [("cli.create_admin", None, "user"), ("cli.reset_password", None, "user")]
+
+
+def test_reset_mfa_removes_the_factor_and_reports_unknown_users(tmp_path: Path) -> None:
+    data_dir = tmp_path / "auth-data"
+    env = _auth_env(data_dir)
+    assert _create_admin(env, "cli@example.com").exit_code == 0
+    connection = sqlite3.connect(data_dir / "assetboard.db")
+    try:
+        with connection:
+            (user_id,) = connection.execute(
+                "SELECT id FROM users WHERE email = 'cli@example.com'"
+            ).fetchone()
+            connection.execute(
+                "INSERT INTO totp_factors (user_id, encrypted_secret, enabled_at, last_step) "
+                "VALUES (?, 'ciphertext', '2026-10-21 12:00:00.000000', -1)",
+                (user_id,),
+            )
+            connection.execute(
+                "INSERT INTO totp_recovery_codes (user_id, code_hash) VALUES (?, ?)",
+                (user_id, "0" * 64),
+            )
+    finally:
+        connection.close()
+
+    result = CliRunner().invoke(cli_app, ["reset-mfa", "CLI@example.com"], env=env)
+    assert result.exit_code == 0, result.output
+    assert "Two-factor authentication reset for cli@example.com" in result.output
+    connection = sqlite3.connect(data_dir / "assetboard.db")
+    try:
+        assert connection.execute("SELECT COUNT(*) FROM totp_factors").fetchone() == (0,)
+        assert connection.execute("SELECT COUNT(*) FROM totp_recovery_codes").fetchone() == (0,)
+        assert connection.execute(
+            "SELECT actor_type FROM audit_events WHERE action = 'cli.reset_mfa'"
+        ).fetchall() == [("cli",)]
+    finally:
+        connection.close()
+
+    again = CliRunner().invoke(cli_app, ["reset-mfa", "cli@example.com"], env=env)
+    assert again.exit_code == 1 and "no two-factor authentication" in again.output
+    unknown = CliRunner().invoke(cli_app, ["reset-mfa", "nobody@example.com"], env=env)
+    assert unknown.exit_code == 1 and "No user has that email address" in unknown.output

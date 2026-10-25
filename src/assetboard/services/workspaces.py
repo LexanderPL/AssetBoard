@@ -16,6 +16,12 @@ amounts adds a check to ``BASE_CURRENCY_LOCKS``: F2.2 transactions (soft-deleted
 and F2.3 budget lines (the lines that exist now: a removed planned value holds no amount).
 The settings write takes the exclusive workspace lock first, so on PostgreSQL a currency change
 and a concurrent first transaction (which takes the shared lock) cannot both pass.
+
+**Deleting a workspace** (owners, ADR-0020) is permanent: the workspace and every row that
+belongs to it, its audit log included, are removed in one transaction, after the owner typed the
+workspace's exact name. One instance-level ``workspace.delete`` event (``workspace_id`` NULL)
+keeps the name and id. Sessions that had it selected fall back to another membership, or to
+the "No workspace" page.
 """
 
 from __future__ import annotations
@@ -28,6 +34,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.clock import Clock
+from assetboard.config import DEFAULT_RECURRENCE_HORIZON_MONTHS
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.identity import User
 from assetboard.db.repositories import (
@@ -40,16 +47,24 @@ from assetboard.db.repositories import (
 )
 from assetboard.domain.identity import InvalidEmail, normalize_email
 from assetboard.services import categories
+from assetboard.services.auth import record_auth_event
 from assetboard.services.budget import workspace_has_budget_lines
 from assetboard.services.context import (
     Context,
-    PermissionDenied,
     Role,
     require_role,
+    require_role_now,
     select_workspace,
 )
 from assetboard.services.instance_settings import read_settings
 from assetboard.services.invitations import new_token
+from assetboard.services.scheduled import (
+    has_working_day_items,
+    holidays_supported,
+    regenerate_working_day_items,
+    workspace_has_scheduled_amounts,
+)
+from assetboard.services.taxes import workspace_has_fixed_tax_amounts
 from assetboard.services.transactions import workspace_has_transactions
 from assetboard.services.workspace_options import WorkspaceOptionError, validate_workspace_options
 
@@ -62,6 +77,8 @@ MAX_PENDING_INVITATIONS = 50
 BASE_CURRENCY_LOCKS: list[Callable[[Session, Context], bool]] = [
     workspace_has_transactions,
     workspace_has_budget_lines,
+    workspace_has_scheduled_amounts,
+    workspace_has_fixed_tax_amounts,
 ]
 
 
@@ -92,6 +109,19 @@ class WorkspaceCreationDisabled(WorkspaceError):
     """Self-service workspace creation is off for this account (or the account is inactive)."""
 
     code = "creation_disabled"
+
+
+class WorkspaceNameMismatch(WorkspaceError):
+    """The confirmation did not repeat the workspace's exact name."""
+
+    code = "name_mismatch"
+
+
+class WorkspaceChanged(WorkspaceError):
+    """The confirmation was for another workspace than the request's current one (a stale tab
+    after a switch, or a repeated submit after the first one deleted it)."""
+
+    code = "workspace_changed"
 
 
 class InvalidInvitation(WorkspaceError):
@@ -138,6 +168,7 @@ class WorkspaceSettings:
     auto_copy_plan: bool = False
     # True once amounts are stored in the base currency (it can no longer change).
     base_currency_locked: bool = False
+    require_two_factor: bool = False
 
 
 def _checkpoint(_name: str) -> None:
@@ -146,10 +177,7 @@ def _checkpoint(_name: str) -> None:
 
 def _require_owner_now(session: Session, ctx: Context) -> None:
     """Re-read the actor's membership inside the write transaction; it must still be owner."""
-    actor = MembershipRepository(session, ctx).for_user(ctx.user.id)
-    actual = Role(actor.role) if actor is not None else Role.VIEWER
-    if actor is None or actual is not Role.OWNER:
-        raise PermissionDenied(Role.OWNER, actual)
+    require_role_now(session, ctx, Role.OWNER)
 
 
 def _base_currency_locked(session: Session, ctx: Context) -> bool:
@@ -174,6 +202,7 @@ def workspace_settings(factory: sessionmaker[Session], ctx: Context) -> Workspac
             timezone=workspace.timezone,
             locale=workspace.locale,
             auto_copy_plan=workspace.auto_copy_plan,
+            require_two_factor=workspace.require_two_factor,
             base_currency_locked=_base_currency_locked(session, ctx),
         )
 
@@ -188,8 +217,15 @@ def update_settings(
     timezone: str,
     locale: str,
     auto_copy_plan: bool,
+    require_two_factor: bool = False,
+    recurrence_horizon_months: int = DEFAULT_RECURRENCE_HORIZON_MONTHS,
 ) -> WorkspaceSettings:
-    """Change the workspace's settings; the audit event lists changed fields, not values."""
+    """Change the workspace's settings; the audit event lists changed fields, not values.
+
+    A country change regenerates working-day recurring items (F3.1) in the same transaction.
+    It is refused for a country without holiday data while such items exist (those items could
+    no longer be computed); other workspaces keep any listed country.
+    """
     require_role(ctx, Role.OWNER)
     clean_name = name.strip()
     if not clean_name or len(clean_name) > MAX_WORKSPACE_NAME_LENGTH:
@@ -203,6 +239,11 @@ def update_settings(
         )
     except WorkspaceOptionError as exc:
         raise InvalidWorkspaceSettings(exc.field, f"invalid_{exc.field}") from exc
+    if require_two_factor and ctx.auth_method == "password" and not ctx.second_factor_verified:
+        # The owner enabling the policy is subject to it: without a verified second factor in
+        # this password session, saving would lock them out of their own workspace. External
+        # (OIDC/proxy) sessions are exempt from the policy, so they may enable it.
+        raise InvalidWorkspaceSettings("require_two_factor", "own_two_factor_required")
     wanted = WorkspaceSettings(
         name=clean_name,
         base_currency=options.base_currency,
@@ -210,6 +251,7 @@ def update_settings(
         timezone=options.timezone,
         locale=options.locale,
         auto_copy_plan=auto_copy_plan,
+        require_two_factor=require_two_factor,
     )
 
     def write(session: Session) -> WorkspaceSettings:
@@ -227,13 +269,23 @@ def update_settings(
                 ("timezone", wanted.timezone),
                 ("locale", wanted.locale),
                 ("auto_copy_plan", wanted.auto_copy_plan),
+                ("require_two_factor", wanted.require_two_factor),
             )
             if getattr(workspace, field) != value
         }
         if "base_currency" in changes and _base_currency_locked(session, ctx):
             raise BaseCurrencyLocked
+        country_changed = "country_code" in changes
+        if (
+            country_changed
+            and not holidays_supported(wanted.country_code)
+            and has_working_day_items(session, ctx)
+        ):
+            raise InvalidWorkspaceSettings("country_code", "country_without_holidays")
         if changes:
             repository.update(**changes)
+            if country_changed:
+                regenerate_working_day_items(session, ctx, ctx.clock, recurrence_horizon_months)
             AuditEventRepository(session, ctx).record(
                 actor_user_id=ctx.user.id,
                 action="workspace.settings_updated",
@@ -408,6 +460,71 @@ def revoke_invitation(factory: sessionmaker[Session], ctx: Context, *, invitatio
             entity_id=str(invitation.id),
             ts=now,
             data={"reason": "owner"},
+        )
+
+    run_immediate(factory, write)
+
+
+# Deleting a workspace (ADR-0020)
+
+
+@dataclass(frozen=True, slots=True)
+class DeletionPreview:
+    """What the confirmation page shows: the name to type, and who else loses access."""
+
+    name: str
+    other_members: int
+
+
+def deletion_preview(factory: sessionmaker[Session], ctx: Context) -> DeletionPreview:
+    require_role(ctx, Role.OWNER)
+    with factory() as session:
+        workspace = CurrentWorkspaceRepository(session, ctx).get()
+        members = MembershipRepository(session, ctx).members()
+        others = sum(1 for member in members if member.user_id != ctx.user.id)
+        return DeletionPreview(name=workspace.name, other_members=others)
+
+
+def delete_workspace(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    *,
+    confirm_name: str,
+    expected_workspace_id: UUID | None,
+) -> None:
+    """Delete the current workspace and all its data, permanently.
+
+    ``expected_workspace_id`` is the workspace the confirmation page was shown for; unless it is
+    the Context's workspace, nothing is written (``WorkspaceChanged``). Two workspaces may share
+    a name, so the typed name alone cannot tell them apart. The deleted id is always the
+    Context's.
+    ``confirm_name`` must be the workspace's exact name (surrounding spaces ignored, case
+    sensitive), compared with the stored name inside the transaction, after the actor's role
+    was re-read there and the exclusive workspace lock taken. The only trace left is the
+    instance-level ``workspace.delete`` event with the name; no amounts.
+    """
+    require_role(ctx, Role.OWNER)
+    if expected_workspace_id != ctx.workspace.id:
+        raise WorkspaceChanged
+
+    def write(session: Session) -> None:
+        _require_owner_now(session, ctx)
+        _checkpoint("delete_workspace")
+        repository = CurrentWorkspaceRepository(session, ctx)
+        repository.lock(exclusive=True)
+        name = repository.get().name
+        if confirm_name.strip() != name:
+            raise WorkspaceNameMismatch
+        now = ctx.clock.now()
+        repository.delete_with_all_data(now=now)
+        record_auth_event(
+            session,
+            ctx.clock,
+            action="workspace.delete",
+            entity_type="workspace",
+            entity_id=str(ctx.workspace.id),
+            actor_user_id=ctx.user.id,
+            data={"name": name},
         )
 
     run_immediate(factory, write)

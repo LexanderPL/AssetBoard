@@ -3,6 +3,7 @@
 from assetboard.db.models.identity import (
     AuditEvent,
     AuthThrottle,
+    EmailToken,
     ExternalIdentity,
     InstanceSettings,
     Invitation,
@@ -13,12 +14,20 @@ from assetboard.db.models.identity import (
     Workspace,
 )
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
+from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
+from assetboard.db.models.tax import TaxRule, TaxRuleVersion
+from assetboard.db.models.totp import TotpFactor, TotpRecoveryCode
 
 __all__ = [
+    "ScheduledItem",
+    "ScheduledOccurrence",
+    "TaxRule",
+    "TaxRuleVersion",
     "AuditEvent",
     "AuthThrottle",
     "BudgetLine",
     "Category",
+    "EmailToken",
     "ExternalIdentity",
     "InstanceSettings",
     "Invitation",
@@ -26,6 +35,8 @@ __all__ = [
     "MonthState",
     "SetupState",
     "Transaction",
+    "TotpFactor",
+    "TotpRecoveryCode",
     "User",
     "UserSession",
     "Workspace",

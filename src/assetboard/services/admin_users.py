@@ -14,6 +14,7 @@ only ``data`` keys each one carries:
 * ``admin.user_deactivated``: ``sessions_revoked`` (how many sessions ended)
 * ``admin.admin_granted``: none
 * ``admin.admin_revoked``: none
+* ``admin.totp_reset``: ``sessions_revoked`` (how many sessions ended)
 """
 
 from __future__ import annotations
@@ -29,8 +30,11 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.clock import Clock
 from assetboard.db.models.identity import ExternalIdentity, User
+from assetboard.db.models.totp import TotpFactor
+from assetboard.db.repositories.totp import TotpRepository
 from assetboard.services.auth import (
     PasswordPolicyError,
+    invalidate_reset_tokens,
     record_auth_event,
     revoke_all_sessions,
     validate_password,
@@ -44,11 +48,18 @@ AUDIT_DATA_KEYS: dict[str, tuple[str, ...]] = {
     "admin.user_deactivated": ("sessions_revoked",),
     "admin.admin_granted": (),
     "admin.admin_revoked": (),
+    "admin.totp_reset": ("sessions_revoked",),
 }
 
-AdminAction = Literal["activate", "deactivate", "promote", "demote"]
-ADMIN_ACTIONS: tuple[AdminAction, ...] = ("activate", "deactivate", "promote", "demote")
-ActionStatus = Literal["done", "unchanged", "self", "last_admin", "not_found"]
+AdminAction = Literal["activate", "deactivate", "promote", "demote", "reset_totp"]
+ADMIN_ACTIONS: tuple[AdminAction, ...] = (
+    "activate",
+    "deactivate",
+    "promote",
+    "demote",
+    "reset_totp",
+)
+ActionStatus = Literal["done", "unchanged", "self", "self_totp_reset", "last_admin", "not_found"]
 TEMPORARY_PASSWORD_BYTES = 12  # token_urlsafe(12): 16 characters, 96 bits
 TEMPORARY_PASSWORD_ATTEMPTS = 20
 
@@ -81,14 +92,31 @@ class UserRow:
     last_login_at: datetime | None
     created_at: datetime
     methods: tuple[Literal["password", "oidc", "proxy"], ...]
+    has_two_factor: bool
 
 
-def _row(session: Session, user: User) -> UserRow:
-    providers = set(
-        session.scalars(
-            select(ExternalIdentity.provider).where(ExternalIdentity.user_id == user.id)
-        ).all()
-    )
+def _two_factor_users(session: Session, user_ids: list[UUID] | None = None) -> set[UUID]:
+    """Users with an enabled factor, in one query (``None``: every user)."""
+    statement = select(TotpFactor.user_id).where(TotpFactor.enabled_at.is_not(None))
+    if user_ids is not None:
+        statement = statement.where(TotpFactor.user_id.in_(user_ids))
+    return set(session.scalars(statement))
+
+
+def _providers_by_user(
+    session: Session, user_ids: list[UUID] | None = None
+) -> dict[UUID, set[str]]:
+    """Linked identity providers per user, in one query (``None``: every user)."""
+    statement = select(ExternalIdentity.user_id, ExternalIdentity.provider)
+    if user_ids is not None:
+        statement = statement.where(ExternalIdentity.user_id.in_(user_ids))
+    providers: dict[UUID, set[str]] = {}
+    for user_id, provider in session.execute(statement):
+        providers.setdefault(user_id, set()).add(provider)
+    return providers
+
+
+def _row(user: User, *, providers: set[str], has_two_factor: bool) -> UserRow:
     methods: list[Literal["password", "oidc", "proxy"]] = []
     if user.password_hash is not None:
         methods.append("password")
@@ -106,6 +134,7 @@ def _row(session: Session, user: User) -> UserRow:
         last_login_at=user.last_login_at,
         created_at=user.created_at,
         methods=tuple(methods),
+        has_two_factor=has_two_factor,
     )
 
 
@@ -113,14 +142,29 @@ def list_users(factory: sessionmaker[Session], *, actor_id: UUID) -> list[UserRo
     with factory() as session:
         require_instance_admin(session, actor_id)
         users = session.scalars(select(User).order_by(User.email)).all()
-        return [_row(session, user) for user in users]
+        two_factor = _two_factor_users(session)
+        providers = _providers_by_user(session)
+        return [
+            _row(
+                user,
+                providers=providers.get(user.id, set()),
+                has_two_factor=user.id in two_factor,
+            )
+            for user in users
+        ]
 
 
 def get_user(factory: sessionmaker[Session], *, actor_id: UUID, user_id: UUID) -> UserRow | None:
     with factory() as session:
         require_instance_admin(session, actor_id)
         user = session.get(User, user_id)
-        return _row(session, user) if user is not None else None
+        if user is None:
+            return None
+        return _row(
+            user,
+            providers=_providers_by_user(session, [user.id]).get(user.id, set()),
+            has_two_factor=bool(_two_factor_users(session, [user.id])),
+        )
 
 
 def _other_active_admins(session: Session, user_id: UUID) -> int:
@@ -176,7 +220,17 @@ def apply_admin_action(
     if refusal is not None:
         return refusal
     data: dict[str, str | int | bool] = {}
-    if action == "activate":
+    if action == "reset_totp":
+        if target.id == actor.id:
+            return "self_totp_reset"
+        repository = TotpRepository(session, target.id)
+        factor = repository.factor(lock=True)
+        if factor is None or factor.enabled_at is None:
+            return "unchanged"
+        repository.clear()
+        data["sessions_revoked"] = revoke_all_sessions(session, target.id)
+        audit = "admin.totp_reset"
+    elif action == "activate":
         if target.is_active:
             return "unchanged"
         target.is_active = True
@@ -188,16 +242,20 @@ def apply_admin_action(
         # Every session ends, password, OIDC and proxy alike; sign-in already refuses
         # inactive accounts on every path.
         data["sessions_revoked"] = revoke_all_sessions(session, target.id)
+        invalidate_reset_tokens(session, target.id)
         audit = "admin.user_deactivated"
     elif action == "promote":
         if target.is_instance_admin:
             return "unchanged"
         target.is_instance_admin = True
+        # A role change spends reset links sent earlier (ADR-0017).
+        invalidate_reset_tokens(session, target.id)
         audit = "admin.admin_granted"
     else:
         if not target.is_instance_admin:
             return "unchanged"
         target.is_instance_admin = False
+        invalidate_reset_tokens(session, target.id)
         audit = "admin.admin_revoked"
     record_auth_event(
         session,

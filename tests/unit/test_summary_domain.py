@@ -13,10 +13,12 @@ from assetboard.domain.money import Money
 from assetboard.domain.summary import (
     BLOCK_ORDER,
     Entry,
+    FlowBar,
     PlanLine,
     SummaryCategory,
     block_of,
     difference,
+    flow_bar,
     savings_rate_bp,
     savings_rate_tenths,
     summarize_month,
@@ -63,13 +65,12 @@ def test_golden_example() -> None:
         _eur(102700),
     )
     # Independent hand calculation: earned 3 400.00, spent 550.00 + 4 323.00 = 4 873.00,
-    # saved 0.00; net 3 400 - 4 873 - 0 = -1 473.00; rate -1 473 / 3 400 = -0.4332352...,
-    # i.e. -4 332.35 bp, rounded half away from zero: -4 332 bp.
+    # saved 0.00; net 3 400 - 4 873 - 0 = -1 473.00; savings rate saved / earned = 0.
     kpis = summary.kpis
     assert (kpis.earned, kpis.spent, kpis.saved) == (_eur(340000), _eur(487300), _eur(0))
     assert kpis.net == _eur(-147300)
-    assert kpis.savings_rate_bp == -4332
-    assert kpis.savings_rate_tenths == -433  # -43.3 %, rounded once from the exact ratio
+    assert kpis.savings_rate_bp == 0
+    assert kpis.savings_rate_tenths == 0
 
 
 # Blocks and signs
@@ -152,42 +153,45 @@ def test_withdrawals_are_their_own_block_and_not_in_net() -> None:
     assert summary.block("withdrawn").difference == _eur(-200)
     assert (summary.kpis.earned, summary.kpis.saved) == (_eur(1000), _eur(200))
     assert summary.kpis.net == _eur(800)  # 1 000 - 0 - 200
-    assert summary.kpis.savings_rate_bp == 10000
+    assert summary.kpis.savings_rate_bp == 2000  # 200 saved of 1 000 earned; no withdrawals
 
 
 @pytest.mark.parametrize(
-    ("earned", "spent", "rate"),
+    ("earned", "saved", "rate"),
     [
         (0, 0, None),
         (0, 500, None),
-        (1000, 0, 10000),
-        (1000, 1000, 0),
-        (3, 1, 6667),  # 6 666.67 bp
-        (3, 2, 3333),  # 3 333.33 bp
-        (20000, 19999, 1),  # 0.5 bp rounds up
-        (20000, 20001, -1),  # -0.5 bp rounds away from zero
-        (340000, 487300, -4332),
+        (1000, 0, 0),
+        (1000, 1000, 10000),
+        (3, 2, 6667),  # 6 666.67 bp
+        (3, 1, 3333),  # 3 333.33 bp
+        (20000, 1, 1),  # 0.5 bp rounds up
+        (20000, -1, -1),  # -0.5 bp (refunds above savings) rounds away from zero
+        (300000, 80000, 2667),  # 26.666... %
+        (945000, 150000, 1587),  # 15.873... %
     ],
 )
-def test_savings_rate_in_basis_points(earned: int, spent: int, rate: int | None) -> None:
-    assert savings_rate_bp(earned, spent) == rate
+def test_savings_rate_in_basis_points(earned: int, saved: int, rate: int | None) -> None:
+    assert savings_rate_bp(earned, saved) == rate
 
 
 @pytest.mark.parametrize(
-    ("earned", "spent", "tenths"),
+    ("earned", "saved", "tenths"),
     [
         (0, 1, None),
-        (340000, 487300, -433),  # -43.32 %
-        (200000, 175301, 123),  # 12.3495 %: once, 12.3 % (the bp 1 235 would give 12.4 %)
-        (200000, 175300, 124),  # 12.35 %: half away from zero
-        (200000, 224700, -124),  # -12.35 %
-        (1000, 0, 1000),
+        (300000, 80000, 267),  # 26.67 %: "26.7%" (the owner's example)
+        (945000, 150000, 159),  # 15.87 %: "15.9%" (the owner's example)
+        (340000, 0, 0),
+        (200000, 24699, 123),  # 12.3495 %: once, 12.3 % (the bp 1 235 would give 12.4 %)
+        (200000, 24700, 124),  # 12.35 %: half up
+        (200000, -24700, -124),  # -12.35 %
+        (1000, 1000, 1000),
     ],
 )
 def test_the_displayed_rate_is_rounded_once_from_the_exact_ratio(
-    earned: int, spent: int, tenths: int | None
+    earned: int, saved: int, tenths: int | None
 ) -> None:
-    assert savings_rate_tenths(earned, spent) == tenths
+    assert savings_rate_tenths(earned, saved) == tenths
 
 
 def test_mixed_currencies_and_unknown_categories_are_refused() -> None:
@@ -276,8 +280,52 @@ def test_totals_equal_the_sum_of_rows_and_transfers_never_appear(
 
 
 @given(st.integers(min_value=1, max_value=10**15), st.integers(min_value=0, max_value=10**15))
-def test_the_savings_rate_is_within_half_a_basis_point(earned: int, spent: int) -> None:
-    rate = savings_rate_bp(earned, spent)
+def test_the_savings_rate_is_within_half_a_basis_point(earned: int, saved: int) -> None:
+    rate = savings_rate_bp(earned, saved)
     assert rate is not None
-    exact = (earned - spent) * 10000
+    exact = saved * 10000
     assert abs(rate * earned - exact) * 2 <= earned  # |rate - exact/earned| <= 0.5
+
+
+@pytest.mark.parametrize(
+    ("earned", "spent", "saved", "expected"),
+    [
+        # Earned is the scale: spent, saved, then what is left.
+        (4000_00, 2000_00, 1000_00, FlowBar(500, 750, 1000)),
+        # Spending and saving exceed earnings: their sum is the scale.
+        (3400_00, 4873_00, 0, FlowBar(1000, 1000, 697)),
+        (1000_00, 800_00, 500_00, FlowBar(615, 1000, 769)),
+        # Nothing earned: all of it is overspend.
+        (0, 10_00, 0, FlowBar(1000, 1000, 0)),
+        (0, 0, 0, FlowBar(0, 0, 0)),
+        # Exactly balanced.
+        (100, 60, 40, FlowBar(600, 1000, 1000)),
+        # Negative actuals (refunds above spending) draw nothing.
+        (100, -50, 0, FlowBar(0, 0, 1000)),
+    ],
+)
+def test_flow_bar_segments(earned: int, spent: int, saved: int, expected: FlowBar) -> None:
+    assert flow_bar(earned, spent, saved) == expected
+
+
+def test_flow_bar_parts() -> None:
+    assert flow_bar(0, 0, 0).empty
+    bar = flow_bar(4000, 2000, 1000)
+    assert (bar.left, bar.overspent) == (250, 0)
+    over = flow_bar(1000, 800, 500)
+    assert (over.left, over.overspent) == (0, 231)
+
+
+@given(
+    earned=st.integers(min_value=-(10**12), max_value=10**12),
+    spent=st.integers(min_value=-(10**12), max_value=10**12),
+    saved=st.integers(min_value=-(10**12), max_value=10**12),
+)
+def test_flow_bar_segments_tile_the_scale(earned: int, spent: int, saved: int) -> None:
+    bar = flow_bar(earned, spent, saved)
+    assert 0 <= bar.spent_end <= bar.saved_end <= 1000
+    assert 0 <= bar.earned_end <= 1000
+    assert bar.left == 0 or bar.overspent == 0
+    if not bar.empty:
+        # The longer of earned and spent + saved fills the bar.
+        assert max(bar.earned_end, bar.saved_end) == 1000

@@ -38,6 +38,7 @@ from assetboard.services.external_identity import PROXY_PROVIDER, SignInIdentity
 from assetboard.services.oidc_accounts import sign_in_external
 from assetboard.services.workspace_options import validate_workspace_options
 from assetboard.services.workspaces import create_invitation
+from tests.conftest import ANY_VERIFIED
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 PASSWORD = "Seeding Strong Password"
@@ -147,7 +148,7 @@ def test_without_a_seed_language_the_workspace_locale_is_used(
 
 def test_open_registration_seeds_as_the_new_user(db: WorkspaceDb, tmp_path: Path) -> None:
     _close_setup(db)
-    settings = Settings(_env_file=None, data_dir=tmp_path, allow_registration=True)
+    settings = Settings(_env_file=None, data_dir=tmp_path)
     outcome = auth.register_with_factory(
         db.factory,
         email="reg@example.com",
@@ -159,6 +160,7 @@ def test_open_registration_seeds_as_the_new_user(db: WorkspaceDb, tmp_path: Path
         host="192.0.2.1",
         workspace_locale="en",
         seed_locale="pl",
+        verified=ANY_VERIFIED,
     )
     assert outcome.status == "created" and outcome.user and outcome.workspace
     assert _categories(db, outcome.workspace.id) == _expected("pl")
@@ -421,9 +423,10 @@ def test_a_seed_constraint_error_in_registration_is_not_reported_as_a_taken_emai
             display_name="Registrant",
             password=PASSWORD,
             workspace_name="Mine",
-            settings=Settings(_env_file=None, data_dir=tmp_path, allow_registration=True),
+            settings=Settings(_env_file=None, data_dir=tmp_path),
             clock=db.clock,
             host="192.0.2.3",
+            verified=ANY_VERIFIED,
         )
     assert isinstance(failed.value.__cause__, IntegrityError)
     with db.factory() as session:

@@ -20,8 +20,11 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_DEFAULT_LOCALE` | `en` | App | Two-letter lowercase default locale. |
 | `ASSETBOARD_DEFAULT_CURRENCY` | `EUR` | App | Three-letter ISO currency used as the default. |
 | `ASSETBOARD_AUTO_MIGRATE` | `true` | App | Apply pending database migrations at startup when enabled. Only one instance/worker may use a data volume with automatic migrations enabled. |
+| `ASSETBOARD_RECURRENCE_HORIZON_MONTHS` | `13` | App | Calendar months ahead for generating scheduled occurrences; must be positive. |
+| `ASSETBOARD_UPCOMING_DAYS` | `30` | App | Days ahead shown in the Upcoming inbox, in addition to all overdue occurrences; 1 to 365. |
+| `ASSETBOARD_SCHEDULER_ENABLED` | `true` | App | Enable in-process recurring generation and auto-post jobs. Disable for tests or when running jobs separately. |
 | `ASSETBOARD_SETUP_TOKEN` | unset | App | First-run setup token (at least 22 characters; use a random value). If unset, a 256-bit token is generated at each process start and logged once at `WARNING` while no user exists. A configured token is never logged. |
-| `ASSETBOARD_ALLOW_REGISTRATION` | `false` | App | Allow open self-registration; each registrant gets a new empty workspace they own. |
+| `ASSETBOARD_ALLOW_REGISTRATION` | unset | App | **Removed** (pre-release B). Open registration is turned on in **Instance settings** and needs SMTP. `true` refuses to start with a message; `false` is ignored with a warning. Remove the variable. |
 | `ASSETBOARD_SESSION_IDLE_TIMEOUT_DAYS` | `14` | App | Sessions expire after this many days without activity. Must not exceed the absolute timeout. |
 | `ASSETBOARD_SESSION_ABSOLUTE_TIMEOUT_DAYS` | `60` | App | Sessions expire this many days after login regardless of activity. |
 | `ASSETBOARD_AUTH_ACCOUNT_FREE_FAILURES` | `5` | App | Sign-in attempts per email (successful ones included) within the window of `ASSETBOARD_AUTH_IP_WINDOW_MINUTES` before exponential backoff starts; nothing resets the count. The same number of wrong current passwords (password change, confirming a change) is allowed per user, in a separate count that a correct password resets. |
@@ -30,9 +33,19 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_AUTH_THROTTLE_BASE_SECONDS` | `60` | App | First backoff delay; it doubles with each further failure. |
 | `ASSETBOARD_AUTH_THROTTLE_MAX_SECONDS` | `900` | App | Maximum backoff delay (bounds how long an attacker can lock an account). |
 | `ASSETBOARD_SETUP_THROTTLE_FREE_FAILURES` | `5` | App | Wrong setup-token attempts per client address before backoff starts. |
-| `ASSETBOARD_REGISTRATION_IP_LIMIT` | `5` | App | Registration attempts (successful or not) allowed per client address within the registration window. |
+| `ASSETBOARD_REGISTRATION_IP_LIMIT` | `5` | App | Registration attempts (successful or not) allowed per client address within the registration window. Open registration counts both of its steps (the email form and the form behind the emailed link); accounts created through OIDC or the proxy count too. |
 | `ASSETBOARD_REGISTRATION_WINDOW_MINUTES` | `60` | App | Window for the registration attempt limit. |
 | `ASSETBOARD_AUTH_MAX_CONCURRENT_HASHES` | `2` | App | Password hashes (Argon2id, about 64 MiB of memory each) computed at the same time, 1 to 8. At most 16 further sign-in requests wait in total; when 16 are already waiting, or a wait exceeds 10 seconds, they get HTTP 503 with `Retry-After`. Health checks are not affected. |
+| `ASSETBOARD_SMTP_HOST` | unset | App | SMTP server for outgoing email (registration links, password reset). Unset turns email off: no open registration, no "Forgot your password?". With it set, `BASE_URL` must be set explicitly (links in emails are built from it) and use `https://` unless `ENV=dev`. See [Email](#email). |
+| `ASSETBOARD_SMTP_PORT` | by security | App | SMTP port; default 587 for `starttls`, 465 for `tls`, 25 for `none`. |
+| `ASSETBOARD_SMTP_SECURITY` | `starttls` | App | `starttls`, `tls` (implicit TLS) or `none`. Certificates are always verified. A password with `none` refuses to start outside `ENV=dev`; `none` to a host other than this one logs a warning at startup. |
+| `ASSETBOARD_SMTP_USERNAME` | unset | App | SMTP user name; set together with the password, or neither. |
+| `ASSETBOARD_SMTP_PASSWORD` | unset | App | SMTP password. Never logged or shown. |
+| `ASSETBOARD_SMTP_FROM` | unset | App | Sender address, required with `SMTP_HOST` (for example `budget@example.com`); the display name is the application name. |
+| `ASSETBOARD_SMTP_TIMEOUT_SECONDS` | `10` | App | Connection and command timeout, 1 to 120 seconds. |
+| `ASSETBOARD_MAIL_EMAIL_LIMIT` | `3` | App | Emails per address (registration and password reset together) within the mail window. Requests beyond it get the same answer, but no email is sent, and a `mail_address_limit` warning with a keyed hash of the address is logged. Counted the same way whether or not an account has the address, so anyone can use up an address's quota for one window. |
+| `ASSETBOARD_MAIL_IP_LIMIT` | `10` | App | "Forgot your password?" requests and new passwords set from a link, per client address within the mail window; beyond it the page says to try later. |
+| `ASSETBOARD_MAIL_WINDOW_MINUTES` | `60` | App | Window for the two mail limits, 1 to 1440 minutes. |
 | `ASSETBOARD_OIDC_ISSUER` | unset | App | OIDC provider's issuer URL, exactly as its discovery document states it (trailing slash included). Setting it turns OIDC sign-in on; it must be `https://` unless `ASSETBOARD_ENV=dev`, and `ASSETBOARD_BASE_URL` must then be set explicitly (and `https://` outside dev). See [docs/auth/oidc.md](auth/oidc.md). |
 | `ASSETBOARD_OIDC_CLIENT_ID` | unset | App | Client ID registered at the provider. Required with `OIDC_ISSUER`. The redirect URI to register is `<BASE_URL>/auth/oidc/callback`. |
 | `ASSETBOARD_OIDC_CLIENT_SECRET` | unset | App | Client secret; never logged. Unset means a public client that relies on PKCE alone. |
@@ -43,7 +56,7 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_OIDC_ALLOWED_DOMAINS` | empty | App | Comma-separated email domains allowed to sign in with OIDC (exact match, verified email required). Empty allows any. Checked at every sign-in. |
 | `ASSETBOARD_OIDC_GROUPS_CLAIM` | `groups` | App | Claim holding the user's groups; only read when `OIDC_ADMIN_GROUP` is set. |
 | `ASSETBOARD_OIDC_ADMIN_GROUP` | unset | App | Members of this group become instance administrators at OIDC sign-in, and non-members lose it (never the last active one). A missing or malformed groups claim changes nothing. |
-| `ASSETBOARD_OIDC_ONLY` | `false` | App | Hide password sign-in and registration. Needs `OIDC_ISSUER`; refuses to start with `ALLOW_REGISTRATION`. |
+| `ASSETBOARD_OIDC_ONLY` | `false` | App | Hide password sign-in, open registration and password reset by email. Needs `OIDC_ISSUER`. |
 | `ASSETBOARD_ALLOW_LOCAL_ADMIN_LOGIN` | `false` | App | Break-glass: with `OIDC_ONLY`, keep password sign-in at `/login/local` for instance administrators. No effect otherwise. |
 | `ASSETBOARD_OIDC_RP_LOGOUT` | `false` | App | Signing out of an OIDC session also signs out at the provider (RP-initiated logout), if it publishes an `end_session_endpoint`. Register `<BASE_URL>/login` as the post-logout redirect URI. |
 | `ASSETBOARD_PROXY_AUTH_ENABLED` | `false` | App | Reverse-proxy header authentication ([ADR-0015](adr/0015-proxy-header-authentication.md)). Requires `PROXY_AUTH_USER_HEADER`, `PROXY_AUTH_EMAIL_HEADER` and `TRUSTED_PROXIES` with no entry wider than IPv4 /24 or IPv6 /64. Read [docs/auth/proxy-auth.md](auth/proxy-auth.md) first. |
@@ -52,6 +65,8 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_PROXY_AUTH_NAME_HEADER` | unset | App | Optional header with a display name, used only when an account is created. |
 | `ASSETBOARD_PROXY_AUTH_AUTO_CREATE` | `false` | App | Proxy-authenticated people without an account get one with their own workspace. |
 | `ASSETBOARD_PROXY_AUTH_LINK_BY_EMAIL` | `false` | App | A first proxy sign-in whose email matches an existing account with a password links them after that password is entered once. |
+| `ASSETBOARD_RECURRENCE_HORIZON_MONTHS` | `13` | App | Positive number of calendar months of recurring occurrences to generate ahead. |
+| `ASSETBOARD_SCHEDULER_ENABLED` | `true` | App | Run the in-process recurring-item scheduler (daily generation and startup catch-up). The test suite sets `false`. |
 | `ASSETBOARD_BIND_ADDRESS` | `127.0.0.1` | Compose only | Host interface to publish. Use `0.0.0.0` to listen on all host interfaces. |
 | `ASSETBOARD_HOST_PORT` | `8000` | Compose only | Host port mapped to the container's port 8000. |
 | `ASSETBOARD_IMAGE` | `assetboard:local` | Compose only | Image reference interpolated by Compose. Set this when running a published image with `--no-build`. |
@@ -71,20 +86,64 @@ alternative that needs no token.
 
 Sessions are stored on the server. The session cookie lasts for the absolute session lifetime
 (`ASSETBOARD_SESSION_ABSOLUTE_TIMEOUT_DAYS`); the idle timeout is enforced on the server. For MFA,
-prefer OIDC or reverse-proxy auth backed by an IdP that enforces multi-factor authentication; TOTP
-is intentionally deferred to the post-1.0 backlog. Run a single application process (one Uvicorn
-worker): the setup token, the password-hashing limit and some caches live in the process.
+users with local passwords can enroll TOTP in their profile
+(see [account security](accounts.md#two-factor-authentication)).
+OIDC and reverse-proxy sign-ins delegate MFA to their identity provider. Run a single application
+process (one Uvicorn worker): the setup token, the password-hashing limit and some caches live in
+the process.
+
+### Secret key and two-factor authentication
+
+Back up `ASSETBOARD_SECRET_KEY` or the persistent `DATA_DIR/secret_key` together with the database:
+TOTP secrets are encrypted with a key derived from it. Keep the key outside database-only exports.
+Replacing or losing this key makes existing authenticator secrets unreadable: authenticator codes
+then fail for those users (the log shows a warning "An authenticator secret could not be
+decrypted"), while recovery codes still work. Restore the previous key, or have each affected
+user sign in with a recovery code, disable two-factor authentication and enroll again; an
+administrator can also reset it (**Users**, or `assetboard reset-mfa` below). A password reset
+does not remove MFA.
+
+### Recurring-item generation
+
+`ASSETBOARD_RECURRENCE_HORIZON_MONTHS` is a positive integer (default `13`). Planned occurrences
+are generated immediately on rule changes and workspace country changes, shortly after startup
+(a background catch-up job, so startup does not wait for it) and daily at 03:00 in each
+workspace's time zone. Keep one application process/worker: the scheduler lives in the process,
+and the app logs a warning at startup when `WEB_CONCURRENCY` asks for more than one worker.
+`ASSETBOARD_SCHEDULER_ENABLED=false` turns the scheduler off (generation on rule changes still
+happens). New workspaces/time-zone changes are discovered within a minute. Calendars are local;
+no external service is contacted. See [Recurring items](recurring.md).
 
 ### Invitations
 
-Workspace owners add people from **Members** with an invitation link. AssetBoard sends no email:
-copy the link (it is shown only once) and share it privately. The link works once and expires
-after 1, 7 or 30 days. Whoever opens it can sign in, or create an account even when
-`ASSETBOARD_ALLOW_REGISTRATION` is off; an account created this way joins only that workspace.
+Workspace owners add people from **Members** with an invitation link. AssetBoard does not email
+invitations: copy the link (it is shown only once) and share it privately. The link works once
+and expires after 1, 7 or 30 days. Whoever opens it can sign in, or create an account even when
+open registration is off; an account created this way joins only that workspace.
 Every invitation is locked to an email address: only an account with that address can accept
 it. The lock is not proof that the person controls that address, since email addresses are not
 verified. See
 [ADR-0013](adr/0013-invitation-links.md).
+
+### Email
+
+With `ASSETBOARD_SMTP_HOST` and `ASSETBOARD_SMTP_FROM` set, AssetBoard sends plain-text email
+for two things only ([ADR-0017](adr/0017-email-and-account-recovery.md)):
+
+- **Open registration**, once an instance administrator turns it on under **Instance settings**
+  (it cannot be turned on without SMTP, nor under `ASSETBOARD_OIDC_ONLY`). People enter their
+  email address and get a link (valid 24 hours) to finish creating their account; nothing is
+  created before that.
+- **"Forgot your password?"** on the sign-in page (not under `ASSETBOARD_OIDC_ONLY`). The link
+  is valid for 60 minutes; setting a new password signs out every device of that account.
+
+Both forms answer the same way for every address, so they never tell whether an account exists.
+Emails are sent from a queue in the application process, after the page has answered and a
+random wait of 0.5 to 3 seconds: a send
+that fails is logged (`mail_send_failed`, with the error class only) and not retried, and
+emails still queued when the process stops are lost; people simply ask again. Run
+`assetboard mail-test you@example.com` to check the settings: it prints "Test email sent" or the
+class of the error, never the server's reply or the password.
 
 ### Database schema state
 
@@ -113,9 +172,15 @@ migrations first, like application startup; with `false` they refuse to run unti
 - `assetboard reset-password <email>` sets a new password for any user (prompted, or from stdin
   with `--password-stdin`) and signs that user out of every session. It does not change whether the
   account is active. Anyone who can run commands in the container can therefore take over any
-  account; protect shell access accordingly.
+  account; protect shell access accordingly. It does not remove two-factor authentication.
+- `assetboard reset-mfa <email>` removes a user's two-factor authentication (authenticator and
+  recovery codes) and signs that user out of every password session; identity provider and proxy
+  sessions are unaffected. Use it when the user has lost every recovery method and no
+  administrator can reset it from **Users**. The user then signs in with their password and can
+  enroll again; a workspace that requires two-factor authentication stays inaccessible until they
+  do.
 
-Both commands write an audit event with the CLI as the actor.
+Each command writes an audit event with the CLI as the actor.
 
 ## Run a published image
 
@@ -124,9 +189,17 @@ Release images are published on GHCR as `ghcr.io/lexanderpl/assetboard` for `lin
 Compose without building locally:
 
 ```bash
-export ASSETBOARD_IMAGE=ghcr.io/lexanderpl/assetboard:0.2.0 # x-release-please-version
+export ASSETBOARD_IMAGE=ghcr.io/lexanderpl/assetboard:0.3.0 # x-release-please-version
 docker compose -f compose.example.yaml up -d --no-build
 ```
+
+## Build from source
+
+`docker compose -f compose.example.yaml build` (or `docker build .`) and `uv build` work from a
+plain git checkout. The compiled translation catalogs (`messages.mo`) are not in the repository:
+the wheel's build hook (`hatch_build.py`) compiles them from the committed `.po` files, using Babel
+as a build requirement, so both the wheel and the image include them. The image build fails if
+they are missing.
 
 ## Release automation credentials
 
@@ -203,6 +276,29 @@ when you intend to upload the image and its release tags.
 
 ## Upgrading
 
+### Unreleased: two-factor authentication (F1.6)
+
+- Migration `0016_f16_totp` adds the `totp_factors` and `totp_recovery_codes` tables, a session
+  flag and the `require_two_factor` workspace setting (off). Nothing changes until a user enrolls
+  or an owner turns the setting on. Back up the secret key with the database (see [Secret key and two-factor authentication](#secret-key-and-two-factor-authentication)).
+
+### Unreleased: recurring items (F3.1)
+
+- Migration `0015_f31` adds the `scheduled_items` and `scheduled_occurrences` tables.
+- The in-process scheduler generates planned occurrences at startup (in the background) and
+  daily at 03:00 workspace time. Run one worker; `ASSETBOARD_SCHEDULER_ENABLED=false` turns the
+  scheduler off. See [Recurring-item generation](#recurring-item-generation).
+
+### Unreleased: email, verified registration and password reset (pre-release B)
+
+- **`ASSETBOARD_ALLOW_REGISTRATION` is removed.** With `true` the application refuses to start
+  and says so; with `false` it logs a warning. Remove the variable. Open registration is now
+  an instance setting (**Instance settings → Registration**, off by default) and needs SMTP
+  (`ASSETBOARD_SMTP_*`, see [Email](#email)): registrants confirm their address through an
+  emailed link before the account exists. Without SMTP there is no open registration.
+- With SMTP configured, the sign-in page offers **Forgot your password?**.
+- Migration `0014_email_tokens` adds the `email_tokens` table and the registration setting.
+
 ### Unreleased: self-service workspaces (pre-release A)
 
 - Migration `0013_instance_settings` adds the `instance_settings` table with one row. Any
@@ -259,7 +355,8 @@ when you intend to upload the image and its release tags.
 
 ### Unreleased: categories (F2.1)
 
-- **Categories page** at "Categories" in the main navigation; see
+- **Categories page** at "Categories" in the account menu (in the main navigation before the
+  2026-10-24 UI polish); see
   [docs/categories.md](categories.md). The migration adds the `categories` table and changes no
   existing data. No new setting.
 
@@ -354,7 +451,7 @@ when you intend to upload the image and its release tags.
   container needs outbound HTTPS access to the provider; a private CA is trusted through
   `SSL_CERT_FILE` (see [docs/auth/oidc.md](auth/oidc.md)).
 - **Settings that refuse to start:** `OIDC_ONLY` without `OIDC_ISSUER`, `OIDC_ONLY` with
-  `ALLOW_REGISTRATION`, and OIDC without an explicit `BASE_URL` (or with an `http://` issuer or
+  `ALLOW_REGISTRATION` (removed since pre-release B), and OIDC without an explicit `BASE_URL` (or with an `http://` issuer or
   `BASE_URL` outside `ENV=dev`).
 - **Before turning on `OIDC_ONLY`**, sign in once as an administrator through the provider, or
   set `ASSETBOARD_ALLOW_LOCAL_ADMIN_LOGIN=true` to keep `/login/local`.

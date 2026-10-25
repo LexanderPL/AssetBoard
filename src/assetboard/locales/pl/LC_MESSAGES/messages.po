@@ -124,6 +124,24 @@ msgstr "Wypłata z oszczędności"
 msgid "Enter a valid amount."
 msgstr "Podaj prawidłową kwotę."
 
+msgid "Recurring item created"
+msgstr "Utworzono pozycję cykliczną"
+
+msgid "Recurring item updated"
+msgstr "Zaktualizowano pozycję cykliczną"
+
+msgid "Recurring item paused"
+msgstr "Wstrzymano pozycję cykliczną"
+
+msgid "Recurring item resumed"
+msgstr "Wznowiono pozycję cykliczną"
+
+msgid "Recurring item archived"
+msgstr "Zarchiwizowano pozycję cykliczną"
+
+msgid "Recurring item deleted"
+msgstr "Usunięto pozycję cykliczną"
+
 msgid "First administrator created at setup"
 msgstr "Pierwszy administrator utworzony podczas konfiguracji"
 
@@ -132,6 +150,9 @@ msgstr "Administrator utworzony z wiersza poleceń"
 
 msgid "Password reset on the command line"
 msgstr "Hasło zresetowane z wiersza poleceń"
+
+msgid "Two-factor authentication reset on the command line"
+msgstr "Uwierzytelnianie dwuskładnikowe zresetowane z wiersza poleceń"
 
 msgid "Signed in"
 msgstr "Zalogowano"
@@ -147,6 +168,21 @@ msgstr "Zarejestrowano konto"
 
 msgid "Password changed"
 msgstr "Zmieniono hasło"
+
+msgid "Password reset link sent"
+msgstr "Wysłano link do resetu hasła"
+
+msgid "Password reset by email"
+msgstr "Hasło zresetowane przez e-mail"
+
+msgid "Two-factor authentication enabled"
+msgstr "Włączono uwierzytelnianie dwuskładnikowe"
+
+msgid "Two-factor authentication disabled"
+msgstr "Wyłączono uwierzytelnianie dwuskładnikowe"
+
+msgid "Two-factor recovery codes regenerated"
+msgstr "Wygenerowano nowe kody odzyskiwania"
 
 msgid "Password confirmation failed"
 msgstr "Nieudane potwierdzenie hasłem"
@@ -184,11 +220,17 @@ msgstr "Aktywowano konto"
 msgid "Account deactivated"
 msgstr "Dezaktywowano konto"
 
+msgid "Two-factor authentication reset by an administrator"
+msgstr "Administrator zresetował uwierzytelnianie dwuskładnikowe"
+
 msgid "Workspace settings changed"
 msgstr "Zmieniono ustawienia obszaru roboczego"
 
 msgid "Workspace created"
 msgstr "Utworzono obszar roboczy"
+
+msgid "Workspace deleted"
+msgstr "Usunięto obszar roboczy"
 
 msgid "Instance settings changed"
 msgstr "Zmieniono ustawienia instancji"
@@ -246,6 +288,9 @@ msgstr "Usunięto transakcję"
 
 msgid "Deleted transaction restored"
 msgstr "Przywrócono usuniętą transakcję"
+
+msgid "Category of several transactions changed"
+msgstr "Zmieniono kategorię wielu transakcji"
 
 msgid "Planned value added"
 msgstr "Dodano wartość planowaną"
@@ -343,6 +388,9 @@ msgstr "Liczba"
 msgid "Every signed-in user can create workspaces"
 msgstr "Każdy zalogowany użytkownik może tworzyć obszary robocze"
 
+msgid "Open registration"
+msgstr "Otwarta rejestracja"
+
 msgid "Month"
 msgstr "Miesiąc"
 
@@ -370,6 +418,12 @@ msgstr "Poprzednia kwota"
 msgid "Currency"
 msgstr "Waluta"
 
+msgid "Previous categories"
+msgstr "Poprzednie kategorie"
+
+msgid "Months"
+msgstr "Miesiące"
+
 msgid "Copied from"
 msgstr "Skopiowano z"
 
@@ -390,6 +444,9 @@ msgstr "obserwator"
 
 msgid "not an instance administrator"
 msgstr "nie jest administratorem instancji"
+
+msgid "second factor not verified"
+msgstr "drugi składnik niezweryfikowany"
 
 msgid "no account for this sign-in"
 msgstr "brak konta dla tego logowania"
@@ -462,6 +519,9 @@ msgstr "profil"
 
 msgid "an invitation"
 msgstr "zaproszenie"
+
+msgid "a confirmed email address"
+msgstr "potwierdzony adres e-mail"
 
 msgid "an invitation, through the identity provider"
 msgstr "zaproszenie, przez dostawcę tożsamości"
@@ -595,6 +655,29 @@ msgstr "Administracja kontami"
 msgid "Instance settings"
 msgstr "Ustawienia instancji"
 
+msgid "Deleted workspaces"
+msgstr "Usunięte obszary robocze"
+
+#, python-format
+msgid "Confirm your email address for %(app)s"
+msgstr "Potwierdź adres e-mail w %(app)s"
+
+#, python-format
+msgid "You already have an account at %(app)s"
+msgstr "Masz już konto w %(app)s"
+
+#, python-format
+msgid "Reset your %(app)s password"
+msgstr "Zresetuj hasło do %(app)s"
+
+#, python-format
+msgid "About your %(app)s password"
+msgstr "W sprawie hasła do %(app)s"
+
+#, python-format
+msgid "Test email from %(app)s"
+msgstr "Testowy e-mail z %(app)s"
+
 msgid "Same as the system"
 msgstr "Jak w systemie"
 
@@ -683,6 +766,9 @@ msgstr "Nadaj uprawnienia administratora instancji"
 msgid "Remove instance administrator"
 msgstr "Odbierz uprawnienia administratora instancji"
 
+msgid "Reset two-factor authentication"
+msgstr "Zresetuj uwierzytelnianie dwuskładnikowe"
+
 #, python-format
 msgid "%(user)s can sign in again."
 msgstr "%(user)s znów może się logować."
@@ -704,6 +790,17 @@ msgstr "%(user)s może zarządzać wszystkimi kontami w tej instancji."
 msgid "%(user)s can no longer manage accounts on this instance."
 msgstr "%(user)s nie może już zarządzać kontami w tej instancji."
 
+#, python-format
+msgid ""
+"Remove %(user)s's authenticator and recovery codes, end every session, "
+"and require them to enroll again before accessing workspaces that require"
+" two-factor authentication."
+msgstr ""
+"Usuń aplikację uwierzytelniającą i kody odzyskiwania użytkownika "
+"%(user)s, zakończ wszystkie jego sesje i wymagaj ponownej konfiguracji "
+"przed dostępem do obszarów roboczych wymagających uwierzytelniania "
+"dwuskładnikowego."
+
 msgid "Done."
 msgstr "Gotowe."
 
@@ -716,6 +813,13 @@ msgid ""
 msgstr ""
 "Nie możesz dezaktywować własnego konta ani odebrać sobie uprawnień "
 "administratora."
+
+msgid ""
+"Use your own account security page to manage your two-factor "
+"authentication."
+msgstr ""
+"Do zarządzania własnym uwierzytelnianiem dwuskładnikowym użyj strony "
+"zabezpieczeń konta."
 
 msgid "This is the last active administrator, so this would leave none."
 msgstr "To ostatni aktywny administrator; po tej zmianie nie zostałby żaden."
@@ -733,8 +837,20 @@ msgstr "Zapisano ustawienia instancji."
 msgid "Nothing to change: the settings already had these values."
 msgstr "Nie ma nic do zmiany: ustawienia mają już te wartości."
 
-msgid "Choose who can create workspaces."
-msgstr "Wybierz, kto może tworzyć obszary robocze."
+msgid "Open registration needs an email server: set ASSETBOARD_SMTP_HOST first."
+msgstr ""
+"Otwarta rejestracja wymaga serwera poczty: najpierw ustaw "
+"ASSETBOARD_SMTP_HOST."
+
+msgid ""
+"Open registration is not available while only the identity provider signs"
+" people in (ASSETBOARD_OIDC_ONLY)."
+msgstr ""
+"Otwarta rejestracja jest niedostępna, gdy logowanie odbywa się wyłącznie "
+"przez dostawcę tożsamości (ASSETBOARD_OIDC_ONLY)."
+
+msgid "Choose a value for each setting."
+msgstr "Wybierz wartość każdego ustawienia."
 
 msgid "Enter a valid email address."
 msgstr "Podaj prawidłowy adres e-mail."
@@ -811,12 +927,6 @@ msgstr ""
 
 msgid "Setup in progress"
 msgstr "Konfiguracja w toku"
-
-msgid "Too many registration attempts from your network. Try again later."
-msgstr "Zbyt wiele prób rejestracji z Twojej sieci. Spróbuj ponownie później."
-
-msgid "This email address cannot be registered."
-msgstr "Nie można zarejestrować tego adresu e-mail."
 
 msgid ""
 "This account has no password: it signs in with your identity provider. An"
@@ -905,6 +1015,50 @@ msgstr ""
 "Zaloguj się ponownie, aby potwierdzić tę zmianę: bez hasła wymaga ona "
 "logowania z ostatnich 10 minut."
 
+msgid "Check your inbox"
+msgstr "Sprawdź skrzynkę pocztową"
+
+msgid ""
+"If this address can be registered, we sent it a link to finish creating "
+"your account. The link works for 24 hours. Nothing arrived? Check your "
+"spam folder, or ask again later."
+msgstr ""
+"Jeśli ten adres można zarejestrować, wysłaliśmy na niego link do "
+"dokończenia zakładania konta. Link działa przez 24 godziny. Nic nie "
+"przyszło? Sprawdź folder ze spamem albo poproś ponownie później."
+
+msgid ""
+"If an account uses this address, we sent it an email with the next step. "
+"A password reset link works for 60 minutes. Nothing arrived? Check your "
+"spam folder, or ask again later."
+msgstr ""
+"Jeśli jakieś konto używa tego adresu, wysłaliśmy na niego e-mail z "
+"dalszymi krokami. Link do resetu hasła działa przez 60 minut. Nic nie "
+"przyszło? Sprawdź folder ze spamem albo poproś ponownie później."
+
+msgid "Link not valid"
+msgstr "Link jest nieważny"
+
+msgid ""
+"This link is not valid: it may have expired or been used already. Ask for"
+" a new one."
+msgstr ""
+"Ten link jest nieważny: mógł wygasnąć albo zostać już użyty. Poproś o "
+"nowy."
+
+msgid ""
+"Your password was changed, and every device signed in to this account was"
+" signed out. Sign in with the new password."
+msgstr ""
+"Hasło zostało zmienione, a wszystkie urządzenia zalogowane na to konto "
+"zostały wylogowane. Zaloguj się nowym hasłem."
+
+msgid "Too many registration attempts from your network. Try again later."
+msgstr "Zbyt wiele prób rejestracji z Twojej sieci. Spróbuj ponownie później."
+
+msgid "Too many requests from your network. Try again later."
+msgstr "Zbyt wiele żądań z Twojej sieci. Spróbuj ponownie później."
+
 msgid "This request came from another site and was blocked."
 msgstr "To żądanie pochodziło z innej witryny i zostało zablokowane."
 
@@ -975,6 +1129,9 @@ msgstr "Edytor"
 
 msgid "Viewer"
 msgstr "Przeglądający"
+
+msgid "This email address cannot be registered."
+msgstr "Nie można zarejestrować tego adresu e-mail."
 
 msgid ""
 "Enter a day of the month (1-31) or a date such as 2026-10-07 or "
@@ -1218,6 +1375,119 @@ msgstr ""
 "skonfigurowanym adresem (%(base_url)s), zezwól na pliki cookie dla niej i"
 " spróbuj ponownie."
 
+msgid "Enter a name."
+msgstr "Podaj nazwę."
+
+msgid "Choose an active category matching the direction."
+msgstr "Wybierz aktywną kategorię zgodną z kierunkiem."
+
+msgid "Enter a positive amount in the workspace currency."
+msgstr "Podaj dodatnią kwotę w walucie obszaru roboczego."
+
+msgid "Enter a valid start date."
+msgstr "Podaj prawidłową datę początkową."
+
+msgid "Enter an end date on or after the start date, or leave it empty."
+msgstr ""
+"Podaj datę końcową nie wcześniejszą niż początkowa albo pozostaw pole "
+"puste."
+
+msgid "Enter a whole number of 1 or more, or leave it empty."
+msgstr "Podaj liczbę całkowitą równą co najmniej 1 albo pozostaw pole puste."
+
+msgid "Enter a whole number of 1 or more."
+msgstr "Podaj liczbę całkowitą równą co najmniej 1."
+
+msgid "Choose at least one weekday for a weekly rule."
+msgstr "Wybierz co najmniej jeden dzień tygodnia dla reguły tygodniowej."
+
+msgid "This day does not exist in the chosen month."
+msgstr "Ten dzień nie istnieje w wybranym miesiącu."
+
+msgid "Choose a month."
+msgstr "Wybierz miesiąc."
+
+msgid ""
+"Holiday adjustments need a workspace country with holiday data, or no "
+"country."
+msgstr ""
+"Przesuwanie dat o święta wymaga kraju obszaru roboczego z danymi o "
+"świętach albo braku kraju."
+
+msgid "This recurring item is archived and cannot change."
+msgstr "Ta pozycja cykliczna jest zarchiwizowana i nie można jej zmienić."
+
+msgid ""
+"This item adjusts dates to working days, and the workspace country has no"
+" holiday data."
+msgstr ""
+"Ta pozycja przesuwa daty na dni robocze, a dla kraju obszaru roboczego "
+"brak danych o świętach."
+
+msgid "The recurring item could not be saved. Check the form and try again."
+msgstr ""
+"Nie udało się zapisać pozycji cyklicznej. Sprawdź formularz i spróbuj "
+"ponownie."
+
+msgid "Monday"
+msgstr "Poniedziałek"
+
+msgid "Tuesday"
+msgstr "Wtorek"
+
+msgid "Wednesday"
+msgstr "Środa"
+
+msgid "Thursday"
+msgstr "Czwartek"
+
+msgid "Friday"
+msgstr "Piątek"
+
+msgid "Saturday"
+msgstr "Sobota"
+
+msgid "Sunday"
+msgstr "Niedziela"
+
+msgid "Choose a valid tax effect and base."
+msgstr "Wybierz prawidłowy rodzaj i podstawę podatku."
+
+msgid "Enter a valid effective date between 1900 and 2199."
+msgstr "Podaj prawidłową datę z zakresu od 1900 do 2199."
+
+msgid "Enter a non-negative percentage with at most two decimal places."
+msgstr "Podaj nieujemny procent z co najwyżej dwoma miejscami po przecinku."
+
+msgid "Enter a non-negative fixed amount in the workspace currency."
+msgstr "Podaj nieujemną kwotę w walucie obszaru roboczego."
+
+msgid "Enter a non-negative net amount in the workspace currency."
+msgstr "Podaj nieujemną kwotę netto w walucie obszaru roboczego."
+
+msgid "A new version must start after the latest existing version."
+msgstr "Nowa wersja musi obowiązywać od daty późniejszej niż najnowsza wersja."
+
+msgid "Archived tax rules cannot be changed."
+msgstr "Nie można zmieniać zarchiwizowanych reguł podatkowych."
+
+msgid "Choose how the income is recorded."
+msgstr "Wybierz sposób zapisu przychodu."
+
+msgid "The tax rule could not be saved. Check the form and try again."
+msgstr ""
+"Nie udało się zapisać reguły podatkowej. Sprawdź formularz i spróbuj "
+"ponownie."
+
+msgid "Cash received (gross)"
+msgstr "Wpływ brutto"
+
+msgid "Net"
+msgstr "Netto"
+
+msgid "Take-home"
+msgstr "Na rękę"
+
 msgid "Too many attempts. Try again later."
 msgstr "Zbyt wiele prób. Spróbuj ponownie później."
 
@@ -1227,6 +1497,98 @@ msgid_plural "Too many attempts. Try again in %(num)d minutes."
 msgstr[0] "Zbyt wiele prób. Spróbuj ponownie za %(num)d minutę."
 msgstr[1] "Zbyt wiele prób. Spróbuj ponownie za %(num)d minuty."
 msgstr[2] "Zbyt wiele prób. Spróbuj ponownie za %(num)d minut."
+
+msgid "The code is not valid or enrollment has expired."
+msgstr "Kod jest nieprawidłowy lub czas konfiguracji upłynął."
+
+msgid "Enter a date such as 2026-10-07 or 07.10.2026."
+msgstr "Podaj datę, na przykład 2026-10-07 lub 07.10.2026."
+
+msgid "The end date is before the start date."
+msgstr "Data końcowa jest wcześniejsza niż początkowa."
+
+msgid "Choose expenses, income or both."
+msgstr "Wybierz wydatki, przychody albo oba rodzaje."
+
+msgid "The amount cannot be negative."
+msgstr "Kwota nie może być ujemna."
+
+msgid "The largest amount is below the smallest."
+msgstr "Największa kwota jest mniejsza niż najmniejsza."
+
+msgid "Choose one of the listed options."
+msgstr "Wybierz jedną z opcji z listy."
+
+msgid ""
+"A decimal comma needs the semicolon delimiter, so that amounts stay one "
+"column."
+msgstr ""
+"Przecinek dziesiętny wymaga średnika jako separatora pól, aby kwoty "
+"pozostały w jednej kolumnie."
+
+msgid "Select at least one entry."
+msgstr "Zaznacz co najmniej jeden wpis."
+
+#, python-format
+msgid ""
+"Too many entries for one change (at most %(max)d). Narrow the filters "
+"first."
+msgstr "Za dużo wpisów na jedną zmianę (najwyżej %(max)d). Najpierw zawęź filtry."
+
+#, python-format
+msgid ""
+"Too many ticked entries (at most %(max)d at a time). Tick fewer, or "
+"change all matching entries."
+msgstr ""
+"Zaznaczono za dużo wpisów (najwyżej %(max)d naraz). Zaznacz mniej albo "
+"zmień wszystkie pasujące wpisy."
+
+msgid "Choose an active category."
+msgstr "Wybierz aktywną kategorię."
+
+msgid ""
+"Choose a category of the same kind as the entries. To change expenses and"
+" income, filter by one of them first."
+msgstr ""
+"Wybierz kategorię tego samego rodzaju co wpisy. Aby zmienić wydatki i "
+"przychody, najpierw przefiltruj według jednego z nich."
+
+msgid ""
+"The entries changed after you reviewed the change. Nothing was changed; "
+"review it again."
+msgstr ""
+"Wpisy zmieniły się po tym, jak przejrzano zmianę. Niczego nie zmieniono; "
+"przejrzyj ją ponownie."
+
+#, python-format
+msgid ""
+"Nothing was changed: some entries are in closed months (%(months)s). An "
+"owner can reopen them."
+msgstr ""
+"Niczego nie zmieniono: część wpisów należy do zamkniętych miesięcy "
+"(%(months)s). Właściciel może je ponownie otworzyć."
+
+msgid "Correct the marked filters to see the entries."
+msgstr "Popraw zaznaczone filtry, aby zobaczyć wpisy."
+
+msgid "Newest first"
+msgstr "Od najnowszych"
+
+msgid "Oldest first"
+msgstr "Od najstarszych"
+
+msgid "Largest amount first"
+msgstr "Od największej kwoty"
+
+msgid "Smallest amount first"
+msgstr "Od najmniejszej kwoty"
+
+#, python-format
+msgid "Category changed for %(num)d entry."
+msgid_plural "Category changed for %(num)d entries."
+msgstr[0] "Zmieniono kategorię %(num)d wpisu."
+msgstr[1] "Zmieniono kategorię %(num)d wpisów."
+msgstr[2] "Zmieniono kategorię %(num)d wpisów."
 
 msgid "Entry deleted."
 msgstr "Usunięto wpis."
@@ -1240,6 +1602,32 @@ msgstr "Usunięcia nie można już cofnąć: wpis pozostaje usunięty."
 msgid "Not saved"
 msgstr "Nie zapisano"
 
+msgid "Enter a valid date between 1900 and 2199."
+msgstr "Podaj prawidłową datę z zakresu od 1900 do 2199."
+
+msgid "This month is closed. Reopen it or choose a date in an open month."
+msgstr ""
+"Ten miesiąc jest zamknięty. Otwórz go ponownie lub wybierz datę w "
+"otwartym miesiącu."
+
+msgid "This occurrence is no longer pending."
+msgstr "To wystąpienie nie jest już oczekujące."
+
+msgid "This occurrence has no transaction to undo."
+msgstr "To wystąpienie nie ma transakcji, którą można cofnąć."
+
+msgid "The 10-second undo window has expired."
+msgstr "Upłynął 10-sekundowy limit czasu na cofnięcie."
+
+msgid "The occurrence category is unavailable; edit the recurring rule."
+msgstr "Kategoria wystąpienia jest niedostępna; edytuj regułę cykliczną."
+
+msgid "Check the amount and date, then try again."
+msgstr "Sprawdź kwotę i datę, a następnie spróbuj ponownie."
+
+msgid "Choose a valid direction."
+msgstr "Wybierz prawidłowy kierunek."
+
 msgid "Choose a supported currency."
 msgstr "Wybierz obsługiwaną walutę."
 
@@ -1249,11 +1637,29 @@ msgstr "Waluty bazowej nie można zmienić: są już w niej zapisane kwoty."
 msgid "Choose a country from the list."
 msgstr "Wybierz kraj z listy."
 
+msgid ""
+"Holiday data is not available for this country, and recurring items "
+"adjust dates to working days. Change those items to keep their dates, or "
+"choose another country."
+msgstr ""
+"Dla tego kraju brak danych o świętach, a pozycje cykliczne przesuwają "
+"daty na dni robocze. Zmień te pozycje, aby zachować ich daty, albo "
+"wybierz inny kraj."
+
 msgid "Choose a time zone from the list."
 msgstr "Wybierz strefę czasową z listy."
 
 msgid "Choose a supported language."
 msgstr "Wybierz obsługiwany język."
+
+msgid ""
+"Enable two-factor authentication for your own account and sign in with it"
+" before requiring it for this workspace; otherwise you would lock "
+"yourself out."
+msgstr ""
+"Zanim zaczniesz wymagać uwierzytelniania dwuskładnikowego w tym obszarze "
+"roboczym, włącz je na swoim koncie i zaloguj się z jego użyciem; inaczej "
+"stracisz do niego dostęp."
 
 msgid "A workspace needs at least one owner. Make another member an owner first."
 msgstr ""
@@ -1282,6 +1688,20 @@ msgstr ""
 msgid "Workspace settings saved."
 msgstr "Zapisano ustawienia obszaru roboczego."
 
+msgid "Type the workspace name exactly as shown to confirm."
+msgstr ""
+"Aby potwierdzić, wpisz nazwę obszaru roboczego dokładnie tak, jak jest "
+"pokazana."
+
+msgid ""
+"Your current workspace changed since this page was opened (in another "
+"tab, or it was already deleted). Nothing was deleted. Check the workspace"
+" named below and confirm again."
+msgstr ""
+"Bieżący obszar roboczy zmienił się od otwarcia tej strony (w innej karcie"
+" albo został już usunięty). Nic nie usunięto. Sprawdź obszar roboczy "
+"podany poniżej i potwierdź ponownie."
+
 msgid "Home"
 msgstr "Strona główna"
 
@@ -1290,6 +1710,9 @@ msgstr "Menu główne"
 
 msgid "Recurring"
 msgstr "Cykliczne"
+
+msgid "Upcoming"
+msgstr "Nadchodzące"
 
 msgid "Net worth"
 msgstr "Majątek netto"
@@ -1308,6 +1731,9 @@ msgstr "Twoje konto"
 
 msgid "Audit log: workspace"
 msgstr "Dziennik zdarzeń: obszar roboczy"
+
+msgid "New workspace"
+msgstr "Nowy obszar roboczy"
 
 msgid "Users"
 msgstr "Użytkownicy"
@@ -1338,9 +1764,6 @@ msgstr "Obszar roboczy"
 
 msgid "Switch"
 msgstr "Przełącz"
-
-msgid "New workspace"
-msgstr "Nowy obszar roboczy"
 
 msgid "Are you sure?"
 msgstr "Czy na pewno?"
@@ -1423,6 +1846,9 @@ msgstr "Zmień hasło albo wyloguj inne urządzenia."
 msgid "This account has no password. You can still sign out other devices."
 msgstr "To konto nie ma hasła. Nadal możesz wylogować inne urządzenia."
 
+msgid "Two-factor authentication"
+msgstr "Uwierzytelnianie dwuskładnikowe"
+
 msgid "Sign-in methods"
 msgstr "Metody logowania"
 
@@ -1460,6 +1886,82 @@ msgstr "Serwer proxy loguje Cię jako %(user)s."
 msgid "Link this proxy sign-in"
 msgstr "Powiąż to logowanie przez proxy"
 
+msgid ""
+"Protect password sign-ins with an authenticator app. A workspace owner "
+"may require this for access. Identity provider and proxy sign-ins use "
+"their provider's security instead."
+msgstr ""
+"Zabezpiecz logowanie hasłem za pomocą aplikacji uwierzytelniającej. "
+"Właściciel obszaru roboczego może tego wymagać. Przy logowaniu przez "
+"dostawcę tożsamości lub proxy obowiązują zabezpieczenia tego dostawcy."
+
+msgid "Save your recovery codes"
+msgstr "Zapisz kody odzyskiwania"
+
+msgid ""
+"These ten codes are shown only once. Store them safely. Each replaces an "
+"authenticator code for one sign-in."
+msgstr ""
+"Te dziesięć kodów jest wyświetlanych tylko raz. Przechowuj je "
+"bezpiecznie. Każdy zastępuje kod z aplikacji podczas jednego logowania."
+
+msgid "Two-factor authentication is enabled."
+msgstr "Uwierzytelnianie dwuskładnikowe jest włączone."
+
+msgid ""
+"Replace all recovery codes if they are lost or exposed. Your current "
+"password and authenticator or an unused recovery code are both required. "
+"Existing recovery codes stop working immediately."
+msgstr ""
+"Wygeneruj nowe kody odzyskiwania, jeśli poprzednie zostały zgubione lub "
+"ujawnione. Wymagane jest bieżące hasło oraz kod z aplikacji "
+"uwierzytelniającej lub niewykorzystany kod odzyskiwania. Dotychczasowe "
+"kody odzyskiwania przestaną działać natychmiast."
+
+msgid "Authenticator or recovery code"
+msgstr "Kod z aplikacji lub kod odzyskiwania"
+
+msgid "Generate new recovery codes"
+msgstr "Wygeneruj nowe kody odzyskiwania"
+
+msgid "Disable two-factor authentication"
+msgstr "Wyłącz uwierzytelnianie dwuskładnikowe"
+
+msgid "Scan with your authenticator app"
+msgstr "Zeskanuj w aplikacji uwierzytelniającej"
+
+msgid "Authenticator enrollment QR code"
+msgstr "Kod QR do konfiguracji aplikacji uwierzytelniającej"
+
+msgid "Or enter this key manually:"
+msgstr "Lub wprowadź ten klucz ręcznie:"
+
+msgid "Enter a six-digit code to finish enrollment within ten minutes."
+msgstr ""
+"Wprowadź sześciocyfrowy kod, aby zakończyć konfigurację w ciągu "
+"dziesięciu minut."
+
+msgid "Authenticator code"
+msgstr "Kod z aplikacji uwierzytelniającej"
+
+msgid "Enable two-factor authentication"
+msgstr "Włącz uwierzytelnianie dwuskładnikowe"
+
+msgid "Set up two-factor authentication"
+msgstr "Skonfiguruj uwierzytelnianie dwuskładnikowe"
+
+msgid ""
+"This account signs in through an identity provider or proxy. Configure "
+"multi-factor authentication there."
+msgstr ""
+"To konto korzysta z logowania przez dostawcę tożsamości lub proxy. "
+"Skonfiguruj uwierzytelnianie wieloskładnikowe u tego dostawcy."
+
+msgid "Required only if your account has two-factor authentication enabled."
+msgstr ""
+"Wymagane tylko wtedy, gdy na Twoim koncie włączono uwierzytelnianie "
+"dwuskładnikowe."
+
 msgid "Back to users"
 msgstr "Wróć do użytkowników"
 
@@ -1483,6 +1985,27 @@ msgstr ""
 "Kto tworzy obszar roboczy, zostaje jego właścicielem. Nie dotyczy to "
 "otwartej rejestracji ani kont tworzonych przy pierwszym logowaniu przez "
 "dostawcę tożsamości lub serwer proxy: te mają własne ustawienia."
+
+msgid "Registration"
+msgstr "Rejestracja"
+
+msgid "Off: accounts come from invitations, administrators or sign-in providers"
+msgstr ""
+"Wyłączona: konta powstają z zaproszeń, przez administratorów lub "
+"dostawców logowania"
+
+msgid "On: anyone can register with a verified email address"
+msgstr "Włączona: każdy może się zarejestrować z potwierdzonym adresem e-mail"
+
+msgid ""
+"A new account must confirm its email address through a link before it is "
+"created, and gets its own workspace."
+msgstr ""
+"Nowe konto musi potwierdzić adres e-mail linkiem, zanim zostanie "
+"utworzone, i dostaje własny obszar roboczy."
+
+msgid "Registration stays closed until this is fixed."
+msgstr "Rejestracja pozostaje zamknięta, dopóki to nie zostanie naprawione."
 
 msgid "Save settings"
 msgstr "Zapisz ustawienia"
@@ -1628,6 +2151,23 @@ msgstr "Najnowsze"
 msgid "Older"
 msgstr "Starsze"
 
+msgid "Sign in"
+msgstr "Zaloguj się"
+
+msgid "Back to sign in"
+msgstr "Wróć do logowania"
+
+msgid "Forgot your password?"
+msgstr "Nie pamiętasz hasła?"
+
+msgid ""
+"Enter the email address of your account. We will send you a link to "
+"choose a new password."
+msgstr "Podaj adres e-mail swojego konta. Wyślemy link do ustawienia nowego hasła."
+
+msgid "Send the link"
+msgstr "Wyślij link"
+
 msgid "Link your account"
 msgstr "Połącz swoje konto"
 
@@ -1645,11 +2185,11 @@ msgstr ""
 msgid "This signs the account out on all other devices."
 msgstr "Spowoduje to wylogowanie konta na wszystkich innych urządzeniach."
 
+msgid "Leave blank if two-factor authentication is not enabled."
+msgstr "Pozostaw puste, jeśli uwierzytelnianie dwuskładnikowe nie jest włączone."
+
 msgid "Link and sign in"
 msgstr "Połącz i zaloguj się"
-
-msgid "Sign in"
-msgstr "Zaloguj się"
 
 #, python-format
 msgid "Continue as %(user)s"
@@ -1711,11 +2251,28 @@ msgstr "Wyloguj się wszędzie poza tym urządzeniem."
 msgid "Sign out other devices"
 msgstr "Wyloguj inne urządzenia"
 
-msgid "Workspace name"
-msgstr "Nazwa obszaru roboczego"
+msgid ""
+"Enter your email address. We will send you a link to confirm it and "
+"finish creating your account."
+msgstr ""
+"Podaj swój adres e-mail. Wyślemy link, którym go potwierdzisz i "
+"dokończysz zakładanie konta."
 
 msgid "Already have an account?"
 msgstr "Masz już konto?"
+
+#, python-format
+msgid "Your email address %(email)s is confirmed. Choose your name and password."
+msgstr "Adres e-mail %(email)s jest potwierdzony. Wybierz nazwę i hasło."
+
+msgid "Workspace name"
+msgstr "Nazwa obszaru roboczego"
+
+msgid "Choose a new password"
+msgstr "Ustaw nowe hasło"
+
+msgid "Every device signed in to this account will be signed out."
+msgstr "Wszystkie urządzenia zalogowane na to konto zostaną wylogowane."
 
 msgid "First-run setup"
 msgstr "Konfiguracja początkowa"
@@ -1834,6 +2391,78 @@ msgstr "Usunąć kategorię %(name)s?"
 msgid "Delete"
 msgstr "Usuń"
 
+msgid "Hello,"
+msgstr "Dzień dobry,"
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to reset the password of your %(app)s "
+"account. To choose a new password, open this link:"
+msgstr ""
+"Ktoś, miejmy nadzieję, że Ty, poprosił o reset hasła do Twojego konta w "
+"%(app)s. Aby ustawić nowe hasło, otwórz ten link:"
+
+msgid ""
+"The link works once, for 60 minutes. Choosing a new password signs out "
+"every device signed in to your account."
+msgstr ""
+"Link działa raz, przez 60 minut. Ustawienie nowego hasła wyloguje "
+"wszystkie urządzenia zalogowane na Twoje konto."
+
+msgid ""
+"If you did not ask for this, ignore this email: your password stays the "
+"same."
+msgstr "Jeśli to nie Ty, zignoruj tę wiadomość: hasło pozostanie bez zmian."
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to reset the password of your %(app)s "
+"account. Your account has no password: you sign in through your identity "
+"provider or your proxy, so there is nothing to reset here."
+msgstr ""
+"Ktoś, miejmy nadzieję, że Ty, poprosił o reset hasła do Twojego konta w "
+"%(app)s. Twoje konto nie ma hasła: logujesz się przez dostawcę tożsamości"
+" albo serwer proxy, więc nie ma tu czego resetować."
+
+msgid "Sign in:"
+msgstr "Zaloguj się:"
+
+msgid "If you did not ask for this, ignore this email: nothing was changed."
+msgstr "Jeśli to nie Ty, zignoruj tę wiadomość: nic nie zostało zmienione."
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to create an account at %(app)s with this "
+"email address. An account with this address already exists, so no new one"
+" was created."
+msgstr ""
+"Ktoś, miejmy nadzieję, że Ty, poprosił o założenie konta w %(app)s z tym "
+"adresem e-mail. Konto z tym adresem już istnieje, więc nowe nie zostało "
+"utworzone."
+
+msgid "Forgot your password? Ask for a new one here:"
+msgstr "Nie pamiętasz hasła? Poproś o nowe tutaj:"
+
+#, python-format
+msgid ""
+"Someone, hopefully you, asked to create an account at %(app)s with this "
+"email address. To confirm the address and finish creating your account, "
+"open this link:"
+msgstr ""
+"Ktoś, miejmy nadzieję, że Ty, poprosił o założenie konta w %(app)s z tym "
+"adresem e-mail. Aby potwierdzić adres i dokończyć zakładanie konta, "
+"otwórz ten link:"
+
+msgid "The link works once, for 24 hours."
+msgstr "Link działa raz, przez 24 godziny."
+
+msgid "If you did not ask for this, ignore this email: no account is created."
+msgstr "Jeśli to nie Ty, zignoruj tę wiadomość: konto nie zostanie utworzone."
+
+#, python-format
+msgid "This is a test email from %(app)s. Your email settings work."
+msgstr "To testowy e-mail z %(app)s. Ustawienia poczty działają."
+
 msgid "Dismiss"
 msgstr "Zamknij"
 
@@ -1907,6 +2536,9 @@ msgstr "Wcześniejsze opisy"
 msgid "Choose a category"
 msgstr "Wybierz kategorię"
 
+msgid "Automatically posted"
+msgstr "Automatycznie zaksięgowano"
+
 msgid "archived"
 msgstr "zarchiwizowana"
 
@@ -1953,23 +2585,30 @@ msgstr "nieliczone"
 msgid "Total"
 msgstr "Razem"
 
+#, python-format
+msgid ""
+"Earned %(earned)s: spent %(spent)s, saved or invested %(saved)s, left "
+"%(net)s."
+msgstr ""
+"Zarobiono %(earned)s: wydano %(spent)s, zaoszczędzono lub zainwestowano "
+"%(saved)s, zostało %(net)s."
+
+#, python-format
+msgid "Spending and saving exceed earnings by %(amount)s."
+msgstr "Wydatki i oszczędności przekraczają zarobki o %(amount)s."
+
 msgid "Earned"
 msgstr "Zarobione"
 
 msgid "Spent"
 msgstr "Wydane"
 
-msgid "Saved"
-msgstr "Zaoszczędzone"
+msgid "Left"
+msgstr "Zostało"
 
-msgid "Net"
-msgstr "Bilans"
-
-msgid "Savings rate"
-msgstr "Stopa oszczędności"
-
-msgid "Not available: nothing earned"
-msgstr "Niedostępne: brak zarobków"
+#, python-format
+msgid "Saved / invested %(rate)s of income"
+msgstr "Zaoszczędzono / zainwestowano %(rate)s przychodu"
 
 #, python-format
 msgid "Spent %(actual)s of %(planned)s planned"
@@ -1981,6 +2620,9 @@ msgstr "Zarobiono %(actual)s z zaplanowanych %(planned)s"
 
 msgid "(over plan)"
 msgstr "(ponad plan)"
+
+msgid "Planned"
+msgstr "Plan"
 
 msgid "Order"
 msgstr "Kolejność"
@@ -2044,9 +2686,6 @@ msgstr "Cofnij"
 msgid "Summary"
 msgstr "Podsumowanie"
 
-msgid "Planned"
-msgstr "Plan"
-
 msgid "Actual"
 msgstr "Wykonanie"
 
@@ -2065,9 +2704,6 @@ msgstr "Dodaj kategorie, aby zaplanować ten miesiąc."
 
 msgid "Closed"
 msgstr "Zamknięty"
-
-msgid "Months"
-msgstr "Miesiące"
 
 #, python-format
 msgid "Previous month: %(month)s"
@@ -2137,6 +2773,523 @@ msgstr "Zamknięcie chroni miesiąc przed przypadkowymi zmianami."
 msgid "Future months stay open for planning."
 msgstr "Przyszłe miesiące pozostają otwarte do planowania."
 
+msgid "Recurring item"
+msgstr "Pozycja cykliczna"
+
+msgid "Edit recurring item"
+msgstr "Edytuj pozycję cykliczną"
+
+msgid "New recurring item"
+msgstr "Nowa pozycja cykliczna"
+
+msgid "Check the highlighted field."
+msgstr "Sprawdź wyróżnione pole."
+
+#, python-format
+msgid ""
+"The category %(name)s is archived, so this item creates no new dates. "
+"Choose an active category to save it."
+msgstr ""
+"Kategoria %(name)s jest zarchiwizowana, więc ta pozycja nie tworzy nowych"
+" terminów. Wybierz aktywną kategorię, aby ją zapisać."
+
+msgid "Amount type"
+msgstr "Rodzaj kwoty"
+
+msgid "Fixed"
+msgstr "Stała"
+
+msgid "Estimate"
+msgstr "Szacunkowa"
+
+msgid "Automatically post on the due date"
+msgstr "Automatycznie księguj w terminie"
+
+msgid "Start date"
+msgstr "Data początkowa"
+
+msgid "End date (optional)"
+msgstr "Data końcowa (opcjonalnie)"
+
+msgid "Maximum occurrences (optional)"
+msgstr "Maksymalna liczba wystąpień (opcjonalnie)"
+
+msgid "Repeat"
+msgstr "Powtarzanie"
+
+msgid "Weekly"
+msgstr "Co tydzień"
+
+msgid "Monthly"
+msgstr "Co miesiąc"
+
+msgid "Yearly"
+msgstr "Co rok"
+
+msgid "Every N weeks, months or years"
+msgstr "Co ile tygodni, miesięcy lub lat"
+
+msgid "Weekdays (weekly rules)"
+msgstr "Dni tygodnia (reguły tygodniowe)"
+
+msgid "Day (monthly or yearly rules)"
+msgstr "Dzień (reguły miesięczne lub roczne)"
+
+msgid "Last day"
+msgstr "Ostatni dzień"
+
+msgid "First working day"
+msgstr "Pierwszy dzień roboczy"
+
+msgid "Last working day"
+msgstr "Ostatni dzień roboczy"
+
+msgid "Month number (yearly rules)"
+msgstr "Numer miesiąca (reguły roczne)"
+
+msgid "Weekend and holiday adjustment"
+msgstr "Przesunięcie na wypadek weekendu lub święta"
+
+msgid "Keep the date"
+msgstr "Zachowaj datę"
+
+msgid "Previous working day"
+msgstr "Poprzedni dzień roboczy"
+
+msgid "Next working day"
+msgstr "Następny dzień roboczy"
+
+msgid "Notes"
+msgstr "Notatki"
+
+msgid "Include past occurrences"
+msgstr "Uwzględnij przeszłe wystąpienia"
+
+msgid ""
+"Saving a rule creates planned occurrences, never transactions. Edits "
+"replace only pending dates from today onward."
+msgstr ""
+"Zapisanie reguły tworzy planowane wystąpienia, a nie transakcje. Edycja "
+"zastępuje tylko oczekujące wystąpienia od dzisiaj."
+
+msgid "Save recurring item"
+msgstr "Zapisz pozycję cykliczną"
+
+msgid "Next six due dates"
+msgstr "Sześć najbliższych terminów"
+
+msgid ""
+"Enable JavaScript for the live preview. You can still save this form "
+"without it."
+msgstr ""
+"Włącz JavaScript, aby zobaczyć podgląd na żywo. Bez niego nadal możesz "
+"zapisać formularz."
+
+msgid "Recurring items"
+msgstr "Pozycje cykliczne"
+
+msgid "Upcoming inbox"
+msgstr "Skrzynka nadchodzących"
+
+msgid "Archived"
+msgstr "Zarchiwizowana"
+
+msgid "Paused"
+msgstr "Wstrzymana"
+
+msgid "Edit rule"
+msgstr "Edytuj regułę"
+
+msgid "Resume"
+msgstr "Wznów"
+
+msgid "Pause"
+msgstr "Wstrzymaj"
+
+#, python-format
+msgid ""
+"Delete the recurring item %(name)s? Its pending dates are removed; with "
+"posted or skipped history it is archived instead."
+msgstr ""
+"Usunąć pozycję cykliczną %(name)s? Jej oczekujące terminy zostaną "
+"usunięte; jeśli ma historię zaksięgowanych lub pominiętych terminów, "
+"zostanie zarchiwizowana."
+
+msgid "No recurring items yet."
+msgstr "Nie ma jeszcze pozycji cyklicznych."
+
+msgid ""
+"Pausing removes pending dates from today onward. Archiving or deleting "
+"removes all pending dates; posted and skipped dates are history and are "
+"kept, so deleting an item with history archives it instead. Dates in "
+"closed months never change."
+msgstr ""
+"Wstrzymanie usuwa oczekujące terminy od dzisiaj. Archiwizacja lub "
+"usunięcie usuwa wszystkie oczekujące terminy; zaksięgowane i pominięte "
+"terminy są historią i zostają, więc usunięcie pozycji z historią ją "
+"archiwizuje. Terminy w zamkniętych miesiącach nigdy się nie zmieniają."
+
+msgid "Choose valid recurrence dates to see the preview."
+msgstr "Wybierz prawidłowe daty powtarzania, aby zobaczyć podgląd."
+
+msgid "No more occurrences match this rule."
+msgstr "Brak kolejnych wystąpień pasujących do tej reguły."
+
+msgid "Occurrence marked paid or received."
+msgstr "Wystąpienie oznaczono jako opłacone lub otrzymane."
+
+msgid "Filters"
+msgstr "Filtry"
+
+msgid "Expenses and income"
+msgstr "Wydatki i przychody"
+
+msgid "All categories"
+msgstr "Wszystkie kategorie"
+
+msgid "Apply filters"
+msgstr "Zastosuj filtry"
+
+msgid "Clear"
+msgstr "Wyczyść"
+
+#, python-format
+msgid "Showing overdue items and the next %(days)d days."
+msgstr "Wyświetlane są zaległe pozycje i pozycje z kolejnych %(days)d dni."
+
+#, python-format
+msgid "Week of %(date)s"
+msgstr "Tydzień od %(date)s"
+
+msgid "Automatic posting"
+msgstr "Automatyczne księgowanie"
+
+msgid "Overdue"
+msgstr "Zaległe"
+
+msgid "Rescheduled for this occurrence"
+msgstr "Zmieniono termin tego wystąpienia"
+
+msgid "Mark paid or received"
+msgstr "Oznacz jako opłacone lub otrzymane"
+
+msgid "Save transaction"
+msgstr "Zapisz transakcję"
+
+msgid "Reschedule this one"
+msgstr "Zmień termin tylko tego wystąpienia"
+
+msgid "New due date"
+msgstr "Nowy termin"
+
+msgid "Save date"
+msgstr "Zapisz datę"
+
+msgid "Edit amount"
+msgstr "Edytuj kwotę"
+
+msgid "Save amount"
+msgstr "Zapisz kwotę"
+
+msgid "Skip"
+msgstr "Pomiń"
+
+#, python-format
+msgid "Nothing is overdue or due in the next %(days)d days."
+msgstr ""
+"Brak zaległych pozycji i pozycji z terminem w ciągu kolejnych %(days)d "
+"dni."
+
+msgid "Tax calculator"
+msgstr "Kalkulator podatków"
+
+msgid "Rates are entered by you; this is not tax advice."
+msgstr "Stawki wprowadzasz samodzielnie; to nie jest porada podatkowa."
+
+#, python-format
+msgid "Net amount (%(currency)s)"
+msgstr "Kwota netto (%(currency)s)"
+
+msgid "Calculation date"
+msgstr "Data obliczenia"
+
+msgid "Record income as"
+msgstr "Zapisz przychód jako"
+
+msgid "Calculate"
+msgstr "Oblicz"
+
+#, python-format
+msgid "No effective version on this date for: %(names)s"
+msgstr "Brak obowiązującej wersji na ten dzień dla: %(names)s"
+
+#, python-format
+msgid "Breakdown for %(date)s"
+msgstr "Zestawienie na dzień %(date)s"
+
+msgid "Added tax"
+msgstr "Podatek doliczony"
+
+msgid "Gross"
+msgstr "Brutto"
+
+msgid "Withheld"
+msgstr "Potrącono"
+
+msgid "Ledger amount"
+msgstr "Kwota w księdze"
+
+msgid "Planned tax payments"
+msgstr "Planowane płatności podatkowe"
+
+msgid "No tax payments for this recording mode."
+msgstr "Brak płatności podatkowych dla tego sposobu zapisu."
+
+msgid "Manage tax rules"
+msgstr "Zarządzaj regułami podatkowymi"
+
+msgid "Tax rules"
+msgstr "Reguły podatkowe"
+
+msgid "Calculator preview"
+msgstr "Podgląd kalkulatora"
+
+msgid "New tax rule"
+msgstr "Nowa reguła podatkowa"
+
+msgid "Effect"
+msgstr "Działanie"
+
+msgid "Added to net"
+msgstr "Doliczany do kwoty netto"
+
+msgid "Tax base"
+msgstr "Podstawa podatku"
+
+msgid "Notes (optional)"
+msgstr "Uwagi (opcjonalnie)"
+
+msgid "First version effective from"
+msgstr "Data obowiązywania pierwszej wersji"
+
+msgid "Value type"
+msgstr "Rodzaj wartości"
+
+msgid "Percent"
+msgstr "Procent"
+
+msgid "Fixed amount"
+msgstr "Kwota stała"
+
+msgid "Rate in percent"
+msgstr "Stawka w procentach"
+
+#, python-format
+msgid "Fixed amount (%(currency)s)"
+msgstr "Kwota stała (%(currency)s)"
+
+msgid "Create tax rule"
+msgstr "Utwórz regułę podatkową"
+
+#, python-format
+msgid "Base: %(base)s"
+msgstr "Podstawa: %(base)s"
+
+#, python-format
+msgid "Archive the tax rule %(name)s?"
+msgstr "Zarchiwizować regułę podatkową %(name)s?"
+
+msgid "Versions"
+msgstr "Wersje"
+
+msgid "Add a new version"
+msgstr "Dodaj nową wersję"
+
+msgid "Effective from"
+msgstr "Obowiązuje od"
+
+msgid "Save version"
+msgstr "Zapisz wersję"
+
+msgid "Edit name and notes"
+msgstr "Edytuj nazwę i uwagi"
+
+msgid "Save details"
+msgstr "Zapisz szczegóły"
+
+msgid "No tax rules yet."
+msgstr "Nie ma jeszcze reguł podatkowych."
+
+msgid ""
+"Tax-rule effect and base are fixed at creation to preserve the meaning of"
+" existing rate versions. Create a separate rule to model a different tax."
+msgstr ""
+"Działanie i podstawa reguły są ustalone podczas tworzenia, aby zachować "
+"znaczenie istniejących wersji stawek. Utwórz osobną regułę dla innego "
+"podatku."
+
+msgid "Export CSV"
+msgstr "Eksportuj CSV"
+
+msgid "Export as CSV"
+msgstr "Eksport do CSV"
+
+msgid "Close"
+msgstr "Zamknij"
+
+msgid ""
+"Downloads every entry that matches the filters, oldest first, in the "
+"columns of the workspace archive's transactions.csv. With the standard "
+"options the file can be imported again."
+msgstr ""
+"Pobiera wszystkie wpisy pasujące do filtrów, od najstarszych, w kolumnach"
+" pliku transactions.csv z archiwum przestrzeni roboczej. Przy "
+"standardowych opcjach plik można ponownie zaimportować."
+
+msgid "Delimiter"
+msgstr "Separator pól"
+
+msgid "Comma (standard)"
+msgstr "Przecinek (standardowo)"
+
+msgid "Semicolon"
+msgstr "Średnik"
+
+msgid "Decimal separator"
+msgstr "Separator dziesiętny"
+
+msgid "Dot (standard)"
+msgstr "Kropka (standardowo)"
+
+msgid "Comma"
+msgstr "Przecinek"
+
+msgid "A decimal comma needs the semicolon delimiter."
+msgstr "Przecinek dziesiętny wymaga średnika jako separatora pól."
+
+msgid ""
+"For Excel: start the file with a byte order mark, so that Excel reads it "
+"as UTF-8"
+msgstr ""
+"Dla Excela: rozpocznij plik znacznikiem kolejności bajtów (BOM), aby "
+"Excel odczytał go jako UTF-8"
+
+msgid "Protect against spreadsheet formulas"
+msgstr "Chroń przed formułami arkusza kalkulacyjnego"
+
+msgid ""
+"Puts an apostrophe before =, +, -, @ (also their full-width forms) at the"
+" start of a description or category name, after leading spaces, or after "
+"a comma or semicolon inside it, so that a spreadsheet does not run them "
+"as formulas. Such values then differ from the stored ones, and a "
+"protected description may be too long to import again."
+msgstr ""
+"Wstawia apostrof przed =, +, -, @ (także w formach pełnej szerokości) na "
+"początku opisu lub nazwy kategorii, po początkowych spacjach albo po "
+"przecinku lub średniku w ich treści, aby arkusz kalkulacyjny nie wykonał "
+"ich jako formuł. Takie wartości różnią się wtedy od zapisanych, a "
+"chroniony opis może być za długi do ponownego importu."
+
+msgid "Download CSV"
+msgstr "Pobierz CSV"
+
+msgid "Smallest amount"
+msgstr "Najmniejsza kwota"
+
+msgid "Largest amount"
+msgstr "Największa kwota"
+
+msgid "Description contains"
+msgstr "Opis zawiera"
+
+msgid "None ticked: every category."
+msgstr "Bez zaznaczenia: wszystkie kategorie."
+
+msgid "Show entries"
+msgstr "Pokaż wpisy"
+
+msgid "Clear filters"
+msgstr "Wyczyść filtry"
+
+msgid "Entries"
+msgstr "Wpisy"
+
+#, python-format
+msgid "%(first)d–%(last)d of %(num)d entry"
+msgid_plural "%(first)d–%(last)d of %(num)d entries"
+msgstr[0] "%(first)d–%(last)d z %(num)d wpisu"
+msgstr[1] "%(first)d–%(last)d z %(num)d wpisów"
+msgstr[2] "%(first)d–%(last)d z %(num)d wpisów"
+
+msgid "No entries match these filters."
+msgstr "Żaden wpis nie pasuje do tych filtrów."
+
+msgid "Entries matching the filters"
+msgstr "Wpisy pasujące do filtrów"
+
+#, python-format
+msgid "page %(number)d of %(pages)d"
+msgstr "strona %(number)d z %(pages)d"
+
+msgid "Select"
+msgstr "Zaznacz"
+
+#, python-format
+msgid "Select the entry of %(date)s, %(amount)s"
+msgstr "Zaznacz wpis z %(date)s, %(amount)s"
+
+msgid "closed"
+msgstr "zamknięty"
+
+#, python-format
+msgid "Page %(number)d of %(pages)d"
+msgstr "Strona %(number)d z %(pages)d"
+
+msgid "Change category"
+msgstr "Zmień kategorię"
+
+msgid ""
+"Tick entries in the list, or change all entries that match the filters. "
+"You confirm the change on the next page."
+msgstr ""
+"Zaznacz wpisy na liście albo zmień wszystkie wpisy pasujące do filtrów. "
+"Zmianę potwierdzisz na następnej stronie."
+
+msgid "New category"
+msgstr "Nowa kategoria"
+
+msgid "Change the ticked entries"
+msgstr "Zmień zaznaczone wpisy"
+
+#, python-format
+msgid "Change all %(num)d matching entry"
+msgid_plural "Change all %(num)d matching entries"
+msgstr[0] "Zmień %(num)d pasujący wpis"
+msgstr[1] "Zmień wszystkie %(num)d pasujące wpisy"
+msgstr[2] "Zmień wszystkie %(num)d pasujących wpisów"
+
+#, python-format
+msgid "Move %(num)d entry to %(category)s?"
+msgid_plural "Move %(num)d entries to %(category)s?"
+msgstr[0] "Przenieść %(num)d wpis do kategorii %(category)s?"
+msgstr[1] "Przenieść %(num)d wpisy do kategorii %(category)s?"
+msgstr[2] "Przenieść %(num)d wpisów do kategorii %(category)s?"
+
+msgid "Already in this category"
+msgstr "Już w tej kategorii"
+
+msgid ""
+"The change is recorded in the workspace audit log. Monthly totals of "
+"these categories change with it."
+msgstr ""
+"Zmiana zostanie zapisana w dzienniku zdarzeń przestrzeni roboczej. "
+"Zmienią się też miesięczne sumy tych kategorii."
+
+msgid "Every selected entry is already in this category; nothing would change."
+msgstr ""
+"Wszystkie zaznaczone wpisy są już w tej kategorii; nic by się nie "
+"zmieniło."
+
 msgid "Defaults to your display name."
 msgstr "Domyślnie Twoja wyświetlana nazwa."
 
@@ -2151,6 +3304,43 @@ msgstr "Nie ustawiono"
 
 msgid "Time zone"
 msgstr "Strefa czasowa"
+
+msgid "Delete workspace"
+msgstr "Usuń obszar roboczy"
+
+#, python-format
+msgid "Delete %(name)s permanently?"
+msgstr "Usunąć %(name)s na zawsze?"
+
+msgid ""
+"Every transaction, planned value, category, recurring item, closed month "
+"and invitation of this workspace is removed for good, and so is its audit"
+" log. This cannot be undone, and the app keeps no copy."
+msgstr ""
+"Wszystkie transakcje, wartości planowane, kategorie, pozycje cykliczne, "
+"zamknięte miesiące i zaproszenia tego obszaru roboczego zostaną trwale "
+"usunięte, razem z jego dziennikiem zdarzeń. Tego nie można cofnąć, a "
+"aplikacja nie zachowuje kopii."
+
+#, python-format
+msgid "%(num)d other member also loses access to it."
+msgid_plural "%(num)d other members also lose access to it."
+msgstr[0] "%(num)d inna osoba również straci do niego dostęp."
+msgstr[1] "%(num)d inne osoby również stracą do niego dostęp."
+msgstr[2] "%(num)d innych osób również straci do niego dostęp."
+
+msgid "Export what you want to keep first."
+msgstr "Najpierw wyeksportuj to, co chcesz zachować."
+
+msgid "Export transactions as CSV"
+msgstr "Eksportuj transakcje do CSV"
+
+#, python-format
+msgid "To confirm, type the workspace name: %(name)s"
+msgstr "Aby potwierdzić, wpisz nazwę obszaru roboczego: %(name)s"
+
+msgid "Delete this workspace"
+msgstr "Usuń ten obszar roboczy"
 
 msgid "People in this workspace"
 msgstr "Osoby w tym obszarze roboczym"
@@ -2236,11 +3426,11 @@ msgid "General"
 msgstr "Ogólne"
 
 msgid ""
-"Locked: transactions (deleted ones included) or planned values exist, and"
-" their amounts are stored in this currency."
+"Locked: transactions (deleted ones included) or planned values or "
+"recurring items exist, and their amounts are stored in this currency."
 msgstr ""
-"Zablokowana: istnieją transakcje (także usunięte) lub wartości planowane,"
-" a ich kwoty są zapisane w tej walucie."
+"Zablokowana: istnieją transakcje (również usunięte), wartości planowane "
+"lub pozycje cykliczne, a ich kwoty są zapisane w tej walucie."
 
 msgid "Formatting default"
 msgstr "Domyślne formatowanie"
@@ -2258,6 +3448,13 @@ msgstr ""
 "planowane nigdy nie są nadpisywane."
 
 msgid ""
+"Require two-factor authentication for password-based access to this "
+"workspace"
+msgstr ""
+"Wymagaj uwierzytelniania dwuskładnikowego przy dostępie hasłem do tego "
+"obszaru roboczego"
+
+msgid ""
 "The formatting default is used for numbers and dates where no personal "
 "preference applies. Your interface language follows your account and "
 "browser."
@@ -2265,6 +3462,36 @@ msgstr ""
 "Domyślne formatowanie dotyczy liczb i dat tam, gdzie nie obowiązują "
 "ustawienia osobiste. Język interfejsu zależy od Twojego konta i "
 "przeglądarki."
+
+msgid "Categories and workspaces"
+msgstr "Kategorie i obszary robocze"
+
+msgid ""
+"The income and expense categories of this workspace, their colours and "
+"their order."
+msgstr ""
+"Kategorie przychodów i wydatków tego obszaru roboczego, ich kolory i "
+"kolejność."
+
+msgid "Manage categories"
+msgstr "Zarządzaj kategoriami"
+
+msgid "A separate budget with its own members, categories and currency."
+msgstr "Osobny budżet z własnymi członkami, kategoriami i walutą."
+
+msgid "Create a workspace"
+msgstr "Utwórz obszar roboczy"
+
+msgid ""
+"Permanently removes this workspace and all its data, for every member. "
+"You confirm on the next page by typing the workspace name."
+msgstr ""
+"Trwale usuwa ten obszar roboczy i wszystkie jego dane, dla wszystkich "
+"członków. Potwierdzisz to na następnej stronie, wpisując nazwę obszaru "
+"roboczego."
+
+msgid "Delete workspace…"
+msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Enter a display name of at most 120 characters."
 #~ msgstr "Podaj wyświetlaną nazwę o długości najwyżej 120 znaków."
@@ -2316,4 +3543,19 @@ msgstr ""
 
 #~ msgid "Plan"
 #~ msgstr "Plan"
+
+#~ msgid "Choose who can create workspaces."
+#~ msgstr "Wybierz, kto może tworzyć obszary robocze."
+
+#~ msgid "Saved"
+#~ msgstr "Zaoszczędzone"
+
+#~ msgid "Net"
+#~ msgstr "Bilans"
+
+#~ msgid "Savings rate"
+#~ msgstr "Stopa oszczędności"
+
+#~ msgid "Not available: nothing earned"
+#~ msgstr "Niedostępne: brak zarobków"
 

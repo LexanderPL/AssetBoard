@@ -22,6 +22,7 @@ from assetboard.db.models.identity import AuthThrottle, User, UserSession
 from assetboard.services.auth import session_id_hash
 from assetboard.services.hash_gate import HashGateBusy
 from assetboard.web.security import safe_next
+from tests.conftest import mail_link
 
 if TYPE_CHECKING:
     from conftest import CountingHasher, WebHarness
@@ -346,7 +347,7 @@ class _BusyGate:
 
 
 def test_busy_hashing_returns_503_with_retry_after_on_every_auth_route(web: WebHarness) -> None:
-    app = web.app(allow_registration=True)
+    app = web.mail_app()
     with TestClient(app, client=("192.0.2.40", 1000)) as client:
         setup_form = {
             "csrf_token": web.csrf(client.get("/setup").text),
@@ -360,13 +361,18 @@ def test_busy_hashing_returns_503_with_retry_after_on_every_auth_route(web: WebH
         setup = client.post("/setup", data=setup_form)
         app.state.hash_gate = real_gate
         web.complete_setup(app)
+        web.enable_registration(app)
+        client.post(
+            "/register",
+            data={"csrf_token": web.csrf(client.get("/register").text), "email": "n@example.com"},
+        )
+        link = mail_link(web.sent_mail(app)[0], "/register/complete/")
         app.state.hash_gate = _BusyGate()
         login = _login(client, web, web.admin_email, web.admin_password)
         register = client.post(
-            "/register",
+            link,
             data={
-                "csrf_token": web.csrf(client.get("/register").text),
-                "email": "new@example.com",
+                "csrf_token": web.csrf(client.get(link).text),
                 "display_name": "New",
                 "password": "Another Strong Password",
             },
@@ -388,9 +394,9 @@ def test_busy_hashing_returns_503_with_retry_after_on_every_auth_route(web: WebH
         assert response.status_code == 503, response.text
         assert response.headers["retry-after"] == "5"
         assert "The server is busy" in response.text
-    # Each busy request released what it reserved; the one count left is the successful
-    # sign-in in between (every sign-in attempt counts).
+    # Each busy request released what it reserved; the counts left are the successful
+    # sign-in in between (every sign-in attempt counts) and registration's first step.
     account = _throttle(app, "account", web.admin_email)
     assert account is not None and account.failure_count == 1
     register_row = _throttle(app, "register", "192.0.2.40/32")
-    assert register_row is not None and register_row.failure_count == 0
+    assert register_row is not None and register_row.failure_count == 1

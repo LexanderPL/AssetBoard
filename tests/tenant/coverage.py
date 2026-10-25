@@ -22,6 +22,29 @@ BASE_METHOD_COVERAGE: dict[str, str] = {
 
 # Public methods a subclass adds: (repository class name, method) -> covering test.
 EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
+    **{
+        ("ScheduledItemRepository", method): "test_scheduled_queries_stay_in_their_workspace"
+        for method in ("create", "ordered", "any_exists", "category_counts")
+    },
+    **{
+        ("ScheduledOccurrenceRepository", method): "test_scheduled_queries_stay_in_their_workspace"
+        for method in (
+            "create",
+            "for_item",
+            "get_for_update",
+            "linked_to_transaction_for_update",
+            "upcoming",
+            "category_counts",
+        )
+    },
+    **{
+        ("TaxRuleRepository", method): "test_tax_rule_queries_stay_in_their_workspace"
+        for method in ("create", "ordered", "effective_for_all")
+    },
+    **{
+        ("TaxRuleVersionRepository", method): "test_tax_rule_queries_stay_in_their_workspace"
+        for method in ("create", "for_rule", "all_for_rules", "effective", "any_fixed_amount")
+    },
     ("MembershipRepository", "members"): "test_membership_queries_stay_in_their_workspace",
     ("MembershipRepository", "for_user"): "test_membership_queries_stay_in_their_workspace",
     ("MembershipRepository", "count_owners"): "test_membership_queries_stay_in_their_workspace",
@@ -55,6 +78,10 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         )
     },
     **{
+        ("TransactionRepository", method): "test_transaction_search_stays_in_its_workspace"
+        for method in ("search", "count_matching", "iter_matching", "matching_for_update")
+    },
+    **{
         ("BudgetLineRepository", method): "test_budget_line_queries_stay_in_their_workspace"
         for method in ("create", "for_month", "line", "usage_by_category", "any_exists")
     },
@@ -74,6 +101,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
 READER_METHOD_COVERAGE: dict[str, str] = {
     "memberships": "test_user_membership_reader_returns_only_its_users_rows",
     "membership_in": "test_user_membership_reader_returns_only_its_users_rows",
+    "authorization_in": "test_user_membership_reader_returns_only_its_users_rows",
 }
 
 # CurrentWorkspaceRepository is not a ScopedRepository (Workspace is the tenant row itself).
@@ -81,6 +109,7 @@ CURRENT_WORKSPACE_METHOD_COVERAGE: dict[str, str] = {
     "get": "test_current_workspace_repository_touches_only_its_workspace",
     "update": "test_current_workspace_repository_touches_only_its_workspace",
     "lock": "test_current_workspace_repository_touches_only_its_workspace",
+    "delete_with_all_data": "test_deleting_a_workspace_removes_every_owned_row_and_nothing_else",
 }
 
 # InstanceAuditReader reads only instance-level events (workspace_id IS NULL), never a
