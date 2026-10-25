@@ -156,3 +156,32 @@ def test_occurrence_actions_preserve_rule_and_closed_month_blocks_post(owner):
         token_from="/upcoming",
     )
     assert posted.status_code == 303 and f"posted={other_id}" in posted.headers["location"]
+
+
+def test_deleting_a_posted_transaction_in_the_ledger_returns_it_to_the_inbox(owner):
+    fixed_clock(owner)
+    assert create_recurring(owner).status_code == 303
+    with owner.db() as session:
+        occurrence = session.scalars(select(ScheduledOccurrence)).first()
+        assert occurrence is not None
+        occurrence_id = occurrence.id
+    form = {"day": "2026-03-01", "amount": "100"}
+    owner.post(f"/upcoming/{occurrence_id}/post", form, token_from="/upcoming")
+    with owner.db() as session:
+        transaction_id = session.scalars(select(Transaction.id)).one()
+
+    response = owner.post(
+        f"/m/2026-03/transactions/{transaction_id}/delete", token_from="/m/2026-03"
+    )
+    assert response.status_code == 303
+
+    with owner.db() as session:
+        occurrence = session.get(ScheduledOccurrence, occurrence_id)
+        assert occurrence is not None
+        assert occurrence.status == "pending" and occurrence.transaction_id is None
+    assert "Mark paid or received" in owner.client.get("/upcoming").text
+    reposted = owner.post(f"/upcoming/{occurrence_id}/post", form, token_from="/upcoming")
+    assert reposted.status_code == 303
+    with owner.db() as session:
+        live = session.scalars(select(Transaction).where(Transaction.deleted_at.is_(None))).all()
+        assert len(live) == 1
