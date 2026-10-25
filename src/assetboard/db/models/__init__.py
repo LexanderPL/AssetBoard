@@ -15,11 +15,14 @@ from assetboard.db.models.identity import (
 )
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkLog
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
+from assetboard.db.models.notifications import NotificationChannel, NotificationLog
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.models.tax import TaxRule, TaxRuleVersion
 from assetboard.db.models.totp import TotpFactor, TotpRecoveryCode
 
 __all__ = [
+    "NotificationChannel",
+    "NotificationLog",
     "ScheduledItem",
     "ScheduledOccurrence",
     "IncomeSource",

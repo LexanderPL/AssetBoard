@@ -50,6 +50,8 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "invitations",
         "memberships",
         "month_states",
+        "notification_channels",
+        "notification_log",
         "setup_state",
         "transactions",
         "scheduled_items",
@@ -114,6 +116,36 @@ def test_0020_income_sources_migration_is_reversible(tmp_path: Path) -> None:
         } & set(inspect(engine).get_table_names())
         assert "income_source_id" not in {
             column["name"] for column in inspect(engine).get_columns("scheduled_occurrences")
+        }
+        upgrade_database(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0021_notifications_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'notify.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        assert {"notification_channels", "notification_log"} <= set(inspector.get_table_names())
+        assert "reminder_lead_days" in {
+            column["name"] for column in inspector.get_columns("scheduled_items")
+        }
+        unique = {
+            tuple(constraint["column_names"])
+            for constraint in inspector.get_unique_constraints("notification_log")
+        }
+        assert ("channel_id", "kind", "subject_key", "sent_on") in unique
+        command.downgrade(alembic_config(settings), "0020_f34")
+        assert not {"notification_channels", "notification_log"} & set(
+            inspect(engine).get_table_names()
+        )
+        assert "reminder_lead_days" not in {
+            column["name"] for column in inspect(engine).get_columns("scheduled_items")
         }
         upgrade_database(settings)
         check_database_migrations(settings)

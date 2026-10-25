@@ -11,7 +11,7 @@ from __future__ import annotations
 import itertools
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, date, datetime, time, timedelta
 from decimal import Decimal
 from typing import Any
 from uuid import UUID, uuid4
@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkLog
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
+from assetboard.db.models.notifications import NotificationChannel, NotificationLog
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.models.tax import TaxRule, TaxRuleVersion
 from assetboard.services.invitations import new_token
@@ -257,6 +258,41 @@ def make_income_source_tax_rule(session: Session, workspace_id: UUID) -> IncomeS
     )
 
 
+def make_notification_channel(session: Session, workspace_id: UUID) -> NotificationChannel:
+    return NotificationChannel(
+        workspace_id=workspace_id,
+        user_id=_user(session).id,
+        name="Phone",
+        url_encrypted="synthetic-ciphertext",
+        scheme="ntfy",
+        service_name="ntfy",
+        enabled=True,
+        mode="digest",
+        digest_time=time(8, 0),
+        default_lead_days=3,
+        notify_due_soon=True,
+        notify_overdue=True,
+        notify_work_logs=True,
+        include_amounts=False,
+    )
+
+
+def make_notification_log(session: Session, workspace_id: UUID) -> NotificationLog:
+    channel = make_notification_channel(session, workspace_id)
+    session.add(channel)
+    session.flush()
+    return NotificationLog(
+        workspace_id=workspace_id,
+        channel_id=channel.id,
+        kind="overdue",
+        subject_key=str(uuid4()),
+        occurrence_id=None,
+        sent_on=date(2026, 1, 1),
+        status="sent",
+        attempted_at=session.info["clock"].now(),
+    )
+
+
 TENANT_CASES: dict[type[Any], TenantCase] = {
     ScheduledItem: TenantCase(make_scheduled_item, update_values={"name": "Rent"}),
     ScheduledOccurrence: TenantCase(make_scheduled_occurrence, update_values={"label": "Rent"}),
@@ -287,4 +323,6 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     IncomeSource: TenantCase(make_income_source, update_values={"name": "Updated salary"}),
     WorkLog: TenantCase(make_work_log, update_values={"units": Decimal("20")}),
     IncomeSourceTaxRule: TenantCase(make_income_source_tax_rule, update_values={"due_day": 12}),
+    NotificationChannel: TenantCase(make_notification_channel, update_values={"name": "Laptop"}),
+    NotificationLog: TenantCase(make_notification_log, update_values={"status": "failed"}),
 }
