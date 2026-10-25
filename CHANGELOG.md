@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.3.1](https://github.com/LexanderPL/AssetBoard/compare/v0.3.0...v0.3.1) (2026-10-25)
+
+
+### Features
+
+* **deploy:** native systemd install, Proxmox LXC and Podman guides, release install assets ([#151](https://github.com/LexanderPL/AssetBoard/issues/151)) ([4ad4f10](https://github.com/LexanderPL/AssetBoard/commit/4ad4f1002deabb79469c54450356ce38a2b53940))
+* **recurring:** add F3.2 upcoming inbox ([#137](https://github.com/LexanderPL/AssetBoard/issues/137)) ([a1dba50](https://github.com/LexanderPL/AssetBoard/commit/a1dba5013ef1b7fafbcf919667b3e464fa352284))
+* **taxes:** add F3.3 tax rules and calculator ([#138](https://github.com/LexanderPL/AssetBoard/issues/138)) ([668affe](https://github.com/LexanderPL/AssetBoard/commit/668affe873b85b91097036efa7b68e79cb3b27b7))
+* **ui:** month flow bar, over-plan rows, export dialog, native money format and lighter navigation ([#144](https://github.com/LexanderPL/AssetBoard/issues/144)) ([96a59ee](https://github.com/LexanderPL/AssetBoard/commit/96a59ee49618bb8a13ae5db18dc2862e278ef00a))
+* **web:** F2.7 Home dashboard, Month summary, Transactions and History pages ([#150](https://github.com/LexanderPL/AssetBoard/issues/150)) ([8e1e5bf](https://github.com/LexanderPL/AssetBoard/commit/8e1e5bf2b59453446261131b17884aa4c4806418))
+* **workspaces:** let owners delete a workspace and all its data ([#139](https://github.com/LexanderPL/AssetBoard/issues/139)) ([4349a00](https://github.com/LexanderPL/AssetBoard/commit/4349a00d435b8d0d348abc626d845bce04fa6a1f))
+
+
+### Bug Fixes
+
+* **deps:** update dependencies with known vulnerabilities ([#146](https://github.com/LexanderPL/AssetBoard/issues/146)) ([04284ce](https://github.com/LexanderPL/AssetBoard/commit/04284ced0c47bc7e95acbf1f9274d266db1c4934))
+* deterministic throttled-wait test and one-query admin users list ([#147](https://github.com/LexanderPL/AssetBoard/issues/147)) ([4fed58e](https://github.com/LexanderPL/AssetBoard/commit/4fed58e4fbebe0d80d80535be0e7e637ffa6593c))
+* **recurring:** return a posted occurrence to pending when its transaction is deleted ([#148](https://github.com/LexanderPL/AssetBoard/issues/148)) ([b2c4885](https://github.com/LexanderPL/AssetBoard/commit/b2c488527f0dee70f5c27667bfa17e7c2080c19e))
+
+
+### Documentation
+
+* **specs:** navigation restructure (F2.7), Reports milestone (M10) and demo account ([#145](https://github.com/LexanderPL/AssetBoard/issues/145)) ([9cbd724](https://github.com/LexanderPL/AssetBoard/commit/9cbd7246feab30b08f8917258503c7cb38abcdb7))
+
 ## [0.3.0](https://github.com/LexanderPL/AssetBoard/compare/v0.2.1...v0.3.0) (2026-10-24)
 
 
