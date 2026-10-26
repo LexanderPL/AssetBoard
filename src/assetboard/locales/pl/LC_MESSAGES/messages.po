@@ -659,6 +659,10 @@ msgid "Deleted workspaces"
 msgstr "Usunięte obszary robocze"
 
 #, python-format
+msgid "%(name)s tax payment"
+msgstr "%(name)s – płatność podatku"
+
+#, python-format
 msgid "Confirm your email address for %(app)s"
 msgstr "Potwierdź adres e-mail w %(app)s"
 

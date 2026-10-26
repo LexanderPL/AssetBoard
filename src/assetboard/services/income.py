@@ -56,8 +56,18 @@ from assetboard.domain.taxes import (
     calculate_taxes,
 )
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR, clean_description
+from assetboard.i18n import gettext
 from assetboard.services.category_usage import CategoryUsage
 from assetboard.services.context import Context, Role, require_role, require_role_now
+
+
+def _(message: str) -> str:
+    """Marks a message for extraction; it is translated when used."""
+    return message
+
+
+# Generated tax payments are named in the workspace language, as the seeded categories are.
+TAX_PAYMENT_LABEL = _("%(name)s tax payment")
 
 
 class IncomeError(Exception):
@@ -301,6 +311,8 @@ def _sync_children(
     due: date,
 ) -> None:
     selected, _missing = _tax_lines(session, scope, source, due)
+    locale = CurrentWorkspaceRepository(session, scope).get().locale
+    label = gettext(TAX_PAYMENT_LABEL, locale) % {"name": source.name}
     breakdown = _calculate_breakdown(
         net, [tax for _, tax, _ in selected], RecordAs(source.record_as)
     )
@@ -347,7 +359,7 @@ def _sync_children(
         child.expected_minor = amount
         child.currency = source.currency
         child.amount_state = "confirmed"
-        child.label = f"{source.name} tax payment"
+        child.label = label
     for attachment_id, (attachment, amount, due_date) in wanted.items():
         if YearMonth.from_date(due_date) in closed_months:
             continue
@@ -366,7 +378,7 @@ def _sync_children(
             amount_state="confirmed",
             status="pending",
             generated_by="tax",
-            label=f"{source.name} tax payment",
+            label=label,
         )
 
 

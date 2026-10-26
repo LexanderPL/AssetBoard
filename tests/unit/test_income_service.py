@@ -107,6 +107,19 @@ def test_income_source_golden_example_generates_tax_payment(team: WorkspaceDb) -
         assert children[0].due_date == date(2026, 9, 20)
         assert children[0].expected_minor == 537_510
         assert children[0].category_id == expense_category
+        assert children[0].label == "Contract work tax payment"
+
+    # The label is in the workspace language; a recalculation renames pending payments.
+    with team.factory.begin() as session:
+        CurrentWorkspaceRepository(session, ctx).update(locale="pl")
+    assert not income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("19"))
+    with team.factory() as session:
+        repository = ScheduledOccurrenceRepository(session, ctx)
+        parent = repository.for_income_work_month(source_id, date(2026, 8, 1))
+        assert parent is not None
+        assert [child.label for child in repository.children(parent.id)] == [
+            "Contract work – płatność podatku"
+        ]
 
     listed = income.list_sources(team.factory, ctx)
     source = next(row for row in listed if row.id == source_id)
