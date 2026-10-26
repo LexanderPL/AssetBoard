@@ -7,7 +7,7 @@ CDN at runtime.
 |---|---:|---|---|---|---|
 | `htmx.min.js` | 2.0.4 | Zero-Clause BSD (0BSD) | `69caefd0da92269066e725d7fe175e26b9d50c962e3056459c0c477154cdb9d3` | `HTMX-LICENSE.txt` | https://github.com/bigskysoftware/htmx |
 | `alpinejs-csp.min.js` | 3.14.8 | MIT | `c98f46291087f0f93c9cdefb682d120fe1d2b3dcb649de83cfc1ad5b1fac58e4` | `ALPINE-LICENSE.txt` | https://github.com/alpinejs/alpine |
-| `echarts.min.js` | 5.6.0 | Apache-2.0 | `bf4a223524e40b77c304bec67e1222cf551f14880cf42c69dc046558e11c07b1` | `ECHARTS-LICENSE.txt` | https://github.com/apache/echarts |
+| `echarts.min.js` | 6.1.0 | Apache-2.0 | `b66b25aeb4df84e33199dc21694014d336d222cbd9deb0e5a7c14bd6aa0d0fd0` | `ECHARTS-LICENSE.txt` | https://github.com/apache/echarts |
 
 ### Build tools (not shipped)
 
@@ -23,7 +23,7 @@ versioned upstream release during `make css` and cached in
 `.cache/`; it is a build tool and is not used by the running application. It is not included in
 the shipped assets, so no standalone Tailwind license file is kept here.
 
-Apache ECharts 5.6.0 ships an upstream `NOTICE`; its exact text is included in `ECHARTS-NOTICE.txt`.
+Apache ECharts 6.1.0 ships an upstream `NOTICE`; its exact text is included in `ECHARTS-NOTICE.txt`.
 
 ### Bundled data (not served)
 

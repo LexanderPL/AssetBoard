@@ -683,7 +683,7 @@ current order.
   active item (Transactions for `/transactions/...`, History for `/history`). The brand link and
   "Home" both go to `/`.
 - **Charts** (the Home and Month donuts):
-  - Apache ECharts from the already vendored `static/vendor/echarts.min.js` (5.6.0; licence,
+  - Apache ECharts from the already vendored `static/vendor/echarts.min.js` (6.1.0; licence,
     NOTICE and SHA-256 in `static/vendor/README.md`), loaded only on pages with a chart. If a
     newer version is vendored, the README entry, licence files and checksum change in the same
     PR.
