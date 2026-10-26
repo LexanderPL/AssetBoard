@@ -10,7 +10,7 @@ from datetime import date
 
 from babel import Locale
 from babel.core import UnknownLocaleError
-from babel.dates import format_date, format_skeleton
+from babel.dates import format_date, format_skeleton, get_day_names
 
 from assetboard.domain.months import YearMonth
 
@@ -46,3 +46,15 @@ def format_month_after_from(month: YearMonth, locale: str) -> str:
 def format_day(day: date, locale: str) -> str:
     """A date in the locale's medium format: "Oct 14, 2026", "14 paź 2026"."""
     return format_date(day, format="medium", locale=_locale(locale))
+
+
+def format_day_long(day: date, locale: str) -> str:
+    """A date with its weekday in the locale's full format, for screen-reader labels:
+    "Monday, March 2, 2026", "poniedziałek, 2 marca 2026"."""
+    return format_date(day, format="full", locale=_locale(locale))
+
+
+def weekday_names(locale: str) -> list[str]:
+    """Abbreviated weekday names from Monday to Sunday (CLDR stand-alone): "Mon", "pon."."""
+    names = get_day_names("abbreviated", context="stand-alone", locale=_locale(locale))
+    return [names[index] for index in range(7)]

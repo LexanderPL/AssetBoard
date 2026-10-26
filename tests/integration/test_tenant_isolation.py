@@ -1008,6 +1008,7 @@ def test_income_queries_stay_in_their_workspace(
         IncomeSourceTaxRuleRepository,
         ScheduledOccurrenceRepository,
         TaxRuleRepository,
+        WorkDayRepository,
         WorkLogRepository,
     )
 
@@ -1095,6 +1096,16 @@ def test_income_queries_stay_in_their_workspace(
         source_a.id: {date(2026, 1, 1)}
     }
     assert logs_b.work_months_for_sources([source_a.id]) == {}
+
+    # F3.7 day entries: a month query sees only its own workspace's rows.
+    day_a = WorkDayRepository(db_session, ctx_a).create(
+        income_source_id=source_a.id, work_date=date(2026, 1, 5), units=Decimal("1")
+    )
+    january = (date(2026, 1, 1), date(2026, 1, 31))
+    assert [
+        row.id for row in WorkDayRepository(db_session, ctx_a).for_month(source_a.id, *january)
+    ] == [day_a.id]
+    assert WorkDayRepository(db_session, ctx_b).for_month(source_a.id, *january) == []
 
     # Pending income occurrences: the month list and the overdue count see only their own.
     occurrences = {}

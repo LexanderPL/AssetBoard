@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 from babel.messages.pofile import read_po
@@ -50,3 +51,12 @@ def test_a_month_after_from_uses_the_inflected_form() -> None:
     september = YearMonth(2026, 9)
     assert format_month_after_from(september, "pl") == "września 2026"  # "z września 2026"
     assert format_month_after_from(september, "en") == "September 2026"
+
+
+def test_calendar_weekday_names_and_long_dates_come_from_cldr() -> None:
+    from assetboard.i18n.dates import format_day_long, weekday_names
+
+    assert weekday_names("en") == ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    assert weekday_names("pl")[0] == "pon."
+    assert format_day_long(date(2026, 3, 2), "en") == "Monday, March 2, 2026"
+    assert format_day_long(date(2026, 3, 2), "pl") == "poniedziałek, 2 marca 2026"

@@ -1199,6 +1199,16 @@ msgid "Archived income sources cannot be changed."
 msgstr "Nie można zmieniać zarchiwizowanych źródeł przychodu."
 
 msgid ""
+"This month's units come from the work calendar. Change the days in the "
+"calendar."
+msgstr ""
+"Jednostki tego miesiąca pochodzą z kalendarza pracy. Zmień dni w "
+"kalendarzu."
+
+msgid "Enter a number of units above 0 and at most 24."
+msgstr "Podaj liczbę jednostek większą od 0 i nie większą niż 24."
+
+msgid ""
 "The work log was saved; posted income was not changed. Adjust its "
 "transaction manually if needed."
 msgstr ""
@@ -2871,6 +2881,99 @@ msgstr ""
 "Wszystkie zaznaczone wpisy są już w tej kategorii; nic by się nie "
 "zmieniło."
 
+msgid "Calendar months"
+msgstr "Miesiące kalendarza"
+
+msgid "Previous month"
+msgstr "Poprzedni miesiąc"
+
+msgid "Next month"
+msgstr "Następny miesiąc"
+
+#, python-format
+msgid "Month total: %(units)s (%(unit)s)"
+msgstr "Suma miesiąca: %(units)s (%(unit)s)"
+
+msgid ""
+"The month's work log is the sum of these days; change it here, not in the"
+" month form."
+msgstr ""
+"Rejestr pracy tego miesiąca to suma tych dni; zmieniaj go tutaj, nie w "
+"formularzu miesięcznym."
+
+#, python-format
+msgid ""
+"This month has a manual work log of %(units)s. Marking a day replaces it "
+"with the sum of the days."
+msgstr ""
+"Ten miesiąc ma ręczny rejestr pracy: %(units)s. Zaznaczenie dnia zastąpi "
+"go sumą dni."
+
+msgid "No days marked. The month keeps its month-level work log or estimate."
+msgstr ""
+"Nie zaznaczono dni. Miesiąc zachowuje swój miesięczny rejestr pracy lub "
+"szacunek."
+
+#, python-format
+msgid "Days of %(month)s"
+msgstr "Dni: %(month)s"
+
+msgid "holiday"
+msgstr "święto"
+
+msgid "weekend"
+msgstr "weekend"
+
+#, python-format
+msgid "%(units)s %(unit)s"
+msgstr "%(units)s %(unit)s"
+
+msgid "Holiday"
+msgstr "Święto"
+
+msgid "Legend"
+msgstr "Legenda"
+
+msgid "Worked"
+msgstr "Przepracowany"
+
+msgid "Weekend"
+msgstr "Weekend"
+
+msgid "Fill working days"
+msgstr "Uzupełnij dni robocze"
+
+#, python-format
+msgid ""
+"Clear every day of %(month)s? The month work log made from them is "
+"removed too."
+msgstr ""
+"Wyczyścić wszystkie dni: %(month)s? Rejestr pracy miesiąca utworzony z "
+"tych dni też zostanie usunięty."
+
+msgid "Clear month"
+msgstr "Wyczyść miesiąc"
+
+msgid "Day values"
+msgstr "Wartości dni"
+
+msgid ""
+"A marked day counts 1 by default; enter a half day (0.5) or hours "
+"instead, up to 24."
+msgstr ""
+"Zaznaczony dzień liczy się domyślnie jako 1; zamiast tego możesz wpisać "
+"pół dnia (0,5) lub godziny, maksymalnie 24."
+
+msgid "Work calendar"
+msgstr "Kalendarz pracy"
+
+#, python-format
+msgid "Work calendar: %(name)s"
+msgstr "Kalendarz pracy: %(name)s"
+
+msgid "Back to income sources"
+msgstr "Wróć do źródeł przychodów"
+
 msgid "New income source"
 msgstr "Nowe źródło przychodu"
 
@@ -2997,8 +3100,14 @@ msgstr "Planowana płatność: %(name)s — %(amount)s"
 msgid "Work logs"
 msgstr "Dzienniki pracy"
 
+msgid "from the work calendar"
+msgstr "z kalendarza pracy"
+
 msgid "No work logs yet."
 msgstr "Nie ma jeszcze dzienników pracy."
+
+msgid "Open the work calendar"
+msgstr "Otwórz kalendarz pracy"
 
 msgid "Work month"
 msgstr "Miesiąc pracy"
@@ -3009,6 +3118,13 @@ msgstr "Przepracowane jednostki (%(unit)s)"
 
 msgid "Save work log"
 msgstr "Zapisz dziennik pracy"
+
+msgid ""
+"Months with days marked in the work calendar are read-only here: their "
+"units are the sum of the days."
+msgstr ""
+"Miesiące z dniami zaznaczonymi w kalendarzu pracy są tu tylko do odczytu:"
+" ich jednostki to suma dni."
 
 msgid "Attached tax rules"
 msgstr "Przypisane reguły podatkowe"

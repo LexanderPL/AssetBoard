@@ -310,6 +310,31 @@ Implement F3.7 (stretch) from docs/specs/M3-recurring-income-and-taxes.md: WorkD
 derivation of the month WorkLog from day entries, fill-working-days shortcut. Make sure F3.4 recalculation is triggered on every change.
 ```
 
+**As built (F3.7; owner decisions of 2026-10-25):**
+- `WorkDay(id, workspace_id, income_source_id, work_date, units Decimal, timestamps)`, unique
+  `(workspace_id, income_source_id, work_date)`, composite FK to the income source with
+  `ON DELETE CASCADE` (migration `0022_f37`, which also adds `work_logs.derived_from_days`).
+  `0 < units <= 24` is enforced in the service, not by a SQL check: a check on a `DecimalType`
+  column compares text on SQLite.
+- Variable income sources only; the calendar is optional. A work month with any day entries has a
+  `WorkLog` with `units = sum(days)` and `derived_from_days = true`, created or updated by the
+  service; `log_work` refuses it (`derived_work_log`). The first day entry overwrites a manual log
+  of that month (the `WorkLog` model has no note column, so nothing else is kept); removing the
+  last day or clearing the month deletes the derived log.
+- Toggle (1 unit by default), set value (locale number parsing), fill working days (weekdays that
+  are not workspace-country holidays and have no entry; existing values are never overwritten)
+  and clear month. Each runs in one transaction with the same role checks (editor;
+  `require_role_now` inside `run_immediate`), the same closed-month rule (refused while the
+  pending occurrence's pay month is closed) and the same F3.4 recalculation (`_sync_work_month`)
+  as a month-level work log save; a posted occurrence is left unchanged and the page says so.
+- A workspace country without holiday data shows and fills weekends only (working-day estimates
+  still refuse it, as in F3.1).
+- UI: `/income/{id}/calendar?month=YYYY-MM` (HTMX fragment swaps, plain-form fallbacks with
+  redirects), day buttons with `aria-pressed` and a full-date `aria-label`, CLDR weekday names,
+  "Clear month" behind the shared confirmation dialog, linked from each variable income source.
+- Workspace deletion covers `work_days` through the metadata-driven delete; archive files
+  (`work_days.csv`) stay with F3.8.
+
 ---
 
 ## F3.8 Archive extension: recurring items, income sources, taxes and work logs
