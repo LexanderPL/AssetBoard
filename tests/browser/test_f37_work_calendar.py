@@ -1,5 +1,6 @@
 """Work calendar in Chromium (F3.7): toggle days with the mouse and the keyboard, edit a day
-value, fill the working days and clear the month (confirmation dialog). No CSP violations."""
+value, fill the working days and clear the month (confirmation dialog); then a one-time
+recurring item, whose repeat fields hide. No CSP violations."""
 
 from __future__ import annotations
 
@@ -7,6 +8,7 @@ import os
 import socket
 import threading
 import time
+from datetime import date, timedelta
 from pathlib import Path
 
 import pytest
@@ -123,6 +125,19 @@ def test_work_calendar_in_a_browser(tmp_path: Path) -> None:
 
             page.locator("[data-calendar-next]").click()
             expect(page.locator("[data-calendar-month]")).to_have_text("September 2026")
+
+            # A one-time item: choosing "One time" hides the repeat fields.
+            page.goto(f"{base}/recurring/new", wait_until="networkidle")
+            repeat_fields = page.locator('[data-hidden-when="freq=once"]')
+            expect(repeat_fields).to_be_visible()
+            page.get_by_label("Name").fill("Wedding gift")
+            page.get_by_label("Amount", exact=True).fill("120")
+            page.get_by_label("Start date").fill((date.today() + timedelta(days=30)).isoformat())
+            page.get_by_label("Repeat").select_option("once")
+            expect(repeat_fields).to_be_hidden()
+            page.get_by_role("button", name="Save recurring item").click()
+            page.wait_for_load_state("networkidle")
+            expect(page.locator("[data-one-time]")).to_contain_text("One time on")
             assert page.evaluate("window.__cspViolations") == []
             browser.close()
     finally:
