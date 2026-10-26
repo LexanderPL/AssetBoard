@@ -38,7 +38,7 @@ class ScheduledItem(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         CheckConstraint(
             f"amount_minor > 0 AND amount_minor <= {MAX_AMOUNT_MINOR}", name="amount_valid"
         ),
-        CheckConstraint("freq IN ('weekly', 'monthly', 'yearly')", name="freq_valid"),
+        CheckConstraint("freq IN ('once', 'weekly', 'monthly', 'yearly')", name="freq_valid"),
         CheckConstraint("interval >= 1", name="interval_valid"),
         CheckConstraint("max_count IS NULL OR max_count >= 1", name="max_count_valid"),
         CheckConstraint("end_date IS NULL OR end_date >= start_date", name="end_date_valid"),

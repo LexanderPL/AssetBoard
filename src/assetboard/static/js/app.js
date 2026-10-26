@@ -256,6 +256,22 @@ document.addEventListener("change", (event) => {
   target.form?.requestSubmit();
 });
 
+// Progressive disclosure: an element marked data-hidden-when="<select id>=<value>" is hidden
+// while that select holds that value (the recurring form hides the repeat fields of a one-time
+// item). Without JavaScript everything stays visible and the form explains what is ignored.
+function applyHiddenWhen() {
+  document.querySelectorAll("[data-hidden-when]").forEach((element) => {
+    if (!(element instanceof HTMLElement)) return;
+    const [id, value] = (element.dataset.hiddenWhen ?? "").split("=");
+    const select = document.getElementById(id ?? "");
+    if (select instanceof HTMLSelectElement) element.hidden = select.value === value;
+  });
+}
+document.addEventListener("change", (event) => {
+  if (event.target instanceof HTMLSelectElement) applyHiddenWhen();
+});
+document.addEventListener("DOMContentLoaded", applyHiddenWhen);
+
 // Buttons marked data-copy-target copy the referenced input's value (invitation links).
 document.addEventListener("click", async (event) => {
   const target = event.target;

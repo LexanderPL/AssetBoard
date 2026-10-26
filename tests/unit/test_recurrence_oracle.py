@@ -29,6 +29,10 @@ _WEEKDAYS = (rr.MO, rr.TU, rr.WE, rr.TH, rr.FR, rr.SA, rr.SU)
 
 
 def _oracle(rule: RecurrenceRule, first: date, last: date) -> list[date]:
+    if rule.freq == Frequency.ONCE:
+        # One time: a single daily occurrence on the start date; the repeat fields do not apply.
+        only = rr.rrule(rr.DAILY, dtstart=rule.start_date, count=1)[0].date()
+        return [only] if first <= only <= last else []
     options: dict[str, object] = {
         "dtstart": datetime.combine(rule.start_date, datetime.min.time()),
         "interval": rule.interval,

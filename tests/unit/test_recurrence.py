@@ -10,6 +10,7 @@ from assetboard.domain.recurrence import (
     MonthDay,
     RecurrenceRule,
     WeekendPolicy,
+    normalised,
     occurrences,
     occurrences_with_nominal,
 )
@@ -129,3 +130,38 @@ def test_monthly_results_are_deterministic_ordered_unique_bounded(day, interval,
     assert actual == sorted(set(actual)) and len(actual) <= count
     assert all(first <= day <= last for day in actual)
     assert occurrences(rule, first, last, set(), limit=6) == actual[:6]
+
+
+def test_once_yields_its_start_date_and_ignores_the_repeat_fields() -> None:
+    rule = RecurrenceRule(
+        date(2026, 3, 10),
+        Frequency.ONCE,
+        interval=3,
+        weekdays=(1, 2),
+        month_day=MonthDay.LAST_WORKING,
+        month=7,
+        end_date=date(2027, 1, 1),
+        max_count=5,
+    )
+    assert occurrences(rule, date(2026, 1, 1), date(2030, 12, 31), set()) == [date(2026, 3, 10)]
+    assert occurrences(rule, date(2026, 3, 11), date(2030, 12, 31), set()) == []
+    assert occurrences(rule, date(2026, 1, 1), date(2026, 3, 9), set()) == []
+    assert not rule.uses_working_days
+    assert normalised(rule) == RecurrenceRule(date(2026, 3, 10), Frequency.ONCE)
+
+
+@pytest.mark.parametrize(
+    ("policy", "expected"),
+    [
+        (WeekendPolicy.NONE, date(2026, 5, 2)),
+        (WeekendPolicy.PREVIOUS, date(2026, 4, 30)),
+        (WeekendPolicy.NEXT, date(2026, 5, 4)),
+    ],
+)
+def test_once_applies_the_weekend_and_holiday_policy(policy, expected) -> None:
+    # Saturday 2 May 2026; 1 May is a holiday in this synthetic calendar.
+    rule = RecurrenceRule(date(2026, 5, 2), Frequency.ONCE, weekend_policy=policy)
+    holidays = {date(2026, 5, 1)}
+    assert occurrences_with_nominal(rule, date(2026, 1, 1), date(2026, 12, 31), holidays) == [
+        (date(2026, 5, 2), expected)
+    ]

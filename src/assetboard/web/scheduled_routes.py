@@ -108,12 +108,20 @@ def _rule(values: dict[str, str]) -> RecurrenceRule:
     except ValueError:
         raise InvalidField("month_day") from None
     start = _parse(values, "start_date", date.fromisoformat, "")
+    freq = _parse(values, "freq", Frequency, "monthly")
+    policy = _parse(values, "weekend_policy", WeekendPolicy, "none")
+    if freq == Frequency.ONCE:
+        # One time: the repeat fields are ignored, whatever the (hidden) inputs hold.
+        try:
+            return RecurrenceRule(start_date=start, freq=freq, weekend_policy=policy)
+        except ValueError:
+            raise InvalidField("start_date") from None
     try:
         return RecurrenceRule(
             start_date=start,
             end_date=_optional(values, "end_date", date.fromisoformat),
             max_count=_optional(values, "max_count", int),
-            freq=_parse(values, "freq", Frequency, "monthly"),
+            freq=freq,
             interval=_parse(values, "interval", int, "1"),
             weekdays=_parse(
                 values,
@@ -123,7 +131,7 @@ def _rule(values: dict[str, str]) -> RecurrenceRule:
             ),
             month_day=month_day,
             month=_parse(values, "month", int, "1"),
-            weekend_policy=_parse(values, "weekend_policy", WeekendPolicy, "none"),
+            weekend_policy=policy,
         )
     except InvalidField:
         raise
@@ -212,6 +220,7 @@ async def items(request: Request, ctx: CurrentContext) -> Response:
         "scheduled/list.html",
         context={
             "items": rows,
+            "format_day": format_day,
             "can_edit": has_role(ctx, Role.EDITOR),
             "error": gettext(ACTION_ERRORS.get(error, GENERIC_ERROR), request.state.locale)
             if error
