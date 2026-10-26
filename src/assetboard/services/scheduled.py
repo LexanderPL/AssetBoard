@@ -11,6 +11,12 @@ month close/reopen), so generation is serialised per workspace.
 **History.** Only posted and skipped rows (and rows kept because their month is closed) are
 history. Archiving or deleting removes every other pending row; deleting with no history left
 removes the item itself.
+
+**One-time items** (frequency ``once``) have a single occurrence on their date, created when
+the date enters the generation horizon like any other. Their repeat fields are stored
+normalised (interval 1, no end date or count). Once that occurrence is history, overdue or in
+a closed month, a date edit adds no second one; with a posted or skipped occurrence the item is
+"done".
 """
 
 from __future__ import annotations
@@ -45,6 +51,7 @@ from assetboard.domain.recurrence import (
     MonthDay,
     RecurrenceRule,
     WeekendPolicy,
+    normalised,
     occurrences,
     occurrences_with_nominal,
 )
@@ -77,6 +84,8 @@ class ScheduledView:
     values: ScheduledInput
     paused: bool
     archived: bool
+    # A one-time item whose occurrence is posted or skipped: nothing more will come.
+    done: bool = False
 
 
 def _rule(item: ScheduledItem) -> RecurrenceRule:
@@ -150,12 +159,22 @@ def preview(factory: sessionmaker[Session], ctx: Context, rule: RecurrenceRule) 
         )
 
 
+def _has_history(rows: list[ScheduledOccurrence]) -> bool:
+    return any(row.status != OccurrenceStatus.PENDING for row in rows)
+
+
 def list_items(factory: sessionmaker[Session], ctx: Context) -> list[ScheduledView]:
     require_role(ctx, Role.VIEWER)
     with factory() as session:
+        occurrences_repository = ScheduledOccurrenceRepository(session, ctx)
         return [
             ScheduledView(
-                row.id, _values(row), row.paused_at is not None, row.archived_at is not None
+                row.id,
+                _values(row),
+                row.paused_at is not None,
+                row.archived_at is not None,
+                row.freq == Frequency.ONCE
+                and _has_history(occurrences_repository.for_item(row.id)),
             )
             for row in ScheduledItemRepository(session, ctx).ordered()
         ]
@@ -256,6 +275,10 @@ def _generate(
             )
         kept.add(row.nominal_date)
     missing = sorted(set(wanted) - kept)
+    if item.freq == Frequency.ONCE and kept:
+        # A one-time item never has more than one occurrence: once its row is history (or
+        # overdue, or in a closed month), a date edit does not add another.
+        missing = []
     for nominal in missing:
         repository.create(
             scheduled_item_id=item.id,
@@ -371,7 +394,7 @@ def save_item(
         if category.kind != values.direction or category.archived_at is not None:
             raise ValueError("invalid_category")
         repository = ScheduledItemRepository(session, ctx)
-        rule = values.rule
+        rule = normalised(values.rule)
         fields = {
             "name": name,
             "notes": notes,

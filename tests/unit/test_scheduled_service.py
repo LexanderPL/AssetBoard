@@ -20,7 +20,7 @@ from assetboard.domain.months import YearMonth
 from assetboard.domain.recurrence import Frequency, MonthDay, RecurrenceRule, WeekendPolicy
 from assetboard.domain.scheduled import ItemAction
 from assetboard.domain.transactions import TransactionDirection
-from assetboard.services import scheduled
+from assetboard.services import occurrences, scheduled
 from assetboard.services.categories import (
     KindChangeBlocked,
     archive_category,
@@ -478,3 +478,75 @@ def test_one_failing_item_does_not_stop_the_workspace_run(team, monkeypatch, cap
     [record] = caplog.records
     assert str(bad) in record.getMessage() and "12345" not in record.getMessage()
     assert record.exc_info is not None
+
+
+def one_time(day: date, **changes) -> RecurrenceRule:
+    return RecurrenceRule(day, Frequency.ONCE, **changes)
+
+
+def test_one_time_item_is_created_normalised_and_regenerated_on_a_date_edit(team):
+    ctx = team.ctx("owner", "owner")
+    settings = Settings(_env_file=None)
+    values = data(
+        team,
+        rule=one_time(
+            date(2026, 5, 2),  # a Saturday
+            interval=4,
+            max_count=3,
+            end_date=date(2026, 6, 1),
+            weekend_policy=WeekendPolicy.NEXT,
+        ),
+    )
+    item = scheduled.save_item(team.factory, ctx, values, settings)
+    stored = scheduled.get_item(team.factory, ctx, item).rule
+    assert stored == one_time(date(2026, 5, 2), weekend_policy=WeekendPolicy.NEXT)
+    [row] = rows(team, item)
+    assert (row.nominal_date, row.due_date, row.status) == (
+        date(2026, 5, 2),
+        date(2026, 5, 4),
+        "pending",
+    )
+    scheduled.save_item(
+        team.factory, ctx, replace(values, rule=one_time(date(2026, 7, 15))), settings, item_id=item
+    )
+    assert [(r.nominal_date, r.due_date) for r in rows(team, item)] == [
+        (date(2026, 7, 15), date(2026, 7, 15))
+    ]
+    assert scheduled.generate_workspace(team.factory, ctx, team.clock, settings) == 0
+    [view] = scheduled.list_items(team.factory, ctx)
+    assert not view.done
+
+
+def test_one_time_item_waits_for_the_horizon_and_follows_include_past(team):
+    ctx = team.ctx("owner", "owner")
+    settings = Settings(_env_file=None).model_copy(update={"recurrence_horizon_months": 2})
+    later = scheduled.save_item(
+        team.factory, ctx, data(team, rule=one_time(date(2026, 6, 1))), settings
+    )
+    assert rows(team, later) == []
+    april = FixedClock("2026-04-01T12:00:00+00:00")  # 1 June is inside the horizon now
+    assert scheduled.generate_workspace(team.factory, ctx, april, settings) == 1
+    assert [row.due_date for row in rows(team, later)] == [date(2026, 6, 1)]
+    past = data(team, rule=one_time(date(2026, 2, 10)))
+    skipped = scheduled.save_item(team.factory, ctx, past, settings)
+    assert rows(team, skipped) == []
+    included = scheduled.save_item(team.factory, ctx, past, settings, include_past=True)
+    assert [row.due_date for row in rows(team, included)] == [date(2026, 2, 10)]
+
+
+def test_posting_a_one_time_occurrence_marks_the_item_done(team):
+    ctx = team.ctx("owner", "owner")
+    settings = Settings(_env_file=None)
+    values = data(team, rule=one_time(date(2026, 3, 1)))
+    item = scheduled.save_item(team.factory, ctx, values, settings)
+    [row] = rows(team, item)
+    occurrences.post_occurrence(team.factory, ctx, row.id, amount_minor=10000, day=row.due_date)
+    [view] = scheduled.list_items(team.factory, ctx)
+    assert view.done and not view.archived
+    # A date edit after posting adds no second occurrence.
+    scheduled.save_item(
+        team.factory, ctx, replace(values, rule=one_time(date(2026, 9, 1))), settings, item_id=item
+    )
+    assert [r.status for r in rows(team, item)] == ["posted"]
+    scheduled.change_state(team.factory, ctx, item, ItemAction.ARCHIVE, settings)
+    assert scheduled.list_items(team.factory, ctx)[0].archived
