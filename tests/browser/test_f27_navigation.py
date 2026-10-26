@@ -186,12 +186,13 @@ def test_f27_navigation_in_a_browser(tmp_path: Path) -> None:
             assert _chart_colours(page) != light  # redrawn with the dark tokens
             page.locator("[data-theme-toggle]").click()
 
-            # Month: a summary with the expense donut, no entry form.
+            # Month: a summary with the expense and income donuts, no entry form.
             page.locator("[data-open-month]").click()
             page.wait_for_url(f"{base}/m/{today}")
             expect(page.locator("#month-summary")).to_be_visible()
+            expect(page.locator("[data-donut]")).to_have_count(2)
             expect(page.locator("[data-donut='expense'] canvas")).to_have_count(1)
-            expect(page.locator("[data-donut='income']")).to_have_count(0)
+            expect(page.locator("[data-donut='income'] canvas")).to_have_count(1)
             expect(page.locator("[data-entry-form]")).to_have_count(0)
 
             # History: filters and the export dialog.

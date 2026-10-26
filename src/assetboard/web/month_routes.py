@@ -1,8 +1,9 @@
 """Month pages (F2.5): ``/m/YYYY-MM`` with navigation, the month picker, closing and reopening.
 
 Since F2.7 the Month page is a summary: F2.3's planned values, F2.4's summary with the flow bar,
-and the expense donut (``web.charts``). The transaction tables moved to the Transactions page
-(``web.transactions_page_routes``), which shares ``month_header`` and the navigation partial.
+and the expense and income donuts (``web.charts``). The transaction tables moved to the
+Transactions page (``web.transactions_page_routes``), which shares ``month_header`` and the
+navigation partial.
 F2.3 fills the summary block with the planned values (``web.plan``; the writes are
 in ``web.plan_routes``) and runs the automatic plan copy when an editor opens a month page
 (``services.budget.auto_copy_on_open``: a GET that writes at most once per month, by design).
@@ -165,7 +166,8 @@ def month_context(
     automatic: bool = False,
 ) -> dict[str, object]:
     """The Month page's context (blocking: run in a thread): the summary with its flow bar
-    and planned values, and the expense donut (F2.7: no entry form, no transaction list).
+    and planned values, and the expense and income donuts (F2.7: no entry form, no transaction
+    list).
     ``plan_cell`` is a refused planned value and ``copied`` a plan copy to report."""
     context = month_header(request, ctx, target, notice=notice, error=error)
     view = cast(MonthView, context["view"])
@@ -180,7 +182,10 @@ def month_context(
     )
     donuts = ()
     if summary.source is not None:
-        donuts = (build_donut(summary.source, "expense", request.state.locale),)
+        donuts = tuple(
+            build_donut(summary.source, block, request.state.locale)
+            for block in ("expense", "income")
+        )
     return {**context, **summary_context(summary), "donuts": donuts}
 
 
