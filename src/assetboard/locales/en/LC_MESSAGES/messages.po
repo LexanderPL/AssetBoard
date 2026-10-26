@@ -3327,13 +3327,10 @@ msgstr ""
 msgid "Start date"
 msgstr ""
 
-msgid "End date (optional)"
-msgstr ""
-
-msgid "Maximum occurrences (optional)"
-msgstr ""
-
 msgid "Repeat"
+msgstr ""
+
+msgid "One time"
 msgstr ""
 
 msgid "Weekly"
@@ -3343,6 +3340,17 @@ msgid "Monthly"
 msgstr ""
 
 msgid "Yearly"
+msgstr ""
+
+msgid ""
+"One time: a single date on the start date. The end date, maximum "
+"occurrences, interval, weekdays, day and month are then ignored."
+msgstr ""
+
+msgid "End date (optional)"
+msgstr ""
+
+msgid "Maximum occurrences (optional)"
 msgstr ""
 
 msgid "Every N weeks, months or years"
@@ -3404,6 +3412,13 @@ msgid "Recurring items"
 msgstr ""
 
 msgid "Upcoming inbox"
+msgstr ""
+
+#, python-format
+msgid "One time on %(date)s"
+msgstr ""
+
+msgid "Done"
 msgstr ""
 
 msgid "Paused"

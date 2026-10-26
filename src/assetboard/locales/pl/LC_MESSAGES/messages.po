@@ -3624,14 +3624,11 @@ msgstr "Pozostaw puste, aby użyć domyślnej wartości każdego kanału powiado
 msgid "Start date"
 msgstr "Data początkowa"
 
-msgid "End date (optional)"
-msgstr "Data końcowa (opcjonalnie)"
-
-msgid "Maximum occurrences (optional)"
-msgstr "Maksymalna liczba wystąpień (opcjonalnie)"
-
 msgid "Repeat"
 msgstr "Powtarzanie"
+
+msgid "One time"
+msgstr "Jednorazowo"
 
 msgid "Weekly"
 msgstr "Co tydzień"
@@ -3641,6 +3638,20 @@ msgstr "Co miesiąc"
 
 msgid "Yearly"
 msgstr "Co rok"
+
+msgid ""
+"One time: a single date on the start date. The end date, maximum "
+"occurrences, interval, weekdays, day and month are then ignored."
+msgstr ""
+"Jednorazowo: jeden termin w dniu daty początkowej. Data końcowa, "
+"maksymalna liczba wystąpień, odstęp, dni tygodnia, dzień i miesiąc są "
+"wtedy pomijane."
+
+msgid "End date (optional)"
+msgstr "Data końcowa (opcjonalnie)"
+
+msgid "Maximum occurrences (optional)"
+msgstr "Maksymalna liczba wystąpień (opcjonalnie)"
 
 msgid "Every N weeks, months or years"
 msgstr "Co ile tygodni, miesięcy lub lat"
@@ -3706,6 +3717,13 @@ msgstr "Pozycje cykliczne"
 
 msgid "Upcoming inbox"
 msgstr "Skrzynka nadchodzących"
+
+#, python-format
+msgid "One time on %(date)s"
+msgstr "Jednorazowo, %(date)s"
+
+msgid "Done"
+msgstr "Zakończona"
 
 msgid "Paused"
 msgstr "Wstrzymana"
