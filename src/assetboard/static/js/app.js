@@ -710,12 +710,3 @@ document.addEventListener("htmx:afterSettle", (event) => {
   const heading = ledger?.querySelector("h2");
   if (heading instanceof HTMLElement) heading.focus();
 });
-  const trigger = event.detail?.requestConfig?.elt;
-  if (!(trigger instanceof Element) || !trigger.matches("[data-filter-link], [data-ledger-show-all]")) {
-    return;
-  }
-  const status = document.getElementById("ledger-status");
-  if (status) status.textContent = ledger?.getAttribute("data-ledger-announce") ?? "";
-  const heading = ledger?.querySelector("h2");
-  if (heading instanceof HTMLElement) heading.focus();
-});
