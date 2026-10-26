@@ -20,6 +20,7 @@ from assetboard.i18n.dates import (
     format_day_long,
     format_month,
     format_month_heading,
+    month_names,
     weekday_names,
 )
 from assetboard.i18n.numbers import (
@@ -67,7 +68,7 @@ ERRORS = {
     "negative_income_after_tax": _("The tax rules calculate a negative income amount."),
     "invalid_units": _("Enter a non-negative number of units."),
     "invalid_date": _("Enter a valid date between 1900 and 2199."),
-    "invalid_work_month": _("Choose the first day of a work month."),
+    "invalid_work_month": _("Choose a valid work month."),
     "invalid_category": _("Choose an active income category."),
     "unsupported_holidays": _("Working-day estimates are unavailable for this workspace country."),
     "invalid_tax_attachment": _("Choose a valid tax rule and payment category."),
@@ -102,6 +103,26 @@ def _day(value: str) -> date:
         raise income.IncomeError("invalid_date") from None
 
 
+def _month(values: dict[str, str], name: str) -> date | None:
+    """The first day of the month chosen in the ``<name>_month`` and ``<name>_year`` selects;
+    None when both are empty. A plain ``<name>`` ISO date is still accepted."""
+    year, month = values.get(f"{name}_year", "").strip(), values.get(f"{name}_month", "").strip()
+    if not year and not month:
+        legacy = values.get(name, "").strip()
+        return _day(legacy) if legacy else None
+    try:
+        return date(int(year), int(month), 1)
+    except ValueError:
+        raise income.IncomeError("invalid_work_month") from None
+
+
+def _required_month(values: dict[str, str], name: str) -> date:
+    chosen = _month(values, name)
+    if chosen is None:
+        raise income.IncomeError("invalid_work_month")
+    return chosen
+
+
 def _source_input(values: dict[str, str], locale: str, currency: str) -> _SourceFields:
     kind = values.get("kind", "variable")
     fixed_minor = None
@@ -128,8 +149,8 @@ def _source_input(values: dict[str, str], locale: str, currency: str) -> _Source
         "expected_units_value": units,
         "average_months": int(values.get("average_months", "3")),
         "record_as": values.get("record_as", "cash_received"),
-        "active_from": _day(values.get("active_from", "")),
-        "active_to": _day(values["active_to"]) if values.get("active_to") else None,
+        "active_from": _required_month(values, "active_from"),
+        "active_to": _month(values, "active_to"),
     }
 
 
@@ -137,11 +158,11 @@ def _format_work_month(work_month: date, locale: str) -> str:
     return format_month(YearMonth.from_date(work_month), locale)
 
 
-def _redirect(request: Request, error: str | None = None) -> Response:
+def _redirect(request: Request, error: str | None = None, form: str | None = None) -> Response:
+    """Back to the sources page; ``form`` names the collapsed form to reopen with the error."""
     target = request.url_for("income_sources").path
-    return RedirectResponse(
-        target + ("?" + urlencode({"error": error}) if error else ""), status_code=303
-    )
+    query = ({"error": error} | ({"form": form} if form else {})) if error else {}
+    return RedirectResponse(target + ("?" + urlencode(query) if query else ""), status_code=303)
 
 
 async def _form(request: Request) -> dict[str, str]:
@@ -159,6 +180,7 @@ async def sources_page(request: Request, ctx: CurrentContext) -> Response:
         )
     )
     error = request.query_params.get("error")
+    today = ctx.clock.today(ctx.workspace.timezone)
     return render_template(
         request,
         "income/sources.html",
@@ -168,10 +190,13 @@ async def sources_page(request: Request, ctx: CurrentContext) -> Response:
             "expense_categories": categories.expense,
             "tax_rules": [rule for rule in rules if not rule.archived],
             "can_edit": has_role(ctx, Role.EDITOR),
-            "today": ctx.clock.today(ctx.workspace.timezone),
+            "today": today,
             "error": gettext(ERRORS.get(error, ERRORS["failed"]), request.state.locale)
             if error
             else None,
+            "open_form": request.query_params.get("form") if error else None,
+            "month_names": month_names(request.state.locale),
+            "picker_years": list(range(today.year - 10, today.year + 6)),
             "format_money": format_money,
             "format_amount_input": format_amount_input,
             "format_quantity_input": format_quantity_input,
@@ -198,9 +223,9 @@ async def create_source(request: Request, ctx: CurrentContext) -> Response:
             request.app.state.settings,
         )
     except income.IncomeError as exc:
-        return _redirect(request, exc.code)
+        return _redirect(request, exc.code, "new-source")
     except (ValueError, ArithmeticError):
-        return _redirect(request, "invalid_source")
+        return _redirect(request, "invalid_source", "new-source")
     return _redirect(request)
 
 
@@ -223,9 +248,9 @@ async def update_source(request: Request, ctx: CurrentContext, source_id: str) -
             request.app.state.settings,
         )
     except income.IncomeError as exc:
-        return _redirect(request, exc.code)
+        return _redirect(request, exc.code, f"edit-{source_id}")
     except (ValueError, ArithmeticError):
-        return _redirect(request, "invalid_source")
+        return _redirect(request, "invalid_source", f"edit-{source_id}")
     return _redirect(request)
 
 
@@ -260,9 +285,35 @@ async def attach_tax_rule(request: Request, ctx: CurrentContext, source_id: str)
             )
         )
     except income.IncomeError as exc:
-        return _redirect(request, exc.code)
+        return _redirect(request, exc.code, f"attach-{source_id}")
     except ValueError:
-        return _redirect(request, "invalid_tax_attachment")
+        return _redirect(request, "invalid_tax_attachment", f"attach-{source_id}")
+    return _redirect(request)
+
+
+@router.post("/income/{source_id}/tax-rules/{attachment_id}", name="income_tax_update")
+async def update_tax_rule(
+    request: Request, ctx: CurrentContext, source_id: str, attachment_id: str
+) -> Response:
+    values = await _form(request)
+    form = f"tax-{attachment_id}"
+    try:
+        await run_in_threadpool(
+            lambda: income.update_tax_attachment(
+                request.app.state.session_factory,
+                ctx,
+                _id(source_id),
+                _id(attachment_id),
+                payment_category_id=_id(values.get("payment_category_id", "")),
+                due_day=int(values.get("due_day", "1")),
+                due_month_offset=int(values.get("due_month_offset", "0")),
+                generate_payment=values.get("generate_payment") == "1",
+            )
+        )
+    except income.IncomeError as exc:
+        return _redirect(request, exc.code, form)
+    except ValueError:
+        return _redirect(request, "invalid_tax_attachment", form)
     return _redirect(request)
 
 
@@ -293,7 +344,7 @@ async def save_work_log(request: Request, ctx: CurrentContext, source_id: str) -
             request.app.state.session_factory,
             ctx,
             _id(source_id),
-            _day(values.get("work_month", "")),
+            _required_month(values, "work_month"),
             units,
         )
     except income.IncomeError as exc:

@@ -78,8 +78,15 @@ def test_work_calendar_in_a_browser(tmp_path: Path) -> None:
             page.wait_for_url(f"{base}/")
 
             page.goto(f"{base}/income", wait_until="networkidle")
+            # The create form is collapsed behind its summary button.
+            expect(page.get_by_label("Name").first).to_be_hidden()
+            page.locator("[data-new-income-source] > summary").click()
             page.get_by_label("Name").first.fill("Consulting")
             page.get_by_label("Rate per unit", exact=False).first.fill("100")
+            # The work month pickers are month and year selects.
+            picker = page.locator("[data-new-income-source] [data-month-picker='active_from']")
+            picker.get_by_label("Month").select_option("1")
+            picker.get_by_label("Year").select_option("2026")
             page.get_by_role("button", name="Create income source").click()
             page.wait_for_load_state("networkidle")
             page.locator("[data-work-calendar-link]").click()

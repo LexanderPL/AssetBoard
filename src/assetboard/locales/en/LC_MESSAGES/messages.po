@@ -1112,7 +1112,7 @@ msgstr ""
 msgid "Enter a valid date between 1900 and 2199."
 msgstr ""
 
-msgid "Choose the first day of a work month."
+msgid "Choose a valid work month."
 msgstr ""
 
 msgid "Choose an active income category."
@@ -2892,7 +2892,7 @@ msgstr ""
 msgid "Due day %(day)s, offset %(offset)s months"
 msgstr ""
 
-msgid "No tax rules attached."
+msgid "No planned payment"
 msgstr ""
 
 msgid "Payment category"
@@ -2905,6 +2905,12 @@ msgid "Payment month offset"
 msgstr ""
 
 msgid "Generate a planned tax payment"
+msgstr ""
+
+msgid "Save tax rule settings"
+msgstr ""
+
+msgid "No tax rules attached."
 msgstr ""
 
 msgid "Attach tax rule"
@@ -2935,6 +2941,15 @@ msgid "Create account and join"
 msgstr ""
 
 msgid "Share"
+msgstr ""
+
+msgid "No month"
+msgstr ""
+
+msgid "Year"
+msgstr ""
+
+msgid "No year"
 msgstr ""
 
 msgid "Your password"
@@ -3077,9 +3092,6 @@ msgstr ""
 msgid "(over plan)"
 msgstr ""
 
-msgid "Planned"
-msgstr ""
-
 msgid "Largest first"
 msgstr ""
 
@@ -3123,6 +3135,9 @@ msgid "Summary"
 msgstr ""
 
 msgid "Show forecast"
+msgstr ""
+
+msgid "Planned"
 msgstr ""
 
 msgid "Actual"
@@ -3949,5 +3964,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Hide forecast"
+#~ msgstr ""
+
+#~ msgid "Choose the first day of a work month."
 #~ msgstr ""
 

@@ -60,7 +60,7 @@ def test_calendar_page_toggle_edit_fill_and_clear(owner):
     assert "data-derived-log" in income_page.text and "data-work-calendar-link" in income_page.text
     manual = owner.post(
         f"/income/{source_id}/work-logs",
-        {"work_month": "2026-08-01", "units": "3"},
+        {"work_month_month": "8", "work_month_year": "2026", "units": "3"},
         token_from="/income",
     )
     assert "error=derived_work_log" in manual.headers["location"]

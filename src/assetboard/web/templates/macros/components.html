@@ -36,6 +36,34 @@
 <button type="submit" class="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover focus:outline-none focus:ring-2 focus:ring-primary/40">{{ label }}</button>
 {%- endmacro %}
 
+{# A <summary> styled as a button: a collapsed form opens without JavaScript. ``list-none`` and
+   the WebKit marker rule hide the disclosure triangle. #}
+{% set summary_button_primary = "inline-flex cursor-pointer list-none items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden" %}
+{% set summary_button = "inline-flex cursor-pointer list-none items-center rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden" %}
+
+{# One month as a month select and a year select (``<name>_month``, ``<name>_year``):
+   ``type=month`` is missing in desktop Firefox and Safari. ``value`` is a date or None; its
+   year is offered even when it is outside ``years``. #}
+{% macro month_picker(name, label, value=None, required=true, id_prefix="") -%}
+{%- set field_id = (id_prefix ~ "-" if id_prefix else "") ~ name -%}
+{%- set years = picker_years if not value or value.year in picker_years else (picker_years + [value.year])|sort -%}
+<fieldset class="grid gap-1 text-sm" data-month-picker="{{ name }}">
+  <legend class="mb-1">{{ label }}</legend>
+  <div class="grid grid-cols-2 gap-2">
+    <label for="{{ field_id }}-month" class="sr-only">{{ _("Month") }}</label>
+    <select id="{{ field_id }}-month" name="{{ name }}_month"{% if required %} required{% endif %} class="form-select rounded-lg py-2">
+      {%- if not required %}<option value=""{% if not value %} selected{% endif %}>{{ _("No month") }}</option>{% endif %}
+      {%- for month_name in month_names %}<option value="{{ loop.index }}"{% if value and value.month == loop.index %} selected{% endif %}>{{ month_name }}</option>{% endfor -%}
+    </select>
+    <label for="{{ field_id }}-year" class="sr-only">{{ _("Year") }}</label>
+    <select id="{{ field_id }}-year" name="{{ name }}_year"{% if required %} required{% endif %} class="form-select rounded-lg py-2">
+      {%- if not required %}<option value=""{% if not value %} selected{% endif %}>{{ _("No year") }}</option>{% endif %}
+      {%- for year in years %}<option value="{{ year }}"{% if value and value.year == year %} selected{% endif %}>{{ year }}</option>{% endfor -%}
+    </select>
+  </div>
+</fieldset>
+{%- endmacro %}
+
 {% macro link_button(label, href) -%}
 <a href="{{ href }}" rel="noreferrer" class="flex w-full justify-center rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-ink shadow-sm hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40">{{ label }}</a>
 {%- endmacro %}

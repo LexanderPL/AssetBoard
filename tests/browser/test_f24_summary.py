@@ -217,7 +217,8 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             expect(food_row.locator("[data-forecast-column]:visible")).to_have_count(2)
             assert _order(page) == ["Golden Travel", "Golden Food"]
 
-            # The expense donut is drawn from the summary's actuals.
+            # Both donuts are shown; the expense donut is drawn from the summary's actuals.
+            expect(page.locator("[data-donut]")).to_have_count(2)
             expect(page.locator("[data-donut='expense'] [data-chart-canvas] canvas")).to_have_count(
                 1
             )

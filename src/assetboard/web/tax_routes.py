@@ -89,11 +89,11 @@ def _day(value: str) -> date:
         raise taxes.TaxRuleError("invalid_date") from None
 
 
-def _redirect(request: Request, error: str | None = None) -> Response:
+def _redirect(request: Request, error: str | None = None, form: str | None = None) -> Response:
+    """Back to the rules page; ``form`` names the collapsed form to reopen with the error."""
     target = request.url_for("tax_rules").path
-    return RedirectResponse(
-        target + ("?" + urlencode({"error": error}) if error else ""), status_code=303
-    )
+    query = ({"error": error} | ({"form": form} if form else {})) if error else {}
+    return RedirectResponse(target + ("?" + urlencode(query) if query else ""), status_code=303)
 
 
 @router.get("/taxes", name="tax_rules")
@@ -109,6 +109,7 @@ async def rules_page(request: Request, ctx: CurrentContext) -> Response:
             "error": gettext(ERRORS.get(error, ERRORS["failed"]), request.state.locale)
             if error
             else None,
+            "open_form": request.query_params.get("form") if error else None,
             "today": ctx.clock.today(ctx.workspace.timezone).isoformat(),
             "format_day": format_day,
             "format_amount_input": format_amount_input,
@@ -134,9 +135,9 @@ async def create(request: Request, ctx: CurrentContext) -> Response:
             )
         )
     except taxes.TaxRuleError as exc:
-        return _redirect(request, exc.code)
+        return _redirect(request, exc.code, "new-rule")
     except ValueError:
-        return _redirect(request, "invalid_rule")
+        return _redirect(request, "invalid_rule", "new-rule")
     return _redirect(request)
 
 

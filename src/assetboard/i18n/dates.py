@@ -10,7 +10,7 @@ from datetime import date
 
 from babel import Locale
 from babel.core import UnknownLocaleError
-from babel.dates import format_date, format_skeleton, get_day_names
+from babel.dates import format_date, format_skeleton, get_day_names, get_month_names
 
 from assetboard.domain.months import YearMonth
 
@@ -58,3 +58,10 @@ def weekday_names(locale: str) -> list[str]:
     """Abbreviated weekday names from Monday to Sunday (CLDR stand-alone): "Mon", "pon."."""
     names = get_day_names("abbreviated", context="stand-alone", locale=_locale(locale))
     return [names[index] for index in range(7)]
+
+
+def month_names(locale: str) -> list[str]:
+    """Month names from January to December as CLDR writes them on their own (stand-alone),
+    for a month select: "January", "styczeń"."""
+    names = get_month_names("wide", context="stand-alone", locale=_locale(locale))
+    return [names[index] for index in range(1, 13)]

@@ -148,9 +148,6 @@
     </div>
     {% endfor %}
   </div>
-  {% if summary.bars|selectattr("has_plan")|list %}
-  <p class="flex items-center gap-2 text-xs text-muted" aria-hidden="true"><span class="inline-block h-3.5 w-[3px] bg-ink"></span>{{ _("Planned") }}</p>
-  {% endif %}
 </div>
 {%- endmacro %}
 
