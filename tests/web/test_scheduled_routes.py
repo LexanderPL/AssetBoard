@@ -197,3 +197,39 @@ def test_country_without_holiday_data_is_explained_on_the_settings_page(owner):
         token_from="/workspace/settings",
     )
     assert response.status_code == 400 and "Holiday data is not available" in response.text
+
+
+def test_one_time_item_form_ignores_repeat_fields_and_lists_its_date(owner):
+    owner.app.state.clock = FixedClock("2026-03-01T12:00:00+00:00")
+    page = owner.client.get("/recurring/new")
+    assert '<option value="once">One time</option>' in page.text
+    assert 'data-hidden-when="freq=once"' in page.text
+    # The repeat fields would be invalid for a recurring rule; a one-time item ignores them.
+    data = form(
+        owner,
+        name="Wedding gift",
+        freq="once",
+        start_date="2026-05-02",
+        weekend_policy="next_working_day",
+        end_date="2026-01-01",
+        max_count="0",
+        interval="0",
+    )
+    preview = owner.post("/recurring/preview", data)
+    assert "2026-05-04" in preview.text and "2026-06" not in preview.text
+    assert owner.post("/recurring", data).status_code == 303
+    from sqlalchemy import select
+
+    with owner.db() as session:
+        item = session.scalars(select(ScheduledItem)).one()
+        assert (item.freq, item.interval, item.end_date, item.max_count, item.month_day) == (
+            "once",
+            1,
+            None,
+            None,
+            "1",
+        )
+    listing = owner.client.get("/recurring")
+    assert "One time on" in listing.text and "Active" in listing.text
+    edit = owner.client.get(f"/recurring/{item.id}/edit")
+    assert '<option value="once" selected>One time</option>' in edit.text

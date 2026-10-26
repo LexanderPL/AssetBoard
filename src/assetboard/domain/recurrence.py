@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import calendar
 from collections.abc import Container, Iterator
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, timedelta
 from enum import StrEnum
 
@@ -10,6 +10,7 @@ from assetboard.domain.months import MAX_YEAR, MIN_YEAR
 
 
 class Frequency(StrEnum):
+    ONCE = "once"
     WEEKLY = "weekly"
     MONTHLY = "monthly"
     YEARLY = "yearly"
@@ -75,6 +76,15 @@ class RecurrenceRule:
         )
 
 
+def normalised(rule: RecurrenceRule) -> RecurrenceRule:
+    """The stored form of ``rule``: a one-time rule keeps only its date and weekend policy."""
+    if rule.freq != Frequency.ONCE:
+        return rule
+    return replace(
+        rule, interval=1, weekdays=(), month_day=1, month=1, end_date=None, max_count=None
+    )
+
+
 def _longest_month(month: int) -> int:
     return calendar.monthrange(2000, month)[1]  # 2000 is a leap year
 
@@ -108,7 +118,9 @@ def _month_day(year: int, month: int, choice: int | MonthDay, holidays: Containe
 
 
 def _nominal_dates(rule: RecurrenceRule, holidays: Container[date]) -> Iterator[date]:
-    if rule.freq == Frequency.WEEKLY:
+    if rule.freq == Frequency.ONCE:
+        yield rule.start_date
+    elif rule.freq == Frequency.WEEKLY:
         anchor = rule.start_date - timedelta(days=rule.start_date.weekday())
         while anchor.year <= MAX_YEAR:
             for weekday in sorted(set(rule.weekdays)):
@@ -158,6 +170,8 @@ def occurrences_with_nominal(
     count = 0
     if from_date > to_date:
         return []
+    # A one-time rule ignores the repeat fields, whatever they hold.
+    rule = normalised(rule)
     for nominal in _nominal_dates(rule, holidays):
         if nominal < rule.start_date:
             continue

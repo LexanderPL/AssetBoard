@@ -62,6 +62,24 @@ Implementation order: F3.1 → F3.2 → F3.3 → F3.4 → F3.5 → F3.6 → (F3.
 - Startup catches up the forward horizon; job definitions reconcile new workspaces/time-zone
   changes every minute. See [user guide](../recurring.md) and [ADR-0018](../adr/0018-recurring-items.md).
 
+**As built: one-time items (owner decisions of 2026-10-26):**
+- Frequency `once` ("One time"): exactly one occurrence on `start_date`, shifted by
+  `weekend_policy` with the usual holiday handling. Interval, weekdays, month day, month, end
+  date and maximum count are ignored and stored normalised (interval 1, end date and count
+  null, weekdays empty, month day and month 1). The form hides those fields (a small
+  `data-hidden-when` progressive-disclosure handler) and explains that they are ignored.
+- The horizon rule is unchanged: the occurrence is generated once its date enters the
+  horizon. A past date follows "include past occurrences". A date edit regenerates the pending
+  occurrence like any rule edit. Once the item has a kept row (posted, skipped, overdue or in a
+  closed month), a date edit adds no second occurrence; move an overdue one from Upcoming.
+- With its occurrence posted or skipped the item is shown as "Done" (no pause/resume; archive
+  as usual). The list shows "One time on <date>" (the nominal date).
+- The pending occurrence feeds the month's Expected and Forecast; Planned (the budget) is not
+  changed.
+- Migration `0023_one_time_items` widens `ck_scheduled_items_freq_valid`. Its downgrade keeps
+  each one-time item as `monthly` on the day of its date with `max_count = 1` (same single
+  date), so no data is lost.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).

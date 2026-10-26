@@ -12,9 +12,12 @@ from uuid import UUID
 import pytest
 
 from assetboard.clock import FixedClock
+from assetboard.config import Settings
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
-from assetboard.services import income
+from assetboard.domain.recurrence import Frequency, RecurrenceRule
+from assetboard.domain.transactions import TransactionDirection
+from assetboard.services import income, scheduled
 from assetboard.services.budget import set_planned
 from assetboard.services.categories import archive_category, create_category
 from assetboard.services.context import Context
@@ -149,3 +152,31 @@ def test_nothing_crosses_workspaces(team: WorkspaceDb) -> None:
     team.add_member("ed", "editor", other)
     data = month_summary(team.factory, team.ctx("ed", "editor", other), OCTOBER)
     assert all(not b.rows for b in data.summary.blocks) and data.categories == {}
+
+
+def test_one_time_item_feeds_expected_and_forecast_but_not_planned(team: WorkspaceDb) -> None:
+    gifts = _category(team, "Golden Gifts")
+    _plan(team, gifts, "50")
+    _spend(team, gifts, "10")
+    scheduled.save_item(
+        team.factory,
+        _editor(team),
+        scheduled.ScheduledInput(
+            "Wedding gift",
+            TransactionDirection.EXPENSE,
+            gifts,
+            Money(12_000, "EUR"),
+            RecurrenceRule(date(2026, 10, 20), Frequency.ONCE),
+        ),
+        Settings(_env_file=None),
+    )
+    row = month_summary(team.factory, _editor(team), OCTOBER).summary.row(gifts)
+    assert row is not None
+    assert (row.planned, row.actual, row.expected, row.forecast) == (
+        Money(5_000, "EUR"),
+        Money(1_000, "EUR"),
+        Money(12_000, "EUR"),
+        Money(13_000, "EUR"),
+    )
+    november = month_summary(team.factory, _editor(team), YearMonth(2026, 11)).summary.row(gifts)
+    assert november is None or november.expected == Money(0, "EUR")
