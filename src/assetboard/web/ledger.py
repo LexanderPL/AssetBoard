@@ -21,6 +21,7 @@ from fastapi import Request
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.domain.months import YearMonth
+from assetboard.domain.shading import maxima, shade
 from assetboard.domain.transactions import MAX_DESCRIPTION_LENGTH, TransactionDirection
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day
@@ -29,6 +30,7 @@ from assetboard.services.categories import list_categories
 from assetboard.services.context import Context, Role, has_role
 from assetboard.services.months import MonthView
 from assetboard.services.occurrences import UpcomingOccurrence, pending_for_month
+from assetboard.services.profile import highlights_large_amounts
 from assetboard.services.transactions import TransactionView, list_month
 
 
@@ -129,6 +131,7 @@ class RowView:
     t: TransactionView
     full_date: str
     amount: str
+    shade: int = 0  # 0-4: the row's tint (domain.shading); 0 without one
 
 
 @dataclass(frozen=True, slots=True)
@@ -203,12 +206,17 @@ def build_ledger(
     With ``filter_id`` (a category of this workspace, archived and transfer ones included) only
     that category's table and rows are shown, and its entry row preselects the category when
     it takes new entries. An unknown id is ignored.
+
+    Row tints (the user's "Highlight large transactions" setting) compare each amount with the
+    largest one of its table and currency in the whole month, also when a filter is applied, so
+    a row keeps its tint whichever view shows it. Every render reads the month afresh.
     """
     locale = request.state.locale
     transactions = list_month(factory, ctx, view.month)
     pending = pending_for_month(factory, ctx, view.month)
     categories = list_categories(factory, ctx, usage_sources=())
     can_write = has_role(ctx, Role.EDITOR) and not view.closed
+    highlight = highlights_large_amounts(factory, ctx.user.id)
     chosen = next(
         (
             c
@@ -228,7 +236,7 @@ def build_ledger(
         if ledger_filter is not None and ledger_filter.kind != direction:
             continue
         state = (states or {}).get(direction, SectionState())
-        stored = transactions.expense if direction == "expense" else transactions.income
+        stored = whole = transactions.expense if direction == "expense" else transactions.income
         if ledger_filter is not None:
             stored = tuple(t for t in stored if t.category_id == ledger_filter.category_id)
         expected = tuple(
@@ -237,8 +245,12 @@ def build_ledger(
             if occurrence.direction == direction
             and (ledger_filter is None or occurrence.category_id == ledger_filter.category_id)
         )
+        top = maxima(t.amount for t in whole) if highlight else {}
         rows = tuple(
-            RowView(t, format_day(t.date, locale), format_money(t.amount, locale)) for t in stored
+            RowView(
+                t, format_day(t.date, locale), format_money(t.amount, locale), shade(t.amount, top)
+            )
+            for t in stored
         )
         pending_rows = tuple(
             PendingRowView(

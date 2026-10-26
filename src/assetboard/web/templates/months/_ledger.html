@@ -11,6 +11,13 @@
 {% set primary_class = "rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover" %}
 {% set small_class = "rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink" %}
 {% set delete_class = "rounded-lg px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger-soft" %}
+{# Row tints by web.ledger.RowView.shade (0-4, computed in Python; 0 = no tint): expense rows
+   red, income rows green, like a spreadsheet colour scale. Token colours with an opacity, so
+   both themes keep their own shades and the text colour stays the normal ink. #}
+{% set shade_classes = {
+  "expense": ("", "bg-danger/10", "bg-danger/20", "bg-danger/30", "bg-danger/40"),
+  "income": ("", "bg-success/10", "bg-success/20", "bg-success/30", "bg-success/40"),
+} %}
 {% set listbox_class = "absolute left-0 right-0 z-10 mt-1 max-h-64 overflow-y-auto rounded-lg border border-line bg-surface py-1 text-sm text-ink shadow-card" %}
 
 {# The category filter (F2.4) travels with every write, so the answer stays filtered. #}
@@ -120,11 +127,17 @@
 {{ edit_row(s, r) }}
 {% else %}
 {% set row_id = r.t.id|string %}
-<tr id="tx-{{ row_id }}" data-transaction="{{ row_id }}">
-  <td class="py-2 pr-2 tabular-nums"><time datetime="{{ r.t.date.isoformat() }}"><span aria-hidden="true">{{ r.t.date.day }}</span><span class="sr-only">{{ r.full_date }}</span></time></td>
-  <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums" data-amount>{{ r.amount }}</td>
-  <td class="break-words py-2 pr-2" data-description>{{ r.t.description }}{% if r.t.source == "recurring_auto" %} <span class="text-xs {{ muted_class }}">{{ _("Automatically posted") }}</span>{% endif %}</td>
-  <td class="py-2 pr-2"><span class="flex items-center gap-2">{{ swatch(r.t.category_color) }}<span data-category-name>{{ r.t.category_name }}</span>{% if r.t.category_archived %}<span class="text-xs {{ muted_class }}">{{ _("archived") }}</span>{% endif %}</span></td>
+{# The tint covers the data cells only: the actions cell keeps the plain surface, so the
+   buttons' text, hover and focus ring look as on any row. Small labels use the ink colour on a
+   tint (muted grey is too faint on the stronger steps). #}
+{% set tint = shade_classes[s.direction][r.shade] %}
+{% set cell = (" " ~ tint) if tint else "" %}
+{% set label_class = "text-ink" if tint else muted_class %}
+<tr id="tx-{{ row_id }}" data-transaction="{{ row_id }}"{% if tint %} data-shade="{{ r.shade }}"{% endif %}>
+  <td class="py-2 pr-2 tabular-nums{{ cell }}"><time datetime="{{ r.t.date.isoformat() }}"><span aria-hidden="true">{{ r.t.date.day }}</span><span class="sr-only">{{ r.full_date }}</span></time></td>
+  <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums{{ cell }}" data-amount>{{ r.amount }}</td>
+  <td class="break-words py-2 pr-2{{ cell }}" data-description>{{ r.t.description }}{% if r.t.source == "recurring_auto" %} <span class="text-xs {{ label_class }}">{{ _("Automatically posted") }}</span>{% endif %}</td>
+  <td class="py-2 pr-2{{ cell }}"><span class="flex items-center gap-2">{{ swatch(r.t.category_color) }}<span data-category-name>{{ r.t.category_name }}</span>{% if r.t.category_archived %}<span class="text-xs {{ label_class }}">{{ _("archived") }}</span>{% endif %}</span></td>
   {% if ledger.can_write %}
   <td class="whitespace-nowrap py-1 text-right">
     <a href="{{ scoped_url(request, 'transactions_month', month=ledger.month|string) }}?edit={{ row_id }}{% if ledger.filter %}&amp;category={{ ledger.filter_id }}{% endif %}#tx-{{ row_id }}" hx-get="{{ scoped_url(request, 'transaction_edit', month=ledger.month|string, transaction_id=row_id) }}" hx-target="#tx-{{ row_id }}" hx-swap="outerHTML"{{ autofocus(s.state, "row:" ~ row_id) }} data-edit aria-label="{{ _('Edit the entry of %(date)s, %(amount)s', date=r.full_date, amount=r.amount) }}" class="{{ small_class }}">{{ _("Edit") }}</a>
