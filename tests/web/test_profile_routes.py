@@ -256,6 +256,42 @@ def test_profile_saves_name_language_and_theme(h: Harness, value: str, stored: s
     assert (saved.display_name, saved.locale, saved.theme) == ("Ola Admin", stored, "dark")
 
 
+def test_profile_shows_highlight_large_transactions_checked_by_default(h: Harness) -> None:
+    client = admin(h)
+    assert h.user(h.web.admin_email).highlight_large_amounts is True
+    page = client.get("/account").text
+    checkbox = re.search(r"<input[^>]*data-highlight-setting[^>]*>", page)
+    assert checkbox is not None and " checked" in checkbox.group(0)
+
+
+@pytest.mark.parametrize(("value", "stored"), [(None, False), ("1", True)])
+def test_profile_saves_highlight_large_transactions(
+    h: Harness, value: str | None, stored: bool
+) -> None:
+    client = admin(h)
+    form = {"display_name": "Admin", "locale": "en", "theme": "system"}
+    if value is not None:
+        form["highlight_large_amounts"] = value
+    response = client.post(
+        "/account/profile", data={**form, "csrf_token": h.token(client)}, follow_redirects=False
+    )
+    assert response.status_code == 303
+    assert h.user(h.web.admin_email).highlight_large_amounts is stored
+    checkbox = re.search(r"<input[^>]*data-highlight-setting[^>]*>", client.get("/account").text)
+    assert checkbox is not None and (" checked" in checkbox.group(0)) is stored
+
+
+def test_profile_highlight_setting_needs_the_csrf_token(h: Harness) -> None:
+    client = admin(h)
+    response = client.post(
+        "/account/profile",
+        data={"display_name": "Admin", "locale": "en", "theme": "system"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 403
+    assert h.user(h.web.admin_email).highlight_large_amounts is True
+
+
 def save_locale(h: Harness, client: TestClient, locale: str) -> None:
     client.post(
         "/account/profile",
