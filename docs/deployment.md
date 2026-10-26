@@ -242,7 +242,7 @@ Release images are published on GHCR as `ghcr.io/lexanderpl/assetboard` for `lin
 Compose without building locally:
 
 ```bash
-export ASSETBOARD_IMAGE=ghcr.io/lexanderpl/assetboard:0.3.1 # x-release-please-version
+export ASSETBOARD_IMAGE=ghcr.io/lexanderpl/assetboard:0.3.2 # x-release-please-version
 docker compose -f compose.example.yaml up -d --no-build
 ```
 
