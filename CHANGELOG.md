@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.3.2](https://github.com/LexanderPL/AssetBoard/compare/v0.3.1...v0.3.2) (2026-10-26)
+
+
+### Features
+
+* **income:** F3.4 income sources and work logs, with F3.5 month integration ([#149](https://github.com/LexanderPL/AssetBoard/issues/149)) ([ad1fc01](https://github.com/LexanderPL/AssetBoard/commit/ad1fc011c132b90c937ddf67a92032f37930e77f))
+* **income:** F3.7 work calendar with derived month work logs ([#155](https://github.com/LexanderPL/AssetBoard/issues/155)) ([ced5b35](https://github.com/LexanderPL/AssetBoard/commit/ced5b35e9c284b615c9cc03fdccb5d677a6616a9))
+* **month:** complete F3.5 month integration (forecast toggle, overdue badge, tests) ([#153](https://github.com/LexanderPL/AssetBoard/issues/153)) ([e6c899c](https://github.com/LexanderPL/AssetBoard/commit/e6c899ca8308b394eceba6c0439c0283816a570f))
+* **notifications:** F3.6 reminders through Apprise channels ([#154](https://github.com/LexanderPL/AssetBoard/issues/154)) ([7d3139b](https://github.com/LexanderPL/AssetBoard/commit/7d3139baeff162cddf6c5baabdd80f54a4665627))
+
+
+### Bug Fixes
+
+* pre-release polish ("no plan" bars, translated tax payments, prerelease installs, *_FILE secrets) ([#156](https://github.com/LexanderPL/AssetBoard/issues/156)) ([6c99491](https://github.com/LexanderPL/AssetBoard/commit/6c994919a9edf4ec281f7fbc6a4bfc11103e4f2c))
+
 ## [0.3.1](https://github.com/LexanderPL/AssetBoard/compare/v0.3.0...v0.3.1) (2026-10-25)
 
 
