@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.3](https://github.com/LexanderPL/AssetBoard/compare/v0.3.2...v0.3.3) (2026-10-26)
+
+
+### Features
+
+* **scheduled:** one-time planned items ([#158](https://github.com/LexanderPL/AssetBoard/issues/158)) ([ea19c0f](https://github.com/LexanderPL/AssetBoard/commit/ea19c0fc96d0da3e674cce17b8a50547b936ccca))
+* **ui:** income donut on Month, collapsed forms, editable tax attachments, month pickers ([#159](https://github.com/LexanderPL/AssetBoard/issues/159)) ([8a7369e](https://github.com/LexanderPL/AssetBoard/commit/8a7369ea1c2309d8161051ddb2592e9d02cfda93))
+
 ## [0.3.2](https://github.com/LexanderPL/AssetBoard/compare/v0.3.1...v0.3.2) (2026-10-26)
 
 
