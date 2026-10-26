@@ -1,13 +1,14 @@
 {% extends "base.html" %}
-{% from "macros/components.html" import csrf_input with context %}
+{% from "macros/components.html" import csrf_input, month_picker, summary_button, summary_button_primary with context %}
 {% block title %}{{ _("Income sources") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Income sources") }}{% endblock %}
 {% block content %}
 {% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong">{{ error }}</p>{% endif %}
 {% if can_edit %}
-<section class="panel mb-6 p-4 sm:p-6">
-  <h2 class="font-semibold">{{ _("New income source") }}</h2>
-  <form method="post" action="{{ scoped_url(request, 'income_source_create') }}" class="mt-4 grid gap-4 sm:grid-cols-2">
+<details class="mb-6" data-new-income-source{% if open_form == "new-source" %} open{% endif %}>
+  <summary class="{{ summary_button_primary }}">{{ _("New income source") }}</summary>
+  <section class="panel mt-3 p-4 sm:p-6" aria-label="{{ _('New income source') }}">
+  <form method="post" action="{{ scoped_url(request, 'income_source_create') }}" class="grid gap-4 sm:grid-cols-2">
     {{ csrf_input() }}
     <label class="grid gap-1 text-sm">{{ _("Name") }}<input name="name" maxlength="200" required class="form-control rounded-lg px-3 py-2"></label>
     <label class="grid gap-1 text-sm">{{ _("Type") }}<select name="kind" class="form-select rounded-lg py-2"><option value="variable">{{ _("Variable") }}</option><option value="fixed">{{ _("Fixed") }}</option></select></label>
@@ -21,11 +22,12 @@
     <label class="grid gap-1 text-sm">{{ _("Fixed expected units") }}<input name="expected_units" inputmode="decimal" class="form-control rounded-lg px-3 py-2"></label>
     <label class="grid gap-1 text-sm">{{ _("Months for average") }}<input name="average_months" type="number" min="1" max="24" value="3" class="form-control rounded-lg px-3 py-2"></label>
     <label class="grid gap-1 text-sm">{{ _("Record income as") }}<select name="record_as" class="form-select rounded-lg py-2"><option value="cash_received">{{ _("Cash received (gross)") }}</option><option value="net">{{ _("Net") }}</option><option value="take_home">{{ _("Take-home") }}</option></select></label>
-    <label class="grid gap-1 text-sm">{{ _("Active from work month") }}<input type="date" name="active_from" value="{{ today.replace(day=1).isoformat() }}" required class="form-control rounded-lg px-3 py-2"></label>
-    <label class="grid gap-1 text-sm">{{ _("Active through work month (optional)") }}<input type="date" name="active_to" class="form-control rounded-lg px-3 py-2"></label>
+    {{ month_picker("active_from", _("Active from work month"), today.replace(day=1), id_prefix="new-source") }}
+    {{ month_picker("active_to", _("Active through work month (optional)"), None, required=false, id_prefix="new-source") }}
     <button type="submit" class="rounded-lg bg-primary px-4 py-2 font-semibold text-on-primary sm:col-span-2">{{ _("Create income source") }}</button>
   </form>
-</section>
+  </section>
+</details>
 {% endif %}
 <div class="space-y-4">
 {% for source in sources %}
@@ -41,7 +43,7 @@
   </div>
   {% if source.archived %}<p class="mt-2 text-sm text-muted">{{ _("Archived") }}</p>{% endif %}
   {% if can_edit and not source.archived %}
-  <details class="mt-4">
+  <details class="mt-4"{% if open_form == "edit-" ~ source.id %} open{% endif %}>
     <summary class="cursor-pointer text-sm font-semibold text-primary-ink">{{ _("Edit income source") }}</summary>
     <form method="post" action="{{ scoped_url(request, 'income_source_update', source_id=source.id) }}" class="mt-3 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
       {{ csrf_input() }}
@@ -57,8 +59,8 @@
       <label class="grid gap-1 text-sm">{{ _("Fixed expected units") }}<input name="expected_units" inputmode="decimal" value="{{ format_quantity_input(source.expected_units, locale) if source.expected_units is not none else '' }}" class="form-control rounded-lg px-3 py-2"></label>
       <label class="grid gap-1 text-sm">{{ _("Months for average") }}<input name="average_months" type="number" min="1" max="24" value="{{ source.average_months }}" class="form-control rounded-lg px-3 py-2"></label>
       <label class="grid gap-1 text-sm">{{ _("Record income as") }}<select name="record_as" class="form-select rounded-lg py-2"><option value="cash_received"{% if source.record_as.value == "cash_received" %} selected{% endif %}>{{ _("Cash received (gross)") }}</option><option value="net"{% if source.record_as.value == "net" %} selected{% endif %}>{{ _("Net") }}</option><option value="take_home"{% if source.record_as.value == "take_home" %} selected{% endif %}>{{ _("Take-home") }}</option></select></label>
-      <label class="grid gap-1 text-sm">{{ _("Active from work month") }}<input type="date" name="active_from" value="{{ source.active_from.isoformat() }}" required class="form-control rounded-lg px-3 py-2"></label>
-      <label class="grid gap-1 text-sm">{{ _("Active through work month (optional)") }}<input type="date" name="active_to" value="{{ source.active_to.isoformat() if source.active_to else '' }}" class="form-control rounded-lg px-3 py-2"></label>
+      {{ month_picker("active_from", _("Active from work month"), source.active_from, id_prefix="source-" ~ source.id) }}
+      {{ month_picker("active_to", _("Active through work month (optional)"), source.active_to, required=false, id_prefix="source-" ~ source.id) }}
       <button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm font-semibold sm:col-span-2">{{ _("Save income source") }}</button>
     </form>
   </details>
@@ -91,7 +93,7 @@
   {% if can_edit and not source.archived and source.kind.value == "variable" %}
   <form method="post" action="{{ scoped_url(request, 'income_work_log', source_id=source.id) }}" class="mt-4 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-3">
     {{ csrf_input() }}
-    <label class="grid gap-1 text-sm">{{ _("Work month") }}<input type="date" name="work_month" value="{{ today.replace(day=1).isoformat() }}" required class="form-control rounded-lg px-3 py-2"></label>
+    {{ month_picker("work_month", _("Work month"), today.replace(day=1), id_prefix="log-" ~ source.id) }}
     <label class="grid gap-1 text-sm">{{ _("Units worked (%(unit)s)", unit=source.unit_label) }}<input name="units" inputmode="decimal" required class="form-control rounded-lg px-3 py-2"></label>
     <button type="submit" class="self-end rounded-lg border border-line px-3 py-2 text-sm font-semibold">{{ _("Save work log") }}</button>
     <p class="text-xs text-muted sm:col-span-3">{{ _("Months with days marked in the work calendar are read-only here: their units are the sum of the days.") }}</p>
@@ -100,12 +102,27 @@
   <h3 class="mt-5 text-sm font-semibold">{{ _("Attached tax rules") }}</h3>
   {% if source.attachments %}
   <ul class="mt-2 space-y-2 text-sm">{% for attachment in source.attachments %}
-    <li class="flex flex-wrap items-center gap-2"><span>{{ tax_rule_names.get(attachment.tax_rule_id, _("Tax rule")) }} · {{ _("Due day %(day)s, offset %(offset)s months", day=attachment.due_day, offset=attachment.due_month_offset) }}</span>
-    {% if can_edit and not source.archived %}<form method="post" action="{{ scoped_url(request, 'income_tax_remove', source_id=source.id, attachment_id=attachment.id) }}">{{ csrf_input() }}<button type="submit" class="text-danger underline">{{ _("Remove") }}</button></form>{% endif %}</li>
+    <li data-tax-attachment="{{ attachment.id }}"><div class="flex flex-wrap items-center gap-2"><span>{{ tax_rule_names.get(attachment.tax_rule_id, _("Tax rule")) }} · {{ _("Due day %(day)s, offset %(offset)s months", day=attachment.due_day, offset=attachment.due_month_offset) }}{% if not attachment.generate_payment %} · {{ _("No planned payment") }}{% endif %}</span>
+    {% if can_edit and not source.archived %}<form method="post" action="{{ scoped_url(request, 'income_tax_remove', source_id=source.id, attachment_id=attachment.id) }}">{{ csrf_input() }}<button type="submit" class="text-danger underline">{{ _("Remove") }}</button></form>{% endif %}</div>
+    {% if can_edit and not source.archived %}
+    <details class="mt-2"{% if open_form == "tax-" ~ attachment.id %} open{% endif %}>
+      <summary class="{{ summary_button }}">{{ _("Edit") }}<span class="sr-only"> {{ tax_rule_names.get(attachment.tax_rule_id, _("Tax rule")) }}</span></summary>
+      <form method="post" action="{{ scoped_url(request, 'income_tax_update', source_id=source.id, attachment_id=attachment.id) }}" class="mt-2 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
+        {{ csrf_input() }}
+        <label class="grid gap-1 text-sm">{{ _("Payment category") }}<select name="payment_category_id" class="form-select rounded-lg py-2">{% for category in expense_categories if category.treatment != "transfer" %}<option value="{{ category.id }}"{% if category.id == attachment.payment_category_id %} selected{% endif %}>{{ category.name }}</option>{% endfor %}</select></label>
+        <label class="grid gap-1 text-sm">{{ _("Payment due day") }}<input name="due_day" type="number" min="1" max="31" value="{{ attachment.due_day }}" required class="form-control rounded-lg px-3 py-2"></label>
+        <label class="grid gap-1 text-sm">{{ _("Payment month offset") }}<input name="due_month_offset" type="number" min="0" max="24" value="{{ attachment.due_month_offset }}" required class="form-control rounded-lg px-3 py-2"></label>
+        <label class="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" name="generate_payment" value="1"{% if attachment.generate_payment %} checked{% endif %} class="h-4 w-4 accent-primary">{{ _("Generate a planned tax payment") }}</label>
+        <button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm font-semibold sm:col-span-2">{{ _("Save tax rule settings") }}</button>
+      </form>
+    </details>
+    {% endif %}</li>
   {% endfor %}</ul>
   {% else %}<p class="mt-2 text-sm text-muted">{{ _("No tax rules attached.") }}</p>{% endif %}
   {% if can_edit and not source.archived and tax_rules and expense_categories %}
-  <form method="post" action="{{ scoped_url(request, 'income_tax_attach', source_id=source.id) }}" class="mt-3 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
+  <details class="mt-3" data-attach-tax-rule{% if open_form == "attach-" ~ source.id %} open{% endif %}>
+  <summary class="{{ summary_button }}">{{ _("Attach tax rule") }}</summary>
+  <form method="post" action="{{ scoped_url(request, 'income_tax_attach', source_id=source.id) }}" class="mt-2 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
     {{ csrf_input() }}
     <label class="grid gap-1 text-sm">{{ _("Tax rule") }}<select name="tax_rule_id" class="form-select rounded-lg py-2">{% for rule in tax_rules %}<option value="{{ rule.id }}">{{ rule.name }}</option>{% endfor %}</select></label>
     <label class="grid gap-1 text-sm">{{ _("Payment category") }}<select name="payment_category_id" class="form-select rounded-lg py-2">{% for category in expense_categories if category.treatment != "transfer" %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</select></label>
@@ -114,6 +131,7 @@
     <label class="flex items-center gap-2 text-sm sm:col-span-2"><input type="checkbox" name="generate_payment" value="1" checked class="h-4 w-4 accent-primary">{{ _("Generate a planned tax payment") }}</label>
     <button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm font-semibold sm:col-span-2">{{ _("Attach tax rule") }}</button>
   </form>
+  </details>
   {% endif %}
 </section>
 {% else %}<p class="panel p-6 text-muted">{{ _("No income sources yet.") }}</p>{% endfor %}

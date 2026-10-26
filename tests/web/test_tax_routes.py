@@ -113,3 +113,13 @@ def test_invalid_percentages_are_refused(owner):
     for rate in ("", "-1", "12.345", "abc", "99999999999"):
         response = owner.post("/taxes", _rule_form(rate))
         assert "error=invalid_rate" in response.headers["location"], rate
+
+
+def test_the_new_tax_rule_form_is_collapsed_until_it_fails(owner):
+    page = owner.client.get("/taxes").text
+    assert "data-new-tax-rule>" in page and "data-new-tax-rule open" not in page
+    failed = owner.post("/taxes", {"name": "", "effect": "added", "base": "net",
+                                   "effective_from": "2026-01-01", "mode": "percent",
+                                   "rate_percent": "x"})  # fmt: skip
+    assert failed.headers["location"].endswith("&form=new-rule")
+    assert "data-new-tax-rule open>" in owner.client.get(failed.headers["location"]).text
