@@ -867,17 +867,74 @@ def attach_tax_rule(
             ts=ctx.clock.now(),
             data={"tax_rule_id": str(tax_rule_id)},
         )
-        logs = {row.work_month for row in WorkLogRepository(session, ctx).for_source(source_id)}
-        logs.update(
-            row.work_month
-            for row in ScheduledOccurrenceRepository(session, ctx).for_income_source(source_id)
-            if row.work_month is not None and row.status == "pending"
-        )
-        for work_month in sorted(logs):
-            _sync_work_month(session, ctx, ctx.clock, source, work_month, allow_past=True)
+        _resync_tax_months(session, ctx, source)
         return attachment.id
 
     return run_immediate(factory, write)
+
+
+def _resync_tax_months(session: Session, ctx: Context, source: IncomeSource) -> None:
+    """Recalculate every logged or pending work month of ``source`` after its tax attachments
+    changed, so pending tax payments follow the new settings."""
+    months = {row.work_month for row in WorkLogRepository(session, ctx).for_source(source.id)}
+    months.update(
+        row.work_month
+        for row in ScheduledOccurrenceRepository(session, ctx).for_income_source(source.id)
+        if row.work_month is not None and row.status == "pending"
+    )
+    for work_month in sorted(months):
+        _sync_work_month(session, ctx, ctx.clock, source, work_month, allow_past=True)
+
+
+def update_tax_attachment(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    source_id: UUID,
+    attachment_id: UUID,
+    *,
+    payment_category_id: UUID,
+    due_day: int,
+    due_month_offset: int,
+    generate_payment: bool,
+) -> None:
+    """Change how an attached tax rule's payment is planned; pending payments are re-synced."""
+    require_role(ctx, Role.EDITOR)
+    if not 1 <= due_day <= 31 or not 0 <= due_month_offset <= 24:
+        raise IncomeError("invalid_tax_attachment")
+
+    def write(session: Session) -> None:
+        require_role_now(session, ctx, Role.EDITOR)
+        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+        source = IncomeSourceRepository(session, ctx).get_or_raise(source_id)
+        if source.archived_at is not None:
+            raise IncomeError("archived")
+        repository = IncomeSourceTaxRuleRepository(session, ctx)
+        attachment = repository.get_or_raise(attachment_id)
+        if attachment.income_source_id != source_id:
+            raise IncomeError("invalid_tax_attachment")
+        category = CategoryRepository(session, ctx).get_or_raise(payment_category_id)
+        if category.archived_at is not None:
+            raise IncomeError("invalid_tax_attachment")
+        if category.kind != "expense" or category.treatment == "transfer":
+            raise IncomeError("invalid_tax_category")
+        repository.update(
+            attachment_id,
+            payment_category_id=payment_category_id,
+            due_day=due_day,
+            due_month_offset=due_month_offset,
+            generate_payment=generate_payment,
+        )
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=ctx.user.id,
+            action="income_source_tax_rule.updated",
+            entity_type="income_source",
+            entity_id=str(source_id),
+            ts=ctx.clock.now(),
+            data={"attachment_id": str(attachment_id), "tax_rule_id": str(attachment.tax_rule_id)},
+        )
+        _resync_tax_months(session, ctx, source)
+
+    run_immediate(factory, write)
 
 
 def archive_source(factory: sessionmaker[Session], ctx: Context, source_id: UUID) -> None:
