@@ -923,3 +923,42 @@ def test_0023_one_time_items_round_trip_converts_once_to_a_single_monthly(
             connection.exec_driver_sql(insert_item, ("0" * 31 + "f", home, gift, "once"))
     finally:
         engine.dispose()
+
+
+def test_0024_amount_shading_round_trip_turns_the_setting_on_for_existing_users(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'shade.db'}"
+    )
+    upgrade_database(settings)
+    command.downgrade(alembic_config(settings), "0023_one_time_items")
+    engine = create_database_engine(settings.database_url or "")
+    stamp = "'2026-01-01 00:00:00'"
+
+    def columns() -> dict[str, bool]:  # name -> nullable
+        return {c["name"]: c["nullable"] for c in inspect(engine).get_columns("users")}
+
+    try:
+        assert "highlight_large_amounts" not in columns()
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO users (id, email, display_name, theme, is_active, "
+                "is_instance_admin, must_change_password, created_at, updated_at) VALUES "
+                f"(?, 'a@example.com', 'A', 'system', 1, 0, 0, {stamp}, {stamp})",
+                ("00000000000000000000000000000001",),
+            )
+        upgrade_database(settings)
+        assert columns()["highlight_large_amounts"] is False  # NOT NULL
+        with engine.connect() as connection:
+            flag = connection.exec_driver_sql("SELECT highlight_large_amounts FROM users")
+            assert flag.scalar_one() == 1  # existing accounts: on
+        command.downgrade(alembic_config(settings), "0023_one_time_items")
+        assert "highlight_large_amounts" not in columns()
+        with engine.connect() as connection:
+            assert connection.exec_driver_sql("SELECT count(*) FROM users").scalar_one() == 1
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()

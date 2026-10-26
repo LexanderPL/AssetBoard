@@ -51,6 +51,10 @@ class User(IdMixin, TimestampMixin, Base):
     must_change_password: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
+    # The profile setting that tints larger rows on the Transactions page (on by default).
+    highlight_large_amounts: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
     last_login_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
     @validates("email")
