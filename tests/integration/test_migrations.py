@@ -874,3 +874,52 @@ def test_0022_work_calendar_migration_is_reversible(tmp_path: Path) -> None:
         check_database_migrations(settings)
     finally:
         engine.dispose()
+
+
+def test_0023_one_time_items_round_trip_converts_once_to_a_single_monthly(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'once.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    home, gift, item = "0" * 31 + "1", "0" * 31 + "c", "0" * 31 + "e"
+    stamp = "'2026-01-01 00:00:00'"
+    insert_item = (
+        "INSERT INTO scheduled_items (id, workspace_id, name, direction, category_id, "
+        "amount_mode, amount_minor, currency, start_date, freq, interval, weekdays, "
+        "month_day, month, weekend_policy, notes, auto_post, created_at, updated_at) VALUES "
+        "(?, ?, 'Gift', 'expense', ?, 'fixed', 5000, 'EUR', '2026-05-30', ?, "
+        f"1, '[]', '1', 1, 'next_working_day', '', 0, {stamp}, {stamp})"
+    )
+    try:
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO workspaces (id, name, base_currency, locale, timezone, created_at, "
+                f"updated_at) VALUES (?, 'W', 'EUR', 'en', 'UTC', {stamp}, {stamp})",
+                (home,),
+            )
+            connection.exec_driver_sql(
+                "INSERT INTO categories (id, workspace_id, name, name_key, kind, treatment, "
+                "color, sort_order, created_at, updated_at) VALUES (?, ?, 'Gifts', 'gifts', "
+                f"'expense', 'regular', '#16a34a', 0, {stamp}, {stamp})",
+                (gift, home),
+            )
+            connection.exec_driver_sql(insert_item, (item, home, gift, "once"))
+        command.downgrade(alembic_config(settings), "0022_f37")
+        with engine.connect() as connection:
+            row = connection.exec_driver_sql(
+                "SELECT freq, interval, month_day, max_count, end_date, start_date, "
+                "weekend_policy FROM scheduled_items"
+            ).one()
+        assert tuple(row) == ("monthly", 1, "30", 1, None, "2026-05-30", "next_working_day")
+        with pytest.raises(IntegrityError), engine.begin() as connection:
+            connection.exec_driver_sql(insert_item, ("0" * 31 + "f", home, gift, "once"))
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+        with engine.begin() as connection:
+            connection.exec_driver_sql(insert_item, ("0" * 31 + "f", home, gift, "once"))
+    finally:
+        engine.dispose()
