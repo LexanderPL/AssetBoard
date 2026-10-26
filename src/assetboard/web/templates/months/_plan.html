@@ -19,7 +19,7 @@
 <tr id="{{ row_id }}" data-plan-row="{{ r.category_id }}"{% if r.over == "danger" %} class="bg-danger-tint" data-over-plan="expense"{% elif r.over == "success" %} class="bg-success-tint" data-over-plan="income"{% endif %}>
   <th scope="row" class="py-1.5 pl-2 pr-2 text-left font-normal">
     {# F2.7: the category's entries are on the Transactions page, filtered (F2.4 part B). #}
-    {% set filter_href = scoped_url(request, 'transactions_month', month=summary.month) ~ "?category=" ~ r.category_id %}<span class="flex items-center gap-2">{{ swatch(r.color) }}<a href="{{ filter_href }}" title="{{ _('Show only the entries of %(name)s', name=r.name) }}" class="rounded underline-offset-2 hover:underline" data-plan-category data-filter-link="{{ r.category_id }}">{{ r.name }}</a>{% if r.archived %}<span class="text-xs text-muted">{{ _("archived") }}</span>{% endif %}</span>
+    {% set filter_href = scoped_url(request, 'transactions_month', month=summary.month) ~ "?category=" ~ r.category_id %}<span class="flex items-center gap-2">{{ swatch(r.color) }}<a href="{{ filter_href }}" title="{{ _('Show only the entries of %(name)s', name=r.name) }}" class="rounded underline-offset-2 hover:underline" data-plan-category>{{ r.name }}</a>{% if r.archived %}<span class="text-xs text-muted">{{ _("archived") }}</span>{% endif %}</span>
   </th>
   <td class="py-1.5 pr-2 text-right align-top">
     {% if r.editable %}
@@ -139,7 +139,7 @@
     {% for b in summary.bars %}
     {% set fill = "fill-danger" if b.over and b.key == "expense" else ("fill-success" if b.over else "fill-primary") %}
     <div data-summary-bar="{{ b.key }}">
-      <p class="text-xs text-muted">{% if b.key == "expense" %}{{ _("Spent %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% else %}{{ _("Earned %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% endif %}{% if b.over %} <span class="{% if b.key == "expense" %}text-danger{% else %}text-success-strong{% endif %}">{{ _("(over plan)") }}</span>{% endif %}</p>
+      <p class="text-xs text-muted">{% if not b.has_plan %}{% if b.key == "expense" %}{{ _("Spent %(actual)s (no plan)", actual=b.actual) }}{% else %}{{ _("Earned %(actual)s (no plan)", actual=b.actual) }}{% endif %}{% elif b.key == "expense" %}{{ _("Spent %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% else %}{{ _("Earned %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% endif %}{% if b.over and b.has_plan %} <span class="{% if b.key == "expense" %}text-danger{% else %}text-success-strong{% endif %}">{{ _("(over plan)") }}</span>{% endif %}</p>
       <svg class="mt-1.5 h-4 w-full overflow-visible" viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true" focusable="false">
         <rect x="0" y="3" width="100" height="10" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke" data-bar-track></rect>
         <rect x="0" y="3" width="{{ b.actual_width }}" height="10" class="{{ fill }}" data-bar-actual></rect>

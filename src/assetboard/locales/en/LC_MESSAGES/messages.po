@@ -656,6 +656,10 @@ msgid "Deleted workspaces"
 msgstr ""
 
 #, python-format
+msgid "%(name)s tax payment"
+msgstr ""
+
+#, python-format
 msgid "Confirm your email address for %(app)s"
 msgstr ""
 
@@ -3052,6 +3056,14 @@ msgstr ""
 
 #, python-format
 msgid "Saved / invested %(rate)s of income"
+msgstr ""
+
+#, python-format
+msgid "Spent %(actual)s (no plan)"
+msgstr ""
+
+#, python-format
+msgid "Earned %(actual)s (no plan)"
 msgstr ""
 
 #, python-format

@@ -79,6 +79,13 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_HOST_PORT` | `8000` | Compose only | Host port mapped to the container's port 8000. |
 | `ASSETBOARD_IMAGE` | `assetboard:local` | Compose only | Image reference interpolated by Compose. Set this when running a published image with `--no-build`. |
 
+**Secrets from files.** `ASSETBOARD_SECRET_KEY`, `ASSETBOARD_SETUP_TOKEN`,
+`ASSETBOARD_DATABASE_URL`, `ASSETBOARD_OIDC_CLIENT_SECRET` and `ASSETBOARD_SMTP_PASSWORD` can
+instead be read from a file: set `ASSETBOARD_<NAME>_FILE` to its path (for example
+`ASSETBOARD_SMTP_PASSWORD_FILE=/run/secrets/smtp_password` with Docker or Podman secrets, or a
+systemd credential under `$CREDENTIALS_DIRECTORY`). A trailing newline is ignored. Setting both
+the variable and its `_FILE` form is refused at startup.
+
 The Compose file intentionally binds to loopback by default. Publishing on all interfaces exposes
 the sign-in page to the LAN; put a reverse proxy with HTTPS in front before exposing it further.
 

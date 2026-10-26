@@ -699,23 +699,12 @@ document.addEventListener("htmx:configRequest", (event) => {
   if (chosen) event.detail.parameters.filter = chosen;
 });
 
-// The summary marks the category the tables show. A filter link swaps only the tables
-// (#ledger), so the mark moves here, after any swap; after a filter link or "Show all" the
-// change is announced on the ledger's status line and the focus goes to the table heading.
+// After "Show all" swaps the tables (#ledger), the change is announced on the ledger's status
+// line and the focus goes to the table heading.
 document.addEventListener("htmx:afterSettle", (event) => {
-  const ledger = document.getElementById("ledger");
-  const chosen = ledger?.getAttribute("data-ledger-filter") ?? "";
-  document.querySelectorAll("[data-filter-link]").forEach((link) => {
-    if (chosen && link.getAttribute("data-filter-link") === chosen) {
-      link.setAttribute("aria-current", "true");
-    } else {
-      link.removeAttribute("aria-current");
-    }
-  });
   const trigger = event.detail?.requestConfig?.elt;
-  if (!(trigger instanceof Element) || !trigger.matches("[data-filter-link], [data-ledger-show-all]")) {
-    return;
-  }
+  if (!(trigger instanceof Element) || !trigger.matches("[data-ledger-show-all]")) return;
+  const ledger = document.getElementById("ledger");
   const status = document.getElementById("ledger-status");
   if (status) status.textContent = ledger?.getAttribute("data-ledger-announce") ?? "";
   const heading = ledger?.querySelector("h2");
