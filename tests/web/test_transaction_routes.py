@@ -797,9 +797,7 @@ def test_htmx_writes_recompute_the_tints(ledger: OwnerApp) -> None:
     assert _shades(deleted.text, "expense") == {"Big shop": 4, "Half": 2, "Small": 1}
     undone = _htmx(ledger, f"{MONTH}/transactions/{rent_id}/undo")
     assert _shades(undone.text, "expense")["Rent"] == 4
-    added = _htmx(
-        ledger, f"{MONTH}/transactions", _form(food, amount="20000", description="Car")
-    )
+    added = _htmx(ledger, f"{MONTH}/transactions", _form(food, amount="20000", description="Car"))
     assert _shades(added.text, "expense")["Car"] == 4
     assert _shades(added.text, "expense")["Rent"] == 1
     row = _htmx_get(ledger, f"{MONTH}/transactions/{rent_id}/row")
