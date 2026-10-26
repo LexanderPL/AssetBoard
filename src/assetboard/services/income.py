@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from calendar import monthrange
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
@@ -14,7 +15,13 @@ from sqlalchemy.orm import Session, sessionmaker
 from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.engine import run_immediate
-from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkLog
+from assetboard.db.models.income import (
+    MAX_WORK_DAY_UNITS,
+    IncomeSource,
+    IncomeSourceTaxRule,
+    WorkDay,
+    WorkLog,
+)
 from assetboard.db.models.scheduled import ScheduledOccurrence
 from assetboard.db.repositories import (
     AuditEventRepository,
@@ -25,6 +32,7 @@ from assetboard.db.repositories import (
     MonthStateRepository,
     ScheduledOccurrenceRepository,
     TaxRuleRepository,
+    WorkDayRepository,
     WorkLogRepository,
 )
 from assetboard.db.repositories.base import WorkspaceScope
@@ -973,15 +981,14 @@ def log_work(
             in MonthStateRepository(session, ctx).closed_months()
         ):
             raise IncomeError("month_closed")
-        exponent = units.as_tuple().exponent
-        integer_digits = max(units.adjusted() + 1, 0)
-        scale = max(-exponent, 0) if isinstance(exponent, int) else 19
-        if integer_digits > 20 or scale > 18 or integer_digits + scale > 38:
-            raise IncomeError("invalid_units")
+        _check_units_size(units)
         repo = WorkLogRepository(session, ctx)
         row = next(
             (log for log in repo.for_source(source_id) if log.work_month == work_month), None
         )
+        if row is not None and row.derived_from_days:
+            # F3.7: the month is the sum of its calendar days; change the days instead.
+            raise IncomeError("derived_work_log")
         if row is None:
             row = repo.create(income_source_id=source_id, work_month=work_month, units=units)
         else:
@@ -1008,6 +1015,252 @@ def log_work(
         return False
 
     return run_immediate(factory, write)
+
+
+def _check_units_size(units: Decimal) -> None:
+    """Refuse values the 38-digit, 18-decimal ``DecimalType`` cannot store exactly."""
+    exponent = units.as_tuple().exponent
+    integer_digits = max(units.adjusted() + 1, 0)
+    scale = max(-exponent, 0) if isinstance(exponent, int) else 19
+    if integer_digits > 20 or scale > 18 or integer_digits + scale > 38:
+        raise IncomeError("invalid_units")
+
+
+# F3.7 work calendar
+
+
+@dataclass(frozen=True, slots=True)
+class CalendarDay:
+    day: date
+    units: Decimal | None
+    weekend: bool
+    holiday: bool
+
+    @property
+    def working_day(self) -> bool:
+        return not self.weekend and not self.holiday
+
+
+@dataclass(frozen=True, slots=True)
+class WorkCalendar:
+    source_id: UUID
+    source_name: str
+    unit_label: str
+    month: date
+    days: tuple[CalendarDay, ...]
+    total: Decimal
+    derived: bool
+    manual_units: Decimal | None
+    editable: bool
+
+
+def _calendar_holidays(country: str | None, year: int) -> set[date]:
+    """Holidays to show and skip in the calendar; a country without data shows weekends only."""
+    try:
+        return _holidays(country, year)
+    except IncomeError:
+        return set()
+
+
+def _month_days(month: date) -> list[date]:
+    return [
+        date(month.year, month.month, number)
+        for number in range(1, monthrange(month.year, month.month)[1] + 1)
+    ]
+
+
+def work_calendar(
+    factory: sessionmaker[Session], ctx: Context, source_id: UUID, month: date
+) -> WorkCalendar:
+    """The day-level calendar of one variable income source for ``month`` (first day)."""
+    require_role(ctx, Role.VIEWER)
+    _valid_month(month)
+    with factory() as session:
+        source = IncomeSourceRepository(session, ctx).get_or_raise(source_id)
+        if source.kind != IncomeKind.VARIABLE.value:
+            raise IncomeError("invalid_source")
+        workspace = CurrentWorkspaceRepository(session, ctx).get()
+        holidays = _calendar_holidays(workspace.country_code, month.year)
+        days = _month_days(month)
+        entries = {
+            row.work_date: row.units
+            for row in WorkDayRepository(session, ctx).for_month(source_id, days[0], days[-1])
+        }
+        log = next(
+            (
+                row
+                for row in WorkLogRepository(session, ctx).for_source(source_id)
+                if row.work_month == month
+            ),
+            None,
+        )
+        return WorkCalendar(
+            source_id=source.id,
+            source_name=source.name,
+            unit_label=source.unit_label,
+            month=month,
+            days=tuple(
+                CalendarDay(
+                    day=day,
+                    units=entries.get(day),
+                    weekend=day.weekday() >= 5,
+                    holiday=day in holidays,
+                )
+                for day in days
+            ),
+            total=sum(entries.values(), Decimal(0)),
+            derived=bool(entries),
+            manual_units=log.units if log is not None and not log.derived_from_days else None,
+            editable=source.archived_at is None,
+        )
+
+
+def _valid_day_units(units: Decimal) -> Decimal:
+    if not units.is_finite() or not 0 < units <= MAX_WORK_DAY_UNITS:
+        raise IncomeError("invalid_day_units")
+    try:
+        _check_units_size(units)
+    except IncomeError:
+        raise IncomeError("invalid_day_units") from None
+    return units
+
+
+def _change_work_days(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    source_id: UUID,
+    month: date,
+    change: Callable[[WorkDayRepository, dict[date, WorkDay], set[date]], None],
+    action: str,
+) -> bool:
+    """Apply ``change`` to one month's day entries, then derive the month's work log and
+    recalculate its income occurrence exactly as a month-level work log save does.
+
+    Returns ``True`` when the month's income is already posted (the ledger row is not changed).
+    """
+    require_role(ctx, Role.EDITOR)
+    _valid_month(month)
+
+    def write(session: Session) -> bool:
+        require_role_now(session, ctx, Role.EDITOR)
+        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+        source = IncomeSourceRepository(session, ctx).get_or_raise(source_id)
+        if source.archived_at is not None or source.kind != IncomeKind.VARIABLE.value:
+            raise IncomeError("invalid_source")
+        occurrence = ScheduledOccurrenceRepository(session, ctx).for_income_work_month(
+            source_id, month
+        )
+        if (
+            occurrence is not None
+            and occurrence.status == "pending"
+            and YearMonth.from_date(occurrence.due_date)
+            in MonthStateRepository(session, ctx).closed_months()
+        ):
+            raise IncomeError("month_closed")
+        days = _month_days(month)
+        repository = WorkDayRepository(session, ctx)
+        entries = {row.work_date: row for row in repository.for_month(source_id, days[0], days[-1])}
+        workspace = CurrentWorkspaceRepository(session, ctx).get()
+        change(repository, entries, _calendar_holidays(workspace.country_code, month.year))
+        session.flush()
+        remaining = repository.for_month(source_id, days[0], days[-1])
+        logs = WorkLogRepository(session, ctx)
+        log = next((row for row in logs.for_source(source_id) if row.work_month == month), None)
+        if remaining:
+            total = sum((row.units for row in remaining), Decimal(0))
+            _check_units_size(total)
+            if log is None:
+                log = logs.create(
+                    income_source_id=source_id,
+                    work_month=month,
+                    units=total,
+                    derived_from_days=True,
+                )
+            else:
+                logs.update(log.id, units=total, derived_from_days=True)
+        elif log is not None and log.derived_from_days:
+            logs.delete(log)
+        audit = AuditEventRepository(session, ctx)
+        if occurrence is not None and occurrence.status == "posted":
+            audit.record(
+                actor_user_id=ctx.user.id,
+                action="work_log.updated_after_posting",
+                entity_type="income_source",
+                entity_id=str(source_id),
+                ts=ctx.clock.now(),
+                data={"work_month": month.isoformat()},
+            )
+            return True
+        _sync_work_month(session, ctx, ctx.clock, source, month, allow_past=True)
+        audit.record(
+            actor_user_id=ctx.user.id,
+            action=action,
+            entity_type="income_source",
+            entity_id=str(source_id),
+            ts=ctx.clock.now(),
+            data={"work_month": month.isoformat()},
+        )
+        return False
+
+    return run_immediate(factory, write)
+
+
+def toggle_work_day(
+    factory: sessionmaker[Session], ctx: Context, source_id: UUID, day: date
+) -> bool:
+    """Mark ``day`` worked (1 unit) or, when it already has an entry, remove it."""
+
+    def change(repository: WorkDayRepository, entries: dict[date, WorkDay], _: set[date]) -> None:
+        existing = entries.get(day)
+        if existing is None:
+            repository.create(income_source_id=source_id, work_date=day, units=Decimal(1))
+        else:
+            repository.delete(existing)
+
+    return _change_work_days(factory, ctx, source_id, _month_start(day), change, "work_day.toggled")
+
+
+def set_work_day(
+    factory: sessionmaker[Session], ctx: Context, source_id: UUID, day: date, units: Decimal
+) -> bool:
+    """Set the units of ``day`` (0 < units <= 24), creating its entry when needed."""
+    value = _valid_day_units(units)
+
+    def change(repository: WorkDayRepository, entries: dict[date, WorkDay], _: set[date]) -> None:
+        existing = entries.get(day)
+        if existing is None:
+            repository.create(income_source_id=source_id, work_date=day, units=value)
+        else:
+            repository.update(existing.id, units=value)
+
+    return _change_work_days(factory, ctx, source_id, _month_start(day), change, "work_day.saved")
+
+
+def fill_working_days(
+    factory: sessionmaker[Session], ctx: Context, source_id: UUID, month: date
+) -> bool:
+    """Add 1 unit for every working day of ``month`` without an entry; never overwrite."""
+
+    def change(
+        repository: WorkDayRepository, entries: dict[date, WorkDay], holidays: set[date]
+    ) -> None:
+        for day in _month_days(month):
+            if day.weekday() < 5 and day not in holidays and day not in entries:
+                repository.create(income_source_id=source_id, work_date=day, units=Decimal(1))
+
+    return _change_work_days(factory, ctx, source_id, month, change, "work_days.filled")
+
+
+def clear_work_month(
+    factory: sessionmaker[Session], ctx: Context, source_id: UUID, month: date
+) -> bool:
+    """Remove every day entry of ``month``; the derived work log goes with them."""
+
+    def change(repository: WorkDayRepository, entries: dict[date, WorkDay], _: set[date]) -> None:
+        for row in entries.values():
+            repository.delete(row)
+
+    return _change_work_days(factory, ctx, source_id, month, change, "work_days.cleared")
 
 
 def missing_work_logs(

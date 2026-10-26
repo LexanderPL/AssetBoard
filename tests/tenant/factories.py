@@ -19,7 +19,7 @@ from uuid import UUID, uuid4
 from sqlalchemy.orm import Session
 
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
-from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkLog
+from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.db.models.notifications import NotificationChannel, NotificationLog
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
@@ -240,6 +240,18 @@ def make_work_log(session: Session, workspace_id: UUID) -> WorkLog:
     )
 
 
+def make_work_day(session: Session, workspace_id: UUID) -> WorkDay:
+    source = make_income_source(session, workspace_id)
+    session.add(source)
+    session.flush()
+    return WorkDay(
+        workspace_id=workspace_id,
+        income_source_id=source.id,
+        work_date=date(2026, 1, 5),
+        units=Decimal("1"),
+    )
+
+
 def make_income_source_tax_rule(session: Session, workspace_id: UUID) -> IncomeSourceTaxRule:
     source = make_income_source(session, workspace_id)
     category = make_category(session, workspace_id)
@@ -322,6 +334,7 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     ),
     IncomeSource: TenantCase(make_income_source, update_values={"name": "Updated salary"}),
     WorkLog: TenantCase(make_work_log, update_values={"units": Decimal("20")}),
+    WorkDay: TenantCase(make_work_day, update_values={"units": Decimal("0.5")}),
     IncomeSourceTaxRule: TenantCase(make_income_source_tax_rule, update_values={"due_day": 12}),
     NotificationChannel: TenantCase(make_notification_channel, update_values={"name": "Laptop"}),
     NotificationLog: TenantCase(make_notification_log, update_values={"status": "failed"}),

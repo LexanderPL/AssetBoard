@@ -5,7 +5,7 @@ from uuid import UUID
 
 from sqlalchemy import exists, func, select
 
-from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkLog
+from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
 from assetboard.db.repositories.base import ScopedRepository
 
 
@@ -35,6 +35,27 @@ class IncomeSourceRepository(ScopedRepository[IncomeSource]):
             .group_by(IncomeSource.category_id)
         )
         return dict(rows.all())
+
+
+class WorkDayRepository(ScopedRepository[WorkDay]):
+    model = WorkDay
+
+    def create(self, **values: object) -> WorkDay:
+        return self.add(WorkDay(**values))
+
+    def for_month(self, source_id: UUID, first: date, last: date) -> list[WorkDay]:
+        """The source's day entries from ``first`` through ``last`` (inclusive), by date."""
+        return list(
+            self._session.scalars(
+                self._scoped_select()
+                .where(
+                    WorkDay.income_source_id == source_id,
+                    WorkDay.work_date >= first,
+                    WorkDay.work_date <= last,
+                )
+                .order_by(WorkDay.work_date)
+            )
+        )
 
 
 class WorkLogRepository(ScopedRepository[WorkLog]):

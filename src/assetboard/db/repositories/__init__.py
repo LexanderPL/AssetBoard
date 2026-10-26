@@ -18,6 +18,7 @@ from assetboard.db.repositories.category import CategoryRepository
 from assetboard.db.repositories.income import (
     IncomeSourceRepository,
     IncomeSourceTaxRuleRepository,
+    WorkDayRepository,
     WorkLogRepository,
 )
 from assetboard.db.repositories.invitation import (
@@ -56,6 +57,7 @@ __all__ = [
     "ScheduledOccurrenceRepository",
     "IncomeSourceRepository",
     "IncomeSourceTaxRuleRepository",
+    "WorkDayRepository",
     "WorkLogRepository",
     "TaxRuleRepository",
     "TaxRuleVersionRepository",
