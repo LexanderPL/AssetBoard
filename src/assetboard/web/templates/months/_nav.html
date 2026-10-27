@@ -15,16 +15,23 @@
     {% else %}
     <span class="{{ nav_off }}" aria-disabled="true">{{ _("Next") }}<span aria-hidden="true">›</span></span>
     {% endif %}
-    <a href="{{ scoped_url(request, nav_route, month=view.current|string) }}" class="{{ nav_link }}" data-month-today{% if view.is_current %} aria-current="date"{% endif %}>{{ _("Today") }}</a>
 
-    {# Native month picker; desktop Firefox and Safari show a text box, so the server also
-       accepts 10.2026 and 10/2026. A complete month opens on change (app.js, data-autosubmit);
-       without JavaScript the Go button submits it. #}
-    <form method="get" action="{{ scoped_url(request, picker_route) }}" class="flex items-center gap-2" data-month-picker>
-      <input type="hidden" name="from" value="{{ view.month }}">
-      <label for="month-picker" class="sr-only">{{ _("Go to month") }}</label>
-      <input id="month-picker" name="month" type="month" value="{{ view.month }}" placeholder="{{ _('YYYY-MM') }}" min="1900-01" max="2199-12"
-             data-autosubmit class="form-control rounded-full py-2">
-      <noscript><button type="submit" class="{{ nav_link }}">{{ _("Go") }}</button></noscript>
-    </form>
+    {# Use in-app month/year controls so browser-native Clear/Today shortcuts are not shown. #}
+    <details class="relative" data-month-picker>
+      <summary class="{{ nav_link }} cursor-pointer list-none [&::-webkit-details-marker]:hidden">{{ month_heading }}<span aria-hidden="true">⌄</span><span class="sr-only">{{ _("Choose month and year") }}</span></summary>
+      <form method="get" action="{{ scoped_url(request, picker_route) }}" class="absolute right-0 z-20 mt-2 grid min-w-64 grid-cols-2 gap-3 rounded-xl border border-line bg-surface p-4 shadow-card">
+        <input type="hidden" name="from" value="{{ view.month }}">
+        <div>
+          <label for="month-picker-month" class="mb-1 block text-xs font-medium">{{ _("Month") }}</label>
+          <select id="month-picker-month" name="month_month" class="form-select w-full rounded-lg py-1.5 pl-2.5">
+            {% for name in month_names %}<option value="{{ loop.index }}"{% if loop.index == view.month.month %} selected{% endif %}>{{ name }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="month-picker-year" class="mb-1 block text-xs font-medium">{{ _("Year") }}</label>
+          <input id="month-picker-year" name="month_year" type="number" min="{{ picker_min_year }}" max="{{ picker_max_year }}" value="{{ view.month.year }}" required class="form-control w-full rounded-lg px-2.5 py-1.5">
+        </div>
+        <button type="submit" class="{{ nav_link }} col-span-2 justify-center">{{ _("Go") }}</button>
+      </form>
+    </details>
   </nav>

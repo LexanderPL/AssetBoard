@@ -256,6 +256,70 @@ document.addEventListener("change", (event) => {
   target.form?.requestSubmit();
 });
 
+// Future dates are planned one-time occurrences; past/current dates remain transactions.
+function updateEntryAction(row) {
+  const page = row.closest("[data-month][data-today]");
+  const day = row.querySelector('input[name="day"]');
+  const add = row.querySelector("[data-entry-add]");
+  const plan = row.querySelector("[data-entry-plan]");
+  if (!(page instanceof HTMLElement) || !(day instanceof HTMLInputElement) ||
+      !(add instanceof HTMLButtonElement) || !(plan instanceof HTMLButtonElement)) return;
+  const month = page.dataset.month ?? "";
+  const today = page.dataset.today ?? "";
+  let selected = "";
+  const value = day.value.trim();
+  if (/^\d{1,2}$/.test(value) && /^\d{4}-\d{2}$/.test(month)) {
+    selected = `${month}-${value.padStart(2, "0")}`;
+  } else if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(value)) {
+    const [year, monthNumber, dayNumber] = value.split("-");
+    selected = `${year}-${monthNumber.padStart(2, "0")}-${dayNumber.padStart(2, "0")}`;
+  } else if (/^\d{1,2}\.\d{1,2}\.\d{4}$/.test(value)) {
+    const [dayNumber, monthNumber, year] = value.split(".");
+    selected = `${year}-${monthNumber.padStart(2, "0")}-${dayNumber.padStart(2, "0")}`;
+  }
+  const future = selected ? selected > today : month > today.slice(0, 7);
+  add.hidden = future;
+  plan.hidden = !future;
+}
+
+function updateEntryActions(root = document) {
+  root.querySelectorAll("[data-entry-row]").forEach(updateEntryAction);
+}
+document.addEventListener("input", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLInputElement && target.form?.hasAttribute("data-live-search")) {
+    const form = target.form;
+    const previous = form.dataset.searchTimer;
+    if (previous) window.clearTimeout(Number(previous));
+    form.dataset.searchTimer = String(window.setTimeout(() => form.requestSubmit(), 300));
+  }
+  if (target instanceof HTMLInputElement && target.name === "day") {
+    const row = target.closest("[data-entry-row]");
+    if (row instanceof HTMLElement) updateEntryAction(row);
+  }
+});
+document.addEventListener("change", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLInputElement && target.name === "day") {
+    const row = target.closest("[data-entry-row]");
+    if (row instanceof HTMLElement) updateEntryAction(row);
+  }
+});
+document.addEventListener("DOMContentLoaded", () => updateEntryActions());
+document.addEventListener("htmx:afterSwap", (event) => updateEntryActions(event.target));
+
+// A cancel button inside an expanded occurrence editor simply closes that disclosure.
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const close = target.closest("[data-details-close]");
+  const details = close?.closest("details");
+  if (details instanceof HTMLDetailsElement) {
+    event.preventDefault();
+    details.open = false;
+  }
+});
+
 // Progressive disclosure: an element marked data-hidden-when="<select id>=<value>" is hidden
 // while that select holds that value (the recurring form hides the repeat fields of a one-time
 // item). Without JavaScript everything stays visible and the form explains what is ignored.

@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import math
 import re
+from contextlib import suppress
 from dataclasses import dataclass
+from datetime import date
 from typing import Annotated, Any
 from urllib.parse import urlencode
 from uuid import UUID
@@ -31,16 +33,28 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.repositories import NotFound
+from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
+from assetboard.domain.recurrence import Frequency, RecurrenceRule
+from assetboard.domain.scheduled import AmountMode
+from assetboard.domain.transactions import (
+    EntryError,
+    TransactionDirection,
+    amount_minor,
+    parse_entry_date,
+)
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_month
+from assetboard.services import scheduled
 from assetboard.services.categories import get_category
 from assetboard.services.context import Context
 from assetboard.services.months import MonthClosed, get_month
+from assetboard.services.scheduled import ScheduledInput
 from assetboard.services.transactions import (
     InvalidTransaction,
     TransactionView,
     UndoExpired,
+    _entry,
     create_transaction,
     delete_transaction,
     get_transaction,
@@ -82,6 +96,7 @@ def _(message: str) -> str:
 
 STATUS = {
     "added": _("Entry added."),
+    "planned": _("Planned transaction saved."),
     "saved": _("Entry saved."),
     "deleted": _("Entry deleted."),
     "restored": _("Entry restored."),
@@ -194,6 +209,7 @@ def _section(
         factory, ctx, request, view, {direction: state}, _filter(request, direction)
     )
     context: dict[str, object] = {
+        "view": view,
         "ledger": ledger,
         "section_view": ledger.section(direction),
         "status": _t(request, STATUS[status]) if status else "",
@@ -281,20 +297,77 @@ async def transaction_create(
         )
     values = _values(day, amount, description, category_id)
     currency = ctx.workspace.base_currency
+    planned_date: date | None = None
+    with suppress(EntryError):
+        planned_date = parse_entry_date(day, target)
+    is_planned = planned_date is not None and planned_date > ctx.clock.today(ctx.workspace.timezone)
     try:
-        saved = await run_in_threadpool(
-            lambda: create_transaction(
-                request.app.state.session_factory,
-                ctx,
-                month=target,
-                direction=direction,
-                day=day,
-                amount=amount,
-                description=description,
-                category_id=_category_id(category_id),
-                locale=request.state.locale,
+        if is_planned:
+            assert planned_date is not None
+            entry = await run_in_threadpool(
+                lambda: _entry(
+                    month=target,
+                    day=day,
+                    amount=amount,
+                    description=description,
+                    category_id=_category_id(category_id),
+                    locale=request.state.locale,
+                    currency=currency,
+                )
             )
-        )
+            minor = amount_minor(entry.amount, currency)
+            item_name = entry.description
+            chosen_category = _category_id(category_id)
+            assert chosen_category is not None
+            try:
+                selected_category = await run_in_threadpool(
+                    get_category,
+                    request.app.state.session_factory,
+                    ctx,
+                    chosen_category,
+                    usage_sources=(),
+                )
+            except NotFound:
+                raise InvalidTransaction({"category": "invalid_category"}) from None
+            if selected_category.kind != direction:
+                raise InvalidTransaction({"category": "category_kind_mismatch"})
+            if selected_category.archived:
+                raise InvalidTransaction({"category": "category_archived"})
+            if not entry.description:
+                item_name = selected_category.name
+            await run_in_threadpool(
+                lambda: scheduled.save_item(
+                    request.app.state.session_factory,
+                    ctx,
+                    ScheduledInput(
+                        name=item_name,
+                        direction=TransactionDirection(direction),
+                        category_id=chosen_category,
+                        amount=Money(minor, currency),
+                        rule=RecurrenceRule(start_date=planned_date, freq=Frequency.ONCE),
+                        amount_mode=AmountMode.FIXED,
+                        occurrence_label=entry.description,
+                    ),
+                    request.app.state.settings,
+                )
+            )
+            saved_month = YearMonth.from_date(planned_date)
+            saved = None
+        else:
+            saved = await run_in_threadpool(
+                lambda: create_transaction(
+                    request.app.state.session_factory,
+                    ctx,
+                    month=target,
+                    direction=direction,
+                    day=day,
+                    amount=amount,
+                    description=description,
+                    category_id=_category_id(category_id),
+                    locale=request.state.locale,
+                )
+            )
+            saved_month = saved.month
     except InvalidTransaction as exc:
         errors = field_messages(request, exc.errors, direction=direction, currency=currency)
         state = SectionState(
@@ -315,26 +388,53 @@ async def transaction_create(
             focus="entry:day",
         )
         return await run_in_threadpool(_refused, request, ctx, target, direction, state, 409)
+    except ValueError as exc:
+        if str(exc) not in {"invalid_category", "invalid_currency", "unsupported_holidays"}:
+            raise
+        errors = field_messages(
+            request, {"category": "invalid_category"}, direction=direction, currency=currency
+        )
+        state = SectionState(
+            entry_values=values,
+            entry_errors=errors,
+            error=_t(request, NOT_SAVED),
+            focus="entry:category",
+        )
+        return await run_in_threadpool(_refused, request, ctx, target, direction, state, 400)
+    if is_planned and saved_month != target:
+        return _redirect(request, saved_month, "notice=planned", status_code=303)
     # The next entry row keeps the day (owner, 2026-10-18): as a day number when the entry is
     # in the viewed month, else as typed; app.js selects it so typing replaces it.
-    kept_day = str(saved.date.day) if saved.month == target else day.strip()
+    kept_day = str(saved.date.day) if saved is not None and saved.month == target else day.strip()
     if not ENTRY_DAY.fullmatch(kept_day):
         kept_day = ""
     if not is_htmx_fragment_request(request):
         query = "notice=transaction_added"
-        if _hidden(request, saved, target):
+        if saved is not None and _hidden(request, saved, target):
             query = "notice=outside_filter"
-        if saved.month != target:
-            query = f"saved_in={saved.month}"
+        if saved_month != target:
+            query = "notice=planned" if is_planned else "saved_in=" + str(saved_month)
+            if kept_day:
+                query += "&" + urlencode({"entry": direction, "day": kept_day})
+            path = transactions_path(request, saved_month, query)
+            return RedirectResponse(f"{path}#ledger-{direction}", status_code=303)
+        if is_planned:
+            query = "notice=planned"
         if kept_day:
             query += "&" + urlencode({"entry": direction, "day": kept_day})
         path = _path(request, target, query, direction)
         return RedirectResponse(f"{path}#ledger-{direction}", status_code=303)
-    state = SectionState(
-        entry_values={"day": kept_day}, focus="entry:day", **_moved(request, saved, target)
-    )
+    moved = _moved(request, saved, target) if saved is not None else {}
+    state = SectionState(entry_values={"day": kept_day}, focus="entry:day", **moved)
     return await run_in_threadpool(
-        lambda: _section(request, ctx, target, direction, state, status="added")
+        lambda: _section(
+            request,
+            ctx,
+            target,
+            direction,
+            state,
+            status="planned" if is_planned else "added",
+        )
     )
 
 

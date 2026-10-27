@@ -65,6 +65,7 @@ class UpcomingOccurrence:
     amount_state: str
     auto_post: bool
     rescheduled: bool
+    one_time: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,7 +88,7 @@ def _upcoming_view(
         id=occurrence.id,
         scheduled_item_id=item.id if item is not None else None,
         income_source_id=occurrence.income_source_id,
-        label=occurrence.label,
+        label=occurrence.label or category_name,
         direction=occurrence.direction,
         category_id=occurrence.category_id,
         category_name=category_name,
@@ -97,6 +98,7 @@ def _upcoming_view(
         amount_state=occurrence.amount_state,
         auto_post=item.auto_post if item is not None else False,
         rescheduled=occurrence.rescheduled_at is not None,
+        one_time=item is not None and item.freq == "once",
     )
 
 
@@ -202,7 +204,11 @@ def _post_in_session(
     category = CategoryRepository(session, scope).get_or_raise(occurrence.category_id)
     if category.archived_at is not None or category.kind != occurrence.direction:
         raise OccurrenceError("category_unavailable")
-    description = clean_description(occurrence.label or (item.name if item else ""))
+    description = clean_description(
+        occurrence.label
+        if item is not None and item.freq == "once"
+        else occurrence.label or (item.name if item else "")
+    )
     transaction = TransactionRepository(session, scope).create(
         direction=occurrence.direction,
         day=day,

@@ -9,6 +9,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.db.engine import run_immediate
+from assetboard.db.models.identity import User
 from assetboard.db.models.tax import TaxRule, TaxRuleVersion
 from assetboard.db.repositories import (
     AuditEventRepository,
@@ -29,6 +30,27 @@ from assetboard.domain.taxes import (
 )
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR, clean_description
 from assetboard.services.context import Context, Role, require_role, require_role_now
+
+
+def rate_warning_dismissed(factory: sessionmaker[Session], ctx: Context) -> bool:
+    """Whether this account dismissed the user-entered tax rates warning."""
+    require_role(ctx, Role.VIEWER)
+    with factory() as session:
+        user = session.get(User, ctx.user.id)
+        return bool(user and user.tax_warning_dismissed)
+
+
+def dismiss_rate_warning(factory: sessionmaker[Session], ctx: Context) -> None:
+    """Persist dismissal on the account, across its workspaces."""
+    require_role(ctx, Role.VIEWER)
+
+    def write(session: Session) -> None:
+        require_role_now(session, ctx, Role.VIEWER)
+        user = session.get(User, ctx.user.id)
+        if user is not None:
+            user.tax_warning_dismissed = True
+
+    run_immediate(factory, write)
 
 
 class TaxRuleError(Exception):

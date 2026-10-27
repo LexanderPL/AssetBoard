@@ -68,14 +68,20 @@ Implementation order: F3.1 → F3.2 → F3.3 → F3.4 → F3.5 → F3.6 → (F3.
   date and maximum count are ignored and stored normalised (interval 1, end date and count
   null, weekdays empty, month day and month 1). The form hides those fields (a small
   `data-hidden-when` progressive-disclosure handler) and explains that they are ignored.
-- The horizon rule is unchanged: the occurrence is generated once its date enters the
-  horizon. A past date follows "include past occurrences". A date edit regenerates the pending
-  occurrence like any rule edit. Once the item has a kept row (posted, skipped, overdue or in a
-  closed month), a date edit adds no second occurrence; move an overdue one from Upcoming.
+- A one-time item is materialized immediately, even when its date is beyond the recurring
+  generation horizon. Other recurring items keep the horizon rule. A past date follows
+  "include past occurrences". A date edit regenerates the
+  pending occurrence like any rule edit. Once the item has a kept row (posted, skipped, overdue
+  or in a closed month), a date edit adds no second occurrence; move an overdue one from Upcoming.
 - With its occurrence posted or skipped the item is shown as "Done" (no pause/resume; archive
   as usual). The list shows "One time on <date>" (the nominal date).
 - The pending occurrence feeds the month's Expected and Forecast; Planned (the budget) is not
   changed.
+- The Transactions entry row changes its submit label from **Add** to **Plan** when its date is
+  after today in the workspace time zone. Submitting saves a one-time item and pending
+  occurrence immediately, with the same date, amount, description and category; no extra
+  confirmation is needed to create the plan. Confirm remains the separate action that posts it
+  as a transaction. The pending one-time row has Delete; its confirmation editor has Cancel.
 - Migration `0023_one_time_items` widens `ck_scheduled_items_freq_valid`. Its downgrade keeps
   each one-time item as `monthly` on the day of its date with `max_count = 1` (same single
   date), so no data is lost.
@@ -172,7 +178,9 @@ Which taxes get a planned payment expense (`generate_payment = true`):
 Payment due date = `due_day` of the month `pay_date.month + due_month_offset` (clamped to month length).
 
 **Acceptance**
-- Tax rule CRUD with versions (add a new version instead of editing history), archive; notice "Rates are entered by you; this is not tax advice."
+- Tax rule CRUD with versions (add a new version instead of editing history), archive; notice
+  "Rates are entered by you; this is not tax advice." The notice can be dismissed and its
+  dismissal is remembered for the account across workspaces.
 - **Calculator preview**: enter a net amount and (optionally) pick an income source → shows the breakdown table (net, each added tax, gross, each withheld tax, take-home, ledger amount, planned payments).
 - Golden test: net 23 370.00 PLN; VAT 23% added → 5 375.10; gross 28 745.10; income tax 12% withheld on net → 2 804.40; fixed levy 1 000.00 withheld → total withheld 3 804.40; take-home 19 565.60. Ledger amounts: `cash_received` 28 745.10 with payments 5 375.10 + 2 804.40 + 1 000.00; `net` 23 370.00 with payments 2 804.40 + 1 000.00; `take_home` 19 565.60 with no payments.
 - **Invariant (property test):** when every rule has `generate_payment`, `ledger_amount − sum(payments) == take_home` for all three `record_as` modes and any inputs.

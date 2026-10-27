@@ -6,10 +6,9 @@
    No inline script or style. #}
 {% block title %}{{ month_heading }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ month_heading }}{% if view.closed %} <span class="ml-2 inline-flex items-center gap-1 rounded-full bg-warning-soft px-2.5 py-1 align-middle text-xs font-semibold text-warning-strong" data-closed-badge>{{ _("Closed") }}</span>{% endif %}{% endblock %}
-{% block header_actions %}<a href="{{ scoped_url(request, 'transactions_month', month=view.month|string) }}" class="rounded-full bg-primary px-3.5 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-enter-transactions>{{ _("Enter transactions") }}</a>{% endblock %}
 {% block scripts %}{% include "macros/chart_scripts.html" %}{% endblock %}
 {% block content %}
-<div class="space-y-6" data-month="{{ view.month }}">
+<div class="space-y-6" data-month="{{ view.month }}" data-today="{{ today }}">
   {% if notice %}
   <p class="rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{% if notice_href %}<a href="{{ notice_href }}" class="font-medium underline">{{ notice }}</a>{% else %}{{ notice }}{% endif %}</p>
   {% endif %}

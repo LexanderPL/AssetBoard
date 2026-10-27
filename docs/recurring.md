@@ -14,11 +14,17 @@ non-leap year.
 Choose **One time** to plan a single payment or income on one date, such as a gift or an annual
 fee you pay just once. The item has one occurrence on its start date; the weekend and holiday
 adjustment still applies, while the end date, maximum occurrences, interval, weekdays, day and
-month are ignored (the form hides them). Like any other occurrence it is created once its date
-enters the generation horizon (see below), so a date more than 13 months away appears later.
-A past date needs **Include past occurrences**. Changing the date moves its pending occurrence;
-once the occurrence is posted or skipped, the list shows the item as **Done** and you can
-archive it. A one-time item adds to the month's Expected and Forecast columns, not to Planned.
+month are ignored (the form hides them). It is generated immediately, even when its date is
+more than 13 months away. A past date in the Recurring form needs **Include past occurrences**.
+Changing the date moves its pending occurrence; once the occurrence is posted or skipped, the
+list shows the item as **Done** and you can archive it. A one-time item adds to the month's
+Expected and Forecast columns, not to Planned.
+
+In the Transactions entry row, dates after today show a **Plan** button. It immediately saves a
+one-time planned occurrence using the same date, amount, description and category fields as an
+ordinary transaction. Confirm remains the separate action that posts it as a transaction. A
+pending one-time occurrence can be deleted; its confirmation form can be cancelled without
+changing the plan.
 
 The form previews the next six effective due dates as you change the rule. JavaScript is needed
 only for the live preview; the form can be saved without it. A finite or ended rule may have
@@ -40,8 +46,9 @@ effective day merge into one occurrence, so there can be fewer stored occurrence
 
 ## Generation and history
 
-Saving immediately generates planned occurrences from today in the workspace time zone through
-the same day 13 calendar months ahead, inclusive (clamped at month end). Administrators can set
+Saving a recurring rule immediately generates planned occurrences from today in the workspace
+time zone through the same day 13 calendar months ahead, inclusive (clamped at month end). A
+one-time item is materialized immediately at any valid future date. Administrators can set
 `ASSETBOARD_RECURRENCE_HORIZON_MONTHS` to another positive number. **Include past occurrences** on
 creation also backfills dates from the start of the rule; it is off by default. Generation is
 idempotent: repeating a job never creates a second occurrence for the same item and nominal

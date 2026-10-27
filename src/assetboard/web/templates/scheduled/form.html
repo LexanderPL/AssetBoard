@@ -12,16 +12,14 @@
 <form id="schedule-form" method="post" action="{{ scoped_url(request, 'scheduled_update', item_id=item_id) if item_id else scoped_url(request, 'scheduled_create') }}" class="space-y-4">
   {{ csrf_input() }}
   {{ field("name", _("Name"), value=values.get('name', ''), error=errors.get('name'), required=true, maxlength=200) }}
-  <label class="block text-sm font-medium" for="direction">{{ _("Direction") }}</label>
-  <select id="direction" name="direction" class="form-select w-full">
-    <option value="expense"{% if values.get('direction') == 'expense' %} selected{% endif %}>{{ _("Expense") }}</option>
-    <option value="income"{% if values.get('direction') == 'income' %} selected{% endif %}>{{ _("Income") }}</option>
-  </select>
   <div class="space-y-1.5">
   <label class="block text-sm font-medium" for="category_id">{{ _("Category") }}</label>
   <select id="category_id" name="category_id" class="form-select w-full" required{% if errors.get('category_id') %} aria-invalid="true"{% endif %}{% if errors.get('category_id') or archived_category %} aria-describedby="{% if archived_category %}category_id-archived{% endif %}{% if errors.get('category_id') %} category_id-error{% endif %}"{% endif %}>
     {% if archived_category %}<option value="{{ archived_category.id }}" selected disabled data-archived-category>{{ archived_category.name }} · {{ _("archived") }}</option>{% endif %}
-    {% for category in categories %}<option value="{{ category.id }}"{% if not archived_category and values.get('category_id') == category.id|string %} selected{% endif %}>{{ category.name }} · {{ _("Income") if category.kind == 'income' else _("Expense") }}</option>{% endfor %}
+    {% for kind, heading in (("expense", _("Expense categories")), ("income", _("Income categories"))) %}
+    {% set matching = categories|selectattr('kind', 'equalto', kind)|list %}
+    {% if matching %}<optgroup label="{{ heading }}">{% for category in matching %}<option value="{{ category.id }}"{% if not archived_category and values.get('category_id') == category.id|string %} selected{% endif %}>{{ category.name }}</option>{% endfor %}</optgroup>{% endif %}
+    {% endfor %}
   </select>
   {% if archived_category %}<p id="category_id-archived" class="text-sm text-muted" data-archived-notice>{{ _("The category %(name)s is archived, so this item creates no new dates. Choose an active category to save it.", name=archived_category.name) }}</p>{% endif %}
   {{ error_text("category_id") }}

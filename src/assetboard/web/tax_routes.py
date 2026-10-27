@@ -99,12 +99,17 @@ def _redirect(request: Request, error: str | None = None, form: str | None = Non
 @router.get("/taxes", name="tax_rules")
 async def rules_page(request: Request, ctx: CurrentContext) -> Response:
     rows = await run_in_threadpool(taxes.list_rules, request.app.state.session_factory, ctx)
+    warning_dismissed = await run_in_threadpool(
+        taxes.rate_warning_dismissed, request.app.state.session_factory, ctx
+    )
     error = request.query_params.get("error")
     return render_template(
         request,
         "taxes/rules.html",
         context={
             "rules": rows,
+            "tax_warning_dismissed": warning_dismissed,
+            "tax_warning_return": "rules",
             "can_edit": has_role(ctx, Role.EDITOR),
             "error": gettext(ERRORS.get(error, ERRORS["failed"]), request.state.locale)
             if error
@@ -192,6 +197,9 @@ async def archive(request: Request, ctx: CurrentContext, rule_id: str) -> Respon
 
 @router.get("/taxes/calculator", name="tax_calculator")
 async def calculator(request: Request, ctx: CurrentContext) -> Response:
+    warning_dismissed = await run_in_threadpool(
+        taxes.rate_warning_dismissed, request.app.state.session_factory, ctx
+    )
     values = {
         "net": request.query_params.get("net", ""),
         "day": request.query_params.get("day", ctx.clock.today(ctx.workspace.timezone).isoformat()),
@@ -229,6 +237,8 @@ async def calculator(request: Request, ctx: CurrentContext) -> Response:
         request,
         "taxes/calculator.html",
         context={
+            "tax_warning_dismissed": warning_dismissed,
+            "tax_warning_return": "calculator",
             "values": values,
             "calculation": calculation,
             "error": gettext(ERRORS.get(error, ERRORS["failed"]), request.state.locale)
@@ -243,6 +253,24 @@ async def calculator(request: Request, ctx: CurrentContext) -> Response:
             "format_amount_input": format_amount_input,
         },
     )
+
+
+@router.post("/taxes/warning/dismiss", name="tax_warning_dismiss")
+async def dismiss_warning(request: Request, ctx: CurrentContext) -> Response:
+    form = await request.form()
+    page = form.get("return_to")
+    target_name = "tax_calculator" if page == "calculator" else "tax_rules"
+    await run_in_threadpool(taxes.dismiss_rate_warning, request.app.state.session_factory, ctx)
+    target = request.url_for(target_name).path
+    if target_name == "tax_calculator":
+        params: dict[str, str] = {}
+        for name in ("net", "day", "record_as"):
+            value = form.get(name)
+            if isinstance(value, str) and value:
+                params[name] = value
+        if params:
+            target += "?" + urlencode(params)
+    return RedirectResponse(target, status_code=303)
 
 
 @router.post("/taxes/calculator", name="tax_calculate")

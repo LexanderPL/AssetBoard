@@ -25,9 +25,9 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.repositories import NotFound
-from assetboard.domain.months import InvalidMonth, YearMonth
+from assetboard.domain.months import MAX_YEAR, MIN_YEAR, InvalidMonth, YearMonth
 from assetboard.i18n import gettext
-from assetboard.i18n.dates import format_day, format_month, format_month_heading
+from assetboard.i18n.dates import format_day, format_month, format_month_heading, month_names
 from assetboard.services.budget import CopyResult, auto_copy_on_open
 from assetboard.services.context import Context
 from assetboard.services.income import missing_work_logs
@@ -76,6 +76,7 @@ NOTICES = {
     "already_closed": _("This month was already closed."),
     "already_open": _("This month is already open."),
     "transaction_added": _("Entry added."),
+    "planned": _("Planned transaction saved."),
     "transaction_saved": _("Entry saved."),
     "transaction_restored": _("Entry restored."),
     "outside_filter": _("Entry saved. Its category is not shown while this filter is on."),
@@ -107,9 +108,16 @@ async def month_current(
     request: Request,
     ctx: CurrentContext,
     month: str | None = None,
+    month_month: str | None = None,
+    month_year: str | None = None,
     from_: Annotated[str, Query(alias="from")] = "",
 ) -> Response:
-    """Today's month, or the month chosen in the picker (``?month=...&from=YYYY-MM``)."""
+    """Today's month, or the month/year chosen in the in-app picker."""
+    if month is None and (month_month is not None or month_year is not None):
+        try:
+            month = f"{int(month_year or ''):04d}-{int(month_month or ''):02d}"
+        except ValueError:
+            month = ""
     if month is None:
         return RedirectResponse(_month_path(request, current_month(ctx)), status_code=303)
     try:
@@ -137,6 +145,10 @@ def month_header(
         closed_on = format_day(local, locale)
     return {
         "view": view,
+        "today": ctx.clock.today(ctx.workspace.timezone).isoformat(),
+        "month_names": month_names(locale),
+        "picker_min_year": MIN_YEAR,
+        "picker_max_year": MAX_YEAR,
         "month_heading": format_month_heading(view.month, locale),  # heading and title
         "month_name": format_month(view.month, locale),  # in sentences (confirmations)
         "prev_name": format_month(view.prev, locale) if view.prev else None,

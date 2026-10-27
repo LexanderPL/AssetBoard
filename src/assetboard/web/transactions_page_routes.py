@@ -80,12 +80,19 @@ async def transactions_current(
     request: Request,
     ctx: CurrentContext,
     month: str | None = None,
+    month_month: str | None = None,
+    month_year: str | None = None,
     from_: Annotated[str, Query(alias="from")] = "",
 ) -> Response:
     """Today's month (303); the month chosen in the picker (``?month=...``, 303); or, with any
     of F2.6's filter parameters, the History page with the same filters (302)."""
     if any(name in request.query_params for name in HISTORY_PARAMS) and month is None:
         return _to(request, "history", _known(request, HISTORY_PARAMS), 302)
+    if month is None and (month_month is not None or month_year is not None):
+        try:
+            month = f"{int(month_year or ''):04d}-{int(month_month or ''):02d}"
+        except ValueError:
+            month = ""
     if month is None:
         return RedirectResponse(transactions_path(request, current_month(ctx)), status_code=303)
     try:

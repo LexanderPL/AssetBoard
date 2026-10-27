@@ -1365,6 +1365,9 @@ msgstr "Ten miesiąc jest już otwarty."
 msgid "Entry added."
 msgstr "Dodano wpis."
 
+msgid "Planned transaction saved."
+msgstr "Zapisano zaplanowaną transakcję."
+
 msgid "Entry saved."
 msgstr "Zapisano wpis."
 
@@ -1587,8 +1590,8 @@ msgstr ""
 msgid "Enter a name."
 msgstr "Podaj nazwę."
 
-msgid "Choose an active category matching the direction."
-msgstr "Wybierz aktywną kategorię zgodną z kierunkiem."
+msgid "Choose an active category."
+msgstr "Wybierz aktywną kategorię."
 
 msgid "Enter a valid start date."
 msgstr "Podaj prawidłową datę początkową."
@@ -1751,9 +1754,6 @@ msgid ""
 msgstr ""
 "Zaznaczono za dużo wpisów (najwyżej %(max)d naraz). Zaznacz mniej albo "
 "zmień wszystkie pasujące wpisy."
-
-msgid "Choose an active category."
-msgstr "Wybierz aktywną kategorię."
 
 msgid ""
 "Choose a category of the same kind as the entries. To change expenses and"
@@ -1998,9 +1998,6 @@ msgstr "Kontynuuj"
 
 msgid "Cancel"
 msgstr "Anuluj"
-
-msgid "Open month"
-msgstr "Otwórz miesiąc"
 
 msgid "This month"
 msgstr "Ten miesiąc"
@@ -2696,8 +2693,20 @@ msgstr "Utwórz obszar roboczy"
 msgid "Return to overview"
 msgstr "Powrót do podsumowania"
 
+msgid "Change category"
+msgstr "Zmień kategorię"
+
 msgid "Export CSV"
 msgstr "Eksportuj CSV"
+
+msgid "Search descriptions"
+msgstr "Szukaj w opisach"
+
+msgid "Search history"
+msgstr "Szukaj w historii"
+
+msgid "Search"
+msgstr "Szukaj"
 
 msgid "Export as CSV"
 msgstr "Eksport do CSV"
@@ -2770,9 +2779,6 @@ msgstr "Najmniejsza kwota"
 msgid "Largest amount"
 msgstr "Największa kwota"
 
-msgid "Description contains"
-msgstr "Opis zawiera"
-
 msgid "Expenses and income"
 msgstr "Wydatki i przychody"
 
@@ -2836,9 +2842,6 @@ msgstr "Strona %(number)d z %(pages)d"
 
 msgid "Next"
 msgstr "Następny"
-
-msgid "Change category"
-msgstr "Zmień kategorię"
 
 msgid ""
 "Tick entries in the list, or change all entries that match the filters. "
@@ -3234,6 +3237,9 @@ msgstr "Dzień"
 msgid "Earlier descriptions"
 msgstr "Wcześniejsze opisy"
 
+msgid "Plan"
+msgstr "Zaplanuj"
+
 #, python-format
 msgid "Edit the entry of %(date)s, %(amount)s"
 msgstr "Edytuj wpis z %(date)s, %(amount)s"
@@ -3271,14 +3277,8 @@ msgstr "Poprzedni miesiąc: %(month)s"
 msgid "Next month: %(month)s"
 msgstr "Następny miesiąc: %(month)s"
 
-msgid "Today"
-msgstr "Dzisiaj"
-
-msgid "Go to month"
-msgstr "Przejdź do miesiąca"
-
-msgid "YYYY-MM"
-msgstr "RRRR-MM"
+msgid "Choose month and year"
+msgstr "Wybierz miesiąc i rok."
 
 msgid "Go"
 msgstr "Przejdź"
@@ -3440,9 +3440,6 @@ msgstr "Dodaj kategorie, aby zaplanować ten miesiąc."
 
 msgid "Closed"
 msgstr "Zamknięty"
-
-msgid "Enter transactions"
-msgstr "Wprowadź transakcje"
 
 msgid "This month is closed. Its entries and planned values are read-only."
 msgstr ""
@@ -3825,11 +3822,14 @@ msgstr "Edytuj kwotę"
 msgid "Save amount"
 msgstr "Zapisz kwotę"
 
-msgid "Tax calculator"
-msgstr "Kalkulator podatków"
-
 msgid "Rates are entered by you; this is not tax advice."
 msgstr "Stawki wprowadzasz samodzielnie; to nie jest porada podatkowa."
+
+msgid "Dismiss warning"
+msgstr "Zamknij ostrzeżenie"
+
+msgid "Tax calculator"
+msgstr "Kalkulator podatków"
 
 #, python-format
 msgid "Net amount (%(currency)s)"
@@ -3945,9 +3945,6 @@ msgstr ""
 "Działanie i podstawa reguły są ustalone podczas tworzenia, aby zachować "
 "znaczenie istniejących wersji stawek. Utwórz osobną regułę dla innego "
 "podatku."
-
-msgid "Month summary"
-msgstr "Podsumowanie miesiąca"
 
 msgid "Reopen it on the month page."
 msgstr "Można go ponownie otworzyć na stronie miesiąca."
@@ -4253,4 +4250,31 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Choose the first day of a work month."
 #~ msgstr "Wybierz pierwszy dzień miesiąca pracy."
+
+#~ msgid "Open month"
+#~ msgstr "Otwórz miesiąc"
+
+#~ msgid "Description contains"
+#~ msgstr "Opis zawiera"
+
+#~ msgid "Today"
+#~ msgstr "Dzisiaj"
+
+#~ msgid "Enter transactions"
+#~ msgstr "Wprowadź transakcje"
+
+#~ msgid "Month summary"
+#~ msgstr "Podsumowanie miesiąca"
+
+#~ msgid "Choose an active category matching the direction."
+#~ msgstr "Wybierz aktywną kategorię zgodną z kierunkiem."
+
+#~ msgid "Planned transaction"
+#~ msgstr "Zaplanowana transakcja"
+
+#~ msgid "Go to month"
+#~ msgstr "Przejdź do miesiąca"
+
+#~ msgid "YYYY-MM"
+#~ msgstr "RRRR-MM"
 

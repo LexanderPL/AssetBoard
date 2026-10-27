@@ -278,6 +278,7 @@ async def _list_page(
     export_values: Mapping[str, Any] | None = None,
     export_error: str = "",
     export_open: bool = False,
+    bulk_open: bool = False,
     status_code: int = 200,
 ) -> Response:
     factory = request.app.state.session_factory
@@ -304,6 +305,7 @@ async def _list_page(
         if window.has_next:
             pages["next"] = _list_url(request, _state_pairs(raw, sort, window.number + 1))
     current = _state_pairs(raw, sort, window.number if window else 1)
+    search_fields = [(name, value) for name, value in _state_pairs(raw, sort) if name != "q"]
     context: dict[str, Any] = {
         "raw": raw,
         "selected_categories": set(raw.categories),
@@ -319,6 +321,7 @@ async def _list_page(
         "can_edit": has_role(ctx, Role.EDITOR),
         "state_fields": current,
         "filter_fields": pairs,
+        "search_fields": search_fields,
         "list_url": _list_url(request, current),
         "notice": notice,
         "bulk_error": bulk_error,
@@ -329,6 +332,8 @@ async def _list_page(
         # without JavaScript the button links to ?export=1, which renders the dialog open.
         "export_open": export_open or bool(export_error),
         "export_url": _list_url(request, [*current, ("export", "1")]) + "#export-dialog",
+        "bulk_open": bulk_open or bool(bulk_error),
+        "bulk_url": _list_url(request, [*current, ("bulk", "1")]) + "#bulk-dialog",
         "max_text": MAX_SEARCH_TEXT_LENGTH,
         # Read at request time: the cap is a module constant tests may lower.
         "too_many_for_bulk": (
@@ -356,7 +361,10 @@ async def history_page(request: Request, ctx: CurrentContext) -> Response:
             request.state.locale,
         ) % {"num": count}
     export_open = _text(params, "export", 1) == "1"
-    return await _list_page(request, ctx, raw, sort, page, notice=notice, export_open=export_open)
+    bulk_open = _text(params, "bulk", 1) == "1"
+    return await _list_page(
+        request, ctx, raw, sort, page, notice=notice, export_open=export_open, bulk_open=bulk_open
+    )
 
 
 # Export

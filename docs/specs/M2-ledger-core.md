@@ -452,7 +452,7 @@ Property tests: totals equal the sum of rows; transfers never appear; difference
 ## F2.5 Month navigation and closing
 
 **Acceptance**
-- Prev/next month buttons, month picker, "Today" shortcut; URL-addressable months.
+- Prev/next month buttons and an in-app month/year picker; URL-addressable months.
 - Owner/editor can **close** a month (sets read-only for entries and planned values); owner can reopen. Closed state is shown clearly.
 - Empty months (no data) still render; future months are allowed (for planning).
 
@@ -461,12 +461,12 @@ Property tests: totals equal the sum of rows; transfers never appear; difference
   `YYYY-MM`, ASCII digits; months 1900-01..2199-12; anything else is a 404). The nav "Month" item
   links to `/m`; `/` stays the overview (changed by F2.7: `/` becomes the Home dashboard and
   the month page a pure summary). The page header has Previous/Next (no link past the
-  range ends), "Today", and a picker: a plain GET form with `<input type="month">` and a Go
-  button, no JavaScript. Desktop Firefox and Safari render that input as a text box, so the
-  server also accepts `2026/10`, `10.2026`, `10/2026`; an invalid value redirects back with an
-  error. F2.2-F2.4 fill the `month_body` block of `templates/months/page.html`.
-- "Today" is `ctx.clock.today(ctx.workspace.timezone)`: the workspace time zone setting (there is
-  no per-user time zone). Month names come from Babel's CLDR data: `i18n.dates.format_month`
+  range ends) and a disclosure picker with month and year controls plus a Go button. Clicking
+  its month/year heading opens it. The in-app picker avoids browser-native Clear/Today actions
+  and works without JavaScript. F2.2-F2.4 fill the `month_body` block of
+  `templates/months/page.html`.
+- The current month comes from `ctx.clock.today(ctx.workspace.timezone)`: the workspace time zone
+  setting (there is no per-user time zone). Month names come from Babel's CLDR data: `i18n.dates.format_month`
   keeps CLDR's case for running text ("listopad 2026"); `format_month_heading` capitalises the
   first letter for the page heading and title only.
 - `domain.months.YearMonth`: parse/format, prev/next, first/last day, bounds.
@@ -559,6 +559,10 @@ read-only enforcement in the service layer (not only the UI). Tests for enforcem
   link to `/transactions?<filters>&export=1`, which renders the dialog open in the page flow,
   so the export works without JavaScript; a refused option renders the page with the dialog
   open (a modal with JavaScript). Submitting the form closes the dialog.
+- **History controls (owner, 2026-10-27):** description search remains visible above the
+  results and submits after each edit with a short debounce. Date, direction, category and
+  amount filters stay collapsed until opened. Bulk category change opens in a modal like CSV
+  export; its URL can reopen it without JavaScript.
 - **Export** (`/transactions/export.csv`, GET): every matching row, always in M4's entry order
   (date, `created_at`, id) whatever the screen's sort. Rows and their category names come
   from **one** SELECT (a join, fetched in batches), so every row has the name its category had
@@ -630,7 +634,7 @@ current order.
 
 **Acceptance**
 - **Home (`/`)** shows the current month (workspace time zone, from the Clock), headed with the
-  month name and a link "Open month" to `/m/YYYY-MM`:
+  month name:
   - the **F2.4 flow bar** (the KPI design of PR #144): one stacked bar of the month's earned
     income split into Spent / Saved / invested / Left, overspend hatched, captioned "Saved /
     invested X% of income", rendered from the same partial as the Month page, not a copy;
@@ -647,13 +651,12 @@ current order.
 - **Month (`/m/YYYY-MM`)** is a pure summary: the flow bar, the planned-vs-actual table with
   inline planned values (F2.3/F2.4 unchanged, including the closed-month read-only state, the
   sort toggle and the copy banner), and the same expense-by-category donut as Home. It has **no
-  entry form and no transaction list**. Month navigation and close/reopen (F2.5) stay here. A
-  link "Enter transactions" goes to `/transactions/YYYY-MM`.
+  entry form and no transaction list**. Month navigation and close/reopen (F2.5) stay here.
 - Category names in the summary link to `/transactions/YYYY-MM?category=<id>` (F2.4 part B's
   filter moves with the list) instead of `#ledger` on the month page.
 - **Transactions (`/transactions/YYYY-MM`)** is the entry page: F2.2's quick-add rows and the
   month's income and expense tables with inline edit, delete and undo, the F2.4 part B category
-  filter, and the same month navigation (Previous/Next, Today, picker) as the Month page.
+  filter, and the same month navigation (Previous/Next, picker) as the Month page.
   `/transactions` without a query redirects (303) to the current month. Closed months render
   read-only as today. Planned values are not edited here, and the page has no flow bar or KPI
   line (entry only). Every keyboard behaviour,

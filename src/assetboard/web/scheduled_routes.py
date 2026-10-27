@@ -5,12 +5,13 @@ from datetime import date
 from urllib.parse import urlencode
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Form, Request
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.repositories import NotFound
 from assetboard.domain.money import Money
+from assetboard.domain.months import YearMonth
 from assetboard.domain.notifications import MAX_LEAD_DAYS
 from assetboard.domain.recurrence import Frequency, MonthDay, RecurrenceRule, WeekendPolicy
 from assetboard.domain.scheduled import AmountMode, ItemAction
@@ -51,7 +52,7 @@ def _(message: str) -> str:
 
 FIELD_ERRORS = {
     "name": _("Enter a name."),
-    "category_id": _("Choose an active category matching the direction."),
+    "category_id": _("Choose an active category."),
     "amount": _("Enter a positive amount in the workspace currency."),
     "start_date": _("Enter a valid start date."),
     "end_date": _("Enter an end date on or after the start date, or leave it empty."),
@@ -339,7 +340,13 @@ async def update(request: Request, ctx: CurrentContext, item_id: str) -> Respons
 
 
 @router.post("/recurring/{item_id}/{action}", name="scheduled_action")
-async def action(request: Request, ctx: CurrentContext, item_id: str, action: str) -> Response:
+async def action(
+    request: Request,
+    ctx: CurrentContext,
+    item_id: str,
+    action: str,
+    return_month: str = Form(default=""),
+) -> Response:
     try:
         operation = ItemAction(action)
     except ValueError:
@@ -357,4 +364,12 @@ async def action(request: Request, ctx: CurrentContext, item_id: str, action: st
         code = str(exc) if str(exc) in ACTION_ERRORS else "failed"
         target = request.url_for("scheduled_items").path + "?" + urlencode({"error": code})
         return RedirectResponse(target, status_code=303)
+    if return_month:
+        try:
+            month = YearMonth.parse(return_month)
+        except ValueError:
+            raise NotFound from None
+        return RedirectResponse(
+            request.url_for("transactions_month", month=str(month)).path, status_code=303
+        )
     return RedirectResponse(request.url_for("scheduled_items").path, status_code=303)

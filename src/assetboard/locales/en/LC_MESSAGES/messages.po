@@ -1287,6 +1287,9 @@ msgstr ""
 msgid "Entry added."
 msgstr ""
 
+msgid "Planned transaction saved."
+msgstr ""
+
 msgid "Entry saved."
 msgstr ""
 
@@ -1477,7 +1480,7 @@ msgstr ""
 msgid "Enter a name."
 msgstr ""
 
-msgid "Choose an active category matching the direction."
+msgid "Choose an active category."
 msgstr ""
 
 msgid "Enter a valid start date."
@@ -1625,9 +1628,6 @@ msgstr ""
 msgid ""
 "Too many ticked entries (at most %(max)d at a time). Tick fewer, or "
 "change all matching entries."
-msgstr ""
-
-msgid "Choose an active category."
 msgstr ""
 
 msgid ""
@@ -1847,9 +1847,6 @@ msgid "Continue"
 msgstr ""
 
 msgid "Cancel"
-msgstr ""
-
-msgid "Open month"
 msgstr ""
 
 msgid "This month"
@@ -2479,7 +2476,19 @@ msgstr ""
 msgid "Return to overview"
 msgstr ""
 
+msgid "Change category"
+msgstr ""
+
 msgid "Export CSV"
+msgstr ""
+
+msgid "Search descriptions"
+msgstr ""
+
+msgid "Search history"
+msgstr ""
+
+msgid "Search"
 msgstr ""
 
 msgid "Export as CSV"
@@ -2543,9 +2552,6 @@ msgstr ""
 msgid "Largest amount"
 msgstr ""
 
-msgid "Description contains"
-msgstr ""
-
 msgid "Expenses and income"
 msgstr ""
 
@@ -2607,9 +2613,6 @@ msgid "Page %(number)d of %(pages)d"
 msgstr ""
 
 msgid "Next"
-msgstr ""
-
-msgid "Change category"
 msgstr ""
 
 msgid ""
@@ -2980,6 +2983,9 @@ msgstr ""
 msgid "Earlier descriptions"
 msgstr ""
 
+msgid "Plan"
+msgstr ""
+
 #, python-format
 msgid "Edit the entry of %(date)s, %(amount)s"
 msgstr ""
@@ -3014,13 +3020,7 @@ msgstr ""
 msgid "Next month: %(month)s"
 msgstr ""
 
-msgid "Today"
-msgstr ""
-
-msgid "Go to month"
-msgstr ""
-
-msgid "YYYY-MM"
+msgid "Choose month and year"
 msgstr ""
 
 msgid "Go"
@@ -3161,9 +3161,6 @@ msgid "Add categories to plan this month."
 msgstr ""
 
 msgid "Closed"
-msgstr ""
-
-msgid "Enter transactions"
 msgstr ""
 
 msgid "This month is closed. Its entries and planned values are read-only."
@@ -3514,10 +3511,13 @@ msgstr ""
 msgid "Save amount"
 msgstr ""
 
-msgid "Tax calculator"
+msgid "Rates are entered by you; this is not tax advice."
 msgstr ""
 
-msgid "Rates are entered by you; this is not tax advice."
+msgid "Dismiss warning"
+msgstr ""
+
+msgid "Tax calculator"
 msgstr ""
 
 #, python-format
@@ -3630,9 +3630,6 @@ msgstr ""
 msgid ""
 "Tax-rule effect and base are fixed at creation to preserve the meaning of"
 " existing rate versions. Create a separate rule to model a different tax."
-msgstr ""
-
-msgid "Month summary"
 msgstr ""
 
 msgid "Reopen it on the month page."
@@ -3967,5 +3964,32 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Choose the first day of a work month."
+#~ msgstr ""
+
+#~ msgid "Open month"
+#~ msgstr ""
+
+#~ msgid "Description contains"
+#~ msgstr ""
+
+#~ msgid "Today"
+#~ msgstr ""
+
+#~ msgid "Enter transactions"
+#~ msgstr ""
+
+#~ msgid "Month summary"
+#~ msgstr ""
+
+#~ msgid "Choose an active category matching the direction."
+#~ msgstr ""
+
+#~ msgid "Planned transaction"
+#~ msgstr ""
+
+#~ msgid "Go to month"
+#~ msgstr ""
+
+#~ msgid "YYYY-MM"
 #~ msgstr ""
 

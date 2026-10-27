@@ -76,6 +76,9 @@ class ScheduledInput:
     auto_post: bool = False
     # Days before the due date for reminders (F3.6); None: each channel's default.
     reminder_lead_days: int | None = None
+    # A transaction entry can have an empty description even though its one-time item needs a
+    # visible name. Keep the original description on its occurrence for posting.
+    occurrence_label: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -239,10 +242,17 @@ def _generate(
             if row.status == OccurrenceStatus.PENDING and row.rescheduled_at is not None
         ]
         lookback = max(date(1900, 1, 1), min([start, *moved]) - timedelta(days=31))
+        # A one-time item is an explicit planned payment, so materialize it immediately even
+        # when its date lies beyond the normal recurring generation horizon.
+        horizon = (
+            date(MAX_YEAR, 12, 31)
+            if rule.freq == Frequency.ONCE
+            else _horizon(today, horizon_months)
+        )
         pairs = occurrences_with_nominal(
             rule,
             lookback,
-            _horizon(today, horizon_months),
+            horizon,
             _holidays(workspace.country_code, rule),
         )
         known = {nominal for nominal, _ in pairs}
@@ -265,7 +275,8 @@ def _generate(
         row.direction = item.direction
         row.category_id = item.category_id
         row.currency = item.currency
-        row.label = item.name
+        if item.freq != Frequency.ONCE:
+            row.label = item.name
         if not row.amount_overridden:
             row.expected_minor = item.amount_minor
             row.amount_state = (
@@ -391,14 +402,16 @@ def save_item(
         if values.amount.currency != workspace.base_currency:
             raise ValueError("invalid_currency")
         category = CategoryRepository(session, ctx).get_or_raise(values.category_id)
-        if category.kind != values.direction or category.archived_at is not None:
+        if category.archived_at is not None:
             raise ValueError("invalid_category")
         repository = ScheduledItemRepository(session, ctx)
         rule = normalised(values.rule)
         fields = {
             "name": name,
             "notes": notes,
-            "direction": values.direction,
+            # Direction is determined by the selected category; the form has no separate
+            # direction control that could get out of sync with its category.
+            "direction": category.kind,
             "category_id": values.category_id,
             "amount_minor": values.amount.amount_minor,
             "currency": values.amount.currency,
@@ -430,6 +443,17 @@ def save_item(
             settings.recurrence_horizon_months,
             include_past=include_past if item_id is None else False,
         )
+        if rule.freq == Frequency.ONCE:
+            occurrence_label = (
+                values.occurrence_label if values.occurrence_label is not None else item.name
+            )
+            closed_months = MonthStateRepository(session, ctx).closed_months()
+            for occurrence in ScheduledOccurrenceRepository(session, ctx).for_item(item.id):
+                if (
+                    occurrence.status == OccurrenceStatus.PENDING
+                    and YearMonth.from_date(occurrence.due_date) not in closed_months
+                ):
+                    occurrence.label = occurrence_label
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
             action="scheduled.updated" if item_id else "scheduled.created",
