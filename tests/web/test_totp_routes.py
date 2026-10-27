@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import re
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import replace
@@ -13,7 +14,7 @@ from sqlalchemy import select
 
 from assetboard.clock import FixedClock
 from assetboard.db.engine import run_immediate
-from assetboard.db.models.identity import AuditEvent, User, UserSession, Workspace
+from assetboard.db.models.identity import AuditEvent, LoginTicket, User, UserSession, Workspace
 from assetboard.db.models.ledger import Transaction
 from assetboard.db.models.totp import TotpFactor, TotpRecoveryCode
 from assetboard.db.repositories.totp import TotpRepository
@@ -64,12 +65,23 @@ def _enable(owner: OwnerApp) -> tuple[str, list[str]]:
 
 
 def _login(owner: OwnerApp, client: TestClient, code: str = "", *, path: str = "/login"):
-    return client.post(
+    first = client.post(
         path,
         data={
             "csrf_token": owner.web.csrf(client.get(path).text),
             "email": owner.web.admin_email,
             "password": owner.web.admin_password,
+        },
+        follow_redirects=False,
+    )
+    challenge_path = "/login/local/verify" if path == "/login/local" else "/login/verify"
+    if first.status_code != 303 or first.headers.get("location") != challenge_path:
+        return first
+    challenge = client.get(challenge_path)
+    return client.post(
+        challenge_path,
+        data={
+            "csrf_token": owner.web.csrf(challenge.text),
             "second_factor": code,
         },
         follow_redirects=False,
@@ -187,6 +199,68 @@ def test_password_login_requires_factor_prevents_replay_and_consumes_recovery_on
     assert _login(owner, TestClient(owner.app), codes[0]).status_code == 401
     with owner.db() as session:
         assert len(list(session.scalars(select(TotpRecoveryCode)))) == 9
+
+
+def test_password_and_factor_are_separate_steps_with_a_hashed_single_use_ticket(
+    owner: OwnerApp,
+) -> None:
+    secret, _codes = _enable(owner)
+    client = TestClient(owner.app)
+    assert client.get("/login/verify", follow_redirects=False).headers["location"] == "/login"
+    with owner.db() as session:
+        existing_sessions = len(list(session.scalars(select(UserSession))))
+    login_page = client.get("/login")
+    assert 'name="second_factor"' not in login_page.text
+    first = client.post(
+        "/login",
+        data={
+            "csrf_token": owner.web.csrf(login_page.text),
+            "email": owner.web.admin_email,
+            "password": owner.web.admin_password,
+        },
+        follow_redirects=False,
+    )
+    assert first.status_code == 303 and first.headers["location"] == "/login/verify"
+    assert "Max-Age=300" in first.headers["set-cookie"]
+    assert "httponly" in first.headers["set-cookie"].lower()
+    assert "samesite=lax" in first.headers["set-cookie"].lower()
+    ticket_cookie = "assetboard_login_ticket"
+    ticket = client.cookies[ticket_cookie]
+    assert "assetboard_session" not in first.headers.get("set-cookie", "")
+    challenge = client.get("/login/verify")
+    assert "Enter the code from your authenticator app" in challenge.text
+    assert 'name="second_factor"' in challenge.text
+    with owner.db() as session:
+        rows = list(session.scalars(select(LoginTicket)))
+        assert len(rows) == 1 and rows[0].token_hash != ticket
+        assert rows[0].token_hash == hashlib.sha256(ticket.encode()).hexdigest()
+        assert rows[0].expires_at == owner.app.state.clock.now() + timedelta(minutes=5)
+
+    bad = client.post(
+        "/login/verify",
+        data={"csrf_token": owner.web.csrf(challenge.text), "second_factor": "wrong"},
+        follow_redirects=False,
+    )
+    assert bad.status_code == 401
+    assert client.cookies.get(ticket_cookie) == ticket
+    with owner.db() as session:
+        assert session.scalar(select(LoginTicket)) is not None
+        assert len(list(session.scalars(select(UserSession)))) == existing_sessions
+
+    owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
+    retry_page = client.get("/login/verify")
+    success = client.post(
+        "/login/verify",
+        data={
+            "csrf_token": owner.web.csrf(retry_page.text),
+            "second_factor": pyotp.TOTP(secret).at(owner.app.state.clock.now()),
+        },
+        follow_redirects=False,
+    )
+    assert success.status_code == 303
+    assert client.cookies.get(ticket_cookie) is None
+    with owner.db() as session:
+        assert session.scalar(select(LoginTicket)) is None
 
 
 def test_code_failures_are_throttled_on_login_and_enrollment(owner: OwnerApp) -> None:
@@ -770,11 +844,6 @@ def test_correct_password_with_a_wrong_code_does_not_rehash(
         assert stored is not None and stored.password_hash != before
 
 
-# Headers that differ between any two requests, whatever their outcome.
-_PER_REQUEST_HEADERS = {"date", "x-request-id"}
-_MASKED_CSRF = re.compile(rb'(?<=name="csrf_token" value=")[^"]+')
-
-
 def test_wrong_code_fails_like_a_wrong_password_and_is_audited_internally(
     owner: OwnerApp,
 ) -> None:
@@ -795,22 +864,20 @@ def test_wrong_code_fails_like_a_wrong_password_and_is_audited_internally(
         )
 
     wrong_password = attempt("Not The Password 123", "000000")
-    wrong_code = attempt(owner.web.admin_password, "000000")
-    assert wrong_code.status_code == wrong_password.status_code == 401
-    # Byte for byte, except the CSRF token, which is masked afresh in every response (two
-    # wrong passwords differ there just the same).
-    assert _MASKED_CSRF.sub(b"", wrong_code.content) == _MASKED_CSRF.sub(
-        b"", wrong_password.content
+    second_step = attempt(owner.web.admin_password, "000000")
+    assert second_step.status_code == 303
+    assert second_step.headers["location"] == "/login/verify"
+    challenge = client.get("/login/verify")
+    wrong_code = client.post(
+        "/login/verify",
+        data={"csrf_token": owner.web.csrf(challenge.text), "second_factor": "000000"},
+        follow_redirects=False,
     )
+    assert wrong_code.status_code == wrong_password.status_code == 401
+    assert "The email or password is not correct." in wrong_code.text
+    assert "The email or password is not correct." in wrong_password.text
 
-    def headers(response) -> list[tuple[str, str]]:  # noqa: ANN001
-        return sorted(
-            (name, value)
-            for name, value in response.headers.multi_items()
-            if name not in _PER_REQUEST_HEADERS
-        )
-
-    assert headers(wrong_code) == headers(wrong_password)
+    assert wrong_code.headers["content-type"] == wrong_password.headers["content-type"]
     with owner.db() as session:
         failures = list(
             session.scalars(
@@ -883,14 +950,21 @@ def test_cli_password_reset_keeps_the_second_factor(owner: OwnerApp) -> None:
     client = TestClient(owner.app)
 
     def sign_in(code: str):
-        return client.post(
+        first = client.post(
             "/login",
             data={
                 "csrf_token": owner.web.csrf(client.get("/login").text),
                 "email": owner.web.admin_email,
                 "password": "Operator Reset Password 1",
-                "second_factor": code,
             },
+            follow_redirects=False,
+        )
+        if first.headers.get("location") != "/login/verify":
+            return first
+        challenge = client.get("/login/verify")
+        return client.post(
+            "/login/verify",
+            data={"csrf_token": owner.web.csrf(challenge.text), "second_factor": code},
             follow_redirects=False,
         )
 

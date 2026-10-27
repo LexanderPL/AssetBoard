@@ -2236,6 +2236,9 @@ msgstr ""
 msgid "Continue with %(provider)s"
 msgstr ""
 
+msgid "Enter the code from your authenticator app"
+msgstr ""
+
 msgid "or sign in with your password"
 msgstr ""
 

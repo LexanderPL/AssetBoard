@@ -332,11 +332,23 @@ workspace, without affecting any other workspace or external sign-in method.
 - A user can regenerate recovery codes after confirming their password and a current TOTP or
   unused recovery code. Invalidate every previous code atomically, show the new set once, and
   audit the action without code data.
-- Enabled TOTP is checked with the password at `/login` and `/login/local`, in one form; no
-  session is issued until both factors pass. Invalid codes get the generic sign-in failure.
+- Password sign-in is two steps for accounts with enabled TOTP: `/login` and `/login/local`
+  first accept email and password only. A correct password creates no session; it issues a
+  five-minute, single-use ticket whose random value is held in an HttpOnly, SameSite=Lax cookie
+  and whose SHA-256 hash and server-side state are stored in the database. The next page asks
+  for an authenticator or recovery code. The ticket remains valid after a wrong code so the user
+  can retry until success or expiry. Accounts
+  without enabled TOTP still sign in after the password step. OIDC and proxy sign-in are unchanged.
+  The emergency `/login/local` flow uses the same two steps and still refuses non-administrators.
+  Invalid codes get the generic sign-in failure. Password-hash upgrades are prepared after the
+  password check and applied only when the second factor succeeds.
   Password-confirmed linking by email (`/login/link`) also needs the factor to prevent a bypass.
   Already-linked OIDC and proxy sign-ins skip local TOTP (the IdP's responsibility).
-- Sign-in code attempts share the existing account/address reservation and backoff. Enrollment
+- The first code submission uses the sign-in reservation made by the password step. Further code
+  retries on that ticket reserve another sign-in attempt each, so wrong codes count with wrong
+  passwords in the same account/address throttle. A successful first code submission releases the
+  password step's address reservation; a successful retry releases its own address reservation,
+  while earlier failed attempts remain counted. Enrollment
   has a separate per-user bucket with the same free attempts, window and backoff, counted
   independently of password-confirmation successes and enrollment restarts.
 - An owner can enable `Workspace.require_two_factor` (default false) in workspace settings.

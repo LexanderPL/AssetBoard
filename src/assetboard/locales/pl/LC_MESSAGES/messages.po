@@ -2420,6 +2420,9 @@ msgstr "Kontynuuj jako %(user)s"
 msgid "Continue with %(provider)s"
 msgstr "Kontynuuj przez %(provider)s"
 
+msgid "Enter the code from your authenticator app"
+msgstr "Wpisz kod z aplikacji uwierzytelniającej"
+
 msgid "or sign in with your password"
 msgstr "lub zaloguj się hasłem"
 

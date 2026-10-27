@@ -28,7 +28,9 @@ from assetboard.services.auth import (
     WebSession,
     authenticate_user_async,
     change_password_async,
+    complete_login_ticket,
     create_session_for,
+    login_ticket_is_active,
     revoke_other_sessions,
     revoke_session,
     run_initial_setup_async,
@@ -43,15 +45,18 @@ from assetboard.web.confirm import confirm_view, refusal, run_confirmed
 from assetboard.web.errors import error_response, is_htmx_fragment_request
 from assetboard.web.rendering import render_template
 from assetboard.web.security import (
+    clear_cookie,
     clear_csrf_cookie,
     clear_session_cookie,
     client_host,
+    login_ticket_cookie_name,
     oidc_start_url,
     proxy_request,
     proxy_start_url,
     require_csrf,
     safe_next,
     session_cookie_name,
+    set_login_ticket_cookie,
     set_session_cookie,
     web_session,
 )
@@ -132,6 +137,7 @@ def signed_in_redirect(
     set_session_cookie(
         response, state.settings, session_id, expires_at=expires_at, now=state.clock.now()
     )
+    clear_cookie(response, state.settings, login_ticket_cookie_name(state.settings))
     # The anonymous CSRF secret belongs to the signed-out page; rotate it away.
     clear_csrf_cookie(response, state.settings)
     return response
@@ -332,6 +338,7 @@ async def _login_page(
     throttled_until: datetime | None = None,
     status: int = 200,
     break_glass: bool = False,
+    second_factor_step: bool = False,
 ) -> Response:
     state = _state(request)
     settings = state.settings
@@ -357,6 +364,8 @@ async def _login_page(
             "password_login": password_login,
             "forgot_password": not break_glass and password_reset_available(settings),
             "form_action": "login_local" if break_glass else "login",
+            "second_factor_step": second_factor_step,
+            "factor_form_action": "login_local_verify" if break_glass else "login_verify",
             "oidc_provider": settings.oidc_provider_name if oidc else None,
             "oidc_start_url": oidc_start_url(safe_next(next_path, default="")) if oidc else None,
             # Shown only when the trusted proxy presents a user right now (ADR-0015).
@@ -383,7 +392,6 @@ async def _password_sign_in(
     next_path: str,
     *,
     break_glass: bool,
-    second_factor: str = "",
 ) -> Response:
     state = _state(request)
     if len(email) > MAX_EMAIL_LENGTH or len(password) > MAX_PASSWORD_LENGTH:
@@ -408,8 +416,14 @@ async def _password_sign_in(
         user_agent=_user_agent(request),
         existing_session_id=existing,
         require_instance_admin=break_glass,
-        second_factor=second_factor,
+        next_path=safe_next(next_path, default="/"),
+        issue_login_ticket=True,
     )
+    if outcome.login_ticket is not None:
+        target = request.url_for("login_local_factor" if break_glass else "login_factor").path
+        response = RedirectResponse(target, status_code=303)
+        set_login_ticket_cookie(response, state.settings, outcome.login_ticket)
+        return response
     if not outcome.succeeded or outcome.session_id is None:
         # Throttled attempts keep the 401 that log-based tools count (ADR-0012), plus a
         # Retry-After; the page says how long to wait.
@@ -439,13 +453,10 @@ async def login_submit(
     email: FormStr = "",
     password: FormStr = "",
     next: FormStr = "",  # noqa: A002
-    second_factor: FormStr = "",
 ) -> Response:
     if _state(request).settings.oidc_only:
         raise HTTPException(status_code=404)
-    return await _password_sign_in(
-        request, email, password, next, break_glass=False, second_factor=second_factor
-    )
+    return await _password_sign_in(request, email, password, next, break_glass=False)
 
 
 # Break-glass password sign-in for instance administrators under OIDC_ONLY (ADR-0014). Not
@@ -472,12 +483,88 @@ async def login_local_submit(
     email: FormStr = "",
     password: FormStr = "",
     next: FormStr = "",  # noqa: A002
-    second_factor: FormStr = "",
 ) -> Response:
     _require_break_glass(request)
-    return await _password_sign_in(
-        request, email, password, next, break_glass=True, second_factor=second_factor
+    return await _password_sign_in(request, email, password, next, break_glass=True)
+
+
+async def _login_factor_page(request: Request, *, break_glass: bool = False) -> Response:
+    if break_glass:
+        _require_break_glass(request)
+    state = _state(request)
+    ticket = request.cookies.get(login_ticket_cookie_name(state.settings), "")
+    active = await run_in_threadpool(
+        login_ticket_is_active,
+        state.session_factory,
+        ticket=ticket,
+        clock=state.clock,
+        require_instance_admin=break_glass,
     )
+    if not active:
+        target = "login_local" if break_glass else "login"
+        return RedirectResponse(request.url_for(target).path, status_code=303)
+    return await _login_page(request, break_glass=break_glass, second_factor_step=True)
+
+
+@router.get("/login/verify", name="login_factor")
+async def login_factor_form(request: Request) -> Response:
+    return await _login_factor_page(request)
+
+
+@router.get("/login/local/verify", name="login_local_factor")
+async def login_local_factor_form(request: Request) -> Response:
+    return await _login_factor_page(request, break_glass=True)
+
+
+async def _verify_login_ticket(request: Request, code: str, *, break_glass: bool) -> Response:
+    state = _state(request)
+    token = request.cookies.get(login_ticket_cookie_name(state.settings), "")
+    existing = request.cookies.get(session_cookie_name(state.settings))
+    outcome = await run_in_threadpool(
+        complete_login_ticket,
+        state.session_factory,
+        ticket=token,
+        code=code,
+        settings=state.settings,
+        clock=state.clock,
+        host=client_host(request),
+        user_agent=_user_agent(request),
+        existing_session_id=existing,
+        require_instance_admin=break_glass,
+    )
+    if not outcome.succeeded or outcome.session_id is None:
+        response = await _login_page(
+            request,
+            error=outcome.throttled_until is None,
+            throttled_until=outcome.throttled_until,
+            status=401,
+            break_glass=break_glass,
+            second_factor_step=(outcome.ticket_retryable or outcome.throttled_until is not None),
+        )
+        if outcome.throttled_until is None and not outcome.ticket_retryable:
+            clear_cookie(response, state.settings, login_ticket_cookie_name(state.settings))
+        wait = retry_after(outcome.throttled_until, state.clock.now())
+        if wait is not None:
+            response.headers["Retry-After"] = wait
+        return response
+    expires_at = await run_in_threadpool(session_expiry, state.session_factory, outcome.session_id)
+    if expires_at is None:
+        raise RuntimeError("Session disappeared right after two-factor sign-in")
+    response = signed_in_redirect(
+        request, safe_next(outcome.next_path or "/"), outcome.session_id, expires_at
+    )
+    return response
+
+
+@router.post("/login/verify", name="login_verify")
+async def login_factor_submit(request: Request, second_factor: FormStr = "") -> Response:
+    return await _verify_login_ticket(request, second_factor, break_glass=False)
+
+
+@router.post("/login/local/verify", name="login_local_verify")
+async def login_local_factor_submit(request: Request, second_factor: FormStr = "") -> Response:
+    _require_break_glass(request)
+    return await _verify_login_ticket(request, second_factor, break_glass=True)
 
 
 @router.post("/logout", name="logout")
