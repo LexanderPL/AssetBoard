@@ -51,9 +51,12 @@ Each code can replace the authenticator code for one sign-in. Store them separat
 password. The enrollment code has already been used; wait for the next code before signing in
 on another device.
 
-After enrollment, enter your password and an authenticator or recovery code on the sign-in
-form, including the emergency local administrator login. Missing, invalid, expired or reused
-codes show the same generic failure as an incorrect password; code attempts are throttled.
+After enrollment, enter your email and password on the first sign-in page. If two-factor
+authentication is enabled, the next page asks for a code from your authenticator app or a
+recovery code. A wrong or expired code shows the same generic failure as an incorrect password;
+the ticket expires after five minutes and you can retry while it is valid. Attempts use the same
+sign-in throttle as incorrect passwords. The emergency local administrator login uses the same
+two steps.
 When linking a new identity provider or proxy identity by email during sign-in, enter the code
 alongside the existing account's password too. Already-linked external sign-ins rely on their
 provider's MFA instead. Accounts without passwords configure MFA at their identity provider.

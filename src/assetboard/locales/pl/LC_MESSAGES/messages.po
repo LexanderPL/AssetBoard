@@ -2442,6 +2442,9 @@ msgstr "Pozostaw puste, jeśli uwierzytelnianie dwuskładnikowe nie jest włącz
 msgid "Link and sign in"
 msgstr "Połącz i zaloguj się"
 
+msgid "Enter the code from your authenticator app"
+msgstr "Wpisz kod z aplikacji uwierzytelniającej"
+
 #, python-format
 msgid "Continue as %(user)s"
 msgstr "Kontynuuj jako %(user)s"

@@ -232,6 +232,30 @@ class AuthThrottle(Base):
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
 
 
+class LoginTicket(Base):
+    """Short-lived password-verified, second-factor-pending sign-in."""
+
+    __tablename__ = "login_tickets"
+    __table_args__ = (
+        CheckConstraint("length(token_hash) = 64", name="token_hash_sha256_length"),
+        Index("ix_login_tickets_expires_at", "expires_at"),
+    )
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
+    replacement_password_hash: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    next_path: Mapped[str] = mapped_column(String(512), nullable=False, default="/")
+    ip_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    ip_window_started_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
+    ip_block_set: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    code_attempted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    require_instance_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
+
+
 class SetupState(Base):
     """Singleton row serializing first-run setup across concurrent requests."""
 

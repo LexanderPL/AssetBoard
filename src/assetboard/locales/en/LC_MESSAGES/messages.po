@@ -2254,6 +2254,9 @@ msgstr ""
 msgid "Link and sign in"
 msgstr ""
 
+msgid "Enter the code from your authenticator app"
+msgstr ""
+
 #, python-format
 msgid "Continue as %(user)s"
 msgstr ""
