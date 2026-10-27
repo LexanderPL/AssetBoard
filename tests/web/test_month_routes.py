@@ -56,14 +56,12 @@ def test_the_current_month_is_judged_in_the_workspace_time_zone(months: OwnerApp
     assert months.client.get("/m", follow_redirects=False).headers["location"] == "/m/2026-10"
 
 
-def test_a_month_page_links_its_neighbours_and_today(months: OwnerApp) -> None:
+def test_a_month_page_links_its_neighbours_and_has_a_month_picker(months: OwnerApp) -> None:
     page = _page(months, "/m/2026-09")
     assert "<h1" in page and "September 2026" in page
     assert _href(page, "data-month-prev") == "/m/2026-08"
     assert _href(page, "data-month-next") == "/m/2026-10"
-    assert _href(page, "data-month-today") == "/m/2026-10"
-    assert 'data-month-today aria-current="date"' not in page
-    assert 'data-month-today aria-current="date"' in _page(months, "/m/2026-10")
+    assert "data-month-picker" in page and "data-month-today" not in page
 
 
 @pytest.mark.parametrize(
@@ -109,7 +107,7 @@ def test_empty_and_future_months_render(months: OwnerApp) -> None:
         assert 'id="month-summary"' in page and "No expenses yet this month" in page
         # F2.7: a pure summary, no entry form and no transaction tables.
         assert 'id="ledger"' not in page and "data-entry-form" not in page
-        assert f'href="/transactions/{month}"' in page  # "Enter transactions"
+        assert "Enter transactions" not in page
         page = _page(months, f"/transactions/{month}")
         assert "No expenses in this month." in page and "No income in this month." in page
 
@@ -120,17 +118,18 @@ def test_the_month_name_follows_the_language(months: OwnerApp) -> None:
     # Capitalised only as a heading and title; CLDR's lowercase form in running text.
     heading = re.search(r"<h1[^>]*>\s*([^<]+?)\s*<", page)
     assert heading is not None and heading.group(1) == "Październik 2026"
-    assert "<title>Październik 2026 · " in page and "Dzisiaj" in page
+    assert "<title>Październik 2026 · " in page
     assert 'aria-label="Następny miesiąc: listopad 2026"' in page
     assert 'aria-label="Poprzedni miesiąc: wrzesień 2026"' in page
     assert 'data-confirm="Zamknąć miesiąc październik 2026? ' in page
-    assert 'placeholder="RRRR-MM"' in page
+    assert 'name="month_month"' in page and 'name="month_year"' in page
+    assert "data-month-picker" in page
     _close(months, "2026-10")
     assert 'data-confirm="Otworzyć ponownie miesiąc październik 2026? ' in _page(
         months, "/m/2026-10"
     )
     months.client.headers["Accept-Language"] = "en"
-    assert 'placeholder="YYYY-MM"' in _page(months, "/m/2026-09")
+    assert 'name="month_year"' in _page(months, "/m/2026-09")
 
 
 def test_the_nav_month_link_shows_on_every_signed_in_page(months: OwnerApp) -> None:
@@ -150,14 +149,16 @@ def test_the_nav_month_link_points_to_the_current_month(months: OwnerApp) -> Non
 # The month picker (no JavaScript needed)
 
 
-def test_the_picker_is_a_plain_get_form_with_a_native_month_input(months: OwnerApp) -> None:
+def test_the_picker_is_an_in_app_month_and_year_form(months: OwnerApp) -> None:
     page = _page(months, "/m/2026-09")
-    form = re.search(
-        r"<form method=\"get\" action=\"/m\"[^>]*data-month-picker>.*?</form>", page, re.S
-    )
+    form = re.search(r"<details[^>]*data-month-picker>.*?</details>", page, re.S)
     assert form is not None
-    assert 'type="month"' in form.group(0) and 'value="2026-09"' in form.group(0)
+    assert 'method="get" action="/m"' in form.group(0)
+    assert 'name="month_month"' in form.group(0) and 'value="9" selected' in form.group(0)
+    assert 'name="month_year"' in form.group(0) and 'value="2026"' in form.group(0)
     assert 'name="from" value="2026-09"' in form.group(0) and 'type="submit"' in form.group(0)
+    assert 'type="month"' not in form.group(0)
+    assert "Clear" not in form.group(0) and "Today" not in form.group(0)
 
 
 @pytest.mark.parametrize(
@@ -167,6 +168,13 @@ def test_the_picker_is_a_plain_get_form_with_a_native_month_input(months: OwnerA
 def test_the_picker_goes_to_the_chosen_month(months: OwnerApp, value: str, location: str) -> None:
     response = months.client.get(f"/m?month={value}&from=2026-09", follow_redirects=False)
     assert (response.status_code, response.headers["location"]) == (303, location)
+
+
+def test_the_month_year_picker_goes_to_the_chosen_month(months: OwnerApp) -> None:
+    response = months.client.get(
+        "/m?month_month=3&month_year=2026&from=2026-09", follow_redirects=False
+    )
+    assert (response.status_code, response.headers["location"]) == (303, "/m/2026-03")
 
 
 @pytest.mark.parametrize(

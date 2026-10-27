@@ -86,7 +86,12 @@ async def transactions_current(
 ) -> Response:
     """Today's month (303); the month chosen in the picker (``?month=...``, 303); or, with any
     of F2.6's filter parameters, the History page with the same filters (302)."""
-    if any(name in request.query_params for name in HISTORY_PARAMS) and month is None:
+    has_picker_selection = month_month is not None or month_year is not None
+    if (
+        any(name in request.query_params for name in HISTORY_PARAMS)
+        and month is None
+        and not has_picker_selection
+    ):
         return _to(request, "history", _known(request, HISTORY_PARAMS), 302)
     if month is None and (month_month is not None or month_year is not None):
         try:

@@ -260,6 +260,23 @@ def test_the_export_options_are_a_dialog_behind_a_header_button(
     assert " open" in _export_dialog(refused) and "data-export-error" in refused
 
 
+def test_search_stays_visible_while_filters_and_category_changes_are_collapsed(
+    ledger: OwnerApp, rows: dict
+) -> None:
+    html = _page(ledger)
+    search = re.search(r'<form id="history-search".*?</form>', html, re.DOTALL)
+    assert search is not None and "data-live-search" in search.group(0)
+    assert 'type="search"' in search.group(0) and 'name="q"' in search.group(0)
+    filters = re.search(r"<details[^>]*data-history-filters[^>]*>", html)
+    assert filters is not None and " open" not in filters.group(0)
+    assert html.index('id="history-search"') < html.index("data-history-filters")
+
+    bulk_button = re.search(r"<a[^>]*data-bulk-open[^>]*>.*?</a>", html, re.DOTALL)
+    bulk_dialog = re.search(r'<dialog id="bulk-dialog"[^>]*>', html)
+    assert bulk_button is not None and "Change category" in bulk_button.group(0)
+    assert bulk_dialog is not None and " open" not in bulk_dialog.group(0)
+
+
 def test_the_export_form_carries_the_filters(ledger: OwnerApp, rows: dict) -> None:
     html = _page(ledger, f"?q=a&category={rows['food']}&sort=amount&page=1")
     match = re.search(r"<form method=\"get\" action=\"/history/export.csv\".*?</form>", html,

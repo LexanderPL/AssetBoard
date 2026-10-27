@@ -197,7 +197,6 @@ def test_roles_validation_and_tenant_isolation(team):
     for changed in (
         replace(values, name=""),
         replace(values, amount=Money(1, "PLN")),
-        replace(values, direction=TransactionDirection.INCOME),
     ):
         with pytest.raises(ValueError):
             scheduled.save_item(team.factory, ctx, changed, settings)
@@ -517,16 +516,15 @@ def test_one_time_item_is_created_normalised_and_regenerated_on_a_date_edit(team
     assert not view.done
 
 
-def test_one_time_item_waits_for_the_horizon_and_follows_include_past(team):
+def test_one_time_item_is_materialized_immediately_and_past_needs_opt_in(team):
     ctx = team.ctx("owner", "owner")
     settings = Settings(_env_file=None).model_copy(update={"recurrence_horizon_months": 2})
     later = scheduled.save_item(
         team.factory, ctx, data(team, rule=one_time(date(2026, 6, 1))), settings
     )
-    assert rows(team, later) == []
-    april = FixedClock("2026-04-01T12:00:00+00:00")  # 1 June is inside the horizon now
-    assert scheduled.generate_workspace(team.factory, ctx, april, settings) == 1
     assert [row.due_date for row in rows(team, later)] == [date(2026, 6, 1)]
+    april = FixedClock("2026-04-01T12:00:00+00:00")
+    assert scheduled.generate_workspace(team.factory, ctx, april, settings) == 0
     past = data(team, rule=one_time(date(2026, 2, 10)))
     skipped = scheduled.save_item(team.factory, ctx, past, settings)
     assert rows(team, skipped) == []

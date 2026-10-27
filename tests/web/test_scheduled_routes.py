@@ -14,7 +14,6 @@ def form(owner, **overrides):
     assert category
     return {
         "name": "Car insurance",
-        "direction": "expense",
         "category_id": category.group(1),
         "amount": "1800",
         "amount_mode": "estimate",
@@ -26,6 +25,13 @@ def form(owner, **overrides):
         "weekend_policy": "none",
         **overrides,
     }
+
+
+def test_category_picker_groups_expense_and_income_categories_without_direction(owner):
+    page = owner.client.get("/recurring/new").text
+    assert 'name="direction"' not in page
+    assert '<optgroup label="Expense categories">' in page
+    assert '<optgroup label="Income categories">' in page
 
 
 def test_crud_preview_pause_resume_archive_and_delete(owner):

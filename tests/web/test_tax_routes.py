@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from assetboard.db.models.identity import User
+
 
 def test_tax_rule_crud_versions_and_calculator_preview(owner):
     data = {
@@ -123,3 +125,24 @@ def test_the_new_tax_rule_form_is_collapsed_until_it_fails(owner):
                                    "rate_percent": "x"})  # fmt: skip
     assert failed.headers["location"].endswith("&form=new-rule")
     assert "data-new-tax-rule open>" in owner.client.get(failed.headers["location"]).text
+
+
+def test_the_rates_warning_can_be_dismissed_for_the_account(owner):
+    rules = owner.client.get("/taxes").text
+    calculator = owner.client.get("/taxes/calculator?net=100&day=2026-01-01&record_as=net").text
+    assert "Rates are entered by you" in rules and "Rates are entered by you" in calculator
+
+    response = owner.post(
+        "/taxes/warning/dismiss",
+        {"return_to": "calculator", "net": "100", "day": "2026-01-01", "record_as": "net"},
+        token_from="/taxes",
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == (
+        "/taxes/calculator?net=100&day=2026-01-01&record_as=net"
+    )
+    assert "Rates are entered by you" not in owner.client.get("/taxes").text
+    assert "Rates are entered by you" not in owner.client.get(response.headers["location"]).text
+    with owner.db() as session:
+        user = session.get(User, owner.admin_id)
+        assert user is not None and user.tax_warning_dismissed

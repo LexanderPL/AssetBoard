@@ -4,6 +4,7 @@ delete and undo, autocomplete, closed months, roles, HTMX fragments and plain fo
 from __future__ import annotations
 
 import re
+from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -13,6 +14,7 @@ from sqlalchemy import select
 
 from assetboard.clock import FixedClock
 from assetboard.db.models.ledger import Category, Transaction
+from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.i18n import gettext
 from assetboard.web.ledger import FIELD_ERRORS, KIND_MISMATCH
 from tests.conftest import OwnerApp
@@ -157,15 +159,38 @@ def test_a_category_less_table_links_the_categories_page(ledger: OwnerApp) -> No
 # Adding
 
 
-def test_a_day_number_is_saved_in_the_viewed_month(ledger: OwnerApp) -> None:
+def test_a_future_day_number_creates_a_one_time_plan_immediately(ledger: OwnerApp) -> None:
     food = _category(ledger, "Food")
     response = _add(ledger, _form(food, "31", "12,5"), "/m/2026-12")
     assert response.headers["location"] == (
-        "/transactions/2026-12?notice=transaction_added&entry=expense&day=31#ledger-expense"
+        "/transactions/2026-12?notice=planned&entry=expense&day=31#ledger-expense"
     )
-    (row,) = _rows(ledger)
-    assert (str(row.date), row.amount_minor, row.currency) == ("2026-12-31", 1250, "EUR")
-    assert "Entry added." in _page(ledger, "/transactions/2026-12?notice=transaction_added")
+    assert _rows(ledger) == []
+    with ledger.db() as session:
+        item = session.scalars(select(ScheduledItem)).one()
+        occurrence = session.scalars(select(ScheduledOccurrence)).one()
+        assert (item.freq, item.start_date, item.amount_minor, item.category_id) == (
+            "once",
+            date(2026, 12, 31),
+            1250,
+            food,
+        )
+        assert occurrence.status == "pending" and occurrence.due_date == date(2026, 12, 31)
+    page = _page(ledger, "/transactions/2026-12?notice=planned")
+    assert "Planned transaction saved." in page
+    assert "data-entry-plan" in page and "data-entry-add" in page
+    assert "data-pending-occurrence" in page and "Confirm" in page
+    assert "Cancel" in page and "data-details-close" in page
+    assert 'action="/recurring/' in page and ">Delete</button>" in page
+    response = ledger.post(
+        f"/recurring/{item.id}/delete",
+        {"return_month": "2026-12"},
+        token_from="/transactions/2026-12",
+    )
+    assert response.status_code == 303 and response.headers["location"] == "/transactions/2026-12"
+    with ledger.db() as session:
+        assert session.get(ScheduledItem, item.id) is None
+        assert session.scalars(select(ScheduledOccurrence)).all() == []
 
 
 def test_htmx_add_returns_the_section_with_a_new_entry_row_keeping_the_day(
@@ -192,10 +217,10 @@ def test_htmx_add_returns_the_section_with_a_new_entry_row_keeping_the_day(
     assert "HX-Request" in response.headers["Vary"]
 
 
-def test_a_full_date_in_another_month_is_saved_there_and_linked(ledger: OwnerApp) -> None:
+def test_past_date_is_saved_there_and_future_date_is_planned(ledger: OwnerApp) -> None:
     food = _category(ledger, "Food")
     response = _add(ledger, _form(food, "07.09.2026"))
-    location = f"{PAGE}?saved_in=2026-09&entry=expense&day=07.09.2026#ledger-expense"
+    location = "/transactions/2026-09?saved_in=2026-09&entry=expense&day=07.09.2026#ledger-expense"
     assert response.headers["location"] == location
     page = _page(ledger, f"{PAGE}?saved_in=2026-09")
     assert (
@@ -203,9 +228,13 @@ def test_a_full_date_in_another_month_is_saved_there_and_linked(ledger: OwnerApp
         "Entry saved in September 2026.</a>" in page
     )
     assert _descriptions(page, "expense") == []
-    html = _htmx(ledger, f"{MONTH}/transactions", _form(food, "2026-11-02")).text
-    assert '<a href="/transactions/2026-11"' in html and "Entry saved in November 2026." in html
-    assert [str(r.date) for r in _rows(ledger)] == ["2026-09-07", "2026-11-02"]
+    response = _htmx(ledger, f"{MONTH}/transactions", _form(food, "2026-11-02"))
+    assert response.status_code == 303
+    assert response.headers["hx-redirect"] == "/transactions/2026-11?notice=planned"
+    assert [str(r.date) for r in _rows(ledger)] == ["2026-09-07"]
+    with ledger.db() as session:
+        occurrence = session.scalars(select(ScheduledOccurrence)).one()
+        assert occurrence.status == "pending" and occurrence.due_date == date(2026, 11, 2)
 
 
 @pytest.mark.parametrize(

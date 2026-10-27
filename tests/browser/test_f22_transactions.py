@@ -20,6 +20,7 @@ from playwright.sync_api import Page, expect, sync_playwright
 from sqlalchemy import select
 
 from assetboard.app import create_app
+from assetboard.clock import FixedClock
 from assetboard.config import Settings
 from assetboard.db.models.identity import Membership, User, Workspace
 from assetboard.services.auth import argon2_hash
@@ -119,6 +120,31 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
             # Setup gave the workspace the suggested categories (pre-release A).
             page.goto(f"{base}/categories")
             expect(page.locator("li[data-category]").first).to_be_visible()
+
+            # A future date switches Add to Plan; Plan creates the pending item immediately.
+            clock = FixedClock("2026-10-14T00:30:00+00:00")
+            app.state.clock = clock
+            app.state.session_factory.configure(info={"clock": clock})
+            page.goto(f"{base}/transactions/2027-03")
+            planned_day = page.locator("#entry-expense-day")
+            planned_day.fill("2027-03-07")
+            expect(page.locator("[data-entry-plan]")).to_be_visible()
+            expect(page.locator("[data-entry-add]")).to_be_hidden()
+            page.locator("#entry-expense-amount").fill("40")
+            page.locator("#entry-expense-description").fill("Future gift")
+            page.locator("#entry-expense-category").select_option(label="Food")
+            page.locator("[data-entry-plan]").click()
+            pending = page.locator("[data-pending-occurrence]")
+            expect(pending).to_contain_text("Future gift")
+            editor = pending.locator("details")
+            editor.locator("summary").click()
+            expect(editor.locator("[data-details-close]")).to_be_visible()
+            editor.locator("[data-details-close]").click()
+            expect(editor).not_to_have_attribute("open", "")
+            editor.locator("summary").click()
+            editor.locator("form").get_by_role("button", name="Confirm").click()
+            expect(page.locator("#ledger-expense [data-description]")).to_have_text(["Future gift"])
+            expect(page.locator("[data-pending-occurrence]")).to_have_count(0)
 
             page.goto(f"{base}/transactions/{MONTH}")
             day = page.locator("#entry-expense-day")
