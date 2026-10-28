@@ -1274,6 +1274,12 @@ msgstr ""
 msgid "Too late to undo: the entry stays deleted."
 msgstr ""
 
+msgid "This occurrence is no longer pending."
+msgstr ""
+
+msgid "Only a one-time planned entry can be deleted here."
+msgstr ""
+
 msgid "This category no longer exists. It may have been deleted elsewhere."
 msgstr ""
 
@@ -1700,9 +1706,6 @@ msgstr ""
 msgid "This month is closed. Reopen it or choose a date in an open month."
 msgstr ""
 
-msgid "This occurrence is no longer pending."
-msgstr ""
-
 msgid "This occurrence has no transaction to undo."
 msgstr ""
 
@@ -1713,9 +1716,6 @@ msgid "The occurrence category is unavailable; edit the recurring rule."
 msgstr ""
 
 msgid "Check the amount and date, then try again."
-msgstr ""
-
-msgid "Only a one-time planned entry can be deleted here."
 msgstr ""
 
 msgid "Choose a valid direction."

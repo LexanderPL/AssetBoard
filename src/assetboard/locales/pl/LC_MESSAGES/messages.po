@@ -1354,6 +1354,12 @@ msgstr "Ten wpis już nie istnieje. Mógł zostać usunięty gdzie indziej."
 msgid "Too late to undo: the entry stays deleted."
 msgstr "Za późno na cofnięcie: wpis pozostaje usunięty."
 
+msgid "This occurrence is no longer pending."
+msgstr "To wystąpienie nie jest już oczekujące."
+
+msgid "Only a one-time planned entry can be deleted here."
+msgstr "Tutaj można usunąć tylko jednorazowy zaplanowany wpis."
+
 msgid "This category no longer exists. It may have been deleted elsewhere."
 msgstr "Ta kategoria już nie istnieje. Mogła zostać usunięta gdzie indziej."
 
@@ -1836,9 +1842,6 @@ msgstr ""
 "Ten miesiąc jest zamknięty. Otwórz go ponownie lub wybierz datę w "
 "otwartym miesiącu."
 
-msgid "This occurrence is no longer pending."
-msgstr "To wystąpienie nie jest już oczekujące."
-
 msgid "This occurrence has no transaction to undo."
 msgstr "To wystąpienie nie ma transakcji, którą można cofnąć."
 
@@ -1850,9 +1853,6 @@ msgstr "Kategoria wystąpienia jest niedostępna; edytuj regułę cykliczną."
 
 msgid "Check the amount and date, then try again."
 msgstr "Sprawdź kwotę i datę, a następnie spróbuj ponownie."
-
-msgid "Only a one-time planned entry can be deleted here."
-msgstr "Tutaj można usunąć tylko jednorazowy zaplanowany wpis."
 
 msgid "Choose a valid direction."
 msgstr "Wybierz prawidłowy kierunek."
