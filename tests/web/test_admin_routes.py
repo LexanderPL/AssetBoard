@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 
+from assetboard.clock import FixedClock
 from assetboard.db.models.identity import (
     AuditEvent,
     ExternalIdentity,
@@ -149,6 +150,8 @@ def test_a_throttled_admin_confirmation_says_how_long_to_wait(h: Harness) -> Non
     add_user(h, OLA)
     target = user_id(h, OLA)
     client = admin(h)
+    # Freeze the app clock so the wait the route computes is exactly 60, not 59 after a slow run.
+    h.app.state.clock = FixedClock(h.app.state.clock.now().isoformat())
     free = h.app.state.settings.auth_account_free_failures
     wrong = [act(h, client, target, "deactivate", "wrong password") for _ in range(free + 1)]
     right = act(h, client, target, "deactivate")
