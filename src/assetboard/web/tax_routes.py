@@ -96,6 +96,15 @@ def _redirect(request: Request, error: str | None = None, form: str | None = Non
     return RedirectResponse(target + ("?" + urlencode(query) if query else ""), status_code=303)
 
 
+@router.post("/taxes/warning/dismiss", name="tax_warning_dismiss")
+async def dismiss_warning(request: Request, ctx: CurrentContext) -> Response:
+    """Close the tax pages' warning for this account; back to the page the button was on."""
+    values = await _values(request)
+    await run_in_threadpool(taxes.dismiss_warning, request.app.state.session_factory, ctx.user.id)
+    route = "tax_calculator" if values.get("page") == "calculator" else "tax_rules"
+    return RedirectResponse(request.url_for(route).path, status_code=303)
+
+
 @router.get("/taxes", name="tax_rules")
 async def rules_page(request: Request, ctx: CurrentContext) -> Response:
     rows = await run_in_threadpool(taxes.list_rules, request.app.state.session_factory, ctx)

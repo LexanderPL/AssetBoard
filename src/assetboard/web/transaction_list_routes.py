@@ -66,6 +66,7 @@ from assetboard.services.transaction_search import (
     search_transactions,
 )
 from assetboard.web.context import CurrentContext
+from assetboard.web.errors import is_htmx_fragment_request
 from assetboard.web.rendering import render_template, scoped_url
 from assetboard.web.security import require_csrf
 
@@ -278,6 +279,8 @@ async def _list_page(
     export_values: Mapping[str, Any] | None = None,
     export_error: str = "",
     export_open: bool = False,
+    filters_open: bool = False,
+    bulk_open: bool = False,
     status_code: int = 200,
 ) -> Response:
     factory = request.app.state.session_factory
@@ -320,14 +323,20 @@ async def _list_page(
         "state_fields": current,
         "filter_fields": pairs,
         "list_url": _list_url(request, current),
+        "search_url": scoped_url(request, "history"),
+        "search_fields": [(name, value) for name, value in pairs if name not in {"q", "page"}],
+        "filters_url": _list_url(request, [*current, ("filters", "1")]) + "#filters-dialog",
+        "bulk_url": _list_url(request, [*current, ("bulk", "1")]) + "#bulk-dialog",
         "notice": notice,
         "bulk_error": bulk_error,
         "bulk_values": bulk_values or {},
+        "bulk_open": bulk_open or bool(bulk_error),
         "export_values": export_values or {"guard": FORMULA_GUARD_DEFAULT},
         "export_error": export_error,
         # The export options are a dialog opened by the header's "Export CSV" button (app.js);
         # without JavaScript the button links to ?export=1, which renders the dialog open.
         "export_open": export_open or bool(export_error),
+        "filters_open": filters_open or (bool(errors) and not is_htmx_fragment_request(request)),
         "export_url": _list_url(request, [*current, ("export", "1")]) + "#export-dialog",
         "max_text": MAX_SEARCH_TEXT_LENGTH,
         # Read at request time: the cap is a module constant tests may lower.
@@ -356,7 +365,19 @@ async def history_page(request: Request, ctx: CurrentContext) -> Response:
             request.state.locale,
         ) % {"num": count}
     export_open = _text(params, "export", 1) == "1"
-    return await _list_page(request, ctx, raw, sort, page, notice=notice, export_open=export_open)
+    filters_open = _text(params, "filters", 1) == "1"
+    bulk_open = _text(params, "bulk", 1) == "1"
+    return await _list_page(
+        request,
+        ctx,
+        raw,
+        sort,
+        page,
+        notice=notice,
+        export_open=export_open,
+        filters_open=filters_open,
+        bulk_open=bulk_open,
+    )
 
 
 # Export

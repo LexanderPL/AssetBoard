@@ -27,7 +27,7 @@ from starlette.responses import RedirectResponse, Response
 from assetboard.db.repositories import NotFound
 from assetboard.domain.months import InvalidMonth, YearMonth
 from assetboard.i18n import gettext
-from assetboard.i18n.dates import format_day, format_month, format_month_heading
+from assetboard.i18n.dates import format_day, format_month, format_month_heading, month_names
 from assetboard.services.budget import CopyResult, auto_copy_on_open
 from assetboard.services.context import Context
 from assetboard.services.income import missing_work_logs
@@ -79,10 +79,15 @@ NOTICES = {
     "transaction_saved": _("Entry saved."),
     "transaction_restored": _("Entry restored."),
     "outside_filter": _("Entry saved. Its category is not shown while this filter is on."),
+    "planned": _("Entry planned."),
+    "outside_filter_planned": _(
+        "Entry planned. Its category is not shown while this filter is on."
+    ),
     "plan_saved": _("Planned value saved."),
     "plan_removed": _("Planned value removed."),
 }
 SAVED_IN = _("Entry saved in %(month)s.")
+PLANNED_IN = _("Entry planned in %(month)s.")
 
 
 def _t(request: Request, message: str) -> str:
@@ -131,6 +136,14 @@ def month_header(
     the F3.5 missing-work-log banner."""
     view = get_month(request.app.state.session_factory, ctx, target)
     locale = request.state.locale
+    raw_year = request.query_params.get("picker_year", "")
+    picker_open = (
+        len(raw_year) == 4
+        and raw_year.isascii()
+        and raw_year.isdigit()
+        and 1900 <= int(raw_year) <= 2199
+    )
+    picker_year = int(raw_year) if picker_open else view.month.year
     closed_on = None
     if view.closed_at is not None:
         local = view.closed_at.astimezone(ZoneInfo(ctx.workspace.timezone)).date()
@@ -141,6 +154,9 @@ def month_header(
         "month_name": format_month(view.month, locale),  # in sentences (confirmations)
         "prev_name": format_month(view.prev, locale) if view.prev else None,
         "next_name": format_month(view.next, locale) if view.next else None,
+        "picker_open": picker_open,
+        "picker_year": picker_year,
+        "month_names": month_names(locale),
         "closed_on": closed_on,
         "notice": _t(request, NOTICES[notice]) if notice in NOTICES else None,
         "notice_href": None,

@@ -1211,6 +1211,11 @@ msgstr ""
 msgid "Use at most %(max)d characters."
 msgstr ""
 
+msgid ""
+"Add a description. A planned entry becomes a recurring item, so it needs "
+"a name."
+msgstr ""
+
 msgid "Choose a category."
 msgstr ""
 
@@ -1296,6 +1301,12 @@ msgstr ""
 msgid "Entry saved. Its category is not shown while this filter is on."
 msgstr ""
 
+msgid "Entry planned."
+msgstr ""
+
+msgid "Entry planned. Its category is not shown while this filter is on."
+msgstr ""
+
 msgid "Planned value saved."
 msgstr ""
 
@@ -1304,6 +1315,10 @@ msgstr ""
 
 #, python-format
 msgid "Entry saved in %(month)s."
+msgstr ""
+
+#, fuzzy, python-format
+msgid "Entry planned in %(month)s."
 msgstr ""
 
 msgid "Enter a name of up to 100 characters."
@@ -1847,9 +1862,6 @@ msgid "Continue"
 msgstr ""
 
 msgid "Cancel"
-msgstr ""
-
-msgid "Open month"
 msgstr ""
 
 msgid "This month"
@@ -2479,6 +2491,9 @@ msgstr ""
 msgid "Return to overview"
 msgstr ""
 
+msgid "Filters"
+msgstr ""
+
 msgid "Export CSV"
 msgstr ""
 
@@ -2534,16 +2549,16 @@ msgstr ""
 msgid "Download CSV"
 msgstr ""
 
-msgid "Filters"
+msgid "Search"
+msgstr ""
+
+msgid "Description contains"
 msgstr ""
 
 msgid "Smallest amount"
 msgstr ""
 
 msgid "Largest amount"
-msgstr ""
-
-msgid "Description contains"
 msgstr ""
 
 msgid "Expenses and income"
@@ -2562,6 +2577,9 @@ msgid "Clear filters"
 msgstr ""
 
 msgid "Entries"
+msgstr ""
+
+msgid "Change category"
 msgstr ""
 
 #, python-format
@@ -2607,9 +2625,6 @@ msgid "Page %(number)d of %(pages)d"
 msgstr ""
 
 msgid "Next"
-msgstr ""
-
-msgid "Change category"
 msgstr ""
 
 msgid ""
@@ -2980,6 +2995,9 @@ msgstr ""
 msgid "Earlier descriptions"
 msgstr ""
 
+msgid "Plan"
+msgstr ""
+
 #, python-format
 msgid "Edit the entry of %(date)s, %(amount)s"
 msgstr ""
@@ -3017,13 +3035,13 @@ msgstr ""
 msgid "Today"
 msgstr ""
 
-msgid "Go to month"
+msgid "Choose a month"
 msgstr ""
 
-msgid "YYYY-MM"
+msgid "Previous year"
 msgstr ""
 
-msgid "Go"
+msgid "Next year"
 msgstr ""
 
 msgid "(favourable)"
@@ -3161,9 +3179,6 @@ msgid "Add categories to plan this month."
 msgstr ""
 
 msgid "Closed"
-msgstr ""
-
-msgid "Enter transactions"
 msgstr ""
 
 msgid "This month is closed. Its entries and planned values are read-only."
@@ -3514,10 +3529,10 @@ msgstr ""
 msgid "Save amount"
 msgstr ""
 
-msgid "Tax calculator"
+msgid "Rates are entered by you; this is not tax advice."
 msgstr ""
 
-msgid "Rates are entered by you; this is not tax advice."
+msgid "Tax calculator"
 msgstr ""
 
 #, python-format
@@ -3630,9 +3645,6 @@ msgstr ""
 msgid ""
 "Tax-rule effect and base are fixed at creation to preserve the meaning of"
 " existing rate versions. Create a separate rule to model a different tax."
-msgstr ""
-
-msgid "Month summary"
 msgstr ""
 
 msgid "Reopen it on the month page."
@@ -3967,5 +3979,23 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Choose the first day of a work month."
+#~ msgstr ""
+
+#~ msgid "Open month"
+#~ msgstr ""
+
+#~ msgid "Go to month"
+#~ msgstr ""
+
+#~ msgid "YYYY-MM"
+#~ msgstr ""
+
+#~ msgid "Go"
+#~ msgstr ""
+
+#~ msgid "Enter transactions"
+#~ msgstr ""
+
+#~ msgid "Month summary"
 #~ msgstr ""
 

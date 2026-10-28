@@ -60,6 +60,7 @@ from assetboard.domain.transactions import MAX_AMOUNT_MINOR, TransactionDirectio
 from assetboard.services.category_usage import CategoryUsage
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.income import generate_workspace_in_session
+from assetboard.services.months import ensure_date_open
 
 logger = logging.getLogger(__name__)
 
@@ -239,10 +240,16 @@ def _generate(
             if row.status == OccurrenceStatus.PENDING and row.rescheduled_at is not None
         ]
         lookback = max(date(1900, 1, 1), min([start, *moved]) - timedelta(days=31))
+        horizon_end = _horizon(today, horizon_months)
+        if item.freq == Frequency.ONCE:
+            # A one-time item has exactly one date, which may be farther ahead than the regular
+            # recurrence horizon (a planned payment). Include it, or every generation run would
+            # prune its pending occurrence as "not wanted".
+            horizon_end = max(horizon_end, rule.start_date)
         pairs = occurrences_with_nominal(
             rule,
             lookback,
-            _horizon(today, horizon_months),
+            horizon_end,
             _holidays(workspace.country_code, rule),
         )
         known = {nominal for nominal, _ in pairs}
@@ -373,6 +380,8 @@ def save_item(
     *,
     item_id: UUID | None = None,
     include_past: bool = False,
+    require_open: date | None = None,
+    require_kind: str | None = None,
 ) -> UUID:
     require_role(ctx, Role.EDITOR)
     name = clean_description(values.name)
@@ -387,18 +396,25 @@ def save_item(
     def write(session: Session) -> UUID:
         require_role_now(session, ctx, Role.EDITOR)
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+        if require_open is not None:
+            ensure_date_open(session, ctx, require_open)
         workspace = CurrentWorkspaceRepository(session, ctx).get()
         if values.amount.currency != workspace.base_currency:
             raise ValueError("invalid_currency")
         category = CategoryRepository(session, ctx).get_or_raise(values.category_id)
-        if category.kind != values.direction or category.archived_at is not None:
+        if category.archived_at is not None:
             raise ValueError("invalid_category")
+        if require_kind is not None and category.kind != require_kind:
+            raise ValueError("category_kind_mismatch")
+        # The category decides the direction: the form has no separate field, and an edit that
+        # moves an item to a category of the other kind changes its direction with it.
+        direction = category.kind
         repository = ScheduledItemRepository(session, ctx)
         rule = normalised(values.rule)
         fields = {
             "name": name,
             "notes": notes,
-            "direction": values.direction,
+            "direction": direction,
             "category_id": values.category_id,
             "amount_minor": values.amount.amount_minor,
             "currency": values.amount.currency,

@@ -3,7 +3,7 @@
 {% block title %}{{ _("Tax calculator") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Tax calculator") }}{% endblock %}
 {% block content %}
-<p class="mb-5 rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong">{{ _("Rates are entered by you; this is not tax advice.") }}</p>
+{% with warning_page = "calculator" %}{% include "taxes/_warning.html" %}{% endwith %}
 {% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong">{{ error }}</p>{% endif %}
 <section class="panel p-4 sm:p-6">
   <form method="get" action="{{ scoped_url(request, 'tax_calculator') }}" class="grid gap-4 sm:grid-cols-3">

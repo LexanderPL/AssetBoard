@@ -39,12 +39,33 @@
 
 {% block title %}{{ _("History") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("History") }}{% endblock %}
-{% block header_actions %}<a href="{{ export_url }}" data-dialog-open="export-dialog" aria-haspopup="dialog" class="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium hover:bg-subtle" data-export-open>{{ _("Export CSV") }}</a>{% endblock %}
+{% block header_actions %}<a href="{{ filters_url }}" data-dialog-open="filters-dialog" aria-haspopup="dialog" class="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium hover:bg-subtle" data-filters-open>{{ _("Filters") }}</a> <a href="{{ export_url }}" data-dialog-open="export-dialog" aria-haspopup="dialog" class="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium hover:bg-subtle" data-export-open>{{ _("Export CSV") }}</a>{% endblock %}
 {% block content %}
 <div class="space-y-6" data-transaction-list>
   {% if notice %}
   <p class="rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
   {% endif %}
+  {# The search bar stays outside #history-results: a live search replaces that block, and the
+     focused field must survive the swap. The results, their page links, the bulk action and the
+     dialogs (with their hidden filter state) are inside and follow the search. #}
+  <section class="panel p-4 sm:p-6" aria-label="{{ _('Search') }}">
+    <form method="get" action="{{ search_url }}" class="flex flex-wrap items-end gap-3" data-search-form>
+      <div class="min-w-0 flex-1">
+        <label for="filter-q" class="{{ label_class }}">{{ _("Description contains") }}</label>
+        <input id="filter-q" name="q" type="search" autocomplete="off" maxlength="{{ max_text }}" value="{{ raw.text }}"{{ invalid("text") }}
+               hx-get="{{ search_url }}" hx-trigger="input changed delay:300ms, search" hx-target="#history-results" hx-swap="outerHTML" hx-select="#history-results" hx-push-url="true" hx-sync="this:replace" hx-include="closest form"
+               class="{{ input_class }}">
+        {{ field_error("text") }}
+      </div>
+      {{ hidden(search_fields) }}
+      <noscript><button type="submit" class="{{ primary_class }}">{{ _("Search") }}</button></noscript>
+    </form>
+  </section>
+
+  {# The dialogs and the results live in one element: the live search replaces this block with a
+     matching one from the full page (hx-select="#history-results"), so the count, the rows, the
+     page links and the dialogs' hidden filter state always agree with the search bar. #}
+  <div id="history-results" class="space-y-6" data-history-results>
   {# The export options (F2.6): a dialog the header's "Export CSV" button opens as a modal
      (app.js: data-dialog-open, data-dialog-close; Esc closes it too). Without JavaScript the
      button is a link to ?export=1, and the dialog is rendered open in the page flow; an
@@ -91,13 +112,19 @@
    </div>
   </dialog>
 
-  {% if bulk_error %}
-  <p class="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-bulk-error>{{ bulk_error }}</p>
-  {% endif %}
-
-  <section class="panel p-4 sm:p-6" aria-labelledby="filters-heading">
-    <h2 id="filters-heading" class="text-base font-semibold">{{ _("Filters") }}</h2>
-    <form method="get" action="{{ scoped_url(request, 'history') }}" class="mt-4 space-y-4" novalidate data-filters>
+  {# The filters are a dialog that the header's "Filters" button opens as a modal (app.js:
+     data-dialog-open, data-dialog-close; Esc closes it too). Without JavaScript the button is a
+     link to ?filters=1, and the dialog is rendered open in the page flow; invalid filters render
+     it open as well. The search bar above stays outside it and reacts as you type. #}
+  <dialog id="filters-dialog" aria-labelledby="filters-heading" data-dialog-modal{% if filters_open %} open{% endif %}
+          class="w-[min(92vw,48rem)] rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl backdrop:bg-black/50 [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none">
+   <div class="p-4 sm:p-6">
+    <div class="flex items-start justify-between gap-4">
+      <h2 id="filters-heading" class="text-base font-semibold">{{ _("Filters") }}</h2>
+      <a href="{{ list_url }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" title="{{ _('Close') }}"><span aria-hidden="true">×</span><span class="sr-only">{{ _("Close") }}</span></a>
+    </div>
+    <form method="get" action="{{ search_url }}" class="mt-4 space-y-4" novalidate data-filters>
+      <input type="hidden" name="q" value="{{ raw.text }}">
       <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label for="filter-from" class="{{ label_class }}">{{ _("From") }}</label>
@@ -118,11 +145,6 @@
           <label for="filter-max" class="{{ label_class }}">{{ _("Largest amount") }}</label>
           <input id="filter-max" name="max" type="text" inputmode="decimal" autocomplete="off" maxlength="64" value="{{ raw.amount_max }}"{{ invalid("amount_max") }} class="{{ input_class }}">
           {{ field_error("amount_max") }}
-        </div>
-        <div class="sm:col-span-2">
-          <label for="filter-q" class="{{ label_class }}">{{ _("Description contains") }}</label>
-          <input id="filter-q" name="q" type="search" autocomplete="off" maxlength="{{ max_text }}" value="{{ raw.text }}"{{ invalid("text") }} class="{{ input_class }}">
-          {{ field_error("text") }}
         </div>
         <div>
           <label for="filter-direction" class="{{ label_class }}">{{ _("Kind") }}</label>
@@ -155,10 +177,17 @@
         <a href="{{ scoped_url(request, 'history') }}" class="{{ secondary_class }}" data-clear-filters>{{ _("Clear filters") }}</a>
       </div>
     </form>
-  </section>
+   </div>
+  </dialog>
 
+  {# The results and the bulk-change dialog follow the search bar above. #}
   <section class="panel p-4 sm:p-6" aria-labelledby="results-heading" data-results>
-    <h2 id="results-heading" class="text-base font-semibold">{{ _("Entries") }}</h2>
+    <div class="flex flex-wrap items-baseline justify-between gap-3">
+      <h2 id="results-heading" class="text-base font-semibold">{{ _("Entries") }}</h2>
+      {% if can_edit and rows %}
+      <a href="{{ bulk_url }}" data-dialog-open="bulk-dialog" aria-haspopup="dialog" class="{{ secondary_class }}" data-bulk-open>{{ _("Change category") }}</a>
+      {% endif %}
+    </div>
     {% if filter_invalid %}
     <p class="mt-2 text-sm text-danger" role="alert" data-filter-invalid>{{ filter_invalid }}</p>
     {% elif window %}
@@ -204,9 +233,17 @@
   </section>
 
   {% if can_edit and rows %}
-  <section class="panel p-4 sm:p-6" aria-labelledby="bulk-heading" data-bulk>
-    <h2 id="bulk-heading" class="text-base font-semibold">{{ _("Change category") }}</h2>
+  <dialog id="bulk-dialog" aria-labelledby="bulk-heading" data-bulk data-dialog-modal{% if bulk_open %} open{% endif %}
+          class="w-[min(92vw,40rem)] rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl backdrop:bg-black/50 [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none">
+   <div class="p-4 sm:p-6">
+    <div class="flex items-start justify-between gap-4">
+      <h2 id="bulk-heading" class="text-base font-semibold">{{ _("Change category") }}</h2>
+      <a href="{{ list_url }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" title="{{ _('Close') }}"><span aria-hidden="true">×</span><span class="sr-only">{{ _("Close") }}</span></a>
+    </div>
     <p class="mt-1 text-sm text-muted">{{ _("Tick entries in the list, or change all entries that match the filters. You confirm the change on the next page.") }}</p>
+    {% if bulk_error %}
+    <p class="mt-3 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-bulk-error>{{ bulk_error }}</p>
+    {% endif %}
     <form id="bulk-form" method="post" action="{{ scoped_url(request, 'history_recategorize_preview') }}" class="mt-4 flex flex-wrap items-end gap-3">
       {{ csrf_input() }}
       {{ hidden(state_fields) }}
@@ -227,8 +264,10 @@
       <button type="submit" name="scope" value="filtered" class="{{ secondary_class }} disabled:cursor-not-allowed disabled:opacity-50"{% if too_many_for_bulk %} disabled aria-describedby="bulk-too-many"{% endif %} data-bulk-filtered>{{ ngettext("Change all %(num)d matching entry", "Change all %(num)d matching entries", window.total) }}</button>
     </form>
     {% if too_many_for_bulk %}<p id="bulk-too-many" class="mt-2 text-xs text-muted" data-bulk-too-many>{{ too_many_for_bulk }}</p>{% endif %}
-  </section>
+   </div>
+  </dialog>
   {% endif %}
+  </div>
 
 </div>
 {% endblock %}

@@ -83,11 +83,11 @@
 <tr id="{{ form_id }}-row" data-entry-row data-ledger-row-form>
   {{ inputs(s, "entry", form_id, form_id, s.state.entry_values, s.state.entry_errors, s.categories) }}
   <td class="py-2 align-top text-right">
-    <form id="{{ form_id }}" method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#ledger-{{ s.direction }}" hx-swap="outerHTML" hx-sync="this:drop" novalidate data-entry-form>
+    <form id="{{ form_id }}" method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#ledger-{{ s.direction }}" hx-swap="outerHTML" hx-sync="this:drop" novalidate data-entry-form data-today="{{ ledger.today.isoformat() }}">
       {{ csrf_input() }}
       <input type="hidden" name="direction" value="{{ s.direction }}">
       {{ filter_input() }}
-      <button type="submit" data-entry-add class="{{ primary_class }}">{{ _("Add") }}</button>
+      <button type="submit" data-entry-add data-label-add="{{ _('Add') }}" data-label-plan="{{ _('Plan') }}" class="{{ primary_class }}">{{ _("Add") }}</button>
     </form>
   </td>
 </tr>

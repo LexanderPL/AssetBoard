@@ -60,6 +60,25 @@ def test_tax_rule_crud_versions_and_calculator_preview(owner):
     assert "No tax payments" in archived_preview.text
 
 
+def test_the_tax_warning_can_be_dismissed_for_the_account(owner):
+    for path in ("/taxes", "/taxes/calculator"):
+        page = owner.client.get(path).text
+        assert "data-tax-warning" in page and "Rates are entered by you" in page
+        assert "data-tax-warning-dismiss" in page
+    response = owner.post("/taxes/warning/dismiss", {"page": "calculator"}, token_from="/taxes")
+    assert response.status_code == 303 and response.headers["location"] == "/taxes/calculator"
+    for path in ("/taxes", "/taxes/calculator"):
+        page = owner.client.get(path).text
+        assert "data-tax-warning" not in page
+        assert "Rates are entered by you" not in page
+    with owner.db() as session:
+        from sqlalchemy import select
+
+        from assetboard.db.models.identity import User
+
+        assert session.scalars(select(User.tax_warning_dismissed)).one()
+
+
 def test_tax_rule_forms_reject_invalid_values(owner):
     invalid = owner.post(
         "/taxes",

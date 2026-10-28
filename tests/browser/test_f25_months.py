@@ -1,4 +1,4 @@
-"""Month page in Chromium (F2.5): navigation, the native month picker, close/reopen with the
+"""Month page in Chromium (F2.5): navigation, the custom month picker, close/reopen with the
 confirm dialog, the sticky sidebar, and no CSP violations."""
 
 from __future__ import annotations
@@ -94,10 +94,14 @@ def test_f25_month_page_in_a_browser(tmp_path: Path) -> None:
             page.locator("[data-month-today]").click()
             page.wait_for_url(f"{base}/m/{today}")
 
-            # The native month picker (Chromium) submits its plain GET form as soon as a month
-            # is picked (data-autosubmit); the Go button is only there without JavaScript.
+            # The custom month picker opens on its trigger; the year stepper reloads the open
+            # picker (no JavaScript needed), then each month is a link.
             expect(page.get_by_role("button", name="Go", exact=True)).to_have_count(0)
-            page.locator("#month-picker").fill("2025-03")
+            page.locator("[data-month-picker-toggle]").click()
+            while int(page.locator("[data-month-picker-year-label]").inner_text()) > 2025:
+                page.locator("[data-month-picker-year]").first.click()
+                page.wait_for_load_state("networkidle")
+            page.locator('[data-month-option="2025-03"]').click()
             page.wait_for_url(f"{base}/m/2025-03")
             expect(heading).to_contain_text("March 2025")
 
