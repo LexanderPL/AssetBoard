@@ -21,6 +21,8 @@ approaches.
 A past date needs **Include past occurrences**. Changing the date moves its pending occurrence;
 once the occurrence is posted or skipped, the list shows the item as **Done** and you can
 archive it. A one-time item adds to the month's Expected and Forecast columns, not to Planned.
+Its expected row on the Transactions page can be confirmed or deleted; deleting removes the
+planned entry and the item.
 
 The form previews the next six effective due dates as you change the rule. JavaScript is needed
 only for the live preview; the form can be saved without it. A finite or ended rule may have

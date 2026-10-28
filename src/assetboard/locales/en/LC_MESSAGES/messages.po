@@ -1307,6 +1307,9 @@ msgstr ""
 msgid "Entry planned. Its category is not shown while this filter is on."
 msgstr ""
 
+msgid "Planned entry deleted."
+msgstr ""
+
 msgid "Planned value saved."
 msgstr ""
 
@@ -1710,6 +1713,9 @@ msgid "The occurrence category is unavailable; edit the recurring rule."
 msgstr ""
 
 msgid "Check the amount and date, then try again."
+msgstr ""
+
+msgid "Only a one-time planned entry can be deleted here."
 msgstr ""
 
 msgid "Choose a valid direction."
@@ -2497,6 +2503,12 @@ msgstr ""
 msgid "Export CSV"
 msgstr ""
 
+msgid "Search"
+msgstr ""
+
+msgid "Description contains"
+msgstr ""
+
 msgid "Export as CSV"
 msgstr ""
 
@@ -2547,12 +2559,6 @@ msgid ""
 msgstr ""
 
 msgid "Download CSV"
-msgstr ""
-
-msgid "Search"
-msgstr ""
-
-msgid "Description contains"
 msgstr ""
 
 msgid "Smallest amount"
@@ -3010,6 +3016,10 @@ msgid "Expected"
 msgstr ""
 
 msgid "Confirm"
+msgstr ""
+
+#, python-format
+msgid "Delete the planned entry %(name)s?"
 msgstr ""
 
 msgid "No entries in this category this month."

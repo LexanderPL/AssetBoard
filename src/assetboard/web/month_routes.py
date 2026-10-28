@@ -66,6 +66,8 @@ ERRORS = {
     "month_closed": MONTH_CLOSED_MESSAGE,
     "transaction_gone": _("This entry no longer exists. It may have been deleted elsewhere."),
     "undo_expired": _("Too late to undo: the entry stays deleted."),
+    "not_pending": _("This occurrence is no longer pending."),
+    "not_planned": _("Only a one-time planned entry can be deleted here."),
     "plan_category_gone": _("This category no longer exists. It may have been deleted elsewhere."),
     "plan_category_archived": PLAN_ERRORS["category_archived"],
     "plan_category_transfer": PLAN_ERRORS["category_transfer"],
@@ -83,6 +85,7 @@ NOTICES = {
     "outside_filter_planned": _(
         "Entry planned. Its category is not shown while this filter is on."
     ),
+    "planned_deleted": _("Planned entry deleted."),
     "plan_saved": _("Planned value saved."),
     "plan_removed": _("Planned value removed."),
 }

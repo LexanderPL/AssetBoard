@@ -197,6 +197,38 @@ def test_a_future_dated_entry_is_planned_as_a_one_time_item(ledger: OwnerApp) ->
     )
 
 
+def test_a_planned_entry_shows_its_day_and_can_be_deleted(ledger: OwnerApp) -> None:
+    food = _category(ledger, "Food")
+    assert (
+        _add(ledger, _form(food, "31", description="Christmas gifts"), "/m/2026-12").status_code
+        == 303
+    )
+    page = _page(ledger, "/transactions/2026-12")
+    # The expected row uses the same day-of-month column as a posted entry.
+    assert (
+        '<time datetime="2026-12-31"><span aria-hidden="true">31</span>'
+        '<span class="sr-only">Dec 31, 2026</span></time>' in page
+    )
+    assert "data-details-close" in page and ">Cancel</button>" in page
+    with ledger.db() as session:
+        occurrence = session.scalars(select(ScheduledOccurrence)).one()
+        occurrence_id = occurrence.id
+    assert f'action="/upcoming/{occurrence_id}/delete"' in page
+
+    response = ledger.post(
+        f"/upcoming/{occurrence_id}/delete",
+        {"return_month": "2026-12"},
+        token_from="/transactions/2026-12",
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/transactions/2026-12?notice=planned_deleted"
+    page = _page(ledger, "/transactions/2026-12?notice=planned_deleted")
+    assert "Planned entry deleted." in page
+    with ledger.db() as session:
+        assert session.scalars(select(ScheduledItem)).all() == []
+        assert session.scalars(select(ScheduledOccurrence)).all() == []
+
+
 def test_htmx_add_returns_the_section_with_a_new_entry_row_keeping_the_day(
     ledger: OwnerApp,
 ) -> None:

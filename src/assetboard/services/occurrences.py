@@ -25,6 +25,7 @@ from assetboard.db.repositories import (
 from assetboard.db.repositories.base import WorkspaceScope
 from assetboard.domain.money import Money
 from assetboard.domain.months import MAX_YEAR, MIN_YEAR, YearMonth
+from assetboard.domain.recurrence import Frequency
 from assetboard.domain.scheduled import AmountState, OccurrenceStatus
 from assetboard.domain.transactions import (
     MAX_AMOUNT_MINOR,
@@ -64,6 +65,7 @@ class UpcomingOccurrence:
     expected: Money
     amount_state: str
     auto_post: bool
+    one_time: bool
     rescheduled: bool
 
 
@@ -96,6 +98,7 @@ def _upcoming_view(
         expected=Money(occurrence.expected_minor, occurrence.currency),
         amount_state=occurrence.amount_state,
         auto_post=item.auto_post if item is not None else False,
+        one_time=item.freq == Frequency.ONCE if item is not None else False,
         rescheduled=occurrence.rescheduled_at is not None,
     )
 

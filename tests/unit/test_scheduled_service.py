@@ -558,3 +558,31 @@ def test_posting_a_one_time_occurrence_marks_the_item_done(team):
     assert [r.status for r in rows(team, item)] == ["posted"]
     scheduled.change_state(team.factory, ctx, item, ItemAction.ARCHIVE, settings)
     assert scheduled.list_items(team.factory, ctx)[0].archived
+
+
+def test_delete_planned_occurrence_only_removes_a_one_time_item(team):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    item = scheduled.save_item(
+        team.factory, ctx, data(team, rule=one_time(date(2026, 6, 1))), settings
+    )
+    [row] = rows(team, item)
+    scheduled.delete_planned_occurrence(team.factory, ctx, row.id)
+    with pytest.raises(NotFound):
+        scheduled.get_item(team.factory, ctx, item)
+    assert rows(team, item) == []
+    with team.factory() as session:
+        actions = set(
+            session.scalars(select(AuditEvent.action).where(AuditEvent.entity_id == str(item)))
+        )
+    assert "scheduled.delete" in actions
+
+    monthly = scheduled.save_item(team.factory, ctx, data(team), settings)
+    monthly_row = rows(team, monthly)[0]
+    with pytest.raises(ValueError, match="not_planned"):
+        scheduled.delete_planned_occurrence(team.factory, ctx, monthly_row.id)
+    assert len(rows(team, monthly)) > 0
+
+    with pytest.raises(PermissionDenied):
+        scheduled.delete_planned_occurrence(
+            team.factory, team.ctx("viewer", "viewer"), monthly_row.id
+        )

@@ -70,6 +70,16 @@ document.addEventListener("click", (event) => {
   const dismiss = target.closest("[data-toast-dismiss]");
   if (dismiss) dismiss.closest("[role='status']")?.remove();
 
+  const detailsClose = target.closest("[data-details-close]");
+  if (detailsClose) {
+    const details = detailsClose.closest("details");
+    if (details) {
+      details.open = false;
+      const summary = details.querySelector("summary");
+      if (summary instanceof HTMLElement) summary.focus();
+    }
+  }
+
   const cancel = target.closest("[data-confirm-cancel]");
   if (cancel) cancel.closest("dialog")?.close("cancel");
 

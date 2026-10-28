@@ -503,6 +503,48 @@ def change_state(
     run_immediate(factory, write)
 
 
+def delete_planned_occurrence(
+    factory: sessionmaker[Session], ctx: Context, occurrence_id: UUID
+) -> None:
+    """Delete a one-time planned entry: its pending occurrence and the item itself.
+
+    The Transactions page's Plan button creates a one-time item, so its expected row can be
+    removed instead of confirmed or skipped. Recurring items are refused: a single expected row
+    of a repeating rule is skipped, never used to delete the rule.
+    """
+    require_role(ctx, Role.EDITOR)
+
+    def write(session: Session) -> None:
+        require_role_now(session, ctx, Role.EDITOR)
+        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+        occurrences = ScheduledOccurrenceRepository(session, ctx)
+        occurrence = occurrences.get_for_update(occurrence_id)
+        if occurrence is None or occurrence.status != OccurrenceStatus.PENDING:
+            raise ValueError("not_pending")
+        item_id = occurrence.scheduled_item_id
+        items = ScheduledItemRepository(session, ctx)
+        item = items.get(item_id) if item_id is not None else None
+        if item is None or item.freq != Frequency.ONCE:
+            raise ValueError("not_planned")
+        ensure_date_open(session, ctx, occurrence.due_date)
+        remaining = _remove_pending(session, ctx, item.id, since=None)
+        if remaining:
+            items.update(item.id, archived_at=ctx.clock.now())
+            action = "scheduled.archive"
+        else:
+            items.delete(item.id)
+            action = "scheduled.delete"
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=ctx.user.id,
+            action=action,
+            entity_type="scheduled_item",
+            entity_id=str(item.id),
+            ts=ctx.clock.now(),
+        )
+
+    run_immediate(factory, write)
+
+
 def category_usage(session: Session, ctx: Context) -> dict[UUID, CategoryUsage]:
     counts: dict[UUID, int] = {}
     for repository in (
