@@ -3,7 +3,7 @@
 {% block title %}{{ _("Tax rules") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Tax rules") }}{% endblock %}
 {% block content %}
-<p class="mb-5 rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong">{{ _("Rates are entered by you; this is not tax advice.") }}</p>
+{% with warning_page = "rules" %}{% include "taxes/_warning.html" %}{% endwith %}
 <div class="mb-5 flex flex-wrap gap-3">
   <a href="{{ scoped_url(request, 'tax_calculator') }}" class="rounded-lg border border-line px-3 py-2 text-sm">{{ _("Calculator preview") }}</a>
 </div>

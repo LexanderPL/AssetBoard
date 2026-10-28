@@ -2481,6 +2481,7 @@ class WebSession:
     current_workspace_id: UUID | None = None
     auth_method: str = "password"
     theme: str = "system"
+    tax_warning_dismissed: bool = False
     must_change_password: bool = False
     second_factor_verified: bool = False
 
@@ -2511,6 +2512,7 @@ def read_web_session(
         current_workspace_id=row.current_workspace_id,
         auth_method=row.auth_method,
         theme=user.theme,
+        tax_warning_dismissed=user.tax_warning_dismissed,
         must_change_password=user.must_change_password,
         second_factor_verified=row.second_factor_verified,
     )

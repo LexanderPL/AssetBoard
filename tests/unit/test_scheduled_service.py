@@ -197,14 +197,20 @@ def test_roles_validation_and_tenant_isolation(team):
     for changed in (
         replace(values, name=""),
         replace(values, amount=Money(1, "PLN")),
-        replace(values, direction=TransactionDirection.INCOME),
     ):
         with pytest.raises(ValueError):
             scheduled.save_item(team.factory, ctx, changed, settings)
     other = team.add_workspace("Other")
     team.add_member("owner", "owner", other)
     other_ctx = team.ctx("owner", "owner", other)
-    item = scheduled.save_item(team.factory, ctx, values, settings)
+    # The category decides the direction; the (legacy) input field is ignored.
+    item = scheduled.save_item(
+        team.factory,
+        ctx,
+        replace(values, direction=TransactionDirection.INCOME),
+        settings,
+    )
+    assert scheduled.get_item(team.factory, ctx, item).direction == "expense"
     assert scheduled.list_items(team.factory, other_ctx) == []
     for action in (
         lambda: scheduled.get_item(team.factory, other_ctx, item),
@@ -517,15 +523,17 @@ def test_one_time_item_is_created_normalised_and_regenerated_on_a_date_edit(team
     assert not view.done
 
 
-def test_one_time_item_waits_for_the_horizon_and_follows_include_past(team):
+def test_one_time_item_is_not_pruned_outside_the_horizon_and_follows_include_past(team):
     ctx = team.ctx("owner", "owner")
     settings = Settings(_env_file=None).model_copy(update={"recurrence_horizon_months": 2})
     later = scheduled.save_item(
         team.factory, ctx, data(team, rule=one_time(date(2026, 6, 1))), settings
     )
-    assert rows(team, later) == []
-    april = FixedClock("2026-04-01T12:00:00+00:00")  # 1 June is inside the horizon now
-    assert scheduled.generate_workspace(team.factory, ctx, april, settings) == 1
+    # A one-time item has one date, which may lie beyond the regular recurrence horizon: it is
+    # shown at once (a planned payment), and a later generation run does not prune it.
+    assert [row.due_date for row in rows(team, later)] == [date(2026, 6, 1)]
+    april = FixedClock("2026-04-01T12:00:00+00:00")
+    assert scheduled.generate_workspace(team.factory, ctx, april, settings) == 0
     assert [row.due_date for row in rows(team, later)] == [date(2026, 6, 1)]
     past = data(team, rule=one_time(date(2026, 2, 10)))
     skipped = scheduled.save_item(team.factory, ctx, past, settings)
@@ -550,3 +558,31 @@ def test_posting_a_one_time_occurrence_marks_the_item_done(team):
     assert [r.status for r in rows(team, item)] == ["posted"]
     scheduled.change_state(team.factory, ctx, item, ItemAction.ARCHIVE, settings)
     assert scheduled.list_items(team.factory, ctx)[0].archived
+
+
+def test_delete_planned_occurrence_only_removes_a_one_time_item(team):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    item = scheduled.save_item(
+        team.factory, ctx, data(team, rule=one_time(date(2026, 6, 1))), settings
+    )
+    [row] = rows(team, item)
+    scheduled.delete_planned_occurrence(team.factory, ctx, row.id)
+    with pytest.raises(NotFound):
+        scheduled.get_item(team.factory, ctx, item)
+    assert rows(team, item) == []
+    with team.factory() as session:
+        actions = set(
+            session.scalars(select(AuditEvent.action).where(AuditEvent.entity_id == str(item)))
+        )
+    assert "scheduled.delete" in actions
+
+    monthly = scheduled.save_item(team.factory, ctx, data(team), settings)
+    monthly_row = rows(team, monthly)[0]
+    with pytest.raises(ValueError, match="not_planned"):
+        scheduled.delete_planned_occurrence(team.factory, ctx, monthly_row.id)
+    assert len(rows(team, monthly)) > 0
+
+    with pytest.raises(PermissionDenied):
+        scheduled.delete_planned_occurrence(
+            team.factory, team.ctx("viewer", "viewer"), monthly_row.id
+        )

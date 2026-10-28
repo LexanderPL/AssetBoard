@@ -1,7 +1,8 @@
 # Tax rules and calculator
 
 Tax rules are optional models of taxes or levies. AssetBoard does not provide tax rates or tax
-advice: rates are entered by you, and calculator results are estimates for planning.
+advice: rates are entered by you, and calculator results are estimates for planning. The tax
+pages show this notice once; close it with **×** and it stays hidden for your account.
 
 Create a rule with an effect (`added` or `withheld`), a calculation base (`net` or `gross`), and
 an initial effective-dated value. Added rules always use net as their base. A value is either a

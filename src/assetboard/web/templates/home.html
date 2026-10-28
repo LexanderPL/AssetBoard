@@ -8,7 +8,6 @@
 {% set input_class = "form-control w-full rounded-lg px-2.5 py-1.5" %}
 {% block title %}{{ _("Home") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ month_heading }}{% endblock %}
-{% block header_actions %}<a href="{{ scoped_url(request, 'month', month=view.month|string) }}" class="rounded-full border border-line bg-surface px-3.5 py-2 text-sm font-medium hover:bg-subtle" data-open-month>{{ _("Open month") }}</a>{% endblock %}
 {% block scripts %}{% include "macros/chart_scripts.html" %}{% endblock %}
 {% block content %}
 <div class="space-y-6" data-home data-month="{{ view.month }}">

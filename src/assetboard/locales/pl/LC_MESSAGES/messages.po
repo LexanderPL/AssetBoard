@@ -1287,6 +1287,13 @@ msgstr "Opis zawiera niedozwolone znaki."
 msgid "Use at most %(max)d characters."
 msgstr "Użyj najwyżej %(max)d znaków."
 
+msgid ""
+"Add a description. A planned entry becomes a recurring item, so it needs "
+"a name."
+msgstr ""
+"Dodaj opis. Zaplanowany wpis staje się pozycją cykliczną, więc wymaga "
+"nazwy."
+
 msgid "Choose a category."
 msgstr "Wybierz kategorię."
 
@@ -1347,6 +1354,12 @@ msgstr "Ten wpis już nie istnieje. Mógł zostać usunięty gdzie indziej."
 msgid "Too late to undo: the entry stays deleted."
 msgstr "Za późno na cofnięcie: wpis pozostaje usunięty."
 
+msgid "This occurrence is no longer pending."
+msgstr "To wystąpienie nie jest już oczekujące."
+
+msgid "Only a one-time planned entry can be deleted here."
+msgstr "Tutaj można usunąć tylko jednorazowy zaplanowany wpis."
+
 msgid "This category no longer exists. It may have been deleted elsewhere."
 msgstr "Ta kategoria już nie istnieje. Mogła zostać usunięta gdzie indziej."
 
@@ -1374,6 +1387,15 @@ msgstr "Przywrócono wpis."
 msgid "Entry saved. Its category is not shown while this filter is on."
 msgstr "Zapisano wpis. Jego kategoria jest ukryta przez filtr."
 
+msgid "Entry planned."
+msgstr "Zaplanowano wpis."
+
+msgid "Entry planned. Its category is not shown while this filter is on."
+msgstr "Zaplanowano wpis. Jego kategoria jest ukryta przez filtr."
+
+msgid "Planned entry deleted."
+msgstr "Usunięto zaplanowany wpis."
+
 msgid "Planned value saved."
 msgstr "Zapisano wartość planowaną."
 
@@ -1383,6 +1405,10 @@ msgstr "Usunięto wartość planowaną."
 #, python-format
 msgid "Entry saved in %(month)s."
 msgstr "Wpis zapisano w miesiącu: %(month)s."
+
+#, python-format
+msgid "Entry planned in %(month)s."
+msgstr "Wpis zaplanowano w miesiącu: %(month)s."
 
 msgid "Enter a name of up to 100 characters."
 msgstr "Podaj nazwę o długości do 100 znaków."
@@ -1816,9 +1842,6 @@ msgstr ""
 "Ten miesiąc jest zamknięty. Otwórz go ponownie lub wybierz datę w "
 "otwartym miesiącu."
 
-msgid "This occurrence is no longer pending."
-msgstr "To wystąpienie nie jest już oczekujące."
-
 msgid "This occurrence has no transaction to undo."
 msgstr "To wystąpienie nie ma transakcji, którą można cofnąć."
 
@@ -1998,9 +2021,6 @@ msgstr "Kontynuuj"
 
 msgid "Cancel"
 msgstr "Anuluj"
-
-msgid "Open month"
-msgstr "Otwórz miesiąc"
 
 msgid "This month"
 msgstr "Ten miesiąc"
@@ -2696,8 +2716,17 @@ msgstr "Utwórz obszar roboczy"
 msgid "Return to overview"
 msgstr "Powrót do podsumowania"
 
+msgid "Filters"
+msgstr "Filtry"
+
 msgid "Export CSV"
 msgstr "Eksportuj CSV"
+
+msgid "Search"
+msgstr "Szukaj"
+
+msgid "Description contains"
+msgstr "Opis zawiera"
 
 msgid "Export as CSV"
 msgstr "Eksport do CSV"
@@ -2761,17 +2790,11 @@ msgstr ""
 msgid "Download CSV"
 msgstr "Pobierz CSV"
 
-msgid "Filters"
-msgstr "Filtry"
-
 msgid "Smallest amount"
 msgstr "Najmniejsza kwota"
 
 msgid "Largest amount"
 msgstr "Największa kwota"
-
-msgid "Description contains"
-msgstr "Opis zawiera"
 
 msgid "Expenses and income"
 msgstr "Wydatki i przychody"
@@ -2790,6 +2813,9 @@ msgstr "Wyczyść filtry"
 
 msgid "Entries"
 msgstr "Wpisy"
+
+msgid "Change category"
+msgstr "Zmień kategorię"
 
 #, python-format
 msgid "%(first)d–%(last)d of %(num)d entry"
@@ -2836,9 +2862,6 @@ msgstr "Strona %(number)d z %(pages)d"
 
 msgid "Next"
 msgstr "Następny"
-
-msgid "Change category"
-msgstr "Zmień kategorię"
 
 msgid ""
 "Tick entries in the list, or change all entries that match the filters. "
@@ -3234,6 +3257,9 @@ msgstr "Dzień"
 msgid "Earlier descriptions"
 msgstr "Wcześniejsze opisy"
 
+msgid "Plan"
+msgstr "Zaplanuj"
+
 #, python-format
 msgid "Edit the entry of %(date)s, %(amount)s"
 msgstr "Edytuj wpis z %(date)s, %(amount)s"
@@ -3247,6 +3273,10 @@ msgstr "Oczekiwane"
 
 msgid "Confirm"
 msgstr "Potwierdź"
+
+#, python-format
+msgid "Delete the planned entry %(name)s?"
+msgstr "Usunąć zaplanowany wpis %(name)s?"
 
 msgid "No entries in this category this month."
 msgstr "Brak wpisów tej kategorii w tym miesiącu."
@@ -3274,14 +3304,14 @@ msgstr "Następny miesiąc: %(month)s"
 msgid "Today"
 msgstr "Dzisiaj"
 
-msgid "Go to month"
-msgstr "Przejdź do miesiąca"
+msgid "Choose a month"
+msgstr "Wybierz miesiąc"
 
-msgid "YYYY-MM"
-msgstr "RRRR-MM"
+msgid "Previous year"
+msgstr "Poprzedni rok"
 
-msgid "Go"
-msgstr "Przejdź"
+msgid "Next year"
+msgstr "Następny rok"
 
 msgid "(favourable)"
 msgstr "(korzystnie)"
@@ -3440,9 +3470,6 @@ msgstr "Dodaj kategorie, aby zaplanować ten miesiąc."
 
 msgid "Closed"
 msgstr "Zamknięty"
-
-msgid "Enter transactions"
-msgstr "Wprowadź transakcje"
 
 msgid "This month is closed. Its entries and planned values are read-only."
 msgstr ""
@@ -3825,11 +3852,11 @@ msgstr "Edytuj kwotę"
 msgid "Save amount"
 msgstr "Zapisz kwotę"
 
-msgid "Tax calculator"
-msgstr "Kalkulator podatków"
-
 msgid "Rates are entered by you; this is not tax advice."
 msgstr "Stawki wprowadzasz samodzielnie; to nie jest porada podatkowa."
+
+msgid "Tax calculator"
+msgstr "Kalkulator podatków"
 
 #, python-format
 msgid "Net amount (%(currency)s)"
@@ -3945,9 +3972,6 @@ msgstr ""
 "Działanie i podstawa reguły są ustalone podczas tworzenia, aby zachować "
 "znaczenie istniejących wersji stawek. Utwórz osobną regułę dla innego "
 "podatku."
-
-msgid "Month summary"
-msgstr "Podsumowanie miesiąca"
 
 msgid "Reopen it on the month page."
 msgstr "Można go ponownie otworzyć na stronie miesiąca."
@@ -4253,4 +4277,22 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Choose the first day of a work month."
 #~ msgstr "Wybierz pierwszy dzień miesiąca pracy."
+
+#~ msgid "Open month"
+#~ msgstr "Otwórz miesiąc"
+
+#~ msgid "Go to month"
+#~ msgstr "Przejdź do miesiąca"
+
+#~ msgid "YYYY-MM"
+#~ msgstr "RRRR-MM"
+
+#~ msgid "Go"
+#~ msgstr "Przejdź"
+
+#~ msgid "Enter transactions"
+#~ msgstr "Wprowadź transakcje"
+
+#~ msgid "Month summary"
+#~ msgstr "Podsumowanie miesiąca"
 

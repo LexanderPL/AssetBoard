@@ -38,6 +38,7 @@ from assetboard.web.ledger import (
     parse_filter,
 )
 from assetboard.web.month_routes import (
+    PLANNED_IN,
     SAVED_IN,
     _optional_month,
     _optional_uuid,
@@ -131,6 +132,7 @@ def transactions_context(
     states: dict[str, SectionState] | None = None,
     deleted: UUID | None = None,
     saved_in: YearMonth | None = None,
+    planned: bool = False,
     filter_id: UUID | None = None,
 ) -> dict[str, object]:
     """The Transactions page's context (blocking: run in a thread). ``states`` carry the
@@ -148,7 +150,8 @@ def transactions_context(
             pending = None
     if saved_in is not None and saved_in != target:
         locale = request.state.locale
-        context["notice"] = _t(request, SAVED_IN) % {"month": format_month(saved_in, locale)}
+        message = PLANNED_IN if planned else SAVED_IN
+        context["notice"] = _t(request, message) % {"month": format_month(saved_in, locale)}
         context["notice_href"] = transactions_path(request, saved_in)
     return {**context, "ledger": ledger, "deleted": pending.id if pending is not None else None}
 
@@ -175,6 +178,7 @@ async def transactions_page(
     edit: str = "",
     deleted: str = "",
     saved_in: str = "",
+    planned: str = "",
     entry: str = "",
     day: str = "",
     category: str = "",
@@ -204,6 +208,7 @@ async def transactions_page(
             states=states,
             deleted=_optional_uuid(deleted),
             saved_in=_optional_month(saved_in),
+            planned=planned == "1",
             filter_id=parse_filter(category),
         )
     )

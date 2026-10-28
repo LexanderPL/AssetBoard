@@ -33,6 +33,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -64,6 +65,9 @@ from assetboard.services import occurrences
 from assetboard.services.category_usage import CategoryUsage
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.months import ensure_date_open, lock_month_writes
+
+if TYPE_CHECKING:
+    from assetboard.config import Settings
 
 SUGGESTION_LIMIT = 8
 
@@ -101,6 +105,23 @@ class TransactionView:
     category_color: str
     category_archived: bool
     source: str
+
+    @property
+    def month(self) -> YearMonth:
+        return YearMonth.from_date(self.date)
+
+
+@dataclass(frozen=True, slots=True)
+class PlannedView:
+    """An entry with a future date, planned as a one-time recurring item instead of a
+    transaction. The route shows it as a pending occurrence of its month."""
+
+    item_id: UUID
+    direction: str
+    date: date
+    amount: Money
+    description: str
+    category_id: UUID
 
     @property
     def month(self) -> YearMonth:
@@ -388,7 +409,57 @@ def create_transaction(
         currency=ctx.workspace.base_currency,
     )
     assert category_id is not None  # checked by _entry
+    return _create_transaction(factory, ctx, entry=entry, wanted=wanted, category_id=category_id)
 
+
+def create_entry(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    *,
+    settings: Settings,
+    month: YearMonth,
+    direction: str,
+    day: str,
+    amount: str,
+    description: str,
+    category_id: UUID | None,
+    locale: str,
+) -> TransactionView | PlannedView:
+    """Add an entry, or plan it as a one-time recurring item when its date is in the future.
+
+    The form has one button; the date decides. A planned entry gets a pending occurrence, so it
+    shows in the target month and in Upcoming, and the Recurring page lists it with "One time".
+    """
+    require_role(ctx, Role.EDITOR)
+    wanted = _direction(direction)
+    entry = _entry(
+        month=month,
+        day=day,
+        amount=amount,
+        description=description,
+        category_id=category_id,
+        locale=locale,
+        currency=ctx.workspace.base_currency,
+    )
+    assert category_id is not None  # checked by _entry
+    if entry.day <= ctx.clock.today(ctx.workspace.timezone):
+        return _create_transaction(
+            factory, ctx, entry=entry, wanted=wanted, category_id=category_id
+        )
+    if not entry.description:
+        # A one-time recurring item needs a name; an ordinary past transaction may be blank.
+        raise InvalidTransaction({"description": "description_required_for_plan"})
+    return _plan_entry(factory, ctx, settings, entry=entry, wanted=wanted, category_id=category_id)
+
+
+def _create_transaction(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    *,
+    entry: _Entry,
+    wanted: TransactionDirection,
+    category_id: UUID,
+) -> TransactionView:
     def write(session: Session) -> TransactionView:
         require_role_now(session, ctx, Role.EDITOR)
         ensure_date_open(session, ctx, entry.day)  # takes the month-write lock first
@@ -410,6 +481,59 @@ def create_transaction(
         return _view(row, category)
 
     return run_immediate(factory, write)
+
+
+def _plan_entry(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    settings: Settings,
+    *,
+    entry: _Entry,
+    wanted: TransactionDirection,
+    category_id: UUID,
+) -> PlannedView:
+    """Create the one-time recurring item and its pending occurrence (inside ``save_item``)."""
+    from assetboard.domain.recurrence import Frequency, RecurrenceRule, WeekendPolicy
+    from assetboard.services.scheduled import ScheduledInput, save_item
+
+    currency = ctx.workspace.base_currency
+    try:
+        minor = amount_minor(entry.amount, currency)
+    except EntryError as exc:
+        raise InvalidTransaction({"amount": exc.code}) from None
+    try:
+        item_id = save_item(
+            factory,
+            ctx,
+            ScheduledInput(
+                name=entry.description,
+                # Kept for the input contract; save_item takes the direction from the category.
+                direction=wanted,
+                category_id=category_id,
+                amount=Money(minor, currency),
+                rule=RecurrenceRule(
+                    start_date=entry.day,
+                    freq=Frequency.ONCE,
+                    weekend_policy=WeekendPolicy.NONE,
+                ),
+                auto_post=False,
+            ),
+            settings,
+            require_open=entry.day,
+            require_kind=wanted.value,
+        )
+    except ValueError as exc:
+        if str(exc) in {"invalid_category", "category_kind_mismatch"}:
+            raise InvalidTransaction({"category": str(exc)}) from None
+        raise InvalidTransaction({"amount": "invalid_amount"}) from None
+    return PlannedView(
+        item_id=item_id,
+        direction=wanted.value,
+        date=entry.day,
+        amount=Money(minor, currency),
+        description=entry.description,
+        category_id=category_id,
+    )
 
 
 def update_transaction(

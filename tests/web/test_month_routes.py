@@ -109,7 +109,6 @@ def test_empty_and_future_months_render(months: OwnerApp) -> None:
         assert 'id="month-summary"' in page and "No expenses yet this month" in page
         # F2.7: a pure summary, no entry form and no transaction tables.
         assert 'id="ledger"' not in page and "data-entry-form" not in page
-        assert f'href="/transactions/{month}"' in page  # "Enter transactions"
         page = _page(months, f"/transactions/{month}")
         assert "No expenses in this month." in page and "No income in this month." in page
 
@@ -124,13 +123,13 @@ def test_the_month_name_follows_the_language(months: OwnerApp) -> None:
     assert 'aria-label="Następny miesiąc: listopad 2026"' in page
     assert 'aria-label="Poprzedni miesiąc: wrzesień 2026"' in page
     assert 'data-confirm="Zamknąć miesiąc październik 2026? ' in page
-    assert 'placeholder="RRRR-MM"' in page
+    assert "data-month-picker-toggle" in page and "październik 2026" in page
     _close(months, "2026-10")
     assert 'data-confirm="Otworzyć ponownie miesiąc październik 2026? ' in _page(
         months, "/m/2026-10"
     )
     months.client.headers["Accept-Language"] = "en"
-    assert 'placeholder="YYYY-MM"' in _page(months, "/m/2026-09")
+    assert "September 2026" in _page(months, "/m/2026-09")
 
 
 def test_the_nav_month_link_shows_on_every_signed_in_page(months: OwnerApp) -> None:
@@ -150,14 +149,23 @@ def test_the_nav_month_link_points_to_the_current_month(months: OwnerApp) -> Non
 # The month picker (no JavaScript needed)
 
 
-def test_the_picker_is_a_plain_get_form_with_a_native_month_input(months: OwnerApp) -> None:
+def test_the_picker_is_a_javascript_free_details_dropdown(months: OwnerApp) -> None:
     page = _page(months, "/m/2026-09")
-    form = re.search(
-        r"<form method=\"get\" action=\"/m\"[^>]*data-month-picker>.*?</form>", page, re.S
-    )
-    assert form is not None
-    assert 'type="month"' in form.group(0) and 'value="2026-09"' in form.group(0)
-    assert 'name="from" value="2026-09"' in form.group(0) and 'type="submit"' in form.group(0)
+    picker = re.search(r"<details[^>]*data-month-picker.*?</details>", page, re.S)
+    assert picker is not None
+    html = picker.group(0)
+    assert "<summary" in html and "data-month-picker-toggle" in html
+    assert 'type="month"' not in html and "<form" not in html
+    for month in range(1, 13):
+        assert f'data-month-option="2026-{month:02d}"' in html
+    assert 'href="/m?month=2026-03"' in html
+    assert 'data-month-picker-year="2025"' in html and 'data-month-picker-year="2027"' in html
+    assert "Clear" not in html and "This month" not in html
+    # The year stepper works without JavaScript: it reloads the page with the dropdown open.
+    opened = _page(months, "/m/2026-09?picker_year=2025")
+    assert re.search(r"<details[^>]*data-month-picker[^>]* open", opened)
+    assert 'data-month-option="2025-03"' in opened
+    assert 'type="month"' not in opened
 
 
 @pytest.mark.parametrize(

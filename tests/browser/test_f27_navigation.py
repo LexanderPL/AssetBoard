@@ -148,9 +148,11 @@ def test_f27_navigation_in_a_browser(tmp_path: Path) -> None:
             amount.fill("60")
             amount.press("Enter")
             expect(groceries.locator("[data-amount]")).to_have_text("€60.00")
-            # The month picker opens a month as soon as it is complete.
-            page.locator("#month-picker").fill("2025-01")
-            page.wait_for_url(f"{base}/transactions/2025-01")
+            # The month picker opens on its trigger; a month link opens that month.
+            page.locator("[data-month-picker-toggle]").click()
+            target = f"{today[:4]}-01"
+            page.locator(f'[data-month-option="{target}"]').click()
+            page.wait_for_url(f"{base}/transactions/{target}")
             page.go_back()
 
             # Home: the flow bar and both donuts are drawn; the tables become sr-only.
@@ -187,7 +189,7 @@ def test_f27_navigation_in_a_browser(tmp_path: Path) -> None:
             page.locator("[data-theme-toggle]").click()
 
             # Month: a summary with the expense and income donuts, no entry form.
-            page.locator("[data-open-month]").click()
+            page.locator("[data-month-link]").click()
             page.wait_for_url(f"{base}/m/{today}")
             expect(page.locator("#month-summary")).to_be_visible()
             expect(page.locator("[data-donut]")).to_have_count(2)
@@ -199,6 +201,8 @@ def test_f27_navigation_in_a_browser(tmp_path: Path) -> None:
             page.locator("[data-history-link]").first.click()
             page.wait_for_url(f"{base}/history")
             page.get_by_label("Description contains").fill("groc")
+            expect(page.locator("[data-description]")).to_have_text(["Groceries"])
+            page.locator("[data-filters-open]").click()
             page.get_by_role("button", name="Show entries").click()
             expect(page).to_have_url(re.compile(r"/history\?.*q=groc"))
             expect(page.locator("[data-description]")).to_have_text(["Groceries"])

@@ -63,6 +63,10 @@ def test_expected_rows_sit_in_their_table_and_confirming_makes_them_real(rent) -
     table = _expense_table(owner.client.get("/transactions/2026-03").text)
     assert f'data-pending-occurrence="{march}"' in table
     assert ">Expected" in table and ">Confirm</summary>" in table
+    assert "data-details-close" in table and ">Cancel</button>" in table
+    # Only a one-time planned entry can be deleted from its expected row; a repeating rule
+    # keeps its row (skip it on the Upcoming page or edit the rule instead).
+    assert ">Delete</button>" not in table
     assert 'name="return_month" value="2026-03"' in table
     income_table = _block(
         owner.client.get("/transactions/2026-03").text, r'<section id="ledger-income".*?</section>'
@@ -92,7 +96,24 @@ def test_viewers_see_expected_rows_without_confirm(rent) -> None:
     owner.set_admin_role("viewer")
     table = _expense_table(owner.client.get("/transactions/2026-03").text)
     assert f'data-pending-occurrence="{occurrences[2]}"' in table
-    assert "Confirm" not in table
+    assert "Confirm" not in table and ">Delete</button>" not in table
+
+
+def test_a_repeating_expected_row_cannot_be_deleted(rent) -> None:
+    owner, _category, occurrences = rent
+    response = owner.post(
+        f"/upcoming/{occurrences[2]}/delete",
+        {"return_month": "2026-03"},
+        token_from="/transactions/2026-03",
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/transactions/2026-03?error=not_planned"
+    assert (
+        "Only a one-time planned entry can be deleted here."
+        in owner.client.get("/transactions/2026-03?error=not_planned").text
+    )
+    with owner.db() as session:
+        assert session.get(ScheduledOccurrence, occurrences[2]) is not None
 
 
 def test_summary_expected_and_forecast_columns_kpis_and_toggle(rent) -> None:

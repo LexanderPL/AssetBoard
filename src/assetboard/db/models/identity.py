@@ -44,6 +44,10 @@ class User(IdMixin, TimestampMixin, Base):
     # The language the user chose in the profile; NULL follows the browser (F1.5).
     locale: Mapped[str | None] = mapped_column(String(8), nullable=True, default=None)
     theme: Mapped[str] = mapped_column(String(16), nullable=False, default="system")
+    # The tax pages' "not tax advice" warning was closed by this account (F3.3).
+    tax_warning_dismissed: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     is_instance_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Set for an account created by an administrator with a temporary password (F1.5): its

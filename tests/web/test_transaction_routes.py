@@ -4,6 +4,7 @@ delete and undo, autocomplete, closed months, roles, HTMX fragments and plain fo
 from __future__ import annotations
 
 import re
+from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -13,6 +14,7 @@ from sqlalchemy import select
 
 from assetboard.clock import FixedClock
 from assetboard.db.models.ledger import Category, Transaction
+from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.i18n import gettext
 from assetboard.web.ledger import FIELD_ERRORS, KIND_MISMATCH
 from tests.conftest import OwnerApp
@@ -31,6 +33,7 @@ PART_A_CODES = {
     "too_many_decimals",
     "invalid_description",
     "description_too_long",
+    "description_required_for_plan",
     "category_required",
     "invalid_category",
     "category_kind_mismatch",
@@ -159,13 +162,71 @@ def test_a_category_less_table_links_the_categories_page(ledger: OwnerApp) -> No
 
 def test_a_day_number_is_saved_in_the_viewed_month(ledger: OwnerApp) -> None:
     food = _category(ledger, "Food")
-    response = _add(ledger, _form(food, "31", "12,5"), "/m/2026-12")
+    response = _add(ledger, _form(food, "31", "12,5"), "/m/2026-08")
     assert response.headers["location"] == (
-        "/transactions/2026-12?notice=transaction_added&entry=expense&day=31#ledger-expense"
+        "/transactions/2026-08?notice=transaction_added&entry=expense&day=31#ledger-expense"
     )
     (row,) = _rows(ledger)
-    assert (str(row.date), row.amount_minor, row.currency) == ("2026-12-31", 1250, "EUR")
-    assert "Entry added." in _page(ledger, "/transactions/2026-12?notice=transaction_added")
+    assert (str(row.date), row.amount_minor, row.currency) == ("2026-08-31", 1250, "EUR")
+    assert "Entry added." in _page(ledger, "/transactions/2026-08?notice=transaction_added")
+
+
+def test_a_future_dated_entry_is_planned_as_a_one_time_item(ledger: OwnerApp) -> None:
+    food = _category(ledger, "Food")
+    response = _add(ledger, _form(food, "31", "12,5", description="Christmas gifts"), "/m/2026-12")
+    assert response.headers["location"] == (
+        "/transactions/2026-12?notice=planned&entry=expense&day=31#ledger-expense"
+    )
+    page = _page(ledger, "/transactions/2026-12?notice=planned")
+    assert "Entry planned." in page
+    assert "Christmas gifts" in page  # the pending occurrence is listed
+    assert _rows(ledger) == []
+    with ledger.db() as session:
+        item = session.scalars(select(ScheduledItem)).one()
+        occurrence = session.scalars(select(ScheduledOccurrence)).one()
+    assert (item.name, item.freq, item.auto_post, item.direction) == (
+        "Christmas gifts",
+        "once",
+        False,
+        "expense",
+    )
+    assert (occurrence.due_date, occurrence.status, occurrence.direction) == (
+        date(2026, 12, 31),
+        "pending",
+        "expense",
+    )
+
+
+def test_a_planned_entry_shows_its_day_and_can_be_deleted(ledger: OwnerApp) -> None:
+    food = _category(ledger, "Food")
+    assert (
+        _add(ledger, _form(food, "31", description="Christmas gifts"), "/m/2026-12").status_code
+        == 303
+    )
+    page = _page(ledger, "/transactions/2026-12")
+    # The expected row uses the same day-of-month column as a posted entry.
+    assert (
+        '<time datetime="2026-12-31"><span aria-hidden="true">31</span>'
+        '<span class="sr-only">Dec 31, 2026</span></time>' in page
+    )
+    assert "data-details-close" in page and ">Cancel</button>" in page
+    with ledger.db() as session:
+        occurrence = session.scalars(select(ScheduledOccurrence)).one()
+        occurrence_id = occurrence.id
+    assert f'action="/upcoming/{occurrence_id}/delete"' in page
+
+    response = ledger.post(
+        f"/upcoming/{occurrence_id}/delete",
+        {"return_month": "2026-12"},
+        token_from="/transactions/2026-12",
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == "/transactions/2026-12?notice=planned_deleted"
+    page = _page(ledger, "/transactions/2026-12?notice=planned_deleted")
+    assert "Planned entry deleted." in page
+    with ledger.db() as session:
+        assert session.scalars(select(ScheduledItem)).all() == []
+        assert session.scalars(select(ScheduledOccurrence)).all() == []
 
 
 def test_htmx_add_returns_the_section_with_a_new_entry_row_keeping_the_day(
@@ -203,9 +264,32 @@ def test_a_full_date_in_another_month_is_saved_there_and_linked(ledger: OwnerApp
         "Entry saved in September 2026.</a>" in page
     )
     assert _descriptions(page, "expense") == []
-    html = _htmx(ledger, f"{MONTH}/transactions", _form(food, "2026-11-02")).text
-    assert '<a href="/transactions/2026-11"' in html and "Entry saved in November 2026." in html
-    assert [str(r.date) for r in _rows(ledger)] == ["2026-09-07", "2026-11-02"]
+    html = _htmx(ledger, f"{MONTH}/transactions", _form(food, "2026-09-08")).text
+    assert '<a href="/transactions/2026-09"' in html and "Entry saved in September 2026." in html
+    assert [str(r.date) for r in _rows(ledger)] == ["2026-09-07", "2026-09-08"]
+
+
+def test_a_future_dated_entry_needs_a_description(ledger: OwnerApp) -> None:
+    food = _category(ledger, "Food")
+    response = _add(ledger, _form(food, "31", "12,5", description=""), "/m/2026-12")
+    assert response.status_code == 400
+    html = response.text
+    assert "Add a description. A planned entry becomes a recurring item" in html
+    assert _rows(ledger) == []
+
+
+def test_a_planned_entry_in_another_month_links_there(ledger: OwnerApp) -> None:
+    food = _category(ledger, "Food")
+    response = _htmx(ledger, f"{MONTH}/transactions", _form(food, "2027-02-02"))
+    html = response.text
+    assert '<a href="/transactions/2027-02"' in html and "Entry planned in February 2027." in html
+    assert "Entry planned." in html  # the section's status line
+    assert _rows(ledger) == []
+    page = _page(ledger, f"{PAGE}?saved_in=2027-02&planned=1")
+    assert (
+        '<a href="/transactions/2027-02" class="font-medium underline">'
+        "Entry planned in February 2027.</a>" in page
+    )
 
 
 @pytest.mark.parametrize(
@@ -285,10 +369,10 @@ def test_description_and_category_errors(ledger: OwnerApp) -> None:
     food = _category(ledger, "Food")
     salary = _category(ledger, "Salary", "income")
     cases = [
-        (_form(food, description="bad\u0000text"), "not allowed"),
-        (_form(salary), "Choose an expense category."),
+        (_form(food, "20", description="bad\u0000text"), "not allowed"),
+        (_form(salary, "20"), "Choose an expense category."),
         (
-            _form(salary, direction="income") | {"category_id": str(food)},
+            _form(salary, "20", direction="income") | {"category_id": str(food)},
             "Choose an income category.",
         ),
         (_form("not-a-uuid"), "Choose one of the listed categories."),

@@ -9,6 +9,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.db.engine import run_immediate
+from assetboard.db.models.identity import User
 from assetboard.db.models.tax import TaxRule, TaxRuleVersion
 from assetboard.db.repositories import (
     AuditEventRepository,
@@ -323,3 +324,14 @@ def archive_rule(factory: sessionmaker[Session], ctx: Context, rule_id: UUID) ->
 
 def workspace_has_fixed_tax_amounts(session: Session, ctx: Context) -> bool:
     return TaxRuleVersionRepository(session, ctx).any_fixed_amount()
+
+
+def dismiss_warning(factory: sessionmaker[Session], user_id: UUID) -> None:
+    """Remember, on the account, that the tax pages' warning was closed."""
+
+    def save(session: Session) -> None:
+        user = session.get(User, user_id)
+        if user is not None:
+            user.tax_warning_dismissed = True
+
+    run_immediate(factory, save)

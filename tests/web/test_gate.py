@@ -139,8 +139,8 @@ def _capture(app: object) -> tuple[logging.Logger, io.StringIO, logging.Handler]
     return logger, output, handler
 
 
-def test_schema_behind_with_auto_migrate_off(web: WebHarness) -> None:
-    app = web.app(auto_migrate=False)
+def test_schema_behind_with_auto_migrate_off(unmigrated_web: WebHarness) -> None:
+    app = unmigrated_web.app(auto_migrate=False)
     logger, output, handler = _capture(app)
     try:
         with TestClient(app) as client:
@@ -191,9 +191,11 @@ def test_schema_newer_than_code(web: WebHarness) -> None:
     connection.close()
 
 
-def test_gate_answers_before_the_csrf_dependency(web: WebHarness) -> None:
+def test_gate_answers_before_the_csrf_dependency(
+    web: WebHarness, unmigrated_web: WebHarness
+) -> None:
     """Middleware order: schema 503 and setup 303 come before a CSRF 403."""
-    behind = web.app(auto_migrate=False)
+    behind = unmigrated_web.app(auto_migrate=False)
     with TestClient(behind) as client:
         assert client.post("/login", data={}).status_code == 503
     open_setup = web.app()
