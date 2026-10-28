@@ -138,6 +138,7 @@ def test_work_calendar_in_a_browser(tmp_path: Path) -> None:
             repeat_fields = page.locator('[data-hidden-when="freq=once"]')
             expect(repeat_fields).to_be_visible()
             page.get_by_label("Name").fill("Wedding gift")
+            page.get_by_label("Category").select_option(label="Gifts")
             page.get_by_label("Amount", exact=True).fill("120")
             page.get_by_label("Start date").fill((date.today() + timedelta(days=30)).isoformat())
             page.get_by_label("Repeat").select_option("once")
