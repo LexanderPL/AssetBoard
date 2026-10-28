@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.4](https://github.com/LexanderPL/AssetBoard/compare/v0.3.3...v0.3.4) (2026-10-28)
+
+
+### Features
+
+* **ui:** streamline month, history and recurring flows ([#166](https://github.com/LexanderPL/AssetBoard/issues/166)) ([25881cb](https://github.com/LexanderPL/AssetBoard/commit/25881cb39842bf1c200353891ef8a8013c3db118))
+
 ## [0.3.3](https://github.com/LexanderPL/AssetBoard/compare/v0.3.2...v0.3.3) (2026-10-26)
 
 
