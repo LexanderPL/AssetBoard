@@ -64,6 +64,14 @@ class Category(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             sqlite_where=text("archived_at IS NULL"),
             postgresql_where=text("archived_at IS NULL"),
         ),
+        Index(
+            "uq_categories_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
         Index("ix_categories_workspace_kind_order", "workspace_id", "kind", "sort_order"),
     )
 
@@ -73,6 +81,7 @@ class Category(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     treatment: Mapped[str] = mapped_column(String(16), nullable=False)
     color: Mapped[str] = mapped_column(String(7), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
 
@@ -133,6 +142,14 @@ class Transaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin
             "source IN ('manual', 'recurring', 'recurring_auto', 'import')", name="source_valid"
         ),
         CheckConstraint("date >= '1900-01-01' AND date <= '2199-12-31'", name="date_in_range"),
+        Index(
+            "uq_transactions_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
         Index("ix_transactions_workspace_date", "workspace_id", "date"),
         Index("ix_transactions_workspace_category_date", "workspace_id", "category_id", "date"),
         Index(
@@ -151,6 +168,7 @@ class Transaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin
     category_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     description: Mapped[str] = mapped_column(String(MAX_DESCRIPTION_LENGTH), nullable=False)
     description_key: Mapped[str] = mapped_column(String(MAX_DESCRIPTION_KEY_LENGTH), nullable=False)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
     source: Mapped[str] = mapped_column(String(16), nullable=False)
     created_by_user_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True

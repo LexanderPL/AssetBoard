@@ -76,6 +76,9 @@
             {% if workspace_nav and workspace_nav.can_create_workspace %}
             <a href="{{ scoped_url(request, 'workspace_new') }}" data-new-workspace-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("New workspace") }}</a>
             {% endif %}
+            {% if workspace_nav and workspace_nav.role in ("owner", "editor") %}
+            <a href="{{ scoped_url(request, 'workspace_data') }}" data-workspace-data-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Export and import") }}</a>
+            {% endif %}
             {% if web_session and web_session.is_instance_admin %}
             <a href="{{ scoped_url(request, 'admin_users') }}" data-admin-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Users") }}</a>
             <a href="{{ scoped_url(request, 'admin_settings') }}" data-admin-settings-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Instance settings") }}</a>

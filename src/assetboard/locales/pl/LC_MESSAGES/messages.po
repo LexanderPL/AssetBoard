@@ -232,6 +232,9 @@ msgstr "Utworzono obszar roboczy"
 msgid "Workspace deleted"
 msgstr "Usunięto obszar roboczy"
 
+msgid "Workspace archive exported"
+msgstr "Wyeksportowano archiwum obszaru roboczego"
+
 msgid "Instance settings changed"
 msgstr "Zmieniono ustawienia instancji"
 
@@ -363,6 +366,15 @@ msgstr "Stały adres e-mail"
 
 msgid "Valid for days"
 msgstr "Ważne dni"
+
+msgid "Categories"
+msgstr "Kategorie"
+
+msgid "Planned values"
+msgstr "Wartości planowane"
+
+msgid "Transactions"
+msgstr "Transakcje"
 
 msgid "Name"
 msgstr "Nazwa"
@@ -628,17 +640,11 @@ msgstr "Zaproszenia"
 msgid "Workspace settings"
 msgstr "Ustawienia obszaru roboczego"
 
-msgid "Categories"
-msgstr "Kategorie"
+msgid "Import and export"
+msgstr "Import i eksport"
 
 msgid "Closing months"
 msgstr "Zamykanie miesięcy"
-
-msgid "Transactions"
-msgstr "Transakcje"
-
-msgid "Planned values"
-msgstr "Wartości planowane"
 
 msgid "Sign-ins"
 msgstr "Logowania"
@@ -1976,6 +1982,9 @@ msgstr "Dziennik zdarzeń: obszar roboczy"
 
 msgid "New workspace"
 msgstr "Nowy obszar roboczy"
+
+msgid "Export and import"
+msgstr "Eksport i import"
 
 msgid "Users"
 msgstr "Użytkownicy"
@@ -3990,6 +3999,26 @@ msgstr "Nie ustawiono"
 
 msgid "Time zone"
 msgstr "Strefa czasowa"
+
+msgid "Download workspace archive"
+msgstr "Pobierz archiwum obszaru roboczego"
+
+msgid ""
+"Save this workspace’s ledger, including categories, planned values, "
+"transactions, and month status."
+msgstr ""
+"Zapisz księgę tego obszaru roboczego, obejmującą kategorie, planowane "
+"wartości, transakcje i status miesięcy."
+
+msgid ""
+"Recurring items, income sources, work logs, tax rules, and notifications "
+"are not included in this archive version."
+msgstr ""
+"Ta wersja archiwum nie obejmuje pozycji cyklicznych, źródeł dochodu, "
+"ewidencji pracy, reguł podatkowych ani powiadomień."
+
+msgid "Download archive"
+msgstr "Pobierz archiwum"
 
 msgid "Delete workspace"
 msgstr "Usuń obszar roboczy"

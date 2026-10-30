@@ -16,7 +16,7 @@ decision 2026-10-19: not audited), so it is a GET.
 from __future__ import annotations
 
 import contextlib
-from collections.abc import Iterator, Mapping
+from collections.abc import Mapping
 from datetime import UTC
 from tempfile import SpooledTemporaryFile
 from typing import Any
@@ -26,8 +26,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Request
 from starlette.concurrency import run_in_threadpool
 from starlette.datastructures import ImmutableMultiDict
-from starlette.responses import RedirectResponse, Response, StreamingResponse
-from starlette.types import Receive, Scope, Send
+from starlette.responses import RedirectResponse, Response
 
 from assetboard import branding
 from assetboard.domain.ledger_csv import (
@@ -67,34 +66,13 @@ from assetboard.services.transaction_search import (
 )
 from assetboard.web.context import CurrentContext
 from assetboard.web.errors import is_htmx_fragment_request
+from assetboard.web.exports import EXPORT_SPOOL_BYTES, SpoolResponse
 from assetboard.web.rendering import render_template, scoped_url
 from assetboard.web.security import require_csrf
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
 
-class SpoolResponse(StreamingResponse):
-    """Streams a spooled export file and closes it however the response ends: after the last
-    chunk, or when sending fails (the client went away mid-download)."""
-
-    def __init__(self, spool: SpooledTemporaryFile[bytes], **kwargs: Any) -> None:
-        def chunks() -> Iterator[bytes]:
-            while data := spool.read(EXPORT_CHUNK_BYTES):
-                yield data
-
-        super().__init__(chunks(), **kwargs)
-        self.spool = spool
-
-    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
-        try:
-            await super().__call__(scope, receive, send)
-        finally:
-            self.spool.close()
-
-
-# The export is written to a spooled file first (one consistent read), then streamed.
-EXPORT_SPOOL_BYTES = 8 * 1024 * 1024
-EXPORT_CHUNK_BYTES = 64 * 1024
 # Query and form field names of the filter (short, readable URLs).
 PARAMS = {
     "date_from": "from",

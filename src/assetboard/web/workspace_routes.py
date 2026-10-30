@@ -10,7 +10,9 @@ pages. Successful writes redirect (303) back to the page they came from.
 from __future__ import annotations
 
 from dataclasses import replace
+from tempfile import SpooledTemporaryFile
 from typing import Annotated
+from urllib.parse import quote
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
@@ -20,7 +22,8 @@ from starlette.responses import RedirectResponse, Response
 from assetboard.db.engine import run_immediate
 from assetboard.domain.identity import MAX_EMAIL_LENGTH
 from assetboard.i18n import gettext
-from assetboard.services.context import Role, WorkspaceNotAvailable, select_workspace
+from assetboard.services.archive import export_workspace
+from assetboard.services.context import Role, WorkspaceNotAvailable, require_role, select_workspace
 from assetboard.services.instance_settings import workspace_creation_allowed
 from assetboard.services.workspaces import (
     DEFAULT_INVITATION_EXPIRY_DAYS,
@@ -49,6 +52,7 @@ from assetboard.services.workspaces import (
     workspace_settings,
 )
 from assetboard.web.context import CurrentContext
+from assetboard.web.exports import EXPORT_SPOOL_BYTES, SpoolResponse
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf, web_session
 from assetboard.web.workspace_forms import workspace_form_options
@@ -109,6 +113,32 @@ def _parse_uuid(value: str) -> UUID:
         return UUID(value)
     except ValueError:
         raise WorkspaceNotAvailable from None
+
+
+@router.get("/workspace/data", name="workspace_data")
+async def workspace_data(request: Request, ctx: CurrentContext) -> Response:
+    require_role(ctx, Role.EDITOR)
+    return render_template(request, "workspace/data.html")
+
+
+@router.post("/workspace/data/export", name="workspace_data_export")
+async def workspace_data_export(request: Request, ctx: CurrentContext) -> Response:
+    archive = await run_in_threadpool(export_workspace, request.app.state.session_factory, ctx)
+    spool = SpooledTemporaryFile(max_size=EXPORT_SPOOL_BYTES)  # noqa: SIM115
+    try:
+        await run_in_threadpool(spool.write, archive.content)
+        spool.seek(0)
+        return SpoolResponse(
+            spool,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f"attachment; filename*=UTF-8''{quote(archive.filename)}",
+                "Cache-Control": "no-store",
+            },
+        )
+    except BaseException:
+        spool.close()
+        raise
 
 
 # Switcher

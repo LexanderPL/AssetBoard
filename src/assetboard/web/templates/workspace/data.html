@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ _("Export and import") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Export and import") }}{% endblock %}
+{% block content %}
+<section class="max-w-2xl rounded-2xl border border-line bg-surface p-6 shadow-card">
+  <h2 class="text-lg font-semibold">{{ _("Download workspace archive") }}</h2>
+  <p class="mt-2 text-sm text-muted">{{ _("Save this workspace’s ledger, including categories, planned values, transactions, and month status.") }}</p>
+  <p class="mt-2 text-sm text-muted">{{ _("Recurring items, income sources, work logs, tax rules, and notifications are not included in this archive version.") }}</p>
+  <form method="post" action="{{ scoped_url(request, 'workspace_data_export') }}" class="mt-5">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+    <button type="submit" class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary">{{ _("Download archive") }}</button>
+  </form>
+</section>
+{% endblock %}
