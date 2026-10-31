@@ -285,7 +285,7 @@ document.addEventListener("change", (event) => {
 // Progressive disclosure: an element marked data-hidden-when="<name>=<value>" is hidden while
 // the select with that id, or the checked radio button of that name, holds that value (the
 // recurring form hides the repeat fields of a one-time item; the tax form hides fields that do
-// not apply to the chosen kind). Without JavaScript everything stays visible and the form
+// not apply to the chosen kind; the income forms show the fields of the chosen estimate). Without JavaScript everything stays visible and the form
 // explains what is ignored.
 function hiddenWhenValue(name) {
   const select = document.getElementById(name);
@@ -298,9 +298,12 @@ function hiddenWhenValue(name) {
 function applyHiddenWhen() {
   document.querySelectorAll("[data-hidden-when]").forEach((element) => {
     if (!(element instanceof HTMLElement)) return;
-    const [name, value] = (element.dataset.hiddenWhen ?? "").split("=");
+    // "<name>!=<value>" hides the element unless the field holds that value.
+    const spec = element.dataset.hiddenWhen ?? "";
+    const negated = spec.includes("!=");
+    const [name, value] = spec.split(negated ? "!=" : "=");
     const current = hiddenWhenValue(name ?? "");
-    if (current !== null) element.hidden = current === value;
+    if (current !== null) element.hidden = negated ? current !== value : current === value;
   });
 }
 document.addEventListener("change", (event) => {

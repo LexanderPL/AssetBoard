@@ -8,16 +8,21 @@ from urllib.parse import urlencode
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
+from markupsafe import escape
 from starlette.concurrency import run_in_threadpool
-from starlette.responses import RedirectResponse, Response
+from starlette.responses import HTMLResponse, RedirectResponse, Response
 
 from assetboard.db.repositories import NotFound
+from assetboard.domain.income import pay_date
+from assetboard.domain.money import Money, minor_unit_for
 from assetboard.domain.months import YearMonth
+from assetboard.domain.taxes import TaxKind
 from assetboard.domain.transactions import amount_minor
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import (
     format_day,
     format_day_long,
+    format_day_month,
     format_day_of_month,
     format_month,
     format_month_heading,
@@ -31,12 +36,13 @@ from assetboard.i18n.numbers import (
     parse_amount,
 )
 from assetboard.services import income, taxes
-from assetboard.services.categories import list_categories
-from assetboard.services.context import Context, Role, has_role
+from assetboard.services.categories import CategoryList, list_categories
+from assetboard.services.context import Context, Role, has_role, require_role
 from assetboard.web.context import CurrentContext
 from assetboard.web.errors import is_htmx_fragment_request
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
+from assetboard.web.tax_routes import rate_label
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
@@ -88,6 +94,11 @@ ERRORS = {
         "The work log was saved; posted income was not changed. "
         "Adjust its transaction manually if needed."
     ),
+    "missing_name": _("Enter a name."),
+    "invalid_unit": _("Enter what you are paid per, for example day or hour."),
+    "invalid_average": _("Enter a number of months between 1 and 24."),
+    "invalid_pay_day": _("Enter a pay day between 1 and 31."),
+    "invalid_range": _("The end month cannot be before the start month."),
     "failed": _("The income source could not be saved. Check the form and try again."),
 }
 
@@ -137,6 +148,7 @@ def _source_input(values: dict[str, str], locale: str, currency: str) -> _Source
     units = (
         parse_amount(values.get("expected_units", ""), locale)
         if values.get("expected_units", "").strip()
+        and values.get("expected_mode", "manual") == "fixed"
         else None
     )
     return {
@@ -145,7 +157,7 @@ def _source_input(values: dict[str, str], locale: str, currency: str) -> _Source
         "category_id": _id(values.get("category_id", "")),
         "fixed_minor": fixed_minor,
         "rate_minor": rate_minor,
-        "unit_label": values.get("unit_label", "day"),
+        "unit_label": _unit_label(values),
         "pay_day_value": int(values.get("pay_day", "1")),
         "pay_lag_months": int(values.get("pay_lag_months", "0")),
         "expected_mode": values.get("expected_mode", "manual"),
@@ -172,48 +184,66 @@ async def _form(request: Request) -> dict[str, str]:
     return {key: value for key, value in data.items() if isinstance(value, str)}
 
 
+def _common(request: Request, ctx: Context) -> dict[str, object]:
+    today = ctx.clock.today(ctx.workspace.timezone)
+    return {
+        "taxes_enabled": ctx.workspace.taxes_enabled,
+        "can_edit": has_role(ctx, Role.EDITOR),
+        "today": today,
+        "month_names": month_names(request.state.locale),
+        "picker_years": list(range(today.year - 10, today.year + 6)),
+        "format_money": format_money,
+        "format_amount_input": format_amount_input,
+        "format_quantity_input": format_quantity_input,
+        "format_month": _format_work_month,
+        "format_day": format_day,
+        "format_day_of_month": format_day_of_month,
+        "rate_label": rate_label,
+        "format_day_month": format_day_month,
+    }
+
+
+def _error_text(request: Request, error: str | None) -> str | None:
+    if not error:
+        return None
+    return gettext(ERRORS.get(error, ERRORS["failed"]), request.state.locale)
+
+
+def _load_page_data(
+    request: Request, ctx: Context
+) -> tuple[list[income.IncomeSourceView], CategoryList, list[taxes.TaxRuleView]]:
+    factory = request.app.state.session_factory
+    return (
+        income.list_sources(factory, ctx),
+        list_categories(factory, ctx),
+        taxes.list_rules(factory, ctx) if ctx.workspace.taxes_enabled else [],
+    )
+
+
 @router.get("/income", name="income_sources")
 async def sources_page(request: Request, ctx: CurrentContext) -> Response:
-    taxes_enabled = ctx.workspace.taxes_enabled
-    rows, categories, rules = await run_in_threadpool(
-        lambda: (
-            income.list_sources(request.app.state.session_factory, ctx),
-            list_categories(request.app.state.session_factory, ctx),
-            taxes.list_rules(request.app.state.session_factory, ctx) if taxes_enabled else [],
-        )
-    )
-    error = request.query_params.get("error")
-    today = ctx.clock.today(ctx.workspace.timezone)
+    rows, categories, rules = await run_in_threadpool(_load_page_data, request, ctx)
     return render_template(
         request,
         "income/sources.html",
         context={
             "sources": rows,
             "income_categories": categories.income,
-            "expense_categories": categories.expense,
-            "taxes_enabled": taxes_enabled,
+            "category_names": {category.id: category.name for category in categories.income},
             "tax_rules": [rule for rule in rules if not rule.archived],
-            "can_edit": has_role(ctx, Role.EDITOR),
-            "today": today,
-            "error": gettext(ERRORS.get(error, ERRORS["failed"]), request.state.locale)
-            if error
-            else None,
-            "open_form": request.query_params.get("form") if error else None,
-            "month_names": month_names(request.state.locale),
-            "picker_years": list(range(today.year - 10, today.year + 6)),
-            "format_money": format_money,
-            "format_amount_input": format_amount_input,
-            "format_quantity_input": format_quantity_input,
-            "format_month": _format_work_month,
-            "format_day": format_day,
-            "tax_rule_names": {rule.id: rule.name for rule in rules},
-            "format_day_of_month": format_day_of_month,
+            "rules_by_id": {rule.id: rule for rule in rules},
+            "withheld_ids": {rule.id for rule in rules if rule.kind == TaxKind.PAYER_WITHHELD},
+            "error": _error_text(request, request.query_params.get("error")),
+            # ``form`` reopens a collapsed form: after an error, or from a "Choose taxes" link.
+            "open_form": request.query_params.get("form"),
+            **_common(request, ctx),
         },
     )
 
 
 @router.post("/income", name="income_source_create")
 async def create_source(request: Request, ctx: CurrentContext) -> Response:
+    """The one-form create of older clients; the app itself uses the "Add income" steps."""
     values = await _form(request)
     try:
         fields = _source_input(values, request.state.locale, ctx.workspace.base_currency)
@@ -228,10 +258,396 @@ async def create_source(request: Request, ctx: CurrentContext) -> Response:
             request.app.state.settings,
         )
     except income.IncomeError as exc:
-        return _redirect(request, exc.code, "new-source")
+        return _redirect(request, exc.code)
     except (ValueError, ArithmeticError):
-        return _redirect(request, "invalid_source", "new-source")
+        return _redirect(request, "invalid_source")
     return _redirect(request)
+
+
+# "Add income": four steps without JavaScript. Every step posts all values; the fields of the
+# other steps travel in hidden inputs, and each step is validated before the next one opens.
+
+WIZARD_FIELDS = (
+    "name",
+    "category_id",
+    "kind",
+    "fixed_amount",
+    "rate_amount",
+    "unit_choice",
+    "unit_other",
+    "expected_mode",
+    "expected_units",
+    "average_months",
+    "pay_day",
+    "pay_lag_months",
+    "active_from_month",
+    "active_from_year",
+    "active_to_month",
+    "active_to_year",
+)
+# Which fields each step shows; the others are carried in hidden inputs.
+STEP_FIELDS = {
+    1: ("name", "category_id", "kind"),
+    2: (
+        "fixed_amount",
+        "rate_amount",
+        "unit_choice",
+        "unit_other",
+        "expected_mode",
+        "expected_units",
+        "average_months",
+    ),
+    3: (
+        "pay_day",
+        "pay_lag_months",
+        "active_from_month",
+        "active_from_year",
+        "active_to_month",
+        "active_to_year",
+    ),
+    4: (),
+}
+PAY_LAGS = (1, 0, 2)
+EXPECTED_MODES = ("working_days", "average", "fixed", "manual")
+
+
+def _wizard_values(
+    values: dict[str, str], ctx: Context, categories: CategoryList
+) -> dict[str, str]:
+    today = ctx.clock.today(ctx.workspace.timezone)
+    first_category = next((str(c.id) for c in categories.income), "")
+    defaults = {
+        "category_id": first_category,
+        "kind": "fixed",
+        "unit_choice": "day",
+        "expected_mode": "working_days",
+        "average_months": "3",
+        "pay_day": "10",
+        "pay_lag_months": "1",
+        "active_from_month": str(today.month),
+        "active_from_year": str(today.year),
+    }
+    return {name: values.get(name, defaults.get(name, "")).strip() for name in WIZARD_FIELDS}
+
+
+def _unit_label(values: dict[str, str]) -> str:
+    """ "Per day", "per hour" or a free label; older forms post ``unit_label`` directly."""
+    choice = values.get("unit_choice", "")
+    if choice in ("day", "hour"):
+        return choice
+    if choice == "other":
+        return values.get("unit_other", "").strip()
+    return values.get("unit_label", "day")
+
+
+def _check_step(
+    step: int, values: dict[str, str], locale: str, currency: str, categories: CategoryList
+) -> None:
+    """Raise ``IncomeError`` with the first problem of ``step``'s fields."""
+    if step == 1:
+        if not values["name"] or len(values["name"]) > 200:
+            raise income.IncomeError("missing_name")
+        if values["category_id"] not in {str(c.id) for c in categories.income}:
+            raise income.IncomeError("invalid_category")
+        if values["kind"] not in ("fixed", "variable"):
+            raise income.IncomeError("invalid_source")
+    elif step == 2:
+        field = "fixed_amount" if values["kind"] == "fixed" else "rate_amount"
+        try:
+            minor = amount_minor(parse_amount(values[field], locale), currency)
+        except (ValueError, ArithmeticError):
+            raise income.IncomeError("invalid_amount") from None
+        if minor <= 0:
+            raise income.IncomeError("invalid_amount")
+        if values["kind"] == "fixed":
+            return
+        if not 0 < len(_unit_label(values)) <= 40:
+            raise income.IncomeError("invalid_unit")
+        if values["expected_mode"] not in EXPECTED_MODES:
+            raise income.IncomeError("invalid_source")
+        if values["expected_mode"] == "fixed":
+            try:
+                units = parse_amount(values["expected_units"], locale)
+            except ValueError:
+                raise income.IncomeError("invalid_units") from None
+            if units < 0:
+                raise income.IncomeError("invalid_units")
+        if values["expected_mode"] == "average" and not _int_in(values["average_months"], 1, 24):
+            raise income.IncomeError("invalid_average")
+    elif step == 3:
+        if not _int_in(values["pay_day"], 1, 31):
+            raise income.IncomeError("invalid_pay_day")
+        if not _int_in(values["pay_lag_months"], 0, 2):
+            raise income.IncomeError("invalid_source")
+        start = _required_month(values, "active_from")
+        end = _month(values, "active_to")
+        if end is not None and end < start:
+            raise income.IncomeError("invalid_range")
+
+
+def _int_in(value: str, low: int, high: int) -> bool:
+    try:
+        return low <= int(value) <= high
+    except ValueError:
+        return False
+
+
+def _payday_sentence(values: dict[str, str], locale: str, today: date) -> str | None:
+    """ "Work done in October is paid on November 10." for the chosen start month."""
+    try:
+        work_month = _month(values, "active_from") or today.replace(day=1)
+        paid_on = pay_date(work_month, int(values["pay_day"]), int(values["pay_lag_months"]))
+    except (ValueError, income.IncomeError):
+        return None
+    return gettext(_("Work done in %(month)s is paid on %(date)s."), locale) % {
+        "month": month_names(locale)[work_month.month - 1],
+        "date": format_day_month(paid_on, locale),
+    }
+
+
+def _wizard_example(
+    request: Request, ctx: Context, values: dict[str, str], rule_ids: list[UUID]
+) -> taxes.IncomeTaxExample | None:
+    """The step-4 example: the fixed amount, or a sample of 10 000 for paid-per-unit income,
+    paid on the first pay date, with the ticked taxes."""
+    currency = ctx.workspace.base_currency
+    try:
+        if values["kind"] == "fixed":
+            amount = parse_amount(values["fixed_amount"], request.state.locale)
+            minor = amount_minor(amount, currency)
+        else:
+            minor = taxes.EXAMPLE_NET_MAJOR * 10 ** minor_unit_for(currency)
+        work_month = _required_month(values, "active_from")
+        paid_on = pay_date(work_month, int(values["pay_day"]), int(values["pay_lag_months"]))
+    except (ValueError, ArithmeticError, income.IncomeError):
+        return None
+    return taxes.income_example(
+        request.app.state.session_factory,
+        ctx,
+        rule_ids,
+        net=Money(minor, currency),
+        paid_on=paid_on,
+    )
+
+
+def _selected_rules(form_rules: list[str], rules: list[taxes.TaxRuleView]) -> list[UUID]:
+    active = {str(rule.id): rule.id for rule in rules if not rule.archived}
+    return [active[value] for value in dict.fromkeys(form_rules) if value in active]
+
+
+async def _render_wizard(
+    request: Request,
+    ctx: Context,
+    step: int,
+    raw: dict[str, str],
+    form_rules: list[str],
+    *,
+    error: str | None = None,
+) -> Response:
+    categories, rules = await run_in_threadpool(
+        lambda: (
+            list_categories(request.app.state.session_factory, ctx),
+            taxes.list_rules(request.app.state.session_factory, ctx)
+            if ctx.workspace.taxes_enabled
+            else [],
+        )
+    )
+    values = _wizard_values(raw, ctx, categories)
+    selected = _selected_rules(form_rules, rules)
+    last_step = 4 if ctx.workspace.taxes_enabled else 3
+    example = (
+        await run_in_threadpool(_wizard_example, request, ctx, values, selected)
+        if step == 4
+        else None
+    )
+    labels = [_("Basics"), _("Amount"), _("Payday"), _("Taxes")][:last_step]
+    return render_template(
+        request,
+        "income/new.html",
+        context={
+            "step": step,
+            "last_step": last_step,
+            "steps": [gettext(label, request.state.locale) for label in labels],
+            "values": values,
+            "hidden_fields": [name for name in WIZARD_FIELDS if name not in STEP_FIELDS[step]],
+            "income_categories": categories.income,
+            "tax_rules": [rule for rule in rules if not rule.archived],
+            "selected_rules": selected,
+            "example": example,
+            "payday_sentence": _payday_sentence(
+                values, request.state.locale, ctx.clock.today(ctx.workspace.timezone)
+            ),
+            "active_from": _month_or_none(values, "active_from"),
+            "active_to": _month_or_none(values, "active_to"),
+            "error": _error_text(request, error),
+            **_common(request, ctx),
+        },
+        status_code=400 if error else 200,
+    )
+
+
+def _month_or_none(values: dict[str, str], name: str) -> date | None:
+    try:
+        return _month(values, name)
+    except income.IncomeError:
+        return None
+
+
+@router.get("/income/new", name="income_new")
+async def new_income_page(request: Request, ctx: CurrentContext) -> Response:
+    require_role(ctx, Role.EDITOR)
+    return await _render_wizard(request, ctx, 1, {}, [])
+
+
+@router.post("/income/new", name="income_new_step")
+async def new_income_step(request: Request, ctx: CurrentContext) -> Response:
+    """One step of "Add income": ``go=back`` returns without checks, ``go=next`` checks this
+    step's fields and opens the next step, or saves the source after the last step."""
+    require_role(ctx, Role.EDITOR)
+    form = await request.form()
+    raw = {key: value for key, value in form.items() if isinstance(value, str)}
+    form_rules = [str(value) for value in form.getlist("tax_rule_id")]
+    last_step = 4 if ctx.workspace.taxes_enabled else 3
+    step = _int_or(raw.get("step", "1"), 1)
+    step = min(max(step, 1), last_step)
+    if raw.get("go") == "back":
+        return await _render_wizard(request, ctx, max(step - 1, 1), raw, form_rules)
+    categories = await run_in_threadpool(list_categories, request.app.state.session_factory, ctx)
+    values = _wizard_values(raw, ctx, categories)
+    # Every step up to this one is checked again: hidden values can be edited too.
+    for checked in range(1, step + 1):
+        try:
+            _check_step(
+                checked, values, request.state.locale, ctx.workspace.base_currency, categories
+            )
+        except income.IncomeError as exc:
+            return await _render_wizard(request, ctx, checked, raw, form_rules, error=exc.code)
+    if step < last_step:
+        return await _render_wizard(request, ctx, step + 1, raw, form_rules)
+    rules = (
+        await run_in_threadpool(taxes.list_rules, request.app.state.session_factory, ctx)
+        if ctx.workspace.taxes_enabled
+        else []
+    )
+    try:
+        fields = _source_input(
+            values | {"unit_label": _unit_label(values)},
+            request.state.locale,
+            ctx.workspace.base_currency,
+        )
+        selected = tuple(_selected_rules(form_rules, rules))
+        await run_in_threadpool(
+            lambda: income.create_source(
+                request.app.state.session_factory, ctx, **fields, tax_rule_ids=selected
+            )
+        )
+        await run_in_threadpool(
+            income.generate_workspace,
+            request.app.state.session_factory,
+            ctx,
+            ctx.clock,
+            request.app.state.settings,
+        )
+    except income.IncomeError as exc:
+        return await _render_wizard(request, ctx, step, raw, form_rules, error=exc.code)
+    except (ValueError, ArithmeticError):
+        return await _render_wizard(request, ctx, step, raw, form_rules, error="invalid_source")
+    return _redirect(request)
+
+
+@router.post("/income/new/example", name="income_new_example")
+async def new_income_example(request: Request, ctx: CurrentContext) -> Response:
+    """The example on the last step of "Add income" (htmx swaps it when a tax is ticked)."""
+    if not ctx.workspace.taxes_enabled:
+        raise NotFound
+    form = await request.form()
+    raw = {key: value for key, value in form.items() if isinstance(value, str)}
+    categories, rules = await run_in_threadpool(
+        lambda: (
+            list_categories(request.app.state.session_factory, ctx),
+            taxes.list_rules(request.app.state.session_factory, ctx),
+        )
+    )
+    values = _wizard_values(raw, ctx, categories)
+    selected = _selected_rules([str(value) for value in form.getlist("tax_rule_id")], rules)
+    example = await run_in_threadpool(_wizard_example, request, ctx, values, selected)
+    return render_template(
+        request, "income/_example.html", context={"example": example, **_common(request, ctx)}
+    )
+
+
+@router.post("/income/payday-sentence", name="income_payday_sentence")
+async def payday_sentence(request: Request, ctx: CurrentContext) -> Response:
+    """The live payday sentence of the income forms (htmx swaps it on change)."""
+    values = await _form(request)
+    sentence = _payday_sentence(
+        values, request.state.locale, ctx.clock.today(ctx.workspace.timezone)
+    )
+    return HTMLResponse(escape(sentence or ""))
+
+
+def _int_or(value: str, default: int) -> int:
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+def _values_from_source(source: income.IncomeSourceView, locale: str) -> dict[str, str]:
+    """The edit form's field values, in the same shape as the "Add income" steps."""
+    known_unit = source.unit_label in ("day", "hour")
+    return {
+        "name": source.name,
+        "category_id": str(source.category_id),
+        "kind": source.kind.value,
+        "fixed_amount": format_amount_input(Money(source.fixed_minor, source.currency), locale)
+        if source.fixed_minor is not None
+        else "",
+        "rate_amount": format_amount_input(Money(source.rate_minor, source.currency), locale)
+        if source.rate_minor is not None
+        else "",
+        "unit_choice": source.unit_label if known_unit else "other",
+        "unit_other": "" if known_unit else source.unit_label,
+        "expected_mode": source.expected_mode.value,
+        "expected_units": format_quantity_input(source.expected_units, locale)
+        if source.expected_units is not None
+        else "",
+        "average_months": str(source.average_months),
+        "pay_day": str(source.pay_day),
+        "pay_lag_months": str(source.pay_lag_months),
+    }
+
+
+@router.get("/income/{source_id}/edit", name="income_source_edit")
+async def edit_page(request: Request, ctx: CurrentContext, source_id: str) -> Response:
+    require_role(ctx, Role.EDITOR)
+    wanted = _id(source_id)
+    rows, categories, _rules = await run_in_threadpool(_load_page_data, request, ctx)
+    source = next((row for row in rows if row.id == wanted and not row.archived), None)
+    if source is None:
+        raise NotFound
+    return render_template(
+        request,
+        "income/edit.html",
+        context={
+            "source": source,
+            "values": _values_from_source(source, request.state.locale),
+            "income_categories": categories.income
+            + tuple(c for c in categories.archived if c.id == source.category_id),
+            "error": _error_text(request, request.query_params.get("error")),
+            "payday_sentence": _payday_sentence(
+                {
+                    "pay_day": str(source.pay_day),
+                    "pay_lag_months": str(source.pay_lag_months),
+                    "active_from_month": str(source.active_from.month),
+                    "active_from_year": str(source.active_from.year),
+                },
+                request.state.locale,
+                ctx.clock.today(ctx.workspace.timezone),
+            ),
+            **_common(request, ctx),
+        },
+    )
 
 
 @router.post("/income/{source_id}", name="income_source_update")
@@ -253,10 +669,15 @@ async def update_source(request: Request, ctx: CurrentContext, source_id: str) -
             request.app.state.settings,
         )
     except income.IncomeError as exc:
-        return _redirect(request, exc.code, f"edit-{source_id}")
+        return _edit_redirect(request, source_id, exc.code)
     except (ValueError, ArithmeticError):
-        return _redirect(request, "invalid_source", f"edit-{source_id}")
+        return _edit_redirect(request, source_id, "invalid_source")
     return _redirect(request)
+
+
+def _edit_redirect(request: Request, source_id: str, error: str) -> Response:
+    target = request.url_for("income_source_edit", source_id=source_id).path
+    return RedirectResponse(f"{target}?{urlencode({'error': error})}", status_code=303)
 
 
 @router.post("/income/{source_id}/archive", name="income_source_archive")

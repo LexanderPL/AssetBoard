@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% from "income/_macros.html" import basics_fields, amount_fields, payday_fields with context %}
+{% block title %}{{ _("Edit %(name)s", name=source.name) }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Edit %(name)s", name=source.name) }}{% endblock %}
+{% block content %}
+<a href="{{ scoped_url(request, 'income_sources') }}" class="mb-4 inline-flex rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Back to Income") }}</a>
+<section class="panel max-w-3xl p-5 sm:p-6" aria-label="{{ _('Edit income') }}">
+  {% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ error }}</p>{% endif %}
+  <form method="post" action="{{ scoped_url(request, 'income_source_update', source_id=source.id) }}" class="grid gap-6" data-income-edit>
+    {{ csrf_input() }}
+    {{ basics_fields(values, income_categories) }}
+    {{ amount_fields(values, source.currency, both=true) }}
+    {{ payday_fields(values, payday_sentence, source.active_from, source.active_to, "edit-income") }}
+    <div class="flex flex-wrap gap-2 border-t border-line pt-4">
+      <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save income") }}</button>
+      <a href="{{ scoped_url(request, 'income_sources') }}" class="rounded-lg border border-line px-4 py-2 text-sm font-medium hover:bg-subtle">{{ _("Cancel") }}</a>
+    </div>
+  </form>
+  <form method="post" action="{{ scoped_url(request, 'income_source_archive', source_id=source.id) }}" class="mt-6 border-t border-line pt-4" data-confirm="{{ _('Archive the income source %(name)s?', name=source.name) }}">
+    {{ csrf_input() }}
+    <button type="submit" class="rounded-lg border border-line px-3 py-1.5 text-sm text-danger hover:bg-subtle">{{ _("Archive") }}</button>
+  </form>
+</section>
+{% endblock %}

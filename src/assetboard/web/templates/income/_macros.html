@@ -1,0 +1,101 @@
+{# Shared pieces of the Income page, "Add income" and the edit form. #}
+{% from "macros/components.html" import month_picker with context %}
+{% set input_class = "form-control rounded-lg px-3 py-2" %}
+{% set option_class = "flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-surface p-3 hover:bg-subtle has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40" %}
+
+{% macro paid_phrase(day, lag) -%}
+{%- set ordinal = format_day_of_month(day, locale) -%}
+{%- if lag == 0 %}{{ _("paid on the %(day)s of the same month", day=ordinal) }}
+{%- elif lag == 1 %}{{ _("paid on the %(day)s of the next month", day=ordinal) }}
+{%- elif lag == 2 %}{{ _("paid on the %(day)s two months later", day=ordinal) }}
+{%- else %}{{ _("paid on the %(day)s, %(months)s months later", day=ordinal, months=lag) }}{% endif -%}
+{%- endmacro %}
+
+{% macro per_unit(amount, unit) -%}
+{%- if unit == "day" %}{{ _("%(rate)s per day", rate=amount) }}
+{%- elif unit == "hour" %}{{ _("%(rate)s per hour", rate=amount) }}
+{%- else %}{{ _("%(rate)s per %(unit)s", rate=amount, unit=unit) }}{% endif -%}
+{%- endmacro %}
+
+{% macro units_text(units, unit) -%}
+{%- set count = units|int if units % 1 == 0 else 5 -%}
+{%- set shown = format_quantity_input(units, locale) -%}
+{%- if unit == "day" %}{{ ngettext("%(units)s day", "%(units)s days", count, units=shown) }}
+{%- elif unit == "hour" %}{{ ngettext("%(units)s hour", "%(units)s hours", count, units=shown) }}
+{%- else %}{{ shown }} {{ unit }}{% endif -%}
+{%- endmacro %}
+
+{% macro estimate_text(mode, average_months, expected_units, unit) -%}
+{%- if mode == "working_days" %}{{ _("estimate: working days") }}
+{%- elif mode == "average" %}{{ ngettext("estimate: average of the last %(num)d month", "estimate: average of the last %(num)d months", average_months) }}
+{%- elif mode == "fixed" and expected_units is not none %}{{ _("estimate: %(units)s a month", units=units_text(expected_units, unit)) }}
+{%- else %}{{ _("no estimate: you enter it yourself") }}{% endif -%}
+{%- endmacro %}
+
+{% macro basics_fields(values, categories) %}
+<label class="grid gap-1 text-sm font-medium">{{ _("Name") }}<input name="name" value="{{ values.name }}" maxlength="200" required class="{{ input_class }} font-normal"></label>
+<label class="grid gap-1 text-sm font-medium">{{ _("Income category") }}<select name="category_id" required class="form-select rounded-lg py-2 font-normal">{% for category in categories %}<option value="{{ category.id }}"{% if values.category_id == category.id|string %} selected{% endif %}>{{ category.name }}</option>{% endfor %}</select></label>
+<fieldset class="grid gap-2">
+  <legend class="mb-2 text-sm font-medium">{{ _("How is it paid?") }}</legend>
+  <div class="grid gap-2 sm:grid-cols-2">
+  {% for value, title, description in (
+    ("fixed", _("A fixed amount"), _("Salary, pension, rent you receive")),
+    ("variable", _("Per day or hour"), _("Contract work; you log what you worked")),
+  ) %}
+  <label class="{{ option_class }}" data-kind-option="{{ value }}">
+    <input type="radio" name="kind" value="{{ value }}" class="mt-1 h-4 w-4 accent-primary"{% if values.kind == value %} checked{% endif %}>
+    <span class="grid gap-0.5"><span class="text-sm font-semibold">{{ title }}</span><span class="text-sm text-muted">{{ description }}</span></span>
+  </label>
+  {% endfor %}
+  </div>
+</fieldset>
+{% endmacro %}
+
+{# ``both``: the edit form shows the fields of both kinds and hides the other kind's with JS. #}
+{% macro amount_fields(values, currency, both=false) %}
+{% if both or values.kind == "fixed" %}
+<div class="grid gap-1"{% if both %} data-hidden-when="kind=variable"{% endif %} data-fixed-fields>
+  <label class="grid max-w-xs gap-1 text-sm font-medium" for="fixed_amount">{{ _("Amount you are paid each month (%(currency)s)", currency=currency) }}</label>
+  <input id="fixed_amount" name="fixed_amount" value="{{ values.fixed_amount }}" inputmode="decimal" aria-describedby="fixed-amount-help" class="{{ input_class }} max-w-xs">
+  <p id="fixed-amount-help" class="text-xs text-muted">{{ _("Enter the amount before the taxes you plan here. If you don't plan taxes, enter what lands on your account.") }}</p>
+</div>
+{% endif %}
+{% if both or values.kind == "variable" %}
+<div class="grid gap-4"{% if both %} data-hidden-when="kind=fixed"{% endif %} data-unit-fields>
+  <div class="flex flex-wrap gap-4">
+    <label class="grid gap-1 text-sm font-medium">{{ _("Rate (%(currency)s)", currency=currency) }}<input name="rate_amount" value="{{ values.rate_amount }}" inputmode="decimal" class="{{ input_class }} w-40 font-normal"></label>
+    <label class="grid gap-1 text-sm font-medium">{{ _("Per") }}<select id="unit_choice" name="unit_choice" class="form-select rounded-lg py-2 font-normal">
+      {% for value, label in (("day", _("day")), ("hour", _("hour")), ("other", _("something else"))) %}<option value="{{ value }}"{% if values.unit_choice == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></label>
+    <label class="grid gap-1 text-sm font-medium" data-hidden-when="unit_choice!=other">{{ _("Unit name") }}<input name="unit_other" value="{{ values.unit_other }}" maxlength="40" class="{{ input_class }} w-40 font-normal"></label>
+  </div>
+  <div class="flex flex-wrap gap-4">
+    <label class="grid gap-1 text-sm font-medium">{{ _("Until you log the real number, estimate it from") }}<select id="expected_mode" name="expected_mode" class="form-select rounded-lg py-2 font-normal">
+      {% for value, label in (("working_days", _("working days in the month")), ("average", _("the average of the last months")), ("fixed", _("a fixed number")), ("manual", _("nothing, I'll enter it myself"))) %}<option value="{{ value }}"{% if values.expected_mode == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></label>
+    <label class="grid gap-1 text-sm font-medium" data-hidden-when="expected_mode!=average">{{ _("Number of months") }}<input name="average_months" type="number" min="1" max="24" value="{{ values.average_months }}" class="{{ input_class }} w-24 font-normal"></label>
+    <label class="grid gap-1 text-sm font-medium" data-hidden-when="expected_mode!=fixed">{{ _("Units a month") }}<input name="expected_units" value="{{ values.expected_units }}" inputmode="decimal" class="{{ input_class }} w-28 font-normal"></label>
+  </div>
+</div>
+{% endif %}
+{% endmacro %}
+
+{% macro payday_fields(values, sentence, active_from, active_to, id_prefix) %}
+{% set lag = values.pay_lag_months|int(-1) %}
+<fieldset class="grid gap-2">
+  <legend class="mb-1 text-sm font-medium">{{ _("When are you paid?") }}</legend>
+  <div class="flex flex-wrap items-center gap-2 text-sm">
+    <label for="{{ id_prefix }}-pay-day">{{ _("Paid on day") }}</label>
+    <input id="{{ id_prefix }}-pay-day" name="pay_day" type="number" min="1" max="31" value="{{ values.pay_day }}" required class="{{ input_class }} w-20">
+    <select name="pay_lag_months" aria-label="{{ _('Which month') }}" class="form-select rounded-lg py-2">
+      {% for value, label in ((1, _("of the next month")), (0, _("of the same month")), (2, _("two months later"))) %}<option value="{{ value }}"{% if lag == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      {% if lag > 2 %}<option value="{{ lag }}" selected>{{ _("%(months)s months later", months=lag) }}</option>{% endif %}
+    </select>
+  </div>
+  <p class="text-sm text-muted" aria-live="polite" data-payday-sentence hx-post="{{ scoped_url(request, 'income_payday_sentence') }}" hx-trigger="change from:closest form, input from:closest form delay:400ms" hx-include="closest form" hx-sync="this:replace" hx-swap="innerHTML">{{ sentence or "" }}</p>
+</fieldset>
+<div class="grid gap-4 sm:grid-cols-2">
+  {{ month_picker("active_from", _("Starts with work month"), active_from, id_prefix=id_prefix) }}
+  {{ month_picker("active_to", _("Ends with work month (optional)"), active_to, required=false, id_prefix=id_prefix) }}
+</div>
+{% endmacro %}

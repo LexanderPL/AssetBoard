@@ -1,130 +1,145 @@
 {% extends "base.html" %}
-{% from "macros/components.html" import csrf_input, month_picker, summary_button, summary_button_primary with context %}
+{% from "macros/components.html" import csrf_input, month_picker, summary_button with context %}
 {% from "taxes/_macros.html" import when with context %}
-{% block title %}{{ _("Income sources") }} · {{ app_name }}{% endblock %}
-{% block heading %}{{ _("Income sources") }}{% endblock %}
+{% from "income/_macros.html" import paid_phrase, per_unit, units_text, estimate_text with context %}
+{% block title %}{{ _("Income") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Income") }}{% endblock %}
 {% block content %}
+{% set secondary = "inline-flex items-center rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle" %}
+{% set chip = "inline-flex rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary-ink" %}
+{% set muted_chip = "ml-1 inline-flex rounded-full border border-line px-2 py-0.5 text-xs text-muted" %}
+<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
+  <p class="text-sm text-muted">{{ _("Where your money comes from and what you will receive next.") }}</p>
+  {% if can_edit %}<a href="{{ scoped_url(request, 'income_new') }}" class="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-add-income>{{ _("Add income") }}</a>{% endif %}
+</div>
 {% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong">{{ error }}</p>{% endif %}
-{% if can_edit %}
-<details class="mb-6" data-new-income-source{% if open_form == "new-source" %} open{% endif %}>
-  <summary class="{{ summary_button_primary }}">{{ _("New income source") }}</summary>
-  <section class="panel mt-3 p-4 sm:p-6" aria-label="{{ _('New income source') }}">
-  <form method="post" action="{{ scoped_url(request, 'income_source_create') }}" class="grid gap-4 sm:grid-cols-2">
-    {{ csrf_input() }}
-    <label class="grid gap-1 text-sm">{{ _("Name") }}<input name="name" maxlength="200" required class="form-control rounded-lg px-3 py-2"></label>
-    <label class="grid gap-1 text-sm">{{ _("Type") }}<select name="kind" class="form-select rounded-lg py-2"><option value="variable">{{ _("Variable") }}</option><option value="fixed">{{ _("Fixed") }}</option></select></label>
-    <label class="grid gap-1 text-sm">{{ _("Income category") }}<select name="category_id" required class="form-select rounded-lg py-2">{% for category in income_categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</select></label>
-    <label class="grid gap-1 text-sm">{{ _("Fixed amount (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="fixed_amount" inputmode="decimal" class="form-control rounded-lg px-3 py-2"></label>
-    <label class="grid gap-1 text-sm">{{ _("Rate per unit (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="rate_amount" inputmode="decimal" class="form-control rounded-lg px-3 py-2"></label>
-    <label class="grid gap-1 text-sm">{{ _("Unit label") }}<input name="unit_label" value="day" maxlength="40" required class="form-control rounded-lg px-3 py-2"></label>
-    <label class="grid gap-1 text-sm">{{ _("Pay day of month") }}<input name="pay_day" type="number" min="1" max="31" value="10" required class="form-control rounded-lg px-3 py-2"></label>
-    <label class="grid gap-1 text-sm">{{ _("Pay lag in months") }}<input name="pay_lag_months" type="number" min="0" max="24" value="0" required class="form-control rounded-lg px-3 py-2"></label>
-    <label class="grid gap-1 text-sm">{{ _("Expected units") }}<select name="expected_mode" class="form-select rounded-lg py-2"><option value="working_days">{{ _("Working days") }}</option><option value="fixed">{{ _("Fixed value") }}</option><option value="average">{{ _("Average of recent months") }}</option><option value="manual">{{ _("Enter manually") }}</option></select></label>
-    <label class="grid gap-1 text-sm">{{ _("Fixed expected units") }}<input name="expected_units" inputmode="decimal" class="form-control rounded-lg px-3 py-2"></label>
-    <label class="grid gap-1 text-sm">{{ _("Months for average") }}<input name="average_months" type="number" min="1" max="24" value="3" class="form-control rounded-lg px-3 py-2"></label>
-    {{ month_picker("active_from", _("Active from work month"), today.replace(day=1), id_prefix="new-source") }}
-    {{ month_picker("active_to", _("Active through work month (optional)"), None, required=false, id_prefix="new-source") }}
-    <button type="submit" class="rounded-lg bg-primary px-4 py-2 font-semibold text-on-primary sm:col-span-2">{{ _("Create income source") }}</button>
-  </form>
-  </section>
-</details>
-{% endif %}
 <div class="space-y-4">
 {% for source in sources %}
-<section id="income-source-{{ source.id }}" class="panel p-4 sm:p-6" data-income-source="{{ source.id }}">
-  <div class="flex flex-wrap items-start justify-between gap-3">
-    <div>
-      <h2 class="font-semibold">{{ source.name }}</h2>
-      <p class="mt-1 text-sm text-muted">{{ _("Fixed") if source.kind.value == "fixed" else _("Variable") }} · {{ _("Pay day %(day)s, lag %(lag)s months", day=source.pay_day, lag=source.pay_lag_months) }}</p>
-    </div>
-    {% if can_edit and not source.archived %}
-    <form method="post" action="{{ scoped_url(request, 'income_source_archive', source_id=source.id) }}" data-confirm="{{ _('Archive the income source %(name)s?', name=source.name) }}">{{ csrf_input() }}<button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm text-danger">{{ _("Archive") }}</button></form>
-    {% endif %}
+{% set fixed = source.kind.value == "fixed" %}
+{% set attached = source.attachments|selectattr("tax_rule_id", "in", rules_by_id)|list if taxes_enabled else [] %}
+{% set with_taxes = attached|length > 0 %}
+<section id="income-source-{{ source.id }}" class="panel p-4 sm:p-6" aria-labelledby="income-source-{{ source.id }}-name" data-income-source="{{ source.id }}">
+  <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+    <h2 id="income-source-{{ source.id }}-name" class="text-base font-semibold">{{ source.name }}</h2>
+    <p class="text-sm text-muted" data-income-summary>
+      {%- if fixed %}{{ _("Fixed · %(amount)s on the %(day)s · Income category: %(category)s", amount=format_money(Money(source.fixed_minor, source.currency), locale), day=format_day_of_month(source.pay_day, locale), category=category_names.get(source.category_id, "")) }}
+      {%- else %}{{ per_unit(format_money(Money(source.rate_minor, source.currency), locale), source.unit_label) }} · {{ paid_phrase(source.pay_day, source.pay_lag_months) }} · {{ estimate_text(source.expected_mode.value, source.average_months, source.expected_units, source.unit_label) }}{% endif -%}
+    </p>
   </div>
   {% if source.archived %}<p class="mt-2 text-sm text-muted">{{ _("Archived") }}</p>{% endif %}
-  {% if can_edit and not source.archived %}
-  <details class="mt-4"{% if open_form == "edit-" ~ source.id %} open{% endif %}>
-    <summary class="cursor-pointer text-sm font-semibold text-primary-ink">{{ _("Edit income source") }}</summary>
-    <form method="post" action="{{ scoped_url(request, 'income_source_update', source_id=source.id) }}" class="mt-3 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
-      {{ csrf_input() }}
-      <label class="grid gap-1 text-sm">{{ _("Name") }}<input name="name" value="{{ source.name }}" maxlength="200" required class="form-control rounded-lg px-3 py-2"></label>
-      <label class="grid gap-1 text-sm">{{ _("Type") }}<select name="kind" class="form-select rounded-lg py-2"><option value="variable"{% if source.kind.value == "variable" %} selected{% endif %}>{{ _("Variable") }}</option><option value="fixed"{% if source.kind.value == "fixed" %} selected{% endif %}>{{ _("Fixed") }}</option></select></label>
-      <label class="grid gap-1 text-sm">{{ _("Income category") }}<select name="category_id" required class="form-select rounded-lg py-2">{% for category in income_categories %}<option value="{{ category.id }}"{% if category.id == source.category_id %} selected{% endif %}>{{ category.name }}</option>{% endfor %}</select></label>
-      <label class="grid gap-1 text-sm">{{ _("Fixed amount (%(currency)s)", currency=source.currency) }}<input name="fixed_amount" inputmode="decimal" value="{% if source.fixed_minor is not none %}{{ format_amount_input(Money(source.fixed_minor, source.currency), locale) }}{% endif %}" class="form-control rounded-lg px-3 py-2"></label>
-      <label class="grid gap-1 text-sm">{{ _("Rate per unit (%(currency)s)", currency=source.currency) }}<input name="rate_amount" inputmode="decimal" value="{% if source.rate_minor is not none %}{{ format_amount_input(Money(source.rate_minor, source.currency), locale) }}{% endif %}" class="form-control rounded-lg px-3 py-2"></label>
-      <label class="grid gap-1 text-sm">{{ _("Unit label") }}<input name="unit_label" value="{{ source.unit_label }}" maxlength="40" required class="form-control rounded-lg px-3 py-2"></label>
-      <label class="grid gap-1 text-sm">{{ _("Pay day of month") }}<input name="pay_day" type="number" min="1" max="31" value="{{ source.pay_day }}" required class="form-control rounded-lg px-3 py-2"></label>
-      <label class="grid gap-1 text-sm">{{ _("Pay lag in months") }}<input name="pay_lag_months" type="number" min="0" max="24" value="{{ source.pay_lag_months }}" required class="form-control rounded-lg px-3 py-2"></label>
-      <label class="grid gap-1 text-sm">{{ _("Expected units") }}<select name="expected_mode" class="form-select rounded-lg py-2"><option value="working_days"{% if source.expected_mode.value == "working_days" %} selected{% endif %}>{{ _("Working days") }}</option><option value="fixed"{% if source.expected_mode.value == "fixed" %} selected{% endif %}>{{ _("Fixed value") }}</option><option value="average"{% if source.expected_mode.value == "average" %} selected{% endif %}>{{ _("Average of recent months") }}</option><option value="manual"{% if source.expected_mode.value == "manual" %} selected{% endif %}>{{ _("Enter manually") }}</option></select></label>
-      <label class="grid gap-1 text-sm">{{ _("Fixed expected units") }}<input name="expected_units" inputmode="decimal" value="{{ format_quantity_input(source.expected_units, locale) if source.expected_units is not none else '' }}" class="form-control rounded-lg px-3 py-2"></label>
-      <label class="grid gap-1 text-sm">{{ _("Months for average") }}<input name="average_months" type="number" min="1" max="24" value="{{ source.average_months }}" class="form-control rounded-lg px-3 py-2"></label>
-      {{ month_picker("active_from", _("Active from work month"), source.active_from, id_prefix="source-" ~ source.id) }}
-      {{ month_picker("active_to", _("Active through work month (optional)"), source.active_to, required=false, id_prefix="source-" ~ source.id) }}
-      <button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm font-semibold sm:col-span-2">{{ _("Save income source") }}</button>
-    </form>
-  </details>
-  {% endif %}
-  {% if source.preview %}
-  <h3 class="mt-4 text-sm font-semibold">{{ _("Next occurrences with tax preview") if taxes_enabled else _("Next occurrences") }}</h3>
-  <ul class="mt-2 space-y-3 text-sm">
-    {% for item in source.preview %}
-    {% set b = item.breakdown %}
-    <li class="rounded-lg border border-line p-3" data-income-preview>
-      <p class="font-medium">{{ format_day(item.due_date, locale) }} · {{ _("Work month: %(month)s", month=format_month(item.work_month, locale)) }} · {{ _("Estimated") if item.amount_state == "estimated" else _("Confirmed") }}</p>
-      {% if item.units is not none %}<p class="mt-1 text-muted">{{ _("Expected units: %(units)s", units=format_quantity_input(item.units, locale)) }}</p>{% endif %}
-      {% if taxes_enabled and (b.added or b.deducted) %}
-      <p class="mt-1">{{ _("Net: %(amount)s", amount=format_money(b.net, locale)) }}</p>
-      {% for line in b.added %}<p>+ {{ item.tax_names.get(line.name, line.name) }} · {{ format_money(line.amount, locale) }}</p>{% endfor %}
-      {% for line in b.deducted %}<p>{% if line.kind.value == "payer_withheld" %}− {{ item.tax_names.get(line.name, line.name) }} · {{ format_money(line.amount, locale) }}{% else %}{{ _("%(name)s (to pay later)", name=item.tax_names.get(line.name, line.name)) }} · {{ format_money(line.amount, locale) }}{% endif %}</p>{% endfor %}
-      {% endif %}
-      <p class="font-semibold" data-income-receive>{{ _("You receive: %(amount)s", amount=format_money(b.ledger_amount, locale)) }}</p>
-      {% if taxes_enabled %}{% for payment in b.payments %}<p>{{ _("Tax to pay: %(name)s %(amount)s on %(date)s", name=item.tax_names.get(payment.name, payment.name), amount=format_money(payment.amount, locale), date=format_day(item.payment_dates[payment.name], locale)) }}</p>{% endfor %}{% endif %}
-    </li>
+
+  {% if with_taxes %}
+  <p class="mt-3 flex flex-wrap items-center gap-2 text-sm" data-income-tax-chips>
+    <span class="text-muted">{{ _("Taxes on this income:") }}</span>
+    {% for attachment in attached %}{% set rule = rules_by_id[attachment.tax_rule_id] %}
+    <span class="{{ chip }}" data-tax-chip>
+      {%- set label = rule.name ~ " " ~ rate_label(rule.current, locale) -%}
+      {%- if rule.kind.value == "added" %}{{ _("%(tax)s · added on top", tax=label) }}
+      {%- elif rule.kind.value == "self_paid" %}{{ _("%(tax)s · paid by you", tax=label) }}
+      {%- else %}{{ _("%(tax)s · taken off by the payer", tax=label) }}{% endif -%}
+    </span>
     {% endfor %}
-  </ul>
+  </p>
   {% endif %}
-  <h3 class="mt-4 text-sm font-semibold">{{ _("Work logs") }}</h3>
-  {% if source.work_logs %}
-  <ul class="mt-2 flex flex-wrap gap-3 text-sm">{% for log in source.work_logs %}<li>{{ format_month(log.work_month, locale) }} · {{ format_quantity_input(log.units, locale) }}{% if log.derived_from_days %} · <a href="{{ scoped_url(request, 'income_calendar', source_id=source.id|string) }}?month={{ log.work_month.strftime('%Y-%m') }}" class="text-primary-ink underline" data-derived-log>{{ _("from the work calendar") }}</a>{% endif %}</li>{% endfor %}</ul>
-  {% else %}<p class="mt-2 text-sm text-muted">{{ _("No work logs yet.") }}</p>{% endif %}
-  {% if source.kind.value == "variable" %}
-  <p class="mt-2 text-sm"><a href="{{ scoped_url(request, 'income_calendar', source_id=source.id|string) }}" class="font-semibold text-primary-ink underline" data-work-calendar-link>{{ _("Open the work calendar") }}</a></p>
-  {% endif %}
-  {% if can_edit and not source.archived and source.kind.value == "variable" %}
-  <form method="post" action="{{ scoped_url(request, 'income_work_log', source_id=source.id) }}" class="mt-4 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-3">
-    {{ csrf_input() }}
-    {{ month_picker("work_month", _("Work month"), today.replace(day=1), id_prefix="log-" ~ source.id) }}
-    <label class="grid gap-1 text-sm">{{ _("Units worked (%(unit)s)", unit=source.unit_label) }}<input name="units" inputmode="decimal" required class="form-control rounded-lg px-3 py-2"></label>
-    <button type="submit" class="self-end rounded-lg border border-line px-3 py-2 text-sm font-semibold">{{ _("Save work log") }}</button>
-    <p class="text-xs text-muted sm:col-span-3">{{ _("Months with days marked in the work calendar are read-only here: their units are the sum of the days.") }}</p>
-  </form>
-  {% endif %}
-  {% if taxes_enabled %}
-  <h3 class="mt-5 text-sm font-semibold" id="taxes-{{ source.id }}-heading">{{ _("Taxes on this income") }}</h3>
-  {% if can_edit and not source.archived and tax_rules %}
-  <form method="post" action="{{ scoped_url(request, 'income_taxes_save', source_id=source.id) }}" class="mt-2 grid gap-2 rounded-lg border border-line p-3" aria-labelledby="taxes-{{ source.id }}-heading" data-income-taxes>
-    {{ csrf_input() }}
-    {% for rule in tax_rules %}
-    {% set attachment = source.attachments|selectattr("tax_rule_id", "equalto", rule.id)|first %}
-    <div class="grid gap-1" data-income-tax="{{ rule.id }}">
-      <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="tax_rule_id" value="{{ rule.id }}"{% if attachment %} checked{% endif %} class="mt-0.5 h-4 w-4 accent-primary"><span><span class="font-medium">{{ rule.name }}</span> <span class="text-muted">· {{ when(rule.kind.value, rule.payment_timing.value, rule.payment_day, locale) }}</span></span></label>
-      {% if rule.kind.value != "payer_withheld" %}
-      <details class="ml-6"{% if attachment and attachment.due_day is not none %} open{% endif %}>
-        <summary class="cursor-pointer text-xs text-primary-ink">{{ _("Different payment day for this income") }}<span class="sr-only"> · {{ rule.name }}</span></summary>
-        <label class="mt-1 flex items-center gap-2 text-sm">{{ _("Payment day") }}<input name="due_day_{{ rule.id }}" type="number" min="1" max="31" value="{{ attachment.due_day if attachment and attachment.due_day is not none else '' }}" placeholder="{{ rule.payment_day }}" class="form-control w-20 rounded-lg px-3 py-1.5"></label>
-      </details>
-      {% endif %}
-    </div>
-    {% endfor %}
-    <button type="submit" class="mt-1 justify-self-start rounded-lg border border-line px-3 py-2 text-sm font-semibold">{{ _("Save taxes") }}</button>
-  </form>
-  {% elif source.attachments %}
-  <ul class="mt-2 space-y-1 text-sm">{% for attachment in source.attachments %}<li data-tax-attachment="{{ attachment.id }}">{{ tax_rule_names.get(attachment.tax_rule_id, _("Tax")) }}</li>{% endfor %}</ul>
+
+  {% if taxes_enabled and not source.archived %}
+  {% if not attached %}
+  <p class="mt-3 text-sm" data-no-tax-reason="none">{{ _("No tax payment is planned for this income because no taxes are ticked on it.") }}{% if can_edit %} <a href="{{ scoped_url(request, 'income_sources') }}?form=taxes-{{ source.id }}#taxes-{{ source.id }}" class="font-semibold text-primary-ink underline">{{ _("Choose taxes") }}</a>{% endif %}</p>
   {% else %}
-  <p class="mt-2 text-sm text-muted">{{ _("No taxes on this income.") }}{% if can_edit and not tax_rules %} <a href="{{ scoped_url(request, 'tax_rule_new') }}" class="text-primary-ink underline">{{ _("Set up a new tax") }}</a>{% endif %}</p>
+  {% set paying = attached|rejectattr("tax_rule_id", "in", withheld_ids)|list %}
+  {% if not paying %}
+  <p class="mt-3 text-sm" data-no-tax-reason="withheld">{{ _("No tax payment is planned: the payer pays these taxes for you.") }}</p>
+  {% endif %}
+  {% for attachment in paying if not attachment.generate_payment %}
+  <p class="mt-3 text-sm" data-no-tax-reason="switched-off">{{ _("No payment is planned for %(tax)s: planning its payment is switched off for this income.", tax=rules_by_id[attachment.tax_rule_id].name) }}</p>
+  {% endfor %}
   {% endif %}
   {% endif %}
+
+  {% if source.preview %}
+  {% set show_taxes = with_taxes %}
+  <div class="mt-4 overflow-x-auto rounded-lg border border-line" data-income-preview-table>
+    <table class="w-full min-w-[36rem] text-left text-sm">
+      <caption class="sr-only">{{ _("Next payments of %(name)s", name=source.name) }}</caption>
+      <thead class="bg-subtle text-xs text-muted">
+        <tr>
+          {% if not fixed %}<th scope="col" class="px-3 py-2 font-medium">{{ _("Work month") }}</th>{% endif %}
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Paid on") }}</th>
+          {% if show_taxes %}<th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Net") }}</th><th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Taxes") }}</th>{% endif %}
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("You receive") }}</th>
+          {% if show_taxes %}<th scope="col" class="px-3 py-2 font-medium">{{ _("Tax to pay") }}</th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in source.preview[:3] %}
+        {% set b = item.breakdown %}
+        {% set tax_total = b.ledger_amount.amount_minor - b.net.amount_minor %}
+        <tr class="border-t border-line align-top" data-income-preview>
+          {% if not fixed %}<td class="px-3 py-2">{{ format_month(item.work_month, locale) }}{% if item.units is not none %} · {{ units_text(item.units, source.unit_label) }}{% endif %}<span class="{{ muted_chip }}">{{ _("estimate") if item.amount_state == "estimated" else _("logged") }}</span></td>{% endif %}
+          <td class="whitespace-nowrap px-3 py-2">{{ format_day(item.due_date, locale) }}</td>
+          {% if show_taxes %}
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(b.net, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums" data-income-taxes-total>{% if tax_total > 0 %}+{% endif %}{{ format_money(Money(tax_total, source.currency), locale) }}</td>
+          {% endif %}
+          <td class="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums" data-income-receive>{{ format_money(b.ledger_amount, locale) }}</td>
+          {% if show_taxes %}
+          <td class="px-3 py-2" data-income-tax-payments>{% for payment in b.payments %}{% if not loop.first %}<br>{% endif %}{{ _("%(name)s %(amount)s on %(date)s", name=item.tax_names.get(payment.name, payment.name), amount=format_money(payment.amount, locale), date=format_day_month(item.payment_dates[payment.name], locale)) }}{% else %}<span class="text-muted">{{ _("Nothing to pay") }}</span>{% endfor %}</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+
+  {% if not fixed and source.work_logs %}
+  <p class="mt-3 text-xs text-muted" data-work-logs>{{ _("Logged:") }} {% for log in source.work_logs %}{{ format_month(log.work_month, locale) }} · {{ format_quantity_input(log.units, locale) }}{% if log.derived_from_days %} (<a href="{{ scoped_url(request, 'income_calendar', source_id=source.id|string) }}?month={{ log.work_month.strftime('%Y-%m') }}" class="text-primary-ink underline" data-derived-log>{{ _("from the work calendar") }}</a>){% endif %}{% if not loop.last %}; {% endif %}{% endfor %}</p>
+  {% endif %}
+
+  <div class="mt-4 flex flex-wrap items-start gap-2" data-income-actions>
+    {% if can_edit and not source.archived and not fixed %}
+    <details class="open:w-full"{% if open_form == "log-" ~ source.id %} open{% endif %} data-log-work>
+      <summary class="{{ summary_button }}">{{ _("Log days worked") }}</summary>
+      <form method="post" action="{{ scoped_url(request, 'income_work_log', source_id=source.id) }}" class="mt-2 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-3">
+        {{ csrf_input() }}
+        {{ month_picker("work_month", _("Work month"), today.replace(day=1), id_prefix="log-" ~ source.id) }}
+        <label class="grid gap-1 text-sm">{{ _("Units worked (%(unit)s)", unit=source.unit_label) }}<input name="units" inputmode="decimal" required class="form-control rounded-lg px-3 py-2"></label>
+        <button type="submit" class="self-end rounded-lg border border-line px-3 py-2 text-sm font-semibold">{{ _("Save work log") }}</button>
+        <p class="text-xs text-muted sm:col-span-3">{{ _("Months with days marked in the work calendar are read-only here: their units are the sum of the days.") }}</p>
+      </form>
+    </details>
+    {% endif %}
+    {% if not fixed %}<a href="{{ scoped_url(request, 'income_calendar', source_id=source.id|string) }}" class="{{ secondary }}" data-work-calendar-link>{{ _("Work calendar") }}</a>{% endif %}
+    {% if can_edit and not source.archived %}
+    <a href="{{ scoped_url(request, 'income_source_edit', source_id=source.id|string) }}" class="{{ secondary }}" data-edit-income>{{ _("Edit") }}<span class="sr-only"> {{ source.name }}</span></a>
+    {% if taxes_enabled %}
+    <details id="taxes-{{ source.id }}" class="open:w-full"{% if open_form == "taxes-" ~ source.id %} open{% endif %} data-income-taxes-panel>
+      <summary class="{{ summary_button }}">{{ _("Taxes on this income") }}</summary>
+      {% if tax_rules %}
+      <form method="post" action="{{ scoped_url(request, 'income_taxes_save', source_id=source.id) }}" class="mt-2 grid gap-2 rounded-lg border border-line p-3" aria-label="{{ _('Taxes on %(name)s', name=source.name) }}" data-income-taxes>
+        {{ csrf_input() }}
+        {% for rule in tax_rules %}
+        {% set attachment = source.attachments|selectattr("tax_rule_id", "equalto", rule.id)|first %}
+        <div class="grid gap-1" data-income-tax="{{ rule.id }}">
+          <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="tax_rule_id" value="{{ rule.id }}"{% if attachment %} checked{% endif %} class="mt-0.5 h-4 w-4 accent-primary"><span><span class="font-medium">{{ rule.name }} {{ rate_label(rule.current, locale) }}</span> <span class="text-muted">· {{ when(rule.kind.value, rule.payment_timing.value, rule.payment_day, locale) }}</span></span></label>
+          {% if rule.kind.value != "payer_withheld" %}
+          <details class="ml-6"{% if attachment and attachment.due_day is not none %} open{% endif %}>
+            <summary class="cursor-pointer text-xs text-primary-ink">{{ _("Different payment day for this income") }}<span class="sr-only"> · {{ rule.name }}</span></summary>
+            <label class="mt-1 flex items-center gap-2 text-sm">{{ _("Payment day") }}<input name="due_day_{{ rule.id }}" type="number" min="1" max="31" value="{{ attachment.due_day if attachment and attachment.due_day is not none else '' }}" placeholder="{{ rule.payment_day }}" class="form-control w-20 rounded-lg px-3 py-1.5"></label>
+          </details>
+          {% endif %}
+        </div>
+        {% endfor %}
+        <button type="submit" class="mt-1 justify-self-start rounded-lg border border-line px-3 py-2 text-sm font-semibold">{{ _("Save taxes") }}</button>
+      </form>
+      {% else %}
+      <p class="mt-2 text-sm text-muted">{{ _("No taxes are set up yet.") }} <a href="{{ scoped_url(request, 'tax_rule_new') }}" class="text-primary-ink underline">{{ _("Set up a new tax") }}</a></p>
+      {% endif %}
+    </details>
+    {% endif %}
+    {% endif %}
+  </div>
 </section>
-{% else %}<p class="panel p-6 text-muted">{{ _("No income sources yet.") }}</p>{% endfor %}
+{% else %}<p class="panel p-6 text-muted">{{ _("No income yet. Add your salary or contract work to see what you will receive next.") }}</p>{% endfor %}
 </div>
 {% endblock %}

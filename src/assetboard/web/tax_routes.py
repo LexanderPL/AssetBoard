@@ -147,7 +147,7 @@ def _redirect(request: Request, error: str | None = None, form: str | None = Non
     return RedirectResponse(target + ("?" + urlencode(query) if query else ""), status_code=303)
 
 
-def _rate_label(value: PercentOrFixed | None, locale: str) -> str:
+def rate_label(value: PercentOrFixed | None, locale: str) -> str:
     if value is None:
         return ""
     if value.mode == "percent":
@@ -164,7 +164,7 @@ def _common(request: Request) -> dict[str, object]:
         "format_money": format_money,
         "format_amount_input": format_amount_input,
         "format_rate_basis_points": format_rate_basis_points,
-        "rate_label": _rate_label,
+        "rate_label": rate_label,
     }
 
 

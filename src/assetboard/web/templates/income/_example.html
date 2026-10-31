@@ -1,0 +1,10 @@
+{# The example on the last step of "Add income": the ticked taxes on a sample amount. #}
+{% if example %}
+{% set b = example.breakdown %}
+<p class="font-semibold">{{ _("Example for %(amount)s net", amount=format_money(b.net, locale)) }}</p>
+<p class="mt-1" data-example-sentence>{{ _("You receive %(amount)s.", amount=format_money(b.ledger_amount, locale)) }}
+{%- for line in b.payments %} {{ _("%(name)s %(amount)s to pay on %(date)s.", name=example.names[line.name], amount=format_money(line.amount, locale), date=format_day_month(example.payment_dates[line.name], locale)) }}{% endfor %}
+{%- if not b.payments %} {{ _("No tax payments are planned.") }}{% endif %}</p>
+{% else %}
+<p class="text-muted">{{ _("Enter the amount and the payday to see an example.") }}</p>
+{% endif %}
