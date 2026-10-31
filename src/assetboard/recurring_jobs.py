@@ -15,6 +15,7 @@ from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.repositories import NotFound
 from assetboard.db.repositories.scheduled import RecurringWorkspaceReader
+from assetboard.services.income import resync_pending_income
 from assetboard.services.notifications import run_workspace as run_notifications
 from assetboard.services.notify import Notifier
 from assetboard.services.occurrences import auto_post_workspace
@@ -63,6 +64,20 @@ class RecurringJobs:
         except Exception as exc:
             self.logger.error(
                 "recurring_generation_failed workspace=%s exception_type=%s; next run will retry",
+                workspace_id,
+                type(exc).__name__,
+                exc_info=True,
+            )
+
+    def resync_income(self, workspace_id: UUID) -> None:
+        """Recalculate pending income from the current tax model (after an upgrade, ADR-0022)."""
+        try:
+            resync_pending_income(self.factory, _Scope(_Workspace(workspace_id)), self.clock())
+        except NotFound:
+            self.logger.debug("income_resync_skipped workspace=%s reason=deleted", workspace_id)
+        except Exception as exc:
+            self.logger.error(
+                "income_resync_failed workspace=%s exception_type=%s; next start will retry",
                 workspace_id,
                 type(exc).__name__,
                 exc_info=True,
@@ -131,6 +146,7 @@ class RecurringJobs:
         try:
             self.reconcile()
             for workspace_id in tuple(self.zones):
+                self.resync_income(workspace_id)
                 self.run(workspace_id)
                 self.auto_post(workspace_id)
         finally:

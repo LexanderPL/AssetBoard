@@ -49,9 +49,6 @@ class IncomeSource(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             name="expected_mode_valid",
         ),
         CheckConstraint("average_months BETWEEN 1 AND 24", name="average_months_valid"),
-        CheckConstraint(
-            "record_as IN ('cash_received', 'net', 'take_home')", name="record_as_valid"
-        ),
         CheckConstraint("active_to IS NULL OR active_to >= active_from", name="active_range_valid"),
         Index("ix_income_sources_workspace_active", "workspace_id", "active_from", "active_to"),
     )
@@ -68,7 +65,6 @@ class IncomeSource(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     expected_mode: Mapped[str] = mapped_column(String(24), nullable=False, default="manual")
     expected_units: Mapped[Decimal | None] = mapped_column(DecimalType(), nullable=True)
     average_months: Mapped[int] = mapped_column(Integer(), nullable=False, default=3)
-    record_as: Mapped[str] = mapped_column(String(24), nullable=False, default="cash_received")
     active_from: Mapped[date] = mapped_column(Date(), nullable=False)
     active_to: Mapped[date | None] = mapped_column(Date(), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
@@ -171,6 +167,7 @@ class IncomeSourceTaxRule(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     tax_rule_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer(), nullable=False)
     generate_payment: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=True)
-    payment_category_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
-    due_day: Mapped[int] = mapped_column(Integer(), nullable=False)
-    due_month_offset: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
+    # Overrides of the tax rule's payment schedule (ADR-0022); NULL uses the rule's default.
+    payment_category_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
+    due_day: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    due_month_offset: Mapped[int | None] = mapped_column(Integer(), nullable=True)

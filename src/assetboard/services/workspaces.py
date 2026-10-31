@@ -176,6 +176,8 @@ class WorkspaceSettings:
     # True once amounts are stored in the base currency (it can no longer change).
     base_currency_locked: bool = False
     require_two_factor: bool = False
+    # ADR-0022: the Menu section's Taxes switch (changed by services.taxes.set_taxes_enabled).
+    taxes_enabled: bool = False
 
 
 def _checkpoint(_name: str) -> None:
@@ -211,6 +213,7 @@ def workspace_settings(factory: sessionmaker[Session], ctx: Context) -> Workspac
             auto_copy_plan=workspace.auto_copy_plan,
             require_two_factor=workspace.require_two_factor,
             base_currency_locked=_base_currency_locked(session, ctx),
+            taxes_enabled=workspace.taxes_enabled,
         )
 
 

@@ -1036,12 +1036,11 @@ def test_income_queries_stay_in_their_workspace(
             expected_mode="manual",
             expected_units=None,
             average_months=3,
-            record_as="net",
             active_from=date(2026, 1, 1),
             active_to=None,
         )
         tax_rule = TaxRuleRepository(db_session, ctx).create(
-            name=f"Tax {suffix}", effect="withheld", base="net", notes=""
+            name=f"Tax {suffix}", kind="payer_withheld", base="net", notes=""
         )
         expense = CategoryRepository(db_session, ctx).create(
             name=f"Expense {suffix}",
@@ -1337,8 +1336,8 @@ def test_tax_rule_queries_stay_in_their_workspace(
     rules_a, rules_b = TaxRuleRepository(db_session, ctx_a), TaxRuleRepository(db_session, ctx_b)
     versions_a = TaxRuleVersionRepository(db_session, ctx_a)
     versions_b = TaxRuleVersionRepository(db_session, ctx_b)
-    rule_a = rules_a.create(name="Income tax A", effect="withheld", base="net", notes="")
-    rule_b = rules_b.create(name="Income tax B", effect="withheld", base="net", notes="")
+    rule_a = rules_a.create(name="Income tax A", kind="payer_withheld", base="net", notes="")
+    rule_b = rules_b.create(name="Income tax B", kind="payer_withheld", base="net", notes="")
     version_a = versions_a.create(
         tax_rule_id=rule_a.id,
         effective_from=date(2026, 1, 1),
@@ -1376,7 +1375,7 @@ def test_tax_rule_queries_stay_in_their_workspace(
         rules_b.create(
             workspace_id=ctx_a.workspace.id,
             name="Cross workspace",
-            effect="withheld",
+            kind="payer_withheld",
             base="net",
             notes="",
         )

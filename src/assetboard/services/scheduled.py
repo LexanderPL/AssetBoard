@@ -181,6 +181,47 @@ def list_items(factory: sessionmaker[Session], ctx: Context) -> list[ScheduledVi
         ]
 
 
+@dataclass(frozen=True, slots=True)
+class OtherTaxView:
+    """An active recurring item marked as a tax, for the Taxes page."""
+
+    id: UUID
+    name: str
+    amount: Money
+    freq: Frequency
+    interval: int
+    category_name: str
+    next_due: date | None
+
+
+def list_tax_items(factory: sessionmaker[Session], ctx: Context) -> list[OtherTaxView]:
+    require_role(ctx, Role.VIEWER)
+    with factory() as session:
+        today = ctx.clock.today(ctx.workspace.timezone)
+        occurrences_repository = ScheduledOccurrenceRepository(session, ctx)
+        categories = CategoryRepository(session, ctx)
+        result: list[OtherTaxView] = []
+        for row in ScheduledItemRepository(session, ctx).tax_items():
+            upcoming = [
+                occurrence.due_date
+                for occurrence in occurrences_repository.for_item(row.id)
+                if occurrence.status == OccurrenceStatus.PENDING and occurrence.due_date >= today
+            ]
+            category = categories.get(row.category_id)
+            result.append(
+                OtherTaxView(
+                    id=row.id,
+                    name=row.name,
+                    amount=Money(row.amount_minor, row.currency),
+                    freq=Frequency(row.freq),
+                    interval=row.interval,
+                    category_name=category.name if category is not None else "",
+                    next_due=min(upcoming) if upcoming else None,
+                )
+            )
+        return result
+
+
 def get_item(factory: sessionmaker[Session], ctx: Context, item_id: UUID) -> ScheduledInput:
     require_role(ctx, Role.VIEWER)
     with factory() as session:
@@ -382,7 +423,10 @@ def save_item(
     include_past: bool = False,
     require_open: date | None = None,
     require_kind: str | None = None,
+    is_tax: bool | None = None,
 ) -> UUID:
+    """Create or update an item. ``is_tax`` marks an "other tax" (ADR-0022); ``None`` keeps
+    the stored flag on an update (off on creation)."""
     require_role(ctx, Role.EDITOR)
     name = clean_description(values.name)
     notes = clean_description(values.notes)
@@ -431,6 +475,8 @@ def save_item(
             "auto_post": values.auto_post,
             "reminder_lead_days": values.reminder_lead_days,
         }
+        if is_tax is not None:
+            fields["is_tax"] = is_tax
         if item_id is None:
             item = repository.create(**fields)
         else:

@@ -174,7 +174,7 @@ def make_tax_rule(session: Session, workspace_id: UUID) -> TaxRule:
     return TaxRule(
         workspace_id=workspace_id,
         name=f"Tax {uuid4().hex[:8]}",
-        effect="withheld",
+        kind="payer_withheld",
         base="net",
         notes="Synthetic fixture",
     )
@@ -222,7 +222,6 @@ def make_income_source(session: Session, workspace_id: UUID) -> IncomeSource:
         expected_mode="manual",
         expected_units=None,
         average_months=3,
-        record_as="cash_received",
         active_from=date(2026, 1, 1),
         active_to=None,
     )

@@ -58,7 +58,8 @@ def test_income_source_golden_example_generates_tax_payment(team: WorkspaceDb) -
         team.factory,
         ctx,
         name="VAT",
-        effect="added",
+        kind="added",
+        payment_category_id=expense_category,
         base="net",
         notes="",
         effective_from=date(2026, 1, 1),
@@ -78,7 +79,6 @@ def test_income_source_golden_example_generates_tax_payment(team: WorkspaceDb) -
         expected_mode="manual",
         expected_units_value=None,
         average_months=3,
-        record_as="cash_received",
         active_from=date(2026, 1, 1),
         active_to=None,
     )
@@ -144,7 +144,6 @@ def test_posted_income_occurrence_is_not_recalculated(team: WorkspaceDb) -> None
         expected_mode="manual",
         expected_units_value=None,
         average_months=3,
-        record_as="net",
         active_from=date(2026, 1, 1),
         active_to=None,
     )
@@ -192,7 +191,6 @@ def test_missing_work_log_tracks_pay_month_and_disappears_after_logging(
         expected_mode="manual",
         expected_units_value=None,
         average_months=3,
-        record_as="net",
         active_from=date(2026, 1, 1),
         active_to=None,
     )
@@ -217,7 +215,6 @@ def _source(team: WorkspaceDb, ctx, category_id, **overrides):
         "expected_mode": "manual",
         "expected_units_value": None,
         "average_months": 3,
-        "record_as": "net",
         "active_from": date(2026, 1, 1),
         "active_to": None,
     } | overrides
@@ -309,7 +306,8 @@ def test_skipping_the_parent_removes_its_pending_tax_payments(team: WorkspaceDb)
         team.factory,
         ctx,
         name="Income tax",
-        effect="withheld",
+        kind="self_paid",
+        payment_category_id=expense_category,
         base="net",
         notes="",
         effective_from=date(2026, 1, 1),
@@ -380,55 +378,50 @@ def test_working_days_need_a_supported_holiday_country(team: WorkspaceDb) -> Non
     assert error.value.code == "unsupported_holidays"
 
 
-# F3.3 golden example fed by the F3.4 rate x units: 1 230.00 x 19 days = 23 370.00 net.
+# F3.3 golden example fed by the F3.4 rate x units: 1 230.00 x 19 days = 23 370.00 net
+# (ADR-0022 kinds). VAT 23% added = 5 375.10; income tax 12% = 2 804.40; levy 1 000.00.
 GOLDEN_PAYMENTS = {
-    "cash_received": (2_874_510, [537_510, 280_440, 100_000]),
-    "net": (2_337_000, [280_440, 100_000]),
-    "take_home": (1_956_560, []),
+    # Both paid by the user: received 23 370.00 + 5 375.10 = 28 745.10.
+    "self_paid": (2_874_510, [537_510, 280_440, 100_000]),
+    # Both withheld by the payer: 28 745.10 - 2 804.40 - 1 000.00 = 24 940.70; VAT paid.
+    "payer_withheld": (2_494_070, [537_510]),
 }
 
 
-@pytest.mark.parametrize("record_as", sorted(GOLDEN_PAYMENTS))
-def test_golden_tax_rules_through_an_income_source(team: WorkspaceDb, record_as: str) -> None:
+@pytest.mark.parametrize("deducted_kind", sorted(GOLDEN_PAYMENTS))
+def test_golden_tax_rules_through_an_income_source(team: WorkspaceDb, deducted_kind: str) -> None:
     ctx = team.ctx("owner", "owner")
     income_category, expense_category = categories(team, ctx)
     rules = [
         ("VAT", "added", PercentOrFixed.percent(2300)),
-        ("Income tax", "withheld", PercentOrFixed.percent(1200)),
-        ("Levy", "withheld", PercentOrFixed.fixed_amount(Money(100_000, "PLN"))),
+        ("Income tax", deducted_kind, PercentOrFixed.percent(1200)),
+        ("Levy", deducted_kind, PercentOrFixed.fixed_amount(Money(100_000, "PLN"))),
     ]
-    source_id = _source(team, ctx, income_category, rate_minor=123_000, record_as=record_as)
-    for name, effect, value in rules:
+    source_id = _source(team, ctx, income_category, rate_minor=123_000)
+    for name, kind, value in rules:
         rule_id = taxes.create_rule(
             team.factory,
             ctx,
             name=name,
-            effect=effect,
-            base="net",
-            notes="",
-            effective_from=date(2026, 1, 1),
+            kind=kind,
             value=value,
-        )
-        income.attach_tax_rule(
-            team.factory,
-            ctx,
-            source_id,
-            tax_rule_id=rule_id,
+            payment_day=20,
+            payment_timing="next_month",
             payment_category_id=expense_category,
-            due_day=20,
-            due_month_offset=1,
-            generate_payment=True,
         )
+        income.attach_tax_rule(team.factory, ctx, source_id, tax_rule_id=rule_id)
     income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("19"))
     parent = _occurrence(team, ctx, source_id, date(2026, 8, 1))
     assert parent is not None
-    ledger, payments = GOLDEN_PAYMENTS[record_as]
-    assert (parent.due_date, parent.expected_minor) == (date(2026, 9, 10), ledger)
+    received, payments = GOLDEN_PAYMENTS[deducted_kind]
+    assert (parent.due_date, parent.expected_minor) == (date(2026, 9, 10), received)
     with team.factory() as session:
         children = ScheduledOccurrenceRepository(session, ctx).children(parent.id)
         assert sorted((c.expected_minor for c in children), reverse=True) == payments
+        # The rule's schedule: the 20th of the month after the pay date (2026-09-10).
         assert all(c.due_date == date(2026, 10, 20) for c in children)
         assert all(c.generated_by == "tax" and c.direction == "expense" for c in children)
+        assert all(c.category_id == expense_category for c in children)
 
 
 @pytest.mark.parametrize(
@@ -469,7 +462,8 @@ def _attached(team: WorkspaceDb, ctx):
         team.factory,
         ctx,
         name="Income tax",
-        effect="withheld",
+        kind="self_paid",
+        payment_category_id=expense_category,
         base="net",
         notes="",
         effective_from=date(2026, 1, 1),
@@ -636,3 +630,73 @@ def test_updating_a_tax_attachment_needs_an_editor(team: WorkspaceDb) -> None:
     with pytest.raises(PermissionDenied):
         update(team.ctx("dee", "editor"))
     assert _tax_children(team, owner, source_id)[0][0] == date(2026, 10, 20)
+
+
+def test_rule_defaults_overrides_and_the_taxes_checklist(team: WorkspaceDb) -> None:
+    """ADR-0022: NULL attachment values use the rule's schedule; set_source_taxes ticks taxes
+    with an optional payment-day override and unticks the others."""
+    ctx = team.ctx("owner", "owner")
+    income_category, expense_category = categories(team, ctx)
+    quarterly = taxes.create_rule(
+        team.factory,
+        ctx,
+        name="Quarterly",
+        kind="self_paid",
+        value=PercentOrFixed.percent(1000),
+        payment_day=25,
+        payment_timing="after_quarter",
+        payment_category_id=expense_category,
+    )
+    withheld = taxes.create_rule(
+        team.factory, ctx, name="Withheld", kind="payer_withheld", value=PercentOrFixed.percent(500)
+    )
+    source_id = _source(team, ctx, income_category)
+    income.set_source_taxes(team.factory, ctx, source_id, {quarterly: None, withheld: None})
+    income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("10"))
+    parent = _occurrence(team, ctx, source_id, date(2026, 8, 1))
+    assert parent is not None
+    # 10 x 100.00 = 1 000.00 net; received 1 000.00 - 5% withheld = 950.00.
+    assert parent.expected_minor == 95_000
+    # Paid 2026-09-10 (Q3) -> the 25th of October; the withheld tax plans nothing.
+    assert [(due, amount) for due, _c, amount in _tax_children(team, ctx, source_id)] == [
+        (date(2026, 10, 25), 10_000)
+    ]
+    income.set_source_taxes(team.factory, ctx, source_id, {quarterly: 3})
+    assert [(due, amount) for due, _c, amount in _tax_children(team, ctx, source_id)] == [
+        (date(2026, 10, 3), 10_000)
+    ]
+    assert _occurrence(team, ctx, source_id, date(2026, 8, 1)).expected_minor == 100_000
+    [view] = income.list_sources(team.factory, ctx)
+    assert [(a.tax_rule_id, a.due_day, a.due_month_offset) for a in view.attachments] == [
+        (quarterly, 3, None)
+    ]
+    with pytest.raises(income.IncomeError, match="invalid_tax_attachment"):
+        income.set_source_taxes(team.factory, ctx, source_id, {quarterly: 32})
+
+
+def test_attaching_a_payable_tax_without_any_category_is_refused(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    income_category, _expense = categories(team, ctx)
+    with team.factory.begin() as session:
+        from assetboard.db.repositories import TaxRuleRepository
+
+        rule = TaxRuleRepository(session, ctx).create(
+            name="Legacy", kind="self_paid", base="net", notes="", payment_category_id=None
+        )
+        rule_id = rule.id
+    source_id = _source(team, ctx, income_category)
+    with pytest.raises(income.IncomeError, match="tax_without_category"):
+        income.set_source_taxes(team.factory, ctx, source_id, {rule_id: None})
+
+
+def test_resync_pending_income_applies_the_current_tax_model(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    source_id, _attachment, _rule, _other, _salary = _attached(team, ctx)
+    with team.factory.begin() as session:
+        parent = ScheduledOccurrenceRepository(session, ctx).for_income_work_month(
+            source_id, date(2026, 8, 1)
+        )
+        assert parent is not None
+        parent.expected_minor = 1  # as if computed by the old model
+    assert income.resync_pending_income(team.factory, ctx, team.clock) >= 1
+    assert _occurrence(team, ctx, source_id, date(2026, 8, 1)).expected_minor == 100_000

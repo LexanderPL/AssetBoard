@@ -102,6 +102,10 @@ class Workspace(IdMixin, TimestampMixin, Base):
     auto_copy_plan: Mapped[bool] = mapped_column(
         Boolean(), nullable=False, default=False, server_default=false()
     )
+    # ADR-0022: the Taxes menu item and the tax parts of income (off for new workspaces).
+    taxes_enabled: Mapped[bool] = mapped_column(
+        Boolean(), nullable=False, default=False, server_default=false()
+    )
 
 
 class Membership(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):

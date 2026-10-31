@@ -1,4 +1,5 @@
-"""User-defined tax rules, immutable versions, and calculator previews (F3.3)."""
+"""User-defined taxes on income (kinds, schedules, immutable rate versions), the Taxes switch
+and the example panel (F3.3, redesigned by ADR-0022)."""
 
 from __future__ import annotations
 
@@ -9,33 +10,50 @@ from uuid import UUID
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.db.engine import run_immediate
-from assetboard.db.models.identity import User
 from assetboard.db.models.tax import TaxRule, TaxRuleVersion
 from assetboard.db.repositories import (
     AuditEventRepository,
+    CategoryRepository,
     CurrentWorkspaceRepository,
+    IncomeSourceRepository,
+    IncomeSourceTaxRuleRepository,
     TaxRuleRepository,
     TaxRuleVersionRepository,
 )
-from assetboard.domain.money import Money
+from assetboard.domain.money import Money, minor_unit_for
 from assetboard.domain.months import MAX_YEAR, MIN_YEAR
 from assetboard.domain.percent_or_fixed import PercentOrFixed
 from assetboard.domain.taxes import (
-    RecordAs,
+    PaymentTiming,
     TaxBase,
     TaxBreakdown,
-    TaxEffect,
     TaxInput,
+    TaxKind,
     calculate_taxes,
+    tax_payment_date,
 )
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR, clean_description
 from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.income import resync_sources_with_rule
+
+# The first rate version of a tax is valid "from the start" (the app's earliest date).
+FIRST_VERSION_DATE = date(MIN_YEAR, 1, 1)
+# The example panel's income: 10 000.00 in the workspace currency's major unit.
+EXAMPLE_NET_MAJOR = 10_000
 
 
 class TaxRuleError(Exception):
     def __init__(self, code: str) -> None:
         super().__init__(code)
         self.code = code
+
+
+class TaxesInUse(Exception):
+    """Taxes cannot be turned off: these non-archived income sources have taxes attached."""
+
+    def __init__(self, sources: tuple[str, ...]) -> None:
+        super().__init__("taxes_in_use")
+        self.sources = sources
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,18 +67,29 @@ class TaxRuleVersionView:
 class TaxRuleView:
     id: UUID
     name: str
-    effect: TaxEffect
+    kind: TaxKind
     base: TaxBase
     notes: str
     archived: bool
     versions: tuple[TaxRuleVersionView, ...]
+    payment_day: int
+    payment_timing: PaymentTiming
+    payment_category_id: UUID | None
+    # Names of the non-archived income sources the tax is attached to.
+    used_by: tuple[str, ...] = ()
+    # Kind and base are locked once posted income was calculated with the tax.
+    locked: bool = False
+
+    @property
+    def current(self) -> PercentOrFixed | None:
+        return self.versions[-1].value if self.versions else None
 
 
 @dataclass(frozen=True, slots=True)
-class TaxPreview:
-    day: date
-    calculation: TaxBreakdown
-    missing_rules: tuple[str, ...]
+class TaxExample:
+    paid_on: date
+    payment_date: date
+    breakdown: TaxBreakdown
 
 
 def _validate_day(day: date) -> None:
@@ -78,11 +107,18 @@ def _value_from_row(row: TaxRuleVersion, currency: str) -> PercentOrFixed:
     return PercentOrFixed.fixed_amount(Money(row.fixed_minor, currency))
 
 
-def _view(rule: TaxRule, versions: list[TaxRuleVersion], currency: str) -> TaxRuleView:
+def _view(
+    session: Session,
+    ctx: Context,
+    rule: TaxRule,
+    versions: list[TaxRuleVersion],
+    source_names: dict[UUID, str],
+) -> TaxRuleView:
+    attachments = IncomeSourceTaxRuleRepository(session, ctx).for_rule(rule.id)
     return TaxRuleView(
         id=rule.id,
         name=rule.name,
-        effect=TaxEffect(rule.effect),
+        kind=TaxKind(rule.kind),
         base=TaxBase(rule.base),
         notes=rule.notes,
         archived=rule.archived_at is not None,
@@ -90,11 +126,29 @@ def _view(rule: TaxRule, versions: list[TaxRuleVersion], currency: str) -> TaxRu
             TaxRuleVersionView(
                 id=version.id,
                 effective_from=version.effective_from,
-                value=_value_from_row(version, currency),
+                value=_value_from_row(version, ctx.workspace.base_currency),
             )
             for version in versions
         ),
+        payment_day=rule.payment_day,
+        payment_timing=PaymentTiming(rule.payment_timing),
+        payment_category_id=rule.payment_category_id,
+        used_by=tuple(
+            sorted(
+                source_names[row.income_source_id]
+                for row in attachments
+                if row.income_source_id in source_names
+            )
+        ),
+        locked=TaxRuleRepository(session, ctx).has_posted_income(rule.id),
     )
+
+
+def _active_source_names(session: Session, ctx: Context) -> dict[UUID, str]:
+    return {
+        source.id: source.name
+        for source in IncomeSourceRepository(session, ctx).ordered(active_only=True)
+    }
 
 
 def list_rules(factory: sessionmaker[Session], ctx: Context) -> list[TaxRuleView]:
@@ -102,69 +156,113 @@ def list_rules(factory: sessionmaker[Session], ctx: Context) -> list[TaxRuleView
     with factory() as session:
         rules = TaxRuleRepository(session, ctx).ordered()
         versions = TaxRuleVersionRepository(session, ctx).all_for_rules()
+        names = _active_source_names(session, ctx)
         by_rule: dict[UUID, list[TaxRuleVersion]] = {}
         for version in versions:
             by_rule.setdefault(version.tax_rule_id, []).append(version)
-        return [
-            _view(rule, by_rule.get(rule.id, []), ctx.workspace.base_currency) for rule in rules
-        ]
+        return [_view(session, ctx, rule, by_rule.get(rule.id, []), names) for rule in rules]
 
 
-def preview(
-    factory: sessionmaker[Session],
+def get_rule(factory: sessionmaker[Session], ctx: Context, rule_id: UUID) -> TaxRuleView:
+    require_role(ctx, Role.VIEWER)
+    with factory() as session:
+        rule = TaxRuleRepository(session, ctx).get_or_raise(rule_id)
+        versions = TaxRuleVersionRepository(session, ctx).for_rule(rule_id)
+        return _view(session, ctx, rule, versions, _active_source_names(session, ctx))
+
+
+def example(
     ctx: Context,
     *,
-    net: Money,
-    day: date,
-    record_as: RecordAs,
-) -> TaxPreview:
+    name: str,
+    kind: TaxKind,
+    base: TaxBase,
+    value: PercentOrFixed,
+    payment_day: int,
+    payment_timing: PaymentTiming,
+) -> TaxExample:
+    """The example panel: income of 10 000.00 net paid on the 10th of next month."""
     require_role(ctx, Role.VIEWER)
-    _validate_day(day)
-    if net.currency != ctx.workspace.base_currency or not 0 <= net.amount_minor <= MAX_AMOUNT_MINOR:
-        raise TaxRuleError("invalid_amount")
-    with factory() as session:
-        rules_repository = TaxRuleRepository(session, ctx)
-        rules = rules_repository.ordered(include_archived=False)
-        effective = rules_repository.effective_for_all(day)
-    selected = {rule.id: version for rule, version in effective}
-    inputs: list[TaxInput] = []
-    missing: list[str] = []
-    for rule in rules:
-        version = selected.get(rule.id)
-        if version is None:
-            missing.append(rule.name)
-            continue
-        inputs.append(
-            TaxInput(
-                name=rule.name,
-                effect=TaxEffect(rule.effect),
-                base=TaxBase(rule.base),
-                value=_value_from_row(version, net.currency),
-                generate_payment=True,
-            )
-        )
-    return TaxPreview(
-        day=day,
-        calculation=calculate_taxes(net, inputs, record_as),
-        missing_rules=tuple(missing),
+    currency = ctx.workspace.base_currency
+    net = Money(EXAMPLE_NET_MAJOR * 10 ** minor_unit_for(currency), currency)
+    today = ctx.clock.today(ctx.workspace.timezone)
+    year, month = divmod(today.year * 12 + today.month, 12)
+    paid_on = date(min(year, MAX_YEAR), month + 1, 10)
+    if value.mode == "fixed" and (value.fixed is None or value.fixed.currency != currency):
+        raise TaxRuleError("invalid_value")
+    if kind == TaxKind.ADDED:
+        base = TaxBase.NET
+    breakdown = calculate_taxes(net, [TaxInput(name, kind, base, value)])
+    return TaxExample(
+        paid_on=paid_on,
+        payment_date=tax_payment_date(paid_on, payment_day, payment_timing),
+        breakdown=breakdown,
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _RuleFields:
+    name: str
+    notes: str
+    kind: TaxKind
+    base: TaxBase
+    payment_day: int
+    payment_timing: PaymentTiming
+    payment_category_id: UUID | None
+
+
 def _validated_rule(
-    name: str, effect: str, base: str, notes: str
-) -> tuple[str, TaxEffect, TaxBase, str]:
+    *,
+    name: str,
+    notes: str,
+    kind: str,
+    base: str,
+    payment_day: int,
+    payment_timing: str,
+    payment_category_id: UUID | None,
+) -> _RuleFields:
     clean_name = clean_description(name)
-    clean_notes = clean_description(notes)
     if not clean_name:
         raise TaxRuleError("invalid_name")
     try:
-        tax_effect = TaxEffect(effect)
+        tax_kind = TaxKind(kind)
         tax_base = TaxBase(base)
     except ValueError:
         raise TaxRuleError("invalid_rule") from None
-    if tax_effect == TaxEffect.ADDED and tax_base != TaxBase.NET:
-        raise TaxRuleError("invalid_rule")
-    return clean_name, tax_effect, tax_base, clean_notes
+    if tax_kind == TaxKind.ADDED:
+        tax_base = TaxBase.NET  # the UI has no base for added taxes
+    try:
+        timing = PaymentTiming(payment_timing)
+    except ValueError:
+        raise TaxRuleError("invalid_schedule") from None
+    if not 1 <= payment_day <= 31:
+        raise TaxRuleError("invalid_schedule")
+    if not tax_kind.plans_payment:
+        payment_category_id = None  # nothing is planned: no category
+    elif payment_category_id is None:
+        raise TaxRuleError("invalid_category")
+    return _RuleFields(
+        name=clean_name,
+        notes=clean_description(notes),
+        kind=tax_kind,
+        base=tax_base,
+        payment_day=payment_day,
+        payment_timing=timing,
+        payment_category_id=payment_category_id,
+    )
+
+
+def _check_category(session: Session, ctx: Context, category_id: UUID | None) -> None:
+    if category_id is None:
+        return
+    category = CategoryRepository(session, ctx).get(category_id)
+    if (
+        category is None
+        or category.archived_at is not None
+        or category.kind != "expense"
+        or category.treatment == "transfer"
+    ):
+        raise TaxRuleError("invalid_category")
 
 
 def _version_fields(value: PercentOrFixed, currency: str) -> dict[str, object]:
@@ -182,27 +280,41 @@ def create_rule(
     ctx: Context,
     *,
     name: str,
-    effect: str,
-    base: str,
-    notes: str,
-    effective_from: date,
+    kind: str,
+    base: str = TaxBase.NET.value,
+    notes: str = "",
     value: PercentOrFixed,
+    payment_day: int = 10,
+    payment_timing: str = PaymentTiming.NEXT_MONTH.value,
+    payment_category_id: UUID | None = None,
+    effective_from: date = FIRST_VERSION_DATE,
 ) -> UUID:
     require_role(ctx, Role.EDITOR)
     _validate_day(effective_from)
-    clean_name, tax_effect, tax_base, clean_notes = _validated_rule(name, effect, base, notes)
+    fields = _validated_rule(
+        name=name,
+        notes=notes,
+        kind=kind,
+        base=base,
+        payment_day=payment_day,
+        payment_timing=payment_timing,
+        payment_category_id=payment_category_id,
+    )
 
     def write(session: Session) -> UUID:
         require_role_now(session, ctx, Role.EDITOR)
         workspace = CurrentWorkspaceRepository(session, ctx)
         workspace.lock(exclusive=True)
         version_values = _version_fields(value, workspace.get().base_currency)
-        rules = TaxRuleRepository(session, ctx)
-        rule = rules.create(
-            name=clean_name,
-            effect=tax_effect.value,
-            base=tax_base.value,
-            notes=clean_notes,
+        _check_category(session, ctx, fields.payment_category_id)
+        rule = TaxRuleRepository(session, ctx).create(
+            name=fields.name,
+            kind=fields.kind.value,
+            base=fields.base.value,
+            notes=fields.notes,
+            payment_day=fields.payment_day,
+            payment_timing=fields.payment_timing.value,
+            payment_category_id=fields.payment_category_id,
         )
         TaxRuleVersionRepository(session, ctx).create(
             tax_rule_id=rule.id,
@@ -215,11 +327,7 @@ def create_rule(
             entity_type="tax_rule",
             entity_id=str(rule.id),
             ts=ctx.clock.now(),
-            data={
-                "name": clean_name,
-                "effect": tax_effect.value,
-                "base": tax_base.value,
-            },
+            data={"name": fields.name, "kind": fields.kind.value, "base": fields.base.value},
         )
         return rule.id
 
@@ -232,13 +340,27 @@ def update_rule(
     rule_id: UUID,
     *,
     name: str,
-    notes: str,
+    kind: str,
+    base: str = TaxBase.NET.value,
+    notes: str = "",
+    payment_day: int = 10,
+    payment_timing: str = PaymentTiming.NEXT_MONTH.value,
+    payment_category_id: UUID | None = None,
 ) -> None:
+    """Change a tax's name, kind, base and payment schedule; pending income follows.
+
+    Kind and base cannot change once posted income was calculated with the tax (ADR-0022).
+    """
     require_role(ctx, Role.EDITOR)
-    clean_name = clean_description(name)
-    clean_notes = clean_description(notes)
-    if not clean_name:
-        raise TaxRuleError("invalid_name")
+    fields = _validated_rule(
+        name=name,
+        notes=notes,
+        kind=kind,
+        base=base,
+        payment_day=payment_day,
+        payment_timing=payment_timing,
+        payment_category_id=payment_category_id,
+    )
 
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.EDITOR)
@@ -247,13 +369,31 @@ def update_rule(
         rule = repository.get_or_raise(rule_id)
         if rule.archived_at is not None:
             raise TaxRuleError("archived")
-        repository.update(rule_id, name=clean_name, notes=clean_notes)
+        meaning_changed = rule.kind != fields.kind.value or rule.base != fields.base.value
+        if meaning_changed and repository.has_posted_income(rule_id):
+            raise TaxRuleError("kind_locked")
+        if fields.payment_category_id != rule.payment_category_id:
+            _check_category(session, ctx, fields.payment_category_id)
+        if fields.kind.plans_payment and fields.payment_category_id is None:
+            raise TaxRuleError("invalid_category")
+        repository.update(
+            rule_id,
+            name=fields.name,
+            notes=fields.notes,
+            kind=fields.kind.value,
+            base=fields.base.value,
+            payment_day=fields.payment_day,
+            payment_timing=fields.payment_timing.value,
+            payment_category_id=fields.payment_category_id,
+        )
+        resync_sources_with_rule(session, ctx, rule_id)
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
             action="tax_rule.updated",
             entity_type="tax_rule",
             entity_id=str(rule_id),
             ts=ctx.clock.now(),
+            data={"kind": fields.kind.value, "base": fields.base.value},
         )
 
     run_immediate(factory, write)
@@ -287,6 +427,7 @@ def add_version(
             effective_from=effective_from,
             **version_values,
         )
+        resync_sources_with_rule(session, ctx, rule_id)
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
             action="tax_rule.version_added",
@@ -326,12 +467,44 @@ def workspace_has_fixed_tax_amounts(session: Session, ctx: Context) -> bool:
     return TaxRuleVersionRepository(session, ctx).any_fixed_amount()
 
 
-def dismiss_warning(factory: sessionmaker[Session], user_id: UUID) -> None:
-    """Remember, on the account, that the tax pages' warning was closed."""
+def _sources_with_taxes(session: Session, ctx: Context) -> tuple[str, ...]:
+    names = _active_source_names(session, ctx)
+    attached = {row.income_source_id for row in IncomeSourceTaxRuleRepository(session, ctx).list()}
+    return tuple(sorted(names[source_id] for source_id in attached if source_id in names))
 
-    def save(session: Session) -> None:
-        user = session.get(User, user_id)
-        if user is not None:
-            user.tax_warning_dismissed = True
 
-    run_immediate(factory, save)
+def sources_with_taxes(factory: sessionmaker[Session], ctx: Context) -> tuple[str, ...]:
+    """Non-archived income sources with a tax attached (they keep the Taxes switch on)."""
+    require_role(ctx, Role.VIEWER)
+    with factory() as session:
+        return _sources_with_taxes(session, ctx)
+
+
+def set_taxes_enabled(factory: sessionmaker[Session], ctx: Context, enabled: bool) -> None:
+    """The Workspace settings "Menu" switch; owners only, as the other workspace settings.
+
+    Turning it off is refused while a non-archived income source has a tax attached.
+    """
+    require_role(ctx, Role.OWNER)
+
+    def write(session: Session) -> None:
+        require_role_now(session, ctx, Role.OWNER)
+        repository = CurrentWorkspaceRepository(session, ctx)
+        repository.lock(exclusive=True)
+        if repository.get().taxes_enabled == enabled:
+            return
+        if not enabled:
+            in_use = _sources_with_taxes(session, ctx)
+            if in_use:
+                raise TaxesInUse(in_use)
+        repository.update(taxes_enabled=enabled)
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=ctx.user.id,
+            action="workspace.settings_updated",
+            entity_type="workspace",
+            entity_id=str(ctx.workspace.id),
+            ts=ctx.clock.now(),
+            data={"taxes_enabled": enabled},
+        )
+
+    run_immediate(factory, write)

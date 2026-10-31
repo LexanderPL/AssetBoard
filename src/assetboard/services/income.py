@@ -23,6 +23,7 @@ from assetboard.db.models.income import (
     WorkLog,
 )
 from assetboard.db.models.scheduled import ScheduledOccurrence
+from assetboard.db.models.tax import TaxRule
 from assetboard.db.repositories import (
     AuditEventRepository,
     CategoryRepository,
@@ -48,12 +49,14 @@ from assetboard.domain.money import Money
 from assetboard.domain.months import MAX_YEAR, MIN_YEAR, YearMonth
 from assetboard.domain.percent_or_fixed import PercentOrFixed
 from assetboard.domain.taxes import (
-    RecordAs,
+    PaymentTiming,
     TaxBase,
     TaxBreakdown,
-    TaxEffect,
     TaxInput,
+    TaxKind,
     calculate_taxes,
+    tax_payment_date,
+    tax_payment_date_with_offset,
 )
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR, clean_description
 from assetboard.i18n import gettext
@@ -84,6 +87,8 @@ class IncomePreview:
     units: Decimal | None
     breakdown: TaxBreakdown
     tax_names: dict[str, str]
+    # Attachment id (str) -> the planned tax payment's date.
+    payment_dates: dict[str, date]
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,7 +106,6 @@ class IncomeSourceView:
     expected_mode: ExpectedUnitsMode
     expected_units: Decimal | None
     average_months: int
-    record_as: RecordAs
     active_from: date
     active_to: date | None
     archived: bool
@@ -123,7 +127,6 @@ class _IncomeSourceValues:
     expected_mode: str
     expected_units: Decimal | None
     average_months: int
-    record_as: str
     active_from: date
     active_to: date | None
 
@@ -140,7 +143,6 @@ class _IncomeSourceValues:
             "expected_mode": self.expected_mode,
             "expected_units": self.expected_units,
             "average_months": self.average_months,
-            "record_as": self.record_as,
             "active_from": self.active_from,
             "active_to": self.active_to,
         }
@@ -245,13 +247,13 @@ def _source_estimate(
         raise IncomeError(str(exc)) from None
 
 
-def _calculate_breakdown(net: Money, taxes: list[TaxInput], record_as: RecordAs) -> TaxBreakdown:
-    breakdown = calculate_taxes(net, taxes, record_as)
+def _calculate_breakdown(net: Money, taxes: list[TaxInput]) -> TaxBreakdown:
+    breakdown = calculate_taxes(net, taxes)
     amounts = (
         breakdown.gross.amount_minor,
         breakdown.take_home.amount_minor,
         breakdown.ledger_amount.amount_minor,
-        *(line.amount.amount_minor for line in (*breakdown.added, *breakdown.withheld)),
+        *(line.amount.amount_minor for line in (*breakdown.added, *breakdown.deducted)),
     )
     if any(amount > MAX_AMOUNT_MINOR for amount in amounts):
         raise IncomeError("amount_too_large")
@@ -260,16 +262,35 @@ def _calculate_breakdown(net: Money, taxes: list[TaxInput], record_as: RecordAs)
     return breakdown
 
 
+@dataclass(frozen=True, slots=True)
+class _AttachedTax:
+    attachment: IncomeSourceTaxRule
+    rule: TaxRule
+    tax: TaxInput
+
+
+def attachment_payment_date(attachment: IncomeSourceTaxRule, rule: TaxRule, paid_on: date) -> date:
+    """The tax payment date: the attachment's overrides, else the rule's schedule."""
+    day = attachment.due_day if attachment.due_day is not None else rule.payment_day
+    if attachment.due_month_offset is not None:
+        return tax_payment_date_with_offset(paid_on, day, attachment.due_month_offset)
+    return tax_payment_date(paid_on, day, PaymentTiming(rule.payment_timing))
+
+
+def _payment_category(attachment: IncomeSourceTaxRule, rule: TaxRule) -> UUID | None:
+    return attachment.payment_category_id or rule.payment_category_id
+
+
 def _tax_lines(
     session: Session,
     scope: WorkspaceScope,
     source: IncomeSource,
     day: date,
-) -> tuple[list[tuple[IncomeSourceTaxRule, TaxInput, str]], set[UUID]]:
+) -> tuple[list[_AttachedTax], set[UUID]]:
     attachments = IncomeSourceTaxRuleRepository(session, scope).for_source(source.id)
     effective = TaxRuleRepository(session, scope).effective_for_all(day)
     versions = {rule.id: (rule, version) for rule, version in effective}
-    selected: list[tuple[IncomeSourceTaxRule, TaxInput, str]] = []
+    selected: list[_AttachedTax] = []
     missing: set[UUID] = set()
     for attachment in attachments:
         pair = versions.get(attachment.tax_rule_id)
@@ -286,16 +307,16 @@ def _tax_lines(
                 raise RuntimeError("fixed tax version has no amount")
             value = PercentOrFixed.fixed_amount(Money(version.fixed_minor, source.currency))
         selected.append(
-            (
+            _AttachedTax(
                 attachment,
+                rule,
                 TaxInput(
                     name=str(attachment.id),
-                    effect=TaxEffect(rule.effect),
+                    kind=TaxKind(rule.kind),
                     base=TaxBase(rule.base),
                     value=value,
                     generate_payment=attachment.generate_payment,
                 ),
-                rule.name,
             )
         )
     return selected, missing
@@ -313,26 +334,28 @@ def _sync_children(
     selected, _missing = _tax_lines(session, scope, source, due)
     locale = CurrentWorkspaceRepository(session, scope).get().locale
     label = gettext(TAX_PAYMENT_LABEL, locale) % {"name": source.name}
-    breakdown = _calculate_breakdown(
-        net, [tax for _, tax, _ in selected], RecordAs(source.record_as)
-    )
+    breakdown = _calculate_breakdown(net, [line.tax for line in selected])
     amounts: dict[str, int] = {}
-    for line in (*breakdown.added, *breakdown.withheld):
+    for line in (*breakdown.added, *breakdown.deducted):
         if line.amount.amount_minor > MAX_AMOUNT_MINOR:
             raise IncomeError("amount_too_large")
         amounts[line.name] = line.amount.amount_minor
     payable = {line.name for line in breakdown.payments}
-    wanted: dict[UUID, tuple[IncomeSourceTaxRule, int, date]] = {}
-    for attachment, tax, _tax_name in selected:
-        if tax.name not in payable:
+    wanted: dict[UUID, tuple[UUID, int, date]] = {}
+    for line in selected:
+        if line.tax.name not in payable:
             continue
-        amount = amounts[tax.name]
-        if amount <= 0:
+        amount = amounts[line.tax.name]
+        category_id = _payment_category(line.attachment, line.rule)
+        if amount <= 0 or category_id is None:
             continue
-        payment_day = pay_date(
-            _month_shift(_month_start(due), attachment.due_month_offset), attachment.due_day, 0
-        )
-        wanted[attachment.id] = (attachment, amount, payment_day)
+        try:
+            payment_day = attachment_payment_date(line.attachment, line.rule, due)
+        except ValueError:
+            raise IncomeError("invalid_date") from None
+        if not MIN_YEAR <= payment_day.year <= MAX_YEAR:
+            raise IncomeError("invalid_date")
+        wanted[line.attachment.id] = (category_id, amount, payment_day)
 
     repository = ScheduledOccurrenceRepository(session, scope)
     closed_months = MonthStateRepository(session, scope).closed_months()
@@ -352,15 +375,15 @@ def _sync_children(
         if target is None:
             repository.delete(child)
             continue
-        attachment, amount, due_date = target
-        child.category_id = attachment.payment_category_id
+        category_id, amount, due_date = target
+        child.category_id = category_id
         child.due_date = due_date
         child.nominal_date = due_date
         child.expected_minor = amount
         child.currency = source.currency
         child.amount_state = "confirmed"
         child.label = label
-    for attachment_id, (attachment, amount, due_date) in wanted.items():
+    for attachment_id, (category_id, amount, due_date) in wanted.items():
         if YearMonth.from_date(due_date) in closed_months:
             continue
         repository.create(
@@ -370,7 +393,7 @@ def _sync_children(
             parent_occurrence_id=parent.id,
             income_source_tax_rule_id=attachment_id,
             direction="expense",
-            category_id=attachment.payment_category_id,
+            category_id=category_id,
             nominal_date=due_date,
             due_date=due_date,
             expected_minor=amount,
@@ -423,11 +446,7 @@ def _sync_work_month(
     logs = WorkLogRepository(session, scope).for_source(source.id)
     estimate = _source_estimate(source, month, logs, workspace.country_code)
     tax_rules, _missing = _tax_lines(session, scope, source, due)
-    breakdown = _calculate_breakdown(
-        estimate.net,
-        [tax for _, tax, _ in tax_rules],
-        RecordAs(source.record_as),
-    )
+    breakdown = _calculate_breakdown(estimate.net, [line.tax for line in tax_rules])
     if occurrence is None:
         occurrence = repository.create(
             scheduled_item_id=None,
@@ -563,11 +582,7 @@ def list_sources(factory: sessionmaker[Session], ctx: Context) -> list[IncomeSou
                     continue
                 estimate = _source_estimate(source, work_month, logs, workspace.country_code)
                 selected, _missing = _tax_lines(session, ctx, source, due)
-                breakdown = _calculate_breakdown(
-                    estimate.net,
-                    [tax for _, tax, _ in selected],
-                    RecordAs(source.record_as),
-                )
+                breakdown = _calculate_breakdown(estimate.net, [line.tax for line in selected])
                 preview_rows.append(
                     IncomePreview(
                         work_month=work_month,
@@ -575,7 +590,13 @@ def list_sources(factory: sessionmaker[Session], ctx: Context) -> list[IncomeSou
                         amount_state=estimate.amount_state,
                         units=estimate.units,
                         breakdown=breakdown,
-                        tax_names={str(attachment.id): name for attachment, _, name in selected},
+                        tax_names={str(line.attachment.id): line.rule.name for line in selected},
+                        payment_dates={
+                            str(line.attachment.id): attachment_payment_date(
+                                line.attachment, line.rule, due
+                            )
+                            for line in selected
+                        },
                     )
                 )
             result.append(
@@ -593,7 +614,6 @@ def list_sources(factory: sessionmaker[Session], ctx: Context) -> list[IncomeSou
                     expected_mode=ExpectedUnitsMode(source.expected_mode),
                     expected_units=source.expected_units,
                     average_months=source.average_months,
-                    record_as=RecordAs(source.record_as),
                     active_from=source.active_from,
                     active_to=source.active_to,
                     archived=source.archived_at is not None,
@@ -609,7 +629,12 @@ def category_usage(session: Session, ctx: Context) -> dict[UUID, CategoryUsage]:
     counts: dict[UUID, int] = {}
     source_counts = IncomeSourceRepository(session, ctx).category_counts()
     payment_counts = IncomeSourceTaxRuleRepository(session, ctx).payment_category_counts()
-    for category_id, count in (*source_counts.items(), *payment_counts.items()):
+    rule_counts = TaxRuleRepository(session, ctx).payment_category_counts()
+    for category_id, count in (
+        *source_counts.items(),
+        *payment_counts.items(),
+        *rule_counts.items(),
+    ):
         counts[category_id] = counts.get(category_id, 0) + count
     return {category_id: CategoryUsage(references=count) for category_id, count in counts.items()}
 
@@ -631,7 +656,6 @@ def _source_fields(
     expected_mode: str,
     expected_units_value: Decimal | None,
     average_months: int,
-    record_as: str,
     active_from: date,
     active_to: date | None,
 ) -> _IncomeSourceValues:
@@ -649,7 +673,6 @@ def _source_fields(
     try:
         source_kind = IncomeKind(kind)
         expected_mode_value = ExpectedUnitsMode(expected_mode)
-        record_mode = RecordAs(record_as)
     except ValueError:
         raise IncomeError("invalid_source") from None
     if source_kind == IncomeKind.FIXED:
@@ -686,7 +709,6 @@ def _source_fields(
         expected_mode=expected_mode_value.value,
         expected_units=expected_units_value,
         average_months=average_months,
-        record_as=record_mode.value,
         active_from=active_from,
         active_to=active_to,
     )
@@ -707,7 +729,6 @@ def create_source(
     expected_mode: str,
     expected_units_value: Decimal | None,
     average_months: int,
-    record_as: str,
     active_from: date,
     active_to: date | None,
 ) -> UUID:
@@ -724,7 +745,6 @@ def create_source(
         expected_mode=expected_mode,
         expected_units_value=expected_units_value,
         average_months=average_months,
-        record_as=record_as,
         active_from=active_from,
         active_to=active_to,
     )
@@ -769,7 +789,6 @@ def update_source(
     expected_mode: str,
     expected_units_value: Decimal | None,
     average_months: int,
-    record_as: str,
     active_from: date,
     active_to: date | None,
 ) -> None:
@@ -786,7 +805,6 @@ def update_source(
         expected_mode=expected_mode,
         expected_units_value=expected_units_value,
         average_months=average_months,
-        record_as=record_as,
         active_from=active_from,
         active_to=active_to,
     )
@@ -818,54 +836,98 @@ def update_source(
     run_immediate(factory, write)
 
 
+def _check_payment_category(session: Session, ctx: Context, category_id: UUID | None) -> None:
+    if category_id is None:
+        return
+    category = CategoryRepository(session, ctx).get_or_raise(category_id)
+    if category.archived_at is not None:
+        raise IncomeError("invalid_tax_attachment")
+    if category.kind != "expense" or category.treatment == "transfer":
+        raise IncomeError("invalid_tax_category")
+
+
+def _check_overrides(due_day: int | None, due_month_offset: int | None) -> None:
+    if (due_day is not None and not 1 <= due_day <= 31) or (
+        due_month_offset is not None and not 0 <= due_month_offset <= 24
+    ):
+        raise IncomeError("invalid_tax_attachment")
+
+
+def _attach(
+    session: Session,
+    ctx: Context,
+    source: IncomeSource,
+    tax_rule_id: UUID,
+    *,
+    payment_category_id: UUID | None,
+    due_day: int | None,
+    due_month_offset: int | None,
+    generate_payment: bool,
+) -> IncomeSourceTaxRule:
+    tax_rule = TaxRuleRepository(session, ctx).get_or_raise(tax_rule_id)
+    if tax_rule.archived_at is not None:
+        raise IncomeError("invalid_tax_attachment")
+    _check_payment_category(session, ctx, payment_category_id)
+    if (
+        TaxKind(tax_rule.kind).plans_payment
+        and generate_payment
+        and (payment_category_id or tax_rule.payment_category_id) is None
+    ):
+        raise IncomeError("tax_without_category")
+    repo = IncomeSourceTaxRuleRepository(session, ctx)
+    if repo.for_source_and_rule(source.id, tax_rule_id) is not None:
+        raise IncomeError("duplicate_tax_rule")
+    order = max((row.sort_order for row in repo.for_source(source.id)), default=-1) + 1
+    attachment = repo.create(
+        income_source_id=source.id,
+        tax_rule_id=tax_rule_id,
+        sort_order=order,
+        generate_payment=generate_payment,
+        payment_category_id=payment_category_id,
+        due_day=due_day,
+        due_month_offset=due_month_offset,
+    )
+    AuditEventRepository(session, ctx).record(
+        actor_user_id=ctx.user.id,
+        action="income_source_tax_rule.attached",
+        entity_type="income_source",
+        entity_id=str(source.id),
+        ts=ctx.clock.now(),
+        data={"tax_rule_id": str(tax_rule_id)},
+    )
+    return attachment
+
+
 def attach_tax_rule(
     factory: sessionmaker[Session],
     ctx: Context,
     source_id: UUID,
     *,
     tax_rule_id: UUID,
-    payment_category_id: UUID,
-    due_day: int,
-    due_month_offset: int,
-    generate_payment: bool,
+    payment_category_id: UUID | None = None,
+    due_day: int | None = None,
+    due_month_offset: int | None = None,
+    generate_payment: bool = True,
 ) -> UUID:
+    """Attach a tax; ``None`` overrides use the tax rule's payment schedule (ADR-0022)."""
     require_role(ctx, Role.EDITOR)
-    if not 1 <= due_day <= 31 or not 0 <= due_month_offset <= 24:
-        raise IncomeError("invalid_tax_attachment")
+    _check_overrides(due_day, due_month_offset)
 
     def write(session: Session) -> UUID:
         require_role_now(session, ctx, Role.EDITOR)
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        sources = IncomeSourceRepository(session, ctx)
-        source = sources.get_or_raise(source_id)
+        source = IncomeSourceRepository(session, ctx).get_or_raise(source_id)
         if source.archived_at is not None:
             raise IncomeError("archived")
-        tax_rule = TaxRuleRepository(session, ctx).get_or_raise(tax_rule_id)
-        category = CategoryRepository(session, ctx).get_or_raise(payment_category_id)
-        if tax_rule.archived_at is not None or category.archived_at is not None:
-            raise IncomeError("invalid_tax_attachment")
-        if category.kind != "expense" or category.treatment == "transfer":
-            raise IncomeError("invalid_tax_category")
-        repo = IncomeSourceTaxRuleRepository(session, ctx)
-        if repo.for_source_and_rule(source_id, tax_rule_id) is not None:
-            raise IncomeError("duplicate_tax_rule")
-        order = max((row.sort_order for row in repo.for_source(source_id)), default=-1) + 1
-        attachment = repo.create(
-            income_source_id=source_id,
-            tax_rule_id=tax_rule_id,
-            sort_order=order,
-            generate_payment=generate_payment,
+        attachment = _attach(
+            session,
+            ctx,
+            source,
+            tax_rule_id,
             payment_category_id=payment_category_id,
             due_day=due_day,
             due_month_offset=due_month_offset,
-        )
-        AuditEventRepository(session, ctx).record(
-            actor_user_id=ctx.user.id,
-            action="income_source_tax_rule.attached",
-            entity_type="income_source",
-            entity_id=str(source_id),
-            ts=ctx.clock.now(),
-            data={"tax_rule_id": str(tax_rule_id)},
+            generate_payment=generate_payment,
         )
         _resync_tax_months(session, ctx, source)
         return attachment.id
@@ -886,21 +948,52 @@ def _resync_tax_months(session: Session, ctx: Context, source: IncomeSource) -> 
         _sync_work_month(session, ctx, ctx.clock, source, work_month, allow_past=True)
 
 
+def resync_sources_with_rule(session: Session, ctx: Context, tax_rule_id: UUID) -> None:
+    """After a tax rule's kind, base or schedule changed: recalculate its sources."""
+    sources = IncomeSourceRepository(session, ctx)
+    for attachment in IncomeSourceTaxRuleRepository(session, ctx).for_rule(tax_rule_id):
+        source = sources.get_or_raise(attachment.income_source_id)
+        if source.archived_at is None:
+            _resync_tax_months(session, ctx, source)
+
+
+def resync_pending_income(
+    factory: sessionmaker[Session], scope: WorkspaceScope, clock: Clock
+) -> int:
+    """Recalculate every pending income occurrence (and its tax payments) from the current
+    sources and tax rules. Run by the startup catch-up, so an upgrade that changes the tax
+    model (ADR-0022) is reflected without waiting for an edit. Returns the occurrences seen."""
+
+    def write(session: Session) -> int:
+        CurrentWorkspaceRepository(session, scope).lock(exclusive=True)
+        count = 0
+        occurrences = ScheduledOccurrenceRepository(session, scope)
+        for source in IncomeSourceRepository(session, scope).ordered(active_only=True):
+            for occurrence in occurrences.for_income_source(source.id):
+                if occurrence.status == "pending" and occurrence.work_month is not None:
+                    _sync_work_month(
+                        session, scope, clock, source, occurrence.work_month, allow_past=True
+                    )
+                    count += 1
+        return count
+
+    return run_immediate(factory, write)
+
+
 def update_tax_attachment(
     factory: sessionmaker[Session],
     ctx: Context,
     source_id: UUID,
     attachment_id: UUID,
     *,
-    payment_category_id: UUID,
-    due_day: int,
-    due_month_offset: int,
-    generate_payment: bool,
+    payment_category_id: UUID | None = None,
+    due_day: int | None = None,
+    due_month_offset: int | None = None,
+    generate_payment: bool = True,
 ) -> None:
     """Change how an attached tax rule's payment is planned; pending payments are re-synced."""
     require_role(ctx, Role.EDITOR)
-    if not 1 <= due_day <= 31 or not 0 <= due_month_offset <= 24:
-        raise IncomeError("invalid_tax_attachment")
+    _check_overrides(due_day, due_month_offset)
 
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.EDITOR)
@@ -912,11 +1005,7 @@ def update_tax_attachment(
         attachment = repository.get_or_raise(attachment_id)
         if attachment.income_source_id != source_id:
             raise IncomeError("invalid_tax_attachment")
-        category = CategoryRepository(session, ctx).get_or_raise(payment_category_id)
-        if category.archived_at is not None:
-            raise IncomeError("invalid_tax_attachment")
-        if category.kind != "expense" or category.treatment == "transfer":
-            raise IncomeError("invalid_tax_category")
+        _check_payment_category(session, ctx, payment_category_id)
         repository.update(
             attachment_id,
             payment_category_id=payment_category_id,
@@ -932,6 +1021,68 @@ def update_tax_attachment(
             ts=ctx.clock.now(),
             data={"attachment_id": str(attachment_id), "tax_rule_id": str(attachment.tax_rule_id)},
         )
+        _resync_tax_months(session, ctx, source)
+
+    run_immediate(factory, write)
+
+
+def _detach(session: Session, ctx: Context, attachment: IncomeSourceTaxRule) -> None:
+    occurrences = ScheduledOccurrenceRepository(session, ctx)
+    closed_months = MonthStateRepository(session, ctx).closed_months()
+    for child in occurrences.for_tax_attachment(attachment.id):
+        if child.status != "pending":
+            raise IncomeError("attachment_in_use")
+        if YearMonth.from_date(child.due_date) in closed_months:
+            raise IncomeError("month_closed")
+        occurrences.delete(child)
+    IncomeSourceTaxRuleRepository(session, ctx).delete(attachment)
+    AuditEventRepository(session, ctx).record(
+        actor_user_id=ctx.user.id,
+        action="income_source_tax_rule.removed",
+        entity_type="income_source",
+        entity_id=str(attachment.income_source_id),
+        ts=ctx.clock.now(),
+    )
+
+
+def set_source_taxes(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    source_id: UUID,
+    selection: dict[UUID, int | None],
+) -> None:
+    """The "Taxes on this income" checklist: ``selection`` maps each ticked tax rule to its
+    payment-day override (``None``: the rule's day). Unticked attachments are removed (refused
+    while a posted tax payment uses one); other overrides of kept attachments stay."""
+    require_role(ctx, Role.EDITOR)
+    for day in selection.values():
+        _check_overrides(day, None)
+
+    def write(session: Session) -> None:
+        require_role_now(session, ctx, Role.EDITOR)
+        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+        source = IncomeSourceRepository(session, ctx).get_or_raise(source_id)
+        if source.archived_at is not None:
+            raise IncomeError("archived")
+        repository = IncomeSourceTaxRuleRepository(session, ctx)
+        existing = {row.tax_rule_id: row for row in repository.for_source(source_id)}
+        for rule_id, attachment in existing.items():
+            if rule_id not in selection:
+                _detach(session, ctx, attachment)
+            elif attachment.due_day != selection[rule_id]:
+                repository.update(attachment.id, due_day=selection[rule_id])
+        for rule_id, day in selection.items():
+            if rule_id not in existing:
+                _attach(
+                    session,
+                    ctx,
+                    source,
+                    rule_id,
+                    payment_category_id=None,
+                    due_day=day,
+                    due_month_offset=None,
+                    generate_payment=True,
+                )
         _resync_tax_months(session, ctx, source)
 
     run_immediate(factory, write)
@@ -987,32 +1138,16 @@ def remove_tax_attachment(
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.EDITOR)
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        repository = IncomeSourceTaxRuleRepository(session, ctx)
-        attachment = repository.get_or_raise(attachment_id)
+        attachment = IncomeSourceTaxRuleRepository(session, ctx).get_or_raise(attachment_id)
         if attachment.income_source_id != source_id:
             raise IncomeError("invalid_tax_attachment")
-        occurrences = ScheduledOccurrenceRepository(session, ctx)
-        closed_months = MonthStateRepository(session, ctx).closed_months()
-        for child in occurrences.for_tax_attachment(attachment_id):
-            if child.status != "pending":
-                raise IncomeError("attachment_in_use")
-            if YearMonth.from_date(child.due_date) in closed_months:
-                raise IncomeError("month_closed")
-            occurrences.delete(child)
-        repository.delete(attachment)
+        _detach(session, ctx, attachment)
         source = IncomeSourceRepository(session, ctx).get_or_raise(source_id)
-        for occurrence in occurrences.for_income_source(source_id):
+        for occurrence in ScheduledOccurrenceRepository(session, ctx).for_income_source(source_id):
             if occurrence.status == "pending" and occurrence.work_month is not None:
                 _sync_work_month(
                     session, ctx, ctx.clock, source, occurrence.work_month, allow_past=True
                 )
-        AuditEventRepository(session, ctx).record(
-            actor_user_id=ctx.user.id,
-            action="income_source_tax_rule.removed",
-            entity_type="income_source",
-            entity_id=str(source_id),
-            ts=ctx.clock.now(),
-        )
 
     run_immediate(factory, write)
 

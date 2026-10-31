@@ -980,3 +980,137 @@ def test_0025_amount_shading_round_trip_turns_the_setting_on_for_existing_users(
         check_database_migrations(settings)
     finally:
         engine.dispose()
+
+
+def test_0027_taxes_redesign_maps_kinds_and_schedules_and_round_trips(tmp_path: Path) -> None:
+    """ADR-0022 data mapping: effect + record_as -> kind, first attachment -> rule defaults,
+    equal attachment values -> NULL; downgrade restores what the old model can express."""
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'taxes.db'}"
+    )
+    config = alembic_config(settings)
+    command.upgrade(config, "0026_two_step_login")
+    engine = create_database_engine(settings.database_url or "")
+    ws, empty_ws = "0" * 31 + "1", "0" * 31 + "2"
+    salary, taxes_cat, social = "0" * 30 + "a1", "0" * 30 + "a2", "0" * 30 + "a3"
+    contract, job = "0" * 30 + "b1", "0" * 30 + "b2"
+    vat, pit, zus, orphan = ("0" * 30 + f"c{i}" for i in range(1, 5))
+    stamp = "'2026-01-01 00:00:00'"
+    try:
+        with engine.begin() as c:
+            for workspace in (ws, empty_ws):
+                c.exec_driver_sql(
+                    "INSERT INTO workspaces (id, name, base_currency, locale, timezone, "
+                    f"created_at, updated_at) VALUES (?, 'W', 'EUR', 'en', 'UTC', {stamp}, {stamp})",
+                    (workspace,),
+                )
+            for category, name, kind, order in (
+                (salary, "Salary", "income", 0),
+                (taxes_cat, "Taxes", "expense", 1),
+                (social, "Social", "expense", 2),
+            ):
+                c.exec_driver_sql(
+                    "INSERT INTO categories (id, workspace_id, name, name_key, kind, treatment, "
+                    "color, sort_order, created_at, updated_at) VALUES (?, ?, ?, ?, ?, 'regular', "
+                    f"'#16a34a', ?, {stamp}, {stamp})",
+                    (category, ws, name, name.lower(), kind, order),
+                )
+            for source, record_as in ((contract, "cash_received"), (job, "take_home")):
+                c.exec_driver_sql(
+                    "INSERT INTO income_sources (id, workspace_id, name, kind, category_id, "
+                    "currency, fixed_minor, unit_label, pay_day, pay_lag_months, expected_mode, "
+                    "average_months, record_as, active_from, created_at, updated_at) VALUES "
+                    "(?, ?, 'S', 'fixed', ?, 'EUR', 100000, 'day', 10, 0, 'manual', 3, ?, "
+                    f"'2026-01-01', {stamp}, {stamp})",
+                    (source, ws, salary, record_as),
+                )
+            for rule, effect in (
+                (vat, "added"),
+                (pit, "withheld"),
+                (zus, "withheld"),
+                (orphan, "withheld"),
+            ):
+                c.exec_driver_sql(
+                    "INSERT INTO tax_rules (id, workspace_id, name, effect, base, notes, "
+                    f"created_at, updated_at) VALUES (?, ?, 'T', ?, 'net', '', {stamp}, {stamp})",
+                    (rule, ws, effect),
+                )
+            attachments = (
+                # id, source, rule, order, category, day, offset, created
+                ("d1", contract, vat, 0, taxes_cat, 25, 1, "2026-01-01"),
+                ("d2", contract, zus, 1, social, 15, 2, "2026-01-01"),
+                ("d3", contract, pit, 2, taxes_cat, 5, 1, "2026-02-01"),
+                ("d4", job, pit, 0, taxes_cat, 20, 0, "2026-01-15"),
+                ("d5", job, zus, 1, taxes_cat, 15, 2, "2026-03-01"),
+            )
+            for key, source, rule, order, category, day, offset, created in attachments:
+                c.exec_driver_sql(
+                    "INSERT INTO income_source_tax_rules (id, workspace_id, income_source_id, "
+                    "tax_rule_id, sort_order, generate_payment, payment_category_id, due_day, "
+                    "due_month_offset, created_at, updated_at) VALUES "
+                    f"(?, ?, ?, ?, ?, 1, ?, ?, ?, ?, {stamp})",
+                    ("0" * 30 + key, ws, source, rule, order, category, day, offset, created),
+                )
+        upgrade_database(settings)
+        with engine.connect() as c:
+            rules = {
+                row[0][-2:]: tuple(row[1:])
+                for row in c.exec_driver_sql(
+                    "SELECT id, kind, payment_day, payment_timing, payment_category_id "
+                    "FROM tax_rules"
+                )
+            }
+            rows = {
+                row[0][-2:]: tuple(row[1:])
+                for row in c.exec_driver_sql(
+                    "SELECT id, due_day, due_month_offset, payment_category_id "
+                    "FROM income_source_tax_rules"
+                )
+            }
+            enabled = dict(c.exec_driver_sql("SELECT id, taxes_enabled FROM workspaces").all())
+        assert rules == {
+            "c1": ("added", 25, "next_month", taxes_cat),  # first attachment d1 (offset 1)
+            "c2": ("payer_withheld", 20, "same_month", taxes_cat),  # on a take-home source; d4
+            # Also on the take-home source (d5): payer-withheld; defaults from d2 (offset 2).
+            "c3": ("payer_withheld", 15, "next_month", social),
+            "c4": ("self_paid", 10, "next_month", None),  # no attachment
+        }
+        assert rows == {
+            "d1": (None, None, None),
+            "d2": (None, 2, None),  # offset 2 differs from next_month (1)
+            "d3": (5, 1, None),  # day 5 and offset 1 differ from the rule (20, same month)
+            "d4": (None, None, None),
+            "d5": (None, 2, taxes_cat),
+        }
+        assert enabled == {ws: 1, empty_ws: 0}
+        assert "record_as" not in {
+            col["name"] for col in inspect(engine).get_columns("income_sources")
+        }
+        check_database_migrations(settings)
+
+        command.downgrade(config, "0026_two_step_login")
+        with engine.connect() as c:
+            effects = dict(c.exec_driver_sql("SELECT id, effect FROM tax_rules").all())
+            record_as = dict(c.exec_driver_sql("SELECT id, record_as FROM income_sources").all())
+            restored = {
+                row[0][-2:]: tuple(row[1:])
+                for row in c.exec_driver_sql(
+                    "SELECT id, due_day, due_month_offset, payment_category_id "
+                    "FROM income_source_tax_rules"
+                )
+            }
+        assert effects == {vat: "added", pit: "withheld", zus: "withheld", orphan: "withheld"}
+        # Lossy: the contract source has payer-withheld taxes attached (d2, d3): take-home.
+        assert record_as == {contract: "take_home", job: "take_home"}
+        assert restored == {
+            "d1": (25, 1, taxes_cat),
+            "d2": (15, 2, social),
+            "d3": (5, 1, taxes_cat),
+            "d4": (20, 0, taxes_cat),
+            "d5": (15, 2, taxes_cat),
+        }
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()

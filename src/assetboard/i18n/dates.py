@@ -65,3 +65,11 @@ def month_names(locale: str) -> list[str]:
     for a month select: "January", "styczeń"."""
     names = get_month_names("wide", context="stand-alone", locale=_locale(locale))
     return [names[index] for index in range(1, 13)]
+
+
+def format_day_of_month(day: int, locale: str) -> str:
+    """A day of the month as an ordinal for sentences: "25th" (English), "25." (others)."""
+    if _locale(locale).split("_")[0] != "en":
+        return f"{day}."
+    suffix = "th" if 11 <= day % 100 <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    return f"{day}{suffix}"

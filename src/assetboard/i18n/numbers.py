@@ -209,6 +209,12 @@ def format_rate_tenths(tenths: int, locale: str) -> str:
     return format_percent(value, format="#,##0.0%", locale=_normalize_number_locale(locale))
 
 
+def format_rate_short(rate_bp: int, locale: str) -> str:
+    """A basis-point rate without trailing zero decimals ("23%", "12,5%")."""
+    value = Decimal(rate_bp).scaleb(-4)
+    return format_percent(value, format="#,##0.##%", locale=_normalize_number_locale(locale))
+
+
 def format_rate_basis_points(rate_bp: int, locale: str) -> str:
     """Format an integer basis-point rate with two decimal places in the given locale."""
     value = Decimal(rate_bp).scaleb(-4)
