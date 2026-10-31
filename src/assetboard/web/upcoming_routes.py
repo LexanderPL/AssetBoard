@@ -15,7 +15,7 @@ from assetboard.domain.transactions import amount_minor
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day
 from assetboard.i18n.numbers import format_amount_input, parse_amount
-from assetboard.services import occurrences
+from assetboard.services import occurrences, scheduled
 from assetboard.services.categories import list_categories
 from assetboard.services.context import Role, has_role
 from assetboard.web.context import CurrentContext
@@ -38,6 +38,7 @@ ACTION_ERRORS = {
     "undo_expired": _("The 10-second undo window has expired."),
     "category_unavailable": _("The occurrence category is unavailable; edit the recurring rule."),
     "invalid_input": _("Check the amount and date, then try again."),
+    "not_planned": _("Only a one-time planned entry can be deleted here."),
 }
 INVALID_DIRECTION = _("Choose a valid direction.")
 
@@ -59,6 +60,7 @@ def _redirect(
     *,
     error: str | None = None,
     posted: UUID | None = None,
+    notice: str | None = None,
     back: str = "",
     return_month: YearMonth | None = None,
 ) -> Response:
@@ -73,6 +75,8 @@ def _redirect(
         params["error"] = error
     if posted:
         params["posted"] = str(posted)
+    if notice and return_month is not None:
+        params["notice"] = notice
     target = (
         request.url_for("transactions_month", month=str(return_month)).path
         if return_month is not None
@@ -184,6 +188,28 @@ async def skip(request: Request, ctx: CurrentContext, occurrence_id: str) -> Res
     except occurrences.OccurrenceError as exc:
         return _redirect(request, error=exc.code)
     return _redirect(request, back=values.get("back", ""))
+
+
+@router.post("/upcoming/{occurrence_id}/delete", name="upcoming_delete")
+async def delete(request: Request, ctx: CurrentContext, occurrence_id: str) -> Response:
+    """Delete a one-time planned entry from its expected row (the Plan button's item)."""
+    values = await _values(request)
+    return_month = None
+    with contextlib.suppress(InvalidMonth):
+        return_month = YearMonth.parse(values.get("return_month", ""))
+    try:
+        await run_in_threadpool(
+            scheduled.delete_planned_occurrence,
+            request.app.state.session_factory,
+            ctx,
+            _id(occurrence_id),
+        )
+    except ValueError as exc:
+        code = str(exc)
+        if code not in ACTION_ERRORS:
+            code = "invalid_input"
+        return _redirect(request, error=code, return_month=return_month)
+    return _redirect(request, notice="planned_deleted", return_month=return_month)
 
 
 @router.post("/upcoming/{occurrence_id}/reschedule", name="upcoming_reschedule")

@@ -925,14 +925,14 @@ def test_0023_one_time_items_round_trip_converts_once_to_a_single_monthly(
         engine.dispose()
 
 
-def test_0024_amount_shading_round_trip_turns_the_setting_on_for_existing_users(
+def test_0025_amount_shading_round_trip_turns_the_setting_on_for_existing_users(
     tmp_path: Path,
 ) -> None:
     settings = Settings(
         _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'shade.db'}"
     )
     upgrade_database(settings)
-    command.downgrade(alembic_config(settings), "0023_one_time_items")
+    command.downgrade(alembic_config(settings), "0024_tax_warning")
     engine = create_database_engine(settings.database_url or "")
     stamp = "'2026-01-01 00:00:00'"
 
@@ -953,7 +953,7 @@ def test_0024_amount_shading_round_trip_turns_the_setting_on_for_existing_users(
         with engine.connect() as connection:
             flag = connection.exec_driver_sql("SELECT highlight_large_amounts FROM users")
             assert flag.scalar_one() == 1  # existing accounts: on
-        command.downgrade(alembic_config(settings), "0023_one_time_items")
+        command.downgrade(alembic_config(settings), "0024_tax_warning")
         assert "highlight_large_amounts" not in columns()
         with engine.connect() as connection:
             assert connection.exec_driver_sql("SELECT count(*) FROM users").scalar_one() == 1

@@ -5,6 +5,7 @@ import pytest
 from sqlalchemy import select
 
 from assetboard.config import Settings
+from assetboard.db.models.identity import AuditEvent
 from assetboard.db.models.scheduled import ScheduledOccurrence
 from assetboard.db.repositories import (
     CategoryRepository,
@@ -459,3 +460,179 @@ def test_missing_work_log_banner_skips_fixed_sources(team: WorkspaceDb) -> None:
     income_category, _expense = categories(team, ctx)
     _source(team, ctx, income_category, kind="fixed", fixed_minor=500_000, rate_minor=None)
     assert income.missing_work_logs(team.factory, ctx, date(2026, 3, 1)) == []
+
+
+def _attached(team: WorkspaceDb, ctx):
+    """A source with a 12 % withheld rule attached (due day 20, one month later) and a log."""
+    income_category, expense_category = categories(team, ctx)
+    rule_id = taxes.create_rule(
+        team.factory,
+        ctx,
+        name="Income tax",
+        effect="withheld",
+        base="net",
+        notes="",
+        effective_from=date(2026, 1, 1),
+        value=PercentOrFixed.percent(1200),
+    )
+    source_id = _source(team, ctx, income_category)
+    attachment_id = income.attach_tax_rule(
+        team.factory,
+        ctx,
+        source_id,
+        tax_rule_id=rule_id,
+        payment_category_id=expense_category,
+        due_day=20,
+        due_month_offset=1,
+        generate_payment=True,
+    )
+    income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("10"))
+    with team.factory.begin() as session:
+        other = CategoryRepository(session, ctx).create(
+            name="Social security",
+            name_key="social_security",
+            kind="expense",
+            treatment="regular",
+            color="#2563eb",
+            sort_order=2,
+        )
+        other_id = other.id
+    return source_id, attachment_id, rule_id, other_id, income_category
+
+
+def _tax_children(team: WorkspaceDb, ctx, source_id):
+    parent = _occurrence(team, ctx, source_id, date(2026, 8, 1))
+    assert parent is not None
+    with team.factory() as session:
+        return [
+            (child.due_date, child.category_id, child.expected_minor)
+            for child in ScheduledOccurrenceRepository(session, ctx).children(parent.id)
+        ]
+
+
+def test_updating_a_tax_attachment_resyncs_the_pending_payment(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    source_id, attachment_id, rule_id, other_id, _salary = _attached(team, ctx)
+    assert [(due, amount) for due, _c, amount in _tax_children(team, ctx, source_id)] == [
+        (date(2026, 10, 20), 12_000)
+    ]
+    # A changed rate shows that the amount is recalculated on the update, too.
+    taxes.add_version(
+        team.factory,
+        ctx,
+        rule_id,
+        effective_from=date(2026, 9, 1),
+        value=PercentOrFixed.percent(1900),
+    )
+
+    income.update_tax_attachment(
+        team.factory,
+        ctx,
+        source_id,
+        attachment_id,
+        payment_category_id=other_id,
+        due_day=5,
+        due_month_offset=2,
+        generate_payment=True,
+    )
+
+    assert _tax_children(team, ctx, source_id) == [(date(2026, 11, 5), other_id, 19_000)]
+    listed = next(row for row in income.list_sources(team.factory, ctx) if row.id == source_id)
+    attachment = listed.attachments[0]
+    assert (attachment.due_day, attachment.due_month_offset) == (5, 2)
+    with team.factory() as session:
+        event = session.scalars(
+            select(AuditEvent).where(AuditEvent.action == "income_source_tax_rule.updated")
+        ).one()
+        assert event.data == {"attachment_id": str(attachment_id), "tax_rule_id": str(rule_id)}
+
+    # Switching the payment off removes the pending payment; switching it on brings it back.
+    for generate, expected in ((False, 0), (True, 1)):
+        income.update_tax_attachment(
+            team.factory,
+            ctx,
+            source_id,
+            attachment_id,
+            payment_category_id=other_id,
+            due_day=5,
+            due_month_offset=2,
+            generate_payment=generate,
+        )
+        assert len(_tax_children(team, ctx, source_id)) == expected
+
+
+@pytest.mark.parametrize(
+    ("due_day", "offset", "code"),
+    [(0, 1, "invalid_tax_attachment"), (32, 1, "invalid_tax_attachment"),
+     (10, -1, "invalid_tax_attachment"), (10, 25, "invalid_tax_attachment")],
+)  # fmt: skip
+def test_updating_a_tax_attachment_validates_day_and_offset(
+    team: WorkspaceDb, due_day: int, offset: int, code: str
+) -> None:
+    ctx = team.ctx("owner", "owner")
+    source_id, attachment_id, _rule, other_id, _salary = _attached(team, ctx)
+    with pytest.raises(income.IncomeError) as caught:
+        income.update_tax_attachment(
+            team.factory,
+            ctx,
+            source_id,
+            attachment_id,
+            payment_category_id=other_id,
+            due_day=due_day,
+            due_month_offset=offset,
+            generate_payment=True,
+        )
+    assert caught.value.code == code
+
+
+def test_updating_a_tax_attachment_rejects_bad_categories_and_sources(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    source_id, attachment_id, _rule, other_id, salary = _attached(team, ctx)
+    other_source = _source(team, ctx, salary, name="Other")
+
+    def update(source, category):
+        income.update_tax_attachment(
+            team.factory,
+            ctx,
+            source,
+            attachment_id,
+            payment_category_id=category,
+            due_day=10,
+            due_month_offset=1,
+            generate_payment=True,
+        )
+
+    with pytest.raises(income.IncomeError) as caught:
+        update(source_id, salary)  # an income category
+    assert caught.value.code == "invalid_tax_category"
+    with pytest.raises(income.IncomeError) as caught:
+        update(other_source, other_id)  # the attachment belongs to another source
+    assert caught.value.code == "invalid_tax_attachment"
+    income.archive_source(team.factory, ctx, source_id)
+    with pytest.raises(income.IncomeError) as caught:
+        update(source_id, other_id)
+    assert caught.value.code == "archived"
+
+
+def test_updating_a_tax_attachment_needs_an_editor(team: WorkspaceDb) -> None:
+    owner = team.ctx("owner", "owner")
+    source_id, attachment_id, _rule, other_id, _salary = _attached(team, owner)
+
+    def update(ctx):
+        income.update_tax_attachment(
+            team.factory,
+            ctx,
+            source_id,
+            attachment_id,
+            payment_category_id=other_id,
+            due_day=5,
+            due_month_offset=2,
+            generate_payment=True,
+        )
+
+    with pytest.raises(PermissionDenied):
+        update(team.ctx("viewer", "viewer"))
+    team.add_member("dee", "viewer")  # demoted: the Context still says editor
+    with pytest.raises(PermissionDenied):
+        update(team.ctx("dee", "editor"))
+    assert _tax_children(team, owner, source_id)[0][0] == date(2026, 10, 20)

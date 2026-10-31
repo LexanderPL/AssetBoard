@@ -1,8 +1,9 @@
 """Month pages (F2.5): ``/m/YYYY-MM`` with navigation, the month picker, closing and reopening.
 
 Since F2.7 the Month page is a summary: F2.3's planned values, F2.4's summary with the flow bar,
-and the expense donut (``web.charts``). The transaction tables moved to the Transactions page
-(``web.transactions_page_routes``), which shares ``month_header`` and the navigation partial.
+and the expense and income donuts (``web.charts``). The transaction tables moved to the
+Transactions page (``web.transactions_page_routes``), which shares ``month_header`` and the
+navigation partial.
 F2.3 fills the summary block with the planned values (``web.plan``; the writes are
 in ``web.plan_routes``) and runs the automatic plan copy when an editor opens a month page
 (``services.budget.auto_copy_on_open``: a GET that writes at most once per month, by design).
@@ -26,7 +27,7 @@ from starlette.responses import RedirectResponse, Response
 from assetboard.db.repositories import NotFound
 from assetboard.domain.months import InvalidMonth, YearMonth
 from assetboard.i18n import gettext
-from assetboard.i18n.dates import format_day, format_month, format_month_heading
+from assetboard.i18n.dates import format_day, format_month, format_month_heading, month_names
 from assetboard.services.budget import CopyResult, auto_copy_on_open
 from assetboard.services.context import Context
 from assetboard.services.income import missing_work_logs
@@ -65,6 +66,8 @@ ERRORS = {
     "month_closed": MONTH_CLOSED_MESSAGE,
     "transaction_gone": _("This entry no longer exists. It may have been deleted elsewhere."),
     "undo_expired": _("Too late to undo: the entry stays deleted."),
+    "not_pending": _("This occurrence is no longer pending."),
+    "not_planned": _("Only a one-time planned entry can be deleted here."),
     "plan_category_gone": _("This category no longer exists. It may have been deleted elsewhere."),
     "plan_category_archived": PLAN_ERRORS["category_archived"],
     "plan_category_transfer": PLAN_ERRORS["category_transfer"],
@@ -78,10 +81,16 @@ NOTICES = {
     "transaction_saved": _("Entry saved."),
     "transaction_restored": _("Entry restored."),
     "outside_filter": _("Entry saved. Its category is not shown while this filter is on."),
+    "planned": _("Entry planned."),
+    "outside_filter_planned": _(
+        "Entry planned. Its category is not shown while this filter is on."
+    ),
+    "planned_deleted": _("Planned entry deleted."),
     "plan_saved": _("Planned value saved."),
     "plan_removed": _("Planned value removed."),
 }
 SAVED_IN = _("Entry saved in %(month)s.")
+PLANNED_IN = _("Entry planned in %(month)s.")
 
 
 def _t(request: Request, message: str) -> str:
@@ -130,6 +139,14 @@ def month_header(
     the F3.5 missing-work-log banner."""
     view = get_month(request.app.state.session_factory, ctx, target)
     locale = request.state.locale
+    raw_year = request.query_params.get("picker_year", "")
+    picker_open = (
+        len(raw_year) == 4
+        and raw_year.isascii()
+        and raw_year.isdigit()
+        and 1900 <= int(raw_year) <= 2199
+    )
+    picker_year = int(raw_year) if picker_open else view.month.year
     closed_on = None
     if view.closed_at is not None:
         local = view.closed_at.astimezone(ZoneInfo(ctx.workspace.timezone)).date()
@@ -140,6 +157,9 @@ def month_header(
         "month_name": format_month(view.month, locale),  # in sentences (confirmations)
         "prev_name": format_month(view.prev, locale) if view.prev else None,
         "next_name": format_month(view.next, locale) if view.next else None,
+        "picker_open": picker_open,
+        "picker_year": picker_year,
+        "month_names": month_names(locale),
         "closed_on": closed_on,
         "notice": _t(request, NOTICES[notice]) if notice in NOTICES else None,
         "notice_href": None,
@@ -165,7 +185,8 @@ def month_context(
     automatic: bool = False,
 ) -> dict[str, object]:
     """The Month page's context (blocking: run in a thread): the summary with its flow bar
-    and planned values, and the expense donut (F2.7: no entry form, no transaction list).
+    and planned values, and the expense and income donuts (F2.7: no entry form, no transaction
+    list).
     ``plan_cell`` is a refused planned value and ``copied`` a plan copy to report."""
     context = month_header(request, ctx, target, notice=notice, error=error)
     view = cast(MonthView, context["view"])
@@ -180,7 +201,10 @@ def month_context(
     )
     donuts = ()
     if summary.source is not None:
-        donuts = (build_donut(summary.source, "expense", request.state.locale),)
+        donuts = tuple(
+            build_donut(summary.source, block, request.state.locale)
+            for block in ("expense", "income")
+        )
     return {**context, **summary_context(summary), "donuts": donuts}
 
 

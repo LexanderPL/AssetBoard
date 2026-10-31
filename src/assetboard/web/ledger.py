@@ -15,6 +15,7 @@ from __future__ import annotations
 import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
+from datetime import date
 from uuid import UUID
 
 from fastapi import Request
@@ -63,6 +64,9 @@ FIELD_ERRORS: dict[str, str] = {
     "too_many_decimals": _("Too many decimal places for %(currency)s."),
     "invalid_description": _("The description contains characters that are not allowed."),
     "description_too_long": _("Use at most %(max)d characters."),
+    "description_required_for_plan": _(
+        "Add a description. A planned entry becomes a recurring item, so it needs a name."
+    ),
     "category_required": _("Choose a category."),
     "invalid_category": _("Choose one of the listed categories."),
     "category_kind_mismatch": "",  # by direction, see KIND_MISMATCH
@@ -170,6 +174,7 @@ class LedgerView:
     month: YearMonth
     can_write: bool  # editor or owner, and the month is open
     sections: tuple[SectionView, ...]
+    today: date
     max_description: int = MAX_DESCRIPTION_LENGTH
     filter: LedgerFilter | None = None
 
@@ -298,7 +303,11 @@ def build_ledger(
             )
         )
     return LedgerView(
-        month=view.month, can_write=can_write, sections=tuple(sections), filter=ledger_filter
+        month=view.month,
+        can_write=can_write,
+        sections=tuple(sections),
+        today=ctx.clock.today(ctx.workspace.timezone),
+        filter=ledger_filter,
     )
 
 

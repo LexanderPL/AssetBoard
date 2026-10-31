@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import re
+import shutil
 import smtplib
 import socket
 import threading
@@ -18,6 +19,7 @@ import pytest
 import uvicorn
 from argon2 import profiles
 from fastapi import FastAPI
+from fastapi.dependencies import models as fastapi_dependency_models
 from fastapi.testclient import TestClient
 from httpx import Response
 from sqlalchemy import delete, select, update
@@ -72,6 +74,32 @@ def pytest_sessionstart(session: pytest.Session) -> None:
             + "; ".join(problems)
             + "). Run `make i18n-compile` (or `make test`, which compiles them first)."
         )
+
+
+# FastAPI 0.156 classifies callables (generator, async generator, coroutine) in module-level
+# lru_caches keyed by a ``_CallIdentity`` that strongly holds the callable. ``create_app``
+# defines ``healthz``/``readyz`` as closures over the app, so every app a test builds would stay
+# alive in these caches, taking its engines and database with it for the rest of the run.
+# ``getattr`` keeps collection working if a later FastAPI renames or removes the caches.
+_FASTAPI_CALLABLE_CACHES = tuple(
+    cache
+    for cache in (
+        getattr(fastapi_dependency_models, "_is_gen_callable_cached", None),
+        getattr(fastapi_dependency_models, "_is_async_gen_callable_cached", None),
+        getattr(fastapi_dependency_models, "_is_coroutine_callable_cached", None),
+    )
+    if cache is not None
+)
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_teardown(item: pytest.Item, nextitem: pytest.Item | None) -> Iterator[None]:
+    """Let the next test start without the previous test's FastAPI caches holding its apps."""
+    try:
+        yield
+    finally:
+        for cache in _FASTAPI_CALLABLE_CACHES:
+            cache.cache_clear()
 
 
 @pytest.fixture(autouse=True)
@@ -169,6 +197,21 @@ def database_engine(tmp_path_factory: pytest.TempPathFactory) -> Iterator[Engine
         engine.dispose()
 
 
+@pytest.fixture(scope="session")
+def migrated_database_template(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """A migrated, empty database that app fixtures copy instead of running every migration."""
+    database_directory = tmp_path_factory.mktemp("assetboard-database-template")
+    database_path = database_directory / "template.db"
+    upgrade_database(
+        Settings(
+            _env_file=None,
+            data_dir=database_directory,
+            database_url=f"sqlite:///{database_path}",
+        )
+    )
+    return database_path
+
+
 @pytest.fixture
 def db_session(database_engine: Engine, fixed_clock: FixedClock) -> Iterator[Session]:
     connection = database_engine.connect()
@@ -257,12 +300,22 @@ class WebHarness:
     admin_email = ADMIN_EMAIL
     admin_password = ADMIN_PASSWORD
 
-    def __init__(self, data_dir: Path) -> None:
+    def __init__(self, data_dir: Path, migrated_database: Path | None = None) -> None:
         self.data_dir = data_dir
+        self.migrated_database = migrated_database
 
     def settings(self, **overrides: object) -> Settings:
         values: dict[str, object] = {"data_dir": self.data_dir, "secret_key": "test-secret"}
         values.update(overrides)
+        if (
+            self.migrated_database is not None
+            and "data_dir" not in overrides
+            and "database_url" not in overrides
+        ):
+            self.data_dir.mkdir(parents=True, exist_ok=True)
+            database_path = self.data_dir / "assetboard.db"
+            if not database_path.exists():
+                shutil.copyfile(self.migrated_database, database_path)
         return Settings(_env_file=None, **values)  # type: ignore[arg-type]
 
     def app(self, **overrides: object) -> FastAPI:
@@ -352,8 +405,14 @@ class WebHarness:
 
 
 @pytest.fixture
-def web(tmp_path: Path) -> WebHarness:
-    return WebHarness(tmp_path / "web-data")
+def web(tmp_path: Path, migrated_database_template: Path) -> WebHarness:
+    return WebHarness(tmp_path / "web-data", migrated_database_template)
+
+
+@pytest.fixture
+def unmigrated_web(tmp_path: Path) -> WebHarness:
+    """A harness whose database starts empty, for migration and schema-gate tests."""
+    return WebHarness(tmp_path / "unmigrated-web-data")
 
 
 @pytest.fixture

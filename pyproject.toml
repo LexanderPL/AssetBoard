@@ -1,6 +1,6 @@
 [project]
 name = "assetboard"
-version = "0.3.2"
+version = "0.3.4"
 description = "A self-hosted personal finance web app"
 readme = "README.md"
 license = "AGPL-3.0-or-later"
@@ -95,8 +95,12 @@ addopts = "--cov=src/assetboard --cov-report=term-missing --cov-report=xml"
 testpaths = ["tests"]
 # Lets tests import shared helpers from tests/tenant.
 pythonpath = ["."]
+# Each run writes a SQLite database per app fixture; keep only the latest run's tree on tmpfs.
+tmp_path_retention_count = 1
 
 [tool.coverage.run]
+# sys.monitoring is much cheaper than the default tracer and reports the same data here.
+core = "sysmon"
 branch = false
 source = ["src/assetboard"]
 

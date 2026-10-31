@@ -6,8 +6,7 @@ Your money is tracked month by month. The main navigation starts with four pages
   the month's expenses by category next to a donut of its income by category, and up to ten
   upcoming recurring items (overdue ones, highlighted, and those due in the next 7 days; see
   [Recurring items](recurring.md)). Editors and owners can mark an item paid or received, or
-  skip it, right there; **All upcoming items** opens the Upcoming page. **Open month** opens
-  the month page.
+  skip it, right there; **All upcoming items** opens the Upcoming page.
 - **Month** (`/m`, `/m/2026-10`): the summary of one month, with its planned values and the
   expense donut (this page).
 - **Transactions** (`/transactions`, `/transactions/2026-10`): where you enter, edit and
@@ -15,8 +14,8 @@ Your money is tracked month by month. The main navigation starts with four pages
 - **History** (`/history`): every entry of every month, with search, filters, CSV export and
   changing many categories at once (see [Transactions](transactions.md#history)).
 
-Open "Month" in the main navigation: it shows the current month's summary. **Enter
-transactions** opens the same month's Transactions page. Every month has its own address, such as `/m/2026-10` for October 2026, so you can bookmark it. The address names
+Open "Month" in the main navigation: it shows the current month's summary. "Transactions" in
+the main navigation opens the same month's Transactions page. Every month has its own address, such as `/m/2026-10` for October 2026, so you can bookmark it. The address names
 only the month, not the workspace: whoever opens the link sees that month in the workspace they
 currently have selected. A member who belongs only to your workspace sees your month; a member
 of several workspaces may need to switch first.
@@ -29,10 +28,9 @@ zone, not at midnight UTC.
 
 - **‹ Previous** and **Next ›** go one month back or forward, across years as well.
 - **Today** goes back to the current month.
-- **Go to month**: choose a month; it opens as soon as the month is complete (without
-  JavaScript, press **Go**). Most browsers show a month picker. Firefox
-  and Safari on a computer show a text box instead: type the month as `2026-10`, or as `10.2026`
-  or `10/2026`. An entry that is not a month leaves you where you were and says so.
+- The **month and year** button opens a picker: use **‹** and **›** to change the year, then
+  choose one of the twelve months. It needs no JavaScript, and the month opens as soon as you
+  choose it.
 
 Every month from January 1900 to December 2199 can be opened, including months with no data yet
 and future months, which you can use for planning. The Transactions page has the same

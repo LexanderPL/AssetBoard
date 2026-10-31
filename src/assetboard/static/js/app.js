@@ -70,6 +70,16 @@ document.addEventListener("click", (event) => {
   const dismiss = target.closest("[data-toast-dismiss]");
   if (dismiss) dismiss.closest("[role='status']")?.remove();
 
+  const detailsClose = target.closest("[data-details-close]");
+  if (detailsClose) {
+    const details = detailsClose.closest("details");
+    if (details) {
+      details.open = false;
+      const summary = details.querySelector("summary");
+      if (summary instanceof HTMLElement) summary.focus();
+    }
+  }
+
   const cancel = target.closest("[data-confirm-cancel]");
   if (cancel) cancel.closest("dialog")?.close("cancel");
 
@@ -228,6 +238,22 @@ document.addEventListener("submit", (event) => {
 });
 
 document.querySelectorAll("dialog[data-dialog-modal][open]").forEach(openModalDialog);
+
+// The month picker is a <details>, so its summary opens it without JavaScript. Clicking
+// anywhere else, or pressing Escape, closes an open picker.
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  document.querySelectorAll("details[data-month-picker][open]").forEach((picker) => {
+    if (!picker.contains(target)) picker.open = false;
+  });
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  document.querySelectorAll("details[data-month-picker][open]").forEach((picker) => {
+    picker.open = false;
+  });
+});
 
 // HTMX requests carry the CSRF token in a header; plain forms use their hidden input.
 document.addEventListener("htmx:configRequest", (event) => {
@@ -404,6 +430,59 @@ function keptDay(text) {
 }
 
 const submittedEntries = new Map(); // entry form id -> values sent (restored if sending fails)
+
+// A future-dated entry is planned as a one-time recurring item; the one button says so. The
+// server makes the same decision, so this only keeps the label in step while typing.
+function entryDayISO(text) {
+  const value = text.trim();
+  const month = document.querySelector("[data-month]")?.getAttribute("data-month") ?? "";
+  let match = /^([0-9]{4})-([0-9]{1,2})-([0-9]{1,2})$/.exec(value);
+  let parts = match ? [match[1], match[2], match[3]] : null;
+  if (!parts) {
+    match = /^([0-9]{1,2})\.([0-9]{1,2})\.([0-9]{4})$/.exec(value);
+    if (match) parts = [match[3], match[2], match[1]];
+  }
+  if (!parts && /^[0-9]{1,2}$/.test(value) && /^[0-9]{4}-[0-9]{2}$/.test(month)) {
+    parts = [month.slice(0, 4), month.slice(5), value];
+  }
+  if (!parts) return null;
+  const [year, monthNumber, day] = parts.map(Number);
+  const parsed = new Date(Date.UTC(year, monthNumber - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== monthNumber - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    return null;
+  }
+  return `${String(year).padStart(4, "0")}-${String(monthNumber).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function updateEntryLabel(form) {
+  if (!(form instanceof HTMLFormElement) || !form.matches("[data-entry-form]")) return;
+  const button = form.querySelector("[data-entry-add]");
+  const row = document.getElementById(`${form.id}-row`);
+  const day = row?.querySelector("[name='day']");
+  if (!(button instanceof HTMLElement) || !(day instanceof HTMLInputElement)) return;
+  const date = entryDayISO(day.value);
+  const today = form.dataset.today ?? "";
+  button.textContent = date !== null && today !== "" && date > today
+    ? (button.dataset.labelPlan ?? "Plan")
+    : (button.dataset.labelAdd ?? "Add");
+}
+
+function updateEntryLabels(root) {
+  root.querySelectorAll("[data-entry-form]").forEach(updateEntryLabel);
+}
+
+document.addEventListener("input", (event) => {
+  const input = event.target;
+  if (!(input instanceof HTMLInputElement) || input.name !== "day") return;
+  if (input.form instanceof HTMLFormElement) updateEntryLabel(input.form);
+});
+document.addEventListener("DOMContentLoaded", () => updateEntryLabels(document));
+document.addEventListener("htmx:load", () => updateEntryLabels(document));
+document.addEventListener("htmx:afterSwap", () => updateEntryLabels(document));
 
 document.addEventListener("htmx:beforeRequest", (event) => {
   const form = event.detail?.elt;

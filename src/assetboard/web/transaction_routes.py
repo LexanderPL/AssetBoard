@@ -39,9 +39,10 @@ from assetboard.services.context import Context
 from assetboard.services.months import MonthClosed, get_month
 from assetboard.services.transactions import (
     InvalidTransaction,
+    PlannedView,
     TransactionView,
     UndoExpired,
-    create_transaction,
+    create_entry,
     delete_transaction,
     get_transaction,
     suggest_descriptions,
@@ -82,12 +83,15 @@ def _(message: str) -> str:
 
 STATUS = {
     "added": _("Entry added."),
+    "planned": _("Entry planned."),
     "saved": _("Entry saved."),
     "deleted": _("Entry deleted."),
     "restored": _("Entry restored."),
 }
 MOVED = _("Entry saved in %(month)s.")
+PLANNED_IN = _("Entry planned in %(month)s.")
 OUTSIDE_FILTER = _("Entry saved. Its category is not shown while this filter is on.")
+PLANNED_OUTSIDE_FILTER = _("Entry planned. Its category is not shown while this filter is on.")
 UNDO_TOO_LATE_TITLE = _("Too late to undo")
 UNDO_TOO_LATE = _("The deletion can no longer be undone: the entry stays deleted.")
 NOT_SAVED_TITLE = _("Not saved")
@@ -244,20 +248,28 @@ def _closed_elsewhere(request: Request, exc: MonthClosed) -> dict[str, str]:
     return {"day": _t(request, MONTH_CLOSED_ELSEWHERE) % {"month": month}}
 
 
-def _hidden(request: Request, saved: TransactionView, month: YearMonth) -> bool:
+def _hidden(request: Request, saved: TransactionView | PlannedView, month: YearMonth) -> bool:
     """Whether a saved entry of this month is not shown because of the category filter."""
     chosen = _filter(request, saved.direction)
     return saved.month == month and chosen is not None and saved.category_id != chosen
 
 
-def _moved(request: Request, saved: TransactionView, month: YearMonth) -> dict[str, Any]:
+def _moved(
+    request: Request,
+    saved: TransactionView | PlannedView,
+    month: YearMonth,
+    *,
+    planned: bool = False,
+) -> dict[str, Any]:
     """The notice for an entry whose date lies in another month, linking that month, or that
     the filter hides (F2.4)."""
     if _hidden(request, saved, month):
-        return {"notice": _t(request, OUTSIDE_FILTER)}
+        message = PLANNED_OUTSIDE_FILTER if planned else OUTSIDE_FILTER
+        return {"notice": _t(request, message)}
     if saved.month == month:
         return {}
-    text = _t(request, MOVED) % {"month": format_month(saved.month, request.state.locale)}
+    message = PLANNED_IN if planned else MOVED
+    text = _t(request, message) % {"month": format_month(saved.month, request.state.locale)}
     return {"notice": text, "notice_href": transactions_path(request, saved.month)}
 
 
@@ -283,9 +295,10 @@ async def transaction_create(
     currency = ctx.workspace.base_currency
     try:
         saved = await run_in_threadpool(
-            lambda: create_transaction(
+            lambda: create_entry(
                 request.app.state.session_factory,
                 ctx,
+                settings=request.app.state.settings,
                 month=target,
                 direction=direction,
                 day=day,
@@ -317,24 +330,32 @@ async def transaction_create(
         return await run_in_threadpool(_refused, request, ctx, target, direction, state, 409)
     # The next entry row keeps the day (owner, 2026-10-18): as a day number when the entry is
     # in the viewed month, else as typed; app.js selects it so typing replaces it.
+    planned = isinstance(saved, PlannedView)
     kept_day = str(saved.date.day) if saved.month == target else day.strip()
     if not ENTRY_DAY.fullmatch(kept_day):
         kept_day = ""
     if not is_htmx_fragment_request(request):
-        query = "notice=transaction_added"
         if _hidden(request, saved, target):
-            query = "notice=outside_filter"
-        if saved.month != target:
+            query = "notice=outside_filter_planned" if planned else "notice=outside_filter"
+        elif saved.month != target:
             query = f"saved_in={saved.month}"
+            if planned:
+                query += "&planned=1"
+        else:
+            query = "notice=planned" if planned else "notice=transaction_added"
         if kept_day:
             query += "&" + urlencode({"entry": direction, "day": kept_day})
         path = _path(request, target, query, direction)
         return RedirectResponse(f"{path}#ledger-{direction}", status_code=303)
     state = SectionState(
-        entry_values={"day": kept_day}, focus="entry:day", **_moved(request, saved, target)
+        entry_values={"day": kept_day},
+        focus="entry:day",
+        **_moved(request, saved, target, planned=planned),
     )
     return await run_in_threadpool(
-        lambda: _section(request, ctx, target, direction, state, status="added")
+        lambda: _section(
+            request, ctx, target, direction, state, status="planned" if planned else "added"
+        )
     )
 
 

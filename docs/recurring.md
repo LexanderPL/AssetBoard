@@ -1,8 +1,9 @@
 # Recurring items
 
 Open **Recurring** to define planned expenses or income once. Editors and owners can add or
-change items; viewers can read the list. An item has a name, an active category matching its
-direction, a fixed or estimated amount in the workspace currency, optional notes, and a rule.
+change items; viewers can read the list. An item has a name, an active category (which decides
+whether it is an expense or income), a fixed or estimated amount in the workspace currency,
+optional notes, and a rule.
 
 Choose weekly weekdays, a monthly day (including the last day or first/last working day), or a
 yearly month and day. The interval means every N weeks, months or years. Weeks start on Monday;
@@ -14,11 +15,14 @@ non-leap year.
 Choose **One time** to plan a single payment or income on one date, such as a gift or an annual
 fee you pay just once. The item has one occurrence on its start date; the weekend and holiday
 adjustment still applies, while the end date, maximum occurrences, interval, weekdays, day and
-month are ignored (the form hides them). Like any other occurrence it is created once its date
-enters the generation horizon (see below), so a date more than 13 months away appears later.
+month are ignored (the form hides them). Its occurrence appears at once, even when the date is
+farther ahead than the regular generation horizon (see below), and is not pruned as the date
+approaches.
 A past date needs **Include past occurrences**. Changing the date moves its pending occurrence;
 once the occurrence is posted or skipped, the list shows the item as **Done** and you can
 archive it. A one-time item adds to the month's Expected and Forecast columns, not to Planned.
+Its expected row on the Transactions page can be confirmed or deleted; deleting removes the
+planned entry and the item.
 
 The form previews the next six effective due dates as you change the rule. JavaScript is needed
 only for the live preview; the form can be saved without it. A finite or ended rule may have

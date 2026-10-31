@@ -1,17 +1,18 @@
 {% extends "base.html" %}
-{% from "macros/components.html" import csrf_input with context %}
+{% from "macros/components.html" import csrf_input, summary_button_primary with context %}
 {% block title %}{{ _("Tax rules") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Tax rules") }}{% endblock %}
 {% block content %}
-<p class="mb-5 rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong">{{ _("Rates are entered by you; this is not tax advice.") }}</p>
+{% with warning_page = "rules" %}{% include "taxes/_warning.html" %}{% endwith %}
 <div class="mb-5 flex flex-wrap gap-3">
   <a href="{{ scoped_url(request, 'tax_calculator') }}" class="rounded-lg border border-line px-3 py-2 text-sm">{{ _("Calculator preview") }}</a>
 </div>
 {% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 {% if can_edit %}
-<section class="panel mb-6 p-4 sm:p-6">
-  <h2 class="font-semibold">{{ _("New tax rule") }}</h2>
-  <form method="post" action="{{ scoped_url(request, 'tax_rule_create') }}" class="mt-4 grid gap-4 sm:grid-cols-2">
+<details class="mb-6" data-new-tax-rule{% if open_form == "new-rule" %} open{% endif %}>
+  <summary class="{{ summary_button_primary }}">{{ _("New tax rule") }}</summary>
+  <section class="panel mt-3 p-4 sm:p-6" aria-label="{{ _('New tax rule') }}">
+  <form method="post" action="{{ scoped_url(request, 'tax_rule_create') }}" class="grid gap-4 sm:grid-cols-2">
     {{ csrf_input() }}
     <label class="grid gap-1 text-sm">{{ _("Name") }}<input name="name" maxlength="200" required class="form-control rounded-lg px-3 py-2"></label>
     <label class="grid gap-1 text-sm">{{ _("Effect") }}<select name="effect" required class="form-select rounded-lg py-2"><option value="added">{{ _("Added to net") }}</option><option value="withheld">{{ _("Withheld") }}</option></select></label>
@@ -23,7 +24,8 @@
     <label class="grid gap-1 text-sm">{{ _("Fixed amount (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="fixed_amount" inputmode="decimal" class="form-control rounded-lg px-3 py-2"></label>
     <button type="submit" class="rounded-lg bg-primary px-4 py-2 font-semibold text-on-primary sm:col-span-2">{{ _("Create tax rule") }}</button>
   </form>
-</section>
+  </section>
+</details>
 {% endif %}
 <div class="space-y-4">
 {% for rule in rules %}

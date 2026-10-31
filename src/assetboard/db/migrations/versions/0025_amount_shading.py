@@ -1,7 +1,7 @@
 """highlight large transactions
 
-Revision ID: 0024_amount_shading
-Revises: 0023_one_time_items
+Revision ID: 0025_amount_shading
+Revises: 0024_tax_warning
 Create Date: 2026-10-26 15:00:00.000000
 
 ``users.highlight_large_amounts``: the profile setting that tints larger rows on the
@@ -13,8 +13,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0024_amount_shading"
-down_revision = "0023_one_time_items"
+revision = "0025_amount_shading"
+down_revision = "0024_tax_warning"
 branch_labels = None
 depends_on = None
 

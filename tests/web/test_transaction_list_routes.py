@@ -123,6 +123,28 @@ def test_filters_in_the_query_string(ledger: OwnerApp, rows: dict) -> None:
     assert "No entries match these filters." in _page(ledger, "?q=nothing")
 
 
+def test_the_search_is_live_and_filters_and_bulk_actions_are_dialogs(
+    ledger: OwnerApp, rows: dict
+) -> None:
+    html = _page(ledger)
+    search = re.search(r'<input id="filter-q".*?>', html, re.S)
+    assert search is not None
+    tag = search.group(0)
+    assert 'hx-get="/history"' in tag and 'name="q"' in tag
+    assert 'hx-trigger="input changed delay:300ms, search"' in tag
+    assert 'hx-target="#history-results"' in tag and 'hx-select="#history-results"' in tag
+    assert "data-search-form" in html and "data-filters-open" in html
+    assert 'data-dialog-open="filters-dialog"' in html
+    assert 'data-dialog-open="bulk-dialog"' in html and "data-bulk-open" in html
+    # Without JavaScript the buttons link to a page that renders the dialog open.
+    assert re.search(r'<dialog id="filters-dialog"[^>]* open', _page(ledger, "?filters=1"))
+    assert re.search(r'<dialog id="bulk-dialog"[^>]* open', _page(ledger, "?bulk=1"))
+    # The live search replaces the dialogs too, so their hidden filter state carries the search.
+    searched = _page(ledger, "?q=lidl")
+    filters = re.search(r'<dialog id="filters-dialog".*?</dialog>', searched, re.S)
+    assert filters is not None and 'name="q" value="lidl"' in filters.group(0)
+
+
 def test_sorting(ledger: OwnerApp, rows: dict) -> None:
     assert _descriptions(_page(ledger, "?sort=amount")) == ["Bakery", "Lidl", "Żabka weekly", "Pay"]
     assert _descriptions(_page(ledger, "?sort=-amount"))[0] == "Pay"

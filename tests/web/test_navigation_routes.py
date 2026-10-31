@@ -65,7 +65,7 @@ def _recurring(app: OwnerApp, category: UUID, name: str = "Rent") -> None:
 def test_home_without_data_renders_empty_states(nav: OwnerApp) -> None:
     html = nav.client.get("/").text
     assert "<h1" in html and "March 2026" in html
-    assert f'href="{MONTH}"' in html and "Open month" in html
+    assert "data-open-month" not in html and "Open month" not in html
     assert "data-summary-kpis" in html and 'data-flow-segment="empty"' in html
     assert "No expenses yet this month" in html and "No income yet this month" in html
     assert 'type="application/json"' not in html  # no chart without slices
@@ -139,15 +139,19 @@ def test_home_upcoming_list_is_capped_at_ten(nav: OwnerApp) -> None:
 # Month and Transactions
 
 
-def test_the_month_page_is_a_summary_with_the_expense_donut(nav: OwnerApp) -> None:
+def test_the_month_page_is_a_summary_with_both_donuts(nav: OwnerApp) -> None:
     food = _category(nav, "Food")
+    salary = _category(nav, "Salary", kind="income")
     _add(nav, food, "25")
+    _add(nav, salary, "900", direction="income")
     html = nav.client.get(MONTH).text
     assert 'id="month-summary"' in html and "data-summary-kpis" in html
     assert _chart(html, "expense")["slices"][0]["name"] == "Food"
-    assert 'id="chart-income-data"' not in html  # Home only
+    assert _chart(html, "income")["slices"][0]["name"] == "Salary"
+    # Expense first, then income, as on Home.
+    assert html.index('data-donut="expense"') < html.index('data-donut="income"')
     assert 'id="ledger"' not in html and "data-entry-form" not in html
-    assert f'href="{PAGE}"' in html and "Enter transactions" in html
+    assert "data-enter-transactions" not in html and "Enter transactions" not in html
     assert f'href="{PAGE}?category={food}"' in html  # category names open the filtered list
     assert 'data-month-link aria-current="page"' in html
 
@@ -159,9 +163,9 @@ def test_the_transactions_page_is_for_entry_only(nav: OwnerApp) -> None:
     assert "data-summary-kpis" not in html and 'id="month-summary"' not in html
     assert 'type="application/json"' not in html and "echarts" not in html
     assert 'data-transactions-link aria-current="page"' in html
-    assert 'action="/transactions"' in html and "data-autosubmit" in html  # the month picker
+    assert "data-month-picker-toggle" in html and 'type="month"' not in html
     assert 'href="/transactions/2026-02"' in html and 'href="/transactions/2026-04"' in html
-    assert f'href="{MONTH}"' in html  # "Month summary"
+    assert "Month summary" not in html
 
 
 def test_the_transactions_month_picker(nav: OwnerApp) -> None:

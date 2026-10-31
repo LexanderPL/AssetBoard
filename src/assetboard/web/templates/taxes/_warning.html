@@ -1,0 +1,13 @@
+{% from "macros/components.html" import csrf_input with context %}
+{# The tax warning is remembered per account (users.tax_warning_dismissed): the close button
+   posts once and the box stays away on every tax page. #}
+{% if not (web_session and web_session.tax_warning_dismissed) %}
+<div class="mb-5 flex items-start gap-3 rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-tax-warning>
+  <p class="flex-1">{{ _("Rates are entered by you; this is not tax advice.") }}</p>
+  <form method="post" action="{{ scoped_url(request, 'tax_warning_dismiss') }}" class="shrink-0">
+    {{ csrf_input() }}
+    <input type="hidden" name="page" value="{{ warning_page }}">
+    <button type="submit" class="-m-1 rounded-lg px-2 py-1 text-lg leading-none hover:bg-warning-line/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-warning-strong" aria-label="{{ _('Dismiss') }}" title="{{ _('Dismiss') }}" data-tax-warning-dismiss><span aria-hidden="true">×</span></button>
+  </form>
+</div>
+{% endif %}
