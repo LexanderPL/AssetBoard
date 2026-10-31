@@ -428,7 +428,8 @@ def create_entry(
     """Add an entry, or plan it as a one-time recurring item when its date is in the future.
 
     The form has one button; the date decides. A planned entry gets a pending occurrence, so it
-    shows in the target month and in Upcoming, and the Recurring page lists it with "One time".
+    shows in the target month and in Upcoming, where it is edited or deleted (the Recurring page
+    does not list one-time items).
     """
     require_role(ctx, Role.EDITOR)
     wanted = _direction(direction)

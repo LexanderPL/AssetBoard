@@ -465,3 +465,61 @@ def test_auto_post_does_not_repost_an_occurrence_returned_to_pending(team):
         team.factory, ctx, occurrence.id, amount_minor=100, day=occurrence.due_date
     )
     assert occurrence_rows(team, item_id)[0].status == "posted"
+
+
+def test_unskip_returns_a_skipped_date_to_pending_and_is_audited(team):
+    ctx = team.ctx("owner", "owner")
+    item_id = create_item(team)
+    occurrence = occurrence_rows(team, item_id)[0]
+    occurrences.skip_occurrence(team.factory, ctx, occurrence.id)
+    march = YearMonth(2026, 3)
+    assert [row.id for row in occurrences.skipped_for_month(team.factory, ctx, march)] == [
+        occurrence.id
+    ]
+    assert occurrence.id not in {
+        row.id for row in occurrences.pending_for_month(team.factory, ctx, march)
+    }
+
+    occurrences.unskip_occurrence(team.factory, ctx, occurrence.id)
+    stored = occurrence_rows(team, item_id)[0]
+    assert stored.status == "pending"
+    assert (stored.due_date, stored.expected_minor) == (occurrence.due_date, 10000)
+    assert occurrences.skipped_for_month(team.factory, ctx, march) == ()
+    # Idempotent: a pending occurrence stays pending.
+    occurrences.unskip_occurrence(team.factory, ctx, occurrence.id)
+    with team.factory() as session:
+        actions = session.scalars(
+            select(AuditEvent.action).where(AuditEvent.entity_id == str(occurrence.id))
+        ).all()
+    assert actions.count("scheduled_occurrence.unskipped") == 1
+
+    # A posted occurrence cannot be "unskipped".
+    occurrences.post_occurrence(
+        team.factory, ctx, occurrence.id, amount_minor=10000, day=occurrence.due_date
+    )
+    with pytest.raises(occurrences.OccurrenceError, match="not_skipped"):
+        occurrences.unskip_occurrence(team.factory, ctx, occurrence.id)
+
+
+def test_unskip_needs_a_current_editor_an_open_month_and_an_active_item(team):
+    team.add_member("viewer", "viewer")
+    owner = team.ctx("owner", "owner")
+    item_id = create_item(team)
+    first, second = occurrence_rows(team, item_id)[:2]
+    occurrences.skip_occurrence(team.factory, owner, first.id)
+    occurrences.skip_occurrence(team.factory, owner, second.id)
+    for ctx in (team.ctx("viewer", "viewer"), team.ctx("viewer", "editor")):
+        with pytest.raises(PermissionDenied):
+            occurrences.unskip_occurrence(team.factory, ctx, first.id)
+
+    close_month(team.factory, owner, YearMonth.from_date(first.due_date))
+    with pytest.raises(occurrences.OccurrenceError, match="month_closed"):
+        occurrences.unskip_occurrence(team.factory, owner, first.id)
+
+    scheduled.change_state(
+        team.factory, owner, item_id, ItemAction.ARCHIVE, Settings(_env_file=None)
+    )
+    with pytest.raises(occurrences.OccurrenceError, match="archived_item"):
+        occurrences.unskip_occurrence(team.factory, owner, second.id)
+    statuses = {row.id: row.status for row in occurrence_rows(team, item_id)}
+    assert statuses[first.id] == statuses[second.id] == "skipped"

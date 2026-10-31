@@ -251,6 +251,7 @@ def build_ledger(
         stored = whole = transactions.expense if direction == "expense" else transactions.income
         if ledger_filter is not None:
             stored = tuple(t for t in stored if t.category_id == ledger_filter.category_id)
+
         def shown(occurrence: UpcomingOccurrence, direction: str = direction) -> bool:
             return occurrence.direction == direction and (
                 ledger_filter is None or occurrence.category_id == ledger_filter.category_id

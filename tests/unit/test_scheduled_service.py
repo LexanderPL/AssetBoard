@@ -28,7 +28,7 @@ from assetboard.services.categories import (
     update_category,
 )
 from assetboard.services.context import PermissionDenied
-from assetboard.services.months import close_month
+from assetboard.services.months import MonthClosed, close_month
 from assetboard.services.workspaces import (
     BaseCurrencyLocked,
     InvalidWorkspaceSettings,
@@ -586,3 +586,100 @@ def test_delete_planned_occurrence_only_removes_a_one_time_item(team):
         scheduled.delete_planned_occurrence(
             team.factory, team.ctx("viewer", "viewer"), monthly_row.id
         )
+
+
+def one_time_input(db: WorkspaceDb, **changes) -> scheduled.OneTimeInput:
+    category_id = data(db).category_id
+    return replace(
+        scheduled.OneTimeInput(
+            name="Car insurance",
+            direction=TransactionDirection.EXPENSE,
+            category_id=category_id,
+            amount=Money(45000, "EUR"),
+            day=date(2026, 5, 20),
+        ),
+        **changes,
+    )
+
+
+def test_create_one_time_makes_one_pending_occurrence_also_in_the_past(team):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    item_id = scheduled.create_one_time(team.factory, ctx, one_time_input(team), settings)
+    stored = scheduled.get_item(team.factory, ctx, item_id)
+    assert stored.rule.freq == Frequency.ONCE
+    assert stored.rule.start_date == date(2026, 5, 20)
+    [row] = rows(team, item_id)
+    assert (row.status, row.due_date, row.expected_minor, row.label) == (
+        "pending",
+        date(2026, 5, 20),
+        45000,
+        "Car insurance",
+    )
+    # A date already passed (the clock says 2026-03-01) gives an overdue occurrence.
+    past = scheduled.create_one_time(
+        team.factory, ctx, one_time_input(team, day=date(2026, 2, 10)), settings
+    )
+    assert [row.due_date for row in rows(team, past)] == [date(2026, 2, 10)]
+
+    expense_category = one_time_input(team)
+    with pytest.raises(ValueError, match="category_kind_mismatch"):
+        scheduled.create_one_time(
+            team.factory,
+            ctx,
+            replace(expense_category, direction=TransactionDirection.INCOME),
+            settings,
+        )
+    with pytest.raises(PermissionDenied):
+        scheduled.create_one_time(
+            team.factory, team.ctx("viewer", "viewer"), one_time_input(team), settings
+        )
+
+
+def test_update_one_time_changes_item_and_occurrence_together(team):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    item_id = scheduled.create_one_time(
+        team.factory, ctx, one_time_input(team, day=date(2026, 2, 10)), settings
+    )
+    [row] = rows(team, item_id)
+    changed = one_time_input(team, name="Car insurance (renewed)", amount=Money(47500, "EUR"))
+    scheduled.update_one_time(team.factory, ctx, row.id, replace(changed, day=date(2026, 4, 2)))
+    [moved] = rows(team, item_id)
+    assert moved.id == row.id
+    assert (moved.due_date, moved.nominal_date) == (date(2026, 4, 2), date(2026, 4, 2))
+    assert (moved.expected_minor, moved.label, moved.category_id) == (
+        47500,
+        "Car insurance (renewed)",
+        changed.category_id,
+    )
+    stored = scheduled.get_item(team.factory, ctx, item_id)
+    assert (stored.name, stored.amount, stored.rule.start_date) == (
+        "Car insurance (renewed)",
+        Money(47500, "EUR"),
+        date(2026, 4, 2),
+    )
+    # A later generation run keeps the single occurrence on its new date.
+    scheduled.generate_workspace(team.factory, ctx, ctx.clock, settings)
+    assert [r.due_date for r in rows(team, item_id)] == [date(2026, 4, 2)]
+
+    monthly = scheduled.save_item(team.factory, ctx, data(team), settings)
+    with pytest.raises(ValueError, match="not_planned"):
+        scheduled.update_one_time(team.factory, ctx, rows(team, monthly)[0].id, changed)
+    occurrences.skip_occurrence(team.factory, ctx, moved.id)
+    with pytest.raises(ValueError, match="not_pending"):
+        scheduled.update_one_time(team.factory, ctx, moved.id, changed)
+    with pytest.raises(PermissionDenied):
+        scheduled.update_one_time(team.factory, team.ctx("viewer", "editor"), moved.id, changed)
+
+
+def test_update_one_time_refuses_closed_months(team):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    item_id = scheduled.create_one_time(
+        team.factory, ctx, one_time_input(team, day=date(2026, 2, 10)), settings
+    )
+    [row] = rows(team, item_id)
+    close_month(team.factory, ctx, YearMonth(2026, 2))
+    with pytest.raises(MonthClosed):
+        scheduled.update_one_time(
+            team.factory, ctx, row.id, one_time_input(team, day=date(2026, 4, 2))
+        )
+    assert rows(team, item_id)[0].due_date == date(2026, 2, 10)
