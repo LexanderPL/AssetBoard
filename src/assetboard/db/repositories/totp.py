@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
-from assetboard.db.models.identity import UserSession
+from assetboard.db.models.identity import LoginTicket, UserSession
 from assetboard.db.models.totp import TotpFactor, TotpRecoveryCode
 
 
@@ -26,6 +26,12 @@ class TotpRepository:
         return factor
 
     def clear(self) -> None:
+        # Removing the factor also ends the user's pending two-step sign-ins.
+        self.session.execute(
+            delete(LoginTicket)
+            .where(LoginTicket.user_id == self.user_id)
+            .execution_options(synchronize_session=False)
+        )
         self.session.execute(
             delete(TotpRecoveryCode).where(TotpRecoveryCode.user_id == self.user_id)
         )

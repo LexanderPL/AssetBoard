@@ -245,7 +245,8 @@ class LoginTicket(Base):
     user_id: Mapped[UUID] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False
     )
-    password_hash: Mapped[str] = mapped_column(String(512), nullable=False)
+    # HMAC of the user's password hash when the ticket was issued (never the hash itself).
+    password_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     replacement_password_hash: Mapped[str | None] = mapped_column(String(512), nullable=True)
     next_path: Mapped[str] = mapped_column(String(512), nullable=False, default="/")
     ip_key: Mapped[str] = mapped_column(String(64), nullable=False)
@@ -254,6 +255,7 @@ class LoginTicket(Base):
     # Wrong codes entered against this ticket; it is deleted at ``MAX_LOGIN_TICKET_ATTEMPTS``.
     code_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     require_instance_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
     expires_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
 
 

@@ -788,7 +788,7 @@ def test_regenerate_service_requires_a_second_factor_with_the_password(owner: Ow
     )
 
 
-def test_correct_password_with_a_wrong_code_does_not_rehash(
+def test_password_rehash_is_applied_only_after_a_correct_code(
     owner: OwnerApp, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     secret, _codes = _enable(owner)
@@ -817,31 +817,50 @@ def test_correct_password_with_a_wrong_code_does_not_rehash(
 
     monkeypatch.setattr(auth, "password_hasher", lambda: NeedsRehash())
 
-    def sign_in(code: str) -> auth.LoginOutcome:
-        return auth.authenticate_with_factory(
+    first = auth.authenticate_with_factory(
+        app.session_factory,
+        email=owner.web.admin_email,
+        password=owner.web.admin_password,
+        settings=app.settings,
+        clock=app.clock,
+        host="192.0.2.20",
+        hasher=spy,
+    )
+    assert first.login_ticket is not None and not first.succeeded
+    # The upgrade is prepared on the ticket, not applied.
+    assert hashed == [owner.web.admin_password]
+    with owner.db() as session:
+        stored = session.get(User, owner.admin_id)
+        pending = session.scalar(select(LoginTicket))
+        assert stored is not None and stored.password_hash == before
+        assert pending is not None and pending.replacement_password_hash is not None
+        assert before not in (pending.password_fingerprint, pending.replacement_password_hash)
+
+    def complete(code: str) -> auth.LoginOutcome:
+        return auth.complete_login_ticket(
             app.session_factory,
-            email=owner.web.admin_email,
-            password=owner.web.admin_password,
+            ticket=first.login_ticket or "",
+            code=code,
             settings=app.settings,
             clock=app.clock,
             host="192.0.2.20",
-            hasher=spy,
-            second_factor=code,
+            user_agent=None,
+            existing_session_id=None,
+            require_instance_admin=False,
         )
 
     for wrong in ("", "000000"):
-        assert not sign_in(wrong).succeeded
-    assert hashed == []
+        assert not complete(wrong).succeeded
     with owner.db() as session:
         stored = session.get(User, owner.admin_id)
         assert stored is not None and stored.password_hash == before
 
     app.clock = FixedClock("2026-10-21T12:00:30+00:00")
-    assert sign_in(pyotp.TOTP(secret).at(app.clock.now())).succeeded
-    assert hashed == [owner.web.admin_password]  # after the whole sign-in succeeded
+    assert complete(pyotp.TOTP(secret).at(app.clock.now())).succeeded
     with owner.db() as session:
         stored = session.get(User, owner.admin_id)
         assert stored is not None and stored.password_hash != before
+        assert stored.password_hash == pending.replacement_password_hash
 
 
 def test_wrong_code_fails_like_a_wrong_password_and_is_audited_internally(
@@ -874,7 +893,9 @@ def test_wrong_code_fails_like_a_wrong_password_and_is_audited_internally(
         follow_redirects=False,
     )
     assert wrong_code.status_code == wrong_password.status_code == 401
-    assert "The email or password is not correct." in wrong_code.text
+    # The code page is reachable only after a correct password, so it may say which failed.
+    assert "The code is not correct." in wrong_code.text
+    assert "The email or password is not correct." not in wrong_code.text
     assert "The email or password is not correct." in wrong_password.text
 
     assert wrong_code.headers["content-type"] == wrong_password.headers["content-type"]
@@ -1199,3 +1220,126 @@ def test_break_glass_ticket_succeeds_with_a_code(owner: OwnerApp) -> None:
     response = _code_step(client, owner, code, path="/login/local/verify")
     assert response.status_code == 303 and client.cookies.get("assetboard_session")
     assert client.cookies.get("assetboard_login_ticket") is None
+
+
+def _ticket_count(owner: OwnerApp) -> int:
+    with owner.db() as session:
+        return len(session.scalars(select(LoginTicket)).all())
+
+
+def test_ticket_cookie_is_scoped_to_the_login_routes(owner: OwnerApp) -> None:
+    secret, _codes = _enable(owner)
+    client = TestClient(owner.app)
+    first = _password_step(owner, client)
+    assert "Path=/login" in first.headers["set-cookie"]
+    owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
+    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    success = _code_step(client, owner, code)
+    cleared = [h for h in success.headers.get_list("set-cookie") if "login_ticket" in h]
+    assert cleared and all("Path=/login" in h and "Max-Age=0" in h for h in cleared)
+
+
+def test_ticket_stores_no_copy_of_the_password_hash(owner: OwnerApp) -> None:
+    _enable(owner)
+    assert _password_step(owner, TestClient(owner.app)).status_code == 303
+    with owner.db() as session:
+        user = session.get(User, owner.admin_id)
+        pending = session.scalar(select(LoginTicket))
+        assert user is not None and pending is not None and user.password_hash
+        assert pending.password_fingerprint != user.password_hash
+        assert len(pending.password_fingerprint) == 64
+        assert pending.password_fingerprint == auth.password_fingerprint(
+            owner.app.state.settings, user.password_hash
+        )
+
+
+def test_pending_ticket_ends_when_the_password_changes(owner: OwnerApp) -> None:
+    secret, _codes = _enable(owner)
+    client = TestClient(owner.app)
+    assert _password_step(owner, client).status_code == 303
+    with owner.db() as session, session.begin():
+        auth.reset_user_password(
+            session,
+            email=owner.web.admin_email,
+            password="A Brand New Password 1",
+            settings=owner.app.state.settings,
+            clock=owner.app.state.clock,
+        )
+    assert _ticket_count(owner) == 0
+    owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
+    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    assert _code_step(client, owner, code).headers["location"] == "/login?expired=1"
+
+
+def test_pending_ticket_ends_when_the_password_hash_changes_behind_it(owner: OwnerApp) -> None:
+    secret, _codes = _enable(owner)
+    client = TestClient(owner.app)
+    assert _password_step(owner, client).status_code == 303
+    with owner.db() as session, session.begin():  # no revocation hook: the fingerprint alone
+        user = session.get(User, owner.admin_id)
+        assert user is not None
+        user.password_hash = auth.argon2_hash("A Brand New Password 1")
+    owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")
+    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    assert _code_step(client, owner, code).headers["location"] == "/login?expired=1"
+
+
+def test_pending_ticket_ends_when_totp_is_disabled(owner: OwnerApp) -> None:
+    secret, codes = _enable(owner)
+    client = TestClient(owner.app)
+    assert _password_step(owner, client).status_code == 303
+    assert _ticket_count(owner) == 1
+    response = owner.post(
+        "/account/totp/disable",
+        {"confirm_password": owner.web.admin_password, "second_factor": codes[0]},
+    )
+    assert response.status_code == 303, response.text
+    with owner.db() as session:
+        assert session.get(TotpFactor, owner.admin_id) is None
+    assert _ticket_count(owner) == 0
+    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    assert _code_step(client, owner, code).headers["location"] == "/login?expired=1"
+
+
+def test_pending_ticket_ends_on_reset_and_re_enrolment(owner: OwnerApp) -> None:
+    _secret, _codes = _enable(owner)
+    client = TestClient(owner.app)
+    assert _password_step(owner, client).status_code == 303
+    ticket = client.cookies["assetboard_login_ticket"]
+    with owner.db() as session, session.begin():
+        auth.reset_user_two_factor(
+            session, email=owner.web.admin_email, clock=owner.app.state.clock
+        )
+    assert _ticket_count(owner) == 0
+    # Enrolled again (the attacker's authenticator, say): the old ticket stays dead.
+    assert owner.web.sign_in(owner.client).status_code == 303
+    owner.app.state.clock = FixedClock("2026-10-21T12:01:00+00:00")
+    new_secret, _new_codes = _enable(owner)
+    owner.app.state.clock = FixedClock("2026-10-21T12:01:30+00:00")
+    client.cookies.set("assetboard_login_ticket", ticket, path="/login")
+    code = pyotp.TOTP(new_secret).at(owner.app.state.clock.now())
+    assert _code_step(client, owner, code).headers["location"] == "/login?expired=1"
+    assert "assetboard_session" not in client.cookies
+
+
+def test_ticket_issued_before_the_factor_was_enabled_is_refused(owner: OwnerApp) -> None:
+    secret, _codes = _enable(owner)
+    client = TestClient(owner.app)
+    assert _password_step(owner, client).status_code == 303
+    with owner.db() as session, session.begin():  # a factor enabled after the ticket
+        factor = session.get(TotpFactor, owner.admin_id)
+        assert factor is not None
+        factor.enabled_at = owner.app.state.clock.now() + timedelta(seconds=1)
+    assert client.get("/login/verify", follow_redirects=False).headers["location"] == (
+        "/login?expired=1"
+    )
+
+
+def test_signing_out_other_devices_ends_pending_tickets(owner: OwnerApp) -> None:
+    _enable(owner)
+    assert _password_step(owner, TestClient(owner.app)).status_code == 303
+    with owner.db() as session, session.begin():
+        auth.revoke_other_sessions(
+            session, owner.admin_id, "not-a-current-session", clock=owner.app.state.clock
+        )
+    assert _ticket_count(owner) == 0

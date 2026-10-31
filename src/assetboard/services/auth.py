@@ -277,18 +277,8 @@ def complete_login_ticket(
             if pending is not None and pending.expires_at <= now:
                 session.delete(pending)
             return LoginOutcome()
-        user = session.get(User, pending.user_id)
-        if (
-            user is None
-            or not user.is_active
-            or user.password_hash is None
-            or user.password_hash != pending.password_hash
-            or (pending.require_instance_admin and not user.is_instance_admin)
-        ):
-            session.delete(pending)
-            return LoginOutcome()
-        factor = session.get(TotpFactor, pending.user_id)
-        if factor is None or factor.enabled_at is None:
+        user = _ticket_user(session, pending, settings)
+        if user is None:
             session.delete(pending)
             return LoginOutcome()
         _lookup, account_key = _login_keys(user.email)
@@ -381,10 +371,51 @@ def complete_login_ticket(
     return run_immediate(factory, finish)
 
 
+def password_fingerprint(settings: Settings, password_hash: str) -> str:
+    """A keyed digest of the stored password hash: binds a login ticket to the password it
+    was issued for without keeping a copy of the Argon2 hash."""
+    key = derive_subkey(settings.ensure_secret_key(), "login-ticket-password")
+    return hmac.new(key, password_hash.encode(), hashlib.sha256).hexdigest()
+
+
+def _ticket_user(session: Session, pending: LoginTicket, settings: Settings) -> User | None:
+    """The ticket's user while the ticket is still valid for them, else ``None``.
+
+    It ends when the account is deactivated, the password changes, a break-glass user stops
+    being an instance administrator, or the factor is disabled or enrolled again after the
+    ticket was issued.
+    """
+    user = session.get(User, pending.user_id)
+    if (
+        user is None
+        or not user.is_active
+        or user.password_hash is None
+        or not hmac.compare_digest(
+            password_fingerprint(settings, user.password_hash), pending.password_fingerprint
+        )
+        or (pending.require_instance_admin and not user.is_instance_admin)
+    ):
+        return None
+    factor = session.get(TotpFactor, pending.user_id)
+    if factor is None or factor.enabled_at is None or factor.enabled_at > pending.created_at:
+        return None
+    return user
+
+
+def delete_login_tickets(session: Session, user_id: UUID) -> None:
+    """End the user's pending two-step sign-ins (factor, password or session changes)."""
+    session.execute(
+        delete(LoginTicket)
+        .where(LoginTicket.user_id == user_id)
+        .execution_options(synchronize_session=False)
+    )
+
+
 def login_ticket_is_active(
     factory: sessionmaker[Session],
     *,
     ticket: str,
+    settings: Settings,
     clock: Clock,
     require_instance_admin: bool,
 ) -> bool:
@@ -400,16 +431,7 @@ def login_ticket_is_active(
             or pending.require_instance_admin != require_instance_admin
         ):
             return False
-        user = session.get(User, pending.user_id)
-        factor = session.get(TotpFactor, pending.user_id)
-        return bool(
-            user
-            and user.is_active
-            and user.password_hash == pending.password_hash
-            and (user.is_instance_admin or not pending.require_instance_admin)
-            and factor
-            and factor.enabled_at is not None
-        )
+        return _ticket_user(session, pending, settings) is not None
 
 
 PasswordChangeStatus = Literal[
@@ -952,9 +974,7 @@ def _login_flow(
     verify: Verifier | None,
     hasher: Hasher | None,
     require_instance_admin: bool = False,
-    second_factor: str = "",
     next_path: str = "/",
-    issue_login_ticket: bool = False,
 ) -> LoginOutcome:
     """``require_instance_admin`` (break-glass ``/login/local``): a correct password of anyone
     else fails exactly like a wrong one: same response, same counting, no rehash."""
@@ -1022,43 +1042,34 @@ def _login_flow(
             and user.password_hash == candidate.password_hash
             and not not_admin
         )
-        factor_verified = False
-        factor_failed = False
         factor = session.get(TotpFactor, user.id) if succeeded and user is not None else None
         if succeeded and user is not None and factor is not None and factor.enabled_at is not None:
-            if not issue_login_ticket:
-                from assetboard.services.totp import verify_sign_in
-
-                succeeded, factor_verified = verify_sign_in(
-                    session, user.id, code=second_factor, settings=settings, now=now
+            # A correct password on an account with TOTP: no session yet, only a ticket for
+            # the second step (F1.6).
+            ticket = secrets.token_urlsafe(32)
+            session.execute(delete(LoginTicket).where(LoginTicket.expires_at <= now))
+            ip_attempt = next(item for item in candidate.reserved if item.scope == "ip")
+            session.add(
+                LoginTicket(
+                    token_hash=hashlib.sha256(ticket.encode()).hexdigest(),
+                    user_id=user.id,
+                    password_fingerprint=password_fingerprint(settings, user.password_hash or ""),
+                    next_path=next_path[:512],
+                    ip_key=ip_attempt.key,
+                    ip_window_started_at=ip_attempt.window_started_at,
+                    ip_block_set=ip_attempt.block_set,
+                    require_instance_admin=require_instance_admin,
+                    created_at=now,
+                    expires_at=now + LOGIN_TICKET_LIFETIME,
                 )
-                factor_failed = not succeeded
-            else:
-                ticket = secrets.token_urlsafe(32)
-                session.execute(delete(LoginTicket).where(LoginTicket.expires_at <= now))
-                ip_attempt = next(item for item in candidate.reserved if item.scope == "ip")
-                session.add(
-                    LoginTicket(
-                        token_hash=hashlib.sha256(ticket.encode()).hexdigest(),
-                        user_id=user.id,
-                        password_hash=candidate.password_hash or "",
-                        next_path=next_path[:512],
-                        ip_key=ip_attempt.key,
-                        ip_window_started_at=ip_attempt.window_started_at,
-                        ip_block_set=ip_attempt.block_set,
-                        require_instance_admin=require_instance_admin,
-                        expires_at=now + LOGIN_TICKET_LIFETIME,
-                    )
-                )
-                return LoginOutcome(login_ticket=ticket)
+            )
+            return LoginOutcome(login_ticket=ticket)
         if not succeeded or user is None or user.password_hash is None:
             # The reservation stays: it is this failure's count.
             prune_auth_throttles(session, clock)
             reason: dict[str, str | int | bool] | None = None
             if verified and not_admin:
                 reason = {"reason": "not_instance_admin"}
-            elif factor_failed:
-                reason = {"reason": "second_factor"}
             _audit(
                 session,
                 clock,
@@ -1092,7 +1103,7 @@ def _login_flow(
             clock=clock,
             host=host,
             user_agent=user_agent,
-            second_factor_verified=factor_verified,
+            second_factor_verified=False,  # no enabled factor on this account
         )
         _audit(
             session,
@@ -1116,6 +1127,7 @@ def _login_flow(
             candidate.password_hash,
             password,
             hasher,
+            settings,
         )
     elif outcome.succeeded and candidate.user_id is not None:
         _rehash_after_login(run, candidate.user_id, candidate.password_hash, password, hasher)
@@ -1129,6 +1141,7 @@ def _rehash_ticket(
     verified_hash: str | None,
     password: str,
     hasher: Hasher | None,
+    settings: Settings,
 ) -> None:
     """Prepare a password-hash upgrade, applying it only after the factor succeeds."""
     if verified_hash is None or not password_hasher().check_needs_rehash(verified_hash):
@@ -1145,8 +1158,10 @@ def _rehash_ticket(
         if (
             pending is not None
             and user is not None
-            and pending.password_hash == verified_hash
             and user.password_hash == verified_hash
+            and hmac.compare_digest(
+                password_fingerprint(settings, verified_hash), pending.password_fingerprint
+            )
         ):
             pending.replacement_password_hash = replacement
 
@@ -1192,9 +1207,7 @@ def authenticate_user(
     host: str | None,
     user_agent: str | None = None,
     existing_session_id: str | None = None,
-    second_factor: str = "",
     next_path: str = "/",
-    issue_login_ticket: bool = False,
 ) -> LoginOutcome:
     """Authenticate inside the caller's transaction; the caller commits whatever the outcome."""
     return _login_flow(
@@ -1208,9 +1221,7 @@ def authenticate_user(
         existing_session_id=existing_session_id,
         verify=None,
         hasher=None,
-        second_factor=second_factor,
         next_path=next_path,
-        issue_login_ticket=issue_login_ticket,
     )
 
 
@@ -1227,9 +1238,7 @@ def authenticate_with_factory(
     verify: Verifier | None = None,
     hasher: Hasher | None = None,
     require_instance_admin: bool = False,
-    second_factor: str = "",
     next_path: str = "/",
-    issue_login_ticket: bool = False,
 ) -> LoginOutcome:
     """Authenticate with the reservation committed before ``verify`` runs (blocking)."""
     return _login_flow(
@@ -1244,9 +1253,7 @@ def authenticate_with_factory(
         verify=verify,
         hasher=hasher,
         require_instance_admin=require_instance_admin,
-        second_factor=second_factor,
         next_path=next_path,
-        issue_login_ticket=issue_login_ticket,
     )
 
 
@@ -1283,9 +1290,7 @@ async def authenticate_user_async(
     user_agent: str | None = None,
     existing_session_id: str | None = None,
     require_instance_admin: bool = False,
-    second_factor: str = "",
     next_path: str = "/",
-    issue_login_ticket: bool = False,
 ) -> LoginOutcome:
     """Web entry point: database work in a worker thread, hashing through ``gate``.
 
@@ -1305,9 +1310,7 @@ async def authenticate_user_async(
             verify=verify,
             hasher=hasher,
             require_instance_admin=require_instance_admin,
-            second_factor=second_factor,
             next_path=next_path,
-            issue_login_ticket=issue_login_ticket,
         )
     )
 
@@ -1397,6 +1400,9 @@ def revoke_session(
 
 
 def _delete_sessions_except(session: Session, user_id: UUID, keep_hash: str | None) -> int:
+    # Every path that revokes a user's sessions (sign out elsewhere, password change or
+    # reset, deactivation, factor reset) also ends any pending two-step sign-in.
+    delete_login_tickets(session, user_id)
     rows = session.scalars(select(UserSession).where(UserSession.user_id == user_id)).all()
     revoked = 0
     for row in rows:

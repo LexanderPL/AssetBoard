@@ -43,10 +43,10 @@ from assetboard.services.instance_settings import registration_open
 from assetboard.services.profile import ConfirmMethod
 from assetboard.web.confirm import confirm_view, refusal, run_confirmed
 from assetboard.web.errors import error_response, is_htmx_fragment_request
-from assetboard.web.rendering import render_template
+from assetboard.web.rendering import render_template, scoped_url
 from assetboard.web.security import (
-    clear_cookie,
     clear_csrf_cookie,
+    clear_login_ticket_cookie,
     clear_session_cookie,
     client_host,
     login_ticket_cookie_name,
@@ -107,6 +107,8 @@ ERROR_FIELDS = {
     "invalid_workspace_settings": "base_currency",
 }
 LOGIN_FAILED = _("The email or password is not correct.")
+# Shown only on the code page, which only a correct password reaches (F1.6).
+CODE_FAILED = _("The code is not correct.")
 # Neutral: the same for an unknown, expired, used or used-up ticket.
 LOGIN_TICKET_ENDED = _("Your sign-in has expired. Please sign in again.")
 SETUP_RACE = _("Setup was already completed, or is being completed. Reload to continue.")
@@ -139,7 +141,7 @@ def signed_in_redirect(
     set_session_cookie(
         response, state.settings, session_id, expires_at=expires_at, now=state.clock.now()
     )
-    clear_cookie(response, state.settings, login_ticket_cookie_name(state.settings))
+    clear_login_ticket_cookie(response, state.settings, _ticket_cookie_path(request))
     # The anonymous CSRF secret belongs to the signed-out page; rotate it away.
     clear_csrf_cookie(response, state.settings)
     return response
@@ -329,6 +331,7 @@ def _login_error(
     error: bool,
     throttled_until: datetime | None,
     ticket_ended: bool = False,
+    second_factor_step: bool = False,
 ) -> str | None:
     """Throttled only when a bucket refused the attempt; never a hint that an account exists."""
     if throttled_until is not None:
@@ -336,7 +339,9 @@ def _login_error(
         return throttled_message(throttled_until, now, request.state.locale)
     if ticket_ended:
         return _t(request, LOGIN_TICKET_ENDED)
-    return _t(request, LOGIN_FAILED) if error else None
+    if not error:
+        return None
+    return _t(request, CODE_FAILED if second_factor_step else LOGIN_FAILED)
 
 
 async def _login_page(
@@ -375,6 +380,7 @@ async def _login_page(
                 error=error,
                 throttled_until=throttled_until,
                 ticket_ended=ticket_ended,
+                second_factor_step=second_factor_step,
             ),
             "registration_enabled": registration,
             "password_login": password_login,
@@ -434,12 +440,13 @@ async def _password_sign_in(
         existing_session_id=existing,
         require_instance_admin=break_glass,
         next_path=safe_next(next_path, default="/"),
-        issue_login_ticket=True,
     )
     if outcome.login_ticket is not None:
         target = request.url_for("login_local_factor" if break_glass else "login_factor").path
         response = RedirectResponse(target, status_code=303)
-        set_login_ticket_cookie(response, state.settings, outcome.login_ticket)
+        set_login_ticket_cookie(
+            response, state.settings, outcome.login_ticket, _ticket_cookie_path(request)
+        )
         return response
     if not outcome.succeeded or outcome.session_id is None:
         # Throttled attempts keep the 401 that log-based tools count (ADR-0012), plus a
@@ -518,6 +525,7 @@ async def _login_factor_page(request: Request, *, break_glass: bool = False) -> 
         login_ticket_is_active,
         state.session_factory,
         ticket=ticket,
+        settings=state.settings,
         clock=state.clock,
         require_instance_admin=break_glass,
     )
@@ -526,12 +534,17 @@ async def _login_factor_page(request: Request, *, break_glass: bool = False) -> 
     return await _login_page(request, break_glass=break_glass, second_factor_step=True)
 
 
+def _ticket_cookie_path(request: Request) -> str:
+    """``/login`` under the app's root path: the ticket goes only to the sign-in routes."""
+    return scoped_url(request, "login")
+
+
 def _restart_sign_in(request: Request, *, break_glass: bool, ended: bool) -> Response:
     """Back to the password step; ``ended`` says why when the browser held a ticket."""
     settings = _state(request).settings
     target = request.url_for("login_local" if break_glass else "login").path
     response = RedirectResponse(f"{target}?expired=1" if ended else target, status_code=303)
-    clear_cookie(response, settings, login_ticket_cookie_name(settings))
+    clear_login_ticket_cookie(response, settings, _ticket_cookie_path(request))
     return response
 
 

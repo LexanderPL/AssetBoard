@@ -924,6 +924,9 @@ msgstr ""
 msgid "The email or password is not correct."
 msgstr ""
 
+msgid "The code is not correct."
+msgstr ""
+
 msgid "Your sign-in has expired. Please sign in again."
 msgstr ""
 

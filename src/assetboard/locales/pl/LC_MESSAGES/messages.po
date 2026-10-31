@@ -961,6 +961,9 @@ msgstr "Sprawdź dane i spróbuj ponownie."
 msgid "The email or password is not correct."
 msgstr "Adres e-mail lub hasło są nieprawidłowe."
 
+msgid "The code is not correct."
+msgstr "Kod jest nieprawidłowy."
+
 msgid "Your sign-in has expired. Please sign in again."
 msgstr "Logowanie wygasło. Zaloguj się ponownie."
 

@@ -21,7 +21,7 @@ def upgrade() -> None:
         "login_tickets",
         sa.Column("token_hash", sa.String(length=64), nullable=False),
         sa.Column("user_id", sa.Uuid(), nullable=False),
-        sa.Column("password_hash", sa.String(length=512), nullable=False),
+        sa.Column("password_fingerprint", sa.String(length=64), nullable=False),
         sa.Column("replacement_password_hash", sa.String(length=512), nullable=True),
         sa.Column("next_path", sa.String(length=512), nullable=False),
         sa.Column("ip_key", sa.String(length=64), nullable=False),
@@ -29,6 +29,7 @@ def upgrade() -> None:
         sa.Column("ip_block_set", sa.DateTime(timezone=True), nullable=True),
         sa.Column("code_attempts", sa.Integer(), nullable=False),
         sa.Column("require_instance_admin", sa.Boolean(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.CheckConstraint(
             "length(token_hash) = 64", name=op.f("ck_login_tickets_token_hash_sha256_length")

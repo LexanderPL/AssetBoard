@@ -120,12 +120,20 @@ def set_short_cookie(response: Response, settings: Settings, name: str, value: s
     response.set_cookie(name, value, max_age=OIDC_COOKIE_SECONDS, **_cookie_options(settings))
 
 
-def set_login_ticket_cookie(response: Response, settings: Settings, value: str) -> None:
+def set_login_ticket_cookie(response: Response, settings: Settings, value: str, path: str) -> None:
+    """The two-step sign-in ticket (F1.6), sent only to ``path`` (the ``/login`` routes)."""
     response.set_cookie(
         login_ticket_cookie_name(settings),
         value,
         max_age=LOGIN_TICKET_SECONDS,
-        **_cookie_options(settings),
+        **{**_cookie_options(settings), "path": path},
+    )
+
+
+def clear_login_ticket_cookie(response: Response, settings: Settings, path: str) -> None:
+    """Clears the ticket cookie; ``path`` must be the one it was set with."""
+    response.delete_cookie(
+        login_ticket_cookie_name(settings), **{**_cookie_options(settings), "path": path}
     )
 
 
