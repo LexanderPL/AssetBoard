@@ -1,6 +1,6 @@
 # Categories
 
-Categories label your expenses and income. Open "Categories" in the account menu (bottom left) or from the workspace settings. Everyone in
+Categories label your expenses and income. Open "Categories" in the account menu (top right) or from the workspace settings. Everyone in
 the workspace can see them; editors and owners can change them, and viewers see the list
 read-only.
 

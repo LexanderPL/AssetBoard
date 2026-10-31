@@ -10,7 +10,7 @@ A self-hosted web app that replaces a personal finance spreadsheet (monthly inco
 2. **Optional complexity.** Taxes, recurring items, loans, FIRE, multi-currency, work logs: all can be ignored; the app works with just categories and transactions.
 3. **Correctness first.** Finance math lives in pure functions with golden tests against independent oracles.
 4. **Self-hosting first.** One container, SQLite, no required external service. Online features (price feeds, notifications, SSO) degrade gracefully when unavailable.
-5. **Your data is yours.** Full export, documented schema, no telemetry.
+5. **Your data is yours.** Full export, documented schema, no telemetry. The only outgoing request the app can make on its own is the opt-in daily update check (off by default, ADR-0023).
 6. **Boring technology.** Fewer moving parts beats cleverness.
 
 ## 2. Glossary

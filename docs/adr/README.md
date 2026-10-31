@@ -29,6 +29,7 @@ The decisions below are accepted unless noted otherwise.
 | [0020](0020-hard-workspace-deletion.md) | Hard workspace deletion | Accepted |
 | [0021](0021-notifications.md) | Reminders through Apprise channels | Proposed |
 | [0022](0022-tax-kinds-and-payment-schedule.md) | Tax kinds and payment schedule | Proposed |
+| [0023](0023-opt-in-update-check.md) | Opt-in update check | Accepted |
 
 New records should use [the ADR template](template.md), the next available number, and include
 Context, Decision, and Consequences sections.
