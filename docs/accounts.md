@@ -53,7 +53,7 @@ on another device.
 
 After enrollment, enter your email and password on the first sign-in page. If two-factor
 authentication is enabled, the next page asks for a code from your authenticator app or a
-recovery code. A wrong code shows the same generic failure as an incorrect password and you can
+recovery code. A wrong code says "The code is not correct." and you can
 try again on the same page, up to five times within five minutes; after that, or once five
 minutes have passed, you return to the first page with "Your sign-in has expired" and enter your
 password again. "Start over" on the code page also takes you back. Code attempts use the same

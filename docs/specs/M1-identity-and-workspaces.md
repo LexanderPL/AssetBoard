@@ -335,18 +335,23 @@ workspace, without affecting any other workspace or external sign-in method.
 - Password sign-in is two steps for accounts with enabled TOTP: `/login` and `/login/local`
   first accept email and password only. A correct password creates no session; it issues a
   five-minute, single-use ticket whose random value is held in an HttpOnly, SameSite=Lax cookie
-  and whose SHA-256 hash and server-side state are stored in the database. The next page asks
+  (Secure where the session cookie is) sent only to the `/login` routes, and whose SHA-256 hash
+  and server-side state are stored in the database. The next page asks
   for an authenticator or recovery code (`autocomplete="one-time-code"`, CSRF-protected, with a
   "Start over" link to the password step). The ticket remains valid after a wrong code so the
   user can retry until success or expiry, up to five wrong codes per ticket; the fifth deletes it.
-  The ticket is bound to its user, to that user's current password hash and enabled factor, and
-  to the break-glass flag (a break-glass ticket also ends if the user stops being an instance
-  administrator). An unknown, expired, consumed or used-up ticket clears the cookie and returns to
+  The ticket is bound to its user, to that user's current password (an HMAC-SHA256 fingerprint of
+  the stored hash under a subkey of the secret key; never a copy of the hash), to a factor enabled
+  no later than the ticket was issued, and to the break-glass flag (a break-glass ticket also ends
+  if the user stops being an instance administrator). The user's tickets are deleted when the
+  factor is enabled, disabled or reset (account page, administrator, CLI) and whenever the user's
+  sessions are revoked (sign out other devices, password change or reset, deactivation). An unknown, expired, consumed or used-up ticket clears the cookie and returns to
   `/login` (or `/login/local`) with a neutral "sign-in has expired" message. Expired tickets are
   deleted whenever a new ticket is issued and when an expired one is presented. Accounts
   without enabled TOTP still sign in after the password step. OIDC and proxy sign-in are unchanged.
   The emergency `/login/local` flow uses the same two steps and still refuses non-administrators.
-  Invalid codes get the generic sign-in failure. Password-hash upgrades are prepared after the
+  A wrong code says "The code is not correct." (the page is reachable only after a correct
+  password, so this reveals nothing about accounts); it is audited as a sign-in failure. Password-hash upgrades are prepared after the
   password check and applied only when the second factor succeeds.
   Password-confirmed linking by email (`/login/link`) also needs the factor to prevent a bypass.
   Already-linked OIDC and proxy sign-ins skip local TOTP (the IdP's responsibility).
