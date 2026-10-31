@@ -1,8 +1,8 @@
 """The month summary in Chromium (F2.4): actual, difference and KPIs refresh without a reload
 after a planned value or an entry (made on the Transactions page since F2.7) is saved, the sort
-toggle reorders the rows and is kept, the F3.5 forecast toggle hides the forecast columns and is
-kept, clicking a category opens the filtered Transactions page (part B), and there are no CSP
-violations.
+toggle reorders the rows and is kept, the F3.5 "Show pending" toggle hides every pending part
+(lines, striped bar parts, the pending flow bar) and is kept, clicking a category opens the
+filtered Transactions page (part B), and there are no CSP violations.
 The test's categories are created directly ("Golden ..."); the suggested set that setup gives
 every new workspace stays in the summary with nothing in it."""
 
@@ -185,37 +185,85 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             assert page.evaluate("document.activeElement.id") == "summary-sort-actual"
             assert _order(page) == ["Golden Travel", "Golden Food"]
 
-            # F3.5: the forecast toggle hides the Expected and Forecast columns and the forecast
-            # KPI line; the choice survives a row swap (planned value), a whole-summary swap
-            # (sort) and a reload, and it comes back with a second click.
-            forecast = page.get_by_role("button", name="Show forecast")
-            visible_forecast = page.locator("#month-summary [data-forecast-column]:visible")
-            expect(forecast).to_have_attribute("aria-pressed", "true")
-            expect(food_row.locator("[data-forecast-column]:visible")).to_have_count(2)
-            forecast.click()
-            expect(forecast).to_have_attribute("aria-pressed", "false")
-            expect(visible_forecast).to_have_count(0)
+            # F3.5 ("Plan and Actual"): a one-time planned entry is pending. Under Actual it
+            # is "+ X pending" (with the forecast as its tooltip); the bar gets a striped part
+            # and the flow bar a pending twin.
+            html = page.request.get(f"{base}/recurring/new").text()
+            token = re.search(r'name="csrf_token" value="([^"]+)"', html)
+            assert token is not None
+            food_id = food_row.get_attribute("data-plan-row")
+            assert food_id is not None
+            created = page.request.post(
+                f"{base}/recurring",
+                form={
+                    "csrf_token": token.group(1), "name": "Golden Box", "direction": "expense",
+                    "category_id": food_id, "amount": "120", "amount_mode": "estimate",
+                    "start_date": "2025-03-20", "include_past": "1", "freq": "once",
+                    "interval": "1", "month_day": "20", "month": "1", "weekend_policy": "none",
+                },
+                max_redirects=0,
+            )  # fmt: skip
+            assert created.status == 303
+            page.goto(f"{base}/m/{MONTH}")
+            toggle = page.get_by_role("button", name="Show pending")
+            pending = page.locator("#month-summary [data-pending]:visible")
+            food_pending = food_row.locator("[data-pending]:visible")
+            confirmed_only = page.locator("#month-summary [data-pending-off]")
+            expect(toggle).to_have_attribute("aria-pressed", "true")
+            expect(food_row.locator("[data-actual]")).to_have_text("€50.00")
+            expect(food_pending).to_have_text(
+                "+ €120.00 pending (If everything pending arrives: €170.00)"
+            )
+            expect(food_pending).to_have_attribute(
+                "title", "If everything pending arrives: €170.00"
+            )
+            expect(page.locator("[data-summary-bar='expense'] [data-bar-pending]")).to_be_visible()
+            expect(page.locator("svg[data-flow-bar][data-pending]")).to_be_visible()
+            expect(confirmed_only).to_be_hidden()
+            expect(page.locator("[data-flow-heading]")).to_have_text("Spent vs earned")
+            # The toggle hides every pending part and shows the confirmed-only flow bar; the
+            # choice survives a row swap (planned value), a whole-summary swap (sort) and a
+            # reload, and it comes back with a second click.
+            toggle.click()
+            expect(toggle).to_have_attribute("aria-pressed", "false")
+            expect(pending).to_have_count(0)
+            expect(confirmed_only).to_be_visible()
             page.get_by_label("Planned for Golden Travel").fill("5350")
             page.keyboard.press("Tab")
             expect(travel_row.locator("[data-difference]")).to_contain_text("+€4,950.00")
-            expect(visible_forecast).to_have_count(0)
+            expect(pending).to_have_count(0)
+            expect(confirmed_only).to_be_visible()
             page.get_by_role("button", name="Your order").click()
             expect(page.get_by_role("button", name="Your order")).to_have_attribute(
                 "aria-pressed", "true"
             )
-            expect(visible_forecast).to_have_count(0)
-            expect(forecast).to_have_attribute("aria-pressed", "false")
+            expect(pending).to_have_count(0)
+            expect(toggle).to_have_attribute("aria-pressed", "false")
             page.get_by_role("button", name="Largest first").click()
             expect(page.get_by_role("button", name="Largest first")).to_have_attribute(
                 "aria-pressed", "true"
             )
             page.reload()
-            expect(forecast).to_have_attribute("aria-pressed", "false")
-            expect(visible_forecast).to_have_count(0)
-            forecast.click()
-            expect(forecast).to_have_attribute("aria-pressed", "true")
-            expect(food_row.locator("[data-forecast-column]:visible")).to_have_count(2)
+            expect(toggle).to_have_attribute("aria-pressed", "false")
+            expect(pending).to_have_count(0)
+            assert page.evaluate("localStorage.getItem('pending')") == "hidden"
+            toggle.click()
+            expect(toggle).to_have_attribute("aria-pressed", "true")
+            expect(food_pending).to_have_count(1)
+            expect(confirmed_only).to_be_hidden()
             assert _order(page) == ["Golden Travel", "Golden Food"]
+            # The older "forecast" key is read once and replaced by "pending".
+            page.evaluate(
+                "localStorage.removeItem('pending'); localStorage.setItem('forecast', 'hidden')"
+            )
+            page.reload()
+            expect(toggle).to_have_attribute("aria-pressed", "false")
+            expect(pending).to_have_count(0)
+            assert page.evaluate(
+                "[localStorage.getItem('pending'), localStorage.getItem('forecast')]"
+            ) == ["hidden", None]
+            toggle.click()
+            expect(toggle).to_have_attribute("aria-pressed", "true")
 
             # Both donuts are shown; the expense donut is drawn from the summary's actuals.
             expect(page.locator("[data-donut]")).to_have_count(2)
