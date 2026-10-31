@@ -60,7 +60,7 @@ def test_income_source_and_work_log_forms(owner):
     page = owner.client.get("/income")
     assert page.status_code == 200
     assert "Contract work" in page.text
-    assert "Record as: Cash received (gross)" in page.text
+    assert 'name="record_as"' not in page.text
     assert "· 7.5</li>" in page.text
 
 
@@ -166,50 +166,3 @@ def test_a_half_chosen_month_reopens_the_create_form_with_an_error(owner):
     assert "data-new-income-source open>" in page
     closed = owner.client.get("/income").text
     assert "data-new-income-source>" in closed and "data-new-income-source open" not in closed
-
-
-def test_editing_an_attached_tax_rule(owner):
-    assert owner.post("/income", _form(_income_category(owner)), token_from="/income").is_redirect
-    rule = {"name": "PIT", "effect": "withheld", "base": "net", "notes": "",
-            "effective_from": "2026-01-01", "mode": "percent", "rate_percent": "12"}  # fmt: skip
-    assert owner.post("/taxes", rule, token_from="/taxes").status_code == 303
-    from assetboard.db.models.income import IncomeSourceTaxRule
-    from assetboard.db.models.tax import TaxRule
-
-    with owner.db() as session:
-        source = session.scalars(select(IncomeSource)).one()
-        rule_id = session.scalars(select(TaxRule.id)).one()
-    expense = _expense_category(owner)
-    attach = {"tax_rule_id": str(rule_id), "payment_category_id": expense, "due_day": "10",
-              "due_month_offset": "1", "generate_payment": "1"}  # fmt: skip
-    assert owner.post(f"/income/{source.id}/tax-rules", attach, token_from="/income").is_redirect
-    with owner.db() as session:
-        attachment = session.scalars(select(IncomeSourceTaxRule)).one()
-    page = owner.client.get("/income").text
-    assert f"/income/{source.id}/tax-rules/{attachment.id}" in page
-    url = f"/income/{source.id}/tax-rules/{attachment.id}"
-    edit = {"payment_category_id": expense, "due_day": "25", "due_month_offset": "2"}
-
-    # CSRF is required.
-    refused = owner.client.post(url, data=edit, follow_redirects=False)
-    assert refused.status_code == 403
-
-    saved = owner.post(url, edit, token_from="/income")
-    assert saved.status_code == 303 and "error" not in saved.headers["location"]
-    with owner.db() as session:
-        row = session.get(IncomeSourceTaxRule, attachment.id)
-        assert row is not None
-        assert (row.due_day, row.due_month_offset, row.generate_payment) == (25, 2, False)
-    assert "Due day 25, offset 2 months · No planned payment" in owner.client.get("/income").text
-
-    invalid = owner.post(url, edit | {"due_day": "40"}, token_from="/income")
-    location = invalid.headers["location"]
-    assert location.endswith(f"?error=invalid_tax_attachment&form=tax-{attachment.id}")
-    reopened = owner.client.get(location).text
-    assert f'data-tax-attachment="{attachment.id}"><div' in reopened
-    assert reopened.split(f'data-tax-attachment="{attachment.id}"')[1].count(" open>") == 1
-
-    failed_attach = owner.post(f"/income/{source.id}/tax-rules", attach, token_from="/income")
-    location = failed_attach.headers["location"]
-    assert location.endswith(f"?error=duplicate_tax_rule&form=attach-{source.id}")
-    assert "data-attach-tax-rule open>" in owner.client.get(location).text

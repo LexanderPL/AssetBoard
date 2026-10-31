@@ -80,7 +80,7 @@
       <label class="grid gap-1 text-sm">{{ _("Amount (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="amount" inputmode="decimal" required class="{{ input_class }}"></label>
       <label class="grid gap-1 text-sm">{{ _("How often") }}<select name="how_often" class="form-select rounded-lg py-2"><option value="yearly">{{ _("Every year") }}</option><option value="quarterly">{{ _("Every quarter") }}</option><option value="monthly">{{ _("Every month") }}</option><option value="once">{{ _("Once") }}</option></select></label>
       <label class="grid gap-1 text-sm">{{ _("Next due date") }}<input type="date" name="due_date" value="{{ today }}" required class="{{ input_class }}"></label>
-      <label class="grid gap-1 text-sm">{{ _("Expense category") }}<select name="category_id" required class="form-select rounded-lg py-2">{% for category in expense_categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</select></label>
+      <label class="grid gap-1 text-sm">{{ _("Expense category") }}<select name="category_id" required class="form-select rounded-lg py-2">{% for category in expense_categories %}<option value="{{ category.id }}"{% if category.name == _("Taxes") %} selected{% endif %}>{{ category.name }}</option>{% endfor %}</select></label>
       <div class="flex items-end"><button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save") }}</button></div>
     </form>
     {% else %}

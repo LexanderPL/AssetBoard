@@ -488,7 +488,6 @@ def test_work_log_reminder_on_the_first_of_the_month(db, settings, notifier) -> 
             pay_lag_months=1,
             expected_mode="manual",
             average_months=3,
-            record_as="net",
             active_from=date(2026, 1, 1),
         )
         session.add(source)

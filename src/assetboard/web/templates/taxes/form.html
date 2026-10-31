@@ -74,7 +74,7 @@
       </div>
       <label class="grid max-w-xs gap-1 text-sm">{{ _("Record it in category") }}<select name="payment_category_id" class="form-select rounded-lg py-2">
         <option value="">{{ _("Choose a category") }}</option>
-        {% for category in expense_categories %}<option value="{{ category.id }}"{% if values.payment_category_id == category.id|string %} selected{% endif %}>{{ category.name }}</option>{% endfor %}
+        {% for category in expense_categories %}<option value="{{ category.id }}"{% if values.payment_category_id == category.id|string or (not values.payment_category_id and category.name == _("Taxes")) %} selected{% endif %}>{{ category.name }}</option>{% endfor %}
       </select></label>
       <p class="text-xs text-muted">{{ _("Not needed when the payer takes the tax off: nothing is planned.") }}</p>
     </fieldset>

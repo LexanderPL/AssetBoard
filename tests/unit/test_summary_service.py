@@ -109,7 +109,6 @@ def test_pending_income_occurrence_contributes_to_month_forecast(team: Workspace
         expected_mode="manual",
         expected_units_value=None,
         average_months=3,
-        record_as="net",
         active_from=date(2026, 1, 1),
         active_to=None,
     )

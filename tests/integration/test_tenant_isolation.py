@@ -389,7 +389,7 @@ def test_current_workspace_repository_touches_only_its_workspace(
 
     assert {
         "name", "base_currency", "country_code", "timezone", "locale", "auto_copy_plan",
-        "require_two_factor"
+        "require_two_factor", "taxes_enabled"
     } == UPDATABLE_FIELDS  # fmt: skip
     for forbidden in ("id", "created_at", "updated_at", "unknown"):
         with pytest.raises(ValueError):
@@ -996,6 +996,9 @@ def test_scheduled_queries_stay_in_their_workspace(db_session, two_workspaces) -
     assert item.id in {value.id for value in items.ordered(active_only=True)}
     assert items.category_counts()[item.category_id] >= 1
     assert rows.category_counts() == {item.category_id: 1}
+    items.update(item.id, is_tax=True)
+    assert [value.id for value in items.tax_items()] == [item.id]
+    assert other_items.tax_items() == []
     rows.delete(row)
     assert rows.for_item(item.id) == []
 
@@ -1088,6 +1091,8 @@ def test_income_queries_stay_in_their_workspace(
     assert attachments_a.for_source_and_rule(source_a.id, attachment_a.tax_rule_id) is attachment_a
     assert attachments_b.for_source_and_rule(source_b.id, attachment_a.tax_rule_id) is None
     assert attachments_a.payment_category_counts() == {attachment_a.payment_category_id: 1}
+    assert [row.id for row in attachments_a.for_rule(attachment_a.tax_rule_id)] == [attachment_a.id]
+    assert attachments_b.for_rule(attachment_a.tax_rule_id) == []
     assert attachments_b.payment_category_counts() == {attachment_b.payment_category_id: 1}
     assert [row.id for row in logs_b.for_source(source_b.id)] == [log_b.id]
     assert [row.id for row in attachments_b.for_source(source_b.id)] == [attachment_b.id]
@@ -1360,6 +1365,9 @@ def test_tax_rule_queries_stay_in_their_workspace(
         fixed_minor=500,
     )
     assert [row.id for row in rules_a.ordered()] == [rule_a.id]
+    assert rules_a.payment_category_counts() == {} and rules_b.payment_category_counts() == {}
+    assert not rules_a.has_posted_income(rule_a.id)
+    assert not rules_b.has_posted_income(rule_a.id)
     assert rules_a.effective_for_all(date(2026, 1, 1)) == [(rule_a, version_a)]
     assert rules_b.effective_for_all(date(2026, 1, 1))[0][0].id == rule_b.id
     assert versions_a.for_rule(rule_a.id) == [version_a, fixed_version_a]

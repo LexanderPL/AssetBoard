@@ -24,7 +24,7 @@ BASE_METHOD_COVERAGE: dict[str, str] = {
 EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     **{
         ("ScheduledItemRepository", method): "test_scheduled_queries_stay_in_their_workspace"
-        for method in ("create", "ordered", "any_exists", "category_counts")
+        for method in ("create", "ordered", "any_exists", "category_counts", "tax_items")
     },
     **{
         ("ScheduledOccurrenceRepository", method): "test_scheduled_queries_stay_in_their_workspace"
@@ -64,11 +64,18 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "for_source",
             "for_source_and_rule",
             "payment_category_counts",
+            "for_rule",
         )
     },
     **{
         ("TaxRuleRepository", method): "test_tax_rule_queries_stay_in_their_workspace"
-        for method in ("create", "ordered", "effective_for_all")
+        for method in (
+            "create",
+            "ordered",
+            "effective_for_all",
+            "payment_category_counts",
+            "has_posted_income",
+        )
     },
     **{
         ("TaxRuleVersionRepository", method): "test_tax_rule_queries_stay_in_their_workspace"
