@@ -158,8 +158,8 @@ def test_add_income_wizard_in_a_browser(tmp_path: Path) -> None:
             expect(card).to_contain_text("Income tax 12% · paid by you")
             expect(card.locator("th", has_text="Tax to pay")).to_be_visible()
             rental = page.locator("[data-income-source]", has_text="Flat rental")
-            expect(rental).to_contain_text("no taxes are ticked on it")
-            rental.get_by_role("link", name="Choose taxes").click()
+            expect(rental).to_contain_text("No taxes on this income.")
+            rental.get_by_role("link", name="Add taxes").click()
             page.wait_for_load_state("networkidle")
             expect(
                 page.locator("[data-income-source]", has_text="Flat rental").locator(

@@ -237,7 +237,7 @@ def test_why_no_tax_payment_messages(owner):
         )
     page = owner.client.get("/income").text
     rental = _card(page, "Flat rental")
-    assert "no taxes are ticked on it" in rental
+    assert "No taxes on this income." in rental
     with owner.db() as session:
         rental_id = session.scalars(
             select(IncomeSource.id).where(IncomeSource.name == "Flat rental")
@@ -284,7 +284,7 @@ def test_viewer_sees_the_page_read_only(owner):
     assert "Contract work" in page and "Work calendar" in page
     for marker in ("data-add-income", "data-edit-income", "data-log-work", "data-income-taxes"):
         assert marker not in page
-    assert "Choose taxes" not in page
+    assert "Add taxes" not in page
     assert owner.client.get("/income/new").status_code == 403
     with owner.db() as session:
         source_id = session.scalars(select(IncomeSource.id)).one()

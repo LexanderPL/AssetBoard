@@ -3294,15 +3294,11 @@ msgstr "%(tax)s · płacisz sam"
 msgid "%(tax)s · taken off by the payer"
 msgstr "%(tax)s · potrąca płatnik"
 
-msgid ""
-"No tax payment is planned for this income because no taxes are ticked on "
-"it."
-msgstr ""
-"Dla tego przychodu nie zaplanowano płatności podatku, bo nie zaznaczono "
-"przy nim żadnych podatków."
+msgid "No taxes on this income."
+msgstr "Brak podatków od tego dochodu."
 
-msgid "Choose taxes"
-msgstr "Wybierz podatki"
+msgid "Add taxes"
+msgstr "Dodaj podatki"
 
 msgid "No tax payment is planned: the payer pays these taxes for you."
 msgstr "Nie zaplanowano płatności podatku: płatnik płaci te podatki za ciebie."
@@ -4943,4 +4939,16 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "No income sources yet."
 #~ msgstr "Nie ma jeszcze źródeł przychodu."
+
+#~ msgid ""
+#~ "No tax payment is planned for this"
+#~ " income because no taxes are ticked"
+#~ " on it."
+#~ msgstr ""
+#~ "Dla tego przychodu nie zaplanowano "
+#~ "płatności podatku, bo nie zaznaczono "
+#~ "przy nim żadnych podatków."
+
+#~ msgid "Choose taxes"
+#~ msgstr "Wybierz podatki"
 

@@ -3033,12 +3033,10 @@ msgstr ""
 msgid "%(tax)s · taken off by the payer"
 msgstr ""
 
-msgid ""
-"No tax payment is planned for this income because no taxes are ticked on "
-"it."
+msgid "No taxes on this income."
 msgstr ""
 
-msgid "Choose taxes"
+msgid "Add taxes"
 msgstr ""
 
 msgid "No tax payment is planned: the payer pays these taxes for you."
@@ -4699,5 +4697,14 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "No income sources yet."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "No tax payment is planned for this"
+#~ " income because no taxes are ticked"
+#~ " on it."
+#~ msgstr ""
+
+#~ msgid "Choose taxes"
 #~ msgstr ""
 
