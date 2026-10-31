@@ -142,8 +142,27 @@ def test_the_nav_month_link_shows_on_every_signed_in_page(months: OwnerApp) -> N
 def test_the_nav_month_link_points_to_the_current_month(months: OwnerApp) -> None:
     home = _page(months, "/")
     assert 'href="/m" data-month-link>' in home  # not current on the overview
-    assert 'href="/m" data-month-link aria-current="page"' in _page(months, "/m/2026-10")
-    assert 'data-month-link aria-current="page"' not in _page(months, "/categories")
+    assert 'href="/transactions" data-transactions-link>' in home
+    categories = _page(months, "/categories")
+    assert 'href="/m" data-month-link>' in categories
+    assert 'href="/transactions" data-transactions-link>' in categories
+    assert 'data-month-link aria-current="page"' not in categories
+
+
+def test_the_nav_keeps_the_month_shown_on_the_month_page(months: OwnerApp) -> None:
+    page = _page(months, "/m/2026-07")
+    assert 'href="/m/2026-07" data-month-link aria-current="page"' in page
+    assert 'href="/transactions/2026-07" data-transactions-link>' in page
+
+
+def test_the_nav_keeps_the_month_shown_on_the_transactions_page(months: OwnerApp) -> None:
+    page = _page(months, "/transactions/2025-12")
+    assert 'href="/m/2025-12" data-month-link>' in page
+    assert 'href="/transactions/2025-12" data-transactions-link aria-current="page"' in page
+    # Other pages fall back to the current month again.
+    history = _page(months, "/history")
+    assert 'href="/m" data-month-link>' in history
+    assert 'href="/transactions" data-transactions-link>' in history
 
 
 # The month picker (no JavaScript needed)
