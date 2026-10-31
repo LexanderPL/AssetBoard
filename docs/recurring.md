@@ -165,7 +165,8 @@ numbers. **Fill working days** adds 1 for every working day that has no value ye
 changes values you entered; **Clear month** removes every day of the month after a confirmation.
 
 The calendar is optional. While a month has at least one marked day, its work log is the sum of
-the days: it is shown as "from the work calendar" and the month-level form refuses to change it.
+the days: in the payments table its **logged** chip links to that month of the calendar, and the
+month-level form refuses to change it.
 Marking the first day replaces a manual work log for that month; removing the last day (or
 clearing the month) removes the log, and the month goes back to its estimate. Every change
 recalculates the month's pending income and tax-payment occurrences, like a month-level work log,
