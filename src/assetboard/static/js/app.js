@@ -1,31 +1,40 @@
-// F3.5: the forecast toggle of the month summary hides its Expected and Forecast columns and the
-// forecast KPI line (Home keeps them). The choice is a per-device convenience kept in browser
-// storage, and it is applied again after every htmx swap, since planned-value and transaction
-// writes replace summary rows (or the whole summary) with freshly rendered, visible cells.
-let showForecast = true;
+// F3.5: the "Show pending" toggle of the month summary shows or hides every pending part: the
+// "+ X pending" lines, the striped bar extensions and the pending flow bar (data-pending), which
+// then gives way to the confirmed-only flow bar (data-pending-off). Home has no toggle. The
+// choice is a per-device convenience kept in browser storage ("pending"; the older "forecast"
+// key is read once and replaced), and it is applied again after every htmx swap, since
+// planned-value and transaction writes replace summary rows (or the whole summary) with freshly
+// rendered, visible parts.
+let showPending = true;
 try {
-  showForecast = localStorage.getItem("forecast") !== "hidden";
+  let stored = localStorage.getItem("pending");
+  if (stored === null) {
+    stored = localStorage.getItem("forecast");
+    if (stored !== null) {
+      localStorage.setItem("pending", stored);
+      localStorage.removeItem("forecast");
+    }
+  }
+  showPending = stored !== "hidden";
 } catch {
-  // No storage: the forecast stays visible.
+  // No storage: pending amounts stay visible.
 }
 
-function applyForecast() {
-  document.querySelectorAll("[data-forecast-toggle]").forEach((button) => {
-    button.setAttribute("aria-pressed", String(showForecast));
+function applyPending() {
+  document.querySelectorAll("[data-pending-toggle]").forEach((button) => {
+    button.setAttribute("aria-pressed", String(showPending));
   });
-  document.querySelectorAll("[data-month-summary] [data-forecast-column]").forEach((column) => {
-    column.classList.toggle("hidden", !showForecast);
+  document.querySelectorAll("[data-month-summary] [data-pending]").forEach((part) => {
+    part.classList.toggle("hidden", !showPending);
   });
-  // "not counted" spans Actual, Expected, Forecast and Difference; without the two forecast
-  // columns it spans two.
-  document.querySelectorAll("[data-month-summary] td[data-not-counted]").forEach((cell) => {
-    if (cell instanceof HTMLTableCellElement) cell.colSpan = showForecast ? 4 : 2;
+  document.querySelectorAll("[data-month-summary] [data-pending-off]").forEach((part) => {
+    part.classList.toggle("hidden", showPending);
   });
 }
 
-applyForecast();
+applyPending();
 for (const eventName of ["htmx:afterSwap", "htmx:oobAfterSwap"]) {
-  document.addEventListener(eventName, applyForecast);
+  document.addEventListener(eventName, applyPending);
 }
 
 document.addEventListener("click", (event) => {
@@ -42,14 +51,14 @@ document.addEventListener("click", (event) => {
     }
   }
 
-  if (target.closest("[data-forecast-toggle]")) {
-    showForecast = !showForecast;
+  if (target.closest("[data-pending-toggle]")) {
+    showPending = !showPending;
     try {
-      localStorage.setItem("forecast", showForecast ? "shown" : "hidden");
+      localStorage.setItem("pending", showPending ? "shown" : "hidden");
     } catch {
       // The toggle still works for this page when browser storage is unavailable.
     }
-    applyForecast();
+    applyPending();
   }
 
   const themeReset = target.closest("[data-theme-reset]");

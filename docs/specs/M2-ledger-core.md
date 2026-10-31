@@ -405,6 +405,31 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
     (`danger-tint`), an income category green (`success-tint`); new tokens for both themes,
     with every row text at AA on them (`tests/unit/test_theme_tokens.py`). Nothing marks a
     row at or under plan, nor rows of the savings groups.
+- **Plan and Actual (owner, 2026-10-31), replacing F3.5's Expected and Forecast columns on
+  the Month page:** the table has **Plan** (was "Planned"), **Actual** and **Difference**. The
+  pending amount (F3.5's "expected": recurring items and income occurrences not yet
+  confirmed) is part of Actual: a lighter second line "+ €1,200.00 pending" under the confirmed
+  amount, only when it is above zero, in rows, totals and the KPI legend (Left shows
+  "<forecast net> if everything pending arrives"). The forecast (actual + pending) is a hover
+  and screen-reader detail only: the pending line's `title` and sr-only text "If everything
+  pending arrives: X". Difference and the over-plan tint stay confirmed-only; when only actual
+  + pending exceeds the plan (expense and income rows), a softer line "Over plan if everything
+  pending arrives" (warning colour for expenses, success for income) sits under the pending
+  line, with no tint. **Bars:** scaled to max(planned, actual + pending); the confirmed fill,
+  then a striped lighter extension for pending (its SVG `<title>` gives the forecast), the
+  plan line; the text adds "+ X pending" and "(over plan if everything pending arrives)"
+  (only with a plan). **Flow bar:** headed "Spent vs earned", or "Expected spent vs expected
+  earned" for a future month (nothing is confirmed there, so it is a projection). With
+  something pending it is drawn by `domain.summary.pending_flow_bar`: spent confirmed then
+  pending, saved / invested confirmed then pending, then Left, solid while confirmed earnings
+  cover it and striped for the part that needs pending income, and the overspend hatch beyond
+  everything earned; a confirmed-only twin (the F2.4 bar, `data-pending-off`) is hidden until
+  the toggle hides pending parts. Pending stripes are vertical (the overspend hatch is
+  diagonal), and a key reads "Striped: pending, not confirmed yet". The forecast line and the
+  second, thinner forecast bar are gone from the Month page; **Home keeps them** (the shared
+  `kpis` macro renders them unless called with `pending=true`; follow-up). Services are
+  unchanged: `web.plan` only presents their numbers (`KpiView.forecast_saved` was unused and
+  is removed).
 - **Follow-up (review, 2026-10-19):** `web.plan.build_summary` reads twice per render
   (`services.budget.get_plan` for the transfer group and the copy banner, then
   `services.summary.month_summary`); fold them into one read when the summary grows.

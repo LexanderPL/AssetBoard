@@ -15,11 +15,13 @@ from assetboard.domain.summary import (
     Entry,
     FlowBar,
     PendingEntry,
+    PendingFlowBar,
     PlanLine,
     SummaryCategory,
     block_of,
     difference,
     flow_bar,
+    pending_flow_bar,
     savings_rate_bp,
     savings_rate_tenths,
     summarize_month,
@@ -364,3 +366,67 @@ def test_flow_bar_segments_tile_the_scale(earned: int, spent: int, saved: int) -
     if not bar.empty:
         # The longer of earned and spent + saved fills the bar.
         assert max(bar.earned_end, bar.saved_end) == 1000
+
+
+@pytest.mark.parametrize(
+    ("amounts", "expected"),
+    [
+        # (earned, spent, saved, earned pending, spent pending, saved pending)
+        # Nothing pending: the confirmed flow bar, left solid up to earnings.
+        ((4000, 2000, 1000, 0, 0, 0), PendingFlowBar(500, 500, 750, 750, 1000, 1000)),
+        # Pending income covers pending spending: left is striped beyond confirmed earnings.
+        ((1000, 500, 0, 3000, 1500, 500), PendingFlowBar(125, 500, 500, 625, 250, 1000)),
+        # A future month: nothing confirmed, everything striped.
+        ((0, 0, 0, 5000, 2500, 500), PendingFlowBar(0, 500, 500, 600, 0, 1000)),
+        # Everything out exceeds everything earned: out is the scale, overspend beyond earnings.
+        ((1000, 1500, 0, 0, 500, 0), PendingFlowBar(750, 1000, 1000, 1000, 500, 500)),
+        ((0, 0, 0, 0, 0, 0), PendingFlowBar(0, 0, 0, 0, 0, 0)),
+        # Negative amounts draw nothing.
+        ((100, -50, 0, -10, 0, 0), PendingFlowBar(0, 0, 0, 0, 1000, 1000)),
+    ],
+)
+def test_pending_flow_bar_segments(
+    amounts: tuple[int, int, int, int, int, int], expected: PendingFlowBar
+) -> None:
+    earned, spent, saved, earned_p, spent_p, saved_p = amounts
+    bar = pending_flow_bar(
+        earned, spent, saved, earned_pending=earned_p, spent_pending=spent_p, saved_pending=saved_p
+    )
+    assert bar == expected
+
+
+def test_pending_flow_bar_parts() -> None:
+    assert pending_flow_bar(0, 0, 0, earned_pending=0, spent_pending=0, saved_pending=0).empty
+    # Confirmed earnings cover 250 beyond everything out; pending income the remaining 375.
+    bar = pending_flow_bar(1000, 500, 0, earned_pending=3000, spent_pending=1500, saved_pending=500)
+    assert (bar.left_end, bar.left, bar.left_pending, bar.overspent) == (625, 0, 375, 0)
+    covered = pending_flow_bar(4000, 500, 0, earned_pending=0, spent_pending=500, saved_pending=0)
+    assert (covered.out_end, covered.left, covered.left_pending) == (250, 750, 0)
+    over = pending_flow_bar(1000, 1500, 0, earned_pending=0, spent_pending=500, saved_pending=0)
+    assert (over.left, over.left_pending, over.overspent) == (0, 0, 500)
+
+
+@given(amounts=st.lists(st.integers(min_value=-(10**12), max_value=10**12), min_size=6, max_size=6))
+def test_pending_flow_bar_segments_tile_the_scale(amounts: list[int]) -> None:
+    earned, spent, saved, earned_p, spent_p, saved_p = amounts
+    bar = pending_flow_bar(
+        earned, spent, saved, earned_pending=earned_p, spent_pending=spent_p, saved_pending=saved_p
+    )
+    assert 0 <= bar.spent_end <= bar.spent_pending_end <= bar.saved_end <= bar.out_end <= 1000
+    assert 0 <= bar.earned_end <= bar.forecast_earned_end <= 1000
+    # Left (solid and striped) and the overspend never overlap, and together with everything
+    # out they reach the end of the longer side.
+    assert bar.left == 0 or bar.overspent == 0
+    assert bar.left_pending == 0 or bar.overspent == 0
+    end = bar.out_end + bar.left + bar.left_pending
+    assert end == max(bar.out_end, bar.forecast_earned_end)
+    if not bar.empty:
+        assert max(bar.out_end, bar.forecast_earned_end) == 1000
+    # Nothing pending: the same positions as the confirmed flow bar.
+    if earned_p <= 0 and spent_p <= 0 and saved_p <= 0:
+        plain = flow_bar(earned, spent, saved)
+        assert (bar.spent_end, bar.out_end, bar.earned_end) == (
+            plain.spent_end,
+            plain.saved_end,
+            plain.earned_end,
+        )

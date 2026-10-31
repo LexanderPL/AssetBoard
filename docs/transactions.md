@@ -29,7 +29,7 @@ you would type into a spreadsheet:
 An entry dated after today is not posted yet: the button reads **Plan**, and saving creates a
 one-time recurring item with one pending occurrence (see [Recurring items](recurring.md)). A
 planned entry needs a description, because the recurring item is named by it. It appears in the
-month's Expected and Forecast columns; its day-of-month is shown like a posted entry. **Confirm**
+month summary's Actual column as "+ … pending" until it is confirmed; its day-of-month is shown like a posted entry. **Confirm**
 opens the date and amount; confirm it there when it happens, or **Cancel** closes the form
 without changing anything. **Delete** removes the planned entry and its one-time item.
 

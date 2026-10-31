@@ -7,7 +7,7 @@
 {% if row_view %}
 {{ plan_row(row_view, plan_only=group_view is not none and group_view.totals is none) }}
 {% for g in summary.groups %}{% if g.totals %}{{ totals_row(g, oob=true) }}{% endif %}{% endfor %}
-{{ kpis(oob=true) }}
+{{ kpis(oob=true, pending=true) }}
 {{ banner(oob=true) }}
 {% else %}
 {% with summary_oob = true %}{% include "months/_summary.html" %}{% endwith %}
