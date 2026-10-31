@@ -382,6 +382,21 @@ when you intend to upload the image and its release tags.
 
 ## Upgrading
 
+### Unreleased: tax kinds, Taxes switch and other taxes (ADR-0022)
+
+- Migration `0027_taxes_redesign` replaces each tax rule's effect and each income source's
+  "record income as" choice with one kind per tax (added on top, paid by you, withheld by the
+  payer) and moves the payment day, month and category to the tax. `withheld` taxes become
+  "withheld by the payer" when an active source using them recorded take-home income, otherwise
+  "paid by you". Per-source payment settings that differ from the tax's are kept as overrides.
+- Taxes appear in the menu only for workspaces that already had a tax; others can turn them on
+  in Workspace settings → Menu.
+- On the first start after the upgrade (and every start), pending income occurrences and their
+  planned tax payments are recalculated from the new model before the horizon is generated.
+  Sources that recorded **net** income with an added tax (VAT) now expect net plus VAT and plan
+  the VAT payment. Posted transactions never change.
+- Downgrading to `0026` is possible but lossy: see the migration's docstring.
+
 ### Unreleased: notifications and reminders (F3.6)
 
 - Migration `0021_f36` adds the `notification_channels` and `notification_log` tables and the

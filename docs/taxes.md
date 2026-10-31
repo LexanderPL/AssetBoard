@@ -1,32 +1,40 @@
-# Tax rules and calculator
+# Taxes
 
-Tax rules are optional models of taxes or levies. AssetBoard does not provide tax rates or tax
-advice: rates are entered by you, and calculator results are estimates for planning. The tax
-pages show this notice once; close it with **×** and it stays hidden for your account.
+Taxes are optional. Turn them on in **Workspace settings → Menu → Taxes** (owners); the switch
+cannot be turned off while an active income source has a tax ticked, and the settings page lists
+those sources. When it is off, the Taxes menu item, the tax pages and the tax parts of the income
+page are hidden. AssetBoard does not provide tax rates or tax advice: you enter the rates.
 
-Create a rule with an effect (`added` or `withheld`), a calculation base (`net` or `gross`), and
-an initial effective-dated value. Added rules always use net as their base. A value is either a
-percentage (entered in your locale's number format with at most two decimals, e.g. `23` or
-`12,75`, and stored as integer basis points) or a fixed amount in the workspace's base currency.
+## Taxes on income
 
-Rate versions are append-only. A new version must start after the latest version; old versions
-remain unchanged and the calculator uses the latest version effective on the selected date.
-Rule effect and base are fixed at creation so earlier versions keep their meaning. Create a
-separate rule for a different effect or base. Archiving hides a rule from new calculations but
-preserves its versions.
+**New tax** asks one question: *who pays it to the tax office?*
 
-The calculator takes a net amount, date and recording mode:
+- **I do. It is added on top of what I charge** (like VAT): what you receive grows by the tax,
+  and a payment is planned.
+- **I do, from my income** (like income tax or contributions you pay yourself): what you receive
+  is unchanged, and a payment is planned.
+- **The payer takes it off before paying me** (like tax on a salary): what you receive shrinks by
+  the tax, and nothing is planned.
 
-- **Cash received (gross):** ledger amount is gross; generated payment estimates include added and
-  withheld taxes.
-- **Net:** ledger amount is net; generated payment estimates include withheld taxes only.
-- **Take-home:** ledger amount is net after withheld taxes; no tax payment is additionally planned.
+The amount is a percentage (your locale's number format, at most two decimals, e.g. `23` or
+`12,75`) or a fixed amount per payment in the workspace currency. For taxes you pay, choose the
+payment day, the month (the month after you are paid, the month you are paid, or the month after
+each quarter: April, July, October, January) and the expense category for the payment. Taxes
+from your income and withheld taxes can be calculated on the net amount or, under the collapsed
+advanced option, on net plus taxes added on top. The **Example** panel shows what the tax means
+for 10 000 of net income; without JavaScript it shows the saved values.
 
-Each percentage is rounded half up to the currency's minor unit, once per rule. Added taxes are
-calculated on net; withheld taxes use their selected net or gross base. Fixed values use the
-workspace base currency. Rules without a version effective on the selected date are omitted from
-the calculation and listed as missing.
+Each percentage is rounded half up to the currency's minor unit, once per tax. The first rate is
+valid from the start; **Rate changes** on the Taxes page add a later rate, and past months keep
+the old one. Who pays the tax and its base can change until income calculated with the tax has
+been posted; after that create a new tax. Archiving (on the edit page) stops using a tax in new
+calculations and keeps its history.
 
-Tax rules can be attached to income sources in F3.4. The F3.3 calculator therefore accepts a
-manual net amount; it does not yet select an income source or generate scheduled tax-payment
-occurrences.
+## Other taxes
+
+Taxes that do not depend on income, like real estate or vehicle tax, are added with **Add
+another tax**: name, amount, how often (every year, quarter or month, or once), next due date and
+expense category. They are recurring items marked as taxes: they show on the Recurring page too,
+and **Edit** opens the recurring item.
+
+The former calculator page now redirects to Taxes; its function is the example panel.

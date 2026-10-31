@@ -135,10 +135,11 @@ the month after its payment lag; days past the end of a short month are clamped 
 Log units by work month (decimal units are supported). The next pending occurrence and any
 planned tax-payment occurrences are recalculated; a posted transaction is never silently changed.
 
-Optional tax rules are attached in order to an income source. The configured `record_as` choice
-determines whether the income ledger records gross, net, or take-home money. Selected rules can
-create separate planned tax-payment expenses in an expense category. Tax rates and fixed amounts
-are user-entered models, not tax advice. Pending occurrences appear as expected rows, with a
+When Taxes are on (Workspace settings → Menu), tick the workspace's taxes under **Taxes on this
+income**; each can have a different payment day for this income. The expected income is the net
+amount plus taxes added on top minus taxes the payer withholds, and taxes you pay get planned
+tax-payment expenses (see [Taxes](taxes.md)). Tax rates and fixed amounts are user-entered
+models, not tax advice. Pending occurrences appear as expected rows, with a
 Confirm button, in the tables of the month's **Transactions** page; the **Month** summary shows
 pending expected amounts and a forecast alongside actuals. Missing work logs are highlighted on
 both pages when the related pay date is due within ten days or is overdue. A pending income
