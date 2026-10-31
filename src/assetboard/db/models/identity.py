@@ -294,6 +294,13 @@ class InstanceSettings(Base):
     allow_registration: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
+    # Opt-in daily update check against GitHub releases (ADR-0023), with its last result: the
+    # latest release tag seen and when the check last succeeded.
+    check_for_updates: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    latest_release_tag: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    update_checked_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     updated_by_user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True

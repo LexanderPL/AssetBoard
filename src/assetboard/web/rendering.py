@@ -56,6 +56,9 @@ def render_template(
         "web_session": web_session(request),
         # Set for every signed-in page with a workspace; see load_workspace_nav in web/context.py.
         "workspace_nav": getattr(request.state, "workspace_nav", None),
+        # The running version (sidebar footer), and for administrators a newer release.
+        "app_version": request.app.version,
+        "update_notice": getattr(request.state, "update_notice", None),
     }
     if context:
         template_context.update(context)

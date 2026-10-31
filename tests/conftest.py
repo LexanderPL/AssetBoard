@@ -26,6 +26,7 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session
 
+from assetboard import app as app_module
 from assetboard.app import create_app
 from assetboard.branding import APP_NAME, ENV_PREFIX
 from assetboard.clock import FixedClock
@@ -36,6 +37,7 @@ from assetboard.db.models.identity import InstanceSettings, Membership, User, Wo
 from assetboard.db.models.ledger import Category
 from assetboard.services import auth as auth_service
 from assetboard.services.auth import argon2_hash, run_initial_setup
+from tests.fake_release_source import FakeReleaseSource
 
 LOCALES_DIR = Path(__file__).resolve().parents[1] / "src" / "assetboard" / "locales"
 
@@ -175,6 +177,12 @@ def isolate_application_data_dir(
 def no_background_scheduler(monkeypatch: pytest.MonkeyPatch) -> None:
     """Apps built by tests never start the recurring-item scheduler (its own tests drive it)."""
     monkeypatch.setenv(f"{ENV_PREFIX}_SCHEDULER_ENABLED", "false")
+
+
+@pytest.fixture(autouse=True)
+def no_update_check_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Apps built by tests read releases from a fake that never uses the network (ADR-0023)."""
+    monkeypatch.setattr(app_module, "GitHubReleaseSource", FakeReleaseSource)
 
 
 @pytest.fixture(autouse=True)

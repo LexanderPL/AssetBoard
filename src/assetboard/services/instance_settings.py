@@ -8,6 +8,8 @@ One row, ``instance_settings.id = 1`` (migration 0013); a missing row reads as t
 * ``allow_registration`` (default off, pre-release B, ADR-0017): open self-registration with a
   verified email. It can be turned on only with SMTP configured and without ``OIDC_ONLY``, and
   is effective only while both still hold (``registration_open``).
+* ``check_for_updates`` (default off, ADR-0023): once a day, ask GitHub for the latest release
+  (``services.update_check``). Turning it off forgets the last result.
 
 Changes run inside the acting administrator's confirmation (``web.confirm.run_confirmed``) and
 are recorded as the instance-level event ``instance.settings_updated`` with the changed values.
@@ -29,12 +31,14 @@ from assetboard.services.auth import record_auth_event
 ROW_ID = 1
 DEFAULT_ALLOW_WORKSPACE_CREATION = True
 DEFAULT_ALLOW_REGISTRATION = False
+DEFAULT_CHECK_FOR_UPDATES = False
 
 
 @dataclass(frozen=True, slots=True)
 class InstanceSettingsView:
     allow_workspace_creation: bool = DEFAULT_ALLOW_WORKSPACE_CREATION
     allow_registration: bool = DEFAULT_ALLOW_REGISTRATION
+    check_for_updates: bool = DEFAULT_CHECK_FOR_UPDATES
 
 
 def read_settings(session: Session, *, lock: bool = False) -> InstanceSettingsView:
@@ -46,6 +50,7 @@ def read_settings(session: Session, *, lock: bool = False) -> InstanceSettingsVi
     return InstanceSettingsView(
         allow_workspace_creation=row.allow_workspace_creation,
         allow_registration=row.allow_registration,
+        check_for_updates=row.check_for_updates,
     )
 
 
@@ -85,6 +90,7 @@ def update_settings(
     *,
     allow_workspace_creation: bool,
     allow_registration: bool,
+    check_for_updates: bool | None = None,
     settings: Settings,
     clock: Clock,
     host: str | None,
@@ -95,6 +101,7 @@ def update_settings(
     Migration 0013 creates the row, so it always exists; the insert below only covers a
     database where it was deleted by hand. Two administrators inserting it at once could then
     collide on PostgreSQL (a primary-key error, nothing lost); that race is theoretical.
+    ``check_for_updates=None`` keeps the stored value.
     """
     if not actor.is_active or not actor.is_instance_admin:
         raise NotInstanceAdmin
@@ -104,6 +111,7 @@ def update_settings(
             id=ROW_ID,
             allow_workspace_creation=DEFAULT_ALLOW_WORKSPACE_CREATION,
             allow_registration=DEFAULT_ALLOW_REGISTRATION,
+            check_for_updates=DEFAULT_CHECK_FOR_UPDATES,
         )
         session.add(row)
     # Turning registration on needs email; turning it off is always allowed.
@@ -116,10 +124,17 @@ def update_settings(
         changed["allow_workspace_creation"] = allow_workspace_creation
     if row.allow_registration is not allow_registration:
         changed["allow_registration"] = allow_registration
+    if check_for_updates is not None and row.check_for_updates is not check_for_updates:
+        changed["check_for_updates"] = check_for_updates
     if not changed:
         return "unchanged"
     row.allow_workspace_creation = allow_workspace_creation
     row.allow_registration = allow_registration
+    if check_for_updates is not None:
+        row.check_for_updates = check_for_updates
+        if not check_for_updates:
+            row.latest_release_tag = None
+            row.update_checked_at = None
     row.updated_at = clock.now()
     row.updated_by_user_id = actor.id
     record_auth_event(
