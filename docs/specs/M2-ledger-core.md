@@ -625,8 +625,8 @@ F3.2 occurrence service).
 | **Transactions** | `/transactions`, `/transactions/YYYY-MM` | Quick-add form and the month's entries (edit/delete inline) |
 | **History** (pl "Historia") | `/history` | F2.6's cross-month search, filters, CSV export and bulk recategorize |
 
-The other sidebar items (Categories, Recurring, Upcoming, Taxes, later modules) follow in their
-current order.
+The other sidebar items (Recurring, Upcoming, Income, then Taxes directly below Income, later
+modules) follow; Categories lives in the user menu.
 
 **Acceptance**
 - **Home (`/`)** shows the current month (workspace time zone, from the Clock), headed with the
