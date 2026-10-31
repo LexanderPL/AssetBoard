@@ -3,13 +3,15 @@ from __future__ import annotations
 import io
 from datetime import UTC, datetime
 from pathlib import Path
-from zipfile import ZIP_DEFLATED, ZipFile
+from zipfile import ZIP_BZIP2, ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 
+import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
 from assetboard.db.base import Base, WorkspaceOwned
 from assetboard.domain.archive import (
+    ArchiveError,
     ArchiveRows,
     BudgetLineRow,
     CategoryRow,
@@ -164,7 +166,11 @@ def test_reader_accepts_reordered_columns_bom_defaults_and_future_minor() -> Non
     assert not errors and parsed is not None
     assert parsed.rows.categories[0].treatment == "regular"
     assert parsed.rows.categories[0].sort_order == 0
-    assert len(parsed.warnings) == 2
+    assert sorted(w.message for w in parsed.warnings) == [
+        "newer minor version: 1.9",
+        "unknown column: future",
+        "unknown key: future",
+    ]
 
 
 def test_reader_validates_fields_and_references() -> None:
@@ -206,10 +212,10 @@ def test_reader_refuses_unsafe_and_invalid_archives() -> None:
         assert parse_archive(data)[1]
     files = _files()
     files["../secret"] = b"x"
-    assert parse_archive(_rewrite(files))[1]
+    assert parse_archive(_rewrite(files))[1] == (ArchiveError("archive", "unsafe member"),)
     files = _files()
     files["months.csv"] += files["months.csv"].splitlines(keepends=True)[1]
-    assert parse_archive(_rewrite(files))[1]
+    assert parse_archive(_rewrite(files))[1] == (ArchiveError("months.csv", "duplicate month"),)
 
 
 def test_filtered_csv_columns_match_archive() -> None:
@@ -295,3 +301,145 @@ def test_csv_text_round_trip(description: str) -> None:
     parsed, errors = parse_archive(encoded)
     assert not errors and parsed is not None
     assert parsed.rows.transactions[0].description == description
+
+
+def _zip(members: list[tuple[ZipInfo | str, bytes]], *, compression: int = ZIP_DEFLATED) -> bytes:
+    output = io.BytesIO()
+    with ZipFile(output, "w", compression) as archive:
+        for name, data in members:
+            archive.writestr(name, data)
+    return output.getvalue()
+
+
+def _signed_members() -> list[tuple[ZipInfo | str, bytes]]:
+    with ZipFile(io.BytesIO(_rewrite(_files()))) as archive:
+        return [(name, archive.read(name)) for name in archive.namelist()]
+
+
+def _special(name: str, *, mode: int = 0) -> ZipInfo:
+    info = ZipInfo(name)
+    info.external_attr = mode << 16
+    return info
+
+
+@pytest.mark.parametrize(
+    ("extra", "message"),
+    [
+        ((_special("link", mode=0o120777), b"/etc/passwd"), "unsafe member"),
+        ((_special("dir", mode=0o040755), b""), "unsafe member"),
+        (("C:evil", b"x"), "unsafe member"),
+        (("sub\\evil", b"x"), "unsafe member"),
+        (("zeros", b"\0" * (2 * 1024 * 1024)), "uncompressed size or ratio limit"),
+    ],
+    ids=["symlink", "directory", "drive", "backslash", "ratio"],
+)
+def test_reader_refuses_each_unsafe_member(
+    extra: tuple[ZipInfo | str, bytes], message: str
+) -> None:
+    assert parse_archive(_zip([*_signed_members(), extra]))[1] == (
+        ArchiveError("archive", message),
+    )
+
+
+def test_reader_refuses_an_encrypted_member() -> None:
+    data = bytearray(_zip([*_signed_members(), ("secret", b"x")]))
+    # zipfile cannot write encrypted members: set bit 0 of the general-purpose flags in the
+    # central directory entry of the last member (signature PK\x01\x02, flags at offset 8).
+    entry = data.rindex(b"PK\x01\x02")
+    data[entry + 8] |= 1
+    assert parse_archive(bytes(data))[1] == (ArchiveError("archive", "unsafe member"),)
+
+
+def test_reader_refuses_other_methods_duplicates_and_too_many_members() -> None:
+    bz = _zip([*_signed_members(), ("notes.txt", b"x")], compression=ZIP_BZIP2)
+    assert parse_archive(bz)[1] == (ArchiveError("archive", "unsafe member"),)
+    members = _signed_members()
+    with pytest.warns(UserWarning, match="Duplicate name"):
+        duplicated = _zip([*members, members[-1]])
+    assert parse_archive(duplicated)[1] == (ArchiveError("archive", "duplicate member names"),)
+    many = _zip([*members, *((f"extra{n}.txt", b"x") for n in range(60))])
+    assert parse_archive(many)[1] == (ArchiveError("archive", "too many members"),)
+
+
+@pytest.mark.parametrize("limit", ["MAX_MEMBER_BYTES", "MAX_TOTAL_BYTES"])
+def test_reader_stops_at_the_size_limits(monkeypatch: pytest.MonkeyPatch, limit: str) -> None:
+    import assetboard.domain.archive as archive
+
+    monkeypatch.setattr(archive, limit, 100)
+    data = _zip(_signed_members(), compression=ZIP_STORED)
+    assert parse_archive(data)[1] == (ArchiveError("archive", "uncompressed size or ratio limit"),)
+
+
+def test_reader_warns_about_unlisted_files() -> None:
+    parsed, errors = parse_archive(_zip([*_signed_members(), ("README.txt", b"notes")]))
+    assert not errors and parsed is not None
+    assert parsed.warnings == (ArchiveError("README.txt", "unknown file ignored"),)
+
+
+def test_reader_refuses_listed_files_that_are_missing() -> None:
+    import json
+
+    members = dict(_signed_members())
+    manifest = json.loads(members["manifest.json"])
+    manifest["files"].append({"path": "gone.csv", "sha256": "0", "rows": 0, "bytes": 0})
+    members["manifest.json"] = json.dumps(manifest).encode()
+    errors = parse_archive(_zip(list(members.items())))[1]
+    assert errors == (ArchiveError("manifest.json", "invalid file list"),)
+
+
+@pytest.mark.parametrize(
+    ("file", "old", "new"),
+    [
+        ("categories.csv", b",0,", b"," + b"9" * 5000 + b","),
+        ("categories.csv", b",0,", b",1234567890,"),
+        ("transactions.csv", b"2026-09-03T07:12:44Z", b"0001-01-01T00:00:00+01:00"),
+        ("transactions.csv", b"2026-09-03T07:12:44Z", b"9999-12-31T23:59:59-01:00"),
+        ("workspace.json", b'"auto_copy_plan"', b'"x":' + b"9" * 5000 + b',"auto_copy_plan"'),
+        ("workspace.json", b"{", b'{"x":' + b"[" * 100_000 + b"]" * 100_000 + b","),
+    ],
+    ids=["huge-sort", "long-sort", "early-ts", "late-ts", "huge-int", "deep-json"],
+)
+def test_reader_reports_hostile_values_as_errors(file: str, old: str, new: str) -> None:
+    files = _files()
+    assert old in files[file]
+    files[file] = files[file].replace(old, new, 1)
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None and errors
+
+
+@pytest.mark.parametrize(
+    "manifest",
+    [
+        b"[" * 100_000 + b"]" * 100_000,
+        b'{"format":' + b"1" * 5000 + b"}",
+        b'{"format":"workspace-archive","format_version":"1.0",'
+        b'"exported_at":"9999-12-31T23:59:59-01:00"}',
+    ],
+    ids=["deep", "huge-int", "late-ts"],
+)
+def test_reader_reports_a_hostile_manifest_as_an_error(manifest: bytes) -> None:
+    members = dict(_signed_members())
+    members["manifest.json"] = manifest
+    parsed, errors = parse_archive(_zip(list(members.items())))
+    assert parsed is None and errors and errors[0].file == "manifest.json"
+
+
+def test_reader_caps_errors(monkeypatch: pytest.MonkeyPatch) -> None:
+    import assetboard.domain.archive as archive
+
+    monkeypatch.setattr(archive, "MAX_ERRORS", 5)
+    files = _files()
+    files["months.csv"] = b"month\r\n" + b"bad\r\n" * 50
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    assert len(errors) == 6
+    assert errors[-1] == ArchiveError("archive", "too many errors; later rows were not checked")
+
+
+def test_reader_caps_data_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    import assetboard.domain.archive as archive
+
+    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 4)
+    assert parse_archive(_archive())[1] == ()
+    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 3)
+    assert parse_archive(_archive())[1] == (ArchiveError("archive", "too many data rows"),)

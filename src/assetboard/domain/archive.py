@@ -39,6 +39,16 @@ CSV_COLUMNS = {
 FILE_ORDER = ("workspace.json", *CSV_COLUMNS)
 REQUIRED_FILES = ("manifest.json", *FILE_ORDER)
 
+# Reader limits for untrusted archives (F4.2 "ZIP safety"); the reader stops at each of them.
+MAX_MEMBERS = 64
+MAX_MEMBER_BYTES = 100 * 1024 * 1024
+MAX_TOTAL_BYTES = 200 * 1024 * 1024
+MAX_COMPRESSION_RATIO = 200
+RATIO_EXEMPT_BYTES = 1024 * 1024
+MAX_DATA_ROWS = 1_000_000
+MAX_COLUMNS = 64
+MAX_ERRORS = 1000
+
 
 @dataclass(frozen=True, slots=True)
 class CategoryRow:
@@ -246,7 +256,7 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
             if not set(REQUIRED_FILES) <= set(names):
                 return None, (ArchiveError("archive", "missing required members"),)
             # F4.2's documented limits also bound this shared reader before upload exists.
-            if len(names) > 64:
+            if len(names) > MAX_MEMBERS:
                 return None, (ArchiveError("archive", "too many members"),)
             files: dict[str, bytes] = {}
             total = 0
@@ -260,12 +270,15 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
                 ):
                     return None, (ArchiveError("archive", "unsafe member"),)
                 with archive.open(info) as member:
-                    content = member.read(100 * 1024 * 1024 + 1)
+                    content = member.read(MAX_MEMBER_BYTES + 1)
                 total += len(content)
                 if (
-                    len(content) > 100 * 1024 * 1024
-                    or total > 200 * 1024 * 1024
-                    or (len(content) >= 1024 * 1024 and len(content) > info.compress_size * 200)
+                    len(content) > MAX_MEMBER_BYTES
+                    or total > MAX_TOTAL_BYTES
+                    or (
+                        len(content) >= RATIO_EXEMPT_BYTES
+                        and len(content) > info.compress_size * MAX_COMPRESSION_RATIO
+                    )
                 ):
                     return None, (ArchiveError("archive", "uncompressed size or ratio limit"),)
                 files[info.filename] = content
@@ -280,7 +293,7 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
         return None, (ArchiveError("archive", str(exc)),)
     try:
         loaded_manifest: object = json.loads(files["manifest.json"])
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except (ValueError, RecursionError):  # also over-long integers and deep nesting
         return None, (ArchiveError("manifest.json", "invalid JSON"),)
     manifest = _string_keyed_object(loaded_manifest)
     if manifest is None:
@@ -288,11 +301,13 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
     if manifest.get("format") != FORMAT:
         return None, (ArchiveError("manifest.json", "unsupported archive format"),)
     version = manifest.get("format_version")
-    if not isinstance(version, str) or not re.fullmatch(r"1\.[0-9]+", version):
+    if not isinstance(version, str) or not re.fullmatch(r"1\.[0-9]{1,4}", version):
         return None, (ArchiveError("manifest.json", "unsupported archive version"),)
     warnings = [
         ArchiveError(name, "unknown file ignored") for name in names if name not in REQUIRED_FILES
     ]
+    if int(version.partition(".")[2]) > int(FORMAT_VERSION.partition(".")[2]):
+        warnings.append(ArchiveError("manifest.json", f"newer minor version: {version}"))
     warnings.extend(
         ArchiveError("manifest.json", f"unknown key: {key}")
         for key in manifest.keys()
@@ -322,14 +337,18 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
         if not isinstance(path, str):
             return None, (ArchiveError("manifest.json", "invalid file path"),)
         expected[path] = entry
-    if len(expected) != len(entries) or set(expected) != set(files) - {"manifest.json"}:
+    # Unlisted extra members are only warned about above (ADR-0016: readers ignore what they
+    # do not know); every listed file must exist and every data file must be listed.
+    if (
+        len(expected) != len(entries)
+        or "manifest.json" in expected
+        or not set(FILE_ORDER) <= set(expected)
+        or not set(expected) <= set(files)
+    ):
         return None, (ArchiveError("manifest.json", "invalid file list"),)
     errors: list[ArchiveError] = []
-    for name in expected:
-        entry = expected.get(name)
-        if entry is None:
-            errors.append(ArchiveError(name, "missing manifest entry"))
-            continue
+    data_rows = 0
+    for name, entry in expected.items():
         raw = files[name]
         if entry.get("sha256") != hashlib.sha256(raw).hexdigest():
             errors.append(ArchiveError(name, "checksum mismatch"))
@@ -346,11 +365,14 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
             else:
                 if entry.get("rows") != rows:
                     errors.append(ArchiveError(name, "row count mismatch"))
+                data_rows += rows
     if errors:
         return None, tuple(errors)
+    if data_rows > MAX_DATA_ROWS:
+        return None, (ArchiveError("archive", "too many data rows"),)
     try:
         workspace = _string_keyed_object(json.loads(files["workspace.json"]))
-    except (UnicodeDecodeError, json.JSONDecodeError):
+    except (ValueError, RecursionError):
         workspace = None
     if workspace is None:
         return None, (ArchiveError("workspace.json", "invalid JSON object"),)
@@ -385,7 +407,10 @@ def _parse_timestamp(value: str) -> str:
         value,
     ):
         raise ValueError("invalid timestamp")
-    result = _timestamp(datetime.fromisoformat(value))
+    try:
+        result = _timestamp(datetime.fromisoformat(value))
+    except OverflowError:  # an offset that moves year 1 or 9999 out of range
+        raise ValueError("invalid timestamp") from None
     assert result is not None
     return result
 
@@ -427,7 +452,7 @@ def _validate_cell(column: str, value: str, currency: str) -> str:
         if value and not re.fullmatch(r"#[0-9a-f]{6}", value):
             raise ValueError("invalid color")
         return value or "#16a34a"
-    if column == "sort_order" and (not value.isascii() or not value.isdigit()):
+    if column == "sort_order" and not re.fullmatch(r"[0-9]{1,9}", value):
         raise ValueError("invalid sort order")
     return value
 
@@ -456,7 +481,11 @@ def _read_rows(
                 io.StringIO(files[name].decode("utf-8-sig"), newline=""), strict=True
             )
             header = next(reader, list[str]())
-            if len(header) != len(set(header)) or not _REQUIRED_COLUMNS[name] <= set(header):
+            if (
+                len(header) > MAX_COLUMNS
+                or len(header) != len(set(header))
+                or not _REQUIRED_COLUMNS[name] <= set(header)
+            ):
                 errors.append(ArchiveError(name, "invalid or missing header", 1))
                 continue
             warnings.extend(
@@ -465,6 +494,8 @@ def _read_rows(
                 if key not in columns
             )
             for index, cells in enumerate(reader):
+                if len(errors) >= MAX_ERRORS:
+                    break
                 line = reader.line_num
                 if len(cells) != len(header):
                     errors.append(ArchiveError(name, "wrong number of cells", line))
@@ -485,6 +516,10 @@ def _read_rows(
                     rows.append(row)
         except (UnicodeDecodeError, csv.Error) as exc:
             errors.append(ArchiveError(name, str(exc)))
+    if len(errors) >= MAX_ERRORS:
+        # The rows are incomplete, so cross-file checks would only add noise.
+        errors.append(ArchiveError("archive", "too many errors; later rows were not checked"))
+        return ArchiveRows(workspace, (), (), (), ())
     categories = tables["categories.csv"]
     by_id = {row["id"]: row for row in categories}
     if len(by_id) != len(categories):
