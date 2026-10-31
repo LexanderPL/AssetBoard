@@ -92,7 +92,7 @@ def test_income_source_golden_example_generates_tax_payment(team: WorkspaceDb) -
         due_month_offset=0,
         generate_payment=True,
     )
-    assert not income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("19"))
+    income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("19"))
 
     with team.factory() as session:
         parent = ScheduledOccurrenceRepository(session, ctx).for_income_work_month(
@@ -113,7 +113,7 @@ def test_income_source_golden_example_generates_tax_payment(team: WorkspaceDb) -
     # The label is in the workspace language; a recalculation renames pending payments.
     with team.factory.begin() as session:
         CurrentWorkspaceRepository(session, ctx).update(locale="pl")
-    assert not income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("19"))
+    income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("19"))
     with team.factory() as session:
         repository = ScheduledOccurrenceRepository(session, ctx)
         parent = repository.for_income_work_month(source_id, date(2026, 8, 1))
@@ -163,13 +163,34 @@ def test_posted_income_occurrence_is_not_recalculated(team: WorkspaceDb) -> None
         amount_minor=amount,
         day=date(2026, 9, 10),
     )
-    assert income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("7"))
+    # The month's income is received: its log is locked, nothing changes.
+    with pytest.raises(income.WorkLogLocked) as locked:
+        income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("7"))
+    assert locked.value.code == "posted_locked"
+    assert locked.value.transaction_date == date(2026, 9, 10)
     with team.factory() as session:
         stored = session.scalar(
             select(ScheduledOccurrence).where(ScheduledOccurrence.id == occurrence_id)
         )
         assert stored is not None and stored.expected_minor == amount
         assert stored.status == "posted"
+        assert locked.value.transaction_id == stored.transaction_id
+        audit = session.scalars(
+            select(AuditEvent.action).where(AuditEvent.action.like("work_log.%"))
+        ).all()
+        assert "work_log.updated_after_posting" not in audit
+    listed = next(row for row in income.list_sources(team.factory, ctx) if row.id == source_id)
+    assert listed.locked_months == frozenset({date(2026, 8, 1)})
+    assert [log.units for log in listed.work_logs] == [Decimal("2")]
+
+    # Other months stay editable, and a changed log recalculates the pending occurrence.
+    income.log_work(team.factory, ctx, source_id, date(2026, 9, 1), Decimal("3"))
+    income.log_work(team.factory, ctx, source_id, date(2026, 9, 1), Decimal("4"))
+    with team.factory() as session:
+        september = ScheduledOccurrenceRepository(session, ctx).for_income_work_month(
+            source_id, date(2026, 9, 1)
+        )
+        assert september is not None and september.expected_minor == 40_000
 
 
 def test_missing_work_log_tracks_pay_month_and_disappears_after_logging(

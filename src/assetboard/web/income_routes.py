@@ -40,7 +40,7 @@ from assetboard.services.categories import CategoryList, list_categories
 from assetboard.services.context import Context, Role, has_role, require_role
 from assetboard.web.context import CurrentContext
 from assetboard.web.errors import is_htmx_fragment_request
-from assetboard.web.rendering import render_template
+from assetboard.web.rendering import render_template, scoped_url
 from assetboard.web.security import require_csrf
 from assetboard.web.tax_routes import rate_label
 
@@ -94,6 +94,7 @@ ERRORS = {
         "The work log was saved; posted income was not changed. "
         "Adjust its transaction manually if needed."
     ),
+    "posted_locked": _("This month's income is already received. Edit the transaction instead."),
     "missing_name": _("Enter a name."),
     "invalid_unit": _("Enter what you are paid per, for example day or hour."),
     "invalid_average": _("Enter a number of months between 1 and 24."),
@@ -172,11 +173,21 @@ def _format_work_month(work_month: date, locale: str) -> str:
     return format_month(YearMonth.from_date(work_month), locale)
 
 
-def _redirect(request: Request, error: str | None = None, form: str | None = None) -> Response:
+def _redirect(
+    request: Request,
+    error: str | None = None,
+    form: str | None = None,
+    *,
+    extra: dict[str, str] | None = None,
+    anchor: str = "",
+) -> Response:
     """Back to the sources page; ``form`` names the collapsed form to reopen with the error."""
     target = request.url_for("income_sources").path
-    query = ({"error": error} | ({"form": form} if form else {})) if error else {}
-    return RedirectResponse(target + ("?" + urlencode(query) if query else ""), status_code=303)
+    query = ({"error": error} | ({"form": form} if form else {}) | (extra or {})) if error else {}
+    fragment = f"#{anchor}" if anchor else ""
+    return RedirectResponse(
+        target + ("?" + urlencode(query) if query else "") + fragment, status_code=303
+    )
 
 
 async def _form(request: Request) -> dict[str, str]:
@@ -209,6 +220,29 @@ def _error_text(request: Request, error: str | None) -> str | None:
     return gettext(ERRORS.get(error, ERRORS["failed"]), request.state.locale)
 
 
+def _locked_href(request: Request) -> str | None:
+    """The posted transaction's edit link after a refused work log (``?tx=<id>&tx_month=``)."""
+    if request.query_params.get("error") != "posted_locked":
+        return None
+    try:
+        transaction_id = UUID(request.query_params.get("tx", ""))
+        month = YearMonth.parse(request.query_params.get("tx_month", ""))
+    except ValueError:
+        return None
+    path = scoped_url(request, "transactions_month", month=str(month))
+    return f"{path}?{urlencode({'edit': str(transaction_id)})}#tx-{transaction_id}"
+
+
+def _log_prefill(request: Request) -> tuple[str | None, date | None]:
+    """``?log=<source id>&month=YYYY-MM`` opens that source's Log form for the month."""
+    source = request.query_params.get("log")
+    try:
+        month = YearMonth.parse(request.query_params.get("month", "")).first_day
+    except ValueError:
+        month = None
+    return (source if source else None), month
+
+
 def _load_page_data(
     request: Request, ctx: Context
 ) -> tuple[list[income.IncomeSourceView], CategoryList, list[taxes.TaxRuleView]]:
@@ -223,6 +257,10 @@ def _load_page_data(
 @router.get("/income", name="income_sources")
 async def sources_page(request: Request, ctx: CurrentContext) -> Response:
     rows, categories, rules = await run_in_threadpool(_load_page_data, request, ctx)
+    log_source, log_month = _log_prefill(request)
+    open_form = request.query_params.get("form")
+    if log_source is not None and not open_form:
+        open_form = f"log-{log_source}"
     return render_template(
         request,
         "income/sources.html",
@@ -234,8 +272,10 @@ async def sources_page(request: Request, ctx: CurrentContext) -> Response:
             "rules_by_id": {rule.id: rule for rule in rules},
             "withheld_ids": {rule.id for rule in rules if rule.kind == TaxKind.PAYER_WITHHELD},
             "error": _error_text(request, request.query_params.get("error")),
+            "error_href": _locked_href(request),
             # ``form`` reopens a collapsed form: after an error, or from a "Choose taxes" link.
-            "open_form": request.query_params.get("form"),
+            "open_form": open_form,
+            "log_month": log_month,
             **_common(request, ctx),
         },
     )
@@ -722,10 +762,13 @@ async def save_taxes(request: Request, ctx: CurrentContext, source_id: str) -> R
 
 @router.post("/income/{source_id}/work-logs", name="income_work_log")
 async def save_work_log(request: Request, ctx: CurrentContext, source_id: str) -> Response:
+    """Add or change a month's work log (the Log form, or a payment row's inline Edit)."""
     values = await _form(request)
+    form = f"log-{source_id}"
+    anchor = f"income-source-{source_id}"
     try:
         units = parse_amount(values.get("units", ""), request.state.locale)
-        posted = await run_in_threadpool(
+        await run_in_threadpool(
             income.log_work,
             request.app.state.session_factory,
             ctx,
@@ -733,13 +776,21 @@ async def save_work_log(request: Request, ctx: CurrentContext, source_id: str) -
             _required_month(values, "work_month"),
             units,
         )
+    except income.WorkLogLocked as exc:
+        extra = (
+            {
+                "tx": str(exc.transaction_id),
+                "tx_month": str(YearMonth.from_date(exc.transaction_date)),
+            }
+            if exc.transaction_id is not None and exc.transaction_date is not None
+            else {}
+        )
+        return _redirect(request, exc.code, form, extra=extra, anchor=anchor)
     except income.IncomeError as exc:
-        return _redirect(request, exc.code)
+        return _redirect(request, exc.code, form, anchor=anchor)
     except ValueError:
-        return _redirect(request, "invalid_units")
-    if posted:
-        return _redirect(request, "posted")
-    return _redirect(request)
+        return _redirect(request, "invalid_units", form, anchor=anchor)
+    return _redirect(request, anchor=anchor)
 
 
 # F3.7 work calendar

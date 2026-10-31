@@ -891,3 +891,88 @@ document.addEventListener("htmx:afterSettle", (event) => {
   const heading = ledger?.querySelector("h2");
   if (heading instanceof HTMLElement) heading.focus();
 });
+
+// Inline edit (the Income page's logged units): a <details data-inline-edit> expands a small
+// form in the page flow. Opening it focuses the first field; Escape inside it, or its Cancel
+// button (data-details-close), closes it and restores the values it was rendered with.
+document.addEventListener(
+  "toggle",
+  (event) => {
+    const details = event.target;
+    if (!(details instanceof HTMLDetailsElement) || !details.hasAttribute("data-inline-edit")) {
+      return;
+    }
+    if (details.open) {
+      const input = details.querySelector("[data-inline-edit-input]");
+      if (input instanceof HTMLInputElement) {
+        input.focus();
+        input.select();
+      }
+    } else {
+      details.querySelector("form")?.reset();
+    }
+  },
+  true,
+);
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || event.defaultPrevented) return;
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const details = target.closest("details[data-inline-edit][open]");
+  if (!(details instanceof HTMLDetailsElement)) return;
+  event.preventDefault();
+  details.open = false;
+  details.querySelector("form")?.reset();
+  const summary = details.querySelector(":scope > summary");
+  if (summary instanceof HTMLElement) summary.focus();
+});
+
+// The Income page's "Log days worked" form: when the chosen month already has a log, its units
+// fill the field and the button says "Update" (the logs are hidden data-existing-log elements).
+// A month from the work calendar or with income already received shows why it cannot change.
+function syncLogForm(form) {
+  const month = form.querySelector("select[name='work_month_month']");
+  const year = form.querySelector("select[name='work_month_year']");
+  const units = form.querySelector("[data-log-units]");
+  const submit = form.querySelector("[data-log-submit]");
+  const hint = form.querySelector("[data-log-hint]");
+  if (!(month instanceof HTMLSelectElement) || !(year instanceof HTMLSelectElement)) return;
+  if (!(units instanceof HTMLInputElement) || !(submit instanceof HTMLElement)) return;
+  const key = `${year.value}-${month.value.padStart(2, "0")}`;
+  const log = Array.from(form.querySelectorAll("[data-existing-log]")).find(
+    (element) => element.getAttribute("data-existing-log") === key,
+  );
+  const state = log?.getAttribute("data-state") ?? "";
+  if (state === "manual") {
+    units.value = log?.getAttribute("data-units") ?? "";
+    units.dataset.filled = units.value;
+  } else if (units.dataset.filled !== undefined && units.value === units.dataset.filled) {
+    // Only a value this script (or the server) filled in is cleared, never a typed one.
+    units.value = "";
+    delete units.dataset.filled;
+  }
+  const label = form.getAttribute(state === "manual" ? "data-label-update" : "data-label-save");
+  if (label) submit.textContent = label;
+  if (hint instanceof HTMLElement) {
+    let text = "";
+    if (state === "locked") text = form.getAttribute("data-hint-locked") ?? "";
+    if (state === "derived") text = form.getAttribute("data-hint-derived") ?? "";
+    hint.textContent = text;
+    hint.hidden = !text;
+  }
+}
+
+document.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof HTMLSelectElement) || !target.name.startsWith("work_month_")) return;
+  const form = target.closest("form[data-log-form]");
+  if (form instanceof HTMLFormElement) syncLogForm(form);
+});
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.querySelectorAll("form[data-log-form]").forEach((form) => {
+    const units = form.querySelector("[data-log-units]");
+    if (units instanceof HTMLInputElement && units.value) units.dataset.filled = units.value;
+  });
+});

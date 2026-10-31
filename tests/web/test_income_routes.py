@@ -63,8 +63,12 @@ def test_income_source_and_work_log_forms(owner):
     assert page.status_code == 200
     assert "Contract work" in page.text
     assert 'name="record_as"' not in page.text
-    assert f"{month:%B %Y} · 7.5" in page.text
+    assert f"{month:%B %Y} · <span data-logged-units>7.5" in page.text
     assert "data-work-logs" not in page.text
+    # The logged month has an inline Edit; the Log form for this month says "Update".
+    assert f'data-log-edit="{month:%Y-%m}"' in page.text
+    assert f'data-existing-log="{month:%Y-%m}" data-units="7.5" data-state="manual"' in page.text
+    assert ">Update</button>" in page.text
 
 
 def test_income_forms_require_csrf(owner):
