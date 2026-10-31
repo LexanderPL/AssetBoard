@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import urllib.request
 from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock
 
@@ -260,7 +261,7 @@ def test_the_job_survives_an_unexpected_error(db: WorkspaceDb) -> None:
 
 def test_the_github_source_sends_only_a_user_agent(monkeypatch: pytest.MonkeyPatch) -> None:
     """The real client, with the opener replaced: the request it would send, no network."""
-    sent: list[object] = []
+    sent: list[tuple[urllib.request.Request, float]] = []
 
     class Response:
         status = 200
@@ -275,7 +276,7 @@ def test_the_github_source_sends_only_a_user_agent(monkeypatch: pytest.MonkeyPat
             return release_body("v0.3.7")
 
     class Opener:
-        def open(self, request: object, timeout: float) -> Response:
+        def open(self, request: urllib.request.Request, timeout: float) -> Response:
             sent.append((request, timeout))
             return Response()
 
@@ -284,10 +285,10 @@ def test_the_github_source_sends_only_a_user_agent(monkeypatch: pytest.MonkeyPat
     assert parse_release(source.fetch_latest_release()) == "v0.3.7"
     [(request, timeout)] = sent
     assert timeout == 5.0
-    assert request.full_url == (  # type: ignore[attr-defined]
+    assert request.full_url == (
         "https://api.github.com/repos/LexanderPL/AssetBoard/releases/latest"
     )
-    headers = {k.lower(): v for k, v in request.header_items()}  # type: ignore[attr-defined]
+    headers = {k.lower(): v for k, v in request.header_items()}
     assert headers["user-agent"] == "AssetBoard"
     assert "cookie" not in headers and "authorization" not in headers
-    assert request.data is None  # type: ignore[attr-defined]
+    assert request.data is None
