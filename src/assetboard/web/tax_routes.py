@@ -1,6 +1,9 @@
+"""The Taxes page, the new/edit tax page with its example panel, and other taxes (ADR-0022)."""
+
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 from urllib.parse import urlencode
 from uuid import UUID
 
@@ -11,13 +14,22 @@ from starlette.responses import RedirectResponse, Response
 from assetboard.db.repositories import NotFound
 from assetboard.domain.money import Money
 from assetboard.domain.percent_or_fixed import PercentOrFixed
-from assetboard.domain.taxes import RecordAs
-from assetboard.domain.transactions import MAX_AMOUNT_MINOR, amount_minor
+from assetboard.domain.recurrence import Frequency, RecurrenceRule
+from assetboard.domain.taxes import PaymentTiming, TaxBase, TaxKind
+from assetboard.domain.transactions import MAX_AMOUNT_MINOR, TransactionDirection, amount_minor
 from assetboard.i18n import gettext
-from assetboard.i18n.dates import format_day
-from assetboard.i18n.numbers import format_amount_input, format_rate_basis_points, parse_amount
-from assetboard.services import taxes
-from assetboard.services.context import Role, has_role
+from assetboard.i18n.dates import format_day, format_day_of_month
+from assetboard.i18n.numbers import (
+    format_amount_input,
+    format_money,
+    format_quantity_input,
+    format_rate_basis_points,
+    format_rate_short,
+    parse_amount,
+)
+from assetboard.services import scheduled, taxes
+from assetboard.services.categories import list_categories
+from assetboard.services.context import Context, Role, has_role
 from assetboard.web.context import CurrentContext
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
@@ -31,16 +43,35 @@ def _(message: str) -> str:
 
 ERRORS = {
     "invalid_name": _("Enter a name."),
-    "invalid_rule": _("Choose a valid tax effect and base."),
-    "invalid_date": _("Enter a valid effective date between 1900 and 2199."),
+    "invalid_rule": _("Choose who pays the tax to the tax office."),
+    "invalid_date": _("Enter a valid date between 1900 and 2199."),
     "invalid_rate": _("Enter a non-negative percentage with at most two decimal places."),
     "invalid_value": _("Enter a non-negative fixed amount in the workspace currency."),
-    "invalid_amount": _("Enter a non-negative net amount in the workspace currency."),
-    "version_not_newer": _("A new version must start after the latest existing version."),
-    "archived": _("Archived tax rules cannot be changed."),
-    "invalid_record_as": _("Choose how the income is recorded."),
-    "failed": _("The tax rule could not be saved. Check the form and try again."),
+    "invalid_schedule": _("Enter a payment day between 1 and 31 and choose the month."),
+    "invalid_category": _("Choose an expense category that is not a transfer."),
+    "version_not_newer": _("A rate change must start after the latest rate."),
+    "archived": _("Archived taxes cannot be changed."),
+    "kind_locked": _(
+        "Income already posted was calculated with this tax, so who pays it and its base "
+        "cannot change. Create a new tax instead."
+    ),
+    "invalid_other_tax": _("Enter a name, a positive amount, a due date and a category."),
+    "failed": _("The tax could not be saved. Check the form and try again."),
 }
+
+# "How often" choices for other taxes: (frequency, interval).
+OTHER_FREQUENCIES: dict[str, tuple[Frequency, int]] = {
+    "yearly": (Frequency.YEARLY, 1),
+    "quarterly": (Frequency.MONTHLY, 3),
+    "monthly": (Frequency.MONTHLY, 1),
+    "once": (Frequency.ONCE, 1),
+}
+
+
+def _require_taxes(ctx: Context) -> None:
+    """Tax pages exist only while the workspace's Taxes switch is on."""
+    if not ctx.workspace.taxes_enabled:
+        raise NotFound
 
 
 def _id(value: str) -> UUID:
@@ -48,6 +79,13 @@ def _id(value: str) -> UUID:
         return UUID(value)
     except ValueError:
         raise NotFound from None
+
+
+def _optional_id(value: str) -> UUID | None:
+    try:
+        return UUID(value) if value else None
+    except ValueError:
+        return None
 
 
 async def _values(request: Request) -> dict[str, str]:
@@ -89,87 +127,260 @@ def _day(value: str) -> date:
         raise taxes.TaxRuleError("invalid_date") from None
 
 
+def _int(value: str, default: int = 0) -> int:
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
+def _error(request: Request, code: str | None) -> str | None:
+    if not code:
+        return None
+    return gettext(ERRORS.get(code, ERRORS["failed"]), request.state.locale)
+
+
 def _redirect(request: Request, error: str | None = None, form: str | None = None) -> Response:
-    """Back to the rules page; ``form`` names the collapsed form to reopen with the error."""
+    """Back to the Taxes page; ``form`` names the collapsed form to reopen with the error."""
     target = request.url_for("tax_rules").path
     query = ({"error": error} | ({"form": form} if form else {})) if error else {}
     return RedirectResponse(target + ("?" + urlencode(query) if query else ""), status_code=303)
 
 
-@router.post("/taxes/warning/dismiss", name="tax_warning_dismiss")
-async def dismiss_warning(request: Request, ctx: CurrentContext) -> Response:
-    """Close the tax pages' warning for this account; back to the page the button was on."""
-    values = await _values(request)
-    await run_in_threadpool(taxes.dismiss_warning, request.app.state.session_factory, ctx.user.id)
-    route = "tax_calculator" if values.get("page") == "calculator" else "tax_rules"
-    return RedirectResponse(request.url_for(route).path, status_code=303)
+def _rate_label(value: PercentOrFixed | None, locale: str) -> str:
+    if value is None:
+        return ""
+    if value.mode == "percent":
+        assert value.rate_bp is not None
+        return format_rate_short(value.rate_bp, locale)
+    assert value.fixed is not None
+    return format_money(value.fixed, locale)
+
+
+def _common(request: Request) -> dict[str, object]:
+    return {
+        "format_day": format_day,
+        "format_day_of_month": format_day_of_month,
+        "format_money": format_money,
+        "format_amount_input": format_amount_input,
+        "format_rate_basis_points": format_rate_basis_points,
+        "rate_label": _rate_label,
+    }
 
 
 @router.get("/taxes", name="tax_rules")
 async def rules_page(request: Request, ctx: CurrentContext) -> Response:
-    rows = await run_in_threadpool(taxes.list_rules, request.app.state.session_factory, ctx)
+    _require_taxes(ctx)
+    factory = request.app.state.session_factory
+    rows, others, categories = await run_in_threadpool(
+        lambda: (
+            taxes.list_rules(factory, ctx),
+            scheduled.list_tax_items(factory, ctx),
+            list_categories(factory, ctx),
+        )
+    )
     error = request.query_params.get("error")
     return render_template(
         request,
         "taxes/rules.html",
         context={
-            "rules": rows,
+            "rules": [rule for rule in rows if not rule.archived],
+            "archived_rules": [rule for rule in rows if rule.archived],
+            "others": others,
+            "expense_categories": [
+                category
+                for category in categories.expense
+                if category.treatment != "transfer" and not category.archived
+            ],
             "can_edit": has_role(ctx, Role.EDITOR),
-            "error": gettext(ERRORS.get(error, ERRORS["failed"]), request.state.locale)
-            if error
-            else None,
+            "error": _error(request, error),
             "open_form": request.query_params.get("form") if error else None,
             "today": ctx.clock.today(ctx.workspace.timezone).isoformat(),
-            "format_day": format_day,
-            "format_amount_input": format_amount_input,
-            "format_rate_basis_points": format_rate_basis_points,
+            **_common(request),
         },
+    )
+
+
+@router.get("/taxes/calculator", name="tax_calculator")
+async def calculator(request: Request, ctx: CurrentContext) -> Response:
+    """The former calculator page: its function is the example panel of the tax form now."""
+    return RedirectResponse(request.url_for("tax_rules").path, status_code=303)
+
+
+def _form_values(values: dict[str, str]) -> dict[str, str]:
+    """The tax form's submitted values with defaults, for re-rendering and the example."""
+    return {
+        "name": values.get("name", ""),
+        "kind": values.get("kind", TaxKind.SELF_PAID.value),
+        "base": values.get("base", TaxBase.NET.value),
+        "mode": values.get("mode", "percent"),
+        "rate_percent": values.get("rate_percent", ""),
+        "fixed_amount": values.get("fixed_amount", ""),
+        "payment_day": values.get("payment_day", "10"),
+        "payment_timing": values.get("payment_timing", PaymentTiming.NEXT_MONTH.value),
+        "payment_category_id": values.get("payment_category_id", ""),
+    }
+
+
+def _example(request: Request, ctx: Context, values: dict[str, str]) -> taxes.TaxExample | None:
+    """The example for the form's values; None while they are incomplete or invalid."""
+    try:
+        return taxes.example(
+            ctx,
+            name=values["name"].strip() or gettext(_("This tax"), request.state.locale),
+            kind=TaxKind(values["kind"]),
+            base=TaxBase(values["base"]),
+            value=_value(values, request.state.locale, ctx.workspace.base_currency),
+            payment_day=_int(values["payment_day"], 10),
+            payment_timing=PaymentTiming(values["payment_timing"]),
+        )
+    except (taxes.TaxRuleError, ValueError):
+        return None
+
+
+async def _render_form(
+    request: Request,
+    ctx: Context,
+    values: dict[str, str],
+    *,
+    rule: taxes.TaxRuleView | None = None,
+    error: str | None = None,
+    status_code: int = 200,
+) -> Response:
+    categories = await run_in_threadpool(list_categories, request.app.state.session_factory, ctx)
+    return render_template(
+        request,
+        "taxes/form.html",
+        context={
+            "values": values,
+            "rule": rule,
+            "example": _example(request, ctx, values),
+            "expense_categories": [
+                category
+                for category in categories.expense
+                if category.treatment != "transfer"
+                and (not category.archived or str(category.id) == values["payment_category_id"])
+            ],
+            "error": _error(request, error),
+            **_common(request),
+        },
+        status_code=status_code,
+    )
+
+
+@router.get("/taxes/new", name="tax_rule_new")
+async def new_page(request: Request, ctx: CurrentContext) -> Response:
+    _require_taxes(ctx)
+    return await _render_form(request, ctx, _form_values({}))
+
+
+@router.post("/taxes/example", name="tax_example")
+async def example_partial(request: Request, ctx: CurrentContext) -> Response:
+    """The example panel for the form's current values (htmx swaps it on change)."""
+    _require_taxes(ctx)
+    values = _form_values(await _values(request))
+    return render_template(
+        request,
+        "taxes/_example.html",
+        context={"example": _example(request, ctx, values), "values": values, **_common(request)},
     )
 
 
 @router.post("/taxes", name="tax_rule_create")
 async def create(request: Request, ctx: CurrentContext) -> Response:
-    values = await _values(request)
+    _require_taxes(ctx)
+    values = _form_values(await _values(request))
     try:
+        value = _value(values, request.state.locale, ctx.workspace.base_currency)
         await run_in_threadpool(
             lambda: taxes.create_rule(
                 request.app.state.session_factory,
                 ctx,
-                name=values.get("name", ""),
-                effect=values.get("effect", ""),
-                base=values.get("base", ""),
-                notes=values.get("notes", ""),
-                effective_from=_day(values.get("effective_from", "")),
-                value=_value(values, request.state.locale, ctx.workspace.base_currency),
+                value=value,
+                name=values["name"],
+                kind=values["kind"],
+                base=values["base"],
+                payment_day=_int(values["payment_day"]),
+                payment_timing=values["payment_timing"],
+                payment_category_id=_optional_id(values["payment_category_id"]),
             )
         )
     except taxes.TaxRuleError as exc:
-        return _redirect(request, exc.code, "new-rule")
-    except ValueError:
-        return _redirect(request, "invalid_rule", "new-rule")
+        return await _render_form(request, ctx, values, error=exc.code, status_code=400)
     return _redirect(request)
+
+
+def _edit_values(rule: taxes.TaxRuleView, locale: str) -> dict[str, str]:
+    current = rule.current
+    rate = ""
+    fixed = ""
+    if current is not None and current.mode == "percent" and current.rate_bp is not None:
+        rate = format_quantity_input(Decimal(current.rate_bp).scaleb(-2), locale)
+    elif current is not None and current.fixed is not None:
+        fixed = format_amount_input(current.fixed, locale)
+    return {
+        "name": rule.name,
+        "kind": rule.kind.value,
+        "base": rule.base.value,
+        "mode": current.mode if current is not None else "percent",
+        "rate_percent": rate,
+        "fixed_amount": fixed,
+        "payment_day": str(rule.payment_day),
+        "payment_timing": rule.payment_timing.value,
+        "payment_category_id": str(rule.payment_category_id or ""),
+    }
+
+
+async def _rule_or_404(request: Request, ctx: Context, rule_id: str) -> taxes.TaxRuleView:
+    rule = await run_in_threadpool(
+        taxes.get_rule, request.app.state.session_factory, ctx, _id(rule_id)
+    )
+    if rule.archived:
+        raise NotFound
+    return rule
+
+
+@router.get("/taxes/{rule_id}/edit", name="tax_rule_edit")
+async def edit_page(request: Request, ctx: CurrentContext, rule_id: str) -> Response:
+    _require_taxes(ctx)
+    rule = await _rule_or_404(request, ctx, rule_id)
+    return await _render_form(request, ctx, _edit_values(rule, request.state.locale), rule=rule)
 
 
 @router.post("/taxes/{rule_id}/edit", name="tax_rule_update")
 async def update(request: Request, ctx: CurrentContext, rule_id: str) -> Response:
-    values = await _values(request)
+    _require_taxes(ctx)
+    rule = await _rule_or_404(request, ctx, rule_id)
+    submitted = await _values(request)
+    values = _form_values(submitted)
+    # The rate is not edited here (rate changes add versions): keep the stored one.
+    stored = _edit_values(rule, request.state.locale)
+    values.update({key: stored[key] for key in ("mode", "rate_percent", "fixed_amount")})
+    if rule.locked:
+        values.update({"kind": stored["kind"], "base": stored["base"]})
     try:
         await run_in_threadpool(
             lambda: taxes.update_rule(
                 request.app.state.session_factory,
                 ctx,
-                _id(rule_id),
-                name=values.get("name", ""),
-                notes=values.get("notes", ""),
+                rule.id,
+                name=values["name"],
+                kind=values["kind"],
+                base=values["base"],
+                notes=rule.notes,
+                payment_day=_int(values["payment_day"]),
+                payment_timing=values["payment_timing"],
+                payment_category_id=_optional_id(values["payment_category_id"]),
             )
         )
     except taxes.TaxRuleError as exc:
-        return _redirect(request, exc.code)
+        return await _render_form(request, ctx, values, rule=rule, error=exc.code, status_code=400)
     return _redirect(request)
 
 
 @router.post("/taxes/{rule_id}/versions", name="tax_rule_version")
 async def add_version(request: Request, ctx: CurrentContext, rule_id: str) -> Response:
+    _require_taxes(ctx)
     values = await _values(request)
     try:
         await run_in_threadpool(
@@ -182,14 +393,15 @@ async def add_version(request: Request, ctx: CurrentContext, rule_id: str) -> Re
             )
         )
     except taxes.TaxRuleError as exc:
-        return _redirect(request, exc.code)
+        return _redirect(request, exc.code, f"rates-{rule_id}")
     except ValueError:
-        return _redirect(request, "invalid_value")
+        return _redirect(request, "invalid_value", f"rates-{rule_id}")
     return _redirect(request)
 
 
 @router.post("/taxes/{rule_id}/archive", name="tax_rule_archive")
 async def archive(request: Request, ctx: CurrentContext, rule_id: str) -> Response:
+    _require_taxes(ctx)
     try:
         await run_in_threadpool(
             taxes.archive_rule, request.app.state.session_factory, ctx, _id(rule_id)
@@ -199,73 +411,46 @@ async def archive(request: Request, ctx: CurrentContext, rule_id: str) -> Respon
     return _redirect(request)
 
 
-@router.get("/taxes/calculator", name="tax_calculator")
-async def calculator(request: Request, ctx: CurrentContext) -> Response:
-    values = {
-        "net": request.query_params.get("net", ""),
-        "day": request.query_params.get("day", ctx.clock.today(ctx.workspace.timezone).isoformat()),
-        "record_as": request.query_params.get("record_as", RecordAs.CASH_RECEIVED.value),
-    }
-    calculation = None
-    error = request.query_params.get("error")
-    try:
-        record_as = RecordAs(values["record_as"])
-    except ValueError:
-        record_as = None
-        error = "invalid_record_as"
-    if values["net"] and record_as is not None:
-        try:
-            net_decimal = parse_amount(values["net"], request.state.locale)
-            if net_decimal < 0:
-                raise ValueError
-            net_minor = (
-                0 if net_decimal == 0 else amount_minor(net_decimal, ctx.workspace.base_currency)
-            )
-            calculation = await run_in_threadpool(
-                lambda: taxes.preview(
-                    request.app.state.session_factory,
-                    ctx,
-                    net=Money(net_minor, ctx.workspace.base_currency),
-                    day=_day(values["day"]),
-                    record_as=record_as,
-                )
-            )
-        except taxes.TaxRuleError as exc:
-            error = exc.code
-        except ValueError:
-            error = "invalid_amount"
-    return render_template(
-        request,
-        "taxes/calculator.html",
-        context={
-            "values": values,
-            "calculation": calculation,
-            "error": gettext(ERRORS.get(error, ERRORS["failed"]), request.state.locale)
-            if error
-            else None,
-            "record_as_options": [
-                (RecordAs.CASH_RECEIVED.value, _("Cash received (gross)")),
-                (RecordAs.NET.value, _("Net")),
-                (RecordAs.TAKE_HOME.value, _("Take-home")),
-            ],
-            "format_day": format_day,
-            "format_amount_input": format_amount_input,
-        },
+def _other_rule(due: date, how_often: str) -> RecurrenceRule:
+    freq, interval = OTHER_FREQUENCIES[how_often]
+    if freq == Frequency.ONCE:
+        return RecurrenceRule(start_date=due, freq=freq)
+    return RecurrenceRule(
+        start_date=due,
+        freq=freq,
+        interval=interval,
+        month_day=due.day,
+        month=due.month,
     )
 
 
-@router.post("/taxes/calculator", name="tax_calculate")
-async def calculate(request: Request, ctx: CurrentContext) -> Response:
+@router.post("/taxes/other", name="tax_other_create")
+async def create_other(request: Request, ctx: CurrentContext) -> Response:
+    """ "Add another tax": a fixed-amount expense recurring item marked as a tax."""
+    _require_taxes(ctx)
     values = await _values(request)
-    params = {
-        "net": values.get("net", ""),
-        "day": values.get("day", ""),
-        "record_as": values.get("record_as", ""),
-    }
+    currency = ctx.workspace.base_currency
     try:
-        RecordAs(params["record_as"])
-    except ValueError:
-        params["error"] = "invalid_record_as"
-    return RedirectResponse(
-        request.url_for("tax_calculator").path + "?" + urlencode(params), status_code=303
-    )
+        due = date.fromisoformat(values.get("due_date", ""))
+        amount = parse_amount(values.get("amount", ""), request.state.locale)
+        minor = amount_minor(amount, currency)
+        item = scheduled.ScheduledInput(
+            name=values.get("name", ""),
+            direction=TransactionDirection.EXPENSE,
+            category_id=_id(values.get("category_id", "")),
+            amount=Money(minor, currency),
+            rule=_other_rule(due, values.get("how_often", "")),
+        )
+        await run_in_threadpool(
+            lambda: scheduled.save_item(
+                request.app.state.session_factory,
+                ctx,
+                item,
+                request.app.state.settings,
+                require_kind="expense",
+                is_tax=True,
+            )
+        )
+    except (ValueError, KeyError, ArithmeticError, NotFound):
+        return _redirect(request, "invalid_other_tax", "other-tax")
+    return _redirect(request)

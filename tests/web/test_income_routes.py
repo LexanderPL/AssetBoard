@@ -34,7 +34,6 @@ def _form(category_id: str) -> dict[str, str]:
         "expected_mode": "manual",
         "expected_units": "",
         "average_months": "3",
-        "record_as": "cash_received",
         "active_from_month": "1",
         "active_from_year": "2026",
         "active_to_month": "",

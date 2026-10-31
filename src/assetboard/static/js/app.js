@@ -282,19 +282,34 @@ document.addEventListener("change", (event) => {
   target.form?.requestSubmit();
 });
 
-// Progressive disclosure: an element marked data-hidden-when="<select id>=<value>" is hidden
-// while that select holds that value (the recurring form hides the repeat fields of a one-time
-// item). Without JavaScript everything stays visible and the form explains what is ignored.
+// Progressive disclosure: an element marked data-hidden-when="<name>=<value>" is hidden while
+// the select with that id, or the checked radio button of that name, holds that value (the
+// recurring form hides the repeat fields of a one-time item; the tax form hides fields that do
+// not apply to the chosen kind). Without JavaScript everything stays visible and the form
+// explains what is ignored.
+function hiddenWhenValue(name) {
+  const select = document.getElementById(name);
+  if (select instanceof HTMLSelectElement) return select.value;
+  const checked = Array.from(document.querySelectorAll('input[type="radio"]')).find(
+    (input) => input instanceof HTMLInputElement && input.name === name && input.checked,
+  );
+  return checked instanceof HTMLInputElement ? checked.value : null;
+}
 function applyHiddenWhen() {
   document.querySelectorAll("[data-hidden-when]").forEach((element) => {
     if (!(element instanceof HTMLElement)) return;
-    const [id, value] = (element.dataset.hiddenWhen ?? "").split("=");
-    const select = document.getElementById(id ?? "");
-    if (select instanceof HTMLSelectElement) element.hidden = select.value === value;
+    const [name, value] = (element.dataset.hiddenWhen ?? "").split("=");
+    const current = hiddenWhenValue(name ?? "");
+    if (current !== null) element.hidden = current === value;
   });
 }
 document.addEventListener("change", (event) => {
-  if (event.target instanceof HTMLSelectElement) applyHiddenWhen();
+  const target = event.target;
+  if (
+    target instanceof HTMLSelectElement ||
+    (target instanceof HTMLInputElement && target.type === "radio")
+  )
+    applyHiddenWhen();
 });
 document.addEventListener("DOMContentLoaded", applyHiddenWhen);
 
