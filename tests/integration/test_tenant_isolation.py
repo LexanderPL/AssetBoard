@@ -389,7 +389,7 @@ def test_current_workspace_repository_touches_only_its_workspace(
 
     assert {
         "name", "base_currency", "country_code", "timezone", "locale", "auto_copy_plan",
-        "require_two_factor"
+        "require_two_factor", "taxes_enabled"
     } == UPDATABLE_FIELDS  # fmt: skip
     for forbidden in ("id", "created_at", "updated_at", "unknown"):
         with pytest.raises(ValueError):
@@ -996,6 +996,9 @@ def test_scheduled_queries_stay_in_their_workspace(db_session, two_workspaces) -
     assert item.id in {value.id for value in items.ordered(active_only=True)}
     assert items.category_counts()[item.category_id] >= 1
     assert rows.category_counts() == {item.category_id: 1}
+    items.update(item.id, is_tax=True)
+    assert [value.id for value in items.tax_items()] == [item.id]
+    assert other_items.tax_items() == []
     rows.delete(row)
     assert rows.for_item(item.id) == []
 
@@ -1036,12 +1039,11 @@ def test_income_queries_stay_in_their_workspace(
             expected_mode="manual",
             expected_units=None,
             average_months=3,
-            record_as="net",
             active_from=date(2026, 1, 1),
             active_to=None,
         )
         tax_rule = TaxRuleRepository(db_session, ctx).create(
-            name=f"Tax {suffix}", effect="withheld", base="net", notes=""
+            name=f"Tax {suffix}", kind="payer_withheld", base="net", notes=""
         )
         expense = CategoryRepository(db_session, ctx).create(
             name=f"Expense {suffix}",
@@ -1089,6 +1091,8 @@ def test_income_queries_stay_in_their_workspace(
     assert attachments_a.for_source_and_rule(source_a.id, attachment_a.tax_rule_id) is attachment_a
     assert attachments_b.for_source_and_rule(source_b.id, attachment_a.tax_rule_id) is None
     assert attachments_a.payment_category_counts() == {attachment_a.payment_category_id: 1}
+    assert [row.id for row in attachments_a.for_rule(attachment_a.tax_rule_id)] == [attachment_a.id]
+    assert attachments_b.for_rule(attachment_a.tax_rule_id) == []
     assert attachments_b.payment_category_counts() == {attachment_b.payment_category_id: 1}
     assert [row.id for row in logs_b.for_source(source_b.id)] == [log_b.id]
     assert [row.id for row in attachments_b.for_source(source_b.id)] == [attachment_b.id]
@@ -1337,8 +1341,8 @@ def test_tax_rule_queries_stay_in_their_workspace(
     rules_a, rules_b = TaxRuleRepository(db_session, ctx_a), TaxRuleRepository(db_session, ctx_b)
     versions_a = TaxRuleVersionRepository(db_session, ctx_a)
     versions_b = TaxRuleVersionRepository(db_session, ctx_b)
-    rule_a = rules_a.create(name="Income tax A", effect="withheld", base="net", notes="")
-    rule_b = rules_b.create(name="Income tax B", effect="withheld", base="net", notes="")
+    rule_a = rules_a.create(name="Income tax A", kind="payer_withheld", base="net", notes="")
+    rule_b = rules_b.create(name="Income tax B", kind="payer_withheld", base="net", notes="")
     version_a = versions_a.create(
         tax_rule_id=rule_a.id,
         effective_from=date(2026, 1, 1),
@@ -1361,6 +1365,9 @@ def test_tax_rule_queries_stay_in_their_workspace(
         fixed_minor=500,
     )
     assert [row.id for row in rules_a.ordered()] == [rule_a.id]
+    assert rules_a.payment_category_counts() == {} and rules_b.payment_category_counts() == {}
+    assert not rules_a.has_posted_income(rule_a.id)
+    assert not rules_b.has_posted_income(rule_a.id)
     assert rules_a.effective_for_all(date(2026, 1, 1)) == [(rule_a, version_a)]
     assert rules_b.effective_for_all(date(2026, 1, 1))[0][0].id == rule_b.id
     assert versions_a.for_rule(rule_a.id) == [version_a, fixed_version_a]
@@ -1376,7 +1383,7 @@ def test_tax_rule_queries_stay_in_their_workspace(
         rules_b.create(
             workspace_id=ctx_a.workspace.id,
             name="Cross workspace",
-            effect="withheld",
+            kind="payer_withheld",
             base="net",
             notes="",
         )

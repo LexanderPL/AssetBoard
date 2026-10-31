@@ -28,6 +28,7 @@ The decisions below are accepted unless noted otherwise.
 | [0019](0019-local-totp.md) | Local TOTP and workspace enforcement | Accepted |
 | [0020](0020-hard-workspace-deletion.md) | Hard workspace deletion | Accepted |
 | [0021](0021-notifications.md) | Reminders through Apprise channels | Proposed |
+| [0022](0022-tax-kinds-and-payment-schedule.md) | Tax kinds and payment schedule | Proposed |
 
 New records should use [the ADR template](template.md), the next available number, and include
 Context, Decision, and Consequences sections.

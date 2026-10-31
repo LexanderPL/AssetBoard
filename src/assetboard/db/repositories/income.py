@@ -112,7 +112,14 @@ class IncomeSourceTaxRuleRepository(ScopedRepository[IncomeSourceTaxRule]):
     def payment_category_counts(self) -> dict[UUID, int]:
         rows = self._session.execute(
             select(IncomeSourceTaxRule.payment_category_id, func.count())
-            .where(IncomeSourceTaxRule.workspace_id == self._workspace_id)
+            .where(
+                IncomeSourceTaxRule.workspace_id == self._workspace_id,
+                IncomeSourceTaxRule.payment_category_id.is_not(None),
+            )
             .group_by(IncomeSourceTaxRule.payment_category_id)
         )
-        return dict(rows.all())
+        return {category_id: count for category_id, count in rows.all() if category_id}
+
+    def for_rule(self, tax_rule_id: UUID) -> list[IncomeSourceTaxRule]:
+        statement = self._scoped_select().where(IncomeSourceTaxRule.tax_rule_id == tax_rule_id)
+        return list(self._session.scalars(statement.order_by(IncomeSourceTaxRule.id)))

@@ -190,6 +190,30 @@ Payment due date = `due_day` of the month `pay_date.month + due_month_offset` (c
 - If no version is effective on the selected date, the rule is omitted from the calculation and
   named in the preview warning.
 
+**As built: tax redesign ([ADR-0022](../adr/0022-tax-kinds-and-payment-schedule.md); owner
+mockup of 2026-10-31).** This supersedes the effect/`record_as` model above.
+- `TaxRule.kind` is `added` | `self_paid` | `payer_withheld` ("Who pays it to the tax office?").
+  `calculate_taxes(net, rules)` has no `record_as`: received (the occurrence's expected amount,
+  `ledger_amount`) = `net + added − payer_withheld`; payments = `added + self_paid` where
+  `generate_payment`; take-home = `net − self_paid − payer_withheld`. The invariant
+  `received − sum(payments) == take_home` holds when every rule generates payments.
+- Golden test (same numbers, by kind): income tax and levy `self_paid` → received 28 745.10,
+  payments 5 375.10 + 2 804.40 + 1 000.00; income tax `payer_withheld` → 25 940.70, payments
+  5 375.10 + 1 000.00; both `payer_withheld` → 24 940.70, payment 5 375.10.
+- The rule carries the payment schedule: `payment_day`, `payment_timing` (`next_month`,
+  `same_month`, `after_quarter` = the month after the pay date's calendar quarter) and
+  `payment_category_id` (required unless `payer_withheld`). Attachment `due_day`,
+  `due_month_offset` and `payment_category_id` are nullable overrides.
+- The first version is effective from 1900-01-01; kind and base are editable until a posted
+  income occurrence of a source using the rule exists (`kind_locked`).
+- The calculator page is replaced by the example panel of the new/edit tax page (10 000 net,
+  this tax only); `/taxes/calculator` redirects to `/taxes`. The warning box is replaced by an
+  intro line; `users.tax_warning_dismissed` stays but is unused.
+- `workspaces.taxes_enabled` (Workspace settings → Menu, owners) hides the Taxes menu item, the
+  tax pages (404) and the tax parts of income; it cannot be turned off while a non-archived
+  income source has a tax attached.
+- "Other taxes" are `scheduled_items.is_tax` recurring items created on the Taxes page.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
@@ -212,6 +236,13 @@ Tests: the golden example from the spec, the take-home invariant with hypothesis
 - Expected units before logging: `working_days` (Mon–Fri minus public holidays of the workspace country in the work month), `fixed` value, `average` of the last N logged months, or `manual` (occurrence stays "estimated: 0" until logged).
 - `amount_state`: `estimated` until a `WorkLog` exists for the work month, then `confirmed` (and recalculated).
 - Taxes: attach any number of tax rules (ordered), with `generate_payment`, payment category and due settings per attachment; `record_as` decides the ledger amount (see F3.3 table). Without attached rules the source works as plain income.
+
+**As built: tax redesign (ADR-0022).** `record_as` was removed: each attached tax's kind decides
+its effect on the expected amount and whether a payment is planned; payment dates come from the
+rule's schedule unless the attachment overrides them. The income page ticks the workspace's taxes
+("Taxes on this income") with an optional per-source payment day; tax parts are hidden while
+Taxes are off. The golden example below now reads "VAT 23% added" (no `record_as`). The startup
+catch-up recalculates every pending income occurrence before generating.
 
 **Acceptance**
 - Income source CRUD (fixed and variable) with a live "next occurrences" preview including tax breakdown.

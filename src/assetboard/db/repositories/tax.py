@@ -3,8 +3,10 @@ from __future__ import annotations
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import exists, select
+from sqlalchemy import exists, func, select
 
+from assetboard.db.models.income import IncomeSourceTaxRule
+from assetboard.db.models.scheduled import ScheduledOccurrence
 from assetboard.db.models.tax import TaxRule, TaxRuleVersion
 from assetboard.db.repositories.base import ScopedRepository
 
@@ -20,6 +22,33 @@ class TaxRuleRepository(ScopedRepository[TaxRule]):
         if not include_archived:
             statement = statement.where(TaxRule.archived_at.is_(None))
         return list(self._session.scalars(statement.order_by(TaxRule.name, TaxRule.id)))
+
+    def payment_category_counts(self) -> dict[UUID, int]:
+        rows = self._session.execute(
+            select(TaxRule.payment_category_id, func.count())
+            .where(
+                TaxRule.workspace_id == self._workspace_id,
+                TaxRule.payment_category_id.is_not(None),
+            )
+            .group_by(TaxRule.payment_category_id)
+        )
+        return {category_id: count for category_id, count in rows.all() if category_id}
+
+    def has_posted_income(self, tax_rule_id: UUID) -> bool:
+        """Whether a posted income occurrence comes from a source this rule is attached to."""
+        sources = select(IncomeSourceTaxRule.income_source_id).where(
+            IncomeSourceTaxRule.workspace_id == self._workspace_id,
+            IncomeSourceTaxRule.tax_rule_id == tax_rule_id,
+        )
+        statement = select(
+            exists().where(
+                ScheduledOccurrence.workspace_id == self._workspace_id,
+                ScheduledOccurrence.status == "posted",
+                ScheduledOccurrence.generated_by == "income",
+                ScheduledOccurrence.income_source_id.in_(sources),
+            )
+        )
+        return bool(self._session.execute(statement).scalar_one())
 
     def effective_for_all(self, day: date) -> list[tuple[TaxRule, TaxRuleVersion]]:
         rows = self._session.execute(

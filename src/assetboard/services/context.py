@@ -52,6 +52,8 @@ class WorkspaceRef:
     timezone: str
     country_code: str | None
     require_two_factor: bool = False
+    # ADR-0022: the Taxes menu item, tax pages and the tax parts of income are shown.
+    taxes_enabled: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,6 +160,7 @@ def build_context(session: Session, web_session: WebSession, *, clock: Clock) ->
             timezone=membership.timezone,
             country_code=membership.country_code,
             require_two_factor=membership.require_two_factor,
+            taxes_enabled=membership.taxes_enabled,
         ),
         role=Role(membership.role),
         clock=clock,

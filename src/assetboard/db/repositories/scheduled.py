@@ -26,6 +26,15 @@ class ScheduledItemRepository(ScopedRepository[ScheduledItem]):
             )
         return list(self._session.scalars(statement))
 
+    def tax_items(self) -> list[ScheduledItem]:
+        """Active (not archived) items marked as taxes (ADR-0022 "other taxes")."""
+        statement = (
+            self._scoped_select()
+            .where(ScheduledItem.is_tax.is_(True), ScheduledItem.archived_at.is_(None))
+            .order_by(ScheduledItem.name, ScheduledItem.id)
+        )
+        return list(self._session.scalars(statement))
+
     def any_exists(self) -> bool:
         """Whether the workspace has any item (occurrences cannot exist without one)."""
         statement = select(exists().where(ScheduledItem.workspace_id == self._workspace_id))

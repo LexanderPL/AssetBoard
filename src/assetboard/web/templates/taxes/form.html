@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% block title %}{{ _("Edit tax") if rule else _("New tax on income") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Edit tax") if rule else _("New tax on income") }}{% endblock %}
+{% block content %}
+{% set input_class = "form-control rounded-lg px-3 py-2" %}
+{% set option_class = "flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-surface p-3 hover:bg-subtle has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40" %}
+{% set locked = rule is not none and rule.locked %}
+<a href="{{ scoped_url(request, 'tax_rules') }}" class="mb-4 inline-flex rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Back to Taxes") }}</a>
+<div class="flex flex-wrap items-start gap-6">
+<section class="panel min-w-0 flex-[999_1_28rem] p-5 sm:p-6">
+  {% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ error }}</p>{% endif %}
+  <form id="tax-form" method="post" action="{{ scoped_url(request, 'tax_rule_update', rule_id=rule.id) if rule else scoped_url(request, 'tax_rule_create') }}" class="grid gap-6">
+    {{ csrf_input() }}
+    <label class="grid gap-1 text-sm font-medium">{{ _("Name") }}<input name="name" value="{{ values.name }}" maxlength="200" required class="{{ input_class }} font-normal"></label>
+
+    <fieldset class="grid gap-2"{% if locked %} disabled aria-describedby="kind-locked"{% endif %}>
+      <legend class="mb-2 text-sm font-medium">{{ _("Who pays it to the tax office?") }}</legend>
+      {% for value, title, description in (
+        ("added", _("I do. It is added on top of what I charge"), _("Like VAT: the client pays it to you, you pass it on.")),
+        ("self_paid", _("I do, from my income"), _("Like income tax or social contributions you pay yourself.")),
+        ("payer_withheld", _("The payer takes it off before paying me"), _("Like income tax on a salary. You only see it; nothing to pay.")),
+      ) %}
+      <label class="{{ option_class }}" data-kind-option="{{ value }}">
+        <input type="radio" name="kind" value="{{ value }}" class="mt-1 h-4 w-4 accent-primary"{% if values.kind == value %} checked{% endif %}>
+        <span class="grid gap-0.5"><span class="text-sm font-semibold">{{ title }}</span><span class="text-sm text-muted">{{ description }}</span></span>
+      </label>
+      {% endfor %}
+      <details class="mt-1" data-hidden-when="kind=added" data-tax-base>
+        <summary class="cursor-pointer text-sm text-primary-ink">{{ _("Advanced: calculated on") }}</summary>
+        <label class="mt-2 grid max-w-xs gap-1 text-sm">{{ _("Calculated on") }}<select name="base" class="form-select rounded-lg py-2"><option value="net"{% if values.base == "net" %} selected{% endif %}>{{ _("The net amount") }}</option><option value="gross"{% if values.base == "gross" %} selected{% endif %}>{{ _("Net plus taxes added on top") }}</option></select></label>
+        <p class="mt-1 text-xs text-muted">{{ _("Ignored for taxes added on top: they are always calculated on the net amount.") }}</p>
+      </details>
+    </fieldset>
+    {% if locked %}
+    <p id="kind-locked" class="-mt-3 text-sm text-muted" data-kind-locked>{{ _("Income already posted was calculated with this tax, so who pays it and its base cannot change. Create a new tax instead.") }}</p>
+    {% endif %}
+
+    {% if locked %}<input type="hidden" name="kind" value="{{ values.kind }}"><input type="hidden" name="base" value="{{ values.base }}">{% endif %}
+    {% if rule %}
+    {# The rate is changed with Rate changes; these only feed the example panel. #}
+    <input type="hidden" name="mode" value="{{ values.mode }}"><input type="hidden" name="rate_percent" value="{{ values.rate_percent }}"><input type="hidden" name="fixed_amount" value="{{ values.fixed_amount }}">
+    <div class="grid gap-1">
+      <p class="text-sm font-medium">{{ _("How much is it?") }}</p>
+      <p class="text-sm">{{ rate_label(rule.current, locale) }} · <span class="text-muted">{{ _("Change it with Rate changes on the Taxes page; past months keep the old rate.") }}</span></p>
+    </div>
+    {% else %}
+    <fieldset class="grid gap-3">
+      <legend class="mb-2 text-sm font-medium">{{ _("How much is it?") }}</legend>
+      <div class="flex flex-wrap gap-2">
+        {% for value, title in (("percent", _("A percentage")), ("fixed", _("A fixed amount each time"))) %}
+        <label class="{{ option_class }} flex-[1_1_10rem] items-center">
+          <input type="radio" name="mode" value="{{ value }}" class="h-4 w-4 accent-primary"{% if values.mode == value %} checked{% endif %}>
+          <span class="text-sm font-semibold">{{ title }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <label class="grid max-w-[12rem] gap-1 text-sm" data-hidden-when="mode=fixed">{{ _("Rate in %%") }}<input name="rate_percent" value="{{ values.rate_percent }}" inputmode="decimal" class="{{ input_class }}"></label>
+      <label class="grid max-w-[15rem] gap-1 text-sm" data-hidden-when="mode=percent">{{ _("Amount per payment (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="fixed_amount" value="{{ values.fixed_amount }}" inputmode="decimal" class="{{ input_class }}"></label>
+      <p class="text-xs text-muted">{{ _("Valid from the start. If the rate changes later, add a rate change on the tax; past months keep the old rate.") }}</p>
+    </fieldset>
+    {% endif %}
+
+    <fieldset class="grid gap-3" data-hidden-when="kind=payer_withheld" data-tax-schedule>
+      <legend class="mb-2 text-sm font-medium">{{ _("When do you pay it?") }}</legend>
+      <div class="flex flex-wrap items-center gap-2 text-sm">
+        <label for="payment_day">{{ _("On day") }}</label>
+        <input id="payment_day" name="payment_day" type="number" min="1" max="31" value="{{ values.payment_day }}" class="{{ input_class }} w-20">
+        <select name="payment_timing" aria-label="{{ _('Which month') }}" class="form-select rounded-lg py-2">
+          {% for value, label in (("next_month", _("of the month after you're paid")), ("same_month", _("of the month you're paid")), ("after_quarter", _("of the month after each quarter"))) %}
+          <option value="{{ value }}"{% if values.payment_timing == value %} selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <label class="grid max-w-xs gap-1 text-sm">{{ _("Record it in category") }}<select name="payment_category_id" class="form-select rounded-lg py-2">
+        <option value="">{{ _("Choose a category") }}</option>
+        {% for category in expense_categories %}<option value="{{ category.id }}"{% if values.payment_category_id == category.id|string or (not values.payment_category_id and category.name == _("Taxes")) %} selected{% endif %}>{{ category.name }}</option>{% endfor %}
+      </select></label>
+      <p class="text-xs text-muted">{{ _("Not needed when the payer takes the tax off: nothing is planned.") }}</p>
+    </fieldset>
+
+    <div class="flex flex-wrap gap-2">
+      <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save tax") }}</button>
+      <a href="{{ scoped_url(request, 'tax_rules') }}" class="rounded-lg border border-line px-4 py-2 text-sm font-medium hover:bg-subtle">{{ _("Cancel") }}</a>
+    </div>
+  </form>
+  {% if rule %}
+  <form method="post" action="{{ scoped_url(request, 'tax_rule_archive', rule_id=rule.id) }}" class="mt-6 border-t border-line pt-4" data-confirm="{{ _('Archive the tax %(name)s?', name=rule.name) }}">
+    {{ csrf_input() }}
+    <button type="submit" class="rounded-lg border border-line px-3 py-1.5 text-sm text-danger hover:bg-subtle">{{ _("Archive tax") }}</button>
+  </form>
+  {% endif %}
+</section>
+<aside id="tax-example" class="panel min-w-0 flex-[1_1_18rem] bg-subtle p-5" aria-live="polite" aria-labelledby="tax-example-heading" hx-post="{{ scoped_url(request, 'tax_example') }}" hx-trigger="change from:#tax-form delay:150ms, input from:#tax-form delay:400ms" hx-include="#tax-form" hx-sync="this:replace" hx-target="this" hx-swap="innerHTML" data-tax-example>
+  {% include "taxes/_example.html" %}
+</aside>
+</div>
+{% endblock %}

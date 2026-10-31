@@ -1133,16 +1133,21 @@ msgstr ""
 msgid "Working-day estimates are unavailable for this workspace country."
 msgstr ""
 
-msgid "Choose a valid tax rule and payment category."
+msgid "Choose valid taxes and payment days between 1 and 31."
 msgstr ""
 
 msgid "Choose an expense category that is not a transfer."
 msgstr ""
 
-msgid "This tax rule is already attached to the income source."
+msgid "This tax is already ticked for the income source."
 msgstr ""
 
-msgid "A posted tax payment uses this attachment, so it cannot be removed."
+msgid ""
+"This tax has no category to record its payments in. Choose one on the tax"
+" first."
+msgstr ""
+
+msgid "A posted tax payment uses this tax, so it cannot be unticked."
 msgstr ""
 
 msgid "This month is closed. Reopen it before changing the income estimate."
@@ -1338,7 +1343,7 @@ msgstr ""
 msgid "Entry saved in %(month)s."
 msgstr ""
 
-#, fuzzy, python-format
+#, python-format
 msgid "Entry planned in %(month)s."
 msgstr ""
 
@@ -1363,7 +1368,6 @@ msgstr ""
 msgid "You have reached the limit of 10 channels in this workspace."
 msgstr ""
 
-#, fuzzy
 msgid "Too many test messages. Try again in a few minutes."
 msgstr ""
 
@@ -1577,10 +1581,7 @@ msgstr ""
 msgid "Sunday"
 msgstr ""
 
-msgid "Choose a valid tax effect and base."
-msgstr ""
-
-msgid "Enter a valid effective date between 1900 and 2199."
+msgid "Choose who pays the tax to the tax office."
 msgstr ""
 
 msgid "Enter a non-negative percentage with at most two decimal places."
@@ -1589,28 +1590,27 @@ msgstr ""
 msgid "Enter a non-negative fixed amount in the workspace currency."
 msgstr ""
 
-msgid "Enter a non-negative net amount in the workspace currency."
+msgid "Enter a payment day between 1 and 31 and choose the month."
 msgstr ""
 
-msgid "A new version must start after the latest existing version."
+msgid "A rate change must start after the latest rate."
 msgstr ""
 
-msgid "Archived tax rules cannot be changed."
+msgid "Archived taxes cannot be changed."
 msgstr ""
 
-msgid "Choose how the income is recorded."
+msgid ""
+"Income already posted was calculated with this tax, so who pays it and "
+"its base cannot change. Create a new tax instead."
 msgstr ""
 
-msgid "The tax rule could not be saved. Check the form and try again."
+msgid "Enter a name, a positive amount, a due date and a category."
 msgstr ""
 
-msgid "Cash received (gross)"
+msgid "The tax could not be saved. Check the form and try again."
 msgstr ""
 
-msgid "Net"
-msgstr ""
-
-msgid "Take-home"
+msgid "This tax"
 msgstr ""
 
 msgid "Too many attempts. Try again later."
@@ -2832,9 +2832,6 @@ msgstr ""
 msgid "Months for average"
 msgstr ""
 
-msgid "Record income as"
-msgstr ""
-
 msgid "Active from work month"
 msgstr ""
 
@@ -2846,10 +2843,6 @@ msgstr ""
 
 #, python-format
 msgid "Pay day %(day)s, lag %(lag)s months"
-msgstr ""
-
-#, python-format
-msgid "Record as: %(mode)s"
 msgstr ""
 
 #, python-format
@@ -2866,6 +2859,9 @@ msgid "Save income source"
 msgstr ""
 
 msgid "Next occurrences with tax preview"
+msgstr ""
+
+msgid "Next occurrences"
 msgstr ""
 
 #, python-format
@@ -2887,19 +2883,15 @@ msgid "Net: %(amount)s"
 msgstr ""
 
 #, python-format
-msgid "Gross: %(amount)s"
+msgid "%(name)s (to pay later)"
 msgstr ""
 
 #, python-format
-msgid "Take-home: %(amount)s"
+msgid "You receive: %(amount)s"
 msgstr ""
 
 #, python-format
-msgid "Ledger amount: %(amount)s"
-msgstr ""
-
-#, python-format
-msgid "Planned payment: %(name)s — %(amount)s"
+msgid "Tax to pay: %(name)s %(amount)s on %(date)s"
 msgstr ""
 
 msgid "Work logs"
@@ -2929,38 +2921,25 @@ msgid ""
 "units are the sum of the days."
 msgstr ""
 
-msgid "Attached tax rules"
+msgid "Taxes on this income"
 msgstr ""
 
-msgid "Tax rule"
+msgid "Different payment day for this income"
 msgstr ""
 
-#, python-format
-msgid "Due day %(day)s, offset %(offset)s months"
+msgid "Payment day"
 msgstr ""
 
-msgid "No planned payment"
+msgid "Save taxes"
 msgstr ""
 
-msgid "Payment category"
+msgid "Tax"
 msgstr ""
 
-msgid "Payment due day"
+msgid "No taxes on this income."
 msgstr ""
 
-msgid "Payment month offset"
-msgstr ""
-
-msgid "Generate a planned tax payment"
-msgstr ""
-
-msgid "Save tax rule settings"
-msgstr ""
-
-msgid "No tax rules attached."
-msgstr ""
-
-msgid "Attach tax rule"
+msgid "Set up a new tax"
 msgstr ""
 
 msgid "No income sources yet."
@@ -3565,122 +3544,284 @@ msgstr ""
 msgid "Save amount"
 msgstr ""
 
-msgid "Rates are entered by you; this is not tax advice."
-msgstr ""
-
-msgid "Tax calculator"
+msgid "Example"
 msgstr ""
 
 #, python-format
-msgid "Net amount (%(currency)s)"
+msgid "For income of %(amount)s net, paid on %(date)s:"
 msgstr ""
 
-msgid "Calculation date"
-msgstr ""
-
-msgid "Calculate"
+msgid "Net"
 msgstr ""
 
 #, python-format
-msgid "No effective version on this date for: %(names)s"
+msgid "+ %(name)s"
 msgstr ""
 
 #, python-format
-msgid "Breakdown for %(date)s"
+msgid "− %(name)s"
 msgstr ""
 
-msgid "Added tax"
+msgid "You receive"
 msgstr ""
 
-msgid "Gross"
+#, python-format
+msgid "You pay %(amount)s on %(date)s. It is planned as an expense."
 msgstr ""
 
-msgid "Withheld"
+#, python-format
+msgid "You pay %(amount)s on %(date)s, so %(kept)s is really yours."
 msgstr ""
 
-msgid "Ledger amount"
+msgid ""
+"The payer pays it for you, so nothing is planned. Enter the amount you "
+"were promised before tax as the income."
 msgstr ""
 
-msgid "Planned tax payments"
+msgid "Enter a rate or an amount to see an example."
 msgstr ""
 
-msgid "No tax payments for this recording mode."
+msgid "Added on top of what you charge; you pass it on."
 msgstr ""
 
-msgid "Manage tax rules"
+msgid "You pay it from your income."
 msgstr ""
 
-msgid "Tax rules"
+msgid "The payer takes it off before paying you."
 msgstr ""
 
-msgid "Calculator preview"
+msgid "Nothing to pay yourself"
 msgstr ""
 
-msgid "New tax rule"
+#, python-format
+msgid "Paid on the %(day)s of the month you are paid"
 msgstr ""
 
-msgid "Effect"
+#, python-format
+msgid "Paid on the %(day)s of the month after each quarter"
 msgstr ""
 
-msgid "Added to net"
+#, python-format
+msgid "Paid on the %(day)s of the month after you are paid"
 msgstr ""
 
-msgid "Tax base"
+msgid "Edit tax"
 msgstr ""
 
-msgid "Notes (optional)"
+msgid "New tax on income"
 msgstr ""
 
-msgid "First version effective from"
+msgid "Back to Taxes"
+msgstr ""
+
+msgid "Who pays it to the tax office?"
+msgstr ""
+
+msgid "I do. It is added on top of what I charge"
+msgstr ""
+
+msgid "Like VAT: the client pays it to you, you pass it on."
+msgstr ""
+
+msgid "I do, from my income"
+msgstr ""
+
+msgid "Like income tax or social contributions you pay yourself."
+msgstr ""
+
+msgid "The payer takes it off before paying me"
+msgstr ""
+
+msgid "Like income tax on a salary. You only see it; nothing to pay."
+msgstr ""
+
+msgid "Advanced: calculated on"
+msgstr ""
+
+msgid "Calculated on"
+msgstr ""
+
+msgid "The net amount"
+msgstr ""
+
+msgid "Net plus taxes added on top"
+msgstr ""
+
+msgid ""
+"Ignored for taxes added on top: they are always calculated on the net "
+"amount."
+msgstr ""
+
+msgid "How much is it?"
+msgstr ""
+
+msgid ""
+"Change it with Rate changes on the Taxes page; past months keep the old "
+"rate."
+msgstr ""
+
+msgid "A percentage"
+msgstr ""
+
+msgid "A fixed amount each time"
+msgstr ""
+
+#, python-format
+msgid "Rate in %%"
+msgstr ""
+
+#, python-format
+msgid "Amount per payment (%(currency)s)"
+msgstr ""
+
+msgid ""
+"Valid from the start. If the rate changes later, add a rate change on the"
+" tax; past months keep the old rate."
+msgstr ""
+
+msgid "When do you pay it?"
+msgstr ""
+
+msgid "On day"
+msgstr ""
+
+msgid "Which month"
+msgstr ""
+
+msgid "of the month after you're paid"
+msgstr ""
+
+msgid "of the month you're paid"
+msgstr ""
+
+msgid "of the month after each quarter"
+msgstr ""
+
+msgid "Record it in category"
+msgstr ""
+
+msgid "Not needed when the payer takes the tax off: nothing is planned."
+msgstr ""
+
+msgid "Save tax"
+msgstr ""
+
+#, python-format
+msgid "Archive the tax %(name)s?"
+msgstr ""
+
+msgid "Archive tax"
+msgstr ""
+
+msgid "every year"
+msgstr ""
+
+msgid "every quarter"
+msgstr ""
+
+msgid "every month"
+msgstr ""
+
+msgid "once"
+msgstr ""
+
+msgid ""
+"Only if you want taxes planned. You enter the rates; this is not tax "
+"advice. You can hide this page in Workspace settings."
+msgstr ""
+
+msgid "New tax"
+msgstr ""
+
+msgid "Taxes on income"
+msgstr ""
+
+#, python-format
+msgid "Used by: %(sources)s"
+msgstr ""
+
+msgid "not used yet"
+msgstr ""
+
+msgid "Rate changes"
+msgstr ""
+
+msgid "From the start"
+msgstr ""
+
+#, python-format
+msgid "From %(date)s"
+msgstr ""
+
+msgid "New rate from"
 msgstr ""
 
 msgid "Value type"
 msgstr ""
 
-msgid "Percent"
+msgid ""
+"Past months keep the old rate. Fill in the field that matches the value "
+"type."
 msgstr ""
 
-msgid "Fixed amount"
+msgid "Add rate change"
 msgstr ""
 
-msgid "Rate in percent"
-msgstr ""
-
-msgid "Create tax rule"
-msgstr ""
-
-#, python-format
-msgid "Base: %(base)s"
+msgid "No taxes on income yet."
 msgstr ""
 
 #, python-format
-msgid "Archive the tax rule %(name)s?"
+msgid "Archived: %(names)s"
 msgstr ""
 
-msgid "Versions"
-msgstr ""
-
-msgid "Add a new version"
-msgstr ""
-
-msgid "Effective from"
-msgstr ""
-
-msgid "Save version"
-msgstr ""
-
-msgid "Edit name and notes"
-msgstr ""
-
-msgid "Save details"
-msgstr ""
-
-msgid "No tax rules yet."
+msgid "Other taxes"
 msgstr ""
 
 msgid ""
-"Tax-rule effect and base are fixed at creation to preserve the meaning of"
-" existing rate versions. Create a separate rule to model a different tax."
+"Taxes that don't depend on income, like real estate or vehicle tax. They "
+"are planned like any recurring payment."
+msgstr ""
+
+#, python-format
+msgid "category %(name)s"
+msgstr ""
+
+#, python-format
+msgid "Next: %(date)s"
+msgstr ""
+
+msgid "Nothing planned"
+msgstr ""
+
+msgid "Add another tax"
+msgstr ""
+
+#, python-format
+msgid "Amount (%(currency)s)"
+msgstr ""
+
+msgid "How often"
+msgstr ""
+
+msgid "Every year"
+msgstr ""
+
+msgid "Every quarter"
+msgstr ""
+
+msgid "Every month"
+msgstr ""
+
+msgid "Once"
+msgstr ""
+
+msgid "Next due date"
+msgstr ""
+
+msgid "Expense category"
+msgstr ""
+
+msgid "Create an expense category first."
 msgstr ""
 
 msgid "Reopen it on the month page."
@@ -3849,6 +3990,24 @@ msgid ""
 "The formatting default is used for numbers and dates where no personal "
 "preference applies. Your interface language follows your account and "
 "browser."
+msgstr ""
+
+msgid "Menu"
+msgstr ""
+
+msgid ""
+"Hide parts of the app you don't use. Nothing is deleted; turn them back "
+"on any time."
+msgstr ""
+
+msgid ""
+"Plan taxes on income and other taxes. Off: income shows only what you "
+"receive."
+msgstr ""
+
+msgid ""
+"Taxes stay on while these income sources have taxes ticked. Untick them "
+"first:"
 msgstr ""
 
 msgid "Categories and workspaces"
@@ -4049,5 +4208,205 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Month summary"
+#~ msgstr ""
+
+#~ msgid "Choose a valid tax rule and payment category."
+#~ msgstr ""
+
+#~ msgid "This tax rule is already attached to the income source."
+#~ msgstr ""
+
+#~ msgid "A posted tax payment uses this attachment, so it cannot be removed."
+#~ msgstr ""
+
+#~ msgid "Choose a valid tax effect and base."
+#~ msgstr ""
+
+#~ msgid "Enter a valid effective date between 1900 and 2199."
+#~ msgstr ""
+
+#~ msgid "Enter a non-negative net amount in the workspace currency."
+#~ msgstr ""
+
+#~ msgid "A new version must start after the latest existing version."
+#~ msgstr ""
+
+#~ msgid "Archived tax rules cannot be changed."
+#~ msgstr ""
+
+#~ msgid "Choose how the income is recorded."
+#~ msgstr ""
+
+#~ msgid "The tax rule could not be saved. Check the form and try again."
+#~ msgstr ""
+
+#~ msgid "Cash received (gross)"
+#~ msgstr ""
+
+#~ msgid "Take-home"
+#~ msgstr ""
+
+#~ msgid "Record income as"
+#~ msgstr ""
+
+#~ msgid "Record as: %(mode)s"
+#~ msgstr ""
+
+#~ msgid "Gross: %(amount)s"
+#~ msgstr ""
+
+#~ msgid "Take-home: %(amount)s"
+#~ msgstr ""
+
+#~ msgid "Ledger amount: %(amount)s"
+#~ msgstr ""
+
+#~ msgid "Planned payment: %(name)s — %(amount)s"
+#~ msgstr ""
+
+#~ msgid "Attached tax rules"
+#~ msgstr ""
+
+#~ msgid "Tax rule"
+#~ msgstr ""
+
+#~ msgid "Due day %(day)s, offset %(offset)s months"
+#~ msgstr ""
+
+#~ msgid "No planned payment"
+#~ msgstr ""
+
+#~ msgid "Payment category"
+#~ msgstr ""
+
+#~ msgid "Payment due day"
+#~ msgstr ""
+
+#~ msgid "Payment month offset"
+#~ msgstr ""
+
+#~ msgid "Generate a planned tax payment"
+#~ msgstr ""
+
+#~ msgid "Save tax rule settings"
+#~ msgstr ""
+
+#~ msgid "No tax rules attached."
+#~ msgstr ""
+
+#~ msgid "Attach tax rule"
+#~ msgstr ""
+
+#~ msgid "Rates are entered by you; this is not tax advice."
+#~ msgstr ""
+
+#~ msgid "Tax calculator"
+#~ msgstr ""
+
+#~ msgid "Net amount (%(currency)s)"
+#~ msgstr ""
+
+#~ msgid "Calculation date"
+#~ msgstr ""
+
+#~ msgid "Calculate"
+#~ msgstr ""
+
+#~ msgid "No effective version on this date for: %(names)s"
+#~ msgstr ""
+
+#~ msgid "Breakdown for %(date)s"
+#~ msgstr ""
+
+#~ msgid "Added tax"
+#~ msgstr ""
+
+#~ msgid "Gross"
+#~ msgstr ""
+
+#~ msgid "Withheld"
+#~ msgstr ""
+
+#~ msgid "Ledger amount"
+#~ msgstr ""
+
+#~ msgid "Planned tax payments"
+#~ msgstr ""
+
+#~ msgid "No tax payments for this recording mode."
+#~ msgstr ""
+
+#~ msgid "Manage tax rules"
+#~ msgstr ""
+
+#~ msgid "Tax rules"
+#~ msgstr ""
+
+#~ msgid "Calculator preview"
+#~ msgstr ""
+
+#~ msgid "New tax rule"
+#~ msgstr ""
+
+#~ msgid "Effect"
+#~ msgstr ""
+
+#~ msgid "Added to net"
+#~ msgstr ""
+
+#~ msgid "Tax base"
+#~ msgstr ""
+
+#~ msgid "Notes (optional)"
+#~ msgstr ""
+
+#~ msgid "First version effective from"
+#~ msgstr ""
+
+#~ msgid "Percent"
+#~ msgstr ""
+
+#~ msgid "Fixed amount"
+#~ msgstr ""
+
+#~ msgid "Rate in percent"
+#~ msgstr ""
+
+#~ msgid "Create tax rule"
+#~ msgstr ""
+
+#~ msgid "Base: %(base)s"
+#~ msgstr ""
+
+#~ msgid "Archive the tax rule %(name)s?"
+#~ msgstr ""
+
+#~ msgid "Versions"
+#~ msgstr ""
+
+#~ msgid "Add a new version"
+#~ msgstr ""
+
+#~ msgid "Effective from"
+#~ msgstr ""
+
+#~ msgid "Save version"
+#~ msgstr ""
+
+#~ msgid "Edit name and notes"
+#~ msgstr ""
+
+#~ msgid "Save details"
+#~ msgstr ""
+
+#~ msgid "No tax rules yet."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Tax-rule effect and base are fixed"
+#~ " at creation to preserve the meaning"
+#~ " of existing rate versions. Create a"
+#~ " separate rule to model a different"
+#~ " tax."
 #~ msgstr ""
 

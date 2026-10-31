@@ -18,6 +18,7 @@ from assetboard.i18n import gettext
 from assetboard.i18n.dates import (
     format_day,
     format_day_long,
+    format_day_of_month,
     format_month,
     format_month_heading,
     month_names,
@@ -52,7 +53,6 @@ class _SourceFields(TypedDict):
     expected_mode: str
     expected_units_value: Decimal | None
     average_months: int
-    record_as: str
     active_from: date
     active_to: date | None
 
@@ -71,10 +71,13 @@ ERRORS = {
     "invalid_work_month": _("Choose a valid work month."),
     "invalid_category": _("Choose an active income category."),
     "unsupported_holidays": _("Working-day estimates are unavailable for this workspace country."),
-    "invalid_tax_attachment": _("Choose a valid tax rule and payment category."),
+    "invalid_tax_attachment": _("Choose valid taxes and payment days between 1 and 31."),
     "invalid_tax_category": _("Choose an expense category that is not a transfer."),
-    "duplicate_tax_rule": _("This tax rule is already attached to the income source."),
-    "attachment_in_use": _("A posted tax payment uses this attachment, so it cannot be removed."),
+    "duplicate_tax_rule": _("This tax is already ticked for the income source."),
+    "tax_without_category": _(
+        "This tax has no category to record its payments in. Choose one on the tax first."
+    ),
+    "attachment_in_use": _("A posted tax payment uses this tax, so it cannot be unticked."),
     "month_closed": _("This month is closed. Reopen it before changing the income estimate."),
     "archived": _("Archived income sources cannot be changed."),
     "derived_work_log": _(
@@ -148,7 +151,6 @@ def _source_input(values: dict[str, str], locale: str, currency: str) -> _Source
         "expected_mode": values.get("expected_mode", "manual"),
         "expected_units_value": units,
         "average_months": int(values.get("average_months", "3")),
-        "record_as": values.get("record_as", "cash_received"),
         "active_from": _required_month(values, "active_from"),
         "active_to": _month(values, "active_to"),
     }
@@ -172,11 +174,12 @@ async def _form(request: Request) -> dict[str, str]:
 
 @router.get("/income", name="income_sources")
 async def sources_page(request: Request, ctx: CurrentContext) -> Response:
+    taxes_enabled = ctx.workspace.taxes_enabled
     rows, categories, rules = await run_in_threadpool(
         lambda: (
             income.list_sources(request.app.state.session_factory, ctx),
             list_categories(request.app.state.session_factory, ctx),
-            taxes.list_rules(request.app.state.session_factory, ctx),
+            taxes.list_rules(request.app.state.session_factory, ctx) if taxes_enabled else [],
         )
     )
     error = request.query_params.get("error")
@@ -188,6 +191,7 @@ async def sources_page(request: Request, ctx: CurrentContext) -> Response:
             "sources": rows,
             "income_categories": categories.income,
             "expense_categories": categories.expense,
+            "taxes_enabled": taxes_enabled,
             "tax_rules": [rule for rule in rules if not rule.archived],
             "can_edit": has_role(ctx, Role.EDITOR),
             "today": today,
@@ -203,6 +207,7 @@ async def sources_page(request: Request, ctx: CurrentContext) -> Response:
             "format_month": _format_work_month,
             "format_day": format_day,
             "tax_rule_names": {rule.id: rule.name for rule in rules},
+            "format_day_of_month": format_day_of_month,
         },
     )
 
@@ -268,69 +273,29 @@ async def archive_source(request: Request, ctx: CurrentContext, source_id: str) 
     return _redirect(request)
 
 
-@router.post("/income/{source_id}/tax-rules", name="income_tax_attach")
-async def attach_tax_rule(request: Request, ctx: CurrentContext, source_id: str) -> Response:
-    values = await _form(request)
+@router.post("/income/{source_id}/taxes", name="income_taxes_save")
+async def save_taxes(request: Request, ctx: CurrentContext, source_id: str) -> Response:
+    """ "Taxes on this income": the ticked taxes, each with an optional payment-day override."""
+    if not ctx.workspace.taxes_enabled:
+        raise NotFound
+    form = await request.form()
+    selection: dict[UUID, int | None] = {}
     try:
+        for value in form.getlist("tax_rule_id"):
+            rule_id = _id(str(value))
+            day = str(form.get(f"due_day_{rule_id}", "")).strip()
+            selection[rule_id] = int(day) if day else None
         await run_in_threadpool(
-            lambda: income.attach_tax_rule(
-                request.app.state.session_factory,
-                ctx,
-                _id(source_id),
-                tax_rule_id=_id(values.get("tax_rule_id", "")),
-                payment_category_id=_id(values.get("payment_category_id", "")),
-                due_day=int(values.get("due_day", "1")),
-                due_month_offset=int(values.get("due_month_offset", "0")),
-                generate_payment=values.get("generate_payment") == "1",
-            )
-        )
-    except income.IncomeError as exc:
-        return _redirect(request, exc.code, f"attach-{source_id}")
-    except ValueError:
-        return _redirect(request, "invalid_tax_attachment", f"attach-{source_id}")
-    return _redirect(request)
-
-
-@router.post("/income/{source_id}/tax-rules/{attachment_id}", name="income_tax_update")
-async def update_tax_rule(
-    request: Request, ctx: CurrentContext, source_id: str, attachment_id: str
-) -> Response:
-    values = await _form(request)
-    form = f"tax-{attachment_id}"
-    try:
-        await run_in_threadpool(
-            lambda: income.update_tax_attachment(
-                request.app.state.session_factory,
-                ctx,
-                _id(source_id),
-                _id(attachment_id),
-                payment_category_id=_id(values.get("payment_category_id", "")),
-                due_day=int(values.get("due_day", "1")),
-                due_month_offset=int(values.get("due_month_offset", "0")),
-                generate_payment=values.get("generate_payment") == "1",
-            )
-        )
-    except income.IncomeError as exc:
-        return _redirect(request, exc.code, form)
-    except ValueError:
-        return _redirect(request, "invalid_tax_attachment", form)
-    return _redirect(request)
-
-
-@router.post("/income/{source_id}/tax-rules/{attachment_id}/remove", name="income_tax_remove")
-async def remove_tax_rule(
-    request: Request, ctx: CurrentContext, source_id: str, attachment_id: str
-) -> Response:
-    try:
-        await run_in_threadpool(
-            income.remove_tax_attachment,
+            income.set_source_taxes,
             request.app.state.session_factory,
             ctx,
             _id(source_id),
-            _id(attachment_id),
+            selection,
         )
     except income.IncomeError as exc:
-        return _redirect(request, exc.code)
+        return _redirect(request, exc.code, f"taxes-{source_id}")
+    except ValueError:
+        return _redirect(request, "invalid_tax_attachment", f"taxes-{source_id}")
     return _redirect(request)
 
 

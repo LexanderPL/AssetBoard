@@ -15,6 +15,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     Uuid,
+    false,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -70,6 +71,10 @@ class ScheduledItem(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     weekend_policy: Mapped[str] = mapped_column(String(24), nullable=False)
     notes: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     auto_post: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=False)
+    # ADR-0022: an "other tax" (real estate, vehicle...), listed on the Taxes page too.
+    is_tax: Mapped[bool] = mapped_column(
+        Boolean(), nullable=False, default=False, server_default=false()
+    )
     # Days before the due date to send a reminder (F3.6); None: the channel's default.
     reminder_lead_days: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     paused_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)

@@ -128,3 +128,9 @@
     }
   }
 }
+
+/* Progressive disclosure (app.js applyHiddenWhen): the hidden attribute wins over display
+   utilities such as "grid" on the same element. */
+[data-hidden-when][hidden] {
+  display: none !important;
+}

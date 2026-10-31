@@ -1,0 +1,14 @@
+{# Plain-language sentences about a tax (ADR-0022); shared by the Taxes page and income. #}
+{% macro how(kind) -%}
+{%- if kind == "added" %}{{ _("Added on top of what you charge; you pass it on.") }}
+{%- elif kind == "self_paid" %}{{ _("You pay it from your income.") }}
+{%- else %}{{ _("The payer takes it off before paying you.") }}{% endif -%}
+{%- endmacro %}
+
+{% macro when(kind, timing, day, locale) -%}
+{%- set ordinal = format_day_of_month(day, locale) -%}
+{%- if kind == "payer_withheld" %}{{ _("Nothing to pay yourself") }}
+{%- elif timing == "same_month" %}{{ _("Paid on the %(day)s of the month you are paid", day=ordinal) }}
+{%- elif timing == "after_quarter" %}{{ _("Paid on the %(day)s of the month after each quarter", day=ordinal) }}
+{%- else %}{{ _("Paid on the %(day)s of the month after you are paid", day=ordinal) }}{% endif -%}
+{%- endmacro %}

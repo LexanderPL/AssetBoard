@@ -28,6 +28,7 @@ class MembershipView:
     role: str
     created_at: datetime
     require_two_factor: bool = False
+    taxes_enabled: bool = False
 
 
 class UserMembershipReader:
@@ -73,4 +74,5 @@ def _view(membership: Membership, workspace: Workspace) -> MembershipView:
         role=membership.role,
         created_at=membership.created_at,
         require_two_factor=workspace.require_two_factor,
+        taxes_enabled=workspace.taxes_enabled,
     )

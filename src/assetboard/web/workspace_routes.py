@@ -22,6 +22,7 @@ from starlette.responses import RedirectResponse, Response
 from assetboard.db.engine import run_immediate
 from assetboard.domain.identity import MAX_EMAIL_LENGTH
 from assetboard.i18n import gettext
+from assetboard.services import taxes
 from assetboard.services.archive import export_workspace
 from assetboard.services.context import Role, WorkspaceNotAvailable, require_role, select_workspace
 from assetboard.services.instance_settings import workspace_creation_allowed
@@ -174,12 +175,14 @@ def _settings_page(
     errors: dict[str, str] | None = None,
     notice: str | None = None,
     status_code: int = 200,
+    taxes_in_use: tuple[str, ...] = (),
 ) -> Response:
     return render_template(
         request,
         "workspace/settings.html",
         context={
             "values": values,
+            "taxes_in_use": taxes_in_use,
             "errors": {field: _t(request, message) for field, message in (errors or {}).items()},
             "notice": notice,
             **workspace_form_options(request.state.locale),
@@ -248,6 +251,26 @@ async def settings_submit(
             errors={exc.field: SETTINGS_ERRORS[exc.code]},
             status_code=400,
         )
+    return RedirectResponse(
+        request.url_for("workspace_settings").path + "?saved=1", status_code=303
+    )
+
+
+@router.post("/workspace/settings/menu", name="workspace_menu")
+async def menu_submit(
+    request: Request, ctx: CurrentContext, taxes_enabled: FormStr = ""
+) -> Response:
+    """The Menu section: show or hide Taxes (ADR-0022)."""
+    try:
+        await run_in_threadpool(
+            taxes.set_taxes_enabled,
+            request.app.state.session_factory,
+            ctx,
+            taxes_enabled == "1",
+        )
+    except taxes.TaxesInUse as exc:
+        values = await run_in_threadpool(workspace_settings, request.app.state.session_factory, ctx)
+        return _settings_page(request, values, taxes_in_use=exc.sources, status_code=400)
     return RedirectResponse(
         request.url_for("workspace_settings").path + "?saved=1", status_code=303
     )

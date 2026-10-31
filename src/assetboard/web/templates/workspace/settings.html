@@ -41,6 +41,27 @@
     <div class="sm:col-span-2">{{ primary_button(_("Save settings")) }}</div>
   </form>
 </section>
+<section class="panel mt-6 max-w-2xl p-6 sm:p-7" aria-labelledby="workspace-menu-heading" data-settings-menu>
+  <h2 id="workspace-menu-heading" class="text-base font-semibold">{{ _("Menu") }}</h2>
+  <p class="mt-1 text-sm text-muted">{{ _("Hide parts of the app you don't use. Nothing is deleted; turn them back on any time.") }}</p>
+  <form method="post" action="{{ scoped_url(request, 'workspace_menu') }}" class="mt-4 flex items-center justify-between gap-4 border-t border-line pt-4">
+    {{ csrf_input() }}
+    <input type="hidden" name="taxes_enabled" value="{{ '0' if values.taxes_enabled else '1' }}">
+    <div class="min-w-0">
+      <p id="taxes-switch-label" class="text-sm font-medium">{{ _("Taxes") }}</p>
+      <p id="taxes-switch-help" class="text-xs text-muted">{{ _("Plan taxes on income and other taxes. Off: income shows only what you receive.") }}</p>
+    </div>
+    <button type="submit" aria-pressed="{{ 'true' if values.taxes_enabled else 'false' }}" aria-labelledby="taxes-switch-label" aria-describedby="taxes-switch-help" data-taxes-switch class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border border-line-strong bg-subtle p-0.5 aria-pressed:border-primary aria-pressed:bg-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40">
+      <span aria-hidden="true" class="h-5 w-5 rounded-full bg-surface shadow-sm transition-transform{% if values.taxes_enabled %} translate-x-5{% endif %}"></span>
+    </button>
+  </form>
+  {% if taxes_in_use %}
+  <div role="alert" class="mt-3 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-taxes-in-use>
+    <p>{{ _("Taxes stay on while these income sources have taxes ticked. Untick them first:") }}</p>
+    <ul class="mt-1 list-disc pl-5">{% for name in taxes_in_use %}<li>{{ name }}</li>{% endfor %}</ul>
+  </div>
+  {% endif %}
+</section>
 <section class="panel mt-6 max-w-2xl p-6 sm:p-7" aria-labelledby="workspace-more-heading" data-settings-more>
   <h2 id="workspace-more-heading" class="text-base font-semibold">{{ _("Categories and workspaces") }}</h2>
   <div class="mt-4 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-line bg-subtle px-4 py-3">

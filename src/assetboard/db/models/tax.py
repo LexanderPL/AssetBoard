@@ -32,15 +32,30 @@ class TaxRule(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     __tablename__ = "tax_rules"
     __table_args__ = (
         UniqueConstraint("workspace_id", "id", name="uq_tax_rules_workspace_id_id"),
-        CheckConstraint("effect IN ('added', 'withheld')", name="effect_valid"),
+        ForeignKeyConstraint(
+            ["workspace_id", "payment_category_id"],
+            ["categories.workspace_id", "categories.id"],
+            name="fk_tax_rules_workspace_payment_category",
+        ),
+        CheckConstraint("kind IN ('added', 'self_paid', 'payer_withheld')", name="kind_valid"),
         CheckConstraint("base IN ('net', 'gross')", name="base_valid"),
-        CheckConstraint("effect != 'added' OR base = 'net'", name="added_base_valid"),
+        CheckConstraint("kind != 'added' OR base = 'net'", name="added_base_valid"),
+        CheckConstraint("payment_day BETWEEN 1 AND 31", name="payment_day_valid"),
+        CheckConstraint(
+            "payment_timing IN ('next_month', 'same_month', 'after_quarter')",
+            name="payment_timing_valid",
+        ),
         Index("ix_tax_rules_workspace_name", "workspace_id", "name"),
     )
 
     name: Mapped[str] = mapped_column(String(200), nullable=False)
-    effect: Mapped[str] = mapped_column(String(16), nullable=False)
+    # ADR-0022: who pays the tax to the tax office (added | self_paid | payer_withheld).
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
     base: Mapped[str] = mapped_column(String(16), nullable=False)
+    # Default payment schedule; an income source's attachment may override day and category.
+    payment_day: Mapped[int] = mapped_column(Integer(), nullable=False, default=10)
+    payment_timing: Mapped[str] = mapped_column(String(16), nullable=False, default="next_month")
+    payment_category_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
     notes: Mapped[str] = mapped_column(String(200), nullable=False, default="")
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
