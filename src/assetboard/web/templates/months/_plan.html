@@ -66,21 +66,36 @@
 </tr>
 {%- endmacro %}
 
-{# The KPI flow bar and the planned-vs-actual bars. Both are inline SVG (CSP forbids inline
+{# A "Money out" or "Money in" total (web.plan.MoneyBlockView): Out or In, the figures of the
+   lines and bars above. No difference: its groups' differences point different ways. #}
+{% macro block_total_row(b, oob=false) -%}
+<tr id="summary-total-{{ b.key }}" class="border-t-2 {% if b.key == "out" %}border-danger/50{% else %}border-success/50{% endif %} font-semibold" data-money-total="{{ b.key }}"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+  <th scope="row" class="py-2 pl-2 pr-2 text-left">{% if b.key == "out" %}{{ _("Total money out") }}{% else %}{{ _("Total money in") }}{% endif %}</th>
+  <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ b.totals.planned }}</td>
+  <td class="whitespace-nowrap py-2 pr-2 text-right" data-actual-cell><span class="tabular-nums" data-actual>{{ b.totals.actual }}</span>{{ pending_line(b.totals.pending, b.totals.forecast) }}</td>
+  <td class="py-2 pr-2"></td>
+</tr>
+{%- endmacro %}
+
+{# The KPI flow bars and the planned-vs-actual bars. All are inline SVG (CSP forbids inline
    styles, so positions and widths are SVG attributes) hidden from screen readers: the text
-   beside them says the same, and an sr-only sentence sums the flow up.
+   beside them says the same, and an sr-only text sums the flow up.
 
-   Flow bar (domain.summary.flow_bar): what was earned, split into spent (danger), saved /
-   invested (primary) and left (success). When spending and saving exceed earnings, the bar
-   scales to their sum, the part beyond earnings is hatched red and a line marks earnings.
-   Planned-vs-actual: the actual fills an outlined track and a line marks the plan.
+   Home (``kpis``): one flow bar (domain.summary.flow_bar) of what was earned, split into
+   spent (danger), saved / invested (primary) and left (success); when spending and saving
+   exceed earnings the bar scales to their sum, the part beyond earnings is hatched red and a
+   line marks earnings. A forecast line and a thinner forecast bar follow.
 
-   ``pending=true`` (the Month page; Home keeps its forecast line and second bar): every figure
-   is Actual with "+ X pending" under it, the flow bar ("Spent vs earned"; "Expected spent vs
-   expected earned" for a future month) draws each series confirmed (solid) then pending
-   (striped, domain.summary.pending_flow_bar), and the planned-vs-actual bars add a striped
-   pending extension after the actual. Pending parts carry data-pending and the confirmed-only
-   flow bar data-pending-off: the "Show pending" toggle (app.js) shows one or the other. #}
+   The Month page (``in_out``, owner 2026-10-31): a thin strip of where the money came from
+   (earned, success; withdrawn from savings, withdrawn) above the bar of how it was used (spent,
+   saved / invested, left), on one scale (domain.summary.in_out_flow): when In >= Out both end
+   at the right edge; when Out > In the strip ends early, a dashed red outline marks the
+   shortfall and the header says "Short by". Pending parts are striped. Pending parts carry
+   data-pending and the confirmed-only flow data-pending-off: the "Show pending" toggle
+   (app.js) shows one or the other.
+
+   Planned-vs-actual: the actual fills an outlined track and a line marks the plan; on the
+   Month page a striped pending extension follows the actual. #}
 {% macro legend_item(label, value, key, swatch_class, value_class="", pending="", pending_text="") -%}
 <div class="flex min-w-0 items-start gap-2">
   <span class="mt-1 h-3 w-3 shrink-0 rounded-sm {{ swatch_class }}" aria-hidden="true"></span>
@@ -101,7 +116,7 @@
 </pattern>
 {%- endmacro %}
 
-{# The confirmed flow bar (F2.4). #}
+{# Home's flow bar (F2.4). #}
 {% macro flow_svg(f, n, attrs="", extra_class="") -%}
 {% set seg = 'stroke-width="2" vector-effect="non-scaling-stroke"' %}
 <svg class="mt-2 h-6 w-full overflow-visible{% if extra_class %} {{ extra_class }}{% endif %}" viewBox="0 0 {{ n }} 24" preserveAspectRatio="none" aria-hidden="true" focusable="false" data-flow-bar{{ attrs|safe }}>
@@ -125,60 +140,23 @@
 </svg>
 {%- endmacro %}
 
-{# The flow bar with the pending segments (domain.summary.PendingFlowBar). #}
-{% macro pending_flow_svg(p, n) -%}
-{% set seg = 'stroke-width="2" vector-effect="non-scaling-stroke"' %}
-<svg class="mt-2 h-6 w-full overflow-visible" viewBox="0 0 {{ n }} 24" preserveAspectRatio="none" aria-hidden="true" focusable="false" data-flow-bar data-pending>
-  <defs>
-    {{ pending_pattern("flow-pending-danger", "fill-danger", 6) }}
-    {{ pending_pattern("flow-pending-primary", "fill-primary", 6) }}
-    {{ pending_pattern("flow-pending-success", "fill-success", 6) }}
-    <pattern id="flow-pending-overspend-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-      <rect x="0" y="0" width="8" height="8" class="fill-danger-tint"></rect>
-      <rect x="0" y="0" width="4" height="8" class="fill-danger"></rect>
-    </pattern>
-  </defs>
-  {% set parts = [
-    (0, p.spent_end, "fill-danger", "", "spent"),
-    (p.spent_end, p.spent_pending_end, "", "url(#flow-pending-danger)", "spent-pending"),
-    (p.spent_pending_end, p.saved_end, "fill-primary", "", "saved"),
-    (p.saved_end, p.out_end, "", "url(#flow-pending-primary)", "saved-pending"),
-    (p.out_end, p.left_end, "fill-success", "", "left"),
-    (p.left_end, p.left_end + p.left_pending, "", "url(#flow-pending-success)", "left-pending"),
-  ] %}
-  {% for start, end, cls, pattern, key in parts %}{% if end > start %}<rect x="{{ start }}" y="0" width="{{ end - start }}" height="24"{% if pattern %} fill="{{ pattern }}"{% endif %} class="{% if cls %}{{ cls }} {% endif %}stroke-surface" {{ seg|safe }} data-pending-flow-segment="{{ key }}"></rect>{% endif %}{% endfor %}
-  {% if p.overspent > 0 %}
-  <rect x="{{ p.forecast_earned_end }}" y="0" width="{{ p.overspent }}" height="24" fill="url(#flow-pending-overspend-hatch)" class="stroke-surface" {{ seg|safe }} data-pending-flow-segment="overspent"></rect>
-  <line x1="{{ p.forecast_earned_end }}" x2="{{ p.forecast_earned_end }}" y1="-4" y2="28" class="stroke-ink" stroke-width="3" vector-effect="non-scaling-stroke"></line>
-  {% endif %}
-</svg>
-{%- endmacro %}
-
-{% macro kpis(oob=false, pending=false) -%}
+{# Home: the flow bar of earnings, the forecast line and bar, and the spent and earned bars. #}
+{% macro kpis(oob=false) -%}
 {% set k = summary.kpis %}
 {% set f = k.flow %}
 {% set n = k.flow_scale %}
-{% set split = pending and k.has_pending %}
 {# Separators between the segments stay 2px wide however the bar stretches. #}
 {% set seg = 'stroke-width="2" vector-effect="non-scaling-stroke"' %}
 <div id="summary-kpis" class="mt-4 space-y-5" data-summary-kpis{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
   <div data-flow>
-    {% if pending %}<h3 class="mb-2 text-sm font-medium text-muted" data-flow-heading>{% if summary.future %}{{ _("Expected spent vs expected earned") }}{% else %}{{ _("Spent vs earned") }}{% endif %}</h3>{% endif %}
-    <p class="sr-only" data-flow-summary>{{ _("Earned %(earned)s: spent %(spent)s, saved or invested %(saved)s, left %(net)s.", earned=k.earned, spent=k.spent, saved=k.saved, net=k.net) }}{% if k.overspend %} {{ _("Spending and saving exceed earnings by %(amount)s.", amount=k.overspend) }}{% endif %}{% if split %}<span data-pending> {{ _("Pending: earned %(earned)s, spent %(spent)s, saved or invested %(saved)s. If everything pending arrives, left %(net)s.", earned=k.earned_pending or k.zero, spent=k.spent_pending or k.zero, saved=k.saved_pending or k.zero, net=k.forecast_net) }}</span>{% endif %}</p>
+    <p class="sr-only" data-flow-summary>{{ _("Earned %(earned)s: spent %(spent)s, saved or invested %(saved)s, left %(net)s.", earned=k.earned, spent=k.spent, saved=k.saved, net=k.net) }}{% if k.overspend %} {{ _("Spending and saving exceed earnings by %(amount)s.", amount=k.overspend) }}{% endif %}</p>
     <dl class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1" aria-hidden="true">
       <div class="flex flex-wrap items-baseline gap-x-2">
         <dt class="text-sm text-muted">{{ _("Earned") }}</dt>
         <dd class="text-xl font-semibold tabular-nums" data-kpi="earned">{{ k.earned }}</dd>
-        {% if split and k.earned_pending %}<dd class="text-sm tabular-nums text-muted" data-pending data-kpi-pending="earned">{{ _("+ %(amount)s pending", amount=k.earned_pending) }}</dd>{% endif %}
       </div>
     </dl>
-    {% if split %}
-    {{ pending_flow_svg(k.pending_flow, n) }}
-    {{ flow_svg(f, n, " data-pending-off", "hidden") }}
-    {% else %}
     {{ flow_svg(f, n) }}
-    {% endif %}
-    {% if not pending %}
     <p class="mt-3 text-sm text-muted" data-forecast-line>{{ _("Forecast spent %(spent)s · forecast earned %(earned)s.", spent=k.forecast_spent, earned=k.forecast_earned) }}</p>
     {% set ff = k.forecast_flow %}
     <svg class="mt-2 h-4 w-full overflow-visible" viewBox="0 0 {{ n }} 24" preserveAspectRatio="none" aria-hidden="true" focusable="false" data-flow-bar>
@@ -191,15 +169,121 @@
       {% if ff.overspent > 0 %}<rect x="{{ ff.earned_end }}" y="0" width="{{ ff.overspent }}" height="24" fill="url(#flow-overspend-hatch)" class="stroke-surface" {{ seg|safe }}></rect>{% endif %}
       {% endif %}
     </svg>
+    <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3" aria-hidden="true">
+      {{ legend_item(_("Spent"), k.spent, "spent", "bg-danger") }}
+      {{ legend_item(_("Saved / invested"), k.saved, "saved", "bg-primary") }}
+      {% if k.net_tone == "unfavourable" %}
+      {{ legend_item(_("Left"), k.net, "net", "border-2 border-danger bg-danger-tint", "text-danger") }}
+      {% else %}
+      {{ legend_item(_("Left"), k.net, "net", "bg-success", "text-success-strong" if k.net_tone == "favourable" else "") }}
+      {% endif %}
+    </dl>
+    {% if k.savings_rate is not none %}
+    {% set rate %}<span class="font-semibold tabular-nums text-ink" data-kpi="savings-rate">{{ k.savings_rate }}</span>{% endset %}
+    <p class="mt-2 text-sm text-muted" data-savings-rate>{{ _("Saved / invested %(rate)s of income", rate=rate) }}</p>
+    {% endif %}
+  </div>
+  <div class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+    {% for b in summary.bars %}
+    {% set fill = "fill-danger" if b.over and b.key == "expense" else ("fill-success" if b.over else "fill-primary") %}
+    <div data-summary-bar="{{ b.key }}">
+      <p class="text-xs text-muted">{% if not b.has_plan %}{% if b.key == "expense" %}{{ _("Spent %(actual)s (no plan)", actual=b.actual) }}{% else %}{{ _("Earned %(actual)s (no plan)", actual=b.actual) }}{% endif %}{% elif b.key == "expense" %}{{ _("Spent %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% else %}{{ _("Earned %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% endif %}{% if b.over and b.has_plan %} <span class="{% if b.key == "expense" %}text-danger{% else %}text-success-strong{% endif %}">{{ _("(over plan)") }}</span>{% endif %}</p>
+      <svg class="mt-1.5 h-4 w-full overflow-visible" viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <rect x="0" y="3" width="100" height="10" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke" data-bar-track></rect>
+        <rect x="0" y="3" width="{{ b.actual_width }}" height="10" class="{{ fill }}" data-bar-actual></rect>
+        {% if b.has_plan %}<line x1="{{ b.planned_width }}" x2="{{ b.planned_width }}" y1="0" y2="16" class="stroke-ink" stroke-width="3" vector-effect="non-scaling-stroke" data-bar-planned></line>{% endif %}
+      </svg>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{%- endmacro %}
+
+{# The Month page's strip and bar (domain.summary.InOutFlow). ``pending``: the flow with the
+   pending parts (striped); otherwise the confirmed-only twin. #}
+{% macro in_out_svgs(f, n, pending=false, attrs="", extra_class="") -%}
+{% set flow_colour = {"earned": "success", "withdrawn": "withdrawn", "spent": "danger", "saved": "primary", "left": "success"} %}
+{% set flow_fill = {"earned": "fill-success", "withdrawn": "fill-withdrawn", "spent": "fill-danger", "saved": "fill-primary", "left": "fill-success"} %}
+{% set seg = 'stroke-width="2" vector-effect="non-scaling-stroke"' %}
+{% set prefix = "flow-pending-" if pending else "flow-confirmed-" %}
+<div class="mt-2{% if extra_class %} {{ extra_class }}{% endif %}" aria-hidden="true" data-in-out-flow{{ attrs|safe }}>
+  <svg class="h-2 w-full overflow-visible" viewBox="0 0 {{ n }} 8" preserveAspectRatio="none" focusable="false" data-flow-strip>
+    {% if f.empty %}
+    <rect x="0" y="0" width="{{ n }}" height="8" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke" data-strip-segment="empty"></rect>
+    {% else %}
+    {% if pending %}<defs>{{ pending_pattern(prefix ~ "strip-success", "fill-success", 6) }}{{ pending_pattern(prefix ~ "strip-withdrawn", "fill-withdrawn", 6) }}</defs>{% endif %}
+    {% for key, start, end in f.strip_segments() %}
+    {% if key == "short" %}
+    <rect x="{{ start }}" y="0.75" width="{{ end - start }}" height="6.5" fill="none" class="stroke-danger" stroke-width="1.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" data-strip-segment="short"></rect>
+    {% else %}
+    {% set colour = flow_colour[key.split("-")[0]] %}
+    <rect x="{{ start }}" y="0" width="{{ end - start }}" height="8"{% if key.endswith("-pending") %} fill="url(#{{ prefix }}strip-{{ colour }})" class="stroke-surface"{% else %} class="{{ flow_fill[key] }} stroke-surface"{% endif %} {{ seg|safe }} data-strip-segment="{{ key }}"></rect>
+    {% endif %}
+    {% endfor %}
+    {% endif %}
+  </svg>
+  <svg class="mt-0.5 h-6 w-full overflow-visible" viewBox="0 0 {{ n }} 24" preserveAspectRatio="none" focusable="false" data-flow-bar>
+    {% if f.empty %}
+    <rect x="0" y="0" width="{{ n }}" height="24" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke" data-flow-segment="empty"></rect>
+    {% else %}
+    {% if pending %}<defs>{{ pending_pattern(prefix ~ "danger", "fill-danger", 6) }}{{ pending_pattern(prefix ~ "primary", "fill-primary", 6) }}{{ pending_pattern(prefix ~ "success", "fill-success", 6) }}</defs>{% endif %}
+    {% for key, start, end in f.bar_segments() %}
+    {% set colour = flow_colour[key.split("-")[0]] %}
+    <rect x="{{ start }}" y="0" width="{{ end - start }}" height="24"{% if key.endswith("-pending") %} fill="url(#{{ prefix }}{{ colour }})" class="stroke-surface"{% else %} class="{{ flow_fill[key] }} stroke-surface"{% endif %} {{ seg|safe }} data-flow-segment="{{ key }}"></rect>
+    {% endfor %}
+    {% endif %}
+  </svg>
+</div>
+{%- endmacro %}
+
+{# The Month page: In and Out (the strip and the bar), the legend, and the Out and In bars. #}
+{% macro in_out(oob=false) -%}
+{% set io = summary.in_out %}
+{% set n = summary.kpis.flow_scale %}
+{% set split = io.has_pending %}
+<div id="summary-kpis" class="mt-4 space-y-5" data-summary-kpis{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+  <div data-flow>
+    <h3 class="mb-2 text-sm font-medium text-muted" data-flow-heading>{% if summary.future %}{{ _("Expected in vs expected out") }}{% else %}{{ _("In vs out") }}{% endif %}</h3>
+    <ul class="sr-only" data-flow-summary>
+      <li>{{ _("In %(total)s: earned %(earned)s, withdrawn from savings %(withdrawn)s.", total=io.total_in, earned=io.earned, withdrawn=io.withdrawn) }}</li>
+      <li>{{ _("Out %(total)s: spent %(spent)s, saved or invested %(saved)s.", total=io.total_out, spent=io.spent, saved=io.saved) }}</li>
+      <li>{% if io.short %}{{ _("Short by %(amount)s: more went out than came in.", amount=io.left) }}{% else %}{{ _("Left %(amount)s.", amount=io.left) }}{% endif %}</li>
+      {% if split %}<li data-pending>{{ _("Pending: in %(total_in)s (earned %(earned)s, withdrawn %(withdrawn)s), out %(total_out)s (spent %(spent)s, saved or invested %(saved)s).", total_in=io.in_pending or io.zero, earned=io.earned_pending or io.zero, withdrawn=io.withdrawn_pending or io.zero, total_out=io.out_pending or io.zero, spent=io.spent_pending or io.zero, saved=io.saved_pending or io.zero) }} {% if io.forecast_short %}{{ _("If everything pending arrives, short by %(amount)s.", amount=io.forecast_left) }}{% else %}{{ _("If everything pending arrives, left %(amount)s.", amount=io.forecast_left) }}{% endif %}</li>{% endif %}
+    </ul>
+    <dl class="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1" aria-hidden="true">
+      <div class="flex flex-wrap items-baseline gap-x-2">
+        <dt class="text-sm text-muted">{{ _("In") }}</dt>
+        <dd class="text-xl font-semibold tabular-nums" data-kpi="in">{{ io.total_in }}</dd>
+        {% if io.has_withdrawn %}<dd class="text-sm tabular-nums text-muted" data-kpi-breakdown>{{ _("earned %(earned)s + withdrawn %(withdrawn)s", earned=io.earned, withdrawn=io.withdrawn) }}</dd>{% endif %}
+        {% if io.in_pending %}<dd class="text-sm tabular-nums text-muted" data-pending data-kpi-pending="in">{{ _("+ %(amount)s pending", amount=io.in_pending) }}</dd>{% endif %}
+      </div>
+      <div class="flex flex-wrap items-baseline gap-x-2" data-flow-result>
+        {% if io.short %}
+        <dt class="text-sm font-medium text-danger">{{ _("Short by") }}</dt>
+        <dd class="font-semibold tabular-nums text-danger" data-kpi="short">{{ io.left }}</dd>
+        {% else %}
+        <dt class="text-sm text-muted">{{ _("Left") }}</dt>
+        <dd class="font-semibold tabular-nums text-success-strong" data-kpi="left">{{ io.left }}</dd>
+        {% endif %}
+      </div>
+    </dl>
+    {% if split %}
+    {{ in_out_svgs(io.flow, n, pending=true, attrs=" data-pending") }}
+    {{ in_out_svgs(io.confirmed_flow, n, attrs=" data-pending-off", extra_class="hidden") }}
+    {% else %}
+    {{ in_out_svgs(io.confirmed_flow, n) }}
     {% endif %}
     <dl class="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:grid-cols-3" aria-hidden="true">
-      {{ legend_item(_("Spent"), k.spent, "spent", "bg-danger", pending=k.spent_pending if split else "") }}
-      {{ legend_item(_("Saved / invested"), k.saved, "saved", "bg-primary", pending=k.saved_pending if split else "") }}
-      {% set left_pending = _("%(amount)s if everything pending arrives", amount=k.forecast_net) if split else "" %}
-      {% if k.net_tone == "unfavourable" %}
-      {{ legend_item(_("Left"), k.net, "net", "border-2 border-danger bg-danger-tint", "text-danger", pending_text=left_pending) }}
+      {{ legend_item(_("Earned"), io.earned, "earned", "bg-success", pending=io.earned_pending) }}
+      {% if io.has_withdrawn %}{{ legend_item(_("Withdrawn from savings"), io.withdrawn, "withdrawn", "bg-withdrawn", pending=io.withdrawn_pending) }}{% endif %}
+      {{ legend_item(_("Spent"), io.spent, "spent", "bg-danger", pending=io.spent_pending) }}
+      {{ legend_item(_("Saved / invested"), io.saved, "saved", "bg-primary", pending=io.saved_pending) }}
+      {% set forecast = "" %}
+      {% if split %}{% set forecast = _("short by %(amount)s if everything pending arrives", amount=io.forecast_left) if io.forecast_short else _("%(amount)s if everything pending arrives", amount=io.forecast_left) %}{% endif %}
+      {% if io.short %}
+      {{ legend_item(_("Short by"), io.left, "net", "border-2 border-dashed border-danger", "text-danger", pending_text=forecast) }}
       {% else %}
-      {{ legend_item(_("Left"), k.net, "net", "bg-success", "text-success-strong" if k.net_tone == "favourable" else "", pending_text=left_pending) }}
+      {{ legend_item(_("Left"), io.left, "net", "bg-success", "text-success-strong", pending_text=forecast) }}
       {% endif %}
     </dl>
     {% if split %}
@@ -211,22 +295,22 @@
       {{ _("Striped: pending, not confirmed yet") }}
     </p>
     {% endif %}
-    {% if k.savings_rate is not none %}
-    {% set rate %}<span class="font-semibold tabular-nums text-ink" data-kpi="savings-rate">{{ k.savings_rate }}</span>{% endset %}
+    {% if io.savings_rate is not none %}
+    {% set rate %}<span class="font-semibold tabular-nums text-ink" data-kpi="savings-rate">{{ io.savings_rate }}</span>{% endset %}
     <p class="mt-2 text-sm text-muted" data-savings-rate>{{ _("Saved / invested %(rate)s of income", rate=rate) }}</p>
     {% endif %}
   </div>
   <div class="grid gap-x-6 gap-y-3 sm:grid-cols-2">
-    {% for b in summary.bars %}
-    {% set fill = "fill-danger" if b.over and b.key == "expense" else ("fill-success" if b.over else "fill-primary") %}
-    {% set bar_pending = pending and b.pending %}
+    {% for b in summary.in_out_bars %}
+    {% set fill = "fill-danger" if b.over and b.key == "out" else ("fill-success" if b.over else "fill-primary") %}
+    {% set pending_part %}{% if b.pending %}<span data-pending> {{ _("(+ %(amount)s pending)", amount=b.pending) }}<span class="sr-only"> ({{ _("If everything pending arrives: %(amount)s", amount=b.forecast) }})</span></span>{% endif %}{% endset %}
     <div data-summary-bar="{{ b.key }}">
-      <p class="text-xs text-muted">{% if not b.has_plan %}{% if b.key == "expense" %}{{ _("Spent %(actual)s (no plan)", actual=b.actual) }}{% else %}{{ _("Earned %(actual)s (no plan)", actual=b.actual) }}{% endif %}{% elif b.key == "expense" %}{{ _("Spent %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% else %}{{ _("Earned %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% endif %}{% if bar_pending %}<span data-pending> {{ _("+ %(amount)s pending", amount=b.pending) }}<span class="sr-only"> ({{ _("If everything pending arrives: %(amount)s", amount=b.forecast) }})</span></span>{% endif %}{% if b.over and b.has_plan %} <span class="{% if b.key == "expense" %}text-danger{% else %}text-success-strong{% endif %}">{{ _("(over plan)") }}</span>{% elif bar_pending and b.pending_over and b.has_plan %}<span class="{% if b.key == "expense" %}text-warning-strong{% else %}text-success-strong{% endif %}" data-pending data-pending-over> {{ _("(over plan if everything pending arrives)") }}</span>{% endif %}</p>
+      <p class="text-xs text-muted">{% if b.key == "out" %}{% if b.has_plan %}{{ _("Out %(actual)s%(pending)s of %(planned)s planned", actual=b.actual, pending=pending_part, planned=b.planned) }}{% else %}{{ _("Out %(actual)s%(pending)s (no plan)", actual=b.actual, pending=pending_part) }}{% endif %}{% else %}{% if b.has_plan %}{{ _("In %(actual)s%(pending)s of %(planned)s planned", actual=b.actual, pending=pending_part, planned=b.planned) }}{% else %}{{ _("In %(actual)s%(pending)s (no plan)", actual=b.actual, pending=pending_part) }}{% endif %}{% endif %}{% if b.over and b.has_plan %} <span class="{% if b.key == "out" %}text-danger{% else %}text-success-strong{% endif %}">{{ _("(over plan)") }}</span>{% elif b.pending and b.pending_over and b.has_plan %}<span class="{% if b.key == "out" %}text-warning-strong{% else %}text-success-strong{% endif %}" data-pending data-pending-over> {{ _("(over plan if everything pending arrives)") }}</span>{% endif %}</p>
       <svg class="mt-1.5 h-4 w-full overflow-visible" viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        {% if bar_pending %}<defs>{{ pending_pattern("bar-pending-" ~ b.key, fill, 1) }}</defs>{% endif %}
+        {% if b.pending %}<defs>{{ pending_pattern("bar-pending-" ~ b.key, fill, 1) }}</defs>{% endif %}
         <rect x="0" y="3" width="100" height="10" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke" data-bar-track></rect>
         <rect x="0" y="3" width="{{ b.actual_width }}" height="10" class="{{ fill }}" data-bar-actual></rect>
-        {% if bar_pending and b.pending_end > b.actual_width %}<rect x="{{ b.actual_width }}" y="3" width="{{ b.pending_end - b.actual_width }}" height="10" fill="url(#bar-pending-{{ b.key }})" data-pending data-bar-pending><title>{{ _("If everything pending arrives: %(amount)s", amount=b.forecast) }}</title></rect>{% endif %}
+        {% if b.pending and b.pending_end > b.actual_width %}<rect x="{{ b.actual_width }}" y="3" width="{{ b.pending_end - b.actual_width }}" height="10" fill="url(#bar-pending-{{ b.key }})" data-pending data-bar-pending><title>{{ _("If everything pending arrives: %(amount)s", amount=b.forecast) }}</title></rect>{% endif %}
         {% if b.has_plan %}<line x1="{{ b.planned_width }}" x2="{{ b.planned_width }}" y1="0" y2="16" class="stroke-ink" stroke-width="3" vector-effect="non-scaling-stroke" data-bar-planned></line>{% endif %}
       </svg>
     </div>

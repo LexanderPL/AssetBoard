@@ -114,13 +114,16 @@ def test_the_golden_example_on_the_page(summary: OwnerApp) -> None:
         "€4,873.00",
     ]
     assert "+€1,027.00" in total.group(0)
+    # In 3 400 (earned), Out 4 873 (spent): short by 1 473; saved 0 of 3 400 earned.
     assert _kpis(block) == [
+        "€3,400.00",
+        "€1,473.00",
         "€3,400.00",
         "€4,873.00",
         "€0.00",
-        "-€1,473.00",
+        "€1,473.00",
         "0.0%",
-    ]  # saved 0 of 3 400 earned
+    ]
     summary.client.headers["Accept-Language"] = "pl"
     polish = _summary(summary.client.get(MONTH).text)
     assert (
@@ -134,21 +137,38 @@ def test_the_golden_example_on_the_page(summary: OwnerApp) -> None:
 def test_bars_show_planned_and_actual_in_svg_with_the_same_text(summary: OwnerApp) -> None:
     _golden(summary)
     block = _summary(summary.client.get(MONTH).text)
-    expense = re.search(r'data-summary-bar="expense".*?</svg>', block, re.DOTALL)
-    income = re.search(r'data-summary-bar="income".*?</svg>', block, re.DOTALL)
-    assert expense is not None and income is not None
-    assert "Spent €4,873.00 of €5,900.00 planned" in expense.group(0)
+    out = re.search(r'data-summary-bar="out".*?</svg>', block, re.DOTALL)
+    into = re.search(r'data-summary-bar="in".*?</svg>', block, re.DOTALL)
+    assert out is not None and into is not None
+    assert "Out €4,873.00 of €5,900.00 planned" in out.group(0)
     # 4 873 / 5 900 = 82.59 %: floor 82. Planned is the scale (100): its line is at the end.
-    assert re.search(r'width="100"[^>]*class="fill-subtle stroke-line-strong"', expense.group(0))
-    assert re.search(r'width="82"[^>]*class="fill-primary"', expense.group(0))
-    assert re.search(r'x1="100"[^>]*class="stroke-ink"[^>]*data-bar-planned', expense.group(0))
-    # Income over plan: actual is the scale, planned 3 000 / 3 400 = 88.2 %: floor 88.
-    assert "Earned €3,400.00 of €3,000.00 planned" in income.group(0)
-    assert "(over plan)" in income.group(0)
-    assert re.search(r'width="100"[^>]*class="fill-success"', income.group(0))
-    assert re.search(r'x1="88"[^>]*data-bar-planned', income.group(0))
-    assert 'aria-hidden="true"' in expense.group(0)
+    assert re.search(r'width="100"[^>]*class="fill-subtle stroke-line-strong"', out.group(0))
+    assert re.search(r'width="82"[^>]*class="fill-primary"', out.group(0))
+    assert re.search(r'x1="100"[^>]*class="stroke-ink"[^>]*data-bar-planned', out.group(0))
+    # In over plan: actual is the scale, planned 3 000 / 3 400 = 88.2 %: floor 88.
+    assert "In €3,400.00 of €3,000.00 planned" in into.group(0)
+    assert "(over plan)" in into.group(0)
+    assert re.search(r'width="100"[^>]*class="fill-success"', into.group(0))
+    assert re.search(r'x1="88"[^>]*data-bar-planned', into.group(0))
+    assert 'aria-hidden="true"' in out.group(0)
     assert " rx=" not in block  # square ends: rounded corners would stretch with the viewBox
+
+
+def test_out_and_in_bars_include_savings_and_withdrawals(summary: OwnerApp) -> None:
+    """Out = expenses + saved / invested, In = income + withdrawals, plans included."""
+    rent = _category(summary, "Golden Rent")
+    fund = _category(summary, "Golden Fund", treatment="savings")
+    salary = _category(summary, "Golden Salary", "income")
+    drawn = _category(summary, "Golden Drawdown", "income", treatment="savings")
+    for category, amount in ((rent, "2000"), (fund, "1000"), (salary, "4000"), (drawn, "500")):
+        _plan(summary, category, amount)
+    _spend(summary, rent, "1500")
+    _spend(summary, fund, "1000")
+    _spend(summary, salary, "4000", "income")
+    _spend(summary, drawn, "800", "income")
+    block = _summary(summary.client.get(MONTH).text)
+    assert "Out €2,500.00 of €3,000.00 planned" in block
+    assert "In €4,800.00 of €4,500.00 planned" in block
 
 
 def test_nothing_earned_shows_no_savings_rate(summary: OwnerApp) -> None:
@@ -156,20 +176,30 @@ def test_nothing_earned_shows_no_savings_rate(summary: OwnerApp) -> None:
     block = _summary(summary.client.get(MONTH).text)
     assert 'data-kpi="savings-rate"' not in block and "of income" not in block
     bars = re.findall(r'width="(\d+)"[^>]*data-bar-actual', block)
-    assert bars == ["100", "0"]  # spent with no plan: actual is the scale; nothing earned
+    assert bars == ["100", "0"]  # out with no plan: actual is the scale; nothing in
     assert "data-bar-planned" not in block  # nothing planned: no plan line
-    assert "Spent €10.00 (no plan)" in block and "Earned €0.00 (no plan)" in block
+    assert "Out €10.00 (no plan)" in block and "In €0.00 (no plan)" in block
     assert "(over plan)" not in block and "of €0.00 planned" not in block
-    # Everything spent is overspend: the whole flow bar is hatched.
-    assert re.search(r'x="0" y="0" width="1000"[^>]*data-flow-segment="overspent"', block)
-    assert "Spending and saving exceed earnings by €10.00." in block
+    # Nothing came in: the strip is all shortfall, the bar all spent; "Short by" in the header.
+    assert _strip(block) == {"short": (0, 1000)}
+    assert _flow(block) == {"spent": (0, 1000)}
+    assert "Short by €10.00: more went out than came in." in block
 
 
 def _flow(block: str) -> dict[str, tuple[int, int]]:
     return {
         key: (int(x), int(width))
         for x, width, key in re.findall(
-            r'<rect x="(\d+)" y="0" width="(\d+)"[^>]*data-flow-segment="([a-z]+)"', block
+            r'<rect x="(\d+)" y="0" width="(\d+)"[^>]*data-flow-segment="([a-z-]+)"', block
+        )
+    }
+
+
+def _strip(block: str) -> dict[str, tuple[int, int]]:
+    return {
+        key: (int(x), int(width))
+        for x, width, key in re.findall(
+            r'<rect x="(\d+)" y="[0-9.]+" width="(\d+)"[^>]*data-strip-segment="([a-z-]+)"', block
         )
     }
 
@@ -183,26 +213,76 @@ def test_the_flow_bar_splits_earnings(summary: OwnerApp) -> None:
     _spend(summary, fund, "1000")
     block = _summary(summary.client.get(MONTH).text)
     assert _flow(block) == {"spent": (0, 500), "saved": (500, 250), "left": (750, 250)}
+    assert _strip(block) == {"earned": (0, 1000)}
     # The savings rate is saved / earned: 1 000 of 4 000 (what is left is not saved).
-    assert _kpis(block) == ["€4,000.00", "€2,000.00", "€1,000.00", "€1,000.00", "25.0%"]
+    assert _kpis(block) == [
+        "€4,000.00",
+        "€1,000.00",
+        "€4,000.00",
+        "€2,000.00",
+        "€1,000.00",
+        "€1,000.00",
+        "25.0%",
+    ]
     assert re.search(r'data-savings-rate>Saved / invested <span[^>]*data-kpi="savings-rate">'
                      r"25.0%</span> of income</p>", block)  # fmt: skip
-    assert (
-        "Earned €4,000.00: spent €2,000.00, saved or invested €1,000.00, left €1,000.00." in block
-    )
-    assert "data-flow-earned" not in block and "exceed earnings" not in block
-    assert ">Saved / invested</dt>" in block
+    assert "<li>In €4,000.00: earned €4,000.00, withdrawn from savings €0.00.</li>" in block
+    assert "<li>Out €3,000.00: spent €2,000.00, saved or invested €1,000.00.</li>" in block
+    assert "<li>Left €1,000.00.</li>" in block
+    # Nothing withdrawn: no breakdown in the header and no Withdrawn legend item.
+    assert "data-kpi-breakdown" not in block and 'data-kpi="withdrawn"' not in block
+    assert ">Saved / invested</dt>" in block and "Short by" not in block
+
+
+def test_withdrawals_count_as_money_in(summary: OwnerApp) -> None:
+    """In = earned + withdrawn: the strip shows both on the bar's scale (owner, option A)."""
+    rent = _category(summary, "Golden Rent")
+    fund = _category(summary, "Golden Fund", treatment="savings")
+    salary = _category(summary, "Golden Salary", "income")
+    drawn = _category(summary, "Golden Drawdown", "income", treatment="savings")
+    _spend(summary, salary, "8000", "income")
+    _spend(summary, drawn, "1000", "income")
+    _spend(summary, rent, "4500")
+    _spend(summary, fund, "1500")
+    block = _summary(summary.client.get(MONTH).text)
+    # In 9 000: earned 8 000 (888) + withdrawn 1 000; out 6 000 + left 3 000.
+    assert _strip(block) == {"earned": (0, 888), "withdrawn": (888, 112)}
+    assert _flow(block) == {"spent": (0, 500), "saved": (500, 166), "left": (666, 334)}
+    assert re.search(r'data-kpi="in">€9,000.00<', block)
+    assert re.search(r"data-kpi-breakdown>earned €8,000.00 \+ withdrawn €1,000.00<", block)
+    assert re.search(r'data-kpi="left">€3,000.00<', block)
+    assert re.search(r'data-kpi="withdrawn">€1,000.00<', block)
+    assert 'class="fill-withdrawn stroke-surface"' in block
+    # The table: "Money out" (expenses, saved) and "Money in" (income, withdrawn) with totals.
+    blocks = re.findall(r'data-money-block="([a-z]+)"', block)
+    assert blocks == ["out", "in"]
+    out_total = re.search(r'<tr id="summary-total-out".*?</tr>', block, re.DOTALL)
+    in_total = re.search(r'<tr id="summary-total-in".*?</tr>', block, re.DOTALL)
+    assert out_total is not None and in_total is not None
+    assert "Total money out" in out_total.group(0) and "€6,000.00" in out_total.group(0)
+    assert "Total money in" in in_total.group(0) and "€9,000.00" in in_total.group(0)
+    order = [block.index(f'data-plan-group="{key}"') for key in ("expense", "saved")]
+    order += [block.index('data-money-block="in"')]
+    order += [block.index(f'data-plan-group="{key}"') for key in ("income", "withdrawn")]
+    assert order == sorted(order)
+    summary.client.headers["Accept-Language"] = "pl"
+    polish = _summary(summary.client.get(MONTH).text)
+    assert ">Wydane i odłożone</span>" in polish and ">Wpływy</span>" in polish
 
 
 def test_the_flow_bar_shows_overspending(summary: OwnerApp) -> None:
     _golden(summary)
     block = _summary(summary.client.get(MONTH).text)
-    # Spent 4 873 of 3 400 earned: spending is the scale; earnings end at 697.
-    assert _flow(block) == {"spent": (0, 1000), "overspent": (697, 303)}
-    assert re.search(r'x1="697"[^>]*data-flow-earned', block)
-    assert "Spending and saving exceed earnings by €1,473.00." in block
+    # Out 4 873, In 3 400: out is the scale; the strip ends at 697, then the dashed shortfall.
+    assert _flow(block) == {"spent": (0, 1000)}
+    assert _strip(block) == {"earned": (0, 697), "short": (697, 303)}
+    assert re.search(r'stroke-dasharray="5 3"[^>]*data-strip-segment="short"', block)
+    assert re.search(r'text-danger">Short by</dt>\s*<dd[^>]*data-kpi="short">€1,473.00<', block)
+    assert "Short by €1,473.00: more went out than came in." in block
     net = re.search(r'<dd class="([^"]*)" data-kpi="net">', block)
     assert net is not None and "text-danger" in net.group(1)
+    summary.client.headers["Accept-Language"] = "pl"
+    assert "Brakuje" in _summary(summary.client.get(MONTH).text)
 
 
 def test_rows_above_plan_are_tinted(summary: OwnerApp) -> None:
@@ -295,7 +375,8 @@ def test_a_planned_value_save_refreshes_totals_and_kpis_out_of_band(summary: Own
     total = re.search(r'<tr id="summary-total-expense"[^>]*hx-swap-oob="outerHTML"', html)
     assert total is not None
     assert re.search(r'<div id="summary-kpis"[^>]*hx-swap-oob="outerHTML"', html)
-    assert "Spent €100.00 of €150.00 planned" in html
+    assert "Out €100.00 of €150.00 planned" in html
+    assert re.search(r'<tr id="summary-total-out"[^>]*hx-swap-oob="outerHTML"', html)
 
 
 def test_a_transaction_write_refreshes_actuals_and_kpis(summary: OwnerApp) -> None:
