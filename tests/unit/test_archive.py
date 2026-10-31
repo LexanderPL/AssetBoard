@@ -399,7 +399,7 @@ def test_reader_refuses_listed_files_that_are_missing() -> None:
     ],
     ids=["huge-sort", "long-sort", "early-ts", "late-ts", "huge-int", "deep-json"],
 )
-def test_reader_reports_hostile_values_as_errors(file: str, old: str, new: str) -> None:
+def test_reader_reports_hostile_values_as_errors(file: str, old: bytes, new: bytes) -> None:
     files = _files()
     assert old in files[file]
     files[file] = files[file].replace(old, new, 1)
