@@ -1169,7 +1169,32 @@ msgid ""
 "transaction manually if needed."
 msgstr ""
 
+msgid "Enter a name."
+msgstr ""
+
+msgid "Enter what you are paid per, for example day or hour."
+msgstr ""
+
+msgid "Enter a number of months between 1 and 24."
+msgstr ""
+
+msgid "Enter a pay day between 1 and 31."
+msgstr ""
+
+msgid "The end month cannot be before the start month."
+msgstr ""
+
 msgid "The income source could not be saved. Check the form and try again."
+msgstr ""
+
+#, python-format
+msgid "Work done in %(month)s is paid on %(date)s."
+msgstr ""
+
+msgid "Basics"
+msgstr ""
+
+msgid "Payday"
 msgstr ""
 
 msgid ""
@@ -1514,9 +1539,6 @@ msgid ""
 "address (%(base_url)s), allow cookies for it, and try again."
 msgstr ""
 
-msgid "Enter a name."
-msgstr ""
-
 msgid "Choose an active category matching the direction."
 msgstr ""
 
@@ -1812,9 +1834,6 @@ msgid "%(num)d overdue occurrence"
 msgid_plural "%(num)d overdue occurrences"
 msgstr[0] ""
 msgstr[1] ""
-
-msgid "Income sources"
-msgstr ""
 
 msgid "Net worth"
 msgstr ""
@@ -2769,6 +2788,175 @@ msgid ""
 "instead, up to 24."
 msgstr ""
 
+#, python-format
+msgid "Example for %(amount)s net"
+msgstr ""
+
+#, python-format
+msgid "You receive %(amount)s."
+msgstr ""
+
+#, python-format
+msgid "%(name)s %(amount)s to pay on %(date)s."
+msgstr ""
+
+msgid "No tax payments are planned."
+msgstr ""
+
+msgid "Enter the amount and the payday to see an example."
+msgstr ""
+
+#, python-format
+msgid "paid on the %(day)s of the same month"
+msgstr ""
+
+#, python-format
+msgid "paid on the %(day)s of the next month"
+msgstr ""
+
+#, python-format
+msgid "paid on the %(day)s two months later"
+msgstr ""
+
+#, python-format
+msgid "paid on the %(day)s, %(months)s months later"
+msgstr ""
+
+#, python-format
+msgid "%(rate)s per day"
+msgstr ""
+
+#, python-format
+msgid "%(rate)s per hour"
+msgstr ""
+
+#, python-format
+msgid "%(rate)s per %(unit)s"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(units)s day"
+msgid_plural "%(units)s days"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "%(units)s hour"
+msgid_plural "%(units)s hours"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "estimate: working days"
+msgstr ""
+
+#, python-format
+msgid "estimate: average of the last %(num)d month"
+msgid_plural "estimate: average of the last %(num)d months"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "estimate: %(units)s a month"
+msgstr ""
+
+msgid "no estimate: you enter it yourself"
+msgstr ""
+
+msgid "Income category"
+msgstr ""
+
+msgid "How is it paid?"
+msgstr ""
+
+msgid "A fixed amount"
+msgstr ""
+
+msgid "Salary, pension, rent you receive"
+msgstr ""
+
+msgid "Per day or hour"
+msgstr ""
+
+msgid "Contract work; you log what you worked"
+msgstr ""
+
+#, python-format
+msgid "Amount you are paid each month (%(currency)s)"
+msgstr ""
+
+msgid ""
+"Enter the amount before the taxes you plan here. If you don't plan taxes,"
+" enter what lands on your account."
+msgstr ""
+
+#, python-format
+msgid "Rate (%(currency)s)"
+msgstr ""
+
+msgid "Per"
+msgstr ""
+
+msgid "day"
+msgstr ""
+
+msgid "hour"
+msgstr ""
+
+msgid "something else"
+msgstr ""
+
+msgid "Unit name"
+msgstr ""
+
+msgid "Until you log the real number, estimate it from"
+msgstr ""
+
+msgid "working days in the month"
+msgstr ""
+
+msgid "the average of the last months"
+msgstr ""
+
+msgid "a fixed number"
+msgstr ""
+
+msgid "nothing, I'll enter it myself"
+msgstr ""
+
+msgid "Number of months"
+msgstr ""
+
+msgid "Units a month"
+msgstr ""
+
+msgid "When are you paid?"
+msgstr ""
+
+msgid "Paid on day"
+msgstr ""
+
+msgid "Which month"
+msgstr ""
+
+msgid "of the next month"
+msgstr ""
+
+msgid "of the same month"
+msgstr ""
+
+msgid "two months later"
+msgstr ""
+
+#, python-format
+msgid "%(months)s months later"
+msgstr ""
+
+msgid "Starts with work month"
+msgstr ""
+
+msgid "Ends with work month (optional)"
+msgstr ""
+
 msgid "Work calendar"
 msgstr ""
 
@@ -2776,137 +2964,129 @@ msgstr ""
 msgid "Work calendar: %(name)s"
 msgstr ""
 
-msgid "Back to income sources"
-msgstr ""
-
-msgid "New income source"
-msgstr ""
-
-msgid "Type"
-msgstr ""
-
-msgid "Variable"
-msgstr ""
-
-msgid "Fixed"
-msgstr ""
-
-msgid "Income category"
+msgid "Back to Income"
 msgstr ""
 
 #, python-format
-msgid "Fixed amount (%(currency)s)"
+msgid "Edit %(name)s"
 msgstr ""
 
-#, python-format
-msgid "Rate per unit (%(currency)s)"
+msgid "Edit income"
 msgstr ""
 
-msgid "Unit label"
-msgstr ""
-
-msgid "Pay day of month"
-msgstr ""
-
-msgid "Pay lag in months"
-msgstr ""
-
-msgid "Expected units"
-msgstr ""
-
-msgid "Working days"
-msgstr ""
-
-msgid "Fixed value"
-msgstr ""
-
-msgid "Average of recent months"
-msgstr ""
-
-msgid "Enter manually"
-msgstr ""
-
-msgid "Fixed expected units"
-msgstr ""
-
-msgid "Months for average"
-msgstr ""
-
-msgid "Active from work month"
-msgstr ""
-
-msgid "Active through work month (optional)"
-msgstr ""
-
-msgid "Create income source"
-msgstr ""
-
-#, python-format
-msgid "Pay day %(day)s, lag %(lag)s months"
+msgid "Save income"
 msgstr ""
 
 #, python-format
 msgid "Archive the income source %(name)s?"
 msgstr ""
 
+msgid "Add income"
+msgstr ""
+
+msgid "Steps"
+msgstr ""
+
+#, python-format
+msgid "Step %(step)s of %(total)s: %(label)s"
+msgstr ""
+
+msgid "Which taxes apply to this income?"
+msgstr ""
+
+msgid ""
+"Tick the taxes you want planned. Leave all unticked if you get paid after"
+" tax and don't need to plan anything."
+msgstr ""
+
+msgid "No taxes are set up yet."
+msgstr ""
+
+msgid "Set up a new tax"
+msgstr ""
+
+msgid "Back"
+msgstr ""
+
+msgid "Where your money comes from and what you will receive next."
+msgstr ""
+
+#, python-format
+msgid "Fixed · %(amount)s on the %(day)s · Income category: %(category)s"
+msgstr ""
+
 msgid "Archived"
 msgstr ""
 
-msgid "Edit income source"
-msgstr ""
-
-msgid "Save income source"
-msgstr ""
-
-msgid "Next occurrences with tax preview"
-msgstr ""
-
-msgid "Next occurrences"
+msgid "Taxes on this income:"
 msgstr ""
 
 #, python-format
-msgid "Work month: %(month)s"
-msgstr ""
-
-msgid "Estimated"
-msgstr ""
-
-msgid "Confirmed"
+msgid "%(tax)s · added on top"
 msgstr ""
 
 #, python-format
-msgid "Expected units: %(units)s"
+msgid "%(tax)s · paid by you"
 msgstr ""
 
 #, python-format
-msgid "Net: %(amount)s"
+msgid "%(tax)s · taken off by the payer"
+msgstr ""
+
+msgid "No taxes on this income."
+msgstr ""
+
+msgid "Add taxes"
+msgstr ""
+
+msgid "No tax payment is planned: the payer pays these taxes for you."
 msgstr ""
 
 #, python-format
-msgid "%(name)s (to pay later)"
+msgid ""
+"No payment is planned for %(tax)s: planning its payment is switched off "
+"for this income."
 msgstr ""
 
 #, python-format
-msgid "You receive: %(amount)s"
+msgid "Next payments of %(name)s"
+msgstr ""
+
+msgid "Work month"
+msgstr ""
+
+msgid "Paid on"
+msgstr ""
+
+msgid "Net"
+msgstr ""
+
+msgid "You receive"
+msgstr ""
+
+msgid "Tax to pay"
+msgstr ""
+
+msgid "estimate"
+msgstr ""
+
+msgid "logged"
 msgstr ""
 
 #, python-format
-msgid "Tax to pay: %(name)s %(amount)s on %(date)s"
+msgid "%(name)s %(amount)s on %(date)s"
 msgstr ""
 
-msgid "Work logs"
+msgid "Nothing to pay"
+msgstr ""
+
+msgid "Logged:"
 msgstr ""
 
 msgid "from the work calendar"
 msgstr ""
 
-msgid "No work logs yet."
-msgstr ""
-
-msgid "Open the work calendar"
-msgstr ""
-
-msgid "Work month"
+msgid "Log days worked"
 msgstr ""
 
 #, python-format
@@ -2924,6 +3104,10 @@ msgstr ""
 msgid "Taxes on this income"
 msgstr ""
 
+#, python-format
+msgid "Taxes on %(name)s"
+msgstr ""
+
 msgid "Different payment day for this income"
 msgstr ""
 
@@ -2933,16 +3117,9 @@ msgstr ""
 msgid "Save taxes"
 msgstr ""
 
-msgid "Tax"
-msgstr ""
-
-msgid "No taxes on this income."
-msgstr ""
-
-msgid "Set up a new tax"
-msgstr ""
-
-msgid "No income sources yet."
+msgid ""
+"No income yet. Add your salary or contract work to see what you will "
+"receive next."
 msgstr ""
 
 msgid "Invitation"
@@ -3360,6 +3537,9 @@ msgstr ""
 msgid "Amount type"
 msgstr ""
 
+msgid "Fixed"
+msgstr ""
+
 msgid "Automatically post on the due date"
 msgstr ""
 
@@ -3551,18 +3731,16 @@ msgstr ""
 msgid "For income of %(amount)s net, paid on %(date)s:"
 msgstr ""
 
-msgid "Net"
-msgstr ""
-
 #, python-format
 msgid "+ %(name)s"
 msgstr ""
 
 #, python-format
-msgid "− %(name)s"
+msgid "%(name)s (to pay later)"
 msgstr ""
 
-msgid "You receive"
+#, python-format
+msgid "− %(name)s"
 msgstr ""
 
 #, python-format
@@ -3683,9 +3861,6 @@ msgid "When do you pay it?"
 msgstr ""
 
 msgid "On day"
-msgstr ""
-
-msgid "Which month"
 msgstr ""
 
 msgid "of the month after you're paid"
@@ -4408,5 +4583,128 @@ msgstr ""
 #~ " of existing rate versions. Create a"
 #~ " separate rule to model a different"
 #~ " tax."
+#~ msgstr ""
+
+#~ msgid "Income sources"
+#~ msgstr ""
+
+#~ msgid "Back to income sources"
+#~ msgstr ""
+
+#~ msgid "New income source"
+#~ msgstr ""
+
+#~ msgid "Type"
+#~ msgstr ""
+
+#~ msgid "Variable"
+#~ msgstr ""
+
+#~ msgid "Fixed amount (%(currency)s)"
+#~ msgstr ""
+
+#~ msgid "Rate per unit (%(currency)s)"
+#~ msgstr ""
+
+#~ msgid "Unit label"
+#~ msgstr ""
+
+#~ msgid "Pay day of month"
+#~ msgstr ""
+
+#~ msgid "Pay lag in months"
+#~ msgstr ""
+
+#~ msgid "Expected units"
+#~ msgstr ""
+
+#~ msgid "Working days"
+#~ msgstr ""
+
+#~ msgid "Fixed value"
+#~ msgstr ""
+
+#~ msgid "Average of recent months"
+#~ msgstr ""
+
+#~ msgid "Enter manually"
+#~ msgstr ""
+
+#~ msgid "Fixed expected units"
+#~ msgstr ""
+
+#~ msgid "Months for average"
+#~ msgstr ""
+
+#~ msgid "Active from work month"
+#~ msgstr ""
+
+#~ msgid "Active through work month (optional)"
+#~ msgstr ""
+
+#~ msgid "Create income source"
+#~ msgstr ""
+
+#~ msgid "Pay day %(day)s, lag %(lag)s months"
+#~ msgstr ""
+
+#~ msgid "Edit income source"
+#~ msgstr ""
+
+#~ msgid "Save income source"
+#~ msgstr ""
+
+#~ msgid "Next occurrences with tax preview"
+#~ msgstr ""
+
+#~ msgid "Next occurrences"
+#~ msgstr ""
+
+#~ msgid "Work month: %(month)s"
+#~ msgstr ""
+
+#~ msgid "Estimated"
+#~ msgstr ""
+
+#~ msgid "Confirmed"
+#~ msgstr ""
+
+#~ msgid "Expected units: %(units)s"
+#~ msgstr ""
+
+#~ msgid "Net: %(amount)s"
+#~ msgstr ""
+
+#~ msgid "You receive: %(amount)s"
+#~ msgstr ""
+
+#~ msgid "Tax to pay: %(name)s %(amount)s on %(date)s"
+#~ msgstr ""
+
+#~ msgid "Work logs"
+#~ msgstr ""
+
+#~ msgid "No work logs yet."
+#~ msgstr ""
+
+#~ msgid "Open the work calendar"
+#~ msgstr ""
+
+#~ msgid "Tax"
+#~ msgstr ""
+
+#~ msgid "No taxes on this income."
+#~ msgstr ""
+
+#~ msgid "No income sources yet."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "No tax payment is planned for this"
+#~ " income because no taxes are ticked"
+#~ " on it."
+#~ msgstr ""
+
+#~ msgid "Choose taxes"
 #~ msgstr ""
 

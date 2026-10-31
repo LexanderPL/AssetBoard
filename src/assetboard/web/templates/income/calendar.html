@@ -2,6 +2,6 @@
 {% block title %}{{ _("Work calendar") }} · {{ calendar.source_name }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Work calendar: %(name)s", name=calendar.source_name) }}{% endblock %}
 {% block content %}
-<p class="mb-4 text-sm"><a href="{{ scoped_url(request, 'income_sources') }}#income-source-{{ calendar.source_id }}" class="text-primary-ink underline">{{ _("Back to income sources") }}</a></p>
+<p class="mb-4 text-sm"><a href="{{ scoped_url(request, 'income_sources') }}#income-source-{{ calendar.source_id }}" class="text-primary-ink underline">{{ _("Back to Income") }}</a></p>
 {% include "income/_calendar.html" %}
 {% endblock %}

@@ -208,7 +208,8 @@ def test_income_checklist_and_switch_refusal(owner):
     with owner.db() as session:
         attachment = session.scalars(select(IncomeSourceTaxRule)).one()
         assert (attachment.due_day, attachment.payment_category_id) == (15, None)
-    assert "Tax to pay: PIT" in owner.client.get("/income").text
+    page = owner.client.get("/income").text
+    assert "PIT 12% · paid by you" in page and "Tax to pay" in page
 
     refused = _enable(owner, on=False)
     assert refused.status_code == 400

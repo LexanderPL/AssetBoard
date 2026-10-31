@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% from "income/_macros.html" import basics_fields, amount_fields, payday_fields, option_class with context %}
+{% from "taxes/_macros.html" import how, when with context %}
+{% block title %}{{ _("Add income") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Add income") }}{% endblock %}
+{% block content %}
+<a href="{{ scoped_url(request, 'income_sources') }}" class="mb-4 inline-flex rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Back to Income") }}</a>
+<ol class="mb-4 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label="{{ _('Steps') }}" data-wizard-steps>
+  {% for label in steps %}
+  <li class="flex items-center gap-2 {% if loop.index == step %}font-semibold text-ink {% else %}text-muted {% endif %}"{% if loop.index == step %} aria-current="step"{% endif %}>
+    <span class="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold {% if loop.index == step %}bg-primary text-on-primary {% elif loop.index < step %}bg-primary-soft text-primary-ink {% else %}border border-line {% endif %}" aria-hidden="true">{{ loop.index }}</span>{{ label }}
+  </li>
+  {% endfor %}
+</ol>
+<section class="panel max-w-3xl p-5 sm:p-6" aria-labelledby="wizard-step-heading">
+  <h2 id="wizard-step-heading" class="sr-only">{{ _("Step %(step)s of %(total)s: %(label)s", step=step, total=last_step, label=steps[step - 1]) }}</h2>
+  {% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ error }}</p>{% endif %}
+  <form id="income-wizard" method="post" action="{{ scoped_url(request, 'income_new_step') }}" class="grid gap-6" data-income-wizard="{{ step }}">
+    {{ csrf_input() }}
+    <input type="hidden" name="step" value="{{ step }}">
+    {% for name in hidden_fields %}<input type="hidden" name="{{ name }}" value="{{ values[name] }}">{% endfor %}
+    {% if step != 4 %}{% for rule_id in selected_rules %}<input type="hidden" name="tax_rule_id" value="{{ rule_id }}">{% endfor %}{% endif %}
+
+    {% if step == 1 %}
+    {{ basics_fields(values, income_categories) }}
+    {% elif step == 2 %}
+    {{ amount_fields(values, workspace_nav.current.base_currency) }}
+    {% elif step == 3 %}
+    {{ payday_fields(values, payday_sentence, active_from, active_to, "new-income") }}
+    {% else %}
+    <fieldset class="grid gap-2" data-wizard-taxes>
+      <legend class="text-sm font-medium">{{ _("Which taxes apply to this income?") }}</legend>
+      <p class="mb-2 text-sm text-muted">{{ _("Tick the taxes you want planned. Leave all unticked if you get paid after tax and don't need to plan anything.") }}</p>
+      {% for rule in tax_rules %}
+      <label class="{{ option_class }}" data-wizard-tax="{{ rule.id }}">
+        <input type="checkbox" name="tax_rule_id" value="{{ rule.id }}" class="mt-1 h-4 w-4 accent-primary"{% if rule.id in selected_rules %} checked{% endif %}>
+        <span class="grid gap-0.5"><span class="text-sm font-semibold">{{ rule.name }} {{ rate_label(rule.current, locale) }}</span><span class="text-sm text-muted">{{ how(rule.kind.value) }} {{ when(rule.kind.value, rule.payment_timing.value, rule.payment_day, locale) }}</span></span>
+      </label>
+      {% else %}
+      <p class="text-sm text-muted">{{ _("No taxes are set up yet.") }}</p>
+      {% endfor %}
+    </fieldset>
+    <div id="income-example" class="rounded-xl bg-subtle p-4 text-sm" aria-live="polite" hx-post="{{ scoped_url(request, 'income_new_example') }}" hx-trigger="change from:#income-wizard" hx-include="#income-wizard" hx-sync="this:replace" hx-swap="innerHTML" data-income-example>
+      {% include "income/_example.html" %}
+    </div>
+    <p class="text-sm"><a href="{{ scoped_url(request, 'tax_rule_new') }}" class="font-semibold text-primary-ink underline">{{ _("Set up a new tax") }}</a></p>
+    {% endif %}
+
+    <div class="flex flex-wrap items-center gap-2 border-t border-line pt-4">
+      {# Next comes first so that Enter submits it; Back is moved before it visually. #}
+      <button type="submit" name="go" value="next" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-wizard-next>{{ _("Save income") if step == last_step else _("Next") }}</button>
+      {% if step == 1 %}
+      <a href="{{ scoped_url(request, 'income_sources') }}" class="order-first rounded-lg border border-line px-4 py-2 text-sm font-medium hover:bg-subtle">{{ _("Cancel") }}</a>
+      {% else %}
+      <button type="submit" name="go" value="back" formnovalidate class="order-first rounded-lg border border-line px-4 py-2 text-sm font-medium hover:bg-subtle" data-wizard-back>{{ _("Back") }}</button>
+      {% endif %}
+    </div>
+  </form>
+</section>
+{% endblock %}

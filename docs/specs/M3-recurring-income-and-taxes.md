@@ -244,6 +244,15 @@ rule's schedule unless the attachment overrides them. The income page ticks the 
 Taxes are off. The golden example below now reads "VAT 23% added" (no `record_as`). The startup
 catch-up recalculates every pending income occurrence before generating.
 
+**As built: Income page redesign (owner mockup, 2026-10-31).** The page is called "Income": one
+card per source with a summary line, tax chips, the next three payments as a table and a
+"why no tax payment" note while Taxes are on. New sources are created with the four-step
+"Add income" form at `/income/new` (server-side steps with hidden fields, no JavaScript needed;
+the taxes step only while Taxes are on), which ticks the chosen taxes in the same transaction.
+Editing moved to `/income/{id}/edit` (one page, same fields; archive is there too). The payday is
+entered as "day N of the next month / same month / two months later" (pay lag 1/0/2; older
+sources with a longer lag keep it). The old one-form `POST /income` still works.
+
 **Acceptance**
 - Income source CRUD (fixed and variable) with a live "next occurrences" preview including tax breakdown.
 - Logging units for a work month (month-level number, decimals allowed e.g., 7.5) creates/updates the occurrence of the corresponding pay month; only **pending** occurrences are recalculated; posted ones are left alone.

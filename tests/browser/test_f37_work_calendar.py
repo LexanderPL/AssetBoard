@@ -77,17 +77,20 @@ def test_work_calendar_in_a_browser(tmp_path: Path) -> None:
             page.get_by_role("button", name="Sign in").click()
             page.wait_for_url(f"{base}/")
 
+            # "Add income": a per-day source through the four steps.
             page.goto(f"{base}/income", wait_until="networkidle")
-            # The create form is collapsed behind its summary button.
-            expect(page.get_by_label("Name").first).to_be_hidden()
-            page.locator("[data-new-income-source] > summary").click()
-            page.get_by_label("Name").first.fill("Consulting")
-            page.get_by_label("Rate per unit", exact=False).first.fill("100")
+            page.locator("[data-add-income]").click()
+            page.wait_for_load_state("networkidle")
+            page.get_by_label("Name").fill("Consulting")
+            page.get_by_label("Per day or hour").check()
+            page.get_by_role("button", name="Next").click()
+            page.get_by_label("Rate", exact=False).fill("100")
+            page.get_by_role("button", name="Next").click()
             # The work month pickers are month and year selects.
-            picker = page.locator("[data-new-income-source] [data-month-picker='active_from']")
+            picker = page.locator("[data-month-picker='active_from']")
             picker.get_by_label("Month").select_option("1")
             picker.get_by_label("Year").select_option("2026")
-            page.get_by_role("button", name="Create income source").click()
+            page.get_by_role("button", name="Save income").click()
             page.wait_for_load_state("networkidle")
             page.locator("[data-work-calendar-link]").click()
             page.wait_for_load_state("networkidle")

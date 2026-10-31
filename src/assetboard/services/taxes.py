@@ -508,3 +508,47 @@ def set_taxes_enabled(factory: sessionmaker[Session], ctx: Context, enabled: boo
         )
 
     run_immediate(factory, write)
+
+
+@dataclass(frozen=True, slots=True)
+class IncomeTaxExample:
+    """The example on the last step of "Add income": the ticked taxes on a sample amount.
+    ``names`` and ``payment_dates`` are keyed by the breakdown line names (rule ids)."""
+
+    breakdown: TaxBreakdown
+    names: dict[str, str]
+    payment_dates: dict[str, date]
+
+
+def income_example(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    rule_ids: list[UUID],
+    *,
+    net: Money,
+    paid_on: date,
+) -> IncomeTaxExample:
+    """``net`` paid on ``paid_on`` with the ticked taxes, at the rates valid on that day."""
+    require_role(ctx, Role.VIEWER)
+    with factory() as session:
+        effective = {
+            rule.id: (rule, version)
+            for rule, version in TaxRuleRepository(session, ctx).effective_for_all(paid_on)
+        }
+    inputs: list[TaxInput] = []
+    names: dict[str, str] = {}
+    dates: dict[str, date] = {}
+    for rule_id in rule_ids:
+        pair = effective.get(rule_id)
+        if pair is None or pair[0].archived_at is not None:
+            continue
+        rule, version = pair
+        key = str(rule.id)
+        inputs.append(
+            TaxInput(
+                key, TaxKind(rule.kind), TaxBase(rule.base), _value_from_row(version, net.currency)
+            )
+        )
+        names[key] = rule.name
+        dates[key] = tax_payment_date(paid_on, rule.payment_day, PaymentTiming(rule.payment_timing))
+    return IncomeTaxExample(calculate_taxes(net, inputs), names, dates)

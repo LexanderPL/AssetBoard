@@ -48,6 +48,11 @@ def format_day(day: date, locale: str) -> str:
     return format_date(day, format="medium", locale=_locale(locale))
 
 
+def format_day_month(day: date, locale: str) -> str:
+    """The day and month without the year, for sentences: "November 10", "10 listopada"."""
+    return format_skeleton("MMMMd", day, locale=_locale(locale))
+
+
 def format_day_long(day: date, locale: str) -> str:
     """A date with its weekday in the locale's full format, for screen-reader labels:
     "Monday, March 2, 2026", "poniedziałek, 2 marca 2026"."""

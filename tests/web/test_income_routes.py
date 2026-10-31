@@ -61,7 +61,7 @@ def test_income_source_and_work_log_forms(owner):
     assert page.status_code == 200
     assert "Contract work" in page.text
     assert 'name="record_as"' not in page.text
-    assert "· 7.5</li>" in page.text
+    assert "August 2026 · 7.5" in page.text
 
 
 def test_income_forms_require_csrf(owner):
@@ -132,16 +132,14 @@ def test_work_month_pickers_store_the_first_day_and_render_the_choice(owner):
     with owner.db() as session:
         source = session.scalars(select(IncomeSource)).one()
         assert (source.active_from, source.active_to) == (date(2026, 3, 1), date(2027, 11, 1))
-    page = owner.client.get("/income").text
-    edit = page.split(f'id="income-source-{source.id}"')[1]
+    edit = owner.client.get(f"/income/{source.id}/edit").text
     # Month names come from CLDR; the stored month and year are selected.
     assert '<option value="3" selected>March</option>' in edit
     assert '<option value="11" selected>November</option>' in edit
     assert '<option value="2027" selected>2027</option>' in edit
-    assert 'name="work_month_month"' in edit and 'name="work_month_year"' in edit
-    assert 'type="date"' not in page
-    # Only "Active through" has an empty choice.
-    assert page.count('<option value="" selected>') == 2  # the create form's month and year
+    assert 'type="date"' not in edit
+    page = owner.client.get("/income").text
+    assert 'name="work_month_month"' in page and 'name="work_month_year"' in page
 
     # Clearing "Active through" and the plain ISO date of older clients both still work.
     cleared = form | {"active_to_month": "", "active_to_year": ""}
@@ -153,16 +151,20 @@ def test_work_month_pickers_store_the_first_day_and_render_the_choice(owner):
     with owner.db() as session:
         source = session.scalars(select(IncomeSource)).one()
         assert (source.active_from, source.active_to) == (date(2025, 2, 1), None)
-    page = owner.client.get("/income").text
-    assert '<option value="2025" selected>2025</option>' in page
+    edit = owner.client.get(f"/income/{source.id}/edit").text
+    assert '<option value="2025" selected>2025</option>' in edit
 
 
-def test_a_half_chosen_month_reopens_the_create_form_with_an_error(owner):
-    form = _form(_income_category(owner)) | {"active_to_month": "5"}
-    response = owner.post("/income", form, token_from="/income")
-    assert response.headers["location"].endswith("?error=invalid_work_month&form=new-source")
+def test_a_half_chosen_month_reopens_the_edit_form_with_an_error(owner):
+    form = _form(_income_category(owner))
+    assert owner.post("/income", form, token_from="/income").status_code == 303
+    with owner.db() as session:
+        source_id = session.scalars(select(IncomeSource.id)).one()
+    response = owner.post(
+        f"/income/{source_id}", form | {"active_to_month": "5"}, token_from="/income"
+    )
+    assert response.headers["location"].endswith(
+        f"/income/{source_id}/edit?error=invalid_work_month"
+    )
     page = owner.client.get(response.headers["location"]).text
-    assert "Choose a valid work month." in page
-    assert "data-new-income-source open>" in page
-    closed = owner.client.get("/income").text
-    assert "data-new-income-source>" in closed and "data-new-income-source open" not in closed
+    assert "Choose a valid work month." in page and "data-income-edit" in page
