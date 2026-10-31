@@ -1,6 +1,8 @@
 """F3.5 month integration over HTTP, as placed by F2.7: expected rows with Confirm in the tables
-of the Transactions page, the Expected and Forecast columns, forecast KPIs and the forecast toggle
-on the Month summary, and the overdue badge on the Upcoming nav link.
+of the Transactions page; on the Month summary ("Plan and Actual", owner 2026-10-31) the pending
+amounts under Actual, the striped pending parts of the bars and the flow bar, the forecast as a
+hover and screen-reader detail and the "Show pending" toggle; and the overdue badge on the
+Upcoming nav link.
 
 The missing-work-log banner on both pages is covered in tests/web/test_income_routes.py and its
 window in tests/unit/test_income_service.py."""
@@ -51,10 +53,23 @@ def _summary_row(html: str, category: UUID) -> str:
     return _block(html, rf'<tr id="plan-{category}".*?</tr>')
 
 
-def _cell(row: str, name: str) -> str:
-    match = re.search(rf"<td [^>]*data-{name}>([^<]*)<", row)
+def _actual(row: str) -> str:
+    match = re.search(r"data-actual>([^<]*)<", row)
     assert match is not None
     return match.group(1)
+
+
+def _pending(row: str) -> str | None:
+    """The row's "+ X pending" line, or None."""
+    match = re.search(r"<span [^>]*data-pending>([^<]*)<", row)
+    return match.group(1) if match else None
+
+
+def _plan(owner: OwnerApp, category: UUID, amount: str, month: str = "2026-03") -> None:
+    response = owner.post(
+        f"/m/{month}/plan/{category}", {"amount": amount}, token_from="/m/" + month
+    )
+    assert response.status_code == 303
 
 
 def test_expected_rows_sit_in_their_table_and_confirming_makes_them_real(rent) -> None:
@@ -85,10 +100,10 @@ def test_expected_rows_sit_in_their_table_and_confirming_makes_them_real(rent) -
     assert f'data-pending-occurrence="{march}"' not in table
     assert f'data-transaction="{transaction.id}"' in table
 
-    # The summary moves the amount from Expected to Actual.
+    # The summary moves the amount from pending to Actual.
     row = _summary_row(owner.client.get("/m/2026-03").text, category)
-    assert "98.50" in _cell(row, "actual")
-    assert "98.50" in _cell(row, "forecast")
+    assert _actual(row) == "€98.50"
+    assert _pending(row) is None and "If everything pending arrives" not in row
 
 
 def test_viewers_see_expected_rows_without_confirm(rent) -> None:
@@ -116,22 +131,102 @@ def test_a_repeating_expected_row_cannot_be_deleted(rent) -> None:
         assert session.get(ScheduledOccurrence, occurrences[2]) is not None
 
 
-def test_summary_expected_and_forecast_columns_kpis_and_toggle(rent) -> None:
+def test_summary_shows_plan_and_actual_with_pending(rent) -> None:
     owner, category, _occurrences = rent
     html = owner.client.get("/m/2026-03").text
     summary = _block(html, r'<section id="month-summary".*?</section>')
-    assert ">Expected (pending)</th>" in summary and ">Forecast</th>" in summary
+    # Two columns, Plan and Actual (and Difference); no Expected or Forecast column or line.
+    headings = re.findall(r'<th scope="col"[^>]*>([^<]*)</th>', summary)
+    assert headings == ["Category", "Plan", "Actual", "Difference"]
+    assert "Expected (pending)" not in summary and ">Forecast</th>" not in summary
+    assert "Forecast spent" not in summary and "forecast earned" not in summary
+    # The pending amount is a lighter line under the confirmed one, with the forecast as its
+    # tooltip and screen-reader text.
     row = _summary_row(summary, category)
-    assert "100.00" in _cell(row, "forecast-column data-expected")
-    assert "100.00" in _cell(row, "forecast-column data-forecast")
-    assert "Forecast spent" in summary and "forecast earned" in summary
-    # The toggle hides both forecast columns and the forecast KPI line (app.js).
-    assert 'data-forecast-toggle aria-pressed="true"' in summary
-    assert len(re.findall(r"<th [^>]*data-forecast-column", summary)) == 2
-    assert re.search(r"<p [^>]*data-forecast-column>[^<]*Forecast spent", summary)
-    # Home shares the flow bar and its forecast line, but has no toggle.
+    assert _actual(row) == "€0.00"
+    assert _pending(row) == "+ €100.00 pending"
+    assert 'title="If everything pending arrives: €100.00"' in row
+    assert '<span class="sr-only"> (If everything pending arrives: €100.00)</span>' in row
+    total = _block(summary, r'<tr id="summary-total-expense".*?</tr>')
+    assert ">+ €100.00 pending<" in total
+    # KPIs: Actual with "+ X pending"; left if everything pending arrives.
+    assert re.search(r'data-pending data-kpi-pending="spent">\+ €100.00 pending<', summary)
+    assert 'data-kpi-pending="earned"' not in summary  # nothing earned is pending
+    assert re.search(r'data-kpi-pending="net">-€100.00 if everything pending arrives<', summary)
+    assert "Pending: earned €0.00, spent €100.00, saved or invested €0.00." in summary
+    # The flow bar ("Spent vs earned") draws the pending spending striped; the confirmed-only
+    # twin is hidden until the toggle hides the pending parts.
+    assert re.search(r"data-flow-heading>Spent vs earned<", summary)
+    assert re.search(
+        r'fill="url\(#flow-pending-danger\)"[^>]*data-pending-flow-segment="spent-pending"', summary
+    )
+    assert re.search(r'<svg class="[^"]* hidden"[^>]*data-flow-bar data-pending-off>', summary)
+    # The toggle is "Show pending" (app.js hides everything marked data-pending).
+    assert re.search(r'data-pending-toggle aria-pressed="true"[^>]*>Show pending</button>', summary)
+    assert "data-forecast-toggle" not in summary
+    # Home keeps its forecast line and second bar (a follow-up), and has no toggle.
     home = owner.client.get("/").text
-    assert "data-forecast-toggle" not in home
+    assert "data-pending-toggle" not in home and "Forecast spent" in home
+    assert "data-pending" not in home
+
+
+def test_pending_over_plan_is_a_softer_hint(rent) -> None:
+    owner, category, _occurrences = rent
+    _plan(owner, category, "50")  # 0 spent, 100 pending: over plan only if it arrives
+    summary = _block(
+        owner.client.get("/m/2026-03").text, r'<section id="month-summary".*?</section>'
+    )
+    row = _summary_row(summary, category)
+    assert "data-over-plan" not in row  # confirmed is not over plan: no tint
+    assert re.search(
+        r'text-warning-strong" data-pending data-pending-over>'
+        r"Over plan if everything pending arrives<",
+        row,
+    )
+    bar = _block(summary, r'data-summary-bar="expense".*?</svg>')
+    assert "Spent €0.00 of €50.00 planned" in bar and "(over plan)" not in bar
+    assert "+ €100.00 pending" in bar and "(If everything pending arrives: €100.00)" in bar
+    assert "(over plan if everything pending arrives)" in bar
+    # The scale is the forecast (100): plan at 50, the striped pending part from 0 to 100.
+    assert re.search(r'x1="50"[^>]*data-bar-planned', bar)
+    assert re.search(
+        r'<rect x="0" y="3" width="100" height="10" fill="url\(#bar-pending-expense\)" '
+        r"data-pending data-bar-pending><title>If everything pending arrives: €100.00</title>",
+        bar,
+    )
+    _plan(owner, category, "150")  # within plan even when it arrives: no hint
+    summary = _block(
+        owner.client.get("/m/2026-03").text, r'<section id="month-summary".*?</section>'
+    )
+    assert "data-pending-over" not in summary
+    assert "+ €100.00 pending" in _summary_row(summary, category)
+
+
+def test_a_future_month_labels_the_chart_as_expected(rent) -> None:
+    owner, category, _occurrences = rent
+    future = _block(
+        owner.client.get("/m/2026-04").text, r'<section id="month-summary".*?</section>'
+    )
+    assert re.search(r"data-flow-heading>Expected spent vs expected earned<", future)
+    assert _pending(_summary_row(future, category)) == "+ €100.00 pending"
+    assert 'data-pending-flow-segment="spent-pending"' in future
+    current = _block(
+        owner.client.get("/m/2026-03").text, r'<section id="month-summary".*?</section>'
+    )
+    assert re.search(r"data-flow-heading>Spent vs earned<", current)
+    # A month with nothing pending has no pending parts at all.
+    owner.post(f"/upcoming/{_occurrences[0]}/skip", token_from="/upcoming")
+    january = _block(
+        owner.client.get("/m/2026-01").text, r'<section id="month-summary".*?</section>'
+    )
+    assert re.search(r"data-flow-heading>Spent vs earned<", january)
+    assert "data-pending-off" not in january and "data-pending-flow-segment" not in january
+    assert _pending(_summary_row(january, category)) is None
+    owner.client.headers["Accept-Language"] = "pl"
+    polish = _block(
+        owner.client.get("/m/2026-04").text, r'<section id="month-summary".*?</section>'
+    )
+    assert "Pokaż oczekujące" in polish and "oczekuje" in polish
 
 
 def test_overdue_badge_counts_overdue_occurrences_and_links_to_upcoming(rent) -> None:

@@ -96,15 +96,23 @@ def test_the_golden_example_on_the_page(summary: OwnerApp) -> None:
     food, travel, salary = _golden(summary)
     block = _summary(summary.client.get(MONTH).text)
     assert ">Summary</h2>" in block
-    for heading in ("Planned", "Actual", "Difference"):
+    for heading in ("Plan", "Actual", "Difference"):
         assert f">{heading}</th>" in block
+    # Plan and Actual only: pending amounts sit under Actual, there is no Forecast column.
+    assert ">Planned</th>" not in block and ">Forecast</th>" not in block
+    assert "Expected (pending)" not in block and "Forecast spent" not in block
+    # Nothing is pending: no pending line, no pending flow bar, no confirmed-only twin.
+    assert "data-pending" not in block.replace("data-pending-toggle", "")
     assert _cells(_row(block, food)) == ("€550.00", "€0.00")
     assert _cells(_row(block, travel)) == ("€4,323.00", "+€1,027.00")
     assert _cells(_row(block, salary)) == ("€3,400.00", "+€400.00")
     assert "text-success-strong" in _row(block, travel) and "(favourable)" in _row(block, travel)
     total = re.search(r'<tr id="summary-total-expense".*?</tr>', block, re.DOTALL)
     assert total is not None
-    assert re.findall(r"tabular-nums\">([^<]*)<", total.group(0))[:2] == ["€5,900.00", "€4,873.00"]
+    assert re.findall(r"tabular-nums\"[^>]*>([^<]*)<", total.group(0))[:2] == [
+        "€5,900.00",
+        "€4,873.00",
+    ]
     assert "+€1,027.00" in total.group(0)
     assert _kpis(block) == [
         "€3,400.00",

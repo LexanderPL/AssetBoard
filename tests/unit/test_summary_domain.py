@@ -406,11 +406,7 @@ def test_pending_flow_bar_parts() -> None:
     assert (over.left, over.left_pending, over.overspent) == (0, 0, 500)
 
 
-@given(
-    amounts=st.lists(
-        st.integers(min_value=-(10**12), max_value=10**12), min_size=6, max_size=6
-    )
-)
+@given(amounts=st.lists(st.integers(min_value=-(10**12), max_value=10**12), min_size=6, max_size=6))
 def test_pending_flow_bar_segments_tile_the_scale(amounts: list[int]) -> None:
     earned, spent, saved, earned_p, spent_p, saved_p = amounts
     bar = pending_flow_bar(

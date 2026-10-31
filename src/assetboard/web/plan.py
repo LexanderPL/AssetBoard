@@ -21,7 +21,14 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.domain.categories import Treatment
 from assetboard.domain.money import Money
-from assetboard.domain.summary import FLOW_SCALE, FlowBar, SortOrder, flow_bar
+from assetboard.domain.summary import (
+    FLOW_SCALE,
+    FlowBar,
+    PendingFlowBar,
+    SortOrder,
+    flow_bar,
+    pending_flow_bar,
+)
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_month_after_from
 from assetboard.i18n.numbers import format_amount_input, format_money, format_rate_tenths
@@ -92,20 +99,23 @@ class PlanRowView:
     error: str | None
     focus: bool
     actual: str = ""  # "" for the plan-only transfer group
-    expected: str = ""
-    forecast: str = ""
+    pending: str = ""  # expected but not confirmed yet ("" when nothing is pending)
+    forecast: str = ""  # actual + pending: "If everything pending arrives: ..."
     difference: str = ""
     tone: str = ""  # "favourable", "unfavourable" or "even" (for the difference)
     # Actual above plan: "danger" for an expense category, "success" for an income one (the
     # row's background tint); "" otherwise, and for the other groups.
     over: str = ""
+    # Not above plan yet, but actual + pending is: the same tone as ``over`` (a softer hint
+    # under the pending line, no tint); "" otherwise.
+    pending_over: str = ""
 
 
 @dataclass(frozen=True, slots=True)
 class TotalsView:
     planned: str
     actual: str
-    expected: str
+    pending: str  # "" when nothing is pending
     forecast: str
     difference: str
     tone: str
@@ -123,17 +133,25 @@ class PlanGroupView:
 class KpiView:
     earned: str
     spent: str
-    forecast_earned: str
+    forecast_earned: str  # Home's forecast line
     forecast_spent: str
-    forecast_saved: str
     saved: str
     net: str
     net_tone: str
     savings_rate: str | None  # None: nothing earned (no caption)
     overspend: str | None = None  # spending and saving above earnings (-net), else None
     flow: FlowBar = FlowBar(0, 0, 0)  # positions on 0..flow_scale (domain.summary.flow_bar)
-    forecast_flow: FlowBar = FlowBar(0, 0, 0)
+    forecast_flow: FlowBar = FlowBar(0, 0, 0)  # Home's second, thinner bar
     flow_scale: int = FLOW_SCALE
+    # The Month page: the pending part of each figure ("" when nothing is pending), left if
+    # everything pending arrives, and the flow bar with the pending segments.
+    earned_pending: str = ""
+    spent_pending: str = ""
+    saved_pending: str = ""
+    forecast_net: str = ""
+    has_pending: bool = False
+    zero: str = ""  # 0 in the currency (the screen-reader sentence's empty pending parts)
+    pending_flow: PendingFlowBar = PendingFlowBar(0, 0, 0, 0, 0, 0)
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,10 +159,14 @@ class BarView:
     key: str  # "expense" or "income"
     planned: str
     actual: str
-    planned_width: int  # 0-100, of max(planned, actual)
+    planned_width: int  # 0-100, of max(planned, actual + pending)
     actual_width: int
     over: bool  # actual above planned
     has_plan: bool = True  # a planned amount above 0 (the bar shows its marker)
+    pending: str = ""  # "" when nothing is pending
+    pending_end: int = 0  # 0-100: the end of the striped pending part (it starts at actual)
+    forecast: str = ""  # actual + pending
+    pending_over: bool = False  # not over plan yet, but actual + pending is
 
 
 @dataclass(frozen=True, slots=True)
@@ -159,6 +181,7 @@ class SummaryView:
     sort: str = "actual"
     zero_input: str = "0"  # the placeholder of an empty planned cell ("0.00", "0,00")
     filter_id: str = ""  # the category the transaction tables are filtered to (aria-current)
+    future: bool = False  # a future month: the flow bar is a projection ("Expected spent ...")
     source: SummaryData | None = field(default=None, compare=False, repr=False)  # the donuts
 
     def row(self, category_id: UUID) -> PlanRowView | None:
@@ -189,16 +212,28 @@ def _width(part: int, whole: int) -> int:
     return part * 100 // whole if whole > 0 else 0
 
 
-def _bar(key: str, planned: Money, actual: Money, locale: str) -> BarView:
-    scale = max(planned.amount_minor, actual.amount_minor)
+def _pending(amount: Money, locale: str) -> str:
+    """A pending amount for display; "" when nothing is pending."""
+    return format_money(amount, locale) if amount.amount_minor > 0 else ""
+
+
+def _bar(key: str, planned: Money, actual: Money, expected: Money, locale: str) -> BarView:
+    pending = max(expected.amount_minor, 0)
+    forecast = actual.amount_minor + pending
+    scale = max(planned.amount_minor, actual.amount_minor, forecast)
+    over = actual.amount_minor > planned.amount_minor
     return BarView(
         key=key,
         planned=format_money(planned, locale),
         actual=format_money(actual, locale),
         planned_width=_width(planned.amount_minor, scale),
         actual_width=_width(actual.amount_minor, scale),
-        over=actual.amount_minor > planned.amount_minor,
+        over=over,
         has_plan=planned.amount_minor > 0,
+        pending=_pending(expected, locale),
+        pending_end=_width(forecast, scale),
+        forecast=format_money(Money(forecast, actual.currency), locale),
+        pending_over=not over and pending > 0 and forecast > planned.amount_minor,
     )
 
 
@@ -266,12 +301,16 @@ def build_summary(
                 data.categories[r.category_id],
                 r.planned,
                 actual=format_money(r.actual, locale),
-                expected=format_money(r.expected, locale),
+                pending=_pending(r.expected, locale),
                 forecast=format_money(r.forecast, locale),
                 difference=_signed(r.difference, locale),
                 tone=_tone(r.difference),
                 over=OVER_PLAN_TINT.get(block.key, "")
                 if r.actual.amount_minor > r.planned.amount_minor
+                else "",
+                pending_over=OVER_PLAN_TINT.get(block.key, "")
+                if r.actual.amount_minor <= r.planned.amount_minor < r.forecast.amount_minor
+                and r.expected.amount_minor > 0
                 else "",
             )
             for r in block.rows
@@ -281,7 +320,7 @@ def build_summary(
         totals = TotalsView(
             planned=format_money(block.planned, locale),
             actual=format_money(block.actual, locale),
-            expected=format_money(block.expected, locale),
+            pending=_pending(block.expected, locale),
             forecast=format_money(block.forecast, locale),
             difference=_signed(block.difference, locale),
             tone=_tone(block.difference),
@@ -293,13 +332,17 @@ def build_summary(
         rows = tuple(row_view(r.category, r.planned) for r in transfers.rows)
         groups.append(PlanGroupView("transfer", gettext(GROUP_HEADINGS["transfer"], locale), rows))
     kpis = summary.kpis
+    expense, saved, income = (
+        summary.block("expense"),
+        summary.block("saved"),
+        summary.block("income"),
+    )
     rate = kpis.savings_rate_tenths
     kpi_view = KpiView(
         earned=format_money(kpis.earned, locale),
         spent=format_money(kpis.spent, locale),
         forecast_earned=format_money(kpis.forecast_earned, locale),
         forecast_spent=format_money(kpis.forecast_spent, locale),
-        forecast_saved=format_money(kpis.forecast_saved, locale),
         saved=format_money(kpis.saved, locale),
         net=format_money(kpis.net, locale),
         net_tone=_tone(kpis.net),
@@ -313,11 +356,32 @@ def build_summary(
             kpis.forecast_spent.amount_minor,
             kpis.forecast_saved.amount_minor,
         ),
+        earned_pending=_pending(income.expected, locale),
+        spent_pending=_pending(expense.expected, locale),
+        saved_pending=_pending(saved.expected, locale),
+        forecast_net=format_money(
+            Money(
+                kpis.forecast_earned.amount_minor
+                - kpis.forecast_spent.amount_minor
+                - kpis.forecast_saved.amount_minor,
+                kpis.net.currency,
+            ),
+            locale,
+        ),
+        zero=format_money(Money(0, kpis.net.currency), locale),
+        has_pending=any(b.expected.amount_minor > 0 for b in (income, expense, saved)),
+        pending_flow=pending_flow_bar(
+            kpis.earned.amount_minor,
+            kpis.spent.amount_minor,
+            kpis.saved.amount_minor,
+            earned_pending=income.expected.amount_minor,
+            spent_pending=expense.expected.amount_minor,
+            saved_pending=saved.expected.amount_minor,
+        ),
     )
-    expense, income = summary.block("expense"), summary.block("income")
     bars = (
-        _bar("expense", expense.planned, expense.actual, locale),
-        _bar("income", income.planned, income.actual, locale),
+        _bar("expense", expense.planned, expense.actual, expense.expected, locale),
+        _bar("income", income.planned, income.actual, income.expected, locale),
     )
     banner = None
     if can_write and not plan.has_lines and plan.copyable_from_previous and plan.previous:
@@ -341,6 +405,7 @@ def build_summary(
         sort=sort,
         zero_input=format_amount_input(Money(0, summary.currency), locale),
         filter_id=str(filter_id) if filter_id is not None else "",
+        future=view.is_future,
         source=data,
     )
 
