@@ -48,6 +48,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "income_sources",
         "instance_settings",
         "invitations",
+        "login_tickets",
         "memberships",
         "month_states",
         "notification_channels",
@@ -73,6 +74,23 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
     assert script_location is not None
     assert Path(script_location).is_dir()
     assert config.get_main_option("sqlalchemy.url") is None
+
+
+def test_0026_two_step_login_ticket_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'tickets.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        assert "login_tickets" in inspect(engine).get_table_names()
+        command.downgrade(alembic_config(settings), "0025_amount_shading")
+        assert "login_tickets" not in inspect(engine).get_table_names()
+        upgrade_database(settings)
+        assert "login_tickets" in inspect(engine).get_table_names()
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
 
 
 def test_0018_tax_rules_migration_is_reversible(tmp_path: Path) -> None:

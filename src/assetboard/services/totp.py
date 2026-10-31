@@ -25,6 +25,7 @@ from assetboard.services.auth import (
     ThrottleSlot,
     Verifier,
     blocked_until,
+    delete_login_tickets,
     derive_subkey,
     record_auth_event,
     reserve_attempts,
@@ -170,6 +171,7 @@ def complete_enrollment(
         if step is None:
             return None
         factor.enabled_at = clock.now()
+        delete_login_tickets(session, user_id)
         factor.enrollment_session_hash = None
         factor.enrollment_expires_at = None
         factor.last_step = step

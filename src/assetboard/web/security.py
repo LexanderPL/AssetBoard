@@ -58,6 +58,10 @@ def csrf_cookie_name(settings: Settings) -> str:
     return _cookie_name(settings, "csrf")
 
 
+def login_ticket_cookie_name(settings: Settings) -> str:
+    return _cookie_name(settings, "login_ticket")
+
+
 def summary_sort_cookie_name(settings: Settings) -> str:
     """The month summary's row order chosen in this browser (F2.4; not sensitive)."""
     return _cookie_name(settings, "summary_sort")
@@ -101,6 +105,7 @@ def clear_csrf_cookie(response: Response, settings: Settings) -> None:
 # OIDC (F1.3, ADR-0014): the flow cookie (start -> callback) and the pending-link cookie
 # (callback -> password confirmation). Both hold signed payloads that expire after 10 minutes.
 OIDC_COOKIE_SECONDS = 600
+LOGIN_TICKET_SECONDS = 300
 
 
 def oidc_flow_cookie_name(settings: Settings) -> str:
@@ -113,6 +118,23 @@ def oidc_link_cookie_name(settings: Settings) -> str:
 
 def set_short_cookie(response: Response, settings: Settings, name: str, value: str) -> None:
     response.set_cookie(name, value, max_age=OIDC_COOKIE_SECONDS, **_cookie_options(settings))
+
+
+def set_login_ticket_cookie(response: Response, settings: Settings, value: str, path: str) -> None:
+    """The two-step sign-in ticket (F1.6), sent only to ``path`` (the ``/login`` routes)."""
+    response.set_cookie(
+        login_ticket_cookie_name(settings),
+        value,
+        max_age=LOGIN_TICKET_SECONDS,
+        **{**_cookie_options(settings), "path": path},
+    )
+
+
+def clear_login_ticket_cookie(response: Response, settings: Settings, path: str) -> None:
+    """Clears the ticket cookie; ``path`` must be the one it was set with."""
+    response.delete_cookie(
+        login_ticket_cookie_name(settings), **{**_cookie_options(settings), "path": path}
+    )
 
 
 def clear_cookie(response: Response, settings: Settings, name: str) -> None:

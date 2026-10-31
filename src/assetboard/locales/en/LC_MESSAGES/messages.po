@@ -924,6 +924,12 @@ msgstr ""
 msgid "The email or password is not correct."
 msgstr ""
 
+msgid "The code is not correct."
+msgstr ""
+
+msgid "Your sign-in has expired. Please sign in again."
+msgstr ""
+
 msgid "Setup was already completed, or is being completed. Reload to continue."
 msgstr ""
 
@@ -2252,6 +2258,9 @@ msgid "Leave blank if two-factor authentication is not enabled."
 msgstr ""
 
 msgid "Link and sign in"
+msgstr ""
+
+msgid "Enter the code from your authenticator app"
 msgstr ""
 
 #, python-format
