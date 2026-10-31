@@ -501,6 +501,13 @@ def _sync_work_month(
     return occurrence
 
 
+def resync_work_month(session: Session, ctx: Context, source_id: UUID, work_month: date) -> None:
+    """Recalculate one work month's pending occurrence (and its tax payments) in the caller's
+    exclusive-locked write, e.g. after a skipped occurrence is pending again."""
+    source = IncomeSourceRepository(session, ctx).get_or_raise(source_id)
+    _sync_work_month(session, ctx, ctx.clock, source, work_month, allow_past=True)
+
+
 def generate_workspace_in_session(
     session: Session,
     scope: WorkspaceScope,

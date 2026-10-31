@@ -39,6 +39,8 @@ ACTION_ERRORS = {
     "category_unavailable": _("The occurrence category is unavailable; edit the recurring rule."),
     "invalid_input": _("Check the amount and date, then try again."),
     "not_planned": _("Only a one-time planned entry can be deleted here."),
+    "not_skipped": _("This occurrence is not skipped."),
+    "archived_item": _("This recurring item is archived, so its skipped date cannot come back."),
 }
 INVALID_DIRECTION = _("Choose a valid direction.")
 
@@ -175,9 +177,17 @@ async def post(request: Request, ctx: CurrentContext, occurrence_id: str) -> Res
     )
 
 
+def _return_month(values: dict[str, str]) -> YearMonth | None:
+    with contextlib.suppress(InvalidMonth):
+        return YearMonth.parse(values.get("return_month", ""))
+    return None
+
+
 @router.post("/upcoming/{occurrence_id}/skip", name="upcoming_skip")
 async def skip(request: Request, ctx: CurrentContext, occurrence_id: str) -> Response:
+    """Skip one date; from a ledger's expected row (``return_month``) back to that month."""
     values = await _values(request)
+    return_month = _return_month(values)
     try:
         await run_in_threadpool(
             occurrences.skip_occurrence,
@@ -186,8 +196,27 @@ async def skip(request: Request, ctx: CurrentContext, occurrence_id: str) -> Res
             _id(occurrence_id),
         )
     except occurrences.OccurrenceError as exc:
-        return _redirect(request, error=exc.code)
-    return _redirect(request, back=values.get("back", ""))
+        return _redirect(request, error=exc.code, return_month=return_month)
+    return _redirect(
+        request, notice="skipped", back=values.get("back", ""), return_month=return_month
+    )
+
+
+@router.post("/upcoming/{occurrence_id}/unskip", name="upcoming_unskip")
+async def unskip(request: Request, ctx: CurrentContext, occurrence_id: str) -> Response:
+    """Undo a skip (the ledger's greyed-out "Skipped" row): the date is pending again."""
+    values = await _values(request)
+    return_month = _return_month(values)
+    try:
+        await run_in_threadpool(
+            occurrences.unskip_occurrence,
+            request.app.state.session_factory,
+            ctx,
+            _id(occurrence_id),
+        )
+    except occurrences.OccurrenceError as exc:
+        return _redirect(request, error=exc.code, return_month=return_month)
+    return _redirect(request, notice="skip_undone", return_month=return_month)
 
 
 @router.post("/upcoming/{occurrence_id}/delete", name="upcoming_delete")

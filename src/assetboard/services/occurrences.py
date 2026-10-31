@@ -35,6 +35,7 @@ from assetboard.domain.transactions import (
     description_key,
 )
 from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.income import resync_work_month
 from assetboard.services.months import ensure_date_open
 
 logger = logging.getLogger(__name__)
@@ -140,6 +141,18 @@ def pending_for_month(
     with factory() as session:
         rows = ScheduledOccurrenceRepository(session, ctx).pending_for_month(
             month.first_day, month.last_day
+        )
+    return tuple(_upcoming_view(occurrence, item, name) for occurrence, item, name in rows)
+
+
+def skipped_for_month(
+    factory: sessionmaker[Session], ctx: Context, month: YearMonth
+) -> tuple[UpcomingOccurrence, ...]:
+    """The month's skipped occurrences (shown greyed out in the ledger, with Undo)."""
+    require_role(ctx, Role.VIEWER)
+    with factory() as session:
+        rows = ScheduledOccurrenceRepository(session, ctx).pending_for_month(
+            month.first_day, month.last_day, status=OccurrenceStatus.SKIPPED
         )
     return tuple(_upcoming_view(occurrence, item, name) for occurrence, item, name in rows)
 
@@ -307,6 +320,49 @@ def skip_occurrence(factory: sessionmaker[Session], ctx: Context, occurrence_id:
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
             action="scheduled_occurrence.skipped",
+            entity_type="scheduled_occurrence",
+            entity_id=str(occurrence.id),
+            ts=ctx.clock.now(),
+        )
+
+    run_immediate(factory, write)
+
+
+def unskip_occurrence(factory: sessionmaker[Session], ctx: Context, occurrence_id: UUID) -> None:
+    """Undo a skip: the occurrence is pending again, on its date and with its amount.
+
+    An income occurrence is recalculated (its planned tax payments, removed by the skip, come
+    back). A skipped date of an archived recurring item stays skipped: an archived item has no
+    pending dates. The due month must be open, as for the skip itself.
+    """
+    require_role(ctx, Role.EDITOR)
+
+    def write(session: Session) -> None:
+        require_role_now(session, ctx, Role.EDITOR)
+        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+        repository = ScheduledOccurrenceRepository(session, ctx)
+        occurrence = repository.get_for_update(occurrence_id)
+        if occurrence is None:
+            raise NotFound
+        if occurrence.status == OccurrenceStatus.PENDING:
+            return
+        if occurrence.status != OccurrenceStatus.SKIPPED:
+            raise OccurrenceError("not_skipped")
+        _ensure_open(session, ctx, occurrence.due_date)
+        if occurrence.scheduled_item_id is not None:
+            item = ScheduledItemRepository(session, ctx).get(occurrence.scheduled_item_id)
+            if item is None or item.archived_at is not None:
+                raise OccurrenceError("archived_item")
+        repository.update(occurrence.id, status=OccurrenceStatus.PENDING)
+        if (
+            occurrence.generated_by == "income"
+            and occurrence.income_source_id is not None
+            and occurrence.work_month is not None
+        ):
+            resync_work_month(session, ctx, occurrence.income_source_id, occurrence.work_month)
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=ctx.user.id,
+            action="scheduled_occurrence.unskipped",
             entity_type="scheduled_occurrence",
             entity_id=str(occurrence.id),
             ts=ctx.clock.now(),

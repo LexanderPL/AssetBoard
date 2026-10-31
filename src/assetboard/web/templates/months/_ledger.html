@@ -208,13 +208,40 @@
                 <input type="hidden" name="return_month" value="{{ ledger.month }}">
                 <button type="submit" class="{{ delete_class }}" aria-label="{{ _('Delete the entry of %(date)s, %(amount)s', date=r.full_date, amount=r.amount) }}">{{ _("Delete") }}</button>
               </form>
+              {% else %}
+              <form method="post" action="{{ scoped_url(request, 'upcoming_skip', occurrence_id=r.occurrence.id) }}">
+                {{ csrf_input() }}
+                <input type="hidden" name="return_month" value="{{ ledger.month }}">
+                <button type="submit" data-skip class="{{ small_class }}" aria-label="{{ _('Skip %(name)s on %(date)s', name=r.occurrence.label, date=r.full_date) }}">{{ _("Skip") }}</button>
+              </form>
               {% endif %}
             </div>
           </td>
           {% endif %}
         </tr>
         {% endfor %}
-        {% if not s.rows and not s.pending_rows %}<tr data-ledger-empty><td colspan="{{ 5 if ledger.can_write else 4 }}" class="py-3 {{ muted_class }}">{% if ledger.filter %}{{ _("No entries in this category this month.") }}{% else %}{{ s.empty }}{% endif %}</td></tr>{% endif %}
+        {% for r in s.skipped_rows %}
+        {# A skipped date stays visible in its month, greyed out; Undo makes it pending again.
+           It is not counted in the month's pending totals. #}
+        <tr class="text-muted" data-skipped-occurrence="{{ r.occurrence.id }}">
+          <td class="whitespace-nowrap py-2 pr-2 align-top tabular-nums"><time datetime="{{ r.occurrence.due_date.isoformat() }}"><span aria-hidden="true">{{ r.occurrence.due_date.day }}</span><span class="sr-only">{{ r.full_date }}</span></time></td>
+          <td class="whitespace-nowrap py-2 pr-2 text-right align-top tabular-nums"><span class="line-through">{{ r.amount }}</span><span class="block text-xs">{{ _("Skipped") }}</span></td>
+          <td class="py-2 pr-2 align-top">{{ r.occurrence.label }}</td>
+          <td class="py-2 pr-2 align-top">{{ r.occurrence.category_name }}</td>
+          {% if ledger.can_write %}
+          <td class="py-2 align-top text-right">
+            <div class="flex items-center justify-end gap-1" data-skipped-actions>
+              <form method="post" action="{{ scoped_url(request, 'upcoming_unskip', occurrence_id=r.occurrence.id) }}">
+                {{ csrf_input() }}
+                <input type="hidden" name="return_month" value="{{ ledger.month }}">
+                <button type="submit" data-unskip class="{{ small_class }}" aria-label="{{ _('Undo skipping %(name)s on %(date)s', name=r.occurrence.label, date=r.full_date) }}">{{ _("Undo") }}</button>
+              </form>
+            </div>
+          </td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+        {% if not s.rows and not s.pending_rows and not s.skipped_rows %}<tr data-ledger-empty><td colspan="{{ 5 if ledger.can_write else 4 }}" class="py-3 {{ muted_class }}">{% if ledger.filter %}{{ _("No entries in this category this month.") }}{% else %}{{ s.empty }}{% endif %}</td></tr>{% endif %}
         {% if ledger.can_write %}{{ entry_row(s) }}{% endif %}
       </tbody>
     </table>

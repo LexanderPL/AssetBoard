@@ -164,8 +164,9 @@ class ScheduledOccurrenceRepository(ScopedRepository[ScheduledOccurrence]):
         )
 
     def pending_for_month(
-        self, first_day: date, last_day: date
+        self, first_day: date, last_day: date, *, status: str = "pending"
     ) -> list[tuple[ScheduledOccurrence, ScheduledItem | None, str]]:
+        """The month's occurrences in ``status`` (pending; the ledger also reads skipped)."""
         statement = (
             select(ScheduledOccurrence, ScheduledItem, Category.name)
             .outerjoin(
@@ -184,7 +185,7 @@ class ScheduledOccurrenceRepository(ScopedRepository[ScheduledOccurrence]):
             )
             .where(
                 ScheduledOccurrence.workspace_id == self._workspace_id,
-                ScheduledOccurrence.status == "pending",
+                ScheduledOccurrence.status == status,
                 ScheduledOccurrence.due_date >= first_day,
                 ScheduledOccurrence.due_date <= last_day,
             )
