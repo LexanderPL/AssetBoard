@@ -395,7 +395,7 @@ when you intend to upload the image and its release tags.
 - Migration `0016_f16_totp` adds the `totp_factors` and `totp_recovery_codes` tables, a session
   flag and the `require_two_factor` workspace setting (off). Nothing changes until a user enrolls
   or an owner turns the setting on. Back up the secret key with the database (see [Secret key and two-factor authentication](#secret-key-and-two-factor-authentication)).
-- Migration `0024_two_step_totp_login` adds short-lived, hashed login tickets. Password sign-in
+- Migration `0026_two_step_login` adds short-lived, hashed login tickets. Password sign-in
   asks for a TOTP or recovery code on a second page when the account has two-factor authentication.
 
 ### Unreleased: recurring items (F3.1)

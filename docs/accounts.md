@@ -53,8 +53,10 @@ on another device.
 
 After enrollment, enter your email and password on the first sign-in page. If two-factor
 authentication is enabled, the next page asks for a code from your authenticator app or a
-recovery code. A wrong or expired code shows the same generic failure as an incorrect password;
-the ticket expires after five minutes and you can retry while it is valid. Attempts use the same
+recovery code. A wrong code shows the same generic failure as an incorrect password and you can
+try again on the same page, up to five times within five minutes; after that, or once five
+minutes have passed, you return to the first page with "Your sign-in has expired" and enter your
+password again. "Start over" on the code page also takes you back. Code attempts use the same
 sign-in throttle as incorrect passwords. The emergency local administrator login uses the same
 two steps.
 When linking a new identity provider or proxy identity by email during sign-in, enter the code
