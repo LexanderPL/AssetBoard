@@ -731,7 +731,10 @@ def create_source(
     average_months: int,
     active_from: date,
     active_to: date | None,
+    tax_rule_ids: tuple[UUID, ...] = (),
 ) -> UUID:
+    """Create an income source; ``tax_rule_ids`` are ticked in the same transaction ("Add
+    income", step 4), each with the rule's own payment day."""
     require_role(ctx, Role.EDITOR)
     fields = _source_fields(
         name=name,
@@ -768,6 +771,17 @@ def create_source(
             ts=ctx.clock.now(),
             data={"name": fields.name, "kind": fields.kind},
         )
+        for rule_id in dict.fromkeys(tax_rule_ids):
+            _attach(
+                session,
+                ctx,
+                row,
+                rule_id,
+                payment_category_id=None,
+                due_day=None,
+                due_month_offset=None,
+                generate_payment=True,
+            )
         return row.id
 
     return run_immediate(factory, write)
