@@ -185,3 +185,14 @@ def test_deleting_a_posted_transaction_in_the_ledger_returns_it_to_the_inbox(own
     with owner.db() as session:
         live = session.scalars(select(Transaction).where(Transaction.deleted_at.is_(None))).all()
         assert len(live) == 1
+
+
+def test_upcoming_and_recurring_pages_have_no_links_to_other_sections(owner):
+    upcoming = owner.client.get("/upcoming").text
+    main = upcoming.split("<main", 1)[1]
+    assert "<h1" in main and "Upcoming payments" in main
+    assert "<title>Upcoming payments" in upcoming
+    assert 'href="/recurring"' not in main and 'href="/notifications"' not in main
+    assert "data-notifications-shortcut" not in upcoming
+    recurring = owner.client.get("/recurring").text.split("<main", 1)[1]
+    assert 'href="/upcoming"' not in recurring
