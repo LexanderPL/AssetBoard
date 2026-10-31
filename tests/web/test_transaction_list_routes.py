@@ -23,6 +23,7 @@ from assetboard.db.models.ledger import Category, Transaction
 from assetboard.i18n import gettext
 from assetboard.services import transaction_search as search_service
 from assetboard.services.transaction_search import MAX_SELECTED_IDS
+from assetboard.web import exports
 from assetboard.web import transaction_list_routes as routes
 from tests.conftest import OwnerApp
 
@@ -476,9 +477,9 @@ class _Disconnect(OSError):
 
 def test_the_spool_is_closed_when_sending_fails_mid_stream() -> None:
     spool: SpooledTemporaryFile[bytes] = SpooledTemporaryFile(max_size=1024)  # noqa: SIM115
-    spool.write(b"x" * (routes.EXPORT_CHUNK_BYTES * 3))
+    spool.write(b"x" * (exports.EXPORT_CHUNK_BYTES * 3))
     spool.seek(0)
-    response = routes.SpoolResponse(spool, media_type="text/csv")
+    response = exports.SpoolResponse(spool, media_type="text/csv")
     sent: list[str] = []
 
     async def receive() -> dict[str, Any]:
@@ -502,7 +503,7 @@ def test_the_spool_is_closed_after_a_complete_download() -> None:
     spool: SpooledTemporaryFile[bytes] = SpooledTemporaryFile(max_size=1024)  # noqa: SIM115
     spool.write(b"a,b\r\n")
     spool.seek(0)
-    response = routes.SpoolResponse(spool, media_type="text/csv")
+    response = exports.SpoolResponse(spool, media_type="text/csv")
     body: list[bytes] = []
 
     async def receive() -> dict[str, Any]:

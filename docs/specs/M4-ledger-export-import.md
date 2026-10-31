@@ -49,6 +49,8 @@ synthetic too).
   previous_settings JSON?)`. `filename` is the uploaded name, sanitised and cut to 255
   characters; `previous_settings` holds the workspace settings a restore replaced (for its
   rollback). `UNIQUE(workspace_id, id)` is the target of composite foreign keys.
+- F4.1 introduces the nullable `import_key` columns and their unique indexes for export lineage;
+  F4.2 adds batch tracking and populates lineage during import.
 - `Transaction.import_batch_id?`, `Transaction.import_key?`; `Category.import_batch_id?`,
   `Category.import_key?`; `BudgetLine.import_batch_id?` (composite foreign keys to
   `import_batches(workspace_id, id)`). `import_key` is unique per workspace when not null
