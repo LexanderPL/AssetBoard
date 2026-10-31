@@ -8,8 +8,8 @@
 <a href="{{ scoped_url(request, 'income_sources') }}" class="mb-4 inline-flex rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Back to Income") }}</a>
 <ol class="mb-4 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label="{{ _('Steps') }}" data-wizard-steps>
   {% for label in steps %}
-  <li class="flex items-center gap-2{% if loop.index == step %} font-semibold text-ink{% else %} text-muted{% endif %}"{% if loop.index == step %} aria-current="step"{% endif %}>
-    <span class="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold{% if loop.index == step %} bg-primary text-on-primary{% elif loop.index < step %} bg-primary-soft text-primary-ink{% else %} border border-line{% endif %}" aria-hidden="true">{{ loop.index }}</span>{{ label }}
+  <li class="flex items-center gap-2 {% if loop.index == step %}font-semibold text-ink {% else %}text-muted {% endif %}"{% if loop.index == step %} aria-current="step"{% endif %}>
+    <span class="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold {% if loop.index == step %}bg-primary text-on-primary {% elif loop.index < step %}bg-primary-soft text-primary-ink {% else %}border border-line {% endif %}" aria-hidden="true">{{ loop.index }}</span>{{ label }}
   </li>
   {% endfor %}
 </ol>
