@@ -6,7 +6,6 @@ import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from importlib.metadata import version
-from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -26,6 +25,8 @@ from assetboard.domain.archive import (
     CategoryRow,
     MonthRow,
     TransactionRow,
+    lineage_id,
+    timestamp_text,
     write_archive,
 )
 from assetboard.domain.ledger_csv import plain_amount
@@ -55,23 +56,11 @@ class WorkspaceArchive:
     filename: str
 
 
-def _timestamp(value: datetime | None) -> str | None:
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=UTC)
-    return (
-        value.astimezone(UTC)
-        .isoformat(timespec="microseconds" if value.microsecond else "seconds")
-        .replace("+00:00", "Z")
-    )
-
-
 def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceArchive:
     """Export the complete ledger and record a content-free audit event."""
     require_role(ctx, Role.EDITOR)
 
-    def export(session: Session) -> WorkspaceArchive:
+    def export(session: Session) -> tuple[ArchiveRows, datetime, str]:
         require_role_now(session, ctx, Role.EDITOR)
         workspace_repository = CurrentWorkspaceRepository(session, ctx)
         # Ledger writers take this workspace lock too, keeping the files mutually consistent.
@@ -86,7 +75,7 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
                 row.archived_at is not None,
                 row.sort_order,
                 row.name_key,
-                row.id,
+                lineage_id(row.id, row.import_key),  # the exported id, stable across restores
             ),
         )
         category_rank = {
@@ -101,7 +90,7 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
                 treatment=category.treatment,
                 color=category.color,
                 sort_order=category.sort_order,
-                archived_at=_timestamp(category.archived_at),
+                archived_at=timestamp_text(category.archived_at),
             )
             for category in export_categories
         )
@@ -144,15 +133,15 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
                     )
                 ),
                 id=str(lineage_id(row.id, row.import_key)),
-                deleted_at=_timestamp(row.deleted_at),
+                deleted_at=timestamp_text(row.deleted_at),
             )
             for row in transactions
         )
         month_rows = tuple(
             MonthRow(
                 month=row.month.strftime("%Y-%m"),
-                closed_at=_timestamp(row.closed_at),
-                plan_started_at=_timestamp(row.plan_started_at),
+                closed_at=timestamp_text(row.closed_at),
+                plan_started_at=timestamp_text(row.plan_started_at),
             )
             for row in sorted(MonthStateRepository(session, ctx).list(), key=lambda row: row.month)
         )
@@ -171,13 +160,6 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             transactions=transaction_rows,
             months=month_rows,
         )
-        archive = write_archive(
-            rows,
-            app_name=branding.APP_NAME,
-            app_version=version("assetboard"),
-            exported_at=exported_at,
-            base_currency=workspace.base_currency,
-        )
         counts = {
             "categories": len(category_rows),
             "budget_lines": len(budget_rows),
@@ -193,12 +175,17 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             data=counts,
         )
         slug = re.sub(r"[^a-z0-9]+", "-", workspace.name.lower()).strip("-") or "workspace"
-        filename = f"{branding.CLI_NAME}-{slug}-{exported_at.strftime('%Y%m%d-%H%M%S')}Z.zip"
-        return WorkspaceArchive(content=archive, filename=filename)
+        return rows, exported_at, slug
 
-    return run_immediate(factory, export)
-
-
-def lineage_id(row_id: UUID, import_key: str | None) -> UUID:
-    """Preserve origin IDs across restore/export cycles; content keys use the local ID."""
-    return UUID(import_key[3:]) if import_key and import_key.startswith("id:") else row_id
+    rows, exported_at, slug = run_immediate(factory, export)
+    # Compress after commit: the rows are a consistent snapshot, and on SQLite the immediate
+    # transaction blocks every writer of the instance while it is open.
+    archive = write_archive(
+        rows,
+        app_name=branding.APP_NAME,
+        app_version=version("assetboard"),
+        exported_at=exported_at,
+        base_currency=str(rows.workspace["base_currency"]),
+    )
+    filename = f"{branding.CLI_NAME}-{slug}-{exported_at.strftime('%Y%m%d-%H%M%S')}Z.zip"
+    return WorkspaceArchive(content=archive, filename=filename)

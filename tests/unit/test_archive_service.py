@@ -11,8 +11,8 @@ from sqlalchemy.exc import IntegrityError
 
 from assetboard.db.models.identity import AuditEvent, Membership
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
-from assetboard.domain.archive import parse_archive
-from assetboard.services.archive import export_workspace, lineage_id
+from assetboard.domain.archive import lineage_id, parse_archive
+from assetboard.services.archive import export_workspace
 from assetboard.services.context import PermissionDenied
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
@@ -220,6 +220,33 @@ def test_export_orders_categories_and_entries(team: WorkspaceDb) -> None:
     assert [(row.month, row.category) for row in parsed.rows.budget_lines] == [
         (month, name) for month in ("2026-01", "2026-02") for name in names
     ]
+
+
+def test_export_breaks_category_ties_by_the_exported_id(team: WorkspaceDb) -> None:
+    from uuid import UUID
+
+    # Two archived "Old" categories differ only by id; the local ids sort the other way round
+    # from the lineage ids, which are what a restore keeps.
+    with team.factory.begin() as session:
+        for local, origin in ((1, 9), (2, 8)):
+            session.add(
+                Category(
+                    workspace_id=team.workspace_id,
+                    id=UUID(int=local),
+                    name="Old",
+                    name_key="old",
+                    kind="expense",
+                    treatment="regular",
+                    color="#16a34a",
+                    sort_order=0,
+                    archived_at=team.clock.now(),
+                    import_key=f"id:{UUID(int=origin)}",
+                )
+            )
+    result = export_workspace(team.factory, team.ctx("editor", "editor"))
+    parsed, errors = parse_archive(result.content)
+    assert not errors and parsed is not None
+    assert [row.id for row in parsed.rows.categories] == [str(UUID(int=8)), str(UUID(int=9))]
 
 
 def test_export_locks_workspace_before_reading_ledger(team: WorkspaceDb) -> None:

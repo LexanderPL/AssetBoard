@@ -193,14 +193,15 @@ def manifest_bytes(
             "format": FORMAT,
             "format_version": FORMAT_VERSION,
             "app": {"name": app_name, "version": app_version},
-            "exported_at": _timestamp(exported_at),
+            "exported_at": timestamp_text(exported_at),
             "base_currency": base_currency,
             "files": listed,
         }
     )
 
 
-def _timestamp(value: datetime | None) -> str | None:
+def timestamp_text(value: datetime | None) -> str | None:
+    """Format a timestamp as the archive's UTC text (naive values are UTC)."""
     if value is None:
         return None
     if value.tzinfo is None:
@@ -212,13 +213,18 @@ def _timestamp(value: datetime | None) -> str | None:
     )
 
 
+def lineage_id(row_id: UUID, import_key: str | None) -> UUID:
+    """Preserve origin IDs across restore/export cycles; content keys use the local ID."""
+    return UUID(import_key[3:]) if import_key and import_key.startswith("id:") else row_id
+
+
 def zip_bytes(files: dict[str, bytes], *, exported_at: datetime) -> bytes:
     """Create a deterministic deflated ZIP with fixed entry order and timestamps."""
     stamp = exported_at.astimezone(UTC)
     year = max(1980, min(stamp.year, 2107))
     zip_time = (year, stamp.month, stamp.day, stamp.hour, stamp.minute, stamp.second // 2 * 2)
     output = io.BytesIO()
-    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as archive:
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
         for name in REQUIRED_FILES:
             info = zipfile.ZipInfo(name, zip_time)
             info.compress_type = zipfile.ZIP_DEFLATED
@@ -408,7 +414,7 @@ def _parse_timestamp(value: str) -> str:
     ):
         raise ValueError("invalid timestamp")
     try:
-        result = _timestamp(datetime.fromisoformat(value))
+        result = timestamp_text(datetime.fromisoformat(value))
     except OverflowError:  # an offset that moves year 1 or 9999 out of range
         raise ValueError("invalid timestamp") from None
     assert result is not None
