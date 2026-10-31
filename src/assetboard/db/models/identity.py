@@ -106,6 +106,9 @@ class Workspace(IdMixin, TimestampMixin, Base):
     taxes_enabled: Mapped[bool] = mapped_column(
         Boolean(), nullable=False, default=False, server_default=false()
     )
+    # Days ahead shown by Upcoming payments and the Home page (1-365, validated by the service);
+    # NULL: the instance setting ``upcoming_days`` applies.
+    upcoming_days: Mapped[int | None] = mapped_column(Integer(), nullable=True)
 
 
 class Membership(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):

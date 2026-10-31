@@ -25,7 +25,7 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_DEFAULT_CURRENCY` | `EUR` | App | Three-letter ISO currency used as the default. |
 | `ASSETBOARD_AUTO_MIGRATE` | `true` | App | Apply pending database migrations at startup when enabled. Only one instance/worker may use a data volume with automatic migrations enabled. |
 | `ASSETBOARD_RECURRENCE_HORIZON_MONTHS` | `13` | App | Calendar months ahead for generating scheduled occurrences; must be positive. |
-| `ASSETBOARD_UPCOMING_DAYS` | `30` | App | Days ahead shown in the Upcoming inbox, in addition to all overdue occurrences; 1 to 365. |
+| `ASSETBOARD_UPCOMING_DAYS` | `30` | App | Days ahead shown on Upcoming payments and the Home page, in addition to all overdue occurrences; 1 to 365. A workspace owner can override it in Workspace settings. |
 | `ASSETBOARD_SCHEDULER_ENABLED` | `true` | App | Enable in-process recurring generation and auto-post jobs. Disable for tests or when running jobs separately. |
 | `ASSETBOARD_SETUP_TOKEN` | unset | App | First-run setup token (at least 22 characters; use a random value). If unset, a 256-bit token is generated at each process start and logged once at `WARNING` while no user exists. A configured token is never logged. |
 | `ASSETBOARD_ALLOW_REGISTRATION` | unset | App | **Removed** (pre-release B). Open registration is turned on in **Instance settings** and needs SMTP. `true` refuses to start with a message; `false` is ignored with a warning. Remove the variable. |

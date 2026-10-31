@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Callable, Iterator
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,7 @@ from assetboard.services import workspaces
 from assetboard.services.budget import set_planned, workspace_has_budget_lines
 from assetboard.services.categories import create_category
 from assetboard.services.context import Context, PermissionDenied, Role
+from assetboard.services.occurrences import window_days
 from assetboard.services.taxes import workspace_has_fixed_tax_amounts
 from assetboard.services.transactions import (
     create_transaction,
@@ -208,15 +210,38 @@ def test_auto_copy_plan_is_off_by_default_and_owners_turn_it_on(team: WorkspaceD
         ({"timezone": "Mars/Base"}, "timezone", "invalid_timezone"),
         ({"country_code": "ZZ"}, "country_code", "invalid_country_code"),
         ({"locale": "xx"}, "locale", "invalid_locale"),
+        ({"upcoming_days": 0}, "upcoming_days", "invalid_upcoming_days"),
+        ({"upcoming_days": 366}, "upcoming_days", "invalid_upcoming_days"),
     ],
 )
 def test_update_settings_validates_input(
-    team: WorkspaceDb, changes: dict[str, str], field: str, code: str
+    team: WorkspaceDb, changes: dict[str, Any], field: str, code: str
 ) -> None:
     with pytest.raises(InvalidWorkspaceSettings) as invalid:
         update_settings(team.factory, team.ctx("olga", "owner"), **_settings(**changes))
     assert (invalid.value.field, invalid.value.code) == (field, code)
     assert _events(team) == []
+
+
+def test_upcoming_days_is_unset_by_default_and_owners_set_it(team: WorkspaceDb) -> None:
+    owner = team.ctx("olga", "owner")
+    assert workspace_settings(team.factory, owner).upcoming_days is None
+    for days in (1, 45, 365):
+        assert (
+            update_settings(team.factory, owner, **_settings(upcoming_days=days)).upcoming_days
+            == days
+        )
+        assert workspace_settings(team.factory, owner).upcoming_days == days
+    assert _events(team)[-1] == ("workspace.settings_updated", {"fields": "upcoming_days"})
+    update_settings(team.factory, owner, **SETTINGS)
+    assert workspace_settings(team.factory, owner).upcoming_days is None
+
+
+def test_window_days_falls_back_to_the_instance_setting(team: WorkspaceDb) -> None:
+    owner = team.ctx("olga", "owner")
+    assert window_days(owner, 30) == 30
+    with_window = replace(owner, workspace=replace(owner.workspace, upcoming_days=9))
+    assert window_days(with_window, 30) == 9
 
 
 # The base currency is locked once amounts exist (F2.2, owner decision)

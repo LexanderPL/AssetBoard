@@ -34,7 +34,11 @@ from uuid import UUID
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.clock import Clock
-from assetboard.config import DEFAULT_RECURRENCE_HORIZON_MONTHS
+from assetboard.config import (
+    DEFAULT_RECURRENCE_HORIZON_MONTHS,
+    MAX_UPCOMING_DAYS,
+    MIN_UPCOMING_DAYS,
+)
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.identity import User
 from assetboard.db.repositories import (
@@ -178,6 +182,8 @@ class WorkspaceSettings:
     require_two_factor: bool = False
     # ADR-0022: the Menu section's Taxes switch (changed by services.taxes.set_taxes_enabled).
     taxes_enabled: bool = False
+    # Days ahead for Upcoming payments and Home; None: the instance setting applies.
+    upcoming_days: int | None = None
 
 
 def _checkpoint(_name: str) -> None:
@@ -214,6 +220,7 @@ def workspace_settings(factory: sessionmaker[Session], ctx: Context) -> Workspac
             require_two_factor=workspace.require_two_factor,
             base_currency_locked=_base_currency_locked(session, ctx),
             taxes_enabled=workspace.taxes_enabled,
+            upcoming_days=workspace.upcoming_days,
         )
 
 
@@ -229,6 +236,7 @@ def update_settings(
     auto_copy_plan: bool,
     require_two_factor: bool = False,
     recurrence_horizon_months: int = DEFAULT_RECURRENCE_HORIZON_MONTHS,
+    upcoming_days: int | None = None,
 ) -> WorkspaceSettings:
     """Change the workspace's settings; the audit event lists changed fields, not values.
 
@@ -240,6 +248,8 @@ def update_settings(
     clean_name = name.strip()
     if not clean_name or len(clean_name) > MAX_WORKSPACE_NAME_LENGTH:
         raise InvalidWorkspaceSettings("name", "invalid_workspace_name")
+    if upcoming_days is not None and not MIN_UPCOMING_DAYS <= upcoming_days <= MAX_UPCOMING_DAYS:
+        raise InvalidWorkspaceSettings("upcoming_days", "invalid_upcoming_days")
     try:
         options = validate_workspace_options(
             base_currency=base_currency,
@@ -262,6 +272,7 @@ def update_settings(
         locale=options.locale,
         auto_copy_plan=auto_copy_plan,
         require_two_factor=require_two_factor,
+        upcoming_days=upcoming_days,
     )
 
     def write(session: Session) -> WorkspaceSettings:
@@ -280,6 +291,7 @@ def update_settings(
                 ("locale", wanted.locale),
                 ("auto_copy_plan", wanted.auto_copy_plan),
                 ("require_two_factor", wanted.require_two_factor),
+                ("upcoming_days", wanted.upcoming_days),
             )
             if getattr(workspace, field) != value
         }

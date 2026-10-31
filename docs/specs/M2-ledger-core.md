@@ -640,7 +640,9 @@ modules) follow; Categories lives in the user menu.
     "Saved / invested" slice, the flow bar shows saving. Slices use the category colour; a category with zero
     actual has no slice; an empty month shows an empty state per chart ("No expenses yet this
     month"), not an empty ring;
-  - **upcoming items** from F3.2: overdue occurrences (highlighted) and the next 7 days, at most
+  - **upcoming items** from F3.2: overdue occurrences (highlighted) and the workspace's
+    Upcoming window (the same window as the Upcoming payments page, F3.2; it was a fixed
+    7 days before UI batch 3), at most
     10 rows, with a link to the Upcoming page. Editors and owners get the same confirm and skip
     actions as on the Upcoming page; viewers see plain rows;
   - a workspace without data renders (zero KPIs, empty states), as today's placeholder does.

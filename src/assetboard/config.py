@@ -18,6 +18,9 @@ from assetboard.branding import ENV_PREFIX
 # Proxy authentication (F1.4, ADR-0015): the narrowest TRUSTED_PROXIES entries allowed.
 PROXY_AUTH_MIN_PREFIX = {4: 24, 6: 64}
 DEFAULT_RECURRENCE_HORIZON_MONTHS = 13
+# The Upcoming window (instance default and per-workspace setting), in days.
+MIN_UPCOMING_DAYS = 1
+MAX_UPCOMING_DAYS = 365
 _IPV4_MAPPED = ip_network("::ffff:0:0/96")
 _HEADER_NAME = re.compile(r"[!#$%&'*+\-.^_`|~0-9a-z]{1,64}")
 # Headers that carry something else (the connection, forwarding, cookies, the browser's own
@@ -122,7 +125,7 @@ class Settings(BaseSettings):
     # only to refuse ``true`` at startup with a clear message; ``false`` is ignored.
     allow_registration: bool | None = None
     recurrence_horizon_months: int = Field(default=DEFAULT_RECURRENCE_HORIZON_MONTHS, ge=1)
-    upcoming_days: int = Field(default=30, ge=1, le=365)
+    upcoming_days: int = Field(default=30, ge=MIN_UPCOMING_DAYS, le=MAX_UPCOMING_DAYS)
     scheduler_enabled: bool = True
     session_idle_timeout_days: int = Field(default=14, ge=1, le=365)
     session_absolute_timeout_days: int = Field(default=60, ge=1, le=365)

@@ -1,7 +1,8 @@
 """Home (F2.7): the current month's dashboard at ``/``.
 
 The F2.4 flow bar (the same partial as the Month page), the expense and income donuts
-(``web.charts``) and up to ten upcoming F3.2 items (overdue ones and the next seven days). Every
+(``web.charts``) and up to ten upcoming F3.2 items (overdue ones and the
+workspace's Upcoming window, ``occurrences.window_days``). Every
 figure comes from existing services: ``services.summary`` (through ``web.plan.build_summary``)
 and ``services.occurrences``. The month is the workspace's current month (Clock, time zone).
 """
@@ -25,7 +26,6 @@ from assetboard.web.security import require_csrf
 # Every router carries the CSRF dependency, so a new state-changing route is covered by default.
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
-UPCOMING_DAYS = 7  # overdue items and the next seven days (F2.7)
 UPCOMING_LIMIT = 10
 
 
@@ -39,7 +39,8 @@ def home_context(request: Request, ctx: Context) -> dict[str, object]:
     if summary.source is not None:
         source = summary.source
         donuts = tuple(build_donut(source, block, locale) for block in ("expense", "income"))
-    weeks = occurrences.upcoming(factory, ctx, days=UPCOMING_DAYS)
+    days = occurrences.window_days(ctx, request.app.state.settings.upcoming_days)
+    weeks = occurrences.upcoming(factory, ctx, days=days)
     items = sorted((o for w in weeks for o in w.occurrences), key=lambda o: o.due_date)
     return {
         "workspace": ctx.workspace,
@@ -49,6 +50,7 @@ def home_context(request: Request, ctx: Context) -> dict[str, object]:
         "donuts": donuts,
         "upcoming": items[:UPCOMING_LIMIT],
         "upcoming_more": len(items) > UPCOMING_LIMIT,
+        "upcoming_days": days,
         "today": ctx.clock.today(ctx.workspace.timezone),
         "can_edit": has_role(ctx, Role.EDITOR),
         "format_day": format_day,

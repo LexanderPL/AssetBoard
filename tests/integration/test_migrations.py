@@ -1165,3 +1165,43 @@ def test_0028_taxes_redesign_maps_kinds_and_schedules_and_round_trips(tmp_path: 
         check_database_migrations(settings)
     finally:
         engine.dispose()
+
+
+def test_0029_upcoming_days_round_trip_keeps_workspaces_on_the_instance_default(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'upcoming.db'}"
+    )
+    config = alembic_config(settings)
+    command.upgrade(config, "0028_taxes_redesign")
+    engine = create_database_engine(settings.database_url or "")
+    stamp = "'2026-01-01 00:00:00'"
+
+    def columns() -> dict[str, bool]:  # name -> nullable
+        return {c["name"]: c["nullable"] for c in inspect(engine).get_columns("workspaces")}
+
+    try:
+        assert "upcoming_days" not in columns()
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO workspaces (id, name, base_currency, locale, timezone, created_at, "
+                f"updated_at) VALUES (?, 'Home', 'EUR', 'en', 'UTC', {stamp}, {stamp})",
+                ("0" * 31 + "1",),
+            )
+        upgrade_database(settings)
+        assert columns()["upcoming_days"] is True  # nullable
+        with engine.begin() as connection:
+            days = connection.exec_driver_sql("SELECT upcoming_days FROM workspaces")
+            assert days.scalar_one() is None  # existing workspaces: the instance setting
+            connection.exec_driver_sql("UPDATE workspaces SET upcoming_days = 45")
+        command.downgrade(config, "0028_taxes_redesign")
+        assert "upcoming_days" not in columns()
+        with engine.connect() as connection:
+            count = connection.exec_driver_sql("SELECT count(*) FROM workspaces").scalar_one()
+            assert count == 1
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()

@@ -92,12 +92,12 @@ interval/end_date/max_count, determinism. Services use the injected Clock only.
 
 ---
 
-## F3.2 Upcoming inbox and occurrence workflow
+## F3.2 Upcoming payments and occurrence workflow
 
 **Story:** I see what's due and overdue and confirm, skip or move items in one click.
 
 **Acceptance**
-- "Upcoming" page: overdue (highlighted), next 30 days (setting), grouped by week; filters by direction/category.
+- "Upcoming" page (headed "Upcoming payments", pl "Nadchodzące płatności"; the sidebar item stays "Upcoming"): overdue (highlighted), next 30 days (setting), grouped by week; filters by direction/category.
 - Actions per occurrence: **Mark paid/received** (dialog prefilled with expected amount and due date; editable) creates a `Transaction` (`source=recurring`) linked to the occurrence and sets `status=posted`; **Skip**; **Reschedule this one** (changes only this occurrence's date); **Edit amount** (this occurrence only); **Edit rule**.
 - Undo of "mark paid" within 10 seconds deletes the created transaction and restores `pending`.
 - `auto_post=true` items post automatically on the due date (job runs shortly after midnight workspace time) with `source=recurring_auto`; the transaction is clearly marked and editable.
@@ -126,8 +126,12 @@ interval/end_date/max_count, determinism. Services use the injected Clock only.
   `previous_transaction_id`. Auto-post only touches occurrences that were never posted
   (`previous_transaction_id IS NULL`), so a deleted auto-posted transaction is not recreated by
   the next run; the user posts it by hand.
-- The inbox window defaults to 30 days and is configurable by the operator with
-  `ASSETBOARD_UPCOMING_DAYS` (1–365).
+- The window defaults to 30 days and is configurable by the operator with
+  `ASSETBOARD_UPCOMING_DAYS` (1–365). UI batch 3: the owner can override it per workspace in
+  Workspace settings (`workspaces.upcoming_days`, 1–365, NULL = the instance setting, migration
+  `0029_upcoming_days`); the Home page's upcoming list (F2.7) uses the same window instead of a
+  fixed 7 days and keeps its limit of 10 items. The page has no links to Recurring items or
+  Notifications.
 - Auto-post jobs run at 00:05 in each workspace time zone, use the injected Clock, and leave
   occurrences pending when their due month is closed. Paused or archived items are not posted.
 

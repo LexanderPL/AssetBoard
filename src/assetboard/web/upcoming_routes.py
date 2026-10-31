@@ -95,12 +95,12 @@ async def page(request: Request, ctx: CurrentContext) -> Response:
         )
     category_text = request.query_params.get("category") or None
     category_id = _id(category_text) if category_text else None
-    settings = request.app.state.settings
+    days = occurrences.window_days(ctx, request.app.state.settings.upcoming_days)
     weeks = await run_in_threadpool(
         lambda: occurrences.upcoming(
             request.app.state.session_factory,
             ctx,
-            days=settings.upcoming_days,
+            days=days,
             direction=direction,
             category_id=category_id,
         )
@@ -124,7 +124,7 @@ async def page(request: Request, ctx: CurrentContext) -> Response:
         context={
             "weeks": weeks,
             "today": ctx.clock.today(ctx.workspace.timezone),
-            "days": settings.upcoming_days,
+            "days": days,
             "direction": direction or "",
             "category_id": str(category_id) if category_id else "",
             "categories": categories.expense + categories.income + categories.archived,

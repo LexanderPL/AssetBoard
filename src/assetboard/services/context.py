@@ -54,6 +54,8 @@ class WorkspaceRef:
     require_two_factor: bool = False
     # ADR-0022: the Taxes menu item, tax pages and the tax parts of income are shown.
     taxes_enabled: bool = False
+    # Upcoming window in days; None: the instance setting applies (occurrences.window_days).
+    upcoming_days: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -161,6 +163,7 @@ def build_context(session: Session, web_session: WebSession, *, clock: Clock) ->
             country_code=membership.country_code,
             require_two_factor=membership.require_two_factor,
             taxes_enabled=membership.taxes_enabled,
+            upcoming_days=membership.upcoming_days,
         ),
         role=Role(membership.role),
         clock=clock,
