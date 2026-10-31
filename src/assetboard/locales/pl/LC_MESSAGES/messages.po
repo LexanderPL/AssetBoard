@@ -2072,6 +2072,16 @@ msgstr "Język"
 msgid "Theme"
 msgstr "Motyw"
 
+msgid "Highlight large transactions"
+msgstr "Wyróżniaj duże transakcje"
+
+msgid ""
+"On the Transactions page, larger expenses get a stronger red background "
+"and larger income a stronger green one."
+msgstr ""
+"Na stronie Transakcje większe wydatki mają mocniejsze czerwone tło, a "
+"większe przychody mocniejsze zielone."
+
 msgid "Save"
 msgstr "Zapisz"
 

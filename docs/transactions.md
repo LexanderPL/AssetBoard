@@ -93,6 +93,24 @@ Back button) shows everything again. The address includes the category, so the f
 can be bookmarked. Choosing a filter (or Show all) reloads the tables, so anything typed but not
 yet saved in an entry row is dropped.
 
+## Larger entries stand out
+
+Like a spreadsheet colour scale, larger entries get a background tint: expenses red, income
+green. Each entry is compared with the largest expense (or the largest income) of the month, in
+the same currency, even when only one category is shown:
+
+| Share of the month's largest | Tint |
+| --- | --- |
+| under 25% | none |
+| 25% to under 50% | lightest |
+| 50% to under 75% | light |
+| 75% to under 90% | medium |
+| 90% and more | strongest |
+
+The colour is a visual aid only; the amounts say the same. Turn it off under **Highlight large
+transactions** on your profile page (see [Your account](accounts.md)). Saving, deleting or
+restoring an entry recolours its table.
+
 ## History
 
 **History** in the main navigation (`/history`) lists the entries of every month, newest first,

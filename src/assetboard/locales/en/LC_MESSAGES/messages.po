@@ -1918,6 +1918,14 @@ msgstr ""
 msgid "Theme"
 msgstr ""
 
+msgid "Highlight large transactions"
+msgstr ""
+
+msgid ""
+"On the Transactions page, larger expenses get a stronger red background "
+"and larger income a stronger green one."
+msgstr ""
+
 msgid "Save"
 msgstr ""
 

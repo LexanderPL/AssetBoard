@@ -150,6 +150,12 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("#entry-expense-category")).to_have_value("")
             expect(page.locator("#ledger-status")).to_have_text("Entry added.")
             expect(page.locator("#ledger-expense [data-amount]")).to_have_text(["€12.50"])
+            # The month's largest (here: only) expense gets the strongest tint (amount shading).
+            largest = page.locator("#ledger-expense tr[data-transaction] [data-amount]")
+            expect(largest).to_have_class(re.compile(r"(^|\s)bg-danger/40(\s|$)"))
+            assert largest.evaluate("cell => getComputedStyle(cell).backgroundColor") != (
+                "rgba(0, 0, 0, 0)"
+            )
 
             # Enter in a text field saves too.
             page.keyboard.type("3")
