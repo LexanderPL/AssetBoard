@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.3.5](https://github.com/LexanderPL/AssetBoard/compare/v0.3.4...v0.3.5) (2026-10-31)
+
+
+### Features
+
+* **archive:** add full workspace ledger export (F4.1) ([#174](https://github.com/LexanderPL/AssetBoard/issues/174)) ([1e15ba3](https://github.com/LexanderPL/AssetBoard/commit/1e15ba3a7c2da4bb2aa4d39b84c4cea5e032b297))
+* **auth:** two-step TOTP sign-in ([#173](https://github.com/LexanderPL/AssetBoard/issues/173)) ([5d6af55](https://github.com/LexanderPL/AssetBoard/commit/5d6af55229ee71f5e7cf680c7d06c09b8eb63af7))
+* **income:** Income page cards and four-step Add income ([#176](https://github.com/LexanderPL/AssetBoard/issues/176)) ([c718d04](https://github.com/LexanderPL/AssetBoard/commit/c718d0432abd5cb77f7b1e3dbbc23f8348ebf368))
+* **taxes:** tax kinds, guided Taxes page, other taxes and a Taxes switch ([#175](https://github.com/LexanderPL/AssetBoard/issues/175)) ([5819188](https://github.com/LexanderPL/AssetBoard/commit/58191886a07bb26aafb73776adf3b75e605f5ddd))
+* **transactions:** tint larger transactions (per-user setting) ([#171](https://github.com/LexanderPL/AssetBoard/issues/171)) ([6371bc8](https://github.com/LexanderPL/AssetBoard/commit/6371bc81465baa55bbcbec5d3eab1ce15609fd0c))
+
 ## [0.3.4](https://github.com/LexanderPL/AssetBoard/compare/v0.3.3...v0.3.4) (2026-10-28)
 
 
