@@ -384,7 +384,7 @@ when you intend to upload the image and its release tags.
 
 ### Unreleased: tax kinds, Taxes switch and other taxes (ADR-0022)
 
-- Migration `0027_taxes_redesign` replaces each tax rule's effect and each income source's
+- Migration `0028_taxes_redesign` replaces each tax rule's effect and each income source's
   "record income as" choice with one kind per tax (added on top, paid by you, withheld by the
   payer) and moves the payment day, month and category to the tax. `withheld` taxes become
   "withheld by the payer" when an active source using them recorded take-home income, otherwise
@@ -395,7 +395,7 @@ when you intend to upload the image and its release tags.
   planned tax payments are recalculated from the new model before the horizon is generated.
   Sources that recorded **net** income with an added tax (VAT) now expect net plus VAT and plan
   the VAT payment. Posted transactions never change.
-- Downgrading to `0026` is possible but lossy: see the migration's docstring.
+- Downgrading to `0027_f41_lineage` is possible but lossy: see the migration's docstring.
 
 ### Unreleased: notifications and reminders (F3.6)
 
@@ -412,6 +412,11 @@ when you intend to upload the image and its release tags.
   or an owner turns the setting on. Back up the secret key with the database (see [Secret key and two-factor authentication](#secret-key-and-two-factor-authentication)).
 - Migration `0026_two_step_login` adds short-lived, hashed login tickets. Password sign-in
   asks for a TOTP or recovery code on a second page when the account has two-factor authentication.
+
+### Unreleased: workspace archive (F4.1)
+
+- Migration `0027_f41_lineage` adds nullable `import_key` columns to categories and transactions,
+  each with a unique index per workspace (only where it is set). Existing rows keep it empty.
 
 ### Unreleased: recurring items (F3.1)
 

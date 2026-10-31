@@ -229,6 +229,9 @@ msgstr ""
 msgid "Workspace deleted"
 msgstr ""
 
+msgid "Workspace archive exported"
+msgstr ""
+
 msgid "Instance settings changed"
 msgstr ""
 
@@ -359,6 +362,15 @@ msgid "Email address fixed"
 msgstr ""
 
 msgid "Valid for days"
+msgstr ""
+
+msgid "Categories"
+msgstr ""
+
+msgid "Planned values"
+msgstr ""
+
+msgid "Transactions"
 msgstr ""
 
 msgid "Name"
@@ -625,16 +637,10 @@ msgstr ""
 msgid "Workspace settings"
 msgstr ""
 
-msgid "Categories"
+msgid "Import and export"
 msgstr ""
 
 msgid "Closing months"
-msgstr ""
-
-msgid "Transactions"
-msgstr ""
-
-msgid "Planned values"
 msgstr ""
 
 msgid "Sign-ins"
@@ -1829,6 +1835,9 @@ msgid "Audit log: workspace"
 msgstr ""
 
 msgid "New workspace"
+msgstr ""
+
+msgid "Export and import"
 msgstr ""
 
 msgid "Users"
@@ -3831,6 +3840,22 @@ msgid "Not set"
 msgstr ""
 
 msgid "Time zone"
+msgstr ""
+
+msgid "Download workspace archive"
+msgstr ""
+
+msgid ""
+"Save this workspace’s ledger, including categories, planned values, "
+"transactions, and month status."
+msgstr ""
+
+msgid ""
+"Recurring items, income sources, work logs, tax rules, and notifications "
+"are not included in this archive version."
+msgstr ""
+
+msgid "Download archive"
 msgstr ""
 
 msgid "Delete workspace"

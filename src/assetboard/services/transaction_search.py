@@ -40,6 +40,7 @@ from assetboard.db.repositories import (
     MonthStateRepository,
     TransactionRepository,
 )
+from assetboard.domain.archive import lineage_id
 from assetboard.domain.ledger_csv import CsvOptions, TransactionCsvRow, transactions_csv
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
@@ -314,8 +315,9 @@ def export_transactions_csv(
                     currency=row.currency,
                     category=category.name,
                     description=row.description,
-                    category_id=row.category_id,
-                    id=row.id,
+                    # Lineage ids, as in the archive's transactions.csv (F4.1).
+                    category_id=lineage_id(category.id, category.import_key),
+                    id=lineage_id(row.id, row.import_key),
                 )
 
         for chunk in transactions_csv(rows(), options):

@@ -37,7 +37,7 @@ vehicle) had no home.
 - **Kind and base are editable** until posted income was calculated with the tax; then they are
   locked and the user is told to create a new tax. Rates stay append-only versions; the first
   version is valid from 1900-01-01 ("from the start").
-- **Migration `0027_taxes_redesign`** maps `added` → `added`, and `withheld` → `payer_withheld`
+- **Migration `0028_taxes_redesign`** maps `added` → `added`, and `withheld` → `payer_withheld`
   when any active source it is attached to recorded take-home income, otherwise `self_paid`.
   Rule defaults come from the first attachment (by creation time; offset 0 → `same_month`, any
   other → `next_month`), or day 10, next month and no category without attachments. Attachment

@@ -1,7 +1,7 @@
 """Tax kinds, tax payment schedules, the Taxes switch and other taxes (ADR-0022).
 
-Revision ID: 0027_taxes_redesign
-Revises: 0026_two_step_login
+Revision ID: 0028_taxes_redesign
+Revises: 0027_f41_lineage
 Create Date: 2026-10-31 12:00:00.000000
 
 Upgrade:
@@ -35,8 +35,8 @@ from __future__ import annotations
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0027_taxes_redesign"
-down_revision = "0026_two_step_login"
+revision = "0028_taxes_redesign"
+down_revision = "0027_f41_lineage"
 branch_labels = None
 depends_on = None
 

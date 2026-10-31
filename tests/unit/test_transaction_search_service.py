@@ -18,7 +18,7 @@ from sqlalchemy.sql import ClauseElement
 
 from assetboard.clock import FixedClock
 from assetboard.db.models.identity import AuditEvent, Membership
-from assetboard.db.models.ledger import Transaction
+from assetboard.db.models.ledger import Category, Transaction
 from assetboard.domain.ledger_csv import CsvOptions
 from assetboard.domain.months import YearMonth
 from assetboard.domain.transaction_search import SortOrder, TransactionFilter
@@ -417,6 +417,22 @@ def test_another_workspace_is_never_exported(team: WorkspaceDb, ledger: dict) ->
     team.add_member("ed", "editor", other)
     count, _data = _export(team, ctx=team.ctx("ed", "editor", other))
     assert count == 0
+
+
+def test_the_export_writes_lineage_ids_like_the_archive(
+    team: WorkspaceDb, ledger: dict[str, UUID]
+) -> None:
+    category_origin, entry_origin = uuid4(), uuid4()
+    with team.factory.begin() as session:
+        entry = session.get(Transaction, ledger["sep"])
+        assert entry is not None
+        category = session.get(Category, entry.category_id)
+        assert category is not None
+        entry.import_key = f"id:{entry_origin}"
+        category.import_key = f"id:{category_origin}"
+    _count, data = _export(team, _where(team, text="żabka"))
+    (row,) = csv.DictReader(io.StringIO(data.decode("utf-8"), newline=""))
+    assert (row["id"], row["category_id"]) == (str(entry_origin), str(category_origin))
 
 
 # Bulk recategorize
