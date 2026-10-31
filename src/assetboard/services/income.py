@@ -986,7 +986,8 @@ def _relabel_tax_payments(session: Session, scope: WorkspaceScope, source: Incom
     occurrences = ScheduledOccurrenceRepository(session, scope)
     closed_months = MonthStateRepository(session, scope).closed_months()
     for attachment in IncomeSourceTaxRuleRepository(session, scope).for_source(source.id):
-        label = tax_payment_label(locale, rules.get_or_raise(attachment.tax_rule_id).name, source.name)
+        rule = rules.get_or_raise(attachment.tax_rule_id)
+        label = tax_payment_label(locale, rule.name, source.name)
         for child in occurrences.for_tax_attachment(attachment.id):
             if child.status != "pending" or YearMonth.from_date(child.due_date) in closed_months:
                 continue

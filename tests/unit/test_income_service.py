@@ -118,9 +118,7 @@ def test_income_source_golden_example_generates_tax_payment(team: WorkspaceDb) -
         repository = ScheduledOccurrenceRepository(session, ctx)
         parent = repository.for_income_work_month(source_id, date(2026, 8, 1))
         assert parent is not None
-        assert [child.label for child in repository.children(parent.id)] == [
-            "VAT: Contract work"
-        ]
+        assert [child.label for child in repository.children(parent.id)] == ["VAT: Contract work"]
 
     listed = income.list_sources(team.factory, ctx)
     source = next(row for row in listed if row.id == source_id)
