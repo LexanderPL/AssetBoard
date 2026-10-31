@@ -430,6 +430,32 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
   `kpis` macro renders them unless called with `pending=true`; follow-up). Services are
   unchanged: `web.plan` only presents their numbers (`KpiView.forecast_saved` was unused and
   is removed).
+- **In and Out (owner, 2026-10-31, "option A"), the Month page only:** Out = spent +
+  saved / invested, In = earned + withdrawn from savings, left = In - Out ("Short by" when
+  negative). **Header:** "In vs out" ("Expected in vs expected out" for a future month), then
+  "In <amount>" with "earned A + withdrawn B" in muted text when something is withdrawn
+  (confirmed or pending), "+ X pending", and on the right "Left X" or, in red, "Short by X".
+  **Strip and bar** (`domain.summary.in_out_flow`, pure geometry with table tests and a
+  hypothesis property): a thin strip (8 px) of where the money came from (earned, `success`;
+  withdrawn from savings, the new `withdrawn` teal token, fills only) directly above the bar of
+  how it was used (spent, saved / invested, left); both on one scale, max(In, Out) with pending
+  included, so when In >= Out they end at the same right edge (in = out + left). When Out > In
+  the strip ends early and the rest of it is a dashed red outline; the overspend hatch and
+  earnings line of the old bar are gone from the Month page. Pending parts are striped (left is
+  solid while confirmed money in covers it); the confirmed-only twin (`data-pending-off`) is
+  the same function without pending amounts. Legend: Earned, Withdrawn from savings (only when
+  something is withdrawn), Spent, Saved / invested, Left or Short by (with its value if
+  everything pending arrives). Screen readers get an sr-only list (In and its parts, Out and its
+  parts, Left or Short by, and the pending amounts). **Bars:** Out (plan = planned expenses +
+  planned savings) and In (plan = planned income + planned withdrawals; withdrawals do take a
+  plan), worded "Out A (+ C pending) of B planned" / "In A (+ C pending) of B planned" (the
+  pending part only when above zero; "(no plan)" without a plan). **Table:** two blocks, "Money
+  out" (Expenses, Saved / invested; red top rule and marker) and "Money in" (Income, Withdrawn
+  from savings; green), each closed by "Total money out" / "Total money in" (Out and In,
+  pending under the actual). The block totals have no difference (their groups' differences
+  point different ways). Transfers (not counted) stay last. Home keeps the F2.4 flow bar of
+  earnings and the spent / earned bars (follow-up); `domain.summary.pending_flow_bar` is
+  replaced by `in_out_flow` and removed.
 - **Follow-up (review, 2026-10-19):** `web.plan.build_summary` reads twice per render
   (`services.budget.get_plan` for the transfer group and the copy banner, then
   `services.summary.month_summary`); fold them into one read when the summary grows.
@@ -652,6 +678,13 @@ F3.2 occurrence service).
 
 The other sidebar items (Recurring, Upcoming, Income, then Taxes directly below Income, later
 modules) follow; Categories lives in the user menu.
+
+**Month and Transactions keep the viewed month (owner, 2026-10-31):** while the Month or
+Transactions page of a month is shown (routes `month` and `transactions_month`), the sidebar's
+Month and Transactions links point to that month's pages (`/m/YYYY-MM`,
+`/transactions/YYYY-MM`); on every other page they point to `/m` and `/transactions` (the
+current month). `aria-current` is unchanged. The hrefs come from the template global
+`web.rendering.month_nav_links(request)`.
 
 **Acceptance**
 - **Home (`/`)** shows the current month (workspace time zone, from the Clock), headed with the
