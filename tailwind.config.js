@@ -34,6 +34,9 @@ module.exports = {
           strong: token("success-strong"),
           line: token("success-line"),
           tint: token("success-tint"),
+          "shade-1": token("success-shade-1"),
+          "shade-2": token("success-shade-2"),
+          "shade-3": token("success-shade-3"),
         },
         danger: {
           DEFAULT: token("danger"),
@@ -41,6 +44,9 @@ module.exports = {
           strong: token("danger-strong"),
           line: token("danger-line"),
           tint: token("danger-tint"),
+          "shade-1": token("danger-shade-1"),
+          "shade-2": token("danger-shade-2"),
+          "shade-3": token("danger-shade-3"),
         },
         warning: {
           soft: token("warning-soft"),

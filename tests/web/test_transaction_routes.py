@@ -816,7 +816,8 @@ def test_the_description_limit_comes_from_the_domain(ledger: OwnerApp) -> None:
 def _shades(html: str, direction: str) -> dict[str, int]:
     """Description -> tint step (0 without one) of the stored rows in ``direction``'s table."""
     rows = re.findall(
-        r'<tr id="tx-[^"]*" data-transaction="[^"]*"( data-shade="(\d)")?>.*?data-description>'
+        r'<tr id="tx-[^"]*" data-transaction="[^"]*"(?: class="[^"]*")?( data-shade="(\d)")?>'
+        r".*?data-description>"
         r"([^<]*)<",
         _section(html, direction),
         re.DOTALL,
@@ -851,8 +852,11 @@ def test_larger_rows_are_tinted_by_their_share_of_the_months_largest(ledger: Own
     assert _shades(page, "expense") == {"Rent": 4, "Big shop": 4, "Half": 2, "Small": 0}
     assert _shades(page, "income") == {"Pay": 4, "Bonus": 1}
     expense, income = _section(page, "expense"), _section(page, "income")
-    assert "bg-danger/40" in expense and "bg-success" not in expense
-    assert "bg-success/40" in income and "bg-success/10" in income and "bg-danger/" not in income
+    # Step 4 is the Month page's above-plan tint; the tint is on the row, actions cell included.
+    assert 'class="bg-danger-tint" data-shade="4"' in expense and "bg-success" not in expense
+    assert 'class="bg-danger-shade-2" data-shade="2"' in expense
+    assert 'class="bg-success-tint" data-shade="4"' in income
+    assert 'class="bg-success-shade-1" data-shade="1"' in income and "bg-danger-t" not in income
 
 
 def test_turning_the_setting_off_removes_every_tint(ledger: OwnerApp) -> None:
@@ -860,7 +864,7 @@ def test_turning_the_setting_off_removes_every_tint(ledger: OwnerApp) -> None:
     _set_highlight(ledger, False)
     page = _page(ledger)
     assert "data-shade" not in page
-    assert not re.search(r"bg-(danger|success)/\d", page)
+    assert not re.search(r"bg-(danger|success)-(shade-\d|tint)", page)
     _set_highlight(ledger, True)
     assert "data-shade" in _page(ledger)
 
@@ -885,4 +889,4 @@ def test_htmx_writes_recompute_the_tints(ledger: OwnerApp) -> None:
     assert _shades(added.text, "expense")["Car"] == 4
     assert _shades(added.text, "expense")["Rent"] == 1
     row = _htmx_get(ledger, f"{MONTH}/transactions/{rent_id}/row")
-    assert 'data-shade="1"' in row.text and "bg-danger/10" in row.text
+    assert 'class="bg-danger-shade-1" data-shade="1"' in row.text
