@@ -175,3 +175,62 @@ def test_a_half_chosen_month_reopens_the_edit_form_with_an_error(owner):
     )
     page = owner.client.get(response.headers["location"]).text
     assert "Choose a valid work month." in page and "data-income-edit" in page
+
+
+def test_a_received_month_locks_its_work_log_and_links_the_transaction(owner):
+    form = _form(_income_category(owner)) | {"active_from_year": "2020"}
+    assert owner.post("/income", form, token_from="/income").status_code == 303
+    with owner.db() as session:
+        source = session.scalars(select(IncomeSource)).one()
+    for month, units in (("8", "2"), ("9", "3")):
+        owner.post(
+            f"/income/{source.id}/work-logs",
+            {"work_month_month": month, "work_month_year": "2026", "units": units},
+            token_from="/income",
+        )
+    with owner.db() as session:
+        occurrence = session.scalars(
+            select(ScheduledOccurrence).where(
+                ScheduledOccurrence.generated_by == "income",
+                ScheduledOccurrence.work_month == date(2026, 8, 1),
+            )
+        ).one()
+    owner.post(
+        f"/upcoming/{occurrence.id}/post",
+        {"day": "2026-09-10", "amount": "2,460.00"},
+        token_from="/upcoming",
+    )
+    with owner.db() as session:
+        posted = session.get(ScheduledOccurrence, occurrence.id)
+        assert posted is not None
+        transaction_id = posted.transaction_id
+
+    refused = owner.post(
+        f"/income/{source.id}/work-logs",
+        {"work_month_month": "8", "work_month_year": "2026", "units": "9"},
+        token_from="/income",
+    )
+    location = refused.headers["location"]
+    assert "error=posted_locked" in location
+    assert f"tx={transaction_id}" in location
+    assert "tx_month=2026-09" in location
+    assert location.endswith(f"#income-source-{source.id}")
+    page = owner.client.get(location.split("#")[0]).text
+    assert "already received. Edit the transaction instead." in page
+    assert f"/transactions/2026-09?edit={transaction_id}#tx-{transaction_id}" in page
+    assert 'data-existing-log="2026-08" data-units="2" data-state="locked"' in page
+
+    # A month that is not in the preview opens prefilled through ?log=&month=.
+    prefilled = owner.client.get(f"/income?log={source.id}&month=2026-09").text
+    assert 'name="units" inputmode="decimal" required value="3"' in prefilled
+    assert ">Update</button>" in prefilled
+    locked = owner.client.get(f"/income?log={source.id}&month=2026-08").text
+    assert "data-log-hint aria-live" in locked
+    assert ">Save work log</button>" in locked
+
+    changed = owner.post(
+        f"/income/{source.id}/work-logs",
+        {"work_month_month": "9", "work_month_year": "2026", "units": "4"},
+        token_from="/income",
+    )
+    assert "error" not in changed.headers["location"]
