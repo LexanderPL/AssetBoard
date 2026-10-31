@@ -58,7 +58,7 @@
         {% if occurrence.rescheduled %}<p class="mt-1 text-xs text-muted">{{ _("Rescheduled for this occurrence") }}</p>{% endif %}
       </div>
       {% if can_edit %}
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap items-start gap-2" data-occurrence-actions>
         <details>
           <summary class="{{ button_class }} cursor-pointer">{{ _("Mark paid or received") }}</summary>
           <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=occurrence.id) }}" class="mt-3 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">

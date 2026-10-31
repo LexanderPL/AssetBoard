@@ -21,7 +21,7 @@
        year stepper and the twelve months. It has no Clear or This month buttons (the nav's
        Today link is separate) and works without JavaScript: the year links reload the page with
        ``?picker_year=`` and the dropdown open, and each month is a plain link. #}
-    <details class="relative" data-month-picker{% if picker_open %} open{% endif %}>
+    <details class="relative" data-popover data-month-picker{% if picker_open %} open{% endif %}>
       <summary class="{{ nav_link }} cursor-pointer list-none gap-2 [&::-webkit-details-marker]:hidden" aria-label="{{ _('Choose a month') }}" data-month-picker-toggle>
         <span>{{ month_name }}</span>
         <span aria-hidden="true">▾</span>

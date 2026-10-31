@@ -10,9 +10,9 @@
 {% set muted_class = "text-muted" %}
 {% set primary_class = "rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover" %}
 {% set secondary_class = "rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink hover:bg-subtle" %}
-{% set small_class = "rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink" %}
-{% set compact_class = "inline-flex cursor-pointer list-none items-center rounded-lg px-2 py-1 text-xs font-medium text-muted hover:bg-subtle hover:text-ink [&::-webkit-details-marker]:hidden" %}
-{% set delete_class = "rounded-lg px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger-soft" %}
+{% set small_class = "inline-flex items-center rounded-lg px-2.5 py-1.5 text-xs font-medium leading-4 text-muted hover:bg-subtle hover:text-ink" %}
+{% set compact_class = "inline-flex cursor-pointer list-none items-center rounded-lg px-2.5 py-1.5 text-xs font-medium leading-4 text-muted hover:bg-subtle hover:text-ink [&::-webkit-details-marker]:hidden" %}
+{% set delete_class = "inline-flex items-center rounded-lg px-2.5 py-1.5 text-xs font-medium leading-4 text-danger hover:bg-danger-soft" %}
 {# Row tints by web.ledger.RowView.shade (0-4, computed in Python; 0 = no tint): expense rows
    red, income rows green, like a spreadsheet colour scale. Step 4 is the Month page's
    above-plan row tint; steps 1-3 are opaque tokens between it and the card (input.css), so
@@ -188,8 +188,8 @@
           <td class="py-2 pr-2 align-top">{{ r.occurrence.category_name }}</td>
           {% if ledger.can_write %}
           <td class="py-2 align-top text-right">
-            <div class="flex items-start justify-end gap-1">
-              <details class="relative text-left">
+            <div class="flex items-center justify-end gap-1" data-pending-actions>
+              <details class="relative text-left" data-popover>
                 <summary class="{{ compact_class }}">{{ _("Confirm") }}</summary>
                 <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=r.occurrence.id) }}" class="absolute right-0 z-20 mt-1 grid w-72 gap-2 rounded-lg border border-line bg-surface p-3 text-left shadow-card">
                   {{ csrf_input() }}

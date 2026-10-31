@@ -239,20 +239,79 @@ document.addEventListener("submit", (event) => {
 
 document.querySelectorAll("dialog[data-dialog-modal][open]").forEach(openModalDialog);
 
-// The month picker is a <details>, so its summary opens it without JavaScript. Clicking
-// anywhere else, or pressing Escape, closes an open picker.
-document.addEventListener("click", (event) => {
+// Popovers: a <details data-popover> whose content floats over the page (the user menu, the
+// month picker, a planned row's Confirm form). Its summary opens it without JavaScript. A press
+// anywhere outside an open one closes it, opening one closes the others, and Escape closes the
+// innermost one and puts the focus back on its summary. Listeners sit on the document, so
+// popovers that htmx swaps in work too. A <details> that expands an inline form in the page
+// flow is not a popover: closing it would hide what was typed.
+const OPEN_POPOVERS = "details[data-popover][open]";
+
+function closePopover(details, returnFocus) {
+  details.open = false;
+  const summary = details.querySelector(":scope > summary");
+  if (returnFocus && summary instanceof HTMLElement) summary.focus();
+}
+
+document.addEventListener("pointerdown", (event) => {
   const target = event.target;
-  if (!(target instanceof Element)) return;
-  document.querySelectorAll("details[data-month-picker][open]").forEach((picker) => {
-    if (!picker.contains(target)) picker.open = false;
+  if (!(target instanceof Node)) return;
+  document.querySelectorAll(OPEN_POPOVERS).forEach((details) => {
+    if (!details.contains(target)) closePopover(details, false);
   });
 });
+
+// "toggle" does not bubble: listen in the capture phase.
+document.addEventListener(
+  "toggle",
+  (event) => {
+    const opened = event.target;
+    if (!(opened instanceof HTMLDetailsElement) || !opened.open) return;
+    if (!opened.hasAttribute("data-popover")) return;
+    document.querySelectorAll(OPEN_POPOVERS).forEach((details) => {
+      if (details !== opened && !details.contains(opened)) closePopover(details, false);
+    });
+  },
+  true,
+);
+
 document.addEventListener("keydown", (event) => {
-  if (event.key !== "Escape") return;
-  document.querySelectorAll("details[data-month-picker][open]").forEach((picker) => {
-    picker.open = false;
-  });
+  if (event.key !== "Escape" || event.defaultPrevented) return;
+  // Innermost: an open popover without an open popover inside it, preferring the one that holds
+  // the focus. A modal dialog above the page handles its own Escape.
+  const modal = document.querySelector("dialog:modal");
+  const candidates = Array.from(document.querySelectorAll(OPEN_POPOVERS)).filter(
+    (details) =>
+      !details.querySelector(OPEN_POPOVERS) && (!modal || modal.contains(details)),
+  );
+  if (candidates.length === 0) return;
+  const active = document.activeElement;
+  const innermost =
+    candidates.find((details) => active instanceof Node && details.contains(active)) ||
+    candidates[candidates.length - 1];
+  event.preventDefault();
+  closePopover(innermost, true);
+});
+
+// A dialog marked data-backdrop-close (the History page's Export and Filters) closes when a
+// press starts and ends on its backdrop. The confirm dialog never does: it must be answered.
+let backdropPress = null;
+document.addEventListener("pointerdown", (event) => {
+  backdropPress = event.target instanceof HTMLDialogElement ? event.target : null;
+});
+document.addEventListener("click", (event) => {
+  const dialog = event.target;
+  const pressed = backdropPress;
+  backdropPress = null;
+  if (!(dialog instanceof HTMLDialogElement) || dialog !== pressed || !dialog.open) return;
+  if (!dialog.hasAttribute("data-backdrop-close")) return;
+  const box = dialog.getBoundingClientRect();
+  const inside =
+    event.clientX >= box.left &&
+    event.clientX <= box.right &&
+    event.clientY >= box.top &&
+    event.clientY <= box.bottom;
+  if (!inside) dialog.close();
 });
 
 // HTMX requests carry the CSRF token in a header; plain forms use their hidden input.
