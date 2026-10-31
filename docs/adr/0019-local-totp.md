@@ -17,7 +17,9 @@ workspace's access policy. External identity providers remain responsible for th
   direction. These are the authenticator defaults; the one-step tolerance handles modest
   clock drift without accepting arbitrarily old codes. Persist the last accepted step and
   serialize factor updates to reject replay, including simultaneous requests.
-- Ask for password and code together on password sign-in, including `/login/local`. Reuse the
+- Ask for password and code together on password sign-in, including `/login/local`
+  (amended: since the two-step sign-in change the code is asked for on a second page after a
+  correct password, backed by a five-minute single-use login ticket; see F1.6). Reuse the
   existing reserved account/address attempts; never create a partial login session. A missing
   or invalid code uses the existing generic failure. Password-confirmed identity linking also
   verifies the factor before clearing its confirmation throttle or linking the new identity.
@@ -53,7 +55,9 @@ workspace's access policy. External identity providers remain responsible for th
   with shell access can run `assetboard reset-mfa <email>`, which removes the factor and recovery
   codes, revokes the user's password sessions and writes a `cli.reset_mfa` audit event.
 - A correct password with a missing or wrong code fails exactly like a wrong password (same
-  response); the `auth.login_failure` event records the internal reason `second_factor`. A stale
+  response). Amended with the two-step sign-in: the code page, reachable only after a correct
+  password, says "The code is not correct." instead, which reveals nothing more. The
+  `auth.login_failure` event records the internal reason `second_factor`. A stale
   password hash is upgraded only after the whole sign-in succeeds, second factor included, so
   rehashing time never reveals a correct password to someone without the second factor.
 

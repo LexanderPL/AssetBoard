@@ -169,6 +169,7 @@ async def _profile_page(
                 "display_name": user.display_name,
                 "locale": user.locale or BROWSER_LOCALE,
                 "theme": user.theme,
+                "highlight_large_amounts": user.highlight_large_amounts,
             },
             "languages": [(BROWSER_LOCALE, _t(request, _("Browser language")))]
             + [(code, LANGUAGE_NAMES[code]) for code in sorted(SUPPORTED_LOCALES)],
@@ -206,6 +207,7 @@ async def profile_submit(
     display_name: FormStr = "",
     locale: FormStr = "",
     theme: FormStr = "",
+    highlight_large_amounts: FormStr = "",  # a checkbox: absent when unchecked
 ) -> Response:
     current = _require_session(request)
     state = _state(request)
@@ -216,6 +218,7 @@ async def profile_submit(
             display_name=display_name[:1000],
             locale=locale,
             theme=theme,
+            highlight_large_amounts=highlight_large_amounts == "1",
         )
     )
     if problem is not None:

@@ -343,10 +343,18 @@ def test_reset_by_email_keeps_the_second_factor_and_its_mail_does_not_mention_it
         assert session.scalars(select(UserSession)).all() == []
 
     def sign_in(code: str) -> Response:
-        return _post(
+        first = _post(
             client, web, "/login", "/login",
             email=web.admin_email, password=NEW_PASSWORD, second_factor=code,
         )  # fmt: skip
+        if first.headers.get("location") != "/login/verify":
+            return first
+        challenge = client.get("/login/verify")
+        return client.post(
+            "/login/verify",
+            data={"csrf_token": web.csrf(challenge.text), "second_factor": code},
+            follow_redirects=False,
+        )
 
     # The new password alone does not sign in: the reset did not bypass the second factor.
     assert sign_in("").status_code == 401

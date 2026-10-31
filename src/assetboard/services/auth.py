@@ -43,6 +43,7 @@ from assetboard.db.models.identity import (
     AuditEvent,
     AuthThrottle,
     EmailToken,
+    LoginTicket,
     SetupState,
     User,
     UserSession,
@@ -78,6 +79,9 @@ MIN_PASSWORD_LENGTH = 8
 MAX_PASSWORD_LENGTH = 1024
 MAX_NAME_LENGTH = 120
 SESSION_TOUCH_INTERVAL = timedelta(minutes=5)
+LOGIN_TICKET_LIFETIME = timedelta(minutes=5)
+# Wrong codes one ticket accepts before it is deleted; the sign-in throttle applies to each.
+MAX_LOGIN_TICKET_ATTEMPTS = 5
 THROTTLE_IDLE_RESET = timedelta(hours=24)
 
 # Test-only seam: an autouse fixture swaps in cheap parameters; production never sets it.
@@ -230,10 +234,204 @@ class LoginOutcome:
     user: User | None = None
     session_id: str | None = None
     throttled_until: datetime | None = None
+    login_ticket: str | None = None
+    next_path: str | None = None
+    # A wrong code against a live ticket: the browser keeps it and may try again.
+    ticket_retryable: bool = False
 
     @property
     def succeeded(self) -> bool:
         return self.user is not None and self.session_id is not None
+
+
+def complete_login_ticket(
+    factory: sessionmaker[Session],
+    *,
+    ticket: str,
+    code: str,
+    settings: Settings,
+    clock: Clock,
+    host: str | None,
+    user_agent: str | None,
+    existing_session_id: str | None,
+    require_instance_admin: bool,
+) -> LoginOutcome:
+    """Consume one pending second-factor ticket and create its password session.
+
+    An unknown, expired, used-up or no-longer-valid ticket returns a plain ``LoginOutcome()``
+    (the caller starts the sign-in over). Every wrong code counts in the sign-in throttle: the
+    first one is the count the password step already reserved, each later one reserves its own.
+    """
+    if not ticket or len(ticket) > 128:
+        return LoginOutcome()
+    ticket_hash = hashlib.sha256(ticket.encode()).hexdigest()
+
+    def finish(session: Session) -> LoginOutcome:
+        now = clock.now()
+        pending = session.get(LoginTicket, ticket_hash, with_for_update=True)
+        if (
+            pending is None
+            or pending.expires_at <= now
+            or pending.require_instance_admin != require_instance_admin
+        ):
+            if pending is not None and pending.expires_at <= now:
+                session.delete(pending)
+            return LoginOutcome()
+        user = _ticket_user(session, pending, settings)
+        if user is None:
+            session.delete(pending)
+            return LoginOutcome()
+        _lookup, account_key = _login_keys(user.email)
+        slots = (
+            _account_slot(account_key, settings),
+            ThrottleSlot(
+                "ip",
+                _ip_key(host),
+                timedelta(minutes=settings.auth_ip_window_minutes),
+                settings.auth_ip_free_failures,
+            ),
+        )
+        keys: list[tuple[ThrottleScope, str]] = [(slot.scope, slot.key) for slot in slots]
+        first_code_attempt = pending.code_attempts == 0
+        reserved: tuple[ReservedAttempt, ...] = ()
+        if not first_code_attempt:
+            reserved = reserve_attempts(session, slots, now, settings) or ()
+            if not reserved:
+                return LoginOutcome(throttled_until=blocked_until(session, keys, now) or now)
+
+        next_path = pending.next_path
+        from assetboard.services.totp import verify_sign_in
+
+        verified, factor_verified = verify_sign_in(
+            session, user.id, code=code, settings=settings, now=now
+        )
+        if not verified or not factor_verified:
+            pending.code_attempts += 1
+            _audit(
+                session,
+                clock,
+                action="auth.login_failure",
+                entity_type="user",
+                entity_id=str(user.id),
+                actor_type="user",
+                actor_user_id=user.id,
+                host=host,
+                user_agent=user_agent,
+                data={"reason": "second_factor"},
+            )
+            prune_auth_throttles(session, clock)
+            if pending.code_attempts >= MAX_LOGIN_TICKET_ATTEMPTS:
+                session.delete(pending)
+                return LoginOutcome()
+            return LoginOutcome(ticket_retryable=True)
+        session.delete(pending)
+        if pending.replacement_password_hash is not None:
+            user.password_hash = pending.replacement_password_hash
+        release_attempts(
+            session,
+            (
+                [
+                    ReservedAttempt(
+                        "ip", pending.ip_key, pending.ip_window_started_at, pending.ip_block_set
+                    )
+                ]
+                if first_code_attempt
+                else [item for item in reserved if item.scope == "ip"]
+            ),
+        )
+        user.last_login_at = now
+        if existing_session_id:
+            session.execute(
+                delete(UserSession).where(
+                    UserSession.id_hash == session_id_hash(existing_session_id)
+                )
+            )
+        session_id = create_user_session(
+            session,
+            user,
+            settings=settings,
+            clock=clock,
+            host=host,
+            user_agent=user_agent,
+            second_factor_verified=True,
+        )
+        _audit(
+            session,
+            clock,
+            action="auth.login_success",
+            entity_type="user",
+            entity_id=str(user.id),
+            actor_type="user",
+            actor_user_id=user.id,
+            host=host,
+            user_agent=user_agent,
+        )
+        return LoginOutcome(user=user, session_id=session_id, next_path=next_path)
+
+    return run_immediate(factory, finish)
+
+
+def password_fingerprint(settings: Settings, password_hash: str) -> str:
+    """A keyed digest of the stored password hash: binds a login ticket to the password it
+    was issued for without keeping a copy of the Argon2 hash."""
+    key = derive_subkey(settings.ensure_secret_key(), "login-ticket-password")
+    return hmac.new(key, password_hash.encode(), hashlib.sha256).hexdigest()
+
+
+def _ticket_user(session: Session, pending: LoginTicket, settings: Settings) -> User | None:
+    """The ticket's user while the ticket is still valid for them, else ``None``.
+
+    It ends when the account is deactivated, the password changes, a break-glass user stops
+    being an instance administrator, or the factor is disabled or enrolled again after the
+    ticket was issued.
+    """
+    user = session.get(User, pending.user_id)
+    if (
+        user is None
+        or not user.is_active
+        or user.password_hash is None
+        or not hmac.compare_digest(
+            password_fingerprint(settings, user.password_hash), pending.password_fingerprint
+        )
+        or (pending.require_instance_admin and not user.is_instance_admin)
+    ):
+        return None
+    factor = session.get(TotpFactor, pending.user_id)
+    if factor is None or factor.enabled_at is None or factor.enabled_at > pending.created_at:
+        return None
+    return user
+
+
+def delete_login_tickets(session: Session, user_id: UUID) -> None:
+    """End the user's pending two-step sign-ins (factor, password or session changes)."""
+    session.execute(
+        delete(LoginTicket)
+        .where(LoginTicket.user_id == user_id)
+        .execution_options(synchronize_session=False)
+    )
+
+
+def login_ticket_is_active(
+    factory: sessionmaker[Session],
+    *,
+    ticket: str,
+    settings: Settings,
+    clock: Clock,
+    require_instance_admin: bool,
+) -> bool:
+    """Return whether the browser holds a live ticket for an enabled local factor."""
+    if not ticket or len(ticket) > 128:
+        return False
+    ticket_hash = hashlib.sha256(ticket.encode()).hexdigest()
+    with factory() as session:
+        pending = session.get(LoginTicket, ticket_hash)
+        if (
+            pending is None
+            or pending.expires_at <= clock.now()
+            or pending.require_instance_admin != require_instance_admin
+        ):
+            return False
+        return _ticket_user(session, pending, settings) is not None
 
 
 PasswordChangeStatus = Literal[
@@ -776,7 +974,7 @@ def _login_flow(
     verify: Verifier | None,
     hasher: Hasher | None,
     require_instance_admin: bool = False,
-    second_factor: str = "",
+    next_path: str = "/",
 ) -> LoginOutcome:
     """``require_instance_admin`` (break-glass ``/login/local``): a correct password of anyone
     else fails exactly like a wrong one: same response, same counting, no rehash."""
@@ -844,25 +1042,34 @@ def _login_flow(
             and user.password_hash == candidate.password_hash
             and not not_admin
         )
-        factor_verified = False
-        factor_failed = False
-        if succeeded and user is not None:
-            from assetboard.services.totp import verify_sign_in
-
-            # Runs only after a correct password; its cost (a decryption and a few HMACs,
-            # well under a millisecond) is accepted residual timing (ADR-0019).
-            succeeded, factor_verified = verify_sign_in(
-                session, user.id, code=second_factor, settings=settings, now=now
+        factor = session.get(TotpFactor, user.id) if succeeded and user is not None else None
+        if succeeded and user is not None and factor is not None and factor.enabled_at is not None:
+            # A correct password on an account with TOTP: no session yet, only a ticket for
+            # the second step (F1.6).
+            ticket = secrets.token_urlsafe(32)
+            session.execute(delete(LoginTicket).where(LoginTicket.expires_at <= now))
+            ip_attempt = next(item for item in candidate.reserved if item.scope == "ip")
+            session.add(
+                LoginTicket(
+                    token_hash=hashlib.sha256(ticket.encode()).hexdigest(),
+                    user_id=user.id,
+                    password_fingerprint=password_fingerprint(settings, user.password_hash or ""),
+                    next_path=next_path[:512],
+                    ip_key=ip_attempt.key,
+                    ip_window_started_at=ip_attempt.window_started_at,
+                    ip_block_set=ip_attempt.block_set,
+                    require_instance_admin=require_instance_admin,
+                    created_at=now,
+                    expires_at=now + LOGIN_TICKET_LIFETIME,
+                )
             )
-            factor_failed = not succeeded
+            return LoginOutcome(login_ticket=ticket)
         if not succeeded or user is None or user.password_hash is None:
             # The reservation stays: it is this failure's count.
             prune_auth_throttles(session, clock)
             reason: dict[str, str | int | bool] | None = None
             if verified and not_admin:
                 reason = {"reason": "not_instance_admin"}
-            elif factor_failed:
-                reason = {"reason": "second_factor"}
             _audit(
                 session,
                 clock,
@@ -896,7 +1103,7 @@ def _login_flow(
             clock=clock,
             host=host,
             user_agent=user_agent,
-            second_factor_verified=factor_verified,
+            second_factor_verified=False,  # no enabled factor on this account
         )
         _audit(
             session,
@@ -912,9 +1119,53 @@ def _login_flow(
         return LoginOutcome(user=user, session_id=new_session_id)
 
     outcome = run(finish)
-    if outcome.succeeded and candidate.user_id is not None:
+    if outcome.login_ticket is not None and candidate.user_id is not None:
+        _rehash_ticket(
+            run,
+            outcome.login_ticket,
+            candidate.user_id,
+            candidate.password_hash,
+            password,
+            hasher,
+            settings,
+        )
+    elif outcome.succeeded and candidate.user_id is not None:
         _rehash_after_login(run, candidate.user_id, candidate.password_hash, password, hasher)
     return outcome
+
+
+def _rehash_ticket(
+    run: TransactionRunner,
+    ticket: str,
+    user_id: UUID,
+    verified_hash: str | None,
+    password: str,
+    hasher: Hasher | None,
+    settings: Settings,
+) -> None:
+    """Prepare a password-hash upgrade, applying it only after the factor succeeds."""
+    if verified_hash is None or not password_hasher().check_needs_rehash(verified_hash):
+        return
+    try:
+        replacement = (hasher or argon2_hash)(password)
+    except HashGateBusy:
+        return
+    ticket_hash = hashlib.sha256(ticket.encode()).hexdigest()
+
+    def store(session: Session) -> None:
+        pending = session.get(LoginTicket, ticket_hash)
+        user = session.get(User, user_id)
+        if (
+            pending is not None
+            and user is not None
+            and user.password_hash == verified_hash
+            and hmac.compare_digest(
+                password_fingerprint(settings, verified_hash), pending.password_fingerprint
+            )
+        ):
+            pending.replacement_password_hash = replacement
+
+    run(store)
 
 
 def _rehash_after_login(
@@ -956,7 +1207,7 @@ def authenticate_user(
     host: str | None,
     user_agent: str | None = None,
     existing_session_id: str | None = None,
-    second_factor: str = "",
+    next_path: str = "/",
 ) -> LoginOutcome:
     """Authenticate inside the caller's transaction; the caller commits whatever the outcome."""
     return _login_flow(
@@ -970,7 +1221,7 @@ def authenticate_user(
         existing_session_id=existing_session_id,
         verify=None,
         hasher=None,
-        second_factor=second_factor,
+        next_path=next_path,
     )
 
 
@@ -987,7 +1238,7 @@ def authenticate_with_factory(
     verify: Verifier | None = None,
     hasher: Hasher | None = None,
     require_instance_admin: bool = False,
-    second_factor: str = "",
+    next_path: str = "/",
 ) -> LoginOutcome:
     """Authenticate with the reservation committed before ``verify`` runs (blocking)."""
     return _login_flow(
@@ -1002,7 +1253,7 @@ def authenticate_with_factory(
         verify=verify,
         hasher=hasher,
         require_instance_admin=require_instance_admin,
-        second_factor=second_factor,
+        next_path=next_path,
     )
 
 
@@ -1039,7 +1290,7 @@ async def authenticate_user_async(
     user_agent: str | None = None,
     existing_session_id: str | None = None,
     require_instance_admin: bool = False,
-    second_factor: str = "",
+    next_path: str = "/",
 ) -> LoginOutcome:
     """Web entry point: database work in a worker thread, hashing through ``gate``.
 
@@ -1059,7 +1310,7 @@ async def authenticate_user_async(
             verify=verify,
             hasher=hasher,
             require_instance_admin=require_instance_admin,
-            second_factor=second_factor,
+            next_path=next_path,
         )
     )
 
@@ -1149,6 +1400,9 @@ def revoke_session(
 
 
 def _delete_sessions_except(session: Session, user_id: UUID, keep_hash: str | None) -> int:
+    # Every path that revokes a user's sessions (sign out elsewhere, password change or
+    # reset, deactivation, factor reset) also ends any pending two-step sign-in.
+    delete_login_tickets(session, user_id)
     rows = session.scalars(select(UserSession).where(UserSession.user_id == user_id)).all()
     revoked = 0
     for row in rows:

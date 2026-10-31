@@ -17,6 +17,12 @@
       {{ field("display_name", _("Display name"), value=values.display_name, error=errors.get("display_name"), required=true, autocomplete="name", maxlength=120) }}
       {{ select("locale", _("Language"), languages, selected=values.locale, error=errors.get("locale")) }}
       {{ select("theme", _("Theme"), themes, selected=values.theme, error=errors.get("theme")) }}
+      <label class="flex items-start gap-2 text-sm">
+        <input type="checkbox" name="highlight_large_amounts" value="1"{% if values.highlight_large_amounts %} checked{% endif %} aria-describedby="highlight-help" data-highlight-setting class="mt-0.5 h-4 w-4 rounded border-line accent-primary">
+        <span>{{ _("Highlight large transactions") }}
+          <span id="highlight-help" class="block text-xs text-muted">{{ _("On the Transactions page, larger expenses get a stronger red background and larger income a stronger green one.") }}</span>
+        </span>
+      </label>
       {{ primary_button(_("Save")) }}
     </form>
     <p class="mt-4 text-xs text-muted">{{ _("The dark-mode button changes the theme on one device only.") }}

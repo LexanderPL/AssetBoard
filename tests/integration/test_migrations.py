@@ -48,6 +48,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "income_sources",
         "instance_settings",
         "invitations",
+        "login_tickets",
         "memberships",
         "month_states",
         "notification_channels",
@@ -73,6 +74,23 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
     assert script_location is not None
     assert Path(script_location).is_dir()
     assert config.get_main_option("sqlalchemy.url") is None
+
+
+def test_0026_two_step_login_ticket_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'tickets.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        assert "login_tickets" in inspect(engine).get_table_names()
+        command.downgrade(alembic_config(settings), "0025_amount_shading")
+        assert "login_tickets" not in inspect(engine).get_table_names()
+        upgrade_database(settings)
+        assert "login_tickets" in inspect(engine).get_table_names()
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
 
 
 def test_0018_tax_rules_migration_is_reversible(tmp_path: Path) -> None:
@@ -921,5 +939,44 @@ def test_0023_one_time_items_round_trip_converts_once_to_a_single_monthly(
         check_database_migrations(settings)
         with engine.begin() as connection:
             connection.exec_driver_sql(insert_item, ("0" * 31 + "f", home, gift, "once"))
+    finally:
+        engine.dispose()
+
+
+def test_0025_amount_shading_round_trip_turns_the_setting_on_for_existing_users(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'shade.db'}"
+    )
+    upgrade_database(settings)
+    command.downgrade(alembic_config(settings), "0024_tax_warning")
+    engine = create_database_engine(settings.database_url or "")
+    stamp = "'2026-01-01 00:00:00'"
+
+    def columns() -> dict[str, bool]:  # name -> nullable
+        return {c["name"]: c["nullable"] for c in inspect(engine).get_columns("users")}
+
+    try:
+        assert "highlight_large_amounts" not in columns()
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO users (id, email, display_name, theme, is_active, "
+                "is_instance_admin, must_change_password, created_at, updated_at) VALUES "
+                f"(?, 'a@example.com', 'A', 'system', 1, 0, 0, {stamp}, {stamp})",
+                ("00000000000000000000000000000001",),
+            )
+        upgrade_database(settings)
+        assert columns()["highlight_large_amounts"] is False  # NOT NULL
+        with engine.connect() as connection:
+            flag = connection.exec_driver_sql("SELECT highlight_large_amounts FROM users")
+            assert flag.scalar_one() == 1  # existing accounts: on
+        command.downgrade(alembic_config(settings), "0024_tax_warning")
+        assert "highlight_large_amounts" not in columns()
+        with engine.connect() as connection:
+            assert connection.exec_driver_sql("SELECT count(*) FROM users").scalar_one() == 1
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
     finally:
         engine.dispose()

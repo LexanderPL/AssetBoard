@@ -51,9 +51,14 @@ Each code can replace the authenticator code for one sign-in. Store them separat
 password. The enrollment code has already been used; wait for the next code before signing in
 on another device.
 
-After enrollment, enter your password and an authenticator or recovery code on the sign-in
-form, including the emergency local administrator login. Missing, invalid, expired or reused
-codes show the same generic failure as an incorrect password; code attempts are throttled.
+After enrollment, enter your email and password on the first sign-in page. If two-factor
+authentication is enabled, the next page asks for a code from your authenticator app or a
+recovery code. A wrong code says "The code is not correct." and you can
+try again on the same page, up to five times within five minutes; after that, or once five
+minutes have passed, you return to the first page with "Your sign-in has expired" and enter your
+password again. "Start over" on the code page also takes you back. Code attempts use the same
+sign-in throttle as incorrect passwords. The emergency local administrator login uses the same
+two steps.
 When linking a new identity provider or proxy identity by email during sign-in, enter the code
 alongside the existing account's password too. Already-linked external sign-ins rely on their
 provider's MFA instead. Accounts without passwords configure MFA at their identity provider.
@@ -91,6 +96,8 @@ A CLI password reset does not remove your second factor.
   English or Polish pins that language on every device.
 - **Theme**: the saved theme applies on every device. The dark-mode button in the menu changes
   the theme on one device only; "Use the saved theme on this device" undoes that.
+- **Highlight large transactions** (on by default): tints larger entries on the Transactions
+  page, red for expenses and green for income (see [Transactions](transactions.md)).
 
 ## Sign-in methods
 

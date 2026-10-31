@@ -10,9 +10,10 @@ from uuid import UUID
 
 import pytest
 from babel.messages.pofile import read_po
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from assetboard.clock import FixedClock
+from assetboard.db.models.identity import User
 from assetboard.db.models.ledger import Category, Transaction
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.i18n import gettext
@@ -807,3 +808,81 @@ def test_the_description_limit_comes_from_the_domain(ledger: OwnerApp) -> None:
 
     _category(ledger, "Food")
     assert f'maxlength="{MAX_DESCRIPTION_LENGTH}"' in _section(_page(ledger), "expense")
+
+
+# Amount shading: larger rows are tinted (user setting, on by default)
+
+
+def _shades(html: str, direction: str) -> dict[str, int]:
+    """Description -> tint step (0 without one) of the stored rows in ``direction``'s table."""
+    rows = re.findall(
+        r'<tr id="tx-[^"]*" data-transaction="[^"]*"( data-shade="(\d)")?>.*?data-description>'
+        r"([^<]*)<",
+        _section(html, direction),
+        re.DOTALL,
+    )
+    return {description: int(step or 0) for _, step, description in rows}
+
+
+def _set_highlight(app: OwnerApp, value: bool) -> None:
+    with app.db() as session:
+        session.execute(update(User).values(highlight_large_amounts=value))
+        session.commit()
+
+
+def _shading_month(app: OwnerApp) -> tuple[UUID, UUID]:
+    food, rent = _category(app, "Food"), _category(app, "Rent")
+    salary = _category(app, "Salary", "income")
+    for category, amount, description in (
+        (rent, "1000", "Rent"),
+        (food, "900", "Big shop"),
+        (food, "500", "Half"),
+        (food, "249.99", "Small"),
+    ):
+        _add(app, _form(category, amount=amount, description=description))
+    for amount, description in (("3000", "Pay"), ("800", "Bonus")):
+        _add(app, _form(salary, amount=amount, description=description, direction="income"))
+    return food, rent
+
+
+def test_larger_rows_are_tinted_by_their_share_of_the_months_largest(ledger: OwnerApp) -> None:
+    _shading_month(ledger)
+    page = _page(ledger)
+    assert _shades(page, "expense") == {"Rent": 4, "Big shop": 4, "Half": 2, "Small": 0}
+    assert _shades(page, "income") == {"Pay": 4, "Bonus": 1}
+    expense, income = _section(page, "expense"), _section(page, "income")
+    assert "bg-danger/40" in expense and "bg-success" not in expense
+    assert "bg-success/40" in income and "bg-success/10" in income and "bg-danger/" not in income
+
+
+def test_turning_the_setting_off_removes_every_tint(ledger: OwnerApp) -> None:
+    _shading_month(ledger)
+    _set_highlight(ledger, False)
+    page = _page(ledger)
+    assert "data-shade" not in page
+    assert not re.search(r"bg-(danger|success)/\d", page)
+    _set_highlight(ledger, True)
+    assert "data-shade" in _page(ledger)
+
+
+def test_a_filtered_view_compares_with_the_whole_months_largest(ledger: OwnerApp) -> None:
+    food, _rent = _shading_month(ledger)
+    page = _page(ledger, f"{PAGE}?category={food}")
+    assert _shades(page, "expense") == {"Big shop": 4, "Half": 2, "Small": 0}
+
+
+def test_htmx_writes_recompute_the_tints(ledger: OwnerApp) -> None:
+    food, rent = _shading_month(ledger)
+    rent_id = _id(ledger, "Rent")
+    data = {"day": "7", "amount": "5000", "description": "Rent", "category_id": str(rent)}
+    edited = _htmx(ledger, f"{MONTH}/transactions/{rent_id}", data)
+    assert _shades(edited.text, "expense") == {"Rent": 4, "Big shop": 0, "Half": 0, "Small": 0}
+    deleted = _htmx(ledger, f"{MONTH}/transactions/{rent_id}/delete")
+    assert _shades(deleted.text, "expense") == {"Big shop": 4, "Half": 2, "Small": 1}
+    undone = _htmx(ledger, f"{MONTH}/transactions/{rent_id}/undo")
+    assert _shades(undone.text, "expense")["Rent"] == 4
+    added = _htmx(ledger, f"{MONTH}/transactions", _form(food, amount="20000", description="Car"))
+    assert _shades(added.text, "expense")["Car"] == 4
+    assert _shades(added.text, "expense")["Rent"] == 1
+    row = _htmx_get(ledger, f"{MONTH}/transactions/{rent_id}/row")
+    assert 'data-shade="1"' in row.text and "bg-danger/10" in row.text

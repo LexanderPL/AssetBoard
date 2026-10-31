@@ -55,6 +55,10 @@ class User(IdMixin, TimestampMixin, Base):
     must_change_password: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
+    # The profile setting that tints larger rows on the Transactions page (on by default).
+    highlight_large_amounts: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default=true()
+    )
     last_login_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
     @validates("email")
@@ -226,6 +230,33 @@ class AuthThrottle(Base):
     window_started_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
     blocked_until: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     updated_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
+
+
+class LoginTicket(Base):
+    """Short-lived password-verified, second-factor-pending sign-in."""
+
+    __tablename__ = "login_tickets"
+    __table_args__ = (
+        CheckConstraint("length(token_hash) = 64", name="token_hash_sha256_length"),
+        Index("ix_login_tickets_expires_at", "expires_at"),
+    )
+
+    token_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+    )
+    # HMAC of the user's password hash when the ticket was issued (never the hash itself).
+    password_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
+    replacement_password_hash: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    next_path: Mapped[str] = mapped_column(String(512), nullable=False, default="/")
+    ip_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    ip_window_started_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
+    ip_block_set: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    # Wrong codes entered against this ticket; it is deleted at ``MAX_LOGIN_TICKET_ATTEMPTS``.
+    code_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    require_instance_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    created_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
 
 
 class SetupState(Base):

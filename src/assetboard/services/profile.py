@@ -161,8 +161,10 @@ def update_profile(
     display_name: str,
     locale: str,
     theme: str,
+    highlight_large_amounts: bool = True,
 ) -> ProfileError | None:
-    """Display name (``normalize_display_name``), locale and theme.
+    """Display name (``normalize_display_name``), locale, theme and the amount shading of the
+    Transactions page (``highlight_large_amounts``).
 
     ``locale`` is a supported language, or ``""`` / ``"browser"`` for none (stored as NULL:
     the browser's ``Accept-Language`` applies).
@@ -182,9 +184,17 @@ def update_profile(
         user = session.get(User, user_id)
         if user is not None:
             user.display_name, user.locale, user.theme = name, saved_locale, theme
+            user.highlight_large_amounts = highlight_large_amounts
 
     run_immediate(factory, save)
     return None
+
+
+def highlights_large_amounts(factory: sessionmaker[Session], user_id: UUID) -> bool:
+    """Whether the user wants larger rows tinted on the Transactions page (default on)."""
+    with factory() as session:
+        value = session.scalar(select(User.highlight_large_amounts).where(User.id == user_id))
+    return True if value is None else value
 
 
 # Linked identities
