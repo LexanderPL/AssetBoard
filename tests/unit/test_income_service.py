@@ -108,7 +108,7 @@ def test_income_source_golden_example_generates_tax_payment(team: WorkspaceDb) -
         assert children[0].due_date == date(2026, 9, 20)
         assert children[0].expected_minor == 537_510
         assert children[0].category_id == expense_category
-        assert children[0].label == "Contract work tax payment"
+        assert children[0].label == "VAT: Contract work"
 
     # The label is in the workspace language; a recalculation renames pending payments.
     with team.factory.begin() as session:
@@ -119,7 +119,7 @@ def test_income_source_golden_example_generates_tax_payment(team: WorkspaceDb) -
         parent = repository.for_income_work_month(source_id, date(2026, 8, 1))
         assert parent is not None
         assert [child.label for child in repository.children(parent.id)] == [
-            "Contract work – płatność podatku"
+            "VAT: Contract work"
         ]
 
     listed = income.list_sources(team.factory, ctx)
@@ -702,3 +702,56 @@ def test_resync_pending_income_applies_the_current_tax_model(team: WorkspaceDb) 
     assert income.resync_pending_income(team.factory, ctx, team.clock) >= 1
     resynced = _occurrence(team, ctx, source_id, date(2026, 8, 1))
     assert resynced is not None and resynced.expected_minor == 100_000
+
+
+def test_resync_pending_income_relabels_pending_tax_payments(team: WorkspaceDb) -> None:
+    """The startup resync gives pending tax payments the "<tax>: <source>" label, also when
+    their income was already received (not recalculated); posted payments keep theirs."""
+    ctx = team.ctx("owner", "owner")
+    source_id, _attachment, _rule, _other, _salary = _attached(team, ctx)
+    with team.factory.begin() as session:
+        repository = ScheduledOccurrenceRepository(session, ctx)
+        parent = repository.for_income_work_month(source_id, date(2026, 8, 1))
+        assert parent is not None
+        parent.status = "posted"  # the income arrived; its tax payment is still pending
+        [child] = repository.children(parent.id)
+        child.label = "Contract work tax payment"  # the label before the upgrade
+        parent_id = parent.id
+    income.resync_pending_income(team.factory, ctx, team.clock)
+    with team.factory() as session:
+        [child] = ScheduledOccurrenceRepository(session, ctx).children(parent_id)
+        assert child.label == "Income tax: Contract work"
+    # Posted payments keep their stored label; pending ones follow the workspace language.
+    with team.factory.begin() as session:
+        CurrentWorkspaceRepository(session, ctx).update(locale="pl")
+        [child] = ScheduledOccurrenceRepository(session, ctx).children(parent_id)
+        child.status = "posted"
+        child.label = "Old label"
+    income.resync_pending_income(team.factory, ctx, team.clock)
+    with team.factory() as session:
+        [child] = ScheduledOccurrenceRepository(session, ctx).children(parent_id)
+        assert child.label == "Old label"
+
+
+def test_renaming_a_tax_rule_relabels_its_pending_payments(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    source_id, _attachment, rule_id, _other, _salary = _attached(team, ctx)
+    with team.factory.begin() as session:
+        CurrentWorkspaceRepository(session, ctx).update(locale="pl")
+    with team.factory() as session:
+        from assetboard.db.repositories import TaxRuleRepository
+
+        rule = TaxRuleRepository(session, ctx).get_or_raise(rule_id)
+        fields = {
+            "kind": rule.kind,
+            "base": rule.base,
+            "payment_day": rule.payment_day,
+            "payment_timing": rule.payment_timing,
+            "payment_category_id": rule.payment_category_id,
+        }
+    taxes.update_rule(team.factory, ctx, rule_id, name="PIT", **fields)
+    parent = _occurrence(team, ctx, source_id, date(2026, 8, 1))
+    assert parent is not None
+    with team.factory() as session:
+        labels = [c.label for c in ScheduledOccurrenceRepository(session, ctx).children(parent.id)]
+    assert labels == ["PIT: Contract work"]
