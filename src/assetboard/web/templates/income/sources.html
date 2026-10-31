@@ -84,9 +84,9 @@
             {% if can_edit and not source.archived and log and not log.derived_from_days and not locked %}
             {# An inline form in the page flow (the table scrolls sideways, so it cannot float):
                Esc or Cancel closes it and restores the logged value (static/js/app.js). #}
-            <details class="mt-1" data-inline-edit data-log-edit="{{ item.work_month.strftime('%Y-%m') }}">
+            <details class="ml-1 inline-block align-middle open:mt-1 open:block open:ml-0" data-inline-edit data-log-edit="{{ item.work_month.strftime('%Y-%m') }}">
               <summary class="{{ compact }}" aria-label="{{ _('Edit the units logged for %(month)s', month=month_label) }}">{{ _("Edit") }}</summary>
-              <form method="post" action="{{ scoped_url(request, 'income_work_log', source_id=source.id) }}" class="mt-2 grid gap-2 rounded-lg border border-line bg-surface p-3">
+              <form method="post" action="{{ scoped_url(request, 'income_work_log', source_id=source.id) }}" class="mt-2 grid w-fit gap-2 rounded-lg border border-line bg-surface p-3">
                 {{ csrf_input() }}
                 <input type="hidden" name="work_month_month" value="{{ item.work_month.month }}">
                 <input type="hidden" name="work_month_year" value="{{ item.work_month.year }}">

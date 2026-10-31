@@ -347,7 +347,10 @@ async def skip(request: Request, ctx: CurrentContext, occurrence_id: str) -> Res
     except occurrences.OccurrenceError as exc:
         return _redirect(request, error=exc.code, return_month=return_month)
     return _redirect(
-        request, notice="skipped", back=values.get("back", ""), return_month=return_month
+        request,
+        notice="skipped" if return_month is not None else None,
+        back=values.get("back", ""),
+        return_month=return_month,
     )
 
 
