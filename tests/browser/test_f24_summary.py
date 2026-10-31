@@ -128,17 +128,19 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             food_row = page.locator("#month-summary tr[data-plan-row]", has_text="Golden Food")
             travel_row = page.locator("#month-summary tr[data-plan-row]", has_text="Golden Travel")
             kpis = page.locator("#summary-kpis [data-kpi]")
-            # Nothing earned: no savings-rate caption, and an empty flow bar.
-            expect(kpis).to_have_text(["€0.00", "€0.00", "€0.00", "€0.00"])
+            spent = page.locator("#summary-kpis [data-kpi='spent']")
+            # Nothing earned: no savings-rate caption, and an empty strip and flow bar.
+            expect(kpis).to_have_text(["€0.00"] * 6)
             expect(page.locator("[data-flow-segment='empty']")).to_have_count(1)
+            expect(page.locator("[data-strip-segment='empty']")).to_have_count(1)
 
             # A planned value updates the difference, the totals and the bar text at once.
             page.get_by_label("Planned for Golden Food").fill("550")
             page.keyboard.press("Tab")
             expect(food_row.locator("[data-difference]")).to_contain_text("+€550.00")
             expect(page.locator("#summary-total-expense")).to_contain_text("€550.00")
-            expect(page.locator("[data-summary-bar='expense']")).to_contain_text(
-                "Spent €0.00 of €550.00 planned"
+            expect(page.locator("[data-summary-bar='out']")).to_contain_text(
+                "Out €0.00 of €550.00 planned"
             )
 
             # F2.7: entries are made on the Transactions page; the Month summary shows them.
@@ -157,9 +159,14 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             add("expense", "3", "50", "Golden Food")
             expect(food_row.locator("[data-actual]")).to_have_text("€50.00")
             expect(food_row.locator("[data-difference]")).to_contain_text("+€500.00")
-            expect(kpis.nth(1)).to_have_text("€50.00")
+            expect(spent).to_have_text("€50.00")
+            # Nothing came in yet: the header says "Short by" and the strip is a dashed outline.
+            expect(page.locator("[data-kpi='short']")).to_have_text("€50.00")
+            expect(page.locator("[data-strip-segment='short']")).to_have_count(1)
             add("income", "1", "1000", "Golden Salary")
-            expect(kpis).to_have_text(["€1,000.00", "€50.00", "€0.00", "€950.00", "0.0%"])
+            expect(kpis).to_have_text(
+                ["€1,000.00", "€950.00", "€1,000.00", "€50.00", "€0.00", "€950.00", "0.0%"]
+            )
             expect(page.locator("[data-savings-rate]")).to_have_text(
                 "Saved / invested 0.0% of income"
             )
@@ -217,10 +224,10 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             expect(food_pending).to_have_attribute(
                 "title", "If everything pending arrives: €170.00"
             )
-            expect(page.locator("[data-summary-bar='expense'] [data-bar-pending]")).to_be_visible()
-            expect(page.locator("svg[data-flow-bar][data-pending]")).to_be_visible()
+            expect(page.locator("[data-summary-bar='out'] [data-bar-pending]")).to_be_visible()
+            expect(page.locator("[data-in-out-flow][data-pending]")).to_be_visible()
             expect(confirmed_only).to_be_hidden()
-            expect(page.locator("[data-flow-heading]")).to_have_text("Spent vs earned")
+            expect(page.locator("[data-flow-heading]")).to_have_text("In vs out")
             # The toggle hides every pending part and shows the confirmed-only flow bar; the
             # choice survives a row swap (planned value), a whole-summary swap (sort) and a
             # reload, and it comes back with a second click.
@@ -303,7 +310,7 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             assert page.evaluate("localStorage.getItem('htmx-history-cache')") is None
             page.goto(f"{base}/m/{MONTH}")
             expect(food_row.locator("[data-actual]")).to_have_text("€57.00")
-            expect(kpis.nth(1)).to_have_text("€457.00")
+            expect(spent).to_have_text("€457.00")
 
             assert page.evaluate("window.__cspViolations") == []
             assert not [e for e in console_errors if "Content Security Policy" in e]
