@@ -403,6 +403,9 @@ msgstr "Każdy zalogowany użytkownik może tworzyć obszary robocze"
 msgid "Open registration"
 msgstr "Otwarta rejestracja"
 
+msgid "Check for updates"
+msgstr "Sprawdzaj aktualizacje"
+
 msgid "Month"
 msgstr "Miesiąc"
 
@@ -2006,14 +2009,24 @@ msgstr "Prognoza FIRE"
 msgid "Unavailable"
 msgstr "Niedostępne"
 
-msgid "Your account"
-msgstr "Twoje konto"
+#, python-format
+msgid "Update available: %(version)s"
+msgstr "Dostępna aktualizacja: %(version)s"
 
-msgid "Audit log: workspace"
-msgstr "Dziennik zdarzeń: obszar roboczy"
+msgid "Toggle dark mode"
+msgstr "Przełącz tryb ciemny"
+
+msgid "Your overview"
+msgstr "Podsumowanie"
+
+msgid "Workspaces"
+msgstr "Obszary robocze"
 
 msgid "New workspace"
 msgstr "Nowy obszar roboczy"
+
+msgid "Audit log: workspace"
+msgstr "Dziennik zdarzeń: obszar roboczy"
 
 msgid "Export and import"
 msgstr "Eksport i import"
@@ -2032,21 +2045,6 @@ msgstr "Bezpieczeństwo konta"
 
 msgid "Sign out"
 msgstr "Wyloguj się"
-
-msgid "Toggle dark mode"
-msgstr "Przełącz tryb ciemny"
-
-msgid "Personal finance"
-msgstr "Finanse osobiste"
-
-msgid "Your overview"
-msgstr "Podsumowanie"
-
-msgid "Workspace"
-msgstr "Obszar roboczy"
-
-msgid "Switch"
-msgstr "Przełącz"
 
 msgid "Are you sure?"
 msgstr "Czy na pewno?"
@@ -2262,6 +2260,12 @@ msgstr ""
 "To konto korzysta z logowania przez dostawcę tożsamości lub proxy. "
 "Skonfiguruj uwierzytelnianie wieloskładnikowe u tego dostawcy."
 
+msgid "Workspace"
+msgstr "Obszar roboczy"
+
+msgid "Switch"
+msgstr "Przełącz"
+
 msgid "Required only if your account has two-factor authentication enabled."
 msgstr ""
 "Wymagane tylko wtedy, gdy na Twoim koncie włączono uwierzytelnianie "
@@ -2269,9 +2273,6 @@ msgstr ""
 
 msgid "Back to users"
 msgstr "Wróć do użytkowników"
-
-msgid "Workspaces"
-msgstr "Obszary robocze"
 
 msgid "Who can create workspaces"
 msgstr "Kto może tworzyć obszary robocze"
@@ -2311,6 +2312,16 @@ msgstr ""
 
 msgid "Registration stays closed until this is fixed."
 msgstr "Rejestracja pozostaje zamknięta, dopóki to nie zostanie naprawione."
+
+msgid "Updates"
+msgstr "Aktualizacje"
+
+msgid ""
+"Once a day, ask GitHub for the latest release. Off by default; nothing "
+"else is sent."
+msgstr ""
+"Raz dziennie pytaj GitHub o najnowsze wydanie. Domyślnie wyłączone; nic "
+"więcej nie jest wysyłane."
 
 msgid "Save settings"
 msgstr "Zapisz ustawienia"
@@ -5022,4 +5033,10 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Reminders by notification"
 #~ msgstr "Przypomnienia przez powiadomienia"
+
+#~ msgid "Your account"
+#~ msgstr "Twoje konto"
+
+#~ msgid "Personal finance"
+#~ msgstr "Finanse osobiste"
 

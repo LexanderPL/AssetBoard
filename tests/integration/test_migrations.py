@@ -1205,3 +1205,43 @@ def test_0029_upcoming_days_round_trip_keeps_workspaces_on_the_instance_default(
         check_database_migrations(settings)
     finally:
         engine.dispose()
+
+
+def test_0030_update_check_round_trip_starts_off_and_keeps_the_settings_row(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'updates.db'}"
+    )
+    config = alembic_config(settings)
+    command.upgrade(config, "0029_upcoming_days")
+    engine = create_database_engine(settings.database_url or "")
+
+    def columns() -> dict[str, bool]:  # name -> nullable
+        return {c["name"]: c["nullable"] for c in inspect(engine).get_columns("instance_settings")}
+
+    try:
+        assert "check_for_updates" not in columns()
+        upgrade_database(settings)
+        assert columns()["check_for_updates"] is False
+        assert columns()["latest_release_tag"] is True
+        assert columns()["update_checked_at"] is True
+        with engine.begin() as connection:
+            row = connection.exec_driver_sql(
+                "SELECT check_for_updates, latest_release_tag, update_checked_at "
+                "FROM instance_settings"
+            ).one()
+            assert tuple(row) == (0, None, None)  # off by default (ADR-0023)
+            connection.exec_driver_sql(
+                "UPDATE instance_settings SET check_for_updates = 1, latest_release_tag = 'v1.0'"
+            )
+        command.downgrade(config, "0029_upcoming_days")
+        assert "check_for_updates" not in columns()
+        with engine.connect() as connection:
+            count = connection.exec_driver_sql("SELECT count(*) FROM instance_settings")
+            assert count.scalar_one() == 1
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
