@@ -81,7 +81,7 @@ def test_two_step_sign_in_with_an_authenticator_code(tmp_path: Path) -> None:
             code_field = page.get_by_label("Authenticator or recovery code")
             expect(code_field).to_have_attribute("autocomplete", "one-time-code")
             expect(page.locator("[data-start-over]")).to_have_attribute("href", "/login")
-            assert not any(c["name"] == "assetboard_session" for c in context.cookies())
+            assert not any(c.get("name") == "assetboard_session" for c in context.cookies())
 
             code_field.fill("000000")
             page.get_by_role("button", name="Continue").click()
@@ -91,7 +91,7 @@ def test_two_step_sign_in_with_an_authenticator_code(tmp_path: Path) -> None:
             page.get_by_label("Authenticator or recovery code").fill(pyotp.TOTP(secret).now())
             page.get_by_role("button", name="Continue").click()
             page.wait_for_url(f"{base}/")
-            names = {c["name"] for c in context.cookies()}
+            names = {c.get("name") for c in context.cookies()}
             assert "assetboard_session" in names and "assetboard_login_ticket" not in names
             assert page.evaluate("window.__cspViolations") == []
             browser.close()
