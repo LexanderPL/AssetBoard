@@ -398,6 +398,11 @@ when you intend to upload the image and its release tags.
 - Migration `0026_two_step_login` adds short-lived, hashed login tickets. Password sign-in
   asks for a TOTP or recovery code on a second page when the account has two-factor authentication.
 
+### Unreleased: workspace archive (F4.1)
+
+- Migration `0027_f41_lineage` adds nullable `import_key` columns to categories and transactions,
+  each with a unique index per workspace (only where it is set). Existing rows keep it empty.
+
 ### Unreleased: recurring items (F3.1)
 
 - Migration `0015_f31` adds the `scheduled_items` and `scheduled_occurrences` tables.

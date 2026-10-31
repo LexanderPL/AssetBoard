@@ -1,14 +1,14 @@
 """Archive lineage IDs (F4.1).
 
-Revision ID: 0025_f41
-Revises: 0024_tax_warning
+Revision ID: 0027_f41_lineage
+Revises: 0026_two_step_login
 """
 
 import sqlalchemy as sa
 from alembic import op
 
-revision = "0025_f41"
-down_revision = "0024_tax_warning"
+revision = "0027_f41_lineage"
+down_revision = "0026_two_step_login"
 branch_labels = None
 depends_on = None
 

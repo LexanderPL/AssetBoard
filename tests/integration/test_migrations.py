@@ -980,3 +980,53 @@ def test_0025_amount_shading_round_trip_turns_the_setting_on_for_existing_users(
         check_database_migrations(settings)
     finally:
         engine.dispose()
+
+
+def test_0027_f41_lineage_round_trip_keeps_rows_and_scopes_keys(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'lineage.db'}"
+    )
+    upgrade_database(settings)
+    command.downgrade(alembic_config(settings), "0026_two_step_login")
+    engine = create_database_engine(settings.database_url or "")
+    stamp = "'2026-01-01 00:00:00'"
+
+    def columns(table: str) -> set[str]:
+        return {c["name"] for c in inspect(engine).get_columns(table)}
+
+    try:
+        assert "import_key" not in columns("categories")
+        assert "import_key" not in columns("transactions")
+        with engine.begin() as connection:
+            for workspace in ("0" * 31 + "1", "0" * 31 + "2"):
+                connection.exec_driver_sql(
+                    "INSERT INTO workspaces (id, name, base_currency, timezone, locale, "
+                    "created_at, updated_at) "
+                    f"VALUES (?, 'W', 'EUR', 'UTC', 'en', {stamp}, {stamp})",
+                    (workspace,),
+                )
+        upgrade_database(settings)
+        insert = (
+            "INSERT INTO categories (id, workspace_id, name, name_key, kind, treatment, color, "
+            "sort_order, import_key, created_at, updated_at) VALUES (?, ?, ?, ?, "
+            f"'expense', 'regular', '#16a34a', 0, ?, {stamp}, {stamp})"
+        )
+        one, two = "0" * 31 + "1", "0" * 31 + "2"
+        key = "id:2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01"
+        with engine.begin() as connection:
+            connection.exec_driver_sql(insert, ("a" * 32, one, "A", "a", key))
+            connection.exec_driver_sql(insert, ("b" * 32, two, "A", "a", key))  # other workspace
+            connection.exec_driver_sql(insert, ("c" * 32, one, "C", "c", None))
+            connection.exec_driver_sql(insert, ("d" * 32, one, "D", "d", None))  # NULLs repeat
+        with pytest.raises(IntegrityError), engine.begin() as connection:
+            connection.exec_driver_sql(insert, ("e" * 32, one, "E", "e", key))
+        command.downgrade(alembic_config(settings), "0026_two_step_login")
+        assert "import_key" not in columns("categories")
+        assert "import_key" not in columns("transactions")
+        with engine.connect() as connection:
+            assert connection.exec_driver_sql("SELECT count(*) FROM categories").scalar_one() == 4
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
