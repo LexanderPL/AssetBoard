@@ -27,7 +27,7 @@ def upgrade() -> None:
         sa.Column("ip_key", sa.String(length=64), nullable=False),
         sa.Column("ip_window_started_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("ip_block_set", sa.DateTime(timezone=True), nullable=True),
-        sa.Column("code_attempted", sa.Boolean(), nullable=False),
+        sa.Column("code_attempts", sa.Integer(), nullable=False),
         sa.Column("require_instance_admin", sa.Boolean(), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.CheckConstraint(

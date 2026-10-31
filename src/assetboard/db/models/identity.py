@@ -251,7 +251,8 @@ class LoginTicket(Base):
     ip_key: Mapped[str] = mapped_column(String(64), nullable=False)
     ip_window_started_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
     ip_block_set: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
-    code_attempted: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Wrong codes entered against this ticket; it is deleted at ``MAX_LOGIN_TICKET_ATTEMPTS``.
+    code_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     require_instance_admin: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     expires_at: Mapped[datetime] = mapped_column(UtcDateTime(), nullable=False)
 

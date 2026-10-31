@@ -18,6 +18,7 @@
   {{ field("second_factor", _("Authenticator or recovery code"), autocomplete="one-time-code", maxlength=64, required=true) }}
   {{ primary_button(_("Continue")) }}
 </form>
+<p class="mt-4 text-center text-sm"><a class="font-semibold text-primary-ink" href="{{ scoped_url(request, start_over_url) }}" data-start-over>{{ _("Start over") }}</a></p>
 {% elif password_login %}
 {% if oidc_provider or proxy_user %}<p class="mt-6 text-center text-xs text-muted">{{ _("or sign in with your password") }}</p>{% endif %}
 <form method="post" action="{{ scoped_url(request, form_action) }}" class="mt-6 space-y-4" novalidate>

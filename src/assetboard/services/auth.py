@@ -80,6 +80,8 @@ MAX_PASSWORD_LENGTH = 1024
 MAX_NAME_LENGTH = 120
 SESSION_TOUCH_INTERVAL = timedelta(minutes=5)
 LOGIN_TICKET_LIFETIME = timedelta(minutes=5)
+# Wrong codes one ticket accepts before it is deleted; the sign-in throttle applies to each.
+MAX_LOGIN_TICKET_ATTEMPTS = 5
 THROTTLE_IDLE_RESET = timedelta(hours=24)
 
 # Test-only seam: an autouse fixture swaps in cheap parameters; production never sets it.
@@ -234,6 +236,7 @@ class LoginOutcome:
     throttled_until: datetime | None = None
     login_ticket: str | None = None
     next_path: str | None = None
+    # A wrong code against a live ticket: the browser keeps it and may try again.
     ticket_retryable: bool = False
 
     @property
@@ -253,7 +256,12 @@ def complete_login_ticket(
     existing_session_id: str | None,
     require_instance_admin: bool,
 ) -> LoginOutcome:
-    """Consume one pending second-factor ticket and create its password session."""
+    """Consume one pending second-factor ticket and create its password session.
+
+    An unknown, expired, used-up or no-longer-valid ticket returns a plain ``LoginOutcome()``
+    (the caller starts the sign-in over). Every wrong code counts in the sign-in throttle: the
+    first one is the count the password step already reserved, each later one reserves its own.
+    """
     if not ticket or len(ticket) > 128:
         return LoginOutcome()
     ticket_hash = hashlib.sha256(ticket.encode()).hexdigest()
@@ -275,6 +283,7 @@ def complete_login_ticket(
             or not user.is_active
             or user.password_hash is None
             or user.password_hash != pending.password_hash
+            or (pending.require_instance_admin and not user.is_instance_admin)
         ):
             session.delete(pending)
             return LoginOutcome()
@@ -293,7 +302,7 @@ def complete_login_ticket(
             ),
         )
         keys: list[tuple[ThrottleScope, str]] = [(slot.scope, slot.key) for slot in slots]
-        first_code_attempt = not pending.code_attempted
+        first_code_attempt = pending.code_attempts == 0
         reserved: tuple[ReservedAttempt, ...] = ()
         if not first_code_attempt:
             reserved = reserve_attempts(session, slots, now, settings) or ()
@@ -307,7 +316,7 @@ def complete_login_ticket(
             session, user.id, code=code, settings=settings, now=now
         )
         if not verified or not factor_verified:
-            pending.code_attempted = True
+            pending.code_attempts += 1
             _audit(
                 session,
                 clock,
@@ -321,6 +330,9 @@ def complete_login_ticket(
                 data={"reason": "second_factor"},
             )
             prune_auth_throttles(session, clock)
+            if pending.code_attempts >= MAX_LOGIN_TICKET_ATTEMPTS:
+                session.delete(pending)
+                return LoginOutcome()
             return LoginOutcome(ticket_retryable=True)
         session.delete(pending)
         if pending.replacement_password_hash is not None:
@@ -394,6 +406,7 @@ def login_ticket_is_active(
             user
             and user.is_active
             and user.password_hash == pending.password_hash
+            and (user.is_instance_admin or not pending.require_instance_admin)
             and factor
             and factor.enabled_at is not None
         )

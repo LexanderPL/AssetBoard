@@ -107,6 +107,8 @@ ERROR_FIELDS = {
     "invalid_workspace_settings": "base_currency",
 }
 LOGIN_FAILED = _("The email or password is not correct.")
+# Neutral: the same for an unknown, expired, used or used-up ticket.
+LOGIN_TICKET_ENDED = _("Your sign-in has expired. Please sign in again.")
 SETUP_RACE = _("Setup was already completed, or is being completed. Reload to continue.")
 
 
@@ -321,11 +323,19 @@ async def setup_submit(
 # Sign in and out
 
 
-def _login_error(request: Request, *, error: bool, throttled_until: datetime | None) -> str | None:
+def _login_error(
+    request: Request,
+    *,
+    error: bool,
+    throttled_until: datetime | None,
+    ticket_ended: bool = False,
+) -> str | None:
     """Throttled only when a bucket refused the attempt; never a hint that an account exists."""
     if throttled_until is not None:
         now = _state(request).clock.now()
         return throttled_message(throttled_until, now, request.state.locale)
+    if ticket_ended:
+        return _t(request, LOGIN_TICKET_ENDED)
     return _t(request, LOGIN_FAILED) if error else None
 
 
@@ -339,6 +349,7 @@ async def _login_page(
     status: int = 200,
     break_glass: bool = False,
     second_factor_step: bool = False,
+    ticket_ended: bool = False,
 ) -> Response:
     state = _state(request)
     settings = state.settings
@@ -359,13 +370,19 @@ async def _login_page(
         context={
             "email": email,
             "next_path": safe_next(next_path, default=""),
-            "error": _login_error(request, error=error, throttled_until=throttled_until),
+            "error": _login_error(
+                request,
+                error=error,
+                throttled_until=throttled_until,
+                ticket_ended=ticket_ended,
+            ),
             "registration_enabled": registration,
             "password_login": password_login,
             "forgot_password": not break_glass and password_reset_available(settings),
             "form_action": "login_local" if break_glass else "login",
             "second_factor_step": second_factor_step,
             "factor_form_action": "login_local_verify" if break_glass else "login_verify",
+            "start_over_url": "login_local" if break_glass else "login",
             "oidc_provider": settings.oidc_provider_name if oidc else None,
             "oidc_start_url": oidc_start_url(safe_next(next_path, default="")) if oidc else None,
             # Shown only when the trusted proxy presents a user right now (ADR-0015).
@@ -379,10 +396,10 @@ async def _login_page(
 
 
 @router.get("/login", name="login")
-async def login_form(request: Request, next: str = "") -> Response:  # noqa: A002
+async def login_form(request: Request, next: str = "", expired: str = "") -> Response:  # noqa: A002
     if web_session(request) is not None:
         return RedirectResponse(safe_next(next), status_code=303)
-    return await _login_page(request, next_path=next)
+    return await _login_page(request, next_path=next, ticket_ended=expired == "1")
 
 
 async def _password_sign_in(
@@ -470,11 +487,15 @@ def _require_break_glass(request: Request) -> None:
 
 
 @router.get("/login/local", name="login_local")
-async def login_local_form(request: Request, next: str = "") -> Response:  # noqa: A002
+async def login_local_form(
+    request: Request,
+    next: str = "",  # noqa: A002
+    expired: str = "",
+) -> Response:
     _require_break_glass(request)
     if web_session(request) is not None:
         return RedirectResponse(safe_next(next), status_code=303)
-    return await _login_page(request, next_path=next, break_glass=True)
+    return await _login_page(request, next_path=next, break_glass=True, ticket_ended=expired == "1")
 
 
 @router.post("/login/local")
@@ -501,9 +522,17 @@ async def _login_factor_page(request: Request, *, break_glass: bool = False) -> 
         require_instance_admin=break_glass,
     )
     if not active:
-        target = "login_local" if break_glass else "login"
-        return RedirectResponse(request.url_for(target).path, status_code=303)
+        return _restart_sign_in(request, break_glass=break_glass, ended=bool(ticket))
     return await _login_page(request, break_glass=break_glass, second_factor_step=True)
+
+
+def _restart_sign_in(request: Request, *, break_glass: bool, ended: bool) -> Response:
+    """Back to the password step; ``ended`` says why when the browser held a ticket."""
+    settings = _state(request).settings
+    target = request.url_for("login_local" if break_glass else "login").path
+    response = RedirectResponse(f"{target}?expired=1" if ended else target, status_code=303)
+    clear_cookie(response, settings, login_ticket_cookie_name(settings))
+    return response
 
 
 @router.get("/login/verify", name="login_factor")
@@ -533,16 +562,17 @@ async def _verify_login_ticket(request: Request, code: str, *, break_glass: bool
         require_instance_admin=break_glass,
     )
     if not outcome.succeeded or outcome.session_id is None:
+        if outcome.throttled_until is None and not outcome.ticket_retryable:
+            # Unknown, expired, used or used-up ticket: start over with a neutral message.
+            return _restart_sign_in(request, break_glass=break_glass, ended=True)
         response = await _login_page(
             request,
             error=outcome.throttled_until is None,
             throttled_until=outcome.throttled_until,
             status=401,
             break_glass=break_glass,
-            second_factor_step=(outcome.ticket_retryable or outcome.throttled_until is not None),
+            second_factor_step=True,
         )
-        if outcome.throttled_until is None and not outcome.ticket_retryable:
-            clear_cookie(response, state.settings, login_ticket_cookie_name(state.settings))
         wait = retry_after(outcome.throttled_until, state.clock.now())
         if wait is not None:
             response.headers["Retry-After"] = wait

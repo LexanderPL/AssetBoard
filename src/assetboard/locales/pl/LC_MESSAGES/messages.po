@@ -961,6 +961,9 @@ msgstr "Sprawdź dane i spróbuj ponownie."
 msgid "The email or password is not correct."
 msgstr "Adres e-mail lub hasło są nieprawidłowe."
 
+msgid "Your sign-in has expired. Please sign in again."
+msgstr "Logowanie wygasło. Zaloguj się ponownie."
+
 msgid "Setup was already completed, or is being completed. Reload to continue."
 msgstr ""
 "Konfiguracja została już zakończona lub właśnie trwa. Odśwież stronę, aby"
