@@ -199,10 +199,12 @@ def test_country_without_holiday_data_is_explained_on_the_settings_page(owner):
     assert response.status_code == 400 and "Holiday data is not available" in response.text
 
 
-def test_one_time_item_form_ignores_repeat_fields_and_lists_its_date(owner):
+def test_one_time_items_are_not_offered_or_listed_on_the_recurring_page(owner):
     owner.app.state.clock = FixedClock("2026-03-01T12:00:00+00:00")
     page = owner.client.get("/recurring/new")
-    assert '<option value="once">One time</option>' in page.text
+    # One-time payments are added on the Upcoming page now.
+    assert '<option value="once"' not in page.text
+    assert "Add one-time payment on the Upcoming payments page" in page.text
     assert 'data-hidden-when="freq=once"' in page.text
     # The repeat fields would be invalid for a recurring rule; a one-time item ignores them.
     data = form(
@@ -230,6 +232,9 @@ def test_one_time_item_form_ignores_repeat_fields_and_lists_its_date(owner):
             "1",
         )
     listing = owner.client.get("/recurring")
-    assert "One time on" in listing.text and "Active" in listing.text
+    assert f'data-scheduled-item="{item.id}"' not in listing.text
+    assert "One-time payments are on the Upcoming payments page." in listing.text
+    assert "/upcoming?form=one-time" in listing.text
+    # An existing one-time item's rule form still works (it keeps its "One time" choice).
     edit = owner.client.get(f"/recurring/{item.id}/edit")
     assert '<option value="once" selected>One time</option>' in edit.text

@@ -249,3 +249,65 @@ def test_overdue_badge_counts_overdue_occurrences_and_links_to_upcoming(rent) ->
         token_from="/upcoming",
     )
     assert badge() is None
+
+
+def test_skip_a_repeating_expected_row_and_undo_it(rent) -> None:
+    owner, category, occurrences = rent
+    march = occurrences[2]
+    table = _expense_table(owner.client.get("/transactions/2026-03").text)
+    row = _block(table, rf'<tr [^>]*data-pending-occurrence="{march}".*?</tr>')
+    assert "data-skip" in row and f"/upcoming/{march}/skip" in row
+    assert 'name="return_month" value="2026-03"' in row
+    assert _pending(_summary_row(owner.client.get("/m/2026-03").text, category)) is not None
+
+    skipped = owner.post(
+        f"/upcoming/{march}/skip", {"return_month": "2026-03"}, token_from="/transactions/2026-03"
+    )
+    assert skipped.headers["location"] == "/transactions/2026-03?notice=skipped"
+    page = owner.client.get(skipped.headers["location"]).text
+    assert "Skipped. It no longer counts as pending." in page
+    table = _expense_table(page)
+    assert f'data-pending-occurrence="{march}"' not in table
+    row = _block(table, rf'<tr [^>]*data-skipped-occurrence="{march}".*?</tr>')
+    assert ">Skipped<" in row and "data-unskip" in row and ">Undo</button>" in row
+    # A skipped date does not count as pending in the Month summary.
+    assert _pending(_summary_row(owner.client.get("/m/2026-03").text, category)) is None
+    with owner.db() as session:
+        stored = session.get(ScheduledOccurrence, march)
+        assert stored is not None and stored.status == "skipped"
+
+    undone = owner.post(
+        f"/upcoming/{march}/unskip", {"return_month": "2026-03"}, token_from="/transactions/2026-03"
+    )
+    assert undone.headers["location"] == "/transactions/2026-03?notice=skip_undone"
+    table = _expense_table(owner.client.get("/transactions/2026-03").text)
+    assert f'data-pending-occurrence="{march}"' in table
+    assert "data-skipped-occurrence" not in table
+    assert _pending(_summary_row(owner.client.get("/m/2026-03").text, category)) is not None
+
+    again = owner.post(
+        f"/upcoming/{march}/unskip", {"return_month": "2026-03"}, token_from="/transactions/2026-03"
+    )
+    assert again.headers["location"] == "/transactions/2026-03?notice=skip_undone"
+
+
+def test_viewers_see_skipped_rows_without_undo(rent) -> None:
+    owner, _category, occurrences = rent
+    owner.post(
+        f"/upcoming/{occurrences[2]}/skip",
+        {"return_month": "2026-03"},
+        token_from="/transactions/2026-03",
+    )
+    owner.set_admin_role("viewer")
+    table = _expense_table(owner.client.get("/transactions/2026-03").text)
+    assert f'data-skipped-occurrence="{occurrences[2]}"' in table
+    assert "data-unskip" not in table and "data-skip " not in table
+    refused = owner.post(
+        f"/upcoming/{occurrences[2]}/unskip",
+        {"return_month": "2026-03"},
+        token_from="/transactions/2026-03",
+    )
+    assert refused.status_code == 403
+    with owner.db() as session:
+        stored = session.get(ScheduledOccurrence, occurrences[2])
+        assert stored is not None and stored.status == "skipped"

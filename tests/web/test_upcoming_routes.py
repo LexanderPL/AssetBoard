@@ -252,3 +252,137 @@ def test_instance_upcoming_days_applies_without_a_workspace_value(owner):
     owner.app.state.settings = owner.app.state.settings.model_copy(update={"upcoming_days": 12})
     assert "the next 12 days" in owner.client.get("/upcoming").text
     assert 'placeholder="12"' in owner.client.get("/workspace/settings").text
+
+
+def _categories(owner, kind: str) -> list[str]:
+    from assetboard.db.models.ledger import Category
+
+    with owner.db() as session:
+        return [
+            str(category_id)
+            for category_id in session.scalars(
+                select(Category.id).where(
+                    Category.kind == kind,
+                    Category.archived_at.is_(None),
+                    Category.treatment != "transfer",
+                )
+            )
+        ]
+
+
+def test_add_edit_and_delete_a_one_time_payment_on_upcoming(owner):
+    fixed_clock(owner)
+    page = owner.client.get("/upcoming").text
+    assert "data-add-one-time" in page and ">Add one-time payment</summary>" in page
+    assert "data-add-one-time open" not in page
+    assert "data-add-one-time open" in owner.client.get("/upcoming?form=one-time").text
+
+    expense, income = _categories(owner, "expense")[0], _categories(owner, "income")[0]
+    created = owner.post(
+        "/upcoming/one-time",
+        {
+            "name": "Car insurance",
+            "amount": "1,234.50",
+            "direction": "expense",
+            "category_id": expense,
+            "day": "2026-03-20",
+        },
+        token_from="/upcoming",
+    )
+    assert created.status_code == 303
+    assert created.headers["location"] == "/upcoming?added=2026-03-20"
+    with owner.db() as session:
+        occurrence = session.scalars(select(ScheduledOccurrence)).one()
+        assert (occurrence.label, occurrence.expected_minor, occurrence.due_date) == (
+            "Car insurance",
+            123450,
+            date(2026, 3, 20),
+        )
+        occurrence_id = occurrence.id
+    page = owner.client.get(created.headers["location"]).text
+    assert "One-time payment added for" in page
+    card = re.search(rf'<article [^>]*data-occurrence="{occurrence_id}".*?</article>', page, re.S)
+    assert card is not None
+    # A one-time row: Mark paid, Edit and Delete; no Skip, Reschedule or "Edit rule".
+    assert "Mark paid or received" in card.group(0)
+    assert "data-one-time-edit" in card.group(0) and "data-delete" in card.group(0)
+    assert ">Skip<" not in card.group(0) and "Edit rule" not in card.group(0)
+    assert 'value="Car insurance"' in card.group(0)
+    # The Recurring page does not list it.
+    assert "Car insurance" not in owner.client.get("/recurring").text
+
+    edited = owner.post(
+        f"/upcoming/{occurrence_id}/one-time",
+        {
+            "name": "Car insurance 2026",
+            "amount": "1300",
+            "direction": "expense",
+            "category_id": expense,
+            "day": "2026-03-25",
+        },
+        token_from="/upcoming",
+    )
+    assert edited.headers["location"] == "/upcoming?notice=one_time_saved"
+    assert "One-time payment saved." in owner.client.get(edited.headers["location"]).text
+    with owner.db() as session:
+        stored = session.get(ScheduledOccurrence, occurrence_id)
+        assert stored is not None
+        assert (stored.label, stored.expected_minor, stored.due_date) == (
+            "Car insurance 2026",
+            130000,
+            date(2026, 3, 25),
+        )
+
+    # Errors re-render the form with the values and a message.
+    mismatch = owner.post(
+        f"/upcoming/{occurrence_id}/one-time",
+        {
+            "name": "Car insurance 2026",
+            "amount": "1300",
+            "direction": "income",
+            "category_id": expense,
+            "day": "2026-03-25",
+        },
+        token_from="/upcoming",
+    )
+    assert mismatch.status_code == 400
+    assert "Choose an expense category for an expense" in mismatch.text
+    assert "data-one-time-edit open" in mismatch.text
+    missing = owner.post(
+        "/upcoming/one-time",
+        {"name": "", "amount": "5", "direction": "income", "category_id": income, "day": ""},
+        token_from="/upcoming",
+    )
+    assert missing.status_code == 400
+    assert "Enter a description." in missing.text and "data-add-one-time open" in missing.text
+
+    deleted = owner.post(f"/upcoming/{occurrence_id}/delete", token_from="/upcoming")
+    assert deleted.headers["location"] == "/upcoming?notice=planned_deleted"
+    with owner.db() as session:
+        assert session.scalars(select(ScheduledOccurrence)).first() is None
+
+
+def test_a_far_one_time_payment_says_when_it_shows_and_viewers_cannot_add(owner):
+    fixed_clock(owner)
+    created = owner.post(
+        "/upcoming/one-time",
+        {
+            "name": "Holiday",
+            "amount": "800",
+            "direction": "expense",
+            "category_id": _categories(owner, "expense")[0],
+            "day": "2026-12-01",
+        },
+        token_from="/upcoming",
+    )
+    page = owner.client.get(created.headers["location"]).text
+    assert "It shows here when it is due within the next" in page
+    owner.set_admin_role("viewer")
+    page = owner.client.get("/upcoming").text
+    assert "data-add-one-time" not in page
+    refused = owner.post(
+        "/upcoming/one-time",
+        {"name": "X", "amount": "1", "direction": "expense", "day": "2026-04-01"},
+        token_from="/upcoming",
+    )
+    assert refused.status_code == 403
