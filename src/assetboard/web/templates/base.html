@@ -84,9 +84,6 @@
             <a href="{{ scoped_url(request, 'admin_settings') }}" data-admin-settings-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Instance settings") }}</a>
             <a href="{{ scoped_url(request, 'audit') }}?scope=instance" data-audit-instance-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Audit log: instance") }}</a>
             {% endif %}
-            {% if workspace_nav %}
-            <a href="{{ scoped_url(request, 'notifications') }}" data-notifications-link{% if request.url.path.endswith('/notifications') %} aria-current="page"{% endif %} class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Notifications") }}</a>
-            {% endif %}
             <a href="{{ scoped_url(request, 'account') }}" data-profile-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Profile") }}</a>
             <a href="{{ scoped_url(request, 'account_password') }}" class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Account security") }}</a>
             {% if web_session %}

@@ -45,7 +45,8 @@ def test_create_mask_test_send_edit_and_delete(owner):
     assert page.status_code == 200
     assert "No notification channels yet." in page.text
     assert "Include amounts" in page.text and "pass through the service you choose" in page.text
-    assert "data-notifications-link" in page.text  # in the account menu
+    # Not in the account menu any more: in Workspace settings (owners) and on the Profile page.
+    assert "data-notifications-link" not in page.text
 
     created = owner.post("/notifications", channel_form())
     assert created.status_code == 303 and created.headers["location"].endswith("notice=created")
@@ -145,3 +146,17 @@ def test_the_page_is_translated(owner):
     owner.client.headers["accept-language"] = "pl"
     page = owner.client.get("/notifications").text
     assert "Powiadomienia" in page and "Nowy kanał" in page and "Dołączaj kwoty" in page
+
+
+def test_notifications_are_linked_from_workspace_settings_and_the_profile(owner):
+    settings = owner.client.get("/workspace/settings").text
+    section = settings.split("data-settings-notifications", 1)[1].split("</section>", 1)[0]
+    assert 'href="/notifications" data-notifications-link' in section
+    assert 'href="/notifications" data-notifications-link' in owner.client.get("/account").text
+    # Editors and viewers keep their own channels: the Profile page links them.
+    for role in ("editor", "viewer"):
+        owner.set_admin_role(role)
+        assert owner.client.get("/workspace/settings").status_code == 403
+        profile = owner.client.get("/account").text
+        assert 'href="/notifications" data-notifications-link' in profile
+        assert owner.client.get("/notifications").status_code == 200

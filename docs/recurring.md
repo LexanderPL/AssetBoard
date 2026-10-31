@@ -102,8 +102,9 @@ occurrence.
 
 ## Reminders
 
-Open **Notifications** in the account menu (or from **Upcoming**) to get reminders on your
-phone or by email. Add a channel with an [Apprise](https://github.com/caronc/apprise) URL, for
+Open **Notifications** from your **Profile** (owners also find it in **Workspace settings**) to
+get reminders on your phone or by email. Add a channel with an
+[Apprise](https://github.com/caronc/apprise) URL, for
 example `ntfys://ntfy.sh/your-topic` for ntfy, `gotifys://gotify.example.com/token` for Gotify,
 `tgram://bot-token/chat-id` for Telegram or `mailtos://user:password@mail.example.com` for
 email, then press **Send test**. The URL is stored encrypted and shown only as `ntfys://••••••`

@@ -62,6 +62,13 @@
   </div>
   {% endif %}
 </section>
+<section class="panel mt-6 max-w-2xl p-6 sm:p-7" aria-labelledby="workspace-notifications-heading" data-settings-notifications>
+  <h2 id="workspace-notifications-heading" class="text-base font-semibold">{{ _("Notifications") }}</h2>
+  <div class="mt-4 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-line bg-subtle px-4 py-3">
+    <p class="min-w-0 text-xs text-muted">{{ _("Reminders about upcoming and overdue payments and days worked, sent to your own channels (ntfy, Telegram, email and others). Each member sets up their own on their Profile page.") }}</p>
+    <a href="{{ scoped_url(request, 'notifications') }}" data-notifications-link class="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Notification settings") }}</a>
+  </div>
+</section>
 <section class="panel mt-6 max-w-2xl p-6 sm:p-7" aria-labelledby="workspace-more-heading" data-settings-more>
   <h2 id="workspace-more-heading" class="text-base font-semibold">{{ _("Categories and workspaces") }}</h2>
   <div class="mt-4 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-line bg-subtle px-4 py-3">

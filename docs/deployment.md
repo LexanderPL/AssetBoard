@@ -131,7 +131,8 @@ no external service is contacted. See [Recurring items](recurring.md).
 
 ### Notifications
 
-Every member can add their own notification channels under **Notifications** (account menu):
+Every member can add their own notification channels under **Notifications** (linked from
+**Profile**, and for owners also from **Workspace settings**):
 an [Apprise](https://github.com/caronc/apprise) URL such as `ntfys://ntfy.example.com/topic`,
 `gotifys://gotify.example.com/token` or `tgram://bot-token/chat-id`
 ([ADR-0021](adr/0021-notifications.md)). Once a day, at the channel's time in the workspace

@@ -324,6 +324,8 @@ and the overdue badge. Update the golden tests from F2.4 so they still pass.
 **As built (F3.6, [ADR-0021](../adr/0021-notifications.md); owner decisions of 2026-10-25):**
 - Channels are per member and workspace; every member, viewers included, manages only their
   own; removing a member deletes their channels. Up to 10 per member and workspace.
+- The Notifications page is linked from every member's Profile page and, for owners, from a
+  Notifications section in Workspace settings (UI batch 3; it is no longer in the account menu).
 - "User timezone" is the **workspace** time zone (users have none). A channel runs once per
   local day at or after `digest_time` (`last_run_on`), so a restart or downtime catches up.
 - The log's unique key is `(channel_id, kind, subject_key, sent_on)`: `subject_key` is the

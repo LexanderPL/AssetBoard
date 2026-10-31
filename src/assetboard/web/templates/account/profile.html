@@ -39,6 +39,14 @@
     <p class="mt-4"><a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'account_totp') }}">{{ _("Two-factor authentication") }}</a></p>
   </section>
 
+  {% if workspace_nav %}
+  <section class="panel p-6 sm:p-7 lg:col-span-2" aria-labelledby="notifications-heading" data-profile-notifications>
+    <h2 id="notifications-heading" class="text-base font-semibold">{{ _("Notifications") }}</h2>
+    <p class="mt-2 text-sm text-muted">{{ _("Your own reminder channels in this workspace: upcoming and overdue payments and days worked.") }}</p>
+    <p class="mt-4"><a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'notifications') }}" data-notifications-link>{{ _("Notification settings") }}</a></p>
+  </section>
+  {% endif %}
+
   <section class="panel p-6 sm:p-7 lg:col-span-2" aria-labelledby="identities-heading" data-identities>
     <h2 id="identities-heading" class="text-base font-semibold">{{ _("Sign-in methods") }}</h2>
     {% if identities %}
