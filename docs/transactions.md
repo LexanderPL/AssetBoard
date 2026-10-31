@@ -31,7 +31,11 @@ one-time recurring item with one pending occurrence (see [Recurring items](recur
 planned entry needs a description, because the recurring item is named by it. It appears in the
 month summary's Actual column as "+ … pending" until it is confirmed; its day-of-month is shown like a posted entry. **Confirm**
 opens the date and amount; confirm it there when it happens, or **Cancel** closes the form
-without changing anything. **Delete** removes the planned entry and its one-time item.
+without changing anything. **Delete** removes the planned entry and its one-time item. The
+expected row of a repeating recurring item or income has **Skip** instead of Delete: the date
+stays in the table as a greyed-out **Skipped** row, not counted as pending, with **Undo** to
+make it pending again. One-time payments can also be added and edited on the Upcoming payments
+page.
 
 Keys:
 

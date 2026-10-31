@@ -12,18 +12,19 @@ limits on scheduled dates, before any holiday adjustment. A day that does not ex
 31 February becomes the last day of February; yearly 29 February becomes 28 February in a
 non-leap year.
 
-Choose **One time** to plan a single payment or income on one date, such as a gift or an annual
-fee you pay just once. The item has one occurrence on its start date; the weekend and holiday
-adjustment still applies, while the end date, maximum occurrences, interval, weekdays, day and
-month are ignored (the form hides them). Its occurrence appears at once, even when the date is
-farther ahead than the regular generation horizon (see below), and is not pruned as the date
-approaches.
-A past date needs **Include past occurrences**. Changing the date moves its pending occurrence;
-once the occurrence is posted or skipped, the list shows the item as **Done** and you can
-archive it. A one-time item adds to the month's pending amount ("+ … pending" under Actual), not to
-the Plan.
-Its expected row on the Transactions page can be confirmed or deleted; deleting removes the
-planned entry and the item.
+For a single payment or income on one date, such as a gift or an annual fee you pay just once,
+use a **one-time payment** instead: on the **Upcoming payments** page choose **Add one-time
+payment** (also reachable as `/upcoming?form=one-time`, and linked from the Recurring page) and
+enter a description, the amount, expense or income, a category of that kind and the date. It
+gets one occurrence on that date, even when the date is farther ahead than the regular
+generation horizon (see below); a date already passed gives an overdue occurrence. One-time
+payments are not listed on the Recurring page and its form does not offer **One time** for a
+new item (an older one-time item opened from a link keeps its choice there). On Upcoming, a
+one-time payment has **Mark paid or received**, **Edit** (description, amount, date and
+category; an overdue one moves too) and **Delete**; it is shown once it is due within the
+Upcoming window. It adds to the month's pending amount ("+ … pending" under Actual), not to the
+Plan. Its expected row on the Transactions page can be confirmed or deleted; deleting removes
+the payment. A one-time item created by the Transactions page's **Plan** button is the same.
 
 The form previews the next six effective due dates as you change the rule. JavaScript is needed
 only for the live preview; the form can be saved without it. A finite or ended rule may have
@@ -85,7 +86,11 @@ server default applies: 30 days, or what the operator set with `ASSETBOARD_UPCOM
 When occurrences are overdue, the **Upcoming** link in the navigation shows how many.
 
 Editors and owners can mark an occurrence paid or received, skip it, reschedule just that
-occurrence, or edit its expected amount. Marking it paid creates a linked transaction using the
+occurrence, or edit its expected amount. A recurring occurrence's expected row on the month's
+Transactions page also has **Skip** next to Confirm. A skipped occurrence stays in its month
+there as a greyed-out **Skipped** row with **Undo**, which makes it pending again (an income
+occurrence gets its planned tax payments back); skipped dates never count as pending. Undo is
+refused while the month is closed or when the recurring item is archived. Marking it paid creates a linked transaction using the
 entered date and amount. The transaction can be edited from the month or transaction list; undo
 the posting from the Upcoming payments page within 10 seconds to soft-delete the transaction and restore the
 occurrence to pending. Deleting the transaction from the month or transaction list also returns
@@ -143,8 +148,17 @@ can also archive the source. Variable
 sources can estimate units from the workspace's working days, a fixed number, recent logged
 months, or wait for a manual work log. A work month is paid on the source's configured day in
 the month after its payment lag; days past the end of a short month are clamped to its last day.
-Log units by work month (decimal units are supported). The next pending occurrence and any
-planned tax-payment occurrences are recalculated; a posted transaction is never silently changed.
+Log units by work month (decimal units are supported) with **Log days worked**; when the
+chosen month already has a log, the form shows its units and the button reads **Update** (a
+link can open it for a month with `?log=<source id>&month=YYYY-MM`). In the payments table a
+month with a manual log has a small **Edit** next to its units: change the units and **Save**,
+or press Esc or **Cancel** to close it unchanged. The month's pending income occurrence and any
+planned tax-payment occurrences are recalculated.
+
+A month's log can be changed until its income is received. Once its occurrence is confirmed
+(posted as a transaction), the log is locked: the row shows **received** instead of Edit, and
+saving the month is refused with "This month's income is already received. Edit the transaction
+instead.", linking to the transaction.
 
 When Taxes are on (Workspace settings → Menu), tick the workspace's taxes under **Taxes on this
 income** on the card; each can have a different payment day for this income. The expected income is the net
@@ -175,4 +189,4 @@ Marking the first day replaces a manual work log for that month; removing the la
 clearing the month) removes the log, and the month goes back to its estimate. Every change
 recalculates the month's pending income and tax-payment occurrences, like a month-level work log,
 with the same rules: editors and owners only, nothing changes while the pay month is closed, and
-posted income is not changed.
+posted income is not changed (the calendar still records days after posting).
