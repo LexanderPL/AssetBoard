@@ -665,7 +665,8 @@ def test_rule_defaults_overrides_and_the_taxes_checklist(team: WorkspaceDb) -> N
     assert [(due, amount) for due, _c, amount in _tax_children(team, ctx, source_id)] == [
         (date(2026, 10, 3), 10_000)
     ]
-    assert _occurrence(team, ctx, source_id, date(2026, 8, 1)).expected_minor == 100_000
+    resynced = _occurrence(team, ctx, source_id, date(2026, 8, 1))
+    assert resynced is not None and resynced.expected_minor == 100_000
     [view] = income.list_sources(team.factory, ctx)
     assert [(a.tax_rule_id, a.due_day, a.due_month_offset) for a in view.attachments] == [
         (quarterly, 3, None)
@@ -699,4 +700,5 @@ def test_resync_pending_income_applies_the_current_tax_model(team: WorkspaceDb) 
         assert parent is not None
         parent.expected_minor = 1  # as if computed by the old model
     assert income.resync_pending_income(team.factory, ctx, team.clock) >= 1
-    assert _occurrence(team, ctx, source_id, date(2026, 8, 1)).expected_minor == 100_000
+    resynced = _occurrence(team, ctx, source_id, date(2026, 8, 1))
+    assert resynced is not None and resynced.expected_minor == 100_000

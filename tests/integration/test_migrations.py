@@ -1051,7 +1051,8 @@ def test_0028_taxes_redesign_maps_kinds_and_schedules_and_round_trips(tmp_path: 
             for workspace in (ws, empty_ws):
                 c.exec_driver_sql(
                     "INSERT INTO workspaces (id, name, base_currency, locale, timezone, "
-                    f"created_at, updated_at) VALUES (?, 'W', 'EUR', 'en', 'UTC', {stamp}, {stamp})",
+                    "created_at, updated_at) VALUES "
+                    f"(?, 'W', 'EUR', 'en', 'UTC', {stamp}, {stamp})",
                     (workspace,),
                 )
             for category, name, kind, order in (
