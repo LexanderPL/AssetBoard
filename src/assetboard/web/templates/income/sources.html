@@ -75,7 +75,7 @@
         {% set b = item.breakdown %}
         {% set tax_total = b.ledger_amount.amount_minor - b.net.amount_minor %}
         <tr class="border-t border-line align-top" data-income-preview>
-          {% if not fixed %}<td class="px-3 py-2">{{ format_month(item.work_month, locale) }}{% if item.units is not none %} · {{ units_text(item.units, source.unit_label) }}{% endif %}<span class="{{ muted_chip }}">{{ _("estimate") if item.amount_state == "estimated" else _("logged") }}</span></td>{% endif %}
+          {% if not fixed %}<td class="px-3 py-2">{{ format_month(item.work_month, locale) }}{% if item.units is not none %} · {{ units_text(item.units, source.unit_label) }}{% endif %}{% if item.derived_from_days %}<a href="{{ scoped_url(request, 'income_calendar', source_id=source.id|string) }}?month={{ item.work_month.strftime('%Y-%m') }}" class="{{ muted_chip }} text-primary-ink underline" data-derived-log>{{ _("logged") }}<span class="sr-only"> ({{ _("from the work calendar") }})</span></a>{% else %}<span class="{{ muted_chip }}">{{ _("estimate") if item.amount_state == "estimated" else _("logged") }}</span>{% endif %}</td>{% endif %}
           <td class="whitespace-nowrap px-3 py-2">{{ format_day(item.due_date, locale) }}</td>
           {% if show_taxes %}
           <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(b.net, locale) }}</td>
@@ -90,10 +90,6 @@
       </tbody>
     </table>
   </div>
-  {% endif %}
-
-  {% if not fixed and source.work_logs %}
-  <p class="mt-3 text-xs text-muted" data-work-logs>{{ _("Logged:") }} {% for log in source.work_logs %}{{ format_month(log.work_month, locale) }} · {{ format_quantity_input(log.units, locale) }}{% if log.derived_from_days %} (<a href="{{ scoped_url(request, 'income_calendar', source_id=source.id|string) }}?month={{ log.work_month.strftime('%Y-%m') }}" class="text-primary-ink underline" data-derived-log>{{ _("from the work calendar") }}</a>){% endif %}{% if not loop.last %}; {% endif %}{% endfor %}</p>
   {% endif %}
 
   <div class="mt-4 flex flex-wrap items-start gap-2" data-income-actions>

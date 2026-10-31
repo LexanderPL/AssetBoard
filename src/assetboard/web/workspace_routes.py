@@ -83,6 +83,7 @@ SETTINGS_ERRORS = {
         "Enable two-factor authentication for your own account and sign in with it before "
         "requiring it for this workspace; otherwise you would lock yourself out."
     ),
+    "invalid_upcoming_days": _("Enter a number of days from 1 to 365, or leave it empty."),
 }
 MEMBER_ERRORS = {
     "last_owner": _("A workspace needs at least one owner. Make another member an owner first."),
@@ -176,6 +177,7 @@ def _settings_page(
     notice: str | None = None,
     status_code: int = 200,
     taxes_in_use: tuple[str, ...] = (),
+    upcoming_days_text: str | None = None,
 ) -> Response:
     return render_template(
         request,
@@ -187,6 +189,10 @@ def _settings_page(
             "notice": notice,
             **workspace_form_options(request.state.locale),
             "max_name_length": MAX_WORKSPACE_NAME_LENGTH,
+            "instance_upcoming_days": request.app.state.settings.upcoming_days,
+            "upcoming_days_text": upcoming_days_text
+            if upcoming_days_text is not None
+            else ("" if values.upcoming_days is None else str(values.upcoming_days)),
         },
         status_code=status_code,
     )
@@ -210,8 +216,16 @@ async def settings_submit(
     locale: FormStr = "",
     auto_copy_plan: FormStr = "",
     require_two_factor: FormStr = "",
+    upcoming_days: FormStr = "",
 ) -> Response:
     copy_plan = auto_copy_plan == "1"  # an unchecked box sends nothing
+    days_text = upcoming_days.strip()
+    # Empty: the instance default applies. Anything but a plain whole number of up to three
+    # digits becomes 0, which the service refuses like any value outside 1-365.
+    days: int | None = None
+    if days_text:
+        days = int(days_text) if days_text.isascii() and days_text.isdigit() else 0
+        days = days if len(days_text) <= 3 else 0
     submitted = WorkspaceSettings(
         name=name,
         base_currency=base_currency,
@@ -234,6 +248,7 @@ async def settings_submit(
                 auto_copy_plan=copy_plan,
                 require_two_factor=require_two_factor == "1",
                 recurrence_horizon_months=request.app.state.settings.recurrence_horizon_months,
+                upcoming_days=days,
             )
         )
     except InvalidWorkspaceSettings as exc:
@@ -250,6 +265,7 @@ async def settings_submit(
             submitted,
             errors={exc.field: SETTINGS_ERRORS[exc.code]},
             status_code=400,
+            upcoming_days_text=days_text,
         )
     return RedirectResponse(
         request.url_for("workspace_settings").path + "?saved=1", status_code=303

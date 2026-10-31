@@ -28,11 +28,19 @@
     --color-success-strong: 27 94 32; /* #1b5e20 */
     --color-success-line: 200 230 201; /* #c8e6c9 */
     --color-success-tint: 212 237 213; /* #d4edd5 summary row: income above plan */
+    /* Transactions page row scale (steps 1-3; step 4 is the tint): the tint at 40, 60 and 80%
+       over the card surface, so the largest rows look like the Month page's summary rows. */
+    --color-success-shade-1: 238 248 238; /* #eef8ee */
+    --color-success-shade-2: 229 244 230; /* #e5f4e6 */
+    --color-success-shade-3: 221 241 221; /* #ddf1dd */
     --color-danger: 198 40 40; /* #c62828 expense, errors */
     --color-danger-soft: 255 235 238; /* #ffebee */
     --color-danger-strong: 183 28 28; /* #b71c1c */
     --color-danger-line: 255 205 210; /* #ffcdd2 */
     --color-danger-tint: 254 225 228; /* #fee1e4 summary row: expense above plan */
+    --color-danger-shade-1: 255 243 244; /* #fff3f4 */
+    --color-danger-shade-2: 254 237 238; /* #feedee */
+    --color-danger-shade-3: 254 231 233; /* #fee7e9 */
     --color-warning-soft: 255 243 224; /* #fff3e0 */
     --color-warning-strong: 138 75 0; /* #8a4b00 */
     --color-warning-line: 255 224 178; /* #ffe0b2 */
@@ -63,11 +71,17 @@
     --color-success-strong: 165 214 167; /* #a5d6a7 */
     --color-success-line: 31 68 36; /* #1f4424 */
     --color-success-tint: 24 58 29; /* #183a1d */
+    --color-success-shade-1: 26 40 28; /* #1a281c */
+    --color-success-shade-2: 26 46 29; /* #1a2e1d */
+    --color-success-shade-3: 25 52 29; /* #19341d */
     --color-danger: 239 154 154; /* #ef9a9a */
     --color-danger-soft: 59 20 22; /* #3b1416 */
     --color-danger-strong: 255 205 210; /* #ffcdd2 */
     --color-danger-line: 92 31 34; /* #5c1f22 */
     --color-danger-tint: 85 28 32; /* #551c20 */
+    --color-danger-shade-1: 51 28 30; /* #331c1e */
+    --color-danger-shade-2: 62 28 30; /* #3e1c1e */
+    --color-danger-shade-3: 74 28 31; /* #4a1c1f */
     --color-warning-soft: 58 42 12; /* #3a2a0c */
     --color-warning-strong: 255 204 128; /* #ffcc80 */
     --color-warning-line: 90 65 19; /* #5a4113 */

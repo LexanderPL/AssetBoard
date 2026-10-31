@@ -32,6 +32,14 @@ CSS_TEXT_PAIRS = {
         for fg in ("ink", "muted", "danger", "success-strong", "primary-ink")
         for bg in ("danger-tint", "success-tint")
     ),
+    # Transactions page rows are tinted by amount (months/_ledger.html, shade_classes), the
+    # actions cell included: its Edit (muted, ink on hover) and Delete (danger) buttons.
+    *(
+        (fg, f"{kind}-{step}")
+        for fg in ("ink", "muted", "danger")
+        for kind in ("danger", "success")
+        for step in ("shade-1", "shade-2", "shade-3", "tint")
+    ),
 }
 # Text with no background of its own sits on the page or on a card (.panel).
 INHERITED_BACKGROUNDS = ("canvas", "surface")
@@ -53,7 +61,7 @@ def _theme(selector: str) -> dict[str, tuple[int, int, int]]:
     return {
         name: (int(r), int(g), int(b))
         for name, r, g, b in re.findall(
-            r"--color-([a-z-]+):\s*(\d+)\s+(\d+)\s+(\d+);", block.group(1)
+            r"--color-([a-z0-9-]+):\s*(\d+)\s+(\d+)\s+(\d+);", block.group(1)
         )
     }
 

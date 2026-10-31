@@ -57,7 +57,9 @@ def test_calendar_page_toggle_edit_fill_and_clear(owner):
         assert (log.units, log.derived_from_days) == (Decimal("20.5"), True)
 
     income_page = owner.client.get("/income")
-    assert "data-derived-log" in income_page.text and "data-work-calendar-link" in income_page.text
+    # There is no separate "Logged: …" list; the payments table shows each month's units.
+    assert "data-work-logs" not in income_page.text
+    assert "data-work-calendar-link" in income_page.text
     manual = owner.post(
         f"/income/{source_id}/work-logs",
         {"work_month_month": "8", "work_month_year": "2026", "units": "3"},
@@ -71,6 +73,19 @@ def test_calendar_page_toggle_edit_fill_and_clear(owner):
     with owner.db() as session:
         assert session.scalars(select(WorkDay)).first() is None
         assert session.scalars(select(WorkLog)).first() is None
+
+
+def test_previewed_calendar_month_chip_links_to_the_calendar(owner):
+    source_id = _source_id(owner)
+    base = f"/income/{source_id}/calendar"
+    page = owner.client.get("/income")
+    assert "data-derived-log" not in page.text
+    # This month's work is paid on the 10th of next month, so it is always previewed.
+    day = owner.app.state.clock.today("UTC").replace(day=3)
+    assert _htmx_post(owner, f"{base}/days/{day.isoformat()}/toggle").status_code == 200
+    page = owner.client.get("/income")
+    assert f'{base}?month={day.strftime("%Y-%m")}" class=' in page.text
+    assert page.text.count("data-derived-log") == 1
 
 
 def test_calendar_navigation_returns_a_fragment(owner):

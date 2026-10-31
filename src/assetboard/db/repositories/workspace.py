@@ -40,6 +40,7 @@ UPDATABLE_FIELDS = frozenset(
         "auto_copy_plan",
         "require_two_factor",
         "taxes_enabled",
+        "upcoming_days",
     }
 )
 

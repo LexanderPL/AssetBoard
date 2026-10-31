@@ -1928,6 +1928,9 @@ msgstr ""
 "roboczym, włącz je na swoim koncie i zaloguj się z jego użyciem; inaczej "
 "stracisz do niego dostęp."
 
+msgid "Enter a number of days from 1 to 365, or leave it empty."
+msgstr "Podaj liczbę dni od 1 do 365 albo pozostaw pole puste."
+
 msgid "A workspace needs at least one owner. Make another member an owner first."
 msgstr ""
 "Obszar roboczy musi mieć co najmniej jednego właściciela. Najpierw nadaj "
@@ -2020,9 +2023,6 @@ msgstr "Użytkownicy"
 
 msgid "Audit log: instance"
 msgstr "Dziennik zdarzeń: instancja"
-
-msgid "Notifications"
-msgstr "Powiadomienia"
 
 msgid "Profile"
 msgstr "Profil"
@@ -2140,6 +2140,19 @@ msgstr "To konto nie ma hasła. Nadal możesz wylogować inne urządzenia."
 
 msgid "Two-factor authentication"
 msgstr "Uwierzytelnianie dwuskładnikowe"
+
+msgid "Notifications"
+msgstr "Powiadomienia"
+
+msgid ""
+"Your own reminder channels in this workspace: upcoming and overdue "
+"payments and days worked."
+msgstr ""
+"Twoje własne kanały przypomnień w tym obszarze roboczym: nadchodzące i "
+"zaległe płatności oraz przepracowane dni."
+
+msgid "Notification settings"
+msgstr "Ustawienia powiadomień"
 
 msgid "Sign-in methods"
 msgstr "Metody logowania"
@@ -3330,11 +3343,14 @@ msgstr "Otrzymujesz"
 msgid "Tax to pay"
 msgstr "Podatek do zapłaty"
 
-msgid "estimate"
-msgstr "szacunek"
-
 msgid "logged"
 msgstr "wpisane"
+
+msgid "from the work calendar"
+msgstr "z kalendarza pracy"
+
+msgid "estimate"
+msgstr "szacunek"
 
 #, python-format
 msgid "%(name)s %(amount)s on %(date)s"
@@ -3342,12 +3358,6 @@ msgstr "%(name)s %(amount)s dnia %(date)s"
 
 msgid "Nothing to pay"
 msgstr "Nic do zapłaty"
-
-msgid "Logged:"
-msgstr "Wpisane:"
-
-msgid "from the work calendar"
-msgstr "z kalendarza pracy"
 
 msgid "Log days worked"
 msgstr "Wpisz przepracowane dni"
@@ -3986,9 +3996,6 @@ msgstr ""
 msgid "Recurring items"
 msgstr "Pozycje cykliczne"
 
-msgid "Upcoming inbox"
-msgstr "Skrzynka nadchodzących"
-
 #, python-format
 msgid "One time on %(date)s"
 msgstr "Jednorazowo, %(date)s"
@@ -4037,8 +4044,8 @@ msgstr "Wybierz prawidłowe daty powtarzania, aby zobaczyć podgląd."
 msgid "No more occurrences match this rule."
 msgstr "Brak kolejnych wystąpień pasujących do tej reguły."
 
-msgid "Reminders by notification"
-msgstr "Przypomnienia przez powiadomienia"
+msgid "Upcoming payments"
+msgstr "Nadchodzące płatności"
 
 msgid "Occurrence marked paid or received."
 msgstr "Wystąpienie oznaczono jako opłacone lub otrzymane."
@@ -4537,6 +4544,16 @@ msgstr ""
 msgid "Formatting default"
 msgstr "Domyślne formatowanie"
 
+msgid "Upcoming window (days)"
+msgstr "Okno nadchodzących płatności (dni)"
+
+msgid "How far ahead Upcoming payments and the Home page look."
+msgstr "Jak daleko w przód sięgają Nadchodzące płatności i strona główna."
+
+#, python-format
+msgid "Empty: %(days)d days, the server default."
+msgstr "Puste: %(days)d dni, domyślnie dla serwera."
+
 msgid "Copy the previous month's plan when a month is opened for the first time"
 msgstr "Kopiuj plan z poprzedniego miesiąca przy pierwszym otwarciu miesiąca"
 
@@ -4588,6 +4605,15 @@ msgid ""
 msgstr ""
 "Podatki pozostają włączone, dopóki te źródła przychodu mają zaznaczone "
 "podatki. Najpierw je odznacz:"
+
+msgid ""
+"Reminders about upcoming and overdue payments and days worked, sent to "
+"your own channels (ntfy, Telegram, email and others). Each member sets up"
+" their own on their Profile page."
+msgstr ""
+"Przypomnienia o nadchodzących i zaległych płatnościach oraz "
+"przepracowanych dniach, wysyłane na Twoje własne kanały (ntfy, Telegram, "
+"e-mail i inne). Każdy członek ustawia własne na stronie Profil."
 
 msgid "Categories and workspaces"
 msgstr "Kategorie i obszary robocze"
@@ -4990,4 +5016,10 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Forecast"
 #~ msgstr "Prognoza"
+
+#~ msgid "Logged:"
+#~ msgstr "Wpisane:"
+
+#~ msgid "Reminders by notification"
+#~ msgstr "Przypomnienia przez powiadomienia"
 

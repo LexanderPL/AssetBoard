@@ -4,9 +4,10 @@ Your money is tracked month by month. The main navigation starts with four pages
 
 - **Home** (`/`): how the current month is going. The flow bar described below, a donut of
   the month's expenses by category next to a donut of its income by category, and up to ten
-  upcoming recurring items (overdue ones, highlighted, and those due in the next 7 days; see
+  upcoming recurring items (overdue ones, highlighted, and those due within the Upcoming
+  window, 30 days unless the owner changes it in Workspace settings; see
   [Recurring items](recurring.md)). Editors and owners can mark an item paid or received, or
-  skip it, right there; **All upcoming items** opens the Upcoming page.
+  skip it, right there; **All upcoming items** opens the Upcoming payments page.
 - **Month** (`/m`, `/m/2026-10`): the summary of one month, with its planned values and the
   expense donut (this page).
 - **Transactions** (`/transactions`, `/transactions/2026-10`): where you enter, edit and

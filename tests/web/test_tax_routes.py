@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from sqlalchemy import select
 
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule
@@ -52,7 +54,12 @@ def test_tax_pages_are_hidden_until_taxes_are_switched_on(owner):
     )
     assert refused.status_code == 403
     assert _enable(owner).headers["location"].endswith("/workspace/settings?saved=1")
-    assert "data-taxes-link" in owner.client.get("/").text
+    home = owner.client.get("/").text
+    assert "data-taxes-link" in home
+    # Taxes sits directly below Income in the sidebar.
+    nav = home.split('aria-label="Main navigation"', 1)[1].split("</nav>", 1)[0]
+    links = re.findall(r"data-([a-z]+)-link", nav)
+    assert links[links.index("income") + 1] == "taxes"
     page = owner.client.get("/taxes")
     assert page.status_code == 200
     assert "Only if you want taxes planned" in page.text and "data-tax-warning" not in page.text

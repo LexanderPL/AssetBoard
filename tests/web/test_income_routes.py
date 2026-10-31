@@ -49,9 +49,11 @@ def test_income_source_and_work_log_forms(owner):
         source = session.scalars(select(IncomeSource)).one()
         assert source.rate_minor == 123_000
 
+    # This month's work is paid next month, so the payments table always shows it.
+    month = owner.app.state.clock.today("UTC")
     logged = owner.post(
         f"/income/{source.id}/work-logs",
-        {"work_month_month": "8", "work_month_year": "2026", "units": "7.5"},
+        {"work_month_month": str(month.month), "work_month_year": str(month.year), "units": "7.5"},
         token_from="/income",
     )
     assert logged.status_code == 303
@@ -61,7 +63,8 @@ def test_income_source_and_work_log_forms(owner):
     assert page.status_code == 200
     assert "Contract work" in page.text
     assert 'name="record_as"' not in page.text
-    assert "August 2026 · 7.5" in page.text
+    assert f"{month:%B %Y} · 7.5" in page.text
+    assert "data-work-logs" not in page.text
 
 
 def test_income_forms_require_csrf(owner):

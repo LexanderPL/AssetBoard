@@ -25,6 +25,12 @@
     {{ select("country_code", _("Country"), country_options, selected=values.country_code or "", error=errors.get("country_code"), blank=_("Not set")) }}
     {{ select("timezone", _("Time zone"), timezone_options, selected=values.timezone, error=errors.get("timezone")) }}
     {{ select("locale", _("Formatting default"), locales, selected=values.locale, error=errors.get("locale")) }}
+    <div class="space-y-1.5" data-upcoming-days>
+      <label for="upcoming_days" class="block text-sm font-medium text-ink">{{ _("Upcoming window (days)") }}</label>
+      <input id="upcoming_days" name="upcoming_days" type="number" min="1" max="365" step="1" inputmode="numeric" value="{{ upcoming_days_text }}" placeholder="{{ instance_upcoming_days }}" aria-describedby="upcoming_days-help{% if errors.get('upcoming_days') %} upcoming_days-error{% endif %}"{% if errors.get('upcoming_days') %} aria-invalid="true"{% endif %} class="form-control w-full">
+      <p id="upcoming_days-help" class="text-xs text-muted">{{ _("How far ahead Upcoming payments and the Home page look.") }} {{ _("Empty: %(days)d days, the server default.", days=instance_upcoming_days) }}</p>
+      {% if errors.get("upcoming_days") %}<p id="upcoming_days-error" class="text-sm text-danger">{{ errors.get("upcoming_days") }}</p>{% endif %}
+    </div>
     <div class="flex items-start gap-3 sm:col-span-2" data-auto-copy-plan>
       <input id="auto_copy_plan" name="auto_copy_plan" type="checkbox" value="1"{% if values.auto_copy_plan %} checked{% endif %} aria-describedby="auto_copy_plan-help" class="mt-1 h-4 w-4 rounded border-line accent-primary">
       <div>
@@ -61,6 +67,13 @@
     <ul class="mt-1 list-disc pl-5">{% for name in taxes_in_use %}<li>{{ name }}</li>{% endfor %}</ul>
   </div>
   {% endif %}
+</section>
+<section class="panel mt-6 max-w-2xl p-6 sm:p-7" aria-labelledby="workspace-notifications-heading" data-settings-notifications>
+  <h2 id="workspace-notifications-heading" class="text-base font-semibold">{{ _("Notifications") }}</h2>
+  <div class="mt-4 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-line bg-subtle px-4 py-3">
+    <p class="min-w-0 text-xs text-muted">{{ _("Reminders about upcoming and overdue payments and days worked, sent to your own channels (ntfy, Telegram, email and others). Each member sets up their own on their Profile page.") }}</p>
+    <a href="{{ scoped_url(request, 'notifications') }}" data-notifications-link class="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Notification settings") }}</a>
+  </div>
 </section>
 <section class="panel mt-6 max-w-2xl p-6 sm:p-7" aria-labelledby="workspace-more-heading" data-settings-more>
   <h2 id="workspace-more-heading" class="text-base font-semibold">{{ _("Categories and workspaces") }}</h2>

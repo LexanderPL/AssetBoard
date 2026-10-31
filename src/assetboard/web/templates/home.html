@@ -69,7 +69,7 @@
     </ul>
     {% if upcoming_more %}<p class="mt-3 text-sm text-muted">{{ _("More items are waiting on the Upcoming page.") }}</p>{% endif %}
     {% else %}
-    <p class="mt-3 text-sm text-muted" data-upcoming-empty>{{ _("Nothing is overdue or due in the next %(days)d days.", days=7) }}</p>
+    <p class="mt-3 text-sm text-muted" data-upcoming-empty>{{ _("Nothing is overdue or due in the next %(days)d days.", days=upcoming_days) }}</p>
     {% endif %}
   </section>
 </div>

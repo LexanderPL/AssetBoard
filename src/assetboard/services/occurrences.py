@@ -103,6 +103,12 @@ def _upcoming_view(
     )
 
 
+def window_days(ctx: Context, instance_default: int) -> int:
+    """Days ahead shown by Upcoming payments and the Home page: the workspace setting, or the
+    instance setting ``upcoming_days`` when the workspace has none."""
+    return ctx.workspace.upcoming_days or instance_default
+
+
 def upcoming(
     factory: sessionmaker[Session],
     ctx: Context,

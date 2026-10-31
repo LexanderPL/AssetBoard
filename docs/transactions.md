@@ -107,7 +107,9 @@ the same currency, even when only one category is shown:
 | 75% to under 90% | medium |
 | 90% and more | strongest |
 
-The colour is a visual aid only; the amounts say the same. Turn it off under **Highlight large
+The tint fills the whole row, its Edit and Delete buttons included; the strongest step is the
+same colour as a category above plan on the Month page. The colour is a visual aid only; the
+amounts say the same. Turn it off under **Highlight large
 transactions** on your profile page (see [Your account](accounts.md)). Saving, deleting or
 restoring an entry recolours its table.
 

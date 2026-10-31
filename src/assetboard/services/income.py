@@ -89,6 +89,8 @@ class IncomePreview:
     tax_names: dict[str, str]
     # Attachment id (str) -> the planned tax payment's date.
     payment_dates: dict[str, date]
+    # True when the month's units are the sum of days marked in the work calendar.
+    derived_from_days: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -590,6 +592,9 @@ def list_sources(factory: sessionmaker[Session], ctx: Context) -> list[IncomeSou
                         amount_state=estimate.amount_state,
                         units=estimate.units,
                         breakdown=breakdown,
+                        derived_from_days=any(
+                            log.work_month == work_month and log.derived_from_days for log in logs
+                        ),
                         tax_names={str(line.attachment.id): line.rule.name for line in selected},
                         payment_dates={
                             str(line.attachment.id): attachment_payment_date(

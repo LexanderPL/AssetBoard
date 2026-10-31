@@ -2,13 +2,9 @@
 {% from "macros/components.html" import csrf_input with context %}
 {% set input_class = "form-control w-full rounded-lg px-2.5 py-1.5" %}
 {% set button_class = "rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle" %}
-{% block title %}{{ _("Upcoming") }} · {{ app_name }}{% endblock %}
-{% block heading %}{{ _("Upcoming inbox") }}{% endblock %}
+{% block title %}{{ _("Upcoming payments") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Upcoming payments") }}{% endblock %}
 {% block content %}
-<div class="mb-5 flex flex-wrap gap-3">
-  <a href="{{ scoped_url(request, 'scheduled_items') }}" class="rounded-lg border border-line px-3 py-2 text-sm">{{ _("Recurring items") }}</a>
-  <a href="{{ scoped_url(request, 'notifications') }}" class="rounded-lg border border-line px-3 py-2 text-sm" data-notifications-shortcut>{{ _("Reminders by notification") }}</a>
-</div>
 {% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 {% if undo and can_edit %}
 <div role="status" class="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-post-undo>
@@ -62,7 +58,7 @@
         {% if occurrence.rescheduled %}<p class="mt-1 text-xs text-muted">{{ _("Rescheduled for this occurrence") }}</p>{% endif %}
       </div>
       {% if can_edit %}
-      <div class="flex flex-wrap gap-2">
+      <div class="flex flex-wrap items-start gap-2" data-occurrence-actions>
         <details>
           <summary class="{{ button_class }} cursor-pointer">{{ _("Mark paid or received") }}</summary>
           <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=occurrence.id) }}" class="mt-3 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">

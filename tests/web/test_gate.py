@@ -205,3 +205,23 @@ def test_gate_answers_before_the_csrf_dependency(
         # Signed out after setup: /login is public, so the CSRF dependency answers.
         web.complete_setup(open_setup)
         assert client.post("/login", data={}).status_code == 403
+
+
+def test_every_page_links_the_svg_favicon(web: WebHarness) -> None:
+    link = 'rel="icon" type="image/svg+xml" href="/static/img/favicon.svg?v='
+    with TestClient(web.app()) as client:
+        icon = client.get("/static/img/favicon.svg")
+        assert icon.status_code == 200
+        assert icon.headers["content-type"].startswith("image/svg+xml")
+        assert "<svg" in icon.text and "#0277bd" in icon.text
+        # Signed out: the setup page (auth_base.html).
+        setup = client.get("/setup").text
+        assert link in setup and 'referrerpolicy="no-referrer"' in setup.split(link, 1)[1][:80]
+        assert 'href="data:,"' not in setup
+
+
+def test_signed_in_and_error_pages_link_the_svg_favicon(owner) -> None:
+    link = 'rel="icon" type="image/svg+xml" href="/static/img/favicon.svg?v='
+    assert link in owner.client.get("/").text  # base.html
+    missing = owner.client.get("/no-such-page")
+    assert missing.status_code == 404 and link in missing.text  # errors/page.html

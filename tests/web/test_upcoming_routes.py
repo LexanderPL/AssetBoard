@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import re
 from datetime import date
 
 from sqlalchemy import select
 
 from assetboard.clock import FixedClock
+from assetboard.db.models.identity import Workspace
 from assetboard.db.models.ledger import MonthState, Transaction
 from assetboard.db.models.scheduled import ScheduledOccurrence
 
@@ -185,3 +187,68 @@ def test_deleting_a_posted_transaction_in_the_ledger_returns_it_to_the_inbox(own
     with owner.db() as session:
         live = session.scalars(select(Transaction).where(Transaction.deleted_at.is_(None))).all()
         assert len(live) == 1
+
+
+def test_upcoming_and_recurring_pages_have_no_links_to_other_sections(owner):
+    upcoming = owner.client.get("/upcoming").text
+    main = upcoming.split("<main", 1)[1]
+    assert "<h1" in main and "Upcoming payments" in main
+    assert "<title>Upcoming payments" in upcoming
+    assert 'href="/recurring"' not in main and 'href="/notifications"' not in main
+    assert "data-notifications-shortcut" not in upcoming
+    recurring = owner.client.get("/recurring").text.split("<main", 1)[1]
+    assert 'href="/upcoming"' not in recurring
+
+
+def test_upcoming_page_shows_a_monthly_item_due_in_twenty_days(owner):
+    fixed_clock(owner)  # 2026-03-01
+    assert create_recurring(owner, start_date="2026-03-21", month_day="21").status_code == 303
+    page = owner.client.get("/upcoming").text
+    assert 'datetime="2026-03-21"' in page
+    assert "the next 30 days" in page
+    # Home uses the same window (it was a hard-coded week).
+    home = owner.client.get("/").text
+    assert re.search(r'<li [^>]*data-occurrence="[0-9a-f-]+"', home)
+    assert 'datetime="2026-03-21"' in home
+
+
+def _save_window(owner, days: str):
+    form = {"name": "Home", "base_currency": "EUR", "timezone": "UTC", "locale": "en"}
+    return owner.post(
+        "/workspace/settings", form | {"upcoming_days": days}, token_from="/workspace/settings"
+    )
+
+
+def test_workspace_upcoming_window_applies_to_upcoming_and_home(owner):
+    fixed_clock(owner)  # 2026-03-01
+    assert create_recurring(owner, start_date="2026-03-21", month_day="21").status_code == 303
+    settings = owner.client.get("/workspace/settings").text
+    assert 'name="upcoming_days"' in settings and 'placeholder="30"' in settings
+    assert "How far ahead Upcoming payments and the Home page look." in settings
+
+    assert _save_window(owner, "10").status_code == 303
+    with owner.db() as session:
+        assert session.scalars(select(Workspace.upcoming_days)).one() == 10
+    assert 'value="10"' in owner.client.get("/workspace/settings").text
+    page = owner.client.get("/upcoming").text
+    assert "the next 10 days" in page and 'datetime="2026-03-21"' not in page
+    home = owner.client.get("/").text
+    assert 'datetime="2026-03-21"' not in home
+    assert "Nothing is overdue or due in the next 10 days." in home
+
+    # 1-365, a whole number; empty goes back to the instance setting.
+    for bad in ("0", "366", "abc", "7.5", "1000"):
+        refused = _save_window(owner, bad)
+        assert refused.status_code == 400, bad
+        assert "Enter a number of days from 1 to 365" in refused.text
+    assert _save_window(owner, "").status_code == 303
+    with owner.db() as session:
+        assert session.scalars(select(Workspace.upcoming_days)).one() is None
+    assert "the next 30 days" in owner.client.get("/upcoming").text
+
+
+def test_instance_upcoming_days_applies_without_a_workspace_value(owner):
+    fixed_clock(owner)
+    owner.app.state.settings = owner.app.state.settings.model_copy(update={"upcoming_days": 12})
+    assert "the next 12 days" in owner.client.get("/upcoming").text
+    assert 'placeholder="12"' in owner.client.get("/workspace/settings").text

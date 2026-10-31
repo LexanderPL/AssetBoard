@@ -75,17 +75,19 @@ base currency. An item whose category is archived creates no new dates, and its 
 onward are removed on the next daily run. The edit form shows the archived category as the
 current, unavailable choice; choose an active category to save the rule again.
 
-## Upcoming occurrences
+## Upcoming payments
 
-Open **Upcoming** to see overdue occurrences and those due within the next 30 days, grouped by
-week. Use the direction and category filters to narrow the inbox. The operator may set
-`ASSETBOARD_UPCOMING_DAYS` to a value from 1 to 365 to change the forward window.
+Open **Upcoming** to see the **Upcoming payments** page: overdue occurrences and those due within
+the next 30 days, grouped by week. Use the direction and category filters to narrow the list.
+The workspace owner can change how far ahead it looks (1 to 365 days) under **Upcoming window**
+in **Workspace settings**; the Home page's upcoming list uses the same window. Left empty, the
+server default applies: 30 days, or what the operator set with `ASSETBOARD_UPCOMING_DAYS`.
 When occurrences are overdue, the **Upcoming** link in the navigation shows how many.
 
 Editors and owners can mark an occurrence paid or received, skip it, reschedule just that
 occurrence, or edit its expected amount. Marking it paid creates a linked transaction using the
 entered date and amount. The transaction can be edited from the month or transaction list; undo
-the posting from the inbox within 10 seconds to soft-delete the transaction and restore the
+the posting from the Upcoming payments page within 10 seconds to soft-delete the transaction and restore the
 occurrence to pending. Deleting the transaction from the month or transaction list also returns
 its occurrence to pending (keeping its date and amount changes), so it can be marked paid again;
 undoing that deletion re-links the transaction if the occurrence is still pending. Editing an
@@ -103,8 +105,9 @@ occurrence.
 
 ## Reminders
 
-Open **Notifications** in the account menu (or from **Upcoming**) to get reminders on your
-phone or by email. Add a channel with an [Apprise](https://github.com/caronc/apprise) URL, for
+Open **Notifications** from your **Profile** (owners also find it in **Workspace settings**) to
+get reminders on your phone or by email. Add a channel with an
+[Apprise](https://github.com/caronc/apprise) URL, for
 example `ntfys://ntfy.sh/your-topic` for ntfy, `gotifys://gotify.example.com/token` for Gotify,
 `tgram://bot-token/chat-id` for Telegram or `mailtos://user:password@mail.example.com` for
 email, then press **Send test**. The URL is stored encrypted and shown only as `ntfys://••••••`
@@ -166,7 +169,8 @@ numbers. **Fill working days** adds 1 for every working day that has no value ye
 changes values you entered; **Clear month** removes every day of the month after a confirmation.
 
 The calendar is optional. While a month has at least one marked day, its work log is the sum of
-the days: it is shown as "from the work calendar" and the month-level form refuses to change it.
+the days: in the payments table its **logged** chip links to that month of the calendar, and the
+month-level form refuses to change it.
 Marking the first day replaces a manual work log for that month; removing the last day (or
 clearing the month) removes the log, and the month goes back to its estimate. Every change
 recalculates the month's pending income and tax-payment occurrences, like a month-level work log,

@@ -69,7 +69,7 @@ def test_home_without_data_renders_empty_states(nav: OwnerApp) -> None:
     assert "data-summary-kpis" in html and 'data-flow-segment="empty"' in html
     assert "No expenses yet this month" in html and "No income yet this month" in html
     assert 'type="application/json"' not in html  # no chart without slices
-    assert "Nothing is overdue or due in the next 7 days." in html
+    assert "Nothing is overdue or due in the next 30 days." in html
     assert 'data-home-link aria-current="page"' in html
 
 

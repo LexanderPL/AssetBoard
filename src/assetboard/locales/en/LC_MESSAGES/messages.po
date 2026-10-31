@@ -1782,6 +1782,9 @@ msgid ""
 "yourself out."
 msgstr ""
 
+msgid "Enter a number of days from 1 to 365, or leave it empty."
+msgstr ""
+
 msgid "A workspace needs at least one owner. Make another member an owner first."
 msgstr ""
 
@@ -1863,9 +1866,6 @@ msgid "Users"
 msgstr ""
 
 msgid "Audit log: instance"
-msgstr ""
-
-msgid "Notifications"
 msgstr ""
 
 msgid "Profile"
@@ -1979,6 +1979,17 @@ msgid "This account has no password. You can still sign out other devices."
 msgstr ""
 
 msgid "Two-factor authentication"
+msgstr ""
+
+msgid "Notifications"
+msgstr ""
+
+msgid ""
+"Your own reminder channels in this workspace: upcoming and overdue "
+"payments and days worked."
+msgstr ""
+
+msgid "Notification settings"
 msgstr ""
 
 msgid "Sign-in methods"
@@ -3067,10 +3078,13 @@ msgstr ""
 msgid "Tax to pay"
 msgstr ""
 
-msgid "estimate"
+msgid "logged"
 msgstr ""
 
-msgid "logged"
+msgid "from the work calendar"
+msgstr ""
+
+msgid "estimate"
 msgstr ""
 
 #, python-format
@@ -3078,12 +3092,6 @@ msgid "%(name)s %(amount)s on %(date)s"
 msgstr ""
 
 msgid "Nothing to pay"
-msgstr ""
-
-msgid "Logged:"
-msgstr ""
-
-msgid "from the work calendar"
 msgstr ""
 
 msgid "Log days worked"
@@ -3660,9 +3668,6 @@ msgstr ""
 msgid "Recurring items"
 msgstr ""
 
-msgid "Upcoming inbox"
-msgstr ""
-
 #, python-format
 msgid "One time on %(date)s"
 msgstr ""
@@ -3704,7 +3709,7 @@ msgstr ""
 msgid "No more occurrences match this rule."
 msgstr ""
 
-msgid "Reminders by notification"
+msgid "Upcoming payments"
 msgstr ""
 
 msgid "Occurrence marked paid or received."
@@ -4171,6 +4176,16 @@ msgstr ""
 msgid "Formatting default"
 msgstr ""
 
+msgid "Upcoming window (days)"
+msgstr ""
+
+msgid "How far ahead Upcoming payments and the Home page look."
+msgstr ""
+
+#, python-format
+msgid "Empty: %(days)d days, the server default."
+msgstr ""
+
 msgid "Copy the previous month's plan when a month is opened for the first time"
 msgstr ""
 
@@ -4207,6 +4222,12 @@ msgstr ""
 msgid ""
 "Taxes stay on while these income sources have taxes ticked. Untick them "
 "first:"
+msgstr ""
+
+msgid ""
+"Reminders about upcoming and overdue payments and days worked, sent to "
+"your own channels (ntfy, Telegram, email and others). Each member sets up"
+" their own on their Profile page."
 msgstr ""
 
 msgid "Categories and workspaces"
@@ -4742,5 +4763,14 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Forecast"
+#~ msgstr ""
+
+#~ msgid "Logged:"
+#~ msgstr ""
+
+#~ msgid "Upcoming inbox"
+#~ msgstr ""
+
+#~ msgid "Reminders by notification"
 #~ msgstr ""
 
