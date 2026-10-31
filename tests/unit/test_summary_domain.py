@@ -14,6 +14,7 @@ from assetboard.domain.summary import (
     BLOCK_ORDER,
     Entry,
     FlowBar,
+    InOutFlow,
     PendingEntry,
     PendingFlowBar,
     PlanLine,
@@ -21,6 +22,7 @@ from assetboard.domain.summary import (
     block_of,
     difference,
     flow_bar,
+    in_out_flow,
     pending_flow_bar,
     savings_rate_bp,
     savings_rate_tenths,
@@ -430,3 +432,118 @@ def test_pending_flow_bar_segments_tile_the_scale(amounts: list[int]) -> None:
             plain.saved_end,
             plain.earned_end,
         )
+
+
+# The Month page's in/out flow (owner, 2026-10-31, option A)
+
+
+def _flow(*amounts: int) -> InOutFlow:
+    earned, withdrawn, spent, saved, earned_p, withdrawn_p, spent_p, saved_p = amounts
+    return in_out_flow(
+        earned=earned,
+        withdrawn=withdrawn,
+        spent=spent,
+        saved=saved,
+        earned_pending=earned_p,
+        withdrawn_pending=withdrawn_p,
+        spent_pending=spent_p,
+        saved_pending=saved_p,
+    )
+
+
+@pytest.mark.parametrize(
+    ("amounts", "strip", "bar"),
+    [
+        # In 9 000 (8 000 earned + 1 000 withdrawn), out 6 000: left 3 000.
+        (
+            (800_000, 100_000, 450_000, 150_000, 0, 0, 0, 0),
+            (("earned", 0, 888), ("withdrawn", 888, 1000)),
+            (("spent", 0, 500), ("saved", 500, 666), ("left", 666, 1000)),
+        ),
+        # Pending parts follow their confirmed parts; left needing pending money in is striped.
+        (
+            (4000, 1000, 2000, 1000, 2000, 1000, 1000, 1000),
+            (
+                ("earned", 0, 500),
+                ("earned-pending", 500, 750),
+                ("withdrawn", 750, 875),
+                ("withdrawn-pending", 875, 1000),
+            ),
+            (
+                ("spent", 0, 250),
+                ("spent-pending", 250, 375),
+                ("saved", 375, 500),
+                ("saved-pending", 500, 625),
+                ("left-pending", 625, 1000),
+            ),
+        ),
+        # Out exceeds In: Out is the scale and the strip ends early (the shortfall).
+        (
+            (1000, 0, 1500, 500, 0, 0, 0, 0),
+            (("earned", 0, 500), ("short", 500, 1000)),
+            (("spent", 0, 750), ("saved", 750, 1000)),
+        ),
+        ((0, 0, 0, 0, 0, 0, 0, 0), (), ()),
+        # Negative amounts draw nothing.
+        ((100, -50, -10, 0, 0, 0, 0, 0), (("earned", 0, 1000),), (("left", 0, 1000),)),
+    ],
+)
+def test_in_out_flow_segments(
+    amounts: tuple[int, ...],
+    strip: tuple[tuple[str, int, int], ...],
+    bar: tuple[tuple[str, int, int], ...],
+) -> None:
+    flow = _flow(*amounts)
+    assert flow.strip_segments() == strip
+    assert flow.bar_segments() == bar
+
+
+def test_in_out_flow_parts() -> None:
+    assert _flow(0, 0, 0, 0, 0, 0, 0, 0).empty
+    # Confirmed money in (5 000) covers 500 beyond everything out (4 500 of 10 000 scale)...
+    flow = _flow(4000, 1000, 2000, 1000, 2000, 1000, 1000, 500)
+    assert (flow.out_end, flow.left_end, flow.left, flow.left_pending, flow.short) == (
+        562,
+        625,
+        63,
+        375,
+        0,
+    )
+    short = _flow(1000, 500, 1500, 500, 0, 0, 0, 0)
+    assert (short.in_end, short.left, short.left_pending, short.short) == (750, 0, 0, 250)
+    # Without pending amounts the confirmed money in is all of In.
+    plain = _flow(800, 200, 500, 0, 0, 0, 0, 0)
+    assert (plain.confirmed_in_end, plain.in_end, plain.left) == (1000, 1000, 500)
+
+
+def _tiles(segments: tuple[tuple[str, int, int], ...], end: int) -> bool:
+    position = 0
+    for _key, start, stop in segments:
+        if start != position or stop <= start:
+            return False
+        position = stop
+    return position == end
+
+
+@given(amounts=st.lists(st.integers(min_value=-(10**12), max_value=10**12), min_size=8, max_size=8))
+def test_in_out_flow_segments_tile_the_scale(amounts: list[int]) -> None:
+    flow = _flow(*amounts)
+    earned, withdrawn, spent, saved, earned_p, withdrawn_p, spent_p, saved_p = (
+        max(a, 0) for a in amounts
+    )
+    total_in = earned + withdrawn + earned_p + withdrawn_p
+    total_out = spent + saved + spent_p + saved_p
+    if flow.empty:
+        assert total_in == total_out == 0
+        assert flow.strip_segments() == flow.bar_segments() == ()
+        return
+    whole = max(total_in, total_out)
+    # Both rows tile 0..scale without gaps or overlaps.
+    assert _tiles(flow.strip_segments(), 1000)
+    assert _tiles(flow.bar_segments(), 1000)
+    # The strip without its shortfall is In; the bar is Out + left.
+    strip_in = sum(b - a for k, a, b in flow.strip_segments() if k != "short")
+    assert strip_in == flow.in_end == total_in * 1000 // whole
+    left = max(total_in - total_out, 0)
+    assert flow.out_end + flow.left + flow.left_pending == (total_out + left) * 1000 // whole
+    assert flow.short == 0 or flow.left + flow.left_pending == 0
