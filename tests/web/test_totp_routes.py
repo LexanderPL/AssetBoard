@@ -1007,3 +1007,195 @@ def test_cli_mfa_reset_removes_factor_and_password_sessions_only(owner: OwnerApp
         )
     with owner.app.state.session_factory.begin() as session, pytest.raises(auth.UnknownUser):
         auth.reset_user_two_factor(session, email="nobody@example.com", clock=owner.app.state.clock)
+
+
+def _password_step(owner: OwnerApp, client: TestClient, *, path: str = "/login"):
+    return client.post(
+        path,
+        data={
+            "csrf_token": owner.web.csrf(client.get(path).text),
+            "email": owner.web.admin_email,
+            "password": owner.web.admin_password,
+        },
+        follow_redirects=False,
+    )
+
+
+def _code_step(client: TestClient, owner: OwnerApp, code: str, *, path: str = "/login/verify"):
+    page = client.get(path, follow_redirects=False)
+    token = (
+        owner.web.csrf(page.text)
+        if page.status_code == 200
+        else owner.web.csrf(client.get(path.removesuffix("/verify")).text)
+    )
+    return client.post(
+        path, data={"csrf_token": token, "second_factor": code}, follow_redirects=False
+    )
+
+
+def test_code_page_has_one_time_code_field_and_a_start_over_link(owner: OwnerApp) -> None:
+    _enable(owner)
+    client = TestClient(owner.app)
+    assert _password_step(owner, client).headers["location"] == "/login/verify"
+    page = client.get("/login/verify").text
+    assert 'autocomplete="one-time-code"' in page
+    assert 'name="csrf_token"' in page
+    assert re.search(r'<a [^>]*href="/login"[^>]*data-start-over', page)
+    assert 'name="password"' not in page and 'name="email"' not in page
+
+
+def test_account_without_two_factor_signs_in_in_one_step(owner: OwnerApp) -> None:
+    client = TestClient(owner.app)
+    response = _password_step(owner, client)
+    assert response.status_code == 303 and response.headers["location"] == "/"
+    assert client.cookies.get("assetboard_session")
+    assert client.cookies.get("assetboard_login_ticket") is None
+    with owner.db() as session:
+        assert session.scalar(select(LoginTicket)) is None
+
+
+def test_expired_ticket_returns_to_login_with_a_neutral_message(owner: OwnerApp) -> None:
+    secret, _codes = _enable(owner)
+    client = TestClient(owner.app)
+    assert _password_step(owner, client).status_code == 303
+    challenge = client.get("/login/verify")
+    owner.app.state.clock = FixedClock("2026-10-21T12:05:00+00:00")  # exactly 5 minutes on
+    expired = client.post(
+        "/login/verify",
+        data={
+            "csrf_token": owner.web.csrf(challenge.text),
+            "second_factor": pyotp.TOTP(secret).at(owner.app.state.clock.now()),
+        },
+        follow_redirects=False,
+    )
+    assert expired.status_code == 303 and expired.headers["location"] == "/login?expired=1"
+    assert client.cookies.get("assetboard_login_ticket") is None
+    assert "assetboard_session" not in client.cookies
+    page = client.get("/login?expired=1").text
+    assert "Your sign-in has expired. Please sign in again." in page
+    assert 'name="password"' in page
+    with owner.db() as session:
+        assert session.scalar(select(LoginTicket)) is None  # removed on use
+    # A GET with a stale cookie also starts over; no cookie means no message.
+    assert client.get("/login/verify", follow_redirects=False).headers["location"] == "/login"
+
+
+def test_expired_tickets_are_deleted_when_a_new_one_is_issued(owner: OwnerApp) -> None:
+    _enable(owner)
+    assert _password_step(owner, TestClient(owner.app)).status_code == 303
+    owner.app.state.clock = FixedClock("2026-10-21T12:06:00+00:00")
+    client = TestClient(owner.app)
+    assert _password_step(owner, client).status_code == 303
+    with owner.db() as session:
+        rows = list(session.scalars(select(LoginTicket)))
+    assert [row.token_hash for row in rows] == [
+        hashlib.sha256(client.cookies["assetboard_login_ticket"].encode()).hexdigest()
+    ]
+
+
+def test_consumed_ticket_cannot_be_replayed(owner: OwnerApp) -> None:
+    secret, _codes = _enable(owner)
+    client = TestClient(owner.app)
+    assert _password_step(owner, client).status_code == 303
+    ticket = client.cookies["assetboard_login_ticket"]
+    owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")  # past the enrollment code
+    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    assert _code_step(client, owner, code).status_code == 303
+    replay = TestClient(owner.app)
+    replay.cookies.set("assetboard_login_ticket", ticket)
+    response = _code_step(replay, owner, code)
+    assert response.status_code == 303 and response.headers["location"] == "/login?expired=1"
+    assert "assetboard_session" not in replay.cookies
+
+
+def test_each_wrong_code_counts_and_a_ticket_allows_at_most_five(owner: OwnerApp) -> None:
+    secret, _codes = _enable(owner)
+    client = TestClient(owner.app)
+    assert _password_step(owner, client).status_code == 303
+    ticket = client.cookies["assetboard_login_ticket"]
+    for attempt in range(1, auth.MAX_LOGIN_TICKET_ATTEMPTS):
+        response = _code_step(client, owner, "000000")
+        assert response.status_code == 401, attempt
+        assert client.cookies.get("assetboard_login_ticket") == ticket  # kept
+    with owner.db() as session:
+        pending = session.scalar(select(LoginTicket))
+        assert pending is not None and pending.code_attempts == 4
+    last = _code_step(client, owner, "000000")
+    assert last.status_code == 303 and last.headers["location"] == "/login?expired=1"
+    with owner.db() as session:
+        assert session.scalar(select(LoginTicket)) is None
+    assert "assetboard_session" not in client.cookies
+    # The used-up ticket is gone even with a correct code.
+    client.cookies.set("assetboard_login_ticket", ticket)
+    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    assert _code_step(client, owner, code).headers["location"] == "/login?expired=1"
+
+
+def test_wrong_codes_hit_the_sign_in_throttle_and_keep_the_ticket(owner: OwnerApp) -> None:
+    secret, _codes = _enable(owner)
+    owner.app.state.settings.auth_account_free_failures = 2
+    client = TestClient(owner.app)
+    assert _password_step(owner, client).status_code == 303
+    ticket = client.cookies["assetboard_login_ticket"]
+    statuses = []
+    for _ in range(3):
+        response = _code_step(client, owner, "000000")
+        statuses.append((response.status_code, response.headers.get("retry-after")))
+    assert statuses[-1][0] == 401 and statuses[-1][1] is not None, statuses
+    assert client.cookies.get("assetboard_login_ticket") == ticket
+    # Throttled: even the right code is refused without consuming the ticket.
+    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    throttled = _code_step(client, owner, code)
+    assert throttled.status_code == 401 and throttled.headers.get("retry-after")
+    assert "assetboard_session" not in client.cookies
+    with owner.db() as session:
+        assert session.scalar(select(LoginTicket)) is not None
+
+
+def test_no_session_and_no_access_before_the_second_factor(owner: OwnerApp) -> None:
+    _enable(owner)
+    client = TestClient(owner.app)
+    with owner.db() as session:
+        before = len(session.scalars(select(UserSession)).all())
+    assert _password_step(owner, client).status_code == 303
+    with owner.db() as session:
+        assert len(session.scalars(select(UserSession)).all()) == before
+    for path in ("/", "/account", "/account/totp"):
+        response = client.get(path, follow_redirects=False)
+        assert response.status_code == 303, path
+        assert response.headers["location"].startswith("/login"), path
+
+
+def test_break_glass_ticket_is_bound_to_its_flow_and_to_an_admin(owner: OwnerApp) -> None:
+    secret, _codes = _enable(owner)
+    settings = owner.app.state.settings
+    settings.oidc_only = True
+    settings.allow_local_admin_login = True
+    client = TestClient(owner.app)
+    first = _password_step(owner, client, path="/login/local")
+    assert first.headers["location"] == "/login/local/verify"
+    # The break-glass ticket does not open the normal second step, and vice versa.
+    assert client.get("/login/verify", follow_redirects=False).status_code in (303, 404)
+    # Demoted between the two steps: the ticket ends.
+    with owner.db() as session, session.begin():
+        user = session.get(User, owner.admin_id)
+        assert user is not None
+        user.is_instance_admin = False
+    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    response = _code_step(client, owner, code, path="/login/local/verify")
+    assert response.headers["location"] == "/login/local?expired=1"
+    assert "assetboard_session" not in client.cookies
+
+
+def test_break_glass_ticket_succeeds_with_a_code(owner: OwnerApp) -> None:
+    secret, _codes = _enable(owner)
+    settings = owner.app.state.settings
+    settings.oidc_only = True
+    settings.allow_local_admin_login = True
+    client = TestClient(owner.app)
+    assert _password_step(owner, client, path="/login/local").status_code == 303
+    owner.app.state.clock = FixedClock("2026-10-21T12:00:30+00:00")  # past the enrollment code
+    code = pyotp.TOTP(secret).at(owner.app.state.clock.now())
+    response = _code_step(client, owner, code, path="/login/local/verify")
+    assert response.status_code == 303 and client.cookies.get("assetboard_session")
+    assert client.cookies.get("assetboard_login_ticket") is None
