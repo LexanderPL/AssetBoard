@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 import uvicorn
-from playwright.sync_api import Page, expect, sync_playwright
+from playwright.sync_api import FloatRect, Page, expect, sync_playwright
 
 from assetboard.app import create_app
 from assetboard.config import Settings
@@ -45,7 +45,7 @@ def _add_planned(page: Page, label: str) -> None:
     expect(rows).to_have_count(count + 1)
 
 
-def _box(page: Page, selector: str) -> dict[str, float]:
+def _box(page: Page, selector: str) -> FloatRect:
     box = page.locator(selector).first.bounding_box()
     assert box is not None, selector
     return box
