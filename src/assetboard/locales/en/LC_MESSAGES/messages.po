@@ -3251,6 +3251,17 @@ msgid "(unfavourable)"
 msgstr ""
 
 #, python-format
+msgid "If everything pending arrives: %(amount)s"
+msgstr ""
+
+#, python-format
+msgid "+ %(amount)s pending"
+msgstr ""
+
+msgid "Over plan if everything pending arrives"
+msgstr ""
+
+#, python-format
 msgid "Show only the entries of %(name)s"
 msgstr ""
 
@@ -3264,6 +3275,12 @@ msgstr ""
 msgid "Total"
 msgstr ""
 
+msgid "Expected spent vs expected earned"
+msgstr ""
+
+msgid "Spent vs earned"
+msgstr ""
+
 #, python-format
 msgid ""
 "Earned %(earned)s: spent %(spent)s, saved or invested %(saved)s, left "
@@ -3272,6 +3289,12 @@ msgstr ""
 
 #, python-format
 msgid "Spending and saving exceed earnings by %(amount)s."
+msgstr ""
+
+#, python-format
+msgid ""
+"Pending: earned %(earned)s, spent %(spent)s, saved or invested %(saved)s."
+" If everything pending arrives, left %(net)s."
 msgstr ""
 
 msgid "Earned"
@@ -3284,7 +3307,14 @@ msgstr ""
 msgid "Spent"
 msgstr ""
 
+#, python-format
+msgid "%(amount)s if everything pending arrives"
+msgstr ""
+
 msgid "Left"
+msgstr ""
+
+msgid "Striped: pending, not confirmed yet"
 msgstr ""
 
 #, python-format
@@ -3308,6 +3338,9 @@ msgid "Earned %(actual)s of %(planned)s planned"
 msgstr ""
 
 msgid "(over plan)"
+msgstr ""
+
+msgid "(over plan if everything pending arrives)"
 msgstr ""
 
 msgid "Largest first"
@@ -3352,19 +3385,10 @@ msgstr ""
 msgid "Summary"
 msgstr ""
 
-msgid "Show forecast"
-msgstr ""
-
-msgid "Planned"
+msgid "Show pending"
 msgstr ""
 
 msgid "Actual"
-msgstr ""
-
-msgid "Expected (pending)"
-msgstr ""
-
-msgid "Forecast"
 msgstr ""
 
 msgid "Difference"
@@ -4727,6 +4751,18 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Choose taxes"
+#~ msgstr ""
+
+#~ msgid "Show forecast"
+#~ msgstr ""
+
+#~ msgid "Planned"
+#~ msgstr ""
+
+#~ msgid "Expected (pending)"
+#~ msgstr ""
+
+#~ msgid "Forecast"
 #~ msgstr ""
 
 #~ msgid "Logged:"

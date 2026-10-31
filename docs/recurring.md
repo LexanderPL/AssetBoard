@@ -20,7 +20,8 @@ farther ahead than the regular generation horizon (see below), and is not pruned
 approaches.
 A past date needs **Include past occurrences**. Changing the date moves its pending occurrence;
 once the occurrence is posted or skipped, the list shows the item as **Done** and you can
-archive it. A one-time item adds to the month's Expected and Forecast columns, not to Planned.
+archive it. A one-time item adds to the month's pending amount ("+ … pending" under Actual), not to
+the Plan.
 Its expected row on the Transactions page can be confirmed or deleted; deleting removes the
 planned entry and the item.
 
@@ -151,7 +152,7 @@ amount plus taxes added on top minus taxes the payer withholds, and taxes you pa
 tax-payment expenses (see [Taxes](taxes.md)). Tax rates and fixed amounts are user-entered
 models, not tax advice. Pending occurrences appear as expected rows, with a
 Confirm button, in the tables of the month's **Transactions** page; the **Month** summary shows
-pending expected amounts and a forecast alongside actuals. Missing work logs are highlighted on
+the pending amounts under the actuals ("+ … pending"). Missing work logs are highlighted on
 both pages when the related pay date is due within ten days or is overdue. A pending income
 occurrence you rescheduled keeps its date when its amount is recalculated. When Taxes are on, a
 card explains why no tax payment is planned: no taxes are ticked, the payer takes off every tax,

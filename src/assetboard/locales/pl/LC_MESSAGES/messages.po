@@ -3467,7 +3467,7 @@ msgid "Earlier descriptions"
 msgstr "Wcześniejsze opisy"
 
 msgid "Plan"
-msgstr "Zaplanuj"
+msgstr "Plan"
 
 #, python-format
 msgid "Edit the entry of %(date)s, %(amount)s"
@@ -3529,6 +3529,17 @@ msgid "(unfavourable)"
 msgstr "(niekorzystnie)"
 
 #, python-format
+msgid "If everything pending arrives: %(amount)s"
+msgstr "Jeśli wszystko oczekujące wpłynie: %(amount)s"
+
+#, python-format
+msgid "+ %(amount)s pending"
+msgstr "+ %(amount)s oczekuje"
+
+msgid "Over plan if everything pending arrives"
+msgstr "Ponad plan, jeśli wszystko oczekujące wpłynie"
+
+#, python-format
 msgid "Show only the entries of %(name)s"
 msgstr "Pokaż tylko wpisy: %(name)s"
 
@@ -3542,6 +3553,12 @@ msgstr "nieliczone"
 msgid "Total"
 msgstr "Razem"
 
+msgid "Expected spent vs expected earned"
+msgstr "Oczekiwane wydatki a oczekiwane wpływy"
+
+msgid "Spent vs earned"
+msgstr "Wydane a zarobione"
+
 #, python-format
 msgid ""
 "Earned %(earned)s: spent %(spent)s, saved or invested %(saved)s, left "
@@ -3554,6 +3571,15 @@ msgstr ""
 msgid "Spending and saving exceed earnings by %(amount)s."
 msgstr "Wydatki i oszczędności przekraczają zarobki o %(amount)s."
 
+#, python-format
+msgid ""
+"Pending: earned %(earned)s, spent %(spent)s, saved or invested %(saved)s."
+" If everything pending arrives, left %(net)s."
+msgstr ""
+"Oczekujące: zarobione %(earned)s, wydane %(spent)s, zaoszczędzone lub "
+"zainwestowane %(saved)s. Jeśli wszystko oczekujące wpłynie, zostanie "
+"%(net)s."
+
 msgid "Earned"
 msgstr "Zarobione"
 
@@ -3564,8 +3590,15 @@ msgstr "Prognoza wydatków %(spent)s · prognoza przychodów %(earned)s."
 msgid "Spent"
 msgstr "Wydane"
 
+#, python-format
+msgid "%(amount)s if everything pending arrives"
+msgstr "%(amount)s, jeśli wszystko oczekujące wpłynie"
+
 msgid "Left"
 msgstr "Zostało"
+
+msgid "Striped: pending, not confirmed yet"
+msgstr "Paski: oczekujące, jeszcze niepotwierdzone"
 
 #, python-format
 msgid "Saved / invested %(rate)s of income"
@@ -3589,6 +3622,9 @@ msgstr "Zarobiono %(actual)s z zaplanowanych %(planned)s"
 
 msgid "(over plan)"
 msgstr "(ponad plan)"
+
+msgid "(over plan if everything pending arrives)"
+msgstr "(ponad plan, jeśli wszystko oczekujące wpłynie)"
 
 msgid "Largest first"
 msgstr "Od największych"
@@ -3649,20 +3685,11 @@ msgstr "Cofnij"
 msgid "Summary"
 msgstr "Podsumowanie"
 
-msgid "Show forecast"
-msgstr "Pokaż prognozę"
-
-msgid "Planned"
-msgstr "Plan"
+msgid "Show pending"
+msgstr "Pokaż oczekujące"
 
 msgid "Actual"
 msgstr "Wykonanie"
-
-msgid "Expected (pending)"
-msgstr "Oczekiwane (oczekujące)"
-
-msgid "Forecast"
-msgstr "Prognoza"
 
 msgid "Difference"
 msgstr "Różnica"
@@ -4977,6 +5004,18 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Choose taxes"
 #~ msgstr "Wybierz podatki"
+
+#~ msgid "Show forecast"
+#~ msgstr "Pokaż prognozę"
+
+#~ msgid "Planned"
+#~ msgstr "Plan"
+
+#~ msgid "Expected (pending)"
+#~ msgstr "Oczekiwane (oczekujące)"
+
+#~ msgid "Forecast"
+#~ msgstr "Prognoza"
 
 #~ msgid "Logged:"
 #~ msgstr "Wpisane:"

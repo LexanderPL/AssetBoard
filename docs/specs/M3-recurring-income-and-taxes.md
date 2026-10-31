@@ -292,6 +292,17 @@ shows on both the Month and the Transactions page.
 - The toggle ("Show forecast", a pressed toggle) hides **both** extra columns (Expected and
   Forecast) and the forecast KPI line on the Month summary; Home always shows its forecast line.
   The choice is kept per browser and survives the summary's htmx swaps.
+
+**Plan and Actual (owner, 2026-10-31), replacing the two columns on the Month summary:** see
+F2.4 in M2 for the full rules. Expected is shown as part of Actual ("+ X pending", a lighter
+second line, only when above zero), the Forecast column and the "Forecast spent … · forecast
+earned …" line are gone, and the forecast is a hover and screen-reader detail ("If everything
+pending arrives: X"). Bars and the flow bar draw pending striped after the confirmed part; the
+flow bar is "Expected spent vs expected earned" for future months. The toggle is now **"Show
+pending"** (`data-pending-toggle`): it hides every part marked `data-pending` (lines, striped
+bar parts, the pending flow bar) and shows the confirmed-only flow bar (`data-pending-off`).
+It is kept in browser storage under `pending`; the older `forecast` key is read once, copied to
+`pending` and removed. Home is unchanged (follow-up).
 - The banner reads "Enter days worked for <work month> for <source>." and links to the income
   source. It is shown for the viewed month only: the relevant work month is the viewed month
   minus the source's pay lag.
@@ -300,7 +311,7 @@ shows on both the Month and the Transactions page.
 
 **Acceptance**
 - Month page lists **pending occurrences of that month** in each table (visually distinct "expected" rows with a Confirm button); confirming moves them into real rows.
-- Summary gets extra columns: **Expected (pending)** and **Forecast = actual + pending expected**; KPIs show "forecast spent / forecast earned" next to actuals. A toggle hides forecast columns.
+- Summary gets extra columns: **Expected (pending)** and **Forecast = actual + pending expected**; KPIs show "forecast spent / forecast earned" next to actuals. A toggle hides forecast columns. *(Superseded on the Month page by "Plan and Actual", 2026-10-31: pending under Actual, forecast as a hover detail, "Show pending" toggle.)*
 - Banner: "Enter days worked for <month>" for variable income sources whose work log for the relevant work month is missing and whose pay date is within 10 days or past.
 - Overdue count badge in the nav links to the Upcoming page.
 

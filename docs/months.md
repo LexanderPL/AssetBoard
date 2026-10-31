@@ -54,17 +54,29 @@ The **Summary** block at the top of the month page shows how the month is going:
 - A category row turns red when you spent more than planned on it, and green when an income
   category brought more than planned.
 - A table with every category in groups (Expenses, Saved / invested, Income, Withdrawn from
-  savings): **Planned**, **Actual** and **Difference**, and a total per group. A positive
+  savings): **Plan**, **Actual** and **Difference**, and a total per group. A positive
   difference is always good news: spent less, earned more, saved more or withdrew less than
   planned. A category with entries but no plan shows a plan of 0.00.
-- Two more columns look ahead with your [recurring items and income sources](recurring.md):
-  **Expected (pending)** is what is still due this month and not yet confirmed, and
-  **Forecast** is actual plus expected. Under the flow bar, "Forecast spent … · forecast
-  earned …" and a second, thinner bar show the month as it will look once everything pending
-  is confirmed (Home shows them too). Confirming an item on the Transactions page moves its
-  amount from Expected to Actual.
-- **Show forecast** hides or shows the Expected and Forecast columns and the forecast line. This
-  browser remembers the choice.
+- **Pending** amounts come from your [recurring items and income sources](recurring.md): what is
+  still due this month and not yet confirmed. They are part of Actual, shown as a lighter
+  second line under the confirmed amount, for example "+ €1,200.00 pending" (only when something
+  is pending). Hover it to see the month "If everything pending arrives" (screen readers read
+  the same). Confirming an item on the Transactions page moves its amount from pending into the
+  confirmed amount. The difference and the red or green row colour count confirmed amounts
+  only; when the pending amount would take a category over its plan, a softer line under it
+  says "Over plan if everything pending arrives".
+- In the bars, the solid part is confirmed and the **striped** part after it is pending; the
+  text above each bar adds "+ … pending", and "(over plan if everything pending arrives)" when
+  only the pending part goes past the plan.
+- The flow bar is titled **Spent vs earned**. With something pending it draws each part
+  confirmed (solid) and then pending (striped); the legend gives each figure with "+ …
+  pending", and Left as it would be if everything pending arrives. Nothing is confirmed in a
+  future month, so there the bar shows what you expect to spend and earn, and its title reads
+  **Expected spent vs expected earned**. (Home still shows the older "Forecast spent … ·
+  forecast earned …" line and second bar.)
+- **Show pending** hides or shows every pending part: the "+ … pending" lines, the striped
+  parts of the bars and the pending flow bar (the flow bar then shows confirmed amounts only).
+  This browser remembers the choice.
 - **Largest first** sorts each group by the actual amount; **Your order** uses the order of
   your categories. This browser remembers the choice.
 
