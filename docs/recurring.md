@@ -126,9 +126,16 @@ messages pass through the service you chose and any push or mail servers on the 
 delivery shows on the channel and is retried the next day. Removing a member deletes their
 channels in that workspace.
 
-## Income sources and work logs
+## Income and work logs
 
-Open **Income sources** to add a fixed salary or variable income paid per unit worked. Variable
+Open **Income** to see each income source as a card: a one-line summary, the taxes ticked on it,
+and a table of the next payments (with taxes: net, taxes, what you receive and the tax payments
+with their dates). **Add income** walks through four steps, each checked before the next one
+opens: the name, category and how it is paid (a fixed amount, or per day or hour); the amount;
+the payday ("Paid on day 10 of the next month", with a sentence that shows when one work month is
+paid) and the work months it covers; and, when Taxes are on, the taxes that apply, with an
+example. The steps work without JavaScript. **Edit** opens the same fields on one page, where you
+can also archive the source. Variable
 sources can estimate units from the workspace's working days, a fixed number, recent logged
 months, or wait for a manual work log. A work month is paid on the source's configured day in
 the month after its payment lag; days past the end of a short month are clamped to its last day.
@@ -136,19 +143,20 @@ Log units by work month (decimal units are supported). The next pending occurren
 planned tax-payment occurrences are recalculated; a posted transaction is never silently changed.
 
 When Taxes are on (Workspace settings → Menu), tick the workspace's taxes under **Taxes on this
-income**; each can have a different payment day for this income. The expected income is the net
+income** on the card; each can have a different payment day for this income. The expected income is the net
 amount plus taxes added on top minus taxes the payer withholds, and taxes you pay get planned
 tax-payment expenses (see [Taxes](taxes.md)). Tax rates and fixed amounts are user-entered
 models, not tax advice. Pending occurrences appear as expected rows, with a
 Confirm button, in the tables of the month's **Transactions** page; the **Month** summary shows
 pending expected amounts and a forecast alongside actuals. Missing work logs are highlighted on
 both pages when the related pay date is due within ten days or is overdue. A pending income
-occurrence you rescheduled keeps its date when its amount is recalculated.
+occurrence you rescheduled keeps its date when its amount is recalculated. When Taxes are on, a
+card explains why no tax payment is planned: no taxes are ticked, the payer takes off every tax,
+or planning a tax's payment is switched off for the source.
 
 ### Work calendar
 
-A variable income source can also be logged day by day: choose **Open the work calendar** under
-its work logs. The calendar shows one month at a time (use **Previous month** / **Next month**);
+A variable income source can also be logged day by day: choose **Work calendar** on its card. The calendar shows one month at a time (use **Previous month** / **Next month**);
 weekends are greyed and the workspace country's public holidays are marked (without a country,
 only weekends). Click a day, or focus it and press Space or Enter, to mark it worked with 1 unit;
 click it again to remove it. Under **Day values** you can change a marked day to a half day
