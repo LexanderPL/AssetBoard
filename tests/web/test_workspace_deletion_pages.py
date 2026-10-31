@@ -24,7 +24,8 @@ CHANGED = "Your current workspace changed since this page was opened"
 def _open_confirmation(owner: OwnerApp) -> dict[str, str]:
     """The confirmation form's hidden fields, as a browser would hold them."""
     page = owner.client.get("/workspace/delete").text
-    match = WORKSPACE_ID.search(page)
+    # The user menu's switch forms carry workspace_id too; the confirmation is in the content.
+    match = WORKSPACE_ID.search(page, page.index("</details>", page.index("data-user-menu")))
     assert match is not None, "no workspace_id field"
     return {"csrf_token": owner.web.csrf(page), "workspace_id": match.group(1)}
 
