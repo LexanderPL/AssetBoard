@@ -149,18 +149,27 @@ def test_summary_shows_plan_and_actual_with_pending(rent) -> None:
     assert '<span class="sr-only"> (If everything pending arrives: €100.00)</span>' in row
     total = _block(summary, r'<tr id="summary-total-expense".*?</tr>')
     assert ">+ €100.00 pending<" in total
-    # KPIs: Actual with "+ X pending"; left if everything pending arrives.
+    # KPIs: Actual with "+ X pending"; left (here: short) if everything pending arrives.
     assert re.search(r'data-pending data-kpi-pending="spent">\+ €100.00 pending<', summary)
     assert 'data-kpi-pending="earned"' not in summary  # nothing earned is pending
-    assert re.search(r'data-kpi-pending="net">-€100.00 if everything pending arrives<', summary)
-    assert "Pending: earned €0.00, spent €100.00, saved or invested €0.00." in summary
-    # The flow bar ("Spent vs earned") draws the pending spending striped; the confirmed-only
-    # twin is hidden until the toggle hides the pending parts.
-    assert re.search(r"data-flow-heading>Spent vs earned<", summary)
+    assert 'data-kpi-pending="in"' not in summary
     assert re.search(
-        r'fill="url\(#flow-pending-danger\)"[^>]*data-pending-flow-segment="spent-pending"', summary
+        r'data-kpi-pending="net">short by €100.00 if everything pending arrives<', summary
     )
-    assert re.search(r'<svg class="[^"]* hidden"[^>]*data-flow-bar data-pending-off>', summary)
+    assert (
+        "Pending: in €0.00 (earned €0.00, withdrawn €0.00), out €100.00 (spent €100.00, "
+        "saved or invested €0.00). If everything pending arrives, short by €100.00." in summary
+    )
+    # The flow ("In vs out") draws the pending spending striped; the confirmed-only twin is
+    # hidden until the toggle hides the pending parts.
+    assert re.search(r"data-flow-heading>In vs out<", summary)
+    assert re.search(
+        r'fill="url\(#flow-pending-danger\)"[^>]*data-flow-segment="spent-pending"', summary
+    )
+    # Nothing comes in: the strip is all shortfall (dashed).
+    assert re.search(r'data-strip-segment="short"', summary)
+    assert re.search(r'<div class="mt-2 hidden"[^>]*data-in-out-flow data-pending-off>', summary)
+    assert re.search(r'aria-hidden="true" data-in-out-flow data-pending>', summary)
     # The toggle is "Show pending" (app.js hides everything marked data-pending).
     assert re.search(r'data-pending-toggle aria-pressed="true"[^>]*>Show pending</button>', summary)
     assert "data-forecast-toggle" not in summary
@@ -183,14 +192,19 @@ def test_pending_over_plan_is_a_softer_hint(rent) -> None:
         r"Over plan if everything pending arrives<",
         row,
     )
-    bar = _block(summary, r'data-summary-bar="expense".*?</svg>')
-    assert "Spent €0.00 of €50.00 planned" in bar and "(over plan)" not in bar
-    assert "+ €100.00 pending" in bar and "(If everything pending arrives: €100.00)" in bar
+    bar = _block(summary, r'data-summary-bar="out".*?</svg>')
+    # "Out A (+ C pending) of B planned": the pending part never reads as part of the plan.
+    assert re.search(
+        r"Out €0.00<span data-pending> \(\+ €100.00 pending\)<span class=.sr-only.> "
+        r"\(If everything pending arrives: €100.00\)</span></span> of €50.00 planned",
+        bar,
+    )
+    assert "(over plan)" not in bar
     assert "(over plan if everything pending arrives)" in bar
     # The scale is the forecast (100): plan at 50, the striped pending part from 0 to 100.
     assert re.search(r'x1="50"[^>]*data-bar-planned', bar)
     assert re.search(
-        r'<rect x="0" y="3" width="100" height="10" fill="url\(#bar-pending-expense\)" '
+        r'<rect x="0" y="3" width="100" height="10" fill="url\(#bar-pending-out\)" '
         r"data-pending data-bar-pending><title>If everything pending arrives: €100.00</title>",
         bar,
     )
@@ -207,20 +221,20 @@ def test_a_future_month_labels_the_chart_as_expected(rent) -> None:
     future = _block(
         owner.client.get("/m/2026-04").text, r'<section id="month-summary".*?</section>'
     )
-    assert re.search(r"data-flow-heading>Expected spent vs expected earned<", future)
+    assert re.search(r"data-flow-heading>Expected in vs expected out<", future)
     assert _pending(_summary_row(future, category)) == "+ €100.00 pending"
-    assert 'data-pending-flow-segment="spent-pending"' in future
+    assert 'data-flow-segment="spent-pending"' in future
     current = _block(
         owner.client.get("/m/2026-03").text, r'<section id="month-summary".*?</section>'
     )
-    assert re.search(r"data-flow-heading>Spent vs earned<", current)
+    assert re.search(r"data-flow-heading>In vs out<", current)
     # A month with nothing pending has no pending parts at all.
     owner.post(f"/upcoming/{_occurrences[0]}/skip", token_from="/upcoming")
     january = _block(
         owner.client.get("/m/2026-01").text, r'<section id="month-summary".*?</section>'
     )
-    assert re.search(r"data-flow-heading>Spent vs earned<", january)
-    assert "data-pending-off" not in january and "data-pending-flow-segment" not in january
+    assert re.search(r"data-flow-heading>In vs out<", january)
+    assert "data-pending-off" not in january and '-pending"' not in january
     assert _pending(_summary_row(january, category)) is None
     owner.client.headers["Accept-Language"] = "pl"
     polish = _block(

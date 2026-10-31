@@ -3,8 +3,8 @@
 Expenses and income are entered on the Transactions page ("Transactions" in the main navigation,
 or an address such as `/transactions/2026-10`; `/transactions` opens the current month). It has
 the same month navigation as the [month page](months.md) (Previous, Next, Today and the month
-picker); "Month" in the main navigation opens that month's summary. The page is only for
-entries: the flow bar and planned values are on the month page. The page has two tables,
+picker); "Month" in the main navigation opens that month's summary (on another page it opens
+the current month). The page is only for entries: the flow bar and planned values are on the month page. The page has two tables,
 **Expenses** and **Income**, with one row per entry, ordered by date and then by the order you
 entered them.
 

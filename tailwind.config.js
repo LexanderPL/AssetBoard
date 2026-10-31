@@ -38,6 +38,7 @@ module.exports = {
           "shade-2": token("success-shade-2"),
           "shade-3": token("success-shade-3"),
         },
+        withdrawn: token("withdrawn"),
         danger: {
           DEFAULT: token("danger"),
           soft: token("danger-soft"),

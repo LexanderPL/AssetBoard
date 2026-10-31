@@ -1,10 +1,13 @@
 """The month summary block (F2.3 part B, F2.4): view models and messages.
 
-The block is ``#month-summary`` (``months/_summary.html``): the KPI flow bar, planned-vs-actual bars
-and one row per category in the summary's groups (expenses, saved / invested, income, withdrawn
-from savings, and the plan-only "Transfers (not counted)" while such lines exist), each with its
-planned value (F2.3: editable inline for editors and owners while the month is open), actual and
-difference (F2.4), and a totals row per group.
+The block is ``#month-summary`` (``months/_summary.html``): the in/out flow (``InOutView``: where
+the money came from above how it was used), the Out and In planned-vs-actual bars and one row per
+category in the summary's groups (expenses, saved / invested, income, withdrawn from savings, and
+the plan-only "Transfers (not counted)" while such lines exist), each with its planned value
+(F2.3: editable inline for editors and owners while the month is open), actual and difference
+(F2.4), and a totals row per group. The groups sit in two blocks, "Money out" (expenses, saved /
+invested) and "Money in" (income, withdrawn), each with its total (Out and In). Home keeps the
+older flow bar of earnings (``KpiView``).
 
 Shared by ``web.month_routes`` (the Month page), ``web.routes`` (Home shows the flow bar) and
 ``web.plan_routes`` (the planned-value writes). Everything here
@@ -22,12 +25,14 @@ from sqlalchemy.orm import Session, sessionmaker
 from assetboard.domain.categories import Treatment
 from assetboard.domain.money import Money
 from assetboard.domain.summary import (
+    BLOCK_ORDER,
     FLOW_SCALE,
     FlowBar,
-    PendingFlowBar,
+    InOutFlow,
     SortOrder,
+    SummaryBlock,
     flow_bar,
-    pending_flow_bar,
+    in_out_flow,
 )
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_month_after_from
@@ -51,6 +56,11 @@ GROUP_HEADINGS = {
     "withdrawn": _("Withdrawn from savings"),
     "transfer": _("Transfers (not counted)"),
 }
+# The two blocks of the summary table (owner, 2026-10-31): their headings and groups.
+MONEY_BLOCKS = (
+    ("out", _("Money out"), ("expense", "saved")),
+    ("in", _("Money in"), ("income", "withdrawn")),
+)
 # One message per ``services.budget.InvalidPlannedValue`` code.
 PLAN_ERRORS = {
     "invalid_amount": _("Enter a valid amount."),
@@ -130,6 +140,17 @@ class PlanGroupView:
 
 
 @dataclass(frozen=True, slots=True)
+class MoneyBlockView:
+    """A block of the summary table: "Money out" (expenses, saved / invested) or "Money in"
+    (income, withdrawn from savings), with its total (planned, actual and pending)."""
+
+    key: str  # "out" or "in"
+    heading: str
+    groups: tuple[PlanGroupView, ...]
+    totals: TotalsView
+
+
+@dataclass(frozen=True, slots=True)
 class KpiView:
     earned: str
     spent: str
@@ -143,20 +164,41 @@ class KpiView:
     flow: FlowBar = FlowBar(0, 0, 0)  # positions on 0..flow_scale (domain.summary.flow_bar)
     forecast_flow: FlowBar = FlowBar(0, 0, 0)  # Home's second, thinner bar
     flow_scale: int = FLOW_SCALE
-    # The Month page: the pending part of each figure ("" when nothing is pending), left if
-    # everything pending arrives, and the flow bar with the pending segments.
-    earned_pending: str = ""
-    spent_pending: str = ""
-    saved_pending: str = ""
-    forecast_net: str = ""
-    has_pending: bool = False
-    zero: str = ""  # 0 in the currency (the screen-reader sentence's empty pending parts)
-    pending_flow: PendingFlowBar = PendingFlowBar(0, 0, 0, 0, 0, 0)
+
+
+@dataclass(frozen=True, slots=True)
+class InOutView:
+    """The Month page's flow (owner, 2026-10-31): In = earned + withdrawn from savings, Out =
+    spent + saved / invested, left = In - Out ("short by" when negative). Amounts are formatted;
+    a pending part is "" when nothing is pending."""
+
+    total_in: str
+    earned: str
+    withdrawn: str
+    total_out: str
+    spent: str
+    saved: str
+    left: str  # the absolute value: ``short`` says the sign
+    short: bool  # Out above In (confirmed)
+    in_pending: str
+    earned_pending: str
+    withdrawn_pending: str
+    out_pending: str
+    spent_pending: str
+    saved_pending: str
+    forecast_left: str  # left (absolute) if everything pending arrives
+    forecast_short: bool
+    has_withdrawn: bool  # something withdrawn, confirmed or pending (the strip shows it)
+    has_pending: bool
+    zero: str  # 0 in the currency (the screen-reader text's empty parts)
+    flow: InOutFlow  # with the pending parts
+    confirmed_flow: InOutFlow  # without them (the "Show pending" toggle off)
+    savings_rate: str | None  # saved / earned (None: nothing earned)
 
 
 @dataclass(frozen=True, slots=True)
 class BarView:
-    key: str  # "expense" or "income"
+    key: str  # "expense" or "income" (Home); "out" or "in" (the Month page)
     planned: str
     actual: str
     planned_width: int  # 0-100, of max(planned, actual + pending)
@@ -177,7 +219,10 @@ class SummaryView:
     banner_source: str | None  # "Copy plan from <month>" is offered (month after "from")
     copied: CopiedNotice | None
     kpis: KpiView | None = None
-    bars: tuple[BarView, ...] = ()
+    bars: tuple[BarView, ...] = ()  # Home: spent and earned against their plans
+    in_out: InOutView | None = None  # the Month page's flow
+    in_out_bars: tuple[BarView, ...] = ()  # the Month page: Out and In against their plans
+    money_blocks: tuple[MoneyBlockView, ...] = ()  # "Money out" and "Money in"
     sort: str = "actual"
     zero_input: str = "0"  # the placeholder of an empty planned cell ("0.00", "0,00")
     filter_id: str = ""  # the category the transaction tables are filtered to (aria-current)
@@ -234,6 +279,91 @@ def _bar(key: str, planned: Money, actual: Money, expected: Money, locale: str) 
         pending_end=_width(forecast, scale),
         forecast=format_money(Money(forecast, actual.currency), locale),
         pending_over=not over and pending > 0 and forecast > planned.amount_minor,
+    )
+
+
+def _sum_blocks(blocks: tuple[SummaryBlock, ...]) -> tuple[Money, Money, Money]:
+    """Planned, actual and pending of several summary blocks together (Out or In)."""
+    currency = blocks[0].planned.currency
+    return (
+        Money(sum(b.planned.amount_minor for b in blocks), currency),
+        Money(sum(b.actual.amount_minor for b in blocks), currency),
+        Money(sum(max(b.expected.amount_minor, 0) for b in blocks), currency),
+    )
+
+
+def _block_totals(planned: Money, actual: Money, expected: Money, locale: str) -> TotalsView:
+    """A "Money out" or "Money in" total. It has no difference: its groups' differences have
+    different signs (saving more is favourable, spending more is not)."""
+    forecast = Money(actual.amount_minor + expected.amount_minor, actual.currency)
+    return TotalsView(
+        planned=format_money(planned, locale),
+        actual=format_money(actual, locale),
+        pending=_pending(expected, locale),
+        forecast=format_money(forecast, locale),
+        difference="",
+        tone="",
+    )
+
+
+def _in_out(
+    currency: str,
+    expense: SummaryBlock,
+    saved: SummaryBlock,
+    income: SummaryBlock,
+    withdrawn: SummaryBlock,
+    savings_rate: str | None,
+    locale: str,
+) -> InOutView:
+    """The Month page's flow from the four summary blocks (see ``InOutView``)."""
+
+    def money(minor: int) -> str:
+        return format_money(Money(minor, currency), locale)
+
+    def maybe(minor: int) -> str:
+        return money(minor) if minor > 0 else ""
+
+    amounts = {
+        "earned": income.actual.amount_minor,
+        "withdrawn": withdrawn.actual.amount_minor,
+        "spent": expense.actual.amount_minor,
+        "saved": saved.actual.amount_minor,
+    }
+    pendings = {
+        "earned_pending": max(income.expected.amount_minor, 0),
+        "withdrawn_pending": max(withdrawn.expected.amount_minor, 0),
+        "spent_pending": max(expense.expected.amount_minor, 0),
+        "saved_pending": max(saved.expected.amount_minor, 0),
+    }
+    total_in = amounts["earned"] + amounts["withdrawn"]
+    total_out = amounts["spent"] + amounts["saved"]
+    in_pending = pendings["earned_pending"] + pendings["withdrawn_pending"]
+    out_pending = pendings["spent_pending"] + pendings["saved_pending"]
+    left = total_in - total_out
+    forecast_left = left + in_pending - out_pending
+    return InOutView(
+        total_in=money(total_in),
+        earned=money(amounts["earned"]),
+        withdrawn=money(amounts["withdrawn"]),
+        total_out=money(total_out),
+        spent=money(amounts["spent"]),
+        saved=money(amounts["saved"]),
+        left=money(abs(left)),
+        short=left < 0,
+        in_pending=maybe(in_pending),
+        earned_pending=maybe(pendings["earned_pending"]),
+        withdrawn_pending=maybe(pendings["withdrawn_pending"]),
+        out_pending=maybe(out_pending),
+        spent_pending=maybe(pendings["spent_pending"]),
+        saved_pending=maybe(pendings["saved_pending"]),
+        forecast_left=money(abs(forecast_left)),
+        forecast_short=forecast_left < 0,
+        has_withdrawn=amounts["withdrawn"] != 0 or pendings["withdrawn_pending"] > 0,
+        has_pending=in_pending > 0 or out_pending > 0,
+        zero=money(0),
+        flow=in_out_flow(**amounts, **pendings),
+        confirmed_flow=in_out_flow(**amounts),
+        savings_rate=savings_rate,
     )
 
 
@@ -332,12 +462,9 @@ def build_summary(
         rows = tuple(row_view(r.category, r.planned) for r in transfers.rows)
         groups.append(PlanGroupView("transfer", gettext(GROUP_HEADINGS["transfer"], locale), rows))
     kpis = summary.kpis
-    expense, saved, income = (
-        summary.block("expense"),
-        summary.block("saved"),
-        summary.block("income"),
-    )
+    expense, saved, income, withdrawn = (summary.block(key) for key in BLOCK_ORDER)
     rate = kpis.savings_rate_tenths
+    savings_rate = format_rate_tenths(rate, locale) if rate is not None else None
     kpi_view = KpiView(
         earned=format_money(kpis.earned, locale),
         spent=format_money(kpis.spent, locale),
@@ -346,7 +473,7 @@ def build_summary(
         saved=format_money(kpis.saved, locale),
         net=format_money(kpis.net, locale),
         net_tone=_tone(kpis.net),
-        savings_rate=format_rate_tenths(rate, locale) if rate is not None else None,
+        savings_rate=savings_rate,
         overspend=format_money(Money(-kpis.net.amount_minor, kpis.net.currency), locale)
         if kpis.net.amount_minor < 0
         else None,
@@ -356,32 +483,24 @@ def build_summary(
             kpis.forecast_spent.amount_minor,
             kpis.forecast_saved.amount_minor,
         ),
-        earned_pending=_pending(income.expected, locale),
-        spent_pending=_pending(expense.expected, locale),
-        saved_pending=_pending(saved.expected, locale),
-        forecast_net=format_money(
-            Money(
-                kpis.forecast_earned.amount_minor
-                - kpis.forecast_spent.amount_minor
-                - kpis.forecast_saved.amount_minor,
-                kpis.net.currency,
-            ),
-            locale,
-        ),
-        zero=format_money(Money(0, kpis.net.currency), locale),
-        has_pending=any(b.expected.amount_minor > 0 for b in (income, expense, saved)),
-        pending_flow=pending_flow_bar(
-            kpis.earned.amount_minor,
-            kpis.spent.amount_minor,
-            kpis.saved.amount_minor,
-            earned_pending=income.expected.amount_minor,
-            spent_pending=expense.expected.amount_minor,
-            saved_pending=saved.expected.amount_minor,
-        ),
     )
     bars = (
         _bar("expense", expense.planned, expense.actual, expense.expected, locale),
         _bar("income", income.planned, income.actual, income.expected, locale),
+    )
+    in_out = _in_out(summary.currency, expense, saved, income, withdrawn, savings_rate, locale)
+    sums = {"out": _sum_blocks((expense, saved)), "in": _sum_blocks((income, withdrawn))}
+    in_out_bars = tuple(_bar(key, *sums[key], locale) for key in ("out", "in"))
+    by_key = {g.key: g for g in groups}
+    money_blocks = tuple(
+        MoneyBlockView(
+            key=key,
+            heading=gettext(heading, locale),
+            groups=tuple(by_key[k] for k in keys if k in by_key),
+            totals=_block_totals(*sums[key], locale),
+        )
+        for key, heading, keys in MONEY_BLOCKS
+        if any(k in by_key for k in keys)
     )
     banner = None
     if can_write and not plan.has_lines and plan.copyable_from_previous and plan.previous:
@@ -402,6 +521,9 @@ def build_summary(
         copied=notice,
         kpis=kpi_view,
         bars=bars,
+        in_out=in_out,
+        in_out_bars=in_out_bars,
+        money_blocks=money_blocks,
         sort=sort,
         zero_input=format_amount_input(Money(0, summary.currency), locale),
         filter_id=str(filter_id) if filter_id is not None else "",
