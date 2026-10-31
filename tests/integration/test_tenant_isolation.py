@@ -389,7 +389,7 @@ def test_current_workspace_repository_touches_only_its_workspace(
 
     assert {
         "name", "base_currency", "country_code", "timezone", "locale", "auto_copy_plan",
-        "require_two_factor", "taxes_enabled"
+        "require_two_factor", "taxes_enabled", "upcoming_days"
     } == UPDATABLE_FIELDS  # fmt: skip
     for forbidden in ("id", "created_at", "updated_at", "unknown"):
         with pytest.raises(ValueError):
