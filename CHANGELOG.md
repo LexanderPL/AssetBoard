@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.6](https://github.com/LexanderPL/AssetBoard/compare/v0.3.5...v0.3.6) (2026-10-31)
+
+
+### Features
+
+* **months:** Plan and Actual with pending on the Month page ([#177](https://github.com/LexanderPL/AssetBoard/issues/177)) ([3626aab](https://github.com/LexanderPL/AssetBoard/commit/3626aabb771bd4e05a3702db213d55f76a4b3cda))
+* **ui:** quick fixes batch 3 (shading, popovers, upcoming window, favicon) ([#179](https://github.com/LexanderPL/AssetBoard/issues/179)) ([122d4a0](https://github.com/LexanderPL/AssetBoard/commit/122d4a00d09dc1cc52fdbbd0f51b971a905ba109))
+
 ## [0.3.5](https://github.com/LexanderPL/AssetBoard/compare/v0.3.4...v0.3.5) (2026-10-31)
 
 
