@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import mimetypes
 import os
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
@@ -282,6 +283,8 @@ def create_app(
     app.add_middleware(LocaleMiddleware, default_locale=settings.default_locale)
     app.add_middleware(SecurityHeadersMiddleware)
     static_directory = Path(__file__).parent / "static"
+    # The favicon is an SVG; do not depend on the host's mime.types knowing the extension.
+    mimetypes.add_type("image/svg+xml", ".svg")
     app.mount("/static", StaticFiles(directory=static_directory), name="static")
     app.include_router(web_router)
     app.include_router(scheduled_router)
