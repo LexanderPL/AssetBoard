@@ -1,5 +1,6 @@
 {# Shared pieces of the Income page, "Add income" and the edit form. #}
 {% from "macros/components.html" import month_picker with context %}
+{% from "categories/_macros.html" import category_options %}
 {% set input_class = "form-control px-3 py-2" %}
 {% set option_class = "flex cursor-pointer items-start gap-3 border border-line bg-surface p-3 hover:bg-subtle has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40" %}
 
@@ -34,7 +35,7 @@
 
 {% macro basics_fields(values, categories) %}
 <label class="grid gap-1 text-sm font-medium">{{ _("Name") }}<input name="name" value="{{ values.name }}" maxlength="200" required class="{{ input_class }} font-normal"></label>
-<label class="grid gap-1 text-sm font-medium">{{ _("Income category") }}<select name="category_id" required class="form-select py-2 font-normal">{% for category in categories %}<option value="{{ category.id }}"{% if values.category_id == category.id|string %} selected{% endif %}>{{ category.name }}</option>{% endfor %}</select></label>
+<label class="grid gap-1 text-sm font-medium">{{ _("Income category") }}<select name="category_id" required class="form-select py-2 font-normal">{{ category_options([(_("Income categories"), categories)], values.category_id) }}</select></label>
 <fieldset class="grid gap-2">
   <legend class="mb-2 text-sm font-medium">{{ _("How is it paid?") }}</legend>
   <div class="grid gap-2 sm:grid-cols-2">

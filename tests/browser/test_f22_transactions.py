@@ -126,6 +126,31 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
             description = page.locator("#entry-expense-description")
             category = page.locator("#entry-expense-category")
 
+            # The Add button is the cell (owner, 2026-11-01): it fills its cell edge to edge,
+            # square, as tall as the entry row's inputs; no empty-state line above the row.
+            for direction in ("expense", "income"):
+                flush = page.evaluate(
+                    """direction => {
+                      const button = document.querySelector(`#entry-${direction} [data-entry-add]`);
+                      const cell = button.closest("td");
+                      const input = document.getElementById(`entry-${direction}-amount`);
+                      const b = button.getBoundingClientRect();
+                      const c = cell.getBoundingClientRect();
+                      const i = input.getBoundingClientRect();
+                      const style = getComputedStyle(button);
+                      return {
+                        left: Math.abs(b.left - c.left), right: Math.abs(c.right - b.right),
+                        top: Math.abs(b.top - c.top), height: Math.abs(b.height - i.height),
+                        radius: style.borderTopLeftRadius,
+                      };
+                    }""",
+                    direction,
+                )
+                # The cell's 1px border is inside its box (border-collapse): at most 1px.
+                assert all(flush[key] <= 1.5 for key in ("left", "right", "top", "height")), flush
+                assert flush["radius"] == "0px", flush
+            expect(page.locator("[data-ledger-empty]")).to_have_count(0)
+
             # Type, Tab between the fields, Enter on the category select saves; the new entry
             # row is empty and the focus is back in its day field.
             day.click()
@@ -340,7 +365,7 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
             # A closed month is read-only (closed on the Month page, F2.7).
             page.locator("[data-month-close]").click()
             page.get_by_role("button", name="Continue").click()
-            page.wait_for_url(f"{base}/m/{MONTH}?notice=closed")
+            expect(page.locator("[data-closed-banner]")).to_be_visible()
             page.goto(f"{base}/transactions/{MONTH}")
             expect(page.locator("[data-closed-banner]")).to_be_visible()
             expect(page.locator("#entry-expense-row")).to_have_count(0)

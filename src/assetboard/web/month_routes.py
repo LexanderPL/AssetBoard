@@ -74,9 +74,9 @@ ERRORS = {
     "plan_category_archived": PLAN_ERRORS["category_archived"],
     "plan_category_transfer": PLAN_ERRORS["category_transfer"],
 }
+# Closing or reopening a month shows no notice (owner, 2026-11-01): the badge and banner, or the
+# "Close month" button, already say so. Only a no-op ("already ...") is reported.
 NOTICES = {
-    "closed": _("Month closed."),
-    "reopened": _("Month reopened."),
     "already_closed": _("This month was already closed."),
     "already_open": _("This month is already open."),
     "transaction_added": _("Entry added."),
@@ -295,13 +295,13 @@ async def month_close(request: Request, ctx: CurrentContext, month: str) -> Resp
         )
     except MonthError as exc:
         return RedirectResponse(_month_path(request, target, f"error={exc.code}"), status_code=303)
-    notice = "closed" if changed else "already_closed"  # a no-op says so instead
-    return RedirectResponse(_month_path(request, target, f"notice={notice}"), status_code=303)
+    query = "" if changed else "notice=already_closed"  # only a no-op says so
+    return RedirectResponse(_month_path(request, target, query), status_code=303)
 
 
 @router.post("/m/{month}/reopen", name="month_reopen")
 async def month_reopen(request: Request, ctx: CurrentContext, month: str) -> Response:
     target = _parse(month)
     changed = await run_in_threadpool(reopen_month, request.app.state.session_factory, ctx, target)
-    notice = "reopened" if changed else "already_open"  # a no-op says so instead
-    return RedirectResponse(_month_path(request, target, f"notice={notice}"), status_code=303)
+    query = "" if changed else "notice=already_open"  # only a no-op says so
+    return RedirectResponse(_month_path(request, target, query), status_code=303)

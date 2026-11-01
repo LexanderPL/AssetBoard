@@ -64,21 +64,24 @@ The **Summary** block at the top of the month page shows how the month is going:
   income plus the planned withdrawals. The dark line marks the plan.
 - A category row turns red when you spent more than planned on it, and green when an income
   category brought more than planned.
-- A table with every category in groups: **Plan**, **Actual** and **Difference**, and a total
-  per group. The groups sit in two blocks: **Money out** (a red line: Expenses, then Saved /
-  invested) and **Money in** (a green line: Income, then Withdrawn from savings), each closed by
-  its total (**Total money out** is Out, **Total money in** is In, the same figures as above).
-  The block totals have no difference: saving more than planned is good news, spending more is
+- Two tables list every category in groups, with **Plan**, **Actual** and **Difference** and a
+  total per group. The first holds the money that went out (Expenses, then Saved / invested)
+  and ends with **Total money out** (Out); the second the money that came in (Income, then
+  Withdrawn from savings) and ends with **Total money in** (In), the same figures as above.
+  These two totals have no difference: saving more than planned is good news, spending more is
   not. A positive difference is always good news: spent less, earned more, saved more or
-  withdrew less than planned. A category with entries but no plan shows a plan of 0.00.
+  withdrew less than planned.
+- A category without a plan has an empty plan field (a dash), no difference and no red or
+  green colour: there is nothing to compare with. A group's total difference adds only the
+  categories that have a plan, and stays empty when none has one.
 - **Pending** amounts come from your [recurring items and income sources](recurring.md): what is
   still due this month and not yet confirmed. They are part of Actual, shown as a lighter
   second line under the confirmed amount, for example "+ €1,200.00 pending" (only when something
   is pending). Hover it to see the month "If everything pending arrives" (screen readers read
   the same). Confirming an item on the Transactions page moves its amount from pending into the
   confirmed amount. The difference and the red or green row colour count confirmed amounts
-  only; when the pending amount would take a category over its plan, a softer line under it
-  says "Over plan if everything pending arrives".
+  only; when the pending amount would take a planned category over its plan, a softer line
+  under it says "Over plan if everything pending arrives".
 - In the bars, the solid part is confirmed and the **striped** part after it is pending; the
   text above each bar reads, for example, "Out €1,350.50 (+ €2,020.00 pending) of €3,100.00
   planned", and adds "(over plan if everything pending arrives)" when only the pending part
@@ -89,7 +92,7 @@ The **Summary** block at the top of the month page shows how the month is going:
   confirmed in a future month, so there they show what you expect to come in and go out, and
   the title reads **Expected in vs expected out**. (Home still shows the older flow bar of
   earnings with its "Forecast spent … · forecast earned …" line and second bar.)
-- **Show pending** hides or shows every pending part: the "+ … pending" lines, the striped
+- **Show pending** (above both tables) hides or shows every pending part: the "+ … pending" lines, the striped
   parts of the bars and the pending strip and flow bar (they then show confirmed amounts only).
   This browser remembers the choice.
 - **Largest first** sorts each group by the actual amount; **Your order** uses the order of
@@ -103,6 +106,7 @@ expense categories only: saving and investing are in the flow bar, transfers cou
 Each slice has the category's colour; categories with nothing spent have no slice, and beyond
 eight categories the smallest are grouped as "Other". A table with the same amounts and shares
 sits beside it for screen readers, and is shown in place of the chart when JavaScript is off.
+The legend under the chart lists every slice with its share, on as many lines as it needs.
 The chart follows the light or dark theme. Home shows the same donut and one for income.
 
 Click a category's name in the summary to open the Transactions page with only that category's
@@ -140,7 +144,8 @@ When a month is done, close it so nothing in it changes by accident:
   The page shows a "Closed" badge and a banner that says when the month was closed and by whom.
   Every member sees it, viewers included.
 - **Reopen month** is offered to owners only. After reopening, the month's entries and planned
-  values can change again.
+  values can change again. Closing and reopening show no extra message: the badge and banner
+  (or the **Close month** button) already show the month's state.
 - If someone else closed or reopened the month in the meantime (another tab, a double click),
   the page says the month was already closed, or is already open, and nothing changes.
 

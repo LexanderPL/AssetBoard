@@ -1,7 +1,10 @@
 {# A category donut (F2.7). ``d`` is web.charts.DonutView. The data travels in a JSON block
    (Jinja's tojson) read by static/js/charts.js, which draws the chart in the [data-chart-canvas]
    box (hidden until then, aria-hidden) and turns the table into a screen-reader-only one.
-   Without JavaScript the table stays visible in place of the chart. No inline script or style. #}
+   The legend is HTML under the chart (hidden with it, aria-hidden: the table is the accessible
+   version): it wraps onto as many lines as it needs instead of ECharts' paged legend, in the
+   slices' colours. Without JavaScript the table stays visible in place of the chart. No inline
+   script or style. #}
 {% macro donut(d) -%}
 <section class="panel p-4 sm:p-6" aria-labelledby="chart-{{ d.key }}-heading" data-donut="{{ d.key }}">
   <div class="flex flex-wrap items-baseline justify-between gap-2">
@@ -11,7 +14,12 @@
   {% if d.slices %}
   <div data-chart="donut" data-chart-source="chart-{{ d.key }}-data">
     <script type="application/json" id="chart-{{ d.key }}-data">{{ d.data|tojson }}</script>
-    <div class="mt-3 h-64 w-full" hidden aria-hidden="true" data-chart-canvas></div>
+    <div class="mt-3 h-80 w-full" hidden aria-hidden="true" data-chart-canvas></div>
+    <ul class="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-sm" hidden aria-hidden="true" data-chart-legend>
+      {% for s in d.slices %}
+      <li class="flex items-center gap-1.5" data-chart-legend-item><svg class="h-3 w-3 shrink-0" viewBox="0 0 12 12" focusable="false"><rect width="12" height="12"{% if s.color %} fill="{{ s.color }}"{% else %} class="fill-line-strong"{% endif %}/></svg><span>{{ s.name }}</span><span class="tabular-nums text-muted">{{ s.share }}</span></li>
+      {% endfor %}
+    </ul>
     <div class="relative mt-3 overflow-x-auto" data-chart-table>
       <table class="sheet w-full text-sm">
         <caption class="sr-only">{{ d.heading }}</caption>

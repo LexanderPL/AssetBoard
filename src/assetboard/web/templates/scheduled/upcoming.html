@@ -13,11 +13,9 @@
 </div>
 {% endif %}
 {% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-upcoming-notice>{{ notice }}</p>{% endif %}
+{% from "categories/_macros.html" import category_options as grouped_options %}
 {% macro category_options(selected) -%}
-<option value="">{{ _("Choose a category") }}</option>
-{% for heading, group in ((_("Expense categories"), expense_categories), (_("Income categories"), income_categories)) %}{% if group %}
-<optgroup label="{{ heading }}">{% for category in group %}<option value="{{ category.id }}"{% if selected == category.id|string %} selected{% endif %}>{{ category.name }}</option>{% endfor %}</optgroup>
-{% endif %}{% endfor %}
+{{ grouped_options([(_("Expense categories"), expense_categories), (_("Income categories"), income_categories)], selected, _("Choose a category")) }}
 {%- endmacro %}
 {# The fields of a one-time payment: the "Add one-time payment" form and a row's Edit form. #}
 {% macro one_time_fields(prefix, values, errors) -%}
@@ -76,8 +74,8 @@
     <div>
       <label for="upcoming-category" class="mb-1 block text-sm font-medium">{{ _("Category") }}</label>
       <select id="upcoming-category" name="category" class="form-select w-full py-1.5 pl-2.5">
-        <option value="">{{ _("All categories") }}</option>
-        {% for category in categories %}<option value="{{ category.id }}"{% if category_id == category.id|string %} selected{% endif %}>{{ category.name }}{% if category.archived %} · {{ _("archived") }}{% endif %}</option>{% endfor %}
+        {# Kinds and archived categories are dividers (optgroup), not options. #}
+        {{ grouped_options([(_("Expense categories"), expense_categories), (_("Income categories"), income_categories), (_("Archived categories"), archived_categories)], category_id or "", _("All categories")) }}
       </select>
     </div>
     <div class="flex items-end gap-3">

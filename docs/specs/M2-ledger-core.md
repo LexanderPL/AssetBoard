@@ -334,7 +334,8 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
 - Planned-vs-actual bars (ECharts or CSS bars) for total expenses and total income.
 - Clicking a category filters the transaction tables to that category.
 - Golden example (must be a test): budget Food 550.00; transactions Food 50.00 + 500.00 → actual 550.00, difference 0.00; budget Travel 5 350.00 with 4 323.00 spent → difference 1 027.00; income Salary planned 3 000.00, actual 3 400.00 → difference +400.00.
-- Categories with actuals but no planned line are shown with planned 0.00 (never hidden).
+- Categories with actuals but no planned line are shown (never hidden), with no planned value
+  and no difference (owner, 2026-11-01; see "No plan" under As built).
 - **From F2.2/F2.3:** render the summary in `months/_summary.html` from
   `web.plan.summary_context` (F2.3 built the rows with planned cells, `months/_plan.html`);
   every transaction write already sends `#month-summary` out of band, so the totals refresh
@@ -348,8 +349,9 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
   units (no SQL aggregates). An amount in another currency or an unknown category is a
   `ValueError` (guards only: the base currency is locked).
 - Rows: every non-transfer category with a line or actuals, and every active non-transfer
-  category (so it can be planned); actuals without a line show planned **0.00** (read-only
-  cells show "€0.00"; editable cells stay empty with the locale's "0.00" as placeholder);
+  category (so it can be planned); actuals without a line show no planned value (read-only
+  cells show a muted dash, "No plan" for screen readers; editable cells stay empty with a dash
+  as placeholder; superseded "0.00", owner 2026-11-01);
   archived categories appear only with a line or actuals. Transfers are in no block, total or
   KPI; F2.3's "Transfers (not counted)" group stays plan-only (no actual or difference).
 - **Product decisions (owner, 2026-10-18; the owner may still change them):**
@@ -449,11 +451,22 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
   parts, Left or Short by, and the pending amounts). **Bars:** Out (plan = planned expenses +
   planned savings) and In (plan = planned income + planned withdrawals; withdrawals do take a
   plan), worded "Out A (+ C pending) of B planned" / "In A (+ C pending) of B planned" (the
-  pending part only when above zero; "(no plan)" without a plan). **Table:** two blocks, "Money
-  out" (Expenses, Saved / invested; red top rule and marker) and "Money in" (Income, Withdrawn
-  from savings; green), each closed by "Total money out" / "Total money in" (Out and In,
-  pending under the actual). The block totals have no difference (their groups' differences
-  point different ways). Transfers (not counted) stay last. Home keeps the F2.4 flow bar of
+  pending part only when above zero; "(no plan)" without a plan). **Table:** two tables, money
+  out (Expenses, Saved / invested) and money in (Income, Withdrawn from savings), each in its
+  own panel with its own header row (Category, Plan, Actual, Difference) and closed by "Total
+  money out" / "Total money in" (Out and In, pending under the actual; a red or green top rule).
+  Owner, 2026-11-01: the "Money out" / "Money in" heading rows are gone (each table has an
+  sr-only caption instead); the order and "Show pending" toggles stay once, in the Summary
+  panel above both tables, and act on both. The block totals have no difference (their groups'
+  differences point different ways). Transfers (not counted) stay last, in a third table
+  while such lines exist.
+- **No plan (owner, 2026-11-01):** a category without a planned value (no budget line, or 0)
+  has an empty Difference cell, no over-plan row tint and no "Over plan if everything pending
+  arrives" hint; its editable planned field is empty with a muted dash placeholder ("not set";
+  no longer "0.00"), and a read-only cell shows a muted dash with "No plan" for screen readers.
+  A group's total Difference adds only the categories that have a plan, and is empty when none
+  has; the total's Plan and Actual still add every category. The Out and In bars keep "(no
+  plan)". Home keeps the F2.4 flow bar of
   earnings and the spent / earned bars (follow-up); `domain.summary.pending_flow_bar` is
   replaced by `in_out_flow` and removed.
 - **Follow-up (review, 2026-10-19):** `web.plan.build_summary` reads twice per render

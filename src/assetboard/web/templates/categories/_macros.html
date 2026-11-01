@@ -4,6 +4,16 @@
 <svg class="h-3.5 w-3.5 shrink-0" viewBox="0 0 14 14" aria-hidden="true" focusable="false"><circle cx="7" cy="7" r="7" fill="{{ color }}"/></svg>
 {%- endmacro %}
 
+{# The options of every category select element: one <optgroup> per kind (or "Archived categories"),
+   so a kind is a divider that cannot be chosen, never an option of its own. ``groups`` holds
+   (heading, categories) or (heading, categories, kind) items; a category has ``id`` and
+   ``name``; empty groups are left out. ``placeholder`` adds a first empty option;
+   ``kind_attr`` marks each group with data-kind (the Recurring form filters by it). #}
+{% macro category_options(groups, selected="", placeholder="", kind_attr=false) -%}
+{% if placeholder %}<option value="">{{ placeholder }}</option>{% endif %}
+{% for group in groups %}{% if group[1] %}<optgroup label="{{ group[0] }}"{% if kind_attr %} data-kind="{{ group[2] }}"{% endif %}>{% for c in group[1] %}<option value="{{ c.id }}"{% if selected and c.id|string == selected|string %} selected{% endif %}>{{ c.name }}</option>{% endfor %}</optgroup>{% endif %}{% endfor %}
+{%- endmacro %}
+
 {% macro htmx_form(action) -%}
 method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#categories-body" hx-swap="outerHTML"
 {%- endmacro %}

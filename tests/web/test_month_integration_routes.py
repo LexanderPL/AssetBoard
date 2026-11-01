@@ -136,8 +136,9 @@ def test_summary_shows_plan_and_actual_with_pending(rent) -> None:
     html = owner.client.get("/m/2026-03").text
     summary = _block(html, r'<section id="month-summary".*?</section>')
     # Two columns, Plan and Actual (and Difference); no Expected or Forecast column or line.
+    # The money out and money in tables have a header row each.
     headings = re.findall(r'<th scope="col"[^>]*>([^<]*)</th>', summary)
-    assert headings == ["Category", "Plan", "Actual", "Difference"]
+    assert headings == ["Category", "Plan", "Actual", "Difference"] * 2
     assert "Expected (pending)" not in summary and ">Forecast</th>" not in summary
     assert "Forecast spent" not in summary and "forecast earned" not in summary
     # The pending amount is a lighter line under the confirmed one, with the forecast as its
@@ -147,6 +148,9 @@ def test_summary_shows_plan_and_actual_with_pending(rent) -> None:
     assert _pending(row) == "+ €100.00 pending"
     assert 'title="If everything pending arrives: €100.00"' in row
     assert '<span class="sr-only"> (If everything pending arrives: €100.00)</span>' in row
+    # No plan: no "over plan if everything pending arrives" hint and no difference.
+    assert "data-pending-over" not in row and "Over plan" not in row
+    assert re.search(r"data-difference>\s*</td>", row)
     total = _block(summary, r'<tr id="summary-total-expense".*?</tr>')
     assert ">+ €100.00 pending<" in total
     # KPIs: Actual with "+ X pending"; left (here: short) if everything pending arrives.

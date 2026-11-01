@@ -239,6 +239,13 @@
   .cell-input[aria-invalid="true"] {
     @apply outline outline-2 -outline-offset-2 outline-danger;
   }
+
+  /* A button that is the cell (the ledger's Add in an entry row): square, the full width of a
+     "cell-edit" cell and the height of a "cell-input", in the primary colour; the focus ring
+     sits inside it. */
+  .cell-button {
+    @apply block w-full rounded-none bg-primary px-2 py-1.5 text-center text-sm font-semibold text-on-primary hover:bg-primary-hover focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-4 focus-visible:outline-on-primary;
+  }
 }
 
 /* Progressive disclosure (app.js applyHiddenWhen): the hidden attribute wins over display
