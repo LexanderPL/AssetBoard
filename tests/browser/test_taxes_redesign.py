@@ -5,6 +5,7 @@ Taxes page. No CSP violations. Set ASSETBOARD_TAX_SCREENSHOTS to a folder to sav
 from __future__ import annotations
 
 import os
+import re
 import socket
 import threading
 import time
@@ -112,7 +113,8 @@ def test_new_tax_flow_in_a_browser(tmp_path: Path) -> None:
             category = page.get_by_label("Record it in category")
             assert category.evaluate("s => s.selectedOptions[0].text") == "Taxes"
             expect(example).to_contain_text("8,800.00 is really yours")
-            expect(example).to_contain_text("Dec 25")
+            # The example pays on the 25th of a month that depends on today's date.
+            expect(example).to_contain_text(re.compile(r"on [A-Z][a-z]{2} 25, \d{4}"))
             if shots:
                 page.screenshot(path=os.path.join(shots, "taxes-a-new.png"), full_page=True)
             page.get_by_role("button", name="Save tax").click()
