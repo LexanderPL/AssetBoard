@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import atexit
+import shutil
+import tempfile
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from functools import cache
 from pathlib import Path
 from uuid import UUID
 
@@ -84,9 +88,26 @@ class WorkspaceDb:
             return {email.split("@")[0]: role for email, role in rows}
 
 
+@cache
+def _migrated_template() -> Path:
+    """A migrated, empty database built once per test process; each test copies it.
+
+    Running every migration per test cost about 0.6 s of setup for each test that uses
+    ``workspace_db``. Migrations themselves are covered by ``tests/integration/test_migrations.py``.
+    """
+    directory = Path(tempfile.mkdtemp(prefix="assetboard-workspace-template-"))
+    atexit.register(shutil.rmtree, directory, ignore_errors=True)
+    template = directory / "template.db"
+    upgrade_database(
+        Settings(_env_file=None, data_dir=directory, database_url=f"sqlite:///{template}")
+    )
+    return template
+
+
 def workspace_db(tmp_path: Path) -> Iterator[WorkspaceDb]:
-    database_url = f"sqlite:///{tmp_path / 'workspaces.db'}"
-    upgrade_database(Settings(_env_file=None, data_dir=tmp_path, database_url=database_url))
+    database_path = tmp_path / "workspaces.db"
+    shutil.copyfile(_migrated_template(), database_path)
+    database_url = f"sqlite:///{database_path}"
     engine = create_database_engine(database_url)
     clock = FixedClock("2026-03-01T12:00:00+00:00")
     factory = sessionmaker(engine, class_=Session, info={"clock": clock}, expire_on_commit=False)

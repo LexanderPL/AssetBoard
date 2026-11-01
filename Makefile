@@ -1,6 +1,8 @@
 .PHONY: setup dev check test css migrate revision i18n-extract i18n-update i18n-compile
 
 UV := uv
+# Parallel test workers for make check/test (pytest-xdist); PYTEST_WORKERS=0 runs serially.
+PYTEST_WORKERS ?= auto
 DEV_HOST ?= 127.0.0.1
 DEV_PORT ?= 8000
 
@@ -13,7 +15,7 @@ check: i18n-compile
 	$(UV) run ruff check .
 	$(UV) run ruff format --check .
 	$(UV) run pyright
-	$(UV) run pytest
+	$(UV) run pytest -n $(PYTEST_WORKERS)
 	@temp_dir=$$(mktemp -d); \
 	trap 'rm -rf "$$temp_dir"' EXIT; \
 	ASSETBOARD_DATA_DIR="$$temp_dir" ASSETBOARD_DATABASE_URL="sqlite:///$$temp_dir/check.db" $(UV) run assetboard migrate && \
@@ -21,7 +23,7 @@ check: i18n-compile
 	$(UV) run pre-commit run --all-files
 
 test: i18n-compile
-	$(UV) run pytest
+	$(UV) run pytest -n $(PYTEST_WORKERS)
 
 css:
 	@mkdir -p src/assetboard/static/css .cache

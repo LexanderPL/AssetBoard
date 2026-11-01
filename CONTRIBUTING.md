@@ -17,6 +17,12 @@ make check
 must not access the network. Add or update tests for behavior changes and update English and Polish
 translation catalogs when user-facing strings change.
 
+`make check` and `make test` run pytest in parallel with pytest-xdist, one worker per CPU core. Use
+`PYTEST_WORKERS=0 make test` to run serially, or `PYTEST_WORKERS=2` to pick a count. Plain `pytest`
+stays serial. Each worker is a separate process, so tests must not depend on running order or share
+files outside `tmp_path`, and parametrize values must be deterministic: every worker has to collect
+the same test IDs.
+
 Translations: commit the `.po` catalogs (`make i18n-update` refreshes them from the source). The
 compiled `.mo` files are build output and are gitignored: `make setup`, `make dev`, `make test` and
 `make check` run `make i18n-compile` first, and wheel and image builds compile them too. If you

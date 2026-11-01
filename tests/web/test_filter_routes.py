@@ -132,7 +132,7 @@ def test_an_income_category_shows_the_income_table(
     assert "Showing Golden Salary only (1 entry)." in tables
 
 
-@pytest.mark.parametrize("value", ["not-a-uuid", str(uuid4()), ""])
+@pytest.mark.parametrize("value", ["not-a-uuid", "0b9f4c3e-6d1a-4c55-9a0e-2f7d8e1b3a64", ""])
 def test_ids_that_are_no_category_of_this_workspace_show_everything(
     ledger: OwnerApp, golden: dict[str, UUID], value: str
 ) -> None:

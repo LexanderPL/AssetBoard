@@ -38,6 +38,8 @@ from assetboard.services.mail import MailRequest
 from tests.conftest import ADMIN_PASSWORD, mail_body, mail_link
 
 if TYPE_CHECKING:
+    from email.message import EmailMessage
+
     from conftest import WebHarness
 
 NEW_PASSWORD = "Fresh Strong Password"
@@ -109,6 +111,13 @@ def _events(app: FastAPI, action: str) -> list[AuditEvent]:
 # Registration
 
 
+def _by_recipient(sent: list[EmailMessage]) -> dict[str, EmailMessage]:
+    """Messages keyed by recipient: the outbox's sender pool does not keep their order."""
+    by_recipient = {str(message["To"]): message for message in sent}
+    assert len(by_recipient) == len(sent), "one message per recipient expected"
+    return by_recipient
+
+
 def test_first_step_creates_no_account_and_sends_a_hashed_single_use_link(
     mail: tuple[FastAPI, TestClient], web: WebHarness
 ) -> None:
@@ -167,9 +176,9 @@ def test_first_step_says_the_same_for_new_existing_and_deactivated_addresses(
     emails = ("new@example.com", web.admin_email, "gone@example.com")
     responses = [_start(client, web, email) for email in emails]
     _same_response(responses)
-    sent = web.sent_mail(app)
-    assert [m["To"] for m in sent] == ["new@example.com", web.admin_email]
-    existing = mail_body(sent[1])
+    sent = _by_recipient(web.sent_mail(app))
+    assert sorted(sent) == sorted(["new@example.com", web.admin_email])
+    existing = mail_body(sent[web.admin_email])
     assert "/register/complete/" not in existing
     assert "http://testserver/login" in existing and "http://testserver/password/forgot" in existing
     # Only the new address got a link; nothing was created for the others.
@@ -228,7 +237,9 @@ def test_mail_follows_the_request_or_the_account_language(
     _start(client, web, "nowy@example.com")
     client.headers["accept-language"] = "en"
     _forgot(client, web, "ola@example.com")
-    register, reset = web.sent_mail(app)
+    sent = _by_recipient(web.sent_mail(app))
+    assert sorted(sent) == ["nowy@example.com", "ola@example.com"]
+    register, reset = sent["nowy@example.com"], sent["ola@example.com"]
     assert register["Subject"] == "Potwierdź adres e-mail w AssetBoard"
     assert "Link działa raz, przez 24 godziny." in mail_body(register)
     assert reset["Subject"] == "Zresetuj hasło do AssetBoard"
@@ -372,9 +383,9 @@ def test_forgot_says_the_same_for_every_kind_of_address(
     emails = ("nobody@example.com", web.admin_email, "sso@example.com", "gone@example.com")
     responses = [_forgot(client, web, email) for email in emails]
     _same_response(responses)
-    sent = web.sent_mail(app)
-    assert [m["To"] for m in sent] == [web.admin_email, "sso@example.com"]
-    notice = mail_body(sent[1])
+    sent = _by_recipient(web.sent_mail(app))
+    assert sorted(sent) == sorted([web.admin_email, "sso@example.com"])
+    notice = mail_body(sent["sso@example.com"])
     assert "has no password" in notice and "/password/reset/" not in notice
     # Only the account with a password got a link.
     assert len(_tokens(app, "reset")) == 1

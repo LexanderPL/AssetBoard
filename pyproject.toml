@@ -60,6 +60,7 @@ test = [
     "types-pyyaml>=6,<7",
     "httpx>=0.28,<1",
     "playwright>=1.51,<2",
+    "pytest-xdist>=3.6,<4",
 ]
 
 [tool.uv]
