@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.8](https://github.com/LexanderPL/AssetBoard/compare/v0.3.7...v0.3.8) (2026-11-01)
+
+
+### Features
+
+* **ui:** phone menu, Hide pending, softer angled stripes, frameless tables, unified buttons ([#195](https://github.com/LexanderPL/AssetBoard/issues/195)) ([355c622](https://github.com/LexanderPL/AssetBoard/commit/355c622bb1cc402f0f6d3af1b188c3100a8c432f))
+
 ## [0.3.7](https://github.com/LexanderPL/AssetBoard/compare/v0.3.6...v0.3.7) (2026-11-01)
 
 
