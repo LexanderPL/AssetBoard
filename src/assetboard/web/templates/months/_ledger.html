@@ -5,7 +5,10 @@
    Classes are set once here, so the colour tokens can replace them in one place. #}
 {% from "macros/components.html" import csrf_input with context %}
 {% from "categories/_macros.html" import swatch %}
-{% set input_class = "form-control w-full rounded-lg px-2.5 py-1.5" %}
+{# Entry and edit rows: the inputs are the cells (input.css .cell-input); popover forms keep
+   ordinary boxed fields. #}
+{% set input_class = "form-control cell-input" %}
+{% set popover_input_class = "form-control w-full px-2.5 py-1.5" %}
 {% set error_class = "text-danger" %}
 {% set muted_class = "text-muted" %}
 {% set primary_class = "rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover" %}
@@ -28,7 +31,7 @@
 {% macro filter_bar() -%}
   {% if ledger.filter %}
   {% set all_href = scoped_url(request, 'transactions_month', month=ledger.month|string) %}
-  <p class="flex flex-wrap items-center gap-3 mt-2 rounded-xl border border-line bg-subtle px-4 py-3 text-sm" data-ledger-filter-bar>
+  <p class="flex flex-wrap items-center gap-3 mt-2 border border-line bg-subtle px-4 py-3 text-sm" data-ledger-filter-bar>
     <span>{{ ngettext("Showing %(name)s only (%(num)d entry).", "Showing %(name)s only (%(num)d entries).", ledger.filter.count, name=ledger.filter.name) }}</span>
     <a href="{{ all_href }}#ledger" hx-get="{{ all_href }}" hx-select="#ledger" hx-target="#ledger" hx-swap="outerHTML" hx-push-url="true" class="font-medium text-primary-ink underline" data-ledger-show-all>{{ _("Show all") }}</a>
   </p>
@@ -55,17 +58,17 @@
 {# The four inputs of an entry or edit row. ``kind`` is "entry" or "edit" (focus names). #}
 {% macro inputs(s, kind, prefix, form_id, values, errors, options) -%}
 {% set hint = "ledger-" ~ s.direction ~ "-hint" %}
-<td class="py-2 pr-2 align-top">
+<td class="cell-edit align-top">
   <label for="{{ prefix }}-day" class="sr-only">{{ _("Day") }}</label>
   <input id="{{ prefix }}-day" name="day" form="{{ form_id }}" type="text" inputmode="numeric" autocomplete="off" maxlength="10" value="{{ values.get('day', '') }}" placeholder="{{ _('Day') }}"{{ described(prefix, "day", errors, hint) }}{{ autofocus(s.state, kind ~ ":day") }} data-ledger-field class="{{ input_class }}">
   {{ field_error(prefix, "day", errors) }}
 </td>
-<td class="py-2 pr-2 align-top">
+<td class="cell-edit align-top">
   <label for="{{ prefix }}-amount" class="sr-only">{{ _("Amount") }}</label>
   <input id="{{ prefix }}-amount" name="amount" form="{{ form_id }}" type="text" inputmode="decimal" autocomplete="off" maxlength="64" value="{{ values.get('amount', '') }}" placeholder="{{ _('Amount') }}"{{ described(prefix, "amount", errors) }}{{ autofocus(s.state, kind ~ ":amount") }} data-ledger-field class="{{ input_class }} text-right">
   {{ field_error(prefix, "amount", errors) }}
 </td>
-<td class="py-2 pr-2 align-top">
+<td class="cell-edit align-top">
   <label for="{{ prefix }}-description" class="sr-only">{{ _("Description") }}</label>
   <div class="relative">
     <input id="{{ prefix }}-description" name="description" form="{{ form_id }}" type="text" autocomplete="off" maxlength="{{ ledger.max_description }}" value="{{ values.get('description', '') }}" placeholder="{{ _('Description') }}"
@@ -76,9 +79,9 @@
   </div>
   {{ field_error(prefix, "description", errors) }}
 </td>
-<td class="py-2 pr-2 align-top">
+<td class="cell-edit align-top">
   <label for="{{ prefix }}-category" class="sr-only">{{ _("Category") }}</label>
-  <select id="{{ prefix }}-category" name="category_id" form="{{ form_id }}"{{ described(prefix, "category", errors) }}{{ autofocus(s.state, kind ~ ":category") }}{% if kind == "entry" and ledger.filter %} data-default="{{ ledger.filter_id }}"{% endif %} data-ledger-field class="form-select w-full rounded-lg py-1.5 pl-2.5">
+  <select id="{{ prefix }}-category" name="category_id" form="{{ form_id }}"{{ described(prefix, "category", errors) }}{{ autofocus(s.state, kind ~ ":category") }}{% if kind == "entry" and ledger.filter %} data-default="{{ ledger.filter_id }}"{% endif %} data-ledger-field class="form-select cell-input">
     <option value="">{{ _("Choose a category") }}</option>
     {% for value, name in options %}<option value="{{ value }}"{% if value == values.get('category_id') %} selected{% endif %}>{{ name }}</option>{% endfor %}
   </select>
@@ -92,7 +95,7 @@
 {% if s.categories %}
 <tr id="{{ form_id }}-row" data-entry-row data-ledger-row-form>
   {{ inputs(s, "entry", form_id, form_id, s.state.entry_values, s.state.entry_errors, s.categories) }}
-  <td class="py-2 align-top text-right">
+  <td class="cell-tight align-top text-right">
     <form id="{{ form_id }}" method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#ledger-{{ s.direction }}" hx-swap="outerHTML" hx-sync="this:drop" novalidate data-entry-form data-today="{{ ledger.today.isoformat() }}">
       {{ csrf_input() }}
       <input type="hidden" name="direction" value="{{ s.direction }}">
@@ -114,7 +117,7 @@
 {% set action = scoped_url(request, 'transaction_update', month=ledger.month|string, transaction_id=row_id) %}
 <tr id="tx-{{ row_id }}" data-transaction="{{ row_id }}" data-edit-row data-ledger-row-form>
   {{ inputs(s, "edit", form_id, form_id, s.state.edit_values, s.state.edit_errors, s.edit_categories) }}
-  <td class="whitespace-nowrap py-2 align-top text-right">
+  <td class="cell-tight whitespace-nowrap align-top text-right">
     <form id="{{ form_id }}" method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#ledger-{{ s.direction }}" hx-swap="outerHTML" hx-sync="this:drop" novalidate class="inline">
       {{ csrf_input() }}
       {{ filter_input() }}
@@ -141,7 +144,7 @@
   <td class="break-words py-2 pr-2" data-description>{{ r.t.description }}{% if r.t.source == "recurring_auto" %} <span class="text-xs {{ label_class }}">{{ _("Automatically posted") }}</span>{% endif %}</td>
   <td class="py-2 pr-2"><span class="flex items-center gap-2">{{ swatch(r.t.category_color) }}<span data-category-name>{{ r.t.category_name }}</span>{% if r.t.category_archived %}<span class="text-xs {{ label_class }}">{{ _("archived") }}</span>{% endif %}</span></td>
   {% if ledger.can_write %}
-  <td class="whitespace-nowrap py-1 text-right">
+  <td class="cell-tight whitespace-nowrap text-right">
     <a href="{{ scoped_url(request, 'transactions_month', month=ledger.month|string) }}?edit={{ row_id }}{% if ledger.filter %}&amp;category={{ ledger.filter_id }}{% endif %}#tx-{{ row_id }}" hx-get="{{ scoped_url(request, 'transaction_edit', month=ledger.month|string, transaction_id=row_id) }}" hx-target="#tx-{{ row_id }}" hx-swap="outerHTML"{{ autofocus(s.state, "row:" ~ row_id) }} data-edit aria-label="{{ _('Edit the entry of %(date)s, %(amount)s', date=r.full_date, amount=r.amount) }}" class="{{ small_class }}">{{ _("Edit") }}</a>
     {% set delete_action = scoped_url(request, 'transaction_delete', month=ledger.month|string, transaction_id=row_id) %}
     <form method="post" action="{{ delete_action }}" hx-post="{{ delete_action }}" hx-target="#ledger-{{ s.direction }}" hx-swap="outerHTML" class="inline">
@@ -168,7 +171,7 @@
   {# Narrow screens scroll the table sideways; wider ones let the suggestion list overflow.
      "relative" keeps the sr-only labels inside the scroller (no page-wide overflow at 320px). #}
   <div class="relative mt-3 overflow-x-auto md:overflow-visible">
-    <table class="w-full min-w-[40rem] text-sm">
+    <table class="sheet w-full min-w-[40rem] text-sm">
       <thead>
         <tr class="text-left text-xs {{ muted_class }}">
           <th scope="col" class="w-20 py-2 pr-2 font-medium">{{ _("Day") }}</th>
@@ -178,7 +181,7 @@
           {% if ledger.can_write %}<th scope="col" class="w-36 py-2 font-medium"><span class="sr-only">{{ _("Actions") }}</span></th>{% endif %}
         </tr>
       </thead>
-      <tbody class="divide-y divide-line">
+      <tbody>
         {% for r in s.rows %}{{ row(s, r) }}{% endfor %}
         {% for r in s.pending_rows %}
         <tr class="bg-primary-soft/40" data-pending-occurrence="{{ r.occurrence.id }}">
@@ -187,15 +190,15 @@
           <td class="py-2 pr-2 align-top">{{ r.occurrence.label }}</td>
           <td class="py-2 pr-2 align-top">{{ r.occurrence.category_name }}</td>
           {% if ledger.can_write %}
-          <td class="py-2 align-top text-right">
+          <td class="cell-tight align-top text-right">
             <div class="flex items-center justify-end gap-1" data-pending-actions>
               <details class="relative text-left" data-popover>
                 <summary class="{{ compact_class }}">{{ _("Confirm") }}</summary>
                 <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=r.occurrence.id) }}" class="absolute right-0 z-20 mt-1 grid w-72 gap-2 rounded-lg border border-line bg-surface p-3 text-left shadow-card">
                   {{ csrf_input() }}
                   <input type="hidden" name="return_month" value="{{ ledger.month }}">
-                  <label class="text-xs font-medium">{{ _("Date") }}<input name="day" type="date" value="{{ r.occurrence.due_date.isoformat() }}" required class="{{ input_class }}"></label>
-                  <label class="text-xs font-medium">{{ _("Amount") }}<input name="amount" type="text" inputmode="decimal" value="{{ r.amount_input }}" required class="{{ input_class }} text-right"></label>
+                  <label class="text-xs font-medium">{{ _("Date") }}<input name="day" type="date" value="{{ r.occurrence.due_date.isoformat() }}" required class="{{ popover_input_class }}"></label>
+                  <label class="text-xs font-medium">{{ _("Amount") }}<input name="amount" type="text" inputmode="decimal" value="{{ r.amount_input }}" required class="{{ popover_input_class }} text-right"></label>
                   <div class="flex flex-wrap items-center gap-2">
                     <button type="submit" class="{{ primary_class }}">{{ _("Confirm") }}</button>
                     <button type="button" data-details-close class="{{ secondary_class }}">{{ _("Cancel") }}</button>
@@ -229,7 +232,7 @@
           <td class="py-2 pr-2 align-top">{{ r.occurrence.label }}</td>
           <td class="py-2 pr-2 align-top">{{ r.occurrence.category_name }}</td>
           {% if ledger.can_write %}
-          <td class="py-2 align-top text-right">
+          <td class="cell-tight align-top text-right">
             <div class="flex items-center justify-end gap-1" data-skipped-actions>
               <form method="post" action="{{ scoped_url(request, 'upcoming_unskip', occurrence_id=r.occurrence.id) }}">
                 {{ csrf_input() }}

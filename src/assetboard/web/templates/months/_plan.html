@@ -30,39 +30,39 @@
 {# A row above plan is tinted (web.plan.OVER_PLAN_TINT): red for an expense category, green for
    an income one. The difference beside it says the same in text. #}
 <tr id="{{ row_id }}" data-plan-row="{{ r.category_id }}"{% if r.over == "danger" %} class="bg-danger-tint" data-over-plan="expense"{% elif r.over == "success" %} class="bg-success-tint" data-over-plan="income"{% endif %}>
-  <th scope="row" class="py-1.5 pl-2 pr-2 text-left font-normal">
+  <th scope="row" class="py-1.5 pl-2 pr-2 text-left align-top font-normal">
     {# F2.7: the category's entries are on the Transactions page, filtered (F2.4 part B). #}
     {% set filter_href = scoped_url(request, 'transactions_month', month=summary.month) ~ "?category=" ~ r.category_id %}<span class="flex items-center gap-2">{{ swatch(r.color) }}<a href="{{ filter_href }}" title="{{ _('Show only the entries of %(name)s', name=r.name) }}" class="rounded underline-offset-2 hover:underline" data-plan-category>{{ r.name }}</a>{% if r.archived %}<span class="text-xs text-muted">{{ _("archived") }}</span>{% endif %}</span>
   </th>
-  <td class="py-1.5 pr-2 text-right align-top">
+  <td class="{% if r.editable %}cell-edit {% endif %}text-right align-top">
     {% if r.editable %}
     {% set action = scoped_url(request, 'plan_set', month=summary.month, category_id=r.category_id) %}
     <form method="post" action="{{ action }}" hx-post="{{ action }}" hx-trigger="change, submit" hx-target="#{{ row_id }}" hx-swap="outerHTML" hx-sync="this:replace" novalidate data-plan-form>
       {{ csrf_input() }}
       <label for="{{ row_id }}-amount" class="sr-only">{{ _("Planned for %(name)s", name=r.name) }}</label>
       <input id="{{ row_id }}-amount" name="amount" type="text" inputmode="decimal" autocomplete="off" maxlength="64" value="{{ r.value }}" placeholder="{{ summary.zero_input }}" data-saved-value="{{ r.saved_value }}" aria-describedby="plan-hint{% if r.error %} {{ row_id }}-error{% endif %}"{% if r.error %} aria-invalid="true"{% endif %}{% if r.focus %} data-autofocus{% endif %} data-plan-input
-             class="form-control ml-auto w-36 rounded-lg px-2.5 py-1.5 text-right tabular-nums">
-      {% if r.error %}<p id="{{ row_id }}-error" class="mt-1 text-xs text-danger" data-field-error>{{ r.error }}</p>{% endif %}
+             class="form-control cell-input text-right tabular-nums">
+      {% if r.error %}<p id="{{ row_id }}-error" class="mt-1 text-left text-xs text-danger" data-field-error>{{ r.error }}</p>{% endif %}
     </form>
     {% else %}
     <span class="tabular-nums" data-planned>{{ r.display }}</span>
     {% endif %}
   </td>
   {% if plan_only %}
-  <td colspan="2" class="py-1.5 pr-2 text-right text-xs text-muted" data-not-counted>{{ _("not counted") }}</td>
+  <td colspan="2" class="py-1.5 pr-2 text-right align-top text-xs text-muted" data-not-counted>{{ _("not counted") }}</td>
   {% else %}
-  <td class="whitespace-nowrap py-1.5 pr-2 text-right" data-actual-cell><span class="tabular-nums" data-actual>{{ r.actual }}</span>{{ pending_line(r.pending, r.forecast, r.pending_over) }}</td>
-  <td class="whitespace-nowrap py-1.5 pr-2 text-right" data-difference>{{ difference(r.difference, r.tone) }}</td>
+  <td class="whitespace-nowrap py-1.5 pr-2 text-right align-top" data-actual-cell><span class="tabular-nums" data-actual>{{ r.actual }}</span>{{ pending_line(r.pending, r.forecast, r.pending_over) }}</td>
+  <td class="whitespace-nowrap py-1.5 pr-2 text-right align-top" data-difference>{{ difference(r.difference, r.tone) }}</td>
   {% endif %}
 </tr>
 {%- endmacro %}
 
 {% macro totals_row(g, oob=false) -%}
 <tr id="summary-total-{{ g.key }}" class="font-semibold" data-summary-total="{{ g.key }}"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
-  <th scope="row" class="py-2 pl-2 pr-2 text-left">{{ _("Total") }}</th>
-  <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ g.totals.planned }}</td>
-  <td class="whitespace-nowrap py-2 pr-2 text-right" data-actual-cell><span class="tabular-nums" data-actual>{{ g.totals.actual }}</span>{{ pending_line(g.totals.pending, g.totals.forecast) }}</td>
-  <td class="whitespace-nowrap py-2 pr-2 text-right">{{ difference(g.totals.difference, g.totals.tone) }}</td>
+  <th scope="row" class="py-2 pl-2 pr-2 text-left align-top">{{ _("Total") }}</th>
+  <td class="whitespace-nowrap py-2 pr-2 text-right align-top tabular-nums">{{ g.totals.planned }}</td>
+  <td class="whitespace-nowrap py-2 pr-2 text-right align-top" data-actual-cell><span class="tabular-nums" data-actual>{{ g.totals.actual }}</span>{{ pending_line(g.totals.pending, g.totals.forecast) }}</td>
+  <td class="whitespace-nowrap py-2 pr-2 text-right align-top">{{ difference(g.totals.difference, g.totals.tone) }}</td>
 </tr>
 {%- endmacro %}
 
@@ -70,9 +70,9 @@
    lines and bars above. No difference: its groups' differences point different ways. #}
 {% macro block_total_row(b, oob=false) -%}
 <tr id="summary-total-{{ b.key }}" class="border-t-2 {% if b.key == "out" %}border-danger/50{% else %}border-success/50{% endif %} font-semibold" data-money-total="{{ b.key }}"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
-  <th scope="row" class="py-2 pl-2 pr-2 text-left">{% if b.key == "out" %}{{ _("Total money out") }}{% else %}{{ _("Total money in") }}{% endif %}</th>
-  <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums">{{ b.totals.planned }}</td>
-  <td class="whitespace-nowrap py-2 pr-2 text-right" data-actual-cell><span class="tabular-nums" data-actual>{{ b.totals.actual }}</span>{{ pending_line(b.totals.pending, b.totals.forecast) }}</td>
+  <th scope="row" class="py-2 pl-2 pr-2 text-left align-top">{% if b.key == "out" %}{{ _("Total money out") }}{% else %}{{ _("Total money in") }}{% endif %}</th>
+  <td class="whitespace-nowrap py-2 pr-2 text-right align-top tabular-nums">{{ b.totals.planned }}</td>
+  <td class="whitespace-nowrap py-2 pr-2 text-right align-top" data-actual-cell><span class="tabular-nums" data-actual>{{ b.totals.actual }}</span>{{ pending_line(b.totals.pending, b.totals.forecast) }}</td>
   <td class="py-2 pr-2"></td>
 </tr>
 {%- endmacro %}
@@ -335,7 +335,7 @@
 <div id="plan-banner"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
   {% if summary.banner_source %}
   {% set action = scoped_url(request, 'plan_copy', month=summary.month) %}
-  <form method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#month-summary" hx-swap="outerHTML" class="mt-3 flex flex-wrap items-center gap-3 rounded-xl border border-line bg-subtle px-4 py-3 text-sm" data-plan-banner>
+  <form method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#month-summary" hx-swap="outerHTML" class="mt-3 flex flex-wrap items-center gap-3 border border-line bg-subtle px-4 py-3 text-sm" data-plan-banner>
     {{ csrf_input() }}
     <span>{{ _("This month has no plan yet.") }}</span>
     <button type="submit" data-plan-copy class="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Copy plan from %(month)s", month=summary.banner_source) }}</button>

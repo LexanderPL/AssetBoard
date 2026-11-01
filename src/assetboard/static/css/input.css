@@ -103,8 +103,10 @@
 }
 
 @layer components {
+  /* The main content reads like a spreadsheet: square boxes with a thin rule and no shadow.
+     Buttons, chips, the sidebar, the header and dialogs keep their rounded shapes. */
   .panel {
-    @apply rounded-2xl border border-line bg-surface shadow-card;
+    @apply rounded-none border border-line bg-surface;
   }
 
   .nav-link {
@@ -118,7 +120,7 @@
   /* Text inputs and selects share one look; templates add only width and size. */
   .form-control,
   .form-select {
-    @apply rounded-xl border border-line-strong bg-field px-3.5 py-2.5 text-sm text-ink shadow-sm placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:bg-subtle disabled:text-muted;
+    @apply rounded-none border border-line-strong bg-field px-3.5 py-2.5 text-sm text-ink shadow-sm placeholder:text-muted focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:cursor-not-allowed disabled:bg-subtle disabled:text-muted;
   }
 
   /* The browser's own arrow sits against the right edge and ignores padding, so selects draw
@@ -142,6 +144,55 @@
       appearance: auto;
       background-image: none;
     }
+  }
+}
+
+/* Data tables in the main content (class "sheet"): a visible grid of thin cell borders, compact
+   cells and a shaded header row. The cell rules are stronger than the cells' own spacing and
+   border utilities on purpose, so every table looks the same; a cell opts out with "cell-edit"
+   (no padding: it holds a "cell-input") or "cell-tight" (buttons), or with "!" utilities. */
+@layer components {
+  .sheet {
+    @apply border-collapse border border-line;
+  }
+
+  .sheet th,
+  .sheet td {
+    @apply border border-line px-2 py-1.5;
+  }
+
+  .sheet thead th {
+    @apply bg-subtle;
+  }
+
+  .sheet td.cell-edit,
+  .sheet th.cell-edit {
+    @apply p-0;
+  }
+
+  .sheet td.cell-tight,
+  .sheet th.cell-tight {
+    @apply px-1 py-0.5;
+  }
+
+  .sheet .cell-edit [data-field-error] {
+    @apply mt-0 px-2 pb-1;
+  }
+
+  /* A form field that is the cell: no border or fill of its own, so the row's tint shows
+     through; a light wash on hover and an inset outline in the primary colour on focus. Use it
+     with form-control or form-select (which draws the chevron). */
+  .cell-input {
+    @apply block w-full rounded-none border-0 bg-transparent px-2 py-1.5 shadow-none hover:bg-ink/5 focus:bg-field focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-primary focus:ring-0;
+  }
+
+  .cell-input.form-select {
+    @apply pr-8;
+    background-position: right 0.5rem center;
+  }
+
+  .cell-input[aria-invalid="true"] {
+    @apply outline outline-2 -outline-offset-2 outline-danger;
   }
 }
 

@@ -7,8 +7,8 @@
    (``summary_oob``); app.js keeps a half-typed planned value and its focus across that swap. #}
 {% from "months/_plan.html" import plan_row, totals_row, block_total_row, banner, in_out, sort_toggle, copied_text, skipped_text with context %}
 {% macro group_body(g) -%}
-<tbody class="divide-y divide-line" data-plan-group="{{ g.key }}">
-  <tr><th scope="rowgroup" colspan="4" class="pb-1 pl-2 pt-4 text-left text-xs font-semibold uppercase tracking-wide text-muted">{{ g.heading }}</th></tr>
+<tbody data-plan-group="{{ g.key }}">
+  <tr><th scope="rowgroup" colspan="4" class="!pt-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">{{ g.heading }}</th></tr>
   {% for r in g.rows %}{{ plan_row(r, plan_only=g.totals is none) }}{% endfor %}
   {% if g.totals %}{{ totals_row(g) }}{% endif %}
 </tbody>
@@ -35,7 +35,7 @@
   {# relative: the sr-only texts in the table are absolutely positioned, so the scroll box must
      be their containing block, or they widen the page at phone width. #}
   <div class="relative mt-4 overflow-x-auto">
-    <table class="w-full min-w-[40rem] text-sm">
+    <table class="sheet w-full min-w-[40rem] text-sm">
       <thead>
         <tr class="text-left text-xs text-muted">
           <th scope="col" class="py-2 pl-2 pr-2 font-medium">{{ _("Category") }}</th>
@@ -47,11 +47,11 @@
       {# Two blocks with a coloured top rule and marker (red: money out, green: money in). #}
       {% for b in summary.money_blocks %}
       <tbody data-money-block="{{ b.key }}">
-        <tr><th scope="col" colspan="4" id="money-block-{{ b.key }}" class="border-t-2 {% if b.key == "out" %}border-danger/60{% else %}border-success/60{% endif %} pb-1 pl-2 {% if loop.first %}pt-3{% else %}pt-4{% endif %} text-left text-sm font-semibold"><span class="flex items-center gap-2"><span class="h-2.5 w-2.5 shrink-0 rounded-full {% if b.key == "out" %}bg-danger{% else %}bg-success{% endif %}" aria-hidden="true"></span>{{ b.heading }}</span></th></tr>
+        <tr><th scope="col" colspan="4" id="money-block-{{ b.key }}" class="!border-t-2 {% if b.key == "out" %}!border-t-danger/60{% else %}!border-t-success/60{% endif %} text-left text-sm font-semibold"><span class="flex items-center gap-2"><span class="h-2.5 w-2.5 shrink-0 rounded-full {% if b.key == "out" %}bg-danger{% else %}bg-success{% endif %}" aria-hidden="true"></span>{{ b.heading }}</span></th></tr>
       </tbody>
       {% for g in b.groups %}{{ group_body(g) }}{% endfor %}
       <tbody data-money-block-total="{{ b.key }}">{{ block_total_row(b) }}</tbody>
-      {% if not loop.last %}<tbody aria-hidden="true"><tr><td colspan="4" class="h-6"></td></tr></tbody>{% endif %}
+      {% if not loop.last %}<tbody aria-hidden="true"><tr><td colspan="4" class="h-6 !border-x-0"></td></tr></tbody>{% endif %}
       {% endfor %}
       {% for g in summary.groups if g.key == "transfer" %}{{ group_body(g) }}{% endfor %}
     </table>
