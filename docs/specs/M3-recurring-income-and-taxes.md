@@ -34,6 +34,7 @@ Implementation order: F3.1 → F3.2 → F3.3 → F3.4 → F3.5 → F3.6 → (F3.
 - Short months clamp (day 31 → last day of month); yearly 29 Feb → 28 Feb in non-leap years.
 - Weekend policy `previous_working_day` / `next_working_day` using workspace country holidays (python-holidays; justify the dependency); `none` leaves the date.
 - Scheduled item CRUD with live preview of the next 6 due dates; pause/resume; archive.
+  (As built after the redesign: the next 5 dates and the schedule sentence; see below.)
 - Generator service (idempotent): materializes occurrences for the next **13 months** (setting), never duplicates (`unique(scheduled_item_id, due_date)`), by default does not create occurrences before today unless the user ticks "include past occurrences".
 - Rule edit → delete and regenerate **pending future** occurrences only.
 - APScheduler job runs the generator daily at 03:00 workspace time and on every rule change.
@@ -83,7 +84,8 @@ Implementation order: F3.1 → F3.2 → F3.3 → F3.4 → F3.5 → F3.6 → (F3.
 **As built: one-time payments live in Upcoming (owner decisions, UI batch 3):**
 - The Recurring page no longer lists `freq == once` items, and its form no longer offers
   "One time" for a new item (an existing one-time item opened at `/recurring/<id>/edit` keeps
-  the choice, so that form still works). The page links to the new form on Upcoming.
+  the choice, so that form still works). The page linked to the new form on Upcoming; the
+  redesign below removed that link.
 - Upcoming payments has **Add one-time payment** (a collapsed `<details>`, reopened with
   `?form=one-time` and after an error): description, amount, expense/income, category, date.
   `services.scheduled.create_one_time` wraps `save_item` (frequency `once`, no weekend
@@ -95,6 +97,41 @@ Implementation order: F3.1 → F3.2 → F3.3 → F3.4 → F3.5 → F3.6 → (F3.
   Reschedule, Edit amount or Edit rule. `services.scheduled.update_one_time` changes the item
   and its pending occurrence together (an overdue one moves too; the old and the new month must
   be open; the amount override is cleared). Recurring items are refused (`not_planned`).
+
+**As built: Recurring page redesign (owner decisions, UI batch 3):**
+- The list has two sections, **Expenses** and **Income**, each a compact table (cards below
+  the `sm` breakpoint, no sideways page scroll): Name (with a "paused" chip), Amount (with an
+  "estimate" chip), Schedule as one sentence, Next date, Category (swatch and name), and Edit,
+  Pause/Resume and Delete for editors. **Archived items are not listed** (their history stays
+  in transactions); the Archive button is gone from the page (the `archive` action route
+  stays). Delete keeps its confirmation, now worded "its planned dates are removed; payments
+  already recorded or skipped stay in your history". There is no link to Upcoming (owner rule:
+  no buttons or links to other sections). Empty state: one "New recurring item" button; with
+  items, the same primary button sits at the top.
+- The schedule sentence is `web/schedule_text.describe_rule(rule, locale, today)` (gettext
+  words, CLDR month and date names): "Monthly on the 10th", "Every 3 months on the 15th, from
+  January 2027", "Yearly on 31 March", "Weekly on Monday", ", until December 2027",
+  ", 12 times in total", and the weekend adjustment. The start is named when it is after today
+  or the interval is above 1; weekly rules name full dates, others month and year.
+- Next date: the earliest pending occurrence from today; with none (a start beyond the
+  generation horizon) the rule's next date not already posted or skipped; none for paused items
+  and items in an archived category.
+- The form (`/recurring/new`, `/recurring/<id>/edit`) is guided, in sections **What** (name,
+  expense/income radio cards, category filtered by kind via `data-filter-by-kind`; the server
+  refuses a category of the other kind), **How much** (amount, "the amount varies, this is an
+  estimate" checkbox = `amount_mode`), **How often** (radio cards Weekly, Monthly, Every few
+  months, Yearly; only the chosen one's fields are shown: weekdays and every N weeks; day of the
+  month including last day and first/last working day; every N months; day, month and every N
+  years), the weekend/holiday adjustment, **When** (starts on; ends Never / On a date / After a
+  number of times; "include past dates" on creation) and **Options** (automatic posting,
+  reminder days, notes). "Every few months" is `monthly` with interval ≥ 2. The guided post
+  carries `guided=1` and its own field names (`repeat`, `interval_weeks|months|years`,
+  `year_day`, `ends`, `estimate`); the route maps them to the rule fields, so posts with the rule
+  fields themselves still work. A stored rule with both an end date and a count opens with
+  "On a date"; saving it keeps only the date (the form offers one end).
+- A live **Next dates** panel shows the schedule sentence and the next **5** dates (the preview
+  endpoint, `hx-trigger` on change and on input after 300 ms).
+- No migration.
 
 **Agent prompt**
 ```
