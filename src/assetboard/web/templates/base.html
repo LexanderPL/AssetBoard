@@ -25,9 +25,10 @@
   {% from "macros/components.html" import confirm_dialog, flashes %}
   <div class="min-h-screen">
     {# Desktop: the sidebar is fixed to the viewport (top to bottom, so its height never depends on
-       100vh or on the main content's length), the nav scrolls inside it and the user menu stays
-       at the bottom of the screen while the main content scrolls; main makes room for it.
-       Phones and tablets: the sidebar is a block above the content. #}
+       100vh or on the main content's length), the nav scrolls inside it and the footer (version,
+       dark mode) stays at the bottom of the screen while the main content scrolls; main makes
+       room for it. Phones and tablets: the sidebar is a block above the content. The user menu
+       sits at the top right of the page header. #}
     <aside class="border-b border-line bg-surface px-4 py-4 lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex lg:w-64 lg:flex-col lg:border-b-0 lg:border-r lg:px-5 lg:py-6" data-sidebar>
       <a href="{{ scoped_url(request, 'home') }}" class="flex items-center gap-3 px-2" aria-label="{{ _('Home') }}">
         <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-lg font-bold text-on-primary" aria-hidden="true">A</span>
@@ -54,48 +55,11 @@
         <a class="nav-link" href="#loans"><span aria-hidden="true">▤</span>{{ _("Loans") }}</a>
         <span class="nav-link cursor-not-allowed opacity-50" aria-disabled="true"><span aria-hidden="true">✦</span>{{ _("FIRE projection") }}<span class="sr-only">{{ _("Unavailable") }}</span></span>
       </nav>
-      <div class="mt-4 flex shrink-0 items-center justify-between border-t border-line px-2 pt-4 lg:mt-auto" data-user-menu>
-        <details class="group relative min-w-0" data-popover>
-          <summary class="flex cursor-pointer list-none items-center gap-3 rounded-xl px-1 py-1">
-            <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary-ink" aria-hidden="true">◉</span>
-            <span class="min-w-0">
-              <span class="block truncate text-sm font-medium">{{ web_session.display_name if web_session else _("Your account") }}</span>
-              {% if workspace_nav %}<span class="block truncate text-xs text-muted" data-current-workspace>{{ workspace_nav.current.name }}</span>{% endif %}
-            </span>
-            <span class="text-xs text-muted" aria-hidden="true">⌃</span>
-          </summary>
-          <div class="absolute bottom-full left-0 z-20 mb-2 w-52 rounded-xl border border-line bg-surface p-1 shadow-card">
-            {# Categories are edited rarely, so they live here rather than in the main navigation:
-               every member reads them, editors and owners change them. #}
-            {% if workspace_nav %}
-            <a href="{{ scoped_url(request, 'categories') }}" data-categories-link{% if request.url.path.endswith('/categories') %} aria-current="page"{% endif %} class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Categories") }}</a>
-            {% endif %}
-            {% if workspace_nav and workspace_nav.role == "owner" %}
-            <a href="{{ scoped_url(request, 'workspace_settings') }}" data-owner-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Workspace settings") }}</a>
-            <a href="{{ scoped_url(request, 'workspace_members') }}" data-owner-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Members") }}</a>
-            <a href="{{ scoped_url(request, 'audit') }}?scope=workspace" data-audit-workspace-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Audit log: workspace") }}</a>
-            {% endif %}
-            {% if workspace_nav and workspace_nav.can_create_workspace %}
-            <a href="{{ scoped_url(request, 'workspace_new') }}" data-new-workspace-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("New workspace") }}</a>
-            {% endif %}
-            {% if workspace_nav and workspace_nav.role in ("owner", "editor") %}
-            <a href="{{ scoped_url(request, 'workspace_data') }}" data-workspace-data-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Export and import") }}</a>
-            {% endif %}
-            {% if web_session and web_session.is_instance_admin %}
-            <a href="{{ scoped_url(request, 'admin_users') }}" data-admin-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Users") }}</a>
-            <a href="{{ scoped_url(request, 'admin_settings') }}" data-admin-settings-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Instance settings") }}</a>
-            <a href="{{ scoped_url(request, 'audit') }}?scope=instance" data-audit-instance-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Audit log: instance") }}</a>
-            {% endif %}
-            <a href="{{ scoped_url(request, 'account') }}" data-profile-link class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Profile") }}</a>
-            <a href="{{ scoped_url(request, 'account_password') }}" class="block rounded-lg px-3 py-2 text-sm hover:bg-subtle">{{ _("Account security") }}</a>
-            {% if web_session %}
-            <form method="post" action="{{ scoped_url(request, 'logout') }}">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-              <button type="submit" data-sign-out class="block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-subtle">{{ _("Sign out") }}</button>
-            </form>
-            {% endif %}
-          </div>
-        </details>
+      <div class="mt-4 flex shrink-0 items-center justify-between gap-3 border-t border-line px-2 pt-4 lg:mt-auto" data-sidebar-footer>
+        <div class="min-w-0 text-xs text-muted">
+          <span data-app-version>v{{ app_version }}</span>
+          {% if update_notice %}<a href="{{ update_notice.url }}" rel="noopener noreferrer" target="_blank" class="mt-0.5 block font-medium text-primary-ink hover:underline" data-update-available>{{ _("Update available: %(version)s", version=update_notice.version) }}</a>{% endif %}
+        </div>
         <button type="button" data-theme-toggle class="rounded-lg p-2 text-muted hover:bg-subtle" aria-label="{{ _('Toggle dark mode') }}" title="{{ _('Toggle dark mode') }}">
           <span aria-hidden="true">◐</span>
         </button>
@@ -103,33 +67,87 @@
     </aside>
     <main id="main-content" class="min-w-0 px-4 py-6 sm:px-7 lg:ml-64 lg:px-10 lg:py-9">
       <div class="mx-auto max-w-6xl">
-        <header class="mb-8 flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p class="text-xs font-semibold uppercase tracking-[0.18em] text-primary-ink">{{ _("Personal finance") }}</p>
-            <h1 class="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">{% block heading %}{{ _("Your overview") }}{% endblock %}</h1>
-          </div>
-          {% if workspace_nav %}
-          <div class="flex flex-wrap items-center gap-2">
-          {% block header_actions %}{% endblock %}
-          {% if workspace_nav.can_switch %}
-          <form method="post" action="{{ scoped_url(request, 'workspace_switch') }}" class="flex items-center gap-2" data-workspace-switcher>
-            <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-            <label for="workspace-switcher" class="text-sm text-muted">{{ _("Workspace") }}</label>
-            <select id="workspace-switcher" name="workspace_id" data-autosubmit class="form-select rounded-full py-2">
-              {% for choice in workspace_nav.choices %}
-              <option value="{{ choice.id }}" {% if choice.id == workspace_nav.current.id %}selected{% endif %}>{{ choice.name }}</option>
-              {% endfor %}
-            </select>
-            <noscript><button type="submit" class="rounded-full border border-line px-3 py-2 text-sm font-medium hover:bg-subtle">{{ _("Switch") }}</button></noscript>
-          </form>
-          {% else %}
-          <div class="rounded-full border border-line bg-surface px-3.5 py-2 text-sm text-muted">
-            {{ _("Workspace") }} <span class="px-1 text-muted">/</span> {{ workspace_nav.current.name }}
+        {% set menu_item = "block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-subtle focus-visible:bg-subtle" %}
+        <div class="mb-8 flex items-start gap-4">
+          <header class="flex min-w-0 flex-1 flex-wrap items-end justify-between gap-4">
+            <div class="min-w-0">
+              {% if workspace_nav %}<p class="truncate text-xs font-semibold uppercase tracking-[0.18em] text-primary-ink" data-current-workspace>{{ workspace_nav.current.name }}</p>{% endif %}
+              <h1 class="{% if workspace_nav %}mt-2 {% endif %}text-2xl font-semibold tracking-tight sm:text-3xl">{% block heading %}{{ _("Your overview") }}{% endblock %}</h1>
+            </div>
+            {% if workspace_nav %}
+            <div class="flex flex-wrap items-center gap-2" data-header-actions>{% block header_actions %}{% endblock %}</div>
+            {% endif %}
+          </header>
+          {% if web_session %}
+          {# The user menu: workspace switch, workspace pages, administration, account. A
+             popover (app.js): a press outside or Escape closes it; without JavaScript the
+             summary still opens it and every switch is a plain form. #}
+          <div class="shrink-0" data-user-menu>
+            <details class="relative" data-popover>
+              <summary class="flex cursor-pointer list-none items-center gap-2 rounded-full border border-line bg-surface py-1 pl-1 pr-3 text-sm font-medium hover:bg-subtle">
+                <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary-soft text-sm font-semibold text-primary-ink" aria-hidden="true">{{ web_session.display_name[:1] | upper }}</span>
+                <span class="max-w-[7rem] truncate sm:max-w-[12rem]" data-user-name>{{ web_session.display_name }}</span>
+                <span class="text-xs text-muted" aria-hidden="true">▾</span>
+              </summary>
+              <div class="absolute right-0 top-full z-40 mt-2 max-h-[calc(100vh-6rem)] w-64 max-w-[calc(100vw-2rem)] divide-y divide-line overflow-y-auto rounded-xl border border-line bg-surface shadow-card" data-user-menu-panel>
+                {% if workspace_nav and (workspace_nav.can_switch or workspace_nav.can_create_workspace) %}
+                <div class="p-1" role="group" aria-labelledby="user-menu-workspaces">
+                  <p id="user-menu-workspaces" class="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Workspaces") }}</p>
+                  {% if workspace_nav.can_switch %}
+                  <div data-workspace-switcher>
+                    {% for choice in workspace_nav.choices %}
+                    {% if choice.id == workspace_nav.current.id %}
+                    <span class="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-primary-ink" aria-current="true" data-workspace-choice="{{ choice.id }}" data-workspace-choice-current><span class="truncate">{{ choice.name }}</span><span aria-hidden="true">✓</span></span>
+                    {% else %}
+                    <form method="post" action="{{ scoped_url(request, 'workspace_switch') }}">
+                      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                      <input type="hidden" name="workspace_id" value="{{ choice.id }}">
+                      <button type="submit" class="{{ menu_item }} truncate" data-workspace-choice="{{ choice.id }}">{{ choice.name }}</button>
+                    </form>
+                    {% endif %}
+                    {% endfor %}
+                  </div>
+                  {% endif %}
+                  {% if workspace_nav.can_create_workspace %}
+                  <a href="{{ scoped_url(request, 'workspace_new') }}" data-new-workspace-link{% if request.url.path == scoped_url(request, 'workspace_new') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("New workspace") }}</a>
+                  {% endif %}
+                </div>
+                {% endif %}
+                {% if workspace_nav %}
+                <div class="p-1" data-user-menu-workspace>
+                  {# Categories are edited rarely, so they live here rather than in the main
+                     navigation: every member reads them, editors and owners change them. #}
+                  <a href="{{ scoped_url(request, 'categories') }}" data-categories-link{% if request.url.path.endswith('/categories') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Categories") }}</a>
+                  {% if workspace_nav.role == "owner" %}
+                  <a href="{{ scoped_url(request, 'workspace_settings') }}" data-owner-link{% if request.url.path == scoped_url(request, 'workspace_settings') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Workspace settings") }}</a>
+                  <a href="{{ scoped_url(request, 'workspace_members') }}" data-owner-link{% if request.url.path == scoped_url(request, 'workspace_members') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Members") }}</a>
+                  <a href="{{ scoped_url(request, 'audit') }}?scope=workspace" data-audit-workspace-link class="{{ menu_item }}">{{ _("Audit log: workspace") }}</a>
+                  {% endif %}
+                  {% if workspace_nav.role in ("owner", "editor") %}
+                  <a href="{{ scoped_url(request, 'workspace_data') }}" data-workspace-data-link{% if request.url.path == scoped_url(request, 'workspace_data') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Export and import") }}</a>
+                  {% endif %}
+                </div>
+                {% endif %}
+                {% if web_session.is_instance_admin %}
+                <div class="p-1" data-user-menu-admin>
+                  <a href="{{ scoped_url(request, 'admin_users') }}" data-admin-link{% if request.url.path == scoped_url(request, 'admin_users') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Users") }}</a>
+                  <a href="{{ scoped_url(request, 'admin_settings') }}" data-admin-settings-link{% if request.url.path == scoped_url(request, 'admin_settings') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Instance settings") }}</a>
+                  <a href="{{ scoped_url(request, 'audit') }}?scope=instance" data-audit-instance-link class="{{ menu_item }}">{{ _("Audit log: instance") }}</a>
+                </div>
+                {% endif %}
+                <div class="p-1" data-user-menu-account>
+                  <a href="{{ scoped_url(request, 'account') }}" data-profile-link{% if request.url.path == scoped_url(request, 'account') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Profile") }}</a>
+                  <a href="{{ scoped_url(request, 'account_password') }}" data-account-security-link{% if request.url.path == scoped_url(request, 'account_password') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Account security") }}</a>
+                  <form method="post" action="{{ scoped_url(request, 'logout') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+                    <button type="submit" data-sign-out class="{{ menu_item }}">{{ _("Sign out") }}</button>
+                  </form>
+                </div>
+              </div>
+            </details>
           </div>
           {% endif %}
-          </div>
-          {% endif %}
-        </header>
+        </div>
         {{ flashes() }}
         {% block content %}{% endblock %}
       </div>

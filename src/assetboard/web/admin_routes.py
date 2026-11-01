@@ -7,7 +7,7 @@
   shown once in the POST response (no redirect, no cookie, no flash, never logged or audited).
   Both answer 404 under ``OIDC_ONLY``.
 * ``GET /admin/settings`` and ``POST``: instance settings (pre-release A): who may create a
-  workspace.
+  workspace, open registration and the opt-in update check (ADR-0023).
 
 Only active instance administrators get these pages (403 otherwise); every POST is confirmed
 by the acting administrator through ``web.confirm.run_confirmed``, the one confirmation path.
@@ -423,16 +423,17 @@ async def _settings_page(
     request: Request,
     current: WebSession,
     *,
-    wanted: tuple[bool, bool] | None = None,
+    wanted: tuple[bool, bool, bool] | None = None,
     notice: str | None = None,
     error: str | None = None,
     status_code: int = 200,
 ) -> Response:
     state = _state(request)
     stored = await run_in_threadpool(get_settings, state.session_factory)
-    allow_workspace_creation, allow_registration = wanted or (
+    allow_workspace_creation, allow_registration, check_for_updates = wanted or (
         stored.allow_workspace_creation,
         stored.allow_registration,
+        stored.check_for_updates,
     )
     blocker = registration_blocker(state.settings)
     response = render_template(
@@ -441,6 +442,7 @@ async def _settings_page(
         context={
             "allow_workspace_creation": allow_workspace_creation,
             "allow_registration": allow_registration,
+            "check_for_updates": check_for_updates,
             # Turning registration on is impossible; turning it off stays possible.
             "registration_locked": blocker is not None and not stored.allow_registration,
             "registration_blocker": _t(request, SETTINGS_RESULTS[blocker]) if blocker else None,
@@ -465,15 +467,25 @@ async def settings_submit(
     request: Request,
     allow_workspace_creation: FormStr = "",
     allow_registration: FormStr = "",
+    check_for_updates: FormStr = "",
     confirm_password: FormStr = "",
 ) -> Response:
     current = _require_admin(request)
-    if allow_workspace_creation not in {"on", "off"} or allow_registration not in {"on", "off"}:
+    if (
+        allow_workspace_creation not in {"on", "off"}
+        or allow_registration not in {"on", "off"}
+        or check_for_updates not in {"", "on"}  # a checkbox: absent when unticked
+    ):
         return await _settings_page(
             request, current, error=_t(request, SETTINGS_INVALID), status_code=400
         )
-    wanted = (allow_workspace_creation == "on", allow_registration == "on")
+    wanted = (
+        allow_workspace_creation == "on",
+        allow_registration == "on",
+        check_for_updates == "on",
+    )
     state = _state(request)
+    was_checking = (await run_in_threadpool(get_settings, state.session_factory)).check_for_updates
 
     def apply(session: Session, actor: User, _method: ConfirmMethod) -> str:
         return update_settings(
@@ -481,6 +493,7 @@ async def settings_submit(
             actor,
             allow_workspace_creation=wanted[0],
             allow_registration=wanted[1],
+            check_for_updates=wanted[2],
             settings=state.settings,
             clock=state.clock,
             host=client_host(request),
@@ -508,6 +521,11 @@ async def settings_submit(
             error=_t(request, SETTINGS_RESULTS[outcome.value]),
             status_code=400,
         )
+    if outcome.value == "done" and wanted[2] and not was_checking:
+        # Just turned on: check shortly instead of waiting for the hourly look (ADR-0023).
+        jobs = getattr(state, "recurring_jobs", None)
+        if jobs is not None:
+            jobs.request_update_check()
     return await _settings_page(
         request, current, notice=_t(request, SETTINGS_RESULTS[outcome.value])
     )

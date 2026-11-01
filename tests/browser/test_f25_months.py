@@ -126,13 +126,16 @@ def test_f25_month_page_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-closed-banner]")).to_have_count(0)
             expect(page.locator("[data-notice]")).to_have_text("Month reopened.")
 
-            # Sidebar (v0.2.1 bug): on a long desktop page the user menu stays on screen after
-            # scrolling to the bottom, and account pages show the full workspace nav.
+            # Sidebar (v0.2.1 bug): on a long desktop page the sidebar footer stays on screen
+            # after scrolling to the bottom, and account pages show the full workspace nav. The
+            # user menu is at the top of the page.
             page.set_viewport_size({"width": 1280, "height": 720})
             page.goto(f"{base}/categories")
             assert page.evaluate("document.documentElement.scrollHeight > window.innerHeight")
             page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight)")
             assert page.evaluate("window.scrollY > 0")
+            expect(page.locator("[data-sidebar-footer]")).to_be_in_viewport(ratio=1)
+            page.evaluate("window.scrollTo(0, 0)")
             menu = page.locator("[data-user-menu] summary")
             expect(menu).to_be_in_viewport(ratio=1)
             menu.click()
