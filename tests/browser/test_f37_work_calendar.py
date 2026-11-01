@@ -140,9 +140,8 @@ def test_work_calendar_in_a_browser(tmp_path: Path) -> None:
 
             # One-time payments are added on Upcoming; the Recurring form does not offer them.
             page.goto(f"{base}/recurring/new", wait_until="networkidle")
-            repeat_fields = page.locator('[data-hidden-when="freq=once"]')
-            expect(repeat_fields).to_be_visible()
-            expect(page.locator('#freq option[value="once"]')).to_have_count(0)
+            expect(page.locator('[data-repeat-fields="monthly"]')).to_be_visible()
+            expect(page.locator('[data-repeat-option="once"]')).to_have_count(0)
             page.goto(f"{base}/upcoming?form=one-time", wait_until="networkidle")
             one_time = page.locator("form[data-one-time-form]")
             one_time.get_by_label("Description").fill("Wedding gift")
@@ -158,8 +157,9 @@ def test_work_calendar_in_a_browser(tmp_path: Path) -> None:
                     select(ScheduledItem.id).where(ScheduledItem.name == "Wedding gift")
                 ).one()
             page.goto(f"{base}/recurring/{item_id}/edit", wait_until="networkidle")
-            expect(page.get_by_label("Repeat")).to_have_value("once")
-            expect(repeat_fields).to_be_hidden()
+            expect(page.locator('[data-repeat-option="once"] input')).to_be_checked()
+            for fields in ("weekly", "monthly", "every_months", "yearly"):
+                expect(page.locator(f'[data-repeat-fields="{fields}"]')).to_be_hidden()
             assert page.evaluate("window.__cspViolations") == []
             browser.close()
     finally:
