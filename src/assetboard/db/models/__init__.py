@@ -14,6 +14,7 @@ from assetboard.db.models.identity import (
     UserSession,
     Workspace,
 )
+from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.db.models.notifications import NotificationChannel, NotificationLog
@@ -28,6 +29,7 @@ __all__ = [
     "ScheduledOccurrence",
     "IncomeSource",
     "IncomeSourceTaxRule",
+    "ImportBatch",
     "WorkDay",
     "WorkLog",
     "TaxRule",

@@ -232,6 +232,12 @@ msgstr ""
 msgid "Workspace archive exported"
 msgstr ""
 
+msgid "Import applied"
+msgstr ""
+
+msgid "Import rolled back"
+msgstr ""
+
 msgid "Instance settings changed"
 msgstr ""
 
@@ -343,6 +349,9 @@ msgstr ""
 msgid "Source"
 msgstr ""
 
+msgid "Mode"
+msgstr ""
+
 msgid "Temporary password"
 msgstr ""
 
@@ -368,6 +377,33 @@ msgid "Categories"
 msgstr ""
 
 msgid "Planned values"
+msgstr ""
+
+msgid "Transactions created"
+msgstr ""
+
+msgid "Transactions deleted"
+msgstr ""
+
+msgid "Edited transactions"
+msgstr ""
+
+msgid "Planned values kept"
+msgstr ""
+
+msgid "Categories deleted"
+msgstr ""
+
+msgid "Categories archived"
+msgstr ""
+
+msgid "Duplicates skipped"
+msgstr ""
+
+msgid "Conflicts skipped"
+msgstr ""
+
+msgid "Rows skipped"
 msgstr ""
 
 msgid "Transactions"
@@ -662,6 +698,111 @@ msgid "Instance settings"
 msgstr ""
 
 msgid "Deleted workspaces"
+msgstr ""
+
+msgid "Invalid UTF-8 encoding."
+msgstr ""
+
+msgid "The CSV data is invalid."
+msgstr ""
+
+msgid "The file is empty."
+msgstr ""
+
+msgid "The CSV column count is invalid."
+msgstr ""
+
+msgid "The row has a different number of columns than the header."
+msgstr ""
+
+msgid "The upload contains too many data rows."
+msgstr ""
+
+msgid "An unknown file in the archive was ignored."
+msgstr ""
+
+msgid "An unknown CSV column was ignored."
+msgstr ""
+
+msgid "The archive contains duplicate file names."
+msgstr ""
+
+msgid "The archive is missing required files."
+msgstr ""
+
+msgid "The archive contains too many files."
+msgstr ""
+
+msgid "The archive contains an unsafe file."
+msgstr ""
+
+msgid "The archive exceeds an uncompressed size limit."
+msgstr ""
+
+msgid "The archive format is not supported."
+msgstr ""
+
+msgid "The archive version is not supported."
+msgstr ""
+
+msgid "The archive contains invalid JSON."
+msgstr ""
+
+msgid "The archive contains invalid UTF-8 or CSV data."
+msgstr ""
+
+msgid "The file checksum does not match the manifest."
+msgstr ""
+
+msgid "The file size does not match the manifest."
+msgstr ""
+
+msgid "The file row count does not match the manifest."
+msgstr ""
+
+msgid "The CSV delimiter option is invalid."
+msgstr ""
+
+msgid "The stored upload no longer matches its checksum."
+msgstr ""
+
+msgid "The stored upload is missing; upload the file again."
+msgstr ""
+
+msgid "The upload expired after 24 hours and was removed."
+msgstr ""
+
+msgid "Import planning exceeded 60 seconds."
+msgstr ""
+
+msgid "Other imports are being checked; try again in a minute."
+msgstr ""
+
+msgid "Import planning failed."
+msgstr ""
+
+msgid "Already imported."
+msgstr ""
+
+msgid "Imported before and deleted; it is not brought back."
+msgstr ""
+
+msgid "Changed since the export; the stored row is kept."
+msgstr ""
+
+msgid "The same row appears earlier in this file."
+msgstr ""
+
+msgid "An earlier row of this file sets another value; it is kept."
+msgstr ""
+
+msgid "The same planned value already exists."
+msgstr ""
+
+msgid "A different planned value exists; the stored value is kept."
+msgstr ""
+
+msgid "The month is closed."
 msgstr ""
 
 #, python-format
@@ -1926,6 +2067,19 @@ msgstr ""
 msgid ""
 "This workspace has too many pending invitations. Revoke some before "
 "creating more."
+msgstr ""
+
+msgid "The upload is too large."
+msgstr ""
+
+msgid "The import could not be completed. Review the report and try again."
+msgstr ""
+
+msgid "There is no import handler available for this file yet."
+msgstr ""
+
+#, python-format
+msgid "Rollback was refused because these months are closed: %(months)s"
 msgstr ""
 
 msgid "Workspace settings saved."
@@ -4424,6 +4578,109 @@ msgstr ""
 msgid "Download archive"
 msgstr ""
 
+msgid "Import ledger data"
+msgstr ""
+
+msgid "ZIP archive or CSV file"
+msgstr ""
+
+msgid "CSV delimiter"
+msgstr ""
+
+msgid "Dot"
+msgstr ""
+
+msgid "Validate upload"
+msgstr ""
+
+msgid "Recent imports"
+msgstr ""
+
+msgid "Uploaded"
+msgstr ""
+
+msgid "Planned"
+msgstr ""
+
+msgid "Cancelled"
+msgstr ""
+
+msgid "Applied"
+msgstr ""
+
+msgid "Rolled back"
+msgstr ""
+
+msgid "Rows received"
+msgstr ""
+
+msgid "Invalid"
+msgstr ""
+
+msgid "View report"
+msgstr ""
+
+msgid "Download errors and skipped rows CSV"
+msgstr ""
+
+msgid "Cancel import"
+msgstr ""
+
+#, python-format
+msgid "Skip %(count)s invalid rows"
+msgstr ""
+
+msgid "Apply import"
+msgstr ""
+
+msgid "Roll back import"
+msgstr ""
+
+msgid "Import report"
+msgstr ""
+
+msgid "To create"
+msgstr ""
+
+msgid "Closed-month rows skipped"
+msgstr ""
+
+msgid "Invalid rows"
+msgstr ""
+
+msgid "Totals by month"
+msgstr ""
+
+msgid "Rows to create"
+msgstr ""
+
+msgid "Totals by category"
+msgstr ""
+
+msgid "The file was checked, but there is no importer for this kind of file yet."
+msgstr ""
+
+msgid "Warnings"
+msgstr ""
+
+msgid "Closed months"
+msgstr ""
+
+msgid "Errors"
+msgstr ""
+
+#, python-format
+msgid ""
+"%(count)s rows will be skipped; download the errors and skipped rows CSV "
+"for the list."
+msgstr ""
+
+msgid "This upload could not be planned. Download the errors CSV for details."
+msgstr ""
+
+msgid "The import report is not available."
+msgstr ""
+
 msgid "Delete workspace"
 msgstr ""
 
@@ -4454,6 +4711,37 @@ msgid "To confirm, type the workspace name: %(name)s"
 msgstr ""
 
 msgid "Delete this workspace"
+msgstr ""
+
+msgid "Confirm import rollback"
+msgstr ""
+
+msgid "Transactions to remove"
+msgstr ""
+
+msgid "Budget lines to remove"
+msgstr ""
+
+msgid "Budget lines kept (changed since the import)"
+msgstr ""
+
+msgid "Categories to delete"
+msgstr ""
+
+msgid "Categories to archive"
+msgstr ""
+
+#, python-format
+msgid ""
+"%(count)s of the transactions were edited after the import; they are "
+"removed too."
+msgstr ""
+
+#, python-format
+msgid "Rollback is not possible while these months are closed: %(months)s"
+msgstr ""
+
+msgid "Confirm rollback"
 msgstr ""
 
 msgid "People in this workspace"
@@ -5293,9 +5581,24 @@ msgstr ""
 #~ "months never change."
 #~ msgstr ""
 
+#~ msgid "Rollback was refused because an affected month is closed."
+#~ msgstr ""
+
+#~ msgid "Download errors CSV"
+#~ msgstr ""
+
+#~ msgid "Skip invalid rows"
+#~ msgstr ""
+
 #~ msgid "Money in"
 #~ msgstr ""
 
 #~ msgid "Description contains"
+#~ msgstr ""
+
+#~ msgid "Transactions kept"
+#~ msgstr ""
+
+#~ msgid "The file could not be validated."
 #~ msgstr ""
 

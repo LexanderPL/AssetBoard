@@ -1280,6 +1280,7 @@ WORKSPACE_TABLES = {
     "work_days",
     "notification_channels",
     "notification_log",
+    "import_batches",
 }
 
 

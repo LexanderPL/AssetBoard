@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ _("Roll back import") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Roll back import") }}{% endblock %}
+{% block content %}
+<section class="max-w-2xl">
+  <h2 class="text-lg font-semibold">{{ _("Confirm import rollback") }}</h2>
+  <p class="mt-2 text-sm text-muted">{{ batch.filename }}</p>
+  <dl class="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+    <div><dt class="text-muted">{{ _("Transactions to remove") }}</dt><dd>{{ rollback_counts.deleted|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Edited transactions") }}</dt><dd>{{ rollback_counts.edited|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Budget lines to remove") }}</dt><dd>{{ rollback_counts.budget_lines|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Budget lines kept (changed since the import)") }}</dt><dd>{{ rollback_counts.budget_lines_kept|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Categories to delete") }}</dt><dd>{{ rollback_counts.categories_to_delete|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Categories to archive") }}</dt><dd>{{ rollback_counts.categories_to_archive|default(0) }}</dd></div>
+  </dl>
+  {% if rollback_counts.edited %}<p class="mt-4 text-sm">{{ _("%(count)s of the transactions were edited after the import; they are removed too.", count=rollback_counts.edited) }}</p>{% endif %}
+  {% if closed_months %}<p class="mt-4 text-sm text-danger">{{ _("Rollback is not possible while these months are closed: %(months)s", months=closed_months|join(", ")) }}</p>{% endif %}
+  <div class="mt-6 flex items-center gap-4">
+    {% if not closed_months %}
+    <form method="post" action="{{ scoped_url(request, 'workspace_data_import_rollback', batch_id=batch.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <button type="submit" class="rounded-xl border border-danger-line bg-danger-soft px-4 py-2.5 text-sm font-semibold text-danger-strong">{{ _("Confirm rollback") }}</button>
+    </form>
+    {% endif %}
+    <a class="underline" href="{{ scoped_url(request, 'workspace_data') }}">{{ _("Cancel") }}</a>
+  </div>
+</section>
+{% endblock %}

@@ -27,6 +27,9 @@ from assetboard.db.repositories.base import ScopedRepository
 from assetboard.domain.months import YearMonth
 from assetboard.domain.transaction_search import SortOrder, TransactionFilter
 
+# Bound the IN lists of the import lookups (SQLite allows 999 parameters per statement).
+_LOOKUP_CHUNK = 400
+
 # Entry order (M4's export order): date, then the order rows were entered.
 CANONICAL_ORDER = (Transaction.date, Transaction.created_at, Transaction.id)
 _SORTS: dict[SortOrder, tuple[UnaryExpression[Any], ...]] = {
@@ -96,6 +99,8 @@ class TransactionRepository(ScopedRepository[Transaction]):
         description_key: str,
         source: str,
         created_by_user_id: UUID | None,
+        import_batch_id: UUID | None = None,
+        import_key: str | None = None,
     ) -> Transaction:
         return self.add(
             Transaction(
@@ -108,8 +113,69 @@ class TransactionRepository(ScopedRepository[Transaction]):
                 description_key=description_key,
                 source=source,
                 created_by_user_id=created_by_user_id,
+                import_batch_id=import_batch_id,
+                import_key=import_key,
             )
         )
+
+    def create_imported(
+        self,
+        *,
+        direction: str,
+        day: date,
+        amount_minor: int,
+        currency: str,
+        category_id: UUID,
+        description: str,
+        description_key: str,
+        import_batch_id: UUID,
+        import_key: str,
+        created_by_user_id: UUID | None,
+    ) -> Transaction:
+        return self.create(
+            direction=direction,
+            day=day,
+            amount_minor=amount_minor,
+            currency=currency,
+            category_id=category_id,
+            description=description,
+            description_key=description_key,
+            source="import",
+            created_by_user_id=created_by_user_id,
+            import_batch_id=import_batch_id,
+            import_key=import_key,
+        )
+
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[Transaction]:
+        statement = self._scoped_select().where(Transaction.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(self._session.scalars(statement.order_by(Transaction.id)))
+
+    def by_import_keys(self, import_keys: Collection[str]) -> list[Transaction]:
+        """Rows (soft-deleted ones included) whose ``import_key`` is one of ``import_keys``."""
+        keys = list(import_keys)
+        found: list[Transaction] = []
+        for start in range(0, len(keys), _LOOKUP_CHUNK):
+            chunk = keys[start : start + _LOOKUP_CHUNK]
+            statement = self._scoped_select().where(Transaction.import_key.in_(chunk))
+            found.extend(self._session.scalars(statement))
+        return found
+
+    def by_lineage_ids(self, row_ids: Collection[UUID]) -> list[Transaction]:
+        """Rows (soft-deleted ones included) whose id, or ``id:<id>`` import key, is one of
+        ``row_ids`` (F4.2 lineage dedupe)."""
+        ids = list(row_ids)
+        found: dict[UUID, Transaction] = {}
+        for start in range(0, len(ids), _LOOKUP_CHUNK):
+            chunk = ids[start : start + _LOOKUP_CHUNK]
+            statement = self._scoped_select().where(
+                Transaction.id.in_(chunk)
+                | Transaction.import_key.in_([f"id:{row_id}" for row_id in chunk])
+            )
+            for row in self._session.scalars(statement):
+                found[row.id] = row
+        return list(found.values())
 
     def get_for_update(self, row_id: UUID) -> Transaction | None:
         """``get`` with a row lock (``FOR UPDATE`` on PostgreSQL) until the transaction ends.

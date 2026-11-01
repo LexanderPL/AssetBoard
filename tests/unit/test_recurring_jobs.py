@@ -136,6 +136,8 @@ def test_the_reminder_tick_is_scheduled_and_runs_every_workspace(db, monkeypatch
     try:
         job = jobs.scheduler.get_job("notifications")
         assert job is not None and job.max_instances == 1
+        cleanup = jobs.scheduler.get_job("import-upload-cleanup")
+        assert cleanup is not None and cleanup.max_instances == 1
     finally:
         jobs.stop()
 

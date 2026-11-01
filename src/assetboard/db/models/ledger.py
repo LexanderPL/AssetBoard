@@ -73,6 +73,11 @@ class Category(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             postgresql_where=text("import_key IS NOT NULL"),
         ),
         Index("ix_categories_workspace_kind_order", "workspace_id", "kind", "sort_order"),
+        ForeignKeyConstraint(
+            ["workspace_id", "import_batch_id"],
+            ["import_batches.workspace_id", "import_batches.id"],
+            name="fk_categories_import_batch",
+        ),
     )
 
     name: Mapped[str] = mapped_column(String(MAX_CATEGORY_NAME_LENGTH), nullable=False)
@@ -82,6 +87,7 @@ class Category(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     color: Mapped[str] = mapped_column(String(7), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
     import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
 
@@ -121,8 +127,8 @@ class Transaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin
     workspace's category. Rows are soft-deleted (``deleted_at``) and never removed.
     ``description_key`` is the description's case-insensitive key for autocomplete
     (``domain.transactions.description_key``). The reserved columns of the spec
-    (``scheduled_occurrence_id``, ``import_batch_id``, ``account_id``) arrive with the features
-    that own their tables (M3, M4).
+    ``scheduled_occurrence_id`` and ``account_id`` are reserved for later features. Import
+    lineage and batch tracking are represented by ``import_key`` and ``import_batch_id``.
     """
 
     __tablename__ = "transactions"
@@ -152,6 +158,11 @@ class Transaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin
         ),
         Index("ix_transactions_workspace_date", "workspace_id", "date"),
         Index("ix_transactions_workspace_category_date", "workspace_id", "category_id", "date"),
+        ForeignKeyConstraint(
+            ["workspace_id", "import_batch_id"],
+            ["import_batches.workspace_id", "import_batches.id"],
+            name="fk_transactions_import_batch",
+        ),
         Index(
             "ix_transactions_workspace_direction_description",
             "workspace_id",
@@ -169,6 +180,7 @@ class Transaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin
     description: Mapped[str] = mapped_column(String(MAX_DESCRIPTION_LENGTH), nullable=False)
     description_key: Mapped[str] = mapped_column(String(MAX_DESCRIPTION_KEY_LENGTH), nullable=False)
     import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
     source: Mapped[str] = mapped_column(String(16), nullable=False)
     created_by_user_id: Mapped[UUID | None] = mapped_column(
         Uuid(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
@@ -200,6 +212,11 @@ class BudgetLine(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         CheckConstraint("length(currency) = 3", name="currency_length"),
         CheckConstraint("month >= '1900-01-01' AND month <= '2199-12-01'", name="month_in_range"),
         Index("ix_budget_lines_workspace_category", "workspace_id", "category_id"),
+        ForeignKeyConstraint(
+            ["workspace_id", "import_batch_id"],
+            ["import_batches.workspace_id", "import_batches.id"],
+            name="fk_budget_lines_import_batch",
+        ),
     )
 
     month: Mapped[date] = mapped_column(Date(), nullable=False)
@@ -207,3 +224,4 @@ class BudgetLine(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     # Money(planned_minor, currency); no ORM composite, as for transactions.
     planned_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)

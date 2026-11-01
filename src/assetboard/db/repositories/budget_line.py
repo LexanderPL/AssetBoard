@@ -25,7 +25,13 @@ class BudgetLineRepository(ScopedRepository[BudgetLine]):
     model = BudgetLine
 
     def create(
-        self, *, month: YearMonth, category_id: UUID, planned_minor: int, currency: str
+        self,
+        *,
+        month: YearMonth,
+        category_id: UUID,
+        planned_minor: int,
+        currency: str,
+        import_batch_id: UUID | None = None,
     ) -> BudgetLine:
         return self.add(
             BudgetLine(
@@ -33,6 +39,7 @@ class BudgetLineRepository(ScopedRepository[BudgetLine]):
                 category_id=category_id,
                 planned_minor=planned_minor,
                 currency=currency,
+                import_batch_id=import_batch_id,
             )
         )
 
@@ -66,3 +73,9 @@ class BudgetLineRepository(ScopedRepository[BudgetLine]):
         """Whether the workspace has any line (in any month)."""
         statement = select(exists().where(BudgetLine.workspace_id == self._workspace_id))
         return bool(self._session.execute(statement).scalar_one())
+
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[BudgetLine]:
+        statement = self._scoped_select().where(BudgetLine.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(self._session.scalars(statement.order_by(BudgetLine.id)))

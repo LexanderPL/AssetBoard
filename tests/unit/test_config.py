@@ -22,6 +22,8 @@ def test_settings_are_side_effect_free_and_use_spec_defaults(
 
     assert settings.env == "dev"
     assert settings.data_dir == data_dir
+    assert settings.max_request_bytes == 1024 * 1024
+    assert settings.import_max_upload_bytes == 20 * 1024 * 1024
     assert settings.database_url == f"sqlite:///{data_dir / 'assetboard.db'}"
     assert settings.base_url == "http://localhost:8000"
     assert settings.log_level == "INFO"

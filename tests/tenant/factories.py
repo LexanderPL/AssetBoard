@@ -19,6 +19,7 @@ from uuid import UUID, uuid4
 from sqlalchemy.orm import Session
 
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
+from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.db.models.notifications import NotificationChannel, NotificationLog
@@ -304,6 +305,20 @@ def make_notification_log(session: Session, workspace_id: UUID) -> NotificationL
     )
 
 
+def make_import_batch(session: Session, workspace_id: UUID) -> ImportBatch:
+    return ImportBatch(
+        workspace_id=workspace_id,
+        source="transactions_csv",
+        mode="merge",
+        filename="synthetic.csv",
+        file_sha256="a" * 64,
+        size_bytes=1,
+        options={},
+        status="uploaded",
+        started_by_user_id=None,
+    )
+
+
 TENANT_CASES: dict[type[Any], TenantCase] = {
     ScheduledItem: TenantCase(make_scheduled_item, update_values={"name": "Rent"}),
     ScheduledOccurrence: TenantCase(make_scheduled_occurrence, update_values={"label": "Rent"}),
@@ -337,4 +352,9 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     IncomeSourceTaxRule: TenantCase(make_income_source_tax_rule, update_values={"due_day": 12}),
     NotificationChannel: TenantCase(make_notification_channel, update_values={"name": "Laptop"}),
     NotificationLog: TenantCase(make_notification_log, update_values={"status": "failed"}),
+    ImportBatch: TenantCase(
+        make_import_batch,
+        update_values={"status": "failed"},
+        unsupported=frozenset({"delete"}),
+    ),
 }

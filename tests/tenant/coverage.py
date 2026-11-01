@@ -144,8 +144,25 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     },
     **{
         ("BudgetLineRepository", method): "test_budget_line_queries_stay_in_their_workspace"
-        for method in ("create", "for_month", "line", "usage_by_category", "any_exists")
+        for method in (
+            "create",
+            "for_month",
+            "line",
+            "usage_by_category",
+            "any_exists",
+        )
     },
+    **dict.fromkeys(
+        (
+            ("CategoryRepository", "for_import_batch"),
+            ("BudgetLineRepository", "for_import_batch"),
+            ("TransactionRepository", "create_imported"),
+            ("TransactionRepository", "for_import_batch"),
+            ("TransactionRepository", "by_import_keys"),
+            ("TransactionRepository", "by_lineage_ids"),
+        ),
+        "test_imported_ledger_rows_and_dedupe_lookups_stay_in_their_workspace",
+    ),
     **{
         ("InvitationRepository", method): "test_invitation_transitions_stay_in_their_workspace"
         for method in (
@@ -156,6 +173,10 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "mark_used",
             "record_failed_email",
         )
+    },
+    **{
+        ("ImportBatchRepository", method): "test_import_batch_queries_stay_in_their_workspace"
+        for method in ("create", "recent", "get_for_update", "expired_before", "awaiting_apply")
     },
 }
 

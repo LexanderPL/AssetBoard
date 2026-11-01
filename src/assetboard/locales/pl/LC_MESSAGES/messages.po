@@ -235,6 +235,12 @@ msgstr "Usunięto obszar roboczy"
 msgid "Workspace archive exported"
 msgstr "Wyeksportowano archiwum obszaru roboczego"
 
+msgid "Import applied"
+msgstr "Zastosowano import"
+
+msgid "Import rolled back"
+msgstr "Cofnięto import"
+
 msgid "Instance settings changed"
 msgstr "Zmieniono ustawienia instancji"
 
@@ -346,6 +352,9 @@ msgstr "Potwierdzono przez"
 msgid "Source"
 msgstr "Źródło"
 
+msgid "Mode"
+msgstr "Tryb"
+
 msgid "Temporary password"
 msgstr "Hasło tymczasowe"
 
@@ -372,6 +381,33 @@ msgstr "Kategorie"
 
 msgid "Planned values"
 msgstr "Wartości planowane"
+
+msgid "Transactions created"
+msgstr "Utworzone transakcje"
+
+msgid "Transactions deleted"
+msgstr "Usunięte transakcje"
+
+msgid "Edited transactions"
+msgstr "Edytowane transakcje"
+
+msgid "Planned values kept"
+msgstr "Zachowane wartości planowane"
+
+msgid "Categories deleted"
+msgstr "Usunięte kategorie"
+
+msgid "Categories archived"
+msgstr "Zarchiwizowane kategorie"
+
+msgid "Duplicates skipped"
+msgstr "Pominięte duplikaty"
+
+msgid "Conflicts skipped"
+msgstr "Pominięte konflikty"
+
+msgid "Rows skipped"
+msgstr "Pominięte wiersze"
 
 msgid "Transactions"
 msgstr "Transakcje"
@@ -666,6 +702,113 @@ msgstr "Ustawienia instancji"
 
 msgid "Deleted workspaces"
 msgstr "Usunięte obszary robocze"
+
+msgid "Invalid UTF-8 encoding."
+msgstr "Nieprawidłowe kodowanie UTF-8."
+
+msgid "The CSV data is invalid."
+msgstr "Dane CSV są nieprawidłowe."
+
+msgid "The file is empty."
+msgstr "Plik jest pusty."
+
+msgid "The CSV column count is invalid."
+msgstr "Nieprawidłowa liczba kolumn w pliku CSV."
+
+msgid "The row has a different number of columns than the header."
+msgstr "Wiersz ma inną liczbę kolumn niż nagłówek."
+
+msgid "The upload contains too many data rows."
+msgstr "Plik zawiera zbyt wiele wierszy danych."
+
+msgid "An unknown file in the archive was ignored."
+msgstr "Archiwum zawiera nieznany plik, który został pominięty."
+
+msgid "An unknown CSV column was ignored."
+msgstr "Pominięto nieznaną kolumnę CSV."
+
+msgid "The archive contains duplicate file names."
+msgstr "Archiwum zawiera powtarzające się nazwy plików."
+
+msgid "The archive is missing required files."
+msgstr "W archiwum brakuje wymaganych plików."
+
+msgid "The archive contains too many files."
+msgstr "Archiwum zawiera zbyt wiele plików."
+
+msgid "The archive contains an unsafe file."
+msgstr "Archiwum zawiera niebezpieczny plik."
+
+msgid "The archive exceeds an uncompressed size limit."
+msgstr "Archiwum przekracza limit rozmiaru po rozpakowaniu."
+
+msgid "The archive format is not supported."
+msgstr "Format archiwum nie jest obsługiwany."
+
+msgid "The archive version is not supported."
+msgstr "Wersja archiwum nie jest obsługiwana."
+
+msgid "The archive contains invalid JSON."
+msgstr "Archiwum zawiera nieprawidłowe dane JSON."
+
+msgid "The archive contains invalid UTF-8 or CSV data."
+msgstr "Archiwum zawiera nieprawidłowe dane UTF-8 lub CSV."
+
+msgid "The file checksum does not match the manifest."
+msgstr "Suma kontrolna pliku nie zgadza się z manifestem."
+
+msgid "The file size does not match the manifest."
+msgstr "Rozmiar pliku nie zgadza się z manifestem."
+
+msgid "The file row count does not match the manifest."
+msgstr "Liczba wierszy pliku nie zgadza się z manifestem."
+
+msgid "The CSV delimiter option is invalid."
+msgstr "Nieprawidłowy separator w opcjach pliku CSV."
+
+msgid "The stored upload no longer matches its checksum."
+msgstr "Zapisany plik nie zgadza się już z jego sumą kontrolną."
+
+msgid "The stored upload is missing; upload the file again."
+msgstr "Zapisanego pliku brakuje; prześlij plik ponownie."
+
+msgid "The upload expired after 24 hours and was removed."
+msgstr "Przesłany plik wygasł po 24 godzinach i został usunięty."
+
+msgid "Import planning exceeded 60 seconds."
+msgstr "Planowanie importu przekroczyło limit 60 sekund."
+
+msgid "Other imports are being checked; try again in a minute."
+msgstr "Trwa sprawdzanie innych importów; spróbuj ponownie za minutę."
+
+msgid "Import planning failed."
+msgstr "Planowanie importu nie powiodło się."
+
+msgid "Already imported."
+msgstr "Już zaimportowano."
+
+msgid "Imported before and deleted; it is not brought back."
+msgstr "Zaimportowano wcześniej i usunięto; nie zostanie przywrócony."
+
+msgid "Changed since the export; the stored row is kept."
+msgstr "Zmieniono od eksportu; zapisany wiersz zostaje."
+
+msgid "The same row appears earlier in this file."
+msgstr "Ten sam wiersz występuje wcześniej w tym pliku."
+
+msgid "An earlier row of this file sets another value; it is kept."
+msgstr ""
+"Wcześniejszy wiersz tego pliku ustawia inną wartość; zostaje ona "
+"zachowana."
+
+msgid "The same planned value already exists."
+msgstr "Taka sama wartość planowana już istnieje."
+
+msgid "A different planned value exists; the stored value is kept."
+msgstr "Istnieje inna wartość planowana; zapisana wartość zostaje."
+
+msgid "The month is closed."
+msgstr "Miesiąc jest zamknięty."
 
 #, python-format
 msgid "%(tax)s: %(source)s"
@@ -2087,6 +2230,19 @@ msgid ""
 msgstr ""
 "Ten obszar roboczy ma zbyt wiele oczekujących zaproszeń. Odwołaj część z "
 "nich, zanim utworzysz kolejne."
+
+msgid "The upload is too large."
+msgstr "Przesyłany plik jest za duży."
+
+msgid "The import could not be completed. Review the report and try again."
+msgstr "Nie udało się wykonać importu. Sprawdź raport i spróbuj ponownie."
+
+msgid "There is no import handler available for this file yet."
+msgstr "Nie ma jeszcze procedury importu dla tego pliku."
+
+#, python-format
+msgid "Rollback was refused because these months are closed: %(months)s"
+msgstr "Nie można cofnąć importu, ponieważ zamknięte są miesiące: %(months)s"
 
 msgid "Workspace settings saved."
 msgstr "Zapisano ustawienia obszaru roboczego."
@@ -4802,6 +4958,113 @@ msgstr ""
 msgid "Download archive"
 msgstr "Pobierz archiwum"
 
+msgid "Import ledger data"
+msgstr "Import danych księgowych"
+
+msgid "ZIP archive or CSV file"
+msgstr "Archiwum ZIP lub plik CSV"
+
+msgid "CSV delimiter"
+msgstr "Separator CSV"
+
+msgid "Dot"
+msgstr "Kropka"
+
+msgid "Validate upload"
+msgstr "Sprawdź plik"
+
+msgid "Recent imports"
+msgstr "Ostatnie importy"
+
+msgid "Uploaded"
+msgstr "Przesłano"
+
+msgid "Planned"
+msgstr "Zaplanowano"
+
+msgid "Cancelled"
+msgstr "Anulowano"
+
+msgid "Applied"
+msgstr "Zastosowano"
+
+msgid "Rolled back"
+msgstr "Cofnięto"
+
+msgid "Rows received"
+msgstr "Otrzymane wiersze"
+
+msgid "Invalid"
+msgstr "Nieprawidłowe"
+
+msgid "View report"
+msgstr "Wyświetl raport"
+
+msgid "Download errors and skipped rows CSV"
+msgstr "Pobierz plik CSV z błędami i pominiętymi wierszami"
+
+msgid "Cancel import"
+msgstr "Anuluj import"
+
+#, python-format
+msgid "Skip %(count)s invalid rows"
+msgstr "Pomiń nieprawidłowe wiersze: %(count)s"
+
+msgid "Apply import"
+msgstr "Zastosuj import"
+
+msgid "Roll back import"
+msgstr "Cofnij import"
+
+msgid "Import report"
+msgstr "Raport importu"
+
+msgid "To create"
+msgstr "Do utworzenia"
+
+msgid "Closed-month rows skipped"
+msgstr "Pominięte wiersze z zamkniętych miesięcy"
+
+msgid "Invalid rows"
+msgstr "Nieprawidłowe wiersze"
+
+msgid "Totals by month"
+msgstr "Sumy według miesiąca"
+
+msgid "Rows to create"
+msgstr "Wiersze do utworzenia"
+
+msgid "Totals by category"
+msgstr "Sumy według kategorii"
+
+msgid "The file was checked, but there is no importer for this kind of file yet."
+msgstr "Plik został sprawdzony, ale nie ma jeszcze importu dla tego rodzaju pliku."
+
+msgid "Warnings"
+msgstr "Ostrzeżenia"
+
+msgid "Closed months"
+msgstr "Zamknięte miesiące"
+
+msgid "Errors"
+msgstr "Błędy"
+
+#, python-format
+msgid ""
+"%(count)s rows will be skipped; download the errors and skipped rows CSV "
+"for the list."
+msgstr ""
+"Pominięte wiersze: %(count)s; listę zawiera plik CSV z błędami i "
+"pominiętymi wierszami."
+
+msgid "This upload could not be planned. Download the errors CSV for details."
+msgstr ""
+"Nie można zaplanować importu. Pobierz plik CSV z błędami, aby zobaczyć "
+"szczegóły."
+
+msgid "The import report is not available."
+msgstr "Raport importu jest niedostępny."
+
 msgid "Delete workspace"
 msgstr "Usuń obszar roboczy"
 
@@ -4838,6 +5101,37 @@ msgstr "Aby potwierdzić, wpisz nazwę obszaru roboczego: %(name)s"
 
 msgid "Delete this workspace"
 msgstr "Usuń ten obszar roboczy"
+
+msgid "Confirm import rollback"
+msgstr "Potwierdź cofnięcie importu"
+
+msgid "Transactions to remove"
+msgstr "Transakcje do usunięcia"
+
+msgid "Budget lines to remove"
+msgstr "Planowane wartości do usunięcia"
+
+msgid "Budget lines kept (changed since the import)"
+msgstr "Zachowane wartości planowane (zmienione po imporcie)"
+
+msgid "Categories to delete"
+msgstr "Kategorie do usunięcia"
+
+msgid "Categories to archive"
+msgstr "Kategorie do zarchiwizowania"
+
+#, python-format
+msgid ""
+"%(count)s of the transactions were edited after the import; they are "
+"removed too."
+msgstr "Transakcje edytowane po imporcie: %(count)s; one również zostaną usunięte."
+
+#, python-format
+msgid "Rollback is not possible while these months are closed: %(months)s"
+msgstr "Nie można cofnąć importu, dopóki te miesiące są zamknięte: %(months)s"
+
+msgid "Confirm rollback"
+msgstr "Potwierdź cofnięcie"
 
 msgid "People in this workspace"
 msgstr "Osoby w tym obszarze roboczym"
@@ -5525,6 +5819,15 @@ msgstr "Usuń obszar roboczy…"
 #~ "zamkniętych miesiącach nigdy się nie "
 #~ "zmieniają."
 
+#~ msgid "Rollback was refused because an affected month is closed."
+#~ msgstr "Nie można cofnąć importu, ponieważ dotyczy on zamkniętego miesiąca."
+
+#~ msgid "Download errors CSV"
+#~ msgstr "Pobierz plik CSV z błędami"
+
+#~ msgid "Skip invalid rows"
+#~ msgstr "Pomiń nieprawidłowe wiersze"
+
 #~ msgid ""
 #~ "The work log was saved; posted "
 #~ "income was not changed. Adjust its "
@@ -5554,4 +5857,10 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Description contains"
 #~ msgstr "Opis zawiera"
+
+#~ msgid "Transactions kept"
+#~ msgstr "Zachowane transakcje"
+
+#~ msgid "The file could not be validated."
+#~ msgstr "Nie można zweryfikować pliku."
 

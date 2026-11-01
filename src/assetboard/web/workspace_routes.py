@@ -10,12 +10,13 @@ pages. Successful writes redirect (303) back to the page they came from.
 from __future__ import annotations
 
 from dataclasses import replace
+from functools import partial
 from tempfile import SpooledTemporaryFile
 from typing import Annotated
 from urllib.parse import quote
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Form, HTTPException, Request
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Request, UploadFile
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
@@ -25,6 +26,22 @@ from assetboard.i18n import gettext
 from assetboard.services import taxes
 from assetboard.services.archive import export_workspace
 from assetboard.services.context import Role, WorkspaceNotAvailable, require_role, select_workspace
+from assetboard.services.imports import (
+    ImportClosedMonths,
+    ImportConfirmationRequired,
+    ImportError,
+    ImportUnavailable,
+    apply_import,
+    cancel_import,
+    get_import_batch,
+    list_import_batches,
+    plan_import,
+    preview_rollback_import,
+    report_errors_csv,
+    report_message,
+    rollback_import,
+    upload_import,
+)
 from assetboard.services.instance_settings import workspace_creation_allowed
 from assetboard.services.workspaces import (
     DEFAULT_INVITATION_EXPIRY_DAYS,
@@ -61,6 +78,7 @@ from assetboard.web.workspace_forms import workspace_form_options
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
 FormStr = Annotated[str, Form()]
+UploadFileField = Annotated[UploadFile, File(...)]
 
 
 def _(message: str) -> str:
@@ -99,6 +117,10 @@ INVITATION_ERRORS = {
     ),
 }
 MEMBER_ERROR_FALLBACK = _("The change could not be made. Reload the page and try again.")
+UPLOAD_TOO_LARGE = _("The upload is too large.")
+IMPORT_FAILED = _("The import could not be completed. Review the report and try again.")
+IMPORT_NOT_AVAILABLE = _("There is no import handler available for this file yet.")
+ROLLBACK_CLOSED_MONTH = _("Rollback was refused because these months are closed: %(months)s")
 ROLE_LABELS = {
     Role.OWNER: _("Owner"),
     Role.EDITOR: _("Editor"),
@@ -120,7 +142,199 @@ def _parse_uuid(value: str) -> UUID:
 @router.get("/workspace/data", name="workspace_data")
 async def workspace_data(request: Request, ctx: CurrentContext) -> Response:
     require_role(ctx, Role.EDITOR)
-    return render_template(request, "workspace/data.html")
+    batches = await run_in_threadpool(list_import_batches, request.app.state.session_factory, ctx)
+    batch_id = request.query_params.get("batch", "")
+    selected = None
+    if batch_id:
+        try:
+            selected = await run_in_threadpool(
+                get_import_batch,
+                request.app.state.session_factory,
+                ctx,
+                _parse_uuid(batch_id),
+            )
+        except WorkspaceNotAvailable:
+            selected = None
+    return render_template(
+        request,
+        "workspace/data.html",
+        context={
+            "import_batches": batches,
+            "selected_batch": selected,
+            "available_import_sources": request.app.state.import_adapters.sources,
+            "import_message": partial(report_message, locale=request.state.locale),
+        },
+    )
+
+
+@router.post("/workspace/data/import", name="workspace_data_import")
+async def workspace_data_import(
+    request: Request,
+    ctx: CurrentContext,
+    upload: UploadFileField,
+    delimiter: Annotated[str, Form()] = "comma",
+    decimal: Annotated[str, Form()] = "dot",
+) -> Response:
+    require_role(ctx, Role.EDITOR)
+    max_bytes = request.app.state.settings.import_max_upload_bytes
+    content = await upload.read(max_bytes + 1)
+    filename = upload.filename or "upload.csv"
+    await upload.close()
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail=_t(request, UPLOAD_TOO_LARGE))
+    if delimiter not in {"comma", "semicolon"} or decimal not in {"dot", "comma"}:
+        raise HTTPException(status_code=422, detail=_t(request, IMPORT_FAILED))
+    if decimal == "comma" and delimiter != "semicolon":
+        raise HTTPException(status_code=422, detail=_t(request, IMPORT_FAILED))
+    batch_id = await run_in_threadpool(
+        upload_import,
+        request.app.state.session_factory,
+        ctx,
+        data_dir=request.app.state.settings.data_dir,
+        filename=filename,
+        content=content,
+        options={"delimiter": delimiter, "decimal": decimal},
+    )
+    try:
+        await run_in_threadpool(
+            plan_import,
+            request.app.state.session_factory,
+            ctx,
+            request.app.state.settings.data_dir,
+            batch_id,
+            request.app.state.import_adapters,
+        )
+    except ImportError as error:
+        message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
+        raise HTTPException(status_code=409, detail=_t(request, message)) from None
+    return RedirectResponse(
+        f"{request.url_for('workspace_data').path}?batch={batch_id}", status_code=303
+    )
+
+
+@router.get("/workspace/data/import/{batch_id}/errors.csv", name="workspace_data_import_errors")
+async def workspace_data_import_errors(
+    request: Request, ctx: CurrentContext, batch_id: str
+) -> Response:
+    try:
+        identifier = _parse_uuid(batch_id)
+    except WorkspaceNotAvailable:
+        raise HTTPException(status_code=404) from None
+    batch = await run_in_threadpool(
+        get_import_batch, request.app.state.session_factory, ctx, identifier
+    )
+    if batch is None:
+        raise HTTPException(status_code=404)
+    return Response(
+        report_errors_csv(batch.report, request.state.locale),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": 'attachment; filename="import-errors.csv"'},
+    )
+
+
+@router.post("/workspace/data/import/{batch_id}/cancel")
+async def workspace_data_import_cancel(
+    request: Request, ctx: CurrentContext, batch_id: str
+) -> Response:
+    try:
+        identifier = _parse_uuid(batch_id)
+    except WorkspaceNotAvailable:
+        raise HTTPException(status_code=404) from None
+    try:
+        await run_in_threadpool(
+            cancel_import,
+            request.app.state.session_factory,
+            ctx,
+            request.app.state.settings.data_dir,
+            identifier,
+        )
+    except ImportError as error:
+        message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
+        raise HTTPException(status_code=409, detail=_t(request, message)) from None
+    return RedirectResponse(request.url_for("workspace_data").path, status_code=303)
+
+
+@router.post("/workspace/data/import/{batch_id}/apply")
+async def workspace_data_import_apply(
+    request: Request,
+    ctx: CurrentContext,
+    batch_id: str,
+    skip_invalid: Annotated[bool, Form()] = False,
+) -> Response:
+    try:
+        identifier = _parse_uuid(batch_id)
+    except WorkspaceNotAvailable:
+        raise HTTPException(status_code=404) from None
+    try:
+        await run_in_threadpool(
+            apply_import,
+            request.app.state.session_factory,
+            ctx,
+            request.app.state.settings.data_dir,
+            identifier,
+            request.app.state.import_adapters,
+            skip_invalid=skip_invalid,
+        )
+    except ImportConfirmationRequired:
+        return RedirectResponse(
+            f"{request.url_for('workspace_data').path}?batch={identifier}", status_code=303
+        )
+    except ImportError as error:
+        message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
+        raise HTTPException(status_code=409, detail=_t(request, message)) from None
+    return RedirectResponse(request.url_for("workspace_data").path, status_code=303)
+
+
+@router.get(
+    "/workspace/data/import/{batch_id}/rollback",
+    name="workspace_data_import_rollback_confirm",
+)
+async def workspace_data_import_rollback_confirm(
+    request: Request, ctx: CurrentContext, batch_id: str
+) -> Response:
+    try:
+        identifier = _parse_uuid(batch_id)
+    except WorkspaceNotAvailable:
+        raise HTTPException(status_code=404) from None
+    try:
+        batch, counts, closed_months = await run_in_threadpool(
+            preview_rollback_import,
+            request.app.state.session_factory,
+            ctx,
+            identifier,
+        )
+    except ImportError as error:
+        message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
+        raise HTTPException(status_code=409, detail=_t(request, message)) from None
+    return render_template(
+        request,
+        "workspace/import_rollback.html",
+        context={"batch": batch, "rollback_counts": counts, "closed_months": closed_months},
+    )
+
+
+@router.post("/workspace/data/import/{batch_id}/rollback")
+async def workspace_data_import_rollback(
+    request: Request, ctx: CurrentContext, batch_id: str
+) -> Response:
+    try:
+        identifier = _parse_uuid(batch_id)
+    except WorkspaceNotAvailable:
+        raise HTTPException(status_code=404) from None
+    try:
+        await run_in_threadpool(
+            rollback_import,
+            request.app.state.session_factory,
+            ctx,
+            identifier,
+        )
+    except ImportClosedMonths as error:
+        detail = _t(request, ROLLBACK_CLOSED_MONTH) % {"months": ", ".join(error.months)}
+        raise HTTPException(status_code=409, detail=detail) from None
+    except (ImportError, ImportUnavailable) as error:
+        message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
+        raise HTTPException(status_code=409, detail=_t(request, message)) from None
+    return RedirectResponse(request.url_for("workspace_data").path, status_code=303)
 
 
 @router.post("/workspace/data/export", name="workspace_data_export")

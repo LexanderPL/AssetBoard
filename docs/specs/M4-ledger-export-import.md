@@ -61,7 +61,9 @@ synthetic too).
   `categories(workspace_id, id)` with `ON DELETE CASCADE`. Saved mappings (F4.3).
 - The uploaded file is kept, between upload and apply only, under
   `DATA_DIR/imports/<workspace_id>/<batch_id>` (mode 0600, outside any served directory), and
-  deleted on apply, cancel or failure, or by an hourly job 24 hours after upload.
+  deleted on apply, cancel or failure, or by an hourly job 24 hours after upload. The same job
+  removes files in the workspace's folder that no `uploaded` or `planned` batch owns (left by a
+  crash between commit and delete) once they are an hour old.
 
 **Roles (decided here; see open question 1 for viewers)**
 
@@ -162,6 +164,10 @@ be undone.
 - **Parse and plan in a worker thread with a time limit** (60 s, a code constant): parsing is
   pure (`domain.archive`), planning reads the workspace through services and writes nothing.
   Over the limit the batch is `failed` with a message. At most 1 000 000 data rows per upload.
+  The limit counts from when the worker starts the job (two workers; a job that cannot start
+  within 60 s fails as "busy"). The worker passes an `out_of_time` callback to the CSV reader
+  (checked every 1 000 rows) and to the adapter's `plan`, so a job over the limit stops itself;
+  the archive reader is bounded by its size limits instead.
 - **Dry-run report** shown before anything is written, stored in `ImportBatch.report`, status
   `planned`: counts (to create, duplicates skipped, conflicts skipped, skipped in closed months,
   skipped for ignored categories, invalid); a **per-month table** (month; expense total, income
@@ -170,7 +176,8 @@ be undone.
   the old workbook reconciliation); the closed months with their skipped rows; warnings (future
   dates, unknown columns, unknown files, settings that differ in merge mode); errors with file,
   line and column. Errors and skipped rows are downloadable as CSV
-  (`file,line,column,code,message`).
+  (`file,line,column,code,message`). Every report entry carries a stable `code`; the page and
+  the CSV translate known codes and otherwise show the entry's own message.
 - **Invalid rows:** in merge mode the user can apply the valid rows only after ticking "Skip N
   invalid rows"; in restore mode any error blocks the apply (a restore must be complete).
 - **Apply** re-parses the stored file and re-plans in the write transaction (the workspace may
@@ -195,12 +202,20 @@ be undone.
     re-importing; it is reported as "imported before and deleted".
   - Budget lines dedupe on `(month, category)`: same amount = duplicate, different amount =
     conflict (the stored value is kept, listed). Categories: see F4.3.
+  - The same `id` twice in one file, or the same `(month, category)` twice: the later row is a
+    duplicate (or, for a different planned value, a conflict) of the earlier one.
+  - These rules are shared helpers (`services.import_dedupe`) that F4.3 and F4.4's adapters
+    call; a deleted row is "imported before and deleted" whatever its values.
 - **Rollback** of an applied merge batch (editors/owners; confirm page with counts): soft-deletes
   its transactions (edited ones too; the confirm page says how many were edited), removes its
   budget lines (hard delete, as F2.3 does) except lines changed after the import
   (`updated_at > applied_at`, kept and listed), and removes the categories it created through
   F2.1's rule (delete when unused, else archive). Refused as a whole when any affected month is
   closed now (the months are listed). Restore rollback: F4.4.
+  F2.1 counts soft-deleted transactions as references (they keep pointing at their category),
+  so a created category whose transactions this rollback soft-deletes is archived; it is
+  deleted only when nothing else references it (for example, it held only removed budget lines).
+  Rollback works from `import_batch_id` for every source, in the framework (not per adapter).
 - **Cancel** of a planned batch deletes the stored file (`cancelled`). `/workspace/data` lists
   recent batches with status, counts and actions.
 - Audit: `import.applied` and `import.rolled_back` (batch id, source, mode, counts; never
@@ -208,6 +223,10 @@ be undone.
   for imports (the rows carry `import_batch_id`). Logs never contain row contents.
 - `ImportBatch` and `ImportCategoryMapping` follow docs/architecture.md (repository, tenant
   factory, coverage entries); the new columns get migrations; `alembic check` is clean.
+  `ImportCategoryMapping` arrives with F4.3, which first uses it (deferred from F4.2 as agreed).
+- **Adapters:** the framework calls the adapter registered for the batch's `source`
+  (`ImportAdapterRegistry`, `create_app(import_adapters=...)`); F4.3 and F4.4 register theirs.
+  Until one is registered an upload is checked and reported but cannot be applied.
 
 **Agent prompt**
 ```
