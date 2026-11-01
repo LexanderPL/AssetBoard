@@ -1554,16 +1554,104 @@ msgid ""
 "address (%(base_url)s), allow cookies for it, and try again."
 msgstr ""
 
-msgid "Choose an active category matching the direction."
+msgid "on Monday"
+msgstr ""
+
+msgid "on Tuesday"
+msgstr ""
+
+msgid "on Wednesday"
+msgstr ""
+
+msgid "on Thursday"
+msgstr ""
+
+msgid "on Friday"
+msgstr ""
+
+msgid "on Saturday"
+msgstr ""
+
+msgid "on Sunday"
+msgstr ""
+
+msgid "on the first working day"
+msgstr ""
+
+msgid "on the last working day"
+msgstr ""
+
+msgid "on the last day"
+msgstr ""
+
+#, python-format
+msgid "on the %(day)s"
+msgstr ""
+
+#, python-format
+msgid "Once on %(date)s"
+msgstr ""
+
+#, python-format
+msgid "Weekly %(days)s"
+msgstr ""
+
+#, python-format
+msgid "Every %(num)s week %(days)s"
+msgid_plural "Every %(num)s weeks %(days)s"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "Monthly %(day)s"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "Every %(num)s month %(day)s"
+msgid_plural "Every %(num)s months %(day)s"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "Yearly on %(date)s"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "Every %(num)s year on %(date)s"
+msgid_plural "Every %(num)s years on %(date)s"
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid ", from %(start)s"
+msgstr ""
+
+#, python-format
+msgid ", until %(end)s"
+msgstr ""
+
+#, python-format
+msgid ", %(num)s time in total"
+msgid_plural ", %(num)s times in total"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "; a weekend or holiday moves it to the working day before"
+msgstr ""
+
+msgid "; a weekend or holiday moves it to the working day after"
+msgstr ""
+
+msgid "Choose an active category of the chosen kind."
 msgstr ""
 
 msgid "Enter a valid start date."
 msgstr ""
 
-msgid "Enter an end date on or after the start date, or leave it empty."
+msgid "Enter an end date on or after the start date."
 msgstr ""
 
-msgid "Enter a whole number of 1 or more, or leave it empty."
+msgid "Enter how many times: a whole number of 1 or more."
 msgstr ""
 
 msgid "Enter a whole number of 1 or more."
@@ -3615,83 +3703,13 @@ msgstr ""
 msgid "Reminder"
 msgstr ""
 
-msgid "Recurring item"
-msgstr ""
-
 msgid "Edit recurring item"
 msgstr ""
 
 msgid "New recurring item"
 msgstr ""
 
-msgid "Check the highlighted field."
-msgstr ""
-
-#, python-format
-msgid ""
-"The category %(name)s is archived, so this item creates no new dates. "
-"Choose an active category to save it."
-msgstr ""
-
-msgid "Amount type"
-msgstr ""
-
-msgid "Fixed"
-msgstr ""
-
-msgid "Automatically post on the due date"
-msgstr ""
-
-msgid "Reminder: days before the due date (optional)"
-msgstr ""
-
-msgid "Leave empty to use the default of each notification channel."
-msgstr ""
-
-msgid "Start date"
-msgstr ""
-
-msgid "Repeat"
-msgstr ""
-
-msgid "One time"
-msgstr ""
-
-msgid "Weekly"
-msgstr ""
-
-msgid "Monthly"
-msgstr ""
-
-msgid "Yearly"
-msgstr ""
-
-msgid ""
-"One time: a single date on the start date. The end date, maximum "
-"occurrences, interval, weekdays, day and month are then ignored."
-msgstr ""
-
-msgid ""
-"For a single payment, use Add one-time payment on the Upcoming payments "
-"page."
-msgstr ""
-
-msgid "End date (optional)"
-msgstr ""
-
-msgid "Maximum occurrences (optional)"
-msgstr ""
-
-msgid "Every N weeks, months or years"
-msgstr ""
-
-msgid "Weekdays (weekly rules)"
-msgstr ""
-
-msgid "Day (monthly or yearly rules)"
-msgstr ""
-
-msgid "Last day"
+msgid "Last day of the month"
 msgstr ""
 
 msgid "First working day"
@@ -3700,36 +3718,168 @@ msgstr ""
 msgid "Last working day"
 msgstr ""
 
-msgid "Month number (yearly rules)"
+msgid "Back to Recurring"
 msgstr ""
 
-msgid "Weekend and holiday adjustment"
+msgid "Check the highlighted field."
 msgstr ""
 
-msgid "Keep the date"
+msgid "What"
 msgstr ""
 
-msgid "Previous working day"
+msgid "Is it money going out or coming in?"
 msgstr ""
 
-msgid "Next working day"
+msgid "Expense: money going out"
 msgstr ""
 
-msgid "Notes"
+msgid "Income: money coming in"
 msgstr ""
 
-msgid "Include past occurrences"
+#, python-format
+msgid ""
+"The category %(name)s is archived, so this item creates no new dates. "
+"Choose an active category to save it."
+msgstr ""
+
+msgid "How much"
+msgstr ""
+
+#, python-format
+msgid "Amount (%(currency)s)"
+msgstr ""
+
+msgid "The amount varies; this is an estimate"
+msgstr ""
+
+msgid "Like an electricity bill. You confirm the real amount when it is paid."
+msgstr ""
+
+msgid "How often"
+msgstr ""
+
+msgid "Weekly"
+msgstr ""
+
+msgid "On one or more days of the week"
+msgstr ""
+
+msgid "Monthly"
+msgstr ""
+
+msgid "On the same day each month"
+msgstr ""
+
+msgid "Every few months"
+msgstr ""
+
+msgid "Every 2, 3, 6… months, like a quarterly bill"
+msgstr ""
+
+msgid "Yearly"
+msgstr ""
+
+msgid "On the same date each year"
+msgstr ""
+
+msgid "One time"
+msgstr ""
+
+msgid "A single date: the start date"
+msgstr ""
+
+msgid "On which days?"
+msgstr ""
+
+msgid "Every how many weeks? (1 = every week)"
+msgstr ""
+
+msgid "Every how many months?"
+msgstr ""
+
+msgid "Counted from the month of the start date."
+msgstr ""
+
+msgid "Monthly or every few months"
+msgstr ""
+
+msgid "On which day of the month?"
+msgstr ""
+
+msgid "In shorter months, the 29th to 31st become the last day of the month."
+msgstr ""
+
+msgid "Every how many years? (1 = every year)"
+msgstr ""
+
+msgid "If the date falls on a weekend or public holiday"
+msgstr ""
+
+msgid "Keep that date"
+msgstr ""
+
+msgid "Move it to the working day before"
+msgstr ""
+
+msgid "Move it to the working day after"
+msgstr ""
+
+msgid "When"
+msgstr ""
+
+msgid "Starts on"
+msgstr ""
+
+msgid "Ends"
+msgstr ""
+
+msgid "On a date"
+msgstr ""
+
+msgid "End date"
+msgstr ""
+
+msgid "After a number of times"
+msgstr ""
+
+msgid "Number of times"
+msgstr ""
+
+msgid "times"
+msgstr ""
+
+msgid "Also add the dates between the start date and today"
 msgstr ""
 
 msgid ""
-"Saving a rule creates planned occurrences, never transactions. Edits "
-"replace only pending dates from today onward."
+"Only when the start date is in the past. They are added as planned, not "
+"as transactions."
+msgstr ""
+
+msgid "Options"
+msgstr ""
+
+msgid "Record it as paid automatically on the due date"
+msgstr ""
+
+msgid "Remind me this many days before (optional)"
+msgstr ""
+
+msgid "Leave empty to use the default of each notification channel."
+msgstr ""
+
+msgid "Notes (optional)"
+msgstr ""
+
+msgid ""
+"Saving plans the dates; it never records transactions. Changing an item "
+"updates only its planned dates from today onward."
 msgstr ""
 
 msgid "Save recurring item"
 msgstr ""
 
-msgid "Next six due dates"
+msgid "Next dates"
 msgstr ""
 
 msgid ""
@@ -3740,19 +3890,22 @@ msgstr ""
 msgid "Recurring items"
 msgstr ""
 
-msgid "One-time payments are on the Upcoming payments page."
+msgid "Bills and income that repeat. Each one plans its next dates for you."
 msgstr ""
 
-msgid "Add one-time payment"
+msgid "Schedule"
 msgstr ""
 
-msgid "Done"
+msgid "Next date"
 msgstr ""
 
-msgid "Paused"
+msgid "paused"
 msgstr ""
 
-msgid "Edit rule"
+msgid "Next:"
+msgstr ""
+
+msgid "No next date"
 msgstr ""
 
 msgid "Resume"
@@ -3763,18 +3916,27 @@ msgstr ""
 
 #, python-format
 msgid ""
-"Delete the recurring item %(name)s? Its pending dates are removed; with "
-"posted or skipped history it is archived instead."
+"Delete the recurring item %(name)s? Its planned dates are removed. "
+"Payments already recorded or skipped stay in your history."
+msgstr ""
+
+msgid "No recurring expenses yet."
+msgstr ""
+
+msgid "No recurring income yet."
+msgstr ""
+
+msgid ""
+"Pausing removes the planned dates from today onward until you resume. "
+"Dates in closed months never change."
 msgstr ""
 
 msgid "No recurring items yet."
 msgstr ""
 
 msgid ""
-"Pausing removes pending dates from today onward. Archiving or deleting "
-"removes all pending dates; posted and skipped dates are history and are "
-"kept, so deleting an item with history archives it instead. Dates in "
-"closed months never change."
+"Add rent, subscriptions, a salary or anything else that repeats, and its "
+"dates are planned for you."
 msgstr ""
 
 msgid "Choose valid recurrence dates to see the preview."
@@ -3789,11 +3951,10 @@ msgstr ""
 msgid "Occurrence marked paid or received."
 msgstr ""
 
-#, python-format
-msgid "Amount (%(currency)s)"
+msgid "Type"
 msgstr ""
 
-msgid "Type"
+msgid "Add one-time payment"
 msgstr ""
 
 msgid ""
@@ -3840,6 +4001,9 @@ msgid "Edit amount"
 msgstr ""
 
 msgid "Save amount"
+msgstr ""
+
+msgid "Edit rule"
 msgstr ""
 
 msgid "Example"
@@ -4087,9 +4251,6 @@ msgid "Nothing planned"
 msgstr ""
 
 msgid "Add another tax"
-msgstr ""
-
-msgid "How often"
 msgstr ""
 
 msgid "Every year"
@@ -4860,5 +5021,123 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "One time on %(date)s"
+#~ msgstr ""
+
+#~ msgid "Choose an active category matching the direction."
+#~ msgstr ""
+
+#~ msgid "Enter an end date on or after the start date, or leave it empty."
+#~ msgstr ""
+
+#~ msgid "Enter a whole number of 1 or more, or leave it empty."
+#~ msgstr ""
+
+#~ msgid "Recurring item"
+#~ msgstr ""
+
+#~ msgid "Amount type"
+#~ msgstr ""
+
+#~ msgid "Fixed"
+#~ msgstr ""
+
+#~ msgid "Automatically post on the due date"
+#~ msgstr ""
+
+#~ msgid "Reminder: days before the due date (optional)"
+#~ msgstr ""
+
+#~ msgid "Start date"
+#~ msgstr ""
+
+#~ msgid "Repeat"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "One time: a single date on the "
+#~ "start date. The end date, maximum "
+#~ "occurrences, interval, weekdays, day and "
+#~ "month are then ignored."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "For a single payment, use Add "
+#~ "one-time payment on the Upcoming "
+#~ "payments page."
+#~ msgstr ""
+
+#~ msgid "End date (optional)"
+#~ msgstr ""
+
+#~ msgid "Maximum occurrences (optional)"
+#~ msgstr ""
+
+#~ msgid "Every N weeks, months or years"
+#~ msgstr ""
+
+#~ msgid "Weekdays (weekly rules)"
+#~ msgstr ""
+
+#~ msgid "Day (monthly or yearly rules)"
+#~ msgstr ""
+
+#~ msgid "Last day"
+#~ msgstr ""
+
+#~ msgid "Month number (yearly rules)"
+#~ msgstr ""
+
+#~ msgid "Weekend and holiday adjustment"
+#~ msgstr ""
+
+#~ msgid "Keep the date"
+#~ msgstr ""
+
+#~ msgid "Previous working day"
+#~ msgstr ""
+
+#~ msgid "Next working day"
+#~ msgstr ""
+
+#~ msgid "Notes"
+#~ msgstr ""
+
+#~ msgid "Include past occurrences"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Saving a rule creates planned "
+#~ "occurrences, never transactions. Edits replace"
+#~ " only pending dates from today "
+#~ "onward."
+#~ msgstr ""
+
+#~ msgid "Next six due dates"
+#~ msgstr ""
+
+#~ msgid "One-time payments are on the Upcoming payments page."
+#~ msgstr ""
+
+#~ msgid "Done"
+#~ msgstr ""
+
+#~ msgid "Paused"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Delete the recurring item %(name)s? Its"
+#~ " pending dates are removed; with "
+#~ "posted or skipped history it is "
+#~ "archived instead."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Pausing removes pending dates from today"
+#~ " onward. Archiving or deleting removes "
+#~ "all pending dates; posted and skipped"
+#~ " dates are history and are kept, "
+#~ "so deleting an item with history "
+#~ "archives it instead. Dates in closed "
+#~ "months never change."
 #~ msgstr ""
 

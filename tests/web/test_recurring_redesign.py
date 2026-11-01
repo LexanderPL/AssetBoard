@@ -261,3 +261,11 @@ def test_preview_shows_the_sentence_and_five_dates(owner):
         "/recurring/preview", guided(owner, repeat="yearly", year_day="31", month="3")
     )
     assert "Co roku, 31 marca" in polish.text
+
+
+def test_next_date_beyond_the_planning_horizon_comes_from_the_rule(owner):
+    owner.app.state.clock = FixedClock("2026-10-31T12:00:00+00:00")
+    data = guided(owner, name="Far", start_date="2029-05-01", month_day="1")
+    assert owner.post("/recurring", data).status_code == 303
+    page = owner.client.get("/recurring").text
+    assert '<time datetime="2029-05-01">' in _row(page, _item(owner, "Far").id)
