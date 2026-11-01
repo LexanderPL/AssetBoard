@@ -981,10 +981,56 @@ function syncLogForm(form) {
     let text = "";
     if (state === "locked") text = form.getAttribute("data-hint-locked") ?? "";
     if (state === "derived") text = form.getAttribute("data-hint-derived") ?? "";
+    if (state === "closed") text = form.getAttribute("data-hint-closed") ?? "";
     hint.textContent = text;
     hint.hidden = !text;
   }
+  // A received month is read-only until "Edit anyway" (F3.4); a closed one stays read-only.
+  // Choosing another month always drops a previous "Edit anyway".
+  const override = form.querySelector("[data-log-override]");
+  if (override instanceof HTMLInputElement) override.value = "";
+  const anyway = form.querySelector("[data-log-anyway]");
+  if (anyway instanceof HTMLElement) anyway.hidden = state !== "locked";
+  const readOnly = state === "locked" || state === "closed";
+  units.disabled = readOnly;
+  if (submit instanceof HTMLButtonElement) submit.disabled = readOnly;
 }
+
+// "Edit anyway" in the Log form: unlock the received month and send the explicit override.
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest("[data-log-edit-anyway-button]");
+  const form = button?.closest("form[data-log-form]");
+  if (!(form instanceof HTMLFormElement)) return;
+  const override = form.querySelector("[data-log-override]");
+  const units = form.querySelector("[data-log-units]");
+  const submit = form.querySelector("[data-log-submit]");
+  const hint = form.querySelector("[data-log-hint]");
+  const anyway = form.querySelector("[data-log-anyway]");
+  if (override instanceof HTMLInputElement) override.value = "1";
+  if (submit instanceof HTMLButtonElement) submit.disabled = false;
+  if (hint instanceof HTMLElement) hint.hidden = true;
+  if (anyway instanceof HTMLElement) anyway.hidden = true;
+  if (units instanceof HTMLInputElement) {
+    units.disabled = false;
+    const month = form.querySelector("select[name='work_month_month']");
+    const year = form.querySelector("select[name='work_month_year']");
+    const wanted =
+      month instanceof HTMLSelectElement && year instanceof HTMLSelectElement
+        ? `${year.value}-${month.value.padStart(2, "0")}`
+        : "";
+    const log = Array.from(form.querySelectorAll("[data-existing-log]")).find(
+      (element) => element.getAttribute("data-existing-log") === wanted,
+    );
+    const logged = log?.getAttribute("data-units") ?? "";
+    if (logged && !units.value) {
+      units.value = logged;
+      units.dataset.filled = logged;
+    }
+    units.focus();
+  }
+});
 
 document.addEventListener("change", (event) => {
   const target = event.target;
@@ -997,5 +1043,18 @@ document.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("form[data-log-form]").forEach((form) => {
     const units = form.querySelector("[data-log-units]");
     if (units instanceof HTMLInputElement && units.value) units.dataset.filled = units.value;
+    // The server renders a received or closed month read-only unless "Edit anyway" was chosen.
+    const override = form.querySelector("[data-log-override]");
+    const anyway = form.querySelector("[data-log-anyway]");
+    const hint = form.querySelector("[data-log-hint]");
+    const submit = form.querySelector("[data-log-submit]");
+    const overriding = override instanceof HTMLInputElement && override.value === "1";
+    const locked = anyway instanceof HTMLElement && !anyway.hidden;
+    const closed =
+      hint instanceof HTMLElement && !hint.hidden && hint.textContent === form.getAttribute("data-hint-closed");
+    if (!overriding && (locked || closed) && units instanceof HTMLInputElement) {
+      units.disabled = true;
+      if (submit instanceof HTMLButtonElement) submit.disabled = true;
+    }
   });
 });

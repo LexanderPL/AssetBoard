@@ -16,7 +16,7 @@ from assetboard.db.models.ledger import Transaction
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
 from assetboard.services import income
-from assetboard.services.context import PermissionDenied
+from assetboard.services.context import Context, PermissionDenied
 from assetboard.services.months import close_month, reopen_month
 from assetboard.services.occurrences import post_occurrence
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
@@ -36,7 +36,7 @@ def team(tmp_path):
 
 def _received(
     team: WorkspaceDb, *, calendar: bool = False, month: date = AUGUST
-) -> tuple[object, UUID, UUID]:
+) -> tuple[Context, UUID, UUID]:
     """A source whose ``month`` income (2 units of 100.00) is received on its pay day."""
     ctx = team.ctx("owner", "owner")
     income_category, _expense = categories(team, ctx)

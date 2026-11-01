@@ -38,6 +38,8 @@ from assetboard.i18n.numbers import (
 from assetboard.services import income, taxes
 from assetboard.services.categories import CategoryList, list_categories
 from assetboard.services.context import Context, Role, has_role, require_role
+from assetboard.services.months import MonthClosed
+from assetboard.services.transactions import InvalidTransaction
 from assetboard.web.context import CurrentContext
 from assetboard.web.errors import is_htmx_fragment_request
 from assetboard.web.rendering import render_template, scoped_url
@@ -90,11 +92,9 @@ ERRORS = {
         "This month's units come from the work calendar. Change the days in the calendar."
     ),
     "invalid_day_units": _("Enter a number of units above 0 and at most 24."),
-    "posted": _(
-        "The work log was saved; posted income was not changed. "
-        "Adjust its transaction manually if needed."
-    ),
     "posted_locked": _("This month's income is already received. Edit the transaction instead."),
+    "work_month_closed": _("This month is closed. Reopen it to make changes."),
+    "not_received": _("This month's income is not received, so there is no transaction to update."),
     "missing_name": _("Enter a name."),
     "invalid_unit": _("Enter what you are paid per, for example day or hour."),
     "invalid_average": _("Enter a number of months between 1 and 24."),
@@ -220,6 +220,13 @@ def _error_text(request: Request, error: str | None) -> str | None:
     return gettext(ERRORS.get(error, ERRORS["failed"]), request.state.locale)
 
 
+def _transaction_href(request: Request, transaction_id: UUID, day: date | YearMonth) -> str:
+    """The Transactions page of the row's month with its inline edit open."""
+    month = day if isinstance(day, YearMonth) else YearMonth.from_date(day)
+    path = scoped_url(request, "transactions_month", month=str(month))
+    return f"{path}?{urlencode({'edit': str(transaction_id)})}#tx-{transaction_id}"
+
+
 def _locked_href(request: Request) -> str | None:
     """The posted transaction's edit link after a refused work log (``?tx=<id>&tx_month=``)."""
     if request.query_params.get("error") != "posted_locked":
@@ -229,8 +236,65 @@ def _locked_href(request: Request) -> str | None:
         month = YearMonth.parse(request.query_params.get("tx_month", ""))
     except ValueError:
         return None
-    path = scoped_url(request, "transactions_month", month=str(month))
-    return f"{path}?{urlencode({'edit': str(transaction_id)})}#tx-{transaction_id}"
+    return _transaction_href(request, transaction_id, month)
+
+
+def _edit_anyway_href(request: Request) -> str | None:
+    """After a refused (soft-locked) work log: reopen its Log form for the month, with the
+    override already chosen (``?log=<source>&month=YYYY-MM&override=1``)."""
+    if request.query_params.get("error") != "posted_locked":
+        return None
+    source = request.query_params.get("source", "")
+    try:
+        month = YearMonth.parse(request.query_params.get("work_month", ""))
+        UUID(source)
+    except ValueError:
+        return None
+    path = scoped_url(request, "income_sources")
+    query = urlencode({"log": source, "month": str(month), "override": "1"})
+    return f"{path}?{query}#income-source-{source}"
+
+
+def _closed_href(request: Request, month: YearMonth | None = None) -> str | None:
+    """The Month page where a closed month is reopened (``?closed=YYYY-MM`` after an error)."""
+    if month is None:
+        if request.query_params.get("error") != "work_month_closed":
+            return None
+        try:
+            month = YearMonth.parse(request.query_params.get("closed", ""))
+        except ValueError:
+            return None
+    return scoped_url(request, "month", month=str(month))
+
+
+def _posted_change(
+    request: Request, ctx: Context, source: str | None, month: str | None
+) -> income.PostedIncomeChange | None:
+    """The received-payment notice after an override save (``?changed=<source>&month=``)."""
+    try:
+        source_id = UUID(source or "")
+        work_month = YearMonth.parse(month or "").first_day
+    except ValueError:
+        return None
+    try:
+        return income.posted_income_change(
+            request.app.state.session_factory, ctx, source_id, work_month
+        )
+    except (income.IncomeError, NotFound):
+        return None
+
+
+def _change_context(
+    request: Request, change: income.PostedIncomeChange | None
+) -> dict[str, object]:
+    return {
+        "posted_change": change,
+        "posted_change_href": (
+            _transaction_href(request, change.transaction_id, change.transaction_date)
+            if change is not None
+            else None
+        ),
+    }
 
 
 def _log_prefill(request: Request) -> tuple[str | None, date | None]:
@@ -245,18 +309,26 @@ def _log_prefill(request: Request) -> tuple[str | None, date | None]:
 
 def _load_page_data(
     request: Request, ctx: Context
-) -> tuple[list[income.IncomeSourceView], CategoryList, list[taxes.TaxRuleView]]:
+) -> tuple[
+    list[income.IncomeSourceView],
+    CategoryList,
+    list[taxes.TaxRuleView],
+    income.PostedIncomeChange | None,
+]:
     factory = request.app.state.session_factory
     return (
         income.list_sources(factory, ctx),
         list_categories(factory, ctx),
         taxes.list_rules(factory, ctx) if ctx.workspace.taxes_enabled else [],
+        _posted_change(
+            request, ctx, request.query_params.get("changed"), request.query_params.get("month")
+        ),
     )
 
 
 @router.get("/income", name="income_sources")
 async def sources_page(request: Request, ctx: CurrentContext) -> Response:
-    rows, categories, rules = await run_in_threadpool(_load_page_data, request, ctx)
+    rows, categories, rules, change = await run_in_threadpool(_load_page_data, request, ctx)
     log_source, log_month = _log_prefill(request)
     open_form = request.query_params.get("form")
     if log_source is not None and not open_form:
@@ -273,9 +345,15 @@ async def sources_page(request: Request, ctx: CurrentContext) -> Response:
             "withheld_ids": {rule.id for rule in rules if rule.kind == TaxKind.PAYER_WITHHELD},
             "error": _error_text(request, request.query_params.get("error")),
             "error_href": _locked_href(request),
+            "edit_anyway_href": _edit_anyway_href(request),
+            "closed_href": _closed_href(request),
             # ``form`` reopens a collapsed form: after an error, or from a "Choose taxes" link.
             "open_form": open_form,
             "log_month": log_month,
+            # ``?override=1`` (from "Edit anyway") opens the Log form already overriding.
+            "log_override": request.query_params.get("override") == "1",
+            "notice": request.query_params.get("notice"),
+            **_change_context(request, change),
             **_common(request, ctx),
         },
     )
@@ -662,7 +740,7 @@ def _values_from_source(source: income.IncomeSourceView, locale: str) -> dict[st
 async def edit_page(request: Request, ctx: CurrentContext, source_id: str) -> Response:
     require_role(ctx, Role.EDITOR)
     wanted = _id(source_id)
-    rows, categories, _rules = await run_in_threadpool(_load_page_data, request, ctx)
+    rows, categories, _rules, _change = await run_in_threadpool(_load_page_data, request, ctx)
     source = next((row for row in rows if row.id == wanted and not row.archived), None)
     if source is None:
         raise NotFound
@@ -766,18 +844,26 @@ async def save_work_log(request: Request, ctx: CurrentContext, source_id: str) -
     values = await _form(request)
     form = f"log-{source_id}"
     anchor = f"income-source-{source_id}"
+    # "Edit anyway" (F3.4): only an explicit flag lets a received month's log change.
+    override = values.get("override") == "1"
+    try:
+        work_month = _required_month(values, "work_month")
+    except income.IncomeError as exc:
+        return _redirect(request, exc.code, form, anchor=anchor)
     try:
         units = parse_amount(values.get("units", ""), request.state.locale)
-        await run_in_threadpool(
-            income.log_work,
-            request.app.state.session_factory,
-            ctx,
-            _id(source_id),
-            _required_month(values, "work_month"),
-            units,
+        received = await run_in_threadpool(
+            lambda: income.log_work(
+                request.app.state.session_factory,
+                ctx,
+                _id(source_id),
+                work_month,
+                units,
+                override=override,
+            )
         )
     except income.WorkLogLocked as exc:
-        extra = (
+        extra = {"source": source_id, "work_month": str(YearMonth.from_date(work_month))} | (
             {
                 "tx": str(exc.transaction_id),
                 "tx_month": str(YearMonth.from_date(exc.transaction_date)),
@@ -786,11 +872,65 @@ async def save_work_log(request: Request, ctx: CurrentContext, source_id: str) -
             else {}
         )
         return _redirect(request, exc.code, form, extra=extra, anchor=anchor)
+    except income.WorkMonthClosed as exc:
+        return _redirect(request, exc.code, form, extra={"closed": str(exc.month)}, anchor=anchor)
     except income.IncomeError as exc:
         return _redirect(request, exc.code, form, anchor=anchor)
     except ValueError:
         return _redirect(request, "invalid_units", form, anchor=anchor)
+    if received:
+        target = request.url_for("income_sources").path
+        query = urlencode({"changed": source_id, "month": str(YearMonth.from_date(work_month))})
+        return RedirectResponse(f"{target}?{query}#posted-change", status_code=303)
     return _redirect(request, anchor=anchor)
+
+
+@router.post(
+    "/income/{source_id}/work-logs/{month}/update-transaction", name="income_update_posted"
+)
+async def update_posted(
+    request: Request, ctx: CurrentContext, source_id: str, month: str
+) -> Response:
+    """ "Update the transaction to Y" after a received month's log changed (editors, audited).
+
+    The amount is recalculated by the service; nothing amount-like is read from the form.
+    ``return_to=calendar`` goes back to the work calendar instead of the Income page.
+    """
+    values = await _form(request)
+    source = _id(source_id)
+    try:
+        work_month = YearMonth.parse(month).first_day
+    except ValueError:
+        return _redirect(request, "invalid_work_month")
+    calendar = values.get("return_to") == "calendar"
+    error: str | None = None
+    extra: dict[str, str] = {}
+    try:
+        await run_in_threadpool(
+            income.update_posted_income, request.app.state.session_factory, ctx, source, work_month
+        )
+    except income.WorkMonthClosed as exc:
+        error, extra = exc.code, {"closed": str(exc.month)}
+    except MonthClosed as exc:
+        error, extra = "work_month_closed", {"closed": str(exc.month)}
+    except income.IncomeError as exc:
+        error = exc.code
+    except (InvalidTransaction, NotFound):
+        error = "failed"
+    if calendar:
+        url = _calendar_url(request, source, work_month, error)
+        if error is None:
+            url += "&" + urlencode({"notice": "transaction_updated"})
+        elif extra:
+            url += "&" + urlencode(extra)
+        return RedirectResponse(url, status_code=303)
+    anchor = f"income-source-{source_id}"
+    if error is not None:
+        return _redirect(request, error, extra=extra, anchor=anchor)
+    target = request.url_for("income_sources").path
+    return RedirectResponse(
+        f"{target}?{urlencode({'notice': 'transaction_updated'})}#{anchor}", status_code=303
+    )
 
 
 # F3.7 work calendar
@@ -806,8 +946,19 @@ def _calendar_month(value: str, ctx: Context) -> date:
         raise income.IncomeError("invalid_work_month") from None
 
 
-def _calendar_url(request: Request, source_id: UUID, month: date, error: str | None = None) -> str:
-    query = {"month": f"{month:%Y-%m}"} | ({"error": error} if error else {})
+def _calendar_url(
+    request: Request,
+    source_id: UUID,
+    month: date,
+    error: str | None = None,
+    *,
+    override: bool = False,
+) -> str:
+    query = (
+        {"month": f"{month:%Y-%m}"}
+        | ({"error": error} if error else {})
+        | ({"override": "1"} if override else {})
+    )
     path = request.url_for("income_calendar", source_id=str(source_id)).path
     return f"{path}?{urlencode(query)}"
 
@@ -820,10 +971,28 @@ def _render_calendar(
     *,
     error: str | None = None,
     status_code: int = 200,
+    override: bool = False,
+    changed: bool = False,
+    closed: YearMonth | None = None,
+    notice: str | None = None,
 ) -> Response:
-    """The whole calendar page, or only ``#work-calendar`` for an HTMX request."""
+    """The whole calendar page, or only ``#work-calendar`` for an HTMX request.
+
+    A received month is read-only until ``override`` ("Edit anyway"); after an override save
+    (``changed``) the received payment and the recalculated amount are shown side by side.
+    """
     locale = request.state.locale
-    calendar = income.work_calendar(request.app.state.session_factory, ctx, source_id, month)
+    factory = request.app.state.session_factory
+    calendar = income.work_calendar(factory, ctx, source_id, month)
+    lock = calendar.lock
+    overriding = override and lock.state == "received"
+    change = (
+        income.posted_income_change(factory, ctx, source_id, month)
+        if changed and lock.state == "received"
+        else None
+    )
+    if closed is None and lock.state == "closed":
+        closed = lock.closed_month
     year_month = YearMonth.from_date(month)
     previous_month, next_month = year_month.prev(), year_month.next()
     template = (
@@ -834,7 +1003,20 @@ def _render_calendar(
         template,
         context={
             "calendar": calendar,
-            "can_edit": has_role(ctx, Role.EDITOR) and calendar.editable,
+            "can_edit": has_role(ctx, Role.EDITOR)
+            and calendar.editable
+            and (lock.state == "open" or overriding),
+            "can_override": has_role(ctx, Role.EDITOR) and calendar.editable,
+            "overriding": overriding,
+            "override_url": _calendar_url(request, source_id, month, override=True),
+            "transaction_href": (
+                _transaction_href(request, lock.transaction_id, lock.transaction_date)
+                if lock.transaction_id is not None and lock.transaction_date is not None
+                else None
+            ),
+            "closed_href": _closed_href(request, closed) if closed is not None else None,
+            "notice": notice,
+            **_change_context(request, change),
             "month_heading": format_month_heading(year_month, locale),
             "month_value": f"{month:%Y-%m}",
             "previous_month": str(previous_month) if previous_month else None,
@@ -842,6 +1024,8 @@ def _render_calendar(
             "leading_blanks": month.weekday(),
             "weekday_names": weekday_names(locale),
             "error": gettext(ERRORS.get(error, ERRORS["failed"]), locale) if error else None,
+            "error_code": error,
+            "format_money": format_money,
             "format_day_long": format_day_long,
             "format_quantity_input": format_quantity_input,
         },
@@ -859,43 +1043,88 @@ async def calendar_page(request: Request, ctx: CurrentContext, source_id: str) -
     except income.IncomeError:
         month = _calendar_month("", ctx)
     error = request.query_params.get("error")
+    params = request.query_params
+    try:
+        closed = YearMonth.parse(params.get("closed", "")) if params.get("closed") else None
+    except ValueError:
+        closed = None
+    notice = params.get("notice") if params.get("notice") == "transaction_updated" else None
     try:
         return await run_in_threadpool(
-            lambda: _render_calendar(request, ctx, source, month, error=error)
+            lambda: _render_calendar(
+                request,
+                ctx,
+                source,
+                month,
+                error=error,
+                override=params.get("override") == "1",
+                changed=params.get("changed") == "1",
+                closed=closed,
+                notice=notice,
+            )
         )
     except income.IncomeError as exc:
         return _redirect(request, exc.code)
 
 
+async def _override(request: Request) -> bool:
+    """ "Edit anyway" (F3.7): the calendar's forms carry ``override=1`` once it was chosen."""
+    return (await _form(request)).get("override") == "1"
+
+
 async def _calendar_change(
-    request: Request, ctx: Context, source_id: UUID, month: date, change: Callable[[], bool]
+    request: Request,
+    ctx: Context,
+    source_id: UUID,
+    month: date,
+    change: Callable[[], bool],
+    *,
+    override: bool,
 ) -> Response:
     error: str | None = None
+    changed = False
+    closed: YearMonth | None = None
     try:
-        if await run_in_threadpool(change):
-            error = "posted"
+        changed = await run_in_threadpool(change)
+    except income.WorkMonthClosed as exc:
+        error, closed = exc.code, exc.month
     except income.IncomeError as exc:
         error = exc.code
     if is_htmx_fragment_request(request):
-        status = 409 if error not in (None, "posted") else 200
+        status = 409 if error is not None else 200
         return await run_in_threadpool(
             lambda: _render_calendar(
-                request, ctx, source_id, month, error=error, status_code=status
+                request,
+                ctx,
+                source_id,
+                month,
+                error=error,
+                status_code=status,
+                override=override,
+                changed=changed,
+                closed=closed,
             )
         )
-    return RedirectResponse(_calendar_url(request, source_id, month, error), status_code=303)
+    url = _calendar_url(request, source_id, month, error, override=override)
+    if changed:
+        url += "&changed=1"
+    if closed is not None:
+        url += "&" + urlencode({"closed": str(closed)})
+    return RedirectResponse(url, status_code=303)
 
 
 @router.post("/income/{source_id}/calendar/days/{day}/toggle", name="income_calendar_toggle")
 async def toggle_day(request: Request, ctx: CurrentContext, source_id: str, day: str) -> Response:
     source, work_date = _id(source_id), _day(day)
     factory = request.app.state.session_factory
+    override = await _override(request)
     return await _calendar_change(
         request,
         ctx,
         source,
         work_date.replace(day=1),
-        lambda: income.toggle_work_day(factory, ctx, source, work_date),
+        lambda: income.toggle_work_day(factory, ctx, source, work_date, override=override),
+        override=override,
     )
 
 
@@ -904,32 +1133,49 @@ async def save_day(request: Request, ctx: CurrentContext, source_id: str, day: s
     source, work_date = _id(source_id), _day(day)
     values = await _form(request)
     factory = request.app.state.session_factory
+    override = values.get("override") == "1"
 
     def change() -> bool:
         try:
             units = parse_amount(values.get("units", ""), request.state.locale)
         except ValueError:
             raise income.IncomeError("invalid_day_units") from None
-        return income.set_work_day(factory, ctx, source, work_date, units)
+        return income.set_work_day(factory, ctx, source, work_date, units, override=override)
 
-    return await _calendar_change(request, ctx, source, work_date.replace(day=1), change)
+    return await _calendar_change(
+        request, ctx, source, work_date.replace(day=1), change, override=override
+    )
 
 
 @router.post("/income/{source_id}/calendar/fill", name="income_calendar_fill")
 async def fill_month(request: Request, ctx: CurrentContext, source_id: str) -> Response:
     source = _id(source_id)
-    month = _calendar_month((await _form(request)).get("month", ""), ctx)
+    values = await _form(request)
+    month = _calendar_month(values.get("month", ""), ctx)
     factory = request.app.state.session_factory
+    override = values.get("override") == "1"
     return await _calendar_change(
-        request, ctx, source, month, lambda: income.fill_working_days(factory, ctx, source, month)
+        request,
+        ctx,
+        source,
+        month,
+        lambda: income.fill_working_days(factory, ctx, source, month, override=override),
+        override=override,
     )
 
 
 @router.post("/income/{source_id}/calendar/clear", name="income_calendar_clear")
 async def clear_month(request: Request, ctx: CurrentContext, source_id: str) -> Response:
     source = _id(source_id)
-    month = _calendar_month((await _form(request)).get("month", ""), ctx)
+    values = await _form(request)
+    month = _calendar_month(values.get("month", ""), ctx)
     factory = request.app.state.session_factory
+    override = values.get("override") == "1"
     return await _calendar_change(
-        request, ctx, source, month, lambda: income.clear_work_month(factory, ctx, source, month)
+        request,
+        ctx,
+        source,
+        month,
+        lambda: income.clear_work_month(factory, ctx, source, month, override=override),
+        override=override,
     )
