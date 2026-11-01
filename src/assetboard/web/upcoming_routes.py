@@ -143,7 +143,7 @@ def _page_context(request: Request, ctx: Context) -> dict[str, object]:
         "days": days,
         "direction": direction or "",
         "category_id": str(category_id) if category_id else "",
-        "categories": categories.expense + categories.income + categories.archived,
+        "archived_categories": categories.archived,
         "expense_categories": categories.expense,
         "income_categories": categories.income,
         "can_edit": has_role(ctx, Role.EDITOR),

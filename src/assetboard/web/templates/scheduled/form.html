@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/components.html" import field, csrf_input with context %}
+{% from "categories/_macros.html" import category_options %}
 {% block title %}{{ _("Edit recurring item") if item_id else _("New recurring item") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Edit recurring item") if item_id else _("New recurring item") }}{% endblock %}
 {% block content %}
@@ -49,14 +50,7 @@
       <select id="category_id" name="category_id" class="form-select w-full" required data-filter-by-kind="direction"{% if errors.get('category_id') %} aria-invalid="true"{% endif %}{% if errors.get('category_id') or archived_category %} aria-describedby="{% if archived_category %}category_id-archived{% endif %}{% if errors.get('category_id') %} category_id-error{% endif %}"{% endif %}>
         <option value="">{{ _("Choose a category") }}</option>
         {% if archived_category %}<option value="{{ archived_category.id }}" selected disabled data-archived-category>{{ archived_category.name }} · {{ _("archived") }}</option>{% endif %}
-        {% for kind, heading in (("expense", _("Expense categories")), ("income", _("Income categories"))) %}
-        {% set group = categories|selectattr("kind", "equalto", kind)|list %}
-        {% if group %}
-        <optgroup label="{{ heading }}" data-kind="{{ kind }}">
-          {% for category in group %}<option value="{{ category.id }}"{% if not archived_category and values.get('category_id') == category.id|string %} selected{% endif %}>{{ category.name }}</option>{% endfor %}
-        </optgroup>
-        {% endif %}
-        {% endfor %}
+        {{ category_options([(_("Expense categories"), categories|selectattr("kind", "equalto", "expense")|list, "expense"), (_("Income categories"), categories|selectattr("kind", "equalto", "income")|list, "income")], "" if archived_category else values.get('category_id', ''), kind_attr=true) }}
       </select>
       {% if archived_category %}<p id="category_id-archived" class="text-sm text-muted" data-archived-notice>{{ _("The category %(name)s is archived, so this item creates no new dates. Choose an active category to save it.", name=archived_category.name) }}</p>{% endif %}
       {{ error_text("category_id") }}

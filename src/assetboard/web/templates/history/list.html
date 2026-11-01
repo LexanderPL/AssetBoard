@@ -3,7 +3,7 @@
    the ``form`` attribute. No inline script or style. #}
 {% extends "base.html" %}
 {% from "macros/components.html" import csrf_input with context %}
-{% from "categories/_macros.html" import swatch %}
+{% from "categories/_macros.html" import swatch, category_options %}
 {% set label_class = "block text-sm font-medium" %}
 {% set input_class = "form-control w-full px-2.5 py-1.5" %}
 {% set error_class = "mt-1 text-xs text-danger" %}
@@ -250,14 +250,7 @@
       <div>
         <label for="bulk-category" class="{{ label_class }}">{{ _("New category") }}</label>
         <select id="bulk-category" name="category_id" class="form-select w-full py-1.5 pl-2.5">
-          <option value="">{{ _("Choose a category") }}</option>
-          {% for kind, heading in (("expense", _("Expense categories")), ("income", _("Income categories"))) %}
-          {% if categories[kind] %}
-          <optgroup label="{{ heading }}">
-            {% for c in categories[kind] %}<option value="{{ c.id }}"{% if c.id|string == bulk_values.get("category_id") %} selected{% endif %}>{{ c.name }}</option>{% endfor %}
-          </optgroup>
-          {% endif %}
-          {% endfor %}
+          {{ category_options([(_("Expense categories"), categories.expense), (_("Income categories"), categories.income)], bulk_values.get("category_id", ""), _("Choose a category")) }}
         </select>
       </div>
       <button type="submit" name="scope" value="selected" class="{{ secondary_class }}" data-bulk-selected>{{ _("Change the ticked entries") }}</button>

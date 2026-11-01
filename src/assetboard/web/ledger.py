@@ -16,6 +16,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
 from datetime import date
+from typing import NamedTuple
 from uuid import UUID
 
 from fastapi import Request
@@ -150,6 +151,13 @@ class PendingRowView:
     amount_input: str
 
 
+class CategoryOption(NamedTuple):
+    """A category of an entry or edit row's select (``categories/_macros.html``)."""
+
+    id: str
+    name: str
+
+
 @dataclass(frozen=True, slots=True)
 class SectionView:
     direction: str
@@ -158,8 +166,8 @@ class SectionView:
     no_categories: str
     rows: tuple[RowView, ...]
     pending_rows: tuple[PendingRowView, ...]
-    categories: tuple[tuple[str, str], ...]  # (id, name): active categories of this kind
-    edit_categories: tuple[tuple[str, str], ...]  # plus the edited row's archived category
+    categories: tuple[CategoryOption, ...]  # active categories of this kind
+    edit_categories: tuple[CategoryOption, ...]  # plus the edited row's archived category
     state: SectionState
     # Skipped occurrences of the month: greyed out with Undo; never counted as pending.
     skipped_rows: tuple[PendingRowView, ...] = ()
@@ -275,7 +283,7 @@ def build_ledger(
         pending_rows = tuple(pending_row(o) for o in pending if shown(o))
         skipped_rows = tuple(pending_row(o) for o in skipped if shown(o))
         active = categories.expense if direction == "expense" else categories.income
-        options = tuple((str(c.id), c.name) for c in active)
+        options = tuple(CategoryOption(str(c.id), c.name) for c in active)
         edit_options = options
         if (
             ledger_filter is not None
@@ -296,7 +304,7 @@ def build_ledger(
             edited = next(r.t for r in rows if r.t.id == state.editing)
             if edited.category_archived:
                 archived = gettext("%(name)s (archived)", locale) % {"name": edited.category_name}
-                edit_options = (*options, (str(edited.category_id), archived))
+                edit_options = (*options, CategoryOption(str(edited.category_id), archived))
         sections.append(
             SectionView(
                 direction=direction,

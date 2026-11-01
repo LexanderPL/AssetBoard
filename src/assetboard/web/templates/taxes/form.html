@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/components.html" import csrf_input with context %}
+{% from "categories/_macros.html" import category_options %}
 {% block title %}{{ _("Edit tax") if rule else _("New tax on income") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Edit tax") if rule else _("New tax on income") }}{% endblock %}
 {% block content %}
@@ -73,8 +74,8 @@
         </select>
       </div>
       <label class="grid max-w-xs gap-1 text-sm">{{ _("Record it in category") }}<select name="payment_category_id" class="form-select py-2">
-        <option value="">{{ _("Choose a category") }}</option>
-        {% for category in expense_categories %}<option value="{{ category.id }}"{% if values.payment_category_id == category.id|string or (not values.payment_category_id and category.name == _("Taxes")) %} selected{% endif %}>{{ category.name }}</option>{% endfor %}
+        {% set default_category = expense_categories|selectattr("name", "equalto", _("Taxes"))|first %}
+        {{ category_options([(_("Expense categories"), expense_categories)], values.payment_category_id or (default_category.id if default_category else ""), _("Choose a category")) }}
       </select></label>
       <p class="text-xs text-muted">{{ _("Not needed when the payer takes the tax off: nothing is planned.") }}</p>
     </fieldset>
