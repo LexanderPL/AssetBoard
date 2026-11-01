@@ -81,14 +81,14 @@
     </fieldset>
 
     <div class="flex flex-wrap gap-2">
-      <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save tax") }}</button>
-      <a href="{{ scoped_url(request, 'tax_rules') }}" class="rounded-lg border border-line px-4 py-2 text-sm font-medium hover:bg-subtle">{{ _("Cancel") }}</a>
+      <button type="submit" class="btn-primary">{{ _("Save tax") }}</button>
+      <a href="{{ scoped_url(request, 'tax_rules') }}" class="btn">{{ _("Cancel") }}</a>
     </div>
   </form>
   {% if rule %}
   <form method="post" action="{{ scoped_url(request, 'tax_rule_archive', rule_id=rule.id) }}" class="mt-6 border-t border-line pt-4" data-confirm="{{ _('Archive the tax %(name)s?', name=rule.name) }}">
     {{ csrf_input() }}
-    <button type="submit" class="rounded-lg border border-line px-3 py-1.5 text-sm text-danger hover:bg-subtle">{{ _("Archive tax") }}</button>
+    <button type="submit" class="btn text-danger">{{ _("Archive tax") }}</button>
   </form>
   {% endif %}
 </section>

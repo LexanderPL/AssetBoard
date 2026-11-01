@@ -210,7 +210,7 @@ def test_f27_navigation_in_a_browser(tmp_path: Path) -> None:
             # History: filters and the export dialog.
             page.locator("[data-history-link]").first.click()
             page.wait_for_url(f"{base}/history")
-            page.get_by_label("Description contains").fill("groc")
+            page.get_by_label("Search descriptions").fill("groc")
             expect(page.locator("[data-description]")).to_have_text(["Groceries"])
             page.locator("[data-filters-open]").click()
             page.get_by_role("button", name="Show entries").click()

@@ -456,7 +456,7 @@ Tests: unique per (month, category), copy never overwrites, closed-month protect
   own panel with its own header row (Category, Plan, Actual, Difference) and closed by "Total
   money out" / "Total money in" (Out and In, pending under the actual; a red or green top rule).
   Owner, 2026-11-01: the "Money out" / "Money in" heading rows are gone (each table has an
-  sr-only caption instead); the order and "Show pending" toggles stay once, in the Summary
+  sr-only caption instead); the order and pending ("Hide pending" / "Show pending") toggles stay once, in the Summary
   panel above both tables, and act on both. The block totals have no difference (their groups'
   differences point different ways). Transfers (not counted) stay last, in a third table
   while such lines exist.

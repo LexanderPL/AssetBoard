@@ -38,8 +38,8 @@
 
 {# A <summary> styled as a button: a collapsed form opens without JavaScript. ``list-none`` and
    the WebKit marker rule hide the disclosure triangle. #}
-{% set summary_button_primary = "inline-flex cursor-pointer list-none items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden" %}
-{% set summary_button = "inline-flex cursor-pointer list-none items-center rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden" %}
+{% set summary_button_primary = "btn-primary cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden" %}
+{% set summary_button = "btn cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden" %}
 
 {# One month as a month select and a year select (``<name>_month``, ``<name>_year``):
    ``type=month`` is missing in desktop Firefox and Safari. ``value`` is a date or None; its

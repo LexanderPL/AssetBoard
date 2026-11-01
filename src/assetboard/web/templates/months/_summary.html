@@ -3,7 +3,7 @@
    "+ X pending" under it, F3.5) and difference, with a totals row per group, in two panels of
    their own (owner, 2026-11-01): money out (expenses, saved / invested; total Out) and money in
    (income, withdrawn from savings; total In), then the plan-only transfers (months/_plan.html).
-   The order and "Show pending" toggles sit once, in the first panel's header, and act on all
+   The order and pending ("Hide pending" / "Show pending") toggles sit once, in the first panel's header, and act on all
    of them. ``summary`` is web.plan.SummaryView
    (web.plan.summary_context). Every transaction write sends this block out of band
    (``summary_oob``); app.js keeps a half-typed planned value and its focus across that swap. #}
@@ -39,9 +39,10 @@
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h2 id="month-summary-heading" class="text-base font-semibold">{{ _("Summary") }}</h2>
     <div class="flex flex-wrap items-center gap-3">
-      {# F3.5: a pressed toggle with a fixed label; app.js sets aria-pressed from this device's
-         choice and shows or hides every pending part (data-pending). #}
-      <button type="button" data-pending-toggle aria-pressed="true" class="rounded-lg border border-line px-2.5 py-1 text-xs font-medium hover:bg-subtle aria-pressed:bg-subtle">{{ _("Show pending") }}</button>
+      {# F3.5: the label names what a press does ("Hide pending" while pending parts show);
+         app.js applies this device's choice, swaps the label and shows or hides every pending
+         part (data-pending). #}
+      <button type="button" data-pending-toggle data-label-hide="{{ _('Hide pending') }}" data-label-show="{{ _('Show pending') }}" class="rounded-lg border border-line px-2.5 py-1 text-xs font-medium hover:bg-subtle">{{ _("Hide pending") }}</button>
       {% if summary.groups %}{{ sort_toggle() }}{% endif %}
     </div>
   </div>

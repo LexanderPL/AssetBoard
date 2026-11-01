@@ -169,8 +169,8 @@
 
   <p class="text-xs text-muted">{{ _("Saving plans the dates; it never records transactions. Changing an item updates only its planned dates from today onward.") }}</p>
   <div class="flex flex-wrap gap-2 border-t border-line pt-4">
-    <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save recurring item") }}</button>
-    <a href="{{ scoped_url(request, 'scheduled_items') }}" class="rounded-lg border border-line px-4 py-2 text-sm font-medium hover:bg-subtle">{{ _("Cancel") }}</a>
+    <button type="submit" class="btn-primary">{{ _("Save recurring item") }}</button>
+    <a href="{{ scoped_url(request, 'scheduled_items') }}" class="btn">{{ _("Cancel") }}</a>
   </div>
 </form>
 </section>

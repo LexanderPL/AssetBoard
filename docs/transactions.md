@@ -123,7 +123,7 @@ restoring an entry recolours its table.
 
 **History** in the main navigation (`/history`) lists the entries of every month, newest first,
 50 per page. Old links to `/transactions?...` with filters, and to the CSV export, lead here.
-Type in **Description contains** above the list to search by description as you type; the list
+Type in the **Search…** box above the list to search by description as you type; the list
 updates while you type (without JavaScript, press Enter). **Filters** at the top opens the filter
 form:
 
