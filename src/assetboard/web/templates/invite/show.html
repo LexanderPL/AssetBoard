@@ -4,10 +4,10 @@
 {% block heading %}{{ _("Invitation") }}{% endblock %}
 {% block content %}
 {% if error %}
-<p class="mt-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-invite-error>{{ error }}</p>
+<p class="mt-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-invite-error>{{ error }}</p>
 {% endif %}
 {% if notice %}
-<p class="mt-4 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status">{{ notice }}</p>
+<p class="mt-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status">{{ notice }}</p>
 {% endif %}
 {% if preview %}
 <p class="mt-4 text-sm text-muted" data-invite-summary>{{ _("You are invited to join %(workspace)s as %(role)s.", workspace=preview.workspace_name, role=role_name) }}</p>

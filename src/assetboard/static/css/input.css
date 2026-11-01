@@ -165,6 +165,37 @@
     @apply bg-subtle;
   }
 
+  /* From the sm breakpoint only: a table whose rows stack as cards on a phone. */
+  .sheet-sm {
+    @apply sm:border-collapse;
+  }
+
+  .sheet-sm th,
+  .sheet-sm td {
+    @apply sm:border sm:border-line sm:px-2 sm:py-1.5;
+  }
+
+  /* A table that fills its panel edge to edge: the panel's border is the grid's outer edge. */
+  .sheet-flush {
+    @apply border-0;
+  }
+
+  .sheet-flush tr > :first-child {
+    @apply border-l-0;
+  }
+
+  .sheet-flush tr > :last-child {
+    @apply border-r-0;
+  }
+
+  .sheet-flush thead tr:first-child > * {
+    @apply border-t-0;
+  }
+
+  .sheet-flush tbody:last-child tr:last-child > * {
+    @apply border-b-0;
+  }
+
   .sheet td.cell-edit,
   .sheet th.cell-edit {
     @apply p-0;

@@ -10,19 +10,19 @@
 {% block content %}
 <div class="space-y-6" data-month="{{ view.month }}">
   {% if notice %}
-  <p class="rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{% if notice_href %}<a href="{{ notice_href }}" class="font-medium underline">{{ notice }}</a>{% else %}{{ notice }}{% endif %}</p>
+  <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{% if notice_href %}<a href="{{ notice_href }}" class="font-medium underline">{{ notice }}</a>{% else %}{{ notice }}{% endif %}</p>
   {% endif %}
   {% if error %}
-  <p class="rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ error }}</p>
+  <p class="border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ error }}</p>
   {% endif %}
   {% for source_id, source_name, work_month in missing_work_logs %}
-  <p class="rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="status" data-missing-work-log="{{ source_id }}">{{ _("Enter days worked for %(month)s for %(name)s.", month=work_month, name=source_name) }} <a href="{{ scoped_url(request, 'income_sources') }}#income-source-{{ source_id }}" class="font-semibold underline">{{ _("Income") }}</a></p>
+  <p class="border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="status" data-missing-work-log="{{ source_id }}">{{ _("Enter days worked for %(month)s for %(name)s.", month=work_month, name=source_name) }} <a href="{{ scoped_url(request, 'income_sources') }}#income-source-{{ source_id }}" class="font-semibold underline">{{ _("Income") }}</a></p>
   {% endfor %}
 
   {% with nav_route = "month", picker_route = "month_current" %}{% include "months/_nav.html" %}{% endwith %}
 
   {% if view.closed %}
-  <section class="rounded-2xl border border-warning-line bg-warning-soft px-5 py-4 text-warning-strong" role="status" data-closed-banner>
+  <section class="border border-warning-line bg-warning-soft px-5 py-4 text-warning-strong" role="status" data-closed-banner>
     <p class="font-semibold">{{ _("This month is closed. Its entries and planned values are read-only.") }}</p>
     <p class="mt-1 text-sm">
       {% if view.closed_by_name %}{{ _("Closed on %(date)s by %(name)s.", date=closed_on, name=view.closed_by_name) }}{% else %}{{ _("Closed on %(date)s by a former member.", date=closed_on) }}{% endif %}

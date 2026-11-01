@@ -15,7 +15,7 @@
 </ol>
 <section class="panel max-w-3xl p-5 sm:p-6" aria-labelledby="wizard-step-heading">
   <h2 id="wizard-step-heading" class="sr-only">{{ _("Step %(step)s of %(total)s: %(label)s", step=step, total=last_step, label=steps[step - 1]) }}</h2>
-  {% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ error }}</p>{% endif %}
+  {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ error }}</p>{% endif %}
   <form id="income-wizard" method="post" action="{{ scoped_url(request, 'income_new_step') }}" class="grid gap-6" data-income-wizard="{{ step }}">
     {{ csrf_input() }}
     <input type="hidden" name="step" value="{{ step }}">
@@ -41,7 +41,7 @@
       <p class="text-sm text-muted">{{ _("No taxes are set up yet.") }}</p>
       {% endfor %}
     </fieldset>
-    <div id="income-example" class="rounded-xl bg-subtle p-4 text-sm" aria-live="polite" hx-post="{{ scoped_url(request, 'income_new_example') }}" hx-trigger="change from:#income-wizard" hx-include="#income-wizard" hx-sync="this:replace" hx-swap="innerHTML" data-income-example>
+    <div id="income-example" class="bg-subtle p-4 text-sm" aria-live="polite" hx-post="{{ scoped_url(request, 'income_new_example') }}" hx-trigger="change from:#income-wizard" hx-include="#income-wizard" hx-sync="this:replace" hx-swap="innerHTML" data-income-example>
       {% include "income/_example.html" %}
     </div>
     <p class="text-sm"><a href="{{ scoped_url(request, 'tax_rule_new') }}" class="font-semibold text-primary-ink underline">{{ _("Set up a new tax") }}</a></p>

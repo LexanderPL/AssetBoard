@@ -6,13 +6,13 @@
 {% block content %}
 <section class="panel max-w-2xl p-6 sm:p-7" aria-labelledby="delete-heading" data-workspace-delete>
   <h2 id="delete-heading" class="text-base font-semibold">{{ _("Delete %(name)s permanently?", name=preview.name) }}</h2>
-  {% if changed %}<p class="mt-4 rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="alert" data-workspace-changed>{{ changed }}</p>{% endif %}
-  {% if error %}<p class="mt-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-delete-error>{{ error }}</p>{% endif %}
+  {% if changed %}<p class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="alert" data-workspace-changed>{{ changed }}</p>{% endif %}
+  {% if error %}<p class="mt-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-delete-error>{{ error }}</p>{% endif %}
   <p class="mt-4 text-sm">{{ _("Every transaction, planned value, category, recurring item, closed month and invitation of this workspace is removed for good, and so is its audit log. This cannot be undone, and the app keeps no copy.") }}</p>
   {% if preview.other_members %}
   <p class="mt-3 text-sm" data-other-members>{{ ngettext("%(num)d other member also loses access to it.", "%(num)d other members also lose access to it.", preview.other_members) }}</p>
   {% endif %}
-  <p class="mt-3 rounded-xl border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="note" data-export-hint>
+  <p class="mt-3 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="note" data-export-hint>
     {{ _("Export what you want to keep first.") }}
     <a class="font-semibold underline underline-offset-2" href="{{ scoped_url(request, 'history') }}#export-heading" data-export-link>{{ _("Export transactions as CSV") }}</a>
   </p>

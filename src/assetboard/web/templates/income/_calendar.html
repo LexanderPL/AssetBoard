@@ -13,7 +13,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#work-cale
       {% if next_month %}<a href="{{ page_url }}?month={{ next_month }}" hx-get="{{ page_url }}?month={{ next_month }}" hx-target="#work-calendar" hx-swap="outerHTML" hx-push-url="true" class="rounded-lg border border-line px-3 py-2 hover:bg-subtle" data-calendar-next>{{ _("Next month") }}</a>{% endif %}
     </nav>
   </div>
-  {% if error %}<p role="alert" class="mt-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-calendar-error>{{ error }}</p>{% endif %}
+  {% if error %}<p role="alert" class="mt-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-calendar-error>{{ error }}</p>{% endif %}
   <p class="mt-3 text-sm font-semibold" role="status" data-calendar-total>{{ _("Month total: %(units)s (%(unit)s)", units=format_quantity_input(calendar.total, locale), unit=calendar.unit_label) }}</p>
   {% if calendar.derived %}
   <p class="mt-1 text-sm text-muted">{{ _("The month's work log is the sum of these days; change it here, not in the month form.") }}</p>
@@ -42,7 +42,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#work-cale
           <button type="submit" aria-pressed="{{ 'true' if worked else 'false' }}" aria-label="{{ label }}" data-day="{{ day.day.isoformat() }}"{% if day.holiday %} data-holiday{% endif %}{% if day.weekend %} data-weekend{% endif %} class="w-full rounded-lg border px-1 py-2 text-sm hover:border-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-primary {{ tone }}">{{ inner }}</button>
         </form>
         {% else %}
-        <div role="img" aria-label="{{ label }}" data-day="{{ day.day.isoformat() }}" class="rounded-lg border px-1 py-2 text-center text-sm {{ tone }}">{{ inner }}</div>
+        <div role="img" aria-label="{{ label }}" data-day="{{ day.day.isoformat() }}" class="border px-1 py-2 text-center text-sm {{ tone }}">{{ inner }}</div>
         {% endif %}
       </li>
       {% endfor %}
@@ -75,7 +75,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#work-cale
     <li>
       <form {{ htmx_post(scoped_url(request, 'income_calendar_day', source_id=source_id, day=day.day.isoformat())) }} class="flex items-end gap-2" data-day-value="{{ day.day.isoformat() }}">
         {{ csrf_input() }}
-        <label class="grid flex-1 gap-1 text-sm">{{ format_day_long(day.day, locale) }}<input name="units" inputmode="decimal" required value="{{ format_quantity_input(day.units, locale) }}" class="form-control w-full rounded-lg px-3 py-2"></label>
+        <label class="grid flex-1 gap-1 text-sm">{{ format_day_long(day.day, locale) }}<input name="units" inputmode="decimal" required value="{{ format_quantity_input(day.units, locale) }}" class="form-control w-full px-3 py-2"></label>
         <button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm font-semibold hover:bg-subtle">{{ _("Save") }}</button>
       </form>
     </li>

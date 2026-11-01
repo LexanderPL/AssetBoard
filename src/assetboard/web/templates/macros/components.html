@@ -51,12 +51,12 @@
   <legend class="mb-1">{{ label }}</legend>
   <div class="grid grid-cols-2 gap-2">
     <label for="{{ field_id }}-month" class="sr-only">{{ _("Month") }}</label>
-    <select id="{{ field_id }}-month" name="{{ name }}_month"{% if required %} required{% endif %} class="form-select rounded-lg py-2">
+    <select id="{{ field_id }}-month" name="{{ name }}_month"{% if required %} required{% endif %} class="form-select py-2">
       {%- if not required %}<option value=""{% if not value %} selected{% endif %}>{{ _("No month") }}</option>{% endif %}
       {%- for month_name in month_names %}<option value="{{ loop.index }}"{% if value and value.month == loop.index %} selected{% endif %}>{{ month_name }}</option>{% endfor -%}
     </select>
     <label for="{{ field_id }}-year" class="sr-only">{{ _("Year") }}</label>
-    <select id="{{ field_id }}-year" name="{{ name }}_year"{% if required %} required{% endif %} class="form-select rounded-lg py-2">
+    <select id="{{ field_id }}-year" name="{{ name }}_year"{% if required %} required{% endif %} class="form-select py-2">
       {%- if not required %}<option value=""{% if not value %} selected{% endif %}>{{ _("No year") }}</option>{% endif %}
       {%- for year in years %}<option value="{{ year }}"{% if value and value.year == year %} selected{% endif %}>{{ year }}</option>{% endfor -%}
     </select>
@@ -72,7 +72,7 @@
 {% if messages %}
 <div class="space-y-2" role="status" aria-live="polite">
   {% for message in messages %}
-  <div class="rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong">{{ message }}</div>
+  <div class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong">{{ message }}</div>
   {% endfor %}
 </div>
 {% endif %}

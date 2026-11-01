@@ -7,7 +7,7 @@
 {% set chip = "ml-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" %}
 {% set small_button = "rounded-lg border border-line px-2.5 py-1 text-xs font-medium hover:bg-subtle" %}
 {% set new_button = "rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" %}
-{% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
+{% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 {% if has_items %}
 <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
   <p class="max-w-2xl text-sm text-muted">{{ _("Bills and income that repeat. Each one plans its next dates for you.") }}</p>
@@ -18,7 +18,7 @@
   <h2 id="recurring-{{ direction }}-heading" class="mb-3 text-base font-semibold">{{ _("Expenses") if direction == "expense" else _("Income") }}</h2>
   {% if rows %}
   <div class="panel overflow-hidden">
-    <table class="w-full text-sm">
+    <table class="sheet-sm sheet-flush w-full text-sm">
       <thead class="hidden border-b border-line bg-subtle text-left text-xs uppercase tracking-wide text-muted sm:table-header-group">
         <tr>
           <th scope="col" class="px-4 py-2 font-semibold">{{ _("Name") }}</th>
@@ -29,7 +29,7 @@
           {% if can_edit %}<th scope="col" class="px-4 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>{% endif %}
         </tr>
       </thead>
-      <tbody class="divide-y divide-line">
+      <tbody class="divide-y divide-line sm:divide-y-0">
       {% for item, sentence in rows %}
         <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 align-top sm:table-row sm:p-0{% if item.paused %} text-muted {% endif %}" data-scheduled-item="{{ item.id }}">
           <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3">{{ item.values.name }}{% if item.paused %}<span class="{{ chip }} bg-subtle text-muted" data-paused>{{ _("paused") }}</span>{% endif %}</td>
