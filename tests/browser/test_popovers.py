@@ -58,6 +58,8 @@ def test_popovers_and_dialogs_close_from_outside_and_with_escape(tmp_path: Path)
             data_dir=tmp_path,
             database_url=f"sqlite:///{tmp_path / 'browser.db'}",
             secret_key="browser-test-key",
+            # Next month's day-20 entry must fall inside the Upcoming window on any date.
+            upcoming_days=90,
         )
     )
     listener = socket.socket()
