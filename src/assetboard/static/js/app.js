@@ -1,4 +1,4 @@
-// F3.5: the "Show pending" toggle of the month summary shows or hides every pending part: the
+// F3.5: the pending toggle of the month summary ("Hide pending" / "Show pending") shows or hides every pending part: the
 // "+ X pending" lines, the striped bar extensions and the pending flow bar (data-pending), which
 // then gives way to the confirmed-only flow bar (data-pending-off). Home has no toggle. The
 // choice is a per-device convenience kept in browser storage ("pending"; the older "forecast"
@@ -21,8 +21,10 @@ try {
 }
 
 function applyPending() {
+  // The label names what a press does next.
   document.querySelectorAll("[data-pending-toggle]").forEach((button) => {
-    button.setAttribute("aria-pressed", String(showPending));
+    const label = showPending ? button.dataset.labelHide : button.dataset.labelShow;
+    if (label) button.textContent = label;
   });
   document.querySelectorAll("[data-month-summary] [data-pending]").forEach((part) => {
     part.classList.toggle("hidden", !showPending);
@@ -36,6 +38,22 @@ applyPending();
 for (const eventName of ["htmx:afterSwap", "htmx:oobAfterSwap"]) {
   document.addEventListener(eventName, applyPending);
 }
+
+function setSidebarOpen(open) {
+  const toggle = document.querySelector("[data-sidebar-toggle]");
+  const panel = document.querySelector("[data-sidebar-panel]");
+  if (!toggle || !panel) return;
+  toggle.setAttribute("aria-expanded", String(open));
+  panel.toggleAttribute("data-open", open);
+}
+
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape" || event.defaultPrevented) return;
+  const toggle = document.querySelector("[data-sidebar-toggle]");
+  if (toggle?.getAttribute("aria-expanded") !== "true") return;
+  setSidebarOpen(false);
+  toggle.focus();
+});
 
 document.addEventListener("click", (event) => {
   const target = event.target;
@@ -60,6 +78,10 @@ document.addEventListener("click", (event) => {
     }
     applyPending();
   }
+
+  // Phones and tablets: the sidebar's Menu button folds the navigation in and out.
+  const sidebarToggle = target.closest("[data-sidebar-toggle]");
+  if (sidebarToggle) setSidebarOpen(sidebarToggle.getAttribute("aria-expanded") !== "true");
 
   const themeReset = target.closest("[data-theme-reset]");
   if (themeReset) {

@@ -1,7 +1,8 @@
 """The desktop sidebar in Chromium: its footer (version, dark mode) stays at the bottom of the
 viewport on long pages, before and after scrolling, whatever the window height (the nav scrolls
-inside the sidebar instead); on a phone the sidebar is a block above the content. The Home item
-marks the dashboard as the current page. The user menu sits at the top of the page."""
+inside the sidebar instead); on a phone the sidebar is a bar above the content whose Menu button
+unfolds the navigation (Escape folds it again). The Home item marks the dashboard as the current
+page. The user menu sits at the top of the page."""
 
 from __future__ import annotations
 
@@ -102,6 +103,24 @@ def test_the_sidebar_footer_stays_at_the_bottom_of_the_viewport(tmp_path: Path) 
             assert sidebar is not None and main is not None
             assert sidebar["y"] + sidebar["height"] <= main["y"] + 1
             assert page.evaluate("document.documentElement.scrollWidth") <= 375
+            # The navigation and the footer are folded away behind the Menu button.
+            menu = page.locator("[data-sidebar-toggle]")
+            expect(menu).to_have_attribute("aria-expanded", "false")
+            expect(page.locator("[data-home-link]")).to_be_hidden()
+            expect(page.locator("[data-sidebar-footer]")).to_be_hidden()
+            assert sidebar["height"] < 80, sidebar
+            menu.click()
+            expect(menu).to_have_attribute("aria-expanded", "true")
+            expect(page.locator("[data-home-link]")).to_be_visible()
+            expect(page.locator("[data-sidebar-footer]")).to_be_visible()
+            page.keyboard.press("Escape")
+            expect(menu).to_have_attribute("aria-expanded", "false")
+            expect(menu).to_be_focused()
+            expect(page.locator("[data-home-link]")).to_be_hidden()
+            # Desktop: no Menu button, the navigation always shows.
+            page.set_viewport_size({"width": 1280, "height": 800})
+            expect(menu).to_be_hidden()
+            expect(page.locator("[data-home-link]")).to_be_visible()
             browser.close()
     finally:
         server.should_exit = True

@@ -27,7 +27,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#work-cale
   {% elif lock == "received" %}
   <div class="mt-4 flex flex-wrap items-center gap-3 border border-line bg-subtle px-4 py-3 text-sm" data-calendar-received>
     <p>{{ _("This month's income is already received. Edit the transaction instead.") }}{% if transaction_href %} <a href="{{ transaction_href }}" class="font-semibold underline" data-locked-transaction>{{ _("Open the transaction") }}</a>{% endif %}</p>
-    {% if can_override %}<a href="{{ override_url }}" hx-get="{{ override_url }}" hx-target="#work-calendar" hx-swap="outerHTML" class="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-semibold hover:bg-subtle" data-edit-anyway>{{ _("Edit anyway") }}</a>{% endif %}
+    {% if can_override %}<a href="{{ override_url }}" hx-get="{{ override_url }}" hx-target="#work-calendar" hx-swap="outerHTML" class="btn" data-edit-anyway>{{ _("Edit anyway") }}</a>{% endif %}
   </div>
   {% endif %}
   {% if notice == "transaction_updated" %}<p role="status" class="mt-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-transaction-updated>{{ _("The transaction now matches the logged days.") }}</p>{% endif %}
@@ -38,7 +38,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#work-cale
       {% if posted_change.differs and can_override %}
       <form method="post" action="{{ scoped_url(request, 'income_update_posted', source_id=source_id, month=month_value) }}">
         {{ csrf_input() }}<input type="hidden" name="return_to" value="calendar">
-        <button type="submit" class="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-update-transaction>{{ _("Update the transaction to %(amount)s", amount=format_money(posted_change.recalculated, locale)) }}</button>
+        <button type="submit" class="btn-primary" data-update-transaction>{{ _("Update the transaction to %(amount)s", amount=format_money(posted_change.recalculated, locale)) }}</button>
       </form>
       {% endif %}
       {% if posted_change_href %}<a href="{{ posted_change_href }}" class="font-semibold underline">{{ _("Open the transaction") }}</a>{% endif %}
@@ -89,12 +89,12 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#work-cale
   <div class="mt-4 flex flex-wrap gap-2">
     <form {{ htmx_post(scoped_url(request, 'income_calendar_fill', source_id=source_id)) }}>
       {{ csrf_input() }}{{ override_input() }}<input type="hidden" name="month" value="{{ month_value }}">
-      <button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm font-semibold hover:bg-subtle" data-calendar-fill>{{ _("Fill working days") }}</button>
+      <button type="submit" class="btn" data-calendar-fill>{{ _("Fill working days") }}</button>
     </form>
     {% if calendar.derived %}
     <form {{ htmx_post(scoped_url(request, 'income_calendar_clear', source_id=source_id)) }} data-confirm="{{ _('Clear every day of %(month)s? The month work log made from them is removed too.', month=month_heading) }}">
       {{ csrf_input() }}{{ override_input() }}<input type="hidden" name="month" value="{{ month_value }}">
-      <button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm text-danger hover:bg-subtle" data-calendar-clear>{{ _("Clear month") }}</button>
+      <button type="submit" class="btn text-danger" data-calendar-clear>{{ _("Clear month") }}</button>
     </form>
     {% endif %}
   </div>
@@ -107,7 +107,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#work-cale
       <form {{ htmx_post(scoped_url(request, 'income_calendar_day', source_id=source_id, day=day.day.isoformat())) }} class="flex items-end gap-2" data-day-value="{{ day.day.isoformat() }}">
         {{ csrf_input() }}{{ override_input() }}
         <label class="grid flex-1 gap-1 text-sm">{{ format_day_long(day.day, locale) }}<input name="units" inputmode="decimal" required value="{{ format_quantity_input(day.units, locale) }}" class="form-control w-full px-3 py-2"></label>
-        <button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm font-semibold hover:bg-subtle">{{ _("Save") }}</button>
+        <button type="submit" class="btn">{{ _("Save") }}</button>
       </form>
     </li>
     {% endfor %}

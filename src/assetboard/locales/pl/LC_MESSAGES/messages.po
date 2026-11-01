@@ -2108,14 +2108,14 @@ msgstr ""
 msgid "Home"
 msgstr "Strona główna"
 
+msgid "Menu"
+msgstr "Menu"
+
 msgid "Main navigation"
 msgstr "Menu główne"
 
 msgid "History"
 msgstr "Historia"
-
-msgid "Recurring"
-msgstr "Cykliczne"
 
 msgid "Upcoming"
 msgstr "Nadchodzące"
@@ -2126,6 +2126,9 @@ msgid_plural "%(num)d overdue occurrences"
 msgstr[0] "%(num)d zaległe wystąpienie"
 msgstr[1] "%(num)d zaległe wystąpienia"
 msgstr[2] "%(num)d zaległych wystąpień"
+
+msgid "Recurring"
+msgstr "Cykliczne"
 
 msgid "Net worth"
 msgstr "Majątek netto"
@@ -2930,8 +2933,11 @@ msgstr "Eksportuj CSV"
 msgid "Search"
 msgstr "Szukaj"
 
-msgid "Description contains"
-msgstr "Opis zawiera"
+msgid "Search descriptions"
+msgstr "Szukaj w opisach"
+
+msgid "Search…"
+msgstr "Szukaj…"
 
 msgid "Export as CSV"
 msgstr "Eksport do CSV"
@@ -3969,6 +3975,9 @@ msgstr "Różnica"
 msgid "Summary"
 msgstr "Podsumowanie"
 
+msgid "Hide pending"
+msgstr "Ukryj oczekujące"
+
 msgid "Show pending"
 msgstr "Pokaż oczekujące"
 
@@ -4961,9 +4970,6 @@ msgstr ""
 "ustawienia osobiste. Język interfejsu zależy od Twojego konta i "
 "przeglądarki."
 
-msgid "Menu"
-msgstr "Menu"
-
 msgid ""
 "Hide parts of the app you don't use. Nothing is deleted; turn them back "
 "on any time."
@@ -5545,4 +5551,7 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Money in"
 #~ msgstr "Wpływy"
+
+#~ msgid "Description contains"
+#~ msgstr "Opis zawiera"
 

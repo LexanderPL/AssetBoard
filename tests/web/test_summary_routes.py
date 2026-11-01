@@ -142,14 +142,15 @@ def test_bars_show_planned_and_actual_in_svg_with_the_same_text(summary: OwnerAp
     assert out is not None and into is not None
     assert "Out €4,873.00 of €5,900.00 planned" in out.group(0)
     # 4 873 / 5 900 = 82.59 %: floor 82. Planned is the scale (100): its line is at the end.
-    assert re.search(r'width="100"[^>]*class="fill-subtle stroke-line-strong"', out.group(0))
-    assert re.search(r'width="82"[^>]*class="fill-primary"', out.group(0))
-    assert re.search(r'x1="100"[^>]*class="stroke-ink"[^>]*data-bar-planned', out.group(0))
+    # The bars are drawn 500 units wide (percent times 5).
+    assert re.search(r'width="500"[^>]*class="fill-subtle stroke-line-strong"', out.group(0))
+    assert re.search(r'width="410"[^>]*class="fill-primary"', out.group(0))
+    assert re.search(r'x1="500"[^>]*class="stroke-ink"[^>]*data-bar-planned', out.group(0))
     # In over plan: actual is the scale, planned 3 000 / 3 400 = 88.2 %: floor 88.
     assert "In €3,400.00 of €3,000.00 planned" in into.group(0)
     assert "(over plan)" in into.group(0)
-    assert re.search(r'width="100"[^>]*class="fill-success"', into.group(0))
-    assert re.search(r'x1="88"[^>]*data-bar-planned', into.group(0))
+    assert re.search(r'width="500"[^>]*class="fill-success"', into.group(0))
+    assert re.search(r'x1="440"[^>]*data-bar-planned', into.group(0))
     assert 'aria-hidden="true"' in out.group(0)
     assert " rx=" not in block  # square ends: rounded corners would stretch with the viewBox
 

@@ -49,7 +49,7 @@
 
     <div class="flex flex-wrap items-center gap-2 border-t border-line pt-4">
       {# Next comes first so that Enter submits it; Back is moved before it visually. #}
-      <button type="submit" name="go" value="next" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-wizard-next>{{ _("Save income") if step == last_step else _("Next") }}</button>
+      <button type="submit" name="go" value="next" class="btn-primary" data-wizard-next>{{ _("Save income") if step == last_step else _("Next") }}</button>
       {% if step == 1 %}
       <a href="{{ scoped_url(request, 'income_sources') }}" class="order-first rounded-lg border border-line px-4 py-2 text-sm font-medium hover:bg-subtle">{{ _("Cancel") }}</a>
       {% else %}

@@ -145,13 +145,13 @@ def test_f26_search_export_and_bulk_change_in_a_browser(tmp_path: Path) -> None:
             # Filter by text (case and Polish letters fold) and by kind. The live search updates
             # the results first; the other filters and "Show entries" live in the Filters dialog.
             page.goto(f"{base}/history")
-            page.get_by_label("Description contains").fill("ŻAB")
+            page.get_by_label("Search descriptions").fill("ŻAB")
             expect(page.locator("[data-results] [data-description]")).to_have_text(["Żabka"])
             page.locator("[data-filters-open]").click()
             page.get_by_role("button", name="Show entries").click()
             expect(page).to_have_url(re.compile(r"/history\?.*q=%C5%BBAB"))  # bookmarkable
             assert _descriptions(page) == ["Żabka"]
-            page.get_by_label("Description contains").fill("")
+            page.get_by_label("Search descriptions").fill("")
             expect(page.locator("[data-result-count]")).to_have_text("1–50 of 56 entries")
             page.locator("[data-filters-open]").click()
             page.get_by_label("Kind", exact=True).select_option("income")

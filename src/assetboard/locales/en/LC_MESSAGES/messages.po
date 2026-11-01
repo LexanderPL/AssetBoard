@@ -1943,13 +1943,13 @@ msgstr ""
 msgid "Home"
 msgstr ""
 
+msgid "Menu"
+msgstr ""
+
 msgid "Main navigation"
 msgstr ""
 
 msgid "History"
-msgstr ""
-
-msgid "Recurring"
 msgstr ""
 
 msgid "Upcoming"
@@ -1960,6 +1960,9 @@ msgid "%(num)d overdue occurrence"
 msgid_plural "%(num)d overdue occurrences"
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "Recurring"
+msgstr ""
 
 msgid "Net worth"
 msgstr ""
@@ -2691,7 +2694,10 @@ msgstr ""
 msgid "Search"
 msgstr ""
 
-msgid "Description contains"
+msgid "Search descriptions"
+msgstr ""
+
+msgid "Search…"
 msgstr ""
 
 msgid "Export as CSV"
@@ -3647,6 +3653,9 @@ msgstr ""
 msgid "Summary"
 msgstr ""
 
+msgid "Hide pending"
+msgstr ""
+
 msgid "Show pending"
 msgstr ""
 
@@ -4559,9 +4568,6 @@ msgid ""
 "browser."
 msgstr ""
 
-msgid "Menu"
-msgstr ""
-
 msgid ""
 "Hide parts of the app you don't use. Nothing is deleted; turn them back "
 "on any time."
@@ -5288,5 +5294,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Money in"
+#~ msgstr ""
+
+#~ msgid "Description contains"
 #~ msgstr ""
 

@@ -92,7 +92,8 @@ The **Summary** block at the top of the month page shows how the month is going:
   confirmed in a future month, so there they show what you expect to come in and go out, and
   the title reads **Expected in vs expected out**. (Home still shows the older flow bar of
   earnings with its "Forecast spent … · forecast earned …" line and second bar.)
-- **Show pending** (above both tables) hides or shows every pending part: the "+ … pending" lines, the striped
+- **Hide pending** (above both tables; it reads **Show pending** while they are hidden) hides or
+  shows every pending part: the "+ … pending" lines, the striped
   parts of the bars and the pending strip and flow bar (they then show confirmed amounts only).
   This browser remembers the choice.
 - **Largest first** sorts each group by the actual amount; **Your order** uses the order of

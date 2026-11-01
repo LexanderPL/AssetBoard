@@ -131,6 +131,39 @@
     @apply bg-primary-soft text-primary-ink;
   }
 
+  /* Buttons: one shape for every page action (the Month page's "Close month" is the model).
+     .btn is the secondary look, .btn-primary the main action of a page or form. Small in-table
+     row buttons keep their own compact size. */
+  .btn,
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn {
+    @apply border border-line bg-surface text-ink hover:bg-subtle;
+  }
+
+  .btn-primary {
+    @apply border border-primary bg-primary text-on-primary hover:border-primary-hover hover:bg-primary-hover;
+  }
+
+  /* Phones and tablets: the sidebar's Menu button folds the navigation away. The button and the
+     folding need JavaScript (theme.js marks <html> with "js"), so without it the navigation
+     stays open and the button stays hidden. */
+  .sidebar-toggle {
+    display: none;
+  }
+
+  @media (max-width: 1023.98px) {
+    .js .sidebar-toggle {
+      display: inline-flex;
+    }
+
+    .js .sidebar-panel:not([data-open]) {
+      display: none;
+    }
+  }
+
   /* Text inputs and selects share one look; templates add only width and size. */
   .form-control,
   .form-select {

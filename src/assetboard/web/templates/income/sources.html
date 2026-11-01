@@ -22,7 +22,7 @@
     {% if posted_change.differs and can_edit %}
     <form method="post" action="{{ scoped_url(request, 'income_update_posted', source_id=posted_change.source_id|string, month=posted_change.work_month.strftime('%Y-%m')) }}">
       {{ csrf_input() }}
-      <button type="submit" class="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-update-transaction>{{ _("Update the transaction to %(amount)s", amount=format_money(posted_change.recalculated, locale)) }}</button>
+      <button type="submit" class="btn-primary" data-update-transaction>{{ _("Update the transaction to %(amount)s", amount=format_money(posted_change.recalculated, locale)) }}</button>
     </form>
     {% endif %}
     {% if posted_change_href %}<a href="{{ posted_change_href }}" class="font-semibold underline">{{ _("Open the transaction") }}</a>{% endif %}
@@ -108,8 +108,8 @@
                 <input type="hidden" name="work_month_year" value="{{ item.work_month.year }}">
                 <label class="grid gap-1 text-xs font-medium">{{ _("Units worked (%(unit)s)", unit=source.unit_label) }}<input name="units" inputmode="decimal" required value="{{ format_quantity_input(log.units, locale) }}" class="form-control cell-input mt-0.5 w-32 bg-subtle text-sm" data-inline-edit-input></label>
                 <div class="flex flex-wrap items-center gap-2">
-                  <button type="submit" class="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save") }}</button>
-                  <button type="button" data-details-close class="rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Cancel") }}</button>
+                  <button type="submit" class="btn-primary">{{ _("Save") }}</button>
+                  <button type="button" data-details-close class="btn">{{ _("Cancel") }}</button>
                 </div>
               </form>
             </details>
@@ -126,8 +126,8 @@
                 <input type="hidden" name="work_month_year" value="{{ item.work_month.year }}">
                 <label class="grid gap-1 text-xs font-medium">{{ _("Units worked (%(unit)s)", unit=source.unit_label) }}<input name="units" inputmode="decimal" required value="{{ format_quantity_input(log.units, locale) }}" class="form-control cell-input mt-0.5 w-32 bg-subtle text-sm" data-inline-edit-input></label>
                 <div class="flex flex-wrap items-center gap-2">
-                  <button type="submit" class="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save") }}</button>
-                  <button type="button" data-details-close class="rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Cancel") }}</button>
+                  <button type="submit" class="btn-primary">{{ _("Save") }}</button>
+                  <button type="button" data-details-close class="btn">{{ _("Cancel") }}</button>
                 </div>
               </form>
             </details>
@@ -173,7 +173,7 @@
         <label class="grid gap-1 text-sm">{{ _("Units worked (%(unit)s)", unit=source.unit_label) }}<input name="units" inputmode="decimal" required value="{{ format_quantity_input(chosen_log.units, locale) if chosen_state == 'manual' or overriding else '' }}" class="form-control px-3 py-2" data-log-units></label>
         <button type="submit" class="self-end rounded-lg border border-line px-3 py-2 text-sm font-semibold" data-log-submit>{{ _("Update") if chosen_state == "manual" else _("Save work log") }}</button>
         <p class="text-xs text-muted sm:col-span-3"{% if not chosen_state or chosen_state == 'manual' or overriding %} hidden{% endif %} data-log-hint aria-live="polite">{% if chosen_state == "locked" %}{{ locked_hint }}{% elif chosen_state == "derived" %}{{ derived_hint }}{% elif chosen_state == "closed" %}{{ closed_hint }}{% endif %}</p>
-        <p class="sm:col-span-3"{% if chosen_state != "locked" or overriding %} hidden{% endif %} data-log-anyway><button type="button" class="rounded-lg border border-line px-3 py-1.5 text-sm font-semibold hover:bg-subtle" data-log-edit-anyway-button>{{ _("Edit anyway") }}</button></p>
+        <p class="sm:col-span-3"{% if chosen_state != "locked" or overriding %} hidden{% endif %} data-log-anyway><button type="button" class="btn" data-log-edit-anyway-button>{{ _("Edit anyway") }}</button></p>
         <p class="text-xs text-muted sm:col-span-3">{{ _("Months with days marked in the work calendar are read-only here: their units are the sum of the days.") }} {{ _("Once a month's income is received, its log changes only with Edit anyway; a closed month cannot change.") }}</p>
       </form>
     </details>
