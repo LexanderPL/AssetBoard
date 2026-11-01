@@ -110,14 +110,33 @@ class RecurringJobs:
             )
 
     def cleanup_imports(self) -> None:
+        """Hourly (F4.2): expire stored import uploads older than 24 hours, per workspace."""
         try:
-            cleanup_expired_imports(self.factory, self.settings.data_dir, self.clock())
+            with self.factory() as session:
+                workspace_ids = [row[0] for row in RecurringWorkspaceReader(session).workspaces()]
         except Exception as exc:
             self.logger.error(
                 "import_upload_cleanup_failed exception_type=%s; next run will retry",
                 type(exc).__name__,
                 exc_info=True,
             )
+            return
+        for workspace_id in workspace_ids:
+            try:
+                cleanup_expired_imports(
+                    self.factory,
+                    _Scope(_Workspace(workspace_id)),
+                    self.settings.data_dir,
+                    self.clock(),
+                )
+            except Exception as exc:
+                self.logger.error(
+                    "import_upload_cleanup_failed workspace=%s exception_type=%s; "
+                    "next run will retry",
+                    workspace_id,
+                    type(exc).__name__,
+                    exc_info=True,
+                )
 
     def notify(self) -> None:
         """One reminder tick (F3.6): run the due channels of every workspace.

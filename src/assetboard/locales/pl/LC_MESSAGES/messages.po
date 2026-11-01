@@ -391,11 +391,17 @@ msgstr "Usunięte transakcje"
 msgid "Edited transactions"
 msgstr "Edytowane transakcje"
 
-msgid "Transactions kept"
-msgstr "Zachowane transakcje"
+#, fuzzy
+msgid "Planned values kept"
+msgstr "Zachowane wartości planowane"
 
-msgid "Categories to archive"
-msgstr "Kategorie do zarchiwizowania"
+#, fuzzy
+msgid "Categories deleted"
+msgstr "Usunięte kategorie"
+
+#, fuzzy
+msgid "Categories archived"
+msgstr "Zarchiwizowane kategorie"
 
 msgid "Duplicates skipped"
 msgstr "Pominięte duplikaty"
@@ -760,8 +766,15 @@ msgstr "Rozmiar pliku nie zgadza się z manifestem."
 msgid "The file row count does not match the manifest."
 msgstr "Liczba wierszy pliku nie zgadza się z manifestem."
 
+msgid "The CSV delimiter option is invalid."
+msgstr "Nieprawidłowy separator w opcjach pliku CSV."
+
 msgid "The stored upload no longer matches its checksum."
 msgstr "Zapisany plik nie zgadza się już z jego sumą kontrolną."
+
+#, fuzzy
+msgid "The stored upload is missing; upload the file again."
+msgstr "Zapisanego pliku brakuje; prześlij plik ponownie."
 
 msgid "The upload expired after 24 hours and was removed."
 msgstr "Przesłany plik wygasł po 24 godzinach i został usunięty."
@@ -769,14 +782,46 @@ msgstr "Przesłany plik wygasł po 24 godzinach i został usunięty."
 msgid "Import planning exceeded 60 seconds."
 msgstr "Planowanie importu przekroczyło limit 60 sekund."
 
+#, fuzzy
+msgid "Other imports are being checked; try again in a minute."
+msgstr "Trwa sprawdzanie innych importów; spróbuj ponownie za minutę."
+
 msgid "Import planning failed."
 msgstr "Planowanie importu nie powiodło się."
 
-msgid "The file could not be validated."
-msgstr "Nie można zweryfikować pliku."
+#, fuzzy
+msgid "Already imported."
+msgstr "Już zaimportowano."
 
-msgid "The CSV delimiter option is invalid."
-msgstr "Nieprawidłowy separator w opcjach pliku CSV."
+#, fuzzy
+msgid "Imported before and deleted; it is not brought back."
+msgstr "Zaimportowano wcześniej i usunięto; nie zostanie przywrócony."
+
+#, fuzzy
+msgid "Changed since the export; the stored row is kept."
+msgstr "Zmieniono od eksportu; zapisany wiersz zostaje."
+
+#, fuzzy
+msgid "The same row appears earlier in this file."
+msgstr "Ten sam wiersz występuje wcześniej w tym pliku."
+
+#, fuzzy
+msgid "An earlier row of this file sets another value; it is kept."
+msgstr ""
+"Wcześniejszy wiersz tego pliku ustawia inną wartość; zostaje ona "
+"zachowana."
+
+#, fuzzy
+msgid "The same planned value already exists."
+msgstr "Taka sama wartość planowana już istnieje."
+
+#, fuzzy
+msgid "A different planned value exists; the stored value is kept."
+msgstr "Istnieje inna wartość planowana; zapisana wartość zostaje."
+
+#, fuzzy
+msgid "The month is closed."
+msgstr "Miesiąc jest zamknięty."
 
 #, python-format
 msgid "%(tax)s: %(source)s"
@@ -5005,6 +5050,10 @@ msgstr "Wiersze do utworzenia"
 msgid "Totals by category"
 msgstr "Sumy według kategorii"
 
+#, fuzzy
+msgid "The file was checked, but there is no importer for this kind of file yet."
+msgstr "Plik został sprawdzony, ale nie ma jeszcze importu dla tego rodzaju pliku."
+
 msgid "Warnings"
 msgstr "Ostrzeżenia"
 
@@ -5013,6 +5062,14 @@ msgstr "Zamknięte miesiące"
 
 msgid "Errors"
 msgstr "Błędy"
+
+#, fuzzy, python-format
+msgid ""
+"%(count)s rows will be skipped; download the errors and skipped rows CSV "
+"for the list."
+msgstr ""
+"Pominięte wiersze: %(count)s; listę zawiera plik CSV z błędami i "
+"pominiętymi wierszami."
 
 msgid "This upload could not be planned. Download the errors CSV for details."
 msgstr ""
@@ -5067,6 +5124,27 @@ msgstr "Transakcje do usunięcia"
 
 msgid "Budget lines to remove"
 msgstr "Planowane wartości do usunięcia"
+
+#, fuzzy
+msgid "Budget lines kept (changed since the import)"
+msgstr "Zachowane wartości planowane (zmienione po imporcie)"
+
+#, fuzzy
+msgid "Categories to delete"
+msgstr "Kategorie do usunięcia"
+
+msgid "Categories to archive"
+msgstr "Kategorie do zarchiwizowania"
+
+#, fuzzy, python-format
+msgid ""
+"%(count)s of the transactions were edited after the import; they are "
+"removed too."
+msgstr "Transakcje edytowane po imporcie: %(count)s; one również zostaną usunięte."
+
+#, fuzzy, python-format
+msgid "Rollback is not possible while these months are closed: %(months)s"
+msgstr "Nie można cofnąć importu, dopóki te miesiące są zamknięte: %(months)s"
 
 msgid "Confirm rollback"
 msgstr "Potwierdź cofnięcie"
@@ -5765,6 +5843,7 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Skip invalid rows"
 #~ msgstr "Pomiń nieprawidłowe wiersze"
+
 #~ msgid ""
 #~ "The work log was saved; posted "
 #~ "income was not changed. Adjust its "
@@ -5794,4 +5873,10 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Description contains"
 #~ msgstr "Opis zawiera"
+
+#~ msgid "Transactions kept"
+#~ msgstr "Zachowane transakcje"
+
+#~ msgid "The file could not be validated."
+#~ msgstr "Nie można zweryfikować pliku."
 

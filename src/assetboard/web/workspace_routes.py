@@ -10,6 +10,7 @@ pages. Successful writes redirect (303) back to the page they came from.
 from __future__ import annotations
 
 from dataclasses import replace
+from functools import partial
 from tempfile import SpooledTemporaryFile
 from typing import Annotated
 from urllib.parse import quote
@@ -37,6 +38,7 @@ from assetboard.services.imports import (
     plan_import,
     preview_rollback_import,
     report_errors_csv,
+    report_message,
     rollback_import,
     upload_import,
 )
@@ -160,6 +162,7 @@ async def workspace_data(request: Request, ctx: CurrentContext) -> Response:
             "import_batches": batches,
             "selected_batch": selected,
             "available_import_sources": request.app.state.import_adapters.sources,
+            "import_message": partial(report_message, locale=request.state.locale),
         },
     )
 
@@ -294,7 +297,7 @@ async def workspace_data_import_rollback_confirm(
     except WorkspaceNotAvailable:
         raise HTTPException(status_code=404) from None
     try:
-        batch, counts = await run_in_threadpool(
+        batch, counts, closed_months = await run_in_threadpool(
             preview_rollback_import,
             request.app.state.session_factory,
             ctx,
@@ -306,7 +309,7 @@ async def workspace_data_import_rollback_confirm(
     return render_template(
         request,
         "workspace/import_rollback.html",
-        context={"batch": batch, "rollback_counts": counts},
+        context={"batch": batch, "rollback_counts": counts, "closed_months": closed_months},
     )
 
 

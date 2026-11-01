@@ -590,6 +590,8 @@ def test_import_batch_queries_stay_in_their_workspace(
     assert in_b.get_for_update(batch_a.id) is None
     assert in_a.expired_before(datetime.max.replace(tzinfo=UTC)) == [batch_a]
     assert in_b.expired_before(datetime.max.replace(tzinfo=UTC)) == []
+    assert in_a.awaiting_apply() == [batch_a]
+    assert in_b.awaiting_apply() == []
     batch_b = create(in_b)
     assert batch_b.workspace_id == ctx_b.workspace.id
     assert in_a.recent() == [batch_a]
@@ -658,14 +660,16 @@ def test_imported_ledger_rows_and_dedupe_lookups_stay_in_their_workspace(
     assert transaction_a.source == "import"
     assert transactions_a.for_import_batch(batch_a.id) == [transaction_a]
     assert transactions_b.for_import_batch(batch_a.id) == []
-    assert transactions_a.by_import_key(f"id:{source_id}") is transaction_a
-    assert transactions_b.by_import_key(f"id:{source_id}") is None
-    assert transactions_a.by_lineage_id(source_id) is transaction_a
-    assert transactions_b.by_lineage_id(source_id) is None
+    assert transactions_a.by_import_keys([f"id:{source_id}"]) == [transaction_a]
+    assert transactions_b.by_import_keys([f"id:{source_id}"]) == []
+    assert transactions_a.by_lineage_ids([source_id]) == [transaction_a]
+    assert transactions_b.by_lineage_ids([source_id]) == []
+    assert transactions_b.by_lineage_ids([transaction_a.id]) == []
     assert lines_a.for_import_batch(batch_a.id) == [line_a]
     assert BudgetLineRepository(db_session, ctx_b).for_import_batch(batch_a.id) == []
     assert CategoryRepository(db_session, ctx_a).for_import_batch(batch_a.id) == [category_a]
     assert CategoryRepository(db_session, ctx_b).for_import_batch(batch_a.id) == []
+    assert CategoryRepository(db_session, ctx_b).for_import_batch(batch_b.id) == [category_b]
 
 
 def test_transaction_search_stays_in_its_workspace(

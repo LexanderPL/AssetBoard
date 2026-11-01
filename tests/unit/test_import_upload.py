@@ -95,7 +95,7 @@ def test_error_csv_escapes_spreadsheet_formulas() -> None:
                     "file": "=IMPORT()",
                     "line": 1,
                     "column": "=A1",
-                    "code": "invalid_upload",
+                    "code": "invalid_utf8",
                     "message": "invalid UTF-8",
                 }
             ],
@@ -105,8 +105,15 @@ def test_error_csv_escapes_spreadsheet_formulas() -> None:
                     "line": 2,
                     "column": "amount",
                     "code": "closed_month",
-                    "message": "invalid UTF-8",
-                }
+                    "message": "month is closed",
+                },
+                {
+                    "file": "transactions.csv",
+                    "line": 3,
+                    "column": "",
+                    "code": "adapter_specific",
+                    "message": "=HYPERLINK()",
+                },
             ],
         }
     ).decode("utf-8")
@@ -114,4 +121,6 @@ def test_error_csv_escapes_spreadsheet_formulas() -> None:
     assert "'=IMPORT()" in output
     assert "'=A1" in output
     assert "Invalid UTF-8 encoding." in output
-    assert "transactions.csv,2,amount,closed_month" in output
+    assert "transactions.csv,2,amount,closed_month,The month is closed." in output
+    # Unknown codes keep their own message (formula-guarded).
+    assert "transactions.csv,3,,adapter_specific,'=HYPERLINK()" in output

@@ -57,12 +57,13 @@ def test_lineage_matches_local_ids_and_preserved_import_keys() -> None:
 
 
 @pytest.mark.parametrize(
-    ("identity_found", "values_match", "soft_deleted", "action", "reason"),
+    ("identity_found", "values_match", "soft_deleted", "action", "code"),
     [
         (False, False, False, "create", None),
-        (True, True, False, "duplicate", "already imported"),
-        (True, True, True, "duplicate", "imported before and deleted"),
-        (True, False, False, "conflict", "changed since the export"),
+        (True, True, False, "duplicate", "already_imported"),
+        (True, True, True, "duplicate", "imported_before_deleted"),
+        (True, False, True, "duplicate", "imported_before_deleted"),
+        (True, False, False, "conflict", "changed_since_export"),
     ],
 )
 def test_import_match_classification(
@@ -70,14 +71,14 @@ def test_import_match_classification(
     values_match: bool,
     soft_deleted: bool,
     action: str,
-    reason: str | None,
+    code: str | None,
 ) -> None:
     decision = classify_import_match(
         identity_found=identity_found,
         values_match=values_match,
         soft_deleted=soft_deleted,
     )
-    assert (decision.action, decision.reason) == (action, reason)
+    assert (decision.action, decision.code) == (action, code)
 
 
 @pytest.mark.parametrize(

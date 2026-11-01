@@ -13,8 +13,10 @@ DedupeAction = Literal["create", "duplicate", "conflict"]
 
 @dataclass(frozen=True, slots=True)
 class DedupeDecision:
+    """``code`` is the stable report code of a skipped row (``None`` for ``create``)."""
+
     action: DedupeAction
-    reason: str | None = None
+    code: str | None = None
 
 
 def transaction_content_key(
@@ -61,18 +63,19 @@ def classify_import_match(
     values_match: bool,
     soft_deleted: bool = False,
 ) -> DedupeDecision:
+    """A deleted row stays deleted whatever its values (it is never brought back)."""
     if not identity_found:
         return DedupeDecision("create")
-    if not values_match:
-        return DedupeDecision("conflict", "changed since the export")
     if soft_deleted:
-        return DedupeDecision("duplicate", "imported before and deleted")
-    return DedupeDecision("duplicate", "already imported")
+        return DedupeDecision("duplicate", "imported_before_deleted")
+    if not values_match:
+        return DedupeDecision("conflict", "changed_since_export")
+    return DedupeDecision("duplicate", "already_imported")
 
 
 def classify_budget_line(existing_minor: int | None, incoming_minor: int) -> DedupeDecision:
     if existing_minor is None:
         return DedupeDecision("create")
     if existing_minor == incoming_minor:
-        return DedupeDecision("duplicate", "same planned value")
-    return DedupeDecision("conflict", "different planned value")
+        return DedupeDecision("duplicate", "planned_value_exists")
+    return DedupeDecision("conflict", "planned_value_differs")

@@ -27,6 +27,9 @@ from assetboard.db.repositories.base import ScopedRepository
 from assetboard.domain.months import YearMonth
 from assetboard.domain.transaction_search import SortOrder, TransactionFilter
 
+# Bound the IN lists of the import lookups (SQLite allows 999 parameters per statement).
+_LOOKUP_CHUNK = 400
+
 # Entry order (M4's export order): date, then the order rows were entered.
 CANONICAL_ORDER = (Transaction.date, Transaction.created_at, Transaction.id)
 _SORTS: dict[SortOrder, tuple[UnaryExpression[Any], ...]] = {
@@ -149,19 +152,30 @@ class TransactionRepository(ScopedRepository[Transaction]):
             statement = statement.with_for_update()
         return list(self._session.scalars(statement.order_by(Transaction.id)))
 
-    def by_import_key(self, import_key: str, *, lock: bool = False) -> Transaction | None:
-        statement = self._scoped_select().where(Transaction.import_key == import_key)
-        if lock:
-            statement = statement.with_for_update()
-        return self._session.scalars(statement).one_or_none()
+    def by_import_keys(self, import_keys: Collection[str]) -> list[Transaction]:
+        """Rows (soft-deleted ones included) whose ``import_key`` is one of ``import_keys``."""
+        keys = list(import_keys)
+        found: list[Transaction] = []
+        for start in range(0, len(keys), _LOOKUP_CHUNK):
+            chunk = keys[start : start + _LOOKUP_CHUNK]
+            statement = self._scoped_select().where(Transaction.import_key.in_(chunk))
+            found.extend(self._session.scalars(statement))
+        return found
 
-    def by_lineage_id(self, row_id: UUID, *, lock: bool = False) -> Transaction | None:
-        statement = self._scoped_select().where(
-            (Transaction.id == row_id) | (Transaction.import_key == f"id:{row_id}")
-        )
-        if lock:
-            statement = statement.with_for_update()
-        return self._session.scalars(statement).one_or_none()
+    def by_lineage_ids(self, row_ids: Collection[UUID]) -> list[Transaction]:
+        """Rows (soft-deleted ones included) whose id, or ``id:<id>`` import key, is one of
+        ``row_ids`` (F4.2 lineage dedupe)."""
+        ids = list(row_ids)
+        found: dict[UUID, Transaction] = {}
+        for start in range(0, len(ids), _LOOKUP_CHUNK):
+            chunk = ids[start : start + _LOOKUP_CHUNK]
+            statement = self._scoped_select().where(
+                Transaction.id.in_(chunk)
+                | Transaction.import_key.in_([f"id:{row_id}" for row_id in chunk])
+            )
+            for row in self._session.scalars(statement):
+                found[row.id] = row
+        return list(found.values())
 
     def get_for_update(self, row_id: UUID) -> Transaction | None:
         """``get`` with a row lock (``FOR UPDATE`` on PostgreSQL) until the transaction ends.

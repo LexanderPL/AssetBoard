@@ -45,7 +45,7 @@
         <span class="text-sm text-muted">{% if batch.status == 'uploaded' %}{{ _("Uploaded") }}{% elif batch.status == 'planned' %}{{ _("Planned") }}{% elif batch.status == 'failed' %}{{ _("Failed") }}{% elif batch.status == 'cancelled' %}{{ _("Cancelled") }}{% elif batch.status == 'applied' %}{{ _("Applied") }}{% else %}{{ _("Rolled back") }}{% endif %}</span>
       </div>
       {% if batch.report %}
-      <p class="mt-1 text-sm text-muted">{{ _("Rows received") }}: {{ batch.report.counts.rows_received|default(0) }}{% if import_available %} · {{ _("Invalid") }}: {{ batch.report.counts.invalid|default(0) }}{% endif %}</p>
+      <p class="mt-1 text-sm text-muted">{{ _("Rows received") }}: {{ batch.report.counts.rows_received|default(0) }} · {{ _("Invalid") }}: {{ batch.report.counts.invalid|default(0) }}</p>
       {% endif %}
       <div class="mt-2 flex gap-4 text-sm">
         <a class="underline" href="{{ scoped_url(request, 'workspace_data') }}?batch={{ batch.id }}">{{ _("View report") }}</a>
@@ -58,13 +58,13 @@
           <button type="submit" class="underline">{{ _("Cancel import") }}</button>
         </form>
         {% endif %}
-        {% if import_available and batch.status == 'planned' %}
+        {% if batch.source in available_import_sources and batch.status == 'planned' %}
         <form method="post" action="{{ scoped_url(request, 'workspace_data_import_apply', batch_id=batch.id) }}" class="flex items-center gap-2">
           <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
           {% if batch.mode == 'merge' and batch.report.counts.invalid|default(0) > 0 %}<label><input type="checkbox" name="skip_invalid" value="true"> {{ _("Skip %(count)s invalid rows", count=batch.report.counts.invalid) }}</label>{% endif %}
           <button type="submit" class="underline">{{ _("Apply import") }}</button>
         </form>
-        {% elif import_available and batch.status == 'applied' and batch.mode == 'merge' %}
+        {% elif batch.status == 'applied' and batch.mode == 'merge' %}
         <a class="underline" href="{{ scoped_url(request, 'workspace_data_import_rollback_confirm', batch_id=batch.id) }}">{{ _("Roll back import") }}</a>
         {% endif %}
       </div>
@@ -76,7 +76,8 @@
 {% if selected_batch %}
 <section class="mt-8 max-w-4xl" aria-live="polite">
   <h2 class="text-lg font-semibold">{{ _("Import report") }}</h2>
-  {% if selected_batch.report and import_available %}
+  {% if selected_batch.report %}
+  {% if selected_batch.source in available_import_sources %}
   <dl class="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
     <div><dt class="text-muted">{{ _("To create") }}</dt><dd>{{ selected_batch.report.counts.to_create|default(0) }}</dd></div>
     <div><dt class="text-muted">{{ _("Duplicates skipped") }}</dt><dd>{{ selected_batch.report.counts.duplicates_skipped|default(0) }}</dd></div>
@@ -102,16 +103,22 @@
     </table>
   </div>
   {% endif %}
+  {% elif selected_batch.status == 'planned' %}
+  <p class="mt-2 text-sm text-muted">{{ _("The file was checked, but there is no importer for this kind of file yet.") }}</p>
+  {% endif %}
   {% if selected_batch.report.warnings %}
-  <div class="mt-5"><h3 class="font-semibold">{{ _("Warnings") }}</h3><ul class="mt-2 list-disc pl-5 text-sm">{% for warning in selected_batch.report.warnings %}<li>{{ _(warning.message) }}</li>{% endfor %}</ul></div>
+  <div class="mt-5"><h3 class="font-semibold">{{ _("Warnings") }}</h3><ul class="mt-2 list-disc pl-5 text-sm">{% for warning in selected_batch.report.warnings %}<li>{{ import_message(warning) }}</li>{% endfor %}</ul></div>
   {% endif %}
   {% if selected_batch.report.closed_months %}
   <div class="mt-5"><h3 class="font-semibold">{{ _("Closed months") }}</h3><ul class="mt-2 list-disc pl-5 text-sm">{% for month in selected_batch.report.closed_months %}<li>{{ month }}</li>{% endfor %}</ul></div>
   {% endif %}
   {% if selected_batch.report.errors %}
-  <div class="mt-5"><h3 class="font-semibold">{{ _("Errors") }}</h3><ul class="mt-2 list-disc pl-5 text-sm">{% for error in selected_batch.report.errors %}<li>{{ error.file }}{% if error.line %}:{{ error.line }}{% endif %}{% if error.column %} · {{ error.column }}{% endif %}: {{ _(error.message) }}</li>{% endfor %}</ul></div>
+  <div class="mt-5"><h3 class="font-semibold">{{ _("Errors") }}</h3><ul class="mt-2 list-disc pl-5 text-sm">{% for error in selected_batch.report.errors %}<li>{{ error.file }}{% if error.line %}:{{ error.line }}{% endif %}{% if error.column %} · {{ error.column }}{% endif %}: {{ import_message(error) }}</li>{% endfor %}</ul></div>
   {% endif %}
-  {% if selected_batch.report.errors %}<p class="mt-4 text-sm text-danger">{{ _("This upload could not be planned. Download the errors CSV for details.") }}</p>{% endif %}
+  {% if selected_batch.report.skipped %}
+  <p class="mt-5 text-sm">{{ _("%(count)s rows will be skipped; download the errors and skipped rows CSV for the list.", count=selected_batch.report.skipped|length) }}</p>
+  {% endif %}
+  {% if selected_batch.status == 'failed' %}<p class="mt-4 text-sm text-danger">{{ _("This upload could not be planned. Download the errors CSV for details.") }}</p>{% endif %}
   {% else %}
   <p class="mt-2 text-sm text-muted">{{ _("The import report is not available.") }}</p>
   {% endif %}

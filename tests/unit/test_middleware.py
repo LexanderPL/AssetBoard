@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import io
 import logging
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from fastapi import FastAPI
@@ -77,7 +77,8 @@ def test_request_body_limit_rejects_streamed_overflow_without_buffering_the_body
     assert not downstream_completed
     assert response_messages[0]["status"] == 413
     assert response_messages[-1]["body"] == b"Request body exceeds the allowed size."
-    assert (b"x-content-type-options", b"nosniff") in response_messages[0]["headers"]
+    headers = cast(list[tuple[bytes, bytes]], response_messages[0]["headers"])
+    assert (b"x-content-type-options", b"nosniff") in headers
 
 
 def test_import_route_uses_its_larger_limit() -> None:

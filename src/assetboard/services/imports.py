@@ -1,4 +1,20 @@
-"""Import upload and batch lifecycle (F4.2)."""
+"""Import upload and batch lifecycle (F4.2).
+
+Upload stores the file and an ``uploaded`` batch; planning parses it in a worker thread with a
+time limit and stores the dry-run report (``planned``); apply re-parses and re-plans inside the
+write transaction; rollback and cancel undo a batch. The adapter of the batch's ``source``
+(F4.3, F4.4; see ``ImportAdapterRegistry``) writes the rows; dedupe helpers for adapters live
+in ``services.import_dedupe``, and rollback is done here for every source alike.
+
+**Time limit.** ``MAX_IMPORT_SECONDS`` counts from when the worker starts the job, not from when
+it was queued. The worker passes ``out_of_time`` to the parser (checked every few thousand rows)
+and to the adapter's ``plan``, so a job over the limit stops itself and frees its worker. A job
+that cannot start within ``MAX_IMPORT_QUEUE_SECONDS`` (both workers busy) fails as "busy".
+
+**Report entries** (``errors``, ``warnings``, ``skipped``) are ``{file, line, column, code,
+message}``. ``code`` is stable; ``report_message`` translates known codes and otherwise shows
+the original ``message`` (adapters may add their own codes).
+"""
 
 from __future__ import annotations
 
@@ -7,20 +23,22 @@ import hashlib
 import io
 import os
 import re
-from collections.abc import Mapping
-from concurrent.futures import ThreadPoolExecutor, TimeoutError
+import threading
+import time
+import unicodedata
+from collections.abc import Callable, Mapping
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal
 from uuid import UUID
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.clock import Clock
 from assetboard.db.engine import run_immediate
-from assetboard.db.models.identity import Workspace
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.ledger import BudgetLine, Category, Transaction
 from assetboard.db.repositories import (
@@ -32,8 +50,9 @@ from assetboard.db.repositories import (
     MonthStateRepository,
     TransactionRepository,
 )
+from assetboard.db.repositories.base import WorkspaceScope
 from assetboard.domain.archive import CSV_COLUMNS, ArchiveError
-from assetboard.domain.import_upload import ParsedUpload, parse_upload
+from assetboard.domain.import_upload import ParsedUpload, ParseTimeout, parse_upload
 from assetboard.domain.ledger_csv import TRANSACTION_EXPORT_COLUMNS, guard_formula
 from assetboard.domain.months import YearMonth
 from assetboard.i18n import gettext
@@ -42,47 +61,97 @@ from assetboard.services.context import Context, Role, require_role, require_rol
 from assetboard.services.months import lock_month_writes
 
 MAX_IMPORT_SECONDS = 60
+MAX_IMPORT_QUEUE_SECONDS = 60
 IMPORT_FILE_RETENTION = timedelta(hours=24)
+# A file with no uploaded/planned batch is removed once it is this old (it may belong to an
+# upload whose transaction has not committed yet).
+ORPHAN_FILE_GRACE = timedelta(hours=1)
 _WORKER = ThreadPoolExecutor(max_workers=2, thread_name_prefix="assetboard-import")
 _SAFE_FILENAME = re.compile(r"[^A-Za-z0-9._ -]")
+# Letters that NFKD does not decompose into an ASCII base letter.
+_ASCII_LETTERS = str.maketrans(
+    {"Ł": "L", "ł": "l", "Đ": "D", "đ": "d", "Ø": "O", "ø": "o", "ß": "ss",
+     "Æ": "AE", "æ": "ae", "Œ": "OE", "œ": "oe", "Þ": "Th", "þ": "th"}
+)  # fmt: skip
+_monotonic: Callable[[], float] = time.monotonic  # replaced in tests
 
 
 def _(message: str) -> str:
     return message
 
 
-_ERROR_TRANSLATIONS = {
-    "invalid UTF-8": _("Invalid UTF-8 encoding."),
-    "invalid CSV": _("The CSV data is invalid."),
-    "file is empty": _("The file is empty."),
-    "invalid column count": _("The CSV column count is invalid."),
-    "row has a different number of columns": _(
-        "The row has a different number of columns than the header."
-    ),
-    "too many data rows": _("The upload contains too many data rows."),
-    "unknown file ignored": _("An unknown file in the archive was ignored."),
-    "unknown column ignored": _("An unknown CSV column was ignored."),
-    "duplicate member names": _("The archive contains duplicate file names."),
-    "missing required members": _("The archive is missing required files."),
-    "too many members": _("The archive contains too many files."),
-    "unsafe member": _("The archive contains an unsafe file."),
-    "uncompressed size or ratio limit": _("The archive exceeds an uncompressed size limit."),
-    "unsupported archive format": _("The archive format is not supported."),
-    "unsupported archive version": _("The archive version is not supported."),
-    "invalid JSON": _("The archive contains invalid JSON."),
-    "invalid UTF-8 or CSV": _("The archive contains invalid UTF-8 or CSV data."),
-    "checksum mismatch": _("The file checksum does not match the manifest."),
-    "byte count mismatch": _("The file size does not match the manifest."),
-    "row count mismatch": _("The file row count does not match the manifest."),
-    "stored upload checksum mismatch": _("The stored upload no longer matches its checksum."),
-    "Stored upload expired after 24 hours.": _(
-        "The upload expired after 24 hours and was removed."
-    ),
-    "Import planning exceeded 60 seconds.": _("Import planning exceeded 60 seconds."),
-    "Import planning failed.": _("Import planning failed."),
-    "invalid_upload": _("The file could not be validated."),
-    "invalid delimiter option": _("The CSV delimiter option is invalid."),
+# Report codes -> translatable messages (shown on the page and in the errors CSV).
+REPORT_MESSAGES: dict[str, str] = {
+    "invalid_utf8": _("Invalid UTF-8 encoding."),
+    "invalid_csv": _("The CSV data is invalid."),
+    "empty_file": _("The file is empty."),
+    "invalid_column_count": _("The CSV column count is invalid."),
+    "row_column_count": _("The row has a different number of columns than the header."),
+    "too_many_rows": _("The upload contains too many data rows."),
+    "unknown_file": _("An unknown file in the archive was ignored."),
+    "unknown_column": _("An unknown CSV column was ignored."),
+    "duplicate_members": _("The archive contains duplicate file names."),
+    "missing_members": _("The archive is missing required files."),
+    "too_many_members": _("The archive contains too many files."),
+    "unsafe_member": _("The archive contains an unsafe file."),
+    "size_limit": _("The archive exceeds an uncompressed size limit."),
+    "unsupported_format": _("The archive format is not supported."),
+    "unsupported_version": _("The archive version is not supported."),
+    "invalid_json": _("The archive contains invalid JSON."),
+    "invalid_archive_csv": _("The archive contains invalid UTF-8 or CSV data."),
+    "checksum_mismatch": _("The file checksum does not match the manifest."),
+    "byte_count_mismatch": _("The file size does not match the manifest."),
+    "row_count_mismatch": _("The file row count does not match the manifest."),
+    "invalid_delimiter": _("The CSV delimiter option is invalid."),
+    "stored_checksum_mismatch": _("The stored upload no longer matches its checksum."),
+    "stored_file_missing": _("The stored upload is missing; upload the file again."),
+    "expired": _("The upload expired after 24 hours and was removed."),
+    "timeout": _("Import planning exceeded 60 seconds."),
+    "busy": _("Other imports are being checked; try again in a minute."),
+    "planning_failed": _("Import planning failed."),
+    # Dedupe (services.import_dedupe) and closed months.
+    "already_imported": _("Already imported."),
+    "imported_before_deleted": _("Imported before and deleted; it is not brought back."),
+    "changed_since_export": _("Changed since the export; the stored row is kept."),
+    "duplicate_in_file": _("The same row appears earlier in this file."),
+    "conflict_in_file": _("An earlier row of this file sets another value; it is kept."),
+    "planned_value_exists": _("The same planned value already exists."),
+    "planned_value_differs": _("A different planned value exists; the stored value is kept."),
+    "closed_month": _("The month is closed."),
 }
+
+# ``domain.archive`` / ``domain.import_upload`` messages -> report codes.
+_PARSER_CODES: dict[str, str] = {
+    "invalid UTF-8": "invalid_utf8",
+    "invalid CSV": "invalid_csv",
+    "file is empty": "empty_file",
+    "invalid column count": "invalid_column_count",
+    "row has a different number of columns": "row_column_count",
+    "too many data rows": "too_many_rows",
+    "unknown file ignored": "unknown_file",
+    "unknown column ignored": "unknown_column",
+    "duplicate member names": "duplicate_members",
+    "missing required members": "missing_members",
+    "too many members": "too_many_members",
+    "unsafe member": "unsafe_member",
+    "uncompressed size or ratio limit": "size_limit",
+    "unsupported archive format": "unsupported_format",
+    "unsupported archive version": "unsupported_version",
+    "invalid JSON": "invalid_json",
+    "invalid UTF-8 or CSV": "invalid_archive_csv",
+    "checksum mismatch": "checksum_mismatch",
+    "byte count mismatch": "byte_count_mismatch",
+    "row count mismatch": "row_count_mismatch",
+    "invalid delimiter option": "invalid_delimiter",
+}
+
+
+def report_message(entry: Mapping[str, Any], locale: str) -> str:
+    """The text of a report entry in ``locale``: its code's message, else its own message."""
+    known = REPORT_MESSAGES.get(str(entry.get("code", "")))
+    if known is not None:
+        return gettext(known, locale)
+    return str(entry.get("message", ""))
 
 
 class ImportError(Exception):
@@ -105,17 +174,29 @@ class ImportClosedMonths(ImportError):
         self.months = months
 
 
+def _never() -> bool:
+    return False
+
+
 class ImportAdapter:
-    """Feature-specific row writer; F4.3/F4.4 provide the production adapters."""
+    """Feature-specific planner and row writer; F4.3/F4.4 provide the production adapters.
+
+    ``plan`` reads only and returns the report (``counts`` and the per-month and per-category
+    tables); it should ask ``out_of_time`` now and then and raise ``ParseTimeout`` when it
+    answers true. ``apply`` writes the rows with ``source=import``, ``import_batch_id`` and
+    ``import_key`` (``services.import_dedupe`` decides which rows). Rollback is not part of the
+    contract: it works from ``import_batch_id`` for every source (``rollback_import``).
+    """
 
     def plan(
         self,
         session: Session,
         ctx: Context,
         batch: ImportBatch,
-        parsed: object,
+        parsed: ParsedUpload,
         *,
         base_currency: str,
+        out_of_time: Callable[[], bool] = _never,
     ) -> dict[str, Any]:
         raise NotImplementedError
 
@@ -124,7 +205,7 @@ class ImportAdapter:
         session: Session,
         ctx: Context,
         batch: ImportBatch,
-        parsed: object,
+        parsed: ParsedUpload,
         *,
         base_currency: str,
         skip_invalid: bool,
@@ -133,6 +214,8 @@ class ImportAdapter:
 
 
 class ImportAdapterRegistry:
+    """The adapter of each batch ``source`` (``transactions_csv``, ``archive``, ...)."""
+
     def __init__(self, adapters: Mapping[str, ImportAdapter] | None = None) -> None:
         self._adapters = dict(adapters or {})
 
@@ -142,6 +225,7 @@ class ImportAdapterRegistry:
 
     def for_source(self, source: str) -> ImportAdapter | None:
         return self._adapters.get(source)
+
 
 @dataclass(frozen=True, slots=True)
 class ImportBatchView:
@@ -172,8 +256,53 @@ def _upload_path(data_dir: Path, workspace_id: UUID, batch_id: UUID) -> Path:
 
 def _safe_filename(filename: str) -> str:
     basename = filename.replace("\\", "/").rsplit("/", 1)[-1]
-    cleaned = _SAFE_FILENAME.sub("_", basename).strip(" .") or "upload.csv"
+    # Keep base letters ("Łódź wydatki.csv" -> "Lodz wydatki.csv") instead of "_" for each.
+    decomposed = "".join(
+        char
+        for char in unicodedata.normalize("NFKD", basename.translate(_ASCII_LETTERS))
+        if not unicodedata.combining(char)
+    )
+    cleaned = _SAFE_FILENAME.sub("_", decomposed).strip(" .") or "upload.csv"
     return cleaned[:255]
+
+
+def _counts(**values: int) -> dict[str, int]:
+    return {
+        "to_create": 0,
+        "duplicates_skipped": 0,
+        "conflicts_skipped": 0,
+        "closed_months_skipped": 0,
+        "ignored_categories_skipped": 0,
+        "invalid": 0,
+        **values,
+    }
+
+
+def _entry(
+    file: str, code: str, message: str, line: object = "", column: object = ""
+) -> dict[str, object]:
+    return {"file": file, "line": line, "column": column, "code": code, "message": message}
+
+
+def _report(
+    *,
+    counts: dict[str, int] | None = None,
+    errors: list[dict[str, object]] | None = None,
+    warnings: list[dict[str, object]] | None = None,
+) -> dict[str, Any]:
+    return {
+        "counts": counts or _counts(),
+        "months": [],
+        "categories": [],
+        "closed_months": [],
+        "warnings": warnings or [],
+        "skipped": [],
+        "errors": errors or [],
+    }
+
+
+def _failure(code: str, message: str) -> dict[str, Any]:
+    return _report(counts=_counts(invalid=1), errors=[_entry("upload", code, message)])
 
 
 def upload_import(
@@ -226,40 +355,32 @@ def upload_import(
 
 
 def _error_dict(error: ArchiveError) -> dict[str, object]:
-    return {
-        "file": error.file,
-        "line": error.line or "",
-        "column": error.column or "",
-        "code": "invalid_upload",
-        "message": error.message,
-    }
+    return _entry(
+        error.file,
+        _PARSER_CODES.get(error.message, "invalid_upload"),
+        error.message,
+        error.line or "",
+        error.column or "",
+    )
 
 
 def _plan_file(
-    content: bytes, *, delimiter: str = ","
+    content: bytes, *, delimiter: str = ",", out_of_time: Callable[[], bool] = _never
 ) -> tuple[str, dict[str, Any], ParsedUpload | None]:
-    parsed, errors = parse_upload(content, delimiter=delimiter)
+    parsed, errors = parse_upload(content, delimiter=delimiter, out_of_time=out_of_time)
     if parsed is None:
-        return "failed", {
-            "counts": {
-                "to_create": 0,
-                "duplicates_skipped": 0,
-                "conflicts_skipped": 0,
-                "closed_months_skipped": 0,
-                "ignored_categories_skipped": 0,
-                "invalid": len(errors),
-            },
-            "months": [],
-            "categories": [],
-            "closed_months": [],
-            "warnings": [],
-            "skipped": [],
-            "errors": [_error_dict(error) for error in errors],
-        }, None
+        return (
+            "failed",
+            _report(
+                counts=_counts(invalid=len(errors)),
+                errors=[_error_dict(error) for error in errors],
+            ),
+            None,
+        )
 
-    row_count = len(parsed.archive.rows.transactions) if parsed.archive else len(parsed.csv_rows)
     warnings = [_error_dict(error) for error in parsed.warnings]
     if parsed.archive is None:
+        row_count = len(parsed.csv_rows)
         known_columns = {
             "transactions_csv": set(TRANSACTION_EXPORT_COLUMNS),
             "budget_lines_csv": set(CSV_COLUMNS["budget_lines.csv"]),
@@ -271,33 +392,21 @@ def _plan_file(
             if column not in known_columns
         )
     else:
+        rows = parsed.archive.rows
         row_count = sum(
-            len(rows)
-            for rows in (
-                parsed.archive.rows.categories,
-                parsed.archive.rows.budget_lines,
-                parsed.archive.rows.transactions,
-                parsed.archive.rows.months,
-            )
+            len(part)
+            for part in (rows.categories, rows.budget_lines, rows.transactions, rows.months)
         )
-    return "planned", {
-        "source": parsed.source,
-        "counts": {
-            "to_create": 0,
-            "duplicates_skipped": 0,
-            "conflicts_skipped": 0,
-            "closed_months_skipped": 0,
-            "ignored_categories_skipped": 0,
-            "invalid": parsed.invalid_row_count,
-            "rows_received": row_count + parsed.invalid_row_count,
-        },
-        "months": [],
-        "categories": [],
-        "closed_months": [],
-        "warnings": warnings,
-        "skipped": [],
-        "errors": [_error_dict(error) for error in parsed.row_errors],
-    }, parsed
+    report = _report(
+        counts=_counts(
+            invalid=parsed.invalid_row_count,
+            rows_received=row_count + parsed.invalid_row_count,
+        ),
+        errors=[_error_dict(error) for error in parsed.row_errors],
+        warnings=warnings,
+    )
+    report["source"] = parsed.source
+    return "planned", report, parsed
 
 
 def _plan_worker(
@@ -306,26 +415,69 @@ def _plan_worker(
     ctx: Context,
     batch_id: UUID,
     adapters: ImportAdapterRegistry,
+    out_of_time: Callable[[], bool],
 ) -> tuple[str, dict[str, Any]]:
-    content = path.read_bytes()
+    try:
+        content = path.read_bytes()
+    except FileNotFoundError:
+        return "failed", _failure("stored_file_missing", "stored upload is missing")
     with factory() as session:
         batch = ImportBatchRepository(session, ctx).get(batch_id)
         if batch is None:
             raise ImportError("batch is not in this workspace")
         delimiter = ";" if batch.options.get("delimiter") == "semicolon" else ","
-        status, report, parsed = _plan_file(content, delimiter=delimiter)
+        status, report, parsed = _plan_file(content, delimiter=delimiter, out_of_time=out_of_time)
         if status != "planned" or parsed is None:
             return status, report
         adapter = adapters.for_source(parsed.source)
         if adapter is None:
             return status, report
         base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
-        report = adapter.plan(session, ctx, batch, parsed, base_currency=base_currency)
+        report = adapter.plan(
+            session, ctx, batch, parsed, base_currency=base_currency, out_of_time=out_of_time
+        )
         report["source"] = parsed.source
-    report.setdefault("warnings", [])
-    report.setdefault("skipped", [])
-    report.setdefault("errors", [])
+    for key in ("warnings", "skipped", "errors", "months", "categories", "closed_months"):
+        report.setdefault(key, [])
     return status, report
+
+
+def _run_plan_job(
+    path: Path,
+    factory: sessionmaker[Session],
+    ctx: Context,
+    batch_id: UUID,
+    adapters: ImportAdapterRegistry,
+) -> tuple[str, dict[str, Any]]:
+    """Run ``_plan_worker`` with the time limit counted from the job's start."""
+    started = threading.Event()
+    stop = threading.Event()
+
+    def job() -> tuple[str, dict[str, Any]]:
+        started.set()
+        deadline = _monotonic() + MAX_IMPORT_SECONDS
+
+        def out_of_time() -> bool:
+            return stop.is_set() or _monotonic() >= deadline
+
+        try:
+            return _plan_worker(path, factory, ctx, batch_id, adapters, out_of_time)
+        except ParseTimeout:
+            return "failed", _failure("timeout", "Import planning exceeded 60 seconds.")
+
+    future = _WORKER.submit(job)
+    if not started.wait(MAX_IMPORT_QUEUE_SECONDS):
+        if future.cancel():
+            return "failed", _failure("busy", "other imports are being planned")
+        started.wait()
+    try:
+        # A little grace beyond the limit: the worker notices the deadline itself.
+        return future.result(timeout=MAX_IMPORT_SECONDS + 5)
+    except FutureTimeout:
+        stop.set()
+        return "failed", _failure("timeout", "Import planning exceeded 60 seconds.")
+    except Exception:
+        return "failed", _failure("planning_failed", "Import planning failed.")
 
 
 def plan_import(
@@ -345,61 +497,9 @@ def plan_import(
         return _upload_path(data_dir, ctx.workspace.id, batch.id)
 
     path = run_immediate(factory, locate)
-    registry = adapters or ImportAdapterRegistry()
-    future = _WORKER.submit(_plan_worker, path, factory, ctx, batch_id, registry)
-    try:
-        status, report = future.result(timeout=MAX_IMPORT_SECONDS)
-    except TimeoutError:
-        future.cancel()
-        status = "failed"
-        report = {
-            "counts": {
-                "to_create": 0,
-                "duplicates_skipped": 0,
-                "conflicts_skipped": 0,
-                "closed_months_skipped": 0,
-                "ignored_categories_skipped": 0,
-                "invalid": 1,
-            },
-            "months": [],
-            "categories": [],
-            "closed_months": [],
-            "warnings": [],
-            "errors": [
-                {
-                    "file": "upload",
-                    "line": "",
-                    "column": "",
-                    "code": "timeout",
-                    "message": "Import planning exceeded 60 seconds.",
-                }
-            ],
-        }
-    except Exception:
-        status = "failed"
-        report = {
-            "counts": {
-                "to_create": 0,
-                "duplicates_skipped": 0,
-                "conflicts_skipped": 0,
-                "closed_months_skipped": 0,
-                "ignored_categories_skipped": 0,
-                "invalid": 1,
-            },
-            "months": [],
-            "categories": [],
-            "closed_months": [],
-            "warnings": [],
-            "errors": [
-                {
-                    "file": "upload",
-                    "line": "",
-                    "column": "",
-                    "code": "planning_failed",
-                    "message": "Import planning failed.",
-                }
-            ],
-        }
+    status, report = _run_plan_job(
+        path, factory, ctx, batch_id, adapters or ImportAdapterRegistry()
+    )
 
     def save(session: Session) -> dict[str, Any]:
         require_role_now(session, ctx, Role.EDITOR)
@@ -473,42 +573,25 @@ def apply_import(
             raise ImportUnavailable("No importer is registered for this upload type.")
         if batch.mode == "restore":
             require_role_now(session, ctx, Role.OWNER)
-        content = stored_path.read_bytes()
+        try:
+            content = stored_path.read_bytes()
+        except FileNotFoundError:
+            batch.status = "failed"
+            batch.report = _failure("stored_file_missing", "stored upload is missing")
+            return {"_failed": True, "report": batch.report}
         if hashlib.sha256(content).hexdigest() != batch.file_sha256:
             batch.status = "failed"
-            batch.report = {
-                "counts": {
-                    "to_create": 0,
-                    "duplicates_skipped": 0,
-                    "conflicts_skipped": 0,
-                    "closed_months_skipped": 0,
-                    "ignored_categories_skipped": 0,
-                    "invalid": 1,
-                },
-                "months": [],
-                "categories": [],
-                "closed_months": [],
-                "warnings": [],
-                "errors": [
-                    {
-                        "file": "upload",
-                        "line": "",
-                        "column": "",
-                        "code": "checksum_mismatch",
-                        "message": "stored upload checksum mismatch",
-                    }
-                ],
-            }
+            batch.report = _failure("stored_checksum_mismatch", "stored upload checksum mismatch")
             return {"_failed": True, "report": batch.report}
         delimiter = ";" if batch.options.get("delimiter") == "semicolon" else ","
-        parsed, _errors = parse_upload(content, delimiter=delimiter)
-        if parsed is None:
+        status, failed_report, parsed = _plan_file(content, delimiter=delimiter)
+        if status == "failed" or parsed is None:
             batch.status = "failed"
-            report = _plan_file(content, delimiter=delimiter)[1]
-            batch.report = report
-            return {"_failed": True, "report": report}
+            batch.report = failed_report
+            return {"_failed": True, "report": failed_report}
         base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
         report = adapter.plan(session, ctx, batch, parsed, base_currency=base_currency)
+        report["source"] = parsed.source
         if report["counts"] != (batch.report or {}).get("counts", {}):
             batch.report = report
             return {"_confirmation_required": True, "report": report}
@@ -554,11 +637,81 @@ def apply_import(
     return result
 
 
+@dataclass(frozen=True, slots=True)
+class _RollbackPlan:
+    """What rolling a batch back does, decided once for the preview and the rollback."""
+
+    transactions: tuple[Transaction, ...]  # the batch's rows that are not deleted yet
+    edited: int  # of those, changed after the import
+    lines_to_remove: tuple[BudgetLine, ...]
+    lines_kept: int  # changed after the import (``updated_at > applied_at``)
+    categories_to_delete: tuple[Category, ...]
+    categories_to_archive: tuple[Category, ...]
+    closed_months: tuple[str, ...]
+
+    def counts(self) -> dict[str, int]:
+        return {
+            "deleted": len(self.transactions),
+            "edited": self.edited,
+            "budget_lines": len(self.lines_to_remove),
+            "budget_lines_kept": self.lines_kept,
+            "categories_to_delete": len(self.categories_to_delete),
+            "categories_to_archive": len(self.categories_to_archive),
+        }
+
+
+def _rollback_plan(
+    session: Session, ctx: Context, batch: ImportBatch, *, lock: bool
+) -> _RollbackPlan:
+    applied_at = batch.applied_at
+    if applied_at is None:
+        raise ImportError("applied batch has no applied timestamp")
+    transactions = TransactionRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    lines = BudgetLineRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    categories = CategoryRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    live = tuple(row for row in transactions if row.deleted_at is None)
+    to_remove = tuple(line for line in lines if line.updated_at <= applied_at)
+
+    # F2.1's rule: a category still referenced after the rollback is archived, an unused one is
+    # deleted. References count soft-deleted transactions too (they keep pointing at their
+    # category), so a created category whose rows are only soft-deleted here is archived;
+    # only the removed budget lines stop referencing it.
+    removed_lines: dict[UUID, int] = {}
+    for line in to_remove:
+        removed_lines[line.category_id] = removed_lines.get(line.category_id, 0) + 1
+    usage = usage_by_category(session, ctx)
+    to_delete: list[Category] = []
+    to_archive: list[Category] = []
+    for category in categories:
+        used = usage.get(category.id)
+        remaining = (used.references if used else 0) - removed_lines.get(category.id, 0)
+        if remaining <= 0:
+            to_delete.append(category)
+        elif category.archived_at is None:
+            to_archive.append(category)
+
+    affected = {YearMonth.from_date(row.date) for row in live}
+    affected.update(YearMonth.from_date(line.month) for line in to_remove)
+    closed = MonthStateRepository(session, ctx).closed_months()
+    return _RollbackPlan(
+        transactions=live,
+        edited=sum(row.updated_at > applied_at for row in live),
+        lines_to_remove=to_remove,
+        lines_kept=len(lines) - len(to_remove),
+        categories_to_delete=tuple(to_delete),
+        categories_to_archive=tuple(to_archive),
+        closed_months=tuple(str(month) for month in sorted(affected & closed)),
+    )
+
+
 def rollback_import(
     factory: sessionmaker[Session],
     ctx: Context,
     batch_id: UUID,
 ) -> dict[str, int]:
+    """Undo an applied merge batch: soft-delete its transactions (edited ones too), remove its
+    budget lines except those changed since, and delete or archive the categories it created.
+    Refused as a whole (``ImportClosedMonths``) when an affected month is closed now."""
     require_role(ctx, Role.EDITOR)
 
     def rollback(session: Session) -> dict[str, int]:
@@ -568,39 +721,25 @@ def rollback_import(
         batch = ImportBatchRepository(session, ctx).get_for_update(batch_id)
         if batch is None or batch.status != "applied" or batch.mode != "merge":
             raise ImportError("batch cannot be rolled back")
-        selection = _rollback_selection(session, ctx, batch, lock=True)
-        if selection.closed_months:
-            raise ImportClosedMonths(selection.closed_months)
+        plan = _rollback_plan(session, ctx, batch, lock=True)
+        if plan.closed_months:
+            raise ImportClosedMonths(plan.closed_months)
         now = ctx.clock.now()
-        transaction_repository = TransactionRepository(session, ctx)
-        for transaction in selection.transactions:
-            if transaction.deleted_at is None:
-                transaction_repository.update(transaction.id, deleted_at=now)
-        budget_line_repository = BudgetLineRepository(session, ctx)
-        for line in selection.budget_lines:
-            if line.id in selection.budget_lines_to_remove:
-                budget_line_repository.delete(line)
-
-        counts = _rollback_counts(selection)
-        category_repository = CategoryRepository(session, ctx)
-        batch_line_counts: dict[UUID, int] = {}
-        for line in selection.budget_lines:
-            if line.id in selection.budget_lines_to_remove:
-                batch_line_counts[line.category_id] = batch_line_counts.get(line.category_id, 0) + 1
-        for category in selection.categories:
-            remaining_plans = selection.budget_references.get(category.id, 0) - batch_line_counts.get(
-                category.id, 0
-            )
-            remaining_references = selection.category_references.get(category.id, 0) - batch_line_counts.get(
-                category.id, 0
-            )
-            if remaining_references > 0 or remaining_plans > 0:
-                if category.archived_at is None:
-                    category_repository.update(category.id, archived_at=now)
-            else:
-                category_repository.delete(category)
+        transactions = TransactionRepository(session, ctx)
+        for transaction in plan.transactions:
+            transactions.update(transaction.id, deleted_at=now)
+        lines = BudgetLineRepository(session, ctx)
+        for line in plan.lines_to_remove:
+            lines.delete(line)
+        session.flush()
+        categories = CategoryRepository(session, ctx)
+        for category in plan.categories_to_delete:
+            categories.delete(category)
+        for category in plan.categories_to_archive:
+            categories.update(category.id, archived_at=now)
         batch.status = "rolled_back"
         batch.rolled_back_at = now
+        counts = plan.counts()
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
             action="import.rolled_back",
@@ -613,11 +752,12 @@ def rollback_import(
                 "transactions_deleted": counts["deleted"],
                 "transactions_edited": counts["edited"],
                 "budget_lines": counts["budget_lines"],
-                "categories_to_archive": counts["categories_to_archive"],
-                "transactions_kept": counts["budget_lines_kept"],
+                "budget_lines_kept": counts["budget_lines_kept"],
+                "categories_deleted": counts["categories_to_delete"],
+                "categories_archived": counts["categories_to_archive"],
             },
         )
-        return {**counts, "categories_deleted": counts["categories_to_delete"]}
+        return counts
 
     return run_immediate(factory, rollback)
 
@@ -626,15 +766,15 @@ def preview_rollback_import(
     factory: sessionmaker[Session],
     ctx: Context,
     batch_id: UUID,
-) -> tuple[ImportBatchView, dict[str, int]]:
+) -> tuple[ImportBatchView, dict[str, int], tuple[str, ...]]:
+    """The rollback confirm page: the batch, its counts and the closed months that block it."""
     require_role(ctx, Role.EDITOR)
     with factory() as session:
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=False)
         batch = ImportBatchRepository(session, ctx).get(batch_id)
         if batch is None or batch.status != "applied" or batch.mode != "merge":
             raise ImportError("batch cannot be rolled back")
-        selection = _rollback_selection(session, ctx, batch, lock=False)
-        return _batch_view(batch), _rollback_counts(selection)
+        plan = _rollback_plan(session, ctx, batch, lock=False)
+        return _batch_view(batch), plan.counts(), plan.closed_months
 
 
 def list_import_batches(
@@ -655,157 +795,49 @@ def get_import_batch(
 
 
 def report_errors_csv(report: dict[str, Any] | None, locale: str = "en") -> bytes:
+    """Errors and skipped rows as ``file,line,column,code,message`` (formula-guarded)."""
     output = io.StringIO(newline="")
-    writer = csv.DictWriter(
-        output,
-        fieldnames=("file", "line", "column", "code", "message"),
-        lineterminator="\r\n",
-    )
+    fieldnames = ("file", "line", "column", "code", "message")
+    writer = csv.DictWriter(output, fieldnames=fieldnames, lineterminator="\r\n")
     writer.writeheader()
     report_rows = report or {}
     rows = list(report_rows.get("errors") or []) + list(report_rows.get("skipped") or [])
-    for error in rows:
-        row = dict(error)
-        message = str(row.get("message", ""))
-        row["message"] = gettext(
-            _ERROR_TRANSLATIONS.get(message, _("The file could not be validated.")), locale
-        )
-        writer.writerow(
-            {key: guard_formula(str(row.get(key, ""))) for key in writer.fieldnames or ()}
-        )
+    for entry in rows:
+        row = {**entry, "message": report_message(entry, locale)}
+        writer.writerow({key: guard_formula(str(row.get(key, ""))) for key in fieldnames})
     return output.getvalue().encode("utf-8")
 
 
-@dataclass(frozen=True, slots=True)
-class _WorkspaceRef:
-    id: UUID
+def cleanup_expired_imports(
+    factory: sessionmaker[Session], scope: WorkspaceScope, data_dir: Path, clock: Clock
+) -> int:
+    """One workspace's hourly cleanup: expire batches whose file is older than 24 hours
+    (``failed``, file deleted), then remove files under ``imports/<workspace>/`` that no
+    uploaded or planned batch owns (left by a crash between commit and delete) once they are
+    older than ``ORPHAN_FILE_GRACE``. Returns the number of expired batches."""
+    now = clock.now()
+    cutoff = now - IMPORT_FILE_RETENTION
 
+    def expire(session: Session) -> tuple[list[UUID], set[str]]:
+        repository = ImportBatchRepository(session, scope)
+        expired = repository.expired_before(cutoff)
+        for batch in expired:
+            batch.status = "failed"
+            batch.report = _report(
+                warnings=[_entry("upload", "expired", "Stored upload expired after 24 hours.")]
+            )
+        active = {str(batch.id) for batch in repository.awaiting_apply()}
+        return [batch.id for batch in expired], active
 
-@dataclass(frozen=True, slots=True)
-class _WorkspaceScope:
-    workspace: _WorkspaceRef
-
-
-@dataclass(frozen=True, slots=True)
-class _RollbackSelection:
-    applied_at: datetime
-    transactions: tuple[Transaction, ...]
-    budget_lines: tuple[BudgetLine, ...]
-    categories: tuple[Category, ...]
-    closed_months: tuple[str, ...]
-    category_references: dict[UUID, int]
-    budget_references: dict[UUID, int]
-    budget_lines_to_remove: frozenset[UUID]
-
-
-def _rollback_selection(
-    session: Session, ctx: Context, batch: ImportBatch, *, lock: bool
-) -> _RollbackSelection:
-    if batch.applied_at is None:
-        raise ImportError("applied batch has no applied timestamp")
-    transactions = TransactionRepository(session, ctx).for_import_batch(batch.id, lock=lock)
-    budget_lines = BudgetLineRepository(session, ctx).for_import_batch(batch.id, lock=lock)
-    categories = CategoryRepository(session, ctx).for_import_batch(batch.id, lock=lock)
-    category_references = {
-        category_id: usage.references
-        for category_id, usage in usage_by_category(session, ctx).items()
-    }
-    budget_usage = BudgetLineRepository(session, ctx).usage_by_category()
-    budget_references = {
-        category_id: usage.references for category_id, usage in budget_usage.items()
-    }
-    budget_lines_to_remove = frozenset(
-        line.id for line in budget_lines if line.updated_at <= batch.applied_at
-    )
-    closed = MonthStateRepository(session, ctx).closed_months()
-    affected = {YearMonth.from_date(row.date) for row in transactions}
-    affected.update(YearMonth.from_date(line.month) for line in budget_lines)
-    closed_months = tuple(str(month) for month in sorted(affected & closed))
-    return _RollbackSelection(
-        batch.applied_at,
-        tuple(transactions),
-        tuple(budget_lines),
-        tuple(categories),
-        closed_months,
-        category_references,
-        budget_references,
-        budget_lines_to_remove,
-    )
-
-
-def _rollback_counts(selection: _RollbackSelection) -> dict[str, int]:
-    batch_line_counts: dict[UUID, int] = {}
-    for line in selection.budget_lines:
-        if line.id in selection.budget_lines_to_remove:
-            batch_line_counts[line.category_id] = batch_line_counts.get(line.category_id, 0) + 1
-    categories_to_archive = 0
-    categories_to_delete = 0
-    for category in selection.categories:
-        remaining_plans = selection.budget_references.get(category.id, 0) - batch_line_counts.get(
-            category.id, 0
-        )
-        remaining_references = selection.category_references.get(category.id, 0) - batch_line_counts.get(
-            category.id, 0
-        )
-        if remaining_references > 0 or remaining_plans > 0:
-            categories_to_archive += category.archived_at is None
-        else:
-            categories_to_delete += 1
-    return {
-        "deleted": sum(row.deleted_at is None for row in selection.transactions),
-        "edited": sum(
-            row.deleted_at is None
-            and row.updated_at > selection.applied_at
-            for row in selection.transactions
-        ),
-        "budget_lines": len(selection.budget_lines_to_remove),
-        "budget_lines_kept": len(selection.budget_lines) - len(selection.budget_lines_to_remove),
-        "categories_to_archive": categories_to_archive,
-        "categories_to_delete": categories_to_delete,
-    }
-
-
-def cleanup_expired_imports(factory: sessionmaker[Session], data_dir: Path, clock: Clock) -> int:
-    """Delete stale upload files and mark their batches failed, without crossing tenants."""
-    with factory() as session:
-        workspace_ids = list(session.scalars(select(Workspace.id)))
-    cutoff = clock.now() - IMPORT_FILE_RETENTION
-    expired_count = 0
-    for workspace_id in workspace_ids:
-        scope = _WorkspaceScope(_WorkspaceRef(workspace_id))
-
-        def expire(session: Session, scope: _WorkspaceScope = scope) -> list[tuple[UUID, UUID]]:
-            expired = ImportBatchRepository(session, scope).expired_before(cutoff)
-            files: list[tuple[UUID, UUID]] = []
-            for batch in expired:
-                batch.status = "failed"
-                batch.report = {
-                    "counts": {
-                        "to_create": 0,
-                        "duplicates_skipped": 0,
-                        "conflicts_skipped": 0,
-                        "closed_months_skipped": 0,
-                        "ignored_categories_skipped": 0,
-                        "invalid": 0,
-                    },
-                    "months": [],
-                    "categories": [],
-                    "closed_months": [],
-                    "warnings": [
-                        {
-                            "file": "upload",
-                            "line": "",
-                            "column": "",
-                            "message": "Stored upload expired after 24 hours.",
-                        }
-                    ],
-                    "errors": [],
-                }
-                files.append((batch.workspace_id, batch.id))
-            return files
-
-        files = run_immediate(factory, expire)
-        for owner_id, batch_id in files:
-            _delete_upload(_upload_path(data_dir, owner_id, batch_id))
-        expired_count += len(files)
-    return expired_count
+    expired_ids, active = run_immediate(factory, expire)
+    for batch_id in expired_ids:
+        _delete_upload(_upload_path(data_dir, scope.workspace.id, batch_id))
+    workspace_dir = data_dir / "imports" / str(scope.workspace.id)
+    if workspace_dir.is_dir():
+        oldest_allowed = (now - ORPHAN_FILE_GRACE).timestamp()
+        for path in workspace_dir.iterdir():
+            if path.name in active or not path.is_file():
+                continue
+            if path.stat().st_mtime < oldest_allowed:
+                _delete_upload(path)
+    return len(expired_ids)

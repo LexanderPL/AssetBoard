@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Callable
 from dataclasses import dataclass
 
 from assetboard.domain.archive import MAX_ERRORS, ArchiveError, ParsedArchive, parse_archive
@@ -11,13 +12,18 @@ from assetboard.domain.archive import MAX_ERRORS, ArchiveError, ParsedArchive, p
 ZIP_LOCAL_FILE_SIGNATURE = b"PK\x03\x04"
 MAX_IMPORT_ROWS = 1_000_000
 MAX_IMPORT_COLUMNS = 64
+# How often (in data rows) the CSV reader asks ``out_of_time``.
+DEADLINE_CHECK_ROWS = 1000
+
+
+class ParseTimeout(Exception):
+    """``out_of_time`` answered true while the upload was being read."""
 
 
 @dataclass(frozen=True, slots=True)
 class ParsedUpload:
     source: str
     archive: ParsedArchive | None = None
-    csv_text: str | None = None
     csv_header: tuple[str, ...] = ()
     csv_rows: tuple[tuple[str, ...], ...] = ()
     row_errors: tuple[ArchiveError, ...] = ()
@@ -25,12 +31,23 @@ class ParsedUpload:
     warnings: tuple[ArchiveError, ...] = ()
 
 
+def _never() -> bool:
+    return False
+
+
 def parse_upload(
-    content: bytes, *, delimiter: str = ","
+    content: bytes, *, delimiter: str = ",", out_of_time: Callable[[], bool] = _never
 ) -> tuple[ParsedUpload | None, tuple[ArchiveError, ...]]:
-    """Classify by content, then validate without extracting or writing anything."""
+    """Classify by content, then validate without extracting or writing anything.
+
+    ``out_of_time`` is asked every ``DEADLINE_CHECK_ROWS`` CSV rows (and once after reading an
+    archive, whose reader is bounded by its size limits); when it answers true the read stops
+    with ``ParseTimeout``. The caller owns the clock, so this module stays pure.
+    """
     if content.startswith(ZIP_LOCAL_FILE_SIGNATURE):
         archive, errors = parse_archive(content)
+        if out_of_time():
+            raise ParseTimeout
         if archive is None:
             return None, errors
         return ParsedUpload("archive", archive=archive, warnings=archive.warnings), ()
@@ -60,6 +77,8 @@ def parse_upload(
     try:
         for row in reader:
             data_row_count += 1
+            if data_row_count % DEADLINE_CHECK_ROWS == 0 and out_of_time():
+                raise ParseTimeout
             if data_row_count > MAX_IMPORT_ROWS:
                 return None, (ArchiveError("upload.csv", "too many data rows"),)
             if len(row) != len(header):
@@ -88,7 +107,6 @@ def parse_upload(
     return (
         ParsedUpload(
             source,
-            csv_text=text,
             csv_header=header_tuple,
             csv_rows=tuple(rows),
             row_errors=tuple(row_errors),

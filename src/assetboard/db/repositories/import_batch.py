@@ -52,6 +52,11 @@ class ImportBatchRepository(ScopedRepository[ImportBatch]):
         statement = self._scoped_select().where(ImportBatch.id == batch_id).with_for_update()
         return self._session.scalars(statement).one_or_none()
 
+    def awaiting_apply(self) -> list[ImportBatch]:
+        """Batches whose stored file is still needed (``uploaded`` or ``planned``)."""
+        statement = self._scoped_select().where(ImportBatch.status.in_(("uploaded", "planned")))
+        return list(self._session.scalars(statement))
+
     def expired_before(self, cutoff: datetime) -> list[ImportBatch]:
         statement = self._scoped_select().where(
             and_(

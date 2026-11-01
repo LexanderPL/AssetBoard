@@ -388,10 +388,13 @@ msgstr ""
 msgid "Edited transactions"
 msgstr ""
 
-msgid "Transactions kept"
+msgid "Planned values kept"
 msgstr ""
 
-msgid "Categories to archive"
+msgid "Categories deleted"
+msgstr ""
+
+msgid "Categories archived"
 msgstr ""
 
 msgid "Duplicates skipped"
@@ -757,7 +760,13 @@ msgstr ""
 msgid "The file row count does not match the manifest."
 msgstr ""
 
+msgid "The CSV delimiter option is invalid."
+msgstr ""
+
 msgid "The stored upload no longer matches its checksum."
+msgstr ""
+
+msgid "The stored upload is missing; upload the file again."
 msgstr ""
 
 msgid "The upload expired after 24 hours and was removed."
@@ -766,13 +775,34 @@ msgstr ""
 msgid "Import planning exceeded 60 seconds."
 msgstr ""
 
+msgid "Other imports are being checked; try again in a minute."
+msgstr ""
+
 msgid "Import planning failed."
 msgstr ""
 
-msgid "The file could not be validated."
+msgid "Already imported."
 msgstr ""
 
-msgid "The CSV delimiter option is invalid."
+msgid "Imported before and deleted; it is not brought back."
+msgstr ""
+
+msgid "Changed since the export; the stored row is kept."
+msgstr ""
+
+msgid "The same row appears earlier in this file."
+msgstr ""
+
+msgid "An earlier row of this file sets another value; it is kept."
+msgstr ""
+
+msgid "The same planned value already exists."
+msgstr ""
+
+msgid "A different planned value exists; the stored value is kept."
+msgstr ""
+
+msgid "The month is closed."
 msgstr ""
 
 #, python-format
@@ -4627,6 +4657,9 @@ msgstr ""
 msgid "Totals by category"
 msgstr ""
 
+msgid "The file was checked, but there is no importer for this kind of file yet."
+msgstr ""
+
 msgid "Warnings"
 msgstr ""
 
@@ -4634,6 +4667,12 @@ msgid "Closed months"
 msgstr ""
 
 msgid "Errors"
+msgstr ""
+
+#, python-format
+msgid ""
+"%(count)s rows will be skipped; download the errors and skipped rows CSV "
+"for the list."
 msgstr ""
 
 msgid "This upload could not be planned. Download the errors CSV for details."
@@ -4681,6 +4720,25 @@ msgid "Transactions to remove"
 msgstr ""
 
 msgid "Budget lines to remove"
+msgstr ""
+
+msgid "Budget lines kept (changed since the import)"
+msgstr ""
+
+msgid "Categories to delete"
+msgstr ""
+
+msgid "Categories to archive"
+msgstr ""
+
+#, python-format
+msgid ""
+"%(count)s of the transactions were edited after the import; they are "
+"removed too."
+msgstr ""
+
+#, python-format
+msgid "Rollback is not possible while these months are closed: %(months)s"
 msgstr ""
 
 msgid "Confirm rollback"
@@ -5536,5 +5594,11 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Description contains"
+#~ msgstr ""
+
+#~ msgid "Transactions kept"
+#~ msgstr ""
+
+#~ msgid "The file could not be validated."
 #~ msgstr ""
 
