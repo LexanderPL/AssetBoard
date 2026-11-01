@@ -1337,12 +1337,6 @@ msgstr ""
 msgid "This category no longer exists. It may have been deleted elsewhere."
 msgstr ""
 
-msgid "Month closed."
-msgstr ""
-
-msgid "Month reopened."
-msgstr ""
-
 msgid "This month was already closed."
 msgstr ""
 
@@ -1525,12 +1519,6 @@ msgid "Withdrawn from savings"
 msgstr ""
 
 msgid "Transfers (not counted)"
-msgstr ""
-
-msgid "Money out"
-msgstr ""
-
-msgid "Money in"
 msgstr ""
 
 msgid "A planned value cannot be negative."
@@ -3442,6 +3430,9 @@ msgstr ""
 msgid "Planned for %(name)s"
 msgstr ""
 
+msgid "No plan"
+msgstr ""
+
 msgid "not counted"
 msgstr ""
 
@@ -3616,24 +3607,30 @@ msgid_plural "%(num)d planned values of archived or transfer categories were not
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Summary"
-msgstr ""
-
-msgid "Show pending"
-msgstr ""
-
 msgid "Actual"
 msgstr ""
 
 msgid "Difference"
 msgstr ""
 
-msgid ""
-"Enter or leaving the field saves a planned value; 0 or an empty field "
-"removes it. Esc restores the saved value."
+msgid "Summary"
+msgstr ""
+
+msgid "Show pending"
 msgstr ""
 
 msgid "Add categories to plan this month."
+msgstr ""
+
+msgid "Out: expenses and saved / invested"
+msgstr ""
+
+msgid "In: income and withdrawn from savings"
+msgstr ""
+
+msgid ""
+"Enter or leaving the field saves a planned value; 0 or an empty field "
+"removes it. Esc restores the saved value."
 msgstr ""
 
 msgid "Closed"
@@ -5239,5 +5236,17 @@ msgstr ""
 #~ "so deleting an item with history "
 #~ "archives it instead. Dates in closed "
 #~ "months never change."
+#~ msgstr ""
+
+#~ msgid "Month closed."
+#~ msgstr ""
+
+#~ msgid "Month reopened."
+#~ msgstr ""
+
+#~ msgid "Money out"
+#~ msgstr ""
+
+#~ msgid "Money in"
 #~ msgstr ""
 

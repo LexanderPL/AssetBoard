@@ -1423,12 +1423,6 @@ msgstr ""
 msgid "This category no longer exists. It may have been deleted elsewhere."
 msgstr "Ta kategoria już nie istnieje. Mogła zostać usunięta gdzie indziej."
 
-msgid "Month closed."
-msgstr "Miesiąc zamknięty."
-
-msgid "Month reopened."
-msgstr "Miesiąc otwarty ponownie."
-
 msgid "This month was already closed."
 msgstr "Ten miesiąc był już zamknięty."
 
@@ -1632,12 +1626,6 @@ msgstr "Wypłacone z oszczędności"
 
 msgid "Transfers (not counted)"
 msgstr "Przelewy własne (nieliczone)"
-
-msgid "Money out"
-msgstr "Wydane i odłożone"
-
-msgid "Money in"
-msgstr "Wpływy"
 
 msgid "A planned value cannot be negative."
 msgstr "Wartość planowana nie może być ujemna."
@@ -3734,6 +3722,9 @@ msgstr "Pokaż tylko wpisy: %(name)s"
 msgid "Planned for %(name)s"
 msgstr "Plan dla: %(name)s"
 
+msgid "No plan"
+msgstr "Brak planu"
+
 msgid "not counted"
 msgstr "nieliczone"
 
@@ -3934,17 +3925,26 @@ msgstr[2] ""
 "Nie skopiowano %(num)d wartości planowanych kategorii zarchiwizowanych "
 "lub przelewów własnych."
 
+msgid "Actual"
+msgstr "Wykonanie"
+
+msgid "Difference"
+msgstr "Różnica"
+
 msgid "Summary"
 msgstr "Podsumowanie"
 
 msgid "Show pending"
 msgstr "Pokaż oczekujące"
 
-msgid "Actual"
-msgstr "Wykonanie"
+msgid "Add categories to plan this month."
+msgstr "Dodaj kategorie, aby zaplanować ten miesiąc."
 
-msgid "Difference"
-msgstr "Różnica"
+msgid "Out: expenses and saved / invested"
+msgstr "Wydane i odłożone: wydatki oraz zaoszczędzone / zainwestowane"
+
+msgid "In: income and withdrawn from savings"
+msgstr "Wpływy: przychody oraz wypłacone z oszczędności"
 
 msgid ""
 "Enter or leaving the field saves a planned value; 0 or an empty field "
@@ -3952,9 +3952,6 @@ msgid ""
 msgstr ""
 "Enter lub opuszczenie pola zapisuje wartość planowaną; 0 lub puste pole "
 "ją usuwa. Esc przywraca zapisaną wartość."
-
-msgid "Add categories to plan this month."
-msgstr "Dodaj kategorie, aby zaplanować ten miesiąc."
 
 msgid "Closed"
 msgstr "Zamknięty"
@@ -5486,4 +5483,16 @@ msgstr "Usuń obszar roboczy…"
 #~ "historią ją archiwizuje. Terminy w "
 #~ "zamkniętych miesiącach nigdy się nie "
 #~ "zmieniają."
+
+#~ msgid "Month closed."
+#~ msgstr "Miesiąc zamknięty."
+
+#~ msgid "Month reopened."
+#~ msgstr "Miesiąc otwarty ponownie."
+
+#~ msgid "Money out"
+#~ msgstr "Wydane i odłożone"
+
+#~ msgid "Money in"
+#~ msgstr "Wpływy"
 

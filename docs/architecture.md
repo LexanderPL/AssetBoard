@@ -32,7 +32,11 @@ whose rows stack on a phone) and `sheet-flush` drops the grid's outer edge insid
 already draws it. A form field that is a table cell (the Transactions entry and edit rows, the
 Month page's plan inputs, the Income page's inline edit) adds `cell-input` to `form-control` or
 `form-select` and sits in a `cell-edit` cell: no border of its own, a light wash on hover and an
-outline in the link colour on focus. Action cells with buttons use `cell-tight`.
+outline in the link colour on focus. Action cells with buttons use `cell-tight`; a button that
+is the cell (the Transactions entry rows' Add) is a `cell-button` in a `cell-edit` cell:
+square, as tall as a `cell-input`, in the primary colour. Every category `<select>` takes its
+options from `categories/_macros.html` `category_options`, one `<optgroup>` per kind, so a
+kind is a divider, never an option.
 
 ## Workspaces, Context and roles
 

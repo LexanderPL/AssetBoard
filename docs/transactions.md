@@ -14,8 +14,8 @@ longer be changed.
 
 ## Adding entries
 
-Editors and owners see an empty **entry row** at the bottom of each table. Type into it the way
-you would type into a spreadsheet:
+Editors and owners see an empty **entry row** at the bottom of each table, ending in an **Add**
+button that fills its cell. Type into it the way you would type into a spreadsheet:
 
 1. **Day**: the day of the month you are looking at (`7`), or a full date (`2026-10-07` or
    `07.10.2026`). A full date in another month is saved to that month; the page says so and
@@ -24,7 +24,9 @@ you would type into a spreadsheet:
    `1 234,56`. It must be greater than zero, with no more decimal places than the currency has.
 3. **Description** (optional, up to 200 characters).
 4. **Category**: only the active categories of the table's kind are offered (expense categories
-   in the Expenses table, income categories in the Income table).
+   in the Expenses table, income categories in the Income table), under the heading "Expense
+   categories" or "Income categories". As everywhere in the app, such a heading only groups the
+   list and cannot be chosen.
 
 An entry dated after today is not posted yet: the button reads **Plan**, and saving creates a
 one-time recurring item with one pending occurrence (see [Recurring items](recurring.md)). A
