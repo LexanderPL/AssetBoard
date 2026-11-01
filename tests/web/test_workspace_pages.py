@@ -24,9 +24,17 @@ NO_PERMISSION = "You do not have permission to view this page."
 
 
 def _switcher_options(html: str) -> list[str]:
-    match = re.search(r"<select id=\"workspace-switcher\".*?</select>", html, re.DOTALL)
-    assert match is not None, "no switcher"
-    return re.findall(r">([^<]+)</option>", match.group(0))
+    """The workspaces in the user menu's switcher, the current one marked with "*"."""
+    start = html.index("data-workspace-switcher")
+    switcher = html[start : html.index("</div>", start)]
+    options = []
+    for current, name in re.findall(
+        r"data-workspace-choice=\"[^\"]+\"( data-workspace-choice-current)?>"
+        r"(?:<span class=\"truncate\">)?([^<]+)<",
+        switcher,
+    ):
+        options.append(f"{name}*" if current else name)
+    return options
 
 
 # Switcher
@@ -41,8 +49,10 @@ def test_switcher_appears_only_with_several_workspaces(owner: OwnerApp) -> None:
     owner.join(owner.admin_id, second, "viewer")
     page = owner.client.get("/").text
     assert "data-workspace-switcher" in page
-    assert _switcher_options(page) == ["Home", "Second"]
-    assert re.search(r'<option value="[^"]+" selected>Home</option>', page)
+    assert _switcher_options(page) == ["Home*", "Second"]
+    # The current workspace is marked; the others are POST forms to the switch route.
+    assert 'aria-current="true" data-workspace-choice=' in page
+    assert page.count('action="/workspace/switch"') == 1
 
 
 def test_switching_workspace_changes_the_context(owner: OwnerApp) -> None:
@@ -52,7 +62,7 @@ def test_switching_workspace_changes_the_context(owner: OwnerApp) -> None:
     assert (response.status_code, response.headers["location"]) == (303, "/")
     page = owner.client.get("/").text
     assert "data-current-workspace>Second<" in page
-    assert re.search(r'<option value="[^"]+" selected>Second</option>', page)
+    assert _switcher_options(page) == ["Home", "Second*"]
     assert "data-owner-link" not in page  # viewer in Second
 
 

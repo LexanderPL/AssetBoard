@@ -157,6 +157,19 @@ retried by the next daily run. Keep one worker, as for recurring generation.
   channel after `ASSETBOARD_NOTIFICATION_TICK_SECONDS`. Failures are logged with identifiers
   and an error code (`notification_delivery_failed`), never the URL or the service's reply.
 
+### Update check
+
+AssetBoard makes no outgoing request on its own. The one exception is opt-in: with **Check for
+updates** turned on under **Instance settings** (off by default), the scheduler sends one HTTPS
+GET a day (and one shortly after turning it on) to
+`https://api.github.com/repos/LexanderPL/AssetBoard/releases/latest`, with a 5 second timeout
+and only `User-Agent: AssetBoard`: no cookies, token, instance address, version or user data.
+GitHub sees the server's IP address. Instance administrators then see "Update available" in the
+sidebar when a newer release exists. A failure (no egress, rate limit, malformed answer) is
+logged at INFO as `update_check_failed reason=...` and retried the next day; pages are never
+affected. It needs the scheduler (`ASSETBOARD_SCHEDULER_ENABLED`, on by default). See
+[ADR-0023](adr/0023-opt-in-update-check.md).
+
 ### Invitations
 
 Workspace owners add people from **Members** with an invitation link. AssetBoard does not email
@@ -383,6 +396,16 @@ when you intend to upload the image and its release tags.
 
 ## Upgrading
 
+### Unreleased: opt-in update check and account menu (ADR-0023)
+
+- Migration `0030_update_check` adds **Check for updates** to the instance settings, **off by
+  default** (also for existing instances). When an instance administrator turns it on, the
+  application asks the GitHub releases API once a day for the latest release (see
+  [Update check](#update-check)). No environment variable.
+- The account menu moved to the top right of each page and now also holds the workspace
+  switch; the page header shows the current workspace's name. The sidebar footer shows the
+  running version.
+
 ### Unreleased: tax kinds, Taxes switch and other taxes (ADR-0022)
 
 - Migration `0028_taxes_redesign` replaces each tax rule's effect and each income source's
@@ -440,7 +463,7 @@ when you intend to upload the image and its release tags.
 
 - Migration `0013_instance_settings` adds the `instance_settings` table with one row. Any
   signed-in account can now create a workspace from the "No workspace" page or "New workspace"
-  next to the workspace name. Instance administrators turn this off under **Instance settings**
+  in the account menu. Instance administrators turn this off under **Instance settings**
   (account menu); it is on by default, also for existing instances. No environment variable.
 
 ### Unreleased: new workspaces start with the suggested categories (pre-release A)
