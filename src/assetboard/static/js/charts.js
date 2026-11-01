@@ -1,9 +1,10 @@
 // The category donuts (F2.7). Every [data-chart="donut"] element holds its data in a
 // <script type="application/json"> block (amounts in minor units with labels formatted by the
 // server) and a table. With ECharts available the chart is drawn in [data-chart-canvas] and the
-// table becomes screen-reader-only; otherwise the table stays visible. Colours come from the CSS
-// colour tokens (read at runtime), slices from the category colour. Charts re-render when the
-// light/dark theme changes (the "dark" class on <html>) and on resize. CSP-safe: no eval, no
+// table becomes screen-reader-only; otherwise the table stays visible. The legend is HTML under
+// the chart ([data-chart-legend], shown with it), so it wraps onto several lines. Colours come
+// from the CSS colour tokens (read at runtime), slices from the category colour. Charts re-render
+// when the light/dark theme changes (the "dark" class on <html>) and on resize. CSP-safe: no eval, no
 // style attributes in markup, and the tooltip is drawn on the canvas (renderMode "richText").
 (() => {
   "use strict";
@@ -29,7 +30,6 @@
 
   function options(data) {
     const ink = token("ink");
-    const muted = token("muted");
     const surface = token("surface");
     const line = token("line");
     const other = token("line-strong");
@@ -52,20 +52,11 @@
         textStyle: { color: ink },
         formatter: (params) => `${params.data.name}\n${params.data.amount} (${params.data.share})`,
       },
-      legend: {
-        type: "scroll",
-        orient: "horizontal",
-        bottom: 0,
-        textStyle: { color: muted },
-        pageTextStyle: { color: muted },
-        pageIconColor: ink,
-        pageIconInactiveColor: line,
-      },
       series: [
         {
           type: "pie",
-          radius: ["48%", "72%"],
-          center: ["50%", "44%"],
+          radius: ["50%", "86%"],
+          center: ["50%", "50%"],
           avoidLabelOverlap: true,
           label: { show: false },
           labelLine: { show: false },
@@ -90,6 +81,8 @@
     const data = readData(element);
     if (!echarts || !canvas || !data || !Array.isArray(data.slices)) return;
     canvas.hidden = false;
+    const legend = element.querySelector("[data-chart-legend]");
+    if (legend) legend.hidden = false;
     element.querySelector("[data-chart-table]")?.classList.add("sr-only");
     let chart = charts.get(element);
     if (!chart) {

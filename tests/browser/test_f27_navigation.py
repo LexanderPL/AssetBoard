@@ -34,9 +34,9 @@ document.addEventListener("securitypolicyviolation", (event) => {
 """
 PASSWORD = "Correct Horse Battery!"
 XSS = "<img src=x onerror=alert(1)>"
-LEGEND_COLOUR_CHANGED = """colour => {
+CHART_COLOUR_CHANGED = """colour => {
   const el = document.querySelector('[data-donut="expense"] [data-chart-canvas]');
-  return window.echarts.getInstanceByDom(el).getOption().legend[0].textStyle.color !== colour;
+  return window.echarts.getInstanceByDom(el).getOption().series[0].itemStyle.borderColor !== colour;
 }"""
 
 
@@ -52,13 +52,13 @@ def _add(page: Page, direction: str, day: str, amount: str, label: str, text: st
 
 
 def _chart_colours(page: Page) -> list[str]:
-    """The colours the tooltip and legend use (read from the tokens at draw time)."""
+    """The colours the slice borders and the tooltip use (read from the tokens at draw time)."""
     return page.evaluate(
         """() => {
           const el = document.querySelector('[data-donut="expense"] [data-chart-canvas]');
           const chart = window.echarts.getInstanceByDom(el);
           const option = chart.getOption();
-          return [option.legend[0].textStyle.color, option.tooltip[0].backgroundColor];
+          return [option.series[0].itemStyle.borderColor, option.tooltip[0].backgroundColor];
         }"""
     )
 
@@ -165,6 +165,16 @@ def test_f27_navigation_in_a_browser(tmp_path: Path) -> None:
                     "aria-hidden", "true"
                 )
                 expect(donut.locator("[data-chart-table]")).to_have_class(re.compile("sr-only"))
+                # The legend is HTML under the chart: shown with it, wrapping, never paged.
+                expect(donut.locator("[data-chart-legend]")).to_be_visible()
+                expect(donut.locator("[data-chart-legend]")).to_have_attribute(
+                    "aria-hidden", "true"
+                )
+                box = donut.locator("[data-chart-canvas]").bounding_box()
+                assert box is not None and box["height"] >= 300  # taller than before (256)
+            legend = page.locator("[data-donut='expense'] [data-chart-legend-item]")
+            expect(legend).to_have_count(2)
+            expect(legend.first).to_contain_text("Food")
             expect(page.locator("[data-donut='expense'] [data-chart-row]")).to_have_count(2)
             expect(page.locator("[data-donut='expense'] [data-chart-row]").first).to_contain_text(
                 "Food"
@@ -184,7 +194,7 @@ def test_f27_navigation_in_a_browser(tmp_path: Path) -> None:
             light = _chart_colours(page)
             page.locator("[data-theme-toggle]").click()
             expect(page.locator("html")).to_have_class(re.compile(r"\bdark\b"))
-            page.wait_for_function(LEGEND_COLOUR_CHANGED, arg=light[0])
+            page.wait_for_function(CHART_COLOUR_CHANGED, arg=light[0])
             assert _chart_colours(page) != light  # redrawn with the dark tokens
             page.locator("[data-theme-toggle]").click()
 
