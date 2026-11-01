@@ -214,7 +214,7 @@
      through; a light wash on hover and an inset outline in the primary colour on focus. Use it
      with form-control or form-select (which draws the chevron). */
   .cell-input {
-    @apply block w-full rounded-none border-0 bg-transparent px-2 py-1.5 shadow-none hover:bg-ink/5 focus:bg-field focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-primary focus:ring-0;
+    @apply block w-full rounded-none border-0 bg-transparent px-2 py-1.5 shadow-none hover:bg-ink/5 focus:bg-field focus:outline focus:outline-2 focus:-outline-offset-2 focus:outline-primary-ink focus:ring-0;
   }
 
   .cell-input.form-select {
