@@ -70,8 +70,14 @@ def _(message: str) -> str:
     return message
 
 
-# Generated tax payments are named in the workspace language, as the seeded categories are.
-TAX_PAYMENT_LABEL = _("%(name)s tax payment")
+# Generated tax payments are named in the workspace language, as the seeded categories are:
+# the tax rule's name, then the income source's ("PIT: Company").
+TAX_PAYMENT_LABEL = _("%(tax)s: %(source)s")
+
+
+def tax_payment_label(locale: str, tax: str, source: str) -> str:
+    """The label of a generated tax payment, in the workspace language."""
+    return gettext(TAX_PAYMENT_LABEL, locale) % {"tax": tax, "source": source}
 
 
 class IncomeError(Exception):
@@ -351,7 +357,10 @@ def _sync_children(
 ) -> None:
     selected, _missing = _tax_lines(session, scope, source, due)
     locale = CurrentWorkspaceRepository(session, scope).get().locale
-    label = gettext(TAX_PAYMENT_LABEL, locale) % {"name": source.name}
+    labels = {
+        line.attachment.id: tax_payment_label(locale, line.rule.name, source.name)
+        for line in selected
+    }
     breakdown = _calculate_breakdown(net, [line.tax for line in selected])
     amounts: dict[str, int] = {}
     for line in (*breakdown.added, *breakdown.deducted):
@@ -400,7 +409,7 @@ def _sync_children(
         child.expected_minor = amount
         child.currency = source.currency
         child.amount_state = "confirmed"
-        child.label = label
+        child.label = labels[attachment_id]
     for attachment_id, (category_id, amount, due_date) in wanted.items():
         if YearMonth.from_date(due_date) in closed_months:
             continue
@@ -419,7 +428,7 @@ def _sync_children(
             amount_state="confirmed",
             status="pending",
             generated_by="tax",
-            label=label,
+            label=labels[attachment_id],
         )
 
 
@@ -996,6 +1005,25 @@ def _resync_tax_months(session: Session, ctx: Context, source: IncomeSource) -> 
     )
     for work_month in sorted(months):
         _sync_work_month(session, ctx, ctx.clock, source, work_month, allow_past=True)
+    _relabel_tax_payments(session, ctx, source)
+
+
+def _relabel_tax_payments(session: Session, scope: WorkspaceScope, source: IncomeSource) -> None:
+    """Give every pending tax payment of ``source`` (in an open month) the current label, also
+    when its income was already received and so is not recalculated (a renamed tax rule or
+    source, or an upgrade that changed the label). Posted payments keep their description."""
+    locale = CurrentWorkspaceRepository(session, scope).get().locale
+    rules = TaxRuleRepository(session, scope)
+    occurrences = ScheduledOccurrenceRepository(session, scope)
+    closed_months = MonthStateRepository(session, scope).closed_months()
+    for attachment in IncomeSourceTaxRuleRepository(session, scope).for_source(source.id):
+        rule = rules.get_or_raise(attachment.tax_rule_id)
+        label = tax_payment_label(locale, rule.name, source.name)
+        for child in occurrences.for_tax_attachment(attachment.id):
+            if child.status != "pending" or YearMonth.from_date(child.due_date) in closed_months:
+                continue
+            if child.label != label:
+                child.label = label
 
 
 def resync_sources_with_rule(session: Session, ctx: Context, tax_rule_id: UUID) -> None:
@@ -1025,6 +1053,7 @@ def resync_pending_income(
                         session, scope, clock, source, occurrence.work_month, allow_past=True
                     )
                     count += 1
+            _relabel_tax_payments(session, scope, source)
         return count
 
     return run_immediate(factory, write)

@@ -332,6 +332,20 @@ pending"** (`data-pending-toggle`): it hides every part marked `data-pending` (l
 bar parts, the pending flow bar) and shows the confirmed-only flow bar (`data-pending-off`).
 It is kept in browser storage under `pending`; the older `forecast` key is read once, copied to
 `pending` and removed. Home is unchanged (follow-up).
+
+**In and Out (owner, 2026-10-31):** the Month summary's figures are In (earned + withdrawn) and
+Out (spent + saved / invested), with a strip of where the money came from above the flow bar;
+see F2.4 in M2. The pending wording is "Out A (+ C pending) of B planned", so the pending part
+never reads as part of the plan.
+
+**Tax payment labels (owner, 2026-10-31):** a planned tax payment of an income source is
+labelled "<tax rule>: <income source>" (`services.income.TAX_PAYMENT_LABEL`,
+`"%(tax)s: %(source)s"`, e.g. "PIT: Company"), in the workspace language; it was "<source> tax
+payment". Every pending tax payment in an open month gets the current label when its income is
+recalculated, after a tax rule or its attachment changes (a renamed rule included), and at
+startup (`resync_pending_income`), also when the income itself was already received and so is
+not recalculated. Posted payments keep the description stored with their transaction. Other
+taxes (`scheduled_items.is_tax`) keep their own names.
 - The banner reads "Enter days worked for <work month> for <source>." and links to the income
   source. It is shown for the viewed month only: the relevant work month is the viewed month
   minus the source's pay lag.

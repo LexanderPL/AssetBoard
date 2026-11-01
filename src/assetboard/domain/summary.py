@@ -19,8 +19,13 @@ saved ``actual - planned`` (saved more than planned), withdrawn ``planned - actu
 ``savings_rate = saved / earned`` (owner, 2026-10-24: what went to savings and investments, as a
 share of earnings; money merely left over is "left", not saved) in basis points (and, for
 display, in tenths of a percent, each rounded once from the exact ratio, half up), ``None``
-when earned is 0. The page draws
+when earned is 0. Home draws
 them as one flow bar (``flow_bar``): earned split into spent, saved / invested and left (net).
+
+**Out and In** (owner, 2026-10-31; the Month page): Out = spent + saved / invested, In = earned
++ withdrawn from savings, and left = In - Out ("short by" when negative). The Month page draws
+them as ``in_out_flow``: a thin strip of where the money came from (earned, withdrawn) above a
+bar of how it was used (spent, saved / invested, left), on one scale.
 """
 
 from __future__ import annotations
@@ -207,36 +212,46 @@ def flow_bar(earned: int, spent: int, saved: int, scale: int = FLOW_SCALE) -> Fl
     )
 
 
-@dataclass(frozen=True, slots=True)
-class PendingFlowBar:
-    """The flow bar with the month's pending amounts (Month page, "Plan and Actual" redesign).
+FlowSegment = tuple[str, int, int]  # (key, start, end), end > start
 
-    Each series is confirmed (solid) then pending (striped): spent ``[0, spent_end)`` and
-    ``[spent_end, spent_pending_end)``, saved / invested ``[spent_pending_end, saved_end)`` and
-    ``[saved_end, out_end)``. Left is what earnings cover beyond everything spent and saved,
-    pending included: solid while confirmed earnings cover it (``[out_end, earned_end)``),
-    striped for the part that needs pending income (up to ``forecast_earned_end``). When
-    everything spent and saved exceeds everything earned, the part beyond
-    ``forecast_earned_end`` is the overspend. The scale is ``max(earned + pending earned,
-    spent + pending spent + saved + pending saved)``; each position is floored once from the
-    exact cumulative ratio, so the segments tile without gaps.
+
+@dataclass(frozen=True, slots=True)
+class InOutFlow:
+    """The Month page's flow (owner, 2026-10-31, "option A"): a thin strip of where the money
+    came from above the bar of how it was used, on one scale.
+
+    Positions are on ``0..scale_end`` (``FLOW_SCALE``, or 0 when there is nothing to draw); the
+    scale is ``max(In, Out)`` with pending amounts included (In = earned + withdrawn, Out =
+    spent + saved). The **strip**: earned ``[0, earned_end)`` then its pending part up to
+    ``earned_pending_end``, withdrawn from savings up to ``withdrawn_end`` then its pending part
+    up to ``in_end``, and, when Out exceeds In, the shortfall ``[in_end, scale_end)``. The
+    **bar**: spent ``[0, spent_end)`` then pending up to ``spent_pending_end``, saved / invested
+    up to ``saved_end`` then pending up to ``out_end``, and left (what In covers beyond Out):
+    solid while confirmed money in covers it (up to ``left_end``), striped for the part that
+    needs pending money in (up to ``in_end``). So the strip totals In, the bar totals Out + left,
+    and both end at ``scale_end`` when In >= Out. Each position is floored once from the exact
+    cumulative ratio, so the segments tile without gaps.
     """
 
+    earned_end: int
+    earned_pending_end: int
+    withdrawn_end: int
+    in_end: int
     spent_end: int
     spent_pending_end: int
     saved_end: int
     out_end: int
-    earned_end: int
-    forecast_earned_end: int
+    confirmed_in_end: int  # earned + withdrawn without pending, on the same scale
+    scale_end: int
 
     @property
     def empty(self) -> bool:
-        return self.out_end == 0 and self.forecast_earned_end == 0
+        return self.scale_end == 0
 
     @property
     def left_end(self) -> int:
         """The end of the solid "left" segment (it starts at ``out_end``)."""
-        return max(self.out_end, min(self.earned_end, self.forecast_earned_end))
+        return max(self.out_end, min(self.confirmed_in_end, self.in_end))
 
     @property
     def left(self) -> int:
@@ -244,43 +259,75 @@ class PendingFlowBar:
 
     @property
     def left_pending(self) -> int:
-        return max(self.forecast_earned_end - self.left_end, 0)
+        return max(self.in_end - self.left_end, 0)
 
     @property
-    def overspent(self) -> int:
-        return max(self.out_end - self.forecast_earned_end, 0)
+    def short(self) -> int:
+        """Out beyond In: the dashed end of the strip."""
+        return max(self.out_end - self.in_end, 0)
+
+    def strip_segments(self) -> tuple[FlowSegment, ...]:
+        """Where the money came from, left to right (empty segments left out)."""
+        parts = (
+            ("earned", 0, self.earned_end),
+            ("earned-pending", self.earned_end, self.earned_pending_end),
+            ("withdrawn", self.earned_pending_end, self.withdrawn_end),
+            ("withdrawn-pending", self.withdrawn_end, self.in_end),
+            ("short", self.in_end, self.in_end + self.short),
+        )
+        return tuple(part for part in parts if part[2] > part[1])
+
+    def bar_segments(self) -> tuple[FlowSegment, ...]:
+        """How the money was used, left to right (empty segments left out)."""
+        parts = (
+            ("spent", 0, self.spent_end),
+            ("spent-pending", self.spent_end, self.spent_pending_end),
+            ("saved", self.spent_pending_end, self.saved_end),
+            ("saved-pending", self.saved_end, self.out_end),
+            ("left", self.out_end, self.left_end),
+            ("left-pending", self.left_end, self.left_end + self.left_pending),
+        )
+        return tuple(part for part in parts if part[2] > part[1])
 
 
-def pending_flow_bar(
+def in_out_flow(
+    *,
     earned: int,
+    withdrawn: int,
     spent: int,
     saved: int,
-    *,
-    earned_pending: int,
-    spent_pending: int,
-    saved_pending: int,
+    earned_pending: int = 0,
+    withdrawn_pending: int = 0,
+    spent_pending: int = 0,
+    saved_pending: int = 0,
     scale: int = FLOW_SCALE,
-) -> PendingFlowBar:
-    """The flow bar with pending amounts (minor units in; see ``PendingFlowBar``). Negative
-    amounts draw nothing."""
-    earned, spent, saved = max(earned, 0), max(spent, 0), max(saved, 0)
-    earned_pending = max(earned_pending, 0)
-    spent_pending, saved_pending = max(spent_pending, 0), max(saved_pending, 0)
-    out = spent + spent_pending + saved + saved_pending
-    whole = max(earned + earned_pending, out)
+) -> InOutFlow:
+    """The Month page's flow (minor units in; see ``InOutFlow``). Negative amounts draw
+    nothing; without pending amounts it is the confirmed-only flow."""
+    earned, withdrawn, spent, saved = (max(v, 0) for v in (earned, withdrawn, spent, saved))
+    earned_pending, withdrawn_pending, spent_pending, saved_pending = (
+        max(v, 0) for v in (earned_pending, withdrawn_pending, spent_pending, saved_pending)
+    )
+    total_in = earned + earned_pending + withdrawn + withdrawn_pending
+    total_out = spent + spent_pending + saved + saved_pending
+    whole = max(total_in, total_out)
     if whole == 0:
-        return PendingFlowBar(0, 0, 0, 0, 0, 0)
+        return InOutFlow(0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
     def position(amount: int) -> int:
         return amount * scale // whole
 
-    return PendingFlowBar(
+    return InOutFlow(
+        earned_end=position(earned),
+        earned_pending_end=position(earned + earned_pending),
+        withdrawn_end=position(earned + earned_pending + withdrawn),
+        in_end=position(total_in),
         spent_end=position(spent),
         spent_pending_end=position(spent + spent_pending),
         saved_end=position(spent + spent_pending + saved),
-        out_end=position(out),
-        earned_end=position(earned),
-        forecast_earned_end=position(earned + earned_pending),
+        out_end=position(total_out),
+        confirmed_in_end=position(earned + withdrawn),
+        scale_end=scale,
     )
 
 

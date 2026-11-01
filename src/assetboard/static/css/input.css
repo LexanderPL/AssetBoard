@@ -33,6 +33,7 @@
     --color-success-shade-1: 238 248 238; /* #eef8ee */
     --color-success-shade-2: 229 244 230; /* #e5f4e6 */
     --color-success-shade-3: 221 241 221; /* #ddf1dd */
+    --color-withdrawn: 0 137 123; /* #00897b Month flow strip: withdrawn from savings (fills only) */
     --color-danger: 198 40 40; /* #c62828 expense, errors */
     --color-danger-soft: 255 235 238; /* #ffebee */
     --color-danger-strong: 183 28 28; /* #b71c1c */
@@ -74,6 +75,7 @@
     --color-success-shade-1: 26 40 28; /* #1a281c */
     --color-success-shade-2: 26 46 29; /* #1a2e1d */
     --color-success-shade-3: 25 52 29; /* #19341d */
+    --color-withdrawn: 77 182 172; /* #4db6ac */
     --color-danger: 239 154 154; /* #ef9a9a */
     --color-danger-soft: 59 20 22; /* #3b1416 */
     --color-danger-strong: 255 205 210; /* #ffcdd2 */
