@@ -1,9 +1,18 @@
-{# The month summary (#month-summary, F2.3 part B and F2.4): the KPI flow bar, planned-vs-actual bars,
-   and per category the plan (editable inline), actual (with "+ X pending" under it, F3.5)
-   and difference, with a totals row per group (months/_plan.html). ``summary`` is web.plan.SummaryView
+{# The month summary (#month-summary, F2.3 part B and F2.4): In and Out (the flow strip and bar), the
+   Out and In planned-vs-actual bars, and per category the plan (editable inline), actual (with
+   "+ X pending" under it, F3.5) and difference, with a totals row per group, in two blocks:
+   "Money out" (expenses, saved / invested; total Out) and "Money in" (income, withdrawn from
+   savings; total In), then the plan-only transfers (months/_plan.html). ``summary`` is web.plan.SummaryView
    (web.plan.summary_context). Every transaction write sends this block out of band
    (``summary_oob``); app.js keeps a half-typed planned value and its focus across that swap. #}
-{% from "months/_plan.html" import plan_row, totals_row, banner, kpis, sort_toggle, copied_text, skipped_text with context %}
+{% from "months/_plan.html" import plan_row, totals_row, block_total_row, banner, in_out, sort_toggle, copied_text, skipped_text with context %}
+{% macro group_body(g) -%}
+<tbody class="divide-y divide-line" data-plan-group="{{ g.key }}">
+  <tr><th scope="rowgroup" colspan="4" class="pb-1 pl-2 pt-4 text-left text-xs font-semibold uppercase tracking-wide text-muted">{{ g.heading }}</th></tr>
+  {% for r in g.rows %}{{ plan_row(r, plan_only=g.totals is none) }}{% endfor %}
+  {% if g.totals %}{{ totals_row(g) }}{% endif %}
+</tbody>
+{%- endmacro %}
 <section id="month-summary" class="panel p-4 sm:p-6" aria-labelledby="month-summary-heading" data-month-summary{% if summary_oob %} hx-swap-oob="outerHTML"{% endif %}>
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h2 id="month-summary-heading" class="text-base font-semibold">{{ _("Summary") }}</h2>
@@ -21,7 +30,7 @@
   </div>
   {% endif %}
   {{ banner() }}
-  {{ kpis(pending=true) }}
+  {{ in_out() }}
   {% if summary.groups %}
   {# relative: the sr-only texts in the table are absolutely positioned, so the scroll box must
      be their containing block, or they widen the page at phone width. #}
@@ -35,13 +44,16 @@
           <th scope="col" class="w-36 py-2 pr-2 text-right font-medium">{{ _("Difference") }}</th>
         </tr>
       </thead>
-      {% for g in summary.groups %}
-      <tbody class="divide-y divide-line" data-plan-group="{{ g.key }}">
-        <tr><th scope="rowgroup" colspan="4" class="pb-1 pl-2 pt-4 text-left text-xs font-semibold uppercase tracking-wide text-muted">{{ g.heading }}</th></tr>
-        {% for r in g.rows %}{{ plan_row(r, plan_only=g.totals is none) }}{% endfor %}
-        {% if g.totals %}{{ totals_row(g) }}{% endif %}
+      {# Two blocks with a coloured top rule and marker (red: money out, green: money in). #}
+      {% for b in summary.money_blocks %}
+      <tbody data-money-block="{{ b.key }}">
+        <tr><th scope="col" colspan="4" id="money-block-{{ b.key }}" class="border-t-2 {% if b.key == "out" %}border-danger/60{% else %}border-success/60{% endif %} pb-1 pl-2 {% if loop.first %}pt-3{% else %}pt-4{% endif %} text-left text-sm font-semibold"><span class="flex items-center gap-2"><span class="h-2.5 w-2.5 shrink-0 rounded-full {% if b.key == "out" %}bg-danger{% else %}bg-success{% endif %}" aria-hidden="true"></span>{{ b.heading }}</span></th></tr>
       </tbody>
+      {% for g in b.groups %}{{ group_body(g) }}{% endfor %}
+      <tbody data-money-block-total="{{ b.key }}">{{ block_total_row(b) }}</tbody>
+      {% if not loop.last %}<tbody aria-hidden="true"><tr><td colspan="4" class="h-6"></td></tr></tbody>{% endif %}
       {% endfor %}
+      {% for g in summary.groups if g.key == "transfer" %}{{ group_body(g) }}{% endfor %}
     </table>
   </div>
   {% if summary.can_write %}

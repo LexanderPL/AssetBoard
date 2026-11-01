@@ -665,8 +665,8 @@ msgid "Deleted workspaces"
 msgstr "Usunięte obszary robocze"
 
 #, python-format
-msgid "%(name)s tax payment"
-msgstr "%(name)s – płatność podatku"
+msgid "%(tax)s: %(source)s"
+msgstr "%(tax)s: %(source)s"
 
 #, python-format
 msgid "Confirm your email address for %(app)s"
@@ -1629,6 +1629,12 @@ msgstr "Wypłacone z oszczędności"
 
 msgid "Transfers (not counted)"
 msgstr "Przelewy własne (nieliczone)"
+
+msgid "Money out"
+msgstr "Wydane i odłożone"
+
+msgid "Money in"
+msgstr "Wpływy"
 
 msgid "A planned value cannot be negative."
 msgstr "Wartość planowana nie może być ujemna."
@@ -3723,11 +3729,11 @@ msgstr "nieliczone"
 msgid "Total"
 msgstr "Razem"
 
-msgid "Expected spent vs expected earned"
-msgstr "Oczekiwane wydatki a oczekiwane wpływy"
+msgid "Total money out"
+msgstr "Razem wydane i odłożone"
 
-msgid "Spent vs earned"
-msgstr "Wydane a zarobione"
+msgid "Total money in"
+msgstr "Razem wpływy"
 
 #, python-format
 msgid ""
@@ -3741,15 +3747,6 @@ msgstr ""
 msgid "Spending and saving exceed earnings by %(amount)s."
 msgstr "Wydatki i oszczędności przekraczają zarobki o %(amount)s."
 
-#, python-format
-msgid ""
-"Pending: earned %(earned)s, spent %(spent)s, saved or invested %(saved)s."
-" If everything pending arrives, left %(net)s."
-msgstr ""
-"Oczekujące: zarobione %(earned)s, wydane %(spent)s, zaoszczędzone lub "
-"zainwestowane %(saved)s. Jeśli wszystko oczekujące wpłynie, zostanie "
-"%(net)s."
-
 msgid "Earned"
 msgstr "Zarobione"
 
@@ -3760,15 +3757,8 @@ msgstr "Prognoza wydatków %(spent)s · prognoza przychodów %(earned)s."
 msgid "Spent"
 msgstr "Wydane"
 
-#, python-format
-msgid "%(amount)s if everything pending arrives"
-msgstr "%(amount)s, jeśli wszystko oczekujące wpłynie"
-
 msgid "Left"
 msgstr "Zostało"
-
-msgid "Striped: pending, not confirmed yet"
-msgstr "Paski: oczekujące, jeszcze niepotwierdzone"
 
 #, python-format
 msgid "Saved / invested %(rate)s of income"
@@ -3792,6 +3782,90 @@ msgstr "Zarobiono %(actual)s z zaplanowanych %(planned)s"
 
 msgid "(over plan)"
 msgstr "(ponad plan)"
+
+msgid "Expected in vs expected out"
+msgstr "Oczekiwane wpływy a wydane i odłożone"
+
+msgid "In vs out"
+msgstr "Wpływy a wydane i odłożone"
+
+#, python-format
+msgid "In %(total)s: earned %(earned)s, withdrawn from savings %(withdrawn)s."
+msgstr ""
+"Wpływy %(total)s: zarobiono %(earned)s, wypłacono z oszczędności "
+"%(withdrawn)s."
+
+#, python-format
+msgid "Out %(total)s: spent %(spent)s, saved or invested %(saved)s."
+msgstr ""
+"Wydane i odłożone %(total)s: wydano %(spent)s, zaoszczędzono lub "
+"zainwestowano %(saved)s."
+
+#, python-format
+msgid "Short by %(amount)s: more went out than came in."
+msgstr "Brakuje %(amount)s: wyszło więcej, niż wpłynęło."
+
+#, python-format
+msgid "Left %(amount)s."
+msgstr "Zostało %(amount)s."
+
+#, python-format
+msgid ""
+"Pending: in %(total_in)s (earned %(earned)s, withdrawn %(withdrawn)s), "
+"out %(total_out)s (spent %(spent)s, saved or invested %(saved)s)."
+msgstr ""
+"Oczekujące: wpływy %(total_in)s (zarobione %(earned)s, wypłacone "
+"%(withdrawn)s), wydane i odłożone %(total_out)s (wydane %(spent)s, "
+"zaoszczędzone lub zainwestowane %(saved)s)."
+
+#, python-format
+msgid "If everything pending arrives, short by %(amount)s."
+msgstr "Jeśli wszystko oczekujące wpłynie, zabraknie %(amount)s."
+
+#, python-format
+msgid "If everything pending arrives, left %(amount)s."
+msgstr "Jeśli wszystko oczekujące wpłynie, zostanie %(amount)s."
+
+msgid "In"
+msgstr "Wpływy"
+
+#, python-format
+msgid "earned %(earned)s + withdrawn %(withdrawn)s"
+msgstr "zarobione %(earned)s + wypłacone z oszczędności %(withdrawn)s"
+
+msgid "Short by"
+msgstr "Brakuje"
+
+#, python-format
+msgid "short by %(amount)s if everything pending arrives"
+msgstr "zabraknie %(amount)s, jeśli wszystko oczekujące wpłynie"
+
+#, python-format
+msgid "%(amount)s if everything pending arrives"
+msgstr "%(amount)s, jeśli wszystko oczekujące wpłynie"
+
+msgid "Striped: pending, not confirmed yet"
+msgstr "Paski: oczekujące, jeszcze niepotwierdzone"
+
+#, python-format
+msgid "(+ %(amount)s pending)"
+msgstr "(+ %(amount)s oczekuje)"
+
+#, python-format
+msgid "Out %(actual)s%(pending)s of %(planned)s planned"
+msgstr "Wydane i odłożone %(actual)s%(pending)s z zaplanowanych %(planned)s"
+
+#, python-format
+msgid "Out %(actual)s%(pending)s (no plan)"
+msgstr "Wydane i odłożone %(actual)s%(pending)s (bez planu)"
+
+#, python-format
+msgid "In %(actual)s%(pending)s of %(planned)s planned"
+msgstr "Wpływy %(actual)s%(pending)s z zaplanowanych %(planned)s"
+
+#, python-format
+msgid "In %(actual)s%(pending)s (no plan)"
+msgstr "Wpływy %(actual)s%(pending)s (bez planu)"
 
 msgid "(over plan if everything pending arrives)"
 msgstr "(ponad plan, jeśli wszystko oczekujące wpłynie)"
@@ -5284,6 +5358,22 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Reminders by notification"
 #~ msgstr "Przypomnienia przez powiadomienia"
+
+#~ msgid "%(name)s tax payment"
+#~ msgstr "%(name)s – płatność podatku"
+
+#~ msgid "Spent vs earned"
+#~ msgstr "Wydane a zarobione"
+
+#~ msgid ""
+#~ "Pending: earned %(earned)s, spent %(spent)s,"
+#~ " saved or invested %(saved)s. If "
+#~ "everything pending arrives, left %(net)s."
+#~ msgstr ""
+#~ "Oczekujące: zarobione %(earned)s, wydane "
+#~ "%(spent)s, zaoszczędzone lub zainwestowane "
+#~ "%(saved)s. Jeśli wszystko oczekujące wpłynie,"
+#~ " zostanie %(net)s."
 
 #~ msgid "Choose an active category matching the direction."
 #~ msgstr "Wybierz aktywną kategorię zgodną z kierunkiem."
