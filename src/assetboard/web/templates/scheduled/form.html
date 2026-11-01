@@ -3,9 +3,9 @@
 {% block title %}{{ _("Edit recurring item") if item_id else _("New recurring item") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Edit recurring item") if item_id else _("New recurring item") }}{% endblock %}
 {% block content %}
-{% set input_class = "form-control rounded-lg px-3 py-2" %}
+{% set input_class = "form-control px-3 py-2" %}
 {% set check_class = "h-4 w-4 rounded border-line accent-primary" %}
-{% set option_class = "flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-surface p-3 hover:bg-subtle has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40" %}
+{% set option_class = "flex cursor-pointer items-start gap-3 border border-line bg-surface p-3 hover:bg-subtle has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40" %}
 {% set section_heading = "text-base font-semibold" %}
 {% set repeat = values.get('repeat', 'monthly') %}
 {% macro invalid(name) -%}{% if errors.get(name) %} aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}{%- endmacro %}
@@ -25,7 +25,7 @@
 <a href="{{ scoped_url(request, 'scheduled_items') }}" class="mb-4 inline-flex rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Back to Recurring") }}</a>
 <div class="flex flex-wrap items-start gap-6">
 <section class="panel min-w-0 flex-[999_1_30rem] p-5 sm:p-6">
-{% if errors %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ errors.get("form") or _("Check the highlighted field.") }}</p>{% endif %}
+{% if errors %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ errors.get("form") or _("Check the highlighted field.") }}</p>{% endif %}
 <form id="schedule-form" method="post" action="{{ scoped_url(request, 'scheduled_update', item_id=item_id) if item_id else scoped_url(request, 'scheduled_create') }}" class="grid gap-8">
   {{ csrf_input() }}
   <input type="hidden" name="guided" value="1">
@@ -86,7 +86,7 @@
       {% endfor %}
     </div>
 
-    <div class="grid gap-4 rounded-xl border border-line p-4" data-hidden-when="repeat!=weekly" data-repeat-fields="weekly">
+    <div class="grid gap-4 border border-line p-4" data-hidden-when="repeat!=weekly" data-repeat-fields="weekly">
       <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Weekly") }}</p>
       <fieldset{% if repeat == "weekly" %}{{ invalid("weekdays") }}{% endif %}><legend class="text-sm font-medium">{{ _("On which days?") }}</legend>
         <div class="mt-2 flex flex-wrap gap-2">{% for value, label in weekdays %}<label class="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary-soft"><input type="checkbox" name="weekday" value="{{ value }}"{% if value in values.get('weekdays', '').split(',') %} checked{% endif %} class="{{ check_class }}"> {{ label }}</label>{% endfor %}</div>
@@ -95,13 +95,13 @@
       {{ interval_field("weekly", "interval_weeks", _("Every how many weeks? (1 = every week)")) }}
     </div>
 
-    <div class="grid gap-4 rounded-xl border border-line p-4" data-hidden-when="repeat!=every_months" data-repeat-fields="every_months">
+    <div class="grid gap-4 border border-line p-4" data-hidden-when="repeat!=every_months" data-repeat-fields="every_months">
       <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Every few months") }}</p>
       {{ interval_field("every_months", "interval_months", _("Every how many months?")) }}
       <p class="text-xs text-muted">{{ _("Counted from the month of the start date.") }}</p>
     </div>
 
-    <div class="grid gap-1.5 rounded-xl border border-line p-4" data-hidden-when="repeat!=monthly|every_months" data-repeat-fields="monthly">
+    <div class="grid gap-1.5 border border-line p-4" data-hidden-when="repeat!=monthly|every_months" data-repeat-fields="monthly">
       <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Monthly or every few months") }}</p>
       <label class="text-sm font-medium" for="month_day">{{ _("On which day of the month?") }}</label>
       <select id="month_day" name="month_day" class="form-select w-full max-w-xs"{% if repeat in ("monthly", "every_months") %}{{ invalid("month_day") }}{% endif %}>{{ month_day_options(values.get('month_day', '1'), true) }}</select>
@@ -109,7 +109,7 @@
       {% if repeat in ("monthly", "every_months") %}{{ error_text("month_day") }}{% endif %}
     </div>
 
-    <div class="grid gap-4 rounded-xl border border-line p-4" data-hidden-when="repeat!=yearly" data-repeat-fields="yearly">
+    <div class="grid gap-4 border border-line p-4" data-hidden-when="repeat!=yearly" data-repeat-fields="yearly">
       <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Yearly") }}</p>
       <div class="flex flex-wrap items-end gap-3">
         <div class="grid gap-1">

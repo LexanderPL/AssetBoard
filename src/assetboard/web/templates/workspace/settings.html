@@ -6,7 +6,7 @@
 <section class="panel max-w-2xl p-6 sm:p-7" aria-labelledby="workspace-settings-heading">
   <h2 id="workspace-settings-heading" class="text-base font-semibold">{{ _("General") }}</h2>
   {% if notice %}
-  <p class="mt-4 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status">{{ notice }}</p>
+  <p class="mt-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status">{{ notice }}</p>
   {% endif %}
   <form method="post" action="{{ scoped_url(request, 'workspace_settings') }}" class="mt-5 grid gap-4 sm:grid-cols-2" novalidate>
     {{ csrf_input() }}
@@ -62,7 +62,7 @@
     </button>
   </form>
   {% if taxes_in_use %}
-  <div role="alert" class="mt-3 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-taxes-in-use>
+  <div role="alert" class="mt-3 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-taxes-in-use>
     <p>{{ _("Taxes stay on while these income sources have taxes ticked. Untick them first:") }}</p>
     <ul class="mt-1 list-disc pl-5">{% for name in taxes_in_use %}<li>{{ name }}</li>{% endfor %}</ul>
   </div>
@@ -70,14 +70,14 @@
 </section>
 <section class="panel mt-6 max-w-2xl p-6 sm:p-7" aria-labelledby="workspace-notifications-heading" data-settings-notifications>
   <h2 id="workspace-notifications-heading" class="text-base font-semibold">{{ _("Notifications") }}</h2>
-  <div class="mt-4 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-line bg-subtle px-4 py-3">
+  <div class="mt-4 flex flex-wrap items-start justify-between gap-3 border border-line bg-subtle px-4 py-3">
     <p class="min-w-0 text-xs text-muted">{{ _("Reminders about upcoming and overdue payments and days worked, sent to your own channels (ntfy, Telegram, email and others). Each member sets up their own on their Profile page.") }}</p>
     <a href="{{ scoped_url(request, 'notifications') }}" data-notifications-link class="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Notification settings") }}</a>
   </div>
 </section>
 <section class="panel mt-6 max-w-2xl p-6 sm:p-7" aria-labelledby="workspace-more-heading" data-settings-more>
   <h2 id="workspace-more-heading" class="text-base font-semibold">{{ _("Categories and workspaces") }}</h2>
-  <div class="mt-4 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-line bg-subtle px-4 py-3">
+  <div class="mt-4 flex flex-wrap items-start justify-between gap-3 border border-line bg-subtle px-4 py-3">
     <div class="min-w-0">
       <p class="text-sm font-medium">{{ _("Categories") }}</p>
       <p class="text-xs text-muted">{{ _("The income and expense categories of this workspace, their colours and their order.") }}</p>
@@ -85,7 +85,7 @@
     <a href="{{ scoped_url(request, 'categories') }}" data-settings-categories-link class="rounded-lg border border-line bg-surface px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Manage categories") }}</a>
   </div>
   {% if workspace_nav and workspace_nav.can_create_workspace %}
-  <div class="mt-3 flex flex-wrap items-start justify-between gap-3 rounded-xl border border-line bg-subtle px-4 py-3">
+  <div class="mt-3 flex flex-wrap items-start justify-between gap-3 border border-line bg-subtle px-4 py-3">
     <div class="min-w-0">
       <p class="text-sm font-medium">{{ _("New workspace") }}</p>
       <p class="text-xs text-muted">{{ _("A separate budget with its own members, categories and currency.") }}</p>

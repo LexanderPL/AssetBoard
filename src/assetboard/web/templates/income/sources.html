@@ -13,7 +13,7 @@
   <p class="text-sm text-muted">{{ _("Where your money comes from and what you will receive next.") }}</p>
   {% if can_edit %}<a href="{{ scoped_url(request, 'income_new') }}" class="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-add-income>{{ _("Add income") }}</a>{% endif %}
 </div>
-{% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-income-error>{{ error }}{% if error_href %} <a href="{{ error_href }}" class="font-semibold underline" data-locked-transaction>{{ _("Open the transaction") }}</a>{% endif %}</p>{% endif %}
+{% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-income-error>{{ error }}{% if error_href %} <a href="{{ error_href }}" class="font-semibold underline" data-locked-transaction>{{ _("Open the transaction") }}</a>{% endif %}</p>{% endif %}
 <div class="space-y-4">
 {% for source in sources %}
 {% set fixed = source.kind.value == "fixed" %}
@@ -59,8 +59,8 @@
 
   {% if source.preview %}
   {% set show_taxes = with_taxes %}
-  <div class="mt-4 overflow-x-auto rounded-lg border border-line" data-income-preview-table>
-    <table class="w-full min-w-[36rem] text-left text-sm">
+  <div class="mt-4 overflow-x-auto" data-income-preview-table>
+    <table class="sheet w-full min-w-[36rem] text-left text-sm">
       <caption class="sr-only">{{ _("Next payments of %(name)s", name=source.name) }}</caption>
       <thead class="bg-subtle text-xs text-muted">
         <tr>
@@ -86,11 +86,11 @@
                Esc or Cancel closes it and restores the logged value (static/js/app.js). #}
             <details class="ml-1 inline-block align-middle open:mt-1 open:block open:ml-0" data-inline-edit data-log-edit="{{ item.work_month.strftime('%Y-%m') }}">
               <summary class="{{ compact }}" aria-label="{{ _('Edit the units logged for %(month)s', month=month_label) }}">{{ _("Edit") }}</summary>
-              <form method="post" action="{{ scoped_url(request, 'income_work_log', source_id=source.id) }}" class="mt-2 grid w-fit gap-2 rounded-lg border border-line bg-surface p-3">
+              <form method="post" action="{{ scoped_url(request, 'income_work_log', source_id=source.id) }}" class="mt-1 grid w-fit gap-2">
                 {{ csrf_input() }}
                 <input type="hidden" name="work_month_month" value="{{ item.work_month.month }}">
                 <input type="hidden" name="work_month_year" value="{{ item.work_month.year }}">
-                <label class="grid gap-1 text-xs font-medium">{{ _("Units worked (%(unit)s)", unit=source.unit_label) }}<input name="units" inputmode="decimal" required value="{{ format_quantity_input(log.units, locale) }}" class="form-control w-32 rounded-lg px-2.5 py-1.5 text-sm" data-inline-edit-input></label>
+                <label class="grid gap-1 text-xs font-medium">{{ _("Units worked (%(unit)s)", unit=source.unit_label) }}<input name="units" inputmode="decimal" required value="{{ format_quantity_input(log.units, locale) }}" class="form-control cell-input mt-0.5 w-32 bg-subtle text-sm" data-inline-edit-input></label>
                 <div class="flex flex-wrap items-center gap-2">
                   <button type="submit" class="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save") }}</button>
                   <button type="button" data-details-close class="rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Cancel") }}</button>
@@ -127,11 +127,11 @@
       {% set chosen_state = ("locked" if chosen in source.locked_months else "derived" if chosen_log.derived_from_days else "manual") if chosen_log else "" %}
       {% set locked_hint = _("This month's income is already received. Edit the transaction instead.") %}
       {% set derived_hint = _("This month comes from the work calendar. Change the days in the calendar.") %}
-      <form method="post" action="{{ scoped_url(request, 'income_work_log', source_id=source.id) }}" class="mt-2 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-3" data-log-form data-label-save="{{ _('Save work log') }}" data-label-update="{{ _('Update') }}" data-hint-locked="{{ locked_hint }}" data-hint-derived="{{ derived_hint }}">
+      <form method="post" action="{{ scoped_url(request, 'income_work_log', source_id=source.id) }}" class="mt-2 grid gap-3 border border-line p-3 sm:grid-cols-3" data-log-form data-label-save="{{ _('Save work log') }}" data-label-update="{{ _('Update') }}" data-hint-locked="{{ locked_hint }}" data-hint-derived="{{ derived_hint }}">
         {{ csrf_input() }}
         {% for log in source.work_logs %}<span hidden data-existing-log="{{ log.work_month.strftime('%Y-%m') }}" data-units="{{ format_quantity_input(log.units, locale) }}" data-state="{{ 'locked' if log.work_month in source.locked_months else 'derived' if log.derived_from_days else 'manual' }}"></span>{% endfor %}
         {{ month_picker("work_month", _("Work month"), chosen, id_prefix="log-" ~ source.id) }}
-        <label class="grid gap-1 text-sm">{{ _("Units worked (%(unit)s)", unit=source.unit_label) }}<input name="units" inputmode="decimal" required value="{{ format_quantity_input(chosen_log.units, locale) if chosen_state == 'manual' else '' }}" class="form-control rounded-lg px-3 py-2" data-log-units></label>
+        <label class="grid gap-1 text-sm">{{ _("Units worked (%(unit)s)", unit=source.unit_label) }}<input name="units" inputmode="decimal" required value="{{ format_quantity_input(chosen_log.units, locale) if chosen_state == 'manual' else '' }}" class="form-control px-3 py-2" data-log-units></label>
         <button type="submit" class="self-end rounded-lg border border-line px-3 py-2 text-sm font-semibold" data-log-submit>{{ _("Update") if chosen_state == "manual" else _("Save work log") }}</button>
         <p class="text-xs text-muted sm:col-span-3"{% if not chosen_state or chosen_state == 'manual' %} hidden{% endif %} data-log-hint aria-live="polite">{% if chosen_state == "locked" %}{{ locked_hint }}{% elif chosen_state == "derived" %}{{ derived_hint }}{% endif %}</p>
         <p class="text-xs text-muted sm:col-span-3">{{ _("Months with days marked in the work calendar are read-only here: their units are the sum of the days.") }} {{ _("A month's log can be changed until its income is received.") }}</p>
@@ -145,7 +145,7 @@
     <details id="taxes-{{ source.id }}" class="open:w-full"{% if open_form == "taxes-" ~ source.id %} open{% endif %} data-income-taxes-panel>
       <summary class="{{ summary_button }}">{{ _("Taxes on this income") }}</summary>
       {% if tax_rules %}
-      <form method="post" action="{{ scoped_url(request, 'income_taxes_save', source_id=source.id) }}" class="mt-2 grid gap-2 rounded-lg border border-line p-3" aria-label="{{ _('Taxes on %(name)s', name=source.name) }}" data-income-taxes>
+      <form method="post" action="{{ scoped_url(request, 'income_taxes_save', source_id=source.id) }}" class="mt-2 grid gap-2 border border-line p-3" aria-label="{{ _('Taxes on %(name)s', name=source.name) }}" data-income-taxes>
         {{ csrf_input() }}
         {% for rule in tax_rules %}
         {% set attachment = source.attachments|selectattr("tax_rule_id", "equalto", rule.id)|first %}
@@ -154,7 +154,7 @@
           {% if rule.kind.value != "payer_withheld" %}
           <details class="ml-6"{% if attachment and attachment.due_day is not none %} open{% endif %}>
             <summary class="cursor-pointer text-xs text-primary-ink">{{ _("Different payment day for this income") }}<span class="sr-only"> · {{ rule.name }}</span></summary>
-            <label class="mt-1 flex items-center gap-2 text-sm">{{ _("Payment day") }}<input name="due_day_{{ rule.id }}" type="number" min="1" max="31" value="{{ attachment.due_day if attachment and attachment.due_day is not none else '' }}" placeholder="{{ rule.payment_day }}" class="form-control w-20 rounded-lg px-3 py-1.5"></label>
+            <label class="mt-1 flex items-center gap-2 text-sm">{{ _("Payment day") }}<input name="due_day_{{ rule.id }}" type="number" min="1" max="31" value="{{ attachment.due_day if attachment and attachment.due_day is not none else '' }}" placeholder="{{ rule.payment_day }}" class="form-control w-20 px-3 py-1.5"></label>
           </details>
           {% endif %}
         </div>

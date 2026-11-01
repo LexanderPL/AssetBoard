@@ -5,7 +5,7 @@
 {% from "macros/components.html" import csrf_input with context %}
 {% from "categories/_macros.html" import swatch %}
 {% set label_class = "block text-sm font-medium" %}
-{% set input_class = "form-control w-full rounded-lg px-2.5 py-1.5" %}
+{% set input_class = "form-control w-full px-2.5 py-1.5" %}
 {% set error_class = "mt-1 text-xs text-danger" %}
 {% set primary_class = "rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover" %}
 {% set secondary_class = "rounded-lg border border-line px-3 py-1.5 text-sm font-medium text-ink hover:bg-subtle" %}
@@ -43,7 +43,7 @@
 {% block content %}
 <div class="space-y-6" data-transaction-list>
   {% if notice %}
-  <p class="rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
+  <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
   {% endif %}
   {# The search bar stays outside #history-results: a live search replaces that block, and the
      focused field must survive the swap. The results, their page links, the bulk action and the
@@ -84,14 +84,14 @@
       <div class="grid gap-4 sm:grid-cols-2">
         <div>
           <label for="export-delimiter" class="{{ label_class }}">{{ _("Delimiter") }}</label>
-          <select id="export-delimiter" name="delimiter" class="form-select w-full rounded-lg py-1.5 pl-2.5">
+          <select id="export-delimiter" name="delimiter" class="form-select w-full py-1.5 pl-2.5">
             <option value="comma"{% if export_values.get("delimiter") != "semicolon" %} selected{% endif %}>{{ _("Comma (standard)") }}</option>
             <option value="semicolon"{% if export_values.get("delimiter") == "semicolon" %} selected{% endif %}>{{ _("Semicolon") }}</option>
           </select>
         </div>
         <div>
           <label for="export-decimal" class="{{ label_class }}">{{ _("Decimal separator") }}</label>
-          <select id="export-decimal" name="decimal" aria-describedby="export-decimal-help" class="form-select w-full rounded-lg py-1.5 pl-2.5">
+          <select id="export-decimal" name="decimal" aria-describedby="export-decimal-help" class="form-select w-full py-1.5 pl-2.5">
             <option value="dot"{% if export_values.get("decimal") != "comma" %} selected{% endif %}>{{ _("Dot (standard)") }}</option>
             <option value="comma"{% if export_values.get("decimal") == "comma" %} selected{% endif %}>{{ _("Comma") }}</option>
           </select>
@@ -148,7 +148,7 @@
         </div>
         <div>
           <label for="filter-direction" class="{{ label_class }}">{{ _("Kind") }}</label>
-          <select id="filter-direction" name="direction"{{ invalid("direction") }} class="form-select w-full rounded-lg py-1.5 pl-2.5">
+          <select id="filter-direction" name="direction"{{ invalid("direction") }} class="form-select w-full py-1.5 pl-2.5">
             <option value="">{{ _("Expenses and income") }}</option>
             <option value="expense"{% if raw.direction == "expense" %} selected{% endif %}>{{ _("Expenses") }}</option>
             <option value="income"{% if raw.direction == "income" %} selected{% endif %}>{{ _("Income") }}</option>
@@ -157,12 +157,12 @@
         </div>
         <div>
           <label for="filter-sort" class="{{ label_class }}">{{ _("Order") }}</label>
-          <select id="filter-sort" name="sort" class="form-select w-full rounded-lg py-1.5 pl-2.5">
+          <select id="filter-sort" name="sort" class="form-select w-full py-1.5 pl-2.5">
             {% for value, label in sort_options %}<option value="{{ value }}"{% if value == sort.value %} selected{% endif %}>{{ label }}</option>{% endfor %}
           </select>
         </div>
       </div>
-      <details class="rounded-lg border border-line p-3"{% if selected_categories or errors.get("categories") %} open{% endif %} data-category-filter>
+      <details class="border border-line p-3"{% if selected_categories or errors.get("categories") %} open{% endif %} data-category-filter>
         <summary class="cursor-pointer text-sm font-medium">{{ _("Categories") }}{% if selected_categories %} <span class="text-muted">({{ selected_categories|length }})</span>{% endif %}</summary>
         <p class="mt-2 text-xs text-muted">{{ _("None ticked: every category.") }}</p>
         <div class="mt-3 grid gap-4 sm:grid-cols-3">
@@ -195,7 +195,7 @@
     {% endif %}
     {% if rows %}
     <div class="relative mt-3 overflow-x-auto">
-      <table class="w-full min-w-[40rem] text-sm">
+      <table class="sheet w-full min-w-[40rem] text-sm">
         <caption class="sr-only">{{ _("Entries matching the filters") }}{% if window and window.pages > 1 %}, {{ _("page %(number)d of %(pages)d", number=window.number, pages=window.pages) }}{% endif %}</caption>
         <thead>
           <tr class="text-left text-xs text-muted">
@@ -207,7 +207,7 @@
             <th scope="col" class="w-24 py-2 font-medium">{{ _("Kind") }}</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-line">
+        <tbody>
           {% for r in rows %}
           {% set row_id = r.t.id|string %}
           <tr data-row="{{ row_id }}">
@@ -242,14 +242,14 @@
     </div>
     <p class="mt-1 text-sm text-muted">{{ _("Tick entries in the list, or change all entries that match the filters. You confirm the change on the next page.") }}</p>
     {% if bulk_error %}
-    <p class="mt-3 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-bulk-error>{{ bulk_error }}</p>
+    <p class="mt-3 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-bulk-error>{{ bulk_error }}</p>
     {% endif %}
     <form id="bulk-form" method="post" action="{{ scoped_url(request, 'history_recategorize_preview') }}" class="mt-4 flex flex-wrap items-end gap-3">
       {{ csrf_input() }}
       {{ hidden(state_fields) }}
       <div>
         <label for="bulk-category" class="{{ label_class }}">{{ _("New category") }}</label>
-        <select id="bulk-category" name="category_id" class="form-select w-full rounded-lg py-1.5 pl-2.5">
+        <select id="bulk-category" name="category_id" class="form-select w-full py-1.5 pl-2.5">
           <option value="">{{ _("Choose a category") }}</option>
           {% for kind, heading in (("expense", _("Expense categories")), ("income", _("Income categories"))) %}
           {% if categories[kind] %}

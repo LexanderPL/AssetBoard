@@ -13,7 +13,7 @@
     <script type="application/json" id="chart-{{ d.key }}-data">{{ d.data|tojson }}</script>
     <div class="mt-3 h-64 w-full" hidden aria-hidden="true" data-chart-canvas></div>
     <div class="relative mt-3 overflow-x-auto" data-chart-table>
-      <table class="w-full text-sm">
+      <table class="sheet w-full text-sm">
         <caption class="sr-only">{{ d.heading }}</caption>
         <thead>
           <tr class="text-left text-xs text-muted">
@@ -22,7 +22,7 @@
             <th scope="col" class="py-1.5 text-right font-medium">{{ _("Share") }}</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-line">
+        <tbody>
           {% for s in d.slices %}
           <tr data-chart-row>
             <th scope="row" class="py-1.5 pr-2 text-left font-normal">{% if s.color %}<svg class="mr-2 inline h-3 w-3 align-baseline" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><circle cx="6" cy="6" r="6" fill="{{ s.color }}"/></svg>{% endif %}{{ s.name }}</th>

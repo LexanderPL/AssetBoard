@@ -3,13 +3,13 @@
 {% block title %}{{ _("Edit tax") if rule else _("New tax on income") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Edit tax") if rule else _("New tax on income") }}{% endblock %}
 {% block content %}
-{% set input_class = "form-control rounded-lg px-3 py-2" %}
-{% set option_class = "flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-surface p-3 hover:bg-subtle has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40" %}
+{% set input_class = "form-control px-3 py-2" %}
+{% set option_class = "flex cursor-pointer items-start gap-3 border border-line bg-surface p-3 hover:bg-subtle has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40" %}
 {% set locked = rule is not none and rule.locked %}
 <a href="{{ scoped_url(request, 'tax_rules') }}" class="mb-4 inline-flex rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Back to Taxes") }}</a>
 <div class="flex flex-wrap items-start gap-6">
 <section class="panel min-w-0 flex-[999_1_28rem] p-5 sm:p-6">
-  {% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ error }}</p>{% endif %}
+  {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ error }}</p>{% endif %}
   <form id="tax-form" method="post" action="{{ scoped_url(request, 'tax_rule_update', rule_id=rule.id) if rule else scoped_url(request, 'tax_rule_create') }}" class="grid gap-6">
     {{ csrf_input() }}
     <label class="grid gap-1 text-sm font-medium">{{ _("Name") }}<input name="name" value="{{ values.name }}" maxlength="200" required class="{{ input_class }} font-normal"></label>
@@ -28,7 +28,7 @@
       {% endfor %}
       <details class="mt-1" data-hidden-when="kind=added" data-tax-base>
         <summary class="cursor-pointer text-sm text-primary-ink">{{ _("Advanced: calculated on") }}</summary>
-        <label class="mt-2 grid max-w-xs gap-1 text-sm">{{ _("Calculated on") }}<select name="base" class="form-select rounded-lg py-2"><option value="net"{% if values.base == "net" %} selected{% endif %}>{{ _("The net amount") }}</option><option value="gross"{% if values.base == "gross" %} selected{% endif %}>{{ _("Net plus taxes added on top") }}</option></select></label>
+        <label class="mt-2 grid max-w-xs gap-1 text-sm">{{ _("Calculated on") }}<select name="base" class="form-select py-2"><option value="net"{% if values.base == "net" %} selected{% endif %}>{{ _("The net amount") }}</option><option value="gross"{% if values.base == "gross" %} selected{% endif %}>{{ _("Net plus taxes added on top") }}</option></select></label>
         <p class="mt-1 text-xs text-muted">{{ _("Ignored for taxes added on top: they are always calculated on the net amount.") }}</p>
       </details>
     </fieldset>
@@ -66,13 +66,13 @@
       <div class="flex flex-wrap items-center gap-2 text-sm">
         <label for="payment_day">{{ _("On day") }}</label>
         <input id="payment_day" name="payment_day" type="number" min="1" max="31" value="{{ values.payment_day }}" class="{{ input_class }} w-20">
-        <select name="payment_timing" aria-label="{{ _('Which month') }}" class="form-select rounded-lg py-2">
+        <select name="payment_timing" aria-label="{{ _('Which month') }}" class="form-select py-2">
           {% for value, label in (("next_month", _("of the month after you're paid")), ("same_month", _("of the month you're paid")), ("after_quarter", _("of the month after each quarter"))) %}
           <option value="{{ value }}"{% if values.payment_timing == value %} selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
       </div>
-      <label class="grid max-w-xs gap-1 text-sm">{{ _("Record it in category") }}<select name="payment_category_id" class="form-select rounded-lg py-2">
+      <label class="grid max-w-xs gap-1 text-sm">{{ _("Record it in category") }}<select name="payment_category_id" class="form-select py-2">
         <option value="">{{ _("Choose a category") }}</option>
         {% for category in expense_categories %}<option value="{{ category.id }}"{% if values.payment_category_id == category.id|string or (not values.payment_category_id and category.name == _("Taxes")) %} selected{% endif %}>{{ category.name }}</option>{% endfor %}
       </select></label>

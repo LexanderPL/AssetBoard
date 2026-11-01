@@ -5,7 +5,7 @@
 {# Home (F2.7): the current month's flow bar (the Month page's partial), the expense and income
    donuts and up to ten upcoming F3.2 items. No inline script or style. #}
 {% set button_class = "rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle" %}
-{% set input_class = "form-control w-full rounded-lg px-2.5 py-1.5" %}
+{% set input_class = "form-control w-full px-2.5 py-1.5" %}
 {% block title %}{{ _("Home") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ month_heading }}{% endblock %}
 {% block scripts %}{% include "macros/chart_scripts.html" %}{% endblock %}
@@ -29,7 +29,7 @@
     <ul class="mt-3 divide-y divide-line">
       {% for o in upcoming %}
       {% set overdue = o.due_date < today %}
-      <li class="flex flex-wrap items-center justify-between gap-3 py-3{% if overdue %} -mx-2 rounded-lg bg-danger-soft px-2{% endif %}" data-occurrence="{{ o.id }}"{% if overdue %} data-overdue{% endif %}>
+      <li class="flex flex-wrap items-center justify-between gap-3 py-3{% if overdue %} -mx-2 bg-danger-soft px-2{% endif %}" data-occurrence="{{ o.id }}"{% if overdue %} data-overdue{% endif %}>
         <div class="min-w-0">
           <p class="break-words font-medium">{{ o.label }}</p>
           <p class="text-sm text-muted">
@@ -43,7 +43,7 @@
         <div class="flex flex-wrap items-start gap-2">
           <details>
             <summary class="{{ button_class }} cursor-pointer">{{ _("Mark paid or received") }}</summary>
-            <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=o.id) }}" class="mt-3 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2" data-home-post>
+            <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=o.id) }}" class="mt-3 grid gap-3 border border-line p-3 sm:grid-cols-2" data-home-post>
               {{ csrf_input() }}
               <input type="hidden" name="back" value="home">
               <div>

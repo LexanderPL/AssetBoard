@@ -1,18 +1,18 @@
 {% extends "base.html" %}
 {% from "macros/components.html" import csrf_input, summary_button_primary with context %}
-{% set input_class = "form-control w-full rounded-lg px-2.5 py-1.5" %}
+{% set input_class = "form-control w-full px-2.5 py-1.5" %}
 {% set button_class = "rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle" %}
 {% block title %}{{ _("Upcoming payments") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Upcoming payments") }}{% endblock %}
 {% block content %}
-{% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
+{% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 {% if undo and can_edit %}
-<div role="status" class="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-post-undo>
+<div role="status" class="mb-4 flex flex-wrap items-center gap-3 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-post-undo>
   <span>{{ _("Occurrence marked paid or received.") }}</span>
   <form method="post" action="{{ scoped_url(request, 'upcoming_undo', occurrence_id=undo.occurrence_id) }}">{{ csrf_input() }}<button type="submit" class="font-semibold underline">{{ _("Undo") }}</button></form>
 </div>
 {% endif %}
-{% if notice %}<p role="status" class="mb-4 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-upcoming-notice>{{ notice }}</p>{% endif %}
+{% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-upcoming-notice>{{ notice }}</p>{% endif %}
 {% macro category_options(selected) -%}
 <option value="">{{ _("Choose a category") }}</option>
 {% for heading, group in ((_("Expense categories"), expense_categories), (_("Income categories"), income_categories)) %}{% if group %}
@@ -43,7 +43,7 @@
 </fieldset>
 <div class="sm:col-span-2">
   <label for="{{ prefix }}-category" class="mb-1 block text-xs font-medium">{{ _("Category") }}</label>
-  <select id="{{ prefix }}-category" name="category_id" required class="form-select w-full rounded-lg py-1.5 pl-2.5"{% if field in ("category", "category_kind_mismatch") %} aria-invalid="true" aria-describedby="{{ prefix }}-error"{% endif %}>{{ category_options(values.get('category_id', '')) }}</select>
+  <select id="{{ prefix }}-category" name="category_id" required class="form-select w-full py-1.5 pl-2.5"{% if field in ("category", "category_kind_mismatch") %} aria-invalid="true" aria-describedby="{{ prefix }}-error"{% endif %}>{{ category_options(values.get('category_id', '')) }}</select>
 </div>
 {%- endmacro %}
 {% if can_edit %}
@@ -67,7 +67,7 @@
   <form method="get" action="{{ scoped_url(request, 'scheduled_upcoming') }}" class="mt-4 grid gap-4 sm:grid-cols-3">
     <div>
       <label for="upcoming-direction" class="mb-1 block text-sm font-medium">{{ _("Direction") }}</label>
-      <select id="upcoming-direction" name="direction" class="form-select w-full rounded-lg py-1.5 pl-2.5">
+      <select id="upcoming-direction" name="direction" class="form-select w-full py-1.5 pl-2.5">
         <option value="">{{ _("Expenses and income") }}</option>
         <option value="expense"{% if direction == "expense" %} selected{% endif %}>{{ _("Expenses") }}</option>
         <option value="income"{% if direction == "income" %} selected{% endif %}>{{ _("Income") }}</option>
@@ -75,7 +75,7 @@
     </div>
     <div>
       <label for="upcoming-category" class="mb-1 block text-sm font-medium">{{ _("Category") }}</label>
-      <select id="upcoming-category" name="category" class="form-select w-full rounded-lg py-1.5 pl-2.5">
+      <select id="upcoming-category" name="category" class="form-select w-full py-1.5 pl-2.5">
         <option value="">{{ _("All categories") }}</option>
         {% for category in categories %}<option value="{{ category.id }}"{% if category_id == category.id|string %} selected{% endif %}>{{ category.name }}{% if category.archived %} · {{ _("archived") }}{% endif %}</option>{% endfor %}
       </select>
@@ -92,7 +92,7 @@
   <h2 id="week-{{ week.monday.isoformat() }}" class="font-semibold">{{ _("Week of %(date)s", date=format_day(week.monday, locale)) }}</h2>
   <div class="mt-4 space-y-4">
   {% for occurrence in week.occurrences %}
-  <article class="rounded-xl border border-line p-4 {% if occurrence.due_date < today %}border-danger-line bg-danger-soft {% endif %}" data-occurrence="{{ occurrence.id }}">
+  <article class="border border-line p-4 {% if occurrence.due_date < today %}border-danger-line bg-danger-soft {% endif %}" data-occurrence="{{ occurrence.id }}">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div class="min-w-0">
         <h3 class="break-words font-semibold">{{ occurrence.label }}</h3>
@@ -111,7 +111,7 @@
       <div class="flex flex-wrap items-start gap-2" data-occurrence-actions>
         <details>
           <summary class="{{ button_class }} cursor-pointer">{{ _("Mark paid or received") }}</summary>
-          <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=occurrence.id) }}" class="mt-3 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
+          <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=occurrence.id) }}" class="mt-3 grid gap-3 border border-line p-3 sm:grid-cols-2">
             {{ csrf_input() }}
             <div>
               <label for="post-day-{{ occurrence.id }}" class="mb-1 block text-xs font-medium">{{ _("Date") }}</label>
@@ -130,7 +130,7 @@
         {% set values = edit_values if editing_this else {"name": occurrence.label, "amount": amount_input(occurrence.expected), "day": occurrence.due_date.isoformat(), "direction": occurrence.direction, "category_id": occurrence.category_id|string} %}
         <details data-one-time-edit{% if editing_this %} open{% endif %}>
           <summary class="{{ button_class }} cursor-pointer">{{ _("Edit") }}<span class="sr-only"> {{ occurrence.label }}</span></summary>
-          <form method="post" action="{{ scoped_url(request, 'upcoming_one_time_update', occurrence_id=occurrence.id) }}" class="mt-3 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
+          <form method="post" action="{{ scoped_url(request, 'upcoming_one_time_update', occurrence_id=occurrence.id) }}" class="mt-3 grid gap-3 border border-line p-3 sm:grid-cols-2">
             {{ csrf_input() }}
             {{ one_time_fields("edit-" ~ occurrence.id, values, edit_errors if editing_this else {}) }}
             <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
@@ -143,7 +143,7 @@
         {% else %}
         <details>
           <summary class="{{ button_class }} cursor-pointer">{{ _("Reschedule this one") }}</summary>
-          <form method="post" action="{{ scoped_url(request, 'upcoming_reschedule', occurrence_id=occurrence.id) }}" class="mt-3 flex flex-wrap gap-2 rounded-lg border border-line p-3">
+          <form method="post" action="{{ scoped_url(request, 'upcoming_reschedule', occurrence_id=occurrence.id) }}" class="mt-3 flex flex-wrap gap-2 border border-line p-3">
             {{ csrf_input() }}
             <label for="reschedule-{{ occurrence.id }}" class="sr-only">{{ _("New due date") }}</label>
             <input id="reschedule-{{ occurrence.id }}" name="day" type="date" value="{{ occurrence.due_date.isoformat() }}" required class="{{ input_class }}">
@@ -152,7 +152,7 @@
         </details>
         <details>
           <summary class="{{ button_class }} cursor-pointer">{{ _("Edit amount") }}</summary>
-          <form method="post" action="{{ scoped_url(request, 'upcoming_amount', occurrence_id=occurrence.id) }}" class="mt-3 flex flex-wrap gap-2 rounded-lg border border-line p-3">
+          <form method="post" action="{{ scoped_url(request, 'upcoming_amount', occurrence_id=occurrence.id) }}" class="mt-3 flex flex-wrap gap-2 border border-line p-3">
             {{ csrf_input() }}
             <label for="amount-{{ occurrence.id }}" class="sr-only">{{ _("Amount") }}</label>
             <input id="amount-{{ occurrence.id }}" name="amount" type="text" inputmode="decimal" value="{{ amount_input(occurrence.expected) }}" required class="{{ input_class }}">
