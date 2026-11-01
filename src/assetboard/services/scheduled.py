@@ -35,7 +35,7 @@ from assetboard.config import Settings
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.repositories.audit import AuditEventRepository
-from assetboard.db.repositories.base import WorkspaceScope
+from assetboard.db.repositories.base import NotFound, WorkspaceScope
 from assetboard.db.repositories.category import CategoryRepository
 from assetboard.db.repositories.month_state import MonthStateRepository
 from assetboard.db.repositories.scheduled import (
@@ -583,6 +583,115 @@ def delete_planned_occurrence(
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
             action=action,
+            entity_type="scheduled_item",
+            entity_id=str(item.id),
+            ts=ctx.clock.now(),
+        )
+
+    run_immediate(factory, write)
+
+
+@dataclass(frozen=True, slots=True)
+class OneTimeInput:
+    """A one-time payment as the Upcoming page enters it (no repeat fields)."""
+
+    name: str
+    direction: TransactionDirection
+    category_id: UUID
+    amount: Money
+    day: date
+
+
+def create_one_time(
+    factory: sessionmaker[Session], ctx: Context, values: OneTimeInput, settings: Settings
+) -> UUID:
+    """Create a one-time item and its pending occurrence (the Upcoming page's "Add one-time
+    payment"). The category must match the chosen direction; a past date gives an overdue
+    occurrence, a date in a closed month is refused (``MonthClosed``)."""
+    return save_item(
+        factory,
+        ctx,
+        ScheduledInput(
+            name=values.name,
+            direction=values.direction,
+            category_id=values.category_id,
+            amount=values.amount,
+            rule=RecurrenceRule(
+                start_date=values.day, freq=Frequency.ONCE, weekend_policy=WeekendPolicy.NONE
+            ),
+        ),
+        settings,
+        include_past=True,
+        require_open=values.day,
+        require_kind=values.direction.value,
+    )
+
+
+def update_one_time(
+    factory: sessionmaker[Session], ctx: Context, occurrence_id: UUID, values: OneTimeInput
+) -> None:
+    """Change a pending one-time payment from its Upcoming row: description, amount, date and
+    category, on the item and its occurrence together (an overdue one moves too). Recurring
+    items are refused (``not_planned``); the old and the new date must be in open months."""
+    require_role(ctx, Role.EDITOR)
+    name = clean_description(values.name)
+    if not name or not 0 < values.amount.amount_minor <= MAX_AMOUNT_MINOR:
+        raise ValueError("invalid_item")
+
+    def write(session: Session) -> None:
+        require_role_now(session, ctx, Role.EDITOR)
+        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+        occurrences_repository = ScheduledOccurrenceRepository(session, ctx)
+        occurrence = occurrences_repository.get_for_update(occurrence_id)
+        if occurrence is None:
+            raise NotFound
+        items = ScheduledItemRepository(session, ctx)
+        item = (
+            items.get(occurrence.scheduled_item_id)
+            if occurrence.scheduled_item_id is not None
+            else None
+        )
+        if item is None or item.freq != Frequency.ONCE or item.archived_at is not None:
+            raise ValueError("not_planned")
+        if occurrence.status != OccurrenceStatus.PENDING:
+            raise ValueError("not_pending")
+        ensure_date_open(session, ctx, occurrence.due_date)
+        ensure_date_open(session, ctx, values.day)
+        workspace = CurrentWorkspaceRepository(session, ctx).get()
+        if values.amount.currency != workspace.base_currency:
+            raise ValueError("invalid_currency")
+        category = CategoryRepository(session, ctx).get_or_raise(values.category_id)
+        if category.archived_at is not None:
+            raise ValueError("invalid_category")
+        if category.kind != values.direction.value:
+            raise ValueError("category_kind_mismatch")
+        items.update(
+            item.id,
+            name=name,
+            direction=category.kind,
+            category_id=category.id,
+            amount_minor=values.amount.amount_minor,
+            currency=values.amount.currency,
+            start_date=values.day,
+        )
+        occurrences_repository.update(
+            occurrence.id,
+            label=name,
+            direction=category.kind,
+            category_id=category.id,
+            expected_minor=values.amount.amount_minor,
+            currency=values.amount.currency,
+            amount_state=AmountState.CONFIRMED
+            if item.amount_mode == AmountMode.FIXED
+            else AmountState.ESTIMATED,
+            amount_overridden=False,
+            nominal_date=values.day,
+            due_date=values.day,
+            rescheduled_at=None,
+        )
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=ctx.user.id,
+            action="scheduled.updated",
             entity_type="scheduled_item",
             entity_id=str(item.id),
             ts=ctx.clock.now(),

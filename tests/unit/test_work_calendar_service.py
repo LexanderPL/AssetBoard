@@ -102,7 +102,7 @@ def test_the_derived_month_log_is_read_only_and_replaces_a_manual_one(team: Work
         income.log_work(team.factory, ctx, source_id, MARCH, Decimal("12"))
     assert error.value.code == "derived_work_log"
     # Other months keep the month-level form.
-    assert not income.log_work(team.factory, ctx, source_id, MAY, Decimal("12"))
+    income.log_work(team.factory, ctx, source_id, MAY, Decimal("12"))
 
 
 def test_removing_the_last_day_deletes_the_derived_log(team: WorkspaceDb) -> None:

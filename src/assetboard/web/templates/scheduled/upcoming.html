@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros/components.html" import csrf_input with context %}
+{% from "macros/components.html" import csrf_input, summary_button_primary with context %}
 {% set input_class = "form-control w-full rounded-lg px-2.5 py-1.5" %}
 {% set button_class = "rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle" %}
 {% block title %}{{ _("Upcoming payments") }} · {{ app_name }}{% endblock %}
@@ -11,6 +11,56 @@
   <span>{{ _("Occurrence marked paid or received.") }}</span>
   <form method="post" action="{{ scoped_url(request, 'upcoming_undo', occurrence_id=undo.occurrence_id) }}">{{ csrf_input() }}<button type="submit" class="font-semibold underline">{{ _("Undo") }}</button></form>
 </div>
+{% endif %}
+{% if notice %}<p role="status" class="mb-4 rounded-xl border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-upcoming-notice>{{ notice }}</p>{% endif %}
+{% macro category_options(selected) -%}
+<option value="">{{ _("Choose a category") }}</option>
+{% for heading, group in ((_("Expense categories"), expense_categories), (_("Income categories"), income_categories)) %}{% if group %}
+<optgroup label="{{ heading }}">{% for category in group %}<option value="{{ category.id }}"{% if selected == category.id|string %} selected{% endif %}>{{ category.name }}</option>{% endfor %}</optgroup>
+{% endif %}{% endfor %}
+{%- endmacro %}
+{# The fields of a one-time payment: the "Add one-time payment" form and a row's Edit form. #}
+{% macro one_time_fields(prefix, values, errors) -%}
+{% set field = errors.get("field") %}
+{% if errors %}<p role="alert" id="{{ prefix }}-error" class="text-sm text-danger sm:col-span-2" data-one-time-error>{{ errors.form }}</p>{% endif %}
+<div class="sm:col-span-2">
+  <label for="{{ prefix }}-name" class="mb-1 block text-xs font-medium">{{ _("Description") }}</label>
+  <input id="{{ prefix }}-name" name="name" maxlength="200" required value="{{ values.get('name', '') }}" class="{{ input_class }}"{% if field == "name" %} aria-invalid="true" aria-describedby="{{ prefix }}-error"{% endif %}>
+</div>
+<div>
+  <label for="{{ prefix }}-amount" class="mb-1 block text-xs font-medium">{{ _("Amount (%(currency)s)", currency=workspace_nav.current.base_currency) }}</label>
+  <input id="{{ prefix }}-amount" name="amount" type="text" inputmode="decimal" required value="{{ values.get('amount', '') }}" class="{{ input_class }}"{% if field == "amount" %} aria-invalid="true" aria-describedby="{{ prefix }}-error"{% endif %}>
+</div>
+<div>
+  <label for="{{ prefix }}-day" class="mb-1 block text-xs font-medium">{{ _("Date") }}</label>
+  <input id="{{ prefix }}-day" name="day" type="date" required value="{{ values.get('day', '') }}" class="{{ input_class }}"{% if field in ("day", "month_closed") %} aria-invalid="true" aria-describedby="{{ prefix }}-error"{% endif %}>
+</div>
+<fieldset class="sm:col-span-2">
+  <legend class="mb-1 text-xs font-medium">{{ _("Type") }}</legend>
+  <div class="flex flex-wrap gap-4 text-sm">
+    {% for value, label in (("expense", _("Expense")), ("income", _("Income"))) %}<label class="inline-flex items-center gap-2"><input type="radio" name="direction" value="{{ value }}"{% if values.get('direction', 'expense') == value %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ label }}</label>{% endfor %}
+  </div>
+</fieldset>
+<div class="sm:col-span-2">
+  <label for="{{ prefix }}-category" class="mb-1 block text-xs font-medium">{{ _("Category") }}</label>
+  <select id="{{ prefix }}-category" name="category_id" required class="form-select w-full rounded-lg py-1.5 pl-2.5"{% if field in ("category", "category_kind_mismatch") %} aria-invalid="true" aria-describedby="{{ prefix }}-error"{% endif %}>{{ category_options(values.get('category_id', '')) }}</select>
+</div>
+{%- endmacro %}
+{% if can_edit %}
+<details class="mb-6" data-add-one-time{% if open_form == "one-time" %} open{% endif %}>
+  <summary class="{{ summary_button_primary }}">{{ _("Add one-time payment") }}</summary>
+  <section class="panel mt-3 max-w-2xl p-4 sm:p-5" aria-label="{{ _('Add one-time payment') }}">
+    <form method="post" action="{{ scoped_url(request, 'upcoming_one_time_create') }}" class="grid gap-4 sm:grid-cols-2" data-one-time-form>
+      {{ csrf_input() }}
+      {{ one_time_fields("one-time", one_time_values, one_time_errors) }}
+      <p class="text-xs text-muted sm:col-span-2">{{ _("A one-time payment is planned once, on its date. It is listed here, not on the Recurring page.") }}</p>
+      <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+        <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Add payment") }}</button>
+        <button type="button" data-details-close class="{{ button_class }}">{{ _("Cancel") }}</button>
+      </div>
+    </form>
+  </section>
+</details>
 {% endif %}
 <section class="panel mb-6 p-4 sm:p-6" aria-labelledby="upcoming-filters">
   <h2 id="upcoming-filters" class="font-semibold">{{ _("Filters") }}</h2>
@@ -74,6 +124,23 @@
             <button type="submit" class="{{ button_class }} sm:col-span-2">{{ _("Save transaction") }}</button>
           </form>
         </details>
+        {% if occurrence.one_time %}
+        {# A one-time payment is edited and deleted here; the Recurring page does not list it. #}
+        {% set editing_this = editing == occurrence.id %}
+        {% set values = edit_values if editing_this else {"name": occurrence.label, "amount": amount_input(occurrence.expected), "day": occurrence.due_date.isoformat(), "direction": occurrence.direction, "category_id": occurrence.category_id|string} %}
+        <details data-one-time-edit{% if editing_this %} open{% endif %}>
+          <summary class="{{ button_class }} cursor-pointer">{{ _("Edit") }}<span class="sr-only"> {{ occurrence.label }}</span></summary>
+          <form method="post" action="{{ scoped_url(request, 'upcoming_one_time_update', occurrence_id=occurrence.id) }}" class="mt-3 grid gap-3 rounded-lg border border-line p-3 sm:grid-cols-2">
+            {{ csrf_input() }}
+            {{ one_time_fields("edit-" ~ occurrence.id, values, edit_errors if editing_this else {}) }}
+            <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+              <button type="submit" class="{{ button_class }}">{{ _("Save") }}</button>
+              <button type="button" data-details-close class="{{ button_class }}">{{ _("Cancel") }}</button>
+            </div>
+          </form>
+        </details>
+        <form method="post" action="{{ scoped_url(request, 'upcoming_delete', occurrence_id=occurrence.id) }}" data-confirm="{{ _('Delete the planned entry %(name)s?', name=occurrence.label) }}">{{ csrf_input() }}<button type="submit" data-delete class="{{ button_class }} text-danger">{{ _("Delete") }}<span class="sr-only"> {{ occurrence.label }}</span></button></form>
+        {% else %}
         <details>
           <summary class="{{ button_class }} cursor-pointer">{{ _("Reschedule this one") }}</summary>
           <form method="post" action="{{ scoped_url(request, 'upcoming_reschedule', occurrence_id=occurrence.id) }}" class="mt-3 flex flex-wrap gap-2 rounded-lg border border-line p-3">
@@ -94,6 +161,7 @@
         </details>
         <form method="post" action="{{ scoped_url(request, 'upcoming_skip', occurrence_id=occurrence.id) }}">{{ csrf_input() }}<button type="submit" class="{{ button_class }}">{{ _("Skip") }}</button></form>
         {% if occurrence.scheduled_item_id %}<a href="{{ scoped_url(request, 'scheduled_edit', item_id=occurrence.scheduled_item_id) }}" class="{{ button_class }}">{{ _("Edit rule") }}</a>{% elif occurrence.income_source_id %}<a href="{{ scoped_url(request, 'income_sources') }}#income-source-{{ occurrence.income_source_id }}" class="{{ button_class }}">{{ _("Edit income") }}</a>{% endif %}
+        {% endif %}
       </div>
       {% endif %}
     </div>

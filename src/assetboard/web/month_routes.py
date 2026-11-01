@@ -68,6 +68,8 @@ ERRORS = {
     "undo_expired": _("Too late to undo: the entry stays deleted."),
     "not_pending": _("This occurrence is no longer pending."),
     "not_planned": _("Only a one-time planned entry can be deleted here."),
+    "not_skipped": _("This occurrence is not skipped."),
+    "archived_item": _("This recurring item is archived, so its skipped date cannot come back."),
     "plan_category_gone": _("This category no longer exists. It may have been deleted elsewhere."),
     "plan_category_archived": PLAN_ERRORS["category_archived"],
     "plan_category_transfer": PLAN_ERRORS["category_transfer"],
@@ -86,6 +88,8 @@ NOTICES = {
         "Entry planned. Its category is not shown while this filter is on."
     ),
     "planned_deleted": _("Planned entry deleted."),
+    "skipped": _("Skipped. It no longer counts as pending."),
+    "skip_undone": _("Skip undone. It is pending again."),
     "plan_saved": _("Planned value saved."),
     "plan_removed": _("Planned value removed."),
 }

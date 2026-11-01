@@ -80,6 +80,22 @@ Implementation order: F3.1 → F3.2 → F3.3 → F3.4 → F3.5 → F3.6 → (F3.
   each one-time item as `monthly` on the day of its date with `max_count = 1` (same single
   date), so no data is lost.
 
+**As built: one-time payments live in Upcoming (owner decisions, UI batch 3):**
+- The Recurring page no longer lists `freq == once` items, and its form no longer offers
+  "One time" for a new item (an existing one-time item opened at `/recurring/<id>/edit` keeps
+  the choice, so that form still works). The page links to the new form on Upcoming.
+- Upcoming payments has **Add one-time payment** (a collapsed `<details>`, reopened with
+  `?form=one-time` and after an error): description, amount, expense/income, category, date.
+  `services.scheduled.create_one_time` wraps `save_item` (frequency `once`, no weekend
+  adjustment, `include_past=True` so a past date gives an overdue occurrence, the date's month
+  must be open, the category must be of the chosen kind). After saving, Upcoming says when a
+  date beyond its window will show.
+- A one-time occurrence on Upcoming has Mark paid or received, **Edit** (description, amount,
+  date, category) and **Delete** (the existing `delete_planned_occurrence`); it has no Skip,
+  Reschedule, Edit amount or Edit rule. `services.scheduled.update_one_time` changes the item
+  and its pending occurrence together (an overdue one moves too; the old and the new month must
+  be open; the amount override is cleared). Recurring items are refused (`not_planned`).
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
@@ -99,6 +115,7 @@ interval/end_date/max_count, determinism. Services use the injected Clock only.
 **Acceptance**
 - "Upcoming" page (headed "Upcoming payments", pl "Nadchodzące płatności"; the sidebar item stays "Upcoming"): overdue (highlighted), next 30 days (setting), grouped by week; filters by direction/category.
 - Actions per occurrence: **Mark paid/received** (dialog prefilled with expected amount and due date; editable) creates a `Transaction` (`source=recurring`) linked to the occurrence and sets `status=posted`; **Skip**; **Reschedule this one** (changes only this occurrence's date); **Edit amount** (this occurrence only); **Edit rule**.
+  As built (UI batch 3): a recurring expected row on the month's Transactions page also has **Skip** (`upcoming_skip` with `return_month`); the skipped occurrence stays in that month's table, greyed out and labelled "Skipped", with **Undo** (`upcoming_unskip` → `services.occurrences.unskip_occurrence`: editor role, open month, not for an archived item, audited as `scheduled_occurrence.unskipped`; an income occurrence is recalculated so its tax payments return). Skipped occurrences are never pending, so the Month summary does not count them.
 - Undo of "mark paid" within 10 seconds deletes the created transaction and restores `pending`.
 - `auto_post=true` items post automatically on the due date (job runs shortly after midnight workspace time) with `source=recurring_auto`; the transaction is clearly marked and editable.
 - Posting into a closed month is blocked with a clear message (the user must reopen or reschedule).
@@ -263,7 +280,19 @@ sources with a longer lag keep it). The old one-form `POST /income` still works.
 - Generated tax-payment occurrences (`generated_by=tax`, `parent_occurrence_id` set) follow the parent: recalculated when units change, removed if the parent is skipped.
 - Golden example (test): variable source, rate 1 230.00/day, lag 1, pay day 10; work log Aug-2026 = 19 days; VAT 23% added, `record_as=cash_received` → occurrence 2026-09-10 expects 28 745.10 (net 23 370.00 + VAT 5 375.10), confirmed; tax-payment occurrences for the configured rules appear in the configured months.
 - Confirming (F3.2 flow) an income occurrence posts the income transaction with the ledger amount; the user may edit the actual amount (the bank amount rules).
-- Edge cases covered: no log yet, log changed after posting (offers "adjust transaction" but does not auto-edit), lag 0 and lag ≥ 2, `active_to` ends generation.
+- Edge cases covered: no log yet, log changed after posting, lag 0 and lag ≥ 2, `active_to` ends generation.
+- **As built (UI batch 3):** a month-level log stays editable until the month's income
+  occurrence is posted. After that `log_work` refuses the change (`WorkLogLocked`, code
+  `posted_locked`, carrying the posted transaction's id and date) instead of saving the log and
+  offering an "adjust transaction" notice; nothing changes and the Income page says "This
+  month's income is already received. Edit the transaction instead." with a link to the
+  transaction. The payments table has an inline **Edit** (a `<details>` in the row; Esc or
+  Cancel restores the value) for months with a manual log; locked months show "received" and
+  calendar months keep their link to the calendar. The **Log days worked** form prefills the
+  chosen month's units and reads **Update** (server-side for `?log=<source>&month=YYYY-MM`;
+  `static/js/app.js` swaps value and label from hidden `data-existing-log` elements when the
+  month changes). The work calendar (F3.7) still records days after posting and leaves the
+  posted occurrence alone (follow-up: lock it the same way).
 
 **Agent prompt**
 ```

@@ -30,7 +30,11 @@ from assetboard.i18n.numbers import format_amount_input, format_money
 from assetboard.services.categories import list_categories
 from assetboard.services.context import Context, Role, has_role
 from assetboard.services.months import MonthView
-from assetboard.services.occurrences import UpcomingOccurrence, pending_for_month
+from assetboard.services.occurrences import (
+    UpcomingOccurrence,
+    pending_for_month,
+    skipped_for_month,
+)
 from assetboard.services.profile import highlights_large_amounts
 from assetboard.services.transactions import TransactionView, list_month
 
@@ -157,6 +161,8 @@ class SectionView:
     categories: tuple[tuple[str, str], ...]  # (id, name): active categories of this kind
     edit_categories: tuple[tuple[str, str], ...]  # plus the edited row's archived category
     state: SectionState
+    # Skipped occurrences of the month: greyed out with Undo; never counted as pending.
+    skipped_rows: tuple[PendingRowView, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -219,6 +225,7 @@ def build_ledger(
     locale = request.state.locale
     transactions = list_month(factory, ctx, view.month)
     pending = pending_for_month(factory, ctx, view.month)
+    skipped = skipped_for_month(factory, ctx, view.month)
     categories = list_categories(factory, ctx, usage_sources=())
     can_write = has_role(ctx, Role.EDITOR) and not view.closed
     highlight = highlights_large_amounts(factory, ctx.user.id)
@@ -244,12 +251,20 @@ def build_ledger(
         stored = whole = transactions.expense if direction == "expense" else transactions.income
         if ledger_filter is not None:
             stored = tuple(t for t in stored if t.category_id == ledger_filter.category_id)
-        expected = tuple(
-            occurrence
-            for occurrence in pending
-            if occurrence.direction == direction
-            and (ledger_filter is None or occurrence.category_id == ledger_filter.category_id)
-        )
+
+        def shown(occurrence: UpcomingOccurrence, direction: str = direction) -> bool:
+            return occurrence.direction == direction and (
+                ledger_filter is None or occurrence.category_id == ledger_filter.category_id
+            )
+
+        def pending_row(occurrence: UpcomingOccurrence) -> PendingRowView:
+            return PendingRowView(
+                occurrence,
+                format_day(occurrence.due_date, locale),
+                format_money(occurrence.expected, locale),
+                format_amount_input(occurrence.expected, locale),
+            )
+
         top = maxima(t.amount for t in whole) if highlight else {}
         rows = tuple(
             RowView(
@@ -257,15 +272,8 @@ def build_ledger(
             )
             for t in stored
         )
-        pending_rows = tuple(
-            PendingRowView(
-                occurrence,
-                format_day(occurrence.due_date, locale),
-                format_money(occurrence.expected, locale),
-                format_amount_input(occurrence.expected, locale),
-            )
-            for occurrence in expected
-        )
+        pending_rows = tuple(pending_row(o) for o in pending if shown(o))
+        skipped_rows = tuple(pending_row(o) for o in skipped if shown(o))
         active = categories.expense if direction == "expense" else categories.income
         options = tuple((str(c.id), c.name) for c in active)
         edit_options = options
@@ -300,6 +308,7 @@ def build_ledger(
                 categories=options,
                 edit_categories=edit_options,
                 state=state,
+                skipped_rows=skipped_rows,
             )
         )
     return LedgerView(

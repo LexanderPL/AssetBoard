@@ -219,7 +219,8 @@ async def items(request: Request, ctx: CurrentContext) -> Response:
         request,
         "scheduled/list.html",
         context={
-            "items": rows,
+            # One-time items live on the Upcoming page (added, edited and deleted there).
+            "items": [row for row in rows if row.values.rule.freq != Frequency.ONCE],
             "format_day": format_day,
             "can_edit": has_role(ctx, Role.EDITOR),
             "error": gettext(ACTION_ERRORS.get(error, GENERIC_ERROR), request.state.locale)

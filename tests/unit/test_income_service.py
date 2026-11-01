@@ -14,7 +14,7 @@ from assetboard.db.repositories import (
 )
 from assetboard.domain.money import Money
 from assetboard.domain.percent_or_fixed import PercentOrFixed
-from assetboard.services import income, taxes
+from assetboard.services import income, occurrences, taxes
 from assetboard.services.context import PermissionDenied
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
@@ -92,7 +92,7 @@ def test_income_source_golden_example_generates_tax_payment(team: WorkspaceDb) -
         due_month_offset=0,
         generate_payment=True,
     )
-    assert not income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("19"))
+    income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("19"))
 
     with team.factory() as session:
         parent = ScheduledOccurrenceRepository(session, ctx).for_income_work_month(
@@ -113,7 +113,7 @@ def test_income_source_golden_example_generates_tax_payment(team: WorkspaceDb) -
     # The label is in the workspace language; a recalculation renames pending payments.
     with team.factory.begin() as session:
         CurrentWorkspaceRepository(session, ctx).update(locale="pl")
-    assert not income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("19"))
+    income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("19"))
     with team.factory() as session:
         repository = ScheduledOccurrenceRepository(session, ctx)
         parent = repository.for_income_work_month(source_id, date(2026, 8, 1))
@@ -161,13 +161,34 @@ def test_posted_income_occurrence_is_not_recalculated(team: WorkspaceDb) -> None
         amount_minor=amount,
         day=date(2026, 9, 10),
     )
-    assert income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("7"))
+    # The month's income is received: its log is locked, nothing changes.
+    with pytest.raises(income.WorkLogLocked) as locked:
+        income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("7"))
+    assert locked.value.code == "posted_locked"
+    assert locked.value.transaction_date == date(2026, 9, 10)
     with team.factory() as session:
         stored = session.scalar(
             select(ScheduledOccurrence).where(ScheduledOccurrence.id == occurrence_id)
         )
         assert stored is not None and stored.expected_minor == amount
         assert stored.status == "posted"
+        assert locked.value.transaction_id == stored.transaction_id
+        audit = session.scalars(
+            select(AuditEvent.action).where(AuditEvent.action.like("work_log.%"))
+        ).all()
+        assert "work_log.updated_after_posting" not in audit
+    listed = next(row for row in income.list_sources(team.factory, ctx) if row.id == source_id)
+    assert listed.locked_months == frozenset({date(2026, 8, 1)})
+    assert [log.units for log in listed.work_logs] == [Decimal("2")]
+
+    # Other months stay editable, and a changed log recalculates the pending occurrence.
+    income.log_work(team.factory, ctx, source_id, date(2026, 9, 1), Decimal("3"))
+    income.log_work(team.factory, ctx, source_id, date(2026, 9, 1), Decimal("4"))
+    with team.factory() as session:
+        september = ScheduledOccurrenceRepository(session, ctx).for_income_work_month(
+            source_id, date(2026, 9, 1)
+        )
+        assert september is not None and september.expected_minor == 40_000
 
 
 def test_missing_work_log_tracks_pay_month_and_disappears_after_logging(
@@ -700,6 +721,68 @@ def test_resync_pending_income_applies_the_current_tax_model(team: WorkspaceDb) 
     assert income.resync_pending_income(team.factory, ctx, team.clock) >= 1
     resynced = _occurrence(team, ctx, source_id, date(2026, 8, 1))
     assert resynced is not None and resynced.expected_minor == 100_000
+
+
+def test_undoing_a_skipped_income_month_brings_back_its_tax_payment(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    income_category, expense_category = categories(team, ctx)
+    rule_id = taxes.create_rule(
+        team.factory,
+        ctx,
+        name="VAT",
+        kind="added",
+        payment_category_id=expense_category,
+        base="net",
+        notes="",
+        effective_from=date(2026, 1, 1),
+        value=PercentOrFixed.percent(2300),
+    )
+    source_id = income.create_source(
+        team.factory,
+        ctx,
+        name="Contract work",
+        kind="variable",
+        category_id=income_category,
+        fixed_minor=None,
+        rate_minor=123_000,
+        unit_label="day",
+        pay_day_value=10,
+        pay_lag_months=1,
+        expected_mode="manual",
+        expected_units_value=None,
+        average_months=3,
+        active_from=date(2026, 1, 1),
+        active_to=None,
+    )
+    income.attach_tax_rule(
+        team.factory,
+        ctx,
+        source_id,
+        tax_rule_id=rule_id,
+        payment_category_id=expense_category,
+        due_day=20,
+        due_month_offset=0,
+        generate_payment=True,
+    )
+    income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("19"))
+
+    def parent_and_children():
+        with team.factory() as session:
+            repository = ScheduledOccurrenceRepository(session, ctx)
+            parent = repository.for_income_work_month(source_id, date(2026, 8, 1))
+            assert parent is not None
+            return parent, repository.children(parent.id)
+
+    parent, children = parent_and_children()
+    assert len(children) == 1
+    occurrences.skip_occurrence(team.factory, ctx, parent.id)
+    parent, children = parent_and_children()
+    assert (parent.status, children) == ("skipped", [])
+
+    occurrences.unskip_occurrence(team.factory, ctx, parent.id)
+    parent, children = parent_and_children()
+    assert (parent.status, parent.expected_minor) == ("pending", 2_874_510)
+    assert [(child.status, child.expected_minor) for child in children] == [("pending", 537_510)]
 
 
 def test_resync_pending_income_relabels_pending_tax_payments(team: WorkspaceDb) -> None:

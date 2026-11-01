@@ -14,9 +14,11 @@ from pathlib import Path
 import pytest
 import uvicorn
 from playwright.sync_api import expect, sync_playwright
+from sqlalchemy import select
 
 from assetboard.app import create_app
 from assetboard.config import Settings
+from assetboard.db.models.scheduled import ScheduledItem
 from assetboard.services.auth import run_initial_setup
 
 pytestmark = pytest.mark.skipif(
@@ -136,19 +138,28 @@ def test_work_calendar_in_a_browser(tmp_path: Path) -> None:
             page.locator("[data-calendar-next]").click()
             expect(page.locator("[data-calendar-month]")).to_have_text("September 2026")
 
-            # A one-time item: choosing "One time" hides the repeat fields.
+            # One-time payments are added on Upcoming; the Recurring form does not offer them.
             page.goto(f"{base}/recurring/new", wait_until="networkidle")
             repeat_fields = page.locator('[data-hidden-when="freq=once"]')
             expect(repeat_fields).to_be_visible()
-            page.get_by_label("Name").fill("Wedding gift")
-            page.get_by_label("Category").select_option(label="Gifts")
-            page.get_by_label("Amount", exact=True).fill("120")
-            page.get_by_label("Start date").fill((date.today() + timedelta(days=30)).isoformat())
-            page.get_by_label("Repeat").select_option("once")
-            expect(repeat_fields).to_be_hidden()
-            page.get_by_role("button", name="Save recurring item").click()
+            expect(page.locator('#freq option[value="once"]')).to_have_count(0)
+            page.goto(f"{base}/upcoming?form=one-time", wait_until="networkidle")
+            one_time = page.locator("form[data-one-time-form]")
+            one_time.get_by_label("Description").fill("Wedding gift")
+            one_time.get_by_label("Amount", exact=False).fill("120")
+            one_time.get_by_label("Date").fill((date.today() + timedelta(days=30)).isoformat())
+            one_time.get_by_label("Category").select_option(label="Gifts")
+            one_time.get_by_role("button", name="Add payment").click()
             page.wait_for_load_state("networkidle")
-            expect(page.locator("[data-one-time]")).to_contain_text("One time on")
+            expect(page.locator("[data-upcoming-notice]")).to_contain_text("One-time payment")
+            # An existing one-time item's rule form still hides the repeat fields.
+            with app.state.session_factory() as session:
+                item_id = session.scalars(
+                    select(ScheduledItem.id).where(ScheduledItem.name == "Wedding gift")
+                ).one()
+            page.goto(f"{base}/recurring/{item_id}/edit", wait_until="networkidle")
+            expect(page.get_by_label("Repeat")).to_have_value("once")
+            expect(repeat_fields).to_be_hidden()
             assert page.evaluate("window.__cspViolations") == []
             browser.close()
     finally:

@@ -1241,6 +1241,11 @@ msgstr ""
 "Zapisano dziennik pracy; zaksięgowany przychód nie został zmieniony. W "
 "razie potrzeby skoryguj transakcję ręcznie."
 
+msgid "This month's income is already received. Edit the transaction instead."
+msgstr ""
+"Przychód za ten miesiąc został już otrzymany. Zamiast tego edytuj "
+"transakcję."
+
 msgid "Enter a name."
 msgstr "Podaj nazwę."
 
@@ -1407,6 +1412,14 @@ msgstr "To wystąpienie nie jest już oczekujące."
 msgid "Only a one-time planned entry can be deleted here."
 msgstr "Tutaj można usunąć tylko jednorazowy zaplanowany wpis."
 
+msgid "This occurrence is not skipped."
+msgstr "To wystąpienie nie jest pominięte."
+
+msgid "This recurring item is archived, so its skipped date cannot come back."
+msgstr ""
+"Ta pozycja cykliczna jest zarchiwizowana, więc pominięty termin nie może "
+"wrócić."
+
 msgid "This category no longer exists. It may have been deleted elsewhere."
 msgstr "Ta kategoria już nie istnieje. Mogła zostać usunięta gdzie indziej."
 
@@ -1442,6 +1455,12 @@ msgstr "Zaplanowano wpis. Jego kategoria jest ukryta przez filtr."
 
 msgid "Planned entry deleted."
 msgstr "Usunięto zaplanowany wpis."
+
+msgid "Skipped. It no longer counts as pending."
+msgstr "Pominięto. Nie jest już liczone jako oczekujące."
+
+msgid "Skip undone. It is pending again."
+msgstr "Cofnięto pominięcie. Znów jest oczekujące."
 
 msgid "Planned value saved."
 msgstr "Zapisano wartość planowaną."
@@ -1903,6 +1922,32 @@ msgstr "Sprawdź kwotę i datę, a następnie spróbuj ponownie."
 
 msgid "Choose a valid direction."
 msgstr "Wybierz prawidłowy kierunek."
+
+msgid "Enter a description."
+msgstr "Wpisz opis."
+
+msgid ""
+"Choose an expense category for an expense, or an income category for "
+"income."
+msgstr ""
+"Wybierz kategorię wydatków dla wydatku albo kategorię przychodów dla "
+"przychodu."
+
+msgid "Only a one-time payment can be edited here."
+msgstr "Tutaj można edytować tylko płatność jednorazową."
+
+#, python-format
+msgid "One-time payment added for %(date)s."
+msgstr "Dodano płatność jednorazową na %(date)s."
+
+#, python-format
+msgid "It shows here when it is due within the next %(days)d days."
+msgstr ""
+"Pojawi się tutaj, gdy jej termin przypadnie w ciągu najbliższych %(days)d"
+" dni."
+
+msgid "One-time payment saved."
+msgstr "Zapisano płatność jednorazową."
 
 msgid "Choose a supported currency."
 msgstr "Wybierz obsługiwaną walutę."
@@ -3302,6 +3347,9 @@ msgstr "Wstecz"
 msgid "Where your money comes from and what you will receive next."
 msgstr "Skąd pochodzą twoje pieniądze i co otrzymasz w najbliższym czasie."
 
+msgid "Open the transaction"
+msgstr "Otwórz transakcję"
+
 #, python-format
 msgid "Fixed · %(amount)s on the %(day)s · Income category: %(category)s"
 msgstr "Stały · %(amount)s %(day)s dnia · Kategoria przychodu: %(category)s"
@@ -3370,6 +3418,17 @@ msgid "estimate"
 msgstr "szacunek"
 
 #, python-format
+msgid "Edit the units logged for %(month)s"
+msgstr "Edytuj jednostki wpisane za %(month)s"
+
+#, python-format
+msgid "Units worked (%(unit)s)"
+msgstr "Przepracowane jednostki (%(unit)s)"
+
+msgid "received"
+msgstr "otrzymane"
+
+#, python-format
 msgid "%(name)s %(amount)s on %(date)s"
 msgstr "%(name)s %(amount)s dnia %(date)s"
 
@@ -3379,12 +3438,14 @@ msgstr "Nic do zapłaty"
 msgid "Log days worked"
 msgstr "Wpisz przepracowane dni"
 
-#, python-format
-msgid "Units worked (%(unit)s)"
-msgstr "Przepracowane jednostki (%(unit)s)"
+msgid "This month comes from the work calendar. Change the days in the calendar."
+msgstr "Ten miesiąc pochodzi z kalendarza pracy. Zmień dni w kalendarzu."
 
 msgid "Save work log"
 msgstr "Zapisz dziennik pracy"
+
+msgid "Update"
+msgstr "Aktualizuj"
 
 msgid ""
 "Months with days marked in the work calendar are read-only here: their "
@@ -3392,6 +3453,11 @@ msgid ""
 msgstr ""
 "Miesiące z dniami zaznaczonymi w kalendarzu pracy są tu tylko do odczytu:"
 " ich jednostki to suma dni."
+
+msgid "A month's log can be changed until its income is received."
+msgstr ""
+"Wpis za miesiąc można zmieniać, dopóki przychód za niego nie zostanie "
+"otrzymany."
 
 msgid "Taxes on this income"
 msgstr "Podatki od tego przychodu"
@@ -3503,6 +3569,20 @@ msgstr "Potwierdź"
 #, python-format
 msgid "Delete the planned entry %(name)s?"
 msgstr "Usunąć zaplanowany wpis %(name)s?"
+
+#, python-format
+msgid "Skip %(name)s on %(date)s"
+msgstr "Pomiń %(name)s z dnia %(date)s"
+
+msgid "Skipped"
+msgstr "Pominięte"
+
+#, python-format
+msgid "Undo skipping %(name)s on %(date)s"
+msgstr "Cofnij pominięcie %(name)s z dnia %(date)s"
+
+msgid "Undo"
+msgstr "Cofnij"
 
 msgid "No entries in this category this month."
 msgstr "Brak wpisów tej kategorii w tym miesiącu."
@@ -3764,9 +3844,6 @@ msgstr[2] ""
 "Nie skopiowano %(num)d wartości planowanych kategorii zarchiwizowanych "
 "lub przelewów własnych."
 
-msgid "Undo"
-msgstr "Cofnij"
-
 msgid "Summary"
 msgstr "Podsumowanie"
 
@@ -4013,6 +4090,13 @@ msgstr ""
 "maksymalna liczba wystąpień, odstęp, dni tygodnia, dzień i miesiąc są "
 "wtedy pomijane."
 
+msgid ""
+"For a single payment, use Add one-time payment on the Upcoming payments "
+"page."
+msgstr ""
+"Dla pojedynczej płatności użyj opcji Dodaj płatność jednorazową na "
+"stronie Nadchodzące płatności."
+
 msgid "End date (optional)"
 msgstr "Data końcowa (opcjonalnie)"
 
@@ -4081,9 +4165,11 @@ msgstr ""
 msgid "Recurring items"
 msgstr "Pozycje cykliczne"
 
-#, python-format
-msgid "One time on %(date)s"
-msgstr "Jednorazowo, %(date)s"
+msgid "One-time payments are on the Upcoming payments page."
+msgstr "Płatności jednorazowe są na stronie Nadchodzące płatności."
+
+msgid "Add one-time payment"
+msgstr "Dodaj płatność jednorazową"
 
 msgid "Done"
 msgstr "Zakończona"
@@ -4134,6 +4220,23 @@ msgstr "Nadchodzące płatności"
 
 msgid "Occurrence marked paid or received."
 msgstr "Wystąpienie oznaczono jako opłacone lub otrzymane."
+
+#, python-format
+msgid "Amount (%(currency)s)"
+msgstr "Kwota (%(currency)s)"
+
+msgid "Type"
+msgstr "Rodzaj"
+
+msgid ""
+"A one-time payment is planned once, on its date. It is listed here, not "
+"on the Recurring page."
+msgstr ""
+"Płatność jednorazowa jest planowana raz, na swój dzień. Jest wyświetlana "
+"tutaj, a nie na stronie Cykliczne."
+
+msgid "Add payment"
+msgstr "Dodaj płatność"
 
 msgid "All categories"
 msgstr "Wszystkie kategorie"
@@ -4432,10 +4535,6 @@ msgstr "Nic nie zaplanowano"
 
 msgid "Add another tax"
 msgstr "Dodaj inny podatek"
-
-#, python-format
-msgid "Amount (%(currency)s)"
-msgstr "Kwota (%(currency)s)"
 
 msgid "How often"
 msgstr "Jak często"

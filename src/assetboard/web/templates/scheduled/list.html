@@ -5,12 +5,12 @@
 {% block content %}
 {% if error %}<p role="alert" class="mb-4 rounded-xl border border-line px-4 py-3 text-sm text-danger" data-action-error>{{ error }}</p>{% endif %}
 {% if can_edit %}<a href="{{ scoped_url(request, 'scheduled_new') }}" class="mb-6 inline-block rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary">{{ _("New recurring item") }}</a>{% endif %}
+<p class="mb-6 text-sm text-muted" data-one-time-hint>{{ _("One-time payments are on the Upcoming payments page.") }} <a href="{{ scoped_url(request, 'scheduled_upcoming') }}?form=one-time" class="font-medium text-primary-ink underline">{{ _("Add one-time payment") }}</a></p>
 <div class="space-y-4">
 {% for item in items %}
 <section class="panel p-6" data-scheduled-item="{{ item.id }}">
   <h2 class="font-semibold break-words">{{ item.values.name }}</h2>
   <p class="mt-2 text-sm">{{ format_money(item.values.amount, locale) }} · {{ _("Income") if item.values.direction == 'income' else _("Expense") }} · {{ _("Estimate") if item.values.amount_mode == 'estimate' else _("Fixed") }}</p>
-  {% if item.values.rule.freq == 'once' %}<p class="mt-2 text-sm" data-one-time>{{ _("One time on %(date)s", date=format_day(item.values.rule.start_date, locale)) }}</p>{% endif %}
   {% if item.values.notes %}<p class="mt-2 break-words text-sm text-muted">{{ item.values.notes }}</p>{% endif %}
   {% if item.archived %}<p class="mt-3 text-sm text-muted">{{ _("Archived") }}</p>
   {% else %}

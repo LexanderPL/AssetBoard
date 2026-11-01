@@ -1172,6 +1172,9 @@ msgid ""
 "transaction manually if needed."
 msgstr ""
 
+msgid "This month's income is already received. Edit the transaction instead."
+msgstr ""
+
 msgid "Enter a name."
 msgstr ""
 
@@ -1325,6 +1328,12 @@ msgstr ""
 msgid "Only a one-time planned entry can be deleted here."
 msgstr ""
 
+msgid "This occurrence is not skipped."
+msgstr ""
+
+msgid "This recurring item is archived, so its skipped date cannot come back."
+msgstr ""
+
 msgid "This category no longer exists. It may have been deleted elsewhere."
 msgstr ""
 
@@ -1359,6 +1368,12 @@ msgid "Entry planned. Its category is not shown while this filter is on."
 msgstr ""
 
 msgid "Planned entry deleted."
+msgstr ""
+
+msgid "Skipped. It no longer counts as pending."
+msgstr ""
+
+msgid "Skip undone. It is pending again."
 msgstr ""
 
 msgid "Planned value saved."
@@ -1762,6 +1777,28 @@ msgid "Check the amount and date, then try again."
 msgstr ""
 
 msgid "Choose a valid direction."
+msgstr ""
+
+msgid "Enter a description."
+msgstr ""
+
+msgid ""
+"Choose an expense category for an expense, or an income category for "
+"income."
+msgstr ""
+
+msgid "Only a one-time payment can be edited here."
+msgstr ""
+
+#, python-format
+msgid "One-time payment added for %(date)s."
+msgstr ""
+
+#, python-format
+msgid "It shows here when it is due within the next %(days)d days."
+msgstr ""
+
+msgid "One-time payment saved."
 msgstr ""
 
 msgid "Choose a supported currency."
@@ -3037,6 +3074,9 @@ msgstr ""
 msgid "Where your money comes from and what you will receive next."
 msgstr ""
 
+msgid "Open the transaction"
+msgstr ""
+
 #, python-format
 msgid "Fixed · %(amount)s on the %(day)s · Income category: %(category)s"
 msgstr ""
@@ -3103,6 +3143,17 @@ msgid "estimate"
 msgstr ""
 
 #, python-format
+msgid "Edit the units logged for %(month)s"
+msgstr ""
+
+#, python-format
+msgid "Units worked (%(unit)s)"
+msgstr ""
+
+msgid "received"
+msgstr ""
+
+#, python-format
 msgid "%(name)s %(amount)s on %(date)s"
 msgstr ""
 
@@ -3112,16 +3163,21 @@ msgstr ""
 msgid "Log days worked"
 msgstr ""
 
-#, python-format
-msgid "Units worked (%(unit)s)"
+msgid "This month comes from the work calendar. Change the days in the calendar."
 msgstr ""
 
 msgid "Save work log"
 msgstr ""
 
+msgid "Update"
+msgstr ""
+
 msgid ""
 "Months with days marked in the work calendar are read-only here: their "
 "units are the sum of the days."
+msgstr ""
+
+msgid "A month's log can be changed until its income is received."
 msgstr ""
 
 msgid "Taxes on this income"
@@ -3225,6 +3281,20 @@ msgstr ""
 
 #, python-format
 msgid "Delete the planned entry %(name)s?"
+msgstr ""
+
+#, python-format
+msgid "Skip %(name)s on %(date)s"
+msgstr ""
+
+msgid "Skipped"
+msgstr ""
+
+#, python-format
+msgid "Undo skipping %(name)s on %(date)s"
+msgstr ""
+
+msgid "Undo"
 msgstr ""
 
 msgid "No entries in this category this month."
@@ -3458,9 +3528,6 @@ msgid_plural "%(num)d planned values of archived or transfer categories were not
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Undo"
-msgstr ""
-
 msgid "Summary"
 msgstr ""
 
@@ -3683,6 +3750,11 @@ msgid ""
 "occurrences, interval, weekdays, day and month are then ignored."
 msgstr ""
 
+msgid ""
+"For a single payment, use Add one-time payment on the Upcoming payments "
+"page."
+msgstr ""
+
 msgid "End date (optional)"
 msgstr ""
 
@@ -3747,8 +3819,10 @@ msgstr ""
 msgid "Recurring items"
 msgstr ""
 
-#, python-format
-msgid "One time on %(date)s"
+msgid "One-time payments are on the Upcoming payments page."
+msgstr ""
+
+msgid "Add one-time payment"
 msgstr ""
 
 msgid "Done"
@@ -3792,6 +3866,21 @@ msgid "Upcoming payments"
 msgstr ""
 
 msgid "Occurrence marked paid or received."
+msgstr ""
+
+#, python-format
+msgid "Amount (%(currency)s)"
+msgstr ""
+
+msgid "Type"
+msgstr ""
+
+msgid ""
+"A one-time payment is planned once, on its date. It is listed here, not "
+"on the Recurring page."
+msgstr ""
+
+msgid "Add payment"
 msgstr ""
 
 msgid "All categories"
@@ -4077,10 +4166,6 @@ msgid "Nothing planned"
 msgstr ""
 
 msgid "Add another tax"
-msgstr ""
-
-#, python-format
-msgid "Amount (%(currency)s)"
 msgstr ""
 
 msgid "How often"
@@ -4872,5 +4957,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Personal finance"
+#~ msgstr ""
+
+#~ msgid "One time on %(date)s"
 #~ msgstr ""
 

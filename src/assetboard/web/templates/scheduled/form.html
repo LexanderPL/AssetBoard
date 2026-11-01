@@ -40,9 +40,12 @@
   {{ field("start_date", _("Start date"), type="date", value=values.get('start_date', ''), error=errors.get('start_date'), required=true) }}
   <label class="block text-sm font-medium" for="freq">{{ _("Repeat") }}</label>
   <select id="freq" name="freq" class="form-select w-full" aria-describedby="freq-help">
-    {% for value, label in [('once', _('One time')), ('weekly', _('Weekly')), ('monthly', _('Monthly')), ('yearly', _('Yearly'))] %}<option value="{{ value }}"{% if values.get('freq') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    {# One-time items are added on the Upcoming page; an existing one keeps its choice here. #}
+    {% set one_time = values.get('freq') == 'once' %}
+    {% for value, label in ([('once', _('One time'))] if one_time else []) + [('weekly', _('Weekly')), ('monthly', _('Monthly')), ('yearly', _('Yearly'))] %}<option value="{{ value }}"{% if values.get('freq') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
   </select>
-  <p id="freq-help" class="text-sm text-muted">{{ _("One time: a single date on the start date. The end date, maximum occurrences, interval, weekdays, day and month are then ignored.") }}</p>
+  {% if one_time %}<p id="freq-help" class="text-sm text-muted">{{ _("One time: a single date on the start date. The end date, maximum occurrences, interval, weekdays, day and month are then ignored.") }}</p>
+  {% else %}<p id="freq-help" class="text-sm text-muted">{{ _("For a single payment, use Add one-time payment on the Upcoming payments page.") }}</p>{% endif %}
   <div class="space-y-4" data-hidden-when="freq=once">
   {{ field("end_date", _("End date (optional)"), type="date", value=values.get('end_date', ''), error=errors.get('end_date')) }}
   {{ field("max_count", _("Maximum occurrences (optional)"), type="number", value=values.get('max_count', ''), error=errors.get('max_count'), min=1) }}

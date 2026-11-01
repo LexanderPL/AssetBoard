@@ -33,6 +33,7 @@ from assetboard.db.repositories import (
     MonthStateRepository,
     ScheduledOccurrenceRepository,
     TaxRuleRepository,
+    TransactionRepository,
     WorkDayRepository,
     WorkLogRepository,
 )
@@ -85,6 +86,19 @@ class IncomeError(Exception):
         self.code = code
 
 
+class WorkLogLocked(IncomeError):
+    """The month's income is already received (its occurrence is posted): the log is locked.
+
+    ``transaction_id`` and ``transaction_date`` name the posted transaction (when it still has
+    one), so the caller can link to it: the transaction is what changes now.
+    """
+
+    def __init__(self, transaction_id: UUID | None, transaction_date: date | None) -> None:
+        super().__init__("posted_locked")
+        self.transaction_id = transaction_id
+        self.transaction_date = transaction_date
+
+
 @dataclass(frozen=True, slots=True)
 class IncomePreview:
     work_month: date
@@ -120,6 +134,8 @@ class IncomeSourceView:
     attachments: tuple[IncomeSourceTaxRule, ...]
     work_logs: tuple[WorkLog, ...]
     preview: tuple[IncomePreview, ...]
+    # Work months whose income is already received (occurrence posted): their log is locked.
+    locked_months: frozenset[date] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -494,6 +510,13 @@ def _sync_work_month(
     return occurrence
 
 
+def resync_work_month(session: Session, ctx: Context, source_id: UUID, work_month: date) -> None:
+    """Recalculate one work month's pending occurrence (and its tax payments) in the caller's
+    exclusive-locked write, e.g. after a skipped occurrence is pending again."""
+    source = IncomeSourceRepository(session, ctx).get_or_raise(source_id)
+    _sync_work_month(session, ctx, ctx.clock, source, work_month, allow_past=True)
+
+
 def generate_workspace_in_session(
     session: Session,
     scope: WorkspaceScope,
@@ -576,6 +599,7 @@ def list_sources(factory: sessionmaker[Session], ctx: Context) -> list[IncomeSou
         result: list[IncomeSourceView] = []
         attachment_repository = IncomeSourceTaxRuleRepository(session, ctx)
         log_repository = WorkLogRepository(session, ctx)
+        occurrence_repository = ScheduledOccurrenceRepository(session, ctx)
         workspace = CurrentWorkspaceRepository(session, ctx).get()
         today = ctx.clock.today(workspace.timezone)
         for source in sources:
@@ -634,6 +658,13 @@ def list_sources(factory: sessionmaker[Session], ctx: Context) -> list[IncomeSou
                     attachments=tuple(attachment_repository.for_source(source.id)),
                     work_logs=tuple(logs),
                     preview=tuple(preview_rows),
+                    locked_months=frozenset(
+                        row.work_month
+                        for row in occurrence_repository.for_income_source(source.id)
+                        if row.status == "posted"
+                        and row.generated_by == "income"
+                        and row.work_month is not None
+                    ),
                 )
             )
         return result
@@ -1206,18 +1237,19 @@ def log_work(
     source_id: UUID,
     work_month: date,
     units: Decimal,
-) -> bool:
-    """Save a month-level work log and recalculate only its pending occurrence.
+) -> None:
+    """Save (add or change) a month-level work log and recalculate its pending occurrence.
 
-    Returns ``True`` when a posted occurrence exists for the month; callers can offer an explicit
-    transaction adjustment without changing the posted ledger row.
+    A log stays editable until the month's income occurrence is confirmed (posted as a
+    transaction). After that the log is locked: ``WorkLogLocked`` is raised and nothing changes,
+    because the posted transaction, not the log, is then the record of what was received.
     """
     require_role(ctx, Role.EDITOR)
     _valid_month(work_month)
     if not units.is_finite() or units < 0:
         raise IncomeError("invalid_units")
 
-    def write(session: Session) -> bool:
+    def write(session: Session) -> None:
         require_role_now(session, ctx, Role.EDITOR)
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
         sources = IncomeSourceRepository(session, ctx)
@@ -1226,6 +1258,16 @@ def log_work(
             raise IncomeError("invalid_source")
         occurrence_repo = ScheduledOccurrenceRepository(session, ctx)
         occurrence = occurrence_repo.for_income_work_month(source_id, work_month)
+        if occurrence is not None and occurrence.status == "posted":
+            transaction_date = None
+            if occurrence.transaction_id is not None:
+                transaction = TransactionRepository(session, ctx).get(occurrence.transaction_id)
+                if transaction is not None and transaction.deleted_at is None:
+                    transaction_date = transaction.date
+            raise WorkLogLocked(
+                occurrence.transaction_id if transaction_date is not None else None,
+                transaction_date,
+            )
         if (
             occurrence is not None
             and occurrence.status == "pending"
@@ -1245,16 +1287,6 @@ def log_work(
             row = repo.create(income_source_id=source_id, work_month=work_month, units=units)
         else:
             repo.update(row.id, units=units)
-        if occurrence is not None and occurrence.status == "posted":
-            AuditEventRepository(session, ctx).record(
-                actor_user_id=ctx.user.id,
-                action="work_log.updated_after_posting",
-                entity_type="work_log",
-                entity_id=str(row.id),
-                ts=ctx.clock.now(),
-                data={"work_month": work_month.isoformat()},
-            )
-            return True
         _sync_work_month(session, ctx, ctx.clock, source, work_month, allow_past=True)
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
@@ -1264,9 +1296,8 @@ def log_work(
             ts=ctx.clock.now(),
             data={"work_month": work_month.isoformat()},
         )
-        return False
 
-    return run_immediate(factory, write)
+    run_immediate(factory, write)
 
 
 def _check_units_size(units: Decimal) -> None:
