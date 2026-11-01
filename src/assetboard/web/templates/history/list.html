@@ -71,7 +71,7 @@
      button is a link to ?export=1, and the dialog is rendered open in the page flow; an
      invalid option renders it open as well. #}
   <dialog id="export-dialog" aria-labelledby="export-heading" data-export data-dialog-modal data-backdrop-close{% if export_open %} open{% endif %}
-          class="w-[min(92vw,44rem)] rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl backdrop:bg-black/50 [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none">
+          class="popup w-[min(92vw,44rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none">
    <div class="p-4 sm:p-6">
     <div class="flex items-start justify-between gap-4">
       <h2 id="export-heading" class="text-base font-semibold">{{ _("Export as CSV") }}</h2>
@@ -117,7 +117,7 @@
      link to ?filters=1, and the dialog is rendered open in the page flow; invalid filters render
      it open as well. The search bar above stays outside it and reacts as you type. #}
   <dialog id="filters-dialog" aria-labelledby="filters-heading" data-dialog-modal data-backdrop-close{% if filters_open %} open{% endif %}
-          class="w-[min(92vw,48rem)] rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl backdrop:bg-black/50 [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none">
+          class="popup w-[min(92vw,48rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none">
    <div class="p-4 sm:p-6">
     <div class="flex items-start justify-between gap-4">
       <h2 id="filters-heading" class="text-base font-semibold">{{ _("Filters") }}</h2>
@@ -234,7 +234,7 @@
 
   {% if can_edit and rows %}
   <dialog id="bulk-dialog" aria-labelledby="bulk-heading" data-bulk data-dialog-modal{% if bulk_open %} open{% endif %}
-          class="w-[min(92vw,40rem)] rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl backdrop:bg-black/50 [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none">
+          class="popup w-[min(92vw,40rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none">
    <div class="p-4 sm:p-6">
     <div class="flex items-start justify-between gap-4">
       <h2 id="bulk-heading" class="text-base font-semibold">{{ _("Change category") }}</h2>

@@ -25,8 +25,11 @@ background pair in both themes and that templates use no other colours. Form con
 shared `form-control` and `form-select` classes.
 
 The main content looks like a spreadsheet: boxes (`panel`) and form fields have square corners,
-a thin `line` border and no shadow; buttons, chips, the sidebar, the header and dialogs keep
-their rounded shapes. Data tables take the `sheet` class (a grid of thin cell borders, compact
+a thin `line` border and no shadow; buttons, chips, the sidebar and the header keep their
+rounded shapes. Floating boxes are square too: `popup` (square, thin border, `shadow-card`) is
+used by `<dialog>`s (`dialog.popup` adds the larger shadow and the backdrop), popover panels
+(`details[data-popover]`: the ledger's Confirm, the month picker, the user menu) and the
+description suggestions list; toasts add `toast` (square, with a shadow). Data tables take the `sheet` class (a grid of thin cell borders, compact
 cells, a shaded header row); `sheet-sm` applies the grid from the `sm` breakpoint only (a table
 whose rows stack on a phone) and `sheet-flush` drops the grid's outer edge inside a panel that
 already draws it. A form field that is a table cell (the Transactions entry and edit rows, the

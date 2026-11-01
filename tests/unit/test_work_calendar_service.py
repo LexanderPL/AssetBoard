@@ -183,9 +183,12 @@ def test_a_closed_pay_month_refuses_day_changes(team: WorkspaceDb) -> None:
         lambda: income.fill_working_days(team.factory, ctx, source_id, january),
         lambda: income.clear_work_month(team.factory, ctx, source_id, january),
     ):
-        with pytest.raises(income.IncomeError) as error:
+        with pytest.raises(income.WorkMonthClosed) as error:
             call()
-        assert error.value.code == "month_closed"
+        assert error.value.code == "work_month_closed"
+        assert error.value.month == YearMonth(2026, 2)
+    calendar = income.work_calendar(team.factory, ctx, source_id, january)
+    assert calendar.lock.state == "closed" and not calendar.editable
     assert income.work_calendar(team.factory, ctx, source_id, january).total == Decimal(1)
 
 

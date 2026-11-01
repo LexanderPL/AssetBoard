@@ -89,7 +89,7 @@
                 <span class="max-w-[7rem] truncate sm:max-w-[12rem]" data-user-name>{{ web_session.display_name }}</span>
                 <span class="text-xs text-muted" aria-hidden="true">▾</span>
               </summary>
-              <div class="absolute right-0 top-full z-40 mt-2 max-h-[calc(100vh-6rem)] w-64 max-w-[calc(100vw-2rem)] divide-y divide-line overflow-y-auto rounded-xl border border-line bg-surface shadow-card" data-user-menu-panel>
+              <div class="absolute right-0 top-full z-40 mt-2 max-h-[calc(100vh-6rem)] w-64 max-w-[calc(100vw-2rem)] divide-y divide-line overflow-y-auto popup" data-user-menu-panel>
                 {% if workspace_nav and (workspace_nav.can_switch or workspace_nav.can_create_workspace) %}
                 <div class="p-1" role="group" aria-labelledby="user-menu-workspaces">
                   <p id="user-menu-workspaces" class="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Workspaces") }}</p>

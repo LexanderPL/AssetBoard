@@ -154,6 +154,8 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
                 "timezone": workspace.timezone,
                 "locale": workspace.locale,
                 "auto_copy_plan": workspace.auto_copy_plan,
+                "taxes_enabled": workspace.taxes_enabled,
+                "upcoming_days": workspace.upcoming_days,
             },
             categories=category_rows,
             budget_lines=budget_rows,

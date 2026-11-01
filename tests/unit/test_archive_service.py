@@ -270,3 +270,24 @@ def test_export_locks_workspace_before_reading_ledger(team: WorkspaceDb) -> None
     ledger = next(i for i, sql in enumerate(statements) if "FROM categories" in sql)
     assert lock < ledger
     assert "workspaces.id =" in statements[lock]
+
+
+def test_export_includes_the_taxes_switch_and_upcoming_days(team: WorkspaceDb) -> None:
+    from assetboard.db.models.identity import Workspace
+
+    parsed, _ = parse_archive(export_workspace(team.factory, team.ctx("editor", "editor")).content)
+    assert parsed is not None
+    assert parsed.manifest["format_version"] == "1.1"
+    assert parsed.rows.workspace["taxes_enabled"] is False
+    assert parsed.rows.workspace["upcoming_days"] is None
+
+    with team.factory.begin() as session:
+        workspace = session.get_one(Workspace, team.workspace_id)
+        workspace.taxes_enabled = True
+        workspace.upcoming_days = 30
+    parsed, errors = parse_archive(
+        export_workspace(team.factory, team.ctx("editor", "editor")).content
+    )
+    assert errors == () and parsed is not None and parsed.warnings == ()
+    assert parsed.rows.workspace["taxes_enabled"] is True
+    assert parsed.rows.workspace["upcoming_days"] == 30

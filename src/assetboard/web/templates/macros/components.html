@@ -79,7 +79,7 @@
 {%- endmacro %}
 
 {% macro confirm_dialog(id, title, message, confirm_label, cancel_label) -%}
-<dialog id="{{ id }}" class="w-[min(92vw,28rem)] rounded-2xl border border-line bg-surface p-0 text-ink shadow-2xl backdrop:bg-black/50">
+<dialog id="{{ id }}" class="popup w-[min(92vw,28rem)]">
   <div class="space-y-5 p-6">
     <div>
       <h2 class="text-lg font-semibold">{{ title }}</h2>
@@ -98,7 +98,7 @@
 {% macro toast(message, undo_url, undo_label, undo_seconds=10) -%}
 <div hx-swap-oob="beforeend:#toast-container">
   <div id="toast-{{ uuid4().hex }}" data-toast role="status" aria-live="polite"{% if undo_url %} data-toast-strict data-toast-seconds="{{ undo_seconds }}"{% endif %}
-       class="flex items-center justify-between gap-4 rounded-xl bg-inverse px-4 py-3 text-sm text-on-inverse shadow-lg">
+       class="toast flex items-center justify-between gap-4 bg-inverse px-4 py-3 text-sm text-on-inverse">
     <span>{{ message }}</span>
     <div class="flex items-center gap-3">
       {% if undo_url %}<span class="tabular-nums text-on-inverse" aria-hidden="true" data-toast-countdown>{{ undo_seconds }}</span>

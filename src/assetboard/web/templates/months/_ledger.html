@@ -24,7 +24,7 @@
   "expense": ("", "bg-danger-shade-1", "bg-danger-shade-2", "bg-danger-shade-3", "bg-danger-tint"),
   "income": ("", "bg-success-shade-1", "bg-success-shade-2", "bg-success-shade-3", "bg-success-tint"),
 } %}
-{% set listbox_class = "absolute left-0 right-0 z-10 mt-1 max-h-64 overflow-y-auto rounded-lg border border-line bg-surface py-1 text-sm text-ink shadow-card" %}
+{% set listbox_class = "popup absolute left-0 right-0 z-10 mt-1 max-h-64 overflow-y-auto py-1 text-sm" %}
 
 {# The category filter (F2.4) travels with every write, so the answer stays filtered. #}
 {# The filter bar sits in the (only) table shown, so a write's section swap keeps its count. #}
@@ -194,7 +194,7 @@
             <div class="flex items-center justify-end gap-1" data-pending-actions>
               <details class="relative text-left" data-popover>
                 <summary class="{{ compact_class }}">{{ _("Confirm") }}</summary>
-                <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=r.occurrence.id) }}" class="absolute right-0 z-20 mt-1 grid w-72 gap-2 rounded-lg border border-line bg-surface p-3 text-left shadow-card">
+                <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=r.occurrence.id) }}" class="popup absolute right-0 z-20 mt-1 grid w-72 gap-2 p-3 text-left">
                   {{ csrf_input() }}
                   <input type="hidden" name="return_month" value="{{ ledger.month }}">
                   <label class="text-xs font-medium">{{ _("Date") }}<input name="day" type="date" value="{{ r.occurrence.due_date.isoformat() }}" required class="{{ popover_input_class }}"></label>

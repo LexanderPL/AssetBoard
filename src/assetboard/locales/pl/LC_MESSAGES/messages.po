@@ -1234,17 +1234,18 @@ msgstr ""
 msgid "Enter a number of units above 0 and at most 24."
 msgstr "Podaj liczbę jednostek większą od 0 i nie większą niż 24."
 
-msgid ""
-"The work log was saved; posted income was not changed. Adjust its "
-"transaction manually if needed."
-msgstr ""
-"Zapisano dziennik pracy; zaksięgowany przychód nie został zmieniony. W "
-"razie potrzeby skoryguj transakcję ręcznie."
-
 msgid "This month's income is already received. Edit the transaction instead."
 msgstr ""
 "Przychód za ten miesiąc został już otrzymany. Zamiast tego edytuj "
 "transakcję."
+
+msgid "This month is closed. Reopen it to make changes."
+msgstr "Ten miesiąc jest zamknięty. Otwórz go ponownie, aby wprowadzić zmiany."
+
+msgid "This month's income is not received, so there is no transaction to update."
+msgstr ""
+"Przychód za ten miesiąc nie został otrzymany, więc nie ma transakcji do "
+"zaktualizowania."
 
 msgid "Enter a name."
 msgstr "Podaj nazwę."
@@ -3133,6 +3134,37 @@ msgstr "Poprzedni miesiąc"
 msgid "Next month"
 msgstr "Następny miesiąc"
 
+msgid "Open the month page"
+msgstr "Otwórz stronę miesiąca"
+
+msgid ""
+"You are changing a month whose income is already received. Its "
+"transaction stays as it is unless you update it."
+msgstr ""
+"Zmieniasz miesiąc, za który przychód został już otrzymany. Jego "
+"transakcja pozostaje bez zmian, dopóki jej nie zaktualizujesz."
+
+msgid "Open the transaction"
+msgstr "Otwórz transakcję"
+
+msgid "Edit anyway"
+msgstr "Edytuj mimo to"
+
+msgid "The transaction now matches the logged days."
+msgstr "Transakcja odpowiada teraz zapisanym dniom."
+
+#, python-format
+msgid ""
+"Logged days changed. The received payment was %(received)s; the new days "
+"give %(recalculated)s."
+msgstr ""
+"Zapisane dni się zmieniły. Otrzymana płatność wyniosła %(received)s; nowe"
+" dni dają %(recalculated)s."
+
+#, python-format
+msgid "Update the transaction to %(amount)s"
+msgstr "Zaktualizuj transakcję do %(amount)s"
+
 #, python-format
 msgid "Month total: %(units)s (%(unit)s)"
 msgstr "Suma miesiąca: %(units)s (%(unit)s)"
@@ -3437,9 +3469,6 @@ msgstr "Wstecz"
 msgid "Where your money comes from and what you will receive next."
 msgstr "Skąd pochodzą twoje pieniądze i co otrzymasz w najbliższym czasie."
 
-msgid "Open the transaction"
-msgstr "Otwórz transakcję"
-
 #, python-format
 msgid "Fixed · %(amount)s on the %(day)s · Income category: %(category)s"
 msgstr "Stały · %(amount)s %(day)s dnia · Kategoria przychodu: %(category)s"
@@ -3519,6 +3548,10 @@ msgid "received"
 msgstr "otrzymane"
 
 #, python-format
+msgid "Edit the units logged for %(month)s anyway"
+msgstr "Mimo to edytuj jednostki zapisane za %(month)s"
+
+#, python-format
 msgid "%(name)s %(amount)s on %(date)s"
 msgstr "%(name)s %(amount)s dnia %(date)s"
 
@@ -3544,10 +3577,12 @@ msgstr ""
 "Miesiące z dniami zaznaczonymi w kalendarzu pracy są tu tylko do odczytu:"
 " ich jednostki to suma dni."
 
-msgid "A month's log can be changed until its income is received."
+msgid ""
+"Once a month's income is received, its log changes only with Edit anyway;"
+" a closed month cannot change."
 msgstr ""
-"Wpis za miesiąc można zmieniać, dopóki przychód za niego nie zostanie "
-"otrzymany."
+"Gdy przychód za miesiąc zostanie otrzymany, jego zapis można zmienić "
+"tylko przez „Edytuj mimo to”; zamkniętego miesiąca nie można zmienić."
 
 msgid "Taxes on this income"
 msgstr "Podatki od tego przychodu"
@@ -5486,4 +5521,19 @@ msgstr "Usuń obszar roboczy…"
 #~ "historią ją archiwizuje. Terminy w "
 #~ "zamkniętych miesiącach nigdy się nie "
 #~ "zmieniają."
+
+#~ msgid ""
+#~ "The work log was saved; posted "
+#~ "income was not changed. Adjust its "
+#~ "transaction manually if needed."
+#~ msgstr ""
+#~ "Zapisano dziennik pracy; zaksięgowany przychód"
+#~ " nie został zmieniony. W razie "
+#~ "potrzeby skoryguj transakcję ręcznie."
+
+#~ msgid "A month's log can be changed until its income is received."
+#~ msgstr ""
+#~ "Wpis za miesiąc można zmieniać, dopóki"
+#~ " przychód za niego nie zostanie "
+#~ "otrzymany."
 
