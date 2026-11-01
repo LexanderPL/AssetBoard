@@ -3,11 +3,12 @@
    so no row moves). When the row left the summary (an archived or transfer category's line was
    removed), the whole summary comes out of band instead and the target row is replaced by
    nothing. #}
-{% from "months/_plan.html" import plan_row, totals_row, banner, kpis with context %}
+{% from "months/_plan.html" import plan_row, totals_row, block_total_row, banner, in_out with context %}
 {% if row_view %}
 {{ plan_row(row_view, plan_only=group_view is not none and group_view.totals is none) }}
 {% for g in summary.groups %}{% if g.totals %}{{ totals_row(g, oob=true) }}{% endif %}{% endfor %}
-{{ kpis(oob=true, pending=true) }}
+{% for b in summary.money_blocks %}{{ block_total_row(b, oob=true) }}{% endfor %}
+{{ in_out(oob=true) }}
 {{ banner(oob=true) }}
 {% else %}
 {% with summary_oob = true %}{% include "months/_summary.html" %}{% endwith %}

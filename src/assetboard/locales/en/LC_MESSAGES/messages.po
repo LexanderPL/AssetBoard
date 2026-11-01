@@ -665,7 +665,7 @@ msgid "Deleted workspaces"
 msgstr ""
 
 #, python-format
-msgid "%(name)s tax payment"
+msgid "%(tax)s: %(source)s"
 msgstr ""
 
 #, python-format
@@ -1510,6 +1510,12 @@ msgid "Withdrawn from savings"
 msgstr ""
 
 msgid "Transfers (not counted)"
+msgstr ""
+
+msgid "Money out"
+msgstr ""
+
+msgid "Money in"
 msgstr ""
 
 msgid "A planned value cannot be negative."
@@ -3284,10 +3290,10 @@ msgstr ""
 msgid "Total"
 msgstr ""
 
-msgid "Expected spent vs expected earned"
+msgid "Total money out"
 msgstr ""
 
-msgid "Spent vs earned"
+msgid "Total money in"
 msgstr ""
 
 #, python-format
@@ -3300,12 +3306,6 @@ msgstr ""
 msgid "Spending and saving exceed earnings by %(amount)s."
 msgstr ""
 
-#, python-format
-msgid ""
-"Pending: earned %(earned)s, spent %(spent)s, saved or invested %(saved)s."
-" If everything pending arrives, left %(net)s."
-msgstr ""
-
 msgid "Earned"
 msgstr ""
 
@@ -3316,14 +3316,7 @@ msgstr ""
 msgid "Spent"
 msgstr ""
 
-#, python-format
-msgid "%(amount)s if everything pending arrives"
-msgstr ""
-
 msgid "Left"
-msgstr ""
-
-msgid "Striped: pending, not confirmed yet"
 msgstr ""
 
 #, python-format
@@ -3347,6 +3340,83 @@ msgid "Earned %(actual)s of %(planned)s planned"
 msgstr ""
 
 msgid "(over plan)"
+msgstr ""
+
+msgid "Expected in vs expected out"
+msgstr ""
+
+msgid "In vs out"
+msgstr ""
+
+#, python-format
+msgid "In %(total)s: earned %(earned)s, withdrawn from savings %(withdrawn)s."
+msgstr ""
+
+#, python-format
+msgid "Out %(total)s: spent %(spent)s, saved or invested %(saved)s."
+msgstr ""
+
+#, python-format
+msgid "Short by %(amount)s: more went out than came in."
+msgstr ""
+
+#, python-format
+msgid "Left %(amount)s."
+msgstr ""
+
+#, python-format
+msgid ""
+"Pending: in %(total_in)s (earned %(earned)s, withdrawn %(withdrawn)s), "
+"out %(total_out)s (spent %(spent)s, saved or invested %(saved)s)."
+msgstr ""
+
+#, python-format
+msgid "If everything pending arrives, short by %(amount)s."
+msgstr ""
+
+#, python-format
+msgid "If everything pending arrives, left %(amount)s."
+msgstr ""
+
+msgid "In"
+msgstr ""
+
+#, python-format
+msgid "earned %(earned)s + withdrawn %(withdrawn)s"
+msgstr ""
+
+msgid "Short by"
+msgstr ""
+
+#, python-format
+msgid "short by %(amount)s if everything pending arrives"
+msgstr ""
+
+#, python-format
+msgid "%(amount)s if everything pending arrives"
+msgstr ""
+
+msgid "Striped: pending, not confirmed yet"
+msgstr ""
+
+#, python-format
+msgid "(+ %(amount)s pending)"
+msgstr ""
+
+#, python-format
+msgid "Out %(actual)s%(pending)s of %(planned)s planned"
+msgstr ""
+
+#, python-format
+msgid "Out %(actual)s%(pending)s (no plan)"
+msgstr ""
+
+#, python-format
+msgid "In %(actual)s%(pending)s of %(planned)s planned"
+msgstr ""
+
+#, python-format
+msgid "In %(actual)s%(pending)s (no plan)"
 msgstr ""
 
 msgid "(over plan if everything pending arrives)"
@@ -4781,6 +4851,21 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Reminders by notification"
+#~ msgstr ""
+
+#~ msgid "%(name)s tax payment"
+#~ msgstr ""
+
+#~ msgid "Expected spent vs expected earned"
+#~ msgstr ""
+
+#~ msgid "Spent vs earned"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Pending: earned %(earned)s, spent %(spent)s,"
+#~ " saved or invested %(saved)s. If "
+#~ "everything pending arrives, left %(net)s."
 #~ msgstr ""
 
 #~ msgid "Your account"

@@ -16,7 +16,10 @@ Your money is tracked month by month. The main navigation starts with four pages
   changing many categories at once (see [Transactions](transactions.md#history)).
 
 Open "Month" in the main navigation: it shows the current month's summary. "Transactions" in
-the main navigation opens the same month's Transactions page. Every month has its own address, such as `/m/2026-10` for October 2026, so you can bookmark it. The address names
+the main navigation opens the same month's Transactions page. While you look at another month
+on the Month or Transactions page, both links keep that month: from the Month page of March
+2026, "Transactions" opens March 2026's Transactions page, and back. On every other page they
+open the current month. Every month has its own address, such as `/m/2026-10` for October 2026, so you can bookmark it. The address names
 only the month, not the workspace: whoever opens the link sees that month in the workspace they
 currently have selected. A member who belongs only to your workspace sees your month; a member
 of several workspaces may need to switch first.
@@ -41,22 +44,33 @@ navigation.
 
 The **Summary** block at the top of the month page shows how the month is going:
 
-- A **flow bar** of what you **earned**, split into what you **spent** (red), **saved /
-  invested** (blue) and what is **left** (green; earned minus spent minus saved). When spending
-  and saving are more than you earned, the bar grows to their total, the part beyond your
-  earnings is hatched red, a line marks what you earned and "Left" turns red. Below it, "Saved /
-  invested 26.7% of income" is the savings rate: what you saved or invested, as a share of what
-  you earned (money merely left over is "Left", not savings); it is not shown when nothing was
-  earned. Money moved between your own accounts (transfer categories)
-  counts nowhere.
-- Two bars compare what you spent and earned with what you planned; the dark line marks the
-  plan.
+- **In** and **Out**. In is the money that came in: what you **earned** (income) plus what you
+  **withdrew from savings**. Out is the money that went out: what you **spent** (expenses) plus
+  what you **saved / invested**. What is **left** is In minus Out. The header shows In, with
+  "earned … + withdrawn …" when you withdrew something, and on the right "Left" or, in red,
+  "Short by" when more went out than came in.
+- A thin **strip** shows where the money came from: earned (green) and withdrawn from savings
+  (teal). Right below it, on the same scale, the **flow bar** shows how it was used: spent
+  (red), saved / invested (blue) and left (green). When In is at least Out, both end at the
+  right edge, so you can see that what came in equals what went out plus what is left. When
+  more went out than came in, the bar is as long as Out, the strip ends early and the missing
+  part is a dashed red outline. The legend lists each figure; screen readers get the same as a
+  list. Below it, "Saved / invested 26.7% of income" is the savings rate: what you saved or
+  invested, as a share of what you earned (money merely left over is "Left", not savings); it
+  is not shown when nothing was earned. Money moved between your own accounts (transfer
+  categories) counts nowhere.
+- Two bars compare Out and In with what you planned, for example "Out €4,873.00 of €5,900.00
+  planned": Out's plan is the planned expenses plus the planned savings, In's plan the planned
+  income plus the planned withdrawals. The dark line marks the plan.
 - A category row turns red when you spent more than planned on it, and green when an income
   category brought more than planned.
-- A table with every category in groups (Expenses, Saved / invested, Income, Withdrawn from
-  savings): **Plan**, **Actual** and **Difference**, and a total per group. A positive
-  difference is always good news: spent less, earned more, saved more or withdrew less than
-  planned. A category with entries but no plan shows a plan of 0.00.
+- A table with every category in groups: **Plan**, **Actual** and **Difference**, and a total
+  per group. The groups sit in two blocks: **Money out** (a red line: Expenses, then Saved /
+  invested) and **Money in** (a green line: Income, then Withdrawn from savings), each closed by
+  its total (**Total money out** is Out, **Total money in** is In, the same figures as above).
+  The block totals have no difference: saving more than planned is good news, spending more is
+  not. A positive difference is always good news: spent less, earned more, saved more or
+  withdrew less than planned. A category with entries but no plan shows a plan of 0.00.
 - **Pending** amounts come from your [recurring items and income sources](recurring.md): what is
   still due this month and not yet confirmed. They are part of Actual, shown as a lighter
   second line under the confirmed amount, for example "+ €1,200.00 pending" (only when something
@@ -66,16 +80,17 @@ The **Summary** block at the top of the month page shows how the month is going:
   only; when the pending amount would take a category over its plan, a softer line under it
   says "Over plan if everything pending arrives".
 - In the bars, the solid part is confirmed and the **striped** part after it is pending; the
-  text above each bar adds "+ … pending", and "(over plan if everything pending arrives)" when
-  only the pending part goes past the plan.
-- The flow bar is titled **Spent vs earned**. With something pending it draws each part
-  confirmed (solid) and then pending (striped); the legend gives each figure with "+ …
-  pending", and Left as it would be if everything pending arrives. Nothing is confirmed in a
-  future month, so there the bar shows what you expect to spend and earn, and its title reads
-  **Expected spent vs expected earned**. (Home still shows the older "Forecast spent … ·
-  forecast earned …" line and second bar.)
+  text above each bar reads, for example, "Out €1,350.50 (+ €2,020.00 pending) of €3,100.00
+  planned", and adds "(over plan if everything pending arrives)" when only the pending part
+  goes past the plan.
+- The strip and the flow bar are titled **In vs out**. With something pending they draw each
+  part confirmed (solid) and then pending (striped); the legend gives each figure with "+ …
+  pending", and Left (or Short by) as it would be if everything pending arrives. Nothing is
+  confirmed in a future month, so there they show what you expect to come in and go out, and
+  the title reads **Expected in vs expected out**. (Home still shows the older flow bar of
+  earnings with its "Forecast spent … · forecast earned …" line and second bar.)
 - **Show pending** hides or shows every pending part: the "+ … pending" lines, the striped
-  parts of the bars and the pending flow bar (the flow bar then shows confirmed amounts only).
+  parts of the bars and the pending strip and flow bar (they then show confirmed amounts only).
   This browser remembers the choice.
 - **Largest first** sorts each group by the actual amount; **Your order** uses the order of
   your categories. This browser remembers the choice.
