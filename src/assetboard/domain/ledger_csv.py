@@ -1,7 +1,7 @@
 """Transactions as CSV (F2.6), in the columns of M4's ``transactions.csv``. Pure: no I/O.
 
 F2.6's export writes the columns of the workspace archive's ``transactions.csv`` (ADR-0016,
-docs/specs/M4-ledger-export-import.md "Format reference v1.0") in the same order, without
+docs/specs/M4-ledger-export-import.md "Format reference v1.1") in the same order, without
 ``deleted_at``. With the default options a file is a valid ``transactions.csv``: UTF-8 without
 BOM, comma delimiter, RFC 4180 quoting, CRLF line ends, dates ``YYYY-MM-DD``, English enum
 tokens, amounts as plain decimals with ``.`` and exactly the currency's minor digits. The

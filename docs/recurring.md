@@ -191,10 +191,18 @@ month with a manual log has a small **Edit** next to its units: change the units
 or press Esc or **Cancel** to close it unchanged. The month's pending income occurrence and any
 planned tax-payment occurrences are recalculated.
 
-A month's log can be changed until its income is received. Once its occurrence is confirmed
-(posted as a transaction), the log is locked: the row shows **received** instead of Edit, and
-saving the month is refused with "This month's income is already received. Edit the transaction
-instead.", linking to the transaction.
+Once a month's income is received (its occurrence is confirmed as a transaction), its log is
+read-only by default: the row shows **received**, and saving the month is refused with "This
+month's income is already received. Edit the transaction instead.", linking to the transaction.
+If the logged days really were wrong, choose **Edit anyway** (on the row, in the **Log days
+worked** form, or in the refusal message) and save. The posted transaction is not changed
+silently: a notice says "Logged days changed. The received payment was X; the new days give Y."
+with **Update the transaction to Y** (editors and owners) and a link to the transaction. The
+change is recorded in the audit log, and so is an update of the transaction.
+
+When the month the income is paid in is closed, the log cannot change at all, not even with
+Edit anyway: the row shows **closed**, and saving says "This month is closed. Reopen it to make
+changes." with a link to the Month page, where an owner can reopen it.
 
 When Taxes are on (Workspace settings → Menu), tick the workspace's taxes under **Taxes on this
 income** on the card; each can have a different payment day for this income. The expected income is the net
@@ -224,5 +232,7 @@ month-level form refuses to change it.
 Marking the first day replaces a manual work log for that month; removing the last day (or
 clearing the month) removes the log, and the month goes back to its estimate. Every change
 recalculates the month's pending income and tax-payment occurrences, like a month-level work log,
-with the same rules: editors and owners only, nothing changes while the pay month is closed, and
-posted income is not changed (the calendar still records days after posting).
+with the same rules: editors and owners only, and nothing changes while the pay month is closed
+(the calendar then says so and links to the Month page). A month whose income is already received
+is shown read-only with **Edit anyway**; after a change the calendar shows the received payment
+next to the new amount, with **Update the transaction to Y**, exactly as on the Income page.

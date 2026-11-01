@@ -1167,12 +1167,13 @@ msgstr ""
 msgid "Enter a number of units above 0 and at most 24."
 msgstr ""
 
-msgid ""
-"The work log was saved; posted income was not changed. Adjust its "
-"transaction manually if needed."
+msgid "This month's income is already received. Edit the transaction instead."
 msgstr ""
 
-msgid "This month's income is already received. Edit the transaction instead."
+msgid "This month is closed. Reopen it to make changes."
+msgstr ""
+
+msgid "This month's income is not received, so there is no transaction to update."
 msgstr ""
 
 msgid "Enter a name."
@@ -2863,6 +2864,33 @@ msgstr ""
 msgid "Next month"
 msgstr ""
 
+msgid "Open the month page"
+msgstr ""
+
+msgid ""
+"You are changing a month whose income is already received. Its "
+"transaction stays as it is unless you update it."
+msgstr ""
+
+msgid "Open the transaction"
+msgstr ""
+
+msgid "Edit anyway"
+msgstr ""
+
+msgid "The transaction now matches the logged days."
+msgstr ""
+
+#, python-format
+msgid ""
+"Logged days changed. The received payment was %(received)s; the new days "
+"give %(recalculated)s."
+msgstr ""
+
+#, python-format
+msgid "Update the transaction to %(amount)s"
+msgstr ""
+
 #, python-format
 msgid "Month total: %(units)s (%(unit)s)"
 msgstr ""
@@ -3150,9 +3178,6 @@ msgstr ""
 msgid "Where your money comes from and what you will receive next."
 msgstr ""
 
-msgid "Open the transaction"
-msgstr ""
-
 #, python-format
 msgid "Fixed · %(amount)s on the %(day)s · Income category: %(category)s"
 msgstr ""
@@ -3230,6 +3255,10 @@ msgid "received"
 msgstr ""
 
 #, python-format
+msgid "Edit the units logged for %(month)s anyway"
+msgstr ""
+
+#, python-format
 msgid "%(name)s %(amount)s on %(date)s"
 msgstr ""
 
@@ -3253,7 +3282,9 @@ msgid ""
 "units are the sum of the days."
 msgstr ""
 
-msgid "A month's log can be changed until its income is received."
+msgid ""
+"Once a month's income is received, its log changes only with Edit anyway;"
+" a closed month cannot change."
 msgstr ""
 
 msgid "Taxes on this income"
@@ -5228,6 +5259,24 @@ msgstr ""
 #~ "archived instead."
 #~ msgstr ""
 
+#~ msgid "Month closed."
+#~ msgstr ""
+
+#~ msgid "Month reopened."
+#~ msgstr ""
+
+#~ msgid "Money out"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The work log was saved; posted "
+#~ "income was not changed. Adjust its "
+#~ "transaction manually if needed."
+#~ msgstr ""
+
+#~ msgid "A month's log can be changed until its income is received."
+#~ msgstr ""
+
 #~ msgid ""
 #~ "Pausing removes pending dates from today"
 #~ " onward. Archiving or deleting removes "
@@ -5236,15 +5285,6 @@ msgstr ""
 #~ "so deleting an item with history "
 #~ "archives it instead. Dates in closed "
 #~ "months never change."
-#~ msgstr ""
-
-#~ msgid "Month closed."
-#~ msgstr ""
-
-#~ msgid "Month reopened."
-#~ msgstr ""
-
-#~ msgid "Money out"
 #~ msgstr ""
 
 #~ msgid "Money in"

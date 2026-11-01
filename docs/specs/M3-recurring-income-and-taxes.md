@@ -328,8 +328,31 @@ sources with a longer lag keep it). The old one-form `POST /income` still works.
   calendar months keep their link to the calendar. The **Log days worked** form prefills the
   chosen month's units and reads **Update** (server-side for `?log=<source>&month=YYYY-MM`;
   `static/js/app.js` swaps value and label from hidden `data-existing-log` elements when the
-  month changes). The work calendar (F3.7) still records days after posting and leaves the
-  posted occurrence alone (follow-up: lock it the same way).
+  month changes).
+- **As built (follow-ups batch): soft and hard lock.** The lock applies to `log_work` and to every
+  F3.7 calendar change (`services.income._check_work_month_writable`):
+  - *Received* (the income occurrence is posted) is a **soft lock**. Without `override=True`
+    the change raises `WorkLogLocked` (`posted_locked`). With it the log/days are saved, the
+    posted occurrence and transaction are left unchanged, `work_log.updated_after_posting` is
+    audited and the call returns `True`. Routes only pass the form's `override=1`. The UI shows
+    the month read-only with **Edit anyway**: a `<details>` on the payments-table row, a button
+    in the Log form (JS enables the field and sets the hidden `override`; choosing another month
+    clears it), a link in the refusal message (`?log=&month=&override=1`), and
+    `?override=1` on the calendar (its forms then carry `override=1`).
+  - After an override save the page shows "Logged days changed. The received payment was X; the
+    new days give Y." (`posted_income_change`: X is the live transaction's amount, Y the ledger
+    amount recalculated from the logs and the tax rules at the occurrence's due date) with
+    **Update the transaction to Y** when X ≠ Y and a link to the transaction. The button posts to
+    `/income/{id}/work-logs/{YYYY-MM}/update-transaction` (editor, CSRF): `update_posted_income`
+    recalculates Y itself (nothing amount-like comes from the form) and changes the amount through
+    `services.transactions.set_amount_in_session` (closed-month guard, `transaction.updated`
+    audit), plus `income.posted_amount_updated`. Posted tax-payment occurrences are not touched.
+  - *Closed* is a **hard lock**, following the transactions' closed-month rule (F2.5: the month
+    a payment is booked in): the posted transaction's month, the occurrence's due month, or, with
+    no occurrence yet, the computed pay month. Any of them closed raises `WorkMonthClosed`
+    (`work_month_closed`, carrying the month) even with `override`; the page says "This month is
+    closed. Reopen it to make changes." with a link to that month's Month page. The payments
+    table shows **closed** and the calendar is read-only.
 
 **Agent prompt**
 ```
@@ -479,9 +502,10 @@ derivation of the month WorkLog from day entries, fill-working-days shortcut. Ma
 - Toggle (1 unit by default), set value (locale number parsing), fill working days (weekdays that
   are not workspace-country holidays and have no entry; existing values are never overwritten)
   and clear month. Each runs in one transaction with the same role checks (editor;
-  `require_role_now` inside `run_immediate`), the same closed-month rule (refused while the
-  pending occurrence's pay month is closed) and the same F3.4 recalculation (`_sync_work_month`)
-  as a month-level work log save; a posted occurrence is left unchanged and the page says so.
+  `require_role_now` inside `run_immediate`), the same locks as a month-level work log save
+  (F3.4 "soft and hard lock": a received month changes only with the explicit override and then
+  offers "Update the transaction"; a closed payment month refuses every change) and the same
+  F3.4 recalculation (`_sync_work_month`) for pending occurrences.
 - A workspace country without holiday data shows and fills weekends only (working-day estimates
   still refuse it, as in F3.1).
 - UI: `/income/{id}/calendar?month=YYYY-MM` (HTMX fragment swaps, plain-form fallbacks with
