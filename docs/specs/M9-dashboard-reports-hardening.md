@@ -1,6 +1,6 @@
 # M9 — Dashboard, reports, backup/export, API and hardening → v1.0
 
-**Goal:** make the app pleasant to live in and safe to expose in a homelab: an at-a-glance dashboard, reports, full export and backups, a read/write API with tokens, security hardening, documentation and a polished release.
+**Goal:** make the app pleasant to live in and safe to expose in a homelab: an at-a-glance dashboard, reports, full export and backups, a read/write API with tokens, security hardening, a phone-ready installable web app, documentation and a polished release.
 
 **Exit criteria:** a new user can install from the compose file, import their history in the documented archive format of M4 (or start fresh), and use every module; backups and restores are tested; a security checklist is completed; docs cover install, reverse proxies, SSO, backup/restore and upgrade; `v1.0.0` is tagged and the multi-arch image is published.
 
@@ -162,9 +162,104 @@ a Playwright screenshot script, and a CI check reporting translation completenes
 
 ---
 
+## F9.9 Phone layout pass
+
+**Added by the owner (2026-11-01).** Before v1.0, every page is usable on a phone at 360–430 px
+width without horizontal page scroll. The collapsible phone menu (#195) is the first step. The
+web UI stays the only client: native apps remain a non-goal (overview §6); F9.10 makes the web
+app installable instead.
+
+**Acceptance**
+- **Month summary table fits on a phone, with no sideways scroll and no cards.** Below `sm`:
+  - category names wrap instead of pushing the amount columns off screen;
+  - the planned-value input shrinks to about 7 digits;
+  - amounts drop the currency symbol (the section header shows the currency once);
+  - "+ X pending" shortens to "+X" (screen-reader text keeps the full wording);
+  - font and cell padding drop one step.
+
+  Category, Planned, Actual and Difference stay visible and editable at 390 px with the demo
+  data's longest category name and a six-digit amount.
+  If that still does not fit, the fallback is to show Difference as a small coloured line under
+  Actual on phones (like the pending line) instead of its own column. Record the choice in the PR.
+- **Transactions entry row on a phone:** tap targets of at least 44 px; amount fields open the
+  numeric keypad (`inputmode="decimal"`, which still accepts the locale's separator); the row
+  does not overflow.
+- **Upcoming:** confirming or skipping an occurrence works with one tap on a phone.
+- **Every other page has been checked at 390 px:** Home, History, Recurring, Income (incl. the
+  work calendar), Taxes, Categories, settings and auth pages. Each overflow found is fixed or
+  listed as a follow-up in the PR.
+- **Browser tests at a 390 × 844 viewport assert that the page width does not exceed the
+  viewport** on Home, Month, Transactions, History, Upcoming, Recurring and Income.
+
+**Agent prompt**
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F9.9 from docs/specs/M9-dashboard-reports-hardening.md: phone layout of the Month summary
+table (fit, no horizontal scroll), the Transactions entry row and Upcoming actions, a 390 px review
+of every page, and browser tests asserting no horizontal overflow at a phone viewport.
+```
+
+---
+
+## F9.10 Installable web app (PWA)
+
+**Added by the owner (2026-11-01).** AssetBoard can be added to a phone's home screen and opens
+like an app (own icon, no browser bars). It works on Android and on iOS 16.4+. This is the
+answer to "should there be a mobile app": a native app stays a non-goal unless a need the web
+cannot meet comes up (home-screen widget, camera receipts, offline sync). Phone notifications
+keep going through the existing Apprise channels (F3.6); web push is out of scope.
+
+**Acceptance**
+- **Web app manifest** (`manifest.webmanifest`):
+  - name from `branding.APP_NAME`;
+  - `start_url` and `scope` respect the app's root path;
+  - `display: standalone`;
+  - theme and background colours from the design tokens, light and dark.
+
+  It is linked from `base.html` and `auth_base.html`.
+- **Icons:**
+  - PNG 192 and 512 px, each also as a maskable variant;
+  - a 180 px `apple-touch-icon`;
+  - all generated from the existing SVG favicon by a script that is committed, with the
+    outputs committed too.
+
+  No new runtime dependency.
+- **Service worker, minimal and privacy-first:**
+  - it caches only versioned static assets (CSS, JS, vendored libraries, icons) and one
+    offline page;
+  - it never caches HTML pages, HTMX fragments, exports or any response carrying workspace data;
+  - when offline, a navigation shows the offline page ("You are offline"), which is
+    translatable and contains no data;
+  - a new release replaces the cache (cache name carries the app version);
+  - it is served with a scope that matches the root path and is allowed by the CSP. Registration
+    lives in `app.js`, with no inline script.
+- **Standalone mode:**
+  - no dead ends: every page reachable from the menu, a back path on every page;
+  - sign-in, sign-out and OIDC redirects (including Authelia behind a tunnel) return into the
+    installed app;
+  - the update notice and version still show.
+- **Docs:** `docs/` gains "Install on your phone" (Android and iOS steps, and HTTPS being
+  required, as it already is for OIDC).
+- **Tests:**
+  - the manifest is served with the right content type and fields;
+  - the service worker's caching rules (a static asset is cached; an HTML page is not; a
+    workspace fragment is not);
+  - a browser test that registers the worker and loads the offline page.
+
+**Agent prompt**
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F9.10 from docs/specs/M9-dashboard-reports-hardening.md: web app manifest, generated icons,
+a minimal static-only service worker with an offline page, standalone-mode checks incl. OIDC, user
+docs and tests. No new runtime dependency; nothing with workspace data may be cached.
+```
+
+---
+
 ## F9.8 Release v1.0
 
 **Acceptance**
+- F9.9 (phone layout pass) and F9.10 (installable web app) are done.
 - Release checklist executed and recorded in `docs/release-checklist.md`: fresh-install test from the published image; upgrade test from the previous tag with a populated DB; backup/restore verified; migrations forward-only tested on a copy of demo data; changelog reviewed.
 - Tag `v1.0.0`; release-please PR merged; multi-arch image published to GHCR with `latest`, `1`, `1.0`, `1.0.0`; GitHub release notes with upgrade notes.
 - Decide and apply the final project name (if renamed): package, env prefix, CLI, image, docs, via `branding.py` plus a documented migration path for existing data directories and env vars (old prefix accepted with a deprecation warning for one minor version).
