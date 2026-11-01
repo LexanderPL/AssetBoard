@@ -28,7 +28,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
   use outside the app.
 
 **Format decision:** [ADR-0016](../adr/0016-workspace-archive-format.md) records the archive
-format and its versioning and compatibility policy. The [format reference](#format-reference-v10)
+format and its versioning and compatibility policy. The [format reference](#format-reference-v11)
 at the end of this spec is normative for F4.1–F4.4; F4.5 turns it into user documentation.
 
 **Prerequisite (backlog, from the F1.1 review):** before any upload route exists, add a pure-ASGI
@@ -92,11 +92,11 @@ restore.
 
 **Acceptance**
 - Pure module `domain.archive` (in-memory bytes only, no DB, no clock): row types for every file
-  of the [format reference](#format-reference-v10), a writer (`rows -> CSV bytes`, `files ->
+  of the [format reference](#format-reference-v11), a writer (`rows -> CSV bytes`, `files ->
   manifest`) and a reader/validator (`bytes -> ParsedArchive | errors`) shared by F4.2–F4.4.
   Standard library only (`csv`, `zipfile`, `json`, `hashlib`, `io`); no new runtime dependency.
 - Export service `services.archive.export_workspace(ctx)`: editors and owners; reads through the
-  scoped repositories only; writes the files of format 1.0 (`manifest.json`, `workspace.json`,
+  scoped repositories only; writes the files of the current format (1.1; `manifest.json`, `workspace.json`,
   `categories.csv`, `budget_lines.csv`, `transactions.csv`, `months.csv`) exactly as specified,
   including soft-deleted transactions (with `deleted_at`) and archived categories.
 - **Deterministic output:** the same data and the same `exported_at` give byte-identical ZIP
@@ -128,7 +128,7 @@ restore.
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
 Implement F4.1 from docs/specs/M4-ledger-export-import.md: the pure domain.archive module (row types, CSV/manifest writer,
-reader/validator per the "Format reference v1.0" section and ADR-0016), the export service and the /workspace/data page
+reader/validator per the "Format reference v1.1" section and ADR-0016), the export service and the /workspace/data page
 with the download button, lineage ids, deterministic ZIP output, the workspace.exported audit event and the archive
 coverage test (ARCHIVE_EXCLUDED_MODELS). Standard library only. Tests: golden archive from a synthetic workspace,
 byte-for-byte determinism, checksum/row-count verification, soft-deleted and archived rows exported, viewer refused.
@@ -240,7 +240,7 @@ made from my spreadsheet, map its categories onto mine, check the totals and imp
   apply.
 - Header names are matched trimmed and case-insensitively; a missing required column is an
   error; unknown columns are a warning and ignored. Values as in the
-  [format reference](#format-reference-v10): amounts are converted with the currency's minor
+  [format reference](#format-reference-v11): amounts are converted with the currency's minor
   digits and refused (never rounded) when they have too many decimals, are not positive or are
   too large (F2.2's codes); dates must be `YYYY-MM-DD` within 1900-01-01..2199-12-31; a
   `currency`, when present, must equal the workspace's base currency (row error otherwise);
@@ -303,7 +303,9 @@ use.
     listed as information. A `base_currency` different from the workspace's refuses the whole
     archive.
 - **Restore order, in one transaction:** (1) settings from `workspace.json` (name, base
-  currency, country, time zone, locale, automatic plan copy; the replaced values are kept in
+  currency, country, time zone, locale, automatic plan copy, and from 1.1 the Taxes switch and
+  the Upcoming window, which keep their defaults when a 1.0 archive lacks them; the replaced
+  values are kept in
   `ImportBatch.previous_settings`); (2) categories with every attribute (`kind`, `treatment`,
   `color`, `sort_order`, `archived_at`) and `import_key = id:<id>`; (3) budget lines (lines on
   archived or transfer categories included: they existed in the source); (4) transactions in
@@ -366,13 +368,13 @@ with help from an AI assistant, and I understand what that means for my privacy.
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
 Implement F4.5 from docs/specs/M4-ledger-export-import.md: docs/archive-format.md and docs/import-export.md from the
-"Format reference v1.0" and "AI conversion prompt" sections, README and related doc links, and a test that parses the
+"Format reference v1.1" and "AI conversion prompt" sections, README and related doc links, and a test that parses the
 documented example rows with domain.archive and checks that every written column is documented.
 ```
 
 ---
 
-## Format reference v1.0
+## Format reference v1.1
 
 Normative for F4.1–F4.4. Changes follow ADR-0016, and this section changes in the same PR.
 
@@ -411,7 +413,7 @@ when it has only its header row. (The file name prefix comes from `branding.CLI_
 ```json
 {
   "format": "workspace-archive",
-  "format_version": "1.0",
+  "format_version": "1.1",
   "app": {"name": "AssetBoard", "version": "0.4.0"},
   "exported_at": "2026-10-18T14:30:00Z",
   "base_currency": "EUR",
@@ -438,11 +440,23 @@ the header and is `null` for JSON files.
   "country_code": "PL",
   "timezone": "Europe/Warsaw",
   "locale": "pl",
-  "auto_copy_plan": false
+  "auto_copy_plan": false,
+  "taxes_enabled": true,
+  "upcoming_days": null
 }
 ```
 
 `country_code` may be `null`. Later settings are added as optional keys (a minor version).
+
+| Key | Since | Required | Values |
+|---|---|---|---|
+| `taxes_enabled` | 1.1 | no (absent = off) | `true` \| `false`: the workspace's Taxes switch |
+| `upcoming_days` | 1.1 | no (absent = `null`) | integer 1–365, or `null` for the instance default |
+
+**Version history.** 1.0: first release. 1.1 (additive): `workspace.json` gains the optional
+`taxes_enabled` and `upcoming_days` keys; a 1.0 archive reads without them, and a 1.0 reader
+lists them as unknown keys (a warning). Golden archives of both versions are in
+`tests/fixtures/`.
 
 ### `categories.csv`
 
@@ -544,7 +558,7 @@ month,closed_at,plan_started_at
 2026-09,,2026-09-01T06:30:12Z
 ```
 
-### Not in the archive (format 1.0)
+### Not in the archive (format 1.1)
 
 Members, invitations, users and their sessions, the audit log, import batches and saved
 mappings, and who created or closed what. Data of later milestones (M3, M5–M8) is added by their

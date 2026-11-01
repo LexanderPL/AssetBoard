@@ -22,7 +22,9 @@ from assetboard.domain.archive import (
 )
 from assetboard.services.archive import ARCHIVE_EXCLUDED_MODELS, ARCHIVE_INCLUDED_MODELS
 
-GOLDEN = Path(__file__).parents[1] / "fixtures" / "workspace-archive-v1.0.zip"
+FIXTURES = Path(__file__).parents[1] / "fixtures"
+GOLDEN = FIXTURES / "workspace-archive-v1.1.zip"
+GOLDEN_V1_0 = FIXTURES / "workspace-archive-v1.0.zip"
 EXPORTED_AT = datetime(2026, 10, 18, 14, 30, tzinfo=UTC)
 
 
@@ -37,6 +39,8 @@ def _rows() -> ArchiveRows:
             "timezone": "Europe/Warsaw",
             "locale": "pl",
             "auto_copy_plan": False,
+            "taxes_enabled": True,
+            "upcoming_days": 14,
         },
         categories=(CategoryRow(category_id, "expense", "Food", "regular", "#4f9d69", 0, None),),
         budget_lines=(BudgetLineRow("2026-09", "expense", "Food", "550.00", "EUR", category_id),),
@@ -70,6 +74,52 @@ def _archive() -> bytes:
 def test_archive_matches_golden_and_is_deterministic() -> None:
     assert _archive() == GOLDEN.read_bytes()
     assert _archive() == _archive()
+
+
+def test_released_v1_0_archive_still_reads_without_the_1_1_keys() -> None:
+    parsed, errors = parse_archive(GOLDEN_V1_0.read_bytes())
+    assert errors == ()
+    assert parsed is not None and parsed.warnings == ()
+    assert parsed.manifest["format_version"] == "1.0"
+    assert "taxes_enabled" not in parsed.rows.workspace
+    assert "upcoming_days" not in parsed.rows.workspace
+
+
+def test_v1_1_workspace_carries_the_taxes_switch_and_upcoming_days() -> None:
+    parsed, errors = parse_archive(GOLDEN.read_bytes())
+    assert errors == ()
+    assert parsed is not None and parsed.warnings == ()
+    assert parsed.manifest["format_version"] == "1.1"
+    assert parsed.rows.workspace["taxes_enabled"] is True
+    assert parsed.rows.workspace["upcoming_days"] == 14
+
+
+@pytest.mark.parametrize(
+    ("key", "value", "valid"),
+    [
+        ("taxes_enabled", False, True),
+        ("taxes_enabled", "yes", False),
+        ("taxes_enabled", 1, False),
+        ("upcoming_days", None, True),
+        ("upcoming_days", 1, True),
+        ("upcoming_days", 365, True),
+        ("upcoming_days", 0, False),
+        ("upcoming_days", 366, False),
+        ("upcoming_days", True, False),
+        ("upcoming_days", "14", False),
+    ],
+)
+def test_reader_validates_the_1_1_workspace_keys(key: str, value: object, valid: bool) -> None:
+    import json
+
+    files = _files()
+    workspace = json.loads(files["workspace.json"])
+    workspace[key] = value
+    files["workspace.json"] = json.dumps(workspace).encode()
+    parsed, errors = parse_archive(_rewrite(files))
+    assert (parsed is not None) is valid
+    if not valid:
+        assert errors == (ArchiveError("workspace.json", "invalid workspace settings"),)
 
 
 def test_reader_checks_checksums() -> None:

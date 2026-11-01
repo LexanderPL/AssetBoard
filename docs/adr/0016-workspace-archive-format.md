@@ -26,7 +26,7 @@ The format must:
   `workspace.json` (settings) and one CSV file per entity (`categories.csv`,
   `budget_lines.csv`, `transactions.csv`, `months.csv` in format 1.0). Read and written with
   `zipfile`, `csv`, `json` and `hashlib` only. The normative reference is in
-  [the M4 spec](../specs/M4-ledger-export-import.md#format-reference-v10) (published as
+  [the M4 spec](../specs/M4-ledger-export-import.md#format-reference-v11) (published as
   `docs/archive-format.md` by F4.5).
 - **CSV conventions.** UTF-8 (BOM tolerated on import), RFC 4180 quoting, comma delimiter,
   dates `YYYY-MM-DD`, UTC timestamps with `Z`, amounts as plain decimals with `.` and the
