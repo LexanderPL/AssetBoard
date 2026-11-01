@@ -177,7 +177,7 @@ def test_nothing_earned_shows_no_savings_rate(summary: OwnerApp) -> None:
     block = _summary(summary.client.get(MONTH).text)
     assert 'data-kpi="savings-rate"' not in block and "of income" not in block
     bars = re.findall(r'width="(\d+)"[^>]*data-bar-actual', block)
-    assert bars == ["100", "0"]  # out with no plan: actual is the scale; nothing in
+    assert bars == ["500", "0"]  # out with no plan: actual is the scale (500 wide); nothing in
     assert "data-bar-planned" not in block  # nothing planned: no plan line
     assert "Out €10.00 (no plan)" in block and "In €0.00 (no plan)" in block
     assert "(over plan)" not in block and "of €0.00 planned" not in block
