@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.3.8](https://github.com/LexanderPL/AssetBoard/compare/v0.3.7...v0.3.8) (2026-11-01)
+
+
+### Features
+
+* **ui:** phone menu, Hide pending, softer angled stripes, frameless tables, unified buttons ([#195](https://github.com/LexanderPL/AssetBoard/issues/195)) ([355c622](https://github.com/LexanderPL/AssetBoard/commit/355c622bb1cc402f0f6d3af1b188c3100a8c432f))
+
+## [0.3.7](https://github.com/LexanderPL/AssetBoard/compare/v0.3.6...v0.3.7) (2026-11-01)
+
+
+### Features
+
+* export the Taxes switch, lock received work months with Edit anyway, square popups ([#186](https://github.com/LexanderPL/AssetBoard/issues/186)) ([3cfecb5](https://github.com/LexanderPL/AssetBoard/commit/3cfecb545527d7371b2d1c6688b4f1fed91b859d))
+* **months:** In and Out on the Month page, tax names on tax payments ([#180](https://github.com/LexanderPL/AssetBoard/issues/180)) ([4df7a5a](https://github.com/LexanderPL/AssetBoard/commit/4df7a5aea66472cdb6702a285cb9f7eccfee2f39))
+* **recurring:** redesigned Recurring list and guided form with live next dates ([#184](https://github.com/LexanderPL/AssetBoard/issues/184)) ([6cdf3de](https://github.com/LexanderPL/AssetBoard/commit/6cdf3dea9b7ce71f8d9d6afee65ced1be43c82f6))
+* **ui:** edit logged days, one-time payments on Upcoming, Skip and Undo in the ledger ([#181](https://github.com/LexanderPL/AssetBoard/issues/181)) ([320514f](https://github.com/LexanderPL/AssetBoard/commit/320514f3cd81c69f3e872008ebbdedd077513be4))
+* **ui:** Month and ledger nits — no-plan rows, two summary tables, cell Add button, bigger donuts, grouped category selects ([#187](https://github.com/LexanderPL/AssetBoard/issues/187)) ([b4ca812](https://github.com/LexanderPL/AssetBoard/commit/b4ca812c771da5b251674109d4c62cac6d0d1234))
+* **ui:** spreadsheet look for the main content ([#185](https://github.com/LexanderPL/AssetBoard/issues/185)) ([a79d94c](https://github.com/LexanderPL/AssetBoard/commit/a79d94c22cec6c2cd2550396eec78e66b5e75feb))
+* **ui:** workspace name in the header, top-right user menu, version and opt-in update check ([#182](https://github.com/LexanderPL/AssetBoard/issues/182)) ([785c236](https://github.com/LexanderPL/AssetBoard/commit/785c2361782dc27ef5026544803153a09bce00bf))
+
 ## [0.3.6](https://github.com/LexanderPL/AssetBoard/compare/v0.3.5...v0.3.6) (2026-10-31)
 
 

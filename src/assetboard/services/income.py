@@ -99,6 +99,45 @@ class WorkLogLocked(IncomeError):
         self.transaction_date = transaction_date
 
 
+class WorkMonthClosed(IncomeError):
+    """The month the work month is paid in is closed: its log and days cannot change at all
+    (not even with ``override``) until the month is reopened. ``month`` is the closed month."""
+
+    def __init__(self, month: YearMonth) -> None:
+        super().__init__("work_month_closed")
+        self.month = month
+
+
+@dataclass(frozen=True, slots=True)
+class WorkMonthLock:
+    """Whether one work month's log and calendar days can change.
+
+    ``open``: freely. ``received``: the income occurrence is posted (soft lock: a change needs an
+    explicit override). ``closed``: the payment month is closed (hard lock).
+    """
+
+    state: str  # "open" | "received" | "closed"
+    transaction_id: UUID | None = None
+    transaction_date: date | None = None
+    closed_month: YearMonth | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class PostedIncomeChange:
+    """A received work month whose logged units may no longer match its posted transaction."""
+
+    source_id: UUID
+    work_month: date
+    transaction_id: UUID
+    transaction_date: date
+    received: Money
+    recalculated: Money
+
+    @property
+    def differs(self) -> bool:
+        return self.received != self.recalculated
+
+
 @dataclass(frozen=True, slots=True)
 class IncomePreview:
     work_month: date
@@ -134,8 +173,11 @@ class IncomeSourceView:
     attachments: tuple[IncomeSourceTaxRule, ...]
     work_logs: tuple[WorkLog, ...]
     preview: tuple[IncomePreview, ...]
-    # Work months whose income is already received (occurrence posted): their log is locked.
+    # Work months whose income is already received (occurrence posted): their log is
+    # soft-locked (it changes only with an explicit override).
     locked_months: frozenset[date] = frozenset()
+    # Work months paid in a closed month: their log is hard-locked until the month is reopened.
+    closed_months: frozenset[date] = frozenset()
 
 
 @dataclass(frozen=True, slots=True)
@@ -602,8 +644,15 @@ def list_sources(factory: sessionmaker[Session], ctx: Context) -> list[IncomeSou
         occurrence_repository = ScheduledOccurrenceRepository(session, ctx)
         workspace = CurrentWorkspaceRepository(session, ctx).get()
         today = ctx.clock.today(workspace.timezone)
+        closed = MonthStateRepository(session, ctx).closed_months()
+        transactions = TransactionRepository(session, ctx)
         for source in sources:
             logs = log_repository.for_source(source.id)
+            occurrences = {
+                row.work_month: row
+                for row in occurrence_repository.for_income_source(source.id)
+                if row.generated_by == "income" and row.work_month is not None
+            }
             preview_rows: list[IncomePreview] = []
             first = _month_shift(_month_start(today), -source.pay_lag_months)
             work_months = (
@@ -659,11 +708,17 @@ def list_sources(factory: sessionmaker[Session], ctx: Context) -> list[IncomeSou
                     work_logs=tuple(logs),
                     preview=tuple(preview_rows),
                     locked_months=frozenset(
-                        row.work_month
-                        for row in occurrence_repository.for_income_source(source.id)
-                        if row.status == "posted"
-                        and row.generated_by == "income"
-                        and row.work_month is not None
+                        month for month, row in occurrences.items() if row.status == "posted"
+                    ),
+                    closed_months=frozenset(
+                        month
+                        for month in {log.work_month for log in logs}
+                        | {row.work_month for row in preview_rows}
+                        | set(occurrences)
+                        if _work_month_lock(
+                            transactions, closed, source, month, occurrences.get(month)
+                        ).state
+                        == "closed"
                     ),
                 )
             )
@@ -1231,50 +1286,196 @@ def remove_tax_attachment(
     run_immediate(factory, write)
 
 
+def _live_transaction(
+    transactions: TransactionRepository, occurrence: ScheduledOccurrence | None
+) -> tuple[UUID, date, int] | None:
+    """The posted occurrence's live transaction as (id, date, amount_minor), if any."""
+    if occurrence is None or occurrence.status != "posted" or occurrence.transaction_id is None:
+        return None
+    row = transactions.get(occurrence.transaction_id)
+    if row is None or row.deleted_at is not None:
+        return None
+    return row.id, row.date, row.amount_minor
+
+
+def _work_month_lock(
+    transactions: TransactionRepository,
+    closed: set[YearMonth] | frozenset[YearMonth],
+    source: IncomeSource,
+    month: date,
+    occurrence: ScheduledOccurrence | None,
+) -> WorkMonthLock:
+    """Classify one work month (see ``WorkMonthLock``).
+
+    The hard lock follows the transactions' closed-month rule (F2.5): the month a payment is
+    booked in. That is the posted transaction's date or the occurrence's due date (either being
+    closed locks it) or, before an occurrence exists, the computed pay date.
+    """
+    posted = _live_transaction(transactions, occurrence)
+    candidates = [occurrence.due_date] if occurrence is not None else []
+    if posted is not None:
+        candidates.insert(0, posted[1])
+    if occurrence is None:
+        candidates.append(pay_date(month, source.pay_day, source.pay_lag_months))
+    for day in candidates:
+        if YearMonth.from_date(day) in closed:
+            return WorkMonthLock("closed", closed_month=YearMonth.from_date(day))
+    if occurrence is not None and occurrence.status == "posted":
+        return WorkMonthLock(
+            "received",
+            transaction_id=posted[0] if posted is not None else None,
+            transaction_date=posted[1] if posted is not None else None,
+        )
+    return WorkMonthLock("open")
+
+
+def _check_work_month_writable(
+    session: Session, ctx: Context, source: IncomeSource, month: date, *, override: bool
+) -> ScheduledOccurrence | None:
+    """Refuse a change to a hard-locked month always and to a soft-locked one without
+    ``override``; return the month's income occurrence."""
+    occurrence = ScheduledOccurrenceRepository(session, ctx).for_income_work_month(source.id, month)
+    lock = _work_month_lock(
+        TransactionRepository(session, ctx),
+        MonthStateRepository(session, ctx).closed_months(),
+        source,
+        month,
+        occurrence,
+    )
+    if lock.state == "closed":
+        assert lock.closed_month is not None
+        raise WorkMonthClosed(lock.closed_month)
+    if lock.state == "received" and not override:
+        raise WorkLogLocked(lock.transaction_id, lock.transaction_date)
+    return occurrence
+
+
+def _record_after_posting(session: Session, ctx: Context, source_id: UUID, month: date) -> None:
+    AuditEventRepository(session, ctx).record(
+        actor_user_id=ctx.user.id,
+        action="work_log.updated_after_posting",
+        entity_type="income_source",
+        entity_id=str(source_id),
+        ts=ctx.clock.now(),
+        data={"work_month": month.isoformat()},
+    )
+
+
+def _posted_change(
+    session: Session, scope: WorkspaceScope, source: IncomeSource, month: date
+) -> PostedIncomeChange | None:
+    occurrence = ScheduledOccurrenceRepository(session, scope).for_income_work_month(
+        source.id, month
+    )
+    posted = _live_transaction(TransactionRepository(session, scope), occurrence)
+    if occurrence is None or posted is None:
+        return None
+    workspace = CurrentWorkspaceRepository(session, scope).get()
+    logs = WorkLogRepository(session, scope).for_source(source.id)
+    estimate = _source_estimate(source, month, logs, workspace.country_code)
+    selected, _missing = _tax_lines(session, scope, source, occurrence.due_date)
+    breakdown = _calculate_breakdown(estimate.net, [line.tax for line in selected])
+    return PostedIncomeChange(
+        source_id=source.id,
+        work_month=month,
+        transaction_id=posted[0],
+        transaction_date=posted[1],
+        received=Money(posted[2], occurrence.currency),
+        recalculated=breakdown.ledger_amount,
+    )
+
+
+def posted_income_change(
+    factory: sessionmaker[Session], ctx: Context, source_id: UUID, work_month: date
+) -> PostedIncomeChange | None:
+    """What a received work month was paid and what its logged units give now (``None`` when
+    the month is not received or its transaction is gone)."""
+    require_role(ctx, Role.VIEWER)
+    _valid_month(work_month)
+    with factory() as session:
+        source = IncomeSourceRepository(session, ctx).get_or_raise(source_id)
+        if source.kind != IncomeKind.VARIABLE.value:
+            raise IncomeError("invalid_source")
+        return _posted_change(session, ctx, source, work_month)
+
+
+def update_posted_income(
+    factory: sessionmaker[Session], ctx: Context, source_id: UUID, work_month: date
+) -> PostedIncomeChange:
+    """Set a received work month's transaction amount to what its logged units give now.
+
+    The amount is recalculated here, never taken from the request. The transaction changes
+    through the transactions service (closed-month guard, audit ``transaction.updated``); this
+    also records ``income.posted_amount_updated``. Raises ``IncomeError("not_received")`` when
+    the month has no live posted transaction.
+    """
+    require_role(ctx, Role.EDITOR)
+    _valid_month(work_month)
+    # Imported here: services.transactions imports services.occurrences, which imports this.
+    from assetboard.services.transactions import set_amount_in_session
+
+    def write(session: Session) -> PostedIncomeChange:
+        require_role_now(session, ctx, Role.EDITOR)
+        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+        source = IncomeSourceRepository(session, ctx).get_or_raise(source_id)
+        if source.kind != IncomeKind.VARIABLE.value:
+            raise IncomeError("invalid_source")
+        _check_work_month_writable(session, ctx, source, work_month, override=True)
+        change = _posted_change(session, ctx, source, work_month)
+        if change is None:
+            raise IncomeError("not_received")
+        if change.differs:
+            set_amount_in_session(
+                session, ctx, change.transaction_id, change.recalculated.amount_minor
+            )
+            AuditEventRepository(session, ctx).record(
+                actor_user_id=ctx.user.id,
+                action="income.posted_amount_updated",
+                entity_type="income_source",
+                entity_id=str(source_id),
+                ts=ctx.clock.now(),
+                data={
+                    "work_month": work_month.isoformat(),
+                    "transaction_id": str(change.transaction_id),
+                },
+            )
+        return change
+
+    return run_immediate(factory, write)
+
+
 def log_work(
     factory: sessionmaker[Session],
     ctx: Context,
     source_id: UUID,
     work_month: date,
     units: Decimal,
-) -> None:
+    *,
+    override: bool = False,
+) -> bool:
     """Save (add or change) a month-level work log and recalculate its pending occurrence.
 
-    A log stays editable until the month's income occurrence is confirmed (posted as a
-    transaction). After that the log is locked: ``WorkLogLocked`` is raised and nothing changes,
-    because the posted transaction, not the log, is then the record of what was received.
+    Once the month's income occurrence is confirmed (posted as a transaction) the log is
+    soft-locked: without ``override`` ``WorkLogLocked`` is raised and nothing changes. With
+    ``override`` the log is saved and ``work_log.updated_after_posting`` is audited, but the
+    posted transaction is not changed (``update_posted_income`` does that on request). When the
+    month the income is paid in is closed, ``WorkMonthClosed`` is raised even with ``override``.
+
+    Returns ``True`` when the month was already received.
     """
     require_role(ctx, Role.EDITOR)
     _valid_month(work_month)
     if not units.is_finite() or units < 0:
         raise IncomeError("invalid_units")
 
-    def write(session: Session) -> None:
+    def write(session: Session) -> bool:
         require_role_now(session, ctx, Role.EDITOR)
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
         sources = IncomeSourceRepository(session, ctx)
         source = sources.get_or_raise(source_id)
         if source.archived_at is not None or source.kind != IncomeKind.VARIABLE.value:
             raise IncomeError("invalid_source")
-        occurrence_repo = ScheduledOccurrenceRepository(session, ctx)
-        occurrence = occurrence_repo.for_income_work_month(source_id, work_month)
-        if occurrence is not None and occurrence.status == "posted":
-            transaction_date = None
-            if occurrence.transaction_id is not None:
-                transaction = TransactionRepository(session, ctx).get(occurrence.transaction_id)
-                if transaction is not None and transaction.deleted_at is None:
-                    transaction_date = transaction.date
-            raise WorkLogLocked(
-                occurrence.transaction_id if transaction_date is not None else None,
-                transaction_date,
-            )
-        if (
-            occurrence is not None
-            and occurrence.status == "pending"
-            and YearMonth.from_date(occurrence.due_date)
-            in MonthStateRepository(session, ctx).closed_months()
-        ):
-            raise IncomeError("month_closed")
+        occurrence = _check_work_month_writable(session, ctx, source, work_month, override=override)
         _check_units_size(units)
         repo = WorkLogRepository(session, ctx)
         row = next(
@@ -1287,6 +1488,9 @@ def log_work(
             row = repo.create(income_source_id=source_id, work_month=work_month, units=units)
         else:
             repo.update(row.id, units=units)
+        if occurrence is not None and occurrence.status == "posted":
+            _record_after_posting(session, ctx, source_id, work_month)
+            return True
         _sync_work_month(session, ctx, ctx.clock, source, work_month, allow_past=True)
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
@@ -1296,8 +1500,9 @@ def log_work(
             ts=ctx.clock.now(),
             data={"work_month": work_month.isoformat()},
         )
+        return False
 
-    run_immediate(factory, write)
+    return run_immediate(factory, write)
 
 
 def _check_units_size(units: Decimal) -> None:
@@ -1335,6 +1540,9 @@ class WorkCalendar:
     derived: bool
     manual_units: Decimal | None
     editable: bool
+    # The month's lock (``WorkMonthLock``): a received month is read-only until "Edit anyway",
+    # a closed one until it is reopened.
+    lock: WorkMonthLock = WorkMonthLock("open")
 
 
 def _calendar_holidays(country: str | None, year: int) -> set[date]:
@@ -1377,6 +1585,13 @@ def work_calendar(
             ),
             None,
         )
+        lock = _work_month_lock(
+            TransactionRepository(session, ctx),
+            MonthStateRepository(session, ctx).closed_months(),
+            source,
+            month,
+            ScheduledOccurrenceRepository(session, ctx).for_income_work_month(source_id, month),
+        )
         return WorkCalendar(
             source_id=source.id,
             source_name=source.name,
@@ -1394,7 +1609,8 @@ def work_calendar(
             total=sum(entries.values(), Decimal(0)),
             derived=bool(entries),
             manual_units=log.units if log is not None and not log.derived_from_days else None,
-            editable=source.archived_at is None,
+            editable=source.archived_at is None and lock.state != "closed",
+            lock=lock,
         )
 
 
@@ -1415,11 +1631,14 @@ def _change_work_days(
     month: date,
     change: Callable[[WorkDayRepository, dict[date, WorkDay], set[date]], None],
     action: str,
+    override: bool,
 ) -> bool:
     """Apply ``change`` to one month's day entries, then derive the month's work log and
     recalculate its income occurrence exactly as a month-level work log save does.
 
-    Returns ``True`` when the month's income is already posted (the ledger row is not changed).
+    The locks are those of ``log_work``: a received month changes only with ``override`` (the
+    posted transaction is not changed, and ``True`` is returned); a month paid in a closed
+    month never changes.
     """
     require_role(ctx, Role.EDITOR)
     _valid_month(month)
@@ -1430,16 +1649,7 @@ def _change_work_days(
         source = IncomeSourceRepository(session, ctx).get_or_raise(source_id)
         if source.archived_at is not None or source.kind != IncomeKind.VARIABLE.value:
             raise IncomeError("invalid_source")
-        occurrence = ScheduledOccurrenceRepository(session, ctx).for_income_work_month(
-            source_id, month
-        )
-        if (
-            occurrence is not None
-            and occurrence.status == "pending"
-            and YearMonth.from_date(occurrence.due_date)
-            in MonthStateRepository(session, ctx).closed_months()
-        ):
-            raise IncomeError("month_closed")
+        occurrence = _check_work_month_writable(session, ctx, source, month, override=override)
         days = _month_days(month)
         repository = WorkDayRepository(session, ctx)
         entries = {row.work_date: row for row in repository.for_month(source_id, days[0], days[-1])}
@@ -1463,19 +1673,11 @@ def _change_work_days(
                 logs.update(log.id, units=total, derived_from_days=True)
         elif log is not None and log.derived_from_days:
             logs.delete(log)
-        audit = AuditEventRepository(session, ctx)
         if occurrence is not None and occurrence.status == "posted":
-            audit.record(
-                actor_user_id=ctx.user.id,
-                action="work_log.updated_after_posting",
-                entity_type="income_source",
-                entity_id=str(source_id),
-                ts=ctx.clock.now(),
-                data={"work_month": month.isoformat()},
-            )
+            _record_after_posting(session, ctx, source_id, month)
             return True
         _sync_work_month(session, ctx, ctx.clock, source, month, allow_past=True)
-        audit.record(
+        AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
             action=action,
             entity_type="income_source",
@@ -1489,7 +1691,12 @@ def _change_work_days(
 
 
 def toggle_work_day(
-    factory: sessionmaker[Session], ctx: Context, source_id: UUID, day: date
+    factory: sessionmaker[Session],
+    ctx: Context,
+    source_id: UUID,
+    day: date,
+    *,
+    override: bool = False,
 ) -> bool:
     """Mark ``day`` worked (1 unit) or, when it already has an entry, remove it."""
 
@@ -1500,11 +1707,19 @@ def toggle_work_day(
         else:
             repository.delete(existing)
 
-    return _change_work_days(factory, ctx, source_id, _month_start(day), change, "work_day.toggled")
+    return _change_work_days(
+        factory, ctx, source_id, _month_start(day), change, "work_day.toggled", override
+    )
 
 
 def set_work_day(
-    factory: sessionmaker[Session], ctx: Context, source_id: UUID, day: date, units: Decimal
+    factory: sessionmaker[Session],
+    ctx: Context,
+    source_id: UUID,
+    day: date,
+    units: Decimal,
+    *,
+    override: bool = False,
 ) -> bool:
     """Set the units of ``day`` (0 < units <= 24), creating its entry when needed."""
     value = _valid_day_units(units)
@@ -1516,11 +1731,18 @@ def set_work_day(
         else:
             repository.update(existing.id, units=value)
 
-    return _change_work_days(factory, ctx, source_id, _month_start(day), change, "work_day.saved")
+    return _change_work_days(
+        factory, ctx, source_id, _month_start(day), change, "work_day.saved", override
+    )
 
 
 def fill_working_days(
-    factory: sessionmaker[Session], ctx: Context, source_id: UUID, month: date
+    factory: sessionmaker[Session],
+    ctx: Context,
+    source_id: UUID,
+    month: date,
+    *,
+    override: bool = False,
 ) -> bool:
     """Add 1 unit for every working day of ``month`` without an entry; never overwrite."""
 
@@ -1531,11 +1753,16 @@ def fill_working_days(
             if day.weekday() < 5 and day not in holidays and day not in entries:
                 repository.create(income_source_id=source_id, work_date=day, units=Decimal(1))
 
-    return _change_work_days(factory, ctx, source_id, month, change, "work_days.filled")
+    return _change_work_days(factory, ctx, source_id, month, change, "work_days.filled", override)
 
 
 def clear_work_month(
-    factory: sessionmaker[Session], ctx: Context, source_id: UUID, month: date
+    factory: sessionmaker[Session],
+    ctx: Context,
+    source_id: UUID,
+    month: date,
+    *,
+    override: bool = False,
 ) -> bool:
     """Remove every day entry of ``month``; the derived work log goes with them."""
 
@@ -1543,7 +1770,7 @@ def clear_work_month(
         for row in entries.values():
             repository.delete(row)
 
-    return _change_work_days(factory, ctx, source_id, month, change, "work_days.cleared")
+    return _change_work_days(factory, ctx, source_id, month, change, "work_days.cleared", override)
 
 
 def missing_work_logs(

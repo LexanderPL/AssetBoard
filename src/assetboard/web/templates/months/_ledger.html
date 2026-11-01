@@ -4,7 +4,7 @@
    autocomplete list are in static/js/app.js (data-* hooks); no inline script or style.
    Classes are set once here, so the colour tokens can replace them in one place. #}
 {% from "macros/components.html" import csrf_input with context %}
-{% from "categories/_macros.html" import swatch %}
+{% from "categories/_macros.html" import swatch, category_options %}
 {# Entry and edit rows: the inputs are the cells (input.css .cell-input); popover forms keep
    ordinary boxed fields. #}
 {% set input_class = "form-control cell-input" %}
@@ -24,7 +24,7 @@
   "expense": ("", "bg-danger-shade-1", "bg-danger-shade-2", "bg-danger-shade-3", "bg-danger-tint"),
   "income": ("", "bg-success-shade-1", "bg-success-shade-2", "bg-success-shade-3", "bg-success-tint"),
 } %}
-{% set listbox_class = "absolute left-0 right-0 z-10 mt-1 max-h-64 overflow-y-auto rounded-lg border border-line bg-surface py-1 text-sm text-ink shadow-card" %}
+{% set listbox_class = "popup absolute left-0 right-0 z-10 mt-1 max-h-64 overflow-y-auto py-1 text-sm" %}
 
 {# The category filter (F2.4) travels with every write, so the answer stays filtered. #}
 {# The filter bar sits in the (only) table shown, so a write's section swap keeps its count. #}
@@ -82,8 +82,8 @@
 <td class="cell-edit align-top">
   <label for="{{ prefix }}-category" class="sr-only">{{ _("Category") }}</label>
   <select id="{{ prefix }}-category" name="category_id" form="{{ form_id }}"{{ described(prefix, "category", errors) }}{{ autofocus(s.state, kind ~ ":category") }}{% if kind == "entry" and ledger.filter %} data-default="{{ ledger.filter_id }}"{% endif %} data-ledger-field class="form-select cell-input">
-    <option value="">{{ _("Choose a category") }}</option>
-    {% for value, name in options %}<option value="{{ value }}"{% if value == values.get('category_id') %} selected{% endif %}>{{ name }}</option>{% endfor %}
+    {# The kind is a divider (optgroup), not an option. #}
+    {{ category_options([(_("Expense categories") if s.direction == "expense" else _("Income categories"), options)], values.get('category_id', ''), _("Choose a category")) }}
   </select>
   {{ field_error(prefix, "category", errors) }}
 </td>
@@ -95,12 +95,13 @@
 {% if s.categories %}
 <tr id="{{ form_id }}-row" data-entry-row data-ledger-row-form>
   {{ inputs(s, "entry", form_id, form_id, s.state.entry_values, s.state.entry_errors, s.categories) }}
-  <td class="cell-tight align-top text-right">
+  {# The Add button is the cell (input.css .cell-button): square, as tall as the inputs. #}
+  <td class="cell-edit align-top">
     <form id="{{ form_id }}" method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#ledger-{{ s.direction }}" hx-swap="outerHTML" hx-sync="this:drop" novalidate data-entry-form data-today="{{ ledger.today.isoformat() }}">
       {{ csrf_input() }}
       <input type="hidden" name="direction" value="{{ s.direction }}">
       {{ filter_input() }}
-      <button type="submit" data-entry-add data-label-add="{{ _('Add') }}" data-label-plan="{{ _('Plan') }}" class="{{ primary_class }}">{{ _("Add") }}</button>
+      <button type="submit" data-entry-add data-label-add="{{ _('Add') }}" data-label-plan="{{ _('Plan') }}" class="cell-button">{{ _("Add") }}</button>
     </form>
   </td>
 </tr>
@@ -159,7 +160,7 @@
 {%- endmacro %}
 
 {% macro section(s, oob=false) -%}
-<section id="ledger-{{ s.direction }}" class="panel p-4 sm:p-6" aria-labelledby="ledger-{{ s.direction }}-heading" data-ledger="{{ s.direction }}"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
+<section id="ledger-{{ s.direction }}" aria-labelledby="ledger-{{ s.direction }}-heading" data-ledger="{{ s.direction }}"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
   {# Without an entry row (no category of this kind) the focus falls back to the heading. #}
   {% set heading_focus = ledger.can_write and not s.categories and (s.state.focus or "").startswith("entry:") %}
   <h2 id="ledger-{{ s.direction }}-heading" class="text-base font-semibold" tabindex="-1"{% if heading_focus %} data-autofocus{% endif %}>{{ s.heading }}</h2>
@@ -194,7 +195,7 @@
             <div class="flex items-center justify-end gap-1" data-pending-actions>
               <details class="relative text-left" data-popover>
                 <summary class="{{ compact_class }}">{{ _("Confirm") }}</summary>
-                <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=r.occurrence.id) }}" class="absolute right-0 z-20 mt-1 grid w-72 gap-2 rounded-lg border border-line bg-surface p-3 text-left shadow-card">
+                <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=r.occurrence.id) }}" class="popup absolute right-0 z-20 mt-1 grid w-72 gap-2 p-3 text-left">
                   {{ csrf_input() }}
                   <input type="hidden" name="return_month" value="{{ ledger.month }}">
                   <label class="text-xs font-medium">{{ _("Date") }}<input name="day" type="date" value="{{ r.occurrence.due_date.isoformat() }}" required class="{{ popover_input_class }}"></label>
@@ -244,7 +245,10 @@
           {% endif %}
         </tr>
         {% endfor %}
-        {% if not s.rows and not s.pending_rows and not s.skipped_rows %}<tr data-ledger-empty><td colspan="{{ 5 if ledger.can_write else 4 }}" class="py-3 {{ muted_class }}">{% if ledger.filter %}{{ _("No entries in this category this month.") }}{% else %}{{ s.empty }}{% endif %}</td></tr>{% endif %}
+        {# An empty state only where no entry row follows (viewers, a closed month, no category
+           of this kind): the entry row itself says where to add one (owner, 2026-11-01). #}
+        {% set has_entry_row = ledger.can_write and s.categories %}
+        {% if not has_entry_row and not s.rows and not s.pending_rows and not s.skipped_rows %}<tr data-ledger-empty><td colspan="{{ 5 if ledger.can_write else 4 }}" class="py-3 {{ muted_class }}">{% if ledger.filter %}{{ _("No entries in this category this month.") }}{% else %}{{ s.empty }}{% endif %}</td></tr>{% endif %}
         {% if ledger.can_write %}{{ entry_row(s) }}{% endif %}
       </tbody>
     </table>

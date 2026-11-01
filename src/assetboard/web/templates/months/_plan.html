@@ -8,14 +8,15 @@
 
 {% set tone_class = {"favourable": "text-success-strong", "unfavourable": "text-danger", "even": "text-muted"} %}
 
+{# Empty without a planned value (a category or a group with nothing planned). #}
 {% macro difference(text, tone) -%}
-<span class="tabular-nums {{ tone_class[tone] }}">{{ text }}</span>{% if tone == "favourable" %}<span class="sr-only"> {{ _("(favourable)") }}</span>{% elif tone == "unfavourable" %}<span class="sr-only"> {{ _("(unfavourable)") }}</span>{% endif %}
+{% if text %}<span class="tabular-nums {{ tone_class[tone] }}">{{ text }}</span>{% if tone == "favourable" %}<span class="sr-only"> {{ _("(favourable)") }}</span>{% elif tone == "unfavourable" %}<span class="sr-only"> {{ _("(unfavourable)") }}</span>{% endif %}{% endif %}
 {%- endmacro %}
 
 {# The pending part of an actual (F3.5, "Plan and Actual"): a lighter line under the confirmed
    amount, only when something is pending. Its tooltip and screen-reader text give the forecast
    (actual + pending). ``over`` ("danger"/"success") adds the softer "over plan if everything
-   pending arrives" hint. Everything marked data-pending is hidden by the "Show pending" toggle
+   pending arrives" hint. Everything marked data-pending is hidden by the pending toggle
    (app.js). #}
 {% macro pending_line(pending, forecast, over="") -%}
 {% if pending %}
@@ -28,7 +29,9 @@
 {% macro plan_row(r, plan_only=false) -%}
 {% set row_id = "plan-" ~ r.category_id %}
 {# A row above plan is tinted (web.plan.OVER_PLAN_TINT): red for an expense category, green for
-   an income one. The difference beside it says the same in text. #}
+   an income one. The difference beside it says the same in text. A category without a planned
+   value has an empty planned field (a dash placeholder: "not set"), no difference and no
+   tint. #}
 <tr id="{{ row_id }}" data-plan-row="{{ r.category_id }}"{% if r.over == "danger" %} class="bg-danger-tint" data-over-plan="expense"{% elif r.over == "success" %} class="bg-success-tint" data-over-plan="income"{% endif %}>
   <th scope="row" class="py-1.5 pl-2 pr-2 text-left align-top font-normal">
     {# F2.7: the category's entries are on the Transactions page, filtered (F2.4 part B). #}
@@ -40,12 +43,12 @@
     <form method="post" action="{{ action }}" hx-post="{{ action }}" hx-trigger="change, submit" hx-target="#{{ row_id }}" hx-swap="outerHTML" hx-sync="this:replace" novalidate data-plan-form>
       {{ csrf_input() }}
       <label for="{{ row_id }}-amount" class="sr-only">{{ _("Planned for %(name)s", name=r.name) }}</label>
-      <input id="{{ row_id }}-amount" name="amount" type="text" inputmode="decimal" autocomplete="off" maxlength="64" value="{{ r.value }}" placeholder="{{ summary.zero_input }}" data-saved-value="{{ r.saved_value }}" aria-describedby="plan-hint{% if r.error %} {{ row_id }}-error{% endif %}"{% if r.error %} aria-invalid="true"{% endif %}{% if r.focus %} data-autofocus{% endif %} data-plan-input
+      <input id="{{ row_id }}-amount" name="amount" type="text" inputmode="decimal" autocomplete="off" maxlength="64" value="{{ r.value }}" placeholder="–" data-saved-value="{{ r.saved_value }}" aria-describedby="plan-hint{% if r.error %} {{ row_id }}-error{% endif %}"{% if r.error %} aria-invalid="true"{% endif %}{% if r.focus %} data-autofocus{% endif %} data-plan-input
              class="form-control cell-input text-right tabular-nums">
       {% if r.error %}<p id="{{ row_id }}-error" class="mt-1 text-left text-xs text-danger" data-field-error>{{ r.error }}</p>{% endif %}
     </form>
     {% else %}
-    <span class="tabular-nums" data-planned>{{ r.display }}</span>
+    {% if r.display %}<span class="tabular-nums" data-planned>{{ r.display }}</span>{% else %}<span class="text-muted" data-planned><span aria-hidden="true">–</span><span class="sr-only">{{ _("No plan") }}</span></span>{% endif %}
     {% endif %}
   </td>
   {% if plan_only %}
@@ -66,8 +69,8 @@
 </tr>
 {%- endmacro %}
 
-{# A "Money out" or "Money in" total (web.plan.MoneyBlockView): Out or In, the figures of the
-   lines and bars above. No difference: its groups' differences point different ways. #}
+{# The money out or money in table's total (web.plan.MoneyBlockView): Out or In, the figures of
+   the bars above. No difference: its groups' differences point different ways. #}
 {% macro block_total_row(b, oob=false) -%}
 <tr id="summary-total-{{ b.key }}" class="border-t-2 {% if b.key == "out" %}border-danger/50{% else %}border-success/50{% endif %} font-semibold" data-money-total="{{ b.key }}"{% if oob %} hx-swap-oob="outerHTML"{% endif %}>
   <th scope="row" class="py-2 pl-2 pr-2 text-left align-top">{% if b.key == "out" %}{{ _("Total money out") }}{% else %}{{ _("Total money in") }}{% endif %}</th>
@@ -91,7 +94,7 @@
    saved / invested, left), on one scale (domain.summary.in_out_flow): when In >= Out both end
    at the right edge; when Out > In the strip ends early, a dashed red outline marks the
    shortfall and the header says "Short by". Pending parts are striped. Pending parts carry
-   data-pending and the confirmed-only flow data-pending-off: the "Show pending" toggle
+   data-pending and the confirmed-only flow data-pending-off: the pending toggle
    (app.js) shows one or the other.
 
    Planned-vs-actual: the actual fills an outlined track and a line marks the plan; on the
@@ -107,12 +110,14 @@
 </div>
 {%- endmacro %}
 
-{# A striped fill for a pending segment: the series' colour, lighter, with solid vertical
-   stripes (the overspend hatch is diagonal). ``stripe`` is in viewBox units. #}
-{% macro pending_pattern(id, fill, stripe) -%}
-<pattern id="{{ id }}" width="{{ stripe * 2 }}" height="24" patternUnits="userSpaceOnUse">
-  <rect x="0" y="0" width="{{ stripe * 2 }}" height="24" class="{{ fill }}" fill-opacity="0.3"></rect>
-  <rect x="0" y="0" width="{{ stripe }}" height="24" class="{{ fill }}"></rect>
+{# A soft striped fill for a pending segment: a light wash of the series' colour with thin,
+   half-strength stripes at 45° (the overspend hatch is full-strength danger red). ``period``
+   is the stripe spacing in viewBox units; the bars' viewBoxes stay close to one unit per pixel
+   on a wide screen, so the angle holds. #}
+{% macro pending_pattern(id, fill, period) -%}
+<pattern id="{{ id }}" width="{{ period }}" height="{{ period }}" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+  <rect x="0" y="0" width="{{ period }}" height="{{ period }}" class="{{ fill }}" fill-opacity="0.22"></rect>
+  <rect x="0" y="0" width="{{ period * 0.4 }}" height="{{ period }}" class="{{ fill }}" fill-opacity="0.5"></rect>
 </pattern>
 {%- endmacro %}
 
@@ -188,10 +193,12 @@
     {% set fill = "fill-danger" if b.over and b.key == "expense" else ("fill-success" if b.over else "fill-primary") %}
     <div data-summary-bar="{{ b.key }}">
       <p class="text-xs text-muted">{% if not b.has_plan %}{% if b.key == "expense" %}{{ _("Spent %(actual)s (no plan)", actual=b.actual) }}{% else %}{{ _("Earned %(actual)s (no plan)", actual=b.actual) }}{% endif %}{% elif b.key == "expense" %}{{ _("Spent %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% else %}{{ _("Earned %(actual)s of %(planned)s planned", actual=b.actual, planned=b.planned) }}{% endif %}{% if b.over and b.has_plan %} <span class="{% if b.key == "expense" %}text-danger{% else %}text-success-strong{% endif %}">{{ _("(over plan)") }}</span>{% endif %}</p>
-      <svg class="mt-1.5 h-4 w-full overflow-visible" viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        <rect x="0" y="3" width="100" height="10" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke" data-bar-track></rect>
-        <rect x="0" y="3" width="{{ b.actual_width }}" height="10" class="{{ fill }}" data-bar-actual></rect>
-        {% if b.has_plan %}<line x1="{{ b.planned_width }}" x2="{{ b.planned_width }}" y1="0" y2="16" class="stroke-ink" stroke-width="3" vector-effect="non-scaling-stroke" data-bar-planned></line>{% endif %}
+      {# 500 units wide (the widths are 0..100, times 5): close to one unit per pixel, so the
+         pending stripes keep their angle. #}
+      <svg class="mt-1.5 h-4 w-full overflow-visible" viewBox="0 0 500 16" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        <rect x="0" y="3" width="500" height="10" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke" data-bar-track></rect>
+        <rect x="0" y="3" width="{{ b.actual_width * 5 }}" height="10" class="{{ fill }}" data-bar-actual></rect>
+        {% if b.has_plan %}<line x1="{{ b.planned_width * 5 }}" x2="{{ b.planned_width * 5 }}" y1="0" y2="16" class="stroke-ink" stroke-width="3" vector-effect="non-scaling-stroke" data-bar-planned></line>{% endif %}
       </svg>
     </div>
     {% endfor %}
@@ -211,7 +218,7 @@
     {% if f.empty %}
     <rect x="0" y="0" width="{{ n }}" height="8" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke" data-strip-segment="empty"></rect>
     {% else %}
-    {% if pending %}<defs>{{ pending_pattern(prefix ~ "strip-success", "fill-success", 6) }}{{ pending_pattern(prefix ~ "strip-withdrawn", "fill-withdrawn", 6) }}</defs>{% endif %}
+    {% if pending %}<defs>{{ pending_pattern(prefix ~ "strip-success", "fill-success", 8) }}{{ pending_pattern(prefix ~ "strip-withdrawn", "fill-withdrawn", 8) }}</defs>{% endif %}
     {% for key, start, end in f.strip_segments() %}
     {% if key == "short" %}
     <rect x="{{ start }}" y="0.75" width="{{ end - start }}" height="6.5" fill="none" class="stroke-danger" stroke-width="1.5" stroke-dasharray="5 3" vector-effect="non-scaling-stroke" data-strip-segment="short"></rect>
@@ -226,7 +233,7 @@
     {% if f.empty %}
     <rect x="0" y="0" width="{{ n }}" height="24" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke" data-flow-segment="empty"></rect>
     {% else %}
-    {% if pending %}<defs>{{ pending_pattern(prefix ~ "danger", "fill-danger", 6) }}{{ pending_pattern(prefix ~ "primary", "fill-primary", 6) }}{{ pending_pattern(prefix ~ "success", "fill-success", 6) }}</defs>{% endif %}
+    {% if pending %}<defs>{{ pending_pattern(prefix ~ "danger", "fill-danger", 8) }}{{ pending_pattern(prefix ~ "primary", "fill-primary", 8) }}{{ pending_pattern(prefix ~ "success", "fill-success", 8) }}</defs>{% endif %}
     {% for key, start, end in f.bar_segments() %}
     {% set colour = flow_colour[key.split("-")[0]] %}
     <rect x="{{ start }}" y="0" width="{{ end - start }}" height="24"{% if key.endswith("-pending") %} fill="url(#{{ prefix }}{{ colour }})" class="stroke-surface"{% else %} class="{{ flow_fill[key] }} stroke-surface"{% endif %} {{ seg|safe }} data-flow-segment="{{ key }}"></rect>
@@ -289,7 +296,7 @@
     {% if split %}
     <p class="mt-2 flex items-center gap-2 text-xs text-muted" aria-hidden="true" data-pending data-pending-key>
       <svg class="h-3 w-5 shrink-0" viewBox="0 0 20 24" preserveAspectRatio="none" focusable="false">
-        <defs>{{ pending_pattern("pending-key-pattern", "fill-muted", 3) }}</defs>
+        <defs>{{ pending_pattern("pending-key-pattern", "fill-muted", 6) }}</defs>
         <rect x="0" y="0" width="20" height="24" fill="url(#pending-key-pattern)"></rect>
       </svg>
       {{ _("Striped: pending, not confirmed yet") }}
@@ -306,12 +313,14 @@
     {% set pending_part %}{% if b.pending %}<span data-pending> {{ _("(+ %(amount)s pending)", amount=b.pending) }}<span class="sr-only"> ({{ _("If everything pending arrives: %(amount)s", amount=b.forecast) }})</span></span>{% endif %}{% endset %}
     <div data-summary-bar="{{ b.key }}">
       <p class="text-xs text-muted">{% if b.key == "out" %}{% if b.has_plan %}{{ _("Out %(actual)s%(pending)s of %(planned)s planned", actual=b.actual, pending=pending_part, planned=b.planned) }}{% else %}{{ _("Out %(actual)s%(pending)s (no plan)", actual=b.actual, pending=pending_part) }}{% endif %}{% else %}{% if b.has_plan %}{{ _("In %(actual)s%(pending)s of %(planned)s planned", actual=b.actual, pending=pending_part, planned=b.planned) }}{% else %}{{ _("In %(actual)s%(pending)s (no plan)", actual=b.actual, pending=pending_part) }}{% endif %}{% endif %}{% if b.over and b.has_plan %} <span class="{% if b.key == "out" %}text-danger{% else %}text-success-strong{% endif %}">{{ _("(over plan)") }}</span>{% elif b.pending and b.pending_over and b.has_plan %}<span class="{% if b.key == "out" %}text-warning-strong{% else %}text-success-strong{% endif %}" data-pending data-pending-over> {{ _("(over plan if everything pending arrives)") }}</span>{% endif %}</p>
-      <svg class="mt-1.5 h-4 w-full overflow-visible" viewBox="0 0 100 16" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-        {% if b.pending %}<defs>{{ pending_pattern("bar-pending-" ~ b.key, fill, 1) }}</defs>{% endif %}
-        <rect x="0" y="3" width="100" height="10" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke" data-bar-track></rect>
-        <rect x="0" y="3" width="{{ b.actual_width }}" height="10" class="{{ fill }}" data-bar-actual></rect>
-        {% if b.pending and b.pending_end > b.actual_width %}<rect x="{{ b.actual_width }}" y="3" width="{{ b.pending_end - b.actual_width }}" height="10" fill="url(#bar-pending-{{ b.key }})" data-pending data-bar-pending><title>{{ _("If everything pending arrives: %(amount)s", amount=b.forecast) }}</title></rect>{% endif %}
-        {% if b.has_plan %}<line x1="{{ b.planned_width }}" x2="{{ b.planned_width }}" y1="0" y2="16" class="stroke-ink" stroke-width="3" vector-effect="non-scaling-stroke" data-bar-planned></line>{% endif %}
+      {# 500 units wide (the widths are 0..100, times 5): close to one unit per pixel, so the
+         pending stripes keep their angle. #}
+      <svg class="mt-1.5 h-4 w-full overflow-visible" viewBox="0 0 500 16" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+        {% if b.pending %}<defs>{{ pending_pattern("bar-pending-" ~ b.key, fill, 8) }}</defs>{% endif %}
+        <rect x="0" y="3" width="500" height="10" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke" data-bar-track></rect>
+        <rect x="0" y="3" width="{{ b.actual_width * 5 }}" height="10" class="{{ fill }}" data-bar-actual></rect>
+        {% if b.pending and b.pending_end > b.actual_width %}<rect x="{{ b.actual_width * 5 }}" y="3" width="{{ (b.pending_end - b.actual_width) * 5 }}" height="10" fill="url(#bar-pending-{{ b.key }})" data-pending data-bar-pending><title>{{ _("If everything pending arrives: %(amount)s", amount=b.forecast) }}</title></rect>{% endif %}
+        {% if b.has_plan %}<line x1="{{ b.planned_width * 5 }}" x2="{{ b.planned_width * 5 }}" y1="0" y2="16" class="stroke-ink" stroke-width="3" vector-effect="non-scaling-stroke" data-bar-planned></line>{% endif %}
       </svg>
     </div>
     {% endfor %}

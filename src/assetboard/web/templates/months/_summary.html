@@ -1,11 +1,32 @@
 {# The month summary (#month-summary, F2.3 part B and F2.4): In and Out (the flow strip and bar), the
    Out and In planned-vs-actual bars, and per category the plan (editable inline), actual (with
-   "+ X pending" under it, F3.5) and difference, with a totals row per group, in two blocks:
-   "Money out" (expenses, saved / invested; total Out) and "Money in" (income, withdrawn from
-   savings; total In), then the plan-only transfers (months/_plan.html). ``summary`` is web.plan.SummaryView
+   "+ X pending" under it, F3.5) and difference, with a totals row per group, in two panels of
+   their own (owner, 2026-11-01): money out (expenses, saved / invested; total Out) and money in
+   (income, withdrawn from savings; total In), then the plan-only transfers (months/_plan.html).
+   The order and pending ("Hide pending" / "Show pending") toggles sit once, in the first panel's header, and act on all
+   of them. ``summary`` is web.plan.SummaryView
    (web.plan.summary_context). Every transaction write sends this block out of band
    (``summary_oob``); app.js keeps a half-typed planned value and its focus across that swap. #}
 {% from "months/_plan.html" import plan_row, totals_row, block_total_row, banner, in_out, sort_toggle, copied_text, skipped_text with context %}
+{# One table of the summary, flush in its own panel. "relative": the sr-only texts in the table
+   are absolutely positioned, so the scroll box must be their containing block, or they widen
+   the page at phone width. The caption names the table for screen readers only. #}
+{% macro sheet(key, caption) -%}
+<div class="panel relative overflow-x-auto" data-money-block="{{ key }}">
+  <table class="sheet sheet-flush w-full min-w-[40rem] text-sm">
+    <caption class="sr-only">{{ caption }}</caption>
+    <thead>
+      <tr class="text-left text-xs text-muted">
+        <th scope="col" class="py-2 pl-2 pr-2 font-medium">{{ _("Category") }}</th>
+        <th scope="col" class="w-40 py-2 pr-2 text-right font-medium">{{ _("Plan") }}</th>
+        <th scope="col" class="w-44 py-2 pr-2 text-right font-medium">{{ _("Actual") }}</th>
+        <th scope="col" class="w-36 py-2 pr-2 text-right font-medium">{{ _("Difference") }}</th>
+      </tr>
+    </thead>
+    {{ caller() }}
+  </table>
+</div>
+{%- endmacro %}
 {% macro group_body(g) -%}
 <tbody data-plan-group="{{ g.key }}">
   <tr><th scope="rowgroup" colspan="4" class="!pt-3 text-left text-xs font-semibold uppercase tracking-wide text-muted">{{ g.heading }}</th></tr>
@@ -13,13 +34,15 @@
   {% if g.totals %}{{ totals_row(g) }}{% endif %}
 </tbody>
 {%- endmacro %}
-<section id="month-summary" class="panel p-4 sm:p-6" aria-labelledby="month-summary-heading" data-month-summary{% if summary_oob %} hx-swap-oob="outerHTML"{% endif %}>
+<section id="month-summary" class="space-y-4" aria-labelledby="month-summary-heading" data-month-summary{% if summary_oob %} hx-swap-oob="outerHTML"{% endif %}>
+  <div class="panel p-4 sm:p-6">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h2 id="month-summary-heading" class="text-base font-semibold">{{ _("Summary") }}</h2>
     <div class="flex flex-wrap items-center gap-3">
-      {# F3.5: a pressed toggle with a fixed label; app.js sets aria-pressed from this device's
-         choice and shows or hides every pending part (data-pending). #}
-      <button type="button" data-pending-toggle aria-pressed="true" class="rounded-lg border border-line px-2.5 py-1 text-xs font-medium hover:bg-subtle aria-pressed:bg-subtle">{{ _("Show pending") }}</button>
+      {# F3.5: the label names what a press does ("Hide pending" while pending parts show);
+         app.js applies this device's choice, swaps the label and shows or hides every pending
+         part (data-pending). #}
+      <button type="button" data-pending-toggle data-label-hide="{{ _('Hide pending') }}" data-label-show="{{ _('Show pending') }}" class="rounded-lg border border-line px-2.5 py-1 text-xs font-medium hover:bg-subtle">{{ _("Hide pending") }}</button>
       {% if summary.groups %}{{ sort_toggle() }}{% endif %}
     </div>
   </div>
@@ -31,35 +54,22 @@
   {% endif %}
   {{ banner() }}
   {{ in_out() }}
-  {% if summary.groups %}
-  {# relative: the sr-only texts in the table are absolutely positioned, so the scroll box must
-     be their containing block, or they widen the page at phone width. #}
-  <div class="relative mt-4 overflow-x-auto">
-    <table class="sheet w-full min-w-[40rem] text-sm">
-      <thead>
-        <tr class="text-left text-xs text-muted">
-          <th scope="col" class="py-2 pl-2 pr-2 font-medium">{{ _("Category") }}</th>
-          <th scope="col" class="w-40 py-2 pr-2 text-right font-medium">{{ _("Plan") }}</th>
-          <th scope="col" class="w-44 py-2 pr-2 text-right font-medium">{{ _("Actual") }}</th>
-          <th scope="col" class="w-36 py-2 pr-2 text-right font-medium">{{ _("Difference") }}</th>
-        </tr>
-      </thead>
-      {# Two blocks with a coloured top rule and marker (red: money out, green: money in). #}
-      {% for b in summary.money_blocks %}
-      <tbody data-money-block="{{ b.key }}">
-        <tr><th scope="col" colspan="4" id="money-block-{{ b.key }}" class="!border-t-2 {% if b.key == "out" %}!border-t-danger/60{% else %}!border-t-success/60{% endif %} text-left text-sm font-semibold"><span class="flex items-center gap-2"><span class="h-2.5 w-2.5 shrink-0 rounded-full {% if b.key == "out" %}bg-danger{% else %}bg-success{% endif %}" aria-hidden="true"></span>{{ b.heading }}</span></th></tr>
-      </tbody>
-      {% for g in b.groups %}{{ group_body(g) }}{% endfor %}
-      <tbody data-money-block-total="{{ b.key }}">{{ block_total_row(b) }}</tbody>
-      {% if not loop.last %}<tbody aria-hidden="true"><tr><td colspan="4" class="h-6 !border-x-0"></td></tr></tbody>{% endif %}
-      {% endfor %}
-      {% for g in summary.groups if g.key == "transfer" %}{{ group_body(g) }}{% endfor %}
-    </table>
-  </div>
-  {% if summary.can_write %}
-  <p id="plan-hint" class="mt-2 text-xs text-muted">{{ _("Enter or leaving the field saves a planned value; 0 or an empty field removes it. Esc restores the saved value.") }}</p>
-  {% endif %}
-  {% else %}
+  {% if not summary.groups %}
   <p class="mt-3 text-sm text-muted" data-plan-empty>{{ _("Add categories to plan this month.") }} <a href="{{ scoped_url(request, 'categories') }}" class="font-medium text-primary-ink underline">{{ _("Categories") }}</a></p>
+  {% endif %}
+  </div>
+  {% if summary.groups %}
+  {% for b in summary.money_blocks %}
+  {% call sheet(b.key, _("Out: expenses and saved / invested") if b.key == "out" else _("In: income and withdrawn from savings")) %}
+    {% for g in b.groups %}{{ group_body(g) }}{% endfor %}
+    <tbody data-money-block-total="{{ b.key }}">{{ block_total_row(b) }}</tbody>
+  {% endcall %}
+  {% endfor %}
+  {% for g in summary.groups if g.key == "transfer" %}
+  {% call sheet("transfer", g.heading) %}{{ group_body(g) }}{% endcall %}
+  {% endfor %}
+  {% if summary.can_write %}
+  <p id="plan-hint" class="text-xs text-muted">{{ _("Enter or leaving the field saves a planned value; 0 or an empty field removes it. Esc restores the saved value.") }}</p>
+  {% endif %}
   {% endif %}
 </section>

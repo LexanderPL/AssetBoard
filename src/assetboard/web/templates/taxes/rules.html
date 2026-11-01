@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "macros/components.html" import csrf_input, summary_button with context %}
 {% from "taxes/_macros.html" import how, when with context %}
+{% from "categories/_macros.html" import category_options %}
 {% block title %}{{ _("Taxes") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Taxes") }}{% endblock %}
 {% block content %}
@@ -8,7 +9,7 @@
 {% set frequency_names = {"yearly": _("every year"), "quarterly": _("every quarter"), "monthly": _("every month"), "once": _("once")} %}
 <div class="mb-6 flex flex-wrap items-start justify-between gap-3">
   <p class="max-w-2xl text-sm text-muted" data-tax-intro>{{ _("Only if you want taxes planned. You enter the rates; this is not tax advice. You can hide this page in Workspace settings.") }}</p>
-  {% if can_edit %}<a href="{{ scoped_url(request, 'tax_rule_new') }}" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-new-tax>{{ _("New tax") }}</a>{% endif %}
+  {% if can_edit %}<a href="{{ scoped_url(request, 'tax_rule_new') }}" class="btn-primary" data-new-tax>{{ _("New tax") }}</a>{% endif %}
 </div>
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 
@@ -22,7 +23,7 @@
       <p class="text-sm" data-tax-how>{{ how(rule.kind.value) }}</p>
       <p class="text-sm text-muted" data-tax-when>{{ when(rule.kind.value, rule.payment_timing.value, rule.payment_day, locale) }} · {{ _("Used by: %(sources)s", sources=(rule.used_by|join(", ") if rule.used_by else _("not used yet"))) }}</p>
     </div>
-    {% if can_edit %}<a href="{{ scoped_url(request, 'tax_rule_edit', rule_id=rule.id) }}" class="rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle" data-tax-edit>{{ _("Edit") }}<span class="sr-only"> {{ rule.name }}</span></a>{% endif %}
+    {% if can_edit %}<a href="{{ scoped_url(request, 'tax_rule_edit', rule_id=rule.id) }}" class="btn" data-tax-edit>{{ _("Edit") }}<span class="sr-only"> {{ rule.name }}</span></a>{% endif %}
   </div>
   <details class="mt-3" data-tax-rates{% if open_form == "rates-" ~ rule.id %} open{% endif %}>
     <summary class="{{ summary_button }}">{{ _("Rate changes") }}<span class="sr-only"> {{ rule.name }}</span></summary>
@@ -39,7 +40,7 @@
       <label class="grid gap-1 text-sm">{{ _("Rate in %%") }}<input name="rate_percent" inputmode="decimal" class="{{ input_class }}"></label>
       <label class="grid gap-1 text-sm">{{ _("Amount per payment (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="fixed_amount" inputmode="decimal" class="{{ input_class }}"></label>
       <p class="text-xs text-muted sm:col-span-4">{{ _("Past months keep the old rate. Fill in the field that matches the value type.") }}</p>
-      <button type="submit" class="rounded-lg border border-line px-3 py-2 text-sm font-semibold sm:col-span-4 sm:justify-self-start">{{ _("Add rate change") }}</button>
+      <button type="submit" class="btn sm:col-span-4 sm:justify-self-start">{{ _("Add rate change") }}</button>
     </form>
     {% endif %}
   </details>
@@ -64,7 +65,7 @@
       <p class="text-sm">{{ format_money(item.amount, locale) }}{% if how_often %} · {{ frequency_names[how_often] }}{% endif %} · {{ _("category %(name)s", name=item.category_name) }}</p>
       <p class="text-sm text-muted">{% if item.next_due %}{{ _("Next: %(date)s", date=format_day(item.next_due, locale)) }}{% else %}{{ _("Nothing planned") }}{% endif %}</p>
     </div>
-    {% if can_edit %}<a href="{{ scoped_url(request, 'scheduled_edit', item_id=item.id) }}" class="rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Edit") }}<span class="sr-only"> {{ item.name }}</span></a>{% endif %}
+    {% if can_edit %}<a href="{{ scoped_url(request, 'scheduled_edit', item_id=item.id) }}" class="btn">{{ _("Edit") }}<span class="sr-only"> {{ item.name }}</span></a>{% endif %}
   </div>
 </section>
 {% endfor %}
@@ -80,8 +81,8 @@
       <label class="grid gap-1 text-sm">{{ _("Amount (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="amount" inputmode="decimal" required class="{{ input_class }}"></label>
       <label class="grid gap-1 text-sm">{{ _("How often") }}<select name="how_often" class="form-select py-2"><option value="yearly">{{ _("Every year") }}</option><option value="quarterly">{{ _("Every quarter") }}</option><option value="monthly">{{ _("Every month") }}</option><option value="once">{{ _("Once") }}</option></select></label>
       <label class="grid gap-1 text-sm">{{ _("Next due date") }}<input type="date" name="due_date" value="{{ today }}" required class="{{ input_class }}"></label>
-      <label class="grid gap-1 text-sm">{{ _("Expense category") }}<select name="category_id" required class="form-select py-2">{% for category in expense_categories %}<option value="{{ category.id }}"{% if category.name == _("Taxes") %} selected{% endif %}>{{ category.name }}</option>{% endfor %}</select></label>
-      <div class="flex items-end"><button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save") }}</button></div>
+      <label class="grid gap-1 text-sm">{{ _("Expense category") }}{% set default_category = expense_categories|selectattr("name", "equalto", _("Taxes"))|first %}<select name="category_id" required class="form-select py-2">{{ category_options([(_("Expense categories"), expense_categories)], default_category.id if default_category else "") }}</select></label>
+      <div class="flex items-end"><button type="submit" class="btn-primary">{{ _("Save") }}</button></div>
     </form>
     {% else %}
     <p class="text-sm text-muted">{{ _("Create an expense category first.") }}</p>

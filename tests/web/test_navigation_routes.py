@@ -275,7 +275,7 @@ def test_the_sidebar_order_and_current_page(nav: OwnerApp) -> None:
     order = re.findall(
         r"data-(home|month|transactions|history|recurring|upcoming)-link", sidebar.group(0)
     )
-    assert order == ["home", "month", "transactions", "history", "recurring", "upcoming"]
+    assert order == ["home", "month", "transactions", "history", "upcoming", "recurring"]
     for path, current in (("/", "home"), (MONTH, "month"), (PAGE, "transactions"),
                           ("/history", "history")):  # fmt: skip
         page = nav.client.get(path).text

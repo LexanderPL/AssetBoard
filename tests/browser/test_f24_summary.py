@@ -1,8 +1,8 @@
 """The month summary in Chromium (F2.4): actual, difference and KPIs refresh without a reload
 after a planned value or an entry (made on the Transactions page since F2.7) is saved, the sort
-toggle reorders the rows and is kept, the F3.5 "Show pending" toggle hides every pending part
-(lines, striped bar parts, the pending flow bar) and is kept, clicking a category opens the
-filtered Transactions page (part B), and there are no CSP violations.
+toggle reorders the rows and is kept, the F3.5 pending toggle ("Hide pending" / "Show pending")
+hides every pending part (lines, striped bar parts, the pending flow bar) and is kept, clicking
+a category opens the filtered Transactions page (part B), and there are no CSP violations.
 The test's categories are created directly ("Golden ..."); the suggested set that setup gives
 every new workspace stays in the summary with nothing in it."""
 
@@ -212,11 +212,11 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             )  # fmt: skip
             assert created.status == 303
             page.goto(f"{base}/m/{MONTH}")
-            toggle = page.get_by_role("button", name="Show pending")
+            toggle = page.locator("[data-pending-toggle]")
             pending = page.locator("#month-summary [data-pending]:visible")
             food_pending = food_row.locator("[data-pending]:visible")
             confirmed_only = page.locator("#month-summary [data-pending-off]")
-            expect(toggle).to_have_attribute("aria-pressed", "true")
+            expect(toggle).to_have_text("Hide pending")
             expect(food_row.locator("[data-actual]")).to_have_text("€50.00")
             expect(food_pending).to_have_text(
                 "+ €120.00 pending (If everything pending arrives: €170.00)"
@@ -232,7 +232,7 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
             # choice survives a row swap (planned value), a whole-summary swap (sort) and a
             # reload, and it comes back with a second click.
             toggle.click()
-            expect(toggle).to_have_attribute("aria-pressed", "false")
+            expect(toggle).to_have_text("Show pending")
             expect(pending).to_have_count(0)
             expect(confirmed_only).to_be_visible()
             page.get_by_label("Planned for Golden Travel").fill("5350")
@@ -245,17 +245,17 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
                 "aria-pressed", "true"
             )
             expect(pending).to_have_count(0)
-            expect(toggle).to_have_attribute("aria-pressed", "false")
+            expect(toggle).to_have_text("Show pending")
             page.get_by_role("button", name="Largest first").click()
             expect(page.get_by_role("button", name="Largest first")).to_have_attribute(
                 "aria-pressed", "true"
             )
             page.reload()
-            expect(toggle).to_have_attribute("aria-pressed", "false")
+            expect(toggle).to_have_text("Show pending")
             expect(pending).to_have_count(0)
             assert page.evaluate("localStorage.getItem('pending')") == "hidden"
             toggle.click()
-            expect(toggle).to_have_attribute("aria-pressed", "true")
+            expect(toggle).to_have_text("Hide pending")
             expect(food_pending).to_have_count(1)
             expect(confirmed_only).to_be_hidden()
             assert _order(page) == ["Golden Travel", "Golden Food"]
@@ -264,13 +264,13 @@ def test_f24_summary_in_a_browser(tmp_path: Path) -> None:
                 "localStorage.removeItem('pending'); localStorage.setItem('forecast', 'hidden')"
             )
             page.reload()
-            expect(toggle).to_have_attribute("aria-pressed", "false")
+            expect(toggle).to_have_text("Show pending")
             expect(pending).to_have_count(0)
             assert page.evaluate(
                 "[localStorage.getItem('pending'), localStorage.getItem('forecast')]"
             ) == ["hidden", None]
             toggle.click()
-            expect(toggle).to_have_attribute("aria-pressed", "true")
+            expect(toggle).to_have_text("Hide pending")
 
             # Both donuts are shown; the expense donut is drawn from the summary's actuals.
             expect(page.locator("[data-donut]")).to_have_count(2)

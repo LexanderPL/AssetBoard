@@ -136,8 +136,9 @@ def test_summary_shows_plan_and_actual_with_pending(rent) -> None:
     html = owner.client.get("/m/2026-03").text
     summary = _block(html, r'<section id="month-summary".*?</section>')
     # Two columns, Plan and Actual (and Difference); no Expected or Forecast column or line.
+    # The money out and money in tables have a header row each.
     headings = re.findall(r'<th scope="col"[^>]*>([^<]*)</th>', summary)
-    assert headings == ["Category", "Plan", "Actual", "Difference"]
+    assert headings == ["Category", "Plan", "Actual", "Difference"] * 2
     assert "Expected (pending)" not in summary and ">Forecast</th>" not in summary
     assert "Forecast spent" not in summary and "forecast earned" not in summary
     # The pending amount is a lighter line under the confirmed one, with the forecast as its
@@ -147,6 +148,9 @@ def test_summary_shows_plan_and_actual_with_pending(rent) -> None:
     assert _pending(row) == "+ €100.00 pending"
     assert 'title="If everything pending arrives: €100.00"' in row
     assert '<span class="sr-only"> (If everything pending arrives: €100.00)</span>' in row
+    # No plan: no "over plan if everything pending arrives" hint and no difference.
+    assert "data-pending-over" not in row and "Over plan" not in row
+    assert re.search(r"data-difference>\s*</td>", row)
     total = _block(summary, r'<tr id="summary-total-expense".*?</tr>')
     assert ">+ €100.00 pending<" in total
     # KPIs: Actual with "+ X pending"; left (here: short) if everything pending arrives.
@@ -170,8 +174,13 @@ def test_summary_shows_plan_and_actual_with_pending(rent) -> None:
     assert re.search(r'data-strip-segment="short"', summary)
     assert re.search(r'<div class="mt-2 hidden"[^>]*data-in-out-flow data-pending-off>', summary)
     assert re.search(r'aria-hidden="true" data-in-out-flow data-pending>', summary)
-    # The toggle is "Show pending" (app.js hides everything marked data-pending).
-    assert re.search(r'data-pending-toggle aria-pressed="true"[^>]*>Show pending</button>', summary)
+    # The toggle reads "Hide pending" while pending parts show (app.js swaps the label and hides
+    # everything marked data-pending).
+    assert re.search(
+        r'data-pending-toggle data-label-hide="Hide pending" data-label-show="Show pending"'
+        r"[^>]*>Hide pending</button>",
+        summary,
+    )
     assert "data-forecast-toggle" not in summary
     # Home keeps its forecast line and second bar (a follow-up), and has no toggle.
     home = owner.client.get("/").text
@@ -201,10 +210,11 @@ def test_pending_over_plan_is_a_softer_hint(rent) -> None:
     )
     assert "(over plan)" not in bar
     assert "(over plan if everything pending arrives)" in bar
-    # The scale is the forecast (100): plan at 50, the striped pending part from 0 to 100.
-    assert re.search(r'x1="50"[^>]*data-bar-planned', bar)
+    # The scale is the forecast (100, drawn 500 wide): plan at 50, the striped pending part
+    # from 0 to 100.
+    assert re.search(r'x1="250"[^>]*data-bar-planned', bar)
     assert re.search(
-        r'<rect x="0" y="3" width="100" height="10" fill="url\(#bar-pending-out\)" '
+        r'<rect x="0" y="3" width="500" height="10" fill="url\(#bar-pending-out\)" '
         r"data-pending data-bar-pending><title>If everything pending arrives: €100.00</title>",
         bar,
     )

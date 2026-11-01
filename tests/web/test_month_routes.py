@@ -110,7 +110,15 @@ def test_empty_and_future_months_render(months: OwnerApp) -> None:
         # F2.7: a pure summary, no entry form and no transaction tables.
         assert 'id="ledger"' not in page and "data-entry-form" not in page
         page = _page(months, f"/transactions/{month}")
-        assert "No expenses in this month." in page and "No income in this month." in page
+        # The entry rows follow at once: no "No expenses in this month." above them
+        # (owner, 2026-11-01).
+        assert page.count("data-entry-row") == 2 and "data-ledger-empty" not in page
+        assert "No expenses in this month." not in page and "No income in this month." not in page
+    # Without an entry row (a viewer, a closed month) the empty state stays.
+    _close(months, "2026-10")
+    page = _page(months, "/transactions/2026-10")
+    assert "data-entry-row" not in page and page.count("data-ledger-empty") == 2
+    assert "No expenses in this month." in page and "No income in this month." in page
 
 
 def test_the_month_name_follows_the_language(months: OwnerApp) -> None:
@@ -221,20 +229,25 @@ def test_an_owner_closes_and_reopens_a_month(months: OwnerApp) -> None:
     page = _page(months, "/m/2026-10")
     assert "data-month-close" in page and "data-closed-banner" not in page
     response = _close(months, "2026-10")
+    # No "Month closed." notice (owner, 2026-11-01): the badge and the banner say so.
     assert (response.status_code, response.headers["location"]) == (  # type: ignore[attr-defined]
         303,
-        "/m/2026-10?notice=closed",
+        "/m/2026-10",
     )
-    page = _page(months, "/m/2026-10?notice=closed")
-    assert "Month closed." in page and "data-closed-banner" in page and "data-closed-badge" in page
+    page = _page(months, "/m/2026-10")
+    assert "data-closed-banner" in page and "data-closed-badge" in page
+    assert "Month closed." not in page and "data-notice" not in page
+    # An old link with the removed notice code shows nothing either.
+    assert "Month closed." not in _page(months, "/m/2026-10?notice=closed")
     assert "This month is closed. Its entries and planned values are read-only." in page
     assert "Closed on Oct 14, 2026 by Admin." in page
     assert "data-month-close" not in page and "data-month-reopen" in page
 
     response = months.post("/m/2026-10/reopen", token_from="/m/2026-10")
-    assert response.headers["location"] == "/m/2026-10?notice=reopened"
-    page = _page(months, "/m/2026-10?notice=reopened")
-    assert "Month reopened." in page and "data-closed-banner" not in page
+    assert response.headers["location"] == "/m/2026-10"
+    page = _page(months, "/m/2026-10")
+    assert "Month reopened." not in page and "data-notice" not in page
+    assert "data-closed-banner" not in page and "data-month-close" in page
     with months.db() as session:
         actions = session.scalars(
             select(AuditEvent.action)

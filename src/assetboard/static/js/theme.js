@@ -3,6 +3,8 @@
   // <html>, rendered by the server) > the system setting. Runs in <head>, before the body paints.
   const storageKey = "theme";
   const root = document.documentElement;
+  // Styles that need JavaScript (the folding sidebar on phones) apply only under "js".
+  root.classList.add("js");
   const systemDark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
   let preference = null;
   try {

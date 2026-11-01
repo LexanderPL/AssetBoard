@@ -1,7 +1,8 @@
 # Workspace export
 
 Owners and editors can open **Export and import** in the workspace menu and select
-**Download archive**. The ZIP contains the current workspace's settings, all categories
+**Download archive**. The ZIP contains the current workspace's settings (including the Taxes switch and the
+Upcoming window), all categories
 (including archived categories), transactions (including deleted entries), planned values,
 and stored month states (closed months and plan-start markers). Recurring rules, occurrences,
 income sources, work logs/calendars, and tax rules await the F3.8 archive extension. Notification
@@ -18,10 +19,10 @@ values beginning with spreadsheet formula characters; inspect it as text or disa
 execution when opening it in a spreadsheet.
 
 The archive contains `manifest.json`, `workspace.json`, `categories.csv`, `budget_lines.csv`,
-`transactions.csv`, and `months.csv`. The manifest identifies format version 1.0 and records
+`transactions.csv`, and `months.csv`. The manifest identifies format version 1.1 and records
 SHA-256 checksums, byte sizes, and CSV row counts. CSV uses UTF-8, comma separators, ISO dates,
 and exact decimal amounts. Members, invitations, audit events, and user accounts are excluded.
-See the [normative format reference](specs/M4-ledger-export-import.md#format-reference-v10)
+See the [normative format reference](specs/M4-ledger-export-import.md#format-reference-v11)
 for columns, ordering, and compatibility rules.
 
 Origin IDs are preserved when exporting previously imported categories and transactions.

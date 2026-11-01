@@ -5,9 +5,10 @@ the money came from above how it was used), the Out and In planned-vs-actual bar
 category in the summary's groups (expenses, saved / invested, income, withdrawn from savings, and
 the plan-only "Transfers (not counted)" while such lines exist), each with its planned value
 (F2.3: editable inline for editors and owners while the month is open), actual and difference
-(F2.4), and a totals row per group. The groups sit in two blocks, "Money out" (expenses, saved /
-invested) and "Money in" (income, withdrawn), each with its total (Out and In). Home keeps the
-older flow bar of earnings (``KpiView``).
+(F2.4), and a totals row per group. The groups sit in two tables, money out (expenses, saved /
+invested) and money in (income, withdrawn), each with its total (Out and In). A category without
+a planned value has no difference, tint or "over plan" hint, and a group's total difference counts
+only its planned categories. Home keeps the older flow bar of earnings (``KpiView``).
 
 Shared by ``web.month_routes`` (the Month page), ``web.routes`` (Home shows the flow bar) and
 ``web.plan_routes`` (the planned-value writes). Everything here
@@ -31,6 +32,7 @@ from assetboard.domain.summary import (
     InOutFlow,
     SortOrder,
     SummaryBlock,
+    SummaryRow,
     flow_bar,
     in_out_flow,
 )
@@ -56,10 +58,10 @@ GROUP_HEADINGS = {
     "withdrawn": _("Withdrawn from savings"),
     "transfer": _("Transfers (not counted)"),
 }
-# The two blocks of the summary table (owner, 2026-10-31): their headings and groups.
+# The two tables of the summary (owner, 2026-10-31 and 2026-11-01): their groups.
 MONEY_BLOCKS = (
-    ("out", _("Money out"), ("expense", "saved")),
-    ("in", _("Money in"), ("income", "withdrawn")),
+    ("out", ("expense", "saved")),
+    ("in", ("income", "withdrawn")),
 )
 # One message per ``services.budget.InvalidPlannedValue`` code.
 PLAN_ERRORS = {
@@ -105,14 +107,16 @@ class PlanRowView:
     editable: bool  # the planned cell is an input (writers; plannable or with a line)
     value: str  # the input's value (locale decimal sign, no grouping); "" without a line
     saved_value: str  # the stored value in the same form (Esc restores it)
-    display: str  # the formatted planned amount for read-only cells (0.00 without a line)
+    display: str  # the formatted planned amount for read-only cells ("" without a line)
     error: str | None
     focus: bool
     actual: str = ""  # "" for the plan-only transfer group
     pending: str = ""  # expected but not confirmed yet ("" when nothing is pending)
     forecast: str = ""  # actual + pending: "If everything pending arrives: ..."
+    # "" without a planned value (owner, 2026-11-01: nothing to compare with).
     difference: str = ""
-    tone: str = ""  # "favourable", "unfavourable" or "even" (for the difference)
+    tone: str = ""  # "favourable", "unfavourable" or "even" (for the difference); "" without
+    has_plan: bool = False  # a planned value above 0
     # Actual above plan: "danger" for an expense category, "success" for an income one (the
     # row's background tint); "" otherwise, and for the other groups.
     over: str = ""
@@ -127,7 +131,7 @@ class TotalsView:
     actual: str
     pending: str  # "" when nothing is pending
     forecast: str
-    difference: str
+    difference: str  # "" when no category of the group has a planned value
     tone: str
 
 
@@ -141,11 +145,10 @@ class PlanGroupView:
 
 @dataclass(frozen=True, slots=True)
 class MoneyBlockView:
-    """A block of the summary table: "Money out" (expenses, saved / invested) or "Money in"
-    (income, withdrawn from savings), with its total (planned, actual and pending)."""
+    """A table of the summary: money out (expenses, saved / invested) or money in (income,
+    withdrawn from savings), with its total (planned, actual and pending)."""
 
     key: str  # "out" or "in"
-    heading: str
     groups: tuple[PlanGroupView, ...]
     totals: TotalsView
 
@@ -222,9 +225,8 @@ class SummaryView:
     bars: tuple[BarView, ...] = ()  # Home: spent and earned against their plans
     in_out: InOutView | None = None  # the Month page's flow
     in_out_bars: tuple[BarView, ...] = ()  # the Month page: Out and In against their plans
-    money_blocks: tuple[MoneyBlockView, ...] = ()  # "Money out" and "Money in"
+    money_blocks: tuple[MoneyBlockView, ...] = ()  # the money out and money in tables
     sort: str = "actual"
-    zero_input: str = "0"  # the placeholder of an empty planned cell ("0.00", "0,00")
     filter_id: str = ""  # the category the transaction tables are filtered to (aria-current)
     future: bool = False  # a future month: the flow bar is a projection ("Expected spent ...")
     source: SummaryData | None = field(default=None, compare=False, repr=False)  # the donuts
@@ -293,7 +295,7 @@ def _sum_blocks(blocks: tuple[SummaryBlock, ...]) -> tuple[Money, Money, Money]:
 
 
 def _block_totals(planned: Money, actual: Money, expected: Money, locale: str) -> TotalsView:
-    """A "Money out" or "Money in" total. It has no difference: its groups' differences have
+    """A money out or money in table's total. It has no difference: its groups' differences have
     different signs (saving more is favourable, spending more is not)."""
     forecast = Money(actual.amount_minor + expected.amount_minor, actual.currency)
     return TotalsView(
@@ -409,8 +411,8 @@ def build_summary(
             value, error, focus = cell.value, cell.error, cell.focus
         if first and editable:
             focus, first = True, False
-        shown = planned if planned is not None else Money(0, summary.currency)
         return PlanRowView(
+            has_plan=has_line,
             category_id=str(category.id),
             name=category.name,
             color=category.color,
@@ -418,42 +420,54 @@ def build_summary(
             editable=editable,
             value=value,
             saved_value=saved,
-            display=format_money(shown, locale),
+            display=format_money(planned, locale) if planned is not None and has_line else "",
             error=error,
             focus=focus,
             **extra,
         )
 
+    def summary_row(key: str, r: SummaryRow) -> PlanRowView:
+        category = data.categories[r.category_id]
+        actual = format_money(r.actual, locale)
+        pending = _pending(r.expected, locale)
+        forecast = format_money(r.forecast, locale)
+        if r.planned.amount_minor <= 0:
+            # No planned value (owner, 2026-11-01): no difference, tint or "over plan" hint.
+            return row_view(category, r.planned, actual=actual, pending=pending, forecast=forecast)
+        tint = OVER_PLAN_TINT.get(key, "")
+        over = r.actual.amount_minor > r.planned.amount_minor
+        pending_over = (
+            not over
+            and r.expected.amount_minor > 0
+            and r.forecast.amount_minor > r.planned.amount_minor
+        )
+        return row_view(
+            category,
+            r.planned,
+            actual=actual,
+            pending=pending,
+            forecast=forecast,
+            difference=_signed(r.difference, locale),
+            tone=_tone(r.difference),
+            over=tint if over else "",
+            pending_over=tint if pending_over else "",
+        )
+
     groups: list[PlanGroupView] = []
     for block in summary.blocks:
-        rows = tuple(
-            row_view(
-                data.categories[r.category_id],
-                r.planned,
-                actual=format_money(r.actual, locale),
-                pending=_pending(r.expected, locale),
-                forecast=format_money(r.forecast, locale),
-                difference=_signed(r.difference, locale),
-                tone=_tone(r.difference),
-                over=OVER_PLAN_TINT.get(block.key, "")
-                if r.actual.amount_minor > r.planned.amount_minor
-                else "",
-                pending_over=OVER_PLAN_TINT.get(block.key, "")
-                if r.actual.amount_minor <= r.planned.amount_minor < r.forecast.amount_minor
-                and r.expected.amount_minor > 0
-                else "",
-            )
-            for r in block.rows
-        )
+        rows = tuple(summary_row(block.key, r) for r in block.rows)
         if not rows:
             continue
+        # The total difference counts only the planned categories (owner, 2026-11-01).
+        planned_rows = [r for r in block.rows if r.planned.amount_minor > 0]
+        difference = Money(sum(r.difference.amount_minor for r in planned_rows), summary.currency)
         totals = TotalsView(
             planned=format_money(block.planned, locale),
             actual=format_money(block.actual, locale),
             pending=_pending(block.expected, locale),
             forecast=format_money(block.forecast, locale),
-            difference=_signed(block.difference, locale),
-            tone=_tone(block.difference),
+            difference=_signed(difference, locale) if planned_rows else "",
+            tone=_tone(difference) if planned_rows else "",
         )
         heading = gettext(GROUP_HEADINGS[block.key], locale)
         groups.append(PlanGroupView(block.key, heading, rows, totals))
@@ -495,11 +509,10 @@ def build_summary(
     money_blocks = tuple(
         MoneyBlockView(
             key=key,
-            heading=gettext(heading, locale),
             groups=tuple(by_key[k] for k in keys if k in by_key),
             totals=_block_totals(*sums[key], locale),
         )
-        for key, heading, keys in MONEY_BLOCKS
+        for key, keys in MONEY_BLOCKS
         if any(k in by_key for k in keys)
     )
     banner = None
@@ -525,7 +538,6 @@ def build_summary(
         in_out_bars=in_out_bars,
         money_blocks=money_blocks,
         sort=sort,
-        zero_input=format_amount_input(Money(0, summary.currency), locale),
         filter_id=str(filter_id) if filter_id is not None else "",
         future=view.is_future,
         source=data,

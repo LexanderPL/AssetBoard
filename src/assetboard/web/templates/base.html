@@ -27,14 +27,24 @@
     {# Desktop: the sidebar is fixed to the viewport (top to bottom, so its height never depends on
        100vh or on the main content's length), the nav scrolls inside it and the footer (version,
        dark mode) stays at the bottom of the screen while the main content scrolls; main makes
-       room for it. Phones and tablets: the sidebar is a block above the content. The user menu
+       room for it. Phones and tablets: the sidebar is a bar above the content whose Menu button
+       unfolds the navigation. The user menu
        sits at the top right of the page header. #}
-    <aside class="border-b border-line bg-surface px-4 py-4 lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex lg:w-64 lg:flex-col lg:border-b-0 lg:border-r lg:px-5 lg:py-6" data-sidebar>
-      <a href="{{ scoped_url(request, 'home') }}" class="flex items-center gap-3 px-2" aria-label="{{ _('Home') }}">
-        <span class="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-lg font-bold text-on-primary" aria-hidden="true">A</span>
-        <span class="text-lg font-semibold tracking-tight">{{ app_name }}</span>
-      </a>
-      <nav class="mt-7 grid grid-cols-2 gap-1 sm:grid-cols-3 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-y-auto lg:pb-4" aria-label="{{ _('Main navigation') }}">
+    <aside class="border-b border-line bg-surface px-4 py-3 lg:fixed lg:inset-y-0 lg:left-0 lg:z-30 lg:flex lg:w-64 lg:flex-col lg:border-b-0 lg:border-r lg:px-5 lg:py-6" data-sidebar>
+      <div class="flex items-center justify-between gap-3">
+        <a href="{{ scoped_url(request, 'home') }}" class="flex items-center gap-3 px-2" aria-label="{{ _('Home') }}">
+          <span class="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-lg font-bold text-on-primary lg:h-10 lg:w-10" aria-hidden="true">A</span>
+          <span class="text-lg font-semibold tracking-tight">{{ app_name }}</span>
+        </a>
+        {# Phones and tablets: the navigation and the footer fold away behind this button
+           (app.js; collapsed only once theme.js has marked <html> with "js", so without
+           JavaScript the navigation stays open). #}
+        <button type="button" class="sidebar-toggle items-center gap-2 rounded-xl border border-line px-3 py-2 text-sm font-medium hover:bg-subtle lg:hidden" aria-controls="sidebar-panel" aria-expanded="false" data-sidebar-toggle>
+          <span aria-hidden="true">☰</span>{{ _("Menu") }}
+        </button>
+      </div>
+      <div id="sidebar-panel" class="sidebar-panel lg:flex lg:min-h-0 lg:flex-1 lg:flex-col" data-sidebar-panel>
+      <nav class="mt-4 grid grid-cols-2 gap-1 sm:grid-cols-3 lg:mt-7 lg:flex lg:min-h-0 lg:flex-1 lg:flex-col lg:overflow-y-auto lg:pb-4" aria-label="{{ _('Main navigation') }}">
         {# F2.7: Home, Month, Transactions, History first; aria-current marks the page shown. #}
         {% set path = request.url.path %}
         <a class="nav-link" href="{{ scoped_url(request, 'home') }}" data-home-link{% if path == scoped_url(request, 'home') %} aria-current="page"{% endif %}><span aria-hidden="true">⌂</span>{{ _("Home") }}</a>
@@ -46,8 +56,8 @@
         {% if workspace_nav %}<a class="nav-link" href="{{ month_href }}" data-month-link{% if path == month_base or path.startswith(month_base ~ '/') %} aria-current="page"{% endif %}><span aria-hidden="true">◷</span>{{ _("Month") }}</a>{% endif %}
         {% if workspace_nav %}<a class="nav-link" href="{{ transactions_href }}" data-transactions-link{% if path == transactions_base or path.startswith(transactions_base ~ '/') %} aria-current="page"{% endif %}><span aria-hidden="true">≡</span>{{ _("Transactions") }}</a>{% endif %}
         {% if workspace_nav %}<a class="nav-link" href="{{ history_base }}" data-history-link{% if path == history_base or path.startswith(history_base ~ '/') %} aria-current="page"{% endif %}><span aria-hidden="true">⌕</span>{{ _("History") }}</a>{% endif %}
-        {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'scheduled_items') }}" data-recurring-link{% if '/recurring' in request.url.path %} aria-current="page"{% endif %}><span aria-hidden="true">↻</span>{{ _("Recurring") }}</a>{% endif %}
         {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'scheduled_upcoming') }}" data-upcoming-link{% if request.url.path.endswith('/upcoming') %} aria-current="page"{% endif %}><span aria-hidden="true">◷</span>{{ _("Upcoming") }}{% if workspace_nav.overdue_count %}<span class="ml-auto rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger" data-overdue-badge="{{ workspace_nav.overdue_count }}"><span aria-hidden="true">{{ workspace_nav.overdue_count }}</span><span class="sr-only">{{ ngettext('%(num)d overdue occurrence', '%(num)d overdue occurrences', workspace_nav.overdue_count) }}</span></span>{% endif %}</a>{% endif %}
+        {% if workspace_nav %}<a class="nav-link" href="{{ scoped_url(request, 'scheduled_items') }}" data-recurring-link{% if '/recurring' in request.url.path %} aria-current="page"{% endif %}><span aria-hidden="true">↻</span>{{ _("Recurring") }}</a>{% endif %}
         {% if workspace_nav %}{% set income_base = scoped_url(request, 'income_sources') %}<a class="nav-link" href="{{ income_base }}" data-income-link{% if path == income_base or path.startswith(income_base ~ '/') %} aria-current="page"{% endif %}><span aria-hidden="true">¤</span>{{ _("Income") }}</a>{% endif %}
         {% if workspace_nav and workspace_nav.current.taxes_enabled %}<a class="nav-link" href="{{ scoped_url(request, 'tax_rules') }}" data-taxes-link{% if '/taxes' in request.url.path %} aria-current="page"{% endif %}><span aria-hidden="true">%</span>{{ _("Taxes") }}</a>{% endif %}
         <a class="nav-link" href="#net-worth"><span aria-hidden="true">◇</span>{{ _("Net worth") }}</a>
@@ -63,6 +73,7 @@
         <button type="button" data-theme-toggle class="rounded-lg p-2 text-muted hover:bg-subtle" aria-label="{{ _('Toggle dark mode') }}" title="{{ _('Toggle dark mode') }}">
           <span aria-hidden="true">◐</span>
         </button>
+      </div>
       </div>
     </aside>
     <main id="main-content" class="min-w-0 px-4 py-6 sm:px-7 lg:ml-64 lg:px-10 lg:py-9">
@@ -89,7 +100,7 @@
                 <span class="max-w-[7rem] truncate sm:max-w-[12rem]" data-user-name>{{ web_session.display_name }}</span>
                 <span class="text-xs text-muted" aria-hidden="true">▾</span>
               </summary>
-              <div class="absolute right-0 top-full z-40 mt-2 max-h-[calc(100vh-6rem)] w-64 max-w-[calc(100vw-2rem)] divide-y divide-line overflow-y-auto rounded-xl border border-line bg-surface shadow-card" data-user-menu-panel>
+              <div class="absolute right-0 top-full z-40 mt-2 max-h-[calc(100vh-6rem)] w-64 max-w-[calc(100vw-2rem)] divide-y divide-line overflow-y-auto popup" data-user-menu-panel>
                 {% if workspace_nav and (workspace_nav.can_switch or workspace_nav.can_create_workspace) %}
                 <div class="p-1" role="group" aria-labelledby="user-menu-workspaces">
                   <p id="user-menu-workspaces" class="px-3 pb-1 pt-2 text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Workspaces") }}</p>

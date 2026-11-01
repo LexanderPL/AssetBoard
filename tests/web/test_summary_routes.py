@@ -142,14 +142,15 @@ def test_bars_show_planned_and_actual_in_svg_with_the_same_text(summary: OwnerAp
     assert out is not None and into is not None
     assert "Out €4,873.00 of €5,900.00 planned" in out.group(0)
     # 4 873 / 5 900 = 82.59 %: floor 82. Planned is the scale (100): its line is at the end.
-    assert re.search(r'width="100"[^>]*class="fill-subtle stroke-line-strong"', out.group(0))
-    assert re.search(r'width="82"[^>]*class="fill-primary"', out.group(0))
-    assert re.search(r'x1="100"[^>]*class="stroke-ink"[^>]*data-bar-planned', out.group(0))
+    # The bars are drawn 500 units wide (percent times 5).
+    assert re.search(r'width="500"[^>]*class="fill-subtle stroke-line-strong"', out.group(0))
+    assert re.search(r'width="410"[^>]*class="fill-primary"', out.group(0))
+    assert re.search(r'x1="500"[^>]*class="stroke-ink"[^>]*data-bar-planned', out.group(0))
     # In over plan: actual is the scale, planned 3 000 / 3 400 = 88.2 %: floor 88.
     assert "In €3,400.00 of €3,000.00 planned" in into.group(0)
     assert "(over plan)" in into.group(0)
-    assert re.search(r'width="100"[^>]*class="fill-success"', into.group(0))
-    assert re.search(r'x1="88"[^>]*data-bar-planned', into.group(0))
+    assert re.search(r'width="500"[^>]*class="fill-success"', into.group(0))
+    assert re.search(r'x1="440"[^>]*data-bar-planned', into.group(0))
     assert 'aria-hidden="true"' in out.group(0)
     assert " rx=" not in block  # square ends: rounded corners would stretch with the viewBox
 
@@ -176,7 +177,7 @@ def test_nothing_earned_shows_no_savings_rate(summary: OwnerApp) -> None:
     block = _summary(summary.client.get(MONTH).text)
     assert 'data-kpi="savings-rate"' not in block and "of income" not in block
     bars = re.findall(r'width="(\d+)"[^>]*data-bar-actual', block)
-    assert bars == ["100", "0"]  # out with no plan: actual is the scale; nothing in
+    assert bars == ["500", "0"]  # out with no plan: actual is the scale (500 wide); nothing in
     assert "data-bar-planned" not in block  # nothing planned: no plan line
     assert "Out €10.00 (no plan)" in block and "In €0.00 (no plan)" in block
     assert "(over plan)" not in block and "of €0.00 planned" not in block
@@ -253,9 +254,22 @@ def test_withdrawals_count_as_money_in(summary: OwnerApp) -> None:
     assert re.search(r'data-kpi="left">€3,000.00<', block)
     assert re.search(r'data-kpi="withdrawn">€1,000.00<', block)
     assert 'class="fill-withdrawn stroke-surface"' in block
-    # The table: "Money out" (expenses, saved) and "Money in" (income, withdrawn) with totals.
-    blocks = re.findall(r'data-money-block="([a-z]+)"', block)
+    # Two tables, each in its own panel with its own header row and total: money out
+    # (expenses, saved) and money in (income, withdrawn). No "Money out" / "Money in" headings.
+    blocks = re.findall(r'<div class="panel [^"]*" data-money-block="([a-z]+)">', block)
     assert blocks == ["out", "in"]
+    tables = re.findall(r"<table.*?</table>", block, re.DOTALL)
+    assert len(tables) == 2
+    for table, groups in zip(tables, (("expense", "saved"), ("income", "withdrawn")), strict=True):
+        assert re.findall(r'<th scope="col"[^>]*>([^<]*)</th>', table) == [
+            "Category",
+            "Plan",
+            "Actual",
+            "Difference",
+        ]
+        assert re.findall(r'data-plan-group="([a-z]+)"', table) == list(groups)
+    assert "Money out" not in block and "Money in" not in block
+    assert "money-block-out" not in block and "money-block-in" not in block
     out_total = re.search(r'<tr id="summary-total-out".*?</tr>', block, re.DOTALL)
     in_total = re.search(r'<tr id="summary-total-in".*?</tr>', block, re.DOTALL)
     assert out_total is not None and in_total is not None
@@ -267,7 +281,12 @@ def test_withdrawals_count_as_money_in(summary: OwnerApp) -> None:
     assert order == sorted(order)
     summary.client.headers["Accept-Language"] = "pl"
     polish = _summary(summary.client.get(MONTH).text)
-    assert ">Wydane i odłożone</span>" in polish and ">Wpływy</span>" in polish
+    assert ">Wydane i odłożone</span>" not in polish and ">Wpływy</span>" not in polish
+    assert (  # the tables' screen-reader captions
+        '<caption class="sr-only">Wydane i odłożone: wydatki oraz zaoszczędzone / zainwestowane<'
+        in polish
+        and '<caption class="sr-only">Wpływy: przychody oraz wypłacone z oszczędności<' in polish
+    )
 
 
 def test_the_flow_bar_shows_overspending(summary: OwnerApp) -> None:
@@ -287,16 +306,25 @@ def test_the_flow_bar_shows_overspending(summary: OwnerApp) -> None:
 
 def test_rows_above_plan_are_tinted(summary: OwnerApp) -> None:
     food, travel, salary = _golden(summary)
-    over = _category(summary, "Golden Fuel")
-    _spend(summary, over, "12")  # no plan: above plan
+    fuel = _category(summary, "Golden Fuel")
+    _plan(summary, fuel, "10")
+    _spend(summary, fuel, "12")
+    unplanned = _category(summary, "Golden Taxi")
+    _spend(summary, unplanned, "12")  # no plan: nothing to be above (owner, 2026-11-01)
     block = _summary(summary.client.get(MONTH).text)
-    assert 'class="bg-danger-tint" data-over-plan="expense"' in _row(block, over)
+    assert 'class="bg-danger-tint" data-over-plan="expense"' in _row(block, fuel)
     assert 'class="bg-success-tint" data-over-plan="income"' in _row(block, salary)
-    for under in (food, travel):  # at or under plan: no tint
+    for under in (food, travel, unplanned):  # at or under plan, or no plan: no tint
         assert "data-over-plan" not in _row(block, under)
 
 
-def test_actuals_without_a_line_show_planned_zero(summary: OwnerApp) -> None:
+def _difference_cell(row: str) -> str:
+    match = re.search(r"data-difference>(.*?)</td>", row, re.DOTALL)
+    assert match is not None
+    return match.group(1).strip()
+
+
+def test_actuals_without_a_line_show_no_plan_and_no_difference(summary: OwnerApp) -> None:
     unplanned, old = _category(summary, "Golden Fuel"), _category(summary, "Golden Old")
     moving = _category(summary, "Golden Move", treatment="transfer")
     _spend(summary, unplanned, "12")
@@ -305,15 +333,47 @@ def test_actuals_without_a_line_show_planned_zero(summary: OwnerApp) -> None:
     assert summary.post(f"/categories/{old}/archive", {}, token_from="/categories")
     block = _summary(summary.client.get(MONTH).text)
     row = _row(block, unplanned)
-    assert 'value=""' in row and 'placeholder="0.00"' in row  # editable, empty
-    assert _cells(row) == ("€12.00", "-€12.00")
+    # Editable and empty, with a dash placeholder ("not set"), not "0.00".
+    planned_cell = row.split("data-actual")[0]
+    assert 'value=""' in planned_cell and 'placeholder="–"' in planned_cell
+    assert "0.00" not in planned_cell
+    assert re.search(r"data-actual>€12.00<", row)
+    assert _difference_cell(row) == ""  # no plan: no difference
+    assert "data-over-plan" not in row and "bg-danger-tint" not in row
     archived = _row(block, old)
-    assert "data-plan-input" not in archived and re.search(r"data-planned>€0.00<", archived)
+    assert "data-plan-input" not in archived
+    assert re.search(r'data-planned><span aria-hidden="true">–</span><span class="sr-only">'
+                     r"No plan</span>", archived)  # fmt: skip
+    assert _difference_cell(archived) == ""
     assert f"plan-{moving}" not in block
+    # No category is planned: the group's total difference is empty too.
+    total = re.search(r'<tr id="summary-total-expense".*?</tr>', block, re.DOTALL)
+    assert total is not None
+    assert re.findall(r"<td[^>]*>\s*</td>", total.group(0))  # the empty difference cell
+    assert "-€15.00" not in total.group(0)
     summary.set_admin_role("viewer")
-    assert re.search(
-        r"data-planned>€0.00<", _row(_summary(summary.client.get(MONTH).text), unplanned)
-    )
+    viewer = _row(_summary(summary.client.get(MONTH).text), unplanned)
+    assert "No plan" in viewer and "€0.00" not in viewer.split("data-actual")[0]
+    assert _difference_cell(viewer) == ""
+    summary.client.headers["Accept-Language"] = "pl"
+    assert "Brak planu" in _row(_summary(summary.client.get(MONTH).text), unplanned)
+
+
+def test_the_total_difference_counts_planned_categories_only(summary: OwnerApp) -> None:
+    food, fuel = _category(summary, "Golden Food"), _category(summary, "Golden Fuel")
+    _plan(summary, food, "100")
+    _spend(summary, food, "60")  # +40 under plan
+    _spend(summary, fuel, "500")  # no plan: not in the total difference
+    block = _summary(summary.client.get(MONTH).text)
+    total = re.search(r'<tr id="summary-total-expense".*?</tr>', block, re.DOTALL)
+    assert total is not None
+    assert "+€40.00" in total.group(0) and "(favourable)" in total.group(0)
+    assert "-€460.00" not in total.group(0)
+    # Planned and actual still add every category.
+    assert re.findall(r"tabular-nums\"[^>]*>([^<]*)<", total.group(0))[:2] == [
+        "€100.00",
+        "€560.00",
+    ]
 
 
 def test_transfer_lines_are_plan_only(summary: OwnerApp) -> None:

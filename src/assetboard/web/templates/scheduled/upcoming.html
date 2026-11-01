@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "macros/components.html" import csrf_input, summary_button_primary with context %}
 {% set input_class = "form-control w-full px-2.5 py-1.5" %}
-{% set button_class = "rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle" %}
+{% set button_class = "btn" %}
 {% block title %}{{ _("Upcoming payments") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Upcoming payments") }}{% endblock %}
 {% block content %}
@@ -13,11 +13,9 @@
 </div>
 {% endif %}
 {% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-upcoming-notice>{{ notice }}</p>{% endif %}
+{% from "categories/_macros.html" import category_options as grouped_options %}
 {% macro category_options(selected) -%}
-<option value="">{{ _("Choose a category") }}</option>
-{% for heading, group in ((_("Expense categories"), expense_categories), (_("Income categories"), income_categories)) %}{% if group %}
-<optgroup label="{{ heading }}">{% for category in group %}<option value="{{ category.id }}"{% if selected == category.id|string %} selected{% endif %}>{{ category.name }}</option>{% endfor %}</optgroup>
-{% endif %}{% endfor %}
+{{ grouped_options([(_("Expense categories"), expense_categories), (_("Income categories"), income_categories)], selected, _("Choose a category")) }}
 {%- endmacro %}
 {# The fields of a one-time payment: the "Add one-time payment" form and a row's Edit form. #}
 {% macro one_time_fields(prefix, values, errors) -%}
@@ -55,7 +53,7 @@
       {{ one_time_fields("one-time", one_time_values, one_time_errors) }}
       <p class="text-xs text-muted sm:col-span-2">{{ _("A one-time payment is planned once, on its date. It is listed here, not on the Recurring page.") }}</p>
       <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
-        <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Add payment") }}</button>
+        <button type="submit" class="btn-primary">{{ _("Add payment") }}</button>
         <button type="button" data-details-close class="{{ button_class }}">{{ _("Cancel") }}</button>
       </div>
     </form>
@@ -76,13 +74,13 @@
     <div>
       <label for="upcoming-category" class="mb-1 block text-sm font-medium">{{ _("Category") }}</label>
       <select id="upcoming-category" name="category" class="form-select w-full py-1.5 pl-2.5">
-        <option value="">{{ _("All categories") }}</option>
-        {% for category in categories %}<option value="{{ category.id }}"{% if category_id == category.id|string %} selected{% endif %}>{{ category.name }}{% if category.archived %} · {{ _("archived") }}{% endif %}</option>{% endfor %}
+        {# Kinds and archived categories are dividers (optgroup), not options. #}
+        {{ grouped_options([(_("Expense categories"), expense_categories), (_("Income categories"), income_categories), (_("Archived categories"), archived_categories)], category_id or "", _("All categories")) }}
       </select>
     </div>
     <div class="flex items-end gap-3">
-      <button type="submit" class="{{ button_class }}">{{ _("Apply filters") }}</button>
-      <a href="{{ scoped_url(request, 'scheduled_upcoming') }}" class="text-sm text-primary-ink underline">{{ _("Clear") }}</a>
+      <button type="submit" class="btn-primary">{{ _("Apply filters") }}</button>
+      <a href="{{ scoped_url(request, 'scheduled_upcoming') }}" class="btn" data-clear-filters>{{ _("Clear") }}</a>
     </div>
   </form>
   <p class="mt-3 text-sm text-muted">{{ _("Showing overdue items and the next %(days)d days.", days=days) }}</p>
@@ -121,7 +119,7 @@
               <label for="post-amount-{{ occurrence.id }}" class="mb-1 block text-xs font-medium">{{ _("Amount") }}</label>
               <input id="post-amount-{{ occurrence.id }}" name="amount" type="text" inputmode="decimal" value="{{ amount_input(occurrence.expected) }}" required class="{{ input_class }}">
             </div>
-            <button type="submit" class="{{ button_class }} sm:col-span-2">{{ _("Save transaction") }}</button>
+            <button type="submit" class="btn-primary sm:col-span-2">{{ _("Save transaction") }}</button>
           </form>
         </details>
         {% if occurrence.one_time %}

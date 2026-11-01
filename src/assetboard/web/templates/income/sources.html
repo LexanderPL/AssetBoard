@@ -13,7 +13,22 @@
   <p class="text-sm text-muted">{{ _("Where your money comes from and what you will receive next.") }}</p>
   {% if can_edit %}<a href="{{ scoped_url(request, 'income_new') }}" class="inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-add-income>{{ _("Add income") }}</a>{% endif %}
 </div>
-{% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-income-error>{{ error }}{% if error_href %} <a href="{{ error_href }}" class="font-semibold underline" data-locked-transaction>{{ _("Open the transaction") }}</a>{% endif %}</p>{% endif %}
+{% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-income-error>{{ error }}{% if error_href %} <a href="{{ error_href }}" class="font-semibold underline" data-locked-transaction>{{ _("Open the transaction") }}</a>{% endif %}{% if edit_anyway_href and can_edit %} <a href="{{ edit_anyway_href }}" class="font-semibold underline" data-edit-anyway>{{ _("Edit anyway") }}</a>{% endif %}{% if closed_href %} <a href="{{ closed_href }}" class="font-semibold underline" data-reopen-link>{{ _("Open the month page") }}</a>{% endif %}</p>{% endif %}
+{% if notice == "transaction_updated" %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-transaction-updated>{{ _("The transaction now matches the logged days.") }}</p>{% endif %}
+{% if posted_change %}
+<div id="posted-change" role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-posted-change>
+  <p>{{ _("Logged days changed. The received payment was %(received)s; the new days give %(recalculated)s.", received=format_money(posted_change.received, locale), recalculated=format_money(posted_change.recalculated, locale)) }}</p>
+  <div class="mt-2 flex flex-wrap items-center gap-3">
+    {% if posted_change.differs and can_edit %}
+    <form method="post" action="{{ scoped_url(request, 'income_update_posted', source_id=posted_change.source_id|string, month=posted_change.work_month.strftime('%Y-%m')) }}">
+      {{ csrf_input() }}
+      <button type="submit" class="btn-primary" data-update-transaction>{{ _("Update the transaction to %(amount)s", amount=format_money(posted_change.recalculated, locale)) }}</button>
+    </form>
+    {% endif %}
+    {% if posted_change_href %}<a href="{{ posted_change_href }}" class="font-semibold underline">{{ _("Open the transaction") }}</a>{% endif %}
+  </div>
+</div>
+{% endif %}
 <div class="space-y-4">
 {% for source in sources %}
 {% set fixed = source.kind.value == "fixed" %}
@@ -79,9 +94,10 @@
           {% if not fixed %}
           {% set log = source.work_logs|selectattr("work_month", "equalto", item.work_month)|first %}
           {% set locked = item.work_month in source.locked_months %}
+          {% set closed = item.work_month in source.closed_months %}
           {% set month_label = format_month(item.work_month, locale) %}
           <td class="px-3 py-2">{{ month_label }}{% if item.units is not none %} · <span data-logged-units>{{ units_text(item.units, source.unit_label) }}</span>{% endif %}{% if item.derived_from_days %}<a href="{{ scoped_url(request, 'income_calendar', source_id=source.id|string) }}?month={{ item.work_month.strftime('%Y-%m') }}" class="{{ muted_chip }} text-primary-ink underline" data-derived-log>{{ _("logged") }}<span class="sr-only"> ({{ _("from the work calendar") }})</span></a>{% else %}<span class="{{ muted_chip }}">{{ _("estimate") if item.amount_state == "estimated" else _("logged") }}</span>{% endif %}
-            {% if can_edit and not source.archived and log and not log.derived_from_days and not locked %}
+            {% if can_edit and not source.archived and log and not log.derived_from_days and not locked and not closed %}
             {# An inline form in the page flow (the table scrolls sideways, so it cannot float):
                Esc or Cancel closes it and restores the logged value (static/js/app.js). #}
             <details class="ml-1 inline-block align-middle open:mt-1 open:block open:ml-0" data-inline-edit data-log-edit="{{ item.work_month.strftime('%Y-%m') }}">
@@ -92,12 +108,30 @@
                 <input type="hidden" name="work_month_year" value="{{ item.work_month.year }}">
                 <label class="grid gap-1 text-xs font-medium">{{ _("Units worked (%(unit)s)", unit=source.unit_label) }}<input name="units" inputmode="decimal" required value="{{ format_quantity_input(log.units, locale) }}" class="form-control cell-input mt-0.5 w-32 bg-subtle text-sm" data-inline-edit-input></label>
                 <div class="flex flex-wrap items-center gap-2">
-                  <button type="submit" class="rounded-lg bg-primary px-3 py-1.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save") }}</button>
-                  <button type="button" data-details-close class="rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Cancel") }}</button>
+                  <button type="submit" class="btn-primary">{{ _("Save") }}</button>
+                  <button type="button" data-details-close class="btn">{{ _("Cancel") }}</button>
                 </div>
               </form>
             </details>
-            {% elif locked %}<span class="{{ muted_chip }}" data-log-locked>{{ _("received") }}</span>{% endif %}
+            {% elif closed %}<span class="{{ muted_chip }}" data-log-closed title="{{ _('This month is closed. Reopen it to make changes.') }}">{{ _("closed") }}</span>
+            {% elif locked %}<span class="{{ muted_chip }}" data-log-locked>{{ _("received") }}</span>
+            {% if can_edit and not source.archived and log and not log.derived_from_days %}
+            {# Soft lock (F3.4): "Edit anyway" reveals the same form with the override flag. #}
+            <details class="ml-1 inline-block align-middle open:mt-1 open:block open:ml-0" data-inline-edit data-log-edit-anyway="{{ item.work_month.strftime('%Y-%m') }}">
+              <summary class="{{ compact }}" aria-label="{{ _('Edit the units logged for %(month)s anyway', month=month_label) }}">{{ _("Edit anyway") }}</summary>
+              <form method="post" action="{{ scoped_url(request, 'income_work_log', source_id=source.id) }}" class="mt-1 grid w-fit gap-2">
+                {{ csrf_input() }}
+                <input type="hidden" name="override" value="1">
+                <input type="hidden" name="work_month_month" value="{{ item.work_month.month }}">
+                <input type="hidden" name="work_month_year" value="{{ item.work_month.year }}">
+                <label class="grid gap-1 text-xs font-medium">{{ _("Units worked (%(unit)s)", unit=source.unit_label) }}<input name="units" inputmode="decimal" required value="{{ format_quantity_input(log.units, locale) }}" class="form-control cell-input mt-0.5 w-32 bg-subtle text-sm" data-inline-edit-input></label>
+                <div class="flex flex-wrap items-center gap-2">
+                  <button type="submit" class="btn-primary">{{ _("Save") }}</button>
+                  <button type="button" data-details-close class="btn">{{ _("Cancel") }}</button>
+                </div>
+              </form>
+            </details>
+            {% endif %}{% endif %}
           </td>
           {% endif %}
           <td class="whitespace-nowrap px-3 py-2">{{ format_day(item.due_date, locale) }}</td>
@@ -124,17 +158,23 @@
          in static/js/app.js when the month changes): its units, and "Update" on the button. #}
       {% set chosen = log_month if log_month and open_form == "log-" ~ source.id else today.replace(day=1) %}
       {% set chosen_log = source.work_logs|selectattr("work_month", "equalto", chosen)|first %}
-      {% set chosen_state = ("locked" if chosen in source.locked_months else "derived" if chosen_log.derived_from_days else "manual") if chosen_log else "" %}
+      {% set chosen_state = "closed" if chosen in source.closed_months else "locked" if chosen in source.locked_months else ("derived" if chosen_log.derived_from_days else "manual") if chosen_log else "" %}
+      {% set overriding = log_override and chosen_state == "locked" and open_form == "log-" ~ source.id %}
       {% set locked_hint = _("This month's income is already received. Edit the transaction instead.") %}
       {% set derived_hint = _("This month comes from the work calendar. Change the days in the calendar.") %}
-      <form method="post" action="{{ scoped_url(request, 'income_work_log', source_id=source.id) }}" class="mt-2 grid gap-3 border border-line p-3 sm:grid-cols-3" data-log-form data-label-save="{{ _('Save work log') }}" data-label-update="{{ _('Update') }}" data-hint-locked="{{ locked_hint }}" data-hint-derived="{{ derived_hint }}">
+      {% set closed_hint = _("This month is closed. Reopen it to make changes.") %}
+      <form method="post" action="{{ scoped_url(request, 'income_work_log', source_id=source.id) }}" class="mt-2 grid gap-3 border border-line p-3 sm:grid-cols-3" data-log-form data-label-save="{{ _('Save work log') }}" data-label-update="{{ _('Update') }}" data-hint-locked="{{ locked_hint }}" data-hint-derived="{{ derived_hint }}" data-hint-closed="{{ closed_hint }}">
         {{ csrf_input() }}
-        {% for log in source.work_logs %}<span hidden data-existing-log="{{ log.work_month.strftime('%Y-%m') }}" data-units="{{ format_quantity_input(log.units, locale) }}" data-state="{{ 'locked' if log.work_month in source.locked_months else 'derived' if log.derived_from_days else 'manual' }}"></span>{% endfor %}
+        {# "Edit anyway" (F3.4) sets this for a received month; changing the month clears it. #}
+        <input type="hidden" name="override" value="{{ '1' if overriding else '' }}" data-log-override>
+        {% for log in source.work_logs %}<span hidden data-existing-log="{{ log.work_month.strftime('%Y-%m') }}" data-units="{{ format_quantity_input(log.units, locale) }}" data-state="{{ 'closed' if log.work_month in source.closed_months else 'locked' if log.work_month in source.locked_months else 'derived' if log.derived_from_days else 'manual' }}"></span>{% endfor %}
+        {% for month in (source.closed_months | list) + (source.locked_months | list) if not source.work_logs|selectattr("work_month", "equalto", month)|first %}<span hidden data-existing-log="{{ month.strftime('%Y-%m') }}" data-units="" data-state="{{ 'closed' if month in source.closed_months else 'locked' }}"></span>{% endfor %}
         {{ month_picker("work_month", _("Work month"), chosen, id_prefix="log-" ~ source.id) }}
-        <label class="grid gap-1 text-sm">{{ _("Units worked (%(unit)s)", unit=source.unit_label) }}<input name="units" inputmode="decimal" required value="{{ format_quantity_input(chosen_log.units, locale) if chosen_state == 'manual' else '' }}" class="form-control px-3 py-2" data-log-units></label>
+        <label class="grid gap-1 text-sm">{{ _("Units worked (%(unit)s)", unit=source.unit_label) }}<input name="units" inputmode="decimal" required value="{{ format_quantity_input(chosen_log.units, locale) if chosen_state == 'manual' or overriding else '' }}" class="form-control px-3 py-2" data-log-units></label>
         <button type="submit" class="self-end rounded-lg border border-line px-3 py-2 text-sm font-semibold" data-log-submit>{{ _("Update") if chosen_state == "manual" else _("Save work log") }}</button>
-        <p class="text-xs text-muted sm:col-span-3"{% if not chosen_state or chosen_state == 'manual' %} hidden{% endif %} data-log-hint aria-live="polite">{% if chosen_state == "locked" %}{{ locked_hint }}{% elif chosen_state == "derived" %}{{ derived_hint }}{% endif %}</p>
-        <p class="text-xs text-muted sm:col-span-3">{{ _("Months with days marked in the work calendar are read-only here: their units are the sum of the days.") }} {{ _("A month's log can be changed until its income is received.") }}</p>
+        <p class="text-xs text-muted sm:col-span-3"{% if not chosen_state or chosen_state == 'manual' or overriding %} hidden{% endif %} data-log-hint aria-live="polite">{% if chosen_state == "locked" %}{{ locked_hint }}{% elif chosen_state == "derived" %}{{ derived_hint }}{% elif chosen_state == "closed" %}{{ closed_hint }}{% endif %}</p>
+        <p class="sm:col-span-3"{% if chosen_state != "locked" or overriding %} hidden{% endif %} data-log-anyway><button type="button" class="btn" data-log-edit-anyway-button>{{ _("Edit anyway") }}</button></p>
+        <p class="text-xs text-muted sm:col-span-3">{{ _("Months with days marked in the work calendar are read-only here: their units are the sum of the days.") }} {{ _("Once a month's income is received, its log changes only with Edit anyway; a closed month cannot change.") }}</p>
       </form>
     </details>
     {% endif %}

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "macros/components.html" import csrf_input with context %}
+{% from "categories/_macros.html" import category_options %}
 {% block title %}{{ _("Edit tax") if rule else _("New tax on income") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Edit tax") if rule else _("New tax on income") }}{% endblock %}
 {% block content %}
@@ -73,21 +74,21 @@
         </select>
       </div>
       <label class="grid max-w-xs gap-1 text-sm">{{ _("Record it in category") }}<select name="payment_category_id" class="form-select py-2">
-        <option value="">{{ _("Choose a category") }}</option>
-        {% for category in expense_categories %}<option value="{{ category.id }}"{% if values.payment_category_id == category.id|string or (not values.payment_category_id and category.name == _("Taxes")) %} selected{% endif %}>{{ category.name }}</option>{% endfor %}
+        {% set default_category = expense_categories|selectattr("name", "equalto", _("Taxes"))|first %}
+        {{ category_options([(_("Expense categories"), expense_categories)], values.payment_category_id or (default_category.id if default_category else ""), _("Choose a category")) }}
       </select></label>
       <p class="text-xs text-muted">{{ _("Not needed when the payer takes the tax off: nothing is planned.") }}</p>
     </fieldset>
 
     <div class="flex flex-wrap gap-2">
-      <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save tax") }}</button>
-      <a href="{{ scoped_url(request, 'tax_rules') }}" class="rounded-lg border border-line px-4 py-2 text-sm font-medium hover:bg-subtle">{{ _("Cancel") }}</a>
+      <button type="submit" class="btn-primary">{{ _("Save tax") }}</button>
+      <a href="{{ scoped_url(request, 'tax_rules') }}" class="btn">{{ _("Cancel") }}</a>
     </div>
   </form>
   {% if rule %}
   <form method="post" action="{{ scoped_url(request, 'tax_rule_archive', rule_id=rule.id) }}" class="mt-6 border-t border-line pt-4" data-confirm="{{ _('Archive the tax %(name)s?', name=rule.name) }}">
     {{ csrf_input() }}
-    <button type="submit" class="rounded-lg border border-line px-3 py-1.5 text-sm text-danger hover:bg-subtle">{{ _("Archive tax") }}</button>
+    <button type="submit" class="btn text-danger">{{ _("Archive tax") }}</button>
   </form>
   {% endif %}
 </section>

@@ -19,7 +19,10 @@ from assetboard.domain.categories import Kind, Treatment
 from assetboard.domain.money import minor_unit_for
 
 FORMAT = "workspace-archive"
-FORMAT_VERSION = "1.0"
+FORMAT_VERSION = "1.1"
+# Bounds of the optional ``upcoming_days`` key (1.1); mirror ``config.MIN/MAX_UPCOMING_DAYS``.
+MIN_UPCOMING_DAYS = 1
+MAX_UPCOMING_DAYS = 365
 CSV_COLUMNS = {
     "categories.csv": ("id", "kind", "name", "treatment", "color", "sort_order", "archived_at"),
     "budget_lines.csv": ("month", "kind", "category", "planned", "currency", "category_id"),
@@ -394,17 +397,33 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
             workspace.get("country_code") is not None
             and not re.fullmatch(r"[A-Z]{2}", str(workspace["country_code"]))
         )
+        or ("taxes_enabled" in workspace and type(workspace["taxes_enabled"]) is not bool)
+        or not _valid_upcoming_days(workspace.get("upcoming_days"))
     ):
         return None, (ArchiveError("workspace.json", "invalid workspace settings"),)
     warnings.extend(
         ArchiveError("workspace.json", f"unknown key: {key}")
         for key in workspace.keys()
-        - {"name", "base_currency", "country_code", "timezone", "locale", "auto_copy_plan"}
+        - {
+            "name",
+            "base_currency",
+            "country_code",
+            "timezone",
+            "locale",
+            "auto_copy_plan",
+            "taxes_enabled",
+            "upcoming_days",
+        }
     )
     parsed = _read_rows(files, workspace, currency, errors, warnings)
     if errors:
         return None, tuple(errors)
     return ParsedArchive(manifest, files, parsed, tuple(warnings)), ()
+
+
+def _valid_upcoming_days(value: object) -> bool:
+    """``upcoming_days`` (1.1) is optional: absent or ``null`` means the instance default."""
+    return value is None or (type(value) is int and MIN_UPCOMING_DAYS <= value <= MAX_UPCOMING_DAYS)
 
 
 def _parse_timestamp(value: str) -> str:

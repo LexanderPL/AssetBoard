@@ -1278,12 +1278,13 @@ msgstr ""
 msgid "Enter a number of units above 0 and at most 24."
 msgstr ""
 
-msgid ""
-"The work log was saved; posted income was not changed. Adjust its "
-"transaction manually if needed."
+msgid "This month's income is already received. Edit the transaction instead."
 msgstr ""
 
-msgid "This month's income is already received. Edit the transaction instead."
+msgid "This month is closed. Reopen it to make changes."
+msgstr ""
+
+msgid "This month's income is not received, so there is no transaction to update."
 msgstr ""
 
 msgid "Enter a name."
@@ -1446,12 +1447,6 @@ msgid "This recurring item is archived, so its skipped date cannot come back."
 msgstr ""
 
 msgid "This category no longer exists. It may have been deleted elsewhere."
-msgstr ""
-
-msgid "Month closed."
-msgstr ""
-
-msgid "Month reopened."
 msgstr ""
 
 msgid "This month was already closed."
@@ -1636,12 +1631,6 @@ msgid "Withdrawn from savings"
 msgstr ""
 
 msgid "Transfers (not counted)"
-msgstr ""
-
-msgid "Money out"
-msgstr ""
-
-msgid "Money in"
 msgstr ""
 
 msgid "A planned value cannot be negative."
@@ -2078,13 +2067,13 @@ msgstr ""
 msgid "Home"
 msgstr ""
 
+msgid "Menu"
+msgstr ""
+
 msgid "Main navigation"
 msgstr ""
 
 msgid "History"
-msgstr ""
-
-msgid "Recurring"
 msgstr ""
 
 msgid "Upcoming"
@@ -2095,6 +2084,9 @@ msgid "%(num)d overdue occurrence"
 msgid_plural "%(num)d overdue occurrences"
 msgstr[0] ""
 msgstr[1] ""
+
+msgid "Recurring"
+msgstr ""
 
 msgid "Net worth"
 msgstr ""
@@ -2826,7 +2818,10 @@ msgstr ""
 msgid "Search"
 msgstr ""
 
-msgid "Description contains"
+msgid "Search descriptions"
+msgstr ""
+
+msgid "Search…"
 msgstr ""
 
 msgid "Export as CSV"
@@ -2997,6 +2992,33 @@ msgid "Previous month"
 msgstr ""
 
 msgid "Next month"
+msgstr ""
+
+msgid "Open the month page"
+msgstr ""
+
+msgid ""
+"You are changing a month whose income is already received. Its "
+"transaction stays as it is unless you update it."
+msgstr ""
+
+msgid "Open the transaction"
+msgstr ""
+
+msgid "Edit anyway"
+msgstr ""
+
+msgid "The transaction now matches the logged days."
+msgstr ""
+
+#, python-format
+msgid ""
+"Logged days changed. The received payment was %(received)s; the new days "
+"give %(recalculated)s."
+msgstr ""
+
+#, python-format
+msgid "Update the transaction to %(amount)s"
 msgstr ""
 
 #, python-format
@@ -3286,9 +3308,6 @@ msgstr ""
 msgid "Where your money comes from and what you will receive next."
 msgstr ""
 
-msgid "Open the transaction"
-msgstr ""
-
 #, python-format
 msgid "Fixed · %(amount)s on the %(day)s · Income category: %(category)s"
 msgstr ""
@@ -3366,6 +3385,10 @@ msgid "received"
 msgstr ""
 
 #, python-format
+msgid "Edit the units logged for %(month)s anyway"
+msgstr ""
+
+#, python-format
 msgid "%(name)s %(amount)s on %(date)s"
 msgstr ""
 
@@ -3389,7 +3412,9 @@ msgid ""
 "units are the sum of the days."
 msgstr ""
 
-msgid "A month's log can be changed until its income is received."
+msgid ""
+"Once a month's income is received, its log changes only with Edit anyway;"
+" a closed month cannot change."
 msgstr ""
 
 msgid "Taxes on this income"
@@ -3566,6 +3591,9 @@ msgstr ""
 msgid "Planned for %(name)s"
 msgstr ""
 
+msgid "No plan"
+msgstr ""
+
 msgid "not counted"
 msgstr ""
 
@@ -3740,24 +3768,33 @@ msgid_plural "%(num)d planned values of archived or transfer categories were not
 msgstr[0] ""
 msgstr[1] ""
 
-msgid "Summary"
-msgstr ""
-
-msgid "Show pending"
-msgstr ""
-
 msgid "Actual"
 msgstr ""
 
 msgid "Difference"
 msgstr ""
 
-msgid ""
-"Enter or leaving the field saves a planned value; 0 or an empty field "
-"removes it. Esc restores the saved value."
+msgid "Summary"
+msgstr ""
+
+msgid "Hide pending"
+msgstr ""
+
+msgid "Show pending"
 msgstr ""
 
 msgid "Add categories to plan this month."
+msgstr ""
+
+msgid "Out: expenses and saved / invested"
+msgstr ""
+
+msgid "In: income and withdrawn from savings"
+msgstr ""
+
+msgid ""
+"Enter or leaving the field saves a planned value; 0 or an empty field "
+"removes it. Esc restores the saved value."
 msgstr ""
 
 msgid "Closed"
@@ -4761,9 +4798,6 @@ msgid ""
 "browser."
 msgstr ""
 
-msgid "Menu"
-msgstr ""
-
 msgid ""
 "Hide parts of the app you don't use. Nothing is deleted; turn them back "
 "on any time."
@@ -5461,6 +5495,24 @@ msgstr ""
 #~ "archived instead."
 #~ msgstr ""
 
+#~ msgid "Month closed."
+#~ msgstr ""
+
+#~ msgid "Month reopened."
+#~ msgstr ""
+
+#~ msgid "Money out"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The work log was saved; posted "
+#~ "income was not changed. Adjust its "
+#~ "transaction manually if needed."
+#~ msgstr ""
+
+#~ msgid "A month's log can be changed until its income is received."
+#~ msgstr ""
+
 #~ msgid ""
 #~ "Pausing removes pending dates from today"
 #~ " onward. Archiving or deleting removes "
@@ -5478,5 +5530,11 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Skip invalid rows"
+#~ msgstr ""
+
+#~ msgid "Money in"
+#~ msgstr ""
+
+#~ msgid "Description contains"
 #~ msgstr ""
 
