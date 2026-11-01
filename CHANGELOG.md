@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.9](https://github.com/LexanderPL/AssetBoard/compare/v0.3.8...v0.3.9) (2026-11-01)
+
+
+### Features
+
+* **import:** add F4.2 upload and batch framework ([#201](https://github.com/LexanderPL/AssetBoard/issues/201)) ([abf09eb](https://github.com/LexanderPL/AssetBoard/commit/abf09eb475c0db82ad72d25435001c998ad3b4ae))
+
+
+### Documentation
+
+* **specs:** add F9.9 phone layout pass and F9.10 installable web app (pre-1.0) ([#199](https://github.com/LexanderPL/AssetBoard/issues/199)) ([b8d7a77](https://github.com/LexanderPL/AssetBoard/commit/b8d7a77e749a23761739e4307877915c52bb2abf))
+
 ## [0.3.8](https://github.com/LexanderPL/AssetBoard/compare/v0.3.7...v0.3.8) (2026-11-01)
 
 

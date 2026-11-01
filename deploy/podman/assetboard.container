@@ -12,7 +12,7 @@ Wants=network-online.target
 ContainerName=assetboard
 # Pin a release version; see docs/deployment.md#image-tags.
 # x-release-please-start-version
-Image=ghcr.io/lexanderpl/assetboard:0.3.8
+Image=ghcr.io/lexanderpl/assetboard:0.3.9
 # x-release-please-end
 Volume=assetboard-data:/data
 # Loopback only: publish the app through a reverse proxy.
