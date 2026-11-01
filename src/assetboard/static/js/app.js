@@ -352,7 +352,7 @@ document.addEventListener("change", (event) => {
 
 // Progressive disclosure: an element marked data-hidden-when="<name>=<value>" is hidden while
 // the select with that id, or the checked radio button of that name, holds that value (the
-// recurring form hides the repeat fields of a one-time item; the tax form hides fields that do
+// recurring form shows the fields of the chosen "How often"; the tax form hides fields that do
 // not apply to the chosen kind; the income forms show the fields of the chosen estimate). Without JavaScript everything stays visible and the form
 // explains what is ignored.
 function hiddenWhenValue(name) {
@@ -366,12 +366,35 @@ function hiddenWhenValue(name) {
 function applyHiddenWhen() {
   document.querySelectorAll("[data-hidden-when]").forEach((element) => {
     if (!(element instanceof HTMLElement)) return;
-    // "<name>!=<value>" hides the element unless the field holds that value.
+    // "<name>!=<value>" hides the element unless the field holds that value; "a|b" lists
+    // several values (the recurring form's day of the month: monthly or every few months).
     const spec = element.dataset.hiddenWhen ?? "";
     const negated = spec.includes("!=");
     const [name, value] = spec.split(negated ? "!=" : "=");
     const current = hiddenWhenValue(name ?? "");
-    if (current !== null) element.hidden = negated ? current !== value : current === value;
+    const matches = (value ?? "").split("|").includes(current ?? "");
+    if (current !== null) element.hidden = negated ? !matches : matches;
+  });
+  applyKindFilters();
+}
+
+// A select marked data-filter-by-kind="<radio name>" offers only the optgroup whose data-kind
+// matches the checked radio button (the recurring form's categories follow Expense or Income).
+// A selected category of the other kind is cleared. The server checks the kind again.
+function applyKindFilters() {
+  document.querySelectorAll("select[data-filter-by-kind]").forEach((select) => {
+    if (!(select instanceof HTMLSelectElement)) return;
+    const kind = hiddenWhenValue(select.dataset.filterByKind ?? "");
+    if (kind === null) return;
+    select.querySelectorAll("optgroup[data-kind]").forEach((group) => {
+      if (!(group instanceof HTMLOptGroupElement)) return;
+      const other = group.dataset.kind !== kind;
+      group.hidden = other;
+      group.disabled = other;
+    });
+    const selected = select.selectedOptions[0];
+    const group = selected?.parentElement;
+    if (group instanceof HTMLOptGroupElement && group.disabled) select.value = "";
   });
 }
 document.addEventListener("change", (event) => {

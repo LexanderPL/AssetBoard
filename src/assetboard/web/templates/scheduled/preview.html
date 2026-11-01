@@ -1,3 +1,6 @@
-{% if invalid %}<p class="text-sm text-muted">{{ _("Choose valid recurrence dates to see the preview.") }}</p>
-{% elif dates %}<ol class="space-y-2 text-sm">{% for day, label in dates %}<li><time datetime="{{ day.isoformat() }}">{{ label }}</time></li>{% endfor %}</ol>
-{% else %}<p class="text-sm text-muted">{{ _("No more occurrences match this rule.") }}</p>{% endif %}
+{% if invalid %}<p class="text-sm text-muted" data-preview-invalid>{{ _("Choose valid recurrence dates to see the preview.") }}</p>
+{% else %}
+<p class="text-sm font-medium" data-schedule-sentence>{{ sentence }}</p>
+{% if dates %}<ol class="mt-3 space-y-1.5 text-sm" data-preview-dates>{% for day, label in dates %}<li class="flex items-center gap-2"><span class="h-1.5 w-1.5 shrink-0 rounded-full bg-primary" aria-hidden="true"></span><time datetime="{{ day.isoformat() }}">{{ label }}</time></li>{% endfor %}</ol>
+{% else %}<p class="mt-3 text-sm text-muted">{{ _("No more occurrences match this rule.") }}</p>{% endif %}
+{% endif %}
