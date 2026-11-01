@@ -104,9 +104,23 @@
 
 @layer components {
   /* The main content reads like a spreadsheet: square boxes with a thin rule and no shadow.
-     Buttons, chips, the sidebar, the header and dialogs keep their rounded shapes. */
+     Buttons, chips, the sidebar and the header keep their rounded shapes. */
   .panel {
     @apply rounded-none border border-line bg-surface;
+  }
+
+  /* Floating boxes (dialogs, popover panels, the suggestions list) are square like a panel,
+     with a shadow that lifts them off the page. Toasts use .toast. */
+  .popup {
+    @apply rounded-none border border-line bg-surface text-ink shadow-card;
+  }
+
+  dialog.popup {
+    @apply p-0 shadow-2xl backdrop:bg-black/50;
+  }
+
+  .toast {
+    @apply rounded-none shadow-lg;
   }
 
   .nav-link {
