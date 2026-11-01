@@ -153,12 +153,14 @@ def test_each_frequency_saves_its_own_fields(owner):
     assert (_item(owner, "Yearly").month, _item(owner, "Yearly").month_day) == (2, "29")
     assert _item(owner, "Monthly").month_day == "10"
     # Estimate checkbox and the "Ends" choice.
-    assert owner.post("/recurring", guided(owner, name="Power", estimate="1", ends="after",
-                                           max_count="12", end_date="2027-01-01")).status_code == 303  # fmt: skip
+    power_data = guided(
+        owner, name="Power", estimate="1", ends="after", max_count="12", end_date="2027-01-01"
+    )
+    assert owner.post("/recurring", power_data).status_code == 303
     power = _item(owner, "Power")
     assert (power.amount_mode, power.max_count, power.end_date) == ("estimate", 12, None)
-    assert owner.post("/recurring", guided(owner, name="Phone", ends="on_date", max_count="3",
-                                           end_date="2026-12-31")).status_code == 303  # fmt: skip
+    phone_data = guided(owner, name="Phone", ends="on_date", max_count="3", end_date="2026-12-31")
+    assert owner.post("/recurring", phone_data).status_code == 303
     phone = _item(owner, "Phone")
     assert (phone.amount_mode, phone.max_count, phone.end_date) == (
         "fixed",
@@ -244,8 +246,8 @@ def test_preview_shows_the_sentence_and_five_dates(owner):
     owner.app.state.clock = FixedClock("2026-10-31T12:00:00+00:00")
     page = owner.client.get("/recurring/new").text
     assert (
-        'hx-trigger="load, change from:#schedule-form delay:150ms, input from:#schedule-form delay:300ms"'
-        in page
+        'hx-trigger="load, change from:#schedule-form delay:150ms, '
+        'input from:#schedule-form delay:300ms"' in page
     )
     preview = owner.post(
         "/recurring/preview", guided(owner, repeat="weekly", weekday=["0", "4"], interval_weeks="2")

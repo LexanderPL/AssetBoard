@@ -31,7 +31,7 @@
       </thead>
       <tbody class="divide-y divide-line">
       {% for item, sentence in rows %}
-        <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 align-top sm:table-row sm:p-0{% if item.paused %} text-muted{% endif %}" data-scheduled-item="{{ item.id }}">
+        <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 align-top sm:table-row sm:p-0{% if item.paused %} text-muted {% endif %}" data-scheduled-item="{{ item.id }}">
           <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3">{{ item.values.name }}{% if item.paused %}<span class="{{ chip }} bg-subtle text-muted" data-paused>{{ _("paused") }}</span>{% endif %}</td>
           <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3" data-amount>{{ format_money(item.values.amount, locale) }}{% if item.values.amount_mode == 'estimate' %}<span class="{{ chip }} bg-primary-soft text-primary-ink" data-estimate>{{ _("estimate") }}</span>{% endif %}</td>
           <td class="col-span-2 sm:px-4 sm:py-3" data-schedule>{{ sentence }}</td>
