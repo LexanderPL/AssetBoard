@@ -87,6 +87,10 @@ class ScheduledView:
     archived: bool
     # A one-time item whose occurrence is posted or skipped: nothing more will come.
     done: bool = False
+    # The earliest pending date from today onward (None when paused, archived or finished).
+    next_due: date | None = None
+    category_name: str = ""
+    category_color: str = ""
 
 
 def _rule(item: ScheduledItem) -> RecurrenceRule:
@@ -164,21 +168,68 @@ def _has_history(rows: list[ScheduledOccurrence]) -> bool:
     return any(row.status != OccurrenceStatus.PENDING for row in rows)
 
 
+def _next_due(
+    rows: list[ScheduledOccurrence],
+    item: ScheduledItem,
+    today: date,
+    country: str | None,
+    *,
+    generates: bool,
+) -> date | None:
+    """The next pending date; beyond the generation horizon, the rule's next date."""
+    upcoming = [
+        row.due_date
+        for row in rows
+        if row.status == OccurrenceStatus.PENDING and row.due_date >= today
+    ]
+    if upcoming:
+        return min(upcoming)
+    if not generates:
+        return None
+    rule = _rule(item)
+    try:
+        dates = occurrences(rule, today, date(MAX_YEAR, 12, 31), _holidays(country, rule), limit=1)
+    except ValueError:
+        return None
+    # A date the generator would already have created was posted or skipped: not "next".
+    known = {row.nominal_date for row in rows} | {row.due_date for row in rows}
+    return next((day for day in dates if day not in known), None)
+
+
 def list_items(factory: sessionmaker[Session], ctx: Context) -> list[ScheduledView]:
     require_role(ctx, Role.VIEWER)
     with factory() as session:
+        workspace = CurrentWorkspaceRepository(session, ctx).get()
+        today = ctx.clock.today(workspace.timezone)
         occurrences_repository = ScheduledOccurrenceRepository(session, ctx)
-        return [
-            ScheduledView(
-                row.id,
-                _values(row),
-                row.paused_at is not None,
-                row.archived_at is not None,
-                row.freq == Frequency.ONCE
-                and _has_history(occurrences_repository.for_item(row.id)),
+        categories = CategoryRepository(session, ctx)
+        result: list[ScheduledView] = []
+        for row in ScheduledItemRepository(session, ctx).ordered():
+            rows = occurrences_repository.for_item(row.id)
+            category = categories.get(row.category_id)
+            result.append(
+                ScheduledView(
+                    row.id,
+                    _values(row),
+                    row.paused_at is not None,
+                    row.archived_at is not None,
+                    row.freq == Frequency.ONCE and _has_history(rows),
+                    _next_due(
+                        rows,
+                        row,
+                        today,
+                        workspace.country_code,
+                        # Paused, archived or in an archived category: no new dates.
+                        generates=row.paused_at is None
+                        and row.archived_at is None
+                        and category is not None
+                        and category.archived_at is None,
+                    ),
+                    category.name if category is not None else "",
+                    category.color if category is not None else "",
+                )
             )
-            for row in ScheduledItemRepository(session, ctx).ordered()
-        ]
+        return result
 
 
 @dataclass(frozen=True, slots=True)

@@ -11,6 +11,7 @@ from datetime import date
 from babel import Locale
 from babel.core import UnknownLocaleError
 from babel.dates import format_date, format_skeleton, get_day_names, get_month_names
+from babel.lists import format_list
 
 from assetboard.domain.months import YearMonth
 
@@ -78,3 +79,14 @@ def format_day_of_month(day: int, locale: str) -> str:
         return f"{day}."
     suffix = "th" if 11 <= day % 100 <= 13 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
     return f"{day}{suffix}"
+
+
+def format_day_and_month(day: int, month: int, locale: str) -> str:
+    """A day and month written day first for a yearly date: "31 March", "31 marca". The
+    year 2000 is a leap year, so 29 February exists."""
+    return format_date(date(2000, month, day), format="d MMMM", locale=_locale(locale))
+
+
+def format_and_list(items: list[str], locale: str) -> str:
+    """Items joined as the locale writes a list: "A, B and C", "A, B i C"."""
+    return format_list(items, locale=_locale(locale))
