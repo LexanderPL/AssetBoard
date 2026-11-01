@@ -51,6 +51,7 @@ from assetboard.db.repositories import (
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
 from assetboard.domain.transactions import (
+    MAX_AMOUNT_MINOR,
     UNDO_WINDOW,
     EntryError,
     Source,
@@ -610,6 +611,37 @@ def update_transaction(
         return _view(row, category)
 
     return run_immediate(factory, write)
+
+
+def set_amount_in_session(
+    session: Session, ctx: Context, transaction_id: UUID, amount_minor: int
+) -> None:
+    """Change only a live transaction's amount inside the caller's ``run_immediate`` write.
+
+    For services that recalculate a posted amount (F3.4 "Update the transaction"). The caller
+    has checked the editor role with ``require_role_now``; the closed-month guard and the
+    ``transaction.updated`` audit are the same as ``update_transaction``'s.
+    """
+    require_role(ctx, Role.EDITOR)
+    if not 0 < amount_minor <= MAX_AMOUNT_MINOR:
+        raise InvalidTransaction({"amount": "invalid_amount"})
+    lock_month_writes(session, ctx)
+    repository = TransactionRepository(session, ctx)
+    row = _live_row(repository, transaction_id, lock=True)
+    ensure_date_open(session, ctx, row.date)
+    if row.amount_minor == amount_minor:
+        return
+    previous_minor = row.amount_minor
+    repository.update(row.id, amount_minor=amount_minor)
+    category = CategoryRepository(session, ctx).get_or_raise(row.category_id)
+    _audit(
+        session,
+        ctx,
+        "transaction.updated",
+        row,
+        category,
+        {"fields": "amount", "previous_amount": _amount_text(previous_minor, row.currency)},
+    )
 
 
 def delete_transaction(
