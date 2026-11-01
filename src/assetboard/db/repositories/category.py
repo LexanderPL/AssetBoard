@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from uuid import UUID
+
 from sqlalchemy import func, select
 
 from assetboard.db.models.ledger import Category
@@ -23,6 +25,8 @@ class CategoryRepository(ScopedRepository[Category]):
         treatment: str,
         color: str,
         sort_order: int,
+        import_batch_id: UUID | None = None,
+        import_key: str | None = None,
     ) -> Category:
         return self.add(
             Category(
@@ -32,6 +36,8 @@ class CategoryRepository(ScopedRepository[Category]):
                 treatment=treatment,
                 color=color,
                 sort_order=sort_order,
+                import_batch_id=import_batch_id,
+                import_key=import_key,
             )
         )
 
@@ -62,3 +68,9 @@ class CategoryRepository(ScopedRepository[Category]):
             .where(Category.workspace_id == self._workspace_id)
         )
         return self._session.execute(statement).scalar_one()
+
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[Category]:
+        statement = self._scoped_select().where(Category.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(self._session.scalars(statement.order_by(Category.id)))

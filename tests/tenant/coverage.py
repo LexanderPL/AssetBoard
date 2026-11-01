@@ -114,7 +114,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     ("MembershipRepository", "add_member"): "test_membership_queries_stay_in_their_workspace",
     **{
         ("CategoryRepository", method): "test_category_queries_stay_in_their_workspace"
-        for method in ("create", "ordered", "active_by_name_key", "count")
+        for method in ("create", "ordered", "active_by_name_key", "count", "for_import_batch")
     },
     **{
         ("MonthStateRepository", method): "test_month_state_queries_stay_in_their_workspace"
@@ -129,6 +129,10 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         ("TransactionRepository", method): "test_transaction_queries_stay_in_their_workspace"
         for method in (
             "create",
+            "create_imported",
+            "for_import_batch",
+            "by_import_key",
+            "by_lineage_id",
             "get_for_update",
             "for_month",
             "counts_by_category",
@@ -144,7 +148,14 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     },
     **{
         ("BudgetLineRepository", method): "test_budget_line_queries_stay_in_their_workspace"
-        for method in ("create", "for_month", "line", "usage_by_category", "any_exists")
+        for method in (
+            "create",
+            "for_month",
+            "line",
+            "usage_by_category",
+            "any_exists",
+            "for_import_batch",
+        )
     },
     **{
         ("InvitationRepository", method): "test_invitation_transitions_stay_in_their_workspace"

@@ -93,7 +93,7 @@ class RequestBodyLimitMiddleware:
                 received += len(message.get("body", b""))
                 if received > limit:
                     oversized = True
-                    return {"type": "http.request", "body": b"", "more_body": False}
+                    return {"type": "http.disconnect"}
             return message
 
         async def limited_send(message: Message) -> None:
@@ -114,16 +114,21 @@ class RequestBodyLimitMiddleware:
 
     @staticmethod
     async def _too_large(send: Send) -> None:
+        body = b"Request body exceeds the allowed size."
         await send(
             {
                 "type": "http.response.start",
                 "status": 413,
                 "headers": [
-                    (b"content-length", b"0"),
+                    (b"content-type", b"text/plain; charset=utf-8"),
+                    (b"content-length", str(len(body)).encode("ascii")),
+                    (b"cache-control", b"no-store"),
+                    (b"x-content-type-options", b"nosniff"),
+                    (b"content-security-policy", b"default-src 'none'"),
                 ],
             }
         )
-        await send({"type": "http.response.body", "body": b""})
+        await send({"type": "http.response.body", "body": body})
 
 
 def redact_path(path: str) -> str:

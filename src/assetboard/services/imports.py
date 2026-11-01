@@ -7,6 +7,7 @@ import hashlib
 import io
 import os
 import re
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor, TimeoutError
 from dataclasses import dataclass
 from datetime import datetime, timedelta
@@ -21,15 +22,22 @@ from assetboard.clock import Clock
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.identity import Workspace
 from assetboard.db.models.import_batch import ImportBatch
+from assetboard.db.models.ledger import BudgetLine, Category, Transaction
 from assetboard.db.repositories import (
     AuditEventRepository,
+    BudgetLineRepository,
+    CategoryRepository,
     CurrentWorkspaceRepository,
     ImportBatchRepository,
+    MonthStateRepository,
+    TransactionRepository,
 )
-from assetboard.domain.archive import ArchiveError
-from assetboard.domain.import_upload import parse_upload
+from assetboard.domain.archive import CSV_COLUMNS, ArchiveError
+from assetboard.domain.import_upload import ParsedUpload, parse_upload
 from assetboard.domain.ledger_csv import TRANSACTION_EXPORT_COLUMNS, guard_formula
+from assetboard.domain.months import YearMonth
 from assetboard.i18n import gettext
+from assetboard.services.categories import usage_by_category
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.months import lock_month_writes
 
@@ -123,16 +131,17 @@ class ImportAdapter:
     ) -> dict[str, int]:
         raise NotImplementedError
 
-    def rollback(
-        self, session: Session, ctx: Context, batch: ImportBatch
-    ) -> tuple[dict[str, int], tuple[str, ...]]:
-        raise NotImplementedError
 
-    def rollback_preview(
-        self, session: Session, ctx: Context, batch: ImportBatch
-    ) -> dict[str, int]:
-        raise NotImplementedError
+class ImportAdapterRegistry:
+    def __init__(self, adapters: Mapping[str, ImportAdapter] | None = None) -> None:
+        self._adapters = dict(adapters or {})
 
+    @property
+    def sources(self) -> frozenset[str]:
+        return frozenset(self._adapters)
+
+    def for_source(self, source: str) -> ImportAdapter | None:
+        return self._adapters.get(source)
 
 @dataclass(frozen=True, slots=True)
 class ImportBatchView:
@@ -226,8 +235,10 @@ def _error_dict(error: ArchiveError) -> dict[str, object]:
     }
 
 
-def _plan_file(path: Path, *, delimiter: str = ",") -> tuple[str, dict[str, Any]]:
-    parsed, errors = parse_upload(path.read_bytes(), delimiter=delimiter)
+def _plan_file(
+    content: bytes, *, delimiter: str = ","
+) -> tuple[str, dict[str, Any], ParsedUpload | None]:
+    parsed, errors = parse_upload(content, delimiter=delimiter)
     if parsed is None:
         return "failed", {
             "counts": {
@@ -244,12 +255,16 @@ def _plan_file(path: Path, *, delimiter: str = ",") -> tuple[str, dict[str, Any]
             "warnings": [],
             "skipped": [],
             "errors": [_error_dict(error) for error in errors],
-        }
+        }, None
 
     row_count = len(parsed.archive.rows.transactions) if parsed.archive else len(parsed.csv_rows)
     warnings = [_error_dict(error) for error in parsed.warnings]
     if parsed.archive is None:
-        known_columns = set(TRANSACTION_EXPORT_COLUMNS)
+        known_columns = {
+            "transactions_csv": set(TRANSACTION_EXPORT_COLUMNS),
+            "budget_lines_csv": set(CSV_COLUMNS["budget_lines.csv"]),
+            "categories_csv": set(CSV_COLUMNS["categories.csv"]),
+        }[parsed.source]
         warnings.extend(
             _error_dict(ArchiveError("upload.csv", "unknown column ignored", column=column))
             for column in parsed.csv_header
@@ -282,7 +297,7 @@ def _plan_file(path: Path, *, delimiter: str = ",") -> tuple[str, dict[str, Any]
         "warnings": warnings,
         "skipped": [],
         "errors": [_error_dict(error) for error in parsed.row_errors],
-    }
+    }, parsed
 
 
 def _plan_worker(
@@ -290,21 +305,23 @@ def _plan_worker(
     factory: sessionmaker[Session],
     ctx: Context,
     batch_id: UUID,
-    adapter: ImportAdapter | None,
+    adapters: ImportAdapterRegistry,
 ) -> tuple[str, dict[str, Any]]:
+    content = path.read_bytes()
     with factory() as session:
         batch = ImportBatchRepository(session, ctx).get(batch_id)
         if batch is None:
             raise ImportError("batch is not in this workspace")
         delimiter = ";" if batch.options.get("delimiter") == "semicolon" else ","
-        status, report = _plan_file(path, delimiter=delimiter)
-        if status != "planned" or adapter is None:
+        status, report, parsed = _plan_file(content, delimiter=delimiter)
+        if status != "planned" or parsed is None:
             return status, report
-        parsed, errors = parse_upload(path.read_bytes(), delimiter=delimiter)
-        if parsed is None:
-            return "failed", {**report, "errors": [_error_dict(error) for error in errors]}
+        adapter = adapters.for_source(parsed.source)
+        if adapter is None:
+            return status, report
         base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
         report = adapter.plan(session, ctx, batch, parsed, base_currency=base_currency)
+        report["source"] = parsed.source
     report.setdefault("warnings", [])
     report.setdefault("skipped", [])
     report.setdefault("errors", [])
@@ -316,7 +333,7 @@ def plan_import(
     ctx: Context,
     data_dir: Path,
     batch_id: UUID,
-    adapter: ImportAdapter | None = None,
+    adapters: ImportAdapterRegistry | None = None,
 ) -> dict[str, Any]:
     require_role(ctx, Role.EDITOR)
 
@@ -328,7 +345,8 @@ def plan_import(
         return _upload_path(data_dir, ctx.workspace.id, batch.id)
 
     path = run_immediate(factory, locate)
-    future = _WORKER.submit(_plan_worker, path, factory, ctx, batch_id, adapter)
+    registry = adapters or ImportAdapterRegistry()
+    future = _WORKER.submit(_plan_worker, path, factory, ctx, batch_id, registry)
     try:
         status, report = future.result(timeout=MAX_IMPORT_SECONDS)
     except TimeoutError:
@@ -436,13 +454,11 @@ def apply_import(
     ctx: Context,
     data_dir: Path,
     batch_id: UUID,
-    adapter: ImportAdapter | None,
+    adapters: ImportAdapterRegistry,
     *,
     skip_invalid: bool = False,
 ) -> dict[str, Any]:
     require_role(ctx, Role.EDITOR)
-    if adapter is None:
-        raise ImportUnavailable("No importer is registered for this upload type.")
     stored_path = _upload_path(data_dir, ctx.workspace.id, batch_id)
 
     def apply(session: Session) -> dict[str, Any]:
@@ -452,6 +468,9 @@ def apply_import(
         batch = ImportBatchRepository(session, ctx).get_for_update(batch_id)
         if batch is None or batch.status != "planned":
             raise ImportError("batch is not ready to apply")
+        adapter = adapters.for_source(batch.source)
+        if adapter is None:
+            raise ImportUnavailable("No importer is registered for this upload type.")
         if batch.mode == "restore":
             require_role_now(session, ctx, Role.OWNER)
         content = stored_path.read_bytes()
@@ -485,7 +504,7 @@ def apply_import(
         parsed, _errors = parse_upload(content, delimiter=delimiter)
         if parsed is None:
             batch.status = "failed"
-            report = _plan_file(stored_path, delimiter=delimiter)[1]
+            report = _plan_file(content, delimiter=delimiter)[1]
             batch.report = report
             return {"_failed": True, "report": report}
         base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
@@ -539,22 +558,47 @@ def rollback_import(
     factory: sessionmaker[Session],
     ctx: Context,
     batch_id: UUID,
-    adapter: ImportAdapter | None,
 ) -> dict[str, int]:
     require_role(ctx, Role.EDITOR)
-    if adapter is None:
-        raise ImportUnavailable("No rollback handler is registered for this upload type.")
 
     def rollback(session: Session) -> dict[str, int]:
         require_role_now(session, ctx, Role.EDITOR)
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+        lock_month_writes(session, ctx)
         batch = ImportBatchRepository(session, ctx).get_for_update(batch_id)
         if batch is None or batch.status != "applied" or batch.mode != "merge":
             raise ImportError("batch cannot be rolled back")
-        counts, closed_months = adapter.rollback(session, ctx, batch)
-        if closed_months:
-            raise ImportClosedMonths(closed_months)
+        selection = _rollback_selection(session, ctx, batch, lock=True)
+        if selection.closed_months:
+            raise ImportClosedMonths(selection.closed_months)
         now = ctx.clock.now()
+        transaction_repository = TransactionRepository(session, ctx)
+        for transaction in selection.transactions:
+            if transaction.deleted_at is None:
+                transaction_repository.update(transaction.id, deleted_at=now)
+        budget_line_repository = BudgetLineRepository(session, ctx)
+        for line in selection.budget_lines:
+            if line.id in selection.budget_lines_to_remove:
+                budget_line_repository.delete(line)
+
+        counts = _rollback_counts(selection)
+        category_repository = CategoryRepository(session, ctx)
+        batch_line_counts: dict[UUID, int] = {}
+        for line in selection.budget_lines:
+            if line.id in selection.budget_lines_to_remove:
+                batch_line_counts[line.category_id] = batch_line_counts.get(line.category_id, 0) + 1
+        for category in selection.categories:
+            remaining_plans = selection.budget_references.get(category.id, 0) - batch_line_counts.get(
+                category.id, 0
+            )
+            remaining_references = selection.category_references.get(category.id, 0) - batch_line_counts.get(
+                category.id, 0
+            )
+            if remaining_references > 0 or remaining_plans > 0:
+                if category.archived_at is None:
+                    category_repository.update(category.id, archived_at=now)
+            else:
+                category_repository.delete(category)
         batch.status = "rolled_back"
         batch.rolled_back_at = now
         AuditEventRepository(session, ctx).record(
@@ -566,14 +610,14 @@ def rollback_import(
             data={
                 "source": batch.source,
                 "mode": batch.mode,
-                "transactions_deleted": counts.get("deleted", 0),
-                "transactions_edited": counts.get("edited", 0),
-                "budget_lines": counts.get("budget_lines", 0),
-                "categories_to_archive": counts.get("categories_to_archive", 0),
-                "transactions_kept": counts.get("kept", 0),
+                "transactions_deleted": counts["deleted"],
+                "transactions_edited": counts["edited"],
+                "budget_lines": counts["budget_lines"],
+                "categories_to_archive": counts["categories_to_archive"],
+                "transactions_kept": counts["budget_lines_kept"],
             },
         )
-        return counts
+        return {**counts, "categories_deleted": counts["categories_to_delete"]}
 
     return run_immediate(factory, rollback)
 
@@ -582,17 +626,15 @@ def preview_rollback_import(
     factory: sessionmaker[Session],
     ctx: Context,
     batch_id: UUID,
-    adapter: ImportAdapter | None,
 ) -> tuple[ImportBatchView, dict[str, int]]:
     require_role(ctx, Role.EDITOR)
-    if adapter is None:
-        raise ImportUnavailable("No rollback handler is registered for this upload type.")
     with factory() as session:
+        CurrentWorkspaceRepository(session, ctx).lock(exclusive=False)
         batch = ImportBatchRepository(session, ctx).get(batch_id)
         if batch is None or batch.status != "applied" or batch.mode != "merge":
             raise ImportError("batch cannot be rolled back")
-        counts = adapter.rollback_preview(session, ctx, batch)
-        return _batch_view(batch), counts
+        selection = _rollback_selection(session, ctx, batch, lock=False)
+        return _batch_view(batch), _rollback_counts(selection)
 
 
 def list_import_batches(
@@ -642,6 +684,85 @@ class _WorkspaceRef:
 @dataclass(frozen=True, slots=True)
 class _WorkspaceScope:
     workspace: _WorkspaceRef
+
+
+@dataclass(frozen=True, slots=True)
+class _RollbackSelection:
+    applied_at: datetime
+    transactions: tuple[Transaction, ...]
+    budget_lines: tuple[BudgetLine, ...]
+    categories: tuple[Category, ...]
+    closed_months: tuple[str, ...]
+    category_references: dict[UUID, int]
+    budget_references: dict[UUID, int]
+    budget_lines_to_remove: frozenset[UUID]
+
+
+def _rollback_selection(
+    session: Session, ctx: Context, batch: ImportBatch, *, lock: bool
+) -> _RollbackSelection:
+    if batch.applied_at is None:
+        raise ImportError("applied batch has no applied timestamp")
+    transactions = TransactionRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    budget_lines = BudgetLineRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    categories = CategoryRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    category_references = {
+        category_id: usage.references
+        for category_id, usage in usage_by_category(session, ctx).items()
+    }
+    budget_usage = BudgetLineRepository(session, ctx).usage_by_category()
+    budget_references = {
+        category_id: usage.references for category_id, usage in budget_usage.items()
+    }
+    budget_lines_to_remove = frozenset(
+        line.id for line in budget_lines if line.updated_at <= batch.applied_at
+    )
+    closed = MonthStateRepository(session, ctx).closed_months()
+    affected = {YearMonth.from_date(row.date) for row in transactions}
+    affected.update(YearMonth.from_date(line.month) for line in budget_lines)
+    closed_months = tuple(str(month) for month in sorted(affected & closed))
+    return _RollbackSelection(
+        batch.applied_at,
+        tuple(transactions),
+        tuple(budget_lines),
+        tuple(categories),
+        closed_months,
+        category_references,
+        budget_references,
+        budget_lines_to_remove,
+    )
+
+
+def _rollback_counts(selection: _RollbackSelection) -> dict[str, int]:
+    batch_line_counts: dict[UUID, int] = {}
+    for line in selection.budget_lines:
+        if line.id in selection.budget_lines_to_remove:
+            batch_line_counts[line.category_id] = batch_line_counts.get(line.category_id, 0) + 1
+    categories_to_archive = 0
+    categories_to_delete = 0
+    for category in selection.categories:
+        remaining_plans = selection.budget_references.get(category.id, 0) - batch_line_counts.get(
+            category.id, 0
+        )
+        remaining_references = selection.category_references.get(category.id, 0) - batch_line_counts.get(
+            category.id, 0
+        )
+        if remaining_references > 0 or remaining_plans > 0:
+            categories_to_archive += category.archived_at is None
+        else:
+            categories_to_delete += 1
+    return {
+        "deleted": sum(row.deleted_at is None for row in selection.transactions),
+        "edited": sum(
+            row.deleted_at is None
+            and row.updated_at > selection.applied_at
+            for row in selection.transactions
+        ),
+        "budget_lines": len(selection.budget_lines_to_remove),
+        "budget_lines_kept": len(selection.budget_lines) - len(selection.budget_lines_to_remove),
+        "categories_to_archive": categories_to_archive,
+        "categories_to_delete": categories_to_delete,
+    }
 
 
 def cleanup_expired_imports(factory: sessionmaker[Session], data_dir: Path, clock: Clock) -> int:

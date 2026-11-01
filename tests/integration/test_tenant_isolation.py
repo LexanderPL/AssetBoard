@@ -596,6 +596,78 @@ def test_import_batch_queries_stay_in_their_workspace(
     assert in_b.recent() == [batch_b]
 
 
+def test_imported_ledger_rows_and_dedupe_lookups_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    from assetboard.db.repositories import BudgetLineRepository
+
+    ctx_a, ctx_b = two_workspaces
+    batches = [ImportBatchRepository(db_session, ctx) for ctx in (ctx_a, ctx_b)]
+    batch_a = batches[0].create(
+        source="transactions_csv",
+        mode="merge",
+        filename="a.csv",
+        file_sha256="a" * 64,
+        size_bytes=1,
+        options={},
+        status="uploaded",
+        started_by_user_id=None,
+    )
+    batch_b = batches[1].create(
+        source="transactions_csv",
+        mode="merge",
+        filename="b.csv",
+        file_sha256="b" * 64,
+        size_bytes=1,
+        options={},
+        status="uploaded",
+        started_by_user_id=None,
+    )
+    category_a = CategoryRepository(db_session, ctx_a).create(
+        name="Imported", name_key="imported", kind="expense", treatment="regular",
+        color="#16a34a", sort_order=0, import_batch_id=batch_a.id,
+    )  # fmt: skip
+    category_b = CategoryRepository(db_session, ctx_b).create(
+        name="Imported", name_key="imported", kind="expense", treatment="regular",
+        color="#16a34a", sort_order=0, import_batch_id=batch_b.id,
+    )  # fmt: skip
+    source_id = uuid4()
+    transaction_a = TransactionRepository(db_session, ctx_a).create_imported(
+        direction="expense",
+        day=date(2026, 10, 7),
+        amount_minor=1250,
+        currency="EUR",
+        category_id=category_a.id,
+        description="Coffee",
+        description_key="coffee",
+        import_batch_id=batch_a.id,
+        import_key=f"id:{source_id}",
+        created_by_user_id=None,
+    )
+    lines_a = BudgetLineRepository(db_session, ctx_a)
+    line_a = lines_a.create(
+        month=YearMonth(2026, 10),
+        category_id=category_a.id,
+        planned_minor=5000,
+        currency="EUR",
+        import_batch_id=batch_a.id,
+    )
+    transactions_a = TransactionRepository(db_session, ctx_a)
+    transactions_b = TransactionRepository(db_session, ctx_b)
+
+    assert transaction_a.source == "import"
+    assert transactions_a.for_import_batch(batch_a.id) == [transaction_a]
+    assert transactions_b.for_import_batch(batch_a.id) == []
+    assert transactions_a.by_import_key(f"id:{source_id}") is transaction_a
+    assert transactions_b.by_import_key(f"id:{source_id}") is None
+    assert transactions_a.by_lineage_id(source_id) is transaction_a
+    assert transactions_b.by_lineage_id(source_id) is None
+    assert lines_a.for_import_batch(batch_a.id) == [line_a]
+    assert BudgetLineRepository(db_session, ctx_b).for_import_batch(batch_a.id) == []
+    assert CategoryRepository(db_session, ctx_a).for_import_batch(batch_a.id) == [category_a]
+    assert CategoryRepository(db_session, ctx_b).for_import_batch(batch_a.id) == []
+
+
 def test_transaction_search_stays_in_its_workspace(
     db_session: Session, two_workspaces: tuple[Any, Any]
 ) -> None:

@@ -96,6 +96,8 @@ class TransactionRepository(ScopedRepository[Transaction]):
         description_key: str,
         source: str,
         created_by_user_id: UUID | None,
+        import_batch_id: UUID | None = None,
+        import_key: str | None = None,
     ) -> Transaction:
         return self.add(
             Transaction(
@@ -108,8 +110,58 @@ class TransactionRepository(ScopedRepository[Transaction]):
                 description_key=description_key,
                 source=source,
                 created_by_user_id=created_by_user_id,
+                import_batch_id=import_batch_id,
+                import_key=import_key,
             )
         )
+
+    def create_imported(
+        self,
+        *,
+        direction: str,
+        day: date,
+        amount_minor: int,
+        currency: str,
+        category_id: UUID,
+        description: str,
+        description_key: str,
+        import_batch_id: UUID,
+        import_key: str,
+        created_by_user_id: UUID | None,
+    ) -> Transaction:
+        return self.create(
+            direction=direction,
+            day=day,
+            amount_minor=amount_minor,
+            currency=currency,
+            category_id=category_id,
+            description=description,
+            description_key=description_key,
+            source="import",
+            created_by_user_id=created_by_user_id,
+            import_batch_id=import_batch_id,
+            import_key=import_key,
+        )
+
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[Transaction]:
+        statement = self._scoped_select().where(Transaction.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(self._session.scalars(statement.order_by(Transaction.id)))
+
+    def by_import_key(self, import_key: str, *, lock: bool = False) -> Transaction | None:
+        statement = self._scoped_select().where(Transaction.import_key == import_key)
+        if lock:
+            statement = statement.with_for_update()
+        return self._session.scalars(statement).one_or_none()
+
+    def by_lineage_id(self, row_id: UUID, *, lock: bool = False) -> Transaction | None:
+        statement = self._scoped_select().where(
+            (Transaction.id == row_id) | (Transaction.import_key == f"id:{row_id}")
+        )
+        if lock:
+            statement = statement.with_for_update()
+        return self._session.scalars(statement).one_or_none()
 
     def get_for_update(self, row_id: UUID) -> Transaction | None:
         """``get`` with a row lock (``FOR UPDATE`` on PostgreSQL) until the transaction ends.

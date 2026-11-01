@@ -35,6 +35,7 @@ def test_request_id_is_validated_and_returned() -> None:
 def test_request_body_limit_rejects_streamed_overflow_without_buffering_the_body() -> None:
     downstream_body = bytearray()
     response_messages: list[dict[str, object]] = []
+    downstream_completed = False
     chunks = iter((b"1234", b"5678"))
 
     async def receive() -> dict[str, object]:
@@ -44,11 +45,15 @@ def test_request_body_limit_rejects_streamed_overflow_without_buffering_the_body
             return {"type": "http.request", "body": b"", "more_body": False}
 
     async def app(scope: object, receive: object, send: object) -> None:
+        nonlocal downstream_completed
         while True:
             message = await receive()  # type: ignore[operator]
+            if message["type"] == "http.disconnect":
+                return
             downstream_body.extend(message["body"])
             if not message["more_body"]:
                 break
+        downstream_completed = True
         await send({"type": "http.response.start", "status": 200, "headers": []})  # type: ignore[operator]
         await send({"type": "http.response.body", "body": b"ok"})  # type: ignore[operator]
 
@@ -69,8 +74,10 @@ def test_request_body_limit_rejects_streamed_overflow_without_buffering_the_body
     asyncio.run(middleware(scope, receive, send))  # type: ignore[arg-type]
 
     assert bytes(downstream_body) == b"1234"
+    assert not downstream_completed
     assert response_messages[0]["status"] == 413
-    assert response_messages[-1]["body"] == b""
+    assert response_messages[-1]["body"] == b"Request body exceeds the allowed size."
+    assert (b"x-content-type-options", b"nosniff") in response_messages[0]["headers"]
 
 
 def test_import_route_uses_its_larger_limit() -> None:

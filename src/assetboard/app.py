@@ -3,7 +3,7 @@ from __future__ import annotations
 import ipaddress
 import mimetypes
 import os
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Callable, Mapping
 from contextlib import asynccontextmanager
 from functools import partial
 from importlib.metadata import version
@@ -53,7 +53,7 @@ from assetboard.services.context import (
     WorkspaceNotAvailable,
 )
 from assetboard.services.hash_gate import HashGate, HashGateBusy
-from assetboard.services.imports import ImportAdapter
+from assetboard.services.imports import ImportAdapter, ImportAdapterRegistry
 from assetboard.services.instance_settings import workspace_creation_allowed
 from assetboard.services.mail import Mailer, MailOutbox, SmtpMailer
 from assetboard.services.months import MonthClosed
@@ -123,7 +123,7 @@ def create_app(
     mailer: Mailer | None = None,
     mail_delay: Callable[[], float] | None = None,
     notifier: Notifier | None = None,
-    import_adapter: ImportAdapter | None = None,
+    import_adapters: Mapping[str, ImportAdapter] | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     logger = configure_logging(settings.log_level, settings.log_format)
@@ -276,7 +276,7 @@ def create_app(
     app.state.proxy_spoof_warnings = RecentKeys()
     app.state.proxy_audits = RecentKeys()
     app.state.setup_token = None
-    app.state.import_adapter = import_adapter
+    app.state.import_adapters = ImportAdapterRegistry(import_adapters)
     app.state.mail_outbox = outbox
     # Reminder delivery (ADR-0021); tests replace it with a fake that never uses the network.
     app.state.notifier = notifier or AppriseNotifier(settings.notification_timeout_seconds)

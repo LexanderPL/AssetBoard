@@ -159,7 +159,7 @@ async def workspace_data(request: Request, ctx: CurrentContext) -> Response:
         context={
             "import_batches": batches,
             "selected_batch": selected,
-            "import_available": request.app.state.import_adapter is not None,
+            "available_import_sources": request.app.state.import_adapters.sources,
         },
     )
 
@@ -172,6 +172,7 @@ async def workspace_data_import(
     delimiter: Annotated[str, Form()] = "comma",
     decimal: Annotated[str, Form()] = "dot",
 ) -> Response:
+    require_role(ctx, Role.EDITOR)
     max_bytes = request.app.state.settings.import_max_upload_bytes
     content = await upload.read(max_bytes + 1)
     filename = upload.filename or "upload.csv"
@@ -191,14 +192,18 @@ async def workspace_data_import(
         content=content,
         options={"delimiter": delimiter, "decimal": decimal},
     )
-    await run_in_threadpool(
-        plan_import,
-        request.app.state.session_factory,
-        ctx,
-        request.app.state.settings.data_dir,
-        batch_id,
-        request.app.state.import_adapter,
-    )
+    try:
+        await run_in_threadpool(
+            plan_import,
+            request.app.state.session_factory,
+            ctx,
+            request.app.state.settings.data_dir,
+            batch_id,
+            request.app.state.import_adapters,
+        )
+    except ImportError as error:
+        message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
+        raise HTTPException(status_code=409, detail=_t(request, message)) from None
     return RedirectResponse(
         f"{request.url_for('workspace_data').path}?batch={batch_id}", status_code=303
     )
@@ -264,7 +269,7 @@ async def workspace_data_import_apply(
             ctx,
             request.app.state.settings.data_dir,
             identifier,
-            request.app.state.import_adapter,
+            request.app.state.import_adapters,
             skip_invalid=skip_invalid,
         )
     except ImportConfirmationRequired:
@@ -294,7 +299,6 @@ async def workspace_data_import_rollback_confirm(
             request.app.state.session_factory,
             ctx,
             identifier,
-            request.app.state.import_adapter,
         )
     except ImportError as error:
         message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
@@ -320,7 +324,6 @@ async def workspace_data_import_rollback(
             request.app.state.session_factory,
             ctx,
             identifier,
-            request.app.state.import_adapter,
         )
     except ImportClosedMonths as error:
         detail = _t(request, ROLLBACK_CLOSED_MONTH) % {"months": ", ".join(error.months)}
