@@ -1,7 +1,7 @@
-"""The desktop sidebar in Chromium: its user menu stays at the bottom of the viewport on long
-pages, before and after scrolling, whatever the window height (the nav scrolls inside the
-sidebar instead); on a phone the sidebar is a block above the content. The Home item marks the
-dashboard as the current page."""
+"""The desktop sidebar in Chromium: its footer (version, dark mode) stays at the bottom of the
+viewport on long pages, before and after scrolling, whatever the window height (the nav scrolls
+inside the sidebar instead); on a phone the sidebar is a block above the content. The Home item
+marks the dashboard as the current page. The user menu sits at the top of the page."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ pytestmark = pytest.mark.skipif(
 
 PASSWORD = "Correct Horse Battery!"
 MENU_BOX = """() => {
-  const box = document.querySelector('[data-user-menu]').getBoundingClientRect();
+  const box = document.querySelector('[data-sidebar-footer]').getBoundingClientRect();
   return {top: box.top, bottom: box.bottom, height: innerHeight};
 }"""
 
@@ -87,8 +87,12 @@ def test_the_sidebar_footer_stays_at_the_bottom_of_the_viewport(tmp_path: Path) 
                     expect(page.locator("[data-home-link]")).not_to_have_attribute(
                         "aria-current", "page"
                     )
+                    page.evaluate("window.scrollTo(0, 0)")
                     page.locator("[data-user-menu] summary").click()
-                    expect(page.locator("[data-profile-link]")).to_be_in_viewport(ratio=1)
+                    expect(page.locator("[data-user-menu-panel]")).to_be_in_viewport()
+                    page.locator("[data-profile-link]").scroll_into_view_if_needed()
+                    expect(page.locator("[data-profile-link]")).to_be_visible()
+                    page.keyboard.press("Escape")
 
             # Phone: the sidebar sits above the content, and nothing overflows sideways.
             page.set_viewport_size({"width": 375, "height": 800})

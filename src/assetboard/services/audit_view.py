@@ -82,7 +82,11 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     "workspace.created": (),
     # Instance scope: the workspace and its own log are gone (ADR-0020).
     "workspace.delete": ("name",),
-    "instance.settings_updated": ("allow_workspace_creation", "allow_registration"),
+    "instance.settings_updated": (
+        "allow_workspace_creation",
+        "allow_registration",
+        "check_for_updates",
+    ),
     "workspace.exported": ("categories", "budget_lines", "transactions", "months"),
     "member.role_changed": ("from", "to"),
     "member.removed": ("role",),
@@ -226,6 +230,7 @@ KEY_LABELS: dict[str, str] = {
     "count": _("Number"),
     "allow_workspace_creation": _("Every signed-in user can create workspaces"),
     "allow_registration": _("Open registration"),
+    "check_for_updates": _("Check for updates"),
     "month": _("Month"),
     "closed_months_affected": _("Closed months affected"),
     "date": _("Date"),

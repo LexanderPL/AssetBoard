@@ -5,6 +5,7 @@ import threading
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime, timedelta
 from uuid import UUID
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -20,6 +21,16 @@ from assetboard.services.notifications import run_workspace as run_notifications
 from assetboard.services.notify import Notifier
 from assetboard.services.occurrences import auto_post_workspace
 from assetboard.services.scheduled import generate_workspace
+from assetboard.services.update_check import (
+    ReleaseSource,
+    check_due,
+    check_enabled,
+    run_update_check,
+)
+
+# The update check (ADR-0023) runs a few seconds after it is turned on, then looks hourly
+# whether a day has passed; a failed attempt waits a day too.
+UPDATE_CHECK_SOON = timedelta(seconds=10)
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,9 +52,12 @@ class RecurringJobs:
         logger: logging.Logger,
         notifier: Callable[[], Notifier] | None = None,
         monotonic: Callable[[], float] = time.monotonic,
+        release_source: Callable[[], ReleaseSource] | None = None,
     ) -> None:
         self.factory, self.settings, self.clock, self.logger = factory, settings, clock, logger
         self.notifier, self.monotonic = notifier, monotonic
+        self.release_source = release_source
+        self._last_update_attempt: datetime | None = None
         self._notify_offset = 0
         self.scheduler = BackgroundScheduler(timezone="UTC")
         self.zones: dict[UUID, str] = {}
@@ -137,6 +151,44 @@ class RecurringJobs:
                     exc_info=True,
                 )
 
+    def check_updates(self, force: bool = False) -> str:
+        """The opt-in update check (ADR-0023): at most once a day, only while it is on.
+
+        ``force`` (right after an administrator turns it on) skips the daily wait.
+        """
+        if self.release_source is None:
+            return "disabled"
+        try:
+            enabled, last_checked = check_enabled(self.factory)
+            if not enabled:
+                return "disabled"
+            now = self.clock().now()
+            if not force and not (
+                check_due(last_checked, now) and check_due(self._last_update_attempt, now)
+            ):
+                return "not_due"
+            self._last_update_attempt = now
+            return run_update_check(self.factory, self.release_source(), self.clock(), self.logger)
+        except Exception as exc:
+            self.logger.error(
+                "update_check_failed exception_type=%s; next check tomorrow", type(exc).__name__
+            )
+            return "failed"
+
+    def request_update_check(self) -> None:
+        """Check shortly after the setting was turned on (when the scheduler runs)."""
+        if not self.scheduler.running:
+            return
+        self.scheduler.add_job(
+            self.check_updates,
+            "date",
+            run_date=self.clock().now() + UPDATE_CHECK_SOON,
+            kwargs={"force": True},
+            id="update-check-now",
+            replace_existing=True,
+            misfire_grace_time=None,
+        )
+
     def reconcile(self) -> None:
         with self._reconciling:
             self._reconcile()
@@ -191,6 +243,15 @@ class RecurringJobs:
             "interval",
             minutes=1,
             id="notifications",
+            coalesce=True,
+            max_instances=1,
+        )
+        self.scheduler.add_job(
+            self.check_updates,
+            "interval",
+            hours=1,
+            next_run_time=self.clock().now() + UPDATE_CHECK_SOON,
+            id="update-check",
             coalesce=True,
             max_instances=1,
         )

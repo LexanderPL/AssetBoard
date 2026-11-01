@@ -162,7 +162,7 @@ if your account has none.
 
 Any signed-in account can create a workspace and becomes its owner, unless an instance
 administrator has turned this off. "Create workspace" appears on the "No workspace" page, and
-"New workspace" in the account menu (bottom left) and on the workspace settings page. The form asks
+"New workspace" in the account menu (top right) and on the workspace settings page. The form asks
 for the same details as first-run setup: a name (your display name unless you change it),
 base currency, country, time zone and language. The new workspace starts with the suggested
 categories in your language ([categories](categories.md#suggested-categories)), and you switch
@@ -182,6 +182,24 @@ email address they confirm through a link (see above); each such account gets it
 workspace. It can be turned on only when email is set up and password sign-in is not turned off
 (`ASSETBOARD_OIDC_ONLY`); the page says why when it cannot. Accounts from invitations, identity
 providers, the proxy or an administrator do not depend on it.
+
+"Check for updates" (Instance settings, off by default): once a day, ask GitHub for the latest
+release of AssetBoard. Nothing else is sent: no instance address, version, account or workspace
+data, no cookies (GitHub does see the server's IP address). While it is on, instance
+administrators see "Update available: X.Y.Z" under the version at the bottom of the sidebar
+when a newer release exists, linking to its release page. Turning it off stops the checks and
+forgets the last result. See [ADR-0023](adr/0023-opt-in-update-check.md).
+
+## The account menu
+
+The account menu is the button with your name at the top right of every page. It groups, with
+separators: your workspaces (the current one is marked; pick another to switch to it) and "New
+workspace" when allowed; the current workspace's pages (Categories; for owners Workspace
+settings, Members and "Audit log: workspace"; for owners and editors "Export and import");
+for instance administrators Users, Instance settings and "Audit log: instance"; and Profile,
+Account security and Sign out. A press outside it or Escape closes it. The current
+workspace's name is shown above each page title. The bottom of the sidebar shows the running
+version and the dark-mode switch.
 
 ## Audit log
 

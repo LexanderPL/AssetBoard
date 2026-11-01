@@ -16,6 +16,7 @@ from assetboard.services.context import (
     workspace_nav,
 )
 from assetboard.services.instance_settings import workspace_creation_allowed
+from assetboard.services.update_check import update_notice
 from assetboard.web.errors import is_htmx_fragment_request
 from assetboard.web.security import web_session
 
@@ -54,10 +55,17 @@ async def load_workspace_nav(request: Request) -> None:
 
     Account, admin, audit and similar pages take no Context, but ``base.html`` still shows the
     full sidebar for the current workspace. A user without a membership keeps the reduced nav.
-    HTMX fragments do not render the chrome, so they skip the lookup.
+    HTMX fragments do not render the chrome, so they skip the lookup. Instance administrators
+    also get the update notice (``request.state.update_notice``) for the sidebar.
     """
-    if web_session(request) is None or is_htmx_fragment_request(request):
+    signed_in = web_session(request)
+    if signed_in is None or is_htmx_fragment_request(request):
         return
+    if signed_in.is_instance_admin:
+        # The opt-in update check's result (ADR-0023), shown to administrators only.
+        request.state.update_notice = await run_in_threadpool(
+            update_notice, request.app.state.session_factory, request.app.version
+        )
     try:
         await current_context(request)
     except (NoWorkspace, TwoFactorRequired):

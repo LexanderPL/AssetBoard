@@ -400,6 +400,9 @@ msgstr ""
 msgid "Open registration"
 msgstr ""
 
+msgid "Check for updates"
+msgstr ""
+
 msgid "Month"
 msgstr ""
 
@@ -1856,13 +1859,23 @@ msgstr ""
 msgid "Unavailable"
 msgstr ""
 
-msgid "Your account"
+#, python-format
+msgid "Update available: %(version)s"
 msgstr ""
 
-msgid "Audit log: workspace"
+msgid "Toggle dark mode"
+msgstr ""
+
+msgid "Your overview"
+msgstr ""
+
+msgid "Workspaces"
 msgstr ""
 
 msgid "New workspace"
+msgstr ""
+
+msgid "Audit log: workspace"
 msgstr ""
 
 msgid "Export and import"
@@ -1881,21 +1894,6 @@ msgid "Account security"
 msgstr ""
 
 msgid "Sign out"
-msgstr ""
-
-msgid "Toggle dark mode"
-msgstr ""
-
-msgid "Personal finance"
-msgstr ""
-
-msgid "Your overview"
-msgstr ""
-
-msgid "Workspace"
-msgstr ""
-
-msgid "Switch"
 msgstr ""
 
 msgid "Are you sure?"
@@ -2091,13 +2089,16 @@ msgid ""
 "multi-factor authentication there."
 msgstr ""
 
+msgid "Workspace"
+msgstr ""
+
+msgid "Switch"
+msgstr ""
+
 msgid "Required only if your account has two-factor authentication enabled."
 msgstr ""
 
 msgid "Back to users"
-msgstr ""
-
-msgid "Workspaces"
 msgstr ""
 
 msgid "Who can create workspaces"
@@ -2130,6 +2131,14 @@ msgid ""
 msgstr ""
 
 msgid "Registration stays closed until this is fixed."
+msgstr ""
+
+msgid "Updates"
+msgstr ""
+
+msgid ""
+"Once a day, ask GitHub for the latest release. Off by default; nothing "
+"else is sent."
 msgstr ""
 
 msgid "Save settings"
@@ -4857,5 +4866,11 @@ msgstr ""
 #~ "Pending: earned %(earned)s, spent %(spent)s,"
 #~ " saved or invested %(saved)s. If "
 #~ "everything pending arrives, left %(net)s."
+#~ msgstr ""
+
+#~ msgid "Your account"
+#~ msgstr ""
+
+#~ msgid "Personal finance"
 #~ msgstr ""
 

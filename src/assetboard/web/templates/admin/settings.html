@@ -28,6 +28,14 @@
       <p id="allow_registration-help" class="text-xs text-muted">{{ _("A new account must confirm its email address through a link before it is created, and gets its own workspace.") }}</p>
       {% if registration_blocker %}<p id="allow_registration-blocked" class="text-xs text-warning-strong" data-registration-blocked>{{ registration_blocker }}{% if allow_registration and not registration_locked %} {{ _("Registration stays closed until this is fixed.") }}{% endif %}</p>{% endif %}
     </div>
+    <h2 class="pt-2 text-base font-semibold">{{ _("Updates") }}</h2>
+    <div class="space-y-1.5" data-update-check-setting>
+      <label class="flex items-start gap-2 text-sm font-medium text-ink">
+        <input type="checkbox" id="check_for_updates" name="check_for_updates" value="on"{% if check_for_updates %} checked{% endif %} aria-describedby="check_for_updates-help" class="mt-0.5 h-4 w-4 rounded border-line accent-primary">
+        <span>{{ _("Check for updates") }}</span>
+      </label>
+      <p id="check_for_updates-help" class="text-xs text-muted">{{ _("Once a day, ask GitHub for the latest release. Off by default; nothing else is sent.") }}</p>
+    </div>
     <div class="flex flex-wrap items-end gap-3">
       {{ confirm_block(confirm, "admin-settings", _("Save settings")) }}
     </div>

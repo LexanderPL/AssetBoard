@@ -30,3 +30,8 @@ Not covered yet: Kubernetes and Helm, Nix, NAS app stores. These come after 1.0.
   to find that log.
 - **Upgrades** migrate the database automatically (`ASSETBOARD_AUTO_MIGRATE=true`, the default),
   or with `assetboard migrate`. Take a backup first; the native install script does that for you.
+- **No outgoing requests by default.** The app calls out only for features you configure (sign-in
+  providers, email, notifications). To hear about new releases, an administrator can turn on
+  **Check for updates** under Instance settings: one request a day to the GitHub releases API,
+  nothing else sent ([Update check](../deployment.md#update-check)). The running version is
+  shown at the bottom of the sidebar.

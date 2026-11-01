@@ -83,8 +83,10 @@ In the plan, list each acceptance criterion with the test that will prove it, an
   repositories. See ADR-0003 (amendment 2026-10-12).
 - Part B is split again. **B1:** switcher, workspace settings, members page and the last-owner
   rule. **B2:** invitations.
-- The switcher is a form in the page header, shown only on workspace pages (those with a
-  Context) when the user has more than one membership. Account, error, "No workspace" and
+- The switcher is a group of POST forms (one per other workspace, the current one marked
+  `aria-current`) at the top of the account menu in the page header's top right, shown on every
+  signed-in page with a workspace when the user has more than one membership; the header
+  shows the current workspace's name above the title (UI batch 3). Account, error, "No workspace" and
   signed-out pages render without workspace parts.
 - Settings, members, role changes and removal are owners-only. Every write re-reads the
   actor's membership inside its `BEGIN IMMEDIATE` transaction (the request's Context can be
@@ -109,7 +111,7 @@ In the plan, list each acceptance criterion with the test that will prove it, an
     categories in the request's language (M2 F2.1), `workspace.created` is recorded in its own
     log only, and the session switches to it; the response redirects to `/`.
   - The "No workspace" page offers "Create workspace", and every workspace page offers "New
-    workspace" next to the switcher (or the workspace name), both only when allowed. The
+    workspace" in the account menu's workspace group, both only when allowed. The
     service re-reads the account and the setting inside its write transaction.
   - No limit on how many workspaces an account creates.
 - **Workspace deletion (owner decision 2026-10-24, pulled forward from the post-1.0 backlog;
