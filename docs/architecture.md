@@ -24,6 +24,16 @@ by `make css`. `tests/unit/test_theme_tokens.py` checks WCAG AA contrast for eve
 background pair in both themes and that templates use no other colours. Form controls use the
 shared `form-control` and `form-select` classes.
 
+The main content looks like a spreadsheet: boxes (`panel`) and form fields have square corners,
+a thin `line` border and no shadow; buttons, chips, the sidebar, the header and dialogs keep
+their rounded shapes. Data tables take the `sheet` class (a grid of thin cell borders, compact
+cells, a shaded header row); `sheet-sm` applies the grid from the `sm` breakpoint only (a table
+whose rows stack on a phone) and `sheet-flush` drops the grid's outer edge inside a panel that
+already draws it. A form field that is a table cell (the Transactions entry and edit rows, the
+Month page's plan inputs, the Income page's inline edit) adds `cell-input` to `form-control` or
+`form-select` and sits in a `cell-edit` cell: no border of its own, a light wash on hover and an
+outline in the link colour on focus. Action cells with buttons use `cell-tight`.
+
 ## Workspaces, Context and roles
 
 Every signed-in request that works on workspace data gets a `Context(user, workspace, role,
