@@ -1,33 +1,68 @@
 {% extends "base.html" %}
 {% from "macros/components.html" import csrf_input with context %}
+{% from "categories/_macros.html" import swatch %}
 {% block title %}{{ _("Recurring") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Recurring items") }}{% endblock %}
 {% block content %}
-{% if error %}<p role="alert" class="mb-4 rounded-xl border border-line px-4 py-3 text-sm text-danger" data-action-error>{{ error }}</p>{% endif %}
-{% if can_edit %}<a href="{{ scoped_url(request, 'scheduled_new') }}" class="mb-6 inline-block rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary">{{ _("New recurring item") }}</a>{% endif %}
-<p class="mb-6 text-sm text-muted" data-one-time-hint>{{ _("One-time payments are on the Upcoming payments page.") }} <a href="{{ scoped_url(request, 'scheduled_upcoming') }}?form=one-time" class="font-medium text-primary-ink underline">{{ _("Add one-time payment") }}</a></p>
-<div class="space-y-4">
-{% for item in items %}
-<section class="panel p-6" data-scheduled-item="{{ item.id }}">
-  <h2 class="font-semibold break-words">{{ item.values.name }}</h2>
-  <p class="mt-2 text-sm">{{ format_money(item.values.amount, locale) }} · {{ _("Income") if item.values.direction == 'income' else _("Expense") }} · {{ _("Estimate") if item.values.amount_mode == 'estimate' else _("Fixed") }}</p>
-  {% if item.values.notes %}<p class="mt-2 break-words text-sm text-muted">{{ item.values.notes }}</p>{% endif %}
-  {% if item.archived %}<p class="mt-3 text-sm text-muted">{{ _("Archived") }}</p>
-  {% else %}
-  <p class="mt-3 text-sm text-muted" data-item-state>{{ _("Done") if item.done else _("Paused") if item.paused else _("Active") }}</p>
-  {% if can_edit %}
-  <div class="mt-4 flex flex-wrap items-center gap-3">
-    <a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'scheduled_edit', item_id=item.id) }}">{{ _("Edit rule") }}</a>
-    {% set actions = [] if item.done else [('resume' if item.paused else 'pause', _('Resume') if item.paused else _('Pause'))] %}
-    {% for action, label in actions + [('archive', _('Archive'))] %}
-    <form method="post" action="{{ scoped_url(request, 'scheduled_action', item_id=item.id, action=action) }}">{{ csrf_input() }}<button type="submit" class="rounded-xl border border-line px-3 py-2 text-sm">{{ label }}</button></form>
-    {% endfor %}
-    <form method="post" action="{{ scoped_url(request, 'scheduled_action', item_id=item.id, action='delete') }}" data-confirm="{{ _('Delete the recurring item %(name)s? Its pending dates are removed; with posted or skipped history it is archived instead.', name=item.values.name) }}">{{ csrf_input() }}<button type="submit" data-delete class="rounded-xl border border-line px-3 py-2 text-sm text-danger">{{ _("Delete") }}</button></form>
+{% set chip = "ml-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" %}
+{% set small_button = "rounded-lg border border-line px-2.5 py-1 text-xs font-medium hover:bg-subtle" %}
+{% set new_button = "rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" %}
+{% if error %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
+{% if has_items %}
+<div class="mb-6 flex flex-wrap items-start justify-between gap-3">
+  <p class="max-w-2xl text-sm text-muted">{{ _("Bills and income that repeat. Each one plans its next dates for you.") }}</p>
+  {% if can_edit %}<a href="{{ scoped_url(request, 'scheduled_new') }}" class="{{ new_button }}" data-new-recurring>{{ _("New recurring item") }}</a>{% endif %}
+</div>
+{% for direction, rows in sections %}
+<section class="mb-8" aria-labelledby="recurring-{{ direction }}-heading" data-recurring-section="{{ direction }}">
+  <h2 id="recurring-{{ direction }}-heading" class="mb-3 text-base font-semibold">{{ _("Expenses") if direction == "expense" else _("Income") }}</h2>
+  {% if rows %}
+  <div class="panel overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="hidden border-b border-line bg-subtle text-left text-xs uppercase tracking-wide text-muted sm:table-header-group">
+        <tr>
+          <th scope="col" class="px-4 py-2 font-semibold">{{ _("Name") }}</th>
+          <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Amount") }}</th>
+          <th scope="col" class="px-4 py-2 font-semibold">{{ _("Schedule") }}</th>
+          <th scope="col" class="px-4 py-2 font-semibold">{{ _("Next date") }}</th>
+          <th scope="col" class="px-4 py-2 font-semibold">{{ _("Category") }}</th>
+          {% if can_edit %}<th scope="col" class="px-4 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-line">
+      {% for item, sentence in rows %}
+        <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 align-top sm:table-row sm:p-0{% if item.paused %} text-muted {% endif %}" data-scheduled-item="{{ item.id }}">
+          <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3">{{ item.values.name }}{% if item.paused %}<span class="{{ chip }} bg-subtle text-muted" data-paused>{{ _("paused") }}</span>{% endif %}</td>
+          <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3" data-amount>{{ format_money(item.values.amount, locale) }}{% if item.values.amount_mode == 'estimate' %}<span class="{{ chip }} bg-primary-soft text-primary-ink" data-estimate>{{ _("estimate") }}</span>{% endif %}</td>
+          <td class="col-span-2 sm:px-4 sm:py-3" data-schedule>{{ sentence }}</td>
+          <td class="whitespace-nowrap text-muted sm:px-4 sm:py-3 sm:text-ink" data-next-date>{% if item.next_due %}<span class="sm:hidden">{{ _("Next:") }} </span><time datetime="{{ item.next_due.isoformat() }}">{{ format_day(item.next_due, locale) }}</time>{% else %}<span aria-label="{{ _('No next date') }}">—</span>{% endif %}</td>
+          <td class="sm:px-4 sm:py-3" data-category><span class="flex items-center justify-end gap-2 sm:justify-start">{% if item.category_color %}{{ swatch(item.category_color) }}{% endif %}<span>{{ item.category_name }}</span></span></td>
+          {% if can_edit %}
+          <td class="col-span-2 pt-1 sm:px-4 sm:py-3">
+            <div class="flex flex-wrap items-center gap-1.5 sm:justify-end">
+              <a class="{{ small_button }}" href="{{ scoped_url(request, 'scheduled_edit', item_id=item.id) }}" data-edit>{{ _("Edit") }}<span class="sr-only"> {{ item.values.name }}</span></a>
+              {% set action = 'resume' if item.paused else 'pause' %}
+              <form method="post" action="{{ scoped_url(request, 'scheduled_action', item_id=item.id, action=action) }}">{{ csrf_input() }}<button type="submit" class="{{ small_button }}" data-{{ action }}>{{ _("Resume") if item.paused else _("Pause") }}<span class="sr-only"> {{ item.values.name }}</span></button></form>
+              <form method="post" action="{{ scoped_url(request, 'scheduled_action', item_id=item.id, action='delete') }}" data-confirm="{{ _('Delete the recurring item %(name)s? Its planned dates are removed. Payments already recorded or skipped stay in your history.', name=item.values.name) }}">{{ csrf_input() }}<button type="submit" data-delete class="{{ small_button }} text-danger">{{ _("Delete") }}<span class="sr-only"> {{ item.values.name }}</span></button></form>
+            </div>
+          </td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
   </div>
-  {% endif %}
+  {% else %}
+  <p class="panel p-4 text-sm text-muted" data-section-empty>{{ _("No recurring expenses yet.") if direction == "expense" else _("No recurring income yet.") }}</p>
   {% endif %}
 </section>
-{% else %}<p class="panel p-6 text-muted">{{ _("No recurring items yet.") }}</p>{% endfor %}
+{% endfor %}
+<p class="text-sm text-muted">{{ _("Pausing removes the planned dates from today onward until you resume. Dates in closed months never change.") }}</p>
+{% else %}
+<div class="panel grid justify-items-start gap-3 p-6" data-recurring-empty>
+  <p class="font-semibold">{{ _("No recurring items yet.") }}</p>
+  <p class="max-w-xl text-sm text-muted">{{ _("Add rent, subscriptions, a salary or anything else that repeats, and its dates are planned for you.") }}</p>
+  {% if can_edit %}<a href="{{ scoped_url(request, 'scheduled_new') }}" class="{{ new_button }}" data-new-recurring>{{ _("New recurring item") }}</a>{% endif %}
 </div>
-<p class="mt-6 text-sm text-muted">{{ _("Pausing removes pending dates from today onward. Archiving or deleting removes all pending dates; posted and skipped dates are history and are kept, so deleting an item with history archives it instead. Dates in closed months never change.") }}</p>
+{% endif %}
 {% endblock %}

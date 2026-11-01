@@ -1,12 +1,48 @@
 # Recurring items
 
 Open **Recurring** to define planned expenses or income once. Editors and owners can add or
-change items; viewers can read the list. An item has a name, an active category (which decides
-whether it is an expense or income), a fixed or estimated amount in the workspace currency,
-optional notes, and a rule.
+change items; viewers can read the list.
 
-Choose weekly weekdays, a monthly day (including the last day or first/last working day), or a
-yearly month and day. The interval means every N weeks, months or years. Weeks start on Monday;
+## The list
+
+The page has two sections, **Expenses** and **Income**. Each item is one row: its name, the
+amount (marked **estimate** when the amount varies), the schedule as a sentence such as
+"Monthly on the 10th", "Every 3 months on the 15th, from January 2027", "Yearly on 31 March"
+or "Weekly on Monday, until Dec 1, 2027", the next date, and the category. A paused item is
+marked **paused** and has no next date. Editors see **Edit**, **Pause** (or **Resume**) and
+**Delete** on each row and a **New recurring item** button at the top. On a phone each item is
+shown as a small card.
+
+Archived items are not listed. Their payments stay in your transactions and history.
+
+## Adding or changing an item
+
+**New recurring item** and **Edit** open a form in a few short steps, with a **Next dates**
+panel beside it (below it on a phone) that shows the schedule sentence and the next five dates
+as you type:
+
+- **What**: the name, whether it is an expense or income, and the category. Only categories
+  of the chosen kind are offered; the category decides whether the item is an expense or
+  income.
+- **How much**: the amount in the workspace currency. Tick **The amount varies; this is an
+  estimate** for bills like electricity: you confirm the real amount when it is paid.
+- **How often**: **Weekly** (one or more days of the week, every N weeks), **Monthly** (a day
+  of the month, the last day, or the first or last working day), **Every few months** (the same
+  day choices, every N months, counted from the start month) or **Yearly** (a day and month,
+  every N years). Only the fields of your choice are shown. Then choose what happens when the
+  date falls on a weekend or public holiday: keep that date, or move it to the working day
+  before or after.
+- **When**: the start date, and when it ends: **Never**, **On a date** or **After a number of
+  times**. A new item can also add the dates between a past start date and today.
+- **Options**: record it as paid automatically on the due date, reminder days, notes.
+
+If something is wrong, the form shows the message next to the field and keeps what you typed.
+An older rule with both an end date and a number of times opens with **On a date**; saving it
+keeps only the end date.
+
+## How dates are calculated
+
+The interval means every N weeks, months or years. Weeks start on Monday;
 intervals are anchored to the start date's week, month or year. Start/end dates are inclusive
 limits on scheduled dates, before any holiday adjustment. A day that does not exist is clamped:
 31 February becomes the last day of February; yearly 29 February becomes 28 February in a
@@ -14,7 +50,7 @@ non-leap year.
 
 For a single payment or income on one date, such as a gift or an annual fee you pay just once,
 use a **one-time payment** instead: on the **Upcoming payments** page choose **Add one-time
-payment** (also reachable as `/upcoming?form=one-time`, and linked from the Recurring page) and
+payment** (also reachable as `/upcoming?form=one-time`) and
 enter a description, the amount, expense or income, a category of that kind and the date. It
 gets one occurrence on that date, even when the date is farther ahead than the regular
 generation horizon (see below); a date already passed gives an overdue occurrence. One-time
@@ -26,9 +62,9 @@ Upcoming window. It adds to the month's pending amount ("+ … pending" under Ac
 Plan. Its expected row on the Transactions page can be confirmed or deleted; deleting removes
 the payment. A one-time item created by the Transactions page's **Plan** button is the same.
 
-The form previews the next six effective due dates as you change the rule. JavaScript is needed
-only for the live preview; the form can be saved without it. A finite or ended rule may have
-fewer than six dates remaining.
+JavaScript is needed only for the live **Next dates** panel, for showing just the fields of the
+chosen frequency and for filtering the categories; without it every field is shown and the form
+can still be saved. A finite or ended rule may have fewer than five dates remaining.
 
 ## Working days and holidays
 
@@ -39,7 +75,7 @@ when the rule needs working-day calculations; ordinary unadjusted dates still wo
 workspace country recalculates pending dates of working-day items at once; a country without
 holiday data cannot be chosen while such items exist.
 
-Choose **Keep the date**, **Previous working day**, or **Next working day**. An adjustment can
+Choose **Keep that date**, **Move it to the working day before** or **after**. An adjustment can
 cross a month or year boundary, or shift a date before the rule's start/after its end. The
 optional maximum count counts the scheduled dates before shifting; dates that land on the same
 effective day merge into one occurrence, so there can be fewer stored occurrences than the count.
@@ -48,7 +84,7 @@ effective day merge into one occurrence, so there can be fewer stored occurrence
 
 Saving immediately generates planned occurrences from today in the workspace time zone through
 the same day 13 calendar months ahead, inclusive (clamped at month end). Administrators can set
-`ASSETBOARD_RECURRENCE_HORIZON_MONTHS` to another positive number. **Include past occurrences** on
+`ASSETBOARD_RECURRENCE_HORIZON_MONTHS` to another positive number. **Also add the dates between the start date and today** on
 creation also backfills dates from the start of the rule; it is off by default. Generation is
 idempotent: repeating a job never creates a second occurrence for the same item and nominal
 scheduled date. The nominal date remains stable when its effective date changes due to a
@@ -66,8 +102,8 @@ posted and skipped occurrences keep their identity, amount and other data. Pausi
 pending occurrences from today onward and stops generation. Archiving or deleting removes all
 pending occurrences, overdue ones included; posted and skipped occurrences are history.
 Resuming regenerates the forward horizon without creating new overdue dates. Deleting asks for
-confirmation and removes an item only if no history remains; otherwise it archives it. Archived
-items remain visible for history. Occurrences in a closed month are never created, removed or
+confirmation and removes an item only if no history remains; otherwise it archives it, which hides
+it from the list (its posted payments stay). Occurrences in a closed month are never created, removed or
 changed; reopen the month first.
 
 Categories referenced by rules or occurrences cannot change direction or be deleted; deleting

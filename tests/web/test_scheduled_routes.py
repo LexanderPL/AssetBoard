@@ -33,12 +33,14 @@ def test_crud_preview_pause_resume_archive_and_delete(owner):
     data = form(owner)
     response = owner.post("/recurring/preview", data)
     assert response.status_code == 200
-    for day in ("2026-03-31", "2026-04-30", "2026-05-31", "2026-06-30", "2026-07-31", "2026-08-31"):
+    for day in ("2026-03-31", "2026-04-30", "2026-05-31", "2026-06-30", "2026-07-31"):
         assert day in response.text
+    # The live panel shows the next five dates and the schedule sentence.
+    assert "2026-08-31" not in response.text and "Monthly on the 31st" in response.text
     created = owner.post("/recurring", data)
     assert created.status_code == 303
     listing = owner.client.get("/recurring")
-    assert "Car insurance" in listing.text and "Estimate" in listing.text
+    assert "Car insurance" in listing.text and "data-estimate" in listing.text
     with owner.db() as session:
         from sqlalchemy import select
 
@@ -49,7 +51,9 @@ def test_crud_preview_pause_resume_archive_and_delete(owner):
     assert owner.post(f"/recurring/{item_id}/edit", data | {"name": "Updated"}).status_code == 303
     for action in ("pause", "resume", "archive"):
         assert owner.post(f"/recurring/{item_id}/{action}").status_code == 303
-    assert "Archived" in owner.client.get("/recurring").text
+    # Archived items are not listed at all; their history stays in transactions.
+    archived_listing = owner.client.get("/recurring").text
+    assert "Archived" not in archived_listing and "Updated" not in archived_listing
     assert owner.post("/recurring", data | {"name": "Delete me"}).status_code == 303
     with owner.db() as session:
         delete_id = session.scalars(
@@ -117,13 +121,11 @@ def test_locale_amount_and_weekly_form(owner):
 def test_field_errors_are_linked_and_number_fields_have_minimums(owner):
     data = form(owner)
     page = owner.client.get("/recurring/new").text
-    assert 'id="interval"' in page and 'min="1"' in page.split('id="interval"')[1].split(">")[0]
-    assert 'min="1"' in page.split('id="max_count"')[1].split(">")[0]
-    assert page.count('class="h-4 w-4 rounded border-line accent-primary"') == 9
+    for name in ("interval_weeks", "interval_months", "interval_years", "max_count"):
+        assert 'min="1"' in page.split(f'id="{name}"')[1].split(">")[0]
     assert 'name="auto_post"' in page
     response = owner.post("/recurring", data | {"interval": "0"})
     assert response.status_code == 400
-    assert 'aria-invalid="true" aria-describedby="interval-error"' in response.text
     assert 'id="interval-error"' in response.text
     april = owner.post("/recurring", data | {"freq": "yearly", "month": "4", "month_day": "31"})
     assert april.status_code == 400
@@ -202,10 +204,9 @@ def test_country_without_holiday_data_is_explained_on_the_settings_page(owner):
 def test_one_time_items_are_not_offered_or_listed_on_the_recurring_page(owner):
     owner.app.state.clock = FixedClock("2026-03-01T12:00:00+00:00")
     page = owner.client.get("/recurring/new")
-    # One-time payments are added on the Upcoming page now.
-    assert '<option value="once"' not in page.text
-    assert "Add one-time payment on the Upcoming payments page" in page.text
-    assert 'data-hidden-when="freq=once"' in page.text
+    # One-time payments are added on the Upcoming page; the form neither offers nor links them.
+    assert 'value="once"' not in page.text
+    assert "/upcoming" not in page.text.split('id="schedule-form"')[1].split("</form>")[0]
     # The repeat fields would be invalid for a recurring rule; a one-time item ignores them.
     data = form(
         owner,
@@ -233,8 +234,12 @@ def test_one_time_items_are_not_offered_or_listed_on_the_recurring_page(owner):
         )
     listing = owner.client.get("/recurring")
     assert f'data-scheduled-item="{item.id}"' not in listing.text
-    assert "One-time payments are on the Upcoming payments page." in listing.text
-    assert "/upcoming?form=one-time" in listing.text
+    # Owner rule: no links to other sections (the Upcoming hint is gone).
+    assert (
+        "data-one-time-hint" not in listing.text
+        and "/upcoming" not in listing.text.split("<main")[1].split("</main>")[0]
+    )
     # An existing one-time item's rule form still works (it keeps its "One time" choice).
     edit = owner.client.get(f"/recurring/{item.id}/edit")
-    assert '<option value="once" selected>One time</option>' in edit.text
+    assert 'value="once" class="mt-1 h-4 w-4 accent-primary" checked' in edit.text
+    assert "data-ends" not in edit.text

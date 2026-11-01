@@ -1682,19 +1682,109 @@ msgstr ""
 "skonfigurowanym adresem (%(base_url)s), zezwól na pliki cookie dla niej i"
 " spróbuj ponownie."
 
-msgid "Choose an active category matching the direction."
-msgstr "Wybierz aktywną kategorię zgodną z kierunkiem."
+msgid "on Monday"
+msgstr "w poniedziałek"
+
+msgid "on Tuesday"
+msgstr "we wtorek"
+
+msgid "on Wednesday"
+msgstr "w środę"
+
+msgid "on Thursday"
+msgstr "w czwartek"
+
+msgid "on Friday"
+msgstr "w piątek"
+
+msgid "on Saturday"
+msgstr "w sobotę"
+
+msgid "on Sunday"
+msgstr "w niedzielę"
+
+msgid "on the first working day"
+msgstr "pierwszego dnia roboczego"
+
+msgid "on the last working day"
+msgstr "ostatniego dnia roboczego"
+
+msgid "on the last day"
+msgstr "ostatniego dnia"
+
+#, python-format
+msgid "on the %(day)s"
+msgstr "%(day)s dnia"
+
+#, python-format
+msgid "Once on %(date)s"
+msgstr "Jednorazowo %(date)s"
+
+#, python-format
+msgid "Weekly %(days)s"
+msgstr "Co tydzień %(days)s"
+
+#, python-format
+msgid "Every %(num)s week %(days)s"
+msgid_plural "Every %(num)s weeks %(days)s"
+msgstr[0] "Co %(num)s tydzień %(days)s"
+msgstr[1] "Co %(num)s tygodnie %(days)s"
+msgstr[2] "Co %(num)s tygodni %(days)s"
+
+#, python-format
+msgid "Monthly %(day)s"
+msgstr "Co miesiąc, %(day)s"
+
+#, python-format
+msgid "Every %(num)s month %(day)s"
+msgid_plural "Every %(num)s months %(day)s"
+msgstr[0] "Co %(num)s miesiąc, %(day)s"
+msgstr[1] "Co %(num)s miesiące, %(day)s"
+msgstr[2] "Co %(num)s miesięcy, %(day)s"
+
+#, python-format
+msgid "Yearly on %(date)s"
+msgstr "Co roku, %(date)s"
+
+#, python-format
+msgid "Every %(num)s year on %(date)s"
+msgid_plural "Every %(num)s years on %(date)s"
+msgstr[0] "Co %(num)s rok, %(date)s"
+msgstr[1] "Co %(num)s lata, %(date)s"
+msgstr[2] "Co %(num)s lat, %(date)s"
+
+#, python-format
+msgid ", from %(start)s"
+msgstr ", od %(start)s"
+
+#, python-format
+msgid ", until %(end)s"
+msgstr ", do %(end)s"
+
+#, python-format
+msgid ", %(num)s time in total"
+msgid_plural ", %(num)s times in total"
+msgstr[0] ", łącznie %(num)s raz"
+msgstr[1] ", łącznie %(num)s razy"
+msgstr[2] ", łącznie %(num)s razy"
+
+msgid "; a weekend or holiday moves it to the working day before"
+msgstr "; w weekend lub święto przesuwane na poprzedni dzień roboczy"
+
+msgid "; a weekend or holiday moves it to the working day after"
+msgstr "; w weekend lub święto przesuwane na następny dzień roboczy"
+
+msgid "Choose an active category of the chosen kind."
+msgstr "Wybierz aktywną kategorię wybranego rodzaju."
 
 msgid "Enter a valid start date."
 msgstr "Podaj prawidłową datę początkową."
 
-msgid "Enter an end date on or after the start date, or leave it empty."
-msgstr ""
-"Podaj datę końcową nie wcześniejszą niż początkowa albo pozostaw pole "
-"puste."
+msgid "Enter an end date on or after the start date."
+msgstr "Podaj datę końcową nie wcześniejszą niż data początkowa."
 
-msgid "Enter a whole number of 1 or more, or leave it empty."
-msgstr "Podaj liczbę całkowitą równą co najmniej 1 albo pozostaw pole puste."
+msgid "Enter how many times: a whole number of 1 or more."
+msgstr "Podaj, ile razy: liczbę całkowitą równą co najmniej 1."
 
 msgid "Enter a whole number of 1 or more."
 msgstr "Podaj liczbę całkowitą równą co najmniej 1."
@@ -4029,17 +4119,38 @@ msgstr "Kanał"
 msgid "Reminder"
 msgstr "Przypomnienie"
 
-msgid "Recurring item"
-msgstr "Pozycja cykliczna"
-
 msgid "Edit recurring item"
 msgstr "Edytuj pozycję cykliczną"
 
 msgid "New recurring item"
 msgstr "Nowa pozycja cykliczna"
 
+msgid "Last day of the month"
+msgstr "Ostatni dzień miesiąca"
+
+msgid "First working day"
+msgstr "Pierwszy dzień roboczy"
+
+msgid "Last working day"
+msgstr "Ostatni dzień roboczy"
+
+msgid "Back to Recurring"
+msgstr "Wróć do pozycji cyklicznych"
+
 msgid "Check the highlighted field."
 msgstr "Sprawdź wyróżnione pole."
+
+msgid "What"
+msgstr "Co"
+
+msgid "Is it money going out or coming in?"
+msgstr "Czy to pieniądze wychodzące, czy przychodzące?"
+
+msgid "Expense: money going out"
+msgstr "Wydatek: pieniądze wychodzą"
+
+msgid "Income: money coming in"
+msgstr "Przychód: pieniądze wpływają"
 
 #, python-format
 msgid ""
@@ -4049,111 +4160,151 @@ msgstr ""
 "Kategoria %(name)s jest zarchiwizowana, więc ta pozycja nie tworzy nowych"
 " terminów. Wybierz aktywną kategorię, aby ją zapisać."
 
-msgid "Amount type"
-msgstr "Rodzaj kwoty"
+msgid "How much"
+msgstr "Ile"
 
-msgid "Fixed"
-msgstr "Stała"
+#, python-format
+msgid "Amount (%(currency)s)"
+msgstr "Kwota (%(currency)s)"
 
-msgid "Automatically post on the due date"
-msgstr "Automatycznie księguj w terminie"
+msgid "The amount varies; this is an estimate"
+msgstr "Kwota się zmienia; to szacunek"
 
-msgid "Reminder: days before the due date (optional)"
-msgstr "Przypomnienie: dni przed terminem (opcjonalnie)"
+msgid "Like an electricity bill. You confirm the real amount when it is paid."
+msgstr "Jak rachunek za prąd. Prawdziwą kwotę potwierdzasz przy płatności."
 
-msgid "Leave empty to use the default of each notification channel."
-msgstr "Pozostaw puste, aby użyć domyślnej wartości każdego kanału powiadomień."
-
-msgid "Start date"
-msgstr "Data początkowa"
-
-msgid "Repeat"
-msgstr "Powtarzanie"
-
-msgid "One time"
-msgstr "Jednorazowo"
+msgid "How often"
+msgstr "Jak często"
 
 msgid "Weekly"
 msgstr "Co tydzień"
 
+msgid "On one or more days of the week"
+msgstr "W jeden lub kilka dni tygodnia"
+
 msgid "Monthly"
 msgstr "Co miesiąc"
+
+msgid "On the same day each month"
+msgstr "Tego samego dnia co miesiąc"
+
+msgid "Every few months"
+msgstr "Co kilka miesięcy"
+
+msgid "Every 2, 3, 6… months, like a quarterly bill"
+msgstr "Co 2, 3, 6… miesięcy, jak rachunek kwartalny"
 
 msgid "Yearly"
 msgstr "Co rok"
 
-msgid ""
-"One time: a single date on the start date. The end date, maximum "
-"occurrences, interval, weekdays, day and month are then ignored."
+msgid "On the same date each year"
+msgstr "Tego samego dnia co roku"
+
+msgid "One time"
+msgstr "Jednorazowo"
+
+msgid "A single date: the start date"
+msgstr "Jedna data: data początkowa"
+
+msgid "On which days?"
+msgstr "W które dni?"
+
+msgid "Every how many weeks? (1 = every week)"
+msgstr "Co ile tygodni? (1 = co tydzień)"
+
+msgid "Every how many months?"
+msgstr "Co ile miesięcy?"
+
+msgid "Counted from the month of the start date."
+msgstr "Liczone od miesiąca daty początkowej."
+
+msgid "Monthly or every few months"
+msgstr "Co miesiąc lub co kilka miesięcy"
+
+msgid "On which day of the month?"
+msgstr "Którego dnia miesiąca?"
+
+msgid "In shorter months, the 29th to 31st become the last day of the month."
 msgstr ""
-"Jednorazowo: jeden termin w dniu daty początkowej. Data końcowa, "
-"maksymalna liczba wystąpień, odstęp, dni tygodnia, dzień i miesiąc są "
-"wtedy pomijane."
+"W krótszych miesiącach dni od 29 do 31 przypadają na ostatni dzień "
+"miesiąca."
+
+msgid "Every how many years? (1 = every year)"
+msgstr "Co ile lat? (1 = co roku)"
+
+msgid "If the date falls on a weekend or public holiday"
+msgstr "Jeśli termin wypada w weekend lub święto"
+
+msgid "Keep that date"
+msgstr "Zostaw ten dzień"
+
+msgid "Move it to the working day before"
+msgstr "Przesuń na poprzedni dzień roboczy"
+
+msgid "Move it to the working day after"
+msgstr "Przesuń na następny dzień roboczy"
+
+msgid "When"
+msgstr "Kiedy"
+
+msgid "Starts on"
+msgstr "Początek"
+
+msgid "Ends"
+msgstr "Koniec"
+
+msgid "On a date"
+msgstr "W dniu"
+
+msgid "End date"
+msgstr "Data końcowa"
+
+msgid "After a number of times"
+msgstr "Po określonej liczbie razy"
+
+msgid "Number of times"
+msgstr "Liczba razy"
+
+msgid "times"
+msgstr "razy"
+
+msgid "Also add the dates between the start date and today"
+msgstr "Dodaj też terminy między datą początkową a dzisiaj"
 
 msgid ""
-"For a single payment, use Add one-time payment on the Upcoming payments "
-"page."
+"Only when the start date is in the past. They are added as planned, not "
+"as transactions."
 msgstr ""
-"Dla pojedynczej płatności użyj opcji Dodaj płatność jednorazową na "
-"stronie Nadchodzące płatności."
+"Tylko gdy data początkowa jest w przeszłości. Zostaną dodane jako "
+"planowane, nie jako transakcje."
 
-msgid "End date (optional)"
-msgstr "Data końcowa (opcjonalnie)"
+msgid "Options"
+msgstr "Opcje"
 
-msgid "Maximum occurrences (optional)"
-msgstr "Maksymalna liczba wystąpień (opcjonalnie)"
+msgid "Record it as paid automatically on the due date"
+msgstr "Zapisuj jako zapłacone automatycznie w terminie"
 
-msgid "Every N weeks, months or years"
-msgstr "Co ile tygodni, miesięcy lub lat"
+msgid "Remind me this many days before (optional)"
+msgstr "Przypomnij tyle dni wcześniej (opcjonalnie)"
 
-msgid "Weekdays (weekly rules)"
-msgstr "Dni tygodnia (reguły tygodniowe)"
+msgid "Leave empty to use the default of each notification channel."
+msgstr "Pozostaw puste, aby użyć domyślnej wartości każdego kanału powiadomień."
 
-msgid "Day (monthly or yearly rules)"
-msgstr "Dzień (reguły miesięczne lub roczne)"
-
-msgid "Last day"
-msgstr "Ostatni dzień"
-
-msgid "First working day"
-msgstr "Pierwszy dzień roboczy"
-
-msgid "Last working day"
-msgstr "Ostatni dzień roboczy"
-
-msgid "Month number (yearly rules)"
-msgstr "Numer miesiąca (reguły roczne)"
-
-msgid "Weekend and holiday adjustment"
-msgstr "Przesunięcie na wypadek weekendu lub święta"
-
-msgid "Keep the date"
-msgstr "Zachowaj datę"
-
-msgid "Previous working day"
-msgstr "Poprzedni dzień roboczy"
-
-msgid "Next working day"
-msgstr "Następny dzień roboczy"
-
-msgid "Notes"
-msgstr "Notatki"
-
-msgid "Include past occurrences"
-msgstr "Uwzględnij przeszłe wystąpienia"
+msgid "Notes (optional)"
+msgstr "Notatki (opcjonalnie)"
 
 msgid ""
-"Saving a rule creates planned occurrences, never transactions. Edits "
-"replace only pending dates from today onward."
+"Saving plans the dates; it never records transactions. Changing an item "
+"updates only its planned dates from today onward."
 msgstr ""
-"Zapisanie reguły tworzy planowane wystąpienia, a nie transakcje. Edycja "
-"zastępuje tylko oczekujące wystąpienia od dzisiaj."
+"Zapisanie planuje terminy, nigdy nie tworzy transakcji. Zmiana pozycji "
+"aktualizuje tylko jej planowane terminy od dzisiaj."
 
 msgid "Save recurring item"
 msgstr "Zapisz pozycję cykliczną"
 
-msgid "Next six due dates"
-msgstr "Sześć najbliższych terminów"
+msgid "Next dates"
+msgstr "Najbliższe terminy"
 
 msgid ""
 "Enable JavaScript for the live preview. You can still save this form "
@@ -4165,20 +4316,25 @@ msgstr ""
 msgid "Recurring items"
 msgstr "Pozycje cykliczne"
 
-msgid "One-time payments are on the Upcoming payments page."
-msgstr "Płatności jednorazowe są na stronie Nadchodzące płatności."
+msgid "Bills and income that repeat. Each one plans its next dates for you."
+msgstr ""
+"Powtarzające się rachunki i przychody. Każda pozycja sama planuje kolejne"
+" terminy."
 
-msgid "Add one-time payment"
-msgstr "Dodaj płatność jednorazową"
+msgid "Schedule"
+msgstr "Harmonogram"
 
-msgid "Done"
-msgstr "Zakończona"
+msgid "Next date"
+msgstr "Najbliższy termin"
 
-msgid "Paused"
-msgstr "Wstrzymana"
+msgid "paused"
+msgstr "wstrzymana"
 
-msgid "Edit rule"
-msgstr "Edytuj regułę"
+msgid "Next:"
+msgstr "Najbliższy:"
+
+msgid "No next date"
+msgstr "Brak najbliższego terminu"
 
 msgid "Resume"
 msgstr "Wznów"
@@ -4188,26 +4344,34 @@ msgstr "Wstrzymaj"
 
 #, python-format
 msgid ""
-"Delete the recurring item %(name)s? Its pending dates are removed; with "
-"posted or skipped history it is archived instead."
+"Delete the recurring item %(name)s? Its planned dates are removed. "
+"Payments already recorded or skipped stay in your history."
 msgstr ""
-"Usunąć pozycję cykliczną %(name)s? Jej oczekujące terminy zostaną "
-"usunięte; jeśli ma historię zaksięgowanych lub pominiętych terminów, "
-"zostanie zarchiwizowana."
+"Usunąć pozycję cykliczną %(name)s? Jej planowane terminy zostaną "
+"usunięte. Płatności już zapisane lub pominięte zostaną w historii."
+
+msgid "No recurring expenses yet."
+msgstr "Nie ma jeszcze cyklicznych wydatków."
+
+msgid "No recurring income yet."
+msgstr "Nie ma jeszcze cyklicznych przychodów."
+
+msgid ""
+"Pausing removes the planned dates from today onward until you resume. "
+"Dates in closed months never change."
+msgstr ""
+"Wstrzymanie usuwa planowane terminy od dzisiaj do czasu wznowienia. "
+"Terminy w zamkniętych miesiącach nigdy się nie zmieniają."
 
 msgid "No recurring items yet."
 msgstr "Nie ma jeszcze pozycji cyklicznych."
 
 msgid ""
-"Pausing removes pending dates from today onward. Archiving or deleting "
-"removes all pending dates; posted and skipped dates are history and are "
-"kept, so deleting an item with history archives it instead. Dates in "
-"closed months never change."
+"Add rent, subscriptions, a salary or anything else that repeats, and its "
+"dates are planned for you."
 msgstr ""
-"Wstrzymanie usuwa oczekujące terminy od dzisiaj. Archiwizacja lub "
-"usunięcie usuwa wszystkie oczekujące terminy; zaksięgowane i pominięte "
-"terminy są historią i zostają, więc usunięcie pozycji z historią ją "
-"archiwizuje. Terminy w zamkniętych miesiącach nigdy się nie zmieniają."
+"Dodaj czynsz, subskrypcje, wynagrodzenie lub cokolwiek innego, co się "
+"powtarza, a terminy zaplanują się same."
 
 msgid "Choose valid recurrence dates to see the preview."
 msgstr "Wybierz prawidłowe daty powtarzania, aby zobaczyć podgląd."
@@ -4221,12 +4385,11 @@ msgstr "Nadchodzące płatności"
 msgid "Occurrence marked paid or received."
 msgstr "Wystąpienie oznaczono jako opłacone lub otrzymane."
 
-#, python-format
-msgid "Amount (%(currency)s)"
-msgstr "Kwota (%(currency)s)"
-
 msgid "Type"
 msgstr "Rodzaj"
+
+msgid "Add one-time payment"
+msgstr "Dodaj płatność jednorazową"
 
 msgid ""
 "A one-time payment is planned once, on its date. It is listed here, not "
@@ -4275,6 +4438,9 @@ msgstr "Edytuj kwotę"
 
 msgid "Save amount"
 msgstr "Zapisz kwotę"
+
+msgid "Edit rule"
+msgstr "Edytuj regułę"
 
 msgid "Example"
 msgstr "Przykład"
@@ -4535,9 +4701,6 @@ msgstr "Nic nie zaplanowano"
 
 msgid "Add another tax"
 msgstr "Dodaj inny podatek"
-
-msgid "How often"
-msgstr "Jak często"
 
 msgid "Every year"
 msgstr "Co roku"
@@ -5228,4 +5391,99 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Personal finance"
 #~ msgstr "Finanse osobiste"
+
+#~ msgid "Choose an active category matching the direction."
+#~ msgstr "Wybierz aktywną kategorię zgodną z kierunkiem."
+
+#~ msgid "Enter a whole number of 1 or more, or leave it empty."
+#~ msgstr "Podaj liczbę całkowitą równą co najmniej 1 albo pozostaw pole puste."
+
+#~ msgid "Recurring item"
+#~ msgstr "Pozycja cykliczna"
+
+#~ msgid "Amount type"
+#~ msgstr "Rodzaj kwoty"
+
+#~ msgid "Fixed"
+#~ msgstr "Stała"
+
+#~ msgid "Start date"
+#~ msgstr "Data początkowa"
+
+#~ msgid "Repeat"
+#~ msgstr "Powtarzanie"
+
+#~ msgid ""
+#~ "One time: a single date on the "
+#~ "start date. The end date, maximum "
+#~ "occurrences, interval, weekdays, day and "
+#~ "month are then ignored."
+#~ msgstr ""
+#~ "Jednorazowo: jeden termin w dniu daty"
+#~ " początkowej. Data końcowa, maksymalna "
+#~ "liczba wystąpień, odstęp, dni tygodnia, "
+#~ "dzień i miesiąc są wtedy pomijane."
+
+#~ msgid ""
+#~ "For a single payment, use Add "
+#~ "one-time payment on the Upcoming "
+#~ "payments page."
+#~ msgstr ""
+#~ "Dla pojedynczej płatności użyj opcji "
+#~ "Dodaj płatność jednorazową na stronie "
+#~ "Nadchodzące płatności."
+
+#~ msgid "Maximum occurrences (optional)"
+#~ msgstr "Maksymalna liczba wystąpień (opcjonalnie)"
+
+#~ msgid "Every N weeks, months or years"
+#~ msgstr "Co ile tygodni, miesięcy lub lat"
+
+#~ msgid "Weekdays (weekly rules)"
+#~ msgstr "Dni tygodnia (reguły tygodniowe)"
+
+#~ msgid "Month number (yearly rules)"
+#~ msgstr "Numer miesiąca (reguły roczne)"
+
+#~ msgid "Weekend and holiday adjustment"
+#~ msgstr "Przesunięcie na wypadek weekendu lub święta"
+
+#~ msgid "Previous working day"
+#~ msgstr "Poprzedni dzień roboczy"
+
+#~ msgid "Next working day"
+#~ msgstr "Następny dzień roboczy"
+
+#~ msgid "Notes"
+#~ msgstr "Notatki"
+
+#~ msgid "Include past occurrences"
+#~ msgstr "Uwzględnij przeszłe wystąpienia"
+
+#~ msgid "Next six due dates"
+#~ msgstr "Sześć najbliższych terminów"
+
+#~ msgid "One-time payments are on the Upcoming payments page."
+#~ msgstr "Płatności jednorazowe są na stronie Nadchodzące płatności."
+
+#~ msgid "Done"
+#~ msgstr "Zakończona"
+
+#~ msgid ""
+#~ "Pausing removes pending dates from today"
+#~ " onward. Archiving or deleting removes "
+#~ "all pending dates; posted and skipped"
+#~ " dates are history and are kept, "
+#~ "so deleting an item with history "
+#~ "archives it instead. Dates in closed "
+#~ "months never change."
+#~ msgstr ""
+#~ "Wstrzymanie usuwa oczekujące terminy od "
+#~ "dzisiaj. Archiwizacja lub usunięcie usuwa "
+#~ "wszystkie oczekujące terminy; zaksięgowane i"
+#~ " pominięte terminy są historią i "
+#~ "zostają, więc usunięcie pozycji z "
+#~ "historią ją archiwizuje. Terminy w "
+#~ "zamkniętych miesiącach nigdy się nie "
+#~ "zmieniają."
 

@@ -1,91 +1,189 @@
 {% extends "base.html" %}
-{% from "macros/components.html" import field, csrf_input, primary_button with context %}
-{% block title %}{{ _("Recurring item") }} · {{ app_name }}{% endblock %}
+{% from "macros/components.html" import field, csrf_input with context %}
+{% block title %}{{ _("Edit recurring item") if item_id else _("New recurring item") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Edit recurring item") if item_id else _("New recurring item") }}{% endblock %}
 {% block content %}
+{% set input_class = "form-control rounded-lg px-3 py-2" %}
 {% set check_class = "h-4 w-4 rounded border-line accent-primary" %}
+{% set option_class = "flex cursor-pointer items-start gap-3 rounded-xl border border-line bg-surface p-3 hover:bg-subtle has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40" %}
+{% set section_heading = "text-base font-semibold" %}
+{% set repeat = values.get('repeat', 'monthly') %}
 {% macro invalid(name) -%}{% if errors.get(name) %} aria-invalid="true" aria-describedby="{{ name }}-error"{% endif %}{%- endmacro %}
 {% macro error_text(name) -%}{% if errors.get(name) %}<p id="{{ name }}-error" class="text-sm text-danger">{{ errors.get(name) }}</p>{% endif %}{%- endmacro %}
-<div class="grid gap-6 lg:grid-cols-2">
-<section class="panel p-6 sm:p-7">
-{% if errors %}<p role="alert" class="mb-4 text-danger">{{ errors.get("form") or _("Check the highlighted field.") }}</p>{% endif %}
-<form id="schedule-form" method="post" action="{{ scoped_url(request, 'scheduled_update', item_id=item_id) if item_id else scoped_url(request, 'scheduled_create') }}" class="space-y-4">
+{# The interval error belongs to the interval field of the chosen "How often". #}
+{% macro interval_field(choice, name, label) -%}
+<div class="grid gap-1">
+  <label for="{{ name }}" class="text-sm font-medium">{{ label }}</label>
+  <input id="{{ name }}" name="{{ name }}" type="number" min="1" max="999" value="{{ values.get(name, '') }}" inputmode="numeric" class="{{ input_class }} w-24"{% if repeat == choice %}{{ invalid("interval") }}{% endif %}>
+  {% if repeat == choice %}{{ error_text("interval") }}{% endif %}
+</div>
+{%- endmacro %}
+{% macro month_day_options(selected, working_days) -%}
+{% for day in days %}<option value="{{ day }}"{% if selected == day|string %} selected{% endif %}>{{ day }}</option>{% endfor %}
+{% if working_days %}{% for value, label in [('-1', _('Last day of the month')), ('first_working_day', _('First working day')), ('last_working_day', _('Last working day'))] %}<option value="{{ value }}"{% if selected == value %} selected{% endif %}>{{ label }}</option>{% endfor %}{% endif %}
+{%- endmacro %}
+<a href="{{ scoped_url(request, 'scheduled_items') }}" class="mb-4 inline-flex rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Back to Recurring") }}</a>
+<div class="flex flex-wrap items-start gap-6">
+<section class="panel min-w-0 flex-[999_1_30rem] p-5 sm:p-6">
+{% if errors %}<p role="alert" class="mb-4 rounded-xl border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ errors.get("form") or _("Check the highlighted field.") }}</p>{% endif %}
+<form id="schedule-form" method="post" action="{{ scoped_url(request, 'scheduled_update', item_id=item_id) if item_id else scoped_url(request, 'scheduled_create') }}" class="grid gap-8">
   {{ csrf_input() }}
-  {{ field("name", _("Name"), value=values.get('name', ''), error=errors.get('name'), required=true, maxlength=200) }}
-  <div class="space-y-1.5">
-  <label class="block text-sm font-medium" for="category_id">{{ _("Category") }}</label>
-  <select id="category_id" name="category_id" class="form-select w-full" required{% if errors.get('category_id') %} aria-invalid="true"{% endif %}{% if errors.get('category_id') or archived_category %} aria-describedby="{% if archived_category %}category_id-archived{% endif %}{% if errors.get('category_id') %} category_id-error{% endif %}"{% endif %}>
-    <option value="">{{ _("Choose a category") }}</option>
-    {% if archived_category %}<option value="{{ archived_category.id }}" selected disabled data-archived-category>{{ archived_category.name }} · {{ _("archived") }}</option>{% endif %}
-    {% for kind, heading in (("expense", _("Expense categories")), ("income", _("Income categories"))) %}
-    {% set group = categories|selectattr("kind", "equalto", kind)|list %}
-    {% if group %}
-    <optgroup label="{{ heading }}">
-      {% for category in group %}<option value="{{ category.id }}"{% if not archived_category and values.get('category_id') == category.id|string %} selected{% endif %}>{{ category.name }}</option>{% endfor %}
-    </optgroup>
-    {% endif %}
-    {% endfor %}
-  </select>
-  {% if archived_category %}<p id="category_id-archived" class="text-sm text-muted" data-archived-notice>{{ _("The category %(name)s is archived, so this item creates no new dates. Choose an active category to save it.", name=archived_category.name) }}</p>{% endif %}
-  {{ error_text("category_id") }}
-  </div>
-  {{ field("amount", _("Amount"), value=values.get('amount', ''), error=errors.get('amount'), required=true, maxlength=40, help=workspace_nav.current.base_currency) }}
-  <label class="block text-sm font-medium" for="amount_mode">{{ _("Amount type") }}</label>
-  <select id="amount_mode" name="amount_mode" class="form-select w-full">
-    <option value="fixed"{% if values.get('amount_mode') == 'fixed' %} selected{% endif %}>{{ _("Fixed") }}</option>
-    <option value="estimate"{% if values.get('amount_mode') == 'estimate' %} selected{% endif %}>{{ _("Estimate") }}</option>
-  </select>
-  <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="auto_post" value="1"{% if values.get('auto_post') == '1' %} checked{% endif %} class="{{ check_class }}"> {{ _("Automatically post on the due date") }}</label>
-  {{ field("reminder_lead_days", _("Reminder: days before the due date (optional)"), type="number", value=values.get('reminder_lead_days', ''), error=errors.get('reminder_lead_days'), min=0, help=_("Leave empty to use the default of each notification channel.")) }}
-  {{ field("start_date", _("Start date"), type="date", value=values.get('start_date', ''), error=errors.get('start_date'), required=true) }}
-  <label class="block text-sm font-medium" for="freq">{{ _("Repeat") }}</label>
-  <select id="freq" name="freq" class="form-select w-full" aria-describedby="freq-help">
-    {# One-time items are added on the Upcoming page; an existing one keeps its choice here. #}
-    {% set one_time = values.get('freq') == 'once' %}
-    {% for value, label in ([('once', _('One time'))] if one_time else []) + [('weekly', _('Weekly')), ('monthly', _('Monthly')), ('yearly', _('Yearly'))] %}<option value="{{ value }}"{% if values.get('freq') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
-  </select>
-  {% if one_time %}<p id="freq-help" class="text-sm text-muted">{{ _("One time: a single date on the start date. The end date, maximum occurrences, interval, weekdays, day and month are then ignored.") }}</p>
-  {% else %}<p id="freq-help" class="text-sm text-muted">{{ _("For a single payment, use Add one-time payment on the Upcoming payments page.") }}</p>{% endif %}
-  <div class="space-y-4" data-hidden-when="freq=once">
-  {{ field("end_date", _("End date (optional)"), type="date", value=values.get('end_date', ''), error=errors.get('end_date')) }}
-  {{ field("max_count", _("Maximum occurrences (optional)"), type="number", value=values.get('max_count', ''), error=errors.get('max_count'), min=1) }}
-  {{ field("interval", _("Every N weeks, months or years"), type="number", value=values.get('interval', '1'), error=errors.get('interval'), required=true, min=1) }}
-  <fieldset{{ invalid("weekdays") }}><legend class="text-sm font-medium">{{ _("Weekdays (weekly rules)") }}</legend>
-    <div class="mt-2 flex flex-wrap gap-3">{% for value, label in weekdays %}<label class="inline-flex items-center gap-2 text-sm"><input type="checkbox" name="weekday" value="{{ value }}"{% if value in values.get('weekdays', '').split(',') %} checked{% endif %} class="{{ check_class }}"> {{ label }}</label>{% endfor %}</div>
-    {{ error_text("weekdays") }}
+  <input type="hidden" name="guided" value="1">
+
+  <fieldset class="grid gap-4" data-step="what">
+    <legend class="{{ section_heading }} mb-3">{{ _("What") }}</legend>
+    {{ field("name", _("Name"), value=values.get('name', ''), error=errors.get('name'), required=true, maxlength=200) }}
+    <div class="grid gap-2" role="radiogroup" aria-labelledby="direction-label">
+      <p id="direction-label" class="text-sm font-medium">{{ _("Is it money going out or coming in?") }}</p>
+      <div class="grid gap-2 sm:grid-cols-2">
+      {% for value, title in (("expense", _("Expense: money going out")), ("income", _("Income: money coming in"))) %}
+      <label class="{{ option_class }} items-center" data-direction-option="{{ value }}">
+        <input type="radio" name="direction" value="{{ value }}" class="h-4 w-4 accent-primary"{% if values.get('direction', 'expense') == value %} checked{% endif %}>
+        <span class="text-sm font-semibold">{{ title }}</span>
+      </label>
+      {% endfor %}
+      </div>
+    </div>
+    <div class="grid gap-1.5">
+      <label class="text-sm font-medium" for="category_id">{{ _("Category") }}</label>
+      <select id="category_id" name="category_id" class="form-select w-full" required data-filter-by-kind="direction"{% if errors.get('category_id') %} aria-invalid="true"{% endif %}{% if errors.get('category_id') or archived_category %} aria-describedby="{% if archived_category %}category_id-archived{% endif %}{% if errors.get('category_id') %} category_id-error{% endif %}"{% endif %}>
+        <option value="">{{ _("Choose a category") }}</option>
+        {% if archived_category %}<option value="{{ archived_category.id }}" selected disabled data-archived-category>{{ archived_category.name }} · {{ _("archived") }}</option>{% endif %}
+        {% for kind, heading in (("expense", _("Expense categories")), ("income", _("Income categories"))) %}
+        {% set group = categories|selectattr("kind", "equalto", kind)|list %}
+        {% if group %}
+        <optgroup label="{{ heading }}" data-kind="{{ kind }}">
+          {% for category in group %}<option value="{{ category.id }}"{% if not archived_category and values.get('category_id') == category.id|string %} selected{% endif %}>{{ category.name }}</option>{% endfor %}
+        </optgroup>
+        {% endif %}
+        {% endfor %}
+      </select>
+      {% if archived_category %}<p id="category_id-archived" class="text-sm text-muted" data-archived-notice>{{ _("The category %(name)s is archived, so this item creates no new dates. Choose an active category to save it.", name=archived_category.name) }}</p>{% endif %}
+      {{ error_text("category_id") }}
+    </div>
   </fieldset>
-  <div class="space-y-1.5">
-  <label class="block text-sm font-medium" for="month_day">{{ _("Day (monthly or yearly rules)") }}</label>
-  <select id="month_day" name="month_day" class="form-select w-full"{{ invalid("month_day") }}>
-    {% for day in days %}<option value="{{ day }}"{% if values.get('month_day') == day|string %} selected{% endif %}>{{ day }}</option>{% endfor %}
-    {% for value, label in [('-1', _('Last day')), ('first_working_day', _('First working day')), ('last_working_day', _('Last working day'))] %}<option value="{{ value }}"{% if values.get('month_day') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
-  </select>
-  {{ error_text("month_day") }}
+
+  <fieldset class="grid gap-4" data-step="amount">
+    <legend class="{{ section_heading }} mb-3">{{ _("How much") }}</legend>
+    <div class="grid gap-1">
+      <label for="amount" class="text-sm font-medium">{{ _("Amount (%(currency)s)", currency=workspace_nav.current.base_currency) }}</label>
+      <input id="amount" name="amount" value="{{ values.get('amount', '') }}" inputmode="decimal" required maxlength="40" class="{{ input_class }} max-w-xs"{{ invalid("amount") }}>
+      {{ error_text("amount") }}
+    </div>
+    <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="estimate" value="1"{% if values.get('estimate') == '1' %} checked{% endif %} class="{{ check_class }} mt-0.5" aria-describedby="estimate-help"> <span>{{ _("The amount varies; this is an estimate") }}<span id="estimate-help" class="block text-xs text-muted">{{ _("Like an electricity bill. You confirm the real amount when it is paid.") }}</span></span></label>
+  </fieldset>
+
+  <fieldset class="grid gap-4" data-step="often">
+    <legend class="{{ section_heading }} mb-3">{{ _("How often") }}</legend>
+    <div class="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label="{{ _('How often') }}">
+      {% set choices = [("weekly", _("Weekly"), _("On one or more days of the week")), ("monthly", _("Monthly"), _("On the same day each month")), ("every_months", _("Every few months"), _("Every 2, 3, 6… months, like a quarterly bill")), ("yearly", _("Yearly"), _("On the same date each year"))] %}
+      {% if repeat == "once" %}{% set choices = [("once", _("One time"), _("A single date: the start date"))] + choices %}{% endif %}
+      {% for value, title, description in choices %}
+      <label class="{{ option_class }}" data-repeat-option="{{ value }}">
+        <input type="radio" name="repeat" value="{{ value }}" class="mt-1 h-4 w-4 accent-primary"{% if repeat == value %} checked{% endif %}>
+        <span class="grid gap-0.5"><span class="text-sm font-semibold">{{ title }}</span><span class="text-sm text-muted">{{ description }}</span></span>
+      </label>
+      {% endfor %}
+    </div>
+
+    <div class="grid gap-4 rounded-xl border border-line p-4" data-hidden-when="repeat!=weekly" data-repeat-fields="weekly">
+      <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Weekly") }}</p>
+      <fieldset{% if repeat == "weekly" %}{{ invalid("weekdays") }}{% endif %}><legend class="text-sm font-medium">{{ _("On which days?") }}</legend>
+        <div class="mt-2 flex flex-wrap gap-2">{% for value, label in weekdays %}<label class="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-1.5 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary-soft"><input type="checkbox" name="weekday" value="{{ value }}"{% if value in values.get('weekdays', '').split(',') %} checked{% endif %} class="{{ check_class }}"> {{ label }}</label>{% endfor %}</div>
+        {% if repeat == "weekly" %}{{ error_text("weekdays") }}{% endif %}
+      </fieldset>
+      {{ interval_field("weekly", "interval_weeks", _("Every how many weeks? (1 = every week)")) }}
+    </div>
+
+    <div class="grid gap-4 rounded-xl border border-line p-4" data-hidden-when="repeat!=every_months" data-repeat-fields="every_months">
+      <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Every few months") }}</p>
+      {{ interval_field("every_months", "interval_months", _("Every how many months?")) }}
+      <p class="text-xs text-muted">{{ _("Counted from the month of the start date.") }}</p>
+    </div>
+
+    <div class="grid gap-1.5 rounded-xl border border-line p-4" data-hidden-when="repeat!=monthly|every_months" data-repeat-fields="monthly">
+      <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Monthly or every few months") }}</p>
+      <label class="text-sm font-medium" for="month_day">{{ _("On which day of the month?") }}</label>
+      <select id="month_day" name="month_day" class="form-select w-full max-w-xs"{% if repeat in ("monthly", "every_months") %}{{ invalid("month_day") }}{% endif %}>{{ month_day_options(values.get('month_day', '1'), true) }}</select>
+      <p class="text-xs text-muted">{{ _("In shorter months, the 29th to 31st become the last day of the month.") }}</p>
+      {% if repeat in ("monthly", "every_months") %}{{ error_text("month_day") }}{% endif %}
+    </div>
+
+    <div class="grid gap-4 rounded-xl border border-line p-4" data-hidden-when="repeat!=yearly" data-repeat-fields="yearly">
+      <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Yearly") }}</p>
+      <div class="flex flex-wrap items-end gap-3">
+        <div class="grid gap-1">
+          <label class="text-sm font-medium" for="year_day">{{ _("Day") }}</label>
+          <select id="year_day" name="year_day" class="form-select w-24"{% if repeat == "yearly" %}{{ invalid("month_day") }}{% endif %}>{{ month_day_options(values.get('year_day', '1'), false) }}</select>
+        </div>
+        <div class="grid gap-1">
+          <label class="text-sm font-medium" for="month">{{ _("Month") }}</label>
+          <select id="month" name="month" class="form-select w-44"{% if repeat == "yearly" %}{{ invalid("month") }}{% endif %}>{% for number, name in months %}<option value="{{ number }}"{% if values.get('month') == number|string %} selected{% endif %}>{{ name }}</option>{% endfor %}</select>
+        </div>
+      </div>
+      {% if repeat == "yearly" %}{{ error_text("month_day") }}{{ error_text("month") }}{% endif %}
+      {{ interval_field("yearly", "interval_years", _("Every how many years? (1 = every year)")) }}
+    </div>
+
+    <div class="grid gap-1.5">
+      <label class="text-sm font-medium" for="weekend_policy">{{ _("If the date falls on a weekend or public holiday") }}</label>
+      <select id="weekend_policy" name="weekend_policy" class="form-select w-full max-w-md"{{ invalid("weekend_policy") }}>
+        {% for value, label in [('none', _('Keep that date')), ('previous_working_day', _('Move it to the working day before')), ('next_working_day', _('Move it to the working day after'))] %}<option value="{{ value }}"{% if values.get('weekend_policy') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      {{ error_text("weekend_policy") }}
+    </div>
+  </fieldset>
+
+  <fieldset class="grid gap-4" data-step="when">
+    <legend class="{{ section_heading }} mb-3">{{ _("When") }}</legend>
+    <div class="grid gap-1">
+      <label for="start_date" class="text-sm font-medium">{{ _("Starts on") }}</label>
+      <input id="start_date" name="start_date" type="date" value="{{ values.get('start_date', '') }}" required class="{{ input_class }} max-w-xs"{{ invalid("start_date") }}>
+      {{ error_text("start_date") }}
+    </div>
+    {% if repeat != "once" %}
+    <fieldset class="grid gap-2" data-ends>
+      <legend class="mb-1 text-sm font-medium">{{ _("Ends") }}</legend>
+      {% set ends = values.get('ends', 'never') %}
+      <label class="flex items-center gap-2 text-sm"><input type="radio" name="ends" value="never" class="h-4 w-4 accent-primary"{% if ends == 'never' %} checked{% endif %}> {{ _("Never") }}</label>
+      <div class="flex flex-wrap items-center gap-2 text-sm">
+        <label class="flex items-center gap-2"><input type="radio" name="ends" value="on_date" class="h-4 w-4 accent-primary"{% if ends == 'on_date' %} checked{% endif %}> {{ _("On a date") }}</label>
+        <label for="end_date" class="sr-only">{{ _("End date") }}</label>
+        <input id="end_date" name="end_date" type="date" value="{{ values.get('end_date', '') }}" class="{{ input_class }}" data-hidden-when="ends!=on_date"{{ invalid("end_date") }}>
+      </div>
+      {{ error_text("end_date") }}
+      <div class="flex flex-wrap items-center gap-2 text-sm">
+        <label class="flex items-center gap-2"><input type="radio" name="ends" value="after" class="h-4 w-4 accent-primary"{% if ends == 'after' %} checked{% endif %}> {{ _("After a number of times") }}</label>
+        <span class="flex items-center gap-2" data-hidden-when="ends!=after"><label for="max_count" class="sr-only">{{ _("Number of times") }}</label><input id="max_count" name="max_count" type="number" min="1" value="{{ values.get('max_count', '') }}" inputmode="numeric" class="{{ input_class }} w-24"{{ invalid("max_count") }}> <span aria-hidden="true">{{ _("times") }}</span></span>
+      </div>
+      {{ error_text("max_count") }}
+    </fieldset>
+    {% endif %}
+    {% if not item_id %}<label class="flex items-start gap-2 text-sm"><input type="checkbox" name="include_past" value="1"{% if values.get('include_past') == '1' %} checked{% endif %} class="{{ check_class }} mt-0.5"> <span>{{ _("Also add the dates between the start date and today") }}<span class="block text-xs text-muted">{{ _("Only when the start date is in the past. They are added as planned, not as transactions.") }}</span></span></label>{% endif %}
+  </fieldset>
+
+  <fieldset class="grid gap-4" data-step="options">
+    <legend class="{{ section_heading }} mb-3">{{ _("Options") }}</legend>
+    <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="auto_post" value="1"{% if values.get('auto_post') == '1' %} checked{% endif %} class="{{ check_class }}"> {{ _("Record it as paid automatically on the due date") }}</label>
+    <div class="grid gap-1">
+      <label for="reminder_lead_days" class="text-sm font-medium">{{ _("Remind me this many days before (optional)") }}</label>
+      <input id="reminder_lead_days" name="reminder_lead_days" type="number" min="0" max="60" value="{{ values.get('reminder_lead_days', '') }}" inputmode="numeric" class="{{ input_class }} w-24"{% if errors.get('reminder_lead_days') %} aria-invalid="true" aria-describedby="reminder_lead_days-error"{% else %} aria-describedby="reminder-help"{% endif %}>
+      {% if errors.get('reminder_lead_days') %}{{ error_text("reminder_lead_days") }}{% else %}<p id="reminder-help" class="text-xs text-muted">{{ _("Leave empty to use the default of each notification channel.") }}</p>{% endif %}
+    </div>
+    {{ field("notes", _("Notes (optional)"), value=values.get('notes', ''), maxlength=200) }}
+  </fieldset>
+
+  <p class="text-xs text-muted">{{ _("Saving plans the dates; it never records transactions. Changing an item updates only its planned dates from today onward.") }}</p>
+  <div class="flex flex-wrap gap-2 border-t border-line pt-4">
+    <button type="submit" class="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save recurring item") }}</button>
+    <a href="{{ scoped_url(request, 'scheduled_items') }}" class="rounded-lg border border-line px-4 py-2 text-sm font-medium hover:bg-subtle">{{ _("Cancel") }}</a>
   </div>
-  <div class="space-y-1.5">
-  <label class="block text-sm font-medium" for="month">{{ _("Month number (yearly rules)") }}</label>
-  <select id="month" name="month" class="form-select w-full"{{ invalid("month") }}>{% for month in months %}<option value="{{ month }}"{% if values.get('month') == month|string %} selected{% endif %}>{{ month }}</option>{% endfor %}</select>
-  {{ error_text("month") }}
-  </div>
-  </div>
-  <div class="space-y-1.5">
-  <label class="block text-sm font-medium" for="weekend_policy">{{ _("Weekend and holiday adjustment") }}</label>
-  <select id="weekend_policy" name="weekend_policy" class="form-select w-full"{{ invalid("weekend_policy") }}>
-    {% for value, label in [('none', _('Keep the date')), ('previous_working_day', _('Previous working day')), ('next_working_day', _('Next working day'))] %}<option value="{{ value }}"{% if values.get('weekend_policy') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
-  </select>
-  {{ error_text("weekend_policy") }}
-  </div>
-  {{ field("notes", _("Notes"), value=values.get('notes', ''), maxlength=200) }}
-  {% if not item_id %}<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="include_past" value="1"{% if values.get('include_past') == '1' %} checked{% endif %} class="{{ check_class }}"> {{ _("Include past occurrences") }}</label>{% endif %}
-  <p class="text-xs text-muted">{{ _("Saving a rule creates planned occurrences, never transactions. Edits replace only pending dates from today onward.") }}</p>
-  {{ primary_button(_("Save recurring item")) }}
 </form>
-<a class="mt-4 block text-primary-ink" href="{{ scoped_url(request, 'scheduled_items') }}">{{ _("Cancel") }}</a>
 </section>
-<section class="panel self-start p-6 sm:p-7">
-  <h2 class="font-semibold" id="schedule-preview-heading">{{ _("Next six due dates") }}</h2>
-  <div id="schedule-preview" class="mt-4" role="status" aria-live="polite" aria-labelledby="schedule-preview-heading" hx-post="{{ scoped_url(request, 'scheduled_preview') }}" hx-trigger="load, change from:#schedule-form delay:300ms, input from:#schedule-form delay:400ms" hx-include="#schedule-form" hx-sync="this:replace" hx-target="this"></div>
+<aside class="panel min-w-0 flex-[1_1_18rem] self-start bg-subtle p-5 lg:sticky lg:top-6" aria-labelledby="schedule-preview-heading">
+  <h2 class="font-semibold" id="schedule-preview-heading">{{ _("Next dates") }}</h2>
+  <div id="schedule-preview" class="mt-3" role="status" aria-live="polite" aria-labelledby="schedule-preview-heading" hx-post="{{ scoped_url(request, 'scheduled_preview') }}" hx-trigger="load, change from:#schedule-form delay:150ms, input from:#schedule-form delay:300ms" hx-include="#schedule-form" hx-sync="this:replace" hx-target="this" data-schedule-preview></div>
   <noscript><p class="text-sm text-muted">{{ _("Enable JavaScript for the live preview. You can still save this form without it.") }}</p></noscript>
-</section>
+</aside>
 </div>
 {% endblock %}
