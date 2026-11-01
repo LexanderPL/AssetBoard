@@ -45,6 +45,87 @@ _PATH_TOKEN = re.compile(r"(/invite/|/register/complete/|/password/reset/)[^/?#]
 PEER_SCOPE_KEY = "assetboard.peer"
 
 
+class RequestBodyLimitMiddleware:
+    """Reject oversized request bodies without accumulating their contents."""
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        max_request_bytes: int,
+        import_max_upload_bytes: int,
+        import_path: str = "/workspace/data/import",
+    ) -> None:
+        self.app = app
+        self.max_request_bytes = max_request_bytes
+        self.import_max_upload_bytes = import_max_upload_bytes
+        self.import_path = import_path
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        limit = self.max_request_bytes
+        if scope.get("method") == "POST" and route_path(scope) == self.import_path:
+            limit = self.import_max_upload_bytes
+
+        for name, value in scope.get("headers", []):
+            if name.lower() == b"content-length":
+                try:
+                    declared_size = int(value)
+                except ValueError:
+                    continue
+                if declared_size > limit:
+                    await self._too_large(send)
+                    return
+
+        received = 0
+        oversized = False
+        response_started = False
+
+        async def limited_receive() -> Message:
+            nonlocal received, oversized
+            if oversized:
+                return {"type": "http.request", "body": b"", "more_body": False}
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > limit:
+                    oversized = True
+                    return {"type": "http.request", "body": b"", "more_body": False}
+            return message
+
+        async def limited_send(message: Message) -> None:
+            nonlocal response_started
+            if oversized:
+                return
+            if message["type"] == "http.response.start":
+                response_started = True
+            await send(message)
+
+        try:
+            await self.app(scope, limited_receive, limited_send)
+        except Exception:
+            if not oversized:
+                raise
+        if oversized and not response_started:
+            await self._too_large(send)
+
+    @staticmethod
+    async def _too_large(send: Send) -> None:
+        await send(
+            {
+                "type": "http.response.start",
+                "status": 413,
+                "headers": [
+                    (b"content-length", b"0"),
+                ],
+            }
+        )
+        await send({"type": "http.response.body", "body": b""})
+
+
 def redact_path(path: str) -> str:
     """The request path as logged: invitation, registration and reset tokens are replaced
     with ``[redacted]``."""

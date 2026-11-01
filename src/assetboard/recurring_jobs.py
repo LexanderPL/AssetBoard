@@ -16,6 +16,7 @@ from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.repositories import NotFound
 from assetboard.db.repositories.scheduled import RecurringWorkspaceReader
+from assetboard.services.imports import cleanup_expired_imports
 from assetboard.services.income import resync_pending_income
 from assetboard.services.notifications import run_workspace as run_notifications
 from assetboard.services.notify import Notifier
@@ -104,6 +105,16 @@ class RecurringJobs:
             self.logger.error(
                 "recurring_auto_post_failed workspace=%s exception_type=%s; next run will retry",
                 workspace_id,
+                type(exc).__name__,
+                exc_info=True,
+            )
+
+    def cleanup_imports(self) -> None:
+        try:
+            cleanup_expired_imports(self.factory, self.settings.data_dir, self.clock())
+        except Exception as exc:
+            self.logger.error(
+                "import_upload_cleanup_failed exception_type=%s; next run will retry",
                 type(exc).__name__,
                 exc_info=True,
             )
@@ -252,6 +263,14 @@ class RecurringJobs:
             hours=1,
             next_run_time=self.clock().now() + UPDATE_CHECK_SOON,
             id="update-check",
+            coalesce=True,
+            max_instances=1,
+        )
+        self.scheduler.add_job(
+            self.cleanup_imports,
+            "interval",
+            hours=1,
+            id="import-upload-cleanup",
             coalesce=True,
             max_instances=1,
         )

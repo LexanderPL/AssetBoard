@@ -157,6 +157,10 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "record_failed_email",
         )
     },
+    **{
+        ("ImportBatchRepository", method): "test_import_batch_queries_stay_in_their_workspace"
+        for method in ("create", "recent", "get_for_update", "expired_before")
+    },
 }
 
 READER_METHOD_COVERAGE: dict[str, str] = {

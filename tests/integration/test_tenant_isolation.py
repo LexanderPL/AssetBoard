@@ -57,6 +57,7 @@ from assetboard.db.repositories import (
     CategoryRepository,
     CurrentWorkspaceRepository,
     ForeignWorkspace,
+    ImportBatchRepository,
     InstanceAuditReader,
     InvitationRepository,
     InvitationTokenReader,
@@ -561,6 +562,38 @@ def test_transaction_queries_stay_in_their_workspace(
     assert b_row.workspace_id == ctx_b.workspace.id
     assert [r.id for r in in_b.for_month(october)] == [b_row.id]
     assert [r.id for r in in_a.for_month(october)] == [a_row.id]
+
+
+def test_import_batch_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    in_a, in_b = ImportBatchRepository(db_session, ctx_a), ImportBatchRepository(db_session, ctx_b)
+
+    def create(repository: ImportBatchRepository) -> Any:
+        return repository.create(
+            source="archive",
+            mode="merge",
+            filename="backup.zip",
+            file_sha256="a" * 64,
+            size_bytes=1,
+            options={},
+            status="uploaded",
+            started_by_user_id=None,
+        )
+
+    batch_a = create(in_a)
+    assert batch_a.workspace_id == ctx_a.workspace.id
+    assert in_a.recent() == [batch_a]
+    assert in_b.recent() == []
+    assert in_a.get_for_update(batch_a.id) is batch_a
+    assert in_b.get_for_update(batch_a.id) is None
+    assert in_a.expired_before(datetime.max.replace(tzinfo=UTC)) == [batch_a]
+    assert in_b.expired_before(datetime.max.replace(tzinfo=UTC)) == []
+    batch_b = create(in_b)
+    assert batch_b.workspace_id == ctx_b.workspace.id
+    assert in_a.recent() == [batch_a]
+    assert in_b.recent() == [batch_b]
 
 
 def test_transaction_search_stays_in_its_workspace(

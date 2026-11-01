@@ -15,6 +15,8 @@ Compose inputs only and are not application settings.
 | --- | --- | --- | --- |
 | `ASSETBOARD_ENV` | `dev` (Compose: `prod`) | App | Runtime mode: `dev` or `prod`. |
 | `ASSETBOARD_DATA_DIR` | `./data` (Compose: `/data`) | App | Directory for SQLite data and generated secret key; must be writable. |
+| `ASSETBOARD_MAX_REQUEST_BYTES` | `1048576` (1 MiB) | App | Maximum request body size on every route except the import upload; must be positive. |
+| `ASSETBOARD_IMPORT_MAX_UPLOAD_BYTES` | `20971520` (20 MiB) | App | Maximum request body size for `POST /workspace/data/import`; archive members have separate uncompressed limits; must be positive. |
 | `ASSETBOARD_DATABASE_URL` | `<DATA_DIR>/assetboard.db` | App | SQLite URL; this foundation supports SQLite only. |
 | `ASSETBOARD_SECRET_KEY` | unset | App | Optional explicit secret. If absent, a key is generated once and persisted under `DATA_DIR`. |
 | `ASSETBOARD_BASE_URL` | `http://localhost:8000` | App | Public base URL. Set to the external URL when using a reverse proxy. |
@@ -376,10 +378,12 @@ request. Make sure the proxy passes the original `Host` header and scheme.
 accounts) and `/auth/proxy` (proxy sign-in, which can too) at the reverse proxy (for example nginx
 `limit_req`, the Traefik `RateLimit` middleware, or a Caddy rate-limit module), such as a few
 requests per minute per client address. This keeps password-guessing floods from reaching the app
-at all. Also cap the request body size at the proxy (for example nginx `client_max_body_size 1m;`,
-the Traefik `Buffering` middleware's `maxRequestBodyBytes`, or Caddy
-`request_body { max_size 1MB }`): the app does not yet limit body sizes itself, and its forms need
-only a few kilobytes.
+at all. The app also enforces `ASSETBOARD_MAX_REQUEST_BYTES` on every route and the larger
+`ASSETBOARD_IMPORT_MAX_UPLOAD_BYTES` on `POST /workspace/data/import`; set the reverse proxy's
+body cap to at least the import limit if imports are enabled (for example nginx
+`client_max_body_size 20m;`, the Traefik `Buffering` middleware's `maxRequestBodyBytes`, or Caddy
+`request_body { max_size 20MB }`). This layered cap applies even when the app is reached without a
+proxy.
 
 ## Image tags
 

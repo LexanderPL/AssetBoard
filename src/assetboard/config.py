@@ -111,6 +111,8 @@ class Settings(BaseSettings):
 
     env: str = Field(default="dev")
     data_dir: Path = Field(default=Path("./data"))
+    max_request_bytes: int = Field(default=1024 * 1024, ge=1)
+    import_max_upload_bytes: int = Field(default=20 * 1024 * 1024, ge=1)
     database_url: str | None = None
     secret_key: str | None = None
     base_url: str = "http://localhost:8000"

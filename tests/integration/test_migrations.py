@@ -43,6 +43,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "budget_lines",
         "categories",
         "email_tokens",
+        "import_batches",
         "external_identities",
         "income_source_tax_rules",
         "income_sources",
@@ -166,6 +167,30 @@ def test_0021_notifications_migration_is_reversible(tmp_path: Path) -> None:
         assert "reminder_lead_days" not in {
             column["name"] for column in inspect(engine).get_columns("scheduled_items")
         }
+        upgrade_database(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0031_import_batches_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'imports.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        assert "import_batches" in inspector.get_table_names()
+        for table in ("categories", "transactions", "budget_lines"):
+            assert "import_batch_id" in {column["name"] for column in inspector.get_columns(table)}
+        command.downgrade(alembic_config(settings), "0030_update_check")
+        inspector = inspect(engine)
+        assert "import_batches" not in inspector.get_table_names()
+        for table in ("categories", "transactions", "budget_lines"):
+            assert "import_batch_id" not in {
+                column["name"] for column in inspector.get_columns(table)
+            }
         upgrade_database(settings)
         check_database_migrations(settings)
     finally:

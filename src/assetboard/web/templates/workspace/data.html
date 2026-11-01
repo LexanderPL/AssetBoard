@@ -11,4 +11,110 @@
     <button type="submit" class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary">{{ _("Download archive") }}</button>
   </form>
 </section>
+<section class="panel mt-6 max-w-2xl p-6">
+  <h2 class="text-lg font-semibold">{{ _("Import ledger data") }}</h2>
+  <form method="post" enctype="multipart/form-data" action="{{ scoped_url(request, 'workspace_data_import') }}" class="mt-4 space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+    <label class="block text-sm font-medium" for="import-upload">{{ _("ZIP archive or CSV file") }}</label>
+    <input id="import-upload" name="upload" type="file" accept=".zip,.csv,application/zip,text/csv" required class="block w-full text-sm">
+    <div class="grid grid-cols-2 gap-4">
+      <label class="block text-sm">{{ _("CSV delimiter") }}
+        <select name="delimiter" class="form-select mt-1 w-full">
+          <option value="comma">{{ _("Comma") }}</option>
+          <option value="semicolon">{{ _("Semicolon") }}</option>
+        </select>
+      </label>
+      <label class="block text-sm">{{ _("Decimal separator") }}
+        <select name="decimal" class="form-select mt-1 w-full">
+          <option value="dot">{{ _("Dot") }}</option>
+          <option value="comma">{{ _("Comma") }}</option>
+        </select>
+      </label>
+    </div>
+    <button type="submit" class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary">{{ _("Validate upload") }}</button>
+  </form>
+</section>
+{% if import_batches %}
+<section class="mt-8 max-w-4xl">
+  <h2 class="text-lg font-semibold">{{ _("Recent imports") }}</h2>
+  <div class="mt-3 divide-y divide-line">
+    {% for batch in import_batches %}
+    <article class="py-4">
+      <div class="flex flex-wrap items-baseline justify-between gap-2">
+        <a class="font-medium underline" href="{{ scoped_url(request, 'workspace_data') }}?batch={{ batch.id }}">{{ batch.filename }}</a>
+        <span class="text-sm text-muted">{% if batch.status == 'uploaded' %}{{ _("Uploaded") }}{% elif batch.status == 'planned' %}{{ _("Planned") }}{% elif batch.status == 'failed' %}{{ _("Failed") }}{% elif batch.status == 'cancelled' %}{{ _("Cancelled") }}{% elif batch.status == 'applied' %}{{ _("Applied") }}{% else %}{{ _("Rolled back") }}{% endif %}</span>
+      </div>
+      {% if batch.report %}
+      <p class="mt-1 text-sm text-muted">{{ _("Rows received") }}: {{ batch.report.counts.rows_received|default(0) }}{% if import_available %} · {{ _("Invalid") }}: {{ batch.report.counts.invalid|default(0) }}{% endif %}</p>
+      {% endif %}
+      <div class="mt-2 flex gap-4 text-sm">
+        <a class="underline" href="{{ scoped_url(request, 'workspace_data') }}?batch={{ batch.id }}">{{ _("View report") }}</a>
+        {% if batch.report and (batch.report.errors or batch.report.skipped) %}
+        <a class="underline" href="{{ scoped_url(request, 'workspace_data_import_errors', batch_id=batch.id) }}">{{ _("Download errors and skipped rows CSV") }}</a>
+        {% endif %}
+        {% if batch.status in ('uploaded', 'planned', 'failed') %}
+        <form method="post" action="{{ scoped_url(request, 'workspace_data_import_cancel', batch_id=batch.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          <button type="submit" class="underline">{{ _("Cancel import") }}</button>
+        </form>
+        {% endif %}
+        {% if import_available and batch.status == 'planned' %}
+        <form method="post" action="{{ scoped_url(request, 'workspace_data_import_apply', batch_id=batch.id) }}" class="flex items-center gap-2">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+          {% if batch.mode == 'merge' and batch.report.counts.invalid|default(0) > 0 %}<label><input type="checkbox" name="skip_invalid" value="true"> {{ _("Skip %(count)s invalid rows", count=batch.report.counts.invalid) }}</label>{% endif %}
+          <button type="submit" class="underline">{{ _("Apply import") }}</button>
+        </form>
+        {% elif import_available and batch.status == 'applied' and batch.mode == 'merge' %}
+        <a class="underline" href="{{ scoped_url(request, 'workspace_data_import_rollback_confirm', batch_id=batch.id) }}">{{ _("Roll back import") }}</a>
+        {% endif %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% if selected_batch %}
+<section class="mt-8 max-w-4xl" aria-live="polite">
+  <h2 class="text-lg font-semibold">{{ _("Import report") }}</h2>
+  {% if selected_batch.report and import_available %}
+  <dl class="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+    <div><dt class="text-muted">{{ _("To create") }}</dt><dd>{{ selected_batch.report.counts.to_create|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Duplicates skipped") }}</dt><dd>{{ selected_batch.report.counts.duplicates_skipped|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Conflicts skipped") }}</dt><dd>{{ selected_batch.report.counts.conflicts_skipped|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Closed-month rows skipped") }}</dt><dd>{{ selected_batch.report.counts.closed_months_skipped|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Invalid rows") }}</dt><dd>{{ selected_batch.report.counts.invalid|default(0) }}</dd></div>
+  </dl>
+  {% if selected_batch.report.months %}
+  <div class="mt-6 overflow-x-auto">
+    <h3 class="font-semibold">{{ _("Totals by month") }}</h3>
+    <table class="mt-2 w-full text-left text-sm">
+      <thead><tr><th>{{ _("Month") }}</th><th>{{ _("Expenses") }}</th><th>{{ _("Income") }}</th><th>{{ _("Planned") }}</th><th>{{ _("Rows to create") }}</th><th>{{ _("Rows skipped") }}</th></tr></thead>
+      <tbody>{% for month in selected_batch.report.months %}<tr><td>{{ month.month }}</td><td>{{ month.expense_total }}</td><td>{{ month.income_total }}</td><td>{{ month.planned_total }}</td><td>{{ month.rows_to_create }}</td><td>{{ month.rows_skipped }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% if selected_batch.report.categories %}
+  <div class="mt-6 overflow-x-auto">
+    <h3 class="font-semibold">{{ _("Totals by category") }}</h3>
+    <table class="mt-2 w-full text-left text-sm">
+      <thead><tr><th>{{ _("Kind") }}</th><th>{{ _("Category") }}</th><th>{{ _("Total") }}</th><th>{{ _("Rows to create") }}</th></tr></thead>
+      <tbody>{% for category in selected_batch.report.categories %}<tr><td>{% if category.kind == 'expense' %}{{ _("Expense") }}{% else %}{{ _("Income") }}{% endif %}</td><td>{{ category.category }}</td><td>{{ category.total }}</td><td>{{ category.rows_to_create }}</td></tr>{% endfor %}</tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% if selected_batch.report.warnings %}
+  <div class="mt-5"><h3 class="font-semibold">{{ _("Warnings") }}</h3><ul class="mt-2 list-disc pl-5 text-sm">{% for warning in selected_batch.report.warnings %}<li>{{ _(warning.message) }}</li>{% endfor %}</ul></div>
+  {% endif %}
+  {% if selected_batch.report.closed_months %}
+  <div class="mt-5"><h3 class="font-semibold">{{ _("Closed months") }}</h3><ul class="mt-2 list-disc pl-5 text-sm">{% for month in selected_batch.report.closed_months %}<li>{{ month }}</li>{% endfor %}</ul></div>
+  {% endif %}
+  {% if selected_batch.report.errors %}
+  <div class="mt-5"><h3 class="font-semibold">{{ _("Errors") }}</h3><ul class="mt-2 list-disc pl-5 text-sm">{% for error in selected_batch.report.errors %}<li>{{ error.file }}{% if error.line %}:{{ error.line }}{% endif %}{% if error.column %} · {{ error.column }}{% endif %}: {{ _(error.message) }}</li>{% endfor %}</ul></div>
+  {% endif %}
+  {% if selected_batch.report.errors %}<p class="mt-4 text-sm text-danger">{{ _("This upload could not be planned. Download the errors CSV for details.") }}</p>{% endif %}
+  {% else %}
+  <p class="mt-2 text-sm text-muted">{{ _("The import report is not available.") }}</p>
+  {% endif %}
+</section>
+{% endif %}
 {% endblock %}

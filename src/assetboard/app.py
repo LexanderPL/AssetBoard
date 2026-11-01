@@ -28,6 +28,7 @@ from assetboard.i18n import gettext
 from assetboard.logging import configure_logging
 from assetboard.middleware import (
     LocaleMiddleware,
+    RequestBodyLimitMiddleware,
     RequestIdMiddleware,
     SecurityHeadersMiddleware,
     add_security_headers,
@@ -52,6 +53,7 @@ from assetboard.services.context import (
     WorkspaceNotAvailable,
 )
 from assetboard.services.hash_gate import HashGate, HashGateBusy
+from assetboard.services.imports import ImportAdapter
 from assetboard.services.instance_settings import workspace_creation_allowed
 from assetboard.services.mail import Mailer, MailOutbox, SmtpMailer
 from assetboard.services.months import MonthClosed
@@ -121,6 +123,7 @@ def create_app(
     mailer: Mailer | None = None,
     mail_delay: Callable[[], float] | None = None,
     notifier: Notifier | None = None,
+    import_adapter: ImportAdapter | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
     logger = configure_logging(settings.log_level, settings.log_format)
@@ -273,6 +276,7 @@ def create_app(
     app.state.proxy_spoof_warnings = RecentKeys()
     app.state.proxy_audits = RecentKeys()
     app.state.setup_token = None
+    app.state.import_adapter = import_adapter
     app.state.mail_outbox = outbox
     # Reminder delivery (ADR-0021); tests replace it with a fake that never uses the network.
     app.state.notifier = notifier or AppriseNotifier(settings.notification_timeout_seconds)
@@ -286,6 +290,11 @@ def create_app(
     app.add_middleware(RequestIdMiddleware, logger=logger)
     app.add_middleware(LocaleMiddleware, default_locale=settings.default_locale)
     app.add_middleware(SecurityHeadersMiddleware)
+    app.add_middleware(
+        RequestBodyLimitMiddleware,
+        max_request_bytes=settings.max_request_bytes,
+        import_max_upload_bytes=settings.import_max_upload_bytes,
+    )
     static_directory = Path(__file__).parent / "static"
     # The favicon is an SVG; do not depend on the host's mime.types knowing the extension.
     mimetypes.add_type("image/svg+xml", ".svg")
