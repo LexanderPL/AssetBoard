@@ -130,8 +130,12 @@ REPORT_MESSAGES: dict[str, str] = {
     "category_transfer": _("Transfer categories cannot have planned values."),
     "category_differs": _("The category already exists with different values; it is kept."),
     "category_exists": _("A category with this name already exists."),
-    "kind_required": _("The category kind is required because the name is not unambiguous."),
+    "kind_required": _(
+        "The category kind is required: the name is unknown or exists as both an expense and "
+        "an income category."
+    ),
     "invalid_direction": _("The direction must be expense or income."),
+    "invalid_kind": _("The kind must be expense or income."),
     "invalid_date": _("Enter a date as YYYY-MM-DD."),
     "date_out_of_range": _("The date is outside 1900-01-01 to 2199-12-31."),
     "invalid_month": _("Enter a month as YYYY-MM."),
@@ -883,6 +887,19 @@ def rollback_import(
         for line in plan.lines_to_remove:
             lines.delete(line)
         session.flush()
+        raw_started_months = (batch.report or {}).get("plan_started_months", [])
+        if isinstance(raw_started_months, list):
+            month_states = MonthStateRepository(session, ctx)
+            for raw_month in cast("list[object]", raw_started_months):
+                try:
+                    month = YearMonth.parse(str(raw_month))
+                except ValueError:
+                    continue
+                if lines.for_month(month):
+                    continue
+                state = month_states.for_month(month)
+                if state is not None and state.plan_started_at is not None:
+                    month_states.update(state.id, plan_started_at=None)
         ImportCategoryMappingRepository(session, ctx).delete_for_categories(
             [category.id for category in plan.categories_created]
         )

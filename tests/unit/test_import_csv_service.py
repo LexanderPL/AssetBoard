@@ -468,12 +468,21 @@ def test_budget_lines_infer_the_kind_only_when_unambiguous(db: WorkspaceDb, data
     _category(db, "Salary", kind="income")
     _category(db, "Shared")
     _category(db, "Shared", kind="income")
+    _category(db, "Bonus")
     with db.factory.begin() as session:
-        ImportCategoryMappingRepository(session, _ctx(db)).create(
+        repository = ImportCategoryMappingRepository(session, _ctx(db))
+        income = _categories(db, "income")[0].id
+        repository.create(
             kind="income",
             source_name_key=name_key("Pay"),
             action="map",
-            category_id=_categories(db, "income")[0].id,
+            category_id=income,
+        )
+        repository.create(
+            kind="income",
+            source_name_key=name_key("Bonus"),
+            action="map",
+            category_id=income,
         )
 
     batch_id = _upload(
@@ -484,12 +493,13 @@ def test_budget_lines_infer_the_kind_only_when_unambiguous(db: WorkspaceDb, data
         b"2026-03,,Rent,200\n"
         b"2026-02,,Pay,300\n"
         b"2026-02,,Shared,400\n"
+        b"2026-02,,Bonus,600\n"
         b"2026-02,,Nowhere,500\n",
     )
 
     report = _plan(db, data_dir, batch_id)
     codes = [entry["code"] for entry in report["errors"]]
-    assert codes.count("kind_required") == 2
+    assert codes.count("kind_required") == 3
     assert report["counts"]["to_create"] == 3
     by_name = {entry["source_name"]: entry for entry in report["mapping"]}
     assert by_name["Rent"]["kind"] == "expense"
@@ -533,6 +543,39 @@ def test_archived_transfer_and_zero_budget_lines(db: WorkspaceDb, data_dir: Path
     assert [line.planned_minor for line in _budget_lines(db)] == [3000]
     state = _month_state(db, "2026-02")
     assert state is not None and state.plan_started_at == db.clock.now()
+
+
+def test_rollback_clears_only_plan_markers_the_batch_stamped(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    _category(db, "Food")
+    existing_marker = db.clock.now()
+    with db.factory.begin() as session:
+        session.add(
+            MonthState(
+                workspace_id=db.workspace_id,
+                month=date(2026, 2, 1),
+                plan_started_at=existing_marker,
+            )
+        )
+    batch_id = _upload(
+        db,
+        data_dir,
+        b"month,kind,category,planned\n2026-02,expense,Food,100\n2026-03,expense,Food,200\n",
+    )
+    _plan(db, data_dir, batch_id)
+    _apply(db, data_dir, batch_id)
+    report = _batch(db, batch_id).report
+    assert report is not None
+    assert report["plan_started_months"] == ["2026-03"]
+
+    rollback_import(db.factory, _ctx(db), batch_id)
+
+    assert _budget_lines(db) == []
+    february = _month_state(db, "2026-02")
+    march = _month_state(db, "2026-03")
+    assert february is not None and february.plan_started_at == existing_marker
+    assert march is not None and march.plan_started_at is None
 
 
 def test_budget_lines_are_idempotent(db: WorkspaceDb, data_dir: Path) -> None:
@@ -595,6 +638,30 @@ def test_categories_csv_creates_appends_and_keeps_archive_attributes(
     assert {entry["code"] for entry in report["skipped"]} == {"already_imported"}
 
 
+def test_categories_csv_allows_an_active_and_an_archived_category_with_one_name(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    active_id = UUID("44444444-4444-4444-8444-444444444444")
+    archived_id = UUID("55555555-5555-4555-8555-555555555555")
+    content = (
+        b"id,kind,name,treatment,color,sort_order,archived_at\n"
+        + (
+            f"{active_id},expense,Car,regular,#111111,0,\n"
+            f"{archived_id},expense,Car,regular,#222222,1,2025-12-31T18:05:00Z\n"
+        ).encode()
+    )
+
+    batch_id = _upload(db, data_dir, content)
+    report = _plan(db, data_dir, batch_id)
+    assert report["counts"]["to_create"] == 2
+    assert report["skipped"] == []
+
+    _apply(db, data_dir, batch_id)
+    cars = [category for category in _categories(db) if category.name == "Car"]
+    assert len(cars) == 2
+    assert {category.archived_at is not None for category in cars} == {False, True}
+
+
 def test_categories_csv_lists_existing_differences_and_file_duplicates(
     db: WorkspaceDb, data_dir: Path
 ) -> None:
@@ -602,14 +669,15 @@ def test_categories_csv_lists_existing_differences_and_file_duplicates(
     content = (
         b"id,kind,name,treatment,color,sort_order,archived_at\n"
         b",expense,Food,savings,#111111,0,\n"
-        b",expense,Food,regular,#111111,0,\n"
-        b"11111111-1111-4111-8111-111111111111,expense,New,regular,,0,\n"
+        b",expense,New,regular,#111111,0,\n"
+        b",expense,New,savings,#111111,0,\n"
+        b"11111111-1111-4111-8111-111111111111,expense,Other,regular,,0,\n"
         b"11111111-1111-4111-8111-111111111111,expense,Other,regular,,0,\n"
     )
 
     report = _plan(db, data_dir, _upload(db, data_dir, content))
 
-    assert report["counts"]["to_create"] == 1
+    assert report["counts"]["to_create"] == 2
     assert [entry["code"] for entry in report["skipped"]] == [
         "category_differs",
         "conflict_in_file",
@@ -621,6 +689,7 @@ def test_categories_csv_validation_codes(db: WorkspaceDb, data_dir: Path) -> Non
     content = (
         b"id,kind,name,treatment,color,sort_order,archived_at\n"
         b",,No kind,regular,,0,\n"
+        b",invalid,Bad kind,regular,,0,\n"
         b",expense,,regular,,0,\n"
         b",expense,Bad treatment,other,,0,\n"
         b",expense,Bad colour,regular,red,0,\n"
@@ -631,9 +700,10 @@ def test_categories_csv_validation_codes(db: WorkspaceDb, data_dir: Path) -> Non
 
     report = _plan(db, data_dir, _upload(db, data_dir, content))
 
-    assert report["counts"]["invalid"] == 7
+    assert report["counts"]["invalid"] == 8
     assert {entry["code"] for entry in report["errors"]} == {
         "kind_required",
+        "invalid_kind",
         "invalid_category_name",
         "invalid_treatment",
         "invalid_color",

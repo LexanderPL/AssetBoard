@@ -16,7 +16,7 @@ from uuid import UUID
 from assetboard.domain.budget import planned_minor
 from assetboard.domain.categories import Kind, Treatment, clean_name, name_key
 from assetboard.domain.months import InvalidMonth, YearMonth
-from assetboard.domain.transactions import EntryError, amount_minor, clean_description
+from assetboard.domain.transactions import EntryError, amount_minor
 
 TRANSACTIONS = "transactions_csv"
 BUDGET_LINES = "budget_lines_csv"
@@ -202,11 +202,18 @@ def parse_planned_amount(value: str, currency: str, *, decimal: str) -> int:
     return planned_minor(parse_decimal(text, decimal=decimal), currency)
 
 
-def parse_kind(value: str) -> Kind:
+def parse_direction(value: str) -> Kind:
     try:
         return Kind(value.strip())
     except ValueError:
         raise EntryError("invalid_direction") from None
+
+
+def parse_kind(value: str) -> Kind:
+    try:
+        return Kind(value.strip())
+    except ValueError:
+        raise EntryError("invalid_kind") from None
 
 
 def parse_treatment(value: str) -> Treatment:
@@ -231,13 +238,6 @@ def parse_category_name(value: str) -> str:
         return clean_name(value)
     except ValueError:
         raise EntryError("invalid_category_name") from None
-
-
-def parse_description(value: str) -> str:
-    try:
-        return clean_description(value)
-    except EntryError:
-        raise
 
 
 def parse_currency(value: str, base_currency: str) -> str:

@@ -291,16 +291,19 @@ made from my spreadsheet, map its categories onto mine, check the totals and imp
   never adds to it later).
 - `categories.csv` alone (merge): creates the categories that do not resolve (by lineage id, or
   by name key and kind among active ones), appended at the end of their list in file order,
-  archived ones as archived; existing categories are never changed (differences listed). An
-  explicit `sort_order` in the file does not move existing categories or place new ones: merge
-  mode always appends.
+  archived ones as archived; existing categories are never changed (differences listed). Rows
+  with an `id` dedupe by id; name-based in-file duplicate detection applies only among active
+  rows, so an active and an archived category may share a name. An explicit `sort_order` in the
+  file does not move existing categories or place new ones: merge mode always appends.
 - `transactions.csv` rows with a non-empty `deleted_at` are skipped in merge mode and counted
   ("deleted in the source"); only a restore recreates deleted rows.
 - A transaction dated after today in the workspace's time zone is skipped and listed with code
   `future_date` (in the app a future entry becomes a one-off planned item, so importing it as
   an actual entry would contradict that); budget lines for future months are imported normally.
 - A rollback removes the saved mappings that point at categories the batch created (archived
-  ones included), in the same transaction; mappings to pre-existing categories stay.
+  ones included), in the same transaction; mappings to pre-existing categories stay. It also
+  clears `plan_started_at` for months whose marker this batch set, when no planned values remain
+  in that month.
 - The page offers **template downloads**: `transactions.csv` is the hand-made example below
   (header and its three rows); `budget_lines.csv` is the minimal `month,kind,category,planned`
   example below (header and its two rows).
@@ -565,7 +568,7 @@ date;direction;amount;category;description
 | Column | Required | Values |
 |---|---|---|
 | `month` | yes | `YYYY-MM` |
-| `kind` | no, unless the name exists in exactly one kind | `expense` \| `income`; without it, the name must exist in exactly one kind (an existing category or a saved mapping), otherwise `kind_required` |
+| `kind` | no, if the name resolves to exactly one kind (an existing category or a saved mapping); otherwise `kind_required` | `expense` \| `income` |
 | `category` | yes | category name |
 | `planned` | yes | decimal ≥ 0 (0 or empty = no line, skipped) |
 | `currency` | no (default: base currency) | must equal the base currency |

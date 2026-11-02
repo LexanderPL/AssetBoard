@@ -115,7 +115,7 @@
   {% elif selected_batch.status == 'planned' %}
   <p class="mt-2 text-sm text-muted">{{ _("The file was checked, but there is no importer for this kind of file yet.") }}</p>
   {% endif %}
-  {% if selected_batch.report.mapping %}
+  {% if selected_batch.status == 'planned' and selected_batch.report.mapping %}
   <div class="mt-6">
     <h3 class="font-semibold">{{ _("Category mapping") }}</h3>
     <p class="mt-1 text-sm text-muted">{{ _("Map each category in the file to one of yours, create a new category, or ignore its rows. The defaults are already applied; change them and update the preview to check the totals before applying.") }}</p>
@@ -124,6 +124,8 @@
       {% for entry in selected_batch.report.mapping %}
       {% set index = loop.index0 %}
       <fieldset class="rounded-xl border border-line p-4">
+        <input type="hidden" name="mapping_kind_{{ index }}" value="{{ entry.kind }}">
+        <input type="hidden" name="mapping_key_{{ index }}" value="{{ entry.source_name_key }}">
         <legend class="px-1 text-sm font-medium">
           {% if entry.kind == 'expense' %}{{ _("Expense") }}{% else %}{{ _("Income") }}{% endif %}:
           {{ entry.source_name }}

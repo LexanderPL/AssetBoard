@@ -285,9 +285,3 @@ def validate_create_uniqueness(mappings: list[ResolvedMapping]) -> None:
         if key in seen:
             raise MappingError("duplicate_create_name")
         seen.add(key)
-
-
-def saved_kind_for_name(source_name_key: str, saved: list[SavedMapping]) -> str | None:
-    """The one kind a saved mapping has for this name, or ``None`` when absent/ambiguous."""
-    kinds = {mapping.kind for mapping in saved if mapping.source_name_key == source_name_key}
-    return next(iter(kinds)) if len(kinds) == 1 else None

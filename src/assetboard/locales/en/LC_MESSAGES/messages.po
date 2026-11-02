@@ -835,10 +835,15 @@ msgstr ""
 msgid "A category with this name already exists."
 msgstr ""
 
-msgid "The category kind is required because the name is not unambiguous."
+msgid ""
+"The category kind is required: the name is unknown or exists as both an "
+"expense and an income category."
 msgstr ""
 
 msgid "The direction must be expense or income."
+msgstr ""
+
+msgid "The kind must be expense or income."
 msgstr ""
 
 msgid "Enter a date as YYYY-MM-DD."
@@ -5741,5 +5746,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "The file could not be validated."
+#~ msgstr ""
+
+#~ msgid "The category kind is required because the name is not unambiguous."
 #~ msgstr ""
 

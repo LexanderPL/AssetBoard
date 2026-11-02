@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from io import BytesIO
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 from zipfile import ZipFile
 
@@ -15,6 +15,7 @@ from assetboard.db.models.ledger import Category, Transaction
 from assetboard.db.repositories import CategoryRepository
 from assetboard.domain.categories import PALETTE, name_key
 from assetboard.domain.import_csv import TEMPLATE_FILES
+from assetboard.web.workspace_routes import _mapping_options_from_form
 from tests.conftest import OwnerApp
 from tests.tenant.harness import context_for
 
@@ -109,6 +110,8 @@ def _mapping_form(batch: ImportBatch, changes: Mapping[int, Mapping[str, str]] |
             "color": str(entry["create_color"] or "#16a34a"),
         }
         values.update((changes or {}).get(index, {}))
+        data[f"mapping_kind_{index}"] = str(entry["kind"])
+        data[f"mapping_key_{index}"] = str(entry["source_name_key"])
         data[f"mapping_action_{index}"] = values["action"]
         data[f"mapping_category_{index}"] = values["category"]
         data[f"mapping_name_{index}"] = values["name"]
@@ -151,6 +154,68 @@ def test_default_mapping_is_applied_in_one_step(owner: OwnerApp) -> None:
     assert _batch(owner, batch_id).status == "applied"
     assert [row.amount_minor for row in _transactions(owner)] == [1250, 300000]
     assert {category.name for category in _categories(owner)} == {"Food", "Salary"}
+
+
+def test_mapping_form_matches_choices_by_key_not_row_position() -> None:
+    report = {
+        "mapping": [
+            {
+                "kind": "expense",
+                "source_name_key": "food",
+                "action": "map",
+                "category_id": "11111111-1111-4111-8111-111111111111",
+                "create_name": "Food",
+                "create_treatment": "regular",
+                "create_color": "#16a34a",
+            },
+            {
+                "kind": "income",
+                "source_name_key": "salary",
+                "action": "create",
+                "category_id": "",
+                "create_name": "Salary",
+                "create_treatment": "regular",
+                "create_color": "#f97316",
+            },
+        ]
+    }
+    form = {
+        "mapping_kind_0": "income",
+        "mapping_key_0": "salary",
+        "mapping_action_0": "ignore",
+        "mapping_kind_1": "expense",
+        "mapping_key_1": "food",
+        "mapping_action_1": "create",
+        "mapping_name_1": "Groceries",
+        "mapping_kind_2": "expense",
+        "mapping_key_2": "gone",
+        "mapping_action_2": "ignore",
+    }
+
+    options = _mapping_options_from_form(form, report)
+    choices = cast("list[dict[str, object]]", options["mappings"])
+    by_key = {(str(choice["kind"]), str(choice["source_name_key"])): choice for choice in choices}
+
+    assert by_key[("income", "salary")]["action"] == "ignore"
+    assert by_key[("expense", "food")]["action"] == "create"
+    assert by_key[("expense", "food")]["create_name"] == "Groceries"
+    assert ("expense", "gone") not in by_key
+
+
+def test_mapping_form_disappears_after_apply(owner: OwnerApp) -> None:
+    owner.clear_categories()
+    _category(owner, "Food")
+    batch_id = _upload(
+        owner,
+        b"date,direction,amount,category\n2026-01-02,expense,10,Food\n",
+    )
+
+    assert _apply(owner, batch_id).status_code == 303
+
+    page = owner.client.get(f"/workspace/data?batch={batch_id}")
+    assert page.status_code == 200
+    assert "Category mapping" not in page.text
+    assert "Update preview" not in page.text
 
 
 def test_update_preview_saves_choices_and_ignored_rows_are_skipped(owner: OwnerApp) -> None:
@@ -224,6 +289,8 @@ def test_template_downloads_are_exact_and_editor_only(owner: OwnerApp) -> None:
         assert response.content == TEMPLATE_FILES[filename]
         assert response.headers["content-type"].startswith("text/csv")
         assert filename in response.headers["content-disposition"]
+        assert response.headers["cache-control"] == "no-store"
+        assert response.headers["x-content-type-options"] == "nosniff"
 
     assert owner.client.get("/workspace/data/import/templates/other.csv").status_code == 404
 

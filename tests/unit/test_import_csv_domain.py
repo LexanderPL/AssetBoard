@@ -18,7 +18,6 @@ from assetboard.domain.category_mapping import (
     default_treatment,
     next_color,
     resolve_mapping,
-    saved_kind_for_name,
     savings_words,
     validate_create_uniqueness,
 )
@@ -35,7 +34,7 @@ from assetboard.domain.import_csv import (
     parse_currency,
     parse_date,
     parse_decimal,
-    parse_description,
+    parse_direction,
     parse_kind,
     parse_month,
     parse_planned_amount,
@@ -46,7 +45,7 @@ from assetboard.domain.import_csv import (
     parse_uuid,
 )
 from assetboard.domain.import_upload import parse_upload
-from assetboard.domain.transactions import EntryError
+from assetboard.domain.transactions import EntryError, clean_description
 
 FOOD = UUID("11111111-1111-4111-8111-111111111111")
 SALARY = UUID("22222222-2222-4222-8222-222222222222")
@@ -199,10 +198,15 @@ def test_planned_amounts_treat_zero_and_empty_as_no_line() -> None:
 
 
 def test_enum_currency_and_text_values() -> None:
-    assert parse_kind("expense") is Kind.EXPENSE
+    assert parse_direction("expense") is Kind.EXPENSE
+    with pytest.raises(EntryError) as direction:
+        parse_direction("Expenses")
+    assert direction.value.code == "invalid_direction"
+
+    assert parse_kind("income") is Kind.INCOME
     with pytest.raises(EntryError) as kind:
         parse_kind("Expenses")
-    assert kind.value.code == "invalid_direction"
+    assert kind.value.code == "invalid_kind"
 
     assert parse_treatment("") is Treatment.REGULAR
     assert parse_treatment("savings") is Treatment.SAVINGS
@@ -242,9 +246,9 @@ def test_uuids_names_and_descriptions_follow_the_shared_rules() -> None:
         parse_category_name(" ")
     assert bad_name.value.code == "invalid_category_name"
 
-    assert parse_description("  Coffee   and cake ") == "Coffee and cake"
+    assert clean_description("  Coffee   and cake ") == "Coffee and cake"
     with pytest.raises(EntryError) as long_description:
-        parse_description("x" * 201)
+        clean_description("x" * 201)
     assert long_description.value.code == "description_too_long"
 
 
@@ -555,15 +559,3 @@ def test_next_colour_is_deterministic_and_avoids_used_palette_colours() -> None:
         _snapshot(UUID(int=index + 1), color=color) for index, color in enumerate(PALETTE)
     ]
     assert next_color("expense", all_colours) == PALETTE[len(all_colours) % len(PALETTE)]
-
-
-def test_saved_kind_inference_needs_exactly_one_kind() -> None:
-    saved = [
-        SavedMapping("expense", name_key("Food"), "map", FOOD),
-        SavedMapping("income", name_key("Food"), "ignore", None),
-        SavedMapping("expense", name_key("Salary"), "map", SALARY),
-    ]
-
-    assert saved_kind_for_name(name_key("Food"), saved) is None
-    assert saved_kind_for_name(name_key("Salary"), saved) == "expense"
-    assert saved_kind_for_name(name_key("Other"), saved) is None

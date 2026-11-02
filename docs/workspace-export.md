@@ -108,4 +108,5 @@ are listed. An explicit `sort_order` does not place a merged category: merge mod
 appends.
 
 Every import can be rolled back from the recent-imports list. Rolling back a batch that has rows
-in a month closed since the import is refused as a whole and lists those months.
+in a month closed since the import is refused as a whole and lists those months. If the batch
+set a month's first-plan marker and no planned values remain there, rollback clears the marker.

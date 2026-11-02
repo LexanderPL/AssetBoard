@@ -28,7 +28,7 @@ from assetboard.db.repositories import (
     MonthStateRepository,
     TransactionRepository,
 )
-from assetboard.domain.categories import Kind, Treatment, name_key
+from assetboard.domain.categories import Kind, Treatment, clean_color, name_key
 from assetboard.domain.category_mapping import (
     CategorySnapshot,
     MappingChoice,
@@ -37,13 +37,12 @@ from assetboard.domain.category_mapping import (
     SavedMapping,
     next_color,
     resolve_mapping,
-    saved_kind_for_name,
 )
 from assetboard.domain.import_csv import (
     parse_category_name,
     parse_currency,
     parse_date,
-    parse_description,
+    parse_direction,
     parse_kind,
     parse_month,
     parse_planned_amount,
@@ -56,7 +55,7 @@ from assetboard.domain.import_csv import (
 from assetboard.domain.import_upload import DEADLINE_CHECK_ROWS, ParsedUpload, ParseTimeout
 from assetboard.domain.money import minor_unit_for
 from assetboard.domain.months import YearMonth
-from assetboard.domain.transactions import EntryError, description_key
+from assetboard.domain.transactions import EntryError, clean_description, description_key
 from assetboard.services.context import Context, Role, require_role
 from assetboard.services.import_dedupe import (
     IncomingBudgetLine,
@@ -209,8 +208,12 @@ def _find_category(
     return next((category for category in categories if category.id == category_id), None)
 
 
-def _one_existing_kind(categories: list[CategorySnapshot], key: str) -> str | None:
+def _kind_for_name(
+    categories: list[CategorySnapshot], saved: list[SavedMapping], key: str
+) -> str | None:
+    """The one kind this name resolves to across categories and saved mappings."""
     kinds = {category.kind for category in categories if category.name_key == key}
+    kinds.update(mapping.kind for mapping in saved if mapping.source_name_key == key)
     return next(iter(kinds)) if len(kinds) == 1 else None
 
 
@@ -433,7 +436,7 @@ def _parse_transactions(
             errors.append(_error(error, line, "date"))
             continue
         try:
-            direction = parse_kind(record.get("direction", ""))
+            direction = parse_direction(record.get("direction", ""))
         except EntryError as error:
             errors.append(_error(error, line, "direction"))
             continue
@@ -455,7 +458,7 @@ def _parse_transactions(
             errors.append(_error(error, line, "category"))
             continue
         try:
-            description = parse_description(record.get("description", ""))
+            description = clean_description(record.get("description", ""))
         except EntryError as error:
             errors.append(_error(error, line, "description"))
             continue
@@ -808,8 +811,7 @@ def _parse_budget_lines(
                 continue
         else:
             category_key = name_key(category_name)
-            saved_kind = saved_kind_for_name(category_key, saved)
-            kind = saved_kind or _one_existing_kind(categories, category_key)
+            kind = _kind_for_name(categories, saved, category_key)
             if kind is None:
                 errors.append(_entry("kind_required", line, "kind"))
                 continue
@@ -1037,10 +1039,17 @@ class BudgetLinesCsvAdapter(ImportAdapter):
                 conflicts += 1
         month_states = MonthStateRepository(session, ctx)
         now = ctx.clock.now()
+        stamped_months: list[str] = []
         for month in sorted(affected_months):
             state = month_states.for_month(month) or month_states.create(month)
             if state.plan_started_at is None:
                 month_states.update(state.id, plan_started_at=now)
+                stamped_months.append(str(month))
+        if stamped_months:
+            batch.report = {
+                **(batch.report or {}),
+                "plan_started_months": stamped_months,
+            }
         if batch.options.get("remember_mappings"):
             _save_mappings(session, ctx, resolved, list(sources.values()))
         return {
@@ -1096,8 +1105,6 @@ def _parse_category_rows(
         raw_color = record.get("color", "").strip()
         if raw_color:
             try:
-                from assetboard.domain.categories import clean_color
-
                 color = clean_color(raw_color)
             except ValueError:
                 errors.append(_entry("invalid_color", line, "color"))
@@ -1205,32 +1212,29 @@ class CategoriesCsvAdapter(ImportAdapter):
                     )
                     continue
                 seen_ids.add(row.source_id)
-            name_key_value = (row.kind, row.name_key)
-            earlier = seen_names.get(name_key_value)
-            if earlier is not None:
-                code = (
-                    "duplicate_in_file"
-                    if (
-                        earlier.treatment == row.treatment
-                        and earlier.color == row.color
-                        and earlier.archived_at == row.archived_at
-                    )
-                    else "conflict_in_file"
-                )
-                skipped.append(_entry(code, row.line, "name"))
-                categories.append(
-                    {
-                        "kind": row.kind,
-                        "category": row.name,
-                        "total": "",
-                        "rows_to_create": 0,
-                    }
-                )
-                continue
-            seen_names[name_key_value] = row
             existing = by_id.get(row.source_id) if row.source_id is not None else None
-            if existing is None:
-                existing = active.get((row.kind, row.name_key))
+            if existing is None and row.archived_at is None:
+                name_key_value = (row.kind, row.name_key)
+                earlier = seen_names.get(name_key_value)
+                if earlier is not None:
+                    code = (
+                        "duplicate_in_file"
+                        if (earlier.treatment == row.treatment and earlier.color == row.color)
+                        else "conflict_in_file"
+                    )
+                    skipped.append(_entry(code, row.line, "name"))
+                    categories.append(
+                        {
+                            "kind": row.kind,
+                            "category": row.name,
+                            "total": "",
+                            "rows_to_create": 0,
+                        }
+                    )
+                    continue
+                existing = active.get(name_key_value)
+                if existing is None:
+                    seen_names[name_key_value] = row
             if existing is not None:
                 code = (
                     "already_imported"

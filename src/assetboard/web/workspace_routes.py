@@ -157,17 +157,33 @@ def _mapping_options_from_form(
         return {}
     if not any(str(key).startswith("mapping_action_") for key in form):
         return {}
+    entries_by_key = {
+        (str(entry.get("kind", "")), str(entry.get("source_name_key", ""))): entry
+        for entry in entries
+        if isinstance(entry, dict)
+    }
+    mapping_prefix = "mapping_action_"
+    indices = sorted(
+        int(str(key)[len(mapping_prefix) :])
+        for key in form
+        if str(key).startswith(mapping_prefix) and str(key)[len(mapping_prefix) :].isdigit()
+    )
     mappings: list[dict[str, str]] = []
-    for index, entry in enumerate(entries):
-        if not isinstance(entry, dict):
+    for index in indices:
+        kind = str(form.get(f"mapping_kind_{index}", ""))
+        source_name_key = str(form.get(f"mapping_key_{index}", ""))
+        # Match the posted choice to the current report by key, not by row position: a preview
+        # in another tab may have changed the report since this form was rendered.
+        entry = entries_by_key.get((kind, source_name_key))
+        if entry is None:
             continue
         action = str(form.get(f"mapping_action_{index}", entry.get("action", "ignore")))
         if action not in {"map", "create", "ignore"}:
             action = "ignore"
         mappings.append(
             {
-                "kind": str(entry.get("kind", "")),
-                "source_name_key": str(entry.get("source_name_key", "")),
+                "kind": kind,
+                "source_name_key": source_name_key,
                 "action": action,
                 "category_id": str(form.get(f"mapping_category_{index}", "") or ""),
                 "create_name": str(
@@ -394,7 +410,11 @@ async def workspace_data_import_template(
     return Response(
         content,
         media_type="text/csv; charset=utf-8",
-        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 

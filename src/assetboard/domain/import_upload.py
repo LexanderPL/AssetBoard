@@ -90,7 +90,7 @@ def parse_upload(
     if _looks_like_workspace_json(text):
         return None, (ArchiveError("upload.csv", "only part of a full restore", line=1),)
 
-    first_line = text.splitlines()[0] if text.splitlines() else ""
+    first_line = text.split("\n", 1)[0].rstrip("\r")
     chosen = detect_delimiter(first_line) if delimiter == "detect" else delimiter
     reader = csv.reader(io.StringIO(text, newline=""), delimiter=chosen, strict=True)
     try:

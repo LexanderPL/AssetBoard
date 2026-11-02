@@ -840,11 +840,18 @@ msgstr "Kategoria już istnieje z innymi wartościami; zostaje zachowana."
 msgid "A category with this name already exists."
 msgstr "Kategoria o tej nazwie już istnieje."
 
-msgid "The category kind is required because the name is not unambiguous."
-msgstr "Rodzaj kategorii jest wymagany, ponieważ nazwa nie jest jednoznaczna."
+msgid ""
+"The category kind is required: the name is unknown or exists as both an "
+"expense and an income category."
+msgstr ""
+"Rodzaj kategorii jest wymagany: nazwa jest nieznana albo istnieje zarówno"
+" jako kategoria wydatków, jak i przychodów."
 
 msgid "The direction must be expense or income."
 msgstr "Kierunek musi być wydatkiem lub przychodem."
+
+msgid "The kind must be expense or income."
+msgstr "Rodzaj musi być wydatkiem albo przychodem."
 
 msgid "Enter a date as YYYY-MM-DD."
 msgstr "Wpisz datę w formacie RRRR-MM-DD."
