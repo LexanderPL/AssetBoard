@@ -810,6 +810,109 @@ msgstr "Istnieje inna wartość planowana; zapisana wartość zostaje."
 msgid "The month is closed."
 msgstr "Miesiąc jest zamknięty."
 
+msgid "This file is only part of a full restore."
+msgstr "Ten plik jest tylko częścią pełnego przywracania."
+
+msgid "A required column is missing."
+msgstr "Brakuje wymaganej kolumny."
+
+msgid "The header contains a duplicate column."
+msgstr "Nagłówek zawiera powtórzoną kolumnę."
+
+msgid "Deleted in the source; it is not imported in merge mode."
+msgstr "Usunięte w źródle; nie jest importowane w trybie scalania."
+
+msgid "The date is in the future; it is not imported as an actual entry."
+msgstr "Data jest w przyszłości; nie jest importowana jako rzeczywisty wpis."
+
+msgid "The category is ignored for this import."
+msgstr "Ta kategoria jest pomijana w tym imporcie."
+
+msgid "The category is archived; no planned value can be added."
+msgstr "Kategoria jest zarchiwizowana; nie można dodać wartości planowanej."
+
+msgid "Transfer categories cannot have planned values."
+msgstr "Kategorie transferów nie mogą mieć wartości planowanych."
+
+msgid "The category already exists with different values; it is kept."
+msgstr "Kategoria już istnieje z innymi wartościami; zostaje zachowana."
+
+msgid "A category with this name already exists."
+msgstr "Kategoria o tej nazwie już istnieje."
+
+msgid ""
+"The category kind is required: the name is unknown or exists as both an "
+"expense and an income category."
+msgstr ""
+"Rodzaj kategorii jest wymagany: nazwa jest nieznana albo istnieje zarówno"
+" jako kategoria wydatków, jak i przychodów."
+
+msgid "The direction must be expense or income."
+msgstr "Kierunek musi być wydatkiem lub przychodem."
+
+msgid "The kind must be expense or income."
+msgstr "Rodzaj musi być wydatkiem albo przychodem."
+
+msgid "Enter a date as YYYY-MM-DD."
+msgstr "Wpisz datę w formacie RRRR-MM-DD."
+
+msgid "The date is outside 1900-01-01 to 2199-12-31."
+msgstr "Data wykracza poza zakres od 1900-01-01 do 2199-12-31."
+
+msgid "Enter a month as YYYY-MM."
+msgstr "Wpisz miesiąc w formacie RRRR-MM."
+
+msgid "Enter a plain positive amount."
+msgstr "Wpisz dodatnią kwotę bez formatowania."
+
+msgid "The amount must be greater than zero."
+msgstr "Kwota musi być większa od zera."
+
+msgid "The amount is too large."
+msgstr "Kwota jest za duża."
+
+msgid "The amount has too many decimal places."
+msgstr "Kwota ma za dużo miejsc po przecinku."
+
+msgid "The amount cannot be negative."
+msgstr "Kwota nie może być ujemna."
+
+msgid "The currency must be the workspace base currency."
+msgstr "Waluta musi być walutą bazową obszaru roboczego."
+
+msgid "The description contains characters that are not allowed."
+msgstr "Opis zawiera niedozwolone znaki."
+
+msgid "The description is too long."
+msgstr "Opis jest za długi."
+
+msgid "Enter a category name of 1 to 80 characters."
+msgstr "Wpisz nazwę kategorii o długości od 1 do 80 znaków."
+
+msgid "Choose a valid category treatment."
+msgstr "Wybierz prawidłowe traktowanie kategorii."
+
+msgid "Choose a valid colour."
+msgstr "Wybierz prawidłowy kolor."
+
+msgid "The sort order must be a whole number."
+msgstr "Kolejność musi być liczbą całkowitą."
+
+msgid "The id is not a valid UUID."
+msgstr "Identyfikator nie jest prawidłowym UUID."
+
+msgid "The timestamp is invalid."
+msgstr "Znacznik czasu jest nieprawidłowy."
+
+msgid "The mapped category does not exist."
+msgstr "Docelowa kategoria nie istnieje."
+
+msgid "The mapped category has the wrong kind."
+msgstr "Docelowa kategoria ma niewłaściwy rodzaj."
+
+msgid "Two new categories have the same kind and name."
+msgstr "Dwie nowe kategorie mają ten sam rodzaj i nazwę."
+
 #, python-format
 msgid "%(tax)s: %(source)s"
 msgstr "%(tax)s: %(source)s"
@@ -1466,18 +1569,9 @@ msgstr "Ten miesiąc nie ma takiego dnia."
 msgid "Enter a date between the years 1900 and 2199."
 msgstr "Podaj datę z lat 1900-2199."
 
-msgid "The amount must be greater than zero."
-msgstr "Kwota musi być większa od zera."
-
-msgid "The amount is too large."
-msgstr "Kwota jest za duża."
-
 #, python-format
 msgid "Too many decimal places for %(currency)s."
 msgstr "Za dużo miejsc po przecinku dla waluty %(currency)s."
-
-msgid "The description contains characters that are not allowed."
-msgstr "Opis zawiera niedozwolone znaki."
 
 #, python-format
 msgid "Use at most %(max)d characters."
@@ -2032,9 +2126,6 @@ msgstr "Data końcowa jest wcześniejsza niż początkowa."
 
 msgid "Choose expenses, income or both."
 msgstr "Wybierz wydatki, przychody albo oba rodzaje."
-
-msgid "The amount cannot be negative."
-msgstr "Kwota nie może być ujemna."
 
 msgid "The largest amount is below the smallest."
 msgstr "Największa kwota jest mniejsza niż najmniejsza."
@@ -4967,11 +5058,17 @@ msgstr "Archiwum ZIP lub plik CSV"
 msgid "CSV delimiter"
 msgstr "Separator CSV"
 
+msgid "Detect"
+msgstr "Wykryj"
+
 msgid "Dot"
 msgstr "Kropka"
 
 msgid "Validate upload"
 msgstr "Sprawdź plik"
+
+msgid "Templates:"
+msgstr "Szablony:"
 
 msgid "Recent imports"
 msgstr "Ostatnie importy"
@@ -5025,8 +5122,17 @@ msgstr "Do utworzenia"
 msgid "Closed-month rows skipped"
 msgstr "Pominięte wiersze z zamkniętych miesięcy"
 
+msgid "Future-dated rows skipped"
+msgstr "Pominięte wiersze z przyszłą datą"
+
+msgid "Rows of ignored categories skipped"
+msgstr "Pominięte wiersze ignorowanych kategorii"
+
 msgid "Invalid rows"
 msgstr "Nieprawidłowe wiersze"
+
+msgid "Unresolved category mappings"
+msgstr "Nierozwiązane mapowania kategorii"
 
 msgid "Totals by month"
 msgstr "Sumy według miesiąca"
@@ -5039,6 +5145,53 @@ msgstr "Sumy według kategorii"
 
 msgid "The file was checked, but there is no importer for this kind of file yet."
 msgstr "Plik został sprawdzony, ale nie ma jeszcze importu dla tego rodzaju pliku."
+
+msgid "Category mapping"
+msgstr "Mapowanie kategorii"
+
+msgid ""
+"Map each category in the file to one of yours, create a new category, or "
+"ignore its rows. The defaults are already applied; change them and update"
+" the preview to check the totals before applying."
+msgstr ""
+"Przypisz każdą kategorię z pliku do jednej ze swoich, utwórz nową "
+"kategorię albo zignoruj jej wiersze. Domyślne ustawienia są już "
+"zastosowane; zmień je i zaktualizuj podgląd, aby sprawdzić sumy przed "
+"zastosowaniem."
+
+#, python-format
+msgid "%(num)d row"
+msgid_plural "%(num)d rows"
+msgstr[0] "%(num)d wiersz"
+msgstr[1] "%(num)d wiersze"
+msgstr[2] "%(num)d wierszy"
+
+msgid "Action"
+msgstr "Działanie"
+
+msgid "Map to an existing category"
+msgstr "Przypisz do istniejącej kategorii"
+
+msgid "Create a new category"
+msgstr "Utwórz nową kategorię"
+
+msgid "Ignore its rows"
+msgstr "Ignoruj jej wiersze"
+
+msgid "Existing category"
+msgstr "Istniejąca kategoria"
+
+msgid "New category name"
+msgstr "Nazwa nowej kategorii"
+
+msgid "Remember these mappings for later imports"
+msgstr "Zapamiętaj te mapowania na potrzeby późniejszych importów"
+
+msgid "Update preview"
+msgstr "Zaktualizuj podgląd"
+
+msgid "Fix the category mappings above before applying."
+msgstr "Popraw mapowania kategorii powyżej przed zastosowaniem."
 
 msgid "Warnings"
 msgstr "Ostrzeżenia"

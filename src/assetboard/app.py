@@ -53,6 +53,7 @@ from assetboard.services.context import (
     WorkspaceNotAvailable,
 )
 from assetboard.services.hash_gate import HashGate, HashGateBusy
+from assetboard.services.import_csv import default_import_adapters
 from assetboard.services.imports import ImportAdapter, ImportAdapterRegistry
 from assetboard.services.instance_settings import workspace_creation_allowed
 from assetboard.services.mail import Mailer, MailOutbox, SmtpMailer
@@ -276,7 +277,9 @@ def create_app(
     app.state.proxy_spoof_warnings = RecentKeys()
     app.state.proxy_audits = RecentKeys()
     app.state.setup_token = None
-    app.state.import_adapters = ImportAdapterRegistry(import_adapters)
+    app.state.import_adapters = ImportAdapterRegistry(
+        import_adapters if import_adapters is not None else default_import_adapters()
+    )
     app.state.mail_outbox = outbox
     # Reminder delivery (ADR-0021); tests replace it with a fake that never uses the network.
     app.state.notifier = notifier or AppriseNotifier(settings.notification_timeout_seconds)

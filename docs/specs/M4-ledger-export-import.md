@@ -44,7 +44,8 @@ synthetic too).
 **Data model (sketch)**
 - `ImportBatch(id, workspace_id, source[archive|transactions_csv|budget_lines_csv|categories_csv],
   mode[restore|merge], filename, file_sha256, size_bytes, options JSON (delimiter, decimal
-  separator), status[uploaded|planned|applied|rolled_back|cancelled|failed],
+  separator, mapping choices and the remember flag; see F4.3),
+  status[uploaded|planned|applied|rolled_back|cancelled|failed],
   started_by_user_id?, created_at, updated_at, applied_at?, rolled_back_at?, report JSON,
   previous_settings JSON?)`. `filename` is the uploaded name, sanitised and cut to 255
   characters; `previous_settings` holds the workspace settings a restore replaced (for its
@@ -57,8 +58,8 @@ synthetic too).
   (partial unique index on SQLite and PostgreSQL) and is either `id:<uuid>` (the row came from a
   file row with an `id`: its lineage) or `c1:<sha256 hex>` (content key, see F4.2).
 - `ImportCategoryMapping(id, workspace_id, kind, source_name_key, category_id?, action[map|ignore],
-  updated_at)`; unique `(workspace_id, kind, source_name_key)`; composite foreign key to
-  `categories(workspace_id, id)` with `ON DELETE CASCADE`. Saved mappings (F4.3).
+  created_at, updated_at)`; unique `(workspace_id, kind, source_name_key)`; composite foreign key
+  to `categories(workspace_id, id)` with `ON DELETE CASCADE`. Saved mappings (F4.3).
 - The uploaded file is kept, between upload and apply only, under
   `DATA_DIR/imports/<workspace_id>/<batch_id>` (mode 0600, outside any served directory), and
   deleted on apply, cancel or failure, or by an hourly job 24 hours after upload. The same job
@@ -271,8 +272,16 @@ made from my spreadsheet, map its categories onto mine, check the totals and imp
   colour), or **ignore** (its rows are skipped and listed). Defaults: a saved mapping; else the
   same name (F2.1 name key) among active categories of that kind; else "create", proposing
   `treatment=savings` for names in a savings word list (data file, en + pl: savings,
-  investments, oszczędności, inwestycje, ...). "Remember these mappings" saves them as
-  `ImportCategoryMapping`. Apply is blocked until every source category is resolved.
+  investments, oszczędności, inwestycje, ...). A new category takes the next unused palette
+  colour for its kind, in source order. The form can re-run the dry-run with the chosen mappings
+  without writing anything (**Update preview**); the choices are kept in the batch's options.
+  "Remember these mappings" saves them as `ImportCategoryMapping`, only when an apply succeeds
+  and in its transaction. Apply is blocked until every source category is resolved: a missing or
+  wrong-kind target, an empty or invalid create name, a create name that already exists, or two
+  creates with the same kind + name key is a `mapping_invalid` error, shown on the page and
+  refused again at apply. `categories.csv` has no mapping step.
+- Lone files map categories **by name**; a `category_id` in the file is ignored (only a full
+  restore uses ids).
 - Direction must equal the category's kind (mapping is per kind, so it does). Rows of
   `transfer` categories import normally.
 - `budget_lines.csv` in merge mode: rows with `planned` zero or empty are skipped silently (zero
@@ -282,11 +291,24 @@ made from my spreadsheet, map its categories onto mine, check the totals and imp
   never adds to it later).
 - `categories.csv` alone (merge): creates the categories that do not resolve (by lineage id, or
   by name key and kind among active ones), appended at the end of their list in file order,
-  archived ones as archived; existing categories are never changed (differences listed).
+  archived ones as archived; existing categories are never changed (differences listed). Rows
+  with an `id` dedupe by id; name-based in-file duplicate detection applies only among active
+  rows, so an active and an archived category may share a name. An archived row without an id
+  dedupes by kind and name among archived id-less rows and against existing archived categories;
+  it is created only when no archived same-name category matches. An explicit `sort_order` in the
+  file does not move existing categories or place new ones: merge mode always appends.
 - `transactions.csv` rows with a non-empty `deleted_at` are skipped in merge mode and counted
   ("deleted in the source"); only a restore recreates deleted rows.
-- The page offers **template downloads**: `transactions.csv` and `budget_lines.csv` with the
-  header and the example rows of the format reference.
+- A transaction dated after today in the workspace's time zone is skipped and listed with code
+  `future_date` (in the app a future entry becomes a one-off planned item, so importing it as
+  an actual entry would contradict that); budget lines for future months are imported normally.
+- A rollback removes the saved mappings that point at categories the batch created (archived
+  ones included), in the same transaction; mappings to pre-existing categories stay. It also
+  clears `plan_started_at` for months whose marker this batch set, when no planned values remain
+  in that month.
+- The page offers **template downloads**: `transactions.csv` is the hand-made example below
+  (header and its three rows); `budget_lines.csv` is the minimal `month,kind,category,planned`
+  example below (header and its two rows).
 - Messages and report labels are translatable (en, pl); column names and enum values
   (`expense`, `income`, `regular`, ...) are format tokens and stay English in every language.
 
@@ -486,7 +508,7 @@ lists them as unknown keys (a warning). Golden archives of both versions are in
 | `name` | yes | 1–80 characters |
 | `treatment` | no (default `regular`) | `regular` \| `savings` \| `transfer` |
 | `color` | no (default from the palette) | `#rrggbb` |
-| `sort_order` | no (default: file order) | integer ≥ 0, per kind |
+| `sort_order` | no (default: file order) | integer ≥ 0, per kind; a lone merge ignores it for placement and appends new categories in file order |
 | `archived_at` | no | timestamp; set = archived |
 
 Export order: kind (`expense`, `income`), active before archived, `sort_order`, name key, id.
@@ -509,12 +531,13 @@ d1c9e7a0-3b2f-4a8e-b6c5-0e9f8d7c6b55,expense,Car,regular,#a35d3b,2,2025-12-31T18
 | `currency` | no (default: base currency) | must equal the base currency |
 | `category` | yes | category name (of the direction's kind) |
 | `description` | no | at most 200 characters |
-| `category_id` | no (always set in an archive) | UUID from `categories.csv`; needed because archived categories may share a name |
+| `category_id` | no (always set in an archive) | UUID from `categories.csv`; needed because archived categories may share a name. Ignored in a lone CSV, which maps by `category` name |
 | `id` | no | UUID (lineage id; enables exact dedupe) |
 | `deleted_at` | no | timestamp; set = soft-deleted (restored as deleted; skipped in merge) |
 
 Export order: date, then entry order (`created_at`, id). F2.6's export writes the same columns
-without `deleted_at`.
+without `deleted_at`. In merge mode a row dated after today in the workspace's time zone is
+skipped and listed with `future_date`.
 
 Archive example:
 
@@ -547,11 +570,11 @@ date;direction;amount;category;description
 | Column | Required | Values |
 |---|---|---|
 | `month` | yes | `YYYY-MM` |
-| `kind` | no, unless the name exists in both kinds | `expense` \| `income` |
+| `kind` | no, if the name resolves to exactly one kind (an existing category or a saved mapping); otherwise `kind_required` | `expense` \| `income` |
 | `category` | yes | category name |
 | `planned` | yes | decimal ≥ 0 (0 or empty = no line, skipped) |
 | `currency` | no (default: base currency) | must equal the base currency |
-| `category_id` | no (always set in an archive) | UUID from `categories.csv` |
+| `category_id` | no (always set in an archive) | UUID from `categories.csv`; ignored in a lone CSV, which maps by `category` name |
 
 Export order: month, kind, category order. At most one row per (month, category).
 
@@ -559,6 +582,14 @@ Export order: month, kind, category order. At most one row per (month, category)
 month,kind,category,planned,currency,category_id
 2026-09,expense,Food,550.00,EUR,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01
 2026-09,income,Salary,3000.00,EUR,91f4b2c3-7d6e-4f1a-8b9c-2e3d4f5a6b77
+```
+
+Hand-made file with the minimal columns (the template download):
+
+```csv
+month,kind,category,planned
+2026-09,expense,Food,550.00
+2026-09,income,Salary,3000.00
 ```
 
 ### `months.csv` (restore only)

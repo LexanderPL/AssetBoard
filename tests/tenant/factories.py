@@ -19,7 +19,7 @@ from uuid import UUID, uuid4
 from sqlalchemy.orm import Session
 
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
-from assetboard.db.models.import_batch import ImportBatch
+from assetboard.db.models.import_batch import ImportBatch, ImportCategoryMapping
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.db.models.notifications import NotificationChannel, NotificationLog
@@ -319,6 +319,19 @@ def make_import_batch(session: Session, workspace_id: UUID) -> ImportBatch:
     )
 
 
+def make_import_category_mapping(session: Session, workspace_id: UUID) -> ImportCategoryMapping:
+    category = make_category(session, workspace_id)
+    session.add(category)
+    session.flush()
+    return ImportCategoryMapping(
+        workspace_id=workspace_id,
+        kind="expense",
+        source_name_key=f"source-{category.id.hex}",
+        category_id=category.id,
+        action="map",
+    )
+
+
 TENANT_CASES: dict[type[Any], TenantCase] = {
     ScheduledItem: TenantCase(make_scheduled_item, update_values={"name": "Rent"}),
     ScheduledOccurrence: TenantCase(make_scheduled_occurrence, update_values={"label": "Rent"}),
@@ -356,5 +369,9 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
         make_import_batch,
         update_values={"status": "failed"},
         unsupported=frozenset({"delete"}),
+    ),
+    ImportCategoryMapping: TenantCase(
+        make_import_category_mapping,
+        update_values={"source_name_key": "renamed"},
     ),
 }

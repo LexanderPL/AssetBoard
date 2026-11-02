@@ -11,25 +11,25 @@ from assetboard.services.imports import report_errors_csv
 
 
 def test_csv_is_detected_by_content_and_bom_is_removed() -> None:
-    content = b"\xef\xbb\xbfdate,direction,amount\r\n2026-10-01,expense,1.00\r\n"
+    content = b"\xef\xbb\xbfdate,direction,amount,category\r\n2026-10-01,expense,1.00,Food\r\n"
     parsed, errors = parse_upload(content)
 
     assert errors == ()
     assert parsed is not None
     assert parsed.source == "transactions_csv"
-    assert parsed.csv_header == ("date", "direction", "amount")
-    assert parsed.csv_rows == (("2026-10-01", "expense", "1.00"),)
+    assert parsed.csv_header == ("date", "direction", "amount", "category")
+    assert parsed.csv_rows == (("2026-10-01", "expense", "1.00", "Food"),)
 
 
 def test_semicolon_csv_preserves_decimal_comma_values() -> None:
     parsed, errors = parse_upload(
-        b"date;direction;amount\n2026-10-01;expense;1,25\n", delimiter=";"
+        b"date;direction;amount;category\n2026-10-01;expense;1,25;Food\n", delimiter=";"
     )
 
     assert errors == ()
     assert parsed is not None
-    assert parsed.csv_header == ("date", "direction", "amount")
-    assert parsed.csv_rows == (("2026-10-01", "expense", "1,25"),)
+    assert parsed.csv_header == ("date", "direction", "amount", "category")
+    assert parsed.csv_rows == (("2026-10-01", "expense", "1,25", "Food"),)
 
 
 @pytest.mark.parametrize(
@@ -48,18 +48,26 @@ def test_invalid_csv_reports_line(content: bytes, line: int, message: str) -> No
 
 
 def test_invalid_csv_rows_are_reported_while_valid_rows_are_kept() -> None:
-    parsed, errors = parse_upload(b"date,amount\n2026-01-01,1\n2026-01-02\n2026-01-03,3\n")
+    parsed, errors = parse_upload(
+        b"date,direction,amount,category\n"
+        b"2026-01-01,expense,1,Food\n"
+        b"2026-01-02\n"
+        b"2026-01-03,expense,3,Food\n"
+    )
 
     assert errors == ()
     assert parsed is not None
-    assert parsed.csv_rows == (("2026-01-01", "1"), ("2026-01-03", "3"))
+    assert parsed.csv_rows == (
+        ("2026-01-01", "expense", "1", "Food"),
+        ("2026-01-03", "expense", "3", "Food"),
+    )
     assert len(parsed.row_errors) == 1
     assert parsed.row_errors[0].line == 3
     assert parsed.row_errors[0].column == "row"
 
 
 def test_invalid_row_details_are_capped_without_losing_the_total_count() -> None:
-    content = b"date,amount\n" + b"2026-01-01\n" * 1001
+    content = b"date,direction,amount,category\n" + b"2026-01-01\n" * 1001
     parsed, errors = parse_upload(content)
 
     assert errors == ()
@@ -80,11 +88,49 @@ def test_zip_signature_selects_archive_reader() -> None:
 
 
 def test_non_zip_content_is_treated_as_csv_even_with_zip_name() -> None:
-    parsed, errors = parse_upload(b"date,direction\n")
+    parsed, errors = parse_upload(b"date,direction,amount,category\n")
 
     assert errors == ()
     assert parsed is not None
     assert parsed.source == "transactions_csv"
+
+
+def test_semicolon_delimiter_is_detected_by_default() -> None:
+    parsed, errors = parse_upload(
+        b"date;direction;amount;category\n2026-10-01;expense;1,25;Food\n",
+    )
+
+    assert errors == ()
+    assert parsed is not None
+    assert parsed.delimiter == ";"
+    assert parsed.csv_rows == (("2026-10-01", "expense", "1,25", "Food"),)
+
+
+def test_lone_months_csv_is_refused_as_only_part_of_a_restore() -> None:
+    parsed, errors = parse_upload(b"month,closed_at,plan_started_at\n2026-01,,\n")
+
+    assert parsed is None
+    assert errors[0].message == "only part of a full restore"
+
+
+def test_lone_workspace_json_is_refused_as_only_part_of_a_restore() -> None:
+    parsed, errors = parse_upload(b'{"name": "Home", "base_currency": "EUR"}')
+
+    assert parsed is None
+    assert errors[0].message == "only part of a full restore"
+
+
+def test_unknown_columns_warn_and_missing_required_columns_fail() -> None:
+    parsed, errors = parse_upload(
+        b"date,direction,amount,category,colour\n2026-10-01,expense,1,Food,red\n"
+    )
+    assert errors == ()
+    assert parsed is not None
+    assert [warning.column for warning in parsed.warnings] == ["colour"]
+
+    parsed, errors = parse_upload(b"date,direction,amount\n2026-10-01,expense,1\n")
+    assert parsed is None
+    assert errors[0].message == "missing required column: category"
 
 
 def test_error_csv_escapes_spreadsheet_formulas() -> None:

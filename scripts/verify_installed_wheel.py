@@ -13,6 +13,7 @@ REQUIRED_RESOURCES = (
     "locales/en/LC_MESSAGES/messages.mo",
     "locales/pl/LC_MESSAGES/messages.mo",
     "data/common-passwords.txt",
+    "data/savings-words.json",
     "data/NOTICE",
     "data/SECLists-LICENSE.txt",
 )
