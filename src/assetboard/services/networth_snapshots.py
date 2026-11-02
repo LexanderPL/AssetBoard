@@ -31,7 +31,7 @@ from assetboard.db.repositories import (
 )
 from assetboard.db.repositories.base import WorkspaceScope
 from assetboard.domain.money import Money
-from assetboard.domain.networth import Side
+from assetboard.domain.networth import Side, Unavailable
 from assetboard.domain.networth_history import (
     ItemHistory,
     ItemValue,
@@ -48,6 +48,7 @@ from assetboard.domain.networth_history import (
 from assetboard.domain.networth_summary import NetWorthSummary, SummaryItem, summarize_net_worth
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.networth import load_item_histories
+from assetboard.services.networth_links import UNAVAILABLE, registry
 
 __all__ = [
     "BackfillResult",
@@ -147,6 +148,7 @@ def _summarize(
                 ),
                 include_in_net_worth=value.include_in_net_worth,
                 archived=value.archived,
+                unavailable=value.unavailable,
             )
             for value in values
         ),
@@ -155,14 +157,30 @@ def _summarize(
     return summary, snapshot_breakdown(summary)
 
 
+def _linked_for_date(
+    resolved: dict[tuple[UUID, date], Money | Unavailable],
+    histories: tuple[ItemHistory, ...],
+    as_of: date,
+) -> dict[UUID, Money | Unavailable]:
+    return {
+        item.id: resolved.get((item.id, as_of), UNAVAILABLE)
+        for item in histories
+        if item.valuation_mode == "linked"
+    }
+
+
 def _summary_at(
     histories: tuple[ItemHistory, ...],
     *,
     as_of: date,
     timezone: str,
     currency: str,
+    linked: dict[UUID, Money | Unavailable] | None = None,
 ) -> tuple[NetWorthSummary, dict[str, object]]:
-    return _summarize(values_at(histories, as_of, timezone=timezone), currency=currency)
+    return _summarize(
+        values_at(histories, as_of, timezone=timezone, linked=linked),
+        currency=currency,
+    )
 
 
 def _snapshot_uniqueness_error(error: IntegrityError) -> bool:
@@ -198,14 +216,17 @@ def _auto_write(
     if any(row.source in {"manual", "auto"} for row in existing):
         return False
     currency = _currency(session, scope)
+    histories = load_item_histories(session, scope)
+    resolved = registry.resolve_many(session, scope, histories, (as_of,))
     values = values_at(
-        load_item_histories(session, scope),
+        histories,
         as_of,
         timezone=timezone,
+        linked=_linked_for_date(resolved, histories, as_of),
     )
-    # An item created after the month-end has no effective value there yet. Storing a zero
-    # automatic row would start the chart with a misleading drop, and backfill could never
-    # replace it because auto wins over backfill.
+    # An item created after the month-end, or a linked target that cannot resolve, has no
+    # effective value there yet. Storing a zero automatic row would start the chart with a
+    # misleading drop, and backfill could never replace it because auto wins over backfill.
     if not any(value.value_minor is not None for value in values):
         return False
     for row in existing:
@@ -269,11 +290,14 @@ def _manual_write(
     for row in existing:
         if row.source in {"manual", "backfill"}:
             repository.delete(row)
+    histories = load_item_histories(session, ctx)
+    resolved = registry.resolve_many(session, ctx, histories, (as_of,))
     summary, breakdown = _summary_at(
-        load_item_histories(session, ctx),
+        histories,
         as_of=as_of,
         timezone=timezone,
         currency=_currency(session, ctx),
+        linked=_linked_for_date(resolved, histories, as_of),
     )
     row = repository.create(
         as_of=as_of,
@@ -342,6 +366,7 @@ def _backfill_write(session: Session, ctx: Context, *, today: date) -> BackfillR
         return BackfillResult(0, None, None)
     currency = _currency(session, ctx)
     histories = load_item_histories(session, ctx)
+    resolved = registry.resolve_many(session, ctx, histories, dates)
     created = 0
     for as_of in dates:
         if as_of in blocking:
@@ -351,6 +376,7 @@ def _backfill_write(session: Session, ctx: Context, *, today: date) -> BackfillR
             as_of=as_of,
             timezone=ctx.workspace.timezone,
             currency=currency,
+            linked=_linked_for_date(resolved, histories, as_of),
         )
         repository.create(
             as_of=as_of,

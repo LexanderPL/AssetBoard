@@ -36,6 +36,7 @@ class NetWorthSummaryData:
     non_base_items: tuple[ItemView, ...]
     no_value_items: tuple[ItemView, ...]
     excluded_items: tuple[ItemView, ...]
+    unavailable_items: tuple[ItemView, ...]
 
 
 def networth_summary(factory: sessionmaker[Session], ctx: Context) -> NetWorthSummaryData:
@@ -76,6 +77,7 @@ def networth_summary(factory: sessionmaker[Session], ctx: Context) -> NetWorthSu
                 value=value.current,
                 include_in_net_worth=value.include_in_net_worth,
                 archived=value.archived,
+                unavailable=value.unavailable,
             )
             for value in values
         ),
@@ -88,4 +90,5 @@ def networth_summary(factory: sessionmaker[Session], ctx: Context) -> NetWorthSu
         non_base_items=tuple(by_id[item_id] for item_id in summary.non_base_item_ids),
         no_value_items=tuple(by_id[item_id] for item_id in summary.no_value_item_ids),
         excluded_items=tuple(by_id[item_id] for item_id in summary.excluded_item_ids),
+        unavailable_items=tuple(by_id[item_id] for item_id in summary.unavailable_item_ids),
     )

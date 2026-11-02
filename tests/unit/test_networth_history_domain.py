@@ -8,14 +8,14 @@ under test.
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
 from assetboard.domain.money import Money
-from assetboard.domain.networth import Side, ValuationPoint
+from assetboard.domain.networth import Side, Unavailable, ValuationPoint
 from assetboard.domain.networth_history import (
     DEFAULT_HISTORY_RANGE,
     BreakdownCategory,
@@ -46,6 +46,9 @@ def _item(
     include: bool = True,
     valuations: tuple[ValuationPoint, ...] = (),
     currency: str = "EUR",
+    valuation_mode: str = "manual",
+    link_type: str | None = None,
+    link_id: UUID | None = None,
 ) -> ItemHistory:
     return ItemHistory(
         id=uuid4(),
@@ -55,6 +58,9 @@ def _item(
         include_in_net_worth=include,
         archived_at=archived_at,
         valuations=valuations,
+        valuation_mode=valuation_mode,
+        link_type=link_type,
+        link_id=link_id,
     )
 
 
@@ -134,6 +140,35 @@ def test_values_at_ignores_a_valuation_after_the_date() -> None:
     assert (march.value_minor, march.value_as_of) == (200, date(2026, 3, 1))
 
 
+def test_linked_values_come_from_the_service_resolution_not_manual_history() -> None:
+    linked = _item(
+        valuation_mode="linked",
+        link_type="portfolio_asset_class",
+        link_id=uuid4(),
+        valuations=(_point(date(2026, 1, 1), 100),),
+    )
+    resolved = values_at(
+        [linked],
+        date(2026, 1, 31),
+        timezone="UTC",
+        linked={linked.id: Money(500, "EUR")},
+    )[0]
+    unavailable = values_at(
+        [linked],
+        date(2026, 2, 28),
+        timezone="UTC",
+        linked={linked.id: Unavailable()},
+    )[0]
+    missing = values_at([linked], date(2026, 3, 31), timezone="UTC")[0]
+    assert (resolved.value_minor, resolved.value_as_of, resolved.unavailable) == (
+        500,
+        date(2026, 1, 31),
+        False,
+    )
+    assert (unavailable.value_minor, unavailable.unavailable) == (None, True)
+    assert (missing.value_minor, missing.unavailable) == (None, True)
+
+
 def test_an_item_is_archived_from_its_workspace_local_archive_date() -> None:
     archived = datetime(2026, 6, 1, 0, 30, tzinfo=UTC)
     item = _item(archived_at=archived, valuations=(_point(date(2026, 1, 1), 100),))
@@ -166,7 +201,7 @@ def test_breakdown_round_trip_is_versioned_and_ignores_unknown_keys() -> None:
     )
     raw = snapshot_breakdown(summary)
     assert raw["v"] == 1
-    assert raw["not_counted"] == {"non_base": 1, "no_value": 1}
+    assert raw["not_counted"] == {"non_base": 1, "no_value": 1, "unavailable": 0}
     parsed = parse_breakdown(raw)
     assert parsed.categories == (
         BreakdownCategory(category_id, Side.ASSET, 1200),

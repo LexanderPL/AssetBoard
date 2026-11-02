@@ -6,9 +6,10 @@ groups. Items are counted in this order:
 
 1. an archived item is ignored;
 2. ``include_in_net_worth=false`` is the user's choice, so the item is reported as excluded;
-3. an item with no effective value is reported separately;
-4. an item in another currency is reported separately (no conversion before M6);
-5. everything else is counted.
+3. an unavailable linked value is reported separately;
+4. an item with no effective value is reported separately;
+5. an item in another currency is reported separately (no conversion before M6);
+6. everything else is counted.
 
 Items under an archived category still count; only the item's own archive removes it. Category
 shares are of their own side's total, in tenths of a percent, rounded once half up by the same
@@ -37,6 +38,7 @@ class SummaryItem:
     value: Money | None
     include_in_net_worth: bool = True
     archived: bool = False
+    unavailable: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +60,7 @@ class NetWorthSummary:
     non_base_item_ids: tuple[UUID, ...]
     no_value_item_ids: tuple[UUID, ...]
     excluded_item_ids: tuple[UUID, ...]
+    unavailable_item_ids: tuple[UUID, ...]
 
     def categories(self, side: Side) -> tuple[CategoryTotal, ...]:
         return self.asset_categories if side is Side.ASSET else self.liability_categories
@@ -71,12 +74,16 @@ def summarize_net_worth(items: Iterable[SummaryItem], *, currency: str) -> NetWo
     non_base: list[UUID] = []
     no_value: list[UUID] = []
     excluded: list[UUID] = []
+    unavailable: list[UUID] = []
 
     for position, item in enumerate(items):
         if item.archived:
             continue
         if not item.include_in_net_worth:
             excluded.append(item.id)
+            continue
+        if item.unavailable:
+            unavailable.append(item.id)
             continue
         if item.value is None:
             no_value.append(item.id)
@@ -122,4 +129,5 @@ def summarize_net_worth(items: Iterable[SummaryItem], *, currency: str) -> NetWo
         non_base_item_ids=tuple(non_base),
         no_value_item_ids=tuple(no_value),
         excluded_item_ids=tuple(excluded),
+        unavailable_item_ids=tuple(unavailable),
     )

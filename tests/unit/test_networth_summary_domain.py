@@ -28,6 +28,7 @@ def _item(
     include: bool = True,
     archived: bool = False,
     currency: str = "EUR",
+    unavailable: bool = False,
 ) -> SummaryItem:
     return SummaryItem(
         id=uuid4(),
@@ -36,6 +37,7 @@ def _item(
         value=Money(value, currency) if value is not None else None,
         include_in_net_worth=include,
         archived=archived,
+        unavailable=unavailable,
     )
 
 
@@ -139,7 +141,19 @@ def test_exclusions_follow_the_f5_1_order() -> None:
         *summary.excluded_item_ids,
         *summary.no_value_item_ids,
         *summary.non_base_item_ids,
+        *summary.unavailable_item_ids,
     }
+
+
+def test_unavailable_linked_items_are_reported_not_counted() -> None:
+    counted = uuid4()
+    unavailable_category = uuid4()
+    unavailable = _item(unavailable_category, None, unavailable=True)
+    summary = summarize_net_worth([_item(counted, 100), unavailable], currency="EUR")
+    assert summary.assets == _eur(100)
+    assert summary.unavailable_item_ids == (unavailable.id,)
+    assert summary.no_value_item_ids == ()
+    assert [row.category_id for row in summary.asset_categories] == [counted]
 
 
 def test_categories_sort_by_total_with_input_order_as_tie_break() -> None:
