@@ -11,11 +11,15 @@ parses or rounds money.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Literal
 
 from assetboard.domain.charts import ChartBlock, category_breakdown
 from assetboard.i18n import gettext
 from assetboard.i18n.numbers import format_money, format_rate_tenths
 from assetboard.services.summary import SummaryData
+
+NetWorthDonutKey = Literal["assets", "liabilities"]
+DonutKey = ChartBlock | NetWorthDonutKey
 
 
 def _(message: str) -> str:
@@ -45,7 +49,7 @@ class DonutSlice:
 
 @dataclass(frozen=True, slots=True)
 class DonutView:
-    key: ChartBlock
+    key: DonutKey
     heading: str
     empty: str
     currency: str

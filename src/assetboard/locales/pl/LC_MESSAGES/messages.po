@@ -1962,6 +1962,21 @@ msgstr "Ta nazwa występuje w partii więcej niż raz."
 msgid "An active item with this name already exists."
 msgstr "Aktywna pozycja o tej nazwie już istnieje."
 
+msgid "Assets by category"
+msgstr "Aktywa według kategorii"
+
+msgid "Liabilities by category"
+msgstr "Zobowiązania według kategorii"
+
+msgid "No assets with a value yet"
+msgstr "Brak aktywów z wartością"
+
+msgid "No liabilities with a value yet"
+msgstr "Brak zobowiązań z wartością"
+
+msgid "Other categories"
+msgstr "Inne kategorie"
+
 msgid "Enter a name of up to 100 characters."
 msgstr "Podaj nazwę o długości do 100 znaków."
 
@@ -4563,9 +4578,6 @@ msgstr "Zamknięcie chroni miesiąc przed przypadkowymi zmianami."
 msgid "Future months stay open for planning."
 msgstr "Przyszłe miesiące pozostają otwarte do planowania."
 
-msgid "Assets and liabilities"
-msgstr "Aktywa i zobowiązania"
-
 msgid "No categories on this side yet"
 msgstr "Ta strona nie ma jeszcze kategorii"
 
@@ -4739,6 +4751,29 @@ msgid_plural "Create %(num)d items"
 msgstr[0] "Utwórz %(num)d pozycję"
 msgstr[1] "Utwórz %(num)d pozycje"
 msgstr[2] "Utwórz %(num)d pozycji"
+
+#, python-format
+msgid "%(num)d item is in another currency and is not counted."
+msgid_plural "%(num)d items are in another currency and are not counted."
+msgstr[0] "%(num)d pozycja jest w innej walucie i nie jest liczona."
+msgstr[1] "%(num)d pozycje są w innej walucie i nie są liczone."
+msgstr[2] "%(num)d pozycji jest w innej walucie i nie jest liczonych."
+
+#, python-format
+msgid "%(num)d item has no value yet."
+msgid_plural "%(num)d items have no value yet."
+msgstr[0] "%(num)d pozycja nie ma jeszcze wartości."
+msgstr[1] "%(num)d pozycje nie mają jeszcze wartości."
+msgstr[2] "%(num)d pozycji nie ma jeszcze wartości."
+
+#, python-format
+msgid "%(num)d item is not counted because you excluded it."
+msgid_plural "%(num)d items are not counted because you excluded them."
+msgstr[0] "%(num)d pozycja nie jest liczona, ponieważ została przez Ciebie wyłączona."
+msgstr[1] "%(num)d pozycje nie są liczone, ponieważ zostały przez Ciebie wyłączone."
+msgstr[2] ""
+"%(num)d pozycji nie jest liczonych, ponieważ zostały przez Ciebie "
+"wyłączone."
 
 msgid "Apprise URL"
 msgstr "Adres URL Apprise"
@@ -6554,4 +6589,7 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Create a workspace"
 #~ msgstr "Utwórz obszar roboczy"
+
+#~ msgid "Assets and liabilities"
+#~ msgstr "Aktywa i zobowiązania"
 

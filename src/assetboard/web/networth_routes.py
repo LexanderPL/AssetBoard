@@ -52,9 +52,11 @@ from assetboard.services.networth import (
     update_category,
     update_item,
 )
+from assetboard.services.networth_summary import networth_summary
 from assetboard.services.workspace_options import currency_codes
 from assetboard.web.context import CurrentContext
 from assetboard.web.errors import is_htmx_fragment_request
+from assetboard.web.networth_summary import build_summary_view
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
 
@@ -376,6 +378,13 @@ async def networth_page(
             edit_category=category_view,
         )
     )
+
+
+@router.get("/net-worth/summary", name="networth_summary")
+async def networth_summary_page(request: Request, ctx: CurrentContext) -> Response:
+    data = await run_in_threadpool(networth_summary, request.app.state.session_factory, ctx)
+    view = build_summary_view(data, request.state.locale)
+    return render_template(request, "networth/summary.html", context={"view": view})
 
 
 # Categories
