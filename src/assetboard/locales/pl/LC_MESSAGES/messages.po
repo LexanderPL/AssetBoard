@@ -5146,7 +5146,11 @@ msgid ""
 "Map each category in the file to one of yours, create a new category, or "
 "ignore its rows. The defaults are already applied; change them and update"
 " the preview to check the totals before applying."
-msgstr "Przypisz każdą kategorię z pliku do jednej ze swoich, utwórz nową kategorię albo zignoruj jej wiersze. Domyślne ustawienia są już zastosowane; zmień je i zaktualizuj podgląd, aby sprawdzić sumy przed zastosowaniem."
+msgstr ""
+"Przypisz każdą kategorię z pliku do jednej ze swoich, utwórz nową "
+"kategorię albo zignoruj jej wiersze. Domyślne ustawienia są już "
+"zastosowane; zmień je i zaktualizuj podgląd, aby sprawdzić sumy przed "
+"zastosowaniem."
 
 #, python-format
 msgid "%(num)d row"
