@@ -80,13 +80,18 @@ def test_current_values_uses_the_requested_as_of_not_the_clock(team: WorkspaceDb
         as_of=date(2026, 3, 1),
     )
     with team.factory() as session:
-        february = current_values(session, ctx, as_of=date(2026, 2, 1), base_currency="EUR")
-        march = current_values(session, ctx, as_of=date(2026, 3, 1), base_currency="EUR")
+        february = current_values(
+            session, ctx, as_of=date(2026, 2, 1), base_currency="EUR", timezone="UTC"
+        )
+        march = current_values(
+            session, ctx, as_of=date(2026, 3, 1), base_currency="EUR", timezone="UTC"
+        )
         history = current_values(
             session,
             ctx,
             as_of=date(2026, 2, 1),
             base_currency="EUR",
+            timezone="UTC",
             include_history=True,
         )
     assert february[0].current is not None

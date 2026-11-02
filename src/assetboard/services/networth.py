@@ -61,6 +61,7 @@ from assetboard.domain.networth import (
 from assetboard.domain.networth import (
     move_category as move_in_order,
 )
+from assetboard.domain.networth_history import ItemHistory, ItemValue, values_at
 from assetboard.domain.text import text_key
 from assetboard.domain.transactions import EntryError
 from assetboard.domain.transactions import amount_minor as positive_amount_minor
@@ -90,6 +91,7 @@ __all__ = [
     "get_category",
     "get_item",
     "list_networth",
+    "load_item_histories",
     "move_category",
     "preview_bulk",
     "restore_category",
@@ -168,6 +170,7 @@ class ItemView:
     include_in_net_worth: bool
     investable: bool
     archived: bool
+    archived_at: datetime | None
     current: Money | None
     current_as_of: date | None
     valuations: tuple[ValuationView, ...]
@@ -304,6 +307,51 @@ def _valuation_views(
     return views, current_minor, current_as_of, sparkline
 
 
+@dataclass(slots=True)
+class _LoadedRows:
+    categories: list[NetWorthCategory]
+    items: list[NetWorthItem]
+    valuations: dict[UUID, list[ItemValuation]]
+
+
+def _load_rows(
+    session: Session,
+    scope: WorkspaceScope,
+    *,
+    categories: Sequence[NetWorthCategory] | None = None,
+) -> _LoadedRows:
+    category_rows = (
+        list(categories)
+        if categories is not None
+        else NetWorthCategoryRepository(session, scope).ordered()
+    )
+    items = NetWorthItemRepository(session, scope).ordered()
+    valuations: dict[UUID, list[ItemValuation]] = {}
+    for valuation in ItemValuationRepository(session, scope).for_items([item.id for item in items]):
+        valuations.setdefault(valuation.item_id, []).append(valuation)
+    return _LoadedRows(category_rows, items, valuations)
+
+
+def _item_history(item: NetWorthItem, valuations: Sequence[ItemValuation]) -> ItemHistory:
+    return ItemHistory(
+        id=item.id,
+        side=Side(item.side),
+        category_id=item.category_id,
+        currency=item.currency,
+        include_in_net_worth=item.include_in_net_worth,
+        archived_at=item.archived_at,
+        valuations=tuple(_valuation_points(valuations)),
+    )
+
+
+def load_item_histories(
+    session: Session, scope: WorkspaceScope, *, categories: Sequence[NetWorthCategory] | None = None
+) -> tuple[ItemHistory, ...]:
+    """Every item with its full valuation history, loaded once for repeated date selection."""
+    rows = _load_rows(session, scope, categories=categories)
+    return tuple(_item_history(item, rows.valuations.get(item.id, ())) for item in rows.items)
+
+
 def _item_view(
     item: NetWorthItem,
     category: NetWorthCategory,
@@ -336,6 +384,7 @@ def _item_view(
         include_in_net_worth=item.include_in_net_worth,
         investable=item.investable,
         archived=item.archived_at is not None,
+        archived_at=item.archived_at,
         current=current,
         current_as_of=current_as_of,
         valuations=views,
@@ -344,12 +393,51 @@ def _item_view(
     )
 
 
-def current_values(
-    session: Session,
-    ctx: Context,
+def _item_view_at(
+    item: NetWorthItem,
+    category: NetWorthCategory,
+    valuations: Sequence[ItemValuation],
+    value: ItemValue,
     *,
     as_of: date,
     base_currency: str,
+    include_history: bool,
+) -> ItemView:
+    if include_history:
+        views, _current_minor, _current_as_of, sparkline = _valuation_views(valuations, as_of)
+    else:
+        views = ()
+        sparkline = ""
+    current = Money(value.value_minor, item.currency) if value.value_minor is not None else None
+    return ItemView(
+        id=item.id,
+        side=item.side,
+        category_id=item.category_id,
+        category_name=category.name,
+        category_archived=category.archived_at is not None,
+        name=item.name,
+        currency=item.currency,
+        notes=item.notes,
+        acquired_on=item.acquired_on,
+        include_in_net_worth=item.include_in_net_worth,
+        investable=item.investable,
+        archived=value.archived,
+        archived_at=value.archived_at,
+        current=current,
+        current_as_of=value.value_as_of,
+        valuations=views,
+        sparkline=sparkline,
+        non_base=item.currency != base_currency,
+    )
+
+
+def current_values(
+    session: Session,
+    scope: WorkspaceScope,
+    *,
+    as_of: date,
+    base_currency: str,
+    timezone: str,
     include_history: bool = False,
     categories: Sequence[NetWorthCategory] | None = None,
 ) -> list[ItemView]:
@@ -357,28 +445,24 @@ def current_values(
 
     The shared read path for the F5.1 lists (``include_history=True``), the F5.2 summary
     (default) and F5.3's month-end snapshots (any ``as_of``). A valuation dated after
-    ``as_of`` is ignored even when it exists in the history.
+    ``as_of`` is ignored even when it exists in the history. The archived flag follows the
+    owner's F5.3 rule: an item is archived from its workspace-local archive date onwards.
     """
-    category_rows = (
-        list(categories)
-        if categories is not None
-        else NetWorthCategoryRepository(session, ctx).ordered()
-    )
-    category_by_id = {category.id: category for category in category_rows}
-    items = NetWorthItemRepository(session, ctx).ordered()
-    valuations: dict[UUID, list[ItemValuation]] = {}
-    for valuation in ItemValuationRepository(session, ctx).for_items([item.id for item in items]):
-        valuations.setdefault(valuation.item_id, []).append(valuation)
+    rows = _load_rows(session, scope, categories=categories)
+    category_by_id = {category.id: category for category in rows.categories}
+    histories = tuple(_item_history(item, rows.valuations.get(item.id, ())) for item in rows.items)
+    values = values_at(histories, as_of, timezone=timezone)
     return [
-        _item_view(
+        _item_view_at(
             item,
             category_by_id[item.category_id],
-            valuations.get(item.id, ()),
-            today=as_of,
+            rows.valuations.get(item.id, ()),
+            value,
+            as_of=as_of,
             base_currency=base_currency,
             include_history=include_history,
         )
-        for item in items
+        for item, value in zip(rows.items, values, strict=True)
     ]
 
 
@@ -488,6 +572,7 @@ def list_networth(factory: sessionmaker[Session], ctx: Context) -> NetWorthPage:
             ctx,
             as_of=today,
             base_currency=base_currency,
+            timezone=ctx.workspace.timezone,
             include_history=True,
             categories=categories,
         )

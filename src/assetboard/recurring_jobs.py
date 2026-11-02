@@ -18,6 +18,7 @@ from assetboard.db.repositories import NotFound
 from assetboard.db.repositories.scheduled import RecurringWorkspaceReader
 from assetboard.services.imports import cleanup_expired_imports
 from assetboard.services.income import resync_pending_income
+from assetboard.services.networth_snapshots import take_auto_snapshot
 from assetboard.services.notifications import run_workspace as run_notifications
 from assetboard.services.notify import Notifier
 from assetboard.services.occurrences import auto_post_workspace
@@ -104,6 +105,25 @@ class RecurringJobs:
         except Exception as exc:
             self.logger.error(
                 "recurring_auto_post_failed workspace=%s exception_type=%s; next run will retry",
+                workspace_id,
+                type(exc).__name__,
+                exc_info=True,
+            )
+
+    def networth_snapshot(self, workspace_id: UUID, timezone: str) -> None:
+        """Store the previous month-end (F5.3); only this month, never older gaps."""
+        try:
+            take_auto_snapshot(
+                self.factory,
+                _Scope(_Workspace(workspace_id)),
+                self.clock(),
+                timezone,
+            )
+        except NotFound:
+            self.logger.debug("networth_snapshot_skipped workspace=%s reason=deleted", workspace_id)
+        except Exception as exc:
+            self.logger.error(
+                "networth_snapshot_failed workspace=%s exception_type=%s; next run will retry",
                 workspace_id,
                 type(exc).__name__,
                 exc_info=True,
@@ -227,10 +247,12 @@ class RecurringJobs:
         """Startup catch-up: rebuild the daily jobs and generate every workspace's horizon."""
         try:
             self.reconcile()
-            for workspace_id in tuple(self.zones):
+            for workspace_id, timezone in tuple(self.zones.items()):
                 self.resync_income(workspace_id)
                 self.run(workspace_id)
                 self.auto_post(workspace_id)
+                # Only the most recent month-end; older missed months come from backfill.
+                self.networth_snapshot(workspace_id, timezone)
         finally:
             self.caught_up.set()
 
@@ -259,9 +281,20 @@ class RecurringJobs:
                     max_instances=1,
                     misfire_grace_time=None,
                 )
+                self.scheduler.add_job(
+                    self.networth_snapshot,
+                    CronTrigger(day=1, hour=4, timezone=timezone),
+                    args=[workspace_id, timezone],
+                    id=f"networth-snapshot-{workspace_id}",
+                    replace_existing=True,
+                    coalesce=True,
+                    max_instances=1,
+                    misfire_grace_time=None,
+                )
         for workspace_id in self.zones.keys() - workspaces.keys():
             self.scheduler.remove_job(str(workspace_id))
             self.scheduler.remove_job(f"auto-post-{workspace_id}")
+            self.scheduler.remove_job(f"networth-snapshot-{workspace_id}")
         self.zones = workspaces
 
     def start(self) -> None:
