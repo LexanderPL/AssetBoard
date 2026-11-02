@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.4.0](https://github.com/LexanderPL/AssetBoard/compare/v0.3.8...v0.4.0) (2026-11-02)
+
+
+### Features
+
+* import lone CSV files with category mapping (F4.3) ([#203](https://github.com/LexanderPL/AssetBoard/issues/203)) ([33d6456](https://github.com/LexanderPL/AssetBoard/commit/33d64566d6466e8b50d3314695f29ccd38ee97e0))
+* **import:** add F4.2 upload and batch framework ([#201](https://github.com/LexanderPL/AssetBoard/issues/201)) ([abf09eb](https://github.com/LexanderPL/AssetBoard/commit/abf09eb475c0db82ad72d25435001c998ad3b4ae))
+* restore and merge workspace archives (F4.4) ([#204](https://github.com/LexanderPL/AssetBoard/issues/204)) ([592d3ed](https://github.com/LexanderPL/AssetBoard/commit/592d3ed5360901a2cf8181ce2ae0918aa9810787))
+* **ui:** simplify settings and unify page actions ([#207](https://github.com/LexanderPL/AssetBoard/issues/207)) ([909f8b3](https://github.com/LexanderPL/AssetBoard/commit/909f8b347871b065b97ead8c7aa1f083afe2496f))
+
+
+### Documentation
+
+* archive format reference and import and export guide (F4.5) ([#206](https://github.com/LexanderPL/AssetBoard/issues/206)) ([4d98f4b](https://github.com/LexanderPL/AssetBoard/commit/4d98f4b85aca6a1f1fad14c49f8333ad18be5196))
+* **specs:** add F9.9 phone layout pass and F9.10 installable web app (pre-1.0) ([#199](https://github.com/LexanderPL/AssetBoard/issues/199)) ([b8d7a77](https://github.com/LexanderPL/AssetBoard/commit/b8d7a77e749a23761739e4307877915c52bb2abf))
+* **specs:** make the F9.1 Home page configurable with widgets (pre-1.0) ([#205](https://github.com/LexanderPL/AssetBoard/issues/205)) ([3fb431b](https://github.com/LexanderPL/AssetBoard/commit/3fb431be01a0e34db2444e030b24f07e111b4ce1))
+
 ## [0.3.8](https://github.com/LexanderPL/AssetBoard/compare/v0.3.7...v0.3.8) (2026-11-01)
 
 
