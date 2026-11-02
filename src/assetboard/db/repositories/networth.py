@@ -8,7 +8,12 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 
-from assetboard.db.models.networth import ItemValuation, NetWorthCategory, NetWorthItem
+from assetboard.db.models.networth import (
+    ItemValuation,
+    NetWorthCategory,
+    NetWorthItem,
+    NetWorthSnapshot,
+)
 from assetboard.db.repositories.base import ScopedRepository
 
 
@@ -190,3 +195,60 @@ class ItemValuationRepository(ScopedRepository[ItemValuation]):
             )
             rows.extend(self._session.scalars(statement))
         return rows
+
+    def earliest_as_of(self) -> date | None:
+        """The first valuation date in this workspace, or ``None`` when there are none."""
+        return self._session.execute(
+            select(func.min(ItemValuation.as_of)).where(
+                ItemValuation.workspace_id == self._workspace_id
+            )
+        ).scalar_one()
+
+
+class NetWorthSnapshotRepository(ScopedRepository[NetWorthSnapshot]):
+    model = NetWorthSnapshot
+    # A snapshot is replaced as a whole (delete and recreate), never edited field by field.
+    unsupported = frozenset({"update"})
+
+    def create(
+        self,
+        *,
+        as_of: date,
+        assets_minor: int,
+        liabilities_minor: int,
+        currency: str,
+        breakdown: dict[str, object],
+        source: str,
+    ) -> NetWorthSnapshot:
+        return self.add(
+            NetWorthSnapshot(
+                as_of=as_of,
+                assets_minor=assets_minor,
+                liabilities_minor=liabilities_minor,
+                net_minor=assets_minor - liabilities_minor,
+                currency=currency,
+                breakdown=breakdown,
+                source=source,
+            )
+        )
+
+    def for_date(self, as_of: date) -> list[NetWorthSnapshot]:
+        """Every source stored for one date."""
+        statement = self._scoped_select().where(NetWorthSnapshot.as_of == as_of)
+        return list(self._session.scalars(statement.order_by(NetWorthSnapshot.source)))
+
+    def for_range(self, start: date | None) -> list[NetWorthSnapshot]:
+        """Snapshots from ``start`` onwards (all when ``None``), oldest first."""
+        statement = self._scoped_select()
+        if start is not None:
+            statement = statement.where(NetWorthSnapshot.as_of >= start)
+        return list(
+            self._session.scalars(
+                statement.order_by(
+                    NetWorthSnapshot.as_of,
+                    NetWorthSnapshot.source,
+                    NetWorthSnapshot.created_at,
+                    NetWorthSnapshot.id,
+                )
+            )
+        )

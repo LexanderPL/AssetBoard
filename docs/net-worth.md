@@ -1,9 +1,9 @@
 # Net worth
 
-**Net worth** lists what you own and what you owe. Open it from the sidebar. The section has
-three tabs: **Summary**, **Assets** and **Liabilities**. The two lists group items under their
-categories and show a subtotal for every category. Everyone in the workspace can read them;
-editors and owners can add, change and archive things.
+**Net worth** lists what you own and what you owe. Open it from the sidebar. The section has four
+tabs: **Summary**, **Assets**, **Liabilities** and **History**. The two lists group items under
+their categories and show a subtotal for every category. Everyone in the workspace can read them;
+editors and owners can add, change and archive things, take snapshots and rebuild history.
 
 ## Values are positive
 
@@ -25,6 +25,49 @@ not converted or counted before an exchange-rate service exists. Items excluded 
 
 A side with no counted value shows no donut and a dash instead of a share. A workspace with only
 liabilities therefore shows a negative net worth, the liability table, and no asset donut.
+
+## History and snapshots
+
+The **History** tab stores the net-worth total over time. A snapshot keeps assets, liabilities,
+net worth, the currency used and the per-category breakdown as it was on its date. Stored
+automatic and manual snapshots are never recalculated.
+
+- **Automatic snapshots** are taken on the 1st of each month at 04:00 in the workspace time zone
+  and cover the previous month's last day. A workspace with no net-worth items at all is skipped,
+  and so is a month-end where none of the items had an effective value yet; archived items still
+  count as items. After downtime the startup catch-up stores only the most recent month-end;
+  older missed months come from **Backfill from history**.
+- **Take snapshot now** (editors and owners) stores the workspace's today. Taking another manual
+  snapshot on the same date replaces the earlier manual one; a zero total is stored too.
+- **Backfill from history** (editors and owners) recomputes every month-end from the month of the
+  earliest stored value through the previous month-end. It deletes and recreates only rows with
+  `source=backfill`; automatic and manual snapshots are untouched. No stored values means no
+  backfill rows.
+- When several snapshots exist for one date, **manual** wins over **automatic**, and both win over
+  **backfill**. The chart and table show only the preferred source for each date.
+- The chart has net worth, assets and liabilities lines; the legend toggles them. The range
+  selector offers 1 year, 3 years, 5 years and all time (default: 1 year). Hovering a point shows
+  that snapshot's category breakdown. The table underneath is the accessible, no-JavaScript view
+  and marks manual and backfill rows.
+
+**Archived items in snapshots.** An item counts up to its archive date: at month-end `D` it is
+excluded only when its archive time falls on or before `D` in the workspace time zone. An item
+archived in June therefore counts in the May month-end but not in June's; a restored item counts
+in every month. Today's summary keeps the current rule, which is equivalent because an archived
+item's archive date cannot be after today.
+
+**Include in net worth** has no history in this version. The current switch applies to every
+snapshot date, including backfilled ones. Changing it affects future automatic snapshots and a
+rerun of the backfill, never stored automatic or manual rows.
+
+Snapshots keep the currency they were taken in. The chart plots only snapshots in the workspace's
+current base currency; snapshots in another currency remain in the table with their currency code
+and a note that they are not charted. Backfill always uses the current base currency, so rerunning
+it after a base-currency change replaces the old backfill rows.
+
+The stored breakdown is a versioned object. The history page uses the current category names and
+colours and shows **Deleted category** for a category removed since the snapshot. Unknown keys in
+a newer breakdown are ignored, so a later version can add markers without a migration.
 
 ## Categories
 
@@ -110,8 +153,9 @@ Camera; 1 250,50; Photography
 
 ## Archiving and roles
 
-**Archive** on an item hides it from the active lists and from net worth, but keeps its value
-history; **Restore** brings it back. A category and an item are archived independently.
+**Archive** on an item hides it from the active lists and from today's net worth, but keeps its
+value history. Stored snapshots keep the item up to its archive date (see **History and
+snapshots**). **Restore** brings it back. A category and an item are archived independently.
 
 Viewers can read everything but see no add, edit, archive or bulk controls. Editors and owners
 can change data. Changes are recorded in the workspace audit log under **Net worth** (values and
@@ -120,5 +164,6 @@ field names only; notes are not copied there).
 ## Not included yet
 
 The link columns for portfolio assets and loans are reserved for a later version; the page
-creates manual values only. Net worth data is not yet part of the workspace archive, and a
-restore or merge leaves existing net-worth data untouched. Both arrive in later M5 features.
+creates manual values only and snapshots store those manual values. Net worth data, including
+snapshots, is not yet part of the workspace archive, and a restore or merge leaves existing
+net-worth data untouched. Both arrive in later M5 features.

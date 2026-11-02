@@ -1,0 +1,115 @@
+{% from "networth/_tabs.html" import tabs with context %}
+{% from "macros/components.html" import csrf_input with context %}
+<div class="space-y-6" data-networth-history>
+  {{ tabs("history") }}
+
+  {% if view.notice %}
+  <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ view.notice }}</p>
+  {% endif %}
+  {% if view.error %}
+  <p class="border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ view.error }}</p>
+  {% endif %}
+
+  <section class="panel p-4 sm:p-6" aria-labelledby="networth-history-heading">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div class="min-w-0">
+        <h2 id="networth-history-heading" class="text-base font-semibold">{{ _("History") }}</h2>
+        <p class="mt-1 text-sm text-muted">{{ _("Automatic snapshots are stored on the 1st of each month at 04:00 in the workspace time zone. Stored automatic and manual snapshots are never recalculated.") }}</p>
+      </div>
+      {% if view.can_edit %}
+      <div class="flex flex-wrap items-center gap-2" data-history-actions>
+        <form method="post" action="{{ scoped_url(request, 'networth_snapshot_take') }}">
+          {{ csrf_input() }}
+          <input type="hidden" name="range_code" value="{{ view.range_code }}">
+          <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-take-snapshot>{{ _("Take snapshot now") }}</button>
+        </form>
+        <form method="post" action="{{ scoped_url(request, 'networth_snapshot_backfill') }}">
+          {{ csrf_input() }}
+          <input type="hidden" name="range_code" value="{{ view.range_code }}">
+          <button type="submit" class="rounded-xl border border-line-strong px-4 py-2 text-sm font-semibold hover:bg-subtle" data-backfill>{{ _("Backfill from history") }}</button>
+        </form>
+      </div>
+      {% endif %}
+    </div>
+
+    <nav class="mt-5 flex flex-wrap items-center gap-1" aria-label="{{ _('Range') }}" data-history-range>
+      {% for option in view.range_options %}
+        {% if option.active %}
+        <span aria-current="true" class="rounded-lg bg-primary-soft px-3 py-1.5 text-sm font-semibold text-primary-ink" data-range="{{ option.code }}">{{ option.label }}</span>
+        {% else %}
+        <a href="{{ scoped_url(request, 'networth_history') }}?range={{ option.code }}" class="rounded-lg px-3 py-1.5 text-sm font-medium text-muted hover:bg-subtle hover:text-ink" data-range="{{ option.code }}">{{ option.label }}</a>
+        {% endif %}
+      {% endfor %}
+    </nav>
+
+    {% if view.other_currency_count %}
+    <p class="mt-4 text-sm text-muted" data-history-note>{{ ngettext("%(num)d snapshot is in another currency and is not charted.", "%(num)d snapshots are in another currency and are not charted.", view.other_currency_count) }}</p>
+    {% endif %}
+
+    {% if view.rows %}
+    {% if view.has_chart %}
+    <div class="mt-5" data-chart="line" data-chart-source="networth-history-data">
+      <script type="application/json" id="networth-history-data">{{ view.chart|tojson }}</script>
+      <div class="h-80 w-full" hidden aria-hidden="true" data-chart-canvas></div>
+    </div>
+    {% endif %}
+
+    <div class="mt-5 overflow-x-auto" data-history-table>
+      <table class="sheet w-full text-sm">
+        <caption class="sr-only">{{ _("Net worth history") }}</caption>
+        <thead>
+          <tr class="text-left text-xs text-muted">
+            <th scope="col" class="font-medium">{{ _("Date") }}</th>
+            <th scope="col" class="font-medium">{{ _("Source") }}</th>
+            <th scope="col" class="text-right font-medium">{{ _("Net worth") }}</th>
+            <th scope="col" class="text-right font-medium">{{ _("Assets") }}</th>
+            <th scope="col" class="text-right font-medium">{{ _("Liabilities") }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for point in view.rows %}
+          <tr data-history-row data-snapshot-source="{{ point.source }}">
+            <th scope="row" class="text-left font-normal">
+              <span class="whitespace-nowrap">{{ point.as_of_text }}</span>
+              {% if point.breakdown or point.not_counted %}
+              <details class="mt-1" data-history-breakdown>
+                <summary class="cursor-pointer text-xs font-medium text-muted">{{ _("Breakdown") }}</summary>
+                {% if point.breakdown %}
+                <ul class="mt-1 space-y-1 text-xs">
+                  {% for row in point.breakdown %}
+                  <li class="flex justify-between gap-3">
+                    <span>{% if row.color %}<svg class="mr-1.5 inline h-2.5 w-2.5 align-baseline" viewBox="0 0 12 12" aria-hidden="true" focusable="false"><circle cx="6" cy="6" r="6" fill="{{ row.color }}"/></svg>{% endif %}{{ row.side }} · {{ row.name }}</span>
+                    <span class="whitespace-nowrap tabular-nums">{{ row.amount }}</span>
+                  </li>
+                  {% endfor %}
+                </ul>
+                {% endif %}
+                {% for line in point.not_counted %}
+                <p class="mt-1 text-xs text-muted">{{ line }}</p>
+                {% endfor %}
+              </details>
+              {% endif %}
+            </th>
+            <td class="align-top">
+              {% if point.source == "manual" %}
+              <span class="rounded-full bg-primary-soft px-2 py-0.5 text-xs font-medium text-primary-ink" data-source-badge="manual">{{ point.source_label }}</span>
+              {% elif point.source == "backfill" %}
+              <span class="rounded-full bg-subtle px-2 py-0.5 text-xs font-medium text-muted" data-source-badge="backfill">{{ point.source_label }}</span>
+              {% else %}
+              <span class="rounded-full bg-success-soft px-2 py-0.5 text-xs font-medium text-success-strong" data-source-badge="auto">{{ point.source_label }}</span>
+              {% endif %}
+              <span class="mt-1 block text-xs text-muted" data-snapshot-currency>{{ point.currency }}</span>
+            </td>
+            <td class="whitespace-nowrap text-right align-top tabular-nums">{{ point.net }}</td>
+            <td class="whitespace-nowrap text-right align-top tabular-nums">{{ point.assets }}</td>
+            <td class="whitespace-nowrap text-right align-top tabular-nums">{{ point.liabilities }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="mt-5 text-sm text-muted" data-history-empty>{{ _("No snapshots yet. The first automatic snapshot needs at least one net-worth item.") }}</p>
+    {% endif %}
+  </section>
+</div>

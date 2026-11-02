@@ -1,11 +1,13 @@
-"""Net-worth models (F5.1): categories, items and append-only manual valuations."""
+"""Net-worth models (F5.1/F5.3): categories, items, valuations and snapshots."""
 
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     CheckConstraint,
@@ -183,3 +185,52 @@ class ItemValuation(IdMixin, TimestampMixin, WorkspaceScopedMixin, AppendOnly, B
     value_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     note: Mapped[str] = mapped_column(String(MAX_NOTES_LENGTH), nullable=False, default="")
+
+
+class NetWorthSnapshot(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
+    """One stored net-worth total (F5.3), never recalculated except by backfill.
+
+    ``as_of`` is a month-end for automatic and backfilled snapshots and the workspace's today
+    for a manual one. ``source`` is ``auto``, ``manual`` or ``backfill``; the unique constraint
+    is the race guard. ``breakdown`` is a versioned JSON object read by the history page, which
+    ignores unknown keys so later versions can add markers without a migration.
+    """
+
+    __tablename__ = "networth_snapshots"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "id",
+            name="uq_networth_snapshots_workspace_id_id",
+        ),
+        UniqueConstraint(
+            "workspace_id",
+            "as_of",
+            "source",
+            name="uq_networth_snapshots_workspace_as_of_source",
+        ),
+        CheckConstraint(
+            "as_of >= '1900-01-01' AND as_of <= '2199-12-31'",
+            name="as_of_in_range",
+        ),
+        CheckConstraint("assets_minor >= 0", name="assets_non_negative"),
+        CheckConstraint("liabilities_minor >= 0", name="liabilities_non_negative"),
+        CheckConstraint(
+            "net_minor = assets_minor - liabilities_minor",
+            name="net_matches_totals",
+        ),
+        CheckConstraint("length(currency) = 3", name="currency_length"),
+        CheckConstraint(
+            "source IN ('auto', 'manual', 'backfill')",
+            name="source_valid",
+        ),
+        Index("ix_networth_snapshots_workspace_as_of", "workspace_id", "as_of"),
+    )
+
+    as_of: Mapped[date] = mapped_column(Date(), nullable=False)
+    assets_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+    liabilities_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+    net_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    breakdown: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
+    source: Mapped[str] = mapped_column(String(16), nullable=False)

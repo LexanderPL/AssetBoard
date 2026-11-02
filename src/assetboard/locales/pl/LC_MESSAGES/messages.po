@@ -346,6 +346,15 @@ msgstr "Dodano wartość majątku"
 msgid "Net-worth items added in bulk"
 msgstr "Dodano pozycje majątku zbiorczo"
 
+msgid "Net-worth snapshot taken automatically"
+msgstr "Automatycznie zapisano migawkę majątku netto"
+
+msgid "Net-worth snapshot taken"
+msgstr "Zapisano migawkę majątku netto"
+
+msgid "Net-worth history rebuilt from stored values"
+msgstr "Odtworzono historię majątku netto z zapisanych wartości"
+
 msgid "Month closed"
 msgstr "Miesiąc zamknięty"
 
@@ -498,6 +507,9 @@ msgstr "W użyciu"
 
 msgid "Number"
 msgstr "Liczba"
+
+msgid "Replaced an earlier snapshot"
+msgstr "Zastąpiono wcześniejszą migawkę"
 
 msgid "Every signed-in user can create workspaces"
 msgstr "Każdy zalogowany użytkownik może tworzyć obszary robocze"
@@ -1872,11 +1884,61 @@ msgstr "Wpis zapisano w miesiącu: %(month)s."
 msgid "Entry planned in %(month)s."
 msgstr "Wpis zaplanowano w miesiącu: %(month)s."
 
+msgid "1 year"
+msgstr "1 rok"
+
+msgid "3 years"
+msgstr "3 lata"
+
+msgid "5 years"
+msgstr "5 lat"
+
+msgid "All time"
+msgstr "Cały okres"
+
+msgid "Manual"
+msgstr "Ręczna"
+
+msgid "From history"
+msgstr "Z historii"
+
+#, python-format
+msgid "%(num)d item in another currency was not counted."
+msgid_plural "%(num)d items in another currency were not counted."
+msgstr[0] "%(num)d pozycja była w innej walucie i nie została policzona."
+msgstr[1] "%(num)d pozycje były w innej walucie i nie zostały policzone."
+msgstr[2] "%(num)d pozycji było w innej walucie i nie zostało policzonych."
+
+#, python-format
+msgid "%(num)d item had no value yet and was not counted."
+msgid_plural "%(num)d items had no value yet and were not counted."
+msgstr[0] "%(num)d pozycja nie miała jeszcze wartości i nie została policzona."
+msgstr[1] "%(num)d pozycje nie miały jeszcze wartości i nie zostały policzone."
+msgstr[2] "%(num)d pozycji nie miało jeszcze wartości i nie zostało policzonych."
+
+msgid "Deleted category"
+msgstr "Usunięta kategoria"
+
 msgid "Assets"
 msgstr "Aktywa"
 
 msgid "Liabilities"
 msgstr "Zobowiązania"
+
+msgid "Snapshot saved."
+msgstr "Migawka zapisana."
+
+msgid "Snapshot replaced."
+msgstr "Migawka zastąpiona."
+
+msgid "History rebuilt from stored values."
+msgstr "Historia odtworzona z zapisanych wartości."
+
+msgid "There are no stored values to backfill yet."
+msgstr "Nie ma jeszcze zapisanych wartości do uzupełnienia historii."
+
+msgid "A snapshot cannot be dated in the future."
+msgstr "Migawka nie może mieć przyszłej daty."
 
 msgid "Enter a name of 1 to 200 characters, without control characters."
 msgstr "Wpisz nazwę o długości od 1 do 200 znaków, bez znaków sterujących."
@@ -4688,6 +4750,44 @@ msgstr ""
 "Zarchiwizowane pozycje zachowują historię wartości, ale nie wliczają się "
 "do majątku netto."
 
+msgid ""
+"Automatic snapshots are stored on the 1st of each month at 04:00 in the "
+"workspace time zone. Stored automatic and manual snapshots are never "
+"recalculated."
+msgstr ""
+"Migawki automatyczne są zapisywane 1. dnia każdego miesiąca o 04:00 w "
+"strefie czasowej obszaru roboczego. Zapisane migawki automatyczne i "
+"ręczne nigdy nie są przeliczane."
+
+msgid "Take snapshot now"
+msgstr "Zrób migawkę teraz"
+
+msgid "Backfill from history"
+msgstr "Uzupełnij historię"
+
+msgid "Range"
+msgstr "Zakres"
+
+#, python-format
+msgid "%(num)d snapshot is in another currency and is not charted."
+msgid_plural "%(num)d snapshots are in another currency and are not charted."
+msgstr[0] "%(num)d migawka jest w innej walucie i nie jest pokazywana na wykresie."
+msgstr[1] "%(num)d migawki są w innej walucie i nie są pokazywane na wykresie."
+msgstr[2] "%(num)d migawek jest w innej walucie i nie jest pokazywanych na wykresie."
+
+msgid "Net worth history"
+msgstr "Historia majątku netto"
+
+msgid "Breakdown"
+msgstr "Szczegóły"
+
+msgid ""
+"No snapshots yet. The first automatic snapshot needs at least one net-"
+"worth item."
+msgstr ""
+"Nie ma jeszcze migawek. Pierwsza migawka automatyczna wymaga co najmniej "
+"jednej pozycji majątku netto."
+
 #, python-format
 msgid "Not in totals (%(currency)s)"
 msgstr "Poza sumami (%(currency)s)"
@@ -6602,4 +6702,7 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Assets and liabilities"
 #~ msgstr "Aktywa i zobowiązania"
+
+#~ msgid "AssetsassetLiabilities"
+#~ msgstr "Zobowiązania"
 

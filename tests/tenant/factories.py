@@ -22,7 +22,12 @@ from assetboard.db.models.identity import AuditEvent, Invitation, Membership, Us
 from assetboard.db.models.import_batch import ImportBatch, ImportCategoryMapping
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
-from assetboard.db.models.networth import ItemValuation, NetWorthCategory, NetWorthItem
+from assetboard.db.models.networth import (
+    ItemValuation,
+    NetWorthCategory,
+    NetWorthItem,
+    NetWorthSnapshot,
+)
 from assetboard.db.models.notifications import NotificationChannel, NotificationLog
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.models.tax import TaxRule, TaxRuleVersion
@@ -90,6 +95,8 @@ def make_category(session: Session, workspace_id: UUID) -> Category:
 
 # (workspace, month) is unique: each row gets its own month.
 _MONTHS = itertools.count()
+# (workspace, as_of, source) is unique: each snapshot gets its own month too.
+_SNAPSHOT_MONTHS = itertools.count()
 
 
 def make_month_state(session: Session, workspace_id: UUID) -> MonthState:
@@ -379,6 +386,20 @@ def make_item_valuation(session: Session, workspace_id: UUID) -> ItemValuation:
     )
 
 
+def make_networth_snapshot(session: Session, workspace_id: UUID) -> NetWorthSnapshot:
+    index = next(_SNAPSHOT_MONTHS)
+    return NetWorthSnapshot(
+        workspace_id=workspace_id,
+        as_of=date(2000 + index // 12, 1 + index % 12, 1),
+        assets_minor=125000,
+        liabilities_minor=25000,
+        net_minor=100000,
+        currency="EUR",
+        breakdown={"v": 1, "categories": [], "not_counted": {"non_base": 0, "no_value": 0}},
+        source="manual",
+    )
+
+
 TENANT_CASES: dict[type[Any], TenantCase] = {
     ScheduledItem: TenantCase(make_scheduled_item, update_values={"name": "Rent"}),
     ScheduledOccurrence: TenantCase(make_scheduled_occurrence, update_values={"label": "Rent"}),
@@ -391,6 +412,11 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     NetWorthItem: TenantCase(make_networth_item, update_values={"name": "Updated item"}),
     # Valuations are append-only.
     ItemValuation: TenantCase(make_item_valuation, unsupported=frozenset({"update", "delete"})),
+    # Snapshots are replaced as a whole (delete and recreate), never edited.
+    NetWorthSnapshot: TenantCase(
+        make_networth_snapshot,
+        unsupported=frozenset({"update"}),
+    ),
     # Reopening clears the closed fields; rows are never deleted.
     MonthState: TenantCase(
         make_month_state,

@@ -68,6 +68,7 @@ from assetboard.db.repositories import (
     MonthStateRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
+    NetWorthSnapshotRepository,
     NotFound,
     ScopedRepository,
     TransactionRepository,
@@ -611,6 +612,30 @@ def test_networth_queries_stay_in_their_workspace(
     assert [row.id for row in valuations_b.for_item(b_item.id)] == [b_value.id]
     assert [row.id for row in valuations_a.for_items([a_item.id, b_item.id])] == [a_value.id]
     assert [row.id for row in valuations_b.for_items([a_item.id, b_item.id])] == [b_value.id]
+    assert valuations_a.earliest_as_of() == date(2026, 10, 7)
+    assert valuations_b.earliest_as_of() == date(2026, 10, 7)
+
+    snapshots_a = NetWorthSnapshotRepository(db_session, ctx_a)
+    snapshots_b = NetWorthSnapshotRepository(db_session, ctx_b)
+
+    def snapshot(repository: NetWorthSnapshotRepository, assets: int, source: str) -> Any:
+        return repository.create(
+            as_of=date(2026, 10, 31),
+            assets_minor=assets,
+            liabilities_minor=1,
+            currency="EUR",
+            breakdown={"v": 1, "categories": []},
+            source=source,
+        )
+
+    a_snapshot = snapshot(snapshots_a, 125000, "manual")
+    b_snapshot = snapshot(snapshots_b, 99000, "manual")
+    assert [row.id for row in snapshots_a.for_date(date(2026, 10, 31))] == [a_snapshot.id]
+    assert [row.id for row in snapshots_b.for_date(date(2026, 10, 31))] == [b_snapshot.id]
+    assert [row.id for row in snapshots_a.for_range(None)] == [a_snapshot.id]
+    assert [row.id for row in snapshots_b.for_range(None)] == [b_snapshot.id]
+    assert snapshots_a.for_range(date(2026, 11, 1)) == []
+    assert snapshots_b.for_range(date(2026, 11, 1)) == []
 
 
 def test_month_state_queries_stay_in_their_workspace(

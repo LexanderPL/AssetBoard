@@ -15,5 +15,10 @@
   {% else %}
   <a href="{{ scoped_url(request, 'networth') }}?side=liability" role="tab" aria-selected="false" data-side-tab="liability" class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Liabilities") }}</a>
   {% endif %}
+  {% if active == "history" %}
+  <a href="{{ scoped_url(request, 'networth_history') }}" role="tab" aria-selected="true" data-history-tab class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("History") }}</a>
+  {% else %}
+  <a href="{{ scoped_url(request, 'networth_history') }}" role="tab" aria-selected="false" data-history-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("History") }}</a>
+  {% endif %}
 </div>
 {%- endmacro %}

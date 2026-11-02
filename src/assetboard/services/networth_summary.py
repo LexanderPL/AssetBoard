@@ -50,6 +50,7 @@ def networth_summary(factory: sessionmaker[Session], ctx: Context) -> NetWorthSu
             ctx,
             as_of=as_of,
             base_currency=base_currency,
+            timezone=ctx.workspace.timezone,
             categories=category_rows,
         )
         categories = {

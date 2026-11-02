@@ -1290,6 +1290,7 @@ WORKSPACE_TABLES = {
     "networth_categories",
     "networth_items",
     "item_valuations",
+    "networth_snapshots",
 }
 
 
