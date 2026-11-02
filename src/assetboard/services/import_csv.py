@@ -57,6 +57,7 @@ from assetboard.domain.money import minor_unit_for
 from assetboard.domain.months import YearMonth
 from assetboard.domain.transactions import EntryError, clean_description, description_key
 from assetboard.services.context import Context, Role, require_role
+from assetboard.services.import_archive import ArchiveImportAdapter
 from assetboard.services.import_dedupe import (
     IncomingBudgetLine,
     IncomingTransaction,
@@ -1385,11 +1386,12 @@ class CategoriesCsvAdapter(ImportAdapter):
 
 
 def default_import_adapters() -> dict[str, ImportAdapter]:
-    """The F4.3 adapters registered by the application."""
+    """The production adapters registered by the application (F4.3 and F4.4)."""
     return {
         "transactions_csv": TransactionsCsvAdapter(),
         "budget_lines_csv": BudgetLinesCsvAdapter(),
         "categories_csv": CategoriesCsvAdapter(),
+        "archive": ArchiveImportAdapter(),
     }
 
 

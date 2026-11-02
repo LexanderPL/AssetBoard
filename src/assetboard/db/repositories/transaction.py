@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Collection, Iterator, Sequence
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from typing import Any
 from uuid import UUID
 
@@ -15,6 +15,7 @@ from sqlalchemy import (
     and_,
     case,
     cast,
+    delete,
     exists,
     extract,
     func,
@@ -145,6 +146,60 @@ class TransactionRepository(ScopedRepository[Transaction]):
             import_batch_id=import_batch_id,
             import_key=import_key,
         )
+
+    def create_restored(
+        self,
+        *,
+        direction: str,
+        day: date,
+        amount_minor: int,
+        currency: str,
+        category_id: UUID,
+        description: str,
+        description_key: str,
+        import_batch_id: UUID,
+        import_key: str | None,
+        created_by_user_id: UUID | None,
+        created_at: datetime,
+        deleted_at: datetime | None,
+    ) -> Transaction:
+        """Create a transaction from a restore, keeping its entry order and deletion state.
+
+        ``created_at`` and ``updated_at`` are both set explicitly: a restore must not leave
+        timestamps that the clock listener could push past the batch's ``applied_at``.
+        """
+        return self.add(
+            Transaction(
+                direction=direction,
+                date=day,
+                amount_minor=amount_minor,
+                currency=currency,
+                category_id=category_id,
+                description=description,
+                description_key=description_key,
+                source="import",
+                created_by_user_id=created_by_user_id,
+                import_batch_id=import_batch_id,
+                import_key=import_key,
+                created_at=created_at,
+                updated_at=created_at,
+                deleted_at=deleted_at,
+            )
+        )
+
+    def delete_for_import_batch(self, batch_id: UUID) -> int:
+        """Hard-delete a restore batch's transactions (restore rollback only).
+
+        Merge rollback soft-deletes rows; a restore rollback must leave the workspace empty, so
+        the rows never existed before the restore and are removed for good.
+        """
+        result = self._session.execute(
+            delete(Transaction).where(
+                Transaction.workspace_id == self._workspace_id,
+                Transaction.import_batch_id == batch_id,
+            )
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
 
     def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[Transaction]:
         statement = self._scoped_select().where(Transaction.import_batch_id == batch_id)

@@ -523,9 +523,23 @@ def test_month_state_queries_stay_in_their_workspace(
     assert b_october.workspace_id == ctx_b.workspace.id
     assert in_b.for_month(october) is b_october
     assert in_a.for_month(october) is a_october
+    restored_b = in_b.create_restored(
+        month=november,
+        closed_at=None,
+        closed_by_user_id=None,
+        plan_started_at=None,
+        created_at=datetime(2026, 11, 1, 12, tzinfo=UTC),
+        updated_at=datetime(2026, 11, 1, 12, tzinfo=UTC),
+    )
+    assert restored_b.workspace_id == ctx_b.workspace.id
+    assert in_a.for_month(november) is None
     in_a.update(a_october.id, closed_at=datetime(2026, 10, 31, 12, tzinfo=UTC))
     assert in_a.closed_months() == {october}
     assert in_b.closed_months() == frozenset()  # B's October is open; A's close is not seen
+    assert in_b.delete_for_months([october]) == 1  # B's own October, not A's
+    assert in_a.for_month(october) is a_october
+    assert in_a.delete_for_months([november]) == 0
+    assert in_b.delete_for_months([november]) == 1
 
 
 def test_transaction_queries_stay_in_their_workspace(
@@ -709,8 +723,25 @@ def test_imported_ledger_rows_and_dedupe_lookups_stay_in_their_workspace(
     transactions_a = TransactionRepository(db_session, ctx_a)
     transactions_b = TransactionRepository(db_session, ctx_b)
 
+    restored_a = transactions_a.create_restored(
+        direction="expense",
+        day=date(2026, 10, 8),
+        amount_minor=500,
+        currency="EUR",
+        category_id=category_a.id,
+        description="Restored",
+        description_key="restored",
+        import_batch_id=batch_a.id,
+        import_key=f"id:{uuid4()}",
+        created_by_user_id=None,
+        created_at=datetime(2026, 10, 8, 12, tzinfo=UTC),
+        deleted_at=None,
+    )
+    assert restored_a.workspace_id == ctx_a.workspace.id
+    assert transactions_b.get(restored_a.id) is None
+
     assert transaction_a.source == "import"
-    assert transactions_a.for_import_batch(batch_a.id) == [transaction_a]
+    assert set(transactions_a.for_import_batch(batch_a.id)) == {transaction_a, restored_a}
     assert transactions_b.for_import_batch(batch_a.id) == []
     assert transactions_a.by_import_keys([f"id:{source_id}"]) == [transaction_a]
     assert transactions_b.by_import_keys([f"id:{source_id}"]) == []
@@ -722,6 +753,9 @@ def test_imported_ledger_rows_and_dedupe_lookups_stay_in_their_workspace(
     assert CategoryRepository(db_session, ctx_a).for_import_batch(batch_a.id) == [category_a]
     assert CategoryRepository(db_session, ctx_b).for_import_batch(batch_a.id) == []
     assert CategoryRepository(db_session, ctx_b).for_import_batch(batch_b.id) == [category_b]
+    assert transactions_b.delete_for_import_batch(batch_a.id) == 0
+    assert transactions_a.delete_for_import_batch(batch_a.id) == 2
+    assert transactions_a.for_import_batch(batch_a.id) == []
 
 
 def test_transaction_search_stays_in_its_workspace(

@@ -48,15 +48,29 @@ from assetboard.db.repositories import (
     CurrentWorkspaceRepository,
     ImportBatchRepository,
     ImportCategoryMappingRepository,
+    IncomeSourceRepository,
+    IncomeSourceTaxRuleRepository,
     MonthStateRepository,
+    ScheduledItemRepository,
+    ScheduledOccurrenceRepository,
+    TaxRuleRepository,
+    TaxRuleVersionRepository,
     TransactionRepository,
+    WorkDayRepository,
+    WorkLogRepository,
 )
 from assetboard.db.repositories.base import WorkspaceScope
 from assetboard.domain.archive import ArchiveError
-from assetboard.domain.import_upload import ParsedUpload, ParseTimeout, parse_upload
+from assetboard.domain.import_upload import (
+    ZIP_LOCAL_FILE_SIGNATURE,
+    ParsedUpload,
+    ParseTimeout,
+    parse_upload,
+)
 from assetboard.domain.ledger_csv import guard_formula
 from assetboard.domain.months import YearMonth
 from assetboard.i18n import gettext
+from assetboard.services.archive import workspace_is_empty
 from assetboard.services.categories import usage_by_category
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.months import lock_month_writes
@@ -156,6 +170,37 @@ REPORT_MESSAGES: dict[str, str] = {
     "mapping_category_missing": _("The mapped category does not exist."),
     "mapping_kind_mismatch": _("The mapped category has the wrong kind."),
     "duplicate_create_name": _("Two new categories have the same kind and name."),
+    # F4.4 archive restore and merge.
+    "currency_mismatch": _(
+        "The archive's base currency differs from this workspace's base currency."
+    ),
+    "workspace_not_empty": _(
+        "Restore is available only in an empty workspace (the untouched suggested categories "
+        "are fine)."
+    ),
+    "duplicate_category_name": _(
+        "Two active categories in the archive have the same kind and name."
+    ),
+    "invalid_workspace_settings": _("The archive's workspace settings are not supported."),
+    "newer_major_version": _("The archive was made by a newer version of the app."),
+    "newer_minor_version": _(
+        "The archive was made by a newer minor version; unknown data was ignored."
+    ),
+    # Restore rollback reasons.
+    "restore_rows_added": _("The workspace has rows that this restore did not write."),
+    "restore_rows_changed": _("Rows written by this restore were changed after it."),
+    "restore_months_changed": _("Month states written by this restore were changed after it."),
+    "restore_settings_changed": _("Workspace settings changed since the restore."),
+    "restore_m3_rows_added": _(
+        "Recurring items, income sources, work logs or tax rules were added after the restore."
+    ),
+    "restore_m3_references": _(
+        "Recurring items, income sources, work logs or tax rules reference rows written by "
+        "this restore."
+    ),
+    "restore_previous_settings_missing": _(
+        "This restore did not record the workspace settings it replaced."
+    ),
 }
 
 # ``domain.archive`` / ``domain.import_upload`` messages -> report codes.
@@ -175,6 +220,7 @@ _PARSER_CODES: dict[str, str] = {
     "uncompressed size or ratio limit": "size_limit",
     "unsupported archive format": "unsupported_format",
     "unsupported archive version": "unsupported_version",
+    "made by a newer version of the app": "newer_major_version",
     "invalid JSON": "invalid_json",
     "invalid UTF-8 or CSV": "invalid_archive_csv",
     "checksum mismatch": "checksum_mismatch",
@@ -219,6 +265,38 @@ class ImportMappingInvalid(ImportError):
     def __init__(self, report: dict[str, Any]) -> None:
         super().__init__("the import has unresolved or invalid category mappings")
         self.report = report
+
+
+class ImportRefused(ImportError):
+    """The whole upload is refused (a merge archive's base currency differs, for example)."""
+
+
+class ImportRestoreUnavailable(ImportError):
+    """Restore was requested for a workspace that is not empty."""
+
+
+class ImportRestoreRequiresArchive(ImportError):
+    """Restore was requested for an upload that is not a complete ZIP archive."""
+
+
+class ImportRestoreRollbackBlocked(ImportError):
+    """The workspace no longer holds exactly what the restore wrote."""
+
+    def __init__(self, reasons: tuple[str, ...]) -> None:
+        super().__init__("the workspace changed after the restore")
+        self.reasons = reasons
+
+
+@dataclass(frozen=True, slots=True)
+class RollbackPreview:
+    """The rollback confirmation page, for a merge or a restore batch."""
+
+    batch: ImportBatchView
+    mode: str
+    counts: dict[str, int]
+    closed_months: tuple[str, ...] = ()
+    blocked_reasons: tuple[str, ...] = ()
+    settings_restored: tuple[str, ...] = ()
 
 
 def _never() -> bool:
@@ -371,8 +449,13 @@ def upload_import(
     options: dict[str, object] | None = None,
     mode: Literal["restore", "merge"] = "merge",
 ) -> UUID:
+    if mode not in {"restore", "merge"}:
+        raise ImportError("invalid import mode")
     required_role = Role.OWNER if mode == "restore" else Role.EDITOR
     require_role(ctx, required_role)
+    is_archive = content.startswith(ZIP_LOCAL_FILE_SIGNATURE)
+    if mode == "restore" and not is_archive:
+        raise ImportRestoreRequiresArchive
     digest = hashlib.sha256(content).hexdigest()
     path: Path | None = None
 
@@ -380,9 +463,11 @@ def upload_import(
         nonlocal path
         require_role_now(session, ctx, required_role)
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+        if mode == "restore" and not workspace_is_empty(session, ctx):
+            raise ImportRestoreUnavailable
         repository = ImportBatchRepository(session, ctx)
         batch = repository.create(
-            source="archive" if content.startswith(b"PK\x03\x04") else "transactions_csv",
+            source="archive" if is_archive else "transactions_csv",
             mode=mode,
             filename=_safe_filename(filename),
             file_sha256=digest,
@@ -414,6 +499,8 @@ def _error_dict(error: ArchiveError) -> dict[str, object]:
     code = _PARSER_CODES.get(error.message, "invalid_upload")
     if code == "invalid_upload" and error.message.startswith("missing required column:"):
         code = "missing_column"
+    if code == "invalid_upload" and error.message.startswith("newer minor version:"):
+        code = "newer_minor_version"
     return _entry(
         error.file,
         code,
@@ -633,6 +720,7 @@ def _mapping_signature(options: Mapping[str, object]) -> tuple[tuple[str, ...], 
     if not isinstance(raw, list):
         return ()
     fields = (
+        "source_id",
         "kind",
         "source_name_key",
         "action",
@@ -715,6 +803,9 @@ def apply_import(
             adapter.plan(session, ctx, batch, parsed, base_currency=base_currency),
         )
         report["source"] = parsed.source
+        if report.get("refused"):
+            batch.report = report
+            return {"_refused": True, "report": report}
         if report["counts"].get("mapping_invalid", 0):
             batch.report = report
             return {"_mapping_invalid": True, "report": report}
@@ -736,27 +827,30 @@ def apply_import(
         now = ctx.clock.now()
         batch.status = "applied"
         batch.applied_at = now
-        AuditEventRepository(session, ctx).record(
-            actor_user_id=ctx.user.id,
-            action="import.applied",
-            entity_type="import_batch",
-            entity_id=str(batch.id),
-            ts=now,
-            data={
-                "source": batch.source,
-                "mode": batch.mode,
-                "transactions_created": counts.get("created", 0),
-                "duplicates": counts.get("duplicates", 0),
-                "conflicts": counts.get("conflicts", 0),
-                "rows_skipped": counts.get("skipped", 0),
-            },
-        )
+        if batch.mode != "restore":
+            AuditEventRepository(session, ctx).record(
+                actor_user_id=ctx.user.id,
+                action="import.applied",
+                entity_type="import_batch",
+                entity_id=str(batch.id),
+                ts=now,
+                data={
+                    "source": batch.source,
+                    "mode": batch.mode,
+                    "transactions_created": counts.get("created", 0),
+                    "duplicates": counts.get("duplicates", 0),
+                    "conflicts": counts.get("conflicts", 0),
+                    "rows_skipped": counts.get("skipped", 0),
+                },
+            )
         return {"counts": counts, "report": report}
 
     result = run_immediate(factory, apply)
     if result.get("_failed"):
         _delete_upload(stored_path)
         raise ImportError("stored upload failed validation")
+    if result.get("_refused"):
+        raise ImportRefused("the upload was refused as a whole")
     if result.get("_mapping_invalid"):
         raise ImportMappingInvalid(result["report"])
     if result.get("_confirmation_required"):
@@ -859,14 +953,166 @@ def _rollback_plan(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class _RestoreRollbackPlan:
+    transactions: tuple[Transaction, ...]
+    lines: tuple[BudgetLine, ...]
+    categories: tuple[Category, ...]
+    months: tuple[YearMonth, ...]
+    reasons: tuple[str, ...]
+    settings: dict[str, object]
+
+    def counts(self) -> dict[str, int]:
+        return {
+            "deleted": len(self.transactions),
+            "budget_lines": len(self.lines),
+            "categories": len(self.categories),
+            "months": len(self.months),
+        }
+
+
+_M3_REPOSITORIES = (
+    ScheduledItemRepository,
+    ScheduledOccurrenceRepository,
+    IncomeSourceRepository,
+    IncomeSourceTaxRuleRepository,
+    WorkLogRepository,
+    WorkDayRepository,
+    TaxRuleRepository,
+    TaxRuleVersionRepository,
+)
+_M3_REFERENCE_ATTRIBUTES = (
+    "category_id",
+    "payment_category_id",
+    "transaction_id",
+    "previous_transaction_id",
+)
+
+
+def _restore_rollback_plan(
+    session: Session, ctx: Context, batch: ImportBatch, *, lock: bool
+) -> _RestoreRollbackPlan:
+    applied_at = batch.applied_at
+    if applied_at is None:
+        raise ImportError("applied batch has no applied timestamp")
+    transactions = TransactionRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    lines = BudgetLineRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    categories = CategoryRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    all_transactions = TransactionRepository(session, ctx).list()
+    all_lines = BudgetLineRepository(session, ctx).list()
+    all_categories = CategoryRepository(session, ctx).list()
+    all_months = MonthStateRepository(session, ctx).list()
+    reasons: set[str] = set()
+    if (
+        len(all_transactions) != len(transactions)
+        or any(row.import_batch_id != batch.id for row in all_transactions)
+        or len(all_lines) != len(lines)
+        or any(row.import_batch_id != batch.id for row in all_lines)
+        or len(all_categories) != len(categories)
+        or any(row.import_batch_id != batch.id for row in all_categories)
+    ):
+        reasons.add("restore_rows_added")
+    if (
+        any(row.updated_at > applied_at for row in transactions)
+        or any(row.updated_at > applied_at for row in lines)
+        or any(row.updated_at > applied_at for row in categories)
+    ):
+        reasons.add("restore_rows_changed")
+    raw_months = (batch.report or {}).get("restore_months")
+    expected_months: set[YearMonth] = set()
+    if isinstance(raw_months, list):
+        for raw in cast("list[object]", raw_months):
+            try:
+                expected_months.add(YearMonth.parse(str(raw)))
+            except ValueError:
+                reasons.add("restore_months_changed")
+    else:
+        reasons.add("restore_months_changed")
+    stored_months = {YearMonth.from_date(row.month) for row in all_months}
+    if stored_months != expected_months or any(row.updated_at > applied_at for row in all_months):
+        reasons.add("restore_months_changed")
+    workspace = CurrentWorkspaceRepository(session, ctx).get()
+    if workspace.updated_at > applied_at:
+        reasons.add("restore_settings_changed")
+    previous = batch.previous_settings
+    if not isinstance(previous, dict):
+        reasons.add("restore_previous_settings_missing")
+        previous = {}
+    category_ids = {row.id for row in categories}
+    transaction_ids = {row.id for row in transactions}
+    for repository_class in _M3_REPOSITORIES:
+        for row in repository_class(session, ctx).list():
+            if row.created_at > applied_at:
+                reasons.add("restore_m3_rows_added")
+            for attribute in _M3_REFERENCE_ATTRIBUTES:
+                value = getattr(row, attribute, None)
+                if isinstance(value, UUID) and (value in category_ids or value in transaction_ids):
+                    reasons.add("restore_m3_references")
+    month_values: list[YearMonth] = []
+    for raw in cast("list[object]", raw_months or []):
+        try:
+            month_values.append(YearMonth.parse(str(raw)))
+        except ValueError:
+            continue
+    return _RestoreRollbackPlan(
+        transactions=tuple(transactions),
+        lines=tuple(lines),
+        categories=tuple(categories),
+        months=tuple(month_values),
+        reasons=tuple(sorted(reasons)),
+        settings=cast("dict[str, object]", previous),
+    )
+
+
+def _rollback_restore(
+    session: Session, ctx: Context, batch: ImportBatch, plan: _RestoreRollbackPlan
+) -> dict[str, int]:
+    if plan.reasons:
+        raise ImportRestoreRollbackBlocked(plan.reasons)
+    TransactionRepository(session, ctx).delete_for_import_batch(batch.id)
+    lines = BudgetLineRepository(session, ctx)
+    for line in plan.lines:
+        lines.delete(line)
+    session.flush()
+    categories = CategoryRepository(session, ctx)
+    for category in plan.categories:
+        categories.delete(category)
+    MonthStateRepository(session, ctx).delete_for_months(plan.months)
+    session.flush()
+    CurrentWorkspaceRepository(session, ctx).update(**plan.settings)
+    now = ctx.clock.now()
+    batch.status = "rolled_back"
+    batch.rolled_back_at = now
+    AuditEventRepository(session, ctx).record(
+        actor_user_id=ctx.user.id,
+        action="import.rolled_back",
+        entity_type="import_batch",
+        entity_id=str(batch.id),
+        ts=now,
+        data={
+            "source": batch.source,
+            "mode": "restore",
+            "transactions_deleted": len(plan.transactions),
+            "budget_lines": len(plan.lines),
+            "categories_deleted": len(plan.categories),
+            "months_deleted": len(plan.months),
+            "settings_restored": ",".join(sorted(plan.settings)),
+        },
+    )
+    return plan.counts()
+
+
 def rollback_import(
     factory: sessionmaker[Session],
     ctx: Context,
     batch_id: UUID,
 ) -> dict[str, int]:
-    """Undo an applied merge batch: soft-delete its transactions (edited ones too), remove its
-    budget lines except those changed since, and delete or archive the categories it created.
-    Refused as a whole (``ImportClosedMonths``) when an affected month is closed now."""
+    """Undo an applied batch.
+
+    A merge batch is soft-deleted and keeps later edits; a restore batch is hard-deleted and
+    puts the previous workspace settings back, but only while nothing in the workspace changed
+    since ``applied_at``.
+    """
     require_role(ctx, Role.EDITOR)
 
     def rollback(session: Session) -> dict[str, int]:
@@ -874,7 +1120,13 @@ def rollback_import(
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
         lock_month_writes(session, ctx)
         batch = ImportBatchRepository(session, ctx).get_for_update(batch_id)
-        if batch is None or batch.status != "applied" or batch.mode != "merge":
+        if batch is None or batch.status != "applied":
+            raise ImportError("batch cannot be rolled back")
+        if batch.mode == "restore":
+            require_role_now(session, ctx, Role.OWNER)
+            restore_plan = _restore_rollback_plan(session, ctx, batch, lock=True)
+            return _rollback_restore(session, ctx, batch, restore_plan)
+        if batch.mode != "merge":
             raise ImportError("batch cannot be rolled back")
         plan = _rollback_plan(session, ctx, batch, lock=True)
         if plan.closed_months:
@@ -937,15 +1189,32 @@ def preview_rollback_import(
     factory: sessionmaker[Session],
     ctx: Context,
     batch_id: UUID,
-) -> tuple[ImportBatchView, dict[str, int], tuple[str, ...]]:
-    """The rollback confirm page: the batch, its counts and the closed months that block it."""
+) -> RollbackPreview:
+    """The rollback confirm page: counts, blockers and (for a restore) restored settings."""
     require_role(ctx, Role.EDITOR)
     with factory() as session:
         batch = ImportBatchRepository(session, ctx).get(batch_id)
-        if batch is None or batch.status != "applied" or batch.mode != "merge":
+        if batch is None or batch.status != "applied":
+            raise ImportError("batch cannot be rolled back")
+        if batch.mode == "restore":
+            require_role(ctx, Role.OWNER)
+            plan = _restore_rollback_plan(session, ctx, batch, lock=False)
+            return RollbackPreview(
+                batch=_batch_view(batch),
+                mode="restore",
+                counts=plan.counts(),
+                blocked_reasons=plan.reasons,
+                settings_restored=tuple(sorted(plan.settings)),
+            )
+        if batch.mode != "merge":
             raise ImportError("batch cannot be rolled back")
         plan = _rollback_plan(session, ctx, batch, lock=False)
-        return _batch_view(batch), plan.counts(), plan.closed_months
+        return RollbackPreview(
+            batch=_batch_view(batch),
+            mode="merge",
+            counts=plan.counts(),
+            closed_months=plan.closed_months,
+        )
 
 
 def list_import_batches(

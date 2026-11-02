@@ -333,37 +333,61 @@ use.
 
 **Acceptance**
 - An archive upload offers two modes:
-  - **Restore** (owners only), only when the target workspace is **empty**: no categories
-    (archived included), no transactions (deleted included), no budget lines, no month states.
-    The check is a static list `services.archive.EMPTINESS_CHECKS` that later milestones extend
-    (like `BASE_CURRENCY_LOCKS`). Members, invitations and audit events do not count.
+  - **Restore** (owners only), only when the target workspace is **empty**: no categories of
+    its own, no transactions (deleted included), no budget lines, no month states, and no M3
+    data (recurring items and occurrences, income sources, work logs/days, tax rules and their
+    versions and links). A workspace whose only categories are the untouched **automatic
+    suggested set** counts as empty: the restore deletes those categories before writing the
+    archive's and lists them in its report. "Untouched" means the exact suggested set for a
+    supported language, created at the automatic `category.seeded` event's time, never edited,
+    archived or referenced by any row. The check is a static list
+    `services.archive.EMPTINESS_CHECKS` that later milestones extend (like
+    `BASE_CURRENCY_LOCKS`). Members, invitations, audit events, notification channels and saved
+    import mappings do not count.
   - **Merge** (editors and owners): data only (categories, transactions, budget lines) through
-    the F4.3 rules and mapping step, with categories from `categories.csv` defaulting to
-    "create" with their archived attributes when they do not resolve. `workspace.json` and
-    `months.csv` are **not** applied; differing settings and the archive's closed months are
-    listed as information. A `base_currency` different from the workspace's refuses the whole
-    archive.
+    the F4.3 rules and mapping step. The mapping table has one row per archive category, keyed
+    by its archive id, because an archive may contain an active and an archived category with
+    one name. Defaults, in order: explicit choice; lineage match (the archive category id is a
+    workspace category id or `import_key = id:<id>`); saved mapping by kind and name (active
+    archive categories only); active same-name category (active archive categories only); else
+    create with the archive's attributes, archived state included. Merging an archive into its
+    source workspace therefore creates nothing. `workspace.json` and `months.csv` are **not**
+    applied; differing settings and the archive's closed months are listed as information. A
+    `base_currency` different from the workspace's refuses the whole archive even when invalid
+    rows could otherwise be skipped.
 - **Restore order, in one transaction:** (1) settings from `workspace.json` (name, base
   currency, country, time zone, locale, automatic plan copy, and from 1.1 the Taxes switch and
   the Upcoming window, which keep their defaults when a 1.0 archive lacks them; the replaced
-  values are kept in
-  `ImportBatch.previous_settings`); (2) categories with every attribute (`kind`, `treatment`,
+  values are kept in `ImportBatch.previous_settings`); settings are validated with the normal
+  workspace validators and an unsupported value refuses the restore; `require_two_factor` is
+  not archived and stays as it is; (2) categories with every attribute (`kind`, `treatment`,
   `color`, `sort_order`, `archived_at`) and `import_key = id:<id>`; (3) budget lines (lines on
-  archived or transfer categories included: they existed in the source); (4) transactions in
-  file order (so entry order within a day is kept), soft-deleted ones with their `deleted_at`;
+  archived or transfer categories included: they existed in the source); a zero or empty
+  `planned` is "no line" and is not an error; (4) transactions in file order (so entry order
+  within a day is kept), with `import_key = id:<id>` when the row has an id, strictly
+  increasing `created_at` values in file order, and soft-deleted ones with their `deleted_at`;
   (5) month states last, exactly as in `months.csv` (`plan_started_at`, `closed_at`; nothing is
   derived from the budget lines). No mapping step, no skipped rows: any error blocks the
-  restore.
+  restore. The restore flushes all rows before `applied_at` is recorded, so its own timestamps
+  never make a rollback look stale.
 - Restored closed months get `closed_by_user_id` = the restoring owner (users are not in the
-  archive; see open question 4). Restored data is not audited per row; one
-  `workspace.restored` audit event (batch id, counts, names of the settings fields changed).
+  archive; see open question 4). Restored data is not audited per row; a restore records one
+  `workspace.restored` audit event (batch id, counts, names of the settings fields changed and
+  suggested categories removed) and suppresses the generic `import.applied` event. The restore
+  does not post recurring items, send notifications or trigger the automatic plan copy; month
+  states are written last exactly as stored.
 - **Restore rollback** (owners): allowed only while the workspace still holds exactly what the
-  restore wrote (no row without the batch's id, no row, month state or setting changed after
-  `applied_at`); it then **hard-deletes** the batch's rows and month states and puts
-  `previous_settings` back, so the workspace is empty again and a corrected archive can be
-  restored. Otherwise it is refused with the reason. (Hard delete is justified: the rows never
-  existed in this workspace before, and soft-deleted leftovers would keep the workspace
-  non-empty and its base currency locked.)
+  restore wrote. The check refuses with reasons when: a row exists without the batch's id or a
+  batch row is missing; a batch row's `updated_at > applied_at`; the stored month-state set
+  differs from the archive's or a month state changed after `applied_at`; the workspace row
+  changed after `applied_at` ("workspace settings changed since the restore"); any M3 row was
+  created after `applied_at`; or any M3 row references a batch category or transaction (the M3
+  foreign keys would block the hard delete). It then **hard-deletes** the batch's rows and
+  month states and puts `previous_settings` back, so the workspace is empty again and a
+  corrected archive can be restored. A restore rollback leaves a truly empty workspace and
+  does not re-add the suggested categories; the user can press "Add suggested categories"
+  afterwards. (Hard delete is justified: the rows never existed in this workspace before, and
+  soft-deleted leftovers would keep the workspace non-empty and its base currency locked.)
 - Version handling per ADR-0016: an archive of a newer **major** format version is refused
   ("made by a newer version of the app"); a newer **minor** version imports with a warning
   listing the ignored files and columns; older majors pass through the reader's upgrade

@@ -15,10 +15,10 @@ The download is a copy: exporting does not change the ledger. The audit log reco
 and counts of each kind of row, without descriptions or amounts. Viewers cannot download a full
 archive.
 
-Keep the ZIP intact for a future restore. Restoring an archive is not available yet. The archive
-is unencrypted and contains financial history, including deleted entries. Store it privately.
-CSV text is preserved exactly, including values beginning with spreadsheet formula characters;
-inspect it as text or disable formula execution when opening it in a spreadsheet.
+Keep the ZIP intact for a future restore. The archive is unencrypted and contains financial
+history, including deleted entries. Store it privately. CSV text is preserved exactly,
+including values beginning with spreadsheet formula characters; inspect it as text or disable
+formula execution when opening it in a spreadsheet.
 
 The archive contains `manifest.json`, `workspace.json`, `categories.csv`, `budget_lines.csv`,
 `transactions.csv`, and `months.csv`. The manifest identifies format version 1.1 and records
@@ -31,6 +31,56 @@ Origin IDs are preserved when exporting previously imported categories and trans
 Exports with identical ledger data, application version, and export timestamp have identical
 bytes. ZIP member timestamps use UTC with the ZIP format's two-second resolution; the manifest
 preserves the full export timestamp.
+
+## Restoring an archive
+
+Restore is for a reinstall or a move to another instance. It is available to owners only, and
+only while the workspace has no data of its own. A workspace whose only categories are the
+untouched **suggested set** still counts as empty: the restore removes those categories and
+replaces them with the archive's. If you renamed, edited, archived, or used a suggested
+category, the workspace is no longer empty. M3 data (recurring items, income sources, work
+logs/calendars, tax rules) also makes the workspace non-empty, because archive format 1.1
+does not carry it yet.
+
+Restore writes, in one transaction:
+
+1. the workspace settings from `workspace.json` (name, base currency, country, time zone,
+   language, automatic plan copy, Taxes switch and Upcoming window); `require_two_factor` is
+   not part of the archive and stays as it is;
+2. categories with their archived state and order;
+3. planned values, including those of archived and transfer categories;
+4. transactions in file order, including deleted entries and their entry order;
+5. month states exactly as in `months.csv` (closed months and plan-start markers) last.
+
+Any validation error blocks the whole restore. A newer major format version is refused; a newer
+minor version imports with a warning listing what was ignored. Restoring never posts recurring
+items or sends notifications, and the stored month markers stop the automatic plan copy from
+filling a restored month.
+
+The restore report lists the rows it will write, the suggested categories it will remove, the
+settings it will replace, and the months it will close. **Roll back import** on an applied
+restore hard-deletes everything it wrote and puts the previous workspace settings back, but only
+while nothing in the workspace changed after the restore. A rolled-back restore leaves a truly
+empty workspace: it does not re-add the suggested categories. Use **Add suggested categories**
+on the Categories page if you want them.
+
+## Merging an archive
+
+Merge is for bringing an archive's ledger data into a workspace you already use. Editors and
+owners can merge. It writes categories, transactions and planned values only; `workspace.json`
+and `months.csv` are reported but not applied. The archive's base currency must match the
+workspace's, otherwise the whole archive is refused.
+
+The mapping step has one row per archive category, so an active and an archived category with the
+same name stay separate. The defaults are: an explicit choice; a lineage match (the archive
+category id already exists here); a saved mapping for an active archive category; an active
+category with the same name; otherwise create a category with the archive's attributes,
+archived state included. Categories created by a merge are appended, and merging an archive back
+into the workspace it came from creates nothing.
+
+Merge follows the same skip rules as a hand-made CSV: rows in closed months, future-dated
+transactions, deleted transactions and planned values of archived or transfer categories are
+skipped and listed. A merge batch can be rolled back like any other import.
 
 ## Importing a hand-made CSV
 
@@ -107,6 +157,8 @@ order. Archived rows are created archived. Existing categories are never changed
 are listed. An explicit `sort_order` does not place a merged category: merge mode always
 appends.
 
-Every import can be rolled back from the recent-imports list. Rolling back a batch that has rows
-in a month closed since the import is refused as a whole and lists those months. If the batch
-set a month's first-plan marker and no planned values remain there, rollback clears the marker.
+Every import can be rolled back from the recent-imports list. Rolling back a merge batch that has
+rows in a month closed since the import is refused as a whole and lists those months. If the
+batch set a month's first-plan marker and no planned values remain there, rollback clears the
+marker. A restore rollback is refused when any row, month state, workspace setting or M3 data
+changed after the restore; see [Restoring an archive](#restoring-an-archive).

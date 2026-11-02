@@ -125,7 +125,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     },
     **{
         ("MonthStateRepository", method): "test_month_state_queries_stay_in_their_workspace"
-        for method in ("for_month", "create")
+        for method in ("for_month", "create", "create_restored", "delete_for_months")
     },
     **{
         ("MonthStateRepository", "closed_months"): (
@@ -164,6 +164,8 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             ("CategoryRepository", "for_import_batch"),
             ("BudgetLineRepository", "for_import_batch"),
             ("TransactionRepository", "create_imported"),
+            ("TransactionRepository", "create_restored"),
+            ("TransactionRepository", "delete_for_import_batch"),
             ("TransactionRepository", "for_import_batch"),
             ("TransactionRepository", "by_import_keys"),
             ("TransactionRepository", "by_lineage_ids"),

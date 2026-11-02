@@ -232,6 +232,9 @@ msgstr ""
 msgid "Workspace archive exported"
 msgstr ""
 
+msgid "Workspace restored from an archive"
+msgstr ""
+
 msgid "Import applied"
 msgstr ""
 
@@ -479,6 +482,21 @@ msgid "Not copied"
 msgstr ""
 
 msgid "Automatic"
+msgstr ""
+
+msgid "Import batch"
+msgstr ""
+
+msgid "Settings changed"
+msgstr ""
+
+msgid "Settings restored"
+msgstr ""
+
+msgid "Suggested categories removed"
+msgstr ""
+
+msgid "Month states deleted"
 msgstr ""
 
 msgid "owner"
@@ -904,6 +922,51 @@ msgid "The mapped category has the wrong kind."
 msgstr ""
 
 msgid "Two new categories have the same kind and name."
+msgstr ""
+
+msgid "The archive's base currency differs from this workspace's base currency."
+msgstr ""
+
+msgid ""
+"Restore is available only in an empty workspace (the untouched suggested "
+"categories are fine)."
+msgstr ""
+
+msgid "Two active categories in the archive have the same kind and name."
+msgstr ""
+
+msgid "The archive's workspace settings are not supported."
+msgstr ""
+
+msgid "The archive was made by a newer version of the app."
+msgstr ""
+
+msgid "The archive was made by a newer minor version; unknown data was ignored."
+msgstr ""
+
+msgid "The workspace has rows that this restore did not write."
+msgstr ""
+
+msgid "Rows written by this restore were changed after it."
+msgstr ""
+
+msgid "Month states written by this restore were changed after it."
+msgstr ""
+
+msgid "Workspace settings changed since the restore."
+msgstr ""
+
+msgid ""
+"Recurring items, income sources, work logs or tax rules were added after "
+"the restore."
+msgstr ""
+
+msgid ""
+"Recurring items, income sources, work logs or tax rules reference rows "
+"written by this restore."
+msgstr ""
+
+msgid "This restore did not record the workspace settings it replaced."
 msgstr ""
 
 #, python-format
@@ -2167,8 +2230,41 @@ msgstr ""
 msgid "There is no import handler available for this file yet."
 msgstr ""
 
+msgid "This archive cannot be imported into this workspace."
+msgstr ""
+
+msgid "Restore needs a complete workspace archive (a ZIP file)."
+msgstr ""
+
 #, python-format
 msgid "Rollback was refused because these months are closed: %(months)s"
+msgstr ""
+
+#, python-format
+msgid ""
+"Rollback was refused because the workspace changed after the restore: "
+"%(reasons)s"
+msgstr ""
+
+msgid "Workspace name"
+msgstr ""
+
+msgid "Base currency"
+msgstr ""
+
+msgid "Country"
+msgstr ""
+
+msgid "Time zone"
+msgstr ""
+
+msgid "Language"
+msgstr ""
+
+msgid "Automatic plan copy"
+msgstr ""
+
+msgid "Upcoming window"
 msgstr ""
 
 msgid "Workspace settings saved."
@@ -2308,9 +2404,6 @@ msgid "Your details"
 msgstr ""
 
 msgid "Display name"
-msgstr ""
-
-msgid "Language"
 msgstr ""
 
 msgid "Theme"
@@ -2743,9 +2836,6 @@ msgstr ""
 
 #, python-format
 msgid "Your email address %(email)s is confirmed. Choose your name and password."
-msgstr ""
-
-msgid "Workspace name"
 msgstr ""
 
 msgid "Choose a new password"
@@ -4639,16 +4729,7 @@ msgstr ""
 msgid "Defaults to your display name."
 msgstr ""
 
-msgid "Base currency"
-msgstr ""
-
-msgid "Country"
-msgstr ""
-
 msgid "Not set"
-msgstr ""
-
-msgid "Time zone"
 msgstr ""
 
 msgid "Download workspace archive"
@@ -4671,6 +4752,27 @@ msgid "Import ledger data"
 msgstr ""
 
 msgid "ZIP archive or CSV file"
+msgstr ""
+
+msgid "Merge data into this workspace"
+msgstr ""
+
+msgid ""
+"Categories, transactions, and planned values; settings and closed months "
+"are not applied."
+msgstr ""
+
+msgid "Restore into this workspace"
+msgstr ""
+
+msgid ""
+"Replaces settings, categories, transactions, planned values, and month "
+"states. Only for an empty workspace."
+msgstr ""
+
+msgid ""
+"Available only in an empty workspace. The untouched suggested categories "
+"are fine."
 msgstr ""
 
 msgid "CSV delimiter"
@@ -4752,6 +4854,33 @@ msgstr ""
 msgid "Unresolved category mappings"
 msgstr ""
 
+msgid "Restore plan"
+msgstr ""
+
+msgid "Deleted transactions restored"
+msgstr ""
+
+msgid "Month states"
+msgstr ""
+
+msgid "Suggested categories to remove"
+msgstr ""
+
+#, python-format
+msgid "Removed before restoring: %(names)s"
+msgstr ""
+
+msgid "Settings the restore will replace:"
+msgstr ""
+
+msgid "Months that will be restored as closed:"
+msgstr ""
+
+msgid ""
+"A restore needs a completely valid archive. Fix the errors below before "
+"applying."
+msgstr ""
+
 msgid "Totals by month"
 msgstr ""
 
@@ -4759,6 +4888,12 @@ msgid "Rows to create"
 msgstr ""
 
 msgid "Totals by category"
+msgstr ""
+
+msgid "Settings that differ (not applied in merge mode):"
+msgstr ""
+
+msgid "Closed months in the archive (not applied in merge mode):"
 msgstr ""
 
 msgid "The file was checked, but there is no importer for this kind of file yet."
@@ -4862,10 +4997,28 @@ msgstr ""
 msgid "Confirm import rollback"
 msgstr ""
 
+msgid ""
+"This permanently removes everything the restore wrote and puts the "
+"previous workspace settings back. The suggested categories are not "
+"restored."
+msgstr ""
+
 msgid "Transactions to remove"
 msgstr ""
 
 msgid "Budget lines to remove"
+msgstr ""
+
+msgid "Categories to remove"
+msgstr ""
+
+msgid "Month states to remove"
+msgstr ""
+
+msgid "Settings to restore:"
+msgstr ""
+
+msgid "Rollback is not possible:"
 msgstr ""
 
 msgid "Budget lines kept (changed since the import)"

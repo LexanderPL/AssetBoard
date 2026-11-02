@@ -310,12 +310,21 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
     if manifest.get("format") != FORMAT:
         return None, (ArchiveError("manifest.json", "unsupported archive format"),)
     version = manifest.get("format_version")
-    if not isinstance(version, str) or not re.fullmatch(r"1\.[0-9]{1,4}", version):
+    match = (
+        re.fullmatch(r"([0-9]{1,4})\.([0-9]{1,4})", version) if isinstance(version, str) else None
+    )
+    if match is None:
+        return None, (ArchiveError("manifest.json", "unsupported archive version"),)
+    major, minor = int(match.group(1)), int(match.group(2))
+    current_major, current_minor = (int(part) for part in FORMAT_VERSION.split("."))
+    if major > current_major:
+        return None, (ArchiveError("manifest.json", "made by a newer version of the app"),)
+    if major < current_major:  # no 0.x upgrade path exists; 1.x is the first format
         return None, (ArchiveError("manifest.json", "unsupported archive version"),)
     warnings = [
         ArchiveError(name, "unknown file ignored") for name in names if name not in REQUIRED_FILES
     ]
-    if int(version.partition(".")[2]) > int(FORMAT_VERSION.partition(".")[2]):
+    if minor > current_minor:
         warnings.append(ArchiveError("manifest.json", f"newer minor version: {version}"))
     warnings.extend(
         ArchiveError("manifest.json", f"unknown key: {key}")

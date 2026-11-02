@@ -4,20 +4,30 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from importlib.metadata import version
 
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard import branding
 from assetboard.db.engine import run_immediate
+from assetboard.db.models.ledger import Category
 from assetboard.db.repositories import (
     AuditEventRepository,
+    AuditFilter,
     BudgetLineRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
+    IncomeSourceRepository,
+    IncomeSourceTaxRuleRepository,
     MonthStateRepository,
+    ScheduledItemRepository,
+    ScheduledOccurrenceRepository,
+    TaxRuleRepository,
+    TaxRuleVersionRepository,
     TransactionRepository,
+    WorkDayRepository,
+    WorkLogRepository,
 )
 from assetboard.domain.archive import (
     ArchiveRows,
@@ -29,7 +39,11 @@ from assetboard.domain.archive import (
     timestamp_text,
     write_archive,
 )
+from assetboard.domain.categories import SEED
 from assetboard.domain.ledger_csv import plain_amount
+from assetboard.i18n import gettext
+from assetboard.i18n.locale import SUPPORTED_LOCALES
+from assetboard.services.categories import usage_by_category
 from assetboard.services.context import Context, Role, require_role, require_role_now
 
 ARCHIVE_INCLUDED_MODELS = frozenset({"Category", "BudgetLine", "Transaction", "MonthState"})
@@ -52,6 +66,147 @@ ARCHIVE_EXCLUDED_MODELS = {
     "NotificationChannel": "notification URLs contain secrets (F3.8/F9.3)",
     "NotificationLog": "notification delivery history is not portable (F3.8)",
 }
+
+
+# A restore target must hold no workspace data. The untouched suggested set is the one
+# exception: it is deleted by the restore itself. Later milestones add their tables here, as
+# ``services.workspaces.BASE_CURRENCY_LOCKS`` does for amounts.
+def _expected_suggested_categories(locale: str) -> set[tuple[str, str, str, str, int]]:
+    positions: dict[str, int] = {}
+    expected: set[tuple[str, str, str, str, int]] = set()
+    for seed in SEED:
+        name = gettext(seed.name, locale)
+        kind = seed.kind.value
+        position = positions.get(kind, 0)
+        positions[kind] = position + 1
+        expected.add((name, kind, seed.treatment.value, seed.color, position))
+    return expected
+
+
+def suggested_categories_to_remove(session: Session, ctx: Context) -> list[Category]:
+    """The untouched suggested categories a restore may delete before writing its own.
+
+    "Untouched" means the exact suggested set (in a supported locale), unedited and unreferenced,
+    with the automatic seed audit event proving it came from workspace creation. Anything else
+    makes the workspace non-empty.
+    """
+    categories = CategoryRepository(session, ctx).ordered()
+    if len(categories) != len(SEED):
+        return []
+    if any(category.archived_at is not None for category in categories):
+        return []
+    if any(category.updated_at != category.created_at for category in categories):
+        return []
+    seed_events = AuditEventRepository(session, ctx).page(
+        AuditFilter(actions={"category.seeded"}), limit=100
+    )
+    automatic = [event for event in seed_events if event.data.get("automatic") is True]
+    if not automatic:
+        return []
+    seeded_at = automatic[0].ts
+    # A later manual "Add suggested categories" makes the set a user action, not the untouched
+    # automatic seed, even if its rows happen to look the same.
+    if any(
+        event.ts > seeded_at for event in seed_events if event.data.get("automatic") is not True
+    ):
+        return []
+    # Seeding creates the rows and then the audit event in one transaction; a real clock may
+    # tick between the two, so allow a small window instead of exact equality.
+    if any(
+        not (seeded_at <= category.created_at <= seeded_at + timedelta(seconds=5))
+        for category in categories
+    ):
+        return []
+    usage = usage_by_category(session, ctx)
+    if any(usage.get(category.id) is not None for category in categories):
+        return []
+    actual = {
+        (category.name, category.kind, category.treatment, category.color, category.sort_order)
+        for category in categories
+    }
+    if not any(actual == _expected_suggested_categories(locale) for locale in SUPPORTED_LOCALES):
+        return []
+    return categories
+
+
+def _has_unexpected_categories(session: Session, ctx: Context) -> bool:
+    categories = CategoryRepository(session, ctx).list()
+    if not categories:
+        return False
+    return not suggested_categories_to_remove(session, ctx)
+
+
+def _has_transactions(session: Session, ctx: Context) -> bool:
+    return TransactionRepository(session, ctx).any_exists()
+
+
+def _has_budget_lines(session: Session, ctx: Context) -> bool:
+    return BudgetLineRepository(session, ctx).any_exists()
+
+
+def _has_month_states(session: Session, ctx: Context) -> bool:
+    return bool(MonthStateRepository(session, ctx).list())
+
+
+def _has_scheduled_items(session: Session, ctx: Context) -> bool:
+    return bool(ScheduledItemRepository(session, ctx).list())
+
+
+def _has_scheduled_occurrences(session: Session, ctx: Context) -> bool:
+    return bool(ScheduledOccurrenceRepository(session, ctx).list())
+
+
+def _has_income_sources(session: Session, ctx: Context) -> bool:
+    return bool(IncomeSourceRepository(session, ctx).list())
+
+
+def _has_income_source_tax_rules(session: Session, ctx: Context) -> bool:
+    return bool(IncomeSourceTaxRuleRepository(session, ctx).list())
+
+
+def _has_work_logs(session: Session, ctx: Context) -> bool:
+    return bool(WorkLogRepository(session, ctx).list())
+
+
+def _has_work_days(session: Session, ctx: Context) -> bool:
+    return bool(WorkDayRepository(session, ctx).list())
+
+
+def _has_tax_rules(session: Session, ctx: Context) -> bool:
+    return bool(TaxRuleRepository(session, ctx).list())
+
+
+def _has_tax_rule_versions(session: Session, ctx: Context) -> bool:
+    return bool(TaxRuleVersionRepository(session, ctx).list())
+
+
+EMPTINESS_CHECKS = (
+    _has_unexpected_categories,
+    _has_transactions,
+    _has_budget_lines,
+    _has_month_states,
+    _has_scheduled_items,
+    _has_scheduled_occurrences,
+    _has_income_sources,
+    _has_income_source_tax_rules,
+    _has_work_logs,
+    _has_work_days,
+    _has_tax_rules,
+    _has_tax_rule_versions,
+)
+
+
+def workspace_is_empty(session: Session, ctx: Context) -> bool:
+    """Whether a restore may target this workspace (untouched suggested categories aside)."""
+    return not any(check(session, ctx) for check in EMPTINESS_CHECKS)
+
+
+def restore_available(factory: sessionmaker[Session], ctx: Context) -> bool:
+    """Whether the data page should offer restore mode (owners only, empty workspace)."""
+    if ctx.role is not Role.OWNER:
+        return False
+    with factory() as session:
+        return workspace_is_empty(session, ctx)
 
 
 @dataclass(frozen=True, slots=True)
