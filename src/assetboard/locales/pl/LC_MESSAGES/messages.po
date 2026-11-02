@@ -2613,18 +2613,6 @@ msgstr "Przycisk trybu ciemnego zmienia motyw tylko na jednym urządzeniu."
 msgid "Use the saved theme on this device"
 msgstr "Użyj zapisanego motywu na tym urządzeniu"
 
-msgid "Password and devices"
-msgstr "Hasło i urządzenia"
-
-msgid "Change your password or sign out other devices."
-msgstr "Zmień hasło albo wyloguj inne urządzenia."
-
-msgid "This account has no password. You can still sign out other devices."
-msgstr "To konto nie ma hasła. Nadal możesz wylogować inne urządzenia."
-
-msgid "Two-factor authentication"
-msgstr "Uwierzytelnianie dwuskładnikowe"
-
 msgid "Notifications"
 msgstr "Powiadomienia"
 
@@ -2674,6 +2662,9 @@ msgstr "Serwer proxy loguje Cię jako %(user)s."
 
 msgid "Link this proxy sign-in"
 msgstr "Powiąż to logowanie przez proxy"
+
+msgid "Two-factor authentication"
+msgstr "Uwierzytelnianie dwuskładnikowe"
 
 msgid ""
 "Protect password sign-ins with an authenticator app. A workspace owner "
@@ -3052,6 +3043,12 @@ msgstr "Wyloguj się wszędzie poza tym urządzeniem."
 
 msgid "Sign out other devices"
 msgstr "Wyloguj inne urządzenia"
+
+msgid "Two-factor authentication is not enabled."
+msgstr "Uwierzytelnianie dwuskładnikowe nie jest włączone."
+
+msgid "Manage two-factor authentication"
+msgstr "Zarządzaj uwierzytelnianiem dwuskładnikowym"
 
 msgid ""
 "Enter your email address. We will send you a link to confirm it and "
@@ -5616,34 +5613,6 @@ msgstr ""
 "podatki. Najpierw je odznacz:"
 
 msgid ""
-"Reminders about upcoming and overdue payments and days worked, sent to "
-"your own channels (ntfy, Telegram, email and others). Each member sets up"
-" their own on their Profile page."
-msgstr ""
-"Przypomnienia o nadchodzących i zaległych płatnościach oraz "
-"przepracowanych dniach, wysyłane na Twoje własne kanały (ntfy, Telegram, "
-"e-mail i inne). Każdy członek ustawia własne na stronie Profil."
-
-msgid "Categories and workspaces"
-msgstr "Kategorie i obszary robocze"
-
-msgid ""
-"The income and expense categories of this workspace, their colours and "
-"their order."
-msgstr ""
-"Kategorie przychodów i wydatków tego obszaru roboczego, ich kolory i "
-"kolejność."
-
-msgid "Manage categories"
-msgstr "Zarządzaj kategoriami"
-
-msgid "A separate budget with its own members, categories and currency."
-msgstr "Osobny budżet z własnymi członkami, kategoriami i walutą."
-
-msgid "Create a workspace"
-msgstr "Utwórz obszar roboczy"
-
-msgid ""
 "Permanently removes this workspace and all its data, for every member. "
 "You confirm on the next page by typing the workspace name."
 msgstr ""
@@ -6193,4 +6162,48 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "The file could not be validated."
 #~ msgstr "Nie można zweryfikować pliku."
+
+#~ msgid "Password and devices"
+#~ msgstr "Hasło i urządzenia"
+
+#~ msgid "Change your password or sign out other devices."
+#~ msgstr "Zmień hasło albo wyloguj inne urządzenia."
+
+#~ msgid "This account has no password. You can still sign out other devices."
+#~ msgstr "To konto nie ma hasła. Nadal możesz wylogować inne urządzenia."
+
+#~ msgid ""
+#~ "Reminders about upcoming and overdue "
+#~ "payments and days worked, sent to "
+#~ "your own channels (ntfy, Telegram, email"
+#~ " and others). Each member sets up "
+#~ "their own on their Profile page."
+#~ msgstr ""
+#~ "Przypomnienia o nadchodzących i zaległych "
+#~ "płatnościach oraz przepracowanych dniach, "
+#~ "wysyłane na Twoje własne kanały (ntfy,"
+#~ " Telegram, e-mail i inne). Każdy "
+#~ "członek ustawia własne na stronie "
+#~ "Profil."
+
+#~ msgid "Categories and workspaces"
+#~ msgstr "Kategorie i obszary robocze"
+
+#~ msgid ""
+#~ "The income and expense categories of "
+#~ "this workspace, their colours and their"
+#~ " order."
+#~ msgstr ""
+#~ "Kategorie przychodów i wydatków tego "
+#~ "obszaru roboczego, ich kolory i "
+#~ "kolejność."
+
+#~ msgid "Manage categories"
+#~ msgstr "Zarządzaj kategoriami"
+
+#~ msgid "A separate budget with its own members, categories and currency."
+#~ msgstr "Osobny budżet z własnymi członkami, kategoriami i walutą."
+
+#~ msgid "Create a workspace"
+#~ msgstr "Utwórz obszar roboczy"
 

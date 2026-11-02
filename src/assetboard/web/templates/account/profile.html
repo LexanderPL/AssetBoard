@@ -30,15 +30,6 @@
     </p>
   </section>
 
-  <section class="panel p-6 sm:p-7" aria-labelledby="password-heading">
-    <h2 id="password-heading" class="text-base font-semibold">{{ _("Password and devices") }}</h2>
-    <p class="mt-2 text-sm text-muted">
-      {% if has_password %}{{ _("Change your password or sign out other devices.") }}{% else %}{{ _("This account has no password. You can still sign out other devices.") }}{% endif %}
-    </p>
-    <p class="mt-4"><a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'account_password') }}">{{ _("Account security") }}</a></p>
-    <p class="mt-4"><a class="font-semibold text-primary-ink" href="{{ scoped_url(request, 'account_totp') }}">{{ _("Two-factor authentication") }}</a></p>
-  </section>
-
   {% if workspace_nav %}
   <section class="panel p-6 sm:p-7 lg:col-span-2" aria-labelledby="notifications-heading" data-profile-notifications>
     <h2 id="notifications-heading" class="text-base font-semibold">{{ _("Notifications") }}</h2>

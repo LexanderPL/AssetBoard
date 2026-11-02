@@ -134,6 +134,8 @@ def test_enrollment_requires_password_and_code_and_shows_recovery_codes_once(
     assert page.headers["cache-control"] == "no-store"
     assert all(code not in page.text for code in codes)
     assert secret not in page.text and "<svg" not in page.text
+    security = owner.client.get("/account/password").text
+    assert "data-two-factor-enabled" in security
     assert owner.post("/account/totp/verify", {"code": "123456"}).status_code == 400
 
 

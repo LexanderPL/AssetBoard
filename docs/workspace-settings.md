@@ -19,6 +19,9 @@ Owners open "Workspace settings" from the workspace menu. The page has:
 Changes are recorded in the workspace audit log under "Workspace settings" (which fields
 changed, not their values).
 
+The page holds settings only. Notification channels are on each member's Profile page, while
+Categories and workspace creation/switching stay in the account menu.
+
 ## The base currency is locked once amounts exist
 
 Amounts are stored in the base currency and are never converted. So the base currency can be

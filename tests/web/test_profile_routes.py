@@ -208,6 +208,17 @@ def test_profile_page_and_nav_link(h: Harness) -> None:
     assert 'value="browser" selected' in page.text  # new accounts follow the browser
 
 
+def test_two_factor_moves_from_the_profile_to_account_security(h: Harness) -> None:
+    client = admin(h)
+    profile = client.get("/account").text
+    assert "Password and devices" not in profile
+    assert 'href="/account/totp"' not in profile
+    security = client.get("/account/password").text
+    assert "data-account-totp" in security
+    assert 'href="/account/totp"' in security
+    assert "data-two-factor-disabled" in security
+
+
 @pytest.mark.parametrize(
     ("form", "field_error"),
     [

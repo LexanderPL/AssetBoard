@@ -148,10 +148,10 @@ def test_the_page_is_translated(owner):
     assert "Powiadomienia" in page and "Nowy kanał" in page and "Dołączaj kwoty" in page
 
 
-def test_notifications_are_linked_from_workspace_settings_and_the_profile(owner):
+def test_notifications_are_linked_from_the_profile_only(owner):
     settings = owner.client.get("/workspace/settings").text
-    section = settings.split("data-settings-notifications", 1)[1].split("</section>", 1)[0]
-    assert 'href="/notifications" data-notifications-link' in section
+    assert "data-settings-notifications" not in settings
+    assert 'href="/notifications" data-notifications-link' not in settings
     assert 'href="/notifications" data-notifications-link' in owner.client.get("/account").text
     # Editors and viewers keep their own channels: the Profile page links them.
     for role in ("editor", "viewer"):

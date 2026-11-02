@@ -2429,18 +2429,6 @@ msgstr ""
 msgid "Use the saved theme on this device"
 msgstr ""
 
-msgid "Password and devices"
-msgstr ""
-
-msgid "Change your password or sign out other devices."
-msgstr ""
-
-msgid "This account has no password. You can still sign out other devices."
-msgstr ""
-
-msgid "Two-factor authentication"
-msgstr ""
-
 msgid "Notifications"
 msgstr ""
 
@@ -2485,6 +2473,9 @@ msgid "Your proxy signs you in as %(user)s."
 msgstr ""
 
 msgid "Link this proxy sign-in"
+msgstr ""
+
+msgid "Two-factor authentication"
 msgstr ""
 
 msgid ""
@@ -2827,6 +2818,12 @@ msgid "Sign out everywhere except on this device."
 msgstr ""
 
 msgid "Sign out other devices"
+msgstr ""
+
+msgid "Two-factor authentication is not enabled."
+msgstr ""
+
+msgid "Manage two-factor authentication"
 msgstr ""
 
 msgid ""
@@ -5174,29 +5171,6 @@ msgid ""
 msgstr ""
 
 msgid ""
-"Reminders about upcoming and overdue payments and days worked, sent to "
-"your own channels (ntfy, Telegram, email and others). Each member sets up"
-" their own on their Profile page."
-msgstr ""
-
-msgid "Categories and workspaces"
-msgstr ""
-
-msgid ""
-"The income and expense categories of this workspace, their colours and "
-"their order."
-msgstr ""
-
-msgid "Manage categories"
-msgstr ""
-
-msgid "A separate budget with its own members, categories and currency."
-msgstr ""
-
-msgid "Create a workspace"
-msgstr ""
-
-msgid ""
 "Permanently removes this workspace and all its data, for every member. "
 "You confirm on the next page by typing the workspace name."
 msgstr ""
@@ -5905,5 +5879,40 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "The category kind is required because the name is not unambiguous."
+#~ msgstr ""
+
+#~ msgid "Password and devices"
+#~ msgstr ""
+
+#~ msgid "Change your password or sign out other devices."
+#~ msgstr ""
+
+#~ msgid "This account has no password. You can still sign out other devices."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Reminders about upcoming and overdue "
+#~ "payments and days worked, sent to "
+#~ "your own channels (ntfy, Telegram, email"
+#~ " and others). Each member sets up "
+#~ "their own on their Profile page."
+#~ msgstr ""
+
+#~ msgid "Categories and workspaces"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The income and expense categories of "
+#~ "this workspace, their colours and their"
+#~ " order."
+#~ msgstr ""
+
+#~ msgid "Manage categories"
+#~ msgstr ""
+
+#~ msgid "A separate budget with its own members, categories and currency."
+#~ msgstr ""
+
+#~ msgid "Create a workspace"
 #~ msgstr ""
 
