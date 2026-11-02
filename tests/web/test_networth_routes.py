@@ -6,7 +6,7 @@ import re
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from assetboard.db.models.networth import ItemValuation, NetWorthCategory, NetWorthItem
 from tests.conftest import OwnerApp
@@ -23,6 +23,16 @@ def _category_id(owner: OwnerApp, side: str, name: str) -> UUID:
                 NetWorthCategory.name == name,
             )
         ).one()
+
+
+def _clear_side(owner: OwnerApp, side: str) -> None:
+    with owner.db() as session, session.begin():
+        session.execute(
+            delete(NetWorthCategory).where(
+                NetWorthCategory.workspace_id == owner.home_id,
+                NetWorthCategory.side == side,
+            )
+        )
 
 
 def _create_item(
@@ -89,6 +99,33 @@ def test_the_page_has_assets_and_liabilities_tabs(owner: OwnerApp) -> None:
     assert re.search(r'aria-selected="true"[^>]*data-side-tab="liability"', liability) is not None
 
 
+def test_the_seed_form_works_for_an_empty_side(owner: OwnerApp) -> None:
+    _clear_side(owner, "liability")
+    page = owner.client.get("/net-worth?side=liability").text
+    assert "data-seed-offer" in page and "data-seed" in page
+    response = owner.post(
+        "/net-worth/categories/seed",
+        {"side": "liability"},
+        token_from="/net-worth?side=liability",
+    )
+    assert response.status_code == 303
+    assert response.headers["location"] == ("/net-worth?side=liability&notice=categories_seeded")
+    with owner.db() as session:
+        names = session.scalars(
+            select(NetWorthCategory.name)
+            .where(
+                NetWorthCategory.workspace_id == owner.home_id,
+                NetWorthCategory.side == "liability",
+            )
+            .order_by(NetWorthCategory.sort_order)
+        ).all()
+    assert names == ["Installments", "Mortgage", "Other"]
+    assert (
+        "Suggested categories added."
+        in owner.client.get("/net-worth?side=liability&notice=categories_seeded").text
+    )
+
+
 def test_create_item_shows_the_value_and_history(owner: OwnerApp) -> None:
     item = _create_item(owner, name="Car", value="12000", notes="Garage")
     page = owner.client.get("/net-worth").text
@@ -102,6 +139,23 @@ def test_create_item_shows_the_value_and_history(owner: OwnerApp) -> None:
             len(session.scalars(select(ItemValuation).where(ItemValuation.item_id == item)).all())
             == 1
         )
+
+
+def test_too_many_decimals_are_shown_on_the_item_form(owner: OwnerApp) -> None:
+    response = owner.post(
+        "/net-worth/items",
+        {
+            "side": "asset",
+            "category_id": str(_category_id(owner, "asset", "Vehicles")),
+            "name": "Car",
+            "value": "12.345",
+            "currency": "EUR",
+        },
+        token_from="/net-worth",
+    )
+    assert response.status_code == 400
+    assert "The amount has too many decimal places." in response.text
+    assert 'value="12.345"' in response.text
 
 
 def test_add_a_backdated_value_and_see_it_in_the_history(owner: OwnerApp) -> None:
@@ -211,6 +265,17 @@ def test_bulk_preview_reports_an_unknown_category_and_cannot_create(owner: Owner
     created = _htmx(owner, "/net-worth/bulk", {"side": "asset", "text": "Car; 10; Missing"})
     assert created.status_code == 400
     assert "No active category with this name." in created.text
+
+
+def test_bulk_preview_shows_a_decimal_error(owner: OwnerApp) -> None:
+    preview = _htmx(
+        owner,
+        "/net-worth/bulk/preview",
+        {"side": "asset", "text": "Car; 12.345; Vehicles"},
+    )
+    assert preview.status_code == 200
+    assert "The amount has too many decimal places." in preview.text
+    assert "data-bulk-create" not in preview.text
 
 
 def test_bulk_limits_show_a_form_error(owner: OwnerApp) -> None:

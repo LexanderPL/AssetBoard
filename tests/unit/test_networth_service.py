@@ -371,6 +371,7 @@ def test_item_create_uses_the_base_currency_and_validates_currency(
     [
         ("-1", "value", "value_negative"),
         ("not a number", "value", "invalid_amount"),
+        ("12.345", "value", "too_many_decimals"),
         ("9999999999999999", "value", "amount_too_large"),
     ],
 )
@@ -380,6 +381,39 @@ def test_item_value_validation(team: WorkspaceDb, value: str, field: str, code: 
     with pytest.raises(InvalidNetWorth) as caught:
         _item(team, ctx, category, value=value)
     assert (caught.value.field, caught.value.code) == (field, code)
+
+
+def test_extra_decimals_are_refused_for_valuations_and_bulk_lines(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx, "Vehicles")
+    item = _item(team, ctx, category, name="Car", value="100")
+    with pytest.raises(InvalidNetWorth) as caught:
+        add_valuation(
+            team.factory,
+            ctx,
+            item.id,
+            locale="en",
+            value="12.345",
+            as_of=date(2026, 3, 1),
+        )
+    assert (caught.value.field, caught.value.code) == ("value", "too_many_decimals")
+    preview = preview_bulk(
+        team.factory, ctx, side="asset", text="Boat; 12.345; Vehicles", locale="en"
+    )
+    assert preview.lines[0].errors == ("too_many_decimals",)
+    with pytest.raises(BulkRejected) as rejected:
+        create_bulk(
+            team.factory,
+            ctx,
+            side="asset",
+            text="Boat; 12.345; Vehicles",
+            locale="en",
+        )
+    assert rejected.value.preview.lines[0].errors == ("too_many_decimals",)
+    with team.factory() as session:
+        assert len(ItemValuationRepository(session, ctx).for_item(item.id)) == 1
 
 
 def test_item_category_must_be_active_and_on_the_same_side(team: WorkspaceDb) -> None:

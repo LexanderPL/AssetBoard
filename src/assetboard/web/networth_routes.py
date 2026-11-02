@@ -76,6 +76,7 @@ ERRORS = {
     "invalid_notes": _("Enter notes of at most 200 characters."),
     "invalid_amount": _("Enter a valid amount."),
     "value_negative": _("Values cannot be negative."),
+    "too_many_decimals": _("The amount has too many decimal places."),
     "amount_too_large": _("The value is too large."),
     "invalid_currency": _("Choose a supported currency."),
     "currency_locked": _("The currency cannot change after the first value."),
@@ -118,6 +119,7 @@ BULK_ERRORS = {
     "invalid_category": _("Enter a category name of 1 to 80 characters."),
     "invalid_amount": _("Enter a valid amount."),
     "value_negative": _("Values cannot be negative."),
+    "too_many_decimals": _("The amount has too many decimal places."),
     "amount_too_large": _("The value is too large."),
     "category_unknown": _("No active category with this name."),
     "category_archived": _("This category is archived; choose an active one."),
@@ -403,10 +405,28 @@ async def networth_categories_create(
                 side=selected,
                 status_code=400,
                 create_category_values=values,
-                create_category_errors={field: code},
+                create_category_errors={field: ERRORS.get(code, FALLBACK_ERROR)},
             )
         )
     return await run_in_threadpool(lambda: _done(request, ctx, "category_created", selected))
+
+
+@router.post("/net-worth/categories/seed", name="networth_categories_seed")
+async def networth_categories_seed(
+    request: Request, ctx: CurrentContext, side: FormStr = ""
+) -> Response:
+    selected = _selected_side(side)
+    locale = request.state.locale
+    try:
+        await run_in_threadpool(
+            lambda: seed_categories(
+                request.app.state.session_factory, ctx, side=side, locale=locale
+            )
+        )
+    except NetWorthError as exc:
+        code = exc.code
+        return await run_in_threadpool(lambda: _failed(request, ctx, selected, code))
+    return await run_in_threadpool(lambda: _done(request, ctx, "categories_seeded", selected))
 
 
 @router.post("/net-worth/categories/{category_id}", name="networth_category_update")
@@ -436,7 +456,7 @@ async def networth_category_update(
                 status_code=400,
                 edit_category=category,
                 edit_category_values=values,
-                edit_category_errors={field: code},
+                edit_category_errors={field: ERRORS.get(code, FALLBACK_ERROR)},
             )
         )
     return await run_in_threadpool(
@@ -505,24 +525,6 @@ async def networth_category_delete(
     )
     notice = "category_deleted" if outcome == "deleted" else "category_archived_in_use"
     return await run_in_threadpool(lambda: _done(request, ctx, notice, selected))
-
-
-@router.post("/net-worth/categories/seed", name="networth_categories_seed")
-async def networth_categories_seed(
-    request: Request, ctx: CurrentContext, side: FormStr = ""
-) -> Response:
-    selected = _selected_side(side)
-    locale = request.state.locale
-    try:
-        await run_in_threadpool(
-            lambda: seed_categories(
-                request.app.state.session_factory, ctx, side=side, locale=locale
-            )
-        )
-    except NetWorthError as exc:
-        code = exc.code
-        return await run_in_threadpool(lambda: _failed(request, ctx, selected, code))
-    return await run_in_threadpool(lambda: _done(request, ctx, "categories_seeded", selected))
 
 
 @router.get("/net-worth/categories/{category_id}/edit", name="networth_category_edit")
@@ -625,7 +627,7 @@ async def networth_items_create(
                 side=selected,
                 status_code=400,
                 create_item_values=values,
-                create_item_errors={field: code},
+                create_item_errors={field: ERRORS.get(code, FALLBACK_ERROR)},
             )
         )
     return await run_in_threadpool(lambda: _done(request, ctx, "item_created", Side(item.side)))
@@ -682,7 +684,7 @@ async def networth_item_update(
                 status_code=400,
                 edit_item=item,
                 edit_item_values=values,
-                edit_item_errors={field: code},
+                edit_item_errors={field: ERRORS.get(code, FALLBACK_ERROR)},
             )
         )
     return await run_in_threadpool(lambda: _done(request, ctx, "item_saved", Side(item.side)))
@@ -746,7 +748,7 @@ async def networth_item_valuation(
                 error=ERRORS.get(code, FALLBACK_ERROR),
                 valuation_item_id=item.id,
                 valuation_values={"value": value, "as_of": as_of or today, "note": note},
-                valuation_errors={field: code},
+                valuation_errors={field: ERRORS.get(code, FALLBACK_ERROR)},
             )
         )
     return await run_in_threadpool(lambda: _done(request, ctx, "valuation_added", Side(item.side)))

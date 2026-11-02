@@ -91,10 +91,10 @@ def upgrade() -> None:
         sa.Column(
             "include_in_net_worth",
             sa.Boolean(),
-            server_default=sa.text("1"),
+            server_default=sa.true(),
             nullable=False,
         ),
-        sa.Column("investable", sa.Boolean(), server_default=sa.text("0"), nullable=False),
+        sa.Column("investable", sa.Boolean(), server_default=sa.false(), nullable=False),
         sa.Column("archived_at", UtcDateTime(), nullable=True),
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("created_at", UtcDateTime(), nullable=False),

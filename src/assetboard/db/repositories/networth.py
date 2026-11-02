@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from collections.abc import Collection
-from datetime import datetime
+from datetime import date, datetime
 from uuid import UUID
+
+from sqlalchemy import func, select
 
 from assetboard.db.models.networth import ItemValuation, NetWorthCategory, NetWorthItem
 from assetboard.db.repositories.base import ScopedRepository
@@ -58,10 +60,14 @@ class NetWorthCategoryRepository(ScopedRepository[NetWorthCategory]):
 
     def count(self, side: str | None = None) -> int:
         """All categories of the workspace (or one side), archived ones included."""
-        statement = self._scoped_select()
+        statement = (
+            select(func.count())
+            .select_from(NetWorthCategory)
+            .where(NetWorthCategory.workspace_id == self._workspace_id)
+        )
         if side is not None:
             statement = statement.where(NetWorthCategory.side == side)
-        return len(list(self._session.scalars(statement)))
+        return self._session.execute(statement).scalar_one()
 
     def next_sort_order(self, side: str) -> int:
         """One past the last sort order of this side (archived rows included)."""
@@ -73,8 +79,38 @@ class NetWorthCategoryRepository(ScopedRepository[NetWorthCategory]):
 class NetWorthItemRepository(ScopedRepository[NetWorthItem]):
     model = NetWorthItem
 
-    def create(self, **values: object) -> NetWorthItem:
-        return self.add(NetWorthItem(**values))
+    def create(
+        self,
+        *,
+        side: str,
+        category_id: UUID,
+        name: str,
+        currency: str,
+        notes: str = "",
+        acquired_on: date | None = None,
+        valuation_mode: str = "manual",
+        link_type: str | None = None,
+        link_id: UUID | None = None,
+        include_in_net_worth: bool = True,
+        investable: bool = False,
+        archived_at: datetime | None = None,
+    ) -> NetWorthItem:
+        return self.add(
+            NetWorthItem(
+                side=side,
+                category_id=category_id,
+                name=name,
+                currency=currency,
+                notes=notes,
+                acquired_on=acquired_on,
+                valuation_mode=valuation_mode,
+                link_type=link_type,
+                link_id=link_id,
+                include_in_net_worth=include_in_net_worth,
+                investable=investable,
+                archived_at=archived_at,
+            )
+        )
 
     def ordered(
         self, side: str | None = None, *, include_archived: bool = True
@@ -104,8 +140,24 @@ class ItemValuationRepository(ScopedRepository[ItemValuation]):
     model = ItemValuation
     unsupported = frozenset({"update", "delete"})
 
-    def create(self, **values: object) -> ItemValuation:
-        return self.add(ItemValuation(**values))
+    def create(
+        self,
+        *,
+        item_id: UUID,
+        as_of: date,
+        value_minor: int,
+        currency: str,
+        note: str = "",
+    ) -> ItemValuation:
+        return self.add(
+            ItemValuation(
+                item_id=item_id,
+                as_of=as_of,
+                value_minor=value_minor,
+                currency=currency,
+                note=note,
+            )
+        )
 
     def for_item(self, item_id: UUID) -> list[ItemValuation]:
         statement = self._scoped_select().where(ItemValuation.item_id == item_id)

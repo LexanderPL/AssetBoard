@@ -62,7 +62,8 @@ from assetboard.domain.networth import (
     move_category as move_in_order,
 )
 from assetboard.domain.text import text_key
-from assetboard.domain.transactions import MAX_AMOUNT_MINOR
+from assetboard.domain.transactions import EntryError
+from assetboard.domain.transactions import amount_minor as positive_amount_minor
 from assetboard.i18n import gettext
 from assetboard.i18n.numbers import parse_amount
 from assetboard.services.context import Context, Role, require_role, require_role_now
@@ -855,15 +856,21 @@ def _parse_decimal(value: str, locale: str) -> Decimal:
 
 
 def _money(value: Decimal, currency: str) -> Money:
+    """Exact minor units, using the ledger's rule: refuse extra decimals, never round."""
     if value < 0:
         raise InvalidNetWorth("value", "value_negative")
+    if value == 0:
+        return Money(0, currency)
     try:
-        money = Money.from_decimal(value, currency)
-    except (TypeError, ValueError):
-        raise InvalidNetWorth("value", "invalid_amount") from None
-    if money.amount_minor > MAX_AMOUNT_MINOR:
-        raise InvalidNetWorth("value", "amount_too_large")
-    return money
+        minor = positive_amount_minor(value, currency)
+    except EntryError as exc:
+        code = exc.code
+        if code == "amount_not_positive":
+            code = "value_negative"
+        elif code not in {"too_many_decimals", "amount_too_large"}:
+            code = "invalid_amount"
+        raise InvalidNetWorth("value", code) from None
+    return Money(minor, currency)
 
 
 def _currency(value: str) -> str:
