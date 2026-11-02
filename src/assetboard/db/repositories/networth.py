@@ -6,7 +6,7 @@ from collections.abc import Collection
 from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from assetboard.db.models.networth import (
     ItemValuation,
@@ -29,6 +29,8 @@ class NetWorthCategoryRepository(ScopedRepository[NetWorthCategory]):
         color: str,
         sort_order: int,
         archived_at: datetime | None = None,
+        import_batch_id: UUID | None = None,
+        import_key: str | None = None,
     ) -> NetWorthCategory:
         return self.add(
             NetWorthCategory(
@@ -38,6 +40,8 @@ class NetWorthCategoryRepository(ScopedRepository[NetWorthCategory]):
                 color=color,
                 sort_order=sort_order,
                 archived_at=archived_at,
+                import_batch_id=import_batch_id,
+                import_key=import_key,
             )
         )
 
@@ -80,6 +84,12 @@ class NetWorthCategoryRepository(ScopedRepository[NetWorthCategory]):
         orders = [category.sort_order for category in self._session.scalars(statement)]
         return max(orders) + 1 if orders else 0
 
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[NetWorthCategory]:
+        statement = self._scoped_select().where(NetWorthCategory.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(self._session.scalars(statement.order_by(NetWorthCategory.id)))
+
 
 class NetWorthItemRepository(ScopedRepository[NetWorthItem]):
     model = NetWorthItem
@@ -99,6 +109,8 @@ class NetWorthItemRepository(ScopedRepository[NetWorthItem]):
         include_in_net_worth: bool = True,
         investable: bool = False,
         archived_at: datetime | None = None,
+        import_batch_id: UUID | None = None,
+        import_key: str | None = None,
     ) -> NetWorthItem:
         return self.add(
             NetWorthItem(
@@ -114,6 +126,8 @@ class NetWorthItemRepository(ScopedRepository[NetWorthItem]):
                 include_in_net_worth=include_in_net_worth,
                 investable=investable,
                 archived_at=archived_at,
+                import_batch_id=import_batch_id,
+                import_key=import_key,
             )
         )
 
@@ -162,6 +176,26 @@ class NetWorthItemRepository(ScopedRepository[NetWorthItem]):
         )
         return self._session.scalars(statement).one_or_none()
 
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[NetWorthItem]:
+        statement = self._scoped_select().where(NetWorthItem.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(self._session.scalars(statement.order_by(NetWorthItem.id)))
+
+    def by_lineage_ids(self, row_ids: Collection[UUID]) -> list[NetWorthItem]:
+        """Items whose id, or ``id:<id>`` import key, is one of ``row_ids`` (F5.5)."""
+        ids = list(row_ids)
+        found: dict[UUID, NetWorthItem] = {}
+        for start in range(0, len(ids), 400):
+            chunk = ids[start : start + 400]
+            statement = self._scoped_select().where(
+                NetWorthItem.id.in_(chunk)
+                | NetWorthItem.import_key.in_([f"id:{row_id}" for row_id in chunk])
+            )
+            for row in self._session.scalars(statement):
+                found[row.id] = row
+        return list(found.values())
+
 
 class ItemValuationRepository(ScopedRepository[ItemValuation]):
     model = ItemValuation
@@ -175,16 +209,22 @@ class ItemValuationRepository(ScopedRepository[ItemValuation]):
         value_minor: int,
         currency: str,
         note: str = "",
+        import_batch_id: UUID | None = None,
+        import_key: str | None = None,
+        created_at: datetime | None = None,
     ) -> ItemValuation:
-        return self.add(
-            ItemValuation(
-                item_id=item_id,
-                as_of=as_of,
-                value_minor=value_minor,
-                currency=currency,
-                note=note,
-            )
+        row = ItemValuation(
+            item_id=item_id,
+            as_of=as_of,
+            value_minor=value_minor,
+            currency=currency,
+            note=note,
+            import_batch_id=import_batch_id,
+            import_key=import_key,
         )
+        if created_at is not None:
+            row.created_at = created_at
+        return self.add(row)
 
     def for_item(self, item_id: UUID) -> list[ItemValuation]:
         statement = self._scoped_select().where(ItemValuation.item_id == item_id)
@@ -226,6 +266,27 @@ class ItemValuationRepository(ScopedRepository[ItemValuation]):
             )
         ).scalar_one()
 
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[ItemValuation]:
+        statement = self._scoped_select().where(ItemValuation.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(
+            self._session.scalars(
+                statement.order_by(ItemValuation.item_id, ItemValuation.as_of, ItemValuation.id)
+            )
+        )
+
+    def delete_for_import_batch(self, batch_id: UUID) -> int:
+        """Hard-delete a restore/merge batch's valuations; the append-only guard applies to ORM
+        deletes only, and this is the one explicit rollback path (like workspace deletion)."""
+        result = self._session.execute(
+            delete(ItemValuation).where(
+                ItemValuation.workspace_id == self._workspace_id,
+                ItemValuation.import_batch_id == batch_id,
+            )
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
+
 
 class NetWorthSnapshotRepository(ScopedRepository[NetWorthSnapshot]):
     model = NetWorthSnapshot
@@ -241,6 +302,8 @@ class NetWorthSnapshotRepository(ScopedRepository[NetWorthSnapshot]):
         currency: str,
         breakdown: dict[str, object],
         source: str,
+        import_batch_id: UUID | None = None,
+        import_key: str | None = None,
     ) -> NetWorthSnapshot:
         return self.add(
             NetWorthSnapshot(
@@ -251,6 +314,8 @@ class NetWorthSnapshotRepository(ScopedRepository[NetWorthSnapshot]):
                 currency=currency,
                 breakdown=breakdown,
                 source=source,
+                import_batch_id=import_batch_id,
+                import_key=import_key,
             )
         )
 
@@ -274,3 +339,9 @@ class NetWorthSnapshotRepository(ScopedRepository[NetWorthSnapshot]):
                 )
             )
         )
+
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[NetWorthSnapshot]:
+        statement = self._scoped_select().where(NetWorthSnapshot.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(self._session.scalars(statement.order_by(NetWorthSnapshot.id)))

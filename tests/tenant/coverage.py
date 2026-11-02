@@ -126,19 +126,41 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     },
     **{
         ("NetWorthCategoryRepository", method): "test_networth_queries_stay_in_their_workspace"
-        for method in ("create", "ordered", "active_by_name_key", "count", "next_sort_order")
+        for method in (
+            "create",
+            "ordered",
+            "active_by_name_key",
+            "count",
+            "next_sort_order",
+            "for_import_batch",
+        )
     },
     **{
         ("NetWorthItemRepository", method): "test_networth_queries_stay_in_their_workspace"
-        for method in ("create", "ordered", "by_ids", "counts_by_category", "active_linked")
+        for method in (
+            "create",
+            "ordered",
+            "by_ids",
+            "counts_by_category",
+            "active_linked",
+            "for_import_batch",
+            "by_lineage_ids",
+        )
     },
     **{
         ("ItemValuationRepository", method): "test_networth_queries_stay_in_their_workspace"
-        for method in ("create", "for_item", "for_items", "earliest_as_of")
+        for method in (
+            "create",
+            "for_item",
+            "for_items",
+            "earliest_as_of",
+            "for_import_batch",
+            "delete_for_import_batch",
+        )
     },
     **{
         ("NetWorthSnapshotRepository", method): "test_networth_queries_stay_in_their_workspace"
-        for method in ("create", "for_date", "for_range")
+        for method in ("create", "for_date", "for_range", "for_import_batch")
     },
     **{
         ("MonthStateRepository", method): "test_month_state_queries_stay_in_their_workspace"

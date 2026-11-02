@@ -104,6 +104,58 @@ def test_0035_net_worth_link_index_migration_is_reversible(tmp_path: Path) -> No
         engine.dispose()
 
 
+def test_0036_net_worth_archive_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'networth_archive.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    inspector = inspect(engine)
+    try:
+        for table in (
+            "networth_categories",
+            "networth_items",
+            "item_valuations",
+            "networth_snapshots",
+        ):
+            columns = {column["name"] for column in inspector.get_columns(table)}
+            assert {"import_key", "import_batch_id"} <= columns
+            indexes = {index["name"] for index in inspector.get_indexes(table)}
+            assert f"uq_{table}_import_key" in indexes
+        source_check = next(
+            check
+            for check in inspector.get_check_constraints("import_batches")
+            if check["name"] == "ck_import_batches_source_valid"
+        )
+        assert "item_valuations_csv" in str(source_check["sqltext"])
+
+        command.downgrade(alembic_config(settings), "0035_f54_net_worth_links")
+        inspector = inspect(engine)
+        for table in (
+            "networth_categories",
+            "networth_items",
+            "item_valuations",
+            "networth_snapshots",
+        ):
+            columns = {column["name"] for column in inspector.get_columns(table)}
+            assert not {"import_key", "import_batch_id"} & columns
+            indexes = {index["name"] for index in inspector.get_indexes(table)}
+            assert f"uq_{table}_import_key" not in indexes
+        source_check = next(
+            check
+            for check in inspector.get_check_constraints("import_batches")
+            if "source_valid" in (check["name"] or "")
+        )
+        assert "item_valuations_csv" not in str(source_check["sqltext"])
+
+        upgrade_database(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
 def test_0034_net_worth_snapshots_migration_is_reversible(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None,
