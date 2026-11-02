@@ -32,7 +32,7 @@ from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Literal
+from typing import Any, Literal, cast
 from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -47,13 +47,14 @@ from assetboard.db.repositories import (
     CategoryRepository,
     CurrentWorkspaceRepository,
     ImportBatchRepository,
+    ImportCategoryMappingRepository,
     MonthStateRepository,
     TransactionRepository,
 )
 from assetboard.db.repositories.base import WorkspaceScope
-from assetboard.domain.archive import CSV_COLUMNS, ArchiveError
+from assetboard.domain.archive import ArchiveError
 from assetboard.domain.import_upload import ParsedUpload, ParseTimeout, parse_upload
-from assetboard.domain.ledger_csv import TRANSACTION_EXPORT_COLUMNS, guard_formula
+from assetboard.domain.ledger_csv import guard_formula
 from assetboard.domain.months import YearMonth
 from assetboard.i18n import gettext
 from assetboard.services.categories import usage_by_category
@@ -118,6 +119,39 @@ REPORT_MESSAGES: dict[str, str] = {
     "planned_value_exists": _("The same planned value already exists."),
     "planned_value_differs": _("A different planned value exists; the stored value is kept."),
     "closed_month": _("The month is closed."),
+    # F4.3 lone CSV imports and category mapping.
+    "partial_restore": _("This file is only part of a full restore."),
+    "missing_column": _("A required column is missing."),
+    "duplicate_column": _("The header contains a duplicate column."),
+    "deleted_in_source": _("Deleted in the source; it is not imported in merge mode."),
+    "future_date": _("The date is in the future; it is not imported as an actual entry."),
+    "ignored_category": _("The category is ignored for this import."),
+    "category_archived": _("The category is archived; no planned value can be added."),
+    "category_transfer": _("Transfer categories cannot have planned values."),
+    "category_differs": _("The category already exists with different values; it is kept."),
+    "category_exists": _("A category with this name already exists."),
+    "kind_required": _("The category kind is required because the name is not unambiguous."),
+    "invalid_direction": _("The direction must be expense or income."),
+    "invalid_date": _("Enter a date as YYYY-MM-DD."),
+    "date_out_of_range": _("The date is outside 1900-01-01 to 2199-12-31."),
+    "invalid_month": _("Enter a month as YYYY-MM."),
+    "invalid_amount": _("Enter a plain positive amount."),
+    "amount_not_positive": _("The amount must be greater than zero."),
+    "amount_too_large": _("The amount is too large."),
+    "too_many_decimals": _("The amount has too many decimal places."),
+    "amount_negative": _("The amount cannot be negative."),
+    "invalid_currency": _("The currency must be the workspace base currency."),
+    "invalid_description": _("The description contains characters that are not allowed."),
+    "description_too_long": _("The description is too long."),
+    "invalid_category_name": _("Enter a category name of 1 to 80 characters."),
+    "invalid_treatment": _("Choose a valid category treatment."),
+    "invalid_color": _("Choose a valid colour."),
+    "invalid_sort_order": _("The sort order must be a whole number."),
+    "invalid_id": _("The id is not a valid UUID."),
+    "invalid_timestamp": _("The timestamp is invalid."),
+    "mapping_category_missing": _("The mapped category does not exist."),
+    "mapping_kind_mismatch": _("The mapped category has the wrong kind."),
+    "duplicate_create_name": _("Two new categories have the same kind and name."),
 }
 
 # ``domain.archive`` / ``domain.import_upload`` messages -> report codes.
@@ -143,6 +177,9 @@ _PARSER_CODES: dict[str, str] = {
     "byte count mismatch": "byte_count_mismatch",
     "row count mismatch": "row_count_mismatch",
     "invalid delimiter option": "invalid_delimiter",
+    "duplicate column name": "duplicate_column",
+    "only part of a full restore": "partial_restore",
+    "unknown file": "unknown_file",
 }
 
 
@@ -172,6 +209,12 @@ class ImportClosedMonths(ImportError):
     def __init__(self, months: tuple[str, ...]) -> None:
         super().__init__("the batch affects months that are now closed")
         self.months = months
+
+
+class ImportMappingInvalid(ImportError):
+    def __init__(self, report: dict[str, Any]) -> None:
+        super().__init__("the import has unresolved or invalid category mappings")
+        self.report = report
 
 
 def _never() -> bool:
@@ -236,6 +279,7 @@ class ImportBatchView:
     status: str
     created_at: datetime
     report: dict[str, Any] | None
+    options: dict[str, Any]
 
 
 def _batch_view(batch: ImportBatch) -> ImportBatchView:
@@ -247,6 +291,7 @@ def _batch_view(batch: ImportBatch) -> ImportBatchView:
         status=batch.status,
         created_at=batch.created_at,
         report=batch.report,
+        options=batch.options,
     )
 
 
@@ -273,7 +318,12 @@ def _counts(**values: int) -> dict[str, int]:
         "conflicts_skipped": 0,
         "closed_months_skipped": 0,
         "ignored_categories_skipped": 0,
+        "future_dates_skipped": 0,
+        "deleted_skipped": 0,
+        "archived_categories_skipped": 0,
+        "transfer_categories_skipped": 0,
         "invalid": 0,
+        "mapping_invalid": 0,
         **values,
     }
 
@@ -294,6 +344,8 @@ def _report(
         "counts": counts or _counts(),
         "months": [],
         "categories": [],
+        "mapping": [],
+        "mapping_errors": [],
         "closed_months": [],
         "warnings": warnings or [],
         "skipped": [],
@@ -355,17 +407,25 @@ def upload_import(
 
 
 def _error_dict(error: ArchiveError) -> dict[str, object]:
+    code = _PARSER_CODES.get(error.message, "invalid_upload")
+    if code == "invalid_upload" and error.message.startswith("missing required column:"):
+        code = "missing_column"
     return _entry(
         error.file,
-        _PARSER_CODES.get(error.message, "invalid_upload"),
+        code,
         error.message,
         error.line or "",
         error.column or "",
     )
 
 
+def _delimiter_option(options: Mapping[str, object]) -> str:
+    value = options.get("delimiter", "detect")
+    return {"comma": ",", "semicolon": ";"}.get(str(value), "detect")
+
+
 def _plan_file(
-    content: bytes, *, delimiter: str = ",", out_of_time: Callable[[], bool] = _never
+    content: bytes, *, delimiter: str = "detect", out_of_time: Callable[[], bool] = _never
 ) -> tuple[str, dict[str, Any], ParsedUpload | None]:
     parsed, errors = parse_upload(content, delimiter=delimiter, out_of_time=out_of_time)
     if parsed is None:
@@ -381,16 +441,6 @@ def _plan_file(
     warnings = [_error_dict(error) for error in parsed.warnings]
     if parsed.archive is None:
         row_count = len(parsed.csv_rows)
-        known_columns = {
-            "transactions_csv": set(TRANSACTION_EXPORT_COLUMNS),
-            "budget_lines_csv": set(CSV_COLUMNS["budget_lines.csv"]),
-            "categories_csv": set(CSV_COLUMNS["categories.csv"]),
-        }[parsed.source]
-        warnings.extend(
-            _error_dict(ArchiveError("upload.csv", "unknown column ignored", column=column))
-            for column in parsed.csv_header
-            if column not in known_columns
-        )
     else:
         rows = parsed.archive.rows
         row_count = sum(
@@ -409,6 +459,20 @@ def _plan_file(
     return "planned", report, parsed
 
 
+def _merge_adapter_report(base: dict[str, Any], adapter_report: dict[str, Any]) -> dict[str, Any]:
+    """Combine the parser's report with the adapter's (warnings, errors and invalid counts)."""
+    counts = _counts(**adapter_report.get("counts", {}))
+    counts["invalid"] += base.get("counts", {}).get("invalid", 0)
+    counts["rows_received"] = base.get("counts", {}).get("rows_received", 0)
+    merged = {**base, **adapter_report}
+    merged["counts"] = counts
+    merged["warnings"] = [*base.get("warnings", []), *adapter_report.get("warnings", [])]
+    merged["errors"] = [*base.get("errors", []), *adapter_report.get("errors", [])]
+    for key in ("months", "categories", "mapping", "mapping_errors", "closed_months", "skipped"):
+        merged.setdefault(key, [])
+    return merged
+
+
 def _plan_worker(
     path: Path,
     factory: sessionmaker[Session],
@@ -425,16 +489,26 @@ def _plan_worker(
         batch = ImportBatchRepository(session, ctx).get(batch_id)
         if batch is None:
             raise ImportError("batch is not in this workspace")
-        delimiter = ";" if batch.options.get("delimiter") == "semicolon" else ","
-        status, report, parsed = _plan_file(content, delimiter=delimiter, out_of_time=out_of_time)
+        delimiter = _delimiter_option(batch.options)
+        status, base_report, parsed = _plan_file(
+            content, delimiter=delimiter, out_of_time=out_of_time
+        )
         if status != "planned" or parsed is None:
-            return status, report
+            return status, base_report
         adapter = adapters.for_source(parsed.source)
         if adapter is None:
-            return status, report
+            return status, base_report
         base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
-        report = adapter.plan(
-            session, ctx, batch, parsed, base_currency=base_currency, out_of_time=out_of_time
+        report = _merge_adapter_report(
+            base_report,
+            adapter.plan(
+                session,
+                ctx,
+                batch,
+                parsed,
+                base_currency=base_currency,
+                out_of_time=out_of_time,
+            ),
         )
         report["source"] = parsed.source
     for key in ("warnings", "skipped", "errors", "months", "categories", "closed_months"):
@@ -549,6 +623,38 @@ def cancel_import(
     _delete_upload(run_immediate(factory, cancel))
 
 
+def _mapping_signature(options: Mapping[str, object]) -> tuple[tuple[str, ...], ...]:
+    """A stable comparison of the posted mapping choices (order does not matter)."""
+    raw = options.get("mappings")
+    if not isinstance(raw, list):
+        return ()
+    fields = (
+        "kind",
+        "source_name_key",
+        "action",
+        "category_id",
+        "create_name",
+        "create_treatment",
+        "create_color",
+    )
+    entries: list[tuple[str, ...]] = []
+    for raw_item in cast("list[object]", raw):
+        if not isinstance(raw_item, dict):
+            continue
+        item = cast("dict[str, object]", raw_item)
+        entries.append(tuple(str(item.get(field, "")) for field in fields))
+    return tuple(sorted(entries))
+
+
+def _merged_options(
+    current: Mapping[str, object] | None, changes: Mapping[str, object] | None
+) -> dict[str, object]:
+    merged = dict(current or {})
+    if changes:
+        merged.update(changes)
+    return merged
+
+
 def apply_import(
     factory: sessionmaker[Session],
     ctx: Context,
@@ -557,6 +663,7 @@ def apply_import(
     adapters: ImportAdapterRegistry,
     *,
     skip_invalid: bool = False,
+    options: Mapping[str, object] | None = None,
 ) -> dict[str, Any]:
     require_role(ctx, Role.EDITOR)
     stored_path = _upload_path(data_dir, ctx.workspace.id, batch_id)
@@ -573,6 +680,14 @@ def apply_import(
             raise ImportUnavailable("No importer is registered for this upload type.")
         if batch.mode == "restore":
             require_role_now(session, ctx, Role.OWNER)
+        previous_mapping = (batch.report or {}).get("mapping", [])
+        choices_changed = (
+            isinstance(options, Mapping)
+            and "mappings" in options
+            and _mapping_signature(options) != _mapping_signature({"mappings": previous_mapping})
+        )
+        new_options = _merged_options(batch.options, options)
+        batch.options = new_options
         try:
             content = stored_path.read_bytes()
         except FileNotFoundError:
@@ -583,16 +698,23 @@ def apply_import(
             batch.status = "failed"
             batch.report = _failure("stored_checksum_mismatch", "stored upload checksum mismatch")
             return {"_failed": True, "report": batch.report}
-        delimiter = ";" if batch.options.get("delimiter") == "semicolon" else ","
-        status, failed_report, parsed = _plan_file(content, delimiter=delimiter)
+        status, base_report, parsed = _plan_file(
+            content, delimiter=_delimiter_option(batch.options)
+        )
         if status == "failed" or parsed is None:
             batch.status = "failed"
-            batch.report = failed_report
-            return {"_failed": True, "report": failed_report}
+            batch.report = base_report
+            return {"_failed": True, "report": base_report}
         base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
-        report = adapter.plan(session, ctx, batch, parsed, base_currency=base_currency)
+        report = _merge_adapter_report(
+            base_report,
+            adapter.plan(session, ctx, batch, parsed, base_currency=base_currency),
+        )
         report["source"] = parsed.source
-        if report["counts"] != (batch.report or {}).get("counts", {}):
+        if report["counts"].get("mapping_invalid", 0):
+            batch.report = report
+            return {"_mapping_invalid": True, "report": report}
+        if choices_changed or report["counts"] != (batch.report or {}).get("counts", {}):
             batch.report = report
             return {"_confirmation_required": True, "report": report}
         if batch.mode == "restore" and report["counts"].get("invalid", 0):
@@ -631,10 +753,37 @@ def apply_import(
     if result.get("_failed"):
         _delete_upload(stored_path)
         raise ImportError("stored upload failed validation")
+    if result.get("_mapping_invalid"):
+        raise ImportMappingInvalid(result["report"])
     if result.get("_confirmation_required"):
         raise ImportConfirmationRequired(result["report"])
     _delete_upload(stored_path)
     return result
+
+
+def update_import_preview(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    data_dir: Path,
+    batch_id: UUID,
+    adapters: ImportAdapterRegistry,
+    *,
+    options: Mapping[str, object],
+) -> dict[str, Any]:
+    """Save the mapping choices on the batch and re-run the dry-run (no rows are written)."""
+    require_role(ctx, Role.EDITOR)
+
+    def prepare(session: Session) -> None:
+        require_role_now(session, ctx, Role.EDITOR)
+        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+        batch = ImportBatchRepository(session, ctx).get_for_update(batch_id)
+        if batch is None or batch.status != "planned":
+            raise ImportError("batch is not ready to preview")
+        batch.options = _merged_options(batch.options, options)
+        batch.status = "uploaded"
+
+    run_immediate(factory, prepare)
+    return plan_import(factory, ctx, data_dir, batch_id, adapters)
 
 
 @dataclass(frozen=True, slots=True)
@@ -645,6 +794,7 @@ class _RollbackPlan:
     edited: int  # of those, changed after the import
     lines_to_remove: tuple[BudgetLine, ...]
     lines_kept: int  # changed after the import (``updated_at > applied_at``)
+    categories_created: tuple[Category, ...]  # every category the batch created
     categories_to_delete: tuple[Category, ...]
     categories_to_archive: tuple[Category, ...]
     closed_months: tuple[str, ...]
@@ -698,6 +848,7 @@ def _rollback_plan(
         edited=sum(row.updated_at > applied_at for row in live),
         lines_to_remove=to_remove,
         lines_kept=len(lines) - len(to_remove),
+        categories_created=tuple(categories),
         categories_to_delete=tuple(to_delete),
         categories_to_archive=tuple(to_archive),
         closed_months=tuple(str(month) for month in sorted(affected & closed)),
@@ -732,6 +883,9 @@ def rollback_import(
         for line in plan.lines_to_remove:
             lines.delete(line)
         session.flush()
+        ImportCategoryMappingRepository(session, ctx).delete_for_categories(
+            [category.id for category in plan.categories_created]
+        )
         categories = CategoryRepository(session, ctx)
         for category in plan.categories_to_delete:
             categories.delete(category)

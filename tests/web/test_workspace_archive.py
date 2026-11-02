@@ -140,7 +140,7 @@ class TrivialImportAdapter(ImportAdapter):
                 "conflicts_skipped": sum(m.action == "conflict" for m in every),
                 "closed_months_skipped": codes.count("closed_month"),
                 "ignored_categories_skipped": 0,
-                "invalid": parsed.invalid_row_count,
+                "invalid": 0,
             },
             "months": [
                 {
@@ -158,16 +158,7 @@ class TrivialImportAdapter(ImportAdapter):
             "closed_months": [],
             "warnings": [],
             "skipped": skipped,
-            "errors": [
-                {
-                    "file": e.file,
-                    "line": e.line,
-                    "column": e.column,
-                    "code": "row_column_count",
-                    "message": e.message,
-                }
-                for e in parsed.row_errors
-            ],  # fmt: skip
+            "errors": [],
         }
 
     def apply(
@@ -333,7 +324,7 @@ def test_import_upload_is_stored_and_planned(owner: OwnerApp) -> None:
     assert batch.status == "planned"
     assert batch.source == "transactions_csv"
     assert batch.filename == "Lodz ledger.csv"
-    assert batch.options == {"delimiter": "comma", "decimal": "dot"}
+    assert batch.options == {"delimiter": "detect", "decimal": "dot"}
     assert batch.report is not None and batch.report["counts"]["to_create"] == 1
     assert path.read_bytes() == HEADER + COFFEE
     assert path.stat().st_mode & 0o777 == 0o600
@@ -626,6 +617,7 @@ def test_stale_import_cleanup_removes_private_file_and_marks_batch_failed(
 def test_planned_batch_can_be_cancelled_and_unavailable_apply_is_refused(
     owner: OwnerApp,
 ) -> None:
+    owner.app.state.import_adapters = ImportAdapterRegistry({})
     batch_id = _upload(owner, HEADER)
     page = owner.client.get(f"/workspace/data?batch={batch_id}")
     assert "no importer for this kind of file yet" in page.text

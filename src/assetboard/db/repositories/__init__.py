@@ -16,6 +16,7 @@ from assetboard.db.repositories.base import (
 from assetboard.db.repositories.budget_line import BudgetLineRepository, LineUsage
 from assetboard.db.repositories.category import CategoryRepository
 from assetboard.db.repositories.import_batch import ImportBatchRepository
+from assetboard.db.repositories.import_category_mapping import ImportCategoryMappingRepository
 from assetboard.db.repositories.income import (
     IncomeSourceRepository,
     IncomeSourceTaxRuleRepository,
@@ -76,6 +77,7 @@ __all__ = [
     "InvitationLocation",
     "InvitationRepository",
     "ImportBatchRepository",
+    "ImportCategoryMappingRepository",
     "InvitationTokenReader",
     "LineUsage",
     "MembershipRepository",

@@ -9,10 +9,11 @@ pages. Successful writes redirect (303) back to the page they came from.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
 from functools import partial
 from tempfile import SpooledTemporaryFile
-from typing import Annotated
+from typing import Annotated, Any
 from urllib.parse import quote
 from uuid import UUID
 
@@ -22,14 +23,17 @@ from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.engine import run_immediate
 from assetboard.domain.identity import MAX_EMAIL_LENGTH
+from assetboard.domain.import_csv import TEMPLATE_FILES
 from assetboard.i18n import gettext
 from assetboard.services import taxes
 from assetboard.services.archive import export_workspace
 from assetboard.services.context import Role, WorkspaceNotAvailable, require_role, select_workspace
+from assetboard.services.import_csv import mapping_category_options
 from assetboard.services.imports import (
     ImportClosedMonths,
     ImportConfirmationRequired,
     ImportError,
+    ImportMappingInvalid,
     ImportUnavailable,
     apply_import,
     cancel_import,
@@ -40,6 +44,7 @@ from assetboard.services.imports import (
     report_errors_csv,
     report_message,
     rollback_import,
+    update_import_preview,
     upload_import,
 )
 from assetboard.services.instance_settings import workspace_creation_allowed
@@ -139,6 +144,56 @@ def _parse_uuid(value: str) -> UUID:
         raise WorkspaceNotAvailable from None
 
 
+def _mapping_options_from_form(
+    form: Mapping[str, object], report: dict[str, Any] | None
+) -> dict[str, object]:
+    """Read the mapping choices posted by the report form (indexed fields, no JavaScript).
+
+    Returns an empty mapping when the form has no mapping controls (for example the compact
+    Apply button in the recent-imports list), so those requests keep the stored choices.
+    """
+    entries = (report or {}).get("mapping")
+    if not isinstance(entries, list) or not entries:
+        return {}
+    if not any(str(key).startswith("mapping_action_") for key in form):
+        return {}
+    mappings: list[dict[str, str]] = []
+    for index, entry in enumerate(entries):
+        if not isinstance(entry, dict):
+            continue
+        action = str(form.get(f"mapping_action_{index}", entry.get("action", "ignore")))
+        if action not in {"map", "create", "ignore"}:
+            action = "ignore"
+        mappings.append(
+            {
+                "kind": str(entry.get("kind", "")),
+                "source_name_key": str(entry.get("source_name_key", "")),
+                "action": action,
+                "category_id": str(form.get(f"mapping_category_{index}", "") or ""),
+                "create_name": str(
+                    form.get(f"mapping_name_{index}", entry.get("create_name", "")) or ""
+                ),
+                "create_treatment": str(
+                    form.get(f"mapping_treatment_{index}", entry.get("create_treatment", "regular"))
+                    or "regular"
+                ),
+                "create_color": str(
+                    form.get(f"mapping_color_{index}", entry.get("create_color", "")) or ""
+                ),
+            }
+        )
+    return {
+        "mappings": mappings,
+        "remember_mappings": str(form.get("remember_mappings", ""))
+        in {
+            "1",
+            "true",
+            "on",
+            "yes",
+        },
+    }
+
+
 @router.get("/workspace/data", name="workspace_data")
 async def workspace_data(request: Request, ctx: CurrentContext) -> Response:
     require_role(ctx, Role.EDITOR)
@@ -163,6 +218,9 @@ async def workspace_data(request: Request, ctx: CurrentContext) -> Response:
             "selected_batch": selected,
             "available_import_sources": request.app.state.import_adapters.sources,
             "import_message": partial(report_message, locale=request.state.locale),
+            "mapping_categories": await run_in_threadpool(
+                mapping_category_options, request.app.state.session_factory, ctx
+            ),
         },
     )
 
@@ -172,7 +230,7 @@ async def workspace_data_import(
     request: Request,
     ctx: CurrentContext,
     upload: UploadFileField,
-    delimiter: Annotated[str, Form()] = "comma",
+    delimiter: Annotated[str, Form()] = "detect",
     decimal: Annotated[str, Form()] = "dot",
 ) -> Response:
     require_role(ctx, Role.EDITOR)
@@ -182,7 +240,7 @@ async def workspace_data_import(
     await upload.close()
     if len(content) > max_bytes:
         raise HTTPException(status_code=413, detail=_t(request, UPLOAD_TOO_LARGE))
-    if delimiter not in {"comma", "semicolon"} or decimal not in {"dot", "comma"}:
+    if delimiter not in {"detect", "comma", "semicolon"} or decimal not in {"dot", "comma"}:
         raise HTTPException(status_code=422, detail=_t(request, IMPORT_FAILED))
     if decimal == "comma" and delimiter != "semicolon":
         raise HTTPException(status_code=422, detail=_t(request, IMPORT_FAILED))
@@ -265,6 +323,10 @@ async def workspace_data_import_apply(
         identifier = _parse_uuid(batch_id)
     except WorkspaceNotAvailable:
         raise HTTPException(status_code=404) from None
+    batch = await run_in_threadpool(
+        get_import_batch, request.app.state.session_factory, ctx, identifier
+    )
+    options = _mapping_options_from_form(await request.form(), batch.report if batch else None)
     try:
         await run_in_threadpool(
             apply_import,
@@ -274,6 +336,11 @@ async def workspace_data_import_apply(
             identifier,
             request.app.state.import_adapters,
             skip_invalid=skip_invalid,
+            options=options or None,
+        )
+    except ImportMappingInvalid:
+        return RedirectResponse(
+            f"{request.url_for('workspace_data').path}?batch={identifier}", status_code=303
         )
     except ImportConfirmationRequired:
         return RedirectResponse(
@@ -283,6 +350,52 @@ async def workspace_data_import_apply(
         message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
         raise HTTPException(status_code=409, detail=_t(request, message)) from None
     return RedirectResponse(request.url_for("workspace_data").path, status_code=303)
+
+
+@router.post("/workspace/data/import/{batch_id}/preview")
+async def workspace_data_import_preview(
+    request: Request, ctx: CurrentContext, batch_id: str
+) -> Response:
+    """Save the posted mapping choices and re-run the dry-run without writing any rows."""
+    try:
+        identifier = _parse_uuid(batch_id)
+    except WorkspaceNotAvailable:
+        raise HTTPException(status_code=404) from None
+    batch = await run_in_threadpool(
+        get_import_batch, request.app.state.session_factory, ctx, identifier
+    )
+    options = _mapping_options_from_form(await request.form(), batch.report if batch else None)
+    try:
+        await run_in_threadpool(
+            update_import_preview,
+            request.app.state.session_factory,
+            ctx,
+            request.app.state.settings.data_dir,
+            identifier,
+            request.app.state.import_adapters,
+            options=options,
+        )
+    except ImportError as error:
+        message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
+        raise HTTPException(status_code=409, detail=_t(request, message)) from None
+    return RedirectResponse(
+        f"{request.url_for('workspace_data').path}?batch={identifier}", status_code=303
+    )
+
+
+@router.get("/workspace/data/import/templates/{filename}", name="workspace_data_import_template")
+async def workspace_data_import_template(
+    request: Request, ctx: CurrentContext, filename: str
+) -> Response:
+    require_role(ctx, Role.EDITOR)
+    content = TEMPLATE_FILES.get(filename)
+    if content is None:
+        raise HTTPException(status_code=404)
+    return Response(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get(

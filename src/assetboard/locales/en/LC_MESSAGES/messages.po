@@ -805,6 +805,102 @@ msgstr ""
 msgid "The month is closed."
 msgstr ""
 
+msgid "This file is only part of a full restore."
+msgstr ""
+
+msgid "A required column is missing."
+msgstr ""
+
+msgid "The header contains a duplicate column."
+msgstr ""
+
+msgid "Deleted in the source; it is not imported in merge mode."
+msgstr ""
+
+msgid "The date is in the future; it is not imported as an actual entry."
+msgstr ""
+
+msgid "The category is ignored for this import."
+msgstr ""
+
+msgid "The category is archived; no planned value can be added."
+msgstr ""
+
+msgid "Transfer categories cannot have planned values."
+msgstr ""
+
+msgid "The category already exists with different values; it is kept."
+msgstr ""
+
+msgid "A category with this name already exists."
+msgstr ""
+
+msgid "The category kind is required because the name is not unambiguous."
+msgstr ""
+
+msgid "The direction must be expense or income."
+msgstr ""
+
+msgid "Enter a date as YYYY-MM-DD."
+msgstr ""
+
+msgid "The date is outside 1900-01-01 to 2199-12-31."
+msgstr ""
+
+msgid "Enter a month as YYYY-MM."
+msgstr ""
+
+msgid "Enter a plain positive amount."
+msgstr ""
+
+msgid "The amount must be greater than zero."
+msgstr ""
+
+msgid "The amount is too large."
+msgstr ""
+
+msgid "The amount has too many decimal places."
+msgstr ""
+
+msgid "The amount cannot be negative."
+msgstr ""
+
+msgid "The currency must be the workspace base currency."
+msgstr ""
+
+msgid "The description contains characters that are not allowed."
+msgstr ""
+
+msgid "The description is too long."
+msgstr ""
+
+msgid "Enter a category name of 1 to 80 characters."
+msgstr ""
+
+msgid "Choose a valid category treatment."
+msgstr ""
+
+msgid "Choose a valid colour."
+msgstr ""
+
+msgid "The sort order must be a whole number."
+msgstr ""
+
+msgid "The id is not a valid UUID."
+msgstr ""
+
+msgid "The timestamp is invalid."
+msgstr ""
+
+msgid "The mapped category does not exist."
+msgstr ""
+
+msgid "The mapped category has the wrong kind."
+msgstr ""
+
+msgid "Two new categories have the same kind and name."
+msgstr ""
+
 #, python-format
 msgid "%(tax)s: %(source)s"
 msgstr ""
@@ -1384,17 +1480,8 @@ msgstr ""
 msgid "Enter a date between the years 1900 and 2199."
 msgstr ""
 
-msgid "The amount must be greater than zero."
-msgstr ""
-
-msgid "The amount is too large."
-msgstr ""
-
 #, python-format
 msgid "Too many decimal places for %(currency)s."
-msgstr ""
-
-msgid "The description contains characters that are not allowed."
 msgstr ""
 
 #, python-format
@@ -1896,9 +1983,6 @@ msgid "The end date is before the start date."
 msgstr ""
 
 msgid "Choose expenses, income or both."
-msgstr ""
-
-msgid "The amount cannot be negative."
 msgstr ""
 
 msgid "The largest amount is below the smallest."
@@ -4587,10 +4671,16 @@ msgstr ""
 msgid "CSV delimiter"
 msgstr ""
 
+msgid "Detect"
+msgstr ""
+
 msgid "Dot"
 msgstr ""
 
 msgid "Validate upload"
+msgstr ""
+
+msgid "Templates:"
 msgstr ""
 
 msgid "Recent imports"
@@ -4645,7 +4735,16 @@ msgstr ""
 msgid "Closed-month rows skipped"
 msgstr ""
 
+msgid "Future-dated rows skipped"
+msgstr ""
+
+msgid "Rows of ignored categories skipped"
+msgstr ""
+
 msgid "Invalid rows"
+msgstr ""
+
+msgid "Unresolved category mappings"
 msgstr ""
 
 msgid "Totals by month"
@@ -4658,6 +4757,48 @@ msgid "Totals by category"
 msgstr ""
 
 msgid "The file was checked, but there is no importer for this kind of file yet."
+msgstr ""
+
+msgid "Category mapping"
+msgstr ""
+
+msgid ""
+"Map each category in the file to one of yours, create a new category, or "
+"ignore its rows. The defaults are already applied; change them and update"
+" the preview to check the totals before applying."
+msgstr ""
+
+#, python-format
+msgid "%(num)d row"
+msgid_plural "%(num)d rows"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Action"
+msgstr ""
+
+msgid "Map to an existing category"
+msgstr ""
+
+msgid "Create a new category"
+msgstr ""
+
+msgid "Ignore its rows"
+msgstr ""
+
+msgid "Existing category"
+msgstr ""
+
+msgid "New category name"
+msgstr ""
+
+msgid "Remember these mappings for later imports"
+msgstr ""
+
+msgid "Update preview"
+msgstr ""
+
+msgid "Fix the category mappings above before applying."
 msgstr ""
 
 msgid "Warnings"

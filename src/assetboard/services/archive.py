@@ -38,6 +38,7 @@ ARCHIVE_EXCLUDED_MODELS = {
     "Invitation": "invitations are not financial workspace data",
     "AuditEvent": "audit history is intentionally not portable",
     "ImportBatch": "temporary import state and user reports are not portable",
+    "ImportCategoryMapping": "remembered import choices are device-local import metadata",
     "ScheduledItem": "recurring rules require the F3.8 archive extension",
     "ScheduledOccurrence": "occurrence links require the F3.8 archive extension",
     "IncomeSource": "income sources require the F3.8 archive extension",

@@ -1281,6 +1281,7 @@ WORKSPACE_TABLES = {
     "notification_channels",
     "notification_log",
     "import_batches",
+    "import_category_mappings",
 }
 
 

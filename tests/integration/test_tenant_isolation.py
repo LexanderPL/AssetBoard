@@ -58,6 +58,7 @@ from assetboard.db.repositories import (
     CurrentWorkspaceRepository,
     ForeignWorkspace,
     ImportBatchRepository,
+    ImportCategoryMappingRepository,
     InstanceAuditReader,
     InvitationRepository,
     InvitationTokenReader,
@@ -497,6 +498,13 @@ def test_category_queries_stay_in_their_workspace(
     assert in_b.active_by_name_key(kind="expense", name_key="food") is b_food
     assert in_b.active_by_name_key(kind="income", name_key="salary") is None
     assert (in_a.count(), in_b.count()) == (2, 1)
+    assert (in_a.next_sort_order("expense"), in_b.next_sort_order("expense")) == (1, 1)
+    assert (in_a.next_sort_order("income"), in_b.next_sort_order("income")) == (1, 0)
+    source_id = UUID("f0e1d2c3-b4a5-4968-8776-655443322110")
+    in_a.update(a_food.id, import_key=f"id:{source_id}")
+    assert in_a.by_lineage_ids([source_id]) == [a_food]
+    assert in_b.by_lineage_ids([source_id]) == []
+    assert in_b.by_lineage_ids([a_food.id]) == []
 
 
 def test_month_state_queries_stay_in_their_workspace(
@@ -596,6 +604,50 @@ def test_import_batch_queries_stay_in_their_workspace(
     assert batch_b.workspace_id == ctx_b.workspace.id
     assert in_a.recent() == [batch_a]
     assert in_b.recent() == [batch_b]
+
+
+def test_import_category_mapping_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    in_a = ImportCategoryMappingRepository(db_session, ctx_a)
+    in_b = ImportCategoryMappingRepository(db_session, ctx_b)
+    category_a = CategoryRepository(db_session, ctx_a).create(
+        name="Food", name_key="food", kind="expense", treatment="regular",
+        color="#16a34a", sort_order=0,
+    )  # fmt: skip
+    category_b = CategoryRepository(db_session, ctx_b).create(
+        name="Food", name_key="food", kind="expense", treatment="regular",
+        color="#16a34a", sort_order=0,
+    )  # fmt: skip
+    mapping_a = in_a.create(
+        kind="expense", source_name_key="food", action="map", category_id=category_a.id
+    )
+    mapping_b = in_b.create(
+        kind="expense", source_name_key="food", action="map", category_id=category_b.id
+    )
+
+    assert mapping_a.workspace_id == ctx_a.workspace.id
+    assert mapping_b.workspace_id == ctx_b.workspace.id
+    assert in_a.for_kind("expense") == [mapping_a]
+    assert in_b.for_kind("expense") == [mapping_b]
+    assert in_a.get_for_source(kind="expense", source_name_key="food") is mapping_a
+    assert in_b.get_for_source(kind="expense", source_name_key="food") is mapping_b
+    assert in_b.get_for_source(kind="expense", source_name_key="other") is None
+
+    # Deleting mappings for a created category never crosses the workspace boundary.
+    assert in_a.delete_for_categories([category_b.id]) == 0
+    assert in_a.get_for_source(kind="expense", source_name_key="food") is mapping_a
+    assert in_a.delete_for_categories([category_a.id]) == 1
+    assert in_a.get_for_source(kind="expense", source_name_key="food") is None
+    assert in_b.get_for_source(kind="expense", source_name_key="food") is mapping_b
+    assert mapping_b.action == "map"
+
+    # Upsert changes only the owning workspace's row.
+    updated = in_a.upsert(kind="expense", source_name_key="food", action="ignore", category_id=None)
+    assert updated.action == "ignore"
+    assert in_b.get_for_source(kind="expense", source_name_key="food") is mapping_b
+    assert mapping_b.action == "map"
 
 
 def test_imported_ledger_rows_and_dedupe_lookups_stay_in_their_workspace(

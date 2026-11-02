@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -27,6 +29,7 @@ class CategoryRepository(ScopedRepository[Category]):
         sort_order: int,
         import_batch_id: UUID | None = None,
         import_key: str | None = None,
+        archived_at: datetime | None = None,
     ) -> Category:
         return self.add(
             Category(
@@ -38,6 +41,7 @@ class CategoryRepository(ScopedRepository[Category]):
                 sort_order=sort_order,
                 import_batch_id=import_batch_id,
                 import_key=import_key,
+                archived_at=archived_at,
             )
         )
 
@@ -68,6 +72,26 @@ class CategoryRepository(ScopedRepository[Category]):
             .where(Category.workspace_id == self._workspace_id)
         )
         return self._session.execute(statement).scalar_one()
+
+    def by_lineage_ids(self, row_ids: Collection[UUID]) -> list[Category]:
+        """Categories whose id, or ``id:<id>`` import key, is one of ``row_ids`` (F4.3)."""
+        ids = list(row_ids)
+        found: dict[UUID, Category] = {}
+        for start in range(0, len(ids), 400):
+            chunk = ids[start : start + 400]
+            statement = self._scoped_select().where(
+                Category.id.in_(chunk)
+                | Category.import_key.in_([f"id:{row_id}" for row_id in chunk])
+            )
+            for row in self._session.scalars(statement):
+                found[row.id] = row
+        return list(found.values())
+
+    def next_sort_order(self, kind: str) -> int:
+        """One past the last sort order of this kind (archived rows included)."""
+        statement = self._scoped_select().where(Category.kind == kind)
+        orders = [category.sort_order for category in self._session.scalars(statement)]
+        return max(orders) + 1 if orders else 0
 
     def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[Category]:
         statement = self._scoped_select().where(Category.import_batch_id == batch_id)

@@ -44,6 +44,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "categories",
         "email_tokens",
         "import_batches",
+        "import_category_mappings",
         "external_identities",
         "income_source_tax_rules",
         "income_sources",
@@ -191,6 +192,24 @@ def test_0031_import_batches_migration_is_reversible(tmp_path: Path) -> None:
             assert "import_batch_id" not in {
                 column["name"] for column in inspector.get_columns(table)
             }
+        upgrade_database(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0032_import_category_mappings_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None, data_dir=tmp_path, database_url=f"sqlite:///{tmp_path / 'mappings.db'}"
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        assert "import_category_mappings" in inspector.get_table_names()
+        command.downgrade(alembic_config(settings), "0031_f42_import_batches")
+        inspector = inspect(engine)
+        assert "import_category_mappings" not in inspector.get_table_names()
         upgrade_database(settings)
         check_database_migrations(settings)
     finally:

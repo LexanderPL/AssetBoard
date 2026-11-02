@@ -95,7 +95,7 @@ class SeedCategory:
     color: str
 
 
-_PALETTE = (
+PALETTE = (
     "#16a34a",
     "#f97316",
     "#e11d48",
@@ -113,7 +113,7 @@ _PALETTE = (
 
 def _seed(names: Sequence[str], kind: Kind, treatment: Treatment) -> list[SeedCategory]:
     return [
-        SeedCategory(name, kind, treatment, _PALETTE[index % len(_PALETTE)])
+        SeedCategory(name, kind, treatment, PALETTE[index % len(PALETTE)])
         for index, name in enumerate(names)
     ]
 

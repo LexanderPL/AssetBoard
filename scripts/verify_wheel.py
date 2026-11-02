@@ -14,6 +14,7 @@ REQUIRED_FILES = {
     "assetboard/locales/en/LC_MESSAGES/messages.mo",
     "assetboard/locales/pl/LC_MESSAGES/messages.mo",
     "assetboard/data/common-passwords.txt",
+    "assetboard/data/savings-words.json",
     "assetboard/data/NOTICE",
     "assetboard/data/SECLists-LICENSE.txt",
 }
