@@ -25,7 +25,8 @@ Select **Download archive**. The ZIP contains the current workspace's settings (
 Taxes switch and the Upcoming window), all categories (including archived categories),
 transactions (including deleted entries), planned values, and stored month states (closed
 months and plan-start markers). Recurring items, income sources, work logs and calendars, tax
-rules, and net-worth categories, items and value histories are not in this archive version yet.
+rules, and net-worth categories, items, value histories and snapshots are not in this archive
+version yet.
 Notification channels and delivery logs are never exported, because channel URLs can contain
 secrets.
 
@@ -55,7 +56,7 @@ edited, archived or used any of them, the workspace still counts as empty: the r
 them and puts the archive's categories in their place. Recurring items, income sources, work
 logs and calendars, and tax rules make the workspace non-empty, because the archive cannot
 carry them yet. Net-worth data is not in the archive either: a restore leaves any existing
-net-worth categories, items and values untouched.
+net-worth categories, items, values and snapshots untouched.
 
 Restore writes, all at once:
 

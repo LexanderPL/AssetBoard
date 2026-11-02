@@ -106,11 +106,43 @@ Property tests: net = assets - liabilities; category totals sum to side totals; 
 - Line chart of net worth (with assets and liabilities lines toggleable) over time; range selector (1y/3y/5y/all); hover shows the breakdown by category.
 - Linked items are included in snapshots using their value at that moment (once M6/M7 exist); if a link cannot be resolved the snapshot records the item as "unavailable" and the report flags it.
 
-**Open question for F5.3.** `current_values(..., as_of=...)` currently uses the item's *current*
-`archived` and `include_in_net_worth` flags even for a past date. That is right for today's
-summary, but a backfill would drop an item archived last week from last year's month-ends. Decide
-whether snapshots should use `archived_at`/a flag history so archiving removes the item only from
-snapshots after the archive date (and answer the same question for `include_in_net_worth`).
+**Owner decision (2026-11-02).** An item counts up to its archive date. At month-end `D` it is
+excluded only when its `archived_at` falls on or before `D` in the workspace time zone; a restored
+item counts in every month. Today's summary keeps the current archived rule, which is equivalent
+because an archive date is never after today. `include_in_net_worth` has no history: the current
+setting applies to every date, and changing it affects future snapshots and a rerun of the
+backfill, never stored automatic or manual snapshots.
+
+**Implementation notes (F5.3).**
+- `NetWorthSnapshot` stores `as_of`, assets/liabilities/net minor units, currency, a versioned
+  breakdown object and `source` (`auto|manual|backfill`). `UNIQUE(workspace_id, as_of, source)`
+  is the race guard; `net_minor = assets_minor - liabilities_minor`.
+- `domain.networth_history.values_at` selects values from rows loaded once; it is the pure path
+  under `services.networth.current_values`, the auto job and the backfill. A backfill therefore
+  reads items, categories and valuations once rather than once per month.
+- Auto: 1st of the month at 04:00 workspace time for the previous month-end; skipped entirely
+  when the workspace has no net-worth items (archived items count as items). Manual: workspace
+  today, replaces the same date's manual row, stores zero for an empty workspace. Backfill: from
+  the earliest valuation's month-end through the previous month-end; deletes and recreates only
+  `source=backfill` rows, skipping dates with `auto` or `manual`. Re-running is allowed.
+- Startup catch-up creates only the most recent previous month-end's automatic snapshot; older
+  missed months come from backfill. The job logs the workspace id and exception type only.
+- Source priority is manual > auto > backfill. A real snapshot replaces a backfill row for its
+  date; a manual snapshot replaces the manual and backfill rows for its date and leaves auto.
+- Snapshot writes run in `run_immediate`, check inside the transaction, take the workspace lock
+  and treat a unique-constraint race as "already taken". A future `as_of` is refused.
+- History is `GET /net-worth/history`, the fourth tab, with server-side
+  `?range=1y|3y|5y|all` (default `1y`). The ECharts line chart plots only snapshots in the current
+  base currency; other-currency snapshots stay in the table with their currency and a note. The
+  legend toggles net worth, assets and liabilities; tooltips use current category names with a
+  “Deleted category” fallback and are formatted on the server.
+- Breakdown shape: `{"v": 1, "categories": [{"category_id", "side", "total_minor"}],
+  "not_counted": {"non_base": n, "no_value": n}}`. The web layer ignores unknown keys so F5.4 can
+  add an “unavailable” marker without a migration.
+- Audit: `networth_snapshot.created` (system), `networth_snapshot.taken` (user, `replaced` flag)
+  and `networth_snapshot.backfilled` (`from`, `to`, `count`); no amounts.
+- Linked items remain F5.4. F5.3 snapshots manual values only. `NetWorthSnapshot` is in
+  `ARCHIVE_EXCLUDED_MODELS` for F5.5.
 
 **Agent prompt**
 ```
