@@ -133,6 +133,18 @@ class NetWorthItemRepository(ScopedRepository[NetWorthItem]):
         )
         return list(self._session.scalars(statement))
 
+    def by_ids(self, item_ids: Collection[UUID]) -> list[NetWorthItem]:
+        """Only the requested items, in the same order as ``ordered``."""
+        ids = list(item_ids)
+        if not ids:
+            return []
+        statement = (
+            self._scoped_select()
+            .where(NetWorthItem.id.in_(ids))
+            .order_by(NetWorthItem.side, NetWorthItem.created_at, NetWorthItem.id)
+        )
+        return list(self._session.scalars(statement))
+
     def counts_by_category(self) -> dict[UUID, int]:
         """How many items (archived ones included) each category has."""
         counts: dict[UUID, int] = {}

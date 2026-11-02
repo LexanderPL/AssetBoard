@@ -127,6 +127,9 @@ and only its side’s targets are offered.
   items were unavailable.
 - **Unlink** converts the item to manual. If today’s value is available, it is kept as the first
   manual value dated today; otherwise the item becomes manual and shows **No value yet**.
+  After an unlink, **Backfill from history** sees the item as manual with at most today’s value,
+  so months when it was linked are not recreated in backfilled points. Automatic and manual
+  snapshots keep the values stored while it was linked.
 - Two active items cannot link to the same target. Archive one before creating the other. An
   archived linked item can only be restored while no other active item links to its target.
 - Only one item can be linked to a target at a time because otherwise net worth would count it

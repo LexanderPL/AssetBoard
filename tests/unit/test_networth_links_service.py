@@ -281,6 +281,36 @@ def test_unavailable_linked_item_is_flagged_and_snapshot_records_it(
     assert _events(team, "networth_snapshot.taken")
 
 
+def test_one_item_write_resolves_only_that_item(team: WorkspaceDb, fake_links: FakeLinks) -> None:
+    _at(team, "2026-03-15T12:00:00+00:00")
+    first_target = _target(team, label="First", values={date(2026, 3, 15): 100})
+    second_target = _target(team, label="Second", values={date(2026, 3, 15): 200})
+    spec = fake_links.register(targets=[first_target, second_target])
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    first = _linked_item(team, ctx, category, first_target, name="First")
+    _linked_item(team, ctx, category, second_target, name="Second")
+    spec.calls.clear()
+    spec.describe_calls.clear()
+    updated = service.update_item(
+        team.factory,
+        ctx,
+        first.id,
+        category_id=category.id,
+        name=first.name,
+        currency=first.currency,
+        notes="Only this item",
+        acquired_on=first.acquired_on,
+        include_in_net_worth=first.include_in_net_worth,
+        investable=first.investable,
+    )
+    assert updated.notes == "Only this item"
+    assert spec.calls == [
+        (team.workspace_id, frozenset({first_target.link_id}), (date(2026, 3, 15),))
+    ]
+    assert spec.describe_calls == [(team.workspace_id, first_target.link_id)]
+
+
 def test_unlink_keeps_an_available_value_as_the_first_manual_valuation(
     team: WorkspaceDb, fake_links: FakeLinks
 ) -> None:

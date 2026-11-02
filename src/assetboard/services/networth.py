@@ -12,7 +12,7 @@ summed until an FX service exists.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -342,13 +342,15 @@ def _load_rows(
     scope: WorkspaceScope,
     *,
     categories: Sequence[NetWorthCategory] | None = None,
+    item_ids: Collection[UUID] | None = None,
 ) -> _LoadedRows:
     category_rows = (
         list(categories)
         if categories is not None
         else NetWorthCategoryRepository(session, scope).ordered()
     )
-    items = NetWorthItemRepository(session, scope).ordered()
+    repository = NetWorthItemRepository(session, scope)
+    items = repository.by_ids(item_ids) if item_ids is not None else repository.ordered()
     valuations: dict[UUID, list[ItemValuation]] = {}
     for valuation in ItemValuationRepository(session, scope).for_items([item.id for item in items]):
         valuations.setdefault(valuation.item_id, []).append(valuation)
@@ -371,10 +373,14 @@ def _item_history(item: NetWorthItem, valuations: Sequence[ItemValuation]) -> It
 
 
 def load_item_histories(
-    session: Session, scope: WorkspaceScope, *, categories: Sequence[NetWorthCategory] | None = None
+    session: Session,
+    scope: WorkspaceScope,
+    *,
+    categories: Sequence[NetWorthCategory] | None = None,
+    item_ids: Collection[UUID] | None = None,
 ) -> tuple[ItemHistory, ...]:
-    """Every item with its full valuation history, loaded once for repeated date selection."""
-    rows = _load_rows(session, scope, categories=categories)
+    """Every item (or only ``item_ids``) with its valuation history, loaded once."""
+    rows = _load_rows(session, scope, categories=categories, item_ids=item_ids)
     return tuple(_item_history(item, rows.valuations.get(item.id, ())) for item in rows.items)
 
 
@@ -447,6 +453,7 @@ def current_values(
     timezone: str,
     include_history: bool = False,
     categories: Sequence[NetWorthCategory] | None = None,
+    item_ids: Collection[UUID] | None = None,
 ) -> list[ItemView]:
     """Every item with its value effective on ``as_of``.
 
@@ -454,8 +461,9 @@ def current_values(
     (default) and F5.3's month-end snapshots (any ``as_of``). A valuation dated after
     ``as_of`` is ignored even when it exists in the history. The archived flag follows the
     owner's F5.3 rule: an item is archived from its workspace-local archive date onwards.
+    ``item_ids`` narrows the read to a specific item for a write response.
     """
-    rows = _load_rows(session, scope, categories=categories)
+    rows = _load_rows(session, scope, categories=categories, item_ids=item_ids)
     category_by_id = {category.id: category for category in rows.categories}
     histories = tuple(_item_history(item, rows.valuations.get(item.id, ())) for item in rows.items)
     resolved = registry.resolve_many(session, scope, histories, (as_of,))
@@ -617,6 +625,7 @@ def _view_after_write(
         base_currency=base_currency,
         timezone=ctx.workspace.timezone,
         include_history=True,
+        item_ids=(item_id,),
     )
     for value in values:
         if value.id == item_id:

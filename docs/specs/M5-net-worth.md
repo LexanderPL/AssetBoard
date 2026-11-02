@@ -189,6 +189,8 @@ Tests with the fixed Clock: month-end selection, idempotency, backfill semantics
 - Auto, manual and backfill snapshots resolve linked values at their `as_of`; a backfill makes
   one `resolve_many` call per link type. The breakdown keeps `v: 1` and adds
   `not_counted.unavailable`; unavailable linked items do not make an auto snapshot eligible.
+- Follow-up: list pages still call `describe` once per linked item. A batched `describe_many`
+  on the protocol would let M6 avoid one lookup per holding; not required for F5.4.
 
 **Agent prompt**
 ```

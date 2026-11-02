@@ -35,6 +35,7 @@ class FakeLinkSpec:
     side: Side
     targets: list[FakeTarget]
     calls: list[tuple[UUID, frozenset[UUID], tuple[date, ...]]] = field(default_factory=list)
+    describe_calls: list[tuple[UUID, UUID]] = field(default_factory=list)
 
 
 class FakeLinkResolver:
@@ -68,6 +69,7 @@ class FakeLinkResolver:
         return result
 
     def describe(self, link_id: UUID) -> LinkTarget | None | Unavailable:
+        self._spec.describe_calls.append((self._scope.workspace.id, link_id))
         target = self._target(link_id)
         if target is None:
             return None

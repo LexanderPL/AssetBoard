@@ -588,6 +588,9 @@ def test_networth_queries_stay_in_their_workspace(
     )
     assert [row.id for row in items_a.ordered()] == [a_item.id]
     assert [row.id for row in items_b.ordered()] == [b_item.id]
+    assert [row.id for row in items_a.by_ids([a_item.id, b_item.id])] == [a_item.id]
+    assert [row.id for row in items_b.by_ids([a_item.id, b_item.id])] == [b_item.id]
+    assert items_a.by_ids([]) == []
     assert items_a.counts_by_category() == {a_vehicle.id: 1}
     assert items_b.counts_by_category() == {b_vehicle.id: 1}
     link_id = uuid4()
