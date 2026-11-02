@@ -34,6 +34,7 @@ from assetboard.domain.money import Money
 from assetboard.domain.networth import Side
 from assetboard.domain.networth_history import (
     ItemHistory,
+    ItemValue,
     SnapshotBreakdown,
     backfill_month_ends,
     history_start,
@@ -130,14 +131,9 @@ class _StoredSnapshot:
     breakdown: object
 
 
-def _summary_at(
-    histories: tuple[ItemHistory, ...],
-    *,
-    as_of: date,
-    timezone: str,
-    currency: str,
+def _summarize(
+    values: tuple[ItemValue, ...], *, currency: str
 ) -> tuple[NetWorthSummary, dict[str, object]]:
-    values = values_at(histories, as_of, timezone=timezone)
     summary = summarize_net_worth(
         (
             SummaryItem(
@@ -157,6 +153,16 @@ def _summary_at(
         currency=currency,
     )
     return summary, snapshot_breakdown(summary)
+
+
+def _summary_at(
+    histories: tuple[ItemHistory, ...],
+    *,
+    as_of: date,
+    timezone: str,
+    currency: str,
+) -> tuple[NetWorthSummary, dict[str, object]]:
+    return _summarize(values_at(histories, as_of, timezone=timezone), currency=currency)
 
 
 def _snapshot_uniqueness_error(error: IntegrityError) -> bool:
@@ -191,16 +197,21 @@ def _auto_write(
     existing = repository.for_date(as_of)
     if any(row.source in {"manual", "auto"} for row in existing):
         return False
+    currency = _currency(session, scope)
+    values = values_at(
+        load_item_histories(session, scope),
+        as_of,
+        timezone=timezone,
+    )
+    # An item created after the month-end has no effective value there yet. Storing a zero
+    # automatic row would start the chart with a misleading drop, and backfill could never
+    # replace it because auto wins over backfill.
+    if not any(value.value_minor is not None for value in values):
+        return False
     for row in existing:
         if row.source == "backfill":
             repository.delete(row)
-    currency = _currency(session, scope)
-    summary, breakdown = _summary_at(
-        load_item_histories(session, scope),
-        as_of=as_of,
-        timezone=timezone,
-        currency=currency,
-    )
+    summary, breakdown = _summarize(values, currency=currency)
     row = repository.create(
         as_of=as_of,
         assets_minor=summary.assets.amount_minor,

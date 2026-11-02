@@ -33,9 +33,10 @@ net worth, the currency used and the per-category breakdown as it was on its dat
 automatic and manual snapshots are never recalculated.
 
 - **Automatic snapshots** are taken on the 1st of each month at 04:00 in the workspace time zone
-  and cover the previous month's last day. A workspace with no net-worth items at all is skipped;
-  archived items still count as items. After downtime the startup catch-up stores only the most
-  recent month-end; older missed months come from **Backfill from history**.
+  and cover the previous month's last day. A workspace with no net-worth items at all is skipped,
+  and so is a month-end where none of the items had an effective value yet; archived items still
+  count as items. After downtime the startup catch-up stores only the most recent month-end;
+  older missed months come from **Backfill from history**.
 - **Take snapshot now** (editors and owners) stores the workspace's today. Taking another manual
   snapshot on the same date replaces the earlier manual one; a zero total is stored too.
 - **Backfill from history** (editors and owners) recomputes every month-end from the month of the

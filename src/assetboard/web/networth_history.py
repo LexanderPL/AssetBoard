@@ -8,7 +8,7 @@ from uuid import UUID
 
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
-from assetboard.domain.networth_history import HISTORY_RANGES
+from assetboard.domain.networth_history import HISTORY_RANGES, month_end
 from assetboard.i18n import gettext, ngettext
 from assetboard.i18n.dates import format_day, format_month
 from assetboard.i18n.numbers import format_money
@@ -138,6 +138,13 @@ def _breakdown(
     return tuple(rows)
 
 
+def _point_label(day: date, locale: str) -> str:
+    """A month-end says its month; any other date says the day, so labels stay distinct."""
+    if day == month_end(day):
+        return format_month(YearMonth.from_date(day), locale)
+    return format_day(day, locale)
+
+
 def _nice_step(span: int) -> int:
     raw = max(1, span // 5)
     magnitude = 10 ** (len(str(raw)) - 1)
@@ -188,7 +195,7 @@ def _chart(
         lines.extend(_not_counted(point, locale))
         tooltips.append(lines)
     return {
-        "labels": [format_month(YearMonth.from_date(point.as_of), locale) for point in points],
+        "labels": [_point_label(point.as_of, locale) for point in points],
         "y_min": low,
         "y_max": high,
         "y_interval": step,
@@ -231,7 +238,7 @@ def build_history_view(
     rows = tuple(
         HistoryRow(
             as_of=point.as_of,
-            as_of_text=format_day(point.as_of, locale),
+            as_of_text=_point_label(point.as_of, locale),
             source=point.source,
             source_label=gettext(SOURCE_LABELS.get(point.source, point.source), locale),
             net=format_money(point.net, locale),

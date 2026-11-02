@@ -141,6 +141,17 @@ def test_auto_snapshot_uses_the_previous_month_end_and_is_idempotent(
     assert event.data == {"as_of": "2026-02-28"}
 
 
+def test_auto_snapshot_skips_when_no_value_was_effective_at_the_month_end(
+    team: WorkspaceDb,
+) -> None:
+    _at(team, "2026-03-15T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    _item(team, ctx, category, value="100", as_of=date(2026, 3, 1))
+    assert take_auto_snapshot(team.factory, ctx, team.clock, "UTC") is False
+    assert _rows(team) == []
+
+
 def test_an_archived_item_still_makes_the_workspace_eligible_for_an_auto_snapshot(
     team: WorkspaceDb,
 ) -> None:

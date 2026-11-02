@@ -121,8 +121,9 @@ backfill, never stored automatic or manual snapshots.
   under `services.networth.current_values`, the auto job and the backfill. A backfill therefore
   reads items, categories and valuations once rather than once per month.
 - Auto: 1st of the month at 04:00 workspace time for the previous month-end; skipped entirely
-  when the workspace has no net-worth items (archived items count as items). Manual: workspace
-  today, replaces the same date's manual row, stores zero for an empty workspace. Backfill: from
+  when the workspace has no net-worth items (archived items count as items) or when no item had
+  an effective value on that date yet. Manual: workspace today, replaces the same date's manual
+  row, stores zero for an empty workspace. Backfill: from
   the earliest valuation's month-end through the previous month-end; deletes and recreates only
   `source=backfill` rows, skipping dates with `auto` or `manual`. Re-running is allowed.
 - Startup catch-up creates only the most recent previous month-end's automatic snapshot; older

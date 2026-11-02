@@ -217,10 +217,26 @@ def test_the_range_selector_filters_by_date(owner: OwnerApp) -> None:
     _snapshot(owner, as_of=date(2026, 10, 31), assets_minor=200)
     default = owner.client.get("/net-worth/history").text
     assert default.count("data-history-row") == 1
-    assert "Oct 31, 2026" in default and "Jan 31, 2024" not in default
+    assert "October 2026" in default and "January 2024" not in default
     everything = owner.client.get("/net-worth/history?range=all").text
     assert everything.count("data-history-row") == 2
-    assert "Jan 31, 2024" in everything
+    assert "January 2024" in everything
+
+
+def test_two_snapshots_in_one_month_have_distinct_labels(owner: OwnerApp) -> None:
+    owner.app.state.clock = FixedClock("2026-11-02T12:00:00+00:00")
+    _snapshot(owner, as_of=date(2026, 10, 15), assets_minor=100)
+    _snapshot(owner, as_of=date(2026, 10, 31), assets_minor=200)
+    page = owner.client.get("/net-worth/history").text
+    assert "Oct 15, 2026" in page
+    assert "October 2026" in page
+    chart = re.search(
+        r'<script type="application/json" id="networth-history-data">(.*?)</script>',
+        page,
+        re.DOTALL,
+    )
+    assert chart is not None
+    assert '"labels": ["Oct 15, 2026", "October 2026"]' in chart.group(1)
 
 
 def test_other_currency_snapshots_are_in_the_table_but_not_the_chart(
