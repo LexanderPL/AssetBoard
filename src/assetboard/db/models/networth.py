@@ -68,6 +68,19 @@ class NetWorthCategory(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             postgresql_where=text("archived_at IS NULL"),
         ),
         Index("ix_networth_categories_workspace_side_order", "workspace_id", "side", "sort_order"),
+        Index(
+            "uq_networth_categories_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "import_batch_id"],
+            ["import_batches.workspace_id", "import_batches.id"],
+            name="fk_networth_categories_import_batch",
+        ),
     )
 
     name: Mapped[str] = mapped_column(String(MAX_CATEGORY_NAME_LENGTH), nullable=False)
@@ -75,6 +88,8 @@ class NetWorthCategory(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     side: Mapped[str] = mapped_column(String(16), nullable=False)
     color: Mapped[str] = mapped_column(String(7), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
 
@@ -139,6 +154,19 @@ class NetWorthItem(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             sqlite_where=text("valuation_mode = 'linked' AND archived_at IS NULL"),
             postgresql_where=text("valuation_mode = 'linked' AND archived_at IS NULL"),
         ),
+        Index(
+            "uq_networth_items_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "import_batch_id"],
+            ["import_batches.workspace_id", "import_batches.id"],
+            name="fk_networth_items_import_batch",
+        ),
     )
 
     side: Mapped[str] = mapped_column(String(16), nullable=False)
@@ -150,6 +178,8 @@ class NetWorthItem(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     valuation_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="manual")
     link_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     link_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
     include_in_net_worth: Mapped[bool] = mapped_column(
         Boolean(), nullable=False, default=True, server_default=true()
     )
@@ -187,6 +217,19 @@ class ItemValuation(IdMixin, TimestampMixin, WorkspaceScopedMixin, AppendOnly, B
             "as_of",
             "created_at",
         ),
+        Index(
+            "uq_item_valuations_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "import_batch_id"],
+            ["import_batches.workspace_id", "import_batches.id"],
+            name="fk_item_valuations_import_batch",
+        ),
     )
 
     item_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
@@ -194,6 +237,8 @@ class ItemValuation(IdMixin, TimestampMixin, WorkspaceScopedMixin, AppendOnly, B
     value_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     note: Mapped[str] = mapped_column(String(MAX_NOTES_LENGTH), nullable=False, default="")
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
 
 
 class NetWorthSnapshot(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
@@ -234,6 +279,19 @@ class NetWorthSnapshot(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             name="source_valid",
         ),
         Index("ix_networth_snapshots_workspace_as_of", "workspace_id", "as_of"),
+        Index(
+            "uq_networth_snapshots_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "import_batch_id"],
+            ["import_batches.workspace_id", "import_batches.id"],
+            name="fk_networth_snapshots_import_batch",
+        ),
     )
 
     as_of: Mapped[date] = mapped_column(Date(), nullable=False)
@@ -243,3 +301,5 @@ class NetWorthSnapshot(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     currency: Mapped[str] = mapped_column(String(3), nullable=False)
     breakdown: Mapped[dict[str, Any]] = mapped_column(JSON, nullable=False, default=dict)
     source: Mapped[str] = mapped_column(String(16), nullable=False)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)

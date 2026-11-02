@@ -662,6 +662,73 @@ def test_networth_queries_stay_in_their_workspace(
     assert snapshots_a.for_range(date(2026, 11, 1)) == []
     assert snapshots_b.for_range(date(2026, 11, 1)) == []
 
+    def batch(repository: ImportBatchRepository, name: str) -> Any:
+        return repository.create(
+            source="item_valuations_csv",
+            mode="merge",
+            filename=name,
+            file_sha256="a" * 64,
+            size_bytes=1,
+            options={},
+            status="uploaded",
+            started_by_user_id=None,
+        )
+
+    batch_a = batch(ImportBatchRepository(db_session, ctx_a), "a.csv")
+    batch_b = batch(ImportBatchRepository(db_session, ctx_b), "b.csv")
+    imported_category_a = category(categories_a, "Imported")
+    imported_category_a.import_batch_id = batch_a.id
+    db_session.flush()
+    assert categories_a.for_import_batch(batch_a.id) == [imported_category_a]
+    assert categories_b.for_import_batch(batch_a.id) == []
+    lineage = uuid4()
+    imported_item_a = items_a.create(
+        side="asset",
+        category_id=a_vehicle.id,
+        name="Imported",
+        currency="EUR",
+        import_batch_id=batch_a.id,
+        import_key=f"id:{lineage}",
+    )
+    assert items_a.for_import_batch(batch_a.id) == [imported_item_a]
+    assert items_b.for_import_batch(batch_a.id) == []
+    assert items_a.by_lineage_ids([lineage]) == [imported_item_a]
+    assert items_a.by_lineage_ids([imported_item_a.id]) == [imported_item_a]
+    assert items_b.by_lineage_ids([lineage, imported_item_a.id]) == []
+
+    imported_value_a = valuations_a.create(
+        item_id=a_item.id,
+        as_of=date(2026, 11, 1),
+        value_minor=100,
+        currency="EUR",
+        import_batch_id=batch_a.id,
+    )
+    valuations_b.create(
+        item_id=b_item.id,
+        as_of=date(2026, 11, 1),
+        value_minor=100,
+        currency="EUR",
+        import_batch_id=batch_b.id,
+    )
+    assert valuations_a.for_import_batch(batch_a.id) == [imported_value_a]
+    assert valuations_b.for_import_batch(batch_a.id) == []
+    assert valuations_a.delete_for_import_batch(batch_b.id) == 0
+    assert valuations_b.delete_for_import_batch(batch_b.id) == 1
+    assert valuations_a.delete_for_import_batch(batch_a.id) == 1
+    assert valuations_a.get(imported_value_a.id) is None
+
+    imported_snapshot_a = snapshots_a.create(
+        as_of=date(2026, 11, 30),
+        assets_minor=100,
+        liabilities_minor=0,
+        currency="EUR",
+        breakdown={"v": 1, "categories": []},
+        source="auto",
+        import_batch_id=batch_a.id,
+    )
+    assert snapshots_a.for_import_batch(batch_a.id) == [imported_snapshot_a]
+    assert snapshots_b.for_import_batch(batch_a.id) == []
+
 
 def test_month_state_queries_stay_in_their_workspace(
     db_session: Session, two_workspaces: tuple[Any, Any]

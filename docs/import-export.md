@@ -23,12 +23,11 @@ import. The exact files and columns are described in the
 
 Select **Download archive**. The ZIP contains the current workspace's settings (including the
 Taxes switch and the Upcoming window), all categories (including archived categories),
-transactions (including deleted entries), planned values, and stored month states (closed
-months and plan-start markers). Recurring items, income sources, work logs and calendars, tax
-rules, and net-worth categories, items, value histories and snapshots are not in this archive
-version yet.
-Notification channels and delivery logs are never exported, because channel URLs can contain
-secrets.
+transactions (including deleted entries), planned values, stored month states (closed months
+and plan-start markers), and all net-worth categories, items, value histories and snapshots.
+Recurring items, income sources, work logs and calendars, and tax rules are not in this archive
+version yet. Notification channels and delivery logs are never exported, because channel URLs
+can contain secrets.
 
 The download is a copy: exporting does not change the ledger. The audit log records the export
 and the number of rows of each kind, without descriptions or amounts.
@@ -55,8 +54,10 @@ A new workspace starts with the **suggested categories**. As long as you have no
 edited, archived or used any of them, the workspace still counts as empty: the restore removes
 them and puts the archive's categories in their place. Recurring items, income sources, work
 logs and calendars, and tax rules make the workspace non-empty, because the archive cannot
-carry them yet. Net-worth data is not in the archive either: a restore leaves any existing
-net-worth categories, items, values and snapshots untouched.
+carry them yet. The suggested net-worth categories follow the same rule as the ledger ones:
+untouched, unused and seeded automatically, they are removed before the archive's net-worth
+categories are written. Edited categories, items, values or snapshots make the workspace
+non-empty.
 
 Restore writes, all at once:
 
@@ -66,7 +67,11 @@ Restore writes, all at once:
 2. categories, with their archived state and order;
 3. planned values, including those of archived and transfer categories;
 4. transactions, including deleted entries, in their original order within each day;
-5. month states exactly as stored: closed months and plan-start markers.
+5. month states exactly as stored: closed months and plan-start markers;
+6. net-worth categories, items and value histories, then snapshots. Values keep their
+   `created_at`, so several values on one day restore in the same order and the current value
+   does not change. A linked item whose target is not in the archive becomes a manual item
+   without a value and is listed with `link_target_missing`.
 
 A restore needs a completely valid archive: any error blocks it, and nothing is written. The
 **Restore plan** lists what will be written, the suggested categories that will be removed, the
@@ -80,10 +85,11 @@ plan copy from filling a restored month.
 Merge brings an archive's ledger data into a workspace you already use, for example to combine
 two workspaces. Owners and editors can merge; it is the default mode.
 
-A merge writes categories, transactions and planned values only. The archive's settings and
-closed months are listed for information but never applied. The archive's base currency must
+A merge writes categories, transactions and planned values only. The archive's settings,
+closed months and net-worth files are listed for information but never applied; a 1.2 archive
+lists its net-worth files once with a restore-only warning. The archive's base currency must
 match the workspace's; otherwise the whole archive is refused. Existing net-worth data is left
-untouched.
+untouched. To merge a valuation history, import its `item_valuations.csv` alone.
 
 Each category in the archive is a row in the [category mapping](#category-mapping) step, so an
 active and an archived category with the same name stay separate. By default, a category the
@@ -103,10 +109,20 @@ file name:
 | Transactions | `date,direction,amount,category,description` | `currency`, `id` and `deleted_at` are optional; `category_id` is ignored |
 | Planned values | `month,kind,category,planned` | `kind` may be left out when the category name belongs to only one kind (an existing category or a remembered mapping) |
 | Categories | `kind,name` | `id`, `treatment`, `color`, `sort_order` and `archived_at` are optional |
+| Item valuations | `item,as_of,value` | `currency`, `note` and `item_id` are optional; `id` and `created_at` are accepted for an exported file |
 
-Download a ready-made template for transactions or planned values from the links under the
-upload form. A `months.csv` or `workspace.json` on its own is refused: only a full archive can
-restore those.
+Download a ready-made template for transactions, planned values or item valuations from the
+links under the upload form. A `months.csv` or `workspace.json` on its own is refused: only a
+full archive can restore those.
+
+Item valuations are matched by `item_id` first and by name otherwise. Names are not unique, so
+add `item_id` when **item_ambiguous** is listed; it is the lineage id written by an export. A
+row that matches a linked item is refused with **item_linked**. A row `id` imported before is a
+duplicate even if its date or value changed. Otherwise a stored value for the same item and
+date makes an identical value a duplicate and a different value a conflict, while several
+rows in one file for the same item and date are imported in file order, so a same-day
+correction becomes the latest value. Values must use the item's currency and exactly its minor
+digits; a file without `created_at` is stamped in row order from the import time.
 
 ### Upload options
 
@@ -197,18 +213,23 @@ Every applied import has **Roll back import** in the recent-imports list. The co
 shows what will be removed.
 
 - **CSV import or merge:** its transactions are deleted (also ones you edited since; the page
-  says how many), its planned values are removed except ones you changed since, and the
-  categories it created are removed, or archived if they are still used. Remembered mappings
-  that point at categories it created are removed. If the import set a month's plan-start
-  marker and no planned values remain there, the marker is cleared. A rollback is refused while
-  any affected month is closed; the page lists those months.
+  says how many), its planned values are removed except ones you changed since, its imported
+  item valuations are removed, and the categories it created are removed, or archived if they
+  are still used. Remembered mappings that point at categories it created are removed. If the
+  import set a month's plan-start marker and no planned values remain there, the marker is
+  cleared. A rollback is refused while any affected month is closed; the page lists those
+  months.
 - **Restore:** owners only. It removes everything the restore wrote, for good, and puts the
   previous workspace settings back, so the workspace is empty again and you can restore a
-  corrected archive. It is refused, with the reason, once anything changed after the restore:
-  a new or edited entry, category or planned value, a closed or reopened month, a changed
-  setting, or a new recurring item, income source, work log or tax rule. A rolled-back restore
-  does not bring back the suggested categories; use **Add suggested categories** on the
-  [Categories](categories.md) page if you want them.
+  corrected archive. It also removes the net-worth categories, items, valuations and snapshots
+  it wrote; append-only valuations are removed only through this explicit batch rollback. It is
+  refused, with the reason, once anything changed after the restore: a new or edited entry,
+  category, planned value or net-worth row, a closed or reopened month, a changed setting, or a
+  new recurring item, income source, work log or tax rule. A monthly automatic net-worth
+  snapshot taken after the restore also counts as a new row and blocks rollback. A rolled-back
+  restore does not bring back the suggested categories (ledger or net-worth); use **Add
+  suggested categories** on the [Categories](categories.md) or [Net worth](net-worth.md) page
+  if you want them.
 
 The audit log records every apply and rollback with counts, never with amounts, descriptions or
 file names.

@@ -276,13 +276,26 @@ def test_editor_can_download_and_audit_workspace_archive(owner: OwnerApp) -> Non
             "budget_lines.csv",
             "transactions.csv",
             "months.csv",
+            "networth_categories.csv",
+            "networth_items.csv",
+            "item_valuations.csv",
+            "networth_snapshots.csv",
         ]
     with owner.db() as session:
         event = session.scalars(
             select(AuditEvent).where(AuditEvent.action == "workspace.exported")
         ).one()
         assert event.workspace_id == owner.home_id
-        assert set(event.data) == {"categories", "budget_lines", "transactions", "months"}
+        assert set(event.data) == {
+            "categories",
+            "budget_lines",
+            "transactions",
+            "months",
+            "networth_categories",
+            "networth_items",
+            "item_valuations",
+            "networth_snapshots",
+        }
         assert "amount" not in event.data
 
 
@@ -520,6 +533,7 @@ def test_rollback_removes_the_batch_and_keeps_later_changes(owner: OwnerApp) -> 
             "budget_lines_kept": 1,
             "categories_deleted": 0,
             "categories_archived": 2,
+            "item_valuations_deleted": 0,
         }
 
 

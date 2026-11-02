@@ -13,6 +13,7 @@ import dedupe helpers, and keeps every write inside the caller's transaction.
 from __future__ import annotations
 
 import contextlib
+import json
 from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
@@ -25,16 +26,22 @@ from sqlalchemy.orm import Session
 from assetboard.db.models.identity import Workspace
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.ledger import Category
+from assetboard.db.models.networth import NetWorthCategory
 from assetboard.db.repositories import (
     AuditEventRepository,
     BudgetLineRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
     ImportCategoryMappingRepository,
+    ItemValuationRepository,
     MonthStateRepository,
+    NetWorthCategoryRepository,
+    NetWorthItemRepository,
+    NetWorthSnapshotRepository,
     TransactionRepository,
 )
 from assetboard.domain.archive import (
+    NETWORTH_CSV_FILES,
     ArchiveRows,
     BudgetLineRow,
     CategoryRow,
@@ -54,7 +61,11 @@ from assetboard.domain.import_upload import DEADLINE_CHECK_ROWS, ParsedUpload, P
 from assetboard.domain.ledger_csv import plain_amount
 from assetboard.domain.months import YearMonth
 from assetboard.domain.transactions import EntryError, description_key
-from assetboard.services.archive import suggested_categories_to_remove, workspace_is_empty
+from assetboard.services.archive import (
+    suggested_categories_to_remove,
+    suggested_networth_categories_to_remove,
+    workspace_is_empty,
+)
 from assetboard.services.context import Context
 from assetboard.services.import_dedupe import (
     IncomingBudgetLine,
@@ -109,6 +120,12 @@ def _restore_counts(**values: int) -> dict[str, int]:
         "months_created": 0,
         "deleted_transactions": 0,
         "suggested_categories_removed": 0,
+        "suggested_networth_categories_removed": 0,
+        "networth_categories_created": 0,
+        "networth_items_created": 0,
+        "item_valuations_created": 0,
+        "networth_snapshots_created": 0,
+        "linked_items_unlinked": 0,
         **values,
     }
 
@@ -231,17 +248,35 @@ def _duplicate_active_categories(rows: tuple[CategoryRow, ...]) -> set[tuple[str
     return duplicates
 
 
-def _restore_counts_for(rows: ArchiveRows, *, removed: int) -> dict[str, int]:
+def _restore_counts_for(
+    rows: ArchiveRows, *, removed: int, removed_networth: int
+) -> dict[str, int]:
     budget_lines = sum(1 for row in rows.budget_lines if _planned_minor(row))
     deleted = sum(1 for row in rows.transactions if row.deleted_at)
+    linked = sum(1 for row in rows.networth_items if row.valuation_mode == "linked")
     return _restore_counts(
-        to_create=(len(rows.categories) + budget_lines + len(rows.transactions) + len(rows.months)),
+        to_create=(
+            len(rows.categories)
+            + budget_lines
+            + len(rows.transactions)
+            + len(rows.months)
+            + len(rows.networth_categories)
+            + len(rows.networth_items)
+            + len(rows.item_valuations)
+            + len(rows.networth_snapshots)
+        ),
         categories_created=len(rows.categories),
         transactions_created=len(rows.transactions),
         budget_lines_created=budget_lines,
         months_created=len(rows.months),
         deleted_transactions=deleted,
         suggested_categories_removed=removed,
+        suggested_networth_categories_removed=removed_networth,
+        networth_categories_created=len(rows.networth_categories),
+        networth_items_created=len(rows.networth_items),
+        item_valuations_created=len(rows.item_valuations),
+        networth_snapshots_created=len(rows.networth_snapshots),
+        linked_items_unlinked=linked,
     )
 
 
@@ -1268,6 +1303,11 @@ def _merge(
     workspace = CurrentWorkspaceRepository(session, ctx).get()
     settings_diff = _settings_diff(workspace, _archive_setting_values(archive.rows.workspace))
     archive_closed = sorted(row.month for row in archive.rows.months if row.closed_at)
+    warnings = (
+        [_entry("networth_restore_only", file="archive")]
+        if any(name in archive.files for name in NETWORTH_CSV_FILES)
+        else []
+    )
     report = _empty_report(
         counts=counts,
         months=months_report,
@@ -1275,6 +1315,7 @@ def _merge(
         mapping=category_resolution.mapping,
         mapping_errors=category_resolution.mapping_errors,
         closed_months=closed_months,
+        warnings=warnings,
         skipped=skipped,
         errors=errors,
         archive_closed_months=archive_closed,
@@ -1304,14 +1345,33 @@ def _restore_report(
     removed = (
         suggested_categories_to_remove(session, ctx) if workspace_is_empty(session, ctx) else []
     )
-    counts = _restore_counts_for(archive.rows, removed=len(removed))
+    removed_networth = (
+        suggested_networth_categories_to_remove(session, ctx)
+        if workspace_is_empty(session, ctx)
+        else []
+    )
+    counts = _restore_counts_for(
+        archive.rows, removed=len(removed), removed_networth=len(removed_networth)
+    )
     counts["invalid"] = len(errors)
+    warnings = [
+        _entry(
+            "link_target_missing",
+            file="networth_items.csv",
+            line=line,
+            column="link_id",
+        )
+        for line, row in enumerate(archive.rows.networth_items, start=2)
+        if row.valuation_mode == "linked"
+    ]
     report = _empty_report(
         counts=counts,
         errors=errors,
+        warnings=warnings,
         restore_months=[row.month for row in archive.rows.months],
         archive_closed_months=sorted(row.month for row in archive.rows.months if row.closed_at),
         suggested_categories_removed=[category.name for category in removed],
+        suggested_networth_categories_removed=[category.name for category in removed_networth],
         settings_diff=(
             _settings_diff(CurrentWorkspaceRepository(session, ctx).get(), settings.values())
             if settings is not None
@@ -1349,6 +1409,114 @@ def _plan_restore(
     return _restore_report(session, ctx, archive, settings=settings, errors=errors)
 
 
+def _restore_breakdown(raw: str, category_ids: Mapping[UUID, UUID]) -> dict[str, object]:
+    """The archived breakdown with lineage category ids mapped to the restored ones."""
+    loaded: object = json.loads(raw)
+    data: dict[str, object] = {}
+    if isinstance(loaded, dict):
+        source = cast("Mapping[object, object]", loaded)
+        data = {str(key): value for key, value in source.items()}
+    categories = data.get("categories")
+    if isinstance(categories, list):
+        converted: list[object] = []
+        for entry in cast("list[object]", categories):
+            if not isinstance(entry, Mapping):
+                converted.append(entry)
+                continue
+            row = dict(cast("Mapping[str, object]", entry))
+            raw_id = row.get("category_id")
+            if isinstance(raw_id, str):
+                with contextlib.suppress(ValueError):
+                    source_id = UUID(raw_id)
+                    row["category_id"] = str(category_ids.get(source_id, source_id))
+            converted.append(row)
+        data["categories"] = converted
+    return data
+
+
+def _restore_networth(
+    session: Session,
+    ctx: Context,
+    batch: ImportBatch,
+    archive: ParsedArchive,
+    *,
+    restore_now: datetime,
+    removed: list[NetWorthCategory],
+) -> None:
+    """Recreate categories, items, valuations and snapshots after the ledger rows."""
+    categories_repository = NetWorthCategoryRepository(session, ctx)
+    for category in removed:
+        categories_repository.delete(category)
+    category_ids: dict[UUID, UUID] = {}
+    for index, row in enumerate(archive.rows.networth_categories):
+        category = categories_repository.create(
+            name=row.name,
+            name_key=name_key(row.name),
+            side=row.side,
+            color=row.color,
+            sort_order=row.sort_order,
+            import_batch_id=batch.id,
+            import_key=f"id:{row.id}",
+            archived_at=parse_timestamp(row.archived_at) if row.archived_at else None,
+            created_at=restore_now + timedelta(microseconds=index),
+        )
+        category_ids[UUID(row.id)] = category.id
+
+    items_repository = NetWorthItemRepository(session, ctx)
+    item_ids: dict[UUID, UUID] = {}
+    for index, row in enumerate(archive.rows.networth_items):
+        is_linked = row.valuation_mode == "linked"
+        item = items_repository.create(
+            side=row.side,
+            category_id=category_ids[UUID(row.category_id)],
+            name=row.name,
+            currency=row.currency,
+            notes=row.notes,
+            acquired_on=parse_date(row.acquired_on) if row.acquired_on else None,
+            valuation_mode="manual" if is_linked else row.valuation_mode,
+            link_type=None,
+            link_id=None,
+            include_in_net_worth=row.include_in_net_worth == "true",
+            investable=row.investable == "true",
+            archived_at=parse_timestamp(row.archived_at) if row.archived_at else None,
+            import_batch_id=batch.id,
+            import_key=f"id:{row.id}",
+            created_at=restore_now + timedelta(microseconds=index),
+        )
+        item_ids[UUID(row.id)] = item.id
+
+    valuations = ItemValuationRepository(session, ctx)
+    for index, row in enumerate(archive.rows.item_valuations):
+        created_at = (
+            parse_timestamp(row.created_at)
+            if row.created_at
+            else restore_now + timedelta(microseconds=index)
+        )
+        valuations.create(
+            item_id=item_ids[UUID(row.item_id)],
+            as_of=parse_date(row.as_of),
+            value_minor=parse_planned_amount(row.value, row.currency, decimal="dot"),
+            currency=row.currency,
+            note=row.note,
+            import_batch_id=batch.id,
+            import_key=f"id:{row.id}",
+            created_at=created_at,
+        )
+
+    snapshots = NetWorthSnapshotRepository(session, ctx)
+    for row in archive.rows.networth_snapshots:
+        snapshots.create(
+            as_of=parse_date(row.as_of),
+            assets_minor=parse_planned_amount(row.assets, row.currency, decimal="dot"),
+            liabilities_minor=parse_planned_amount(row.liabilities, row.currency, decimal="dot"),
+            currency=row.currency,
+            breakdown=_restore_breakdown(row.breakdown, category_ids),
+            source=row.source,
+            import_batch_id=batch.id,
+            import_key=f"id:{row.id}",
+        )
+
+
 def _apply_restore(
     session: Session,
     ctx: Context,
@@ -1372,6 +1540,7 @@ def _apply_restore(
     }
     CurrentWorkspaceRepository(session, ctx).update(**settings.values())
     removed = suggested_categories_to_remove(session, ctx)
+    removed_networth = suggested_networth_categories_to_remove(session, ctx)
     categories = CategoryRepository(session, ctx)
     for category in removed:
         categories.delete(category)
@@ -1435,7 +1604,16 @@ def _apply_restore(
             created_at=restore_now,
             updated_at=restore_now,
         )
+    _restore_networth(
+        session,
+        ctx,
+        batch,
+        archive,
+        restore_now=restore_now,
+        removed=removed_networth,
+    )
     session.flush()
+    linked_items = sum(1 for row in archive.rows.networth_items if row.valuation_mode == "linked")
     AuditEventRepository(session, ctx).record(
         actor_user_id=ctx.user.id,
         action="workspace.restored",
@@ -1448,8 +1626,14 @@ def _apply_restore(
             "transactions": len(archive.rows.transactions),
             "budget_lines": created_lines,
             "months": len(archive.rows.months),
+            "networth_categories": len(archive.rows.networth_categories),
+            "networth_items": len(archive.rows.networth_items),
+            "item_valuations": len(archive.rows.item_valuations),
+            "networth_snapshots": len(archive.rows.networth_snapshots),
+            "linked_items_unlinked": linked_items,
             "settings_fields": ",".join(settings_diff),
             "suggested_categories_removed": len(removed),
+            "suggested_networth_categories_removed": len(removed_networth),
         },
     )
     return {
@@ -1463,6 +1647,12 @@ def _apply_restore(
         "months_created": len(archive.rows.months),
         "deleted_transactions": deleted,
         "suggested_categories_removed": len(removed),
+        "suggested_networth_categories_removed": len(removed_networth),
+        "networth_categories_created": len(archive.rows.networth_categories),
+        "networth_items_created": len(archive.rows.networth_items),
+        "item_valuations_created": len(archive.rows.item_valuations),
+        "networth_snapshots_created": len(archive.rows.networth_snapshots),
+        "linked_items_unlinked": linked_items,
     }
 
 

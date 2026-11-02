@@ -1,4 +1,4 @@
-# Workspace archive format (v1.1)
+# Workspace archive format (v1.2)
 
 This is the reference for the files that **Export and import** writes and reads: the workspace
 archive (a ZIP) and the hand-made CSV files you can import on their own. It is normative: the
@@ -18,7 +18,11 @@ assetboard-home-20261018-143000Z.zip
 ├── categories.csv
 ├── budget_lines.csv
 ├── transactions.csv
-└── months.csv
+├── months.csv
+├── networth_categories.csv
+├── networth_items.csv
+├── item_valuations.csv
+└── networth_snapshots.csv
 ```
 
 All members sit at the root of the ZIP (no folders). Every file is required in an archive, even
@@ -52,7 +56,10 @@ The manifest's `format_version` is `MAJOR.MINOR`.
 
 **Version history.** 1.0: first release. 1.1 (additive): `workspace.json` gains the optional
 `taxes_enabled` and `upcoming_days` keys; a 1.0 archive reads without them, and a 1.0 reader
-lists them as unknown keys (a warning). Golden archives of both versions are in
+lists them as unknown keys (a warning). 1.2: adds the four net-worth files
+(`networth_categories.csv`, `networth_items.csv`, `item_valuations.csv` and
+`networth_snapshots.csv`); they are required in a 1.2 archive and absent from 1.0/1.1 archives,
+which read with empty net-worth data. Golden archives of all three versions are in
 `tests/fixtures/`.
 
 ## `manifest.json`
@@ -203,6 +210,118 @@ month,kind,category,planned
 2026-09,income,Salary,3000.00
 ```
 
+## `networth_categories.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `side` | yes | `asset` \| `liability` |
+| `name` | yes | 1–80 characters; unique per side among active categories |
+| `color` | no (default from the palette) | `#rrggbb` |
+| `sort_order` | no (default: file order) | integer ≥ 0, per side |
+| `archived_at` | no | timestamp; set = archived |
+
+```csv
+id,side,name,color,sort_order,archived_at
+3f9a1c2d-4b5e-4f60-8a71-2b3c4d5e6f70,asset,Vehicles,#3b6ea8,0,
+```
+
+## `networth_items.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `side` | yes | `asset` \| `liability`; must equal the category's side |
+| `category` | yes | category name (must match `category_id`) |
+| `category_id` | yes | UUID from `networth_categories.csv` |
+| `name` | yes | 1–200 characters |
+| `currency` | yes | ISO 4217 code; every valuation must use it |
+| `notes` | no | at most 200 characters |
+| `acquired_on` | no | `YYYY-MM-DD` |
+| `valuation_mode` | no (default `manual`) | `manual` \| `linked` |
+| `link_type` | no | `portfolio_asset_class` \| `portfolio_holding` \| `loan_balance` |
+| `link_id` | no | UUID of the link target's lineage id |
+| `include_in_net_worth` | no (default `true`) | `true` \| `false` |
+| `investable` | no (default `false`) | `true` \| `false` |
+| `archived_at` | no | timestamp; set = archived |
+
+A linked item keeps its `link_type` and `link_id` on export. Restore clears both and writes a
+manual item without a value, because the target's module has not yet contributed its archive
+files; the item is listed with `link_target_missing`. The M6/M7 archive extensions will resolve
+link target lineage ids.
+
+```csv
+id,side,category,category_id,name,currency,notes,acquired_on,valuation_mode,link_type,link_id,include_in_net_worth,investable,archived_at
+c4d5e6f7-a8b9-4c0d-9e1f-2a3b4c5d6e7f,asset,Vehicles,3f9a1c2d-4b5e-4f60-8a71-2b3c4d5e6f70,Car,EUR,Family car,2025-04-01,manual,,,true,false,
+```
+
+## `item_valuations.csv`
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | in an archive; optional alone | UUID (lineage id) |
+| `item_id` | in an archive; optional alone | item lineage id; when present and found, wins over `item` |
+| `item` | yes | item name |
+| `as_of` | yes | `YYYY-MM-DD`; future dates are allowed |
+| `value` | yes | decimal ≥ 0, exactly the currency's minor digits |
+| `currency` | in an archive; optional alone | must equal the item's currency |
+| `note` | no | at most 200 characters |
+| `created_at` | no | UTC timestamp; preserves same-day entry order |
+
+A value's currency must equal its item's currency, and a linked item has no manual values. The
+same item may have several values on one date; export orders them by `as_of`, then `created_at`,
+then `id`, and that order decides the current value. Restore writes `created_at` explicitly so
+the order survives. A file without it is stamped from the import time in row order.
+
+Hand-made file with the minimal columns (the template download):
+
+```csv
+item,as_of,value
+Car,2026-01-31,12000.00
+Car,2026-02-28,11500.00
+```
+
+The file can also be imported alone in merge mode (the template has the minimal columns). Rows
+match an item by `item_id` first, then by name; names are not unique, so `item_ambiguous` is
+common unless `item_id` is present. A row that matches a linked item is refused with
+`item_linked`. An `id` already imported into the workspace is a duplicate (`already_imported`)
+even if the row's date or value changed, and an `id` repeated in the file is `duplicate_in_file`.
+
+Otherwise a stored value for the same item and date makes an identical row a duplicate
+(`already_imported`) and a different value a conflict (`changed_since_export`); both are listed
+and the stored history is kept. Several rows in one file for the same item and date with no
+stored clash are all imported, in file order, so a same-day correction becomes the latest value.
+Only an exactly identical row (date, value, note and `created_at`) is `duplicate_in_file`.
+
+```csv
+id,item_id,item,as_of,value,currency,note,created_at
+e6f7a8b9-c0d1-4e2f-9a3b-4c5d6e7f8091,c4d5e6f7-a8b9-4c0d-9e1f-2a3b4c5d6e7f,Car,2026-09-01,12000.00,EUR,Bought,2026-09-01T08:00:00Z
+```
+
+## `networth_snapshots.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `as_of` | yes | `YYYY-MM-DD`; one snapshot per date and source |
+| `assets` | yes | decimal ≥ 0 |
+| `liabilities` | yes | decimal ≥ 0 |
+| `currency` | yes | ISO 4217 code |
+| `breakdown` | yes | compact JSON object; category ids are lineage ids and unknown ids are kept |
+| `source` | yes | `auto` \| `manual` \| `backfill` |
+
+`net` is always recomputed as `assets - liabilities`, never read from the file. The breakdown
+uses sorted keys and no extra whitespace so exports are deterministic:
+
+```json
+{"categories":[{"category_id":"3f9a1c2d-4b5e-4f60-8a71-2b3c4d5e6f70","side":"asset","total_minor":1200000}],"not_counted":{"non_base":0,"no_value":0,"unavailable":0},"v":1}
+```
+
+```csv
+id,as_of,assets,liabilities,currency,breakdown,source
+a8b9c0d1-e2f3-4a4b-9c5d-6e7f8091a2b3,2026-08-31,12000.00,0.00,EUR,"{""categories"":[],""not_counted"":{""non_base"":0,""no_value"":0,""unavailable"":0},""v"":1}",auto
+```
+
 ## `months.csv` (restore only)
 
 | Column | Required | Values |
@@ -227,11 +346,13 @@ deflate, duplicate names, more than 64 members, a member over 100 MiB or a total
 uncompressed, or a member (1 MiB or larger) compressed more than 200:1. Unknown member names are
 listed as warnings and ignored. A file may hold at most 1 000 000 data rows and 64 columns.
 
-## Not in the archive (format 1.1)
+## Not in the archive (format 1.2)
 
 Members, invitations, users and their sessions, the audit log, import batches and saved
 mappings, and who created or closed what. Recurring items, income sources, work logs and
 calendars, and tax rules are added by a later archive extension as new files (a minor version);
-until then, a restore requires a workspace without them. Net-worth categories, items and value
-histories are also reserved for a later archive extension. Notification channels are never
+until then, a restore requires a workspace without them. Notification channels are never
 exported, because their URLs can contain secrets.
+
+Net-worth files are restore-only in a full archive merge: they are ignored and listed once as a
+warning. Only a lone `item_valuations.csv` merges.

@@ -22,7 +22,11 @@ from assetboard.db.models.ledger import Category
 from assetboard.db.repositories import (
     BudgetLineRepository,
     CategoryRepository,
+    ItemValuationRepository,
     MonthStateRepository,
+    NetWorthCategoryRepository,
+    NetWorthItemRepository,
+    NetWorthSnapshotRepository,
     ScheduledItemRepository,
     TransactionRepository,
 )
@@ -30,7 +34,11 @@ from assetboard.domain.archive import (
     ArchiveRows,
     BudgetLineRow,
     CategoryRow,
+    ItemValuationRow,
     MonthRow,
+    NetWorthCategoryRow,
+    NetWorthItemRow,
+    NetWorthSnapshotRow,
     ParsedArchive,
     TransactionRow,
     parse_archive,
@@ -38,6 +46,7 @@ from assetboard.domain.archive import (
 )
 from assetboard.domain.categories import SEED
 from assetboard.domain.months import YearMonth
+from assetboard.domain.networth import SEED as NETWORTH_SEED
 from assetboard.services.archive import export_workspace, workspace_is_empty
 from assetboard.services.categories import seed_into
 from assetboard.services.context import PermissionDenied
@@ -60,6 +69,7 @@ from assetboard.services.imports import (
 from assetboard.services.imports import (
     ImportError as ServiceImportError,
 )
+from assetboard.services.networth import seed_into as networth_seed_into
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 EXPORTED_AT = datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC)
@@ -67,6 +77,13 @@ SOURCE = UUID("11111111-1111-4111-8111-111111111111")
 FOOD = UUID("22222222-2222-4222-8222-222222222222")
 ARCHIVED = UUID("33333333-3333-4333-8333-333333333333")
 SALARY = UUID("44444444-4444-4444-8444-444444444444")
+NW_VEHICLES = UUID("55555555-5555-4555-8555-555555555555")
+NW_CAR = UUID("66666666-6666-4666-8666-666666666666")
+NW_BROKERAGE = UUID("77777777-7777-4777-8777-777777777777")
+NW_FIRST_VALUE = UUID("88888888-8888-4888-8888-888888888888")
+NW_SECOND_VALUE = UUID("99999999-9999-4999-8999-999999999999")
+NW_SNAPSHOT = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
+NW_LINK = UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
 
 
 @pytest.fixture
@@ -217,6 +234,81 @@ def _rows(*, currency: str = "EUR", name: str = "Home") -> ArchiveRows:
             ),
         ),
         months=(MonthRow("2026-02", "2026-02-28T20:00:00Z", "2026-02-01T08:00:00Z"),),
+        networth_categories=(
+            NetWorthCategoryRow(str(NW_VEHICLES), "asset", "Vehicles", "#3b6ea8", 0, None),
+        ),
+        networth_items=(
+            NetWorthItemRow(
+                str(NW_CAR),
+                "asset",
+                "Vehicles",
+                str(NW_VEHICLES),
+                "Car",
+                currency,
+                "Family car",
+                "2025-04-01",
+                "manual",
+                None,
+                None,
+                "true",
+                "false",
+                None,
+            ),
+            NetWorthItemRow(
+                str(NW_BROKERAGE),
+                "asset",
+                "Vehicles",
+                str(NW_VEHICLES),
+                "Brokerage",
+                currency,
+                "",
+                None,
+                "linked",
+                "portfolio_holding",
+                str(NW_LINK),
+                "true",
+                "true",
+                None,
+            ),
+        ),
+        item_valuations=(
+            ItemValuationRow(
+                str(NW_FIRST_VALUE),
+                str(NW_CAR),
+                "Car",
+                "2026-02-01",
+                "12000.00",
+                currency,
+                "Bought",
+                "2026-02-01T08:00:00Z",
+            ),
+            ItemValuationRow(
+                str(NW_SECOND_VALUE),
+                str(NW_CAR),
+                "Car",
+                "2026-02-01",
+                "12050.00",
+                currency,
+                "",
+                "2026-02-01T09:00:00Z",
+            ),
+        ),
+        networth_snapshots=(
+            NetWorthSnapshotRow(
+                str(NW_SNAPSHOT),
+                "2026-01-31",
+                "12000.00",
+                "0.00",
+                currency,
+                (
+                    '{"categories":[{"category_id":"'
+                    + str(NW_VEHICLES)
+                    + '","side":"asset","total_minor":1200000}],"not_counted":'
+                    '{"non_base":0,"no_value":0,"unavailable":0},"v":1}'
+                ),
+                "auto",
+            ),
+        ),
     )
 
 
@@ -313,6 +405,62 @@ def _source_workspace(db: WorkspaceDb) -> None:
             created_at=EXPORTED_AT,
             updated_at=EXPORTED_AT,
         )
+        networth_categories = NetWorthCategoryRepository(session, ctx)
+        vehicles = networth_categories.create(
+            name="Vehicles",
+            name_key="vehicles",
+            side="asset",
+            color="#3b6ea8",
+            sort_order=0,
+            import_key=f"id:{NW_VEHICLES}",
+        )
+        networth_items = NetWorthItemRepository(session, ctx)
+        car = networth_items.create(
+            side="asset",
+            category_id=vehicles.id,
+            name="Car",
+            currency="EUR",
+            notes="Family car",
+            acquired_on=date(2025, 4, 1),
+            import_key=f"id:{NW_CAR}",
+        )
+        valuations = ItemValuationRepository(session, ctx)
+        valuations.create(
+            item_id=car.id,
+            as_of=date(2026, 2, 1),
+            value_minor=1200000,
+            currency="EUR",
+            note="Bought",
+            import_key=f"id:{NW_FIRST_VALUE}",
+            created_at=datetime(2026, 2, 1, 8, 0, tzinfo=UTC),
+        )
+        valuations.create(
+            item_id=car.id,
+            as_of=date(2026, 2, 1),
+            value_minor=1205000,
+            currency="EUR",
+            import_key=f"id:{NW_SECOND_VALUE}",
+            created_at=datetime(2026, 2, 1, 9, 0, tzinfo=UTC),
+        )
+        NetWorthSnapshotRepository(session, ctx).create(
+            as_of=date(2026, 1, 31),
+            assets_minor=1200000,
+            liabilities_minor=0,
+            currency="EUR",
+            breakdown={
+                "v": 1,
+                "categories": [
+                    {
+                        "category_id": str(vehicles.id),
+                        "side": "asset",
+                        "total_minor": 1200000,
+                    }
+                ],
+                "not_counted": {"non_base": 0, "no_value": 0, "unavailable": 0},
+            },
+            source="auto",
+            import_key=f"id:{NW_SNAPSHOT}",
+        )
 
 
 def _target(db: WorkspaceDb) -> UUID:
@@ -337,7 +485,16 @@ def test_restore_round_trip_is_byte_identical(db: WorkspaceDb, data_dir: Path) -
     assert errors == () and first_parsed is not None
     assert second_errors == () and second_parsed is not None
     assert first_parsed.files["workspace.json"] == second_parsed.files["workspace.json"]
-    for name in ("categories.csv", "budget_lines.csv", "transactions.csv", "months.csv"):
+    for name in (
+        "categories.csv",
+        "budget_lines.csv",
+        "transactions.csv",
+        "months.csv",
+        "networth_categories.csv",
+        "networth_items.csv",
+        "item_valuations.csv",
+        "networth_snapshots.csv",
+    ):
         assert first_parsed.files[name] == second_parsed.files[name]
     assert first_parsed.manifest["files"] == second_parsed.manifest["files"]
 
@@ -368,23 +525,39 @@ def test_untouched_suggested_categories_are_empty_enough_and_are_removed(
             now=db.clock.now(),
             automatic=True,
         )
+        networth_seed_into(
+            session,
+            target_ctx,
+            locale="en",
+            actor_user_id=db.users["own"],
+            actor_type="user",
+            now=db.clock.now(),
+            automatic=True,
+        )
     with db.factory() as session:
         assert workspace_is_empty(session, target_ctx)
         assert len(CategoryRepository(session, target_ctx).list()) == len(SEED)
+        assert len(NetWorthCategoryRepository(session, target_ctx).list()) == len(NETWORTH_SEED)
 
     batch_id = _upload(db, data_dir, _archive(_rows()), ctx=target_ctx)
     report = _plan(db, data_dir, batch_id, ctx=target_ctx)
     assert report["counts"]["invalid"] == 0, report
     assert report["counts"]["suggested_categories_removed"] == len(SEED)
+    assert report["counts"]["suggested_networth_categories_removed"] == len(NETWORTH_SEED)
     _apply(db, data_dir, batch_id, ctx=target_ctx)
     with db.factory() as session:
         names = {row.name for row in CategoryRepository(session, target_ctx).list()}
         assert names == {"Food", "Car", "Salary"}
+        networth_names = {
+            row.name for row in NetWorthCategoryRepository(session, target_ctx).list()
+        }
+        assert networth_names == {"Vehicles"}
 
     # A restore rollback leaves the workspace empty; it does not re-seed.
     rollback_import(db.factory, target_ctx, batch_id)
     with db.factory() as session:
         assert CategoryRepository(session, target_ctx).list() == []
+        assert NetWorthCategoryRepository(session, target_ctx).list() == []
         assert workspace_is_empty(session, target_ctx)
 
 
@@ -515,6 +688,27 @@ def test_restore_into_truly_empty_workspace_applies_settings_and_rolls_back(
         assert len(BudgetLineRepository(session, target_ctx).list()) == 2
         months = MonthStateRepository(session, target_ctx).list()
         assert len(months) == 1 and months[0].closed_at is not None
+        networth_categories = NetWorthCategoryRepository(session, target_ctx).ordered()
+        assert [(row.name, row.side) for row in networth_categories] == [("Vehicles", "asset")]
+        networth_items = NetWorthItemRepository(session, target_ctx).ordered()
+        assert {row.name: row for row in networth_items}.keys() == {"Car", "Brokerage"}
+        brokerage = next(row for row in networth_items if row.name == "Brokerage")
+        assert brokerage.valuation_mode == "manual"
+        assert brokerage.link_type is None and brokerage.link_id is None
+        assert ItemValuationRepository(session, target_ctx).for_item(brokerage.id) == []
+        car = next(row for row in networth_items if row.name == "Car")
+        values = ItemValuationRepository(session, target_ctx).for_item(car.id)
+        assert [row.value_minor for row in values] == [1200000, 1205000]
+        assert [row.created_at for row in values] == [
+            datetime(2026, 2, 1, 8, 0, tzinfo=UTC),
+            datetime(2026, 2, 1, 9, 0, tzinfo=UTC),
+        ]
+        snapshots = NetWorthSnapshotRepository(session, target_ctx).for_range(None)
+        assert len(snapshots) == 1
+        assert snapshots[0].source == "auto" and snapshots[0].net_minor == 1200000
+        assert snapshots[0].breakdown["categories"][0]["category_id"] == str(
+            networth_categories[0].id
+        )
         actions = [
             event.action for event in session.query(AuditEvent).order_by(AuditEvent.ts).all()
         ]
@@ -535,6 +729,10 @@ def test_restore_into_truly_empty_workspace_applies_settings_and_rolls_back(
         assert TransactionRepository(session, target_ctx).list() == []
         assert BudgetLineRepository(session, target_ctx).list() == []
         assert MonthStateRepository(session, target_ctx).list() == []
+        assert NetWorthCategoryRepository(session, target_ctx).list() == []
+        assert NetWorthItemRepository(session, target_ctx).list() == []
+        assert ItemValuationRepository(session, target_ctx).list() == []
+        assert NetWorthSnapshotRepository(session, target_ctx).list() == []
         workspace = session.get(Workspace, target)
         assert workspace is not None and workspace.name == "Restored"
         event = session.query(AuditEvent).filter(AuditEvent.action == "import.rolled_back").one()
@@ -586,6 +784,78 @@ def test_restore_reads_released_golden_archives(
         assert workspace.upcoming_days == upcoming
         assert CategoryRepository(session, ctx).list()
         assert TransactionRepository(session, ctx).list()
+
+
+def test_restore_reads_the_v1_2_golden_archive(db: WorkspaceDb, data_dir: Path) -> None:
+    content = (Path(__file__).parents[1] / "fixtures" / "workspace-archive-v1.2.zip").read_bytes()
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    batch_id = _upload(db, data_dir, content, ctx=ctx)
+    report = _plan(db, data_dir, batch_id, ctx=ctx)
+    assert report["counts"]["invalid"] == 0, report
+    assert report["counts"]["networth_categories_created"] == 1
+    assert report["counts"]["networth_items_created"] == 2
+    assert report["counts"]["item_valuations_created"] == 2
+    assert report["counts"]["networth_snapshots_created"] == 1
+    assert report["counts"]["linked_items_unlinked"] == 1
+    _apply(db, data_dir, batch_id, ctx=ctx)
+    with db.factory() as session:
+        categories = NetWorthCategoryRepository(session, ctx).ordered()
+        items = NetWorthItemRepository(session, ctx).ordered()
+        assert [row.name for row in categories] == ["Vehicles"]
+        assert [row.name for row in items] == ["Car", "Brokerage"]
+        assert {row.valuation_mode for row in items} == {"manual"}
+        car = next(row for row in items if row.name == "Car")
+        values = ItemValuationRepository(session, ctx).for_item(car.id)
+        assert [row.value_minor for row in values] == [1200000, 1205000]
+        snapshots = NetWorthSnapshotRepository(session, ctx).for_range(None)
+        assert snapshots[0].breakdown["categories"][0]["category_id"] == str(categories[0].id)
+
+
+def test_restore_keeps_unknown_breakdown_category_ids(db: WorkspaceDb, data_dir: Path) -> None:
+    rows = _rows()
+    unknown = str(uuid4())
+    snapshot = replace(
+        rows.networth_snapshots[0],
+        breakdown=(
+            '{"categories":[{"category_id":"'
+            + unknown
+            + '","side":"asset","total_minor":1200000}],"not_counted":'
+            '{"non_base":0,"no_value":0,"unavailable":0},"v":1}'
+        ),
+    )
+    rows = replace(rows, networth_snapshots=(snapshot,))
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    batch_id = _upload(db, data_dir, _archive(rows), ctx=ctx)
+    assert _plan(db, data_dir, batch_id, ctx=ctx)["counts"]["invalid"] == 0
+    _apply(db, data_dir, batch_id, ctx=ctx)
+    with db.factory() as session:
+        stored = NetWorthSnapshotRepository(session, ctx).for_range(None)[0]
+        assert stored.breakdown["categories"][0]["category_id"] == unknown
+
+
+def test_lone_exported_item_valuations_import_as_duplicates(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    batch_id = _upload(db, data_dir, _archive(_rows()), ctx=ctx)
+    assert _plan(db, data_dir, batch_id, ctx=ctx)["counts"]["invalid"] == 0
+    _apply(db, data_dir, batch_id, ctx=ctx)
+
+    exported = export_workspace(db.factory, ctx).content
+    with zipfile.ZipFile(BytesIO(exported)) as archive:
+        content = archive.read("item_valuations.csv")
+    lone = _upload(db, data_dir, content, ctx=ctx, mode="merge")
+    report = _plan(db, data_dir, lone, ctx=ctx)
+    assert report["source"] == "item_valuations_csv"
+    assert report["counts"]["to_create"] == 0
+    assert report["counts"]["duplicates_skipped"] == 2
+    assert {entry["code"] for entry in report["skipped"]} == {"already_imported"}
+    _apply(db, data_dir, lone, ctx=ctx)
+    with db.factory() as session:
+        assert len(ItemValuationRepository(session, ctx).list()) == 2
 
 
 def test_newer_major_archive_is_refused_and_newer_minor_warns(
@@ -811,10 +1081,13 @@ def test_merge_into_source_workspace_creates_nothing(db: WorkspaceDb, data_dir: 
     batch_id = _upload(db, data_dir, content, ctx=db.ctx("own", "owner"), mode="merge")
     report = _plan(db, data_dir, batch_id, ctx=db.ctx("own", "owner"))
     assert report["counts"]["to_create"] == 0, report
+    assert [warning["code"] for warning in report["warnings"]] == ["networth_restore_only"]
     _apply(db, data_dir, batch_id, ctx=db.ctx("own", "owner"))
     with db.factory() as session:
         assert len(CategoryRepository(session, db.ctx("own", "owner")).list()) == 3
         assert len(TransactionRepository(session, db.ctx("own", "owner")).list()) == 3
+        assert len(NetWorthItemRepository(session, db.ctx("own", "owner")).list()) == 1
+        assert len(ItemValuationRepository(session, db.ctx("own", "owner")).list()) == 2
 
 
 def test_merge_into_another_workspace_keeps_settings_and_maps_archived(

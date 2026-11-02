@@ -53,6 +53,8 @@
     <a class="underline" href="{{ scoped_url(request, 'workspace_data_import_template', filename='transactions.csv') }}">transactions.csv</a>
     ·
     <a class="underline" href="{{ scoped_url(request, 'workspace_data_import_template', filename='budget_lines.csv') }}">budget_lines.csv</a>
+    ·
+    <a class="underline" href="{{ scoped_url(request, 'workspace_data_import_template', filename='item_valuations.csv') }}">item_valuations.csv</a>
   </p>
 </section>
 {% if import_batches %}
@@ -118,10 +120,19 @@
       <div><dt class="text-muted">{{ _("Deleted transactions restored") }}</dt><dd>{{ selected_batch.report.counts.deleted_transactions|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Planned values") }}</dt><dd>{{ selected_batch.report.counts.budget_lines_created|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Month states") }}</dt><dd>{{ selected_batch.report.counts.months_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Net-worth categories") }}</dt><dd>{{ selected_batch.report.counts.networth_categories_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Net-worth items") }}</dt><dd>{{ selected_batch.report.counts.networth_items_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Item valuations") }}</dt><dd>{{ selected_batch.report.counts.item_valuations_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Net-worth snapshots") }}</dt><dd>{{ selected_batch.report.counts.networth_snapshots_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Linked items restored as manual") }}</dt><dd>{{ selected_batch.report.counts.linked_items_unlinked|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Suggested categories to remove") }}</dt><dd>{{ selected_batch.report.counts.suggested_categories_removed|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Suggested net-worth categories to remove") }}</dt><dd>{{ selected_batch.report.counts.suggested_networth_categories_removed|default(0) }}</dd></div>
     </dl>
     {% if selected_batch.report.suggested_categories_removed %}
     <p class="mt-2 text-sm text-muted">{{ _("Removed before restoring: %(names)s", names=selected_batch.report.suggested_categories_removed|join(", ")) }}</p>
+    {% endif %}
+    {% if selected_batch.report.suggested_networth_categories_removed %}
+    <p class="mt-2 text-sm text-muted">{{ _("Removed net-worth categories before restoring: %(names)s", names=selected_batch.report.suggested_networth_categories_removed|join(", ")) }}</p>
     {% endif %}
     {% if selected_batch.report.settings_diff %}
     <p class="mt-3 text-sm"><span class="font-medium">{{ _("Settings the restore will replace:") }}</span>
