@@ -125,6 +125,18 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         )
     },
     **{
+        ("NetWorthCategoryRepository", method): "test_networth_queries_stay_in_their_workspace"
+        for method in ("create", "ordered", "active_by_name_key", "count", "next_sort_order")
+    },
+    **{
+        ("NetWorthItemRepository", method): "test_networth_queries_stay_in_their_workspace"
+        for method in ("create", "ordered", "counts_by_category")
+    },
+    **{
+        ("ItemValuationRepository", method): "test_networth_queries_stay_in_their_workspace"
+        for method in ("create", "for_item", "for_items")
+    },
+    **{
         ("MonthStateRepository", method): "test_month_state_queries_stay_in_their_workspace"
         for method in ("for_month", "create", "create_restored", "delete_for_months")
     },

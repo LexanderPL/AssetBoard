@@ -62,9 +62,12 @@ from assetboard.db.repositories import (
     InstanceAuditReader,
     InvitationRepository,
     InvitationTokenReader,
+    ItemValuationRepository,
     LineUsage,
     MembershipRepository,
     MonthStateRepository,
+    NetWorthCategoryRepository,
+    NetWorthItemRepository,
     NotFound,
     ScopedRepository,
     TransactionRepository,
@@ -521,6 +524,93 @@ def test_category_queries_stay_in_their_workspace(
     assert in_a.by_lineage_ids([source_id]) == [a_food]
     assert in_b.by_lineage_ids([source_id]) == []
     assert in_b.by_lineage_ids([a_food.id]) == []
+
+
+def test_networth_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    categories_a = NetWorthCategoryRepository(db_session, ctx_a)
+    categories_b = NetWorthCategoryRepository(db_session, ctx_b)
+
+    def category(repository: NetWorthCategoryRepository, name: str, side: str = "asset") -> Any:
+        return repository.create(
+            name=name,
+            name_key=name.casefold(),
+            side=side,
+            color="#16a34a",
+            sort_order=0,
+        )
+
+    a_vehicle = category(categories_a, "Vehicles")
+    a_mortgage = category(categories_a, "Mortgage", "liability")
+    b_vehicle = category(categories_b, "Vehicles")
+    assert [row.id for row in categories_a.ordered()] == [a_vehicle.id, a_mortgage.id]
+    assert [row.id for row in categories_a.ordered("liability")] == [a_mortgage.id]
+    assert [row.id for row in categories_b.ordered()] == [b_vehicle.id]
+    assert categories_a.active_by_name_key(side="asset", name_key="vehicles") is a_vehicle
+    assert categories_b.active_by_name_key(side="asset", name_key="vehicles") is b_vehicle
+    assert categories_b.active_by_name_key(side="liability", name_key="mortgage") is None
+    assert (categories_a.count(), categories_b.count()) == (2, 1)
+    assert (categories_a.next_sort_order("asset"), categories_b.next_sort_order("asset")) == (
+        1,
+        1,
+    )
+
+    items_a = NetWorthItemRepository(db_session, ctx_a)
+    items_b = NetWorthItemRepository(db_session, ctx_b)
+    a_item = items_a.create(
+        side="asset",
+        category_id=a_vehicle.id,
+        name="Car",
+        currency="EUR",
+        notes="",
+        acquired_on=None,
+        valuation_mode="manual",
+        link_type=None,
+        link_id=None,
+        include_in_net_worth=True,
+        investable=False,
+    )
+    b_item = items_b.create(
+        side="asset",
+        category_id=b_vehicle.id,
+        name="Car",
+        currency="EUR",
+        notes="",
+        acquired_on=None,
+        valuation_mode="manual",
+        link_type=None,
+        link_id=None,
+        include_in_net_worth=True,
+        investable=False,
+    )
+    assert [row.id for row in items_a.ordered()] == [a_item.id]
+    assert [row.id for row in items_b.ordered()] == [b_item.id]
+    assert items_a.counts_by_category() == {a_vehicle.id: 1}
+    assert items_b.counts_by_category() == {b_vehicle.id: 1}
+
+    valuations_a = ItemValuationRepository(db_session, ctx_a)
+    valuations_b = ItemValuationRepository(db_session, ctx_b)
+    a_value = valuations_a.create(
+        item_id=a_item.id,
+        as_of=date(2026, 10, 7),
+        value_minor=125000,
+        currency="EUR",
+        note="",
+    )
+    b_value = valuations_b.create(
+        item_id=b_item.id,
+        as_of=date(2026, 10, 7),
+        value_minor=99000,
+        currency="EUR",
+        note="",
+    )
+    assert [row.id for row in valuations_a.for_item(a_item.id)] == [a_value.id]
+    assert valuations_b.for_item(a_item.id) == []
+    assert [row.id for row in valuations_b.for_item(b_item.id)] == [b_value.id]
+    assert [row.id for row in valuations_a.for_items([a_item.id, b_item.id])] == [a_value.id]
+    assert [row.id for row in valuations_b.for_items([a_item.id, b_item.id])] == [b_value.id]
 
 
 def test_month_state_queries_stay_in_their_workspace(

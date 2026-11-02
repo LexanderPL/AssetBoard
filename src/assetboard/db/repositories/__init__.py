@@ -30,6 +30,11 @@ from assetboard.db.repositories.invitation import (
 )
 from assetboard.db.repositories.membership import MembershipRepository, WorkspaceMember
 from assetboard.db.repositories.month_state import MonthStateRepository
+from assetboard.db.repositories.networth import (
+    ItemValuationRepository,
+    NetWorthCategoryRepository,
+    NetWorthItemRepository,
+)
 from assetboard.db.repositories.notifications import (
     NotificationChannelRepository,
     NotificationLogRepository,
@@ -59,6 +64,9 @@ __all__ = [
     "ScheduledOccurrenceRepository",
     "IncomeSourceRepository",
     "IncomeSourceTaxRuleRepository",
+    "ItemValuationRepository",
+    "NetWorthCategoryRepository",
+    "NetWorthItemRepository",
     "WorkDayRepository",
     "WorkLogRepository",
     "TaxRuleRepository",

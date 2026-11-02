@@ -22,6 +22,7 @@ from assetboard.db.models.identity import AuditEvent, Invitation, Membership, Us
 from assetboard.db.models.import_batch import ImportBatch, ImportCategoryMapping
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
+from assetboard.db.models.networth import ItemValuation, NetWorthCategory, NetWorthItem
 from assetboard.db.models.notifications import NotificationChannel, NotificationLog
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.models.tax import TaxRule, TaxRuleVersion
@@ -332,6 +333,52 @@ def make_import_category_mapping(session: Session, workspace_id: UUID) -> Import
     )
 
 
+def make_networth_category(session: Session, workspace_id: UUID) -> NetWorthCategory:
+    name = f"Net worth category {uuid4().hex[:8]}"
+    return NetWorthCategory(
+        workspace_id=workspace_id,
+        name=name,
+        name_key=name.casefold(),
+        side="asset",
+        color="#16a34a",
+        sort_order=0,
+    )
+
+
+def make_networth_item(session: Session, workspace_id: UUID) -> NetWorthItem:
+    category = make_networth_category(session, workspace_id)
+    session.add(category)
+    session.flush()
+    return NetWorthItem(
+        workspace_id=workspace_id,
+        side="asset",
+        category_id=category.id,
+        name="Synthetic item",
+        currency="EUR",
+        notes="",
+        acquired_on=None,
+        valuation_mode="manual",
+        link_type=None,
+        link_id=None,
+        include_in_net_worth=True,
+        investable=False,
+    )
+
+
+def make_item_valuation(session: Session, workspace_id: UUID) -> ItemValuation:
+    item = make_networth_item(session, workspace_id)
+    session.add(item)
+    session.flush()
+    return ItemValuation(
+        workspace_id=workspace_id,
+        item_id=item.id,
+        as_of=date(2026, 10, 7),
+        value_minor=125000,
+        currency="EUR",
+        note="Synthetic",
+    )
+
+
 TENANT_CASES: dict[type[Any], TenantCase] = {
     ScheduledItem: TenantCase(make_scheduled_item, update_values={"name": "Rent"}),
     ScheduledOccurrence: TenantCase(make_scheduled_occurrence, update_values={"label": "Rent"}),
@@ -340,6 +387,10 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     # Invitations change only through named transitions (revoke, mark_used, ...).
     Invitation: TenantCase(make_invitation, unsupported=frozenset({"update", "delete"})),
     Category: TenantCase(make_category, update_values={"color": "#e11d48"}),
+    NetWorthCategory: TenantCase(make_networth_category, update_values={"color": "#e11d48"}),
+    NetWorthItem: TenantCase(make_networth_item, update_values={"name": "Updated item"}),
+    # Valuations are append-only.
+    ItemValuation: TenantCase(make_item_valuation, unsupported=frozenset({"update", "delete"})),
     # Reopening clears the closed fields; rows are never deleted.
     MonthState: TenantCase(
         make_month_state,
