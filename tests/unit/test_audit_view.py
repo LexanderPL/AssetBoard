@@ -142,6 +142,8 @@ NETWORTH_ACTIONS = {
     "networth_item.restored",
     "networth_item.valuation_added",
     "networth_item.bulk_created",
+    "networth_item.linked",
+    "networth_item.unlinked",
     "networth_snapshot.created",
     "networth_snapshot.taken",
     "networth_snapshot.backfilled",

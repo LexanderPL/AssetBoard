@@ -113,6 +113,17 @@ def _not_counted(point: HistorySnapshot, locale: str) -> tuple[str, ...]:
             )
             % {"num": count}
         )
+    if point.breakdown.unavailable:
+        count = point.breakdown.unavailable
+        lines.append(
+            ngettext(
+                "%(num)d linked item was unavailable and was not counted.",
+                "%(num)d linked items were unavailable and were not counted.",
+                count,
+                locale,
+            )
+            % {"num": count}
+        )
     return tuple(lines)
 
 

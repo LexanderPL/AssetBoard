@@ -38,6 +38,11 @@ class Side(StrEnum):
     LIABILITY = "liability"
 
 
+@dataclass(frozen=True, slots=True)
+class Unavailable:
+    """A linked value could not be resolved for the requested date."""
+
+
 class InvalidItemName(ValueError):
     code = "invalid_name"
 

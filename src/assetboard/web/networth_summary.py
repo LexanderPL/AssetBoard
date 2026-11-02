@@ -86,6 +86,7 @@ class NetWorthSummaryView:
     non_base_items: tuple[WarningItem, ...]
     no_value_items: tuple[WarningItem, ...]
     excluded_items: tuple[WarningItem, ...]
+    unavailable_items: tuple[WarningItem, ...]
 
     @property
     def has_donut(self) -> bool:
@@ -247,4 +248,5 @@ def build_summary_view(data: NetWorthSummaryData, locale: str) -> NetWorthSummar
         non_base_items=tuple(_warning(item, locale) for item in data.non_base_items),
         no_value_items=tuple(_warning(item, locale) for item in data.no_value_items),
         excluded_items=tuple(_warning(item, locale) for item in data.excluded_items),
+        unavailable_items=tuple(_warning(item, locale) for item in data.unavailable_items),
     )

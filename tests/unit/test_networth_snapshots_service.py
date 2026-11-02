@@ -134,7 +134,7 @@ def test_auto_snapshot_uses_the_previous_month_end_and_is_idempotent(
                 "total_minor": 10000,
             }
         ],
-        "not_counted": {"non_base": 0, "no_value": 0},
+        "not_counted": {"non_base": 0, "no_value": 0, "unavailable": 0},
     }
     event = _events(team, "networth_snapshot.created")[0]
     assert event.actor_type == "system" and event.actor_user_id is None
@@ -381,7 +381,11 @@ def test_backfill_exclusions_match_the_summary(team: WorkspaceDb) -> None:
         4000,
         6000,
     )
-    assert january.breakdown["not_counted"] == {"non_base": 1, "no_value": 1}
+    assert january.breakdown["not_counted"] == {
+        "non_base": 1,
+        "no_value": 1,
+        "unavailable": 0,
+    }
 
 
 def test_history_prefers_manual_over_auto_over_backfill_and_filters_the_range(

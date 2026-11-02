@@ -130,6 +130,15 @@ class NetWorthItem(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             "category_id",
         ),
         Index("ix_networth_items_workspace_category", "workspace_id", "category_id"),
+        Index(
+            "uq_networth_items_active_link",
+            "workspace_id",
+            "link_type",
+            "link_id",
+            unique=True,
+            sqlite_where=text("valuation_mode = 'linked' AND archived_at IS NULL"),
+            postgresql_where=text("valuation_mode = 'linked' AND archived_at IS NULL"),
+        ),
     )
 
     side: Mapped[str] = mapped_column(String(16), nullable=False)

@@ -12,7 +12,7 @@ summed until an FX service exists.
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -30,6 +30,7 @@ from assetboard.db.repositories import (
     ItemValuationRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
+    NotFound,
 )
 from assetboard.db.repositories.base import WorkspaceScope
 from assetboard.domain.categories import InvalidCategoryName, InvalidColor, clean_name
@@ -68,6 +69,12 @@ from assetboard.domain.transactions import amount_minor as positive_amount_minor
 from assetboard.i18n import gettext
 from assetboard.i18n.numbers import parse_amount
 from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.networth_links import (
+    UNAVAILABLE,
+    LinkOption,
+    LinkTarget,
+    registry,
+)
 
 __all__ = [
     "BulkLineView",
@@ -79,6 +86,7 @@ __all__ = [
     "NetWorthError",
     "NetWorthPage",
     "SideView",
+    "UnlinkResult",
     "ValuationView",
     "add_valuation",
     "archive_category",
@@ -90,6 +98,7 @@ __all__ = [
     "delete_category",
     "get_category",
     "get_item",
+    "link_options_for_side",
     "list_networth",
     "load_item_histories",
     "move_category",
@@ -98,6 +107,7 @@ __all__ = [
     "restore_item",
     "seed_categories",
     "seed_into",
+    "unlink_item",
     "update_category",
     "update_item",
 ]
@@ -176,6 +186,19 @@ class ItemView:
     valuations: tuple[ValuationView, ...]
     sparkline: str
     non_base: bool
+    valuation_mode: str = "manual"
+    link_type: str | None = None
+    link_id: UUID | None = None
+    link_label: str | None = None
+    link_name: str | None = None
+    link_url: str | None = None
+    unavailable: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class UnlinkResult:
+    item: ItemView
+    value_recorded: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -319,13 +342,15 @@ def _load_rows(
     scope: WorkspaceScope,
     *,
     categories: Sequence[NetWorthCategory] | None = None,
+    item_ids: Collection[UUID] | None = None,
 ) -> _LoadedRows:
     category_rows = (
         list(categories)
         if categories is not None
         else NetWorthCategoryRepository(session, scope).ordered()
     )
-    items = NetWorthItemRepository(session, scope).ordered()
+    repository = NetWorthItemRepository(session, scope)
+    items = repository.by_ids(item_ids) if item_ids is not None else repository.ordered()
     valuations: dict[UUID, list[ItemValuation]] = {}
     for valuation in ItemValuationRepository(session, scope).for_items([item.id for item in items]):
         valuations.setdefault(valuation.item_id, []).append(valuation)
@@ -341,56 +366,22 @@ def _item_history(item: NetWorthItem, valuations: Sequence[ItemValuation]) -> It
         include_in_net_worth=item.include_in_net_worth,
         archived_at=item.archived_at,
         valuations=tuple(_valuation_points(valuations)),
+        valuation_mode=item.valuation_mode,
+        link_type=item.link_type,
+        link_id=item.link_id,
     )
 
 
 def load_item_histories(
-    session: Session, scope: WorkspaceScope, *, categories: Sequence[NetWorthCategory] | None = None
-) -> tuple[ItemHistory, ...]:
-    """Every item with its full valuation history, loaded once for repeated date selection."""
-    rows = _load_rows(session, scope, categories=categories)
-    return tuple(_item_history(item, rows.valuations.get(item.id, ())) for item in rows.items)
-
-
-def _item_view(
-    item: NetWorthItem,
-    category: NetWorthCategory,
-    valuations: Sequence[ItemValuation],
+    session: Session,
+    scope: WorkspaceScope,
     *,
-    today: date,
-    base_currency: str,
-    include_history: bool = True,
-) -> ItemView:
-    if include_history:
-        views, current_minor, current_as_of, sparkline = _valuation_views(valuations, today)
-    else:
-        points = _valuation_points(valuations)
-        current_point = current_valuation(points, today)
-        views = ()
-        current_minor = current_point.value_minor if current_point is not None else None
-        current_as_of = current_point.as_of if current_point is not None else None
-        sparkline = ""
-    current = Money(current_minor, item.currency) if current_minor is not None else None
-    return ItemView(
-        id=item.id,
-        side=item.side,
-        category_id=item.category_id,
-        category_name=category.name,
-        category_archived=category.archived_at is not None,
-        name=item.name,
-        currency=item.currency,
-        notes=item.notes,
-        acquired_on=item.acquired_on,
-        include_in_net_worth=item.include_in_net_worth,
-        investable=item.investable,
-        archived=item.archived_at is not None,
-        archived_at=item.archived_at,
-        current=current,
-        current_as_of=current_as_of,
-        valuations=views,
-        sparkline=sparkline,
-        non_base=item.currency != base_currency,
-    )
+    categories: Sequence[NetWorthCategory] | None = None,
+    item_ids: Collection[UUID] | None = None,
+) -> tuple[ItemHistory, ...]:
+    """Every item (or only ``item_ids``) with its valuation history, loaded once."""
+    rows = _load_rows(session, scope, categories=categories, item_ids=item_ids)
+    return tuple(_item_history(item, rows.valuations.get(item.id, ())) for item in rows.items)
 
 
 def _item_view_at(
@@ -402,6 +393,7 @@ def _item_view_at(
     as_of: date,
     base_currency: str,
     include_history: bool,
+    link_target: LinkTarget | None = None,
 ) -> ItemView:
     if include_history:
         views, _current_minor, _current_as_of, sparkline = _valuation_views(valuations, as_of)
@@ -428,7 +420,28 @@ def _item_view_at(
         valuations=views,
         sparkline=sparkline,
         non_base=item.currency != base_currency,
+        valuation_mode=item.valuation_mode,
+        link_type=item.link_type,
+        link_id=item.link_id,
+        link_label=registry.label(item.link_type),
+        link_name=link_target.label if link_target is not None else None,
+        link_url=link_target.href if link_target is not None else None,
+        unavailable=value.unavailable,
     )
+
+
+def _link_targets(
+    session: Session, scope: WorkspaceScope, histories: Sequence[ItemHistory]
+) -> dict[UUID, LinkTarget]:
+    """Describe every linked item once for display; unknown/unavailable targets are absent."""
+    targets: dict[UUID, LinkTarget] = {}
+    for item in histories:
+        if item.valuation_mode != "linked" or item.link_type is None or item.link_id is None:
+            continue
+        target = registry.describe(session, scope, item.link_type, item.link_id)
+        if isinstance(target, LinkTarget):
+            targets[item.id] = target
+    return targets
 
 
 def current_values(
@@ -440,6 +453,7 @@ def current_values(
     timezone: str,
     include_history: bool = False,
     categories: Sequence[NetWorthCategory] | None = None,
+    item_ids: Collection[UUID] | None = None,
 ) -> list[ItemView]:
     """Every item with its value effective on ``as_of``.
 
@@ -447,11 +461,19 @@ def current_values(
     (default) and F5.3's month-end snapshots (any ``as_of``). A valuation dated after
     ``as_of`` is ignored even when it exists in the history. The archived flag follows the
     owner's F5.3 rule: an item is archived from its workspace-local archive date onwards.
+    ``item_ids`` narrows the read to a specific item for a write response.
     """
-    rows = _load_rows(session, scope, categories=categories)
+    rows = _load_rows(session, scope, categories=categories, item_ids=item_ids)
     category_by_id = {category.id: category for category in rows.categories}
     histories = tuple(_item_history(item, rows.valuations.get(item.id, ())) for item in rows.items)
-    values = values_at(histories, as_of, timezone=timezone)
+    resolved = registry.resolve_many(session, scope, histories, (as_of,))
+    linked = {
+        item.id: resolved.get((item.id, as_of), UNAVAILABLE)
+        for item in histories
+        if item.valuation_mode == "linked"
+    }
+    values = values_at(histories, as_of, timezone=timezone, linked=linked)
+    targets = _link_targets(session, scope, histories)
     return [
         _item_view_at(
             item,
@@ -461,6 +483,7 @@ def current_values(
             as_of=as_of,
             base_currency=base_currency,
             include_history=include_history,
+            link_target=targets.get(item.id),
         )
         for item, value in zip(rows.items, values, strict=True)
     ]
@@ -592,21 +615,30 @@ def list_networth(factory: sessionmaker[Session], ctx: Context) -> NetWorthPage:
     )
 
 
+def _view_after_write(
+    session: Session, ctx: Context, item_id: UUID, *, base_currency: str, today: date
+) -> ItemView:
+    values = current_values(
+        session,
+        ctx,
+        as_of=today,
+        base_currency=base_currency,
+        timezone=ctx.workspace.timezone,
+        include_history=True,
+        item_ids=(item_id,),
+    )
+    for value in values:
+        if value.id == item_id:
+            return value
+    raise NotFound
+
+
 def get_item(factory: sessionmaker[Session], ctx: Context, item_id: UUID) -> ItemView:
     require_role(ctx, Role.VIEWER)
     today = ctx.clock.today(ctx.workspace.timezone)
     with factory() as session:
         base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
-        item = NetWorthItemRepository(session, ctx).get_or_raise(item_id)
-        category = NetWorthCategoryRepository(session, ctx).get_or_raise(item.category_id)
-        valuations = ItemValuationRepository(session, ctx).for_item(item.id)
-    return _item_view(
-        item,
-        category,
-        valuations,
-        today=today,
-        base_currency=base_currency,
-    )
+        return _view_after_write(session, ctx, item_id, base_currency=base_currency, today=today)
 
 
 def get_category(factory: sessionmaker[Session], ctx: Context, category_id: UUID) -> CategoryView:
@@ -615,6 +647,16 @@ def get_category(factory: sessionmaker[Session], ctx: Context, category_id: UUID
         category = NetWorthCategoryRepository(session, ctx).get_or_raise(category_id)
         counts = NetWorthItemRepository(session, ctx).counts_by_category()
     return _category_view(category, counts)
+
+
+def link_options_for_side(
+    factory: sessionmaker[Session], ctx: Context, *, side: str
+) -> tuple[LinkOption, ...]:
+    """The registered link targets for one side; empty while no resolver is registered."""
+    require_role(ctx, Role.VIEWER)
+    wanted = _sides(side)
+    with factory() as session:
+        return registry.options_for_side(session, ctx, wanted)
 
 
 # Category writes (editors and owners)
@@ -1046,6 +1088,11 @@ def _category_for_item(
     return category
 
 
+def _link_unique_error(error: IntegrityError) -> bool:
+    message = str(error.orig).lower()
+    return "networth_items" in message and "link_type" in message and "link_id" in message
+
+
 def create_item(
     factory: sessionmaker[Session],
     ctx: Context,
@@ -1054,7 +1101,7 @@ def create_item(
     side: str,
     category_id: UUID,
     name: str,
-    value: str,
+    value: str = "",
     currency: str = "",
     notes: str = "",
     acquired_on: date | None = None,
@@ -1062,25 +1109,93 @@ def create_item(
     investable: bool = False,
     as_of: date | None = None,
     valuation_note: str = "",
+    link_type: str | None = None,
+    link_id: UUID | None = None,
 ) -> ItemView:
     require_role(ctx, Role.EDITOR)
     wanted_side = _sides(side)
     clean = _item_name(name)
     clean_notes_value = _notes(notes)
-    clean_note = _valuation_note(valuation_note)
     wanted_acquired = _date(acquired_on, "acquired_on")
-    wanted_as_of = _date(as_of, "as_of")
-    parsed = _parse_decimal(value, locale)
-    wanted_currency = _currency(currency) if currency.strip() else None
+    wanted_link_type = link_type.strip() if link_type else None
+    if (wanted_link_type is None) != (link_id is None):
+        raise InvalidNetWorth("link", "invalid_link")
+    parsed: Decimal | None = None
+    clean_note = ""
+    wanted_as_of: date | None = None
+    wanted_currency: str | None = None
+    if wanted_link_type is None:
+        clean_note = _valuation_note(valuation_note)
+        wanted_as_of = _date(as_of, "as_of")
+        parsed = _parse_decimal(value, locale)
+        wanted_currency = _currency(currency) if currency.strip() else None
 
     def write(session: Session) -> ItemView:
         require_role_now(session, ctx, Role.EDITOR)
         _lock(session, ctx, exclusive=False)
         workspace = CurrentWorkspaceRepository(session, ctx).get()
-        item_currency = wanted_currency or workspace.base_currency
-        money = _money(parsed, item_currency)
         category = _category_for_item(session, ctx, category_id, side=wanted_side.value)
         today = ctx.clock.today(ctx.workspace.timezone)
+        if wanted_link_type is not None:
+            assert link_id is not None
+            resolver = registry.resolver_for(session, ctx, wanted_link_type)
+            if resolver is None:
+                raise InvalidNetWorth("link", "invalid_link")
+            if resolver.side is not wanted_side:
+                raise InvalidNetWorth("link", "link_wrong_side")
+            target = resolver.describe(link_id)
+            if not isinstance(target, LinkTarget) or not target.label:
+                raise InvalidNetWorth("link", "invalid_link")
+            try:
+                item_currency = _currency(target.currency)
+            except InvalidNetWorth:
+                raise InvalidNetWorth("link", "invalid_link") from None
+            item = NetWorthItemRepository(session, ctx).create(
+                side=wanted_side.value,
+                category_id=category.id,
+                name=clean,
+                currency=item_currency,
+                notes=clean_notes_value,
+                acquired_on=wanted_acquired,
+                valuation_mode="linked",
+                link_type=wanted_link_type,
+                link_id=link_id,
+                include_in_net_worth=include_in_net_worth,
+                investable=investable,
+            )
+            _audit(
+                session,
+                ctx,
+                "networth_item.created",
+                "networth_item",
+                item.id,
+                {
+                    "name": clean,
+                    "side": wanted_side.value,
+                    "category": category.name,
+                    "currency": item_currency,
+                    "link_type": wanted_link_type,
+                },
+            )
+            _audit(
+                session,
+                ctx,
+                "networth_item.linked",
+                "networth_item",
+                item.id,
+                {"link_type": wanted_link_type, "target": target.label},
+            )
+            return _view_after_write(
+                session,
+                ctx,
+                item.id,
+                base_currency=workspace.base_currency,
+                today=today,
+            )
+
+        assert parsed is not None
+        item_currency = wanted_currency or workspace.base_currency
+        money = _money(parsed, item_currency)
         effective_as_of = wanted_as_of or today
         item = NetWorthItemRepository(session, ctx).create(
             side=wanted_side.value,
@@ -1095,7 +1210,7 @@ def create_item(
             include_in_net_worth=include_in_net_worth,
             investable=investable,
         )
-        valuation = ItemValuationRepository(session, ctx).create(
+        ItemValuationRepository(session, ctx).create(
             item_id=item.id,
             as_of=effective_as_of,
             value_minor=money.amount_minor,
@@ -1117,15 +1232,20 @@ def create_item(
                 "as_of": effective_as_of.isoformat(),
             },
         )
-        return _item_view(
-            item,
-            category,
-            [valuation],
-            today=today,
+        return _view_after_write(
+            session,
+            ctx,
+            item.id,
             base_currency=workspace.base_currency,
+            today=today,
         )
 
-    return run_immediate(factory, write)
+    try:
+        return run_immediate(factory, write)
+    except IntegrityError as exc:
+        if _link_unique_error(exc):
+            raise InvalidNetWorth("link", "already_linked") from exc
+        raise
 
 
 def update_item(
@@ -1159,6 +1279,8 @@ def update_item(
         )
         item_currency = wanted_currency or item.currency
         valuations = ItemValuationRepository(session, ctx).for_item(item.id)
+        if item.valuation_mode == "linked" and item_currency != item.currency:
+            raise InvalidNetWorth("currency", "linked_currency")
         if item_currency != item.currency and valuations:
             raise InvalidNetWorth("currency", "currency_locked")
         changes = {
@@ -1187,12 +1309,12 @@ def update_item(
                     "fields": ",".join(sorted(changes)),
                 },
             )
-        return _item_view(
-            item,
-            category,
-            valuations,
-            today=ctx.clock.today(ctx.workspace.timezone),
+        return _view_after_write(
+            session,
+            ctx,
+            item.id,
             base_currency=workspace.base_currency,
+            today=ctx.clock.today(ctx.workspace.timezone),
         )
 
     return run_immediate(factory, write)
@@ -1230,9 +1352,17 @@ def restore_item(factory: sessionmaker[Session], ctx: Context, item_id: UUID) ->
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.EDITOR)
         _lock(session, ctx, exclusive=False)
-        item = NetWorthItemRepository(session, ctx).get_or_raise(item_id)
+        repository = NetWorthItemRepository(session, ctx)
+        item = repository.get_or_raise(item_id)
         if item.archived_at is None:
             return
+        if (
+            item.valuation_mode == "linked"
+            and item.link_type is not None
+            and item.link_id is not None
+            and repository.active_linked(item.link_type, item.link_id) is not None
+        ):
+            raise InvalidNetWorth("link", "already_linked")
         item.archived_at = None
         session.flush()
         _audit(
@@ -1244,7 +1374,70 @@ def restore_item(factory: sessionmaker[Session], ctx: Context, item_id: UUID) ->
             {"name": item.name, "side": item.side},
         )
 
-    run_immediate(factory, write)
+    try:
+        run_immediate(factory, write)
+    except IntegrityError as exc:
+        if _link_unique_error(exc):
+            raise InvalidNetWorth("link", "already_linked") from exc
+        raise
+
+
+def unlink_item(factory: sessionmaker[Session], ctx: Context, item_id: UUID) -> UnlinkResult:
+    """Convert a linked item to manual; keep today's resolved value when it is available."""
+    require_role(ctx, Role.EDITOR)
+
+    def write(session: Session) -> UnlinkResult:
+        require_role_now(session, ctx, Role.EDITOR)
+        _lock(session, ctx, exclusive=False)
+        workspace = CurrentWorkspaceRepository(session, ctx).get()
+        repository = NetWorthItemRepository(session, ctx)
+        item = repository.get_or_raise(item_id)
+        if item.archived_at is not None:
+            raise ItemArchived
+        if item.valuation_mode != "linked" or item.link_type is None or item.link_id is None:
+            raise InvalidNetWorth("link", "not_linked")
+        today = ctx.clock.today(ctx.workspace.timezone)
+        resolved = registry.resolve_one(
+            session,
+            ctx,
+            link_type=item.link_type,
+            link_id=item.link_id,
+            currency=item.currency,
+            as_of=today,
+        )
+        value_recorded = isinstance(resolved, Money)
+        if value_recorded:
+            ItemValuationRepository(session, ctx).create(
+                item_id=item.id,
+                as_of=today,
+                value_minor=resolved.amount_minor,
+                currency=item.currency,
+                note="",
+            )
+        repository.update(
+            item.id,
+            valuation_mode="manual",
+            link_type=None,
+            link_id=None,
+        )
+        _audit(
+            session,
+            ctx,
+            "networth_item.unlinked",
+            "networth_item",
+            item.id,
+            {"value_recorded": value_recorded},
+        )
+        view = _view_after_write(
+            session,
+            ctx,
+            item.id,
+            base_currency=workspace.base_currency,
+            today=today,
+        )
+        return UnlinkResult(view, value_recorded)
+
+    return run_immediate(factory, write)
 
 
 def add_valuation(
@@ -1270,8 +1463,7 @@ def add_valuation(
         if item.archived_at is not None:
             raise ItemArchived
         if item.valuation_mode != "manual":
-            raise InvalidNetWorth("valuation_mode", "linked_not_supported")
-        category = NetWorthCategoryRepository(session, ctx).get_or_raise(item.category_id)
+            raise InvalidNetWorth("valuation_mode", "linked_value_readonly")
         money = _money(parsed, item.currency)
         today = ctx.clock.today(ctx.workspace.timezone)
         effective_as_of = wanted_as_of or today
@@ -1294,13 +1486,12 @@ def add_valuation(
                 "currency": item.currency,
             },
         )
-        valuations = ItemValuationRepository(session, ctx).for_item(item.id)
-        return _item_view(
-            item,
-            category,
-            valuations,
-            today=today,
+        return _view_after_write(
+            session,
+            ctx,
+            item.id,
             base_currency=workspace.base_currency,
+            today=today,
         )
 
     return run_immediate(factory, write)

@@ -133,12 +133,34 @@ class NetWorthItemRepository(ScopedRepository[NetWorthItem]):
         )
         return list(self._session.scalars(statement))
 
+    def by_ids(self, item_ids: Collection[UUID]) -> list[NetWorthItem]:
+        """Only the requested items, in the same order as ``ordered``."""
+        ids = list(item_ids)
+        if not ids:
+            return []
+        statement = (
+            self._scoped_select()
+            .where(NetWorthItem.id.in_(ids))
+            .order_by(NetWorthItem.side, NetWorthItem.created_at, NetWorthItem.id)
+        )
+        return list(self._session.scalars(statement))
+
     def counts_by_category(self) -> dict[UUID, int]:
         """How many items (archived ones included) each category has."""
         counts: dict[UUID, int] = {}
         for item in self._session.scalars(self._scoped_select()):
             counts[item.category_id] = counts.get(item.category_id, 0) + 1
         return counts
+
+    def active_linked(self, link_type: str, link_id: UUID) -> NetWorthItem | None:
+        """The active item linking to this target, if any."""
+        statement = self._scoped_select().where(
+            NetWorthItem.valuation_mode == "linked",
+            NetWorthItem.link_type == link_type,
+            NetWorthItem.link_id == link_id,
+            NetWorthItem.archived_at.is_(None),
+        )
+        return self._session.scalars(statement).one_or_none()
 
 
 class ItemValuationRepository(ScopedRepository[ItemValuation]):

@@ -21,7 +21,8 @@ from typing import cast
 from uuid import UUID
 from zoneinfo import ZoneInfo
 
-from assetboard.domain.networth import Side, ValuationPoint, current_valuation
+from assetboard.domain.money import Money
+from assetboard.domain.networth import Side, Unavailable, ValuationPoint, current_valuation
 from assetboard.domain.networth_summary import NetWorthSummary
 
 HISTORY_RANGES = ("1y", "3y", "5y", "all")
@@ -43,6 +44,9 @@ class ItemHistory:
     include_in_net_worth: bool
     archived_at: datetime | None
     valuations: tuple[ValuationPoint, ...]
+    valuation_mode: str = "manual"
+    link_type: str | None = None
+    link_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +62,7 @@ class ItemValue:
     archived: bool
     value_minor: int | None
     value_as_of: date | None
+    unavailable: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,6 +79,7 @@ class SnapshotBreakdown:
     categories: tuple[BreakdownCategory, ...]
     non_base: int
     no_value: int
+    unavailable: int = 0
 
 
 def month_end(day: date) -> date:
@@ -151,16 +157,42 @@ def archived_on(archived_at: datetime | None, timezone: str) -> date | None:
     return archived_at.astimezone(ZoneInfo(timezone)).date()
 
 
-def values_at(items: Sequence[ItemHistory], as_of: date, *, timezone: str) -> tuple[ItemValue, ...]:
+def values_at(
+    items: Sequence[ItemHistory],
+    as_of: date,
+    *,
+    timezone: str,
+    linked: Mapping[UUID, Money | Unavailable] | None = None,
+) -> tuple[ItemValue, ...]:
     """Each item's effective value and archive state on ``as_of``, in input order.
 
-    A valuation dated after ``as_of`` is ignored. An item is archived from its workspace-local
-    archive date onwards; that date itself is already excluded (the owner's decision).
+    A manual valuation dated after ``as_of`` is ignored. Linked items use the service-resolved
+    value passed in ``linked`` (keyed by item id); a missing or ``Unavailable`` resolution means
+    the value is unavailable, never zero. An item is archived from its workspace-local archive
+    date onwards; that date itself is already excluded (the owner's decision).
     """
     values: list[ItemValue] = []
     for item in items:
         archive_day = archived_on(item.archived_at, timezone)
         archived = archive_day is not None and archive_day <= as_of
+        if item.valuation_mode == "linked":
+            resolution = (linked or {}).get(item.id)
+            available = isinstance(resolution, Money)
+            values.append(
+                ItemValue(
+                    id=item.id,
+                    side=item.side,
+                    category_id=item.category_id,
+                    currency=item.currency,
+                    include_in_net_worth=item.include_in_net_worth,
+                    archived_at=item.archived_at,
+                    archived=archived,
+                    value_minor=resolution.amount_minor if available else None,
+                    value_as_of=as_of if available else None,
+                    unavailable=not available,
+                )
+            )
+            continue
         current = current_valuation(item.valuations, as_of)
         values.append(
             ItemValue(
@@ -194,6 +226,7 @@ def snapshot_breakdown(summary: NetWorthSummary) -> dict[str, object]:
         "not_counted": {
             "non_base": len(summary.non_base_item_ids),
             "no_value": len(summary.no_value_item_ids),
+            "unavailable": len(summary.unavailable_item_ids),
         },
     }
 
@@ -235,4 +268,5 @@ def parse_breakdown(raw: object) -> SnapshotBreakdown:
         tuple(categories),
         _optional_count(counts.get("non_base")),
         _optional_count(counts.get("no_value")),
+        _optional_count(counts.get("unavailable")),
     )

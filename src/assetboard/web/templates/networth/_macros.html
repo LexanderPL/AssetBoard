@@ -14,10 +14,20 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
 {% if not item.include_in_net_worth %}<span class="rounded-full bg-subtle px-2 py-0.5 text-xs text-muted" data-excluded>{{ _("Excluded from net worth") }}</span>{% endif %}
 {% if item.investable %}<span class="rounded-full bg-primary-soft px-2 py-0.5 text-xs text-primary-ink" data-investable>{{ _("Investable") }}</span>{% endif %}
 {% if item.category_archived %}<span class="rounded-full bg-subtle px-2 py-0.5 text-xs text-muted" data-archived-category>{{ _("Archived category") }}</span>{% endif %}
+{% if item.valuation_mode == "linked" %}
+<span class="rounded-full bg-primary-soft px-2 py-0.5 text-xs text-primary-ink" data-linked>
+  {% if item.link_url %}<a href="{{ item.link_url }}" class="font-medium hover:underline">{{ _("Linked to %(name)s", name=item.link_name or _("an unavailable source")) }}</a>{% else %}{{ _("Linked to %(name)s", name=item.link_name or _("an unavailable source")) }}{% endif %}
+  {% if item.link_label %}<span class="ml-1 text-muted">{{ _(item.link_label) }}</span>{% endif %}
+</span>
+{% endif %}
+{% if item.unavailable %}<span class="rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning-strong" data-unavailable>{{ _("Value unavailable") }}</span>{% endif %}
 {%- endmacro %}
 
 {% macro valuation_block(item, side_value) -%}
 {% set row_id = item.id|string %}
+{% if item.valuation_mode == "linked" %}
+<p class="mt-2 text-xs text-muted" data-linked-readonly>{{ _("This value comes from the linked source and is read-only.") }}</p>
+{% else %}
 {% if item.valuations %}
 <details class="mt-2" data-valuations>
   <summary class="cursor-pointer text-xs font-medium text-muted">{{ _("Value history") }} <span class="font-normal">({{ item.valuations|length }})</span></summary>
@@ -71,6 +81,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
   </form>
 </details>
 {% endif %}
+{% endif %}
 {%- endmacro %}
 
 {% macro item_edit_form(item, side_value) -%}
@@ -94,10 +105,14 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
   </div>
   <div class="space-y-1">
     <label for="item-currency-{{ row_id }}" class="block text-xs text-muted">{{ _("Currency") }}</label>
-    {% if item.valuations %}
+    {% if item.valuations or item.valuation_mode == "linked" %}
     <input type="hidden" name="currency" value="{{ values.currency }}">
     <select id="item-currency-{{ row_id }}" disabled class="form-select py-1.5 w-full">{% for code, _name in currency_options %}<option value="{{ code }}"{% if values.currency == code %} selected{% endif %}>{{ code }}</option>{% endfor %}</select>
+    {% if item.valuation_mode == "linked" %}
+    <p class="text-xs text-muted">{{ _("The currency comes from the linked source.") }}</p>
+    {% else %}
     <p class="text-xs text-muted">{{ _("The currency is fixed once the item has a value.") }}</p>
+    {% endif %}
     {% else %}
     <select id="item-currency-{{ row_id }}" name="currency" class="form-select py-1.5 w-full">{% for code, _name in currency_options %}<option value="{{ code }}"{% if values.currency == code %} selected{% endif %}>{{ code }}</option>{% endfor %}</select>
     {% endif %}
@@ -138,7 +153,9 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
     </div>
     <div class="flex flex-wrap items-center gap-3">
       <div class="text-right">
-        {% if item.current %}<span class="text-sm font-semibold tabular-nums" data-current-value>{{ format_money(item.current) }}</span>{% if item.current_as_of %}<span class="block text-xs text-muted">{{ _("as of %(date)s", date=format_day(item.current_as_of)) }}</span>{% endif %}{% else %}<span class="text-sm text-muted" data-no-value>{{ _("No value yet") }}</span>{% endif %}
+        {% if item.unavailable %}<span class="text-sm text-warning-strong" data-unavailable-value>{{ _("Value unavailable") }}</span>
+        {% elif item.current %}<span class="text-sm font-semibold tabular-nums" data-current-value>{{ format_money(item.current) }}</span>{% if item.current_as_of %}<span class="block text-xs text-muted">{{ _("as of %(date)s", date=format_day(item.current_as_of)) }}</span>{% endif %}
+        {% else %}<span class="text-sm text-muted" data-no-value>{{ _("No value yet") }}</span>{% endif %}
       </div>
       {% if can_edit %}
       <div class="flex flex-wrap items-center gap-1">
@@ -146,6 +163,9 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
         <form {{ htmx_form(scoped_url(request, 'networth_item_restore', item_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Restore"), "data-restore") }}</form>
         {% else %}
         <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&edit_item={{ row_id }}" hx-get="{{ scoped_url(request, 'networth_item_edit', item_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink" data-edit>{{ _("Edit") }}</a>
+        {% if item.valuation_mode == "linked" %}
+        <form {{ htmx_form(scoped_url(request, 'networth_item_unlink', item_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Unlink"), "data-unlink") }}</form>
+        {% endif %}
         <form {{ htmx_form(scoped_url(request, 'networth_item_archive', item_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Archive"), "data-archive") }}</form>
         {% endif %}
       </div>

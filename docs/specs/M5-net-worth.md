@@ -158,10 +158,39 @@ Tests with the fixed Clock: month-end selection, idempotency, backfill semantics
 ## F5.4 Link framework (for portfolio and loans)
 
 **Acceptance**
-- `ValuationResolver` interface in `services/networth/links.py`: `resolve(link_type, link_id, as_of) -> Money | Unavailable`; registry where later modules register resolvers.
+- `ValuationResolver` protocol in `services/networth_links.py`: factory-bound per workspace, with
+  `side`, `resolve_many(link_ids, dates) -> {(link_id, date): Money | Unavailable}`,
+  `describe(link_id)` and `choices()`; a registry where later modules register resolvers.
 - UI: item form shows "Link to…" only for registered link types; linked items display value read-only with a "linked to <name>" chip and a click-through.
 - A linked item cannot be given manual valuations; unlinking converts to manual keeping the last resolved value as a first valuation.
 - Tests with a fake resolver.
+
+**Implementation notes (F5.4).**
+- The framework lives in `services/networth_links.py`. A resolver is registered as a
+  `(session, workspace scope) -> resolver` factory so target lookups are workspace-scoped.
+  Resolvers declare their `side`, implement `resolve_many(link_ids, dates)` for batched
+  historical resolution, `describe(link_id)` for the label/URL/currency, and `choices()` for
+  the form picker. The production registry is empty until M6/M7 register their resolvers.
+- The picker is shown only for the item side with a registered resolver and offers “Manual
+  value” by default. Linking happens at creation. An existing manual item with valuation
+  history must be archived and replaced by a linked item; archive-date snapshots keep its
+  history continuous.
+- A linked item has no manual valuations and shows its value read-only with a “Linked to …”
+  chip, optional click-through and target currency. Unknown targets, removed resolver modules
+  and resolved values in another currency are `Unavailable`, never zero.
+- Unlinking converts the item to manual. If today’s value resolves, it is appended as the first
+  manual valuation dated today; if not, the item becomes manual with no value. Audit records
+  `networth_item.linked` (`link_type`, target label) and `networth_item.unlinked`
+  (`value_recorded`), without amounts.
+- Migration `0035_f54_net_worth_links` adds a partial unique index on
+  `(workspace_id, link_type, link_id)` for active linked items, on SQLite and PostgreSQL.
+  Duplicate creation returns `already_linked`; restoring an archived linked item is refused
+  while another active item links to the same target.
+- Auto, manual and backfill snapshots resolve linked values at their `as_of`; a backfill makes
+  one `resolve_many` call per link type. The breakdown keeps `v: 1` and adds
+  `not_counted.unavailable`; unavailable linked items do not make an auto snapshot eligible.
+- Follow-up: list pages still call `describe` once per linked item. A batched `describe_many`
+  on the protocol would let M6 avoid one lookup per holding; not required for F5.4.
 
 **Agent prompt**
 ```

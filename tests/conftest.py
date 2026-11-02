@@ -37,6 +37,8 @@ from assetboard.db.models.identity import InstanceSettings, Membership, User, Wo
 from assetboard.db.models.ledger import Category
 from assetboard.services import auth as auth_service
 from assetboard.services.auth import argon2_hash, run_initial_setup
+from assetboard.services.networth_links import registry as link_registry
+from tests.fake_links import FakeLinks
 from tests.fake_release_source import FakeReleaseSource
 
 LOCALES_DIR = Path(__file__).resolve().parents[1] / "src" / "assetboard" / "locales"
@@ -189,6 +191,17 @@ def no_update_check_network(monkeypatch: pytest.MonkeyPatch) -> None:
 def cheap_password_hashing(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test-only seam: production hashing keeps argon2-cffi's default parameters."""
     monkeypatch.setattr(auth_service, "ARGON2_PARAMETERS", profiles.CHEAPEST)
+
+
+@pytest.fixture
+def fake_links() -> Iterator[FakeLinks]:
+    """A clean link registry with a workspace-scoped fake resolver."""
+    link_registry.reset_for_tests()
+    harness = FakeLinks()
+    try:
+        yield harness
+    finally:
+        harness.reset()
 
 
 @pytest.fixture(scope="session")

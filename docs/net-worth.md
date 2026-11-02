@@ -108,6 +108,37 @@ marker. Their values are not converted until an exchange-rate service exists, so
 out of the category subtotal. Changing the workspace base currency does not change any stored
 value; it only changes which items currently count towards the subtotals.
 
+## Linked values
+
+Some items can take their value from another feature instead of a manual value. The first sources
+are portfolio asset classes and holdings (M6) and loan balances (M7); until those modules register
+a resolver, the **Link to…** picker does not appear. A resolver belongs to assets or liabilities,
+and only its side’s targets are offered.
+
+- A link is chosen when the item is created. **Link to…** lists the registered targets; leave it
+  at **Manual value** for an ordinary item.
+- A linked item’s value is read-only. It shows a **Linked to …** chip with the target’s name and,
+  when available, a link to that target, plus the target’s currency. It has no **Add a value**
+  panel and cannot receive manual valuations.
+- The target’s currency is the item’s currency. A non-base linked item is shown like any other
+  non-base item: separately, outside the subtotal, until FX arrives.
+- If the target cannot be resolved, or the resolver returns a value in another currency, the item
+  shows **Value unavailable** and is never counted as zero. A snapshot records how many linked
+  items were unavailable.
+- **Unlink** converts the item to manual. If today’s value is available, it is kept as the first
+  manual value dated today; otherwise the item becomes manual and shows **No value yet**.
+  After an unlink, **Backfill from history** sees the item as manual with at most today’s value,
+  so months when it was linked are not recreated in backfilled points. Automatic and manual
+  snapshots keep the values stored while it was linked.
+- Two active items cannot link to the same target. Archive one before creating the other. An
+  archived linked item can only be restored while no other active item links to its target.
+- Only one item can be linked to a target at a time because otherwise net worth would count it
+  twice.
+
+To replace an existing manual item with a linked one, archive the manual item and create a new
+linked item. Archived items count in snapshots up to their archive date, so the history stays
+continuous.
+
 ## Value history
 
 Adding an item records its first value. Every later value change is appended to the item's
@@ -163,7 +194,7 @@ field names only; notes are not copied there).
 
 ## Not included yet
 
-The link columns for portfolio assets and loans are reserved for a later version; the page
-creates manual values only and snapshots store those manual values. Net worth data, including
-snapshots, is not yet part of the workspace archive, and a restore or merge leaves existing
-net-worth data untouched. Both arrive in later M5 features.
+The linking framework is in place, but the portfolio and loan resolvers arrive with M6 and M7;
+until then the **Link to…** picker is not shown. Net worth data, including snapshots, is not yet
+part of the workspace archive, and a restore or merge leaves existing net-worth data untouched.
+The archive extension is F5.5.
