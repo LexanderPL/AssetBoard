@@ -57,7 +57,8 @@ make check
 - [Your account](docs/accounts.md): profile, sign-in methods and the audit log.
 - [Categories](docs/categories.md): expense and income categories, savings and transfers.
 - [Months](docs/months.md): moving between months, closing and reopening a month.
-- [Workspace export](docs/workspace-export.md): downloading a complete ledger archive.
+- [Import and export](docs/import-export.md): downloading, restoring and merging workspace archives; importing CSV files and converting a spreadsheet.
+- [Archive format](docs/archive-format.md): the files and columns of the workspace archive and of importable CSV files.
 - [Transactions](docs/transactions.md): entering, editing and deleting expenses and income; searching, CSV export and changing the category of many entries.
 - [Workspace settings](docs/workspace-settings.md): name, base currency, time zone and formats.
 

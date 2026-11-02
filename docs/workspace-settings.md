@@ -38,9 +38,11 @@ page; type the workspace's exact name there (letter case matters) and confirm.
 
 Deleting is permanent, for every member: all transactions (deleted ones included), planned
 values, categories, recurring items, closed months, members, pending invitations and the
-workspace's own audit log are removed at once, and the app keeps no copy. Export what you want
-to keep first; the confirmation page links to the transaction export (CSV). Categories,
-planned values and recurring items are not part of that export yet.
+workspace's own audit log are removed at once, and the app keeps no copy. Download a workspace
+archive first on the **Export and import** page (see [Import and export](import-export.md#exporting)):
+it holds the settings, categories, planned values, transactions and month states, and can be
+restored into a new workspace later. Recurring items, income sources and tax rules are not in
+the archive yet. The confirmation page also links to the transaction export (CSV).
 
 Afterwards, you and the other members continue in another workspace you belong to. If you have
 none left, you see the "No workspace" page, where you can create a new workspace (when the
