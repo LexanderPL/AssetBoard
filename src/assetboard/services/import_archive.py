@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from assetboard.db.models.identity import Workspace
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.ledger import Category
+from assetboard.db.models.networth import NetWorthCategory
 from assetboard.db.repositories import (
     AuditEventRepository,
     BudgetLineRepository,
@@ -1440,7 +1441,7 @@ def _restore_networth(
     archive: ParsedArchive,
     *,
     restore_now: datetime,
-    removed: list[Any],
+    removed: list[NetWorthCategory],
 ) -> None:
     """Recreate categories, items, valuations and snapshots after the ledger rows."""
     categories_repository = NetWorthCategoryRepository(session, ctx)
