@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ _("Net worth history") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Net worth") }}{% endblock %}
+{% block scripts %}{% if view.has_chart %}{% include "macros/chart_scripts.html" %}{% endif %}{% endblock %}
+{% block content %}
+{% include "networth/_history_body.html" %}
+{% endblock %}

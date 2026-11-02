@@ -343,6 +343,15 @@ msgstr ""
 msgid "Net-worth items added in bulk"
 msgstr ""
 
+msgid "Net-worth snapshot taken automatically"
+msgstr ""
+
+msgid "Net-worth snapshot taken"
+msgstr ""
+
+msgid "Net-worth history rebuilt from stored values"
+msgstr ""
+
 msgid "Month closed"
 msgstr ""
 
@@ -494,6 +503,9 @@ msgid "In use"
 msgstr ""
 
 msgid "Number"
+msgstr ""
+
+msgid "Replaced an earlier snapshot"
 msgstr ""
 
 msgid "Every signed-in user can create workspaces"
@@ -1774,10 +1786,58 @@ msgstr ""
 msgid "Entry planned in %(month)s."
 msgstr ""
 
+msgid "1 year"
+msgstr ""
+
+msgid "3 years"
+msgstr ""
+
+msgid "5 years"
+msgstr ""
+
+msgid "All time"
+msgstr ""
+
+msgid "Manual"
+msgstr ""
+
+msgid "From history"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d item in another currency was not counted."
+msgid_plural "%(num)d items in another currency were not counted."
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy, python-format
+msgid "%(num)d item had no value yet and was not counted."
+msgid_plural "%(num)d items had no value yet and were not counted."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Deleted category"
+msgstr ""
+
 msgid "Assets"
 msgstr ""
 
 msgid "Liabilities"
+msgstr ""
+
+msgid "Snapshot saved."
+msgstr ""
+
+msgid "Snapshot replaced."
+msgstr ""
+
+msgid "History rebuilt from stored values."
+msgstr ""
+
+msgid "There are no stored values to backfill yet."
+msgstr ""
+
+msgid "A snapshot cannot be dated in the future."
 msgstr ""
 
 msgid "Enter a name of 1 to 200 characters, without control characters."
@@ -4331,6 +4391,38 @@ msgid ""
 "worth."
 msgstr ""
 
+msgid ""
+"Automatic snapshots are stored on the 1st of each month at 04:00 in the "
+"workspace time zone. Stored automatic and manual snapshots are never "
+"recalculated."
+msgstr ""
+
+msgid "Take snapshot now"
+msgstr ""
+
+msgid "Backfill from history"
+msgstr ""
+
+msgid "Range"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d snapshot is in another currency and is not charted."
+msgid_plural "%(num)d snapshots are in another currency and are not charted."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Net worth history"
+msgstr ""
+
+msgid "Breakdown"
+msgstr ""
+
+msgid ""
+"No snapshots yet. The first automatic snapshot needs at least one net-"
+"worth item."
+msgstr ""
+
 #, python-format
 msgid "Not in totals (%(currency)s)"
 msgstr ""
@@ -6291,5 +6383,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Assets and liabilities"
+#~ msgstr ""
+
+#~ msgid "AssetsassetLiabilities"
 #~ msgstr ""
 
