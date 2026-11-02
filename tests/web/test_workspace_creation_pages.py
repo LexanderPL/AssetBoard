@@ -222,13 +222,15 @@ def test_the_user_menu_offers_a_new_workspace(owner: OwnerApp) -> None:
         assert "data-new-workspace-link" not in client.get("/").text
 
 
-def test_the_new_workspace_link_left_the_header_for_the_menu_and_settings(owner: OwnerApp) -> None:
+def test_the_new_workspace_link_is_in_the_account_menu_only(owner: OwnerApp) -> None:
     page = owner.client.get("/").text
     header = page[page.index("<header") : page.index("</header>")]
     menu = page[page.index("data-user-menu") : page.index("</details>")]
     assert "data-new-workspace-link" not in header and "data-new-workspace-link" in menu
     settings = owner.client.get("/workspace/settings").text
-    assert "data-settings-new-workspace-link" in settings
+    assert "data-settings-new-workspace-link" not in settings
+    assert "data-settings-notifications" not in settings
+    assert "data-settings-more" not in settings
 
 
 # The instance setting (administrators)
@@ -238,6 +240,7 @@ def test_the_settings_page_is_for_instance_administrators(owner: OwnerApp) -> No
     page = owner.client.get("/admin/settings")
     assert page.status_code == 200
     assert 'value="on" selected' in page.text
+    assert "Back to users" not in page.text
     assert "data-admin-settings" in owner.client.get("/admin/users").text
     assert "data-admin-settings-link" in owner.client.get("/").text
     _csp_safe(page.text)

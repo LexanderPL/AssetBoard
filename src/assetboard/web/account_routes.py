@@ -155,7 +155,6 @@ async def _profile_page(
                 and proxy_owner is None
                 and not any(identity.kind == "proxy" for identity in identities)
                 else None,
-                "has_password": user.password_hash is not None,
             }
 
     data = await run_in_threadpool(read)

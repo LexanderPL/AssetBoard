@@ -79,6 +79,13 @@ def decrypt_secret(settings: Settings, user_id: UUID, token: str) -> str | None:
     return plaintext.removeprefix(prefix)
 
 
+def is_enabled(factory: sessionmaker[Session], *, user_id: UUID) -> bool:
+    """Whether the account has a completed factor; never reads or decrypts its secret."""
+    with factory() as session:
+        factor = TotpRepository(session, user_id).factor()
+        return factor is not None and factor.enabled_at is not None
+
+
 def state(
     factory: sessionmaker[Session],
     *,

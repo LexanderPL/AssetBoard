@@ -102,7 +102,7 @@ def _context(owner: OwnerApp, client: TestClient | None = None):
 
 
 def test_enrollment_requires_password_and_code_and_shows_recovery_codes_once(
-    owner: OwnerApp,
+    owner: OwnerApp, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     disabled = owner.post("/account/totp/disable", {"confirm_password": owner.web.admin_password})
     assert disabled.status_code == 403
@@ -117,6 +117,15 @@ def test_enrollment_requires_password_and_code_and_shows_recovery_codes_once(
         factor = session.get(TotpFactor, owner.admin_id)
         assert factor is not None and factor.enabled_at is None
         assert secret not in factor.encrypted_secret
+
+    def refuse_decryption(*_args: object, **_kwargs: object) -> str:
+        raise AssertionError("the password page must not decrypt a pending TOTP secret")
+
+    with monkeypatch.context() as patch:
+        patch.setattr(totp, "decrypt_secret", refuse_decryption)
+        security = owner.client.get("/account/password")
+    assert security.status_code == 200
+    assert "data-two-factor-disabled" in security.text
     assert owner.post("/account/totp/verify", {"code": "invalid"}).status_code == 400
     response = owner.post(
         "/account/totp/verify", {"code": pyotp.TOTP(secret).at(owner.app.state.clock.now())}
@@ -134,6 +143,8 @@ def test_enrollment_requires_password_and_code_and_shows_recovery_codes_once(
     assert page.headers["cache-control"] == "no-store"
     assert all(code not in page.text for code in codes)
     assert secret not in page.text and "<svg" not in page.text
+    security = owner.client.get("/account/password").text
+    assert "data-two-factor-enabled" in security
     assert owner.post("/account/totp/verify", {"code": "123456"}).status_code == 400
 
 

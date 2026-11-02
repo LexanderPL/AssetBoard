@@ -19,6 +19,7 @@ from assetboard.db.engine import is_database_locked, run_immediate
 from assetboard.db.models.identity import User
 from assetboard.domain.identity import MAX_EMAIL_LENGTH, InvalidEmail
 from assetboard.i18n import gettext
+from assetboard.services import totp
 from assetboard.services.account_email import password_reset_available
 from assetboard.services.auth import (
     MAX_NAME_LENGTH,
@@ -676,8 +677,12 @@ async def _password_page(
     """``errors`` holds message keys (translated here); ``translated_errors`` and ``notice`` are
     already in the request's language (for example a message with the throttle wait)."""
     current = _require_session(request)
+    state = _state(request)
     has_password = await run_in_threadpool(
-        user_has_password, _state(request).session_factory, current.user_id
+        user_has_password, state.session_factory, current.user_id
+    )
+    two_factor_enabled = await run_in_threadpool(
+        lambda: totp.is_enabled(state.session_factory, user_id=current.user_id)
     )
     return render_template(
         request,
@@ -689,6 +694,7 @@ async def _password_page(
             },
             "notice": notice,
             "no_password": None if has_password else _t(request, NO_PASSWORD),
+            "two_factor_enabled": two_factor_enabled,
             "confirm": await confirm_view(request, current),
         },
         status_code=status_code,
