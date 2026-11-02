@@ -60,7 +60,7 @@ from assetboard.domain.identity import (
     normalize_email,
     normalize_new_email,
 )
-from assetboard.services import categories, invitations
+from assetboard.services import categories, invitations, networth
 from assetboard.services.hash_gate import HashGate, HashGateBusy
 from assetboard.services.workspace_options import WorkspaceOptions, validate_workspace_options
 
@@ -1767,6 +1767,15 @@ def _create_user_records(
             owner_user_id=user.id,
         )
         categories.seed_into(
+            session,
+            scope,
+            locale=seed.locale,
+            actor_user_id=user.id if seed.actor_type == "user" else None,
+            actor_type=seed.actor_type,
+            now=seed.now,
+            automatic=True,
+        )
+        networth.seed_into(
             session,
             scope,
             locale=seed.locale,
