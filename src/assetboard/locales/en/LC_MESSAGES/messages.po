@@ -592,7 +592,37 @@ msgstr ""
 msgid "Suggested categories removed"
 msgstr ""
 
+msgid "Suggested net-worth categories removed"
+msgstr ""
+
 msgid "Month states deleted"
+msgstr ""
+
+msgid "Net-worth categories"
+msgstr ""
+
+msgid "Net-worth items"
+msgstr ""
+
+msgid "Item valuations"
+msgstr ""
+
+msgid "Net-worth snapshots"
+msgstr ""
+
+msgid "Linked items restored as manual"
+msgstr ""
+
+msgid "Net-worth categories deleted"
+msgstr ""
+
+msgid "Net-worth items deleted"
+msgstr ""
+
+msgid "Item valuations deleted"
+msgstr ""
+
+msgid "Net-worth snapshots deleted"
 msgstr ""
 
 msgid "owner"
@@ -1042,6 +1072,67 @@ msgid "The mapped category has the wrong kind."
 msgstr ""
 
 msgid "Two new categories have the same kind and name."
+msgstr ""
+
+msgid "No item with this name or id exists."
+msgstr ""
+
+msgid "More than one item has this name; add the item_id column to choose one."
+msgstr ""
+
+msgid "The item is archived; no valuation can be added."
+msgstr ""
+
+msgid "The item is linked; linked items cannot take manual values."
+msgstr ""
+
+msgid "Enter an item name of 1 to 200 characters."
+msgstr ""
+
+msgid "The note is invalid or too long."
+msgstr ""
+
+msgid "The currency must match the item's currency."
+msgstr ""
+
+msgid ""
+"The linked item's target is not in this archive; it was restored as a "
+"manual item without a value."
+msgstr ""
+
+msgid "Net-worth files are restored only; they were ignored in this merge."
+msgstr ""
+
+msgid "A net-worth category id appears more than once."
+msgstr ""
+
+msgid "Two active net-worth categories have the same side and name."
+msgstr ""
+
+msgid "A net-worth item id appears more than once."
+msgstr ""
+
+msgid ""
+"A net-worth item references a category of another side or with another "
+"name."
+msgstr ""
+
+msgid "A linked net-worth item has an invalid link."
+msgstr ""
+
+msgid "An item valuation id appears more than once."
+msgstr ""
+
+msgid "An item valuation references an unknown item or a different name."
+msgstr ""
+
+msgid "A linked item cannot have a manual valuation."
+msgstr ""
+
+msgid "A net-worth snapshot id appears more than once."
+msgstr ""
+
+msgid "Two net-worth snapshots have the same date and source."
 msgstr ""
 
 msgid "The archive's base currency differs from this workspace's base currency."
@@ -5407,8 +5498,15 @@ msgstr ""
 msgid "Suggested categories to remove"
 msgstr ""
 
+msgid "Suggested net-worth categories to remove"
+msgstr ""
+
 #, python-format
 msgid "Removed before restoring: %(names)s"
+msgstr ""
+
+#, python-format
+msgid "Removed net-worth categories before restoring: %(names)s"
 msgstr ""
 
 msgid "Settings the restore will replace:"
@@ -5554,6 +5652,18 @@ msgid "Categories to remove"
 msgstr ""
 
 msgid "Month states to remove"
+msgstr ""
+
+msgid "Net-worth categories to remove"
+msgstr ""
+
+msgid "Net-worth items to remove"
+msgstr ""
+
+msgid "Item valuations to remove"
+msgstr ""
+
+msgid "Net-worth snapshots to remove"
 msgstr ""
 
 msgid "Settings to restore:"

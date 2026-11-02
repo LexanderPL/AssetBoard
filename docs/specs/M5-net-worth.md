@@ -218,6 +218,30 @@ decision, 2026-10-18).
   brought in. Other files are restore only.
 - The new models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them.
 
+**Implementation notes (F5.5).**
+- The archive format is 1.2. `networth_categories.csv`, `networth_items.csv`,
+  `item_valuations.csv` and `networth_snapshots.csv` are required in 1.2 and absent from
+  1.0/1.1 archives, which read with empty net-worth data. The old golden archives stay;
+  `workspace-archive-v1.2.zip` is added.
+- Snapshot `breakdown` is one JSON column, compact with sorted keys. Category ids in it are
+  lineage ids on export and are mapped back to local ids on restore; unknown ids are kept.
+- `item_valuations.csv` carries `created_at` so same-day entry order survives restore. A lone
+  file without it is stamped from the import time in row order.
+- A lone `item_valuations.csv` matches by `item_id` first and by name otherwise. A linked item
+  is refused with `item_linked`; ambiguous names use `item_ambiguous`; the docs point to
+  `item_id`. The currency must equal the item's and use exactly its minor digits; future dates
+  are allowed. Duplicates and conflicts are judged against stored values at write time.
+- Linked items restore as manual with the link cleared and no value, listed as
+  `link_target_missing`; export still writes `link_type`/`link_id` for the M6/M7 extensions.
+- All four models have `import_key`/`import_batch_id` with partial unique indexes on SQLite and
+  PostgreSQL. Restore removes a batch's append-only valuations through an explicit
+  workspace-and-batch-scoped SQL delete; repository `update`/`delete` stay unsupported.
+- Untouched suggested net-worth categories use the ledger rule: automatic
+  `networth_category.seeded`, exact suggested set, unedited, unused, within five seconds. A
+  later manual seed makes them user data.
+- A full archive merge is restore-only for net-worth files and lists that once; only a lone
+  `item_valuations.csv` merges. All four models join `EMPTINESS_CHECKS` and restore rollback.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).

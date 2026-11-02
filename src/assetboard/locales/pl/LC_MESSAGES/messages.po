@@ -595,8 +595,38 @@ msgstr "Przywrócone ustawienia"
 msgid "Suggested categories removed"
 msgstr "Usunięte proponowane kategorie"
 
+msgid "Suggested net-worth categories removed"
+msgstr "Usunięte proponowane kategorie majątku"
+
 msgid "Month states deleted"
 msgstr "Usunięte stany miesięcy"
+
+msgid "Net-worth categories"
+msgstr "Kategorie majątku"
+
+msgid "Net-worth items"
+msgstr "Pozycje majątku"
+
+msgid "Item valuations"
+msgstr "Wyceny pozycji"
+
+msgid "Net-worth snapshots"
+msgstr "Migawki majątku netto"
+
+msgid "Linked items restored as manual"
+msgstr "Pozycje powiązane przywrócone jako ręczne"
+
+msgid "Net-worth categories deleted"
+msgstr "Usunięte kategorie majątku"
+
+msgid "Net-worth items deleted"
+msgstr "Usunięte pozycje majątku"
+
+msgid "Item valuations deleted"
+msgstr "Usunięte wyceny pozycji"
+
+msgid "Net-worth snapshots deleted"
+msgstr "Usunięte migawki majątku netto"
 
 msgid "owner"
 msgstr "właściciel"
@@ -1050,6 +1080,73 @@ msgstr "Docelowa kategoria ma niewłaściwy rodzaj."
 
 msgid "Two new categories have the same kind and name."
 msgstr "Dwie nowe kategorie mają ten sam rodzaj i nazwę."
+
+msgid "No item with this name or id exists."
+msgstr "Nie istnieje pozycja o tej nazwie lub identyfikatorze."
+
+msgid "More than one item has this name; add the item_id column to choose one."
+msgstr ""
+"Więcej niż jedna pozycja ma tę nazwę; dodaj kolumnę item_id, aby wybrać "
+"właściwą."
+
+msgid "The item is archived; no valuation can be added."
+msgstr "Pozycja jest zarchiwizowana; nie można dodać wyceny."
+
+msgid "The item is linked; linked items cannot take manual values."
+msgstr "Pozycja jest powiązana; powiązane pozycje nie przyjmują wartości ręcznych."
+
+msgid "Enter an item name of 1 to 200 characters."
+msgstr "Podaj nazwę pozycji o długości od 1 do 200 znaków."
+
+msgid "The note is invalid or too long."
+msgstr "Notatka jest nieprawidłowa lub zbyt długa."
+
+msgid "The currency must match the item's currency."
+msgstr "Waluta musi być zgodna z walutą pozycji."
+
+msgid ""
+"The linked item's target is not in this archive; it was restored as a "
+"manual item without a value."
+msgstr ""
+"Cel powiązanej pozycji nie znajduje się w tym archiwum; przywrócono ją "
+"jako pozycję ręczną bez wartości."
+
+msgid "Net-worth files are restored only; they were ignored in this merge."
+msgstr ""
+"Pliki majątku netto służą tylko do przywracania; zostały pominięte w tym "
+"scalaniu."
+
+msgid "A net-worth category id appears more than once."
+msgstr "Identyfikator kategorii majątku występuje więcej niż raz."
+
+msgid "Two active net-worth categories have the same side and name."
+msgstr "Dwie aktywne kategorie majątku mają tę samą stronę i nazwę."
+
+msgid "A net-worth item id appears more than once."
+msgstr "Identyfikator pozycji majątku występuje więcej niż raz."
+
+msgid ""
+"A net-worth item references a category of another side or with another "
+"name."
+msgstr "Pozycja majątku odwołuje się do kategorii innej strony lub o innej nazwie."
+
+msgid "A linked net-worth item has an invalid link."
+msgstr "Powiązana pozycja majątku ma nieprawidłowe powiązanie."
+
+msgid "An item valuation id appears more than once."
+msgstr "Identyfikator wyceny pozycji występuje więcej niż raz."
+
+msgid "An item valuation references an unknown item or a different name."
+msgstr "Wycena pozycji odwołuje się do nieznanej pozycji lub innej nazwy."
+
+msgid "A linked item cannot have a manual valuation."
+msgstr "Powiązana pozycja nie może mieć ręcznej wyceny."
+
+msgid "A net-worth snapshot id appears more than once."
+msgstr "Identyfikator migawki majątku netto występuje więcej niż raz."
+
+msgid "Two net-worth snapshots have the same date and source."
+msgstr "Dwie migawki majątku netto mają tę samą datę i źródło."
 
 msgid "The archive's base currency differs from this workspace's base currency."
 msgstr "Waluta bazowa archiwum różni się od waluty bazowej tego obszaru roboczego."
@@ -5838,9 +5935,16 @@ msgstr "Stany miesięcy"
 msgid "Suggested categories to remove"
 msgstr "Proponowane kategorie do usunięcia"
 
+msgid "Suggested net-worth categories to remove"
+msgstr "Proponowane kategorie majątku do usunięcia"
+
 #, python-format
 msgid "Removed before restoring: %(names)s"
 msgstr "Usunięto przed przywróceniem: %(names)s"
+
+#, python-format
+msgid "Removed net-worth categories before restoring: %(names)s"
+msgstr "Usunięte kategorie majątku przed przywróceniem: %(names)s"
 
 msgid "Settings the restore will replace:"
 msgstr "Ustawienia, które zastąpi przywracanie:"
@@ -6005,6 +6109,18 @@ msgstr "Kategorie do usunięcia"
 
 msgid "Month states to remove"
 msgstr "Stany miesięcy do usunięcia"
+
+msgid "Net-worth categories to remove"
+msgstr "Kategorie majątku do usunięcia"
+
+msgid "Net-worth items to remove"
+msgstr "Pozycje majątku do usunięcia"
+
+msgid "Item valuations to remove"
+msgstr "Wyceny pozycji do usunięcia"
+
+msgid "Net-worth snapshots to remove"
+msgstr "Migawki majątku netto do usunięcia"
 
 msgid "Settings to restore:"
 msgstr "Ustawienia do przywrócenia:"

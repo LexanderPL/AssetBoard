@@ -21,6 +21,7 @@ from assetboard.domain.transactions import EntryError, amount_minor
 TRANSACTIONS = "transactions_csv"
 BUDGET_LINES = "budget_lines_csv"
 CATEGORIES = "categories_csv"
+ITEM_VALUATIONS = "item_valuations_csv"
 MONTHS = "months_csv"
 
 KNOWN_COLUMNS: dict[str, frozenset[str]] = {
@@ -41,6 +42,9 @@ KNOWN_COLUMNS: dict[str, frozenset[str]] = {
     CATEGORIES: frozenset(
         {"id", "kind", "name", "treatment", "color", "sort_order", "archived_at"}
     ),
+    ITEM_VALUATIONS: frozenset(
+        {"id", "item_id", "item", "as_of", "value", "currency", "note", "created_at"}
+    ),
     MONTHS: frozenset({"month", "closed_at", "plan_started_at"}),
 }
 
@@ -48,6 +52,7 @@ REQUIRED_COLUMNS: dict[str, frozenset[str]] = {
     TRANSACTIONS: frozenset({"date", "direction", "amount", "category"}),
     BUDGET_LINES: frozenset({"month", "category", "planned"}),
     CATEGORIES: frozenset({"kind", "name"}),
+    ITEM_VALUATIONS: frozenset({"item", "as_of", "value"}),
     MONTHS: frozenset({"month"}),
 }
 
@@ -116,8 +121,9 @@ def classify_header(cells: tuple[str, ...] | list[str]) -> HeaderClassification:
     if not columns:
         raise HeaderError("unknown_file")
     scores = {source: len(set(columns) & known) for source, known in KNOWN_COLUMNS.items()}
-    # Ties prefer transactions, then planned values, then categories, then months.
-    order = (TRANSACTIONS, BUDGET_LINES, CATEGORIES, MONTHS)
+    # Ties prefer transactions, then planned values, then categories, then item valuations,
+    # then months.
+    order = (TRANSACTIONS, BUDGET_LINES, CATEGORIES, ITEM_VALUATIONS, MONTHS)
     source = max(order, key=lambda item: (scores[item], -order.index(item)))
     if scores[source] == 0:
         raise HeaderError("unknown_file")
@@ -264,5 +270,8 @@ TEMPLATE_FILES: dict[str, bytes] = {
         b"month,kind,category,planned\r\n"
         b"2026-09,expense,Food,550.00\r\n"
         b"2026-09,income,Salary,3000.00\r\n"
+    ),
+    "item_valuations.csv": (
+        b"item,as_of,value\r\nCar,2026-01-31,12000.00\r\nCar,2026-02-28,11500.00\r\n"
     ),
 }

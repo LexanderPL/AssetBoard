@@ -15,7 +15,11 @@ from assetboard.domain.archive import (
     ArchiveRows,
     BudgetLineRow,
     CategoryRow,
+    ItemValuationRow,
     MonthRow,
+    NetWorthCategoryRow,
+    NetWorthItemRow,
+    NetWorthSnapshotRow,
     TransactionRow,
     parse_archive,
     write_archive,
@@ -23,7 +27,8 @@ from assetboard.domain.archive import (
 from assetboard.services.archive import ARCHIVE_EXCLUDED_MODELS, ARCHIVE_INCLUDED_MODELS
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
-GOLDEN = FIXTURES / "workspace-archive-v1.1.zip"
+GOLDEN = FIXTURES / "workspace-archive-v1.2.zip"
+GOLDEN_V1_1 = FIXTURES / "workspace-archive-v1.1.zip"
 GOLDEN_V1_0 = FIXTURES / "workspace-archive-v1.0.zip"
 EXPORTED_AT = datetime(2026, 10, 18, 14, 30, tzinfo=UTC)
 
@@ -31,6 +36,18 @@ EXPORTED_AT = datetime(2026, 10, 18, 14, 30, tzinfo=UTC)
 def _rows() -> ArchiveRows:
     category_id = "2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01"
     transaction_id = "5c7d8e9f-0a1b-4c2d-9e3f-4a5b6c7d8e02"
+    networth_category_id = "3f9a1c2d-4b5e-4f60-8a71-2b3c4d5e6f70"
+    networth_item_id = "c4d5e6f7-a8b9-4c0d-9e1f-2a3b4c5d6e7f"
+    linked_item_id = "d5e6f7a8-b9c0-4d1e-8f2a-3b4c5d6e7f80"
+    first_valuation_id = "e6f7a8b9-c0d1-4e2f-9a3b-4c5d6e7f8091"
+    second_valuation_id = "f7a8b9c0-d1e2-4f3a-8b4c-5d6e7f8091a2"
+    snapshot_id = "a8b9c0d1-e2f3-4a4b-9c5d-6e7f8091a2b3"
+    breakdown = (
+        '{"categories":[{"category_id":"'
+        + networth_category_id
+        + '","side":"asset","total_minor":1200000}],"not_counted":'
+        '{"non_base":0,"no_value":0,"unavailable":0},"v":1}'
+    )
     return ArchiveRows(
         workspace={
             "name": "Home",
@@ -58,6 +75,76 @@ def _rows() -> ArchiveRows:
             ),
         ),
         months=(MonthRow("2026-09", None, "2026-09-01T06:30:12Z"),),
+        networth_categories=(
+            NetWorthCategoryRow(networth_category_id, "asset", "Vehicles", "#3b6ea8", 0, None),
+        ),
+        networth_items=(
+            NetWorthItemRow(
+                networth_item_id,
+                "asset",
+                "Vehicles",
+                networth_category_id,
+                "Car",
+                "EUR",
+                "Family car",
+                "2025-04-01",
+                "manual",
+                None,
+                None,
+                "true",
+                "false",
+                None,
+            ),
+            NetWorthItemRow(
+                linked_item_id,
+                "asset",
+                "Vehicles",
+                networth_category_id,
+                "Brokerage",
+                "EUR",
+                "",
+                None,
+                "linked",
+                "portfolio_holding",
+                "b9c0d1e2-f3a4-4b5c-8d6e-7f8091a2b3c4",
+                "true",
+                "true",
+                None,
+            ),
+        ),
+        item_valuations=(
+            ItemValuationRow(
+                first_valuation_id,
+                networth_item_id,
+                "Car",
+                "2026-09-01",
+                "12000.00",
+                "EUR",
+                "Bought",
+                "2026-09-01T08:00:00Z",
+            ),
+            ItemValuationRow(
+                second_valuation_id,
+                networth_item_id,
+                "Car",
+                "2026-09-01",
+                "12050.00",
+                "EUR",
+                "",
+                "2026-09-01T09:00:00Z",
+            ),
+        ),
+        networth_snapshots=(
+            NetWorthSnapshotRow(
+                snapshot_id,
+                "2026-08-31",
+                "12000.00",
+                "0.00",
+                "EUR",
+                breakdown,
+                "auto",
+            ),
+        ),
     )
 
 
@@ -83,15 +170,49 @@ def test_released_v1_0_archive_still_reads_without_the_1_1_keys() -> None:
     assert parsed.manifest["format_version"] == "1.0"
     assert "taxes_enabled" not in parsed.rows.workspace
     assert "upcoming_days" not in parsed.rows.workspace
+    assert parsed.rows.networth_categories == ()
+    assert parsed.rows.networth_items == ()
+    assert parsed.rows.item_valuations == ()
+    assert parsed.rows.networth_snapshots == ()
 
 
 def test_v1_1_workspace_carries_the_taxes_switch_and_upcoming_days() -> None:
-    parsed, errors = parse_archive(GOLDEN.read_bytes())
+    parsed, errors = parse_archive(GOLDEN_V1_1.read_bytes())
     assert errors == ()
     assert parsed is not None and parsed.warnings == ()
     assert parsed.manifest["format_version"] == "1.1"
     assert parsed.rows.workspace["taxes_enabled"] is True
     assert parsed.rows.workspace["upcoming_days"] == 14
+    assert parsed.rows.networth_categories == ()
+    assert parsed.rows.networth_items == ()
+    assert parsed.rows.item_valuations == ()
+    assert parsed.rows.networth_snapshots == ()
+
+
+def test_v1_2_requires_every_net_worth_file() -> None:
+    with ZipFile(io.BytesIO(_archive())) as source:
+        files = {
+            name: source.read(name) for name in source.namelist() if name != "item_valuations.csv"
+        }
+    output = io.BytesIO()
+    with ZipFile(output, "w", ZIP_DEFLATED) as archive:
+        for name, content in files.items():
+            archive.writestr(name, content)
+    parsed, errors = parse_archive(output.getvalue())
+    assert parsed is None
+    assert errors == (ArchiveError("archive", "missing required members"),)
+
+
+def test_v1_2_workspace_carries_the_net_worth_files() -> None:
+    parsed, errors = parse_archive(GOLDEN.read_bytes())
+    assert errors == ()
+    assert parsed is not None and parsed.warnings == ()
+    assert parsed.manifest["format_version"] == "1.2"
+    assert len(parsed.rows.networth_categories) == 1
+    assert [row.name for row in parsed.rows.networth_items] == ["Car", "Brokerage"]
+    assert [row.value for row in parsed.rows.item_valuations] == ["12000.00", "12050.00"]
+    assert parsed.rows.item_valuations[0].created_at == "2026-09-01T08:00:00Z"
+    assert [row.source for row in parsed.rows.networth_snapshots] == ["auto"]
 
 
 @pytest.mark.parametrize(
@@ -256,6 +377,43 @@ def test_reader_normalizes_timestamps_and_accepts_trailing_decimal_zeros() -> No
     parsed, errors = parse_archive(_rewrite(files))
     assert not errors and parsed is not None
     assert parsed.rows.transactions[0].deleted_at == "2026-09-03T07:12:44Z"
+
+
+def _replace_first_line(files: dict[str, bytes], name: str, old: bytes, new: bytes) -> None:
+    header, *rows = files[name].splitlines(keepends=True)
+    for index, row in enumerate(rows):
+        if old in row:
+            rows[index] = row.replace(old, new, 1)
+            break
+    else:  # pragma: no cover - the fixture always contains the marker
+        raise AssertionError(f"{old!r} not found in {name}")
+    files[name] = header + b"".join(rows)
+
+
+def test_reader_checks_net_worth_references_and_snapshot_rules() -> None:
+    files = _files()
+    _replace_first_line(files, "networth_items.csv", b",asset,Vehicles,", b",liability,Vehicles,")
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    assert any(error.message == "net-worth category reference mismatch" for error in errors)
+
+    files = _files()
+    _replace_first_line(files, "item_valuations.csv", b",EUR,Bought,", b",USD,Bought,")
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    assert any(error.message == "item valuation currency differs" for error in errors)
+
+    files = _files()
+    _replace_first_line(files, "networth_snapshots.csv", b",auto", b",other")
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    assert any(error.message == "invalid snapshot source" for error in errors)
+
+    files = _files()
+    files["networth_snapshots.csv"] += files["networth_snapshots.csv"].splitlines(keepends=True)[1]
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    assert any(error.message == "duplicate snapshot date and source" for error in errors)
 
 
 def test_reader_refuses_unsafe_and_invalid_archives() -> None:
@@ -490,7 +648,7 @@ def test_reader_caps_errors(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_reader_caps_data_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     import assetboard.domain.archive as archive
 
-    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 4)
+    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 10)
     assert parse_archive(_archive())[1] == ()
-    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 3)
+    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 9)
     assert parse_archive(_archive())[1] == (ArchiveError("archive", "too many data rows"),)

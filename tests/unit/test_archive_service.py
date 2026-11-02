@@ -112,6 +112,10 @@ def test_export_complete_scoped_deterministic_and_lineage(team: WorkspaceDb) -> 
             "transactions": 1,
             "budget_lines": 1,
             "months": 1,
+            "networth_categories": 0,
+            "networth_items": 0,
+            "item_valuations": 0,
+            "networth_snapshots": 0,
         }
     # Uniqueness is per workspace, including deleted/archived rows; NULLs remain allowed.
     with pytest.raises(IntegrityError), team.factory.begin() as session:
@@ -277,7 +281,7 @@ def test_export_includes_the_taxes_switch_and_upcoming_days(team: WorkspaceDb) -
 
     parsed, _ = parse_archive(export_workspace(team.factory, team.ctx("editor", "editor")).content)
     assert parsed is not None
-    assert parsed.manifest["format_version"] == "1.1"
+    assert parsed.manifest["format_version"] == "1.2"
     assert parsed.rows.workspace["taxes_enabled"] is False
     assert parsed.rows.workspace["upcoming_days"] is None
 

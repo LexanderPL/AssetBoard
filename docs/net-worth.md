@@ -192,9 +192,28 @@ Viewers can read everything but see no add, edit, archive or bulk controls. Edit
 can change data. Changes are recorded in the workspace audit log under **Net worth** (values and
 field names only; notes are not copied there).
 
-## Not included yet
+## Archives and imports
 
-The linking framework is in place, but the portfolio and loan resolvers arrive with M6 and M7;
-until then the **Link to…** picker is not shown. Net worth data, including snapshots, is not yet
-part of the workspace archive, and a restore or merge leaves existing net-worth data untouched.
-The archive extension is F5.5.
+Net worth is part of the workspace archive (format 1.2): categories, items, value histories and
+snapshots are exported with lineage ids. A restore recreates them in dependency order. Values
+keep their `created_at`, so several values for one item on one day come back in the same order
+and the current value does not change. Snapshot breakdowns keep their category lineage ids; a
+restored breakdown points at the restored category.
+
+A linked item whose target is not in the archive is restored as a manual item with the link
+cleared and no value, and listed as `link_target_missing`. The export still writes `link_type`
+and `link_id`; the M6/M7 archive extensions will resolve those target ids. The **Link to…**
+picker stays hidden until a resolver is registered.
+
+A full archive merge ignores the net-worth files and lists that once; only a lone
+`item_valuations.csv` merges. It matches an item by `item_id` first and by name otherwise. Names
+are not unique, so prefer the `item_id` column (the lineage id an export writes) when a name is
+ambiguous. Rows matching a linked item are refused, and the value currency and minor digits must
+match the item. For the same item and date, an identical value is a duplicate and a different
+value a conflict; the stored history is kept. Without `created_at`, values are stamped in file
+order from the import time.
+
+Restoring removes untouched suggested net-worth categories exactly as it removes the ledger
+suggested categories: only the automatic `networth_category.seeded` set, unedited, unused and
+created within five seconds of the event. A later manual **Add suggested categories** makes that
+set user data.

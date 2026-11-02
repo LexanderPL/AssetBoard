@@ -41,6 +41,12 @@ from assetboard.clock import Clock
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.ledger import BudgetLine, Category, Transaction
+from assetboard.db.models.networth import (
+    ItemValuation,
+    NetWorthCategory,
+    NetWorthItem,
+    NetWorthSnapshot,
+)
 from assetboard.db.repositories import (
     AuditEventRepository,
     BudgetLineRepository,
@@ -50,7 +56,11 @@ from assetboard.db.repositories import (
     ImportCategoryMappingRepository,
     IncomeSourceRepository,
     IncomeSourceTaxRuleRepository,
+    ItemValuationRepository,
     MonthStateRepository,
+    NetWorthCategoryRepository,
+    NetWorthItemRepository,
+    NetWorthSnapshotRepository,
     ScheduledItemRepository,
     ScheduledOccurrenceRepository,
     TaxRuleRepository,
@@ -171,6 +181,37 @@ REPORT_MESSAGES: dict[str, str] = {
     "mapping_category_missing": _("The mapped category does not exist."),
     "mapping_kind_mismatch": _("The mapped category has the wrong kind."),
     "duplicate_create_name": _("Two new categories have the same kind and name."),
+    # F5.5 item valuations and net-worth archive files.
+    "item_not_found": _("No item with this name or id exists."),
+    "item_ambiguous": _("More than one item has this name; add the item_id column to choose one."),
+    "item_archived": _("The item is archived; no valuation can be added."),
+    "item_linked": _("The item is linked; linked items cannot take manual values."),
+    "invalid_name": _("Enter an item name of 1 to 200 characters."),
+    "invalid_notes": _("The note is invalid or too long."),
+    "valuation_currency_mismatch": _("The currency must match the item's currency."),
+    "link_target_missing": _(
+        "The linked item's target is not in this archive; it was restored as a manual item "
+        "without a value."
+    ),
+    "networth_restore_only": _(
+        "Net-worth files are restored only; they were ignored in this merge."
+    ),
+    "duplicate_networth_category": _("A net-worth category id appears more than once."),
+    "duplicate_networth_category_name": _(
+        "Two active net-worth categories have the same side and name."
+    ),
+    "duplicate_networth_item": _("A net-worth item id appears more than once."),
+    "networth_category_reference": _(
+        "A net-worth item references a category of another side or with another name."
+    ),
+    "invalid_networth_link": _("A linked net-worth item has an invalid link."),
+    "duplicate_item_valuation": _("An item valuation id appears more than once."),
+    "item_valuation_reference": _(
+        "An item valuation references an unknown item or a different name."
+    ),
+    "linked_item_valuation": _("A linked item cannot have a manual valuation."),
+    "duplicate_networth_snapshot": _("A net-worth snapshot id appears more than once."),
+    "duplicate_snapshot_date": _("Two net-worth snapshots have the same date and source."),
     # F4.4 archive restore and merge.
     "currency_mismatch": _(
         "The archive's base currency differs from this workspace's base currency."
@@ -231,6 +272,31 @@ _PARSER_CODES: dict[str, str] = {
     "duplicate column name": "duplicate_column",
     "only part of a full restore": "partial_restore",
     "unknown file": "unknown_file",
+    # Net-worth row errors (F5.5).
+    "invalid unsigned decimal": "invalid_amount",
+    "invalid precision or zero amount": "too_many_decimals",
+    "currency differs from workspace": "invalid_currency",
+    "invalid date or month": "invalid_date",
+    "invalid boolean": "invalid_row",
+    "invalid valuation mode": "invalid_row",
+    "invalid link type": "invalid_row",
+    "invalid snapshot source": "invalid_row",
+    "invalid breakdown JSON": "invalid_row",
+    "required value missing": "invalid_row",
+    "invalid name": "invalid_name",
+    "invalid item name": "invalid_name",
+    "text too long": "invalid_notes",
+    "duplicate net-worth category id": "duplicate_networth_category",
+    "duplicate active net-worth category name": "duplicate_networth_category_name",
+    "duplicate net-worth item id": "duplicate_networth_item",
+    "net-worth category reference mismatch": "networth_category_reference",
+    "invalid link": "invalid_networth_link",
+    "duplicate item valuation id": "duplicate_item_valuation",
+    "item valuation reference mismatch": "item_valuation_reference",
+    "item valuation currency differs": "item_valuation_reference",
+    "linked item has valuations": "linked_item_valuation",
+    "duplicate snapshot id": "duplicate_networth_snapshot",
+    "duplicate snapshot date and source": "duplicate_snapshot_date",
 }
 
 
@@ -902,6 +968,7 @@ class _RollbackPlan:
     categories_created: tuple[Category, ...]  # every category the batch created
     categories_to_delete: tuple[Category, ...]
     categories_to_archive: tuple[Category, ...]
+    valuations: tuple[ItemValuation, ...]  # append-only, removed by an explicit statement
     closed_months: tuple[str, ...]
 
     def counts(self) -> dict[str, int]:
@@ -912,6 +979,7 @@ class _RollbackPlan:
             "budget_lines_kept": self.lines_kept,
             "categories_to_delete": len(self.categories_to_delete),
             "categories_to_archive": len(self.categories_to_archive),
+            "valuations": len(self.valuations),
         }
 
 
@@ -924,6 +992,7 @@ def _rollback_plan(
     transactions = TransactionRepository(session, ctx).for_import_batch(batch.id, lock=lock)
     lines = BudgetLineRepository(session, ctx).for_import_batch(batch.id, lock=lock)
     categories = CategoryRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    valuations = ItemValuationRepository(session, ctx).for_import_batch(batch.id, lock=lock)
     live = tuple(row for row in transactions if row.deleted_at is None)
     to_remove = tuple(line for line in lines if line.updated_at <= applied_at)
 
@@ -956,6 +1025,7 @@ def _rollback_plan(
         categories_created=tuple(categories),
         categories_to_delete=tuple(to_delete),
         categories_to_archive=tuple(to_archive),
+        valuations=tuple(valuations),
         closed_months=tuple(str(month) for month in sorted(affected & closed)),
     )
 
@@ -966,6 +1036,10 @@ class _RestoreRollbackPlan:
     lines: tuple[BudgetLine, ...]
     categories: tuple[Category, ...]
     months: tuple[YearMonth, ...]
+    networth_categories: tuple[NetWorthCategory, ...]
+    networth_items: tuple[NetWorthItem, ...]
+    valuations: tuple[ItemValuation, ...]
+    snapshots: tuple[NetWorthSnapshot, ...]
     reasons: tuple[str, ...]
     settings: dict[str, object]
 
@@ -975,6 +1049,10 @@ class _RestoreRollbackPlan:
             "budget_lines": len(self.lines),
             "categories": len(self.categories),
             "months": len(self.months),
+            "networth_categories": len(self.networth_categories),
+            "networth_items": len(self.networth_items),
+            "valuations": len(self.valuations),
+            "snapshots": len(self.snapshots),
         }
 
 
@@ -1009,6 +1087,16 @@ def _restore_rollback_plan(
     all_lines = BudgetLineRepository(session, ctx).list()
     all_categories = CategoryRepository(session, ctx).list()
     all_months = MonthStateRepository(session, ctx).list()
+    networth_categories = NetWorthCategoryRepository(session, ctx).for_import_batch(
+        batch.id, lock=lock
+    )
+    networth_items = NetWorthItemRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    valuations = ItemValuationRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    snapshots = NetWorthSnapshotRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    all_networth_categories = NetWorthCategoryRepository(session, ctx).list()
+    all_networth_items = NetWorthItemRepository(session, ctx).list()
+    all_valuations = ItemValuationRepository(session, ctx).list()
+    all_snapshots = NetWorthSnapshotRepository(session, ctx).list()
     reasons: set[str] = set()
     if (
         len(all_transactions) != len(transactions)
@@ -1017,12 +1105,23 @@ def _restore_rollback_plan(
         or any(row.import_batch_id != batch.id for row in all_lines)
         or len(all_categories) != len(categories)
         or any(row.import_batch_id != batch.id for row in all_categories)
+        or len(all_networth_categories) != len(networth_categories)
+        or any(row.import_batch_id != batch.id for row in all_networth_categories)
+        or len(all_networth_items) != len(networth_items)
+        or any(row.import_batch_id != batch.id for row in all_networth_items)
+        or len(all_valuations) != len(valuations)
+        or any(row.import_batch_id != batch.id for row in all_valuations)
+        or len(all_snapshots) != len(snapshots)
+        or any(row.import_batch_id != batch.id for row in all_snapshots)
     ):
         reasons.add("restore_rows_added")
     if (
         any(row.updated_at > applied_at for row in transactions)
         or any(row.updated_at > applied_at for row in lines)
         or any(row.updated_at > applied_at for row in categories)
+        or any(row.updated_at > applied_at for row in networth_categories)
+        or any(row.updated_at > applied_at for row in networth_items)
+        or any(row.updated_at > applied_at for row in snapshots)
     ):
         reasons.add("restore_rows_changed")
     raw_months = (batch.report or {}).get("restore_months")
@@ -1066,6 +1165,10 @@ def _restore_rollback_plan(
         lines=tuple(lines),
         categories=tuple(categories),
         months=tuple(month_values),
+        networth_categories=tuple(networth_categories),
+        networth_items=tuple(networth_items),
+        valuations=tuple(valuations),
+        snapshots=tuple(snapshots),
         reasons=tuple(sorted(reasons)),
         settings=cast("dict[str, object]", previous),
     )
@@ -1077,6 +1180,17 @@ def _rollback_restore(
     if plan.reasons:
         raise ImportRestoreRollbackBlocked(plan.reasons)
     TransactionRepository(session, ctx).delete_for_import_batch(batch.id)
+    ItemValuationRepository(session, ctx).delete_for_import_batch(batch.id)
+    snapshots = NetWorthSnapshotRepository(session, ctx)
+    for snapshot in plan.snapshots:
+        snapshots.delete(snapshot)
+    session.flush()
+    items = NetWorthItemRepository(session, ctx)
+    for item in plan.networth_items:
+        items.delete(item)
+    networth_categories = NetWorthCategoryRepository(session, ctx)
+    for category in plan.networth_categories:
+        networth_categories.delete(category)
     lines = BudgetLineRepository(session, ctx)
     for line in plan.lines:
         lines.delete(line)
@@ -1103,6 +1217,10 @@ def _rollback_restore(
             "budget_lines": len(plan.lines),
             "categories_deleted": len(plan.categories),
             "months_deleted": len(plan.months),
+            "networth_categories_deleted": len(plan.networth_categories),
+            "networth_items_deleted": len(plan.networth_items),
+            "item_valuations_deleted": len(plan.valuations),
+            "networth_snapshots_deleted": len(plan.snapshots),
             "settings_restored": ",".join(sorted(plan.settings)),
         },
     )
@@ -1145,6 +1263,8 @@ def rollback_import(
         lines = BudgetLineRepository(session, ctx)
         for line in plan.lines_to_remove:
             lines.delete(line)
+        if plan.valuations:
+            ItemValuationRepository(session, ctx).delete_for_import_batch(batch.id)
         session.flush()
         raw_started_months = (batch.report or {}).get("plan_started_months", [])
         if isinstance(raw_started_months, list):
@@ -1185,6 +1305,7 @@ def rollback_import(
                 "budget_lines_kept": counts["budget_lines_kept"],
                 "categories_deleted": counts["categories_to_delete"],
                 "categories_archived": counts["categories_to_archive"],
+                "item_valuations_deleted": counts["valuations"],
             },
         )
         return counts

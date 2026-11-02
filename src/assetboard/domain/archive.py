@@ -15,11 +15,12 @@ from datetime import UTC, date, datetime
 from typing import cast
 from uuid import UUID
 
-from assetboard.domain.categories import Kind, Treatment
+from assetboard.domain.categories import Kind, Treatment, name_key
 from assetboard.domain.money import minor_unit_for
+from assetboard.domain.networth import MAX_ITEM_NAME_LENGTH, MAX_NOTES_LENGTH, Side
 
 FORMAT = "workspace-archive"
-FORMAT_VERSION = "1.1"
+FORMAT_VERSION = "1.2"
 # Bounds of the optional ``upcoming_days`` key (1.1); mirror ``config.MIN/MAX_UPCOMING_DAYS``.
 MIN_UPCOMING_DAYS = 1
 MAX_UPCOMING_DAYS = 365
@@ -38,9 +39,54 @@ CSV_COLUMNS = {
         "deleted_at",
     ),
     "months.csv": ("month", "closed_at", "plan_started_at"),
+    "networth_categories.csv": ("id", "side", "name", "color", "sort_order", "archived_at"),
+    "networth_items.csv": (
+        "id",
+        "side",
+        "category",
+        "category_id",
+        "name",
+        "currency",
+        "notes",
+        "acquired_on",
+        "valuation_mode",
+        "link_type",
+        "link_id",
+        "include_in_net_worth",
+        "investable",
+        "archived_at",
+    ),
+    "item_valuations.csv": (
+        "id",
+        "item_id",
+        "item",
+        "as_of",
+        "value",
+        "currency",
+        "note",
+        "created_at",
+    ),
+    "networth_snapshots.csv": (
+        "id",
+        "as_of",
+        "assets",
+        "liabilities",
+        "currency",
+        "breakdown",
+        "source",
+    ),
 }
+BASE_CSV_FILES = ("categories.csv", "budget_lines.csv", "transactions.csv", "months.csv")
+NETWORTH_CSV_FILES = (
+    "networth_categories.csv",
+    "networth_items.csv",
+    "item_valuations.csv",
+    "networth_snapshots.csv",
+)
 FILE_ORDER = ("workspace.json", *CSV_COLUMNS)
 REQUIRED_FILES = ("manifest.json", *FILE_ORDER)
+LINK_TYPES = frozenset({"portfolio_asset_class", "portfolio_holding", "loan_balance"})
+SNAPSHOT_SOURCES = frozenset({"auto", "manual", "backfill"})
 
 # Reader limits for untrusted archives (F4.2 "ZIP safety"); the reader stops at each of them.
 MAX_MEMBERS = 64
@@ -51,6 +97,15 @@ RATIO_EXEMPT_BYTES = 1024 * 1024
 MAX_DATA_ROWS = 1_000_000
 MAX_COLUMNS = 64
 MAX_ERRORS = 1000
+
+
+def required_files(version: str) -> tuple[str, ...]:
+    """Archive members required by a compatible ``MAJOR.MINOR`` version."""
+    major, minor = (int(part) for part in version.split(".", 1))
+    if major != 1:
+        return REQUIRED_FILES
+    csv_files = BASE_CSV_FILES + (NETWORTH_CSV_FILES if minor >= 2 else ())
+    return ("manifest.json", "workspace.json", *csv_files)
 
 
 @dataclass(frozen=True, slots=True)
@@ -95,12 +150,67 @@ class MonthRow:
 
 
 @dataclass(frozen=True, slots=True)
+class NetWorthCategoryRow:
+    id: str
+    side: str
+    name: str
+    color: str
+    sort_order: int
+    archived_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class NetWorthItemRow:
+    id: str
+    side: str
+    category: str
+    category_id: str
+    name: str
+    currency: str
+    notes: str
+    acquired_on: str | None
+    valuation_mode: str
+    link_type: str | None
+    link_id: str | None
+    include_in_net_worth: str
+    investable: str
+    archived_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ItemValuationRow:
+    id: str
+    item_id: str
+    item: str
+    as_of: str
+    value: str
+    currency: str
+    note: str
+    created_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class NetWorthSnapshotRow:
+    id: str
+    as_of: str
+    assets: str
+    liabilities: str
+    currency: str
+    breakdown: str
+    source: str
+
+
+@dataclass(frozen=True, slots=True)
 class ArchiveRows:
     workspace: dict[str, object]
     categories: tuple[CategoryRow, ...]
     budget_lines: tuple[BudgetLineRow, ...]
     transactions: tuple[TransactionRow, ...]
     months: tuple[MonthRow, ...]
+    networth_categories: tuple[NetWorthCategoryRow, ...] = ()
+    networth_items: tuple[NetWorthItemRow, ...] = ()
+    item_valuations: tuple[ItemValuationRow, ...] = ()
+    networth_snapshots: tuple[NetWorthSnapshotRow, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -160,13 +270,17 @@ def _string_keyed_object(value: object) -> dict[str, object] | None:
 
 
 def build_files(rows: ArchiveRows) -> dict[str, bytes]:
-    """Return the five data files, in canonical order."""
+    """Return every data file of the current format, in canonical order."""
     return {
         "workspace.json": _json_bytes(rows.workspace),
         "categories.csv": csv_bytes("categories.csv", rows.categories),
         "budget_lines.csv": csv_bytes("budget_lines.csv", rows.budget_lines),
         "transactions.csv": csv_bytes("transactions.csv", rows.transactions),
         "months.csv": csv_bytes("months.csv", rows.months),
+        "networth_categories.csv": csv_bytes("networth_categories.csv", rows.networth_categories),
+        "networth_items.csv": csv_bytes("networth_items.csv", rows.networth_items),
+        "item_valuations.csv": csv_bytes("item_valuations.csv", rows.item_valuations),
+        "networth_snapshots.csv": csv_bytes("networth_snapshots.csv", rows.networth_snapshots),
     }
 
 
@@ -262,8 +376,6 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
             names = archive.namelist()
             if len(names) != len(set(names)):
                 return None, (ArchiveError("archive", "duplicate member names"),)
-            if not set(REQUIRED_FILES) <= set(names):
-                return None, (ArchiveError("archive", "missing required members"),)
             # F4.2's documented limits also bound this shared reader before upload exists.
             if len(names) > MAX_MEMBERS:
                 return None, (ArchiveError("archive", "too many members"),)
@@ -300,6 +412,8 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
         zlib.error,
     ) as exc:
         return None, (ArchiveError("archive", str(exc)),)
+    if "manifest.json" not in files:
+        return None, (ArchiveError("archive", "missing required members"),)
     try:
         loaded_manifest: object = json.loads(files["manifest.json"])
     except (ValueError, RecursionError):  # also over-long integers and deep nesting
@@ -321,6 +435,9 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
         return None, (ArchiveError("manifest.json", "made by a newer version of the app"),)
     if major < current_major:  # no 0.x upgrade path exists; 1.x is the first format
         return None, (ArchiveError("manifest.json", "unsupported archive version"),)
+    required = required_files(str(version))
+    if not set(required) <= set(names):
+        return None, (ArchiveError("archive", "missing required members"),)
     warnings = [
         ArchiveError(name, "unknown file ignored") for name in names if name not in REQUIRED_FILES
     ]
@@ -360,7 +477,7 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
     if (
         len(expected) != len(entries)
         or "manifest.json" in expected
-        or not set(FILE_ORDER) <= set(expected)
+        or not set(required) - {"manifest.json"} <= set(expected)
         or not set(expected) <= set(files)
     ):
         return None, (ArchiveError("manifest.json", "invalid file list"),)
@@ -449,45 +566,96 @@ def _parse_timestamp(value: str) -> str:
     return result
 
 
-def _validate_cell(column: str, value: str, currency: str) -> str:
-    if column in ("id", "category_id"):
+def _decimal_text(value: str, currency: str, *, allow_zero: bool) -> str:
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", value):
+        raise ValueError("invalid unsigned decimal")
+    whole, _, fractional = value.partition(".")
+    digits = minor_unit_for(currency)
+    if fractional[digits:].strip("0") or (not allow_zero and not (whole + fractional).strip("0")):
+        raise ValueError("invalid precision or zero amount")
+    return value
+
+
+def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
+    if column in ("id", "category_id", "item_id", "link_id"):
         return str(UUID(value)) if value else ""
     if column in ("kind", "direction"):
         return Kind(value).value if value else ""
+    if column == "side":
+        return Side(value).value if value else ""
     if column == "treatment":
         return Treatment(value or "regular").value
-    if column in ("archived_at", "deleted_at", "closed_at", "plan_started_at"):
+    if column == "valuation_mode":
+        if value not in {"", "manual", "linked"}:
+            raise ValueError("invalid valuation mode")
+        return value or "manual"
+    if column == "link_type":
+        if value and value not in LINK_TYPES:
+            raise ValueError("invalid link type")
+        return value
+    if column in ("include_in_net_worth", "investable"):
+        default = "true" if column == "include_in_net_worth" else "false"
+        chosen = value or default
+        if chosen not in {"true", "false"}:
+            raise ValueError("invalid boolean")
+        return chosen
+    if column in ("archived_at", "deleted_at", "closed_at", "plan_started_at", "created_at"):
         return _parse_timestamp(value) if value else ""
-    if column in ("date", "month"):
-        pattern = r"[0-9]{4}-[0-9]{2}" + (r"-[0-9]{2}" if column == "date" else "")
+    if column in ("date", "month", "as_of", "acquired_on"):
+        if not value and column == "acquired_on":
+            return ""
+        pattern = r"[0-9]{4}-[0-9]{2}" + ("" if column == "month" else r"-[0-9]{2}")
         if not re.fullmatch(pattern, value):
             raise ValueError("invalid date or month")
-        date.fromisoformat(value if column == "date" else value + "-01")
-    if column in ("amount", "planned"):
+        date.fromisoformat(value + "-01" if column == "month" else value)
+    if column in ("amount", "planned", "value", "assets", "liabilities"):
         if column == "planned" and not value:
             return "0"
-        if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", value):
-            raise ValueError("invalid unsigned decimal")
-        whole, _, fractional = value.partition(".")
-        digits = minor_unit_for(currency)
-        if fractional[digits:].strip("0") or (
-            column == "amount" and not (whole + fractional).strip("0")
-        ):
-            raise ValueError("invalid precision or zero amount")
+        return _decimal_text(
+            value,
+            currency,
+            allow_zero=column in {"planned", "value", "assets", "liabilities"},
+        )
     if column == "currency":
+        if file in {"networth_items.csv", "item_valuations.csv", "networth_snapshots.csv"}:
+            code = value.upper()
+            if not code:
+                raise ValueError("required value missing")
+            minor_unit_for(code)
+            return code
         if value and value != currency:
             raise ValueError("currency differs from workspace")
         return currency
-    if column in ("category", "name") and not 1 <= len(value) <= 80:
-        raise ValueError("invalid category name")
-    if column == "description" and len(value) > 200:
-        raise ValueError("description too long")
-    if column == "color":
+    if column == "category":
+        if not 1 <= len(value) <= 80:
+            raise ValueError("invalid category name")
+    elif column == "name":
+        maximum = MAX_ITEM_NAME_LENGTH if file == "networth_items.csv" else 80
+        if not 1 <= len(value) <= maximum:
+            raise ValueError("invalid name")
+    elif column == "item":
+        if not 1 <= len(value) <= MAX_ITEM_NAME_LENGTH:
+            raise ValueError("invalid item name")
+    elif column in ("description", "notes"):
+        if len(value) > (MAX_NOTES_LENGTH if column == "notes" else 200):
+            raise ValueError("text too long")
+    elif column == "color":
         if value and not re.fullmatch(r"#[0-9a-f]{6}", value):
             raise ValueError("invalid color")
         return value or "#16a34a"
-    if column == "sort_order" and not re.fullmatch(r"[0-9]{1,9}", value):
-        raise ValueError("invalid sort order")
+    elif column == "sort_order":
+        if not re.fullmatch(r"[0-9]{1,9}", value):
+            raise ValueError("invalid sort order")
+    elif column == "source":
+        if value not in SNAPSHOT_SOURCES:
+            raise ValueError("invalid snapshot source")
+    elif column == "breakdown":
+        try:
+            parsed = json.loads(value)
+        except (ValueError, RecursionError):
+            raise ValueError("invalid breakdown JSON") from None
+        if not isinstance(parsed, dict):
+            raise ValueError("invalid breakdown JSON")
     return value
 
 
@@ -496,6 +664,18 @@ _REQUIRED_COLUMNS = {
     "transactions.csv": {"date", "direction", "amount", "category", "category_id"},
     "budget_lines.csv": {"month", "category", "planned", "category_id"},
     "months.csv": {"month"},
+    "networth_categories.csv": {"id", "side", "name"},
+    "networth_items.csv": {"id", "side", "category", "category_id", "name", "currency"},
+    "item_valuations.csv": {"id", "item_id", "item", "as_of", "value", "currency"},
+    "networth_snapshots.csv": {
+        "id",
+        "as_of",
+        "assets",
+        "liabilities",
+        "currency",
+        "breakdown",
+        "source",
+    },
 }
 
 
@@ -510,6 +690,8 @@ def _read_rows(
     for name, columns in CSV_COLUMNS.items():
         rows: list[dict[str, str]] = []
         tables[name] = rows
+        if name not in files:
+            continue
         try:
             reader = csv.reader(
                 io.StringIO(files[name].decode("utf-8-sig"), newline=""), strict=True
@@ -541,9 +723,9 @@ def _read_rows(
                     if column == "sort_order" and not value:
                         value = str(index)
                     try:
-                        if column in _REQUIRED_COLUMNS[name] and column != "planned" and not value:
+                        if column in _REQUIRED_COLUMNS[name] and not value:
                             raise ValueError("required value missing")
-                        row[column] = _validate_cell(column, value, currency)
+                        row[column] = _validate_cell(name, column, value, currency)
                     except ValueError as exc:
                         errors.append(ArchiveError(name, str(exc), line, column))
                 if len(row) == len(columns):
@@ -554,6 +736,11 @@ def _read_rows(
         # The rows are incomplete, so cross-file checks would only add noise.
         errors.append(ArchiveError("archive", "too many errors; later rows were not checked"))
         return ArchiveRows(workspace, (), (), (), ())
+
+    months = tables["months.csv"]
+    if len({row["month"] for row in months}) != len(months):
+        errors.append(ArchiveError("months.csv", "duplicate month"))
+
     categories = tables["categories.csv"]
     by_id = {row["id"]: row for row in categories}
     if len(by_id) != len(categories):
@@ -573,9 +760,69 @@ def _read_rows(
             if key and key in seen:
                 errors.append(ArchiveError(name, "duplicate row identity"))
             seen.add(key)
-    months = tables["months.csv"]
-    if len({row["month"] for row in months}) != len(months):
-        errors.append(ArchiveError("months.csv", "duplicate month"))
+
+    networth_categories = tables["networth_categories.csv"]
+    networth_by_id = {row["id"]: row for row in networth_categories}
+    if len(networth_by_id) != len(networth_categories):
+        errors.append(ArchiveError("networth_categories.csv", "duplicate net-worth category id"))
+    active_networth_names: set[tuple[str, str]] = set()
+    for row in networth_categories:
+        if not row["archived_at"]:
+            key = (row["side"], name_key(row["name"]))
+            if key in active_networth_names:
+                errors.append(
+                    ArchiveError(
+                        "networth_categories.csv", "duplicate active net-worth category name"
+                    )
+                )
+            active_networth_names.add(key)
+
+    networth_items = tables["networth_items.csv"]
+    networth_items_by_id = {row["id"]: row for row in networth_items}
+    if len(networth_items_by_id) != len(networth_items):
+        errors.append(ArchiveError("networth_items.csv", "duplicate net-worth item id"))
+    for row in networth_items:
+        category = networth_by_id.get(row["category_id"])
+        if (
+            category is None
+            or row["side"] != category["side"]
+            or row["category"] != category["name"]
+        ):
+            errors.append(
+                ArchiveError("networth_items.csv", "net-worth category reference mismatch")
+            )
+        linked = row["valuation_mode"] == "linked"
+        if linked != bool(row["link_type"] and row["link_id"]):
+            errors.append(ArchiveError("networth_items.csv", "invalid link"))
+
+    item_valuations = tables["item_valuations.csv"]
+    seen_valuations: set[str] = set()
+    for row in item_valuations:
+        item = networth_items_by_id.get(row["item_id"])
+        if item is None or row["item"] != item["name"]:
+            errors.append(ArchiveError("item_valuations.csv", "item valuation reference mismatch"))
+        elif row["currency"] != item["currency"]:
+            errors.append(ArchiveError("item_valuations.csv", "item valuation currency differs"))
+        elif item["valuation_mode"] == "linked":
+            errors.append(ArchiveError("item_valuations.csv", "linked item has valuations"))
+        if row["id"] in seen_valuations:
+            errors.append(ArchiveError("item_valuations.csv", "duplicate item valuation id"))
+        seen_valuations.add(row["id"])
+
+    networth_snapshots = tables["networth_snapshots.csv"]
+    seen_snapshots: set[tuple[str, str]] = set()
+    seen_snapshot_ids: set[str] = set()
+    for row in networth_snapshots:
+        key = (row["as_of"], row["source"])
+        if key in seen_snapshots:
+            errors.append(
+                ArchiveError("networth_snapshots.csv", "duplicate snapshot date and source")
+            )
+        seen_snapshots.add(key)
+        if row["id"] in seen_snapshot_ids:
+            errors.append(ArchiveError("networth_snapshots.csv", "duplicate snapshot id"))
+        seen_snapshot_ids.add(row["id"])
+
     return ArchiveRows(
         workspace=workspace,
         categories=tuple(
@@ -607,6 +854,61 @@ def _read_rows(
         ),
         months=tuple(
             MonthRow(row["month"], row["closed_at"] or None, row["plan_started_at"] or None)
-            for row in months
+            for row in tables["months.csv"]
+        ),
+        networth_categories=tuple(
+            NetWorthCategoryRow(
+                row["id"],
+                row["side"],
+                row["name"],
+                row["color"],
+                int(row["sort_order"]),
+                row["archived_at"] or None,
+            )
+            for row in networth_categories
+        ),
+        networth_items=tuple(
+            NetWorthItemRow(
+                row["id"],
+                row["side"],
+                row["category"],
+                row["category_id"],
+                row["name"],
+                row["currency"],
+                row["notes"],
+                row["acquired_on"] or None,
+                row["valuation_mode"],
+                row["link_type"] or None,
+                row["link_id"] or None,
+                row["include_in_net_worth"],
+                row["investable"],
+                row["archived_at"] or None,
+            )
+            for row in networth_items
+        ),
+        item_valuations=tuple(
+            ItemValuationRow(
+                row["id"],
+                row["item_id"],
+                row["item"],
+                row["as_of"],
+                row["value"],
+                row["currency"],
+                row["note"],
+                row["created_at"] or None,
+            )
+            for row in item_valuations
+        ),
+        networth_snapshots=tuple(
+            NetWorthSnapshotRow(
+                row["id"],
+                row["as_of"],
+                row["assets"],
+                row["liabilities"],
+                row["currency"],
+                row["breakdown"],
+                row["source"],
+            )
+            for row in networth_snapshots
         ),
     )

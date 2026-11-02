@@ -2,16 +2,22 @@
 
 from __future__ import annotations
 
+import contextlib
+import json
 import re
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from importlib.metadata import version
+from typing import cast
+from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard import branding
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.ledger import Category
+from assetboard.db.models.networth import NetWorthCategory
 from assetboard.db.repositories import (
     AuditEventRepository,
     AuditFilter,
@@ -20,7 +26,11 @@ from assetboard.db.repositories import (
     CurrentWorkspaceRepository,
     IncomeSourceRepository,
     IncomeSourceTaxRuleRepository,
+    ItemValuationRepository,
     MonthStateRepository,
+    NetWorthCategoryRepository,
+    NetWorthItemRepository,
+    NetWorthSnapshotRepository,
     ScheduledItemRepository,
     ScheduledOccurrenceRepository,
     TaxRuleRepository,
@@ -33,7 +43,11 @@ from assetboard.domain.archive import (
     ArchiveRows,
     BudgetLineRow,
     CategoryRow,
+    ItemValuationRow,
     MonthRow,
+    NetWorthCategoryRow,
+    NetWorthItemRow,
+    NetWorthSnapshotRow,
     TransactionRow,
     lineage_id,
     timestamp_text,
@@ -41,12 +55,24 @@ from assetboard.domain.archive import (
 )
 from assetboard.domain.categories import SEED, clean_name
 from assetboard.domain.ledger_csv import plain_amount
+from assetboard.domain.networth import SEED as NETWORTH_SEED
 from assetboard.i18n import gettext
 from assetboard.i18n.locale import SUPPORTED_LOCALES
 from assetboard.services.categories import usage_by_category
 from assetboard.services.context import Context, Role, require_role, require_role_now
 
-ARCHIVE_INCLUDED_MODELS = frozenset({"Category", "BudgetLine", "Transaction", "MonthState"})
+ARCHIVE_INCLUDED_MODELS = frozenset(
+    {
+        "Category",
+        "BudgetLine",
+        "Transaction",
+        "MonthState",
+        "NetWorthCategory",
+        "NetWorthItem",
+        "ItemValuation",
+        "NetWorthSnapshot",
+    }
+)
 ARCHIVE_EXCLUDED_MODELS = {
     "Membership": "workspace membership is instance access control",
     "Invitation": "invitations are not financial workspace data",
@@ -63,10 +89,6 @@ ARCHIVE_EXCLUDED_MODELS = {
     "WorkDay": "work calendars require the F3.8 archive extension",
     "TaxRule": "tax rules require the F3.8 archive extension",
     "TaxRuleVersion": "tax history requires the F3.8 archive extension",
-    "NetWorthCategory": "net-worth categories require the F5.5 archive extension",
-    "NetWorthItem": "net-worth items require the F5.5 archive extension",
-    "ItemValuation": "net-worth value history requires the F5.5 archive extension",
-    "NetWorthSnapshot": "net-worth snapshots require the F5.5 archive extension",
     "NotificationChannel": "notification URLs contain secrets (F3.8/F9.3)",
     "NotificationLog": "notification delivery history is not portable (F3.8)",
 }
@@ -133,11 +155,90 @@ def suggested_categories_to_remove(session: Session, ctx: Context) -> list[Categ
     return categories
 
 
+def _expected_suggested_networth_categories(locale: str) -> set[tuple[str, str, str, int]]:
+    positions: dict[str, int] = {}
+    expected: set[tuple[str, str, str, int]] = set()
+    for seed in NETWORTH_SEED:
+        name = clean_name(gettext(seed.name, locale))
+        side = seed.side.value
+        position = positions.get(side, 0)
+        positions[side] = position + 1
+        expected.add((name, side, seed.color, position))
+    return expected
+
+
+def suggested_networth_categories_to_remove(
+    session: Session, ctx: Context
+) -> list[NetWorthCategory]:
+    """The untouched suggested net-worth categories a restore may delete.
+
+    Mirrors the ledger rule: exact suggested set in a supported locale, unedited, unused, with
+    the automatic ``networth_category.seeded`` event; a later manual seed makes it user data.
+    """
+    categories = NetWorthCategoryRepository(session, ctx).ordered()
+    if len(categories) != len(NETWORTH_SEED):
+        return []
+    if any(category.archived_at is not None for category in categories):
+        return []
+    if any(category.updated_at != category.created_at for category in categories):
+        return []
+    if (
+        NetWorthItemRepository(session, ctx).any_exists()
+        or ItemValuationRepository(session, ctx).any_exists()
+        or NetWorthSnapshotRepository(session, ctx).any_exists()
+    ):
+        return []
+    seed_events = AuditEventRepository(session, ctx).page(
+        AuditFilter(actions={"networth_category.seeded"}), limit=100
+    )
+    automatic = [event for event in seed_events if event.data.get("automatic") is True]
+    if not automatic:
+        return []
+    seeded_at = automatic[0].ts
+    if any(
+        event.ts > seeded_at for event in seed_events if event.data.get("automatic") is not True
+    ):
+        return []
+    if any(
+        not (seeded_at <= category.created_at <= seeded_at + timedelta(seconds=5))
+        for category in categories
+    ):
+        return []
+    actual = {
+        (category.name, category.side, category.color, category.sort_order)
+        for category in categories
+    }
+    if not any(
+        actual == _expected_suggested_networth_categories(locale) for locale in SUPPORTED_LOCALES
+    ):
+        return []
+    return list(categories)
+
+
 def _has_unexpected_categories(session: Session, ctx: Context) -> bool:
     categories = CategoryRepository(session, ctx).list()
     if not categories:
         return False
     return not suggested_categories_to_remove(session, ctx)
+
+
+def _has_unexpected_networth_categories(session: Session, ctx: Context) -> bool:
+    categories = NetWorthCategoryRepository(session, ctx).list()
+    if not categories:
+        return False
+    return not suggested_networth_categories_to_remove(session, ctx)
+
+
+def _has_networth_items(session: Session, ctx: Context) -> bool:
+    return NetWorthItemRepository(session, ctx).any_exists()
+
+
+def _has_item_valuations(session: Session, ctx: Context) -> bool:
+    return ItemValuationRepository(session, ctx).any_exists()
+
+
+def _has_networth_snapshots(session: Session, ctx: Context) -> bool:
+    return NetWorthSnapshotRepository(session, ctx).any_exists()
 
 
 def _has_transactions(session: Session, ctx: Context) -> bool:
@@ -197,6 +298,10 @@ EMPTINESS_CHECKS = (
     _has_work_days,
     _has_tax_rules,
     _has_tax_rule_versions,
+    _has_unexpected_networth_categories,
+    _has_networth_items,
+    _has_item_valuations,
+    _has_networth_snapshots,
 )
 
 
@@ -211,6 +316,33 @@ def restore_available(factory: sessionmaker[Session], ctx: Context) -> bool:
         return False
     with factory() as session:
         return workspace_is_empty(session, ctx)
+
+
+def _breakdown_for_export(breakdown: object, category_lineage: Mapping[UUID, UUID]) -> str:
+    """Snapshot breakdown JSON with category ids replaced by their exported lineage ids.
+
+    Unknown ids (a removed category, a later format) stay as they are. Compact and sorted so
+    two exports of the same data are byte-identical.
+    """
+    data: dict[str, object] = {}
+    if isinstance(breakdown, Mapping):
+        source = cast("Mapping[object, object]", breakdown)
+        data = {str(key): value for key, value in source.items()}
+    categories = data.get("categories")
+    if isinstance(categories, list):
+        converted: list[object] = []
+        for entry in cast("list[object]", categories):
+            if not isinstance(entry, Mapping):
+                converted.append(entry)
+                continue
+            row = dict(cast("Mapping[str, object]", entry))
+            raw_id = row.get("category_id")
+            if isinstance(raw_id, str):
+                with contextlib.suppress(ValueError):
+                    row["category_id"] = str(category_lineage.get(UUID(raw_id), UUID(raw_id)))
+            converted.append(row)
+        data["categories"] = converted
+    return json.dumps(data, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
 
 
 @dataclass(frozen=True, slots=True)
@@ -308,6 +440,98 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             )
             for row in sorted(MonthStateRepository(session, ctx).list(), key=lambda row: row.month)
         )
+        networth_categories = NetWorthCategoryRepository(session, ctx).ordered()
+        networth_category_rank = {
+            category.id: position for position, category in enumerate(networth_categories)
+        }
+        networth_category_lineage = {
+            category.id: lineage_id(category.id, category.import_key)
+            for category in networth_categories
+        }
+        networth_category_rows = tuple(
+            NetWorthCategoryRow(
+                id=str(networth_category_lineage[category.id]),
+                side=category.side,
+                name=category.name,
+                color=category.color,
+                sort_order=category.sort_order,
+                archived_at=timestamp_text(category.archived_at),
+            )
+            for category in networth_categories
+        )
+        networth_items = sorted(
+            NetWorthItemRepository(session, ctx).ordered(),
+            key=lambda row: (
+                row.side,
+                networth_category_rank[row.category_id],
+                row.name,
+                str(lineage_id(row.id, row.import_key)),
+            ),
+        )
+        networth_items_by_id = {item.id: item for item in networth_items}
+        networth_item_rank = {item.id: position for position, item in enumerate(networth_items)}
+        networth_item_rows = tuple(
+            NetWorthItemRow(
+                id=str(lineage_id(item.id, item.import_key)),
+                side=item.side,
+                category=networth_categories[networth_category_rank[item.category_id]].name,
+                category_id=str(networth_category_lineage[item.category_id]),
+                name=item.name,
+                currency=item.currency,
+                notes=item.notes,
+                acquired_on=item.acquired_on.isoformat() if item.acquired_on else None,
+                valuation_mode=item.valuation_mode,
+                link_type=item.link_type,
+                link_id=str(item.link_id) if item.link_id else None,
+                include_in_net_worth="true" if item.include_in_net_worth else "false",
+                investable="true" if item.investable else "false",
+                archived_at=timestamp_text(item.archived_at),
+            )
+            for item in networth_items
+        )
+        valuations = sorted(
+            ItemValuationRepository(session, ctx).for_items(list(networth_items_by_id)),
+            key=lambda row: (
+                networth_item_rank[row.item_id],
+                row.as_of,
+                row.created_at,
+                str(row.id),
+            ),
+        )
+        item_valuation_rows = tuple(
+            ItemValuationRow(
+                id=str(lineage_id(row.id, row.import_key)),
+                item_id=str(
+                    lineage_id(
+                        networth_items_by_id[row.item_id].id,
+                        networth_items_by_id[row.item_id].import_key,
+                    )
+                ),
+                item=networth_items_by_id[row.item_id].name,
+                as_of=row.as_of.isoformat(),
+                value=plain_amount(row.value_minor, row.currency),
+                currency=row.currency,
+                note=row.note,
+                created_at=timestamp_text(row.created_at),
+            )
+            for row in valuations
+        )
+        snapshots = sorted(
+            NetWorthSnapshotRepository(session, ctx).for_range(None),
+            key=lambda row: (row.as_of, row.source, row.created_at, str(row.id)),
+        )
+        networth_snapshot_rows = tuple(
+            NetWorthSnapshotRow(
+                id=str(lineage_id(row.id, row.import_key)),
+                as_of=row.as_of.isoformat(),
+                assets=plain_amount(row.assets_minor, row.currency),
+                liabilities=plain_amount(row.liabilities_minor, row.currency),
+                currency=row.currency,
+                breakdown=_breakdown_for_export(row.breakdown, networth_category_lineage),
+                source=row.source,
+            )
+            for row in snapshots
+        )
         exported_at = ctx.clock.now().astimezone(UTC)
         rows = ArchiveRows(
             workspace={
@@ -324,12 +548,20 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             budget_lines=budget_rows,
             transactions=transaction_rows,
             months=month_rows,
+            networth_categories=networth_category_rows,
+            networth_items=networth_item_rows,
+            item_valuations=item_valuation_rows,
+            networth_snapshots=networth_snapshot_rows,
         )
         counts = {
             "categories": len(category_rows),
             "budget_lines": len(budget_rows),
             "transactions": len(transaction_rows),
             "months": len(month_rows),
+            "networth_categories": len(networth_category_rows),
+            "networth_items": len(networth_item_rows),
+            "item_valuations": len(item_valuation_rows),
+            "networth_snapshots": len(networth_snapshot_rows),
         }
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,

@@ -12,6 +12,10 @@
     <div><dt class="text-muted">{{ _("Budget lines to remove") }}</dt><dd>{{ preview.counts.budget_lines|default(0) }}</dd></div>
     <div><dt class="text-muted">{{ _("Categories to remove") }}</dt><dd>{{ preview.counts.categories|default(0) }}</dd></div>
     <div><dt class="text-muted">{{ _("Month states to remove") }}</dt><dd>{{ preview.counts.months|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Net-worth categories to remove") }}</dt><dd>{{ preview.counts.networth_categories|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Net-worth items to remove") }}</dt><dd>{{ preview.counts.networth_items|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Item valuations to remove") }}</dt><dd>{{ preview.counts.valuations|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Net-worth snapshots to remove") }}</dt><dd>{{ preview.counts.snapshots|default(0) }}</dd></div>
   </dl>
   {% if preview.settings_restored %}
   <p class="mt-3 text-sm"><span class="font-medium">{{ _("Settings to restore:") }}</span>
@@ -32,6 +36,7 @@
     <div><dt class="text-muted">{{ _("Budget lines kept (changed since the import)") }}</dt><dd>{{ preview.counts.budget_lines_kept|default(0) }}</dd></div>
     <div><dt class="text-muted">{{ _("Categories to delete") }}</dt><dd>{{ preview.counts.categories_to_delete|default(0) }}</dd></div>
     <div><dt class="text-muted">{{ _("Categories to archive") }}</dt><dd>{{ preview.counts.categories_to_archive|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Item valuations to remove") }}</dt><dd>{{ preview.counts.valuations|default(0) }}</dd></div>
   </dl>
   {% if preview.counts.edited %}<p class="mt-4 text-sm">{{ _("%(count)s of the transactions were edited after the import; they are removed too.", count=preview.counts.edited) }}</p>{% endif %}
   {% if preview.closed_months %}<p class="mt-4 text-sm text-danger">{{ _("Rollback is not possible while these months are closed: %(months)s", months=preview.closed_months|join(", ")) }}</p>{% endif %}
