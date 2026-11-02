@@ -1,15 +1,30 @@
 # Net worth
 
-**Net worth** lists what you own and what you owe. Open it from the sidebar. The page has two
-tabs, **Assets** and **Liabilities**; each groups items under their categories and shows a
-subtotal for every category. Everyone in the workspace can read the lists; editors and owners
-can add, change and archive things.
+**Net worth** lists what you own and what you owe. Open it from the sidebar. The section has
+three tabs: **Summary**, **Assets** and **Liabilities**. The two lists group items under their
+categories and show a subtotal for every category. Everyone in the workspace can read them;
+editors and owners can add, change and archive things.
 
 ## Values are positive
 
 Every value is a positive amount in the item's currency. An asset's value is what it is worth; a
 liability's value is the amount you still owe. The app never stores a signed liability amount:
-later totals subtract the liabilities from the assets.
+totals subtract the liabilities from the assets.
+
+## Summary
+
+The summary shows the big net-worth figure, total assets and liabilities, an assets-vs-liabilities
+bar, and a donut and table for each side. Category shares are percentages of that side's own
+total; they are rounded to one decimal place and need not add up to exactly 100.0%.
+
+The same rules as the lists apply: archived items, items with **Include in net worth** off and
+items with no effective value are not counted. Items under an archived category still count until
+the item itself is archived. Items in another currency are shown separately in a warning and are
+not converted or counted before an exchange-rate service exists. Items excluded by your own
+**Include in net worth** switch are shown as a muted note, not a warning.
+
+A side with no counted value shows no donut and a dash instead of a share. A workspace with only
+liabilities therefore shows a negative net worth, the liability table, and no asset donut.
 
 ## Categories
 
@@ -38,7 +53,7 @@ still has items archives it instead.
 An item has a name, category, currency, notes, an optional acquired date, and two switches:
 
 - **Include in net worth** — when off, the item stays in the list but is left out of the
-  subtotals (and of the summary in a later version).
+  subtotals and of the summary.
 - **Investable** — a marker for the FIRE projection; it does not change any total.
 
 The currency defaults to the workspace base currency. It is the item's source of truth: every
