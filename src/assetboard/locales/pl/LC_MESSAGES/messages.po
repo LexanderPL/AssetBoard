@@ -121,6 +121,33 @@ msgstr "Sprzedaż rzeczy"
 msgid "Savings withdrawal"
 msgstr "Wypłata z oszczędności"
 
+msgid "Vehicles"
+msgstr "Pojazdy"
+
+msgid "Electronics"
+msgstr "Elektronika"
+
+msgid "Audio equipment"
+msgstr "Sprzęt audio"
+
+msgid "Instruments"
+msgstr "Instrumenty"
+
+msgid "Appliances"
+msgstr "Urządzenia AGD"
+
+msgid "Jewelry & watches"
+msgstr "Biżuteria i zegarki"
+
+msgid "Photography"
+msgstr "Fotografia"
+
+msgid "Installments"
+msgstr "Raty"
+
+msgid "Mortgage"
+msgstr "Kredyt hipoteczny"
+
 msgid "Enter a valid amount."
 msgstr "Podaj prawidłową kwotę."
 
@@ -282,6 +309,42 @@ msgstr "Usunięto kategorię"
 
 msgid "Suggested categories added"
 msgstr "Dodano proponowane kategorie"
+
+msgid "Net-worth category added"
+msgstr "Dodano kategorię majątku"
+
+msgid "Net-worth category changed"
+msgstr "Zmieniono kategorię majątku"
+
+msgid "Net-worth category archived"
+msgstr "Zarchiwizowano kategorię majątku"
+
+msgid "Net-worth category restored"
+msgstr "Przywrócono kategorię majątku"
+
+msgid "Net-worth category deleted"
+msgstr "Usunięto kategorię majątku"
+
+msgid "Suggested net-worth categories added"
+msgstr "Dodano proponowane kategorie majątku"
+
+msgid "Net-worth item added"
+msgstr "Dodano pozycję majątku"
+
+msgid "Net-worth item changed"
+msgstr "Zmieniono pozycję majątku"
+
+msgid "Net-worth item archived"
+msgstr "Zarchiwizowano pozycję majątku"
+
+msgid "Net-worth item restored"
+msgstr "Przywrócono pozycję majątku"
+
+msgid "Net-worth value added"
+msgstr "Dodano wartość majątku"
+
+msgid "Net-worth items added in bulk"
+msgstr "Dodano pozycje majątku zbiorczo"
 
 msgid "Month closed"
 msgstr "Miesiąc zamknięty"
@@ -447,6 +510,12 @@ msgstr "Sprawdzaj aktualizacje"
 
 msgid "Month"
 msgstr "Miesiąc"
+
+msgid "Side"
+msgstr "Strona"
+
+msgid "As of"
+msgstr "Na dzień"
 
 msgid "Closed months affected"
 msgstr "Objęte zamknięte miesiące"
@@ -673,11 +742,29 @@ msgstr "opis"
 msgid "category"
 msgstr "kategoria"
 
+msgid "notes"
+msgstr "notatki"
+
+msgid "acquired on"
+msgstr "data nabycia"
+
+msgid "include in net worth"
+msgstr "uwzględnij w majątku netto"
+
+msgid "investable"
+msgstr "inwestycyjna"
+
 msgid "expense"
 msgstr "wydatek"
 
 msgid "income"
 msgstr "przychód"
+
+msgid "asset"
+msgstr "aktywo"
+
+msgid "liability"
+msgstr "zobowiązanie"
 
 msgid "regular"
 msgstr "zwykłe"
@@ -699,6 +786,9 @@ msgstr "Ustawienia obszaru roboczego"
 
 msgid "Import and export"
 msgstr "Import i eksport"
+
+msgid "Net worth"
+msgstr "Majątek netto"
 
 msgid "Closing months"
 msgstr "Zamykanie miesięcy"
@@ -1782,6 +1872,96 @@ msgstr "Wpis zapisano w miesiącu: %(month)s."
 msgid "Entry planned in %(month)s."
 msgstr "Wpis zaplanowano w miesiącu: %(month)s."
 
+msgid "Assets"
+msgstr "Aktywa"
+
+msgid "Liabilities"
+msgstr "Zobowiązania"
+
+msgid "Enter a name of 1 to 200 characters, without control characters."
+msgstr "Wpisz nazwę o długości od 1 do 200 znaków, bez znaków sterujących."
+
+msgid "Enter notes of at most 200 characters."
+msgstr "Podaj notatki o długości do 200 znaków."
+
+msgid "Values cannot be negative."
+msgstr "Wartości nie mogą być ujemne."
+
+msgid "The value is too large."
+msgstr "Wartość jest za duża."
+
+msgid "Choose a supported currency."
+msgstr "Wybierz obsługiwaną walutę."
+
+msgid "The currency cannot change after the first value."
+msgstr "Nie można zmienić waluty po dodaniu pierwszej wartości."
+
+msgid "Choose a category from this tab."
+msgstr "Wybierz kategorię z tej zakładki."
+
+msgid "This category is archived; choose an active one."
+msgstr "Ta kategoria jest zarchiwizowana. Wybierz aktywną."
+
+msgid "Choose assets or liabilities."
+msgstr "Wybierz aktywa lub zobowiązania."
+
+msgid "Linked values arrive in a later version."
+msgstr "Wartości powiązane pojawią się w późniejszej wersji."
+
+msgid "Restore the item before changing it."
+msgstr "Przywróć pozycję, zanim ją zmienisz."
+
+msgid "Another active category of this side already has this name."
+msgstr "Inna aktywna kategoria po tej stronie ma już tę nazwę."
+
+msgid "The suggested categories can only be added to an empty side."
+msgstr "Proponowane kategorie można dodać tylko do pustej strony."
+
+msgid "Paste at most 64 KiB of text."
+msgstr "Wklej najwyżej 64 KiB tekstu."
+
+msgid "Paste at most 500 lines."
+msgstr "Wklej najwyżej 500 wierszy."
+
+msgid "Archived because it still has items."
+msgstr "Zarchiwizowano, ponieważ nadal ma pozycje."
+
+msgid "Item added."
+msgstr "Dodano pozycję."
+
+msgid "Item saved."
+msgstr "Zapisano pozycję."
+
+msgid "Item archived."
+msgstr "Zarchiwizowano pozycję."
+
+msgid "Item restored."
+msgstr "Przywrócono pozycję."
+
+msgid "Value added."
+msgstr "Dodano wartość."
+
+msgid "Items added."
+msgstr "Dodano pozycje."
+
+msgid "Use name; value; category on each line."
+msgstr "Użyj formatu nazwa; wartość; kategoria w każdym wierszu."
+
+msgid "Enter a value."
+msgstr "Podaj wartość."
+
+msgid "Enter a category."
+msgstr "Podaj kategorię."
+
+msgid "No active category with this name."
+msgstr "Brak aktywnej kategorii o tej nazwie."
+
+msgid "This name appears more than once in the batch."
+msgstr "Ta nazwa występuje w partii więcej niż raz."
+
+msgid "An active item with this name already exists."
+msgstr "Aktywna pozycja o tej nazwie już istnieje."
+
 msgid "Enter a name of up to 100 characters."
 msgstr "Podaj nazwę o długości do 100 znaków."
 
@@ -2336,9 +2516,6 @@ msgstr ""
 msgid "One-time payment saved."
 msgstr "Zapisano płatność jednorazową."
 
-msgid "Choose a supported currency."
-msgstr "Wybierz obsługiwaną walutę."
-
 msgid "The base currency cannot change: amounts are already stored in it."
 msgstr "Waluty bazowej nie można zmienić: są już w niej zapisane kwoty."
 
@@ -2485,9 +2662,6 @@ msgstr[2] "%(num)d zaległych wystąpień"
 
 msgid "Recurring"
 msgstr "Cykliczne"
-
-msgid "Net worth"
-msgstr "Majątek netto"
 
 msgid "Loans"
 msgstr "Kredyty"
@@ -4389,6 +4563,183 @@ msgstr "Zamknięcie chroni miesiąc przed przypadkowymi zmianami."
 msgid "Future months stay open for planning."
 msgstr "Przyszłe miesiące pozostają otwarte do planowania."
 
+msgid "Assets and liabilities"
+msgstr "Aktywa i zobowiązania"
+
+msgid "No categories on this side yet"
+msgstr "Ta strona nie ma jeszcze kategorii"
+
+#, python-format
+msgid ""
+"Start with the suggested %(side)s categories. You can rename, reorder or "
+"archive them later."
+msgstr ""
+"Zacznij od proponowanych kategorii (%(side)s). Później możesz zmieniać "
+"ich nazwy, kolejność lub je archiwizować."
+
+msgid "Subtotal"
+msgstr "Suma częściowa"
+
+msgid "No total"
+msgstr "Brak sumy"
+
+msgid ""
+"Items in another currency are shown separately and not included in the "
+"subtotal."
+msgstr ""
+"Pozycje w innej walucie są pokazane osobno i nie są wliczane do sumy "
+"częściowej."
+
+msgid "Items excluded from net worth are not included in the subtotal."
+msgstr "Pozycje wyłączone z majątku netto nie są wliczane do sumy częściowej."
+
+msgid "Items without an effective value are not included in the subtotal."
+msgstr "Pozycje bez obowiązującej wartości nie są wliczane do sumy częściowej."
+
+msgid "No items yet"
+msgstr "Nie ma jeszcze pozycji"
+
+msgid "Add an item below, or paste a list of items."
+msgstr "Dodaj pozycję poniżej lub wklej listę pozycji."
+
+msgid "Add an item"
+msgstr "Dodaj pozycję"
+
+msgid "Current value"
+msgstr "Bieżąca wartość"
+
+msgid "Value note (optional)"
+msgstr "Notatka do wartości (opcjonalnie)"
+
+msgid "Acquired on (optional)"
+msgstr "Data nabycia (opcjonalnie)"
+
+msgid "Notes (optional)"
+msgstr "Notatki (opcjonalnie)"
+
+msgid "Include in net worth"
+msgstr "Uwzględnij w majątku netto"
+
+msgid "Investable"
+msgstr "Inwestycyjna"
+
+msgid "Enter values as positive amounts. For a liability, enter the amount owed."
+msgstr ""
+"Podawaj wartości jako liczby dodatnie. W przypadku zobowiązania podaj "
+"kwotę zadłużenia."
+
+msgid "Add item"
+msgstr "Dodaj pozycję"
+
+msgid "Add an active category before adding items."
+msgstr "Dodaj aktywną kategorię, zanim dodasz pozycje."
+
+msgid "Bulk add items"
+msgstr "Dodaj pozycje zbiorczo"
+
+msgid ""
+"Paste one item per line as name; value; category. Amounts use the "
+"interface number format and the workspace base currency. The whole batch "
+"is checked before anything is created."
+msgstr ""
+"Wklej jedną pozycję w wierszu jako nazwa; wartość; kategoria. Kwoty "
+"używają formatu liczb interfejsu i waluty bazowej obszaru roboczego. Cała"
+" partia jest sprawdzana przed utworzeniem czegokolwiek."
+
+msgid "Items to add"
+msgstr "Pozycje do dodania"
+
+msgid "Preview"
+msgstr "Podgląd"
+
+msgid "Their items still count towards net worth until each item is archived."
+msgstr ""
+"Ich pozycje nadal wliczają się do majątku netto, dopóki każda pozycja nie"
+" zostanie zarchiwizowana."
+
+msgid "Categories on this side"
+msgstr "Kategorie po tej stronie"
+
+msgid "Add category"
+msgstr "Dodaj kategorię"
+
+msgid "No active categories on this side."
+msgstr "Brak aktywnych kategorii po tej stronie."
+
+msgid "Archived items"
+msgstr "Zarchiwizowane pozycje"
+
+msgid ""
+"Archived items keep their value history but do not count towards net "
+"worth."
+msgstr ""
+"Zarchiwizowane pozycje zachowują historię wartości, ale nie wliczają się "
+"do majątku netto."
+
+#, python-format
+msgid "Not in totals (%(currency)s)"
+msgstr "Poza sumami (%(currency)s)"
+
+msgid "Excluded from net worth"
+msgstr "Wyłączone z majątku netto"
+
+msgid "Archived category"
+msgstr "Zarchiwizowana kategoria"
+
+msgid "Value history"
+msgstr "Historia wartości"
+
+msgid "Value"
+msgstr "Wartość"
+
+msgid "Note"
+msgstr "Notatka"
+
+msgid "future"
+msgstr "przyszła"
+
+msgid "Add a value"
+msgstr "Dodaj wartość"
+
+msgid "Note (optional)"
+msgstr "Notatka (opcjonalnie)"
+
+msgid "Add value"
+msgstr "Dodaj wartość"
+
+msgid "The currency is fixed once the item has a value."
+msgstr "Waluta jest ustalona po dodaniu wartości do pozycji."
+
+#, python-format
+msgid "Acquired %(date)s"
+msgstr "Nabyto %(date)s"
+
+#, python-format
+msgid "as of %(date)s"
+msgstr "na dzień %(date)s"
+
+msgid "No value yet"
+msgstr "Brak wartości"
+
+msgid "Paste at least one line."
+msgstr "Wklej co najmniej jeden wiersz."
+
+msgid "Line"
+msgstr "Wiersz"
+
+msgid "Problems"
+msgstr "Problemy"
+
+msgid "Ready"
+msgstr "Gotowe"
+
+#, python-format
+msgid "Create %(num)d item"
+msgid_plural "Create %(num)d items"
+msgstr[0] "Utwórz %(num)d pozycję"
+msgstr[1] "Utwórz %(num)d pozycje"
+msgstr[2] "Utwórz %(num)d pozycji"
+
 msgid "Apprise URL"
 msgstr "Adres URL Apprise"
 
@@ -4677,9 +5028,6 @@ msgstr "Przypomnij tyle dni wcześniej (opcjonalnie)"
 
 msgid "Leave empty to use the default of each notification channel."
 msgstr "Pozostaw puste, aby użyć domyślnej wartości każdego kanału powiadomień."
-
-msgid "Notes (optional)"
-msgstr "Notatki (opcjonalnie)"
 
 msgid ""
 "Saving plans the dates; it never records transactions. Changing an item "

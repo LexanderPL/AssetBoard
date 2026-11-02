@@ -1,0 +1,250 @@
+{% from "macros/components.html" import csrf_input with context %}
+{% from "categories/_macros.html" import swatch with context %}
+
+{% macro htmx_form(action) -%}
+method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-body" hx-swap="outerHTML"
+{%- endmacro %}
+
+{% macro small_button(label, attrs="") -%}
+<button type="submit" {{ attrs }} class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink">{{ label }}</button>
+{%- endmacro %}
+
+{% macro item_flags(item) -%}
+{% if item.non_base %}<span class="rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning-strong" data-non-base>{{ _("Not in totals (%(currency)s)", currency=item.currency) }}</span>{% endif %}
+{% if not item.include_in_net_worth %}<span class="rounded-full bg-subtle px-2 py-0.5 text-xs text-muted" data-excluded>{{ _("Excluded from net worth") }}</span>{% endif %}
+{% if item.investable %}<span class="rounded-full bg-primary-soft px-2 py-0.5 text-xs text-primary-ink" data-investable>{{ _("Investable") }}</span>{% endif %}
+{% if item.category_archived %}<span class="rounded-full bg-subtle px-2 py-0.5 text-xs text-muted" data-archived-category>{{ _("Archived category") }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro valuation_block(item, side_value) -%}
+{% set row_id = item.id|string %}
+{% if item.valuations %}
+<details class="mt-2" data-valuations>
+  <summary class="cursor-pointer text-xs font-medium text-muted">{{ _("Value history") }} <span class="font-normal">({{ item.valuations|length }})</span></summary>
+  <div class="mt-2 flex flex-wrap items-center gap-4">
+    {% if item.sparkline %}
+    <svg viewBox="0 0 120 28" class="h-7 w-28 {{ 'text-danger' if item.side == 'liability' else 'text-primary-ink' }}" role="img" aria-label="{{ _('Value history') }}">
+      <polyline points="{{ item.sparkline }}" fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+    </svg>
+    {% endif %}
+  </div>
+  <div class="mt-2 overflow-x-auto">
+    <table class="sheet w-full text-xs">
+      <thead><tr class="text-left text-muted"><th scope="col">{{ _("As of") }}</th><th scope="col" class="text-right">{{ _("Value") }}</th><th scope="col">{{ _("Note") }}</th></tr></thead>
+      <tbody>
+        {% for valuation in item.valuations %}
+        <tr data-valuation="{{ valuation.id }}">
+          <td class="whitespace-nowrap">{{ format_day(valuation.as_of) }}{% if valuation.future %} <span class="text-warning-strong">{{ _("future") }}</span>{% endif %}</td>
+          <td class="whitespace-nowrap text-right tabular-nums">{{ format_money(valuation.value) }}</td>
+          <td class="break-words">{{ valuation.note }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</details>
+{% endif %}
+{% if can_edit and not item.archived %}
+<details class="mt-2" data-add-valuation{% if valuation_item_id == item.id %} open{% endif %}>
+  <summary class="cursor-pointer text-xs font-medium text-primary-ink">{{ _("Add a value") }}</summary>
+  <form {{ htmx_form(scoped_url(request, 'networth_item_valuation', item_id=row_id)) }} class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] sm:items-start" novalidate>
+    {{ csrf_input() }}
+    <input type="hidden" name="side" value="{{ side_value }}">
+    <div class="space-y-1">
+      <label for="valuation-value-{{ row_id }}" class="block text-xs text-muted">{{ _("Value") }}</label>
+      <input id="valuation-value-{{ row_id }}" name="value" type="text" inputmode="decimal" required maxlength="64"
+             value="{% if valuation_item_id == item.id %}{{ valuation_values.value }}{% elif item.current %}{{ amount_input(item.current) }}{% endif %}"
+             class="form-control px-2 py-1.5 w-full"{% if valuation_errors.get("value") %} aria-invalid="true" aria-describedby="valuation-value-{{ row_id }}-error"{% endif %}>
+      {% if valuation_errors.get("value") %}<p id="valuation-value-{{ row_id }}-error" class="text-xs text-danger">{{ valuation_errors.get("value") }}</p>{% endif %}
+    </div>
+    <div class="space-y-1">
+      <label for="valuation-date-{{ row_id }}" class="block text-xs text-muted">{{ _("As of") }}</label>
+      <input id="valuation-date-{{ row_id }}" name="as_of" type="date" required value="{% if valuation_item_id == item.id %}{{ valuation_values.as_of }}{% else %}{{ today }}{% endif %}" class="form-control px-2 py-1.5 w-full">
+      {% if valuation_errors.get("as_of") %}<p class="text-xs text-danger">{{ valuation_errors.get("as_of") }}</p>{% endif %}
+    </div>
+    <div class="space-y-1">
+      <label for="valuation-note-{{ row_id }}" class="block text-xs text-muted">{{ _("Note (optional)") }}</label>
+      <input id="valuation-note-{{ row_id }}" name="note" type="text" maxlength="{{ max_notes_length }}" value="{% if valuation_item_id == item.id %}{{ valuation_values.note }}{% endif %}" class="form-control px-2 py-1.5 w-full">
+      {% if valuation_errors.get("note") %}<p class="text-xs text-danger">{{ valuation_errors.get("note") }}</p>{% endif %}
+    </div>
+    <button type="submit" class="btn-primary px-3 py-1.5 text-xs">{{ _("Add value") }}</button>
+  </form>
+</details>
+{% endif %}
+{%- endmacro %}
+
+{% macro item_edit_form(item, side_value) -%}
+{% set row_id = item.id|string %}
+{% set values = edit_item_values %}
+<form {{ htmx_form(scoped_url(request, 'networth_item_update', item_id=row_id)) }} class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" novalidate data-editing>
+  {{ csrf_input() }}
+  <input type="hidden" name="side" value="{{ side_value }}">
+  <div class="space-y-1">
+    <label for="item-name-{{ row_id }}" class="block text-xs text-muted">{{ _("Name") }}</label>
+    <input id="item-name-{{ row_id }}" name="name" type="text" value="{{ values.name }}" maxlength="{{ max_item_name_length }}" required autocomplete="off" class="form-control px-2 py-1.5 w-full"{% if edit_item_errors.get("name") %} aria-invalid="true" aria-describedby="item-name-{{ row_id }}-error"{% endif %}>
+    {% if edit_item_errors.get("name") %}<p id="item-name-{{ row_id }}-error" class="text-xs text-danger">{{ edit_item_errors.get("name") }}</p>{% endif %}
+  </div>
+  <div class="space-y-1">
+    <label for="item-category-{{ row_id }}" class="block text-xs text-muted">{{ _("Category") }}</label>
+    <select id="item-category-{{ row_id }}" name="category_id" class="form-select py-1.5 w-full"{% if edit_item_errors.get("category") %} aria-invalid="true" aria-describedby="item-category-{{ row_id }}-error"{% endif %}>
+      {% for category in view.categories %}<option value="{{ category.id }}"{% if values.category_id == category.id|string %} selected{% endif %}>{{ category.name }}</option>{% endfor %}
+      {% if item.category_archived %}{% for category in view.archived_categories %}{% if category.id == item.category_id %}<option value="{{ category.id }}" selected>{{ category.name }} ({{ _("Archived") }})</option>{% endif %}{% endfor %}{% endif %}
+    </select>
+    {% if edit_item_errors.get("category") %}<p id="item-category-{{ row_id }}-error" class="text-xs text-danger">{{ edit_item_errors.get("category") }}</p>{% endif %}
+  </div>
+  <div class="space-y-1">
+    <label for="item-currency-{{ row_id }}" class="block text-xs text-muted">{{ _("Currency") }}</label>
+    {% if item.valuations %}
+    <input type="hidden" name="currency" value="{{ values.currency }}">
+    <select id="item-currency-{{ row_id }}" disabled class="form-select py-1.5 w-full">{% for code, _name in currency_options %}<option value="{{ code }}"{% if values.currency == code %} selected{% endif %}>{{ code }}</option>{% endfor %}</select>
+    <p class="text-xs text-muted">{{ _("The currency is fixed once the item has a value.") }}</p>
+    {% else %}
+    <select id="item-currency-{{ row_id }}" name="currency" class="form-select py-1.5 w-full">{% for code, _name in currency_options %}<option value="{{ code }}"{% if values.currency == code %} selected{% endif %}>{{ code }}</option>{% endfor %}</select>
+    {% endif %}
+    {% if edit_item_errors.get("currency") %}<p class="text-xs text-danger">{{ edit_item_errors.get("currency") }}</p>{% endif %}
+  </div>
+  <div class="space-y-1">
+    <label for="item-acquired-{{ row_id }}" class="block text-xs text-muted">{{ _("Acquired on (optional)") }}</label>
+    <input id="item-acquired-{{ row_id }}" name="acquired_on" type="date" value="{{ values.acquired_on }}" class="form-control px-2 py-1.5 w-full">
+    {% if edit_item_errors.get("acquired_on") %}<p class="text-xs text-danger">{{ edit_item_errors.get("acquired_on") }}</p>{% endif %}
+  </div>
+  <div class="space-y-1 sm:col-span-2">
+    <label for="item-notes-{{ row_id }}" class="block text-xs text-muted">{{ _("Notes (optional)") }}</label>
+    <input id="item-notes-{{ row_id }}" name="notes" type="text" value="{{ values.notes }}" maxlength="{{ max_notes_length }}" class="form-control px-2 py-1.5 w-full">
+    {% if edit_item_errors.get("notes") %}<p class="text-xs text-danger">{{ edit_item_errors.get("notes") }}</p>{% endif %}
+  </div>
+  <div class="flex flex-wrap items-center gap-4 text-sm sm:col-span-2">
+    <label class="flex items-center gap-2"><input type="checkbox" name="include_in_net_worth" value="1"{% if values.include_in_net_worth == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Include in net worth") }}</label>
+    <label class="flex items-center gap-2"><input type="checkbox" name="investable" value="1"{% if values.investable == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Investable") }}</label>
+  </div>
+  <div class="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
+    <button type="submit" class="btn-primary">{{ _("Save") }}</button>
+    <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}" hx-get="{{ scoped_url(request, 'networth_item_row', item_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" class="btn">{{ _("Cancel") }}</a>
+  </div>
+</form>
+{%- endmacro %}
+
+{% macro item_row(item, side_value) -%}
+{% set row_id = item.id|string %}
+<li id="item-{{ row_id }}" class="py-3" data-item="{{ row_id }}">
+  {% if edit_item and edit_item.id == item.id %}
+  {{ item_edit_form(item, side_value) }}
+  {% else %}
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="min-w-0 space-y-1">
+      <div class="flex flex-wrap items-center gap-2"><span class="truncate text-sm font-medium" data-item-name>{{ item.name }}</span>{{ item_flags(item) }}</div>
+      {% if item.notes %}<p class="text-xs text-muted">{{ item.notes }}</p>{% endif %}
+      {% if item.acquired_on %}<p class="text-xs text-muted">{{ _("Acquired %(date)s", date=format_day(item.acquired_on)) }}</p>{% endif %}
+    </div>
+    <div class="flex flex-wrap items-center gap-3">
+      <div class="text-right">
+        {% if item.current %}<span class="text-sm font-semibold tabular-nums" data-current-value>{{ format_money(item.current) }}</span>{% if item.current_as_of %}<span class="block text-xs text-muted">{{ _("as of %(date)s", date=format_day(item.current_as_of)) }}</span>{% endif %}{% else %}<span class="text-sm text-muted" data-no-value>{{ _("No value yet") }}</span>{% endif %}
+      </div>
+      {% if can_edit %}
+      <div class="flex flex-wrap items-center gap-1">
+        {% if item.archived %}
+        <form {{ htmx_form(scoped_url(request, 'networth_item_restore', item_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Restore"), "data-restore") }}</form>
+        {% else %}
+        <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&edit_item={{ row_id }}" hx-get="{{ scoped_url(request, 'networth_item_edit', item_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink" data-edit>{{ _("Edit") }}</a>
+        <form {{ htmx_form(scoped_url(request, 'networth_item_archive', item_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Archive"), "data-archive") }}</form>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {{ valuation_block(item, side_value) }}
+  {% endif %}
+</li>
+{%- endmacro %}
+
+{% macro category_row(category, side_value, first=false, last=false) -%}
+{% set row_id = category.id|string %}
+{% if edit_category and edit_category.id == category.id %}
+{% set values = edit_category_values %}
+<li id="category-{{ row_id }}" class="py-3" data-category="{{ row_id }}" data-editing>
+  <form {{ htmx_form(scoped_url(request, 'networth_category_update', category_id=row_id)) }} class="grid gap-3 sm:grid-cols-[minmax(0,2fr)_auto_auto] sm:items-start" novalidate>
+    {{ csrf_input() }}
+    <input type="hidden" name="side" value="{{ side_value }}">
+    <div class="space-y-1">
+      <label for="category-name-{{ row_id }}" class="sr-only">{{ _("Name") }}</label>
+      <input id="category-name-{{ row_id }}" name="name" type="text" value="{{ values.name }}" maxlength="80" required autocomplete="off" class="form-control px-3 py-2 w-full"{% if edit_category_errors.get("name") %} aria-invalid="true" aria-describedby="category-name-{{ row_id }}-error"{% endif %}>
+      {% if edit_category_errors.get("name") %}<p id="category-name-{{ row_id }}-error" class="text-sm text-danger">{{ edit_category_errors.get("name") }}</p>{% endif %}
+    </div>
+    <div class="space-y-1">
+      <label for="category-color-{{ row_id }}" class="sr-only">{{ _("Colour") }}</label>
+      <input id="category-color-{{ row_id }}" name="color" type="color" value="{{ values.color }}" class="h-9 w-10 rounded-lg border border-line-strong bg-field p-1">
+      {% if edit_category_errors.get("color") %}<p class="text-sm text-danger">{{ edit_category_errors.get("color") }}</p>{% endif %}
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <button type="submit" class="btn-primary px-3 py-2 text-sm">{{ _("Save") }}</button>
+      <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}" hx-get="{{ scoped_url(request, 'networth_category_row', category_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" class="btn">{{ _("Cancel") }}</a>
+    </div>
+  </form>
+</li>
+{% else %}
+<li id="category-{{ row_id }}" class="flex flex-wrap items-center justify-between gap-3 py-3" data-category="{{ row_id }}">
+  <div class="flex min-w-0 items-center gap-3">
+    {{ swatch(category.color) }}
+    <span class="truncate text-sm font-medium" data-category-name>{{ category.name }}</span>
+    {% if category.archived %}<span class="rounded-full bg-subtle px-2 py-0.5 text-xs text-muted">{{ _("archived") }}</span>{% endif %}
+    {% if category.in_use %}<span class="text-xs text-muted" data-in-use>{{ _("in use") }}</span>{% endif %}
+  </div>
+  {% if can_edit %}
+  <div class="flex flex-wrap items-center gap-1">
+    {% if category.archived %}
+    <form {{ htmx_form(scoped_url(request, 'networth_category_restore', category_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Restore"), "data-restore") }}</form>
+    {% else %}
+    <form {{ htmx_form(scoped_url(request, 'networth_category_move', category_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}"><input type="hidden" name="direction" value="up">
+      <button type="submit" data-move-up {% if first %}disabled{% endif %} aria-label="{{ _('Move %(name)s up', name=category.name) }}" class="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-subtle disabled:opacity-30"><span aria-hidden="true">↑</span></button></form>
+    <form {{ htmx_form(scoped_url(request, 'networth_category_move', category_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}"><input type="hidden" name="direction" value="down">
+      <button type="submit" data-move-down {% if last %}disabled{% endif %} aria-label="{{ _('Move %(name)s down', name=category.name) }}" class="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-subtle disabled:opacity-30"><span aria-hidden="true">↓</span></button></form>
+    <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&edit_category={{ row_id }}" hx-get="{{ scoped_url(request, 'networth_category_edit', category_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink" data-edit>{{ _("Edit") }}</a>
+    <form {{ htmx_form(scoped_url(request, 'networth_category_archive', category_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Archive"), "data-archive") }}</form>
+    {% endif %}
+    {% if not category.in_use %}
+    <form {{ htmx_form(scoped_url(request, 'networth_category_delete', category_id=row_id)) }} data-confirm="{{ _('Delete the category %(name)s?', name=category.name) }}">{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">
+      <button type="submit" data-delete class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger-soft">{{ _("Delete") }}</button></form>
+    {% endif %}
+  </div>
+  {% endif %}
+</li>
+{% endif %}
+{%- endmacro %}
+
+{% macro bulk_preview_panel(preview) -%}
+<div class="mt-3 space-y-3" data-bulk-preview>
+  {% if preview.input_error == "empty" %}
+  <p class="text-sm text-danger" role="alert">{{ _("Paste at least one line.") }}</p>
+  {% endif %}
+  {% if preview.lines %}
+  <div class="overflow-x-auto">
+    <table class="sheet w-full text-xs">
+      <thead><tr class="text-left text-muted"><th scope="col">{{ _("Line") }}</th><th scope="col">{{ _("Name") }}</th><th scope="col" class="text-right">{{ _("Value") }}</th><th scope="col">{{ _("Category") }}</th><th scope="col">{{ _("Problems") }}</th></tr></thead>
+      <tbody>
+        {% for line in preview.lines %}
+        <tr data-bulk-line="{{ line.number }}"{% if line.errors %} data-invalid{% endif %}>
+          <td class="whitespace-nowrap tabular-nums">{{ line.number }}</td>
+          <td class="break-words">{{ line.name }}</td>
+          <td class="whitespace-nowrap text-right tabular-nums">{{ line.value }}</td>
+          <td class="break-words">{{ line.category }}</td>
+          <td class="space-y-1">
+            {% for code in line.errors %}<span class="block text-danger">{{ bulk_error_labels.get(code, code) }}</span>{% endfor %}
+            {% for code in line.warnings %}<span class="block text-warning-strong">{{ bulk_warning_labels.get(code, code) }}</span>{% endfor %}
+            {% if not line.errors and not line.warnings %}<span class="text-muted">{{ _("Ready") }}</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+  {% if preview.can_create %}
+  <form {{ htmx_form(scoped_url(request, 'networth_bulk_create')) }}>
+    {{ csrf_input() }}
+    <input type="hidden" name="side" value="{{ preview.side.value }}">
+    <input type="hidden" name="text" value="{{ preview.text }}">
+    <button type="submit" class="btn-primary" data-bulk-create>{{ ngettext("Create %(num)d item", "Create %(num)d items", preview.lines|length) }}</button>
+  </form>
+  {% endif %}
+</div>
+{%- endmacro %}

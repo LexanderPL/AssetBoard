@@ -118,6 +118,33 @@ msgstr ""
 msgid "Savings withdrawal"
 msgstr ""
 
+msgid "Vehicles"
+msgstr ""
+
+msgid "Electronics"
+msgstr ""
+
+msgid "Audio equipment"
+msgstr ""
+
+msgid "Instruments"
+msgstr ""
+
+msgid "Appliances"
+msgstr ""
+
+msgid "Jewelry & watches"
+msgstr ""
+
+msgid "Photography"
+msgstr ""
+
+msgid "Installments"
+msgstr ""
+
+msgid "Mortgage"
+msgstr ""
+
 msgid "Enter a valid amount."
 msgstr ""
 
@@ -278,6 +305,42 @@ msgid "Category deleted"
 msgstr ""
 
 msgid "Suggested categories added"
+msgstr ""
+
+msgid "Net-worth category added"
+msgstr ""
+
+msgid "Net-worth category changed"
+msgstr ""
+
+msgid "Net-worth category archived"
+msgstr ""
+
+msgid "Net-worth category restored"
+msgstr ""
+
+msgid "Net-worth category deleted"
+msgstr ""
+
+msgid "Suggested net-worth categories added"
+msgstr ""
+
+msgid "Net-worth item added"
+msgstr ""
+
+msgid "Net-worth item changed"
+msgstr ""
+
+msgid "Net-worth item archived"
+msgstr ""
+
+msgid "Net-worth item restored"
+msgstr ""
+
+msgid "Net-worth value added"
+msgstr ""
+
+msgid "Net-worth items added in bulk"
 msgstr ""
 
 msgid "Month closed"
@@ -443,6 +506,12 @@ msgid "Check for updates"
 msgstr ""
 
 msgid "Month"
+msgstr ""
+
+msgid "Side"
+msgstr ""
+
+msgid "As of"
 msgstr ""
 
 msgid "Closed months affected"
@@ -670,10 +739,28 @@ msgstr ""
 msgid "category"
 msgstr ""
 
+msgid "notes"
+msgstr ""
+
+msgid "acquired on"
+msgstr ""
+
+msgid "include in net worth"
+msgstr ""
+
+msgid "investable"
+msgstr ""
+
 msgid "expense"
 msgstr ""
 
 msgid "income"
+msgstr ""
+
+msgid "asset"
+msgstr ""
+
+msgid "liability"
 msgstr ""
 
 msgid "regular"
@@ -695,6 +782,9 @@ msgid "Workspace settings"
 msgstr ""
 
 msgid "Import and export"
+msgstr ""
+
+msgid "Net worth"
 msgstr ""
 
 msgid "Closing months"
@@ -1684,6 +1774,96 @@ msgstr ""
 msgid "Entry planned in %(month)s."
 msgstr ""
 
+msgid "Assets"
+msgstr ""
+
+msgid "Liabilities"
+msgstr ""
+
+msgid "Enter a name of 1 to 200 characters, without control characters."
+msgstr ""
+
+msgid "Enter notes of at most 200 characters."
+msgstr ""
+
+msgid "Values cannot be negative."
+msgstr ""
+
+msgid "The value is too large."
+msgstr ""
+
+msgid "Choose a supported currency."
+msgstr ""
+
+msgid "The currency cannot change after the first value."
+msgstr ""
+
+msgid "Choose a category from this tab."
+msgstr ""
+
+msgid "This category is archived; choose an active one."
+msgstr ""
+
+msgid "Choose assets or liabilities."
+msgstr ""
+
+msgid "Linked values arrive in a later version."
+msgstr ""
+
+msgid "Restore the item before changing it."
+msgstr ""
+
+msgid "Another active category of this side already has this name."
+msgstr ""
+
+msgid "The suggested categories can only be added to an empty side."
+msgstr ""
+
+msgid "Paste at most 64 KiB of text."
+msgstr ""
+
+msgid "Paste at most 500 lines."
+msgstr ""
+
+msgid "Archived because it still has items."
+msgstr ""
+
+msgid "Item added."
+msgstr ""
+
+msgid "Item saved."
+msgstr ""
+
+msgid "Item archived."
+msgstr ""
+
+msgid "Item restored."
+msgstr ""
+
+msgid "Value added."
+msgstr ""
+
+msgid "Items added."
+msgstr ""
+
+msgid "Use name; value; category on each line."
+msgstr ""
+
+msgid "Enter a value."
+msgstr ""
+
+msgid "Enter a category."
+msgstr ""
+
+msgid "No active category with this name."
+msgstr ""
+
+msgid "This name appears more than once in the batch."
+msgstr ""
+
+msgid "An active item with this name already exists."
+msgstr ""
+
 msgid "Enter a name of up to 100 characters."
 msgstr ""
 
@@ -2174,9 +2354,6 @@ msgstr ""
 msgid "One-time payment saved."
 msgstr ""
 
-msgid "Choose a supported currency."
-msgstr ""
-
 msgid "The base currency cannot change: amounts are already stored in it."
 msgstr ""
 
@@ -2304,9 +2481,6 @@ msgstr[0] ""
 msgstr[1] ""
 
 msgid "Recurring"
-msgstr ""
-
-msgid "Net worth"
 msgstr ""
 
 msgid "Loans"
@@ -4045,6 +4219,169 @@ msgstr ""
 msgid "Future months stay open for planning."
 msgstr ""
 
+msgid "Assets and liabilities"
+msgstr ""
+
+msgid "No categories on this side yet"
+msgstr ""
+
+#, python-format
+msgid ""
+"Start with the suggested %(side)s categories. You can rename, reorder or "
+"archive them later."
+msgstr ""
+
+msgid "Subtotal"
+msgstr ""
+
+msgid "No total"
+msgstr ""
+
+msgid ""
+"Items in another currency are shown separately and not included in the "
+"subtotal."
+msgstr ""
+
+msgid "Items excluded from net worth are not included in the subtotal."
+msgstr ""
+
+msgid "Items without an effective value are not included in the subtotal."
+msgstr ""
+
+msgid "No items yet"
+msgstr ""
+
+msgid "Add an item below, or paste a list of items."
+msgstr ""
+
+msgid "Add an item"
+msgstr ""
+
+msgid "Current value"
+msgstr ""
+
+msgid "Value note (optional)"
+msgstr ""
+
+msgid "Acquired on (optional)"
+msgstr ""
+
+msgid "Notes (optional)"
+msgstr ""
+
+msgid "Include in net worth"
+msgstr ""
+
+msgid "Investable"
+msgstr ""
+
+msgid "Enter values as positive amounts. For a liability, enter the amount owed."
+msgstr ""
+
+msgid "Add item"
+msgstr ""
+
+msgid "Add an active category before adding items."
+msgstr ""
+
+msgid "Bulk add items"
+msgstr ""
+
+msgid ""
+"Paste one item per line as name; value; category. Amounts use the "
+"interface number format and the workspace base currency. The whole batch "
+"is checked before anything is created."
+msgstr ""
+
+msgid "Items to add"
+msgstr ""
+
+msgid "Preview"
+msgstr ""
+
+msgid "Their items still count towards net worth until each item is archived."
+msgstr ""
+
+msgid "Categories on this side"
+msgstr ""
+
+msgid "Add category"
+msgstr ""
+
+msgid "No active categories on this side."
+msgstr ""
+
+msgid "Archived items"
+msgstr ""
+
+msgid ""
+"Archived items keep their value history but do not count towards net "
+"worth."
+msgstr ""
+
+#, python-format
+msgid "Not in totals (%(currency)s)"
+msgstr ""
+
+msgid "Excluded from net worth"
+msgstr ""
+
+msgid "Archived category"
+msgstr ""
+
+msgid "Value history"
+msgstr ""
+
+msgid "Value"
+msgstr ""
+
+msgid "Note"
+msgstr ""
+
+msgid "future"
+msgstr ""
+
+msgid "Add a value"
+msgstr ""
+
+msgid "Note (optional)"
+msgstr ""
+
+msgid "Add value"
+msgstr ""
+
+msgid "The currency is fixed once the item has a value."
+msgstr ""
+
+#, python-format
+msgid "Acquired %(date)s"
+msgstr ""
+
+#, python-format
+msgid "as of %(date)s"
+msgstr ""
+
+msgid "No value yet"
+msgstr ""
+
+msgid "Paste at least one line."
+msgstr ""
+
+msgid "Line"
+msgstr ""
+
+msgid "Problems"
+msgstr ""
+
+msgid "Ready"
+msgstr ""
+
+#, python-format
+msgid "Create %(num)d item"
+msgid_plural "Create %(num)d items"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Apprise URL"
 msgstr ""
 
@@ -4315,9 +4652,6 @@ msgid "Remind me this many days before (optional)"
 msgstr ""
 
 msgid "Leave empty to use the default of each notification channel."
-msgstr ""
-
-msgid "Notes (optional)"
 msgstr ""
 
 msgid ""
