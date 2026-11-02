@@ -25,9 +25,8 @@ The format must:
 - **Container.** A ZIP archive with every member at its root: `manifest.json`,
   `workspace.json` (settings) and one CSV file per entity (`categories.csv`,
   `budget_lines.csv`, `transactions.csv`, `months.csv` in format 1.0). Read and written with
-  `zipfile`, `csv`, `json` and `hashlib` only. The normative reference is in
-  [the M4 spec](../specs/M4-ledger-export-import.md#format-reference-v11) (published as
-  `docs/archive-format.md` by F4.5).
+  `zipfile`, `csv`, `json` and `hashlib` only. The normative reference is
+  [docs/archive-format.md](../archive-format.md) (moved there from the M4 spec by F4.5).
 - **CSV conventions.** UTF-8 (BOM tolerated on import), RFC 4180 quoting, comma delimiter,
   dates `YYYY-MM-DD`, UTC timestamps with `Z`, amounts as plain decimals with `.` and the
   currency's minor digits, fixed English column names and enum tokens. Lone CSV uploads may use

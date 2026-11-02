@@ -28,7 +28,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
   use outside the app.
 
 **Format decision:** [ADR-0016](../adr/0016-workspace-archive-format.md) records the archive
-format and its versioning and compatibility policy. The [format reference](#format-reference-v11)
+format and its versioning and compatibility policy. The [format reference](../archive-format.md)
 at the end of this spec is normative for F4.1–F4.4; F4.5 turns it into user documentation.
 
 **Prerequisite (backlog, from the F1.1 review):** before any upload route exists, add a pure-ASGI
@@ -95,7 +95,7 @@ restore.
 
 **Acceptance**
 - Pure module `domain.archive` (in-memory bytes only, no DB, no clock): row types for every file
-  of the [format reference](#format-reference-v11), a writer (`rows -> CSV bytes`, `files ->
+  of the [format reference](../archive-format.md), a writer (`rows -> CSV bytes`, `files ->
   manifest`) and a reader/validator (`bytes -> ParsedArchive | errors`) shared by F4.2–F4.4.
   Standard library only (`csv`, `zipfile`, `json`, `hashlib`, `io`); no new runtime dependency.
 - Export service `services.archive.export_workspace(ctx)`: editors and owners; reads through the
@@ -260,7 +260,7 @@ made from my spreadsheet, map its categories onto mine, check the totals and imp
   apply.
 - Header names are matched trimmed and case-insensitively; a missing required column is an
   error; unknown columns are a warning and ignored. Values as in the
-  [format reference](#format-reference-v11): amounts are converted with the currency's minor
+  [format reference](../archive-format.md): amounts are converted with the currency's minor
   digits and refused (never rounded) when they have too many decimals, are not positive or are
   too large (F2.2's codes); dates must be `YYYY-MM-DD` within 1900-01-01..2199-12-31; a
   `currency`, when present, must equal the workspace's base currency (row error otherwise);
@@ -415,13 +415,13 @@ source workspace creates nothing, base-currency mismatch refused, newer major re
 with help from an AI assistant, and I understand what that means for my privacy.
 
 **Acceptance**
-- `docs/archive-format.md`: the format reference below, kept in sync with `domain.archive` (a
+- `docs/archive-format.md`: the format reference (moved there from this spec), kept in sync with `domain.archive` (a
   test parses its example rows with the reader and checks that every column the writer emits is
   documented).
 - `docs/import-export.md`: the user guide: exporting; restoring (when it is possible and what it
   restores); merging; importing a lone CSV; the dry-run report and comparing its totals with a
   spreadsheet; category mapping; closed months; rollback; limits; and "Converting a
-  spreadsheet" with the ready-to-copy prompt below and the privacy note.
+  spreadsheet" with the ready-to-copy prompt (moved there from this spec) and the privacy note.
 - README "User guides" lists both; docs/workspace-settings.md links the export page;
   docs/deployment.md documents the two body-size settings (F4.2).
 - The privacy note is prominent and says: the app never sends your data anywhere; pasting
@@ -441,249 +441,20 @@ documented example rows with domain.archive and checks that every written column
 
 ## Format reference v1.1
 
-Normative for F4.1–F4.4. Changes follow ADR-0016, and this section changes in the same PR.
-
-### Archive layout
-
-```
-assetboard-home-20261018-143000Z.zip
-├── manifest.json
-├── workspace.json
-├── categories.csv
-├── budget_lines.csv
-├── transactions.csv
-└── months.csv
-```
-
-All members sit at the root of the ZIP (no folders). Every file is required in an archive, even
-when it has only its header row. (The file name prefix comes from `branding.CLI_NAME`.)
-
-### Common rules
-
-- Encoding UTF-8. Export writes no BOM; import removes one if present.
-- CSV per RFC 4180: one header row; comma delimiter; `"` quotes fields that contain a comma,
-  quote, CR or LF, with inner quotes doubled; export ends lines with CRLF, import accepts CRLF
-  or LF. Export writes columns in the order listed; import matches names in any order.
-- Dates `YYYY-MM-DD`; months `YYYY-MM`; timestamps UTC `YYYY-MM-DDTHH:MM:SS[.ffffff]Z` (import
-  also accepts an explicit offset and converts it to UTC).
-- Amounts: plain decimals with `.`, no grouping, no sign, no currency symbol. Export writes
-  exactly the currency's minor digits (`12.50` for EUR, `1200` for JPY); import accepts fewer
-  (`12.5`) and extra trailing zeros (`12.500`), and refuses more significant decimals.
-- An empty optional field means no value. Enum values are lowercase English tokens.
-- Lone CSV uploads may instead use `;` as delimiter, and then `,` as decimal separator (chosen
-  on the upload form). Files inside an archive never do.
-
-### `manifest.json`
-
-```json
-{
-  "format": "workspace-archive",
-  "format_version": "1.1",
-  "app": {"name": "AssetBoard", "version": "0.4.0"},
-  "exported_at": "2026-10-18T14:30:00Z",
-  "base_currency": "EUR",
-  "files": [
-    {"path": "workspace.json", "sha256": "9f2c…", "rows": null, "bytes": 161},
-    {"path": "categories.csv", "sha256": "0a41…", "rows": 24, "bytes": 2210},
-    {"path": "budget_lines.csv", "sha256": "77de…", "rows": 310, "bytes": 18950},
-    {"path": "transactions.csv", "sha256": "c3b0…", "rows": 4120, "bytes": 512004},
-    {"path": "months.csv", "sha256": "5e19…", "rows": 30, "bytes": 1290}
-  ]
-}
-```
-
-`format` is independent of the product name, so it survives a rename; `app` is informational.
-`sha256` is the lowercase hex digest of the member's bytes (shortened above). `rows` excludes
-the header and is `null` for JSON files.
-
-### `workspace.json` (restore only)
-
-```json
-{
-  "name": "Home",
-  "base_currency": "EUR",
-  "country_code": "PL",
-  "timezone": "Europe/Warsaw",
-  "locale": "pl",
-  "auto_copy_plan": false,
-  "taxes_enabled": true,
-  "upcoming_days": null
-}
-```
-
-`country_code` may be `null`. Later settings are added as optional keys (a minor version).
-
-| Key | Since | Required | Values |
-|---|---|---|---|
-| `taxes_enabled` | 1.1 | no (absent = off) | `true` \| `false`: the workspace's Taxes switch |
-| `upcoming_days` | 1.1 | no (absent = `null`) | integer 1–365, or `null` for the instance default |
-
-**Version history.** 1.0: first release. 1.1 (additive): `workspace.json` gains the optional
-`taxes_enabled` and `upcoming_days` keys; a 1.0 archive reads without them, and a 1.0 reader
-lists them as unknown keys (a warning). Golden archives of both versions are in
-`tests/fixtures/`.
-
-### `categories.csv`
-
-| Column | Required | Values |
-|---|---|---|
-| `id` | in an archive; optional alone | UUID (lineage id) |
-| `kind` | yes | `expense` \| `income` |
-| `name` | yes | 1–80 characters |
-| `treatment` | no (default `regular`) | `regular` \| `savings` \| `transfer` |
-| `color` | no (default from the palette) | `#rrggbb` |
-| `sort_order` | no (default: file order) | integer ≥ 0, per kind; a lone merge ignores it for placement and appends new categories in file order |
-| `archived_at` | no | timestamp; set = archived |
-
-Export order: kind (`expense`, `income`), active before archived, `sort_order`, name key, id.
-
-```csv
-id,kind,name,treatment,color,sort_order,archived_at
-2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,expense,Food,regular,#4f9d69,0,
-6a3d0f42-91b8-4e2c-8d0e-7c5b1a2f3e44,expense,Investments,savings,#3b6ea8,1,
-d1c9e7a0-3b2f-4a8e-b6c5-0e9f8d7c6b55,expense,Car,regular,#a35d3b,2,2025-12-31T18:05:00Z
-91f4b2c3-7d6e-4f1a-8b9c-2e3d4f5a6b77,income,Salary,regular,#2f7f5f,0,
-```
-
-### `transactions.csv`
-
-| Column | Required | Values |
-|---|---|---|
-| `date` | yes | `YYYY-MM-DD` |
-| `direction` | yes | `expense` \| `income` (= the category's kind) |
-| `amount` | yes | decimal > 0 |
-| `currency` | no (default: base currency) | must equal the base currency |
-| `category` | yes | category name (of the direction's kind) |
-| `description` | no | at most 200 characters |
-| `category_id` | no (always set in an archive) | UUID from `categories.csv`; needed because archived categories may share a name. Ignored in a lone CSV, which maps by `category` name |
-| `id` | no | UUID (lineage id; enables exact dedupe) |
-| `deleted_at` | no | timestamp; set = soft-deleted (restored as deleted; skipped in merge) |
-
-Export order: date, then entry order (`created_at`, id). F2.6's export writes the same columns
-without `deleted_at`. In merge mode a row dated after today in the workspace's time zone is
-skipped and listed with `future_date`.
-
-Archive example:
-
-```csv
-date,direction,amount,currency,category,description,category_id,id,deleted_at
-2026-09-01,income,3400.00,EUR,Salary,September salary,91f4b2c3-7d6e-4f1a-8b9c-2e3d4f5a6b77,0b6e2f1a-4c3d-4e5f-8a9b-1c2d3e4f5a01,
-2026-09-02,expense,50.00,EUR,Food,Groceries,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,5c7d8e9f-0a1b-4c2d-9e3f-4a5b6c7d8e02,
-2026-09-02,expense,4.20,EUR,Food,"Bakery, rolls",2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,7e8f9a0b-1c2d-4e3f-8a4b-5c6d7e8f9a03,2026-09-03T07:12:44Z
-```
-
-Hand-made file with the minimal columns (the two identical rows are both imported):
-
-```csv
-date,direction,amount,category,description
-2025-01-03,expense,12.5,Food,Bakery
-2025-01-03,expense,12.5,Food,Bakery
-2025-01-31,income,3000,Salary,
-```
-
-The same first row with semicolons and a decimal comma (upload options "semicolon" and
-"comma"):
-
-```csv
-date;direction;amount;category;description
-2025-01-03;expense;12,50;Food;Bakery
-```
-
-### `budget_lines.csv`
-
-| Column | Required | Values |
-|---|---|---|
-| `month` | yes | `YYYY-MM` |
-| `kind` | no, if the name resolves to exactly one kind (an existing category or a saved mapping); otherwise `kind_required` | `expense` \| `income` |
-| `category` | yes | category name |
-| `planned` | yes | decimal ≥ 0 (0 or empty = no line, skipped) |
-| `currency` | no (default: base currency) | must equal the base currency |
-| `category_id` | no (always set in an archive) | UUID from `categories.csv`; ignored in a lone CSV, which maps by `category` name |
-
-Export order: month, kind, category order. At most one row per (month, category).
-
-```csv
-month,kind,category,planned,currency,category_id
-2026-09,expense,Food,550.00,EUR,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01
-2026-09,income,Salary,3000.00,EUR,91f4b2c3-7d6e-4f1a-8b9c-2e3d4f5a6b77
-```
-
-Hand-made file with the minimal columns (the template download):
-
-```csv
-month,kind,category,planned
-2026-09,expense,Food,550.00
-2026-09,income,Salary,3000.00
-```
-
-### `months.csv` (restore only)
-
-| Column | Required | Values |
-|---|---|---|
-| `month` | yes | `YYYY-MM` |
-| `closed_at` | no | timestamp; set = month closed |
-| `plan_started_at` | no | timestamp (F2.3's automatic-copy marker) |
-
-One row per stored month state; a month without a row is open and has no marker.
-
-```csv
-month,closed_at,plan_started_at
-2026-08,2026-09-02T19:40:00Z,2026-07-28T08:00:00Z
-2026-09,,2026-09-01T06:30:12Z
-```
-
-### Not in the archive (format 1.1)
-
-Members, invitations, users and their sessions, the audit log, import batches and saved
-mappings, and who created or closed what. Data of later milestones (M3, M5–M8) is added by their
-archive-extension features as new files (minor versions).
+**Moved (F4.5):** the normative format reference is [docs/archive-format.md](../archive-format.md):
+archive layout, common rules, versions and compatibility, `manifest.json`, `workspace.json`,
+every CSV file with its columns and examples, reader limits, and what is not in the archive.
+It changes per ADR-0016, in the same PR as `domain.archive`; `tests/unit/test_archive_format_docs.py`
+reads its examples with the reader and checks that every column and key the writer emits is
+documented.
 
 ---
 
 ## AI conversion prompt
 
-Published in docs/import-export.md by F4.5. Users paste it into an AI assistant of their
-choice together with their data; the app itself never calls an AI or any external service.
-
-> **Privacy:** sending your financial data to a third-party AI service is your own choice and
-> is governed by that service's terms. Consider a local model, or remove descriptions and other
-> details you would rather not share. Always check the result with the import's dry-run totals.
-
-```text
-Convert my personal budget spreadsheet (pasted or attached below) into CSV files for a budgeting
-app. Output only the files described here, each in its own code block, then the three lists at
-the end.
-
-File 1: transactions.csv, one row per income or expense entry.
-- Header, exactly: date,direction,amount,category,description
-- date: YYYY-MM-DD. If an entry only has a day number, take the year and month from the
-  sheet, tab or section it is in (for example a tab named "08.26" means August 2026). If you
-  cannot tell the date, do not guess: list the entry under "Questions".
-- direction: expense or income (lowercase).
-- amount: a positive number with a dot as decimal separator, at most 2 decimals, no thousands
-  separators, no currency symbol. Never output a negative or zero amount; if my sheet has a
-  negative value, list it under "Questions" (refund or income?).
-- category: my category name exactly as it is written in my sheet, spelled the same way every
-  time. Do not invent, merge or translate categories.
-- description: my description text, at most 200 characters; leave it empty if there is none.
-- Put a field in double quotes if it contains a comma, a double quote or a line break, and
-  double any double quote inside it.
-- Keep repeated entries: two identical purchases on the same day are two rows.
-- Skip totals, subtotals, summary blocks, headers, empty rows and error values such as #REF!.
-
-File 2 (only if my sheet has planned or budget values): budget_lines.csv
-- Header, exactly: month,kind,category,planned
-- month: YYYY-MM. kind: expense or income. planned: a positive number formatted like amount.
-- Use the same category names as in transactions.csv. Skip zero or empty planned values.
-
-Rules for both files: UTF-8, comma as delimiter, one header row, no extra columns, no comments.
-
-After the files:
-1. "Check table": for every month, the total of expense amounts, the total of income amounts
-   and the total planned, as computed from the files you produced.
-2. "Skipped": every row you left out and why.
-3. "Questions": anything you could not convert without guessing.
-```
+**Moved (F4.5):** the ready-to-copy prompt and the privacy note are in
+[docs/import-export.md](../import-export.md#converting-a-spreadsheet). The app itself never
+calls an AI or any external service.
 
 ---
 
