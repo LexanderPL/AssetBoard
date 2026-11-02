@@ -20,7 +20,9 @@ from assetboard.db.models.identity import (
     Workspace,
 )
 from assetboard.db.models.ledger import Category
+from assetboard.db.models.networth import NetWorthCategory
 from assetboard.domain.categories import SEED
+from assetboard.domain.networth import ASSET_SEED, LIABILITY_SEED
 from assetboard.i18n import gettext
 from assetboard.services import workspaces
 from assetboard.services.admin_users import NotInstanceAdmin
@@ -143,9 +145,19 @@ def test_the_new_workspace_is_seeded_and_audited_in_its_own_log(
         names = session.scalars(
             select(Category.name).where(Category.workspace_id == workspace_id)
         ).all()
+        networth_names = session.scalars(
+            select(NetWorthCategory.name).where(NetWorthCategory.workspace_id == workspace_id)
+        ).all()
     assert len(names) == len(SEED) and gettext("Food", "pl") in names
+    assert len(networth_names) == len(ASSET_SEED) + len(LIABILITY_SEED)
+    assert gettext("Vehicles", "pl") in networth_names
     assert _events(db, workspace_id) == [
         ("category.seeded", ola, {"count": len(SEED), "automatic": True}),
+        (
+            "networth_category.seeded",
+            ola,
+            {"count": len(ASSET_SEED) + len(LIABILITY_SEED), "automatic": True},
+        ),
         ("workspace.created", ola, {}),
     ]
     assert _events(db, db.workspace_id) == []  # nothing in any other workspace

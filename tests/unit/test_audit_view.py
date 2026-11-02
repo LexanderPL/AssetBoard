@@ -11,6 +11,7 @@ from sqlalchemy import update
 
 from assetboard.db.models.identity import AuditEvent, SetupState, User
 from assetboard.domain.categories import Kind, Treatment
+from assetboard.domain.networth import Side
 from assetboard.i18n import gettext
 from assetboard.services.admin_users import NotInstanceAdmin
 from assetboard.services.audit_view import (
@@ -122,6 +123,37 @@ def test_every_category_action_has_a_label_keys_and_a_group() -> None:
         assert set(VALUE_TABLES[table]) == {t.value for t in Treatment}
     texts = [ACTION_LABELS[a] for a in CATEGORY_ACTIONS] + [KEY_LABELS[k] for k in keys]
     texts += [*VALUE_TABLES["kind"].values(), *VALUE_TABLES["treatment"].values()]
+    for text in texts:
+        assert gettext(text, "pl") != text, f"no Polish translation for {text!r}"
+
+
+# Net-worth events (F5.1)
+
+NETWORTH_ACTIONS = {
+    "networth_category.created",
+    "networth_category.updated",
+    "networth_category.archived",
+    "networth_category.restored",
+    "networth_category.deleted",
+    "networth_category.seeded",
+    "networth_item.created",
+    "networth_item.updated",
+    "networth_item.archived",
+    "networth_item.restored",
+    "networth_item.valuation_added",
+    "networth_item.bulk_created",
+}
+
+
+def test_every_networth_action_has_a_label_keys_and_a_group() -> None:
+    assert {a for a in ACTION_LABELS if a.startswith("networth_")} == NETWORTH_ACTIONS
+    assert set(GROUPS["workspace"]["net_worth"]) == NETWORTH_ACTIONS
+    assert "net_worth" in GROUP_LABELS
+    keys = {key for action in NETWORTH_ACTIONS for key in DATA_KEYS[action]}
+    assert keys <= set(KEY_LABELS)
+    assert set(VALUE_TABLES["side"]) == {side.value for side in Side}
+    texts = [ACTION_LABELS[a] for a in NETWORTH_ACTIONS] + [KEY_LABELS[k] for k in keys]
+    texts += [*VALUE_TABLES["side"].values(), GROUP_LABELS["net_worth"]]
     for text in texts:
         assert gettext(text, "pl") != text, f"no Polish translation for {text!r}"
 

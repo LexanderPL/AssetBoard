@@ -23,8 +23,10 @@ from assetboard.cli import app as cli_app
 from assetboard.config import Settings
 from assetboard.db.models.identity import AuditEvent, Membership, SetupState, User, Workspace
 from assetboard.db.models.ledger import Category
+from assetboard.db.models.networth import NetWorthCategory
 from assetboard.db.repositories import CategoryRepository, create_owned_workspace
 from assetboard.domain.categories import SEED
+from assetboard.domain.networth import ASSET_SEED, LIABILITY_SEED
 from assetboard.i18n import gettext
 from assetboard.services import auth, categories
 from assetboard.services.auth import (
@@ -75,6 +77,26 @@ def _expected(locale: str) -> list[tuple[str, str, str, int]]:
     return sorted(rows, key=lambda row: (row[0], row[3]))
 
 
+def _networth_categories(db: WorkspaceDb, workspace_id: UUID) -> list[tuple[str, str, int]]:
+    with db.factory() as session:
+        rows = session.scalars(
+            select(NetWorthCategory)
+            .where(NetWorthCategory.workspace_id == workspace_id)
+            .order_by(NetWorthCategory.side, NetWorthCategory.sort_order)
+        )
+        return [(row.side, row.name, row.sort_order) for row in rows]
+
+
+def _expected_networth(locale: str) -> list[tuple[str, str, int]]:
+    positions: dict[str, int] = {}
+    rows: list[tuple[str, str, int]] = []
+    for seed in (*ASSET_SEED, *LIABILITY_SEED):
+        position = positions.get(seed.side.value, 0)
+        positions[seed.side.value] = position + 1
+        rows.append((seed.side.value, gettext(seed.name, locale), position))
+    return sorted(rows, key=lambda row: (row[0], row[2]))
+
+
 def _seed_events(db: WorkspaceDb, workspace_id: UUID) -> list[tuple[str, UUID | None, Any]]:
     with db.factory() as session:
         events = session.scalars(
@@ -123,6 +145,7 @@ def test_first_run_setup_seeds_in_the_page_language(
         seed_locale=locale,
     )
     assert _categories(db, workspace.id) == _expected(locale)
+    assert _networth_categories(db, workspace.id) == _expected_networth(locale)
     # Setup is a system action: no signed-in actor yet.
     assert _seed_events(db, workspace.id) == [
         ("system", None, {"count": len(SEED), "automatic": True})
@@ -164,6 +187,7 @@ def test_open_registration_seeds_as_the_new_user(db: WorkspaceDb, tmp_path: Path
     )
     assert outcome.status == "created" and outcome.user and outcome.workspace
     assert _categories(db, outcome.workspace.id) == _expected("pl")
+    assert _networth_categories(db, outcome.workspace.id) == _expected_networth("pl")
     assert _seed_events(db, outcome.workspace.id) == [
         ("user", outcome.user.id, {"count": len(SEED), "automatic": True})
     ]

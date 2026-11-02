@@ -63,6 +63,9 @@ ARCHIVE_EXCLUDED_MODELS = {
     "WorkDay": "work calendars require the F3.8 archive extension",
     "TaxRule": "tax rules require the F3.8 archive extension",
     "TaxRuleVersion": "tax history requires the F3.8 archive extension",
+    "NetWorthCategory": "net-worth categories require the F5.5 archive extension",
+    "NetWorthItem": "net-worth items require the F5.5 archive extension",
+    "ItemValuation": "net-worth value history requires the F5.5 archive extension",
     "NotificationChannel": "notification URLs contain secrets (F3.8/F9.3)",
     "NotificationLog": "notification delivery history is not portable (F3.8)",
 }

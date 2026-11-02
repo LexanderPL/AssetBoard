@@ -1,0 +1,214 @@
+{% from "networth/_macros.html" import bulk_preview_panel, category_row, htmx_form, item_row with context %}
+{% from "macros/components.html" import csrf_input with context %}
+<div id="networth-body" class="space-y-6">
+  {% if notice %}
+  <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
+  {% endif %}
+  {% if error %}
+  <p class="border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ error }}</p>
+  {% endif %}
+
+  <div class="flex flex-wrap items-center gap-2" role="tablist" aria-label="{{ _('Assets and liabilities') }}">
+    {% for code, label in side_labels.items() %}
+    {% if side_value == code %}
+    <a href="{{ scoped_url(request, 'networth') }}?side={{ code }}" role="tab" aria-selected="true" data-side-tab="{{ code }}" class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ label }}</a>
+    {% else %}
+    <a href="{{ scoped_url(request, 'networth') }}?side={{ code }}" role="tab" aria-selected="false" data-side-tab="{{ code }}" class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ label }}</a>
+    {% endif %}
+    {% endfor %}
+  </div>
+
+  {% if view.can_seed %}
+  <section class="panel p-6 sm:p-7" aria-labelledby="seed-heading" data-seed-offer>
+    <h2 id="seed-heading" class="text-base font-semibold">{{ _("No categories on this side yet") }}</h2>
+    {% if can_edit %}
+    <p class="mt-2 text-sm text-muted">{{ _("Start with the suggested %(side)s categories. You can rename, reorder or archive them later.", side=side_labels[side_value]|lower) }}</p>
+    <form {{ htmx_form(scoped_url(request, 'networth_categories_seed')) }} class="mt-4">
+      {{ csrf_input() }}
+      <input type="hidden" name="side" value="{{ side_value }}">
+      <button type="submit" class="btn-primary" data-seed>{{ _("Add suggested categories") }}</button>
+    </form>
+    {% else %}
+    <p class="mt-2 text-sm text-muted">{{ _("An editor or owner of this workspace can add categories.") }}</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  {% for group in view.groups %}
+  <section class="panel p-4 sm:p-6" aria-labelledby="category-heading-{{ group.category.id }}" data-category-group="{{ group.category.id }}">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <h2 id="category-heading-{{ group.category.id }}" class="text-base font-semibold">{{ group.category.name }}</h2>
+      <div class="text-right">
+        <span class="text-xs uppercase tracking-wide text-muted">{{ _("Subtotal") }}</span>
+        {% if group.subtotal %}<span class="block text-sm font-semibold tabular-nums" data-subtotal>{{ format_money(group.subtotal) }}</span>{% else %}<span class="block text-sm text-muted" data-subtotal>{{ _("No total") }}</span>{% endif %}
+      </div>
+    </div>
+    {% if group.has_non_base or group.has_excluded or group.has_no_value %}
+    <div class="mt-2 space-y-1 text-xs text-muted">
+      {% if group.has_non_base %}<p data-non-base-note>{{ _("Items in another currency are shown separately and not included in the subtotal.") }}</p>{% endif %}
+      {% if group.has_excluded %}<p data-excluded-note>{{ _("Items excluded from net worth are not included in the subtotal.") }}</p>{% endif %}
+      {% if group.has_no_value %}<p data-no-value-note>{{ _("Items without an effective value are not included in the subtotal.") }}</p>{% endif %}
+    </div>
+    {% endif %}
+    <ul class="mt-3 divide-y divide-line">
+      {% for item in group.items %}{{ item_row(item, side_value) }}{% endfor %}
+    </ul>
+  </section>
+  {% endfor %}
+
+  {% if not view.groups and not view.archived_groups and not view.archived_items %}
+  <div class="panel px-6 py-10 text-center" data-empty-side>
+    <h2 class="text-base font-semibold">{{ _("No items yet") }}</h2>
+    <p class="mt-2 text-sm text-muted">{{ _("Add an item below, or paste a list of items.") }}</p>
+  </div>
+  {% endif %}
+
+  {% if can_edit and view.categories %}
+  <section class="panel p-6 sm:p-7" aria-labelledby="new-item-heading" data-create-item>
+    <h2 id="new-item-heading" class="text-base font-semibold">{{ _("Add an item") }}</h2>
+    <form {{ htmx_form(scoped_url(request, 'networth_items_create')) }} class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" novalidate>
+      {{ csrf_input() }}
+      <input type="hidden" name="side" value="{{ side_value }}">
+      <div class="space-y-1">
+        <label for="new-item-name" class="block text-xs text-muted">{{ _("Name") }}</label>
+        <input id="new-item-name" name="name" type="text" value="{{ create_item_values.name }}" maxlength="{{ max_item_name_length }}" required autocomplete="off" class="form-control px-2 py-1.5 w-full"{% if create_item_errors.get("name") %} aria-invalid="true" aria-describedby="new-item-name-error"{% endif %}>
+        {% if create_item_errors.get("name") %}<p id="new-item-name-error" class="text-xs text-danger">{{ create_item_errors.get("name") }}</p>{% endif %}
+      </div>
+      <div class="space-y-1">
+        <label for="new-item-category" class="block text-xs text-muted">{{ _("Category") }}</label>
+        <select id="new-item-category" name="category_id" required class="form-select py-1.5 w-full"{% if create_item_errors.get("category") %} aria-invalid="true" aria-describedby="new-item-category-error"{% endif %}>
+          <option value="">{{ _("Choose a category") }}</option>
+          {% for category in view.categories %}<option value="{{ category.id }}"{% if create_item_values.category_id == category.id|string %} selected{% endif %}>{{ category.name }}</option>{% endfor %}
+        </select>
+        {% if create_item_errors.get("category") %}<p id="new-item-category-error" class="text-xs text-danger">{{ create_item_errors.get("category") }}</p>{% endif %}
+      </div>
+      <div class="space-y-1">
+        <label for="new-item-value" class="block text-xs text-muted">{{ _("Current value") }}</label>
+        <input id="new-item-value" name="value" type="text" inputmode="decimal" value="{{ create_item_values.value }}" required maxlength="64" class="form-control px-2 py-1.5 w-full"{% if create_item_errors.get("value") %} aria-invalid="true" aria-describedby="new-item-value-error"{% endif %}>
+        {% if create_item_errors.get("value") %}<p id="new-item-value-error" class="text-xs text-danger">{{ create_item_errors.get("value") }}</p>{% endif %}
+      </div>
+      <div class="space-y-1">
+        <label for="new-item-currency" class="block text-xs text-muted">{{ _("Currency") }}</label>
+        <select id="new-item-currency" name="currency" class="form-select py-1.5 w-full">
+          {% for code, _name in currency_options %}<option value="{{ code }}"{% if create_item_values.currency == code %} selected{% endif %}>{{ code }}</option>{% endfor %}
+        </select>
+        {% if create_item_errors.get("currency") %}<p class="text-xs text-danger">{{ create_item_errors.get("currency") }}</p>{% endif %}
+      </div>
+      <div class="space-y-1">
+        <label for="new-item-as-of" class="block text-xs text-muted">{{ _("As of") }}</label>
+        <input id="new-item-as-of" name="as_of" type="date" value="{{ create_item_values.as_of }}" required class="form-control px-2 py-1.5 w-full">
+        {% if create_item_errors.get("as_of") %}<p class="text-xs text-danger">{{ create_item_errors.get("as_of") }}</p>{% endif %}
+      </div>
+      <div class="space-y-1">
+        <label for="new-item-valuation-note" class="block text-xs text-muted">{{ _("Value note (optional)") }}</label>
+        <input id="new-item-valuation-note" name="valuation_note" type="text" maxlength="{{ max_notes_length }}" value="{{ create_item_values.valuation_note }}" class="form-control px-2 py-1.5 w-full">
+        {% if create_item_errors.get("valuation_note") %}<p class="text-xs text-danger">{{ create_item_errors.get("valuation_note") }}</p>{% endif %}
+      </div>
+      <div class="space-y-1">
+        <label for="new-item-acquired" class="block text-xs text-muted">{{ _("Acquired on (optional)") }}</label>
+        <input id="new-item-acquired" name="acquired_on" type="date" value="{{ create_item_values.acquired_on }}" class="form-control px-2 py-1.5 w-full">
+        {% if create_item_errors.get("acquired_on") %}<p class="text-xs text-danger">{{ create_item_errors.get("acquired_on") }}</p>{% endif %}
+      </div>
+      <div class="space-y-1">
+        <label for="new-item-notes" class="block text-xs text-muted">{{ _("Notes (optional)") }}</label>
+        <input id="new-item-notes" name="notes" type="text" maxlength="{{ max_notes_length }}" value="{{ create_item_values.notes }}" class="form-control px-2 py-1.5 w-full">
+        {% if create_item_errors.get("notes") %}<p class="text-xs text-danger">{{ create_item_errors.get("notes") }}</p>{% endif %}
+      </div>
+      <div class="flex flex-wrap items-center gap-4 text-sm sm:col-span-2 lg:col-span-4">
+        <label class="flex items-center gap-2"><input type="checkbox" name="include_in_net_worth" value="1"{% if create_item_values.include_in_net_worth == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Include in net worth") }}</label>
+        <label class="flex items-center gap-2"><input type="checkbox" name="investable" value="1"{% if create_item_values.investable == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Investable") }}</label>
+      </div>
+      <p class="text-xs text-muted sm:col-span-2 lg:col-span-4">{{ _("Enter values as positive amounts. For a liability, enter the amount owed.") }}</p>
+      <div class="sm:col-span-2 lg:col-span-4">
+        <button type="submit" class="btn-primary" data-add-item>{{ _("Add item") }}</button>
+      </div>
+    </form>
+  </section>
+  {% elif can_edit and not view.categories %}
+  <p class="text-sm text-muted" data-no-active-categories>{{ _("Add an active category before adding items.") }}</p>
+  {% endif %}
+
+  {% if can_edit and view.categories %}
+  <details class="panel p-6 sm:p-7" data-bulk>
+    <summary class="cursor-pointer text-base font-semibold">{{ _("Bulk add items") }}</summary>
+    <p class="mt-2 text-sm text-muted">{{ _("Paste one item per line as name; value; category. Amounts use the interface number format and the workspace base currency. The whole batch is checked before anything is created.") }}</p>
+    <form {{ htmx_form(scoped_url(request, 'networth_bulk_preview')) }} class="mt-3 space-y-2">
+      {{ csrf_input() }}
+      <input type="hidden" name="side" value="{{ side_value }}">
+      <label for="bulk-text" class="sr-only">{{ _("Items to add") }}</label>
+      <textarea id="bulk-text" name="text" rows="5" maxlength="65536" class="form-control w-full" data-bulk-text>{{ bulk_text }}</textarea>
+      <button type="submit" class="btn" data-bulk-preview>{{ _("Preview") }}</button>
+    </form>
+    {% if bulk_preview %}{{ bulk_preview_panel(bulk_preview) }}{% endif %}
+  </details>
+  {% endif %}
+
+  {% if view.archived_groups %}
+  <details class="panel p-4 sm:p-6" data-archived-categories>
+    <summary class="cursor-pointer text-base font-semibold">{{ _("Archived categories") }} <span class="text-sm font-normal text-muted">({{ view.archived_groups|length }})</span></summary>
+    <p class="mt-2 text-sm text-muted">{{ _("Their items still count towards net worth until each item is archived.") }}</p>
+    {% for group in view.archived_groups %}
+    <section class="mt-4" aria-labelledby="archived-category-heading-{{ group.category.id }}" data-category-group="{{ group.category.id }}">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <h3 id="archived-category-heading-{{ group.category.id }}" class="text-sm font-semibold">{{ group.category.name }} <span class="text-xs font-normal text-muted">{{ _("archived") }}</span></h3>
+        <div class="text-right">
+          <span class="text-xs uppercase tracking-wide text-muted">{{ _("Subtotal") }}</span>
+          {% if group.subtotal %}<span class="block text-sm font-semibold tabular-nums" data-subtotal>{{ format_money(group.subtotal) }}</span>{% else %}<span class="block text-sm text-muted" data-subtotal>{{ _("No total") }}</span>{% endif %}
+        </div>
+      </div>
+      <ul class="mt-3 divide-y divide-line">
+        {% for item in group.items %}{{ item_row(item, side_value) }}{% endfor %}
+      </ul>
+    </section>
+    {% endfor %}
+  </details>
+  {% endif %}
+
+  {% if view.categories or view.archived_categories or can_edit %}
+  <details class="panel p-6 sm:p-7" data-categories {% if view.can_seed %}open{% endif %}>
+    <summary class="cursor-pointer text-base font-semibold">{{ _("Categories on this side") }} <span class="text-sm font-normal text-muted">({{ view.categories|length }})</span></summary>
+    {% if can_edit %}
+    <form {{ htmx_form(scoped_url(request, 'networth_categories_create')) }} class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,2fr)_auto_auto] sm:items-start" novalidate>
+      {{ csrf_input() }}
+      <input type="hidden" name="side" value="{{ side_value }}">
+      <div class="space-y-1">
+        <label for="new-category-name" class="block text-xs text-muted">{{ _("Name") }}</label>
+        <input id="new-category-name" name="name" type="text" value="{{ create_category_values.name }}" maxlength="80" required autocomplete="off" class="form-control px-2 py-1.5 w-full"{% if create_category_errors.get("name") %} aria-invalid="true" aria-describedby="new-category-name-error"{% endif %}>
+        {% if create_category_errors.get("name") %}<p id="new-category-name-error" class="text-xs text-danger">{{ create_category_errors.get("name") }}</p>{% endif %}
+      </div>
+      <div class="space-y-1">
+        <label for="new-category-color" class="block text-xs text-muted">{{ _("Colour") }}</label>
+        <input id="new-category-color" name="color" type="color" value="{{ create_category_values.color }}" class="h-9 w-10 rounded-lg border border-line-strong bg-field p-1">
+        {% if create_category_errors.get("color") %}<p class="text-xs text-danger">{{ create_category_errors.get("color") }}</p>{% endif %}
+      </div>
+      <button type="submit" class="btn-primary">{{ _("Add category") }}</button>
+    </form>
+    {% endif %}
+    {% if view.categories %}
+    <ul class="mt-3 divide-y divide-line">
+      {% for category in view.categories %}{{ category_row(category, side_value, loop.first, loop.last) }}{% endfor %}
+    </ul>
+    {% else %}
+    <p class="mt-3 text-sm text-muted">{{ _("No active categories on this side.") }}</p>
+    {% endif %}
+    {% if view.archived_categories %}
+    <div class="mt-4 border-t border-line pt-3">
+      <h3 class="text-sm font-semibold">{{ _("Archived categories") }}</h3>
+      <ul class="mt-2 divide-y divide-line">
+        {% for category in view.archived_categories %}{{ category_row(category, side_value) }}{% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </details>
+  {% endif %}
+
+  {% if view.archived_items %}
+  <details class="panel p-4 sm:p-6" data-archived-items>
+    <summary class="cursor-pointer text-base font-semibold">{{ _("Archived items") }} <span class="text-sm font-normal text-muted">({{ view.archived_items|length }})</span></summary>
+    <p class="mt-2 text-sm text-muted">{{ _("Archived items keep their value history but do not count towards net worth.") }}</p>
+    <ul class="mt-3 divide-y divide-line">
+      {% for item in view.archived_items %}{{ item_row(item, side_value) }}{% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+</div>

@@ -51,7 +51,7 @@ from assetboard.db.repositories import (
     create_owned_workspace,
 )
 from assetboard.domain.identity import InvalidEmail, normalize_email
-from assetboard.services import categories
+from assetboard.services import categories, networth
 from assetboard.services.auth import record_auth_event
 from assetboard.services.budget import workspace_has_budget_lines
 from assetboard.services.context import (
@@ -621,6 +621,15 @@ def create_own_workspace(
             owner_user_id=user.id,
         )
         categories.seed_into(
+            session,
+            scope,
+            locale=seed_locale,
+            actor_user_id=user.id,
+            actor_type="user",
+            now=now,
+            automatic=True,
+        )
+        networth.seed_into(
             session,
             scope,
             locale=seed_locale,

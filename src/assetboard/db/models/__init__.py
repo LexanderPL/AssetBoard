@@ -17,6 +17,7 @@ from assetboard.db.models.identity import (
 from assetboard.db.models.import_batch import ImportBatch, ImportCategoryMapping
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
+from assetboard.db.models.networth import ItemValuation, NetWorthCategory, NetWorthItem
 from assetboard.db.models.notifications import NotificationChannel, NotificationLog
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.models.tax import TaxRule, TaxRuleVersion
@@ -31,6 +32,9 @@ __all__ = [
     "IncomeSourceTaxRule",
     "ImportBatch",
     "ImportCategoryMapping",
+    "ItemValuation",
+    "NetWorthCategory",
+    "NetWorthItem",
     "WorkDay",
     "WorkLog",
     "TaxRule",

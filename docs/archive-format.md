@@ -232,5 +232,6 @@ listed as warnings and ignored. A file may hold at most 1 000 000 data rows and 
 Members, invitations, users and their sessions, the audit log, import batches and saved
 mappings, and who created or closed what. Recurring items, income sources, work logs and
 calendars, and tax rules are added by a later archive extension as new files (a minor version);
-until then, a restore requires a workspace without them. Notification channels are never
+until then, a restore requires a workspace without them. Net-worth categories, items and value
+histories are also reserved for a later archive extension. Notification channels are never
 exported, because their URLs can contain secrets.
