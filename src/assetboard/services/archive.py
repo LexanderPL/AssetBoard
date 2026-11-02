@@ -66,6 +66,7 @@ ARCHIVE_EXCLUDED_MODELS = {
     "NetWorthCategory": "net-worth categories require the F5.5 archive extension",
     "NetWorthItem": "net-worth items require the F5.5 archive extension",
     "ItemValuation": "net-worth value history requires the F5.5 archive extension",
+    "NetWorthSnapshot": "net-worth snapshots require the F5.5 archive extension",
     "NotificationChannel": "notification URLs contain secrets (F3.8/F9.3)",
     "NotificationLog": "notification delivery history is not portable (F3.8)",
 }

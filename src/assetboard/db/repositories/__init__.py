@@ -34,6 +34,7 @@ from assetboard.db.repositories.networth import (
     ItemValuationRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
+    NetWorthSnapshotRepository,
 )
 from assetboard.db.repositories.notifications import (
     NotificationChannelRepository,
@@ -67,6 +68,7 @@ __all__ = [
     "ItemValuationRepository",
     "NetWorthCategoryRepository",
     "NetWorthItemRepository",
+    "NetWorthSnapshotRepository",
     "WorkDayRepository",
     "WorkLogRepository",
     "TaxRuleRepository",

@@ -56,6 +56,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "month_states",
         "networth_categories",
         "networth_items",
+        "networth_snapshots",
         "notification_channels",
         "notification_log",
         "setup_state",
@@ -79,6 +80,25 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
     assert script_location is not None
     assert Path(script_location).is_dir()
     assert config.get_main_option("sqlalchemy.url") is None
+
+
+def test_0034_net_worth_snapshots_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'snapshots.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        assert "networth_snapshots" in inspect(engine).get_table_names()
+        command.downgrade(alembic_config(settings), "0033_f51_net_worth")
+        assert "networth_snapshots" not in inspect(engine).get_table_names()
+        upgrade_database(settings)
+        assert "networth_snapshots" in inspect(engine).get_table_names()
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
 
 
 def test_0026_two_step_login_ticket_migration_is_reversible(tmp_path: Path) -> None:
