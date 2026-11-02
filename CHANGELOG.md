@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.1](https://github.com/LexanderPL/AssetBoard/compare/v0.4.0...v0.4.1) (2026-11-02)
+
+
+### Features
+
+* **networth:** F5.1 categories and items ([#208](https://github.com/LexanderPL/AssetBoard/issues/208)) ([53a44d9](https://github.com/LexanderPL/AssetBoard/commit/53a44d919ef31e9e177a6c6565effd59823db954))
+* **networth:** F5.2 summary and net worth ([#210](https://github.com/LexanderPL/AssetBoard/issues/210)) ([7b120ef](https://github.com/LexanderPL/AssetBoard/commit/7b120efddbc57f60047d7bebee18dcd8b9005d1c))
+* **networth:** F5.3 snapshots and net-worth history ([#211](https://github.com/LexanderPL/AssetBoard/issues/211)) ([4c68d76](https://github.com/LexanderPL/AssetBoard/commit/4c68d7666ce4f791b08984cd04e0bf88e3b7ed08))
+* **networth:** F5.4 linked values and resolver framework ([#212](https://github.com/LexanderPL/AssetBoard/issues/212)) ([94900b5](https://github.com/LexanderPL/AssetBoard/commit/94900b5d041848e9ef6c1373efaa9619c4be5fde))
+
 ## [0.4.0](https://github.com/LexanderPL/AssetBoard/compare/v0.3.8...v0.4.0) (2026-11-02)
 
 
