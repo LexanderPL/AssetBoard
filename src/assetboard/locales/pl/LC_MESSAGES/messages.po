@@ -346,6 +346,12 @@ msgstr "Dodano wartość majątku"
 msgid "Net-worth items added in bulk"
 msgstr "Dodano pozycje majątku zbiorczo"
 
+msgid "Net-worth item linked to a source"
+msgstr "Pozycja majątku netto powiązana ze źródłem"
+
+msgid "Net-worth item unlinked"
+msgstr "Pozycja majątku netto odłączona"
+
 msgid "Net-worth snapshot taken automatically"
 msgstr "Automatycznie zapisano migawkę majątku netto"
 
@@ -510,6 +516,15 @@ msgstr "Liczba"
 
 msgid "Replaced an earlier snapshot"
 msgstr "Zastąpiono wcześniejszą migawkę"
+
+msgid "Link type"
+msgstr "Typ powiązania"
+
+msgid "Linked to"
+msgstr "Powiązana z"
+
+msgid "Value kept"
+msgstr "Zachowano wartość"
 
 msgid "Every signed-in user can create workspaces"
 msgstr "Każdy zalogowany użytkownik może tworzyć obszary robocze"
@@ -1916,6 +1931,13 @@ msgstr[0] "%(num)d pozycja nie miała jeszcze wartości i nie została policzona
 msgstr[1] "%(num)d pozycje nie miały jeszcze wartości i nie zostały policzone."
 msgstr[2] "%(num)d pozycji nie miało jeszcze wartości i nie zostało policzonych."
 
+#, python-format
+msgid "%(num)d linked item was unavailable and was not counted."
+msgid_plural "%(num)d linked items were unavailable and were not counted."
+msgstr[0] "%(num)d powiązana pozycja była niedostępna i nie została policzona."
+msgstr[1] "%(num)d powiązane pozycje były niedostępne i nie zostały policzone."
+msgstr[2] "%(num)d powiązanych pozycji było niedostępnych i nie zostało policzonych."
+
 msgid "Deleted category"
 msgstr "Usunięta kategoria"
 
@@ -1967,8 +1989,25 @@ msgstr "Ta kategoria jest zarchiwizowana. Wybierz aktywną."
 msgid "Choose assets or liabilities."
 msgstr "Wybierz aktywa lub zobowiązania."
 
-msgid "Linked values arrive in a later version."
-msgstr "Wartości powiązane pojawią się w późniejszej wersji."
+msgid "Choose a valid link target."
+msgstr "Wybierz prawidłowy cel powiązania."
+
+msgid "Another active item already links to this target."
+msgstr "Inna aktywna pozycja jest już powiązana z tym celem."
+
+msgid "This link belongs to the other side."
+msgstr "To powiązanie należy do drugiej strony."
+
+msgid "This item is not linked."
+msgstr "Ta pozycja nie jest powiązana."
+
+msgid "This item is linked; its value is read-only. Unlink it first."
+msgstr ""
+"Ta pozycja jest powiązana; jej wartość jest tylko do odczytu. Najpierw ją"
+" odłącz."
+
+msgid "The currency comes from the linked source."
+msgstr "Waluta pochodzi z powiązanego źródła."
 
 msgid "Restore the item before changing it."
 msgstr "Przywróć pozycję, zanim ją zmienisz."
@@ -1999,6 +2038,12 @@ msgstr "Zarchiwizowano pozycję."
 
 msgid "Item restored."
 msgstr "Przywrócono pozycję."
+
+msgid "Item unlinked; its value was kept as a manual value."
+msgstr "Pozycja odłączona; jej wartość zachowano jako wartość ręczną."
+
+msgid "Item unlinked; no value was available, so it now has none."
+msgstr "Pozycja odłączona; wartość nie była dostępna, więc teraz jej nie ma."
 
 msgid "Value added."
 msgstr "Dodano wartość."
@@ -4679,6 +4724,19 @@ msgstr "Dodaj pozycję poniżej lub wklej listę pozycji."
 msgid "Add an item"
 msgstr "Dodaj pozycję"
 
+msgid "Link to…"
+msgstr "Powiąż z…"
+
+msgid "Manual value"
+msgstr "Wartość ręczna"
+
+msgid ""
+"A linked item takes its value and currency from the target. The value "
+"fields below are ignored."
+msgstr ""
+"Powiązana pozycja pobiera wartość i walutę z celu. Pola wartości poniżej "
+"są ignorowane."
+
 msgid "Current value"
 msgstr "Bieżąca wartość"
 
@@ -4798,6 +4856,19 @@ msgstr "Wyłączone z majątku netto"
 msgid "Archived category"
 msgstr "Zarchiwizowana kategoria"
 
+#, python-format
+msgid "Linked to %(name)s"
+msgstr "Powiązana z %(name)s"
+
+msgid "an unavailable source"
+msgstr "niedostępnym źródłem"
+
+msgid "Value unavailable"
+msgstr "Wartość niedostępna"
+
+msgid "This value comes from the linked source and is read-only."
+msgstr "Ta wartość pochodzi z powiązanego źródła i jest tylko do odczytu."
+
 msgid "Value history"
 msgstr "Historia wartości"
 
@@ -4833,6 +4904,9 @@ msgstr "na dzień %(date)s"
 msgid "No value yet"
 msgstr "Brak wartości"
 
+msgid "Unlink"
+msgstr "Odłącz"
+
 msgid "Paste at least one line."
 msgstr "Wklej co najmniej jeden wiersz."
 
@@ -4865,6 +4939,13 @@ msgid_plural "%(num)d items have no value yet."
 msgstr[0] "%(num)d pozycja nie ma jeszcze wartości."
 msgstr[1] "%(num)d pozycje nie mają jeszcze wartości."
 msgstr[2] "%(num)d pozycji nie ma jeszcze wartości."
+
+#, python-format
+msgid "%(num)d linked item is unavailable."
+msgid_plural "%(num)d linked items are unavailable."
+msgstr[0] "%(num)d powiązana pozycja jest niedostępna."
+msgstr[1] "%(num)d powiązane pozycje są niedostępne."
+msgstr[2] "%(num)d powiązanych pozycji jest niedostępnych."
 
 #, python-format
 msgid "%(num)d item is not counted because you excluded it."
@@ -6705,4 +6786,7 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "AssetsassetLiabilities"
 #~ msgstr "Zobowiązania"
+
+#~ msgid "Linked values arrive in a later version."
+#~ msgstr "Wartości powiązane pojawią się w późniejszej wersji."
 

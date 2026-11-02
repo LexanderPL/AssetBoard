@@ -75,6 +75,18 @@
         </select>
         {% if create_item_errors.get("category") %}<p id="new-item-category-error" class="text-xs text-danger">{{ create_item_errors.get("category") }}</p>{% endif %}
       </div>
+      {% if link_options %}
+      <div class="space-y-1">
+        <label for="new-item-link" class="block text-xs text-muted">{{ _("Link to…") }}</label>
+        <select id="new-item-link" name="link" class="form-select py-1.5 w-full">
+          <option value="">{{ _("Manual value") }}</option>
+          {% for option in link_options %}
+          <option value="{{ option.link_type }}:{{ option.choice.link_id }}"{% if create_item_values.link == option.link_type ~ ":" ~ (option.choice.link_id|string) %} selected{% endif %}>{{ _(option.link_type_label) }} — {{ option.choice.label }}</option>
+          {% endfor %}
+        </select>
+        <p class="text-xs text-muted">{{ _("A linked item takes its value and currency from the target. The value fields below are ignored.") }}</p>
+      </div>
+      {% endif %}
       <div class="space-y-1">
         <label for="new-item-value" class="block text-xs text-muted">{{ _("Current value") }}</label>
         <input id="new-item-value" name="value" type="text" inputmode="decimal" value="{{ create_item_values.value }}" required maxlength="64" class="form-control px-2 py-1.5 w-full"{% if create_item_errors.get("value") %} aria-invalid="true" aria-describedby="new-item-value-error"{% endif %}>

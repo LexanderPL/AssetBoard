@@ -343,6 +343,12 @@ msgstr ""
 msgid "Net-worth items added in bulk"
 msgstr ""
 
+msgid "Net-worth item linked to a source"
+msgstr ""
+
+msgid "Net-worth item unlinked"
+msgstr ""
+
 msgid "Net-worth snapshot taken automatically"
 msgstr ""
 
@@ -506,6 +512,15 @@ msgid "Number"
 msgstr ""
 
 msgid "Replaced an earlier snapshot"
+msgstr ""
+
+msgid "Link type"
+msgstr ""
+
+msgid "Linked to"
+msgstr ""
+
+msgid "Value kept"
 msgstr ""
 
 msgid "Every signed-in user can create workspaces"
@@ -1816,6 +1831,12 @@ msgid_plural "%(num)d items had no value yet and were not counted."
 msgstr[0] ""
 msgstr[1] ""
 
+#, fuzzy, python-format
+msgid "%(num)d linked item was unavailable and was not counted."
+msgid_plural "%(num)d linked items were unavailable and were not counted."
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Deleted category"
 msgstr ""
 
@@ -1867,7 +1888,22 @@ msgstr ""
 msgid "Choose assets or liabilities."
 msgstr ""
 
-msgid "Linked values arrive in a later version."
+msgid "Choose a valid link target."
+msgstr ""
+
+msgid "Another active item already links to this target."
+msgstr ""
+
+msgid "This link belongs to the other side."
+msgstr ""
+
+msgid "This item is not linked."
+msgstr ""
+
+msgid "This item is linked; its value is read-only. Unlink it first."
+msgstr ""
+
+msgid "The currency comes from the linked source."
 msgstr ""
 
 msgid "Restore the item before changing it."
@@ -1898,6 +1934,12 @@ msgid "Item archived."
 msgstr ""
 
 msgid "Item restored."
+msgstr ""
+
+msgid "Item unlinked; its value was kept as a manual value."
+msgstr ""
+
+msgid "Item unlinked; no value was available, so it now has none."
 msgstr ""
 
 msgid "Value added."
@@ -4329,6 +4371,17 @@ msgstr ""
 msgid "Add an item"
 msgstr ""
 
+msgid "Link to…"
+msgstr ""
+
+msgid "Manual value"
+msgstr ""
+
+msgid ""
+"A linked item takes its value and currency from the target. The value "
+"fields below are ignored."
+msgstr ""
+
 msgid "Current value"
 msgstr ""
 
@@ -4433,6 +4486,19 @@ msgstr ""
 msgid "Archived category"
 msgstr ""
 
+#, python-format
+msgid "Linked to %(name)s"
+msgstr ""
+
+msgid "an unavailable source"
+msgstr ""
+
+msgid "Value unavailable"
+msgstr ""
+
+msgid "This value comes from the linked source and is read-only."
+msgstr ""
+
 msgid "Value history"
 msgstr ""
 
@@ -4468,6 +4534,9 @@ msgstr ""
 msgid "No value yet"
 msgstr ""
 
+msgid "Unlink"
+msgstr ""
+
 msgid "Paste at least one line."
 msgstr ""
 
@@ -4495,6 +4564,12 @@ msgstr[1] ""
 #, python-format
 msgid "%(num)d item has no value yet."
 msgid_plural "%(num)d items have no value yet."
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy, python-format
+msgid "%(num)d linked item is unavailable."
+msgid_plural "%(num)d linked items are unavailable."
 msgstr[0] ""
 msgstr[1] ""
 
@@ -6386,5 +6461,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "AssetsassetLiabilities"
+#~ msgstr ""
+
+#~ msgid "Linked values arrive in a later version."
 #~ msgstr ""
 

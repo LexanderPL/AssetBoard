@@ -43,15 +43,18 @@ from assetboard.services.networth import (
     delete_category,
     get_category,
     get_item,
+    link_options_for_side,
     list_networth,
     move_category,
     preview_bulk,
     restore_category,
     restore_item,
     seed_categories,
+    unlink_item,
     update_category,
     update_item,
 )
+from assetboard.services.networth_links import LinkOption
 from assetboard.services.networth_summary import networth_summary
 from assetboard.services.workspace_options import currency_codes
 from assetboard.web.context import CurrentContext
@@ -88,7 +91,12 @@ ERRORS = {
     "category_archived": _("This category is archived; choose an active one."),
     "invalid_side": _("Choose assets or liabilities."),
     "invalid_direction": _("The change could not be made. Reload the page and try again."),
-    "linked_not_supported": _("Linked values arrive in a later version."),
+    "invalid_link": _("Choose a valid link target."),
+    "already_linked": _("Another active item already links to this target."),
+    "link_wrong_side": _("This link belongs to the other side."),
+    "not_linked": _("This item is not linked."),
+    "linked_value_readonly": _("This item is linked; its value is read-only. Unlink it first."),
+    "linked_currency": _("The currency comes from the linked source."),
     "archived": _("Restore the category before changing it."),
     "item_archived": _("Restore the item before changing it."),
     "duplicate_name": _("Another active category of this side already has this name."),
@@ -109,6 +117,8 @@ NOTICES = {
     "item_saved": _("Item saved."),
     "item_archived": _("Item archived."),
     "item_restored": _("Item restored."),
+    "item_unlinked": _("Item unlinked; its value was kept as a manual value."),
+    "item_unlinked_no_value": _("Item unlinked; no value was available, so it now has none."),
     "valuation_added": _("Value added."),
     "bulk_created": _("Items added."),
 }
@@ -159,6 +169,18 @@ def _parse_date(value: str, field: str) -> date | None:
         raise InvalidNetWorth(field, "invalid_date") from None
 
 
+def _parse_link(value: str) -> tuple[str | None, UUID | None]:
+    if not value.strip():
+        return None, None
+    link_type, separator, raw_id = value.partition(":")
+    if not separator or not link_type or not raw_id:
+        raise InvalidNetWorth("link", "invalid_link")
+    try:
+        return link_type, UUID(raw_id)
+    except ValueError:
+        raise InvalidNetWorth("link", "invalid_link") from None
+
+
 def _selected_side(value: str) -> Side:
     try:
         return Side(value)
@@ -204,6 +226,7 @@ def _create_item_values(base_currency: str, today: str) -> dict[str, str]:
         "investable": "",
         "as_of": today,
         "valuation_note": "",
+        "link": "",
     }
 
 
@@ -236,6 +259,7 @@ def _body_context(
     edit_category_errors: dict[str, str] | None = None,
     bulk_text: str = "",
     bulk_preview: BulkPreview | None = None,
+    link_options: tuple[LinkOption, ...] = (),
 ) -> dict[str, object]:
     locale = request.state.locale
     today = ctx.clock.today(ctx.workspace.timezone).isoformat()
@@ -246,6 +270,7 @@ def _body_context(
         "side_value": side.value,
         "side_labels": {code: _t(request, label) for code, label in SIDE_LABELS.items()},
         "can_edit": has_role(ctx, Role.EDITOR),
+        "link_options": link_options,
         "base_currency": ctx.workspace.base_currency,
         "currency_options": [(code, code) for code in currency_codes()],
         "today": today,
@@ -298,8 +323,16 @@ def _render(
     status_code: int = 200,
     **kwargs: Any,
 ) -> Response:
-    page = list_networth(request.app.state.session_factory, ctx)
-    context = _body_context(request, ctx, page, side=side, **kwargs)
+    factory = request.app.state.session_factory
+    page = list_networth(factory, ctx)
+    context = _body_context(
+        request,
+        ctx,
+        page,
+        side=side,
+        link_options=link_options_for_side(factory, ctx, side=side.value),
+        **kwargs,
+    )
     template = "networth/_body.html" if is_htmx_fragment_request(request) else "networth/list.html"
     response = render_template(request, template, context=context, status_code=status_code)
     response.headers["Vary"] = "HX-Request"
@@ -591,6 +624,7 @@ async def networth_items_create(
     investable: FormStr = "",
     as_of: FormStr = "",
     valuation_note: FormStr = "",
+    link: FormStr = "",
 ) -> Response:
     selected = _selected_side(side)
     factory = request.app.state.session_factory
@@ -607,8 +641,10 @@ async def networth_items_create(
         "investable": investable,
         "as_of": as_of or today,
         "valuation_note": valuation_note,
+        "link": link,
     }
     try:
+        link_type, link_id = _parse_link(link)
         item = await run_in_threadpool(
             lambda: create_item(
                 factory,
@@ -625,6 +661,8 @@ async def networth_items_create(
                 investable=_checked(investable),
                 as_of=_parse_date(as_of, "as_of"),
                 valuation_note=valuation_note,
+                link_type=link_type,
+                link_id=link_id,
             )
         )
     except NetWorthError as exc:
@@ -709,13 +747,32 @@ async def networth_item_archive(
     return await run_in_threadpool(lambda: _done(request, ctx, "item_archived", selected))
 
 
+@router.post("/net-worth/items/{item_id}/unlink", name="networth_item_unlink")
+async def networth_item_unlink(
+    request: Request, ctx: CurrentContext, item_id: str, side: FormStr = ""
+) -> Response:
+    target = _parse_uuid(item_id)
+    selected = _selected_side(side)
+    try:
+        result = await run_in_threadpool(
+            unlink_item, request.app.state.session_factory, ctx, target
+        )
+    except NetWorthError as exc:
+        return await run_in_threadpool(lambda code=exc.code: _failed(request, ctx, selected, code))
+    notice = "item_unlinked" if result.value_recorded else "item_unlinked_no_value"
+    return await run_in_threadpool(lambda: _done(request, ctx, notice, Side(result.item.side)))
+
+
 @router.post("/net-worth/items/{item_id}/restore", name="networth_item_restore")
 async def networth_item_restore(
     request: Request, ctx: CurrentContext, item_id: str, side: FormStr = ""
 ) -> Response:
     target = _parse_uuid(item_id)
     selected = _selected_side(side)
-    await run_in_threadpool(restore_item, request.app.state.session_factory, ctx, target)
+    try:
+        await run_in_threadpool(restore_item, request.app.state.session_factory, ctx, target)
+    except NetWorthError as exc:
+        return await run_in_threadpool(lambda code=exc.code: _failed(request, ctx, selected, code))
     return await run_in_threadpool(lambda: _done(request, ctx, "item_restored", selected))
 
 
