@@ -140,6 +140,16 @@ class NetWorthItemRepository(ScopedRepository[NetWorthItem]):
             counts[item.category_id] = counts.get(item.category_id, 0) + 1
         return counts
 
+    def active_linked(self, link_type: str, link_id: UUID) -> NetWorthItem | None:
+        """The active item linking to this target, if any."""
+        statement = self._scoped_select().where(
+            NetWorthItem.valuation_mode == "linked",
+            NetWorthItem.link_type == link_type,
+            NetWorthItem.link_id == link_id,
+            NetWorthItem.archived_at.is_(None),
+        )
+        return self._session.scalars(statement).one_or_none()
+
 
 class ItemValuationRepository(ScopedRepository[ItemValuation]):
     model = ItemValuation

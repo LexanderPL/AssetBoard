@@ -82,6 +82,28 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
     assert config.get_main_option("sqlalchemy.url") is None
 
 
+def test_0035_net_worth_link_index_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'links.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        indexes = {index["name"] for index in inspect(engine).get_indexes("networth_items")}
+        assert "uq_networth_items_active_link" in indexes
+        command.downgrade(alembic_config(settings), "0034_f53_net_worth_snapshots")
+        indexes = {index["name"] for index in inspect(engine).get_indexes("networth_items")}
+        assert "uq_networth_items_active_link" not in indexes
+        upgrade_database(settings)
+        indexes = {index["name"] for index in inspect(engine).get_indexes("networth_items")}
+        assert "uq_networth_items_active_link" in indexes
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
 def test_0034_net_worth_snapshots_migration_is_reversible(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None,

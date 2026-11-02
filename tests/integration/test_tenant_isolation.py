@@ -590,6 +590,28 @@ def test_networth_queries_stay_in_their_workspace(
     assert [row.id for row in items_b.ordered()] == [b_item.id]
     assert items_a.counts_by_category() == {a_vehicle.id: 1}
     assert items_b.counts_by_category() == {b_vehicle.id: 1}
+    link_id = uuid4()
+    linked_a = items_a.create(
+        side="asset",
+        category_id=a_vehicle.id,
+        name="Linked",
+        currency="EUR",
+        valuation_mode="linked",
+        link_type="portfolio_asset_class",
+        link_id=link_id,
+    )
+    linked_b = items_b.create(
+        side="asset",
+        category_id=b_vehicle.id,
+        name="Linked",
+        currency="USD",
+        valuation_mode="linked",
+        link_type="portfolio_asset_class",
+        link_id=link_id,
+    )
+    assert items_a.active_linked("portfolio_asset_class", link_id) is linked_a
+    assert items_b.active_linked("portfolio_asset_class", link_id) is linked_b
+    assert items_b.active_linked("portfolio_asset_class", uuid4()) is None
 
     valuations_a = ItemValuationRepository(db_session, ctx_a)
     valuations_b = ItemValuationRepository(db_session, ctx_b)
