@@ -14,6 +14,7 @@ readable; the slices still add up to the block's total.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from typing import Literal
 from uuid import UUID
@@ -43,6 +44,54 @@ def share_tenths(part: int, whole: int) -> int:
     return quotient + (1 if 2 * remainder >= whole else 0)
 
 
+@dataclass(frozen=True, slots=True)
+class CategoryAmount:
+    """One category's total for the shared donut slicer."""
+
+    category_id: UUID
+    amount: Money
+
+
+def category_slices(
+    amounts: Iterable[CategoryAmount],
+    *,
+    currency: str,
+    max_slices: int = DEFAULT_MAX_SLICES,
+) -> tuple[Slice, ...]:
+    """The donut slices of category totals, in ``currency`` (see the module docstring).
+
+    This is the shared core of the month and net-worth donuts: positive amounts only, largest
+    first with stable ties, the top ``max_slices - 1`` kept and the tail grouped into one
+    "Other" slice. Shares use ``share_tenths`` (rounded once, half up).
+    """
+    if max_slices < 2:
+        raise ValueError("max_slices must be at least 2")
+    rows = list(amounts)
+    for row in rows:
+        if row.amount.currency != currency:
+            raise ValueError(f"amount in {row.amount.currency}, chart in {currency}")
+    rows = [row for row in rows if row.amount.amount_minor > 0]
+    # sorted() is stable: equal amounts keep the input (category) order.
+    rows = sorted(rows, key=lambda row: -row.amount.amount_minor)
+    total = sum(row.amount.amount_minor for row in rows)
+    if len(rows) > max_slices:
+        kept, rest = rows[: max_slices - 1], rows[max_slices - 1 :]
+    else:
+        kept, rest = rows, []
+    slices = [
+        Slice(
+            row.category_id,
+            Money(row.amount.amount_minor, currency),
+            share_tenths(row.amount.amount_minor, total),
+        )
+        for row in kept
+    ]
+    if rest:
+        other = sum(row.amount.amount_minor for row in rest)
+        slices.append(Slice(None, Money(other, currency), share_tenths(other, total), len(rest)))
+    return tuple(slices)
+
+
 def category_breakdown(
     summary: MonthSummary, block: ChartBlock, *, max_slices: int = DEFAULT_MAX_SLICES
 ) -> tuple[Slice, ...]:
@@ -50,26 +99,8 @@ def category_breakdown(
     (one category and "Other")."""
     if block not in CHART_BLOCKS:
         raise ValueError(f"not a charted block: {block}")
-    if max_slices < 2:
-        raise ValueError("max_slices must be at least 2")
-    rows = [r for r in summary.block(block).rows if r.actual.amount_minor > 0]
-    # sorted() is stable: equal amounts keep the summary's category order.
-    rows = sorted(rows, key=lambda r: -r.actual.amount_minor)
-    total = sum(r.actual.amount_minor for r in rows)
-    currency = summary.currency
-    if len(rows) > max_slices:
-        kept, rest = rows[: max_slices - 1], rows[max_slices - 1 :]
-    else:
-        kept, rest = rows, []
-    slices = [
-        Slice(
-            r.category_id,
-            Money(r.actual.amount_minor, currency),
-            share_tenths(r.actual.amount_minor, total),
-        )
-        for r in kept
-    ]
-    if rest:
-        other = sum(r.actual.amount_minor for r in rest)
-        slices.append(Slice(None, Money(other, currency), share_tenths(other, total), len(rest)))
-    return tuple(slices)
+    return category_slices(
+        (CategoryAmount(row.category_id, row.actual) for row in summary.block(block).rows),
+        currency=summary.currency,
+        max_slices=max_slices,
+    )
