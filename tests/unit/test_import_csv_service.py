@@ -662,6 +662,29 @@ def test_categories_csv_allows_an_active_and_an_archived_category_with_one_name(
     assert {category.archived_at is not None for category in cars} == {False, True}
 
 
+def test_categories_csv_dedupes_archived_rows_without_ids(db: WorkspaceDb, data_dir: Path) -> None:
+    content = (
+        b"kind,name,treatment,color,archived_at\n"
+        b"expense,Car,regular,#111111,2025-12-31T18:05:00Z\n"
+        b"expense,Car,regular,#111111,2025-12-31T18:05:00Z\n"
+    )
+
+    batch_id = _upload(db, data_dir, content)
+    report = _plan(db, data_dir, batch_id)
+    assert report["counts"]["to_create"] == 1
+    assert [entry["code"] for entry in report["skipped"]] == ["duplicate_in_file"]
+    _apply(db, data_dir, batch_id)
+
+    again = _upload(db, data_dir, content)
+    report = _plan(db, data_dir, again)
+    assert report["counts"]["to_create"] == 0
+    assert {entry["code"] for entry in report["skipped"]} == {
+        "already_imported",
+        "duplicate_in_file",
+    }
+    assert len([category for category in _categories(db) if category.name == "Car"]) == 1
+
+
 def test_categories_csv_lists_existing_differences_and_file_duplicates(
     db: WorkspaceDb, data_dir: Path
 ) -> None:

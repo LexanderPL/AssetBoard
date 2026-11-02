@@ -1188,16 +1188,22 @@ class CategoriesCsvAdapter(ImportAdapter):
                 with contextlib.suppress(ValueError):
                     by_id[UUID(category.import_key[3:])] = category
             by_id[category.id] = category
+        all_categories = repository.ordered()
         active = {
             (category.kind, category.name_key): category
-            for category in repository.ordered()
+            for category in all_categories
             if category.archived_at is None
         }
+        archived: dict[tuple[str, str], Any] = {}
+        for category in all_categories:
+            if category.archived_at is not None:
+                archived.setdefault((category.kind, category.name_key), category)
         planned: list[_CategoryRow] = []
         skipped: list[dict[str, object]] = []
         categories: list[dict[str, object]] = []
         seen_ids: set[UUID] = set()
         seen_names: dict[tuple[str, str], _CategoryRow] = {}
+        seen_archived_names: dict[tuple[str, str], _CategoryRow] = {}
         for row in rows:
             if row.source_id is not None:
                 if row.source_id in seen_ids:
@@ -1235,6 +1241,27 @@ class CategoriesCsvAdapter(ImportAdapter):
                 existing = active.get(name_key_value)
                 if existing is None:
                     seen_names[name_key_value] = row
+            elif existing is None and row.source_id is None:
+                name_key_value = (row.kind, row.name_key)
+                earlier = seen_archived_names.get(name_key_value)
+                if earlier is not None:
+                    code = (
+                        "duplicate_in_file"
+                        if (earlier.treatment == row.treatment and earlier.color == row.color)
+                        else "conflict_in_file"
+                    )
+                    skipped.append(_entry(code, row.line, "name"))
+                    categories.append(
+                        {
+                            "kind": row.kind,
+                            "category": row.name,
+                            "total": "",
+                            "rows_to_create": 0,
+                        }
+                    )
+                    continue
+                seen_archived_names[name_key_value] = row
+                existing = archived.get(name_key_value)
             if existing is not None:
                 code = (
                     "already_imported"

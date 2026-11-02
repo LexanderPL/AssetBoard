@@ -293,7 +293,9 @@ made from my spreadsheet, map its categories onto mine, check the totals and imp
   by name key and kind among active ones), appended at the end of their list in file order,
   archived ones as archived; existing categories are never changed (differences listed). Rows
   with an `id` dedupe by id; name-based in-file duplicate detection applies only among active
-  rows, so an active and an archived category may share a name. An explicit `sort_order` in the
+  rows, so an active and an archived category may share a name. An archived row without an id
+  dedupes by kind and name among archived id-less rows and against existing archived categories;
+  it is created only when no archived same-name category matches. An explicit `sort_order` in the
   file does not move existing categories or place new ones: merge mode always appends.
 - `transactions.csv` rows with a non-empty `deleted_at` are skipped in merge mode and counted
   ("deleted in the source"); only a restore recreates deleted rows.
