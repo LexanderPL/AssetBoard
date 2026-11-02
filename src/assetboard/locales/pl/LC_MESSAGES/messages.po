@@ -922,6 +922,9 @@ msgstr "Identyfikator nie jest prawidłowym UUID."
 msgid "The timestamp is invalid."
 msgstr "Znacznik czasu jest nieprawidłowy."
 
+msgid "The row is invalid."
+msgstr "Wiersz jest nieprawidłowy."
+
 msgid "The mapped category does not exist."
 msgstr "Docelowa kategoria nie istnieje."
 

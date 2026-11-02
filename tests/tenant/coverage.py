@@ -15,6 +15,7 @@ BASE_METHOD_COVERAGE: dict[str, str] = {
     "get": ISOLATION_TEST,
     "get_or_raise": ISOLATION_TEST,
     "list": ISOLATION_TEST,
+    "any_exists": "test_any_exists_stays_in_its_workspace",
     "update": ISOLATION_TEST,
     "delete": ISOLATION_TEST,
     "add": "test_add_refuses_rows_of_another_workspace_or_type",

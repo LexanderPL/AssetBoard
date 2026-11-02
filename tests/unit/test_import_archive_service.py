@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 import pytest
 from sqlalchemy import update
 
+from assetboard.clock import Clock
 from assetboard.db.models.identity import AuditEvent, Workspace
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.ledger import Category
@@ -30,6 +31,7 @@ from assetboard.domain.archive import (
     BudgetLineRow,
     CategoryRow,
     MonthRow,
+    ParsedArchive,
     TransactionRow,
     parse_archive,
     write_archive,
@@ -39,9 +41,11 @@ from assetboard.domain.months import YearMonth
 from assetboard.services.archive import export_workspace, workspace_is_empty
 from assetboard.services.categories import seed_into
 from assetboard.services.context import PermissionDenied
+from assetboard.services.import_archive import _collect_sources, _source_categories
 from assetboard.services.import_csv import default_import_adapters
 from assetboard.services.imports import (
     ImportAdapterRegistry,
+    ImportConfirmationRequired,
     ImportRefused,
     ImportRestoreRequiresArchive,
     ImportRestoreRollbackBlocked,
@@ -600,6 +604,82 @@ def test_newer_major_archive_is_refused_and_newer_minor_warns(
     assert any(warning["code"] == "newer_minor_version" for warning in minor["warnings"])
 
 
+def test_merge_settings_diff_uses_1_0_defaults(db: WorkspaceDb, data_dir: Path) -> None:
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    content = (Path(__file__).parents[1] / "fixtures" / "workspace-archive-v1.0.zip").read_bytes()
+    batch_id = _upload(db, data_dir, content, ctx=ctx, mode="merge")
+    report = _plan(db, data_dir, batch_id, ctx=ctx)
+    assert "taxes_enabled" not in report["settings_diff"]
+    assert "upcoming_days" not in report["settings_diff"]
+
+
+def test_restore_apply_detects_a_workspace_that_became_non_empty(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    batch_id = _upload(db, data_dir, _archive(_rows()), ctx=ctx)
+    _plan(db, data_dir, batch_id, ctx=ctx)
+    with db.factory.begin() as session:
+        CategoryRepository(session, ctx).create(
+            name="Added elsewhere",
+            name_key="added elsewhere",
+            kind="expense",
+            treatment="regular",
+            color="#111111",
+            sort_order=0,
+        )
+    with pytest.raises(ImportConfirmationRequired):
+        _apply(db, data_dir, batch_id, ctx=ctx)
+    with pytest.raises(ImportRestoreUnavailable):
+        _apply(db, data_dir, batch_id, ctx=ctx)
+    with db.factory() as session:
+        batch = session.get(ImportBatch, batch_id)
+        assert batch is not None and batch.status == "planned"
+        assert batch.report is not None
+        assert batch.report["errors"][0]["code"] == "workspace_not_empty"
+
+
+def test_merge_records_malformed_rows_instead_of_dropping_them() -> None:
+    rows = ArchiveRows(
+        workspace={
+            "name": "Home",
+            "base_currency": "EUR",
+            "country_code": None,
+            "timezone": "UTC",
+            "locale": "en",
+            "auto_copy_plan": False,
+            "taxes_enabled": False,
+            "upcoming_days": None,
+        },
+        categories=(CategoryRow(str(FOOD), "expense", "Food", "regular", "#111111", 0, None),),
+        budget_lines=(BudgetLineRow("2026-02", "expense", "Food", "oops", "EUR", str(FOOD)),),
+        transactions=(
+            TransactionRow(
+                "2026-02-02", "expense", "oops", "EUR", "Food", "Broken", str(FOOD),
+                str(uuid4()), None,
+            ),
+        ),
+        months=(),
+    )  # fmt: skip
+    archive = ParsedArchive(manifest={}, files={}, rows=rows)
+    sources = _source_categories(rows.categories)
+    collected = _collect_sources(
+        archive,
+        sources=sources,
+        currency="EUR",
+        today=date(2026, 3, 1),
+        closed=frozenset(),
+        out_of_time=lambda: False,
+    )
+    assert collected.invalid == 2
+    assert {(entry["file"], entry["code"]) for entry in collected.errors} == {
+        ("transactions.csv", "invalid_amount"),
+        ("budget_lines.csv", "invalid_amount"),
+    }
+
+
 def test_restore_rejects_duplicate_active_category_names(db: WorkspaceDb, data_dir: Path) -> None:
     rows = _rows()
     duplicate = ArchiveRows(
@@ -704,7 +784,7 @@ def test_restore_rollback_owner_only_and_stepping_clock(db: WorkspaceDb, data_di
     batch_id = _upload(db, data_dir, _archive(_rows()), ctx=target_ctx)
     _plan(db, data_dir, batch_id, ctx=target_ctx)
 
-    class SteppingClock:
+    class SteppingClock(Clock):
         def __init__(self) -> None:
             self.value = datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC)
 
@@ -716,7 +796,9 @@ def test_restore_rollback_owner_only_and_stepping_clock(db: WorkspaceDb, data_di
             del tz
             return self.value.date()
 
-    stepping = replace(target_ctx, clock=SteppingClock())
+    stepping_clock = SteppingClock()
+    db.factory.configure(info={"clock": stepping_clock})
+    stepping = replace(target_ctx, clock=stepping_clock)
     _apply(db, data_dir, batch_id, ctx=stepping)
     preview = preview_rollback_import(db.factory, target_ctx, batch_id)
     assert preview.blocked_reasons == ()

@@ -39,7 +39,7 @@ from assetboard.domain.archive import (
     timestamp_text,
     write_archive,
 )
-from assetboard.domain.categories import SEED
+from assetboard.domain.categories import SEED, clean_name
 from assetboard.domain.ledger_csv import plain_amount
 from assetboard.i18n import gettext
 from assetboard.i18n.locale import SUPPORTED_LOCALES
@@ -75,7 +75,7 @@ def _expected_suggested_categories(locale: str) -> set[tuple[str, str, str, str,
     positions: dict[str, int] = {}
     expected: set[tuple[str, str, str, str, int]] = set()
     for seed in SEED:
-        name = gettext(seed.name, locale)
+        name = clean_name(gettext(seed.name, locale))
         kind = seed.kind.value
         position = positions.get(kind, 0)
         positions[kind] = position + 1
@@ -145,39 +145,39 @@ def _has_budget_lines(session: Session, ctx: Context) -> bool:
 
 
 def _has_month_states(session: Session, ctx: Context) -> bool:
-    return bool(MonthStateRepository(session, ctx).list())
+    return MonthStateRepository(session, ctx).any_exists()
 
 
 def _has_scheduled_items(session: Session, ctx: Context) -> bool:
-    return bool(ScheduledItemRepository(session, ctx).list())
+    return ScheduledItemRepository(session, ctx).any_exists()
 
 
 def _has_scheduled_occurrences(session: Session, ctx: Context) -> bool:
-    return bool(ScheduledOccurrenceRepository(session, ctx).list())
+    return ScheduledOccurrenceRepository(session, ctx).any_exists()
 
 
 def _has_income_sources(session: Session, ctx: Context) -> bool:
-    return bool(IncomeSourceRepository(session, ctx).list())
+    return IncomeSourceRepository(session, ctx).any_exists()
 
 
 def _has_income_source_tax_rules(session: Session, ctx: Context) -> bool:
-    return bool(IncomeSourceTaxRuleRepository(session, ctx).list())
+    return IncomeSourceTaxRuleRepository(session, ctx).any_exists()
 
 
 def _has_work_logs(session: Session, ctx: Context) -> bool:
-    return bool(WorkLogRepository(session, ctx).list())
+    return WorkLogRepository(session, ctx).any_exists()
 
 
 def _has_work_days(session: Session, ctx: Context) -> bool:
-    return bool(WorkDayRepository(session, ctx).list())
+    return WorkDayRepository(session, ctx).any_exists()
 
 
 def _has_tax_rules(session: Session, ctx: Context) -> bool:
-    return bool(TaxRuleRepository(session, ctx).list())
+    return TaxRuleRepository(session, ctx).any_exists()
 
 
 def _has_tax_rule_versions(session: Session, ctx: Context) -> bool:
-    return bool(TaxRuleVersionRepository(session, ctx).list())
+    return TaxRuleVersionRepository(session, ctx).any_exists()
 
 
 EMPTINESS_CHECKS = (

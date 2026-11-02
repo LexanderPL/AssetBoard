@@ -167,6 +167,7 @@ REPORT_MESSAGES: dict[str, str] = {
     "invalid_sort_order": _("The sort order must be a whole number."),
     "invalid_id": _("The id is not a valid UUID."),
     "invalid_timestamp": _("The timestamp is invalid."),
+    "invalid_row": _("The row is invalid."),
     "mapping_category_missing": _("The mapped category does not exist."),
     "mapping_kind_mismatch": _("The mapped category has the wrong kind."),
     "duplicate_create_name": _("Two new categories have the same kind and name."),
@@ -813,6 +814,10 @@ def apply_import(
             batch.report = report
             return {"_confirmation_required": True, "report": report}
         if batch.mode == "restore" and report["counts"].get("invalid", 0):
+            batch.report = report
+            errors = cast("list[dict[str, object]]", report.get("errors", []))
+            if any(entry.get("code") == "workspace_not_empty" for entry in errors):
+                return {"_restore_unavailable": True, "report": report}
             raise ImportError("restore requires a completely valid upload")
         if report["counts"].get("invalid", 0) and not skip_invalid:
             raise ImportError("confirm skipping invalid rows before applying")
@@ -851,6 +856,8 @@ def apply_import(
         raise ImportError("stored upload failed validation")
     if result.get("_refused"):
         raise ImportRefused("the upload was refused as a whole")
+    if result.get("_restore_unavailable"):
+        raise ImportRestoreUnavailable
     if result.get("_mapping_invalid"):
         raise ImportMappingInvalid(result["report"])
     if result.get("_confirmation_required"):

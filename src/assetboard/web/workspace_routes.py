@@ -412,6 +412,8 @@ async def workspace_data_import_apply(
         )
     except ImportRefused:
         raise HTTPException(status_code=409, detail=_t(request, IMPORT_REFUSED)) from None
+    except ImportRestoreUnavailable:
+        raise HTTPException(status_code=409, detail=_t(request, IMPORT_RESTORE_NOT_EMPTY)) from None
     except ImportError as error:
         message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
         raise HTTPException(status_code=409, detail=_t(request, message)) from None

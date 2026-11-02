@@ -915,6 +915,9 @@ msgstr ""
 msgid "The timestamp is invalid."
 msgstr ""
 
+msgid "The row is invalid."
+msgstr ""
+
 msgid "The mapped category does not exist."
 msgstr ""
 

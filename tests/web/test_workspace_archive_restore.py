@@ -149,6 +149,32 @@ def test_owner_can_restore_and_roll_back_over_the_suggested_set(owner: OwnerApp)
         assert workspace is not None and workspace.name == "Home"
 
 
+def test_restore_apply_explains_a_workspace_that_became_non_empty(owner: OwnerApp) -> None:
+    uploaded = _upload(owner, _archive())
+    batch_id = _batch_url(uploaded)
+    ctx = context_for(owner.home_id, owner.app.state.clock)
+    with owner.db() as session, session.begin():
+        CategoryRepository(session, ctx).create(
+            name="Added elsewhere",
+            name_key="added elsewhere",
+            kind="expense",
+            treatment="regular",
+            color="#111111",
+            sort_order=0,
+        )
+    assert (
+        owner.post(
+            f"/workspace/data/import/{batch_id}/apply", token_from="/workspace/data"
+        ).status_code
+        == 303
+    )
+    page = owner.client.get(f"/workspace/data?batch={batch_id}")
+    assert "Restore is available only in an empty workspace" in page.text
+    refused = owner.post(f"/workspace/data/import/{batch_id}/apply", token_from="/workspace/data")
+    assert refused.status_code == 409
+    assert "empty workspace" in refused.json()["detail"]
+
+
 def test_editor_does_not_get_restore_mode(owner: OwnerApp) -> None:
     owner.set_admin_role("editor")
     page = owner.client.get("/workspace/data")

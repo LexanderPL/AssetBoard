@@ -62,7 +62,7 @@ from assetboard.services.import_dedupe import (
     match_budget_lines,
     match_transactions,
 )
-from assetboard.services.imports import ImportAdapter
+from assetboard.services.imports import ImportAdapter, ImportRestoreUnavailable
 from assetboard.services.imports import ImportError as ImportServiceError
 from assetboard.services.workspace_options import WorkspaceOptionError, validate_workspace_options
 from assetboard.services.workspaces import MAX_WORKSPACE_NAME_LENGTH
@@ -198,11 +198,24 @@ def _restore_settings(
     )
 
 
-def _settings_diff(workspace: Workspace, settings: _RestoreSettings) -> list[str]:
-    wanted = settings.values()
+def _settings_diff(workspace: Workspace, wanted: Mapping[str, object]) -> list[str]:
     return [
         field for field in RESTORE_SETTINGS_FIELDS if getattr(workspace, field) != wanted[field]
     ]
+
+
+def _archive_setting_values(workspace: Mapping[str, object]) -> dict[str, object]:
+    """Archive settings with the 1.0 defaults applied, for the merge information report."""
+    return {
+        "name": str(workspace.get("name", "")),
+        "base_currency": str(workspace.get("base_currency", "")),
+        "country_code": workspace.get("country_code"),
+        "timezone": str(workspace.get("timezone", "")),
+        "locale": str(workspace.get("locale", "")),
+        "auto_copy_plan": bool(workspace.get("auto_copy_plan", False)),
+        "taxes_enabled": workspace.get("taxes_enabled", False),
+        "upcoming_days": workspace.get("upcoming_days"),
+    }
 
 
 def _duplicate_active_categories(rows: tuple[CategoryRow, ...]) -> set[tuple[str, str]]:
@@ -336,11 +349,13 @@ class _Collected:
     transactions: list[_ParsedTransaction]
     budget_lines: list[_ParsedBudget]
     skipped: list[dict[str, object]]
+    errors: list[dict[str, object]]
     month_skipped: dict[str, int]
     closed_months: set[str]
     deleted: int = 0
     future: int = 0
     closed: int = 0
+    invalid: int = 0
 
 
 def _source_categories(rows: tuple[CategoryRow, ...]) -> OrderedDict[UUID, _SourceCategory]:
@@ -868,6 +883,7 @@ def _collect_sources(
         transactions=[],
         budget_lines=[],
         skipped=[],
+        errors=[],
         month_skipped={},
         closed_months=set(),
     )
@@ -878,7 +894,13 @@ def _collect_sources(
             source = sources[UUID(row.category_id)]
             day = parse_date(row.date)
             amount = parse_transaction_amount(row.amount, row.currency, decimal="dot")
-        except (KeyError, EntryError, ValueError):
+        except EntryError as error:
+            collected.invalid += 1
+            collected.errors.append(_entry(error.code, file="transactions.csv", line=line))
+            continue
+        except (KeyError, ValueError):
+            collected.invalid += 1
+            collected.errors.append(_entry("invalid_row", file="transactions.csv", line=line))
             continue
         month = YearMonth.from_date(day)
         if row.deleted_at:
@@ -910,7 +932,13 @@ def _collect_sources(
             source = sources[UUID(row.category_id)]
             month = parse_month(row.month)
             planned = parse_planned_amount(row.planned, row.currency, decimal="dot")
-        except (KeyError, EntryError, ValueError):
+        except EntryError as error:
+            collected.invalid += 1
+            collected.errors.append(_entry(error.code, file="budget_lines.csv", line=line))
+            continue
+        except (KeyError, ValueError):
+            collected.invalid += 1
+            collected.errors.append(_entry("invalid_row", file="budget_lines.csv", line=line))
             continue
         if planned == 0:
             continue
@@ -1216,7 +1244,7 @@ def _merge(
         ],
     ]
     closed_months = sorted(collected.closed_months)
-    errors = list(category_resolution.mapping_errors)
+    errors = [*collected.errors, *category_resolution.mapping_errors]
     counts = _restore_counts(
         to_create=category_resolution.created + tx_created + line_created,
         duplicates_skipped=category_resolution.duplicates + tx_duplicates + line_duplicates,
@@ -1231,18 +1259,14 @@ def _merge(
         transfer_categories_skipped=sum(
             entry["code"] == "category_transfer" for entry in collected.skipped
         ),
-        invalid=0,
+        invalid=collected.invalid,
         mapping_invalid=category_resolution.mapping_invalid,
         categories_created=category_resolution.created,
         transactions_created=tx_created,
         budget_lines_created=line_created,
     )
     workspace = CurrentWorkspaceRepository(session, ctx).get()
-    settings_diff = [
-        field
-        for field in RESTORE_SETTINGS_FIELDS
-        if getattr(workspace, field) != archive.rows.workspace.get(field)
-    ]
+    settings_diff = _settings_diff(workspace, _archive_setting_values(archive.rows.workspace))
     archive_closed = sorted(row.month for row in archive.rows.months if row.closed_at)
     report = _empty_report(
         counts=counts,
@@ -1289,7 +1313,7 @@ def _restore_report(
         archive_closed_months=sorted(row.month for row in archive.rows.months if row.closed_at),
         suggested_categories_removed=[category.name for category in removed],
         settings_diff=(
-            _settings_diff(CurrentWorkspaceRepository(session, ctx).get(), settings)
+            _settings_diff(CurrentWorkspaceRepository(session, ctx).get(), settings.values())
             if settings is not None
             else []
         ),
@@ -1333,7 +1357,7 @@ def _apply_restore(
 ) -> dict[str, int]:
     archive = _archive(parsed)
     if not workspace_is_empty(session, ctx):
-        raise ImportServiceError("the workspace is not empty")
+        raise ImportRestoreUnavailable
     settings, errors = _restore_settings(archive)
     if settings is None or errors:
         raise ImportServiceError("the archive's workspace settings are invalid")
@@ -1342,7 +1366,7 @@ def _apply_restore(
         raise ImportServiceError("the archive has duplicate active category names")
     currency = str(archive.rows.workspace["base_currency"])
     workspace = CurrentWorkspaceRepository(session, ctx).get()
-    settings_diff = _settings_diff(workspace, settings)
+    settings_diff = _settings_diff(workspace, settings.values())
     batch.previous_settings = {
         field: getattr(workspace, field) for field in RESTORE_SETTINGS_FIELDS
     }

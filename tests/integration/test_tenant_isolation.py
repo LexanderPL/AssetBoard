@@ -139,6 +139,22 @@ def test_factories_build_rows_for_the_requested_workspace(
 
 
 @pytest.mark.parametrize("model", OWNED_MODELS, ids=lambda model: model.__name__)
+def test_any_exists_stays_in_its_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any], model: type[Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    repository = repositories_for(Base)[model]
+    in_a = repository(db_session, ctx_a)
+    in_b = repository(db_session, ctx_b)
+    assert not in_a.any_exists()
+    in_a.add(TENANT_CASES[model].factory(db_session, ctx_a.workspace.id))
+    assert in_a.any_exists()
+    assert not in_b.any_exists()
+    in_b.add(TENANT_CASES[model].factory(db_session, ctx_b.workspace.id))
+    assert in_b.any_exists()
+
+
+@pytest.mark.parametrize("model", OWNED_MODELS, ids=lambda model: model.__name__)
 def test_user_b_cannot_read_update_or_delete_user_a_rows(
     db_session: Session, two_workspaces: tuple[Any, Any], model: type[Any]
 ) -> None:
