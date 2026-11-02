@@ -277,6 +277,7 @@ _PARSER_CODES: dict[str, str] = {
     "invalid precision or zero amount": "too_many_decimals",
     "currency differs from workspace": "invalid_currency",
     "invalid date or month": "invalid_date",
+    "invalid currency": "invalid_currency",
     "invalid boolean": "invalid_row",
     "invalid valuation mode": "invalid_row",
     "invalid link type": "invalid_row",

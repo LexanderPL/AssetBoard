@@ -404,6 +404,12 @@ def test_reader_checks_net_worth_references_and_snapshot_rules() -> None:
     assert any(error.message == "item valuation currency differs" for error in errors)
 
     files = _files()
+    _replace_first_line(files, "item_valuations.csv", b",EUR,Bought,", b",ZZZ,Bought,")
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    assert any(error.message == "invalid currency" for error in errors)
+
+    files = _files()
     _replace_first_line(files, "networth_snapshots.csv", b",auto", b",other")
     parsed, errors = parse_archive(_rewrite(files))
     assert parsed is None

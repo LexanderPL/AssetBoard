@@ -607,7 +607,10 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         pattern = r"[0-9]{4}-[0-9]{2}" + ("" if column == "month" else r"-[0-9]{2}")
         if not re.fullmatch(pattern, value):
             raise ValueError("invalid date or month")
-        date.fromisoformat(value + "-01" if column == "month" else value)
+        try:
+            date.fromisoformat(value + "-01" if column == "month" else value)
+        except ValueError:
+            raise ValueError("invalid date or month") from None
     if column in ("amount", "planned", "value", "assets", "liabilities"):
         if column == "planned" and not value:
             return "0"
@@ -621,7 +624,10 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
             code = value.upper()
             if not code:
                 raise ValueError("required value missing")
-            minor_unit_for(code)
+            try:
+                minor_unit_for(code)
+            except ValueError:
+                raise ValueError("invalid currency") from None
             return code
         if value and value != currency:
             raise ValueError("currency differs from workspace")
