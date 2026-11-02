@@ -4412,6 +4412,16 @@ msgid_plural "%(num)d items are not counted because you excluded them."
 msgstr[0] ""
 msgstr[1] ""
 
+#, python-format
+msgid "Assets %(assets)s; liabilities %(liabilities)s."
+msgstr ""
+
+msgid "No counted categories"
+msgstr ""
+
+msgid "Show items"
+msgstr ""
+
 msgid "Apprise URL"
 msgstr ""
 

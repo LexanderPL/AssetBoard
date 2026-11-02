@@ -4775,6 +4775,16 @@ msgstr[2] ""
 "%(num)d pozycji nie jest liczonych, ponieważ zostały przez Ciebie "
 "wyłączone."
 
+#, python-format
+msgid "Assets %(assets)s; liabilities %(liabilities)s."
+msgstr "Aktywa: %(assets)s; zobowiązania: %(liabilities)s."
+
+msgid "No counted categories"
+msgstr "Brak liczonych kategorii"
+
+msgid "Show items"
+msgstr "Pokaż pozycje"
+
 msgid "Apprise URL"
 msgstr "Adres URL Apprise"
 
