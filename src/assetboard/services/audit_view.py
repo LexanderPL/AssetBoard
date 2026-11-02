@@ -88,6 +88,15 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
         "check_for_updates",
     ),
     "workspace.exported": ("categories", "budget_lines", "transactions", "months"),
+    "workspace.restored": (
+        "batch_id",
+        "categories",
+        "transactions",
+        "budget_lines",
+        "months",
+        "settings_fields",
+        "suggested_categories_removed",
+    ),
     "import.applied": (
         "source",
         "mode",
@@ -105,6 +114,8 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
         "budget_lines_kept",
         "categories_deleted",
         "categories_archived",
+        "months_deleted",
+        "settings_restored",
     ),
     "member.role_changed": ("from", "to"),
     "member.removed": ("role",),
@@ -187,6 +198,7 @@ ACTION_LABELS: dict[str, str] = {
     "workspace.created": _("Workspace created"),
     "workspace.delete": _("Workspace deleted"),
     "workspace.exported": _("Workspace archive exported"),
+    "workspace.restored": _("Workspace restored from an archive"),
     "import.applied": _("Import applied"),
     "import.rolled_back": _("Import rolled back"),
     "instance.settings_updated": _("Instance settings changed"),
@@ -275,6 +287,11 @@ KEY_LABELS: dict[str, str] = {
     "source_month": _("Copied from"),
     "skipped": _("Not copied"),
     "automatic": _("Automatic"),
+    "batch_id": _("Import batch"),
+    "settings_fields": _("Settings changed"),
+    "settings_restored": _("Settings restored"),
+    "suggested_categories_removed": _("Suggested categories removed"),
+    "months_deleted": _("Month states deleted"),
 }
 
 # Codes stored as values, with their texts, per kind of key: the same code can mean different
@@ -394,7 +411,12 @@ GROUPS: dict[Scope, dict[str, tuple[str, ...]]] = {
             "invitation.email_mismatch",
         ),
         "settings": ("workspace.created", "workspace.settings_updated"),
-        "import_export": ("workspace.exported", "import.applied", "import.rolled_back"),
+        "import_export": (
+            "workspace.exported",
+            "workspace.restored",
+            "import.applied",
+            "import.rolled_back",
+        ),
         "categories": (
             "category.created",
             "category.updated",

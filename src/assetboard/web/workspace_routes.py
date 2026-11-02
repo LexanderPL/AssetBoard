@@ -13,7 +13,7 @@ from collections.abc import Mapping
 from dataclasses import replace
 from functools import partial
 from tempfile import SpooledTemporaryFile
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal, cast
 from urllib.parse import quote
 from uuid import UUID
 
@@ -26,7 +26,7 @@ from assetboard.domain.identity import MAX_EMAIL_LENGTH
 from assetboard.domain.import_csv import TEMPLATE_FILES
 from assetboard.i18n import gettext
 from assetboard.services import taxes
-from assetboard.services.archive import export_workspace
+from assetboard.services.archive import export_workspace, restore_available
 from assetboard.services.context import Role, WorkspaceNotAvailable, require_role, select_workspace
 from assetboard.services.import_csv import mapping_category_options
 from assetboard.services.imports import (
@@ -34,6 +34,10 @@ from assetboard.services.imports import (
     ImportConfirmationRequired,
     ImportError,
     ImportMappingInvalid,
+    ImportRefused,
+    ImportRestoreRequiresArchive,
+    ImportRestoreRollbackBlocked,
+    ImportRestoreUnavailable,
     ImportUnavailable,
     apply_import,
     cancel_import,
@@ -125,7 +129,25 @@ MEMBER_ERROR_FALLBACK = _("The change could not be made. Reload the page and try
 UPLOAD_TOO_LARGE = _("The upload is too large.")
 IMPORT_FAILED = _("The import could not be completed. Review the report and try again.")
 IMPORT_NOT_AVAILABLE = _("There is no import handler available for this file yet.")
+IMPORT_REFUSED = _("This archive cannot be imported into this workspace.")
+IMPORT_RESTORE_NOT_EMPTY = _(
+    "Restore is available only in an empty workspace (the untouched suggested categories are fine)."
+)
+IMPORT_RESTORE_NOT_ARCHIVE = _("Restore needs a complete workspace archive (a ZIP file).")
 ROLLBACK_CLOSED_MONTH = _("Rollback was refused because these months are closed: %(months)s")
+ROLLBACK_RESTORE_CHANGED = _(
+    "Rollback was refused because the workspace changed after the restore: %(reasons)s"
+)
+IMPORT_SETTING_LABELS = {
+    "name": _("Workspace name"),
+    "base_currency": _("Base currency"),
+    "country_code": _("Country"),
+    "timezone": _("Time zone"),
+    "locale": _("Language"),
+    "auto_copy_plan": _("Automatic plan copy"),
+    "taxes_enabled": _("Taxes"),
+    "upcoming_days": _("Upcoming window"),
+}
 ROLE_LABELS = {
     Role.OWNER: _("Owner"),
     Role.EDITOR: _("Editor"),
@@ -135,6 +157,10 @@ ROLE_LABELS = {
 
 def _t(request: Request, message: str) -> str:
     return gettext(message, request.state.locale)
+
+
+def _import_setting_labels(request: Request) -> dict[str, str]:
+    return {field: _t(request, message) for field, message in IMPORT_SETTING_LABELS.items()}
 
 
 def _parse_uuid(value: str) -> UUID:
@@ -158,7 +184,11 @@ def _mapping_options_from_form(
     if not any(str(key).startswith("mapping_action_") for key in form):
         return {}
     entries_by_key = {
-        (str(entry.get("kind", "")), str(entry.get("source_name_key", ""))): entry
+        (
+            str(entry.get("source_id", "")),
+            str(entry.get("kind", "")),
+            str(entry.get("source_name_key", "")),
+        ): entry
         for entry in entries
         if isinstance(entry, dict)
     }
@@ -170,11 +200,12 @@ def _mapping_options_from_form(
     )
     mappings: list[dict[str, str]] = []
     for index in indices:
+        source_id = str(form.get(f"mapping_source_id_{index}", ""))
         kind = str(form.get(f"mapping_kind_{index}", ""))
         source_name_key = str(form.get(f"mapping_key_{index}", ""))
-        # Match the posted choice to the current report by key, not by row position: a preview
-        # in another tab may have changed the report since this form was rendered.
-        entry = entries_by_key.get((kind, source_name_key))
+        # Match the posted choice to the current report by identity, not by row position: a
+        # preview in another tab may have changed the report since this form was rendered.
+        entry = entries_by_key.get((source_id, kind, source_name_key))
         if entry is None:
             continue
         action = str(form.get(f"mapping_action_{index}", entry.get("action", "ignore")))
@@ -182,6 +213,7 @@ def _mapping_options_from_form(
             action = "ignore"
         mappings.append(
             {
+                "source_id": source_id,
                 "kind": kind,
                 "source_name_key": source_name_key,
                 "action": action,
@@ -237,6 +269,11 @@ async def workspace_data(request: Request, ctx: CurrentContext) -> Response:
             "mapping_categories": await run_in_threadpool(
                 mapping_category_options, request.app.state.session_factory, ctx
             ),
+            "can_restore": await run_in_threadpool(
+                restore_available, request.app.state.session_factory, ctx
+            ),
+            "is_owner": ctx.role is Role.OWNER,
+            "import_setting_labels": _import_setting_labels(request),
         },
     )
 
@@ -248,6 +285,7 @@ async def workspace_data_import(
     upload: UploadFileField,
     delimiter: Annotated[str, Form()] = "detect",
     decimal: Annotated[str, Form()] = "dot",
+    mode: Annotated[str, Form()] = "merge",
 ) -> Response:
     require_role(ctx, Role.EDITOR)
     max_bytes = request.app.state.settings.import_max_upload_bytes
@@ -256,19 +294,29 @@ async def workspace_data_import(
     await upload.close()
     if len(content) > max_bytes:
         raise HTTPException(status_code=413, detail=_t(request, UPLOAD_TOO_LARGE))
+    if mode not in {"merge", "restore"}:
+        raise HTTPException(status_code=422, detail=_t(request, IMPORT_FAILED))
     if delimiter not in {"detect", "comma", "semicolon"} or decimal not in {"dot", "comma"}:
         raise HTTPException(status_code=422, detail=_t(request, IMPORT_FAILED))
     if decimal == "comma" and delimiter != "semicolon":
         raise HTTPException(status_code=422, detail=_t(request, IMPORT_FAILED))
-    batch_id = await run_in_threadpool(
-        upload_import,
-        request.app.state.session_factory,
-        ctx,
-        data_dir=request.app.state.settings.data_dir,
-        filename=filename,
-        content=content,
-        options={"delimiter": delimiter, "decimal": decimal},
-    )
+    try:
+        batch_id = await run_in_threadpool(
+            upload_import,
+            request.app.state.session_factory,
+            ctx,
+            data_dir=request.app.state.settings.data_dir,
+            filename=filename,
+            content=content,
+            options={"delimiter": delimiter, "decimal": decimal},
+            mode=cast("Literal['merge', 'restore']", mode),
+        )
+    except ImportRestoreUnavailable:
+        raise HTTPException(status_code=409, detail=_t(request, IMPORT_RESTORE_NOT_EMPTY)) from None
+    except ImportRestoreRequiresArchive:
+        raise HTTPException(
+            status_code=409, detail=_t(request, IMPORT_RESTORE_NOT_ARCHIVE)
+        ) from None
     try:
         await run_in_threadpool(
             plan_import,
@@ -362,6 +410,10 @@ async def workspace_data_import_apply(
         return RedirectResponse(
             f"{request.url_for('workspace_data').path}?batch={identifier}", status_code=303
         )
+    except ImportRefused:
+        raise HTTPException(status_code=409, detail=_t(request, IMPORT_REFUSED)) from None
+    except ImportRestoreUnavailable:
+        raise HTTPException(status_code=409, detail=_t(request, IMPORT_RESTORE_NOT_EMPTY)) from None
     except ImportError as error:
         message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
         raise HTTPException(status_code=409, detail=_t(request, message)) from None
@@ -430,7 +482,7 @@ async def workspace_data_import_rollback_confirm(
     except WorkspaceNotAvailable:
         raise HTTPException(status_code=404) from None
     try:
-        batch, counts, closed_months = await run_in_threadpool(
+        preview = await run_in_threadpool(
             preview_rollback_import,
             request.app.state.session_factory,
             ctx,
@@ -439,10 +491,18 @@ async def workspace_data_import_rollback_confirm(
     except ImportError as error:
         message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
         raise HTTPException(status_code=409, detail=_t(request, message)) from None
+    blocked_reasons = [
+        report_message({"code": reason, "message": reason}, request.state.locale)
+        for reason in preview.blocked_reasons
+    ]
     return render_template(
         request,
         "workspace/import_rollback.html",
-        context={"batch": batch, "rollback_counts": counts, "closed_months": closed_months},
+        context={
+            "preview": preview,
+            "blocked_reasons": blocked_reasons,
+            "import_setting_labels": _import_setting_labels(request),
+        },
     )
 
 
@@ -463,6 +523,13 @@ async def workspace_data_import_rollback(
         )
     except ImportClosedMonths as error:
         detail = _t(request, ROLLBACK_CLOSED_MONTH) % {"months": ", ".join(error.months)}
+        raise HTTPException(status_code=409, detail=detail) from None
+    except ImportRestoreRollbackBlocked as error:
+        reasons = ", ".join(
+            report_message({"code": reason, "message": reason}, request.state.locale)
+            for reason in error.reasons
+        )
+        detail = _t(request, ROLLBACK_RESTORE_CHANGED) % {"reasons": reasons}
         raise HTTPException(status_code=409, detail=detail) from None
     except (ImportError, ImportUnavailable) as error:
         message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED

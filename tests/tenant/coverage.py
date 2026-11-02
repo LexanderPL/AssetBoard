@@ -15,6 +15,7 @@ BASE_METHOD_COVERAGE: dict[str, str] = {
     "get": ISOLATION_TEST,
     "get_or_raise": ISOLATION_TEST,
     "list": ISOLATION_TEST,
+    "any_exists": "test_any_exists_stays_in_its_workspace",
     "update": ISOLATION_TEST,
     "delete": ISOLATION_TEST,
     "add": "test_add_refuses_rows_of_another_workspace_or_type",
@@ -125,7 +126,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     },
     **{
         ("MonthStateRepository", method): "test_month_state_queries_stay_in_their_workspace"
-        for method in ("for_month", "create")
+        for method in ("for_month", "create", "create_restored", "delete_for_months")
     },
     **{
         ("MonthStateRepository", "closed_months"): (
@@ -164,6 +165,8 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             ("CategoryRepository", "for_import_batch"),
             ("BudgetLineRepository", "for_import_batch"),
             ("TransactionRepository", "create_imported"),
+            ("TransactionRepository", "create_restored"),
+            ("TransactionRepository", "delete_for_import_batch"),
             ("TransactionRepository", "for_import_batch"),
             ("TransactionRepository", "by_import_keys"),
             ("TransactionRepository", "by_lineage_ids"),

@@ -16,7 +16,7 @@ from __future__ import annotations
 from typing import Any, ClassVar, Literal, Protocol
 from uuid import UUID
 
-from sqlalchemy import Select, inspect, select
+from sqlalchemy import Select, exists, inspect, select
 from sqlalchemy.orm import DeclarativeBase, Session
 from sqlalchemy.orm.attributes import instance_state
 
@@ -98,6 +98,11 @@ class ScopedRepository[T: WorkspaceOwned]:
 
     def list(self) -> list[T]:
         return list(self._session.scalars(self._scoped_select().order_by(self.model.id)))
+
+    def any_exists(self) -> bool:
+        """Whether the current workspace has at least one row of this model."""
+        statement = select(exists().where(self.model.workspace_id == self._workspace_id))
+        return bool(self._session.execute(statement).scalar_one())
 
     def add(self, obj: T) -> T:
         self._check_type(obj)

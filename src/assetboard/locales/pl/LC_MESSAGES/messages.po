@@ -235,6 +235,9 @@ msgstr "Usunięto obszar roboczy"
 msgid "Workspace archive exported"
 msgstr "Wyeksportowano archiwum obszaru roboczego"
 
+msgid "Workspace restored from an archive"
+msgstr "Przywrócono obszar roboczy z archiwum"
+
 msgid "Import applied"
 msgstr "Zastosowano import"
 
@@ -483,6 +486,21 @@ msgstr "Nie skopiowano"
 
 msgid "Automatic"
 msgstr "Automatycznie"
+
+msgid "Import batch"
+msgstr "Partia importu"
+
+msgid "Settings changed"
+msgstr "Zmienione ustawienia"
+
+msgid "Settings restored"
+msgstr "Przywrócone ustawienia"
+
+msgid "Suggested categories removed"
+msgstr "Usunięte proponowane kategorie"
+
+msgid "Month states deleted"
+msgstr "Usunięte stany miesięcy"
 
 msgid "owner"
 msgstr "właściciel"
@@ -904,6 +922,9 @@ msgstr "Identyfikator nie jest prawidłowym UUID."
 msgid "The timestamp is invalid."
 msgstr "Znacznik czasu jest nieprawidłowy."
 
+msgid "The row is invalid."
+msgstr "Wiersz jest nieprawidłowy."
+
 msgid "The mapped category does not exist."
 msgstr "Docelowa kategoria nie istnieje."
 
@@ -912,6 +933,59 @@ msgstr "Docelowa kategoria ma niewłaściwy rodzaj."
 
 msgid "Two new categories have the same kind and name."
 msgstr "Dwie nowe kategorie mają ten sam rodzaj i nazwę."
+
+msgid "The archive's base currency differs from this workspace's base currency."
+msgstr "Waluta bazowa archiwum różni się od waluty bazowej tego obszaru roboczego."
+
+msgid ""
+"Restore is available only in an empty workspace (the untouched suggested "
+"categories are fine)."
+msgstr ""
+"Przywracanie jest dostępne tylko w pustym obszarze roboczym (nietknięte "
+"proponowane kategorie nie przeszkadzają)."
+
+msgid "Two active categories in the archive have the same kind and name."
+msgstr "Dwie aktywne kategorie w archiwum mają ten sam rodzaj i nazwę."
+
+msgid "The archive's workspace settings are not supported."
+msgstr "Ustawienia obszaru roboczego w archiwum nie są obsługiwane."
+
+msgid "The archive was made by a newer version of the app."
+msgstr "Archiwum zostało utworzone przez nowszą wersję aplikacji."
+
+msgid "The archive was made by a newer minor version; unknown data was ignored."
+msgstr ""
+"Archiwum zostało utworzone przez nowszą wersję pomocniczą; nieznane dane "
+"pominięto."
+
+msgid "The workspace has rows that this restore did not write."
+msgstr "Obszar roboczy zawiera wiersze, których to przywracanie nie zapisało."
+
+msgid "Rows written by this restore were changed after it."
+msgstr "Wiersze zapisane przez to przywracanie zostały później zmienione."
+
+msgid "Month states written by this restore were changed after it."
+msgstr "Stany miesięcy zapisane przez to przywracanie zostały później zmienione."
+
+msgid "Workspace settings changed since the restore."
+msgstr "Ustawienia obszaru roboczego zmieniły się po przywróceniu."
+
+msgid ""
+"Recurring items, income sources, work logs or tax rules were added after "
+"the restore."
+msgstr ""
+"Po przywróceniu dodano pozycje cykliczne, źródła dochodu, ewidencję pracy"
+" lub reguły podatkowe."
+
+msgid ""
+"Recurring items, income sources, work logs or tax rules reference rows "
+"written by this restore."
+msgstr ""
+"Pozycje cykliczne, źródła dochodu, ewidencja pracy lub reguły podatkowe "
+"odwołują się do wierszy zapisanych przez to przywracanie."
+
+msgid "This restore did not record the workspace settings it replaced."
+msgstr "To przywracanie nie zapisało ustawień obszaru roboczego, które zastąpiło."
 
 #, python-format
 msgid "%(tax)s: %(source)s"
@@ -2331,9 +2405,44 @@ msgstr "Nie udało się wykonać importu. Sprawdź raport i spróbuj ponownie."
 msgid "There is no import handler available for this file yet."
 msgstr "Nie ma jeszcze procedury importu dla tego pliku."
 
+msgid "This archive cannot be imported into this workspace."
+msgstr "Tego archiwum nie można zaimportować do tego obszaru roboczego."
+
+msgid "Restore needs a complete workspace archive (a ZIP file)."
+msgstr "Przywracanie wymaga kompletnego archiwum obszaru roboczego (pliku ZIP)."
+
 #, python-format
 msgid "Rollback was refused because these months are closed: %(months)s"
 msgstr "Nie można cofnąć importu, ponieważ zamknięte są miesiące: %(months)s"
+
+#, python-format
+msgid ""
+"Rollback was refused because the workspace changed after the restore: "
+"%(reasons)s"
+msgstr ""
+"Nie można cofnąć przywracania, ponieważ obszar roboczy zmienił się po "
+"przywróceniu: %(reasons)s"
+
+msgid "Workspace name"
+msgstr "Nazwa obszaru roboczego"
+
+msgid "Base currency"
+msgstr "Waluta podstawowa"
+
+msgid "Country"
+msgstr "Kraj"
+
+msgid "Time zone"
+msgstr "Strefa czasowa"
+
+msgid "Language"
+msgstr "Język"
+
+msgid "Automatic plan copy"
+msgstr "Automatyczne kopiowanie planu"
+
+msgid "Upcoming window"
+msgstr "Okno nadchodzących"
 
 msgid "Workspace settings saved."
 msgstr "Zapisano ustawienia obszaru roboczego."
@@ -2481,9 +2590,6 @@ msgstr "Twoje dane"
 
 msgid "Display name"
 msgstr "Wyświetlana nazwa"
-
-msgid "Language"
-msgstr "Język"
 
 msgid "Theme"
 msgstr "Motyw"
@@ -2960,9 +3066,6 @@ msgstr "Masz już konto?"
 #, python-format
 msgid "Your email address %(email)s is confirmed. Choose your name and password."
 msgstr "Adres e-mail %(email)s jest potwierdzony. Wybierz nazwę i hasło."
-
-msgid "Workspace name"
-msgstr "Nazwa obszaru roboczego"
 
 msgid "Choose a new password"
 msgstr "Ustaw nowe hasło"
@@ -5017,17 +5120,8 @@ msgstr "Można go ponownie otworzyć na stronie miesiąca."
 msgid "Defaults to your display name."
 msgstr "Domyślnie Twoja wyświetlana nazwa."
 
-msgid "Base currency"
-msgstr "Waluta podstawowa"
-
-msgid "Country"
-msgstr "Kraj"
-
 msgid "Not set"
 msgstr "Nie ustawiono"
-
-msgid "Time zone"
-msgstr "Strefa czasowa"
 
 msgid "Download workspace archive"
 msgstr "Pobierz archiwum obszaru roboczego"
@@ -5054,6 +5148,33 @@ msgstr "Import danych księgowych"
 
 msgid "ZIP archive or CSV file"
 msgstr "Archiwum ZIP lub plik CSV"
+
+msgid "Merge data into this workspace"
+msgstr "Scal dane z tym obszarem roboczym"
+
+msgid ""
+"Categories, transactions, and planned values; settings and closed months "
+"are not applied."
+msgstr ""
+"Kategorie, transakcje i planowane wartości; ustawienia i zamknięte "
+"miesiące nie są stosowane."
+
+msgid "Restore into this workspace"
+msgstr "Przywróć do tego obszaru roboczego"
+
+msgid ""
+"Replaces settings, categories, transactions, planned values, and month "
+"states. Only for an empty workspace."
+msgstr ""
+"Zastępuje ustawienia, kategorie, transakcje, planowane wartości i stany "
+"miesięcy. Tylko dla pustego obszaru roboczego."
+
+msgid ""
+"Available only in an empty workspace. The untouched suggested categories "
+"are fine."
+msgstr ""
+"Dostępne tylko w pustym obszarze roboczym. Nietknięte proponowane "
+"kategorie nie przeszkadzają."
 
 msgid "CSV delimiter"
 msgstr "Separator CSV"
@@ -5134,6 +5255,35 @@ msgstr "Nieprawidłowe wiersze"
 msgid "Unresolved category mappings"
 msgstr "Nierozwiązane mapowania kategorii"
 
+msgid "Restore plan"
+msgstr "Plan przywracania"
+
+msgid "Deleted transactions restored"
+msgstr "Przywrócone usunięte transakcje"
+
+msgid "Month states"
+msgstr "Stany miesięcy"
+
+msgid "Suggested categories to remove"
+msgstr "Proponowane kategorie do usunięcia"
+
+#, python-format
+msgid "Removed before restoring: %(names)s"
+msgstr "Usunięto przed przywróceniem: %(names)s"
+
+msgid "Settings the restore will replace:"
+msgstr "Ustawienia, które zastąpi przywracanie:"
+
+msgid "Months that will be restored as closed:"
+msgstr "Miesiące, które zostaną przywrócone jako zamknięte:"
+
+msgid ""
+"A restore needs a completely valid archive. Fix the errors below before "
+"applying."
+msgstr ""
+"Przywracanie wymaga całkowicie poprawnego archiwum. Usuń błędy poniżej "
+"przed zastosowaniem."
+
 msgid "Totals by month"
 msgstr "Sumy według miesiąca"
 
@@ -5142,6 +5292,12 @@ msgstr "Wiersze do utworzenia"
 
 msgid "Totals by category"
 msgstr "Sumy według kategorii"
+
+msgid "Settings that differ (not applied in merge mode):"
+msgstr "Ustawienia, które się różnią (nie są stosowane w trybie scalania):"
+
+msgid "Closed months in the archive (not applied in merge mode):"
+msgstr "Zamknięte miesiące w archiwum (nie są stosowane w trybie scalania):"
 
 msgid "The file was checked, but there is no importer for this kind of file yet."
 msgstr "Plik został sprawdzony, ale nie ma jeszcze importu dla tego rodzaju pliku."
@@ -5258,11 +5414,32 @@ msgstr "Usuń ten obszar roboczy"
 msgid "Confirm import rollback"
 msgstr "Potwierdź cofnięcie importu"
 
+msgid ""
+"This permanently removes everything the restore wrote and puts the "
+"previous workspace settings back. The suggested categories are not "
+"restored."
+msgstr ""
+"To trwale usuwa wszystko, co zapisało przywracanie, i przywraca "
+"poprzednie ustawienia obszaru roboczego. Proponowane kategorie nie "
+"zostaną przywrócone."
+
 msgid "Transactions to remove"
 msgstr "Transakcje do usunięcia"
 
 msgid "Budget lines to remove"
 msgstr "Planowane wartości do usunięcia"
+
+msgid "Categories to remove"
+msgstr "Kategorie do usunięcia"
+
+msgid "Month states to remove"
+msgstr "Stany miesięcy do usunięcia"
+
+msgid "Settings to restore:"
+msgstr "Ustawienia do przywrócenia:"
+
+msgid "Rollback is not possible:"
+msgstr "Cofnięcie nie jest możliwe:"
 
 msgid "Budget lines kept (changed since the import)"
 msgstr "Zachowane wartości planowane (zmienione po imporcie)"

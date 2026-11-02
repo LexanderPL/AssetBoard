@@ -201,7 +201,8 @@ def test_reader_checks_counts_currency_and_versions() -> None:
     assert parsed is None and any(e.message == "row count mismatch" for e in errors)
     for changes, message in [
         ({"base_currency": "PLN"}, "base currency differs from manifest"),
-        ({"format_version": "2.0"}, "unsupported archive version"),
+        ({"format_version": "2.0"}, "made by a newer version of the app"),
+        ({"format_version": "0.9"}, "unsupported archive version"),
     ]:
         parsed, errors = parse_archive(_rewrite(files, **changes))
         assert parsed is None and any(e.message == message for e in errors)

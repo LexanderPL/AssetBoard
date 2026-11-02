@@ -17,6 +17,21 @@
     <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
     <label class="block text-sm font-medium" for="import-upload">{{ _("ZIP archive or CSV file") }}</label>
     <input id="import-upload" name="upload" type="file" accept=".zip,.csv,application/zip,text/csv" required class="block w-full text-sm">
+    <fieldset class="space-y-2">
+      <legend class="text-sm font-medium">{{ _("Mode") }}</legend>
+      <label class="flex items-start gap-2 text-sm">
+        <input type="radio" name="mode" value="merge" checked class="mt-1">
+        <span>{{ _("Merge data into this workspace") }}<span class="block text-xs text-muted">{{ _("Categories, transactions, and planned values; settings and closed months are not applied.") }}</span></span>
+      </label>
+      {% if is_owner %}
+      <label class="flex items-start gap-2 text-sm {% if not can_restore %}opacity-60{% endif %}">
+        <input type="radio" name="mode" value="restore" class="mt-1"{% if not can_restore %} disabled{% endif %}>
+        <span>{{ _("Restore into this workspace") }}<span class="block text-xs text-muted">{% if can_restore %}{{ _("Replaces settings, categories, transactions, planned values, and month states. Only for an empty workspace.") }}{% else %}{{ _("Available only in an empty workspace. The untouched suggested categories are fine.") }}{% endif %}</span></span>
+      </label>
+      {% else %}
+      <input type="hidden" name="mode" value="merge">
+      {% endif %}
+    </fieldset>
     <div class="grid grid-cols-2 gap-4">
       <label class="block text-sm">{{ _("CSV delimiter") }}
         <select name="delimiter" class="form-select mt-1 w-full">
@@ -68,9 +83,9 @@
         <form method="post" action="{{ scoped_url(request, 'workspace_data_import_apply', batch_id=batch.id) }}" class="flex items-center gap-2">
           <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
           {% if batch.mode == 'merge' and batch.report.counts.invalid|default(0) > 0 %}<label><input type="checkbox" name="skip_invalid" value="true"> {{ _("Skip %(count)s invalid rows", count=batch.report.counts.invalid) }}</label>{% endif %}
-          <button type="submit" class="underline disabled:opacity-50" {% if batch.report.counts.mapping_invalid|default(0) > 0 %}disabled{% endif %}>{{ _("Apply import") }}</button>
+          <button type="submit" class="underline disabled:opacity-50" {% if batch.report.refused or batch.report.counts.mapping_invalid|default(0) > 0 or (batch.mode == 'restore' and batch.report.counts.invalid|default(0) > 0) %}disabled{% endif %}>{{ _("Apply import") }}</button>
         </form>
-        {% elif batch.status == 'applied' and batch.mode == 'merge' %}
+        {% elif batch.status == 'applied' and (batch.mode == 'merge' or is_owner) %}
         <a class="underline" href="{{ scoped_url(request, 'workspace_data_import_rollback_confirm', batch_id=batch.id) }}">{{ _("Roll back import") }}</a>
         {% endif %}
       </div>
@@ -94,6 +109,33 @@
     <div><dt class="text-muted">{{ _("Invalid rows") }}</dt><dd>{{ selected_batch.report.counts.invalid|default(0) }}</dd></div>
     <div><dt class="text-muted">{{ _("Unresolved category mappings") }}</dt><dd>{{ selected_batch.report.counts.mapping_invalid|default(0) }}</dd></div>
   </dl>
+  {% if selected_batch.mode == 'restore' %}
+  <div class="mt-6">
+    <h3 class="font-semibold">{{ _("Restore plan") }}</h3>
+    <dl class="mt-2 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+      <div><dt class="text-muted">{{ _("Categories") }}</dt><dd>{{ selected_batch.report.counts.categories_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Transactions") }}</dt><dd>{{ selected_batch.report.counts.transactions_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Deleted transactions restored") }}</dt><dd>{{ selected_batch.report.counts.deleted_transactions|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Planned values") }}</dt><dd>{{ selected_batch.report.counts.budget_lines_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Month states") }}</dt><dd>{{ selected_batch.report.counts.months_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Suggested categories to remove") }}</dt><dd>{{ selected_batch.report.counts.suggested_categories_removed|default(0) }}</dd></div>
+    </dl>
+    {% if selected_batch.report.suggested_categories_removed %}
+    <p class="mt-2 text-sm text-muted">{{ _("Removed before restoring: %(names)s", names=selected_batch.report.suggested_categories_removed|join(", ")) }}</p>
+    {% endif %}
+    {% if selected_batch.report.settings_diff %}
+    <p class="mt-3 text-sm"><span class="font-medium">{{ _("Settings the restore will replace:") }}</span>
+      {% for field in selected_batch.report.settings_diff %}{{ import_setting_labels.get(field, field) }}{% if not loop.last %}, {% endif %}{% endfor %}
+    </p>
+    {% endif %}
+    {% if selected_batch.report.archive_closed_months %}
+    <p class="mt-2 text-sm"><span class="font-medium">{{ _("Months that will be restored as closed:") }}</span> {{ selected_batch.report.archive_closed_months|join(", ") }}</p>
+    {% endif %}
+    {% if selected_batch.report.counts.invalid|default(0) > 0 %}
+    <p class="mt-3 text-sm text-danger">{{ _("A restore needs a completely valid archive. Fix the errors below before applying.") }}</p>
+    {% endif %}
+  </div>
+  {% else %}
   {% if selected_batch.report.months %}
   <div class="mt-6 overflow-x-auto">
     <h3 class="font-semibold">{{ _("Totals by month") }}</h3>
@@ -112,6 +154,15 @@
     </table>
   </div>
   {% endif %}
+  {% if selected_batch.report.settings_diff %}
+  <p class="mt-3 text-sm"><span class="font-medium">{{ _("Settings that differ (not applied in merge mode):") }}</span>
+    {% for field in selected_batch.report.settings_diff %}{{ import_setting_labels.get(field, field) }}{% if not loop.last %}, {% endif %}{% endfor %}
+  </p>
+  {% endif %}
+  {% if selected_batch.report.archive_closed_months %}
+  <p class="mt-2 text-sm"><span class="font-medium">{{ _("Closed months in the archive (not applied in merge mode):") }}</span> {{ selected_batch.report.archive_closed_months|join(", ") }}</p>
+  {% endif %}
+  {% endif %}
   {% elif selected_batch.status == 'planned' %}
   <p class="mt-2 text-sm text-muted">{{ _("The file was checked, but there is no importer for this kind of file yet.") }}</p>
   {% endif %}
@@ -124,11 +175,12 @@
       {% for entry in selected_batch.report.mapping %}
       {% set index = loop.index0 %}
       <fieldset class="rounded-xl border border-line p-4">
+        <input type="hidden" name="mapping_source_id_{{ index }}" value="{{ entry.source_id|default('') }}">
         <input type="hidden" name="mapping_kind_{{ index }}" value="{{ entry.kind }}">
         <input type="hidden" name="mapping_key_{{ index }}" value="{{ entry.source_name_key }}">
         <legend class="px-1 text-sm font-medium">
           {% if entry.kind == 'expense' %}{{ _("Expense") }}{% else %}{{ _("Income") }}{% endif %}:
-          {{ entry.source_name }}
+          {{ entry.source_name }}{% if entry.source_archived %} ({{ _("Archived") }}){% endif %}
           <span class="font-normal text-muted">({{ ngettext("%(num)d row", "%(num)d rows", entry.rows) }}, {{ entry.total }})</span>
         </legend>
         <div class="mt-3 grid gap-3 sm:grid-cols-2">
@@ -165,11 +217,12 @@
       </fieldset>
       {% endfor %}
       <label class="flex items-center gap-2 text-sm"><input type="checkbox" name="remember_mappings" value="true" {% if selected_batch.options.get('remember_mappings') %}checked{% endif %}> {{ _("Remember these mappings for later imports") }}</label>
-      {% if selected_batch.report.counts.invalid|default(0) > 0 %}<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="skip_invalid" value="true"> {{ _("Skip %(count)s invalid rows", count=selected_batch.report.counts.invalid) }}</label>{% endif %}
+      {% if selected_batch.mode == 'merge' and selected_batch.report.counts.invalid|default(0) > 0 %}<label class="flex items-center gap-2 text-sm"><input type="checkbox" name="skip_invalid" value="true"> {{ _("Skip %(count)s invalid rows", count=selected_batch.report.counts.invalid) }}</label>{% endif %}
       <div class="flex flex-wrap items-center gap-4">
         <button type="submit" formaction="{{ scoped_url(request, 'workspace_data_import_preview', batch_id=selected_batch.id) }}" class="rounded-xl border border-line-strong px-4 py-2.5 text-sm font-semibold">{{ _("Update preview") }}</button>
-        <button type="submit" class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary disabled:opacity-50" {% if selected_batch.report.counts.mapping_invalid|default(0) > 0 %}disabled{% endif %}>{{ _("Apply import") }}</button>
+        <button type="submit" class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary disabled:opacity-50" {% if selected_batch.report.refused or selected_batch.report.counts.mapping_invalid|default(0) > 0 or (selected_batch.mode == 'restore' and selected_batch.report.counts.invalid|default(0) > 0) %}disabled{% endif %}>{{ _("Apply import") }}</button>
       </div>
+      {% if selected_batch.report.refused %}<p class="text-sm text-danger">{{ _("This archive cannot be imported into this workspace.") }}</p>{% endif %}
       {% if selected_batch.report.counts.mapping_invalid|default(0) > 0 %}<p class="text-sm text-danger">{{ _("Fix the category mappings above before applying.") }}</p>{% endif %}
     </form>
   </div>
