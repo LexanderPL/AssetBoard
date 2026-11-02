@@ -681,14 +681,8 @@ async def _password_page(
     has_password = await run_in_threadpool(
         user_has_password, state.session_factory, current.user_id
     )
-    factor = await run_in_threadpool(
-        lambda: totp.state(
-            state.session_factory,
-            user_id=current.user_id,
-            session_hash=current.session_hash,
-            settings=state.settings,
-            clock=state.clock,
-        )
+    two_factor_enabled = await run_in_threadpool(
+        lambda: totp.is_enabled(state.session_factory, user_id=current.user_id)
     )
     return render_template(
         request,
@@ -700,7 +694,7 @@ async def _password_page(
             },
             "notice": notice,
             "no_password": None if has_password else _t(request, NO_PASSWORD),
-            "two_factor_enabled": factor.enabled,
+            "two_factor_enabled": two_factor_enabled,
             "confirm": await confirm_view(request, current),
         },
         status_code=status_code,

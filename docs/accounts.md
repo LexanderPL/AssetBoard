@@ -43,7 +43,8 @@ These need email, which your administrator sets up ([Email](deployment.md#email)
 
 ## Two-factor authentication
 
-Choose **Two-factor authentication** on **Account security**. Confirm your password, scan the QR code
+Use **Manage two-factor authentication** in the **Two-factor authentication** section of
+**Account security**. Confirm your password, scan the QR code
 with an authenticator app (or enter its manual key), then enter a six-digit code within ten
 minutes. Nothing is enabled until that code succeeds. Enrollment ends other password sessions.
 Save the ten recovery codes shown on completion: this is the only time they are displayed.
