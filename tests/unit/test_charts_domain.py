@@ -9,7 +9,13 @@ import pytest
 from hypothesis import given
 from hypothesis import strategies as st
 
-from assetboard.domain.charts import Slice, category_breakdown, share_tenths
+from assetboard.domain.charts import (
+    CategoryAmount,
+    Slice,
+    category_breakdown,
+    category_slices,
+    share_tenths,
+)
 from assetboard.domain.money import Money
 from assetboard.domain.summary import Entry, PlanLine, SummaryCategory, summarize_month
 
@@ -37,6 +43,27 @@ def _category(kind: str = "expense", treatment: str = "regular") -> SummaryCateg
 )
 def test_share_tenths(part: int, whole: int, expected: int) -> None:
     assert share_tenths(part, whole) == expected
+
+
+def test_the_shared_slicer_works_on_any_category_totals() -> None:
+    first, second, third, fourth, fifth = (uuid4() for _ in range(5))
+    assert category_slices(
+        [
+            CategoryAmount(first, _eur(50_00)),
+            CategoryAmount(second, _eur(30_00)),
+            CategoryAmount(third, _eur(20_00)),
+            CategoryAmount(fourth, _eur(5_00)),
+            CategoryAmount(fifth, _eur(0)),
+        ],
+        currency="EUR",
+        max_slices=3,
+    ) == (
+        Slice(first, _eur(50_00), 476),
+        Slice(second, _eur(30_00), 286),
+        Slice(None, _eur(25_00), 238, grouped=2),
+    )
+    with pytest.raises(ValueError, match="chart in EUR"):
+        category_slices([CategoryAmount(first, Money(1, "USD"))], currency="EUR")
 
 
 def test_expense_slices_sorted_by_amount_with_shares() -> None:

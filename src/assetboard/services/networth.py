@@ -85,6 +85,7 @@ __all__ = [
     "create_bulk",
     "create_category",
     "create_item",
+    "current_values",
     "delete_category",
     "get_category",
     "get_item",
@@ -266,11 +267,8 @@ def _category_view(category: NetWorthCategory, counts: Mapping[UUID, int]) -> Ca
     )
 
 
-def _valuation_views(
-    valuations: Sequence[ItemValuation], today: date
-) -> tuple[tuple[ValuationView, ...], int | None, date | None, str]:
-    rows = {valuation.id: valuation for valuation in valuations}
-    points = ordered_valuations(
+def _valuation_points(valuations: Sequence[ItemValuation]) -> list[ValuationPoint]:
+    return ordered_valuations(
         [
             ValuationPoint(
                 id=valuation.id,
@@ -281,6 +279,13 @@ def _valuation_views(
             for valuation in valuations
         ]
     )
+
+
+def _valuation_views(
+    valuations: Sequence[ItemValuation], today: date
+) -> tuple[tuple[ValuationView, ...], int | None, date | None, str]:
+    rows = {valuation.id: valuation for valuation in valuations}
+    points = _valuation_points(valuations)
     views = tuple(
         ValuationView(
             id=point.id,
@@ -306,8 +311,17 @@ def _item_view(
     *,
     today: date,
     base_currency: str,
+    include_history: bool = True,
 ) -> ItemView:
-    views, current_minor, current_as_of, sparkline = _valuation_views(valuations, today)
+    if include_history:
+        views, current_minor, current_as_of, sparkline = _valuation_views(valuations, today)
+    else:
+        points = _valuation_points(valuations)
+        current_point = current_valuation(points, today)
+        views = ()
+        current_minor = current_point.value_minor if current_point is not None else None
+        current_as_of = current_point.as_of if current_point is not None else None
+        sparkline = ""
     current = Money(current_minor, item.currency) if current_minor is not None else None
     return ItemView(
         id=item.id,
@@ -328,6 +342,44 @@ def _item_view(
         sparkline=sparkline,
         non_base=item.currency != base_currency,
     )
+
+
+def current_values(
+    session: Session,
+    ctx: Context,
+    *,
+    as_of: date,
+    base_currency: str,
+    include_history: bool = False,
+    categories: Sequence[NetWorthCategory] | None = None,
+) -> list[ItemView]:
+    """Every item with its value effective on ``as_of``.
+
+    The shared read path for the F5.1 lists (``include_history=True``), the F5.2 summary
+    (default) and F5.3's month-end snapshots (any ``as_of``). A valuation dated after
+    ``as_of`` is ignored even when it exists in the history.
+    """
+    category_rows = (
+        list(categories)
+        if categories is not None
+        else NetWorthCategoryRepository(session, ctx).ordered()
+    )
+    category_by_id = {category.id: category for category in category_rows}
+    items = NetWorthItemRepository(session, ctx).ordered()
+    valuations: dict[UUID, list[ItemValuation]] = {}
+    for valuation in ItemValuationRepository(session, ctx).for_items([item.id for item in items]):
+        valuations.setdefault(valuation.item_id, []).append(valuation)
+    return [
+        _item_view(
+            item,
+            category_by_id[item.category_id],
+            valuations.get(item.id, ()),
+            today=as_of,
+            base_currency=base_currency,
+            include_history=include_history,
+        )
+        for item in items
+    ]
 
 
 def _sort_items(items: Sequence[ItemView]) -> tuple[ItemView, ...]:
@@ -370,35 +422,21 @@ def _group_view(
 def _side_view(
     side: Side,
     categories: Sequence[NetWorthCategory],
-    items: Sequence[NetWorthItem],
-    valuations: Mapping[UUID, Sequence[ItemValuation]],
+    items: Sequence[ItemView],
     *,
-    today: date,
     base_currency: str,
 ) -> SideView:
     counts: dict[UUID, int] = {}
     for item in items:
         counts[item.category_id] = counts.get(item.category_id, 0) + 1
     category_views = {category.id: _category_view(category, counts) for category in categories}
-    category_objects = {category.id: category for category in categories}
-    item_views = {
-        item.id: _item_view(
-            item,
-            category_objects[item.category_id],
-            valuations.get(item.id, ()),
-            today=today,
-            base_currency=base_currency,
-        )
-        for item in items
-    }
     active_items_by_category: dict[UUID, list[ItemView]] = {}
     archived_items: list[ItemView] = []
     for item in items:
-        view = item_views[item.id]
-        if item.archived_at is not None:
-            archived_items.append(view)
+        if item.archived:
+            archived_items.append(item)
         else:
-            active_items_by_category.setdefault(item.category_id, []).append(view)
+            active_items_by_category.setdefault(item.category_id, []).append(item)
 
     groups: list[GroupView] = []
     archived_groups: list[GroupView] = []
@@ -445,27 +483,25 @@ def list_networth(factory: sessionmaker[Session], ctx: Context) -> NetWorthPage:
     with factory() as session:
         base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
         categories = NetWorthCategoryRepository(session, ctx).ordered()
-        items = NetWorthItemRepository(session, ctx).ordered()
-        valuations: dict[UUID, list[ItemValuation]] = {}
-        for valuation in ItemValuationRepository(session, ctx).for_items(
-            [item.id for item in items]
-        ):
-            valuations.setdefault(valuation.item_id, []).append(valuation)
+        items = current_values(
+            session,
+            ctx,
+            as_of=today,
+            base_currency=base_currency,
+            include_history=True,
+            categories=categories,
+        )
     return NetWorthPage(
         asset=_side_view(
             Side.ASSET,
             categories,
             items,
-            valuations,
-            today=today,
             base_currency=base_currency,
         ),
         liability=_side_view(
             Side.LIABILITY,
             categories,
             items,
-            valuations,
-            today=today,
             base_currency=base_currency,
         ),
     )

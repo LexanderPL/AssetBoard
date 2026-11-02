@@ -1,4 +1,5 @@
 {% from "networth/_macros.html" import bulk_preview_panel, category_row, htmx_form, item_row with context %}
+{% from "networth/_tabs.html" import tabs with context %}
 {% from "macros/components.html" import csrf_input with context %}
 <div id="networth-body" class="space-y-6">
   {% if notice %}
@@ -8,15 +9,7 @@
   <p class="border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ error }}</p>
   {% endif %}
 
-  <div class="flex flex-wrap items-center gap-2" role="tablist" aria-label="{{ _('Assets and liabilities') }}">
-    {% for code, label in side_labels.items() %}
-    {% if side_value == code %}
-    <a href="{{ scoped_url(request, 'networth') }}?side={{ code }}" role="tab" aria-selected="true" data-side-tab="{{ code }}" class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ label }}</a>
-    {% else %}
-    <a href="{{ scoped_url(request, 'networth') }}?side={{ code }}" role="tab" aria-selected="false" data-side-tab="{{ code }}" class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ label }}</a>
-    {% endif %}
-    {% endfor %}
-  </div>
+  {{ tabs(side_value) }}
 
   {% if view.can_seed %}
   <section class="panel p-6 sm:p-7" aria-labelledby="seed-heading" data-seed-offer>

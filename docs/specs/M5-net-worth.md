@@ -66,6 +66,26 @@ Money is Money only. Tests: valuation append semantics, back-dated valuations, c
 - "Debt-to-assets ratio" and "liquid vs illiquid" are **not** required (do not implement).
 - Currency conversion for non-base-currency items uses the FX service if M6 exists; before that, non-base items are shown separately with a warning and excluded from totals (documented limitation).
 
+**Implementation notes (F5.2).**
+- `GET /net-worth/summary` is its own page; the sidebar points to it and both pages share the
+  Summary / Assets / Liabilities tabs. F5.1 URLs stay unchanged.
+- The shared read path is `services.networth.current_values(session, ctx, *, as_of, ...)`; the
+  list uses history, the summary uses current values only, and F5.3 can pass a month-end date.
+  A valuation after `as_of` is ignored.
+- `summarize_net_worth` is pure and works on item IDs, sides and `Money`; names and colours are
+  added in the web layer.
+- Counting order: archived item → excluded → no value → non-base → counted. Items under an
+  archived category still count.
+- Shares are of each side's own total, in once-rounded tenths of a percent, using the existing
+  share helper. A side total of zero gives `None` and a displayed dash.
+- Categories with no counted item are left out. Zero-valued counted items remain in the table
+  but have no share.
+- The assets-vs-liabilities bar is server-rendered SVG with integer widths. Donuts reuse the
+  shared top-N plus “Other categories” slicer and ECharts `charts.js`; the grouped slice is
+  labelled “Other categories” because “Other” is a real seed category.
+- Excluded items are a neutral note; non-base and no-value items use warning tones. No FX, no
+  base-currency lock, no writes/audit, no migration.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
@@ -85,6 +105,12 @@ Property tests: net = assets - liabilities; category totals sum to side totals; 
 - **Backfill** from valuation history: for each past month-end, compute from `ItemValuation`s (latest valuation ≤ date); marked `source=backfill` and replaceable by real snapshots.
 - Line chart of net worth (with assets and liabilities lines toggleable) over time; range selector (1y/3y/5y/all); hover shows the breakdown by category.
 - Linked items are included in snapshots using their value at that moment (once M6/M7 exist); if a link cannot be resolved the snapshot records the item as "unavailable" and the report flags it.
+
+**Open question for F5.3.** `current_values(..., as_of=...)` currently uses the item's *current*
+`archived` and `include_in_net_worth` flags even for a past date. That is right for today's
+summary, but a backfill would drop an item archived last week from last year's month-ends. Decide
+whether snapshots should use `archived_at`/a flag history so archiving removes the item only from
+snapshots after the archive date (and answer the same question for `include_in_net_worth`).
 
 **Agent prompt**
 ```

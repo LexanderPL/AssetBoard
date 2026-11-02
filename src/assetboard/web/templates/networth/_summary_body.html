@@ -1,0 +1,43 @@
+{% from "networth/_tabs.html" import tabs with context %}
+{% from "networth/_summary_macros.html" import bar, category_table, warning_list with context %}
+{% from "macros/charts.html" import donut with context %}
+<div class="space-y-6" data-networth-summary>
+  {{ tabs("summary") }}
+
+  <section class="panel p-4 sm:p-6" aria-labelledby="net-worth-summary-heading" data-summary-figure>
+    <h2 id="net-worth-summary-heading" class="text-base font-semibold">{{ _("Net worth") }}</h2>
+    {% if view.net_tone == "favourable" %}
+    <p class="mt-2 text-4xl font-semibold tracking-tight tabular-nums text-success-strong" data-net-worth>{{ view.net }}</p>
+    {% elif view.net_tone == "unfavourable" %}
+    <p class="mt-2 text-4xl font-semibold tracking-tight tabular-nums text-danger" data-net-worth>{{ view.net }}</p>
+    {% else %}
+    <p class="mt-2 text-4xl font-semibold tracking-tight tabular-nums" data-net-worth>{{ view.net }}</p>
+    {% endif %}
+    <dl class="mt-4 flex flex-wrap gap-x-8 gap-y-2 text-sm">
+      <div class="flex items-baseline gap-2"><dt class="text-muted">{{ _("Assets") }}</dt><dd class="font-semibold tabular-nums" data-assets-total>{{ view.assets }}</dd></div>
+      <div class="flex items-baseline gap-2"><dt class="text-muted">{{ _("Liabilities") }}</dt><dd class="font-semibold tabular-nums" data-liabilities-total>{{ view.liabilities }}</dd></div>
+    </dl>
+    {{ bar(view) }}
+  </section>
+
+  {% if view.non_base_items %}
+  {{ warning_list(ngettext("%(num)d item is in another currency and is not counted.", "%(num)d items are in another currency and are not counted.", view.non_base_items|length), view.non_base_items, tone="non_base") }}
+  {% endif %}
+  {% if view.no_value_items %}
+  {{ warning_list(ngettext("%(num)d item has no value yet.", "%(num)d items have no value yet.", view.no_value_items|length), view.no_value_items, tone="no_value") }}
+  {% endif %}
+  {% if view.excluded_items %}
+  {{ warning_list(ngettext("%(num)d item is not counted because you excluded it.", "%(num)d items are not counted because you excluded them.", view.excluded_items|length), view.excluded_items, tone="excluded") }}
+  {% endif %}
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <div class="space-y-6">
+      {% if view.asset_side.donut %}{{ donut(view.asset_side.donut) }}{% endif %}
+      {{ category_table(view.asset_side) }}
+    </div>
+    <div class="space-y-6">
+      {% if view.liability_side.donut %}{{ donut(view.liability_side.donut) }}{% endif %}
+      {{ category_table(view.liability_side) }}
+    </div>
+  </div>
+</div>
