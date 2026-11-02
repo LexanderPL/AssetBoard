@@ -6,7 +6,7 @@
 
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
-**Data model (sketch):** `ApiToken(id, workspace_id, user_id, name, token_hash, scopes[read|write], last_used_at, expires_at?, revoked_at?)`; `BackupRun(id, started_at, finished_at, status, path, size_bytes, error?)`; `DashboardPreference(user_id, workspace_id, hidden_cards JSON, card_order JSON)`.
+**Data model (sketch):** `ApiToken(id, workspace_id, user_id, name, token_hash, scopes[read|write], last_used_at, expires_at?, revoked_at?)`; `BackupRun(id, started_at, finished_at, status, path, size_bytes, error?)`; `DashboardPreference(user_id, workspace_id, widgets JSON, customised_at?)`, where `widgets` is the ordered list of enabled widget keys (F9.1).
 
 ---
 
@@ -17,18 +17,55 @@ already shows the current month (flow bar, category donuts) and upcoming items. 
 remaining module cards, hiding/reordering and privacy mode to that page; the "This month" and
 "Upcoming" cards are F2.7's blocks, not new ones.
 
+**Configurable widgets (owner, 2026-11-02, pre-1.0):** every user chooses what their Home page
+shows. Home is built from **widgets** picked from a catalogue: charts for the current month,
+upcoming payments, portfolio changes and the other module summaries below. Each user adds, removes
+and orders them. A widget is the same thing as a "card" in the rest of this spec.
+
 **Acceptance**
-- Cards (each links to its module and can be hidden/reordered per user): **This month** (planned vs actual, savings rate, forecast); **Upcoming 30 days** (with overdue highlighted and one-click confirm); **Net worth** (value + 12-month trend); **Portfolio** (value, gain %, allocation mini-donut); **Loans** (remaining principal, payoff date, % repaid); **FIRE** (progress, FIRE age of the default scenario); **Missing data** (stale prices, missing work logs, imports planned but not applied).
-- Cards degrade gracefully when a module has no data ("Set up investments →").
-- Each card is its own HTMX fragment (lazy-loaded) so a slow card never blocks the page; every figure comes from existing services (no duplicated math).
-- Privacy mode toggle (hide amounts everywhere, persisted per user).
+- **Widget catalogue.** Each widget links to its module.
+  - **This month: in vs out** (F2.7's flow bar);
+  - **This month: expenses by category** and **This month: income by category** (F2.7's donuts,
+    one widget each);
+  - **This month: planned vs actual** (planned vs actual, savings rate, forecast);
+  - **Upcoming payments** (F2.7's upcoming block; overdue highlighted, one-click confirm; it uses
+    the workspace's Upcoming window setting);
+  - **Net worth** (value + 12-month trend);
+  - **Portfolio** (value, gain %, allocation mini-donut);
+  - **Portfolio changes** (change in value since the previous day and since the start of the
+    month, in money and %, plus the largest movers);
+  - **Loans** (remaining principal, payoff date, % repaid);
+  - **FIRE** (progress, FIRE age of the default scenario);
+  - **Missing data** (stale prices, missing work logs, imports planned but not applied).
+- **Modules that ship later.** A widget whose module has not shipped yet is not in the catalogue.
+  One whose module has shipped but has no data shows the empty state ("Set up investments →").
+  Later modules add their widgets to the same catalogue (a registry, like `EMPTINESS_CHECKS`).
+- **Customise Home.** A "Customise" control on Home opens the picker:
+  - a checkbox per widget;
+  - move up/down buttons, so reordering works without drag and drop, by keyboard and on a phone;
+  - "Reset to default".
+  Changes apply on save. It works without JavaScript beyond the CSP-safe Alpine build.
+- **Defaults.** A user with no saved preference sees what Home shows today (This month: in vs out,
+  both category donuts, Upcoming payments), followed by each shipped module's widget. Widgets that
+  arrive with a later release appear for users who never customised Home. For users who did, they
+  are available in the picker but stay off until chosen.
+- **Storage.** Preferences are stored per user and workspace (`DashboardPreference`): the ordered
+  list of enabled widgets. An unknown widget key in stored preferences is ignored, so a removed
+  widget never breaks Home.
+- **Loading.** Each widget is its own HTMX fragment (lazy-loaded), so a slow widget never blocks
+  the page. Every figure comes from existing services (no duplicated math). On a phone, widgets
+  stack in the chosen order in one column.
+- **Privacy mode.** A toggle hides amounts everywhere; it is persisted per user.
 
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
-Implement F9.1 from docs/specs/M9-dashboard-reports-hardening.md: dashboard with lazy-loaded card fragments calling existing services,
-per-user hide/reorder preferences (model + migration), graceful empty states, privacy mode. No new finance math.
-Tests: each card renders with data and without; preferences persist per user and workspace.
+Implement F9.1 from docs/specs/M9-dashboard-reports-hardening.md: Home built from a widget registry (catalogue), lazy-loaded
+widget fragments calling existing services, a "Customise" picker (enable, order with up/down buttons, reset to default)
+stored per user and workspace (model + migration), defaults for users who never customised, graceful
+empty states, privacy mode. No new finance math.
+Tests: each widget renders with data and without; preferences persist per user and workspace; unknown stored widget keys are
+ignored; defaults and newly shipped widgets follow the rules above; reordering works without JavaScript.
 ```
 
 ---
