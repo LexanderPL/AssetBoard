@@ -8,8 +8,8 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 
 **Data model (sketch)**
 - `NetWorthCategory(id, workspace_id, side[asset|liability], name, color, sort_order, archived_at)`
-- `NetWorthItem(id, workspace_id, side, category_id, name, notes, valuation_mode[manual|linked], link_type?, link_id?, include_in_net_worth bool default true, investable bool default false, acquired_on?, archived_at)`
-- `ItemValuation(id, workspace_id, item_id, as_of date, value_minor, currency, note)` — append-only; "current manual value" = latest `as_of ≤ today`.
+- `NetWorthItem(id, workspace_id, side, category_id, name, currency, notes, valuation_mode[manual|linked], link_type?, link_id?, include_in_net_worth bool default true, investable bool default false, acquired_on?, archived_at)` — `currency` is the item's source of truth.
+- `ItemValuation(id, workspace_id, item_id, as_of date, value_minor, currency, note)` — append-only; "current manual value" = latest `as_of ≤ today`. Every valuation uses its item's currency.
 - `NetWorthSnapshot(id, workspace_id, as_of date, assets_minor, liabilities_minor, net_minor, currency, breakdown JSON[{category_id, side, total_minor}], source[auto|manual|backfill])`; unique `(workspace_id, as_of, source)`.
 - `link_type` values reserved now: `portfolio_asset_class`, `portfolio_holding`, `loan_balance`. Until the owning module exists, the UI does not offer linked mode.
 
@@ -28,6 +28,25 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 - Seed categories (en + pl): assets — Vehicles, Electronics, Audio equipment, Instruments, Appliances, Jewelry & watches, Photography, Other; liabilities — Installments, Mortgage, Other.
 - Soft delete/archive keeps history.
 
+**Implementation notes (F5.1).**
+- Values are always positive, in the item's currency. A liability's `value_minor` is the amount
+  still owed, never a negative number; F5.2 subtracts liabilities.
+- An item that is not archived counts towards net worth even when its **category is archived**.
+  Its items stay visible under an archived heading until each item is archived. F5.2 must follow
+  the same rule.
+- The item's currency is the source of truth; valuations share it (enforced by a composite
+  foreign key) and it cannot change once a valuation exists.
+- An item with `include_in_net_worth=false`, a non-base currency, or no effective valuation is
+  listed but excluded from the category subtotal (and from F5.2 totals).
+- Seeds: new workspaces get both sets in the workspace-creation transaction, recorded as
+  `networth_category.seeded`; an existing workspace can add the suggested set to an empty side.
+  There is no migration/backfill.
+- Archiving a category with items is allowed; deleting it archives it. Restoring appends it to
+  the end of its side and is refused on an active name clash.
+- Bulk add accepts at most 500 non-blank lines and 64 KiB of text, previews every line, and is
+  all-or-nothing.
+- F5.1 creates manual valuations only. The link columns are reserved for F5.4.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
@@ -42,6 +61,7 @@ Money is Money only. Tests: valuation append semantics, back-dated valuations, c
 
 **Acceptance**
 - Pure domain function `summarize_net_worth(items_with_values) -> NetWorthSummary`: total assets, total liabilities, net worth, per-category totals and shares; items with `include_in_net_worth=false` excluded.
+- Items under an **archived category** still count while the item itself is not archived (F5.1 rule).
 - Summary page: big net-worth figure, assets-vs-liabilities bar, donut of assets by category, table of categories with totals and % of assets; liabilities likewise.
 - "Debt-to-assets ratio" and "liquid vs illiquid" are **not** required (do not implement).
 - Currency conversion for non-base-currency items uses the FX service if M6 exists; before that, non-base items are shown separately with a warning and excluded from totals (documented limitation).

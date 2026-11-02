@@ -24,9 +24,10 @@ import. The exact files and columns are described in the
 Select **Download archive**. The ZIP contains the current workspace's settings (including the
 Taxes switch and the Upcoming window), all categories (including archived categories),
 transactions (including deleted entries), planned values, and stored month states (closed
-months and plan-start markers). Recurring items, income sources, work logs and calendars, and
-tax rules are not in this archive version yet. Notification channels and delivery logs are never
-exported, because channel URLs can contain secrets.
+months and plan-start markers). Recurring items, income sources, work logs and calendars, tax
+rules, and net-worth categories, items and value histories are not in this archive version yet.
+Notification channels and delivery logs are never exported, because channel URLs can contain
+secrets.
 
 The download is a copy: exporting does not change the ledger. The audit log records the export
 and the number of rows of each kind, without descriptions or amounts.
@@ -53,7 +54,8 @@ A new workspace starts with the **suggested categories**. As long as you have no
 edited, archived or used any of them, the workspace still counts as empty: the restore removes
 them and puts the archive's categories in their place. Recurring items, income sources, work
 logs and calendars, and tax rules make the workspace non-empty, because the archive cannot
-carry them yet.
+carry them yet. Net-worth data is not in the archive either: a restore leaves any existing
+net-worth categories, items and values untouched.
 
 Restore writes, all at once:
 
@@ -79,7 +81,8 @@ two workspaces. Owners and editors can merge; it is the default mode.
 
 A merge writes categories, transactions and planned values only. The archive's settings and
 closed months are listed for information but never applied. The archive's base currency must
-match the workspace's; otherwise the whole archive is refused.
+match the workspace's; otherwise the whole archive is refused. Existing net-worth data is left
+untouched.
 
 Each category in the archive is a row in the [category mapping](#category-mapping) step, so an
 active and an archived category with the same name stay separate. By default, a category the
