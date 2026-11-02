@@ -96,7 +96,7 @@ def summarize_net_worth(items: Iterable[SummaryItem], *, currency: str) -> NetWo
         rows = [
             (category_id, amount, order)
             for (row_side, category_id), amount in category_totals.items()
-            if row_side is side
+            if row_side is side and amount != 0
             for order in (category_order[(row_side, category_id)],)
         ]
         rows.sort(key=lambda row: (-row[1], row[2]))

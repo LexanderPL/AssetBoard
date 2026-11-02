@@ -123,7 +123,8 @@ def test_a_zero_value_asset_shows_a_dash_and_no_asset_donut(owner: OwnerApp) -> 
     page = owner.client.get("/net-worth/summary").text
     assert _text(page, "assets-total") == "€0.00"
     assert 'data-donut="assets"' not in page
-    assert "data-summary-category" in page
+    assert "data-summary-category" not in page
+    assert "data-summary-empty" in page
     assert "—" in page
 
 
@@ -133,7 +134,7 @@ def test_non_base_items_are_shown_as_a_warning_and_not_counted(owner: OwnerApp) 
     page = owner.client.get("/net-worth/summary").text
     assert _text(page, "assets-total") == "€100.00"
     note = _note(page, "non_base")
-    assert "Boat" in note and "USD" in note
+    assert "Boat" in note and "$500.00" in note
     assert "data-summary-category" in page
 
 

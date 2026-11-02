@@ -80,23 +80,11 @@ def networth_summary(factory: sessionmaker[Session], ctx: Context) -> NetWorthSu
         ),
         currency=base_currency,
     )
+    by_id = {value.id: value for value in values}
     return NetWorthSummaryData(
         summary=summary,
         categories=categories,
-        non_base_items=tuple(
-            value
-            for value in values
-            if not value.archived
-            and value.include_in_net_worth
-            and value.current is not None
-            and value.current.currency != base_currency
-        ),
-        no_value_items=tuple(
-            value
-            for value in values
-            if not value.archived and value.include_in_net_worth and value.current is None
-        ),
-        excluded_items=tuple(
-            value for value in values if not value.archived and not value.include_in_net_worth
-        ),
+        non_base_items=tuple(by_id[item_id] for item_id in summary.non_base_item_ids),
+        no_value_items=tuple(by_id[item_id] for item_id in summary.no_value_item_ids),
+        excluded_items=tuple(by_id[item_id] for item_id in summary.excluded_item_ids),
     )

@@ -106,6 +106,12 @@ Property tests: net = assets - liabilities; category totals sum to side totals; 
 - Line chart of net worth (with assets and liabilities lines toggleable) over time; range selector (1y/3y/5y/all); hover shows the breakdown by category.
 - Linked items are included in snapshots using their value at that moment (once M6/M7 exist); if a link cannot be resolved the snapshot records the item as "unavailable" and the report flags it.
 
+**Open question for F5.3.** `current_values(..., as_of=...)` currently uses the item's *current*
+`archived` and `include_in_net_worth` flags even for a past date. That is right for today's
+summary, but a backfill would drop an item archived last week from last year's month-ends. Decide
+whether snapshots should use `archived_at`/a flag history so archiving removes the item only from
+snapshots after the archive date (and answer the same question for `include_in_net_worth`).
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).

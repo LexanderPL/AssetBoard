@@ -17,10 +17,9 @@ from assetboard.i18n import gettext
 from assetboard.i18n.numbers import format_money, format_rate_tenths
 from assetboard.services.networth import ItemView
 from assetboard.services.networth_summary import NetWorthSummaryData, SummaryCategory
-from assetboard.web.charts import DonutSlice, DonutView
+from assetboard.web.charts import DonutSlice, DonutView, NetWorthDonutKey
 
 NetWorthTone = Literal["favourable", "unfavourable", "neutral"]
-NetWorthDonutKey = Literal["assets", "liabilities"]
 
 
 def _(message: str) -> str:
@@ -97,9 +96,19 @@ def _bar(summary: NetWorthSummary) -> SummaryBar:
     whole = max(summary.assets.amount_minor, summary.liabilities.amount_minor)
     if whole <= 0:
         return SummaryBar(0, 0)
+    assets_width = (
+        max(1, summary.assets.amount_minor * BAR_SCALE // whole)
+        if summary.assets.amount_minor > 0
+        else 0
+    )
+    liabilities_width = (
+        max(1, summary.liabilities.amount_minor * BAR_SCALE // whole)
+        if summary.liabilities.amount_minor > 0
+        else 0
+    )
     return SummaryBar(
-        assets_width=summary.assets.amount_minor * BAR_SCALE // whole,
-        liabilities_width=summary.liabilities.amount_minor * BAR_SCALE // whole,
+        assets_width=assets_width,
+        liabilities_width=liabilities_width,
     )
 
 
