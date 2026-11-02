@@ -284,9 +284,14 @@ Car,2026-02-28,11500.00
 The file can also be imported alone in merge mode (the template has the minimal columns). Rows
 match an item by `item_id` first, then by name; names are not unique, so `item_ambiguous` is
 common unless `item_id` is present. A row that matches a linked item is refused with
-`item_linked`. A stored value for the same item and date makes an identical row a duplicate
+`item_linked`. An `id` already imported into the workspace is a duplicate (`already_imported`)
+even if the row's date or value changed, and an `id` repeated in the file is `duplicate_in_file`.
+
+Otherwise a stored value for the same item and date makes an identical row a duplicate
 (`already_imported`) and a different value a conflict (`changed_since_export`); both are listed
-and the stored history is kept.
+and the stored history is kept. Several rows in one file for the same item and date with no
+stored clash are all imported, in file order, so a same-day correction becomes the latest value.
+Only an exactly identical row (date, value, note and `created_at`) is `duplicate_in_file`.
 
 ```csv
 id,item_id,item,as_of,value,currency,note,created_at

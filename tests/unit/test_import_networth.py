@@ -181,17 +181,77 @@ def test_import_classifies_stored_and_in_file_duplicates_and_conflicts(
     batch_id = _upload(db, data_dir, content)
     report = _plan(db, data_dir, batch_id)
 
-    assert report["counts"]["to_create"] == 1
+    assert report["counts"]["to_create"] == 2
     assert report["counts"]["duplicates_skipped"] == 2
-    assert report["counts"]["conflicts_skipped"] == 2
+    assert report["counts"]["conflicts_skipped"] == 1
     assert [entry["code"] for entry in report["skipped"]] == [
         "already_imported",
         "changed_since_export",
         "duplicate_in_file",
-        "conflict_in_file",
     ]
     _apply(db, data_dir, batch_id)
-    assert [row.value_minor for row in _values(db, item_id)] == [10000, 20000]
+    assert [row.value_minor for row in _values(db, item_id)] == [10000, 20000, 20100]
+
+
+def test_import_keeps_same_day_corrections_from_one_file(db: WorkspaceDb, data_dir: Path) -> None:
+    category_id = _category(db)
+    item_id = _item(db, category_id, "Car")
+    content = HEADER + b"Car,2026-01-01,100.00,,,\n" + b"Car,2026-01-01,200.00,,,\n"
+    batch_id = _upload(db, data_dir, content)
+    report = _plan(db, data_dir, batch_id)
+    assert report["counts"]["to_create"] == 2
+    assert report["counts"]["duplicates_skipped"] == 0
+    assert report["counts"]["conflicts_skipped"] == 0
+    _apply(db, data_dir, batch_id)
+
+    values = _values(db, item_id)
+    assert [row.value_minor for row in values] == [10000, 20000]
+    assert values[0].created_at < values[1].created_at
+
+
+def test_import_ids_are_lineage_and_a_second_import_creates_nothing(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    category_id = _category(db)
+    item_id = _item(db, category_id, "Car")
+    first_id, second_id = uuid4(), uuid4()
+    content = (
+        b"item,as_of,value,created_at,id\n"
+        + f"Car,2026-01-01,100.00,2025-12-01T10:00:00Z,{first_id}\n".encode()
+        + f"Car,2026-02-01,200.00,2025-12-01T11:00:00Z,{second_id}\n".encode()
+    )
+    batch_id = _upload(db, data_dir, content)
+    _plan(db, data_dir, batch_id)
+    _apply(db, data_dir, batch_id)
+    values = _values(db, item_id)
+    assert [row.value_minor for row in values] == [10000, 20000]
+    assert [row.import_key for row in values] == [f"id:{first_id}", f"id:{second_id}"]
+
+    again = _upload(db, data_dir, content)
+    report = _plan(db, data_dir, again)
+    assert report["counts"]["to_create"] == 0
+    assert report["counts"]["duplicates_skipped"] == 2
+    assert {entry["code"] for entry in report["skipped"]} == {"already_imported"}
+    _apply(db, data_dir, again)
+    assert len(_values(db, item_id)) == 2
+
+    # The id wins even when the row's date or value changed.
+    changed = b"item,as_of,value,id\n" + f"Car,2026-03-01,999.00,{first_id}\n".encode()
+    changed_batch = _upload(db, data_dir, changed)
+    changed_report = _plan(db, data_dir, changed_batch)
+    assert changed_report["counts"]["to_create"] == 0
+    assert changed_report["skipped"][0]["code"] == "already_imported"
+
+    repeated_id = uuid4()
+    repeated = _upload(
+        db,
+        data_dir,
+        b"item,as_of,value,id\n"
+        + f"Car,2026-04-01,300.00,{repeated_id}\n".encode()
+        + f"Car,2026-04-02,300.00,{repeated_id}\n".encode(),
+    )
+    repeated_report = _plan(db, data_dir, repeated)
+    assert {entry["code"] for entry in repeated_report["skipped"]} == {"duplicate_in_file"}
 
 
 def test_import_refuses_currency_mismatch_and_extra_decimals(

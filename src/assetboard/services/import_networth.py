@@ -213,12 +213,18 @@ def _plan(
     by_lineage, by_name = _item_index(items)
     valuations = ItemValuationRepository(session, ctx).for_items([item.id for item in items])
     stored: dict[tuple[UUID, date], list[int]] = {}
+    stored_ids: set[UUID] = set()
     for valuation in valuations:
         stored.setdefault((valuation.item_id, valuation.as_of), []).append(valuation.value_minor)
+        stored_ids.add(valuation.id)
+        if valuation.import_key and valuation.import_key.startswith("id:"):
+            with contextlib.suppress(ValueError):
+                stored_ids.add(UUID(valuation.import_key[3:]))
     base = ctx.clock.now()
     matches: list[_Match] = []
     skipped: list[dict[str, object]] = []
-    seen: dict[tuple[UUID, date], list[int]] = {}
+    seen_ids: set[UUID] = set()
+    seen_rows: set[tuple[UUID, date, int, str, datetime | None]] = set()
     for index, row in enumerate(rows):
         item, problem = _resolve_item(row, by_lineage, by_name)
         if item is None:
@@ -235,24 +241,30 @@ def _plan(
         except EntryError as error:
             errors.append(_entry(error.code, row.line, "value"))
             continue
-        key = (item.id, row.as_of)
-        if key in seen:
-            # A value this import already creates for that item and date.
-            action = "duplicate" if value_minor in seen[key] else "conflict"
-            code = "duplicate_in_file" if action == "duplicate" else "conflict_in_file"
-            skipped.append(_entry(code, row.line, "value"))
-            matches.append(
-                _Match(
-                    row=row,
-                    item=item,
-                    value_minor=value_minor,
-                    created_at=row.created_at or base + timedelta(microseconds=index),
-                    action=action,
-                    code=code,
+        created_at = row.created_at or base + timedelta(microseconds=index)
+        if row.source_id is not None:
+            if row.source_id in seen_ids:
+                matches.append(
+                    _Match(row, item, value_minor, created_at, "duplicate", "duplicate_in_file")
                 )
+                skipped.append(_entry("duplicate_in_file", row.line, "id"))
+                continue
+            seen_ids.add(row.source_id)
+            if row.source_id in stored_ids:
+                matches.append(
+                    _Match(row, item, value_minor, created_at, "duplicate", "already_imported")
+                )
+                skipped.append(_entry("already_imported", row.line, "id"))
+                continue
+        identity = (item.id, row.as_of, value_minor, row.note, row.created_at)
+        if identity in seen_rows:
+            matches.append(
+                _Match(row, item, value_minor, created_at, "duplicate", "duplicate_in_file")
             )
+            skipped.append(_entry("duplicate_in_file", row.line, "value"))
             continue
-        existing = stored.get(key, [])
+        seen_rows.add(identity)
+        existing = stored.get((item.id, row.as_of), [])
         if existing:
             action = "duplicate" if value_minor in existing else "conflict"
             code = "already_imported" if action == "duplicate" else "changed_since_export"
@@ -260,13 +272,12 @@ def _plan(
         else:
             action = "create"
             code = None
-            seen[key] = [value_minor]
         matches.append(
             _Match(
                 row=row,
                 item=item,
                 value_minor=value_minor,
-                created_at=row.created_at or base + timedelta(microseconds=index),
+                created_at=created_at,
                 action=action,
                 code=code,
             )
@@ -335,6 +346,9 @@ class ItemValuationsCsvAdapter(ImportAdapter):
                 currency=match.item.currency,
                 note=match.row.note,
                 import_batch_id=batch.id,
+                import_key=(
+                    f"id:{match.row.source_id}" if match.row.source_id is not None else None
+                ),
                 created_at=match.created_at,
             )
             created += 1

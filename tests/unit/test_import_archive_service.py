@@ -835,6 +835,29 @@ def test_restore_keeps_unknown_breakdown_category_ids(db: WorkspaceDb, data_dir:
         assert stored.breakdown["categories"][0]["category_id"] == unknown
 
 
+def test_lone_exported_item_valuations_import_as_duplicates(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    batch_id = _upload(db, data_dir, _archive(_rows()), ctx=ctx)
+    assert _plan(db, data_dir, batch_id, ctx=ctx)["counts"]["invalid"] == 0
+    _apply(db, data_dir, batch_id, ctx=ctx)
+
+    exported = export_workspace(db.factory, ctx).content
+    with zipfile.ZipFile(BytesIO(exported)) as archive:
+        content = archive.read("item_valuations.csv")
+    lone = _upload(db, data_dir, content, ctx=ctx, mode="merge")
+    report = _plan(db, data_dir, lone, ctx=ctx)
+    assert report["source"] == "item_valuations_csv"
+    assert report["counts"]["to_create"] == 0
+    assert report["counts"]["duplicates_skipped"] == 2
+    assert {entry["code"] for entry in report["skipped"]} == {"already_imported"}
+    _apply(db, data_dir, lone, ctx=ctx)
+    with db.factory() as session:
+        assert len(ItemValuationRepository(session, ctx).list()) == 2
+
+
 def test_newer_major_archive_is_refused_and_newer_minor_warns(
     db: WorkspaceDb, data_dir: Path
 ) -> None:

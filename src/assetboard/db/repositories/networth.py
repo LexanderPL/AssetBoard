@@ -31,19 +31,21 @@ class NetWorthCategoryRepository(ScopedRepository[NetWorthCategory]):
         archived_at: datetime | None = None,
         import_batch_id: UUID | None = None,
         import_key: str | None = None,
+        created_at: datetime | None = None,
     ) -> NetWorthCategory:
-        return self.add(
-            NetWorthCategory(
-                name=name,
-                name_key=name_key,
-                side=side,
-                color=color,
-                sort_order=sort_order,
-                archived_at=archived_at,
-                import_batch_id=import_batch_id,
-                import_key=import_key,
-            )
+        row = NetWorthCategory(
+            name=name,
+            name_key=name_key,
+            side=side,
+            color=color,
+            sort_order=sort_order,
+            archived_at=archived_at,
+            import_batch_id=import_batch_id,
+            import_key=import_key,
         )
+        if created_at is not None:
+            row.created_at = created_at
+        return self.add(row)
 
     def ordered(self, side: str | None = None) -> list[NetWorthCategory]:
         """Categories (of one side, or both) in display order; archived ones included."""
@@ -111,25 +113,27 @@ class NetWorthItemRepository(ScopedRepository[NetWorthItem]):
         archived_at: datetime | None = None,
         import_batch_id: UUID | None = None,
         import_key: str | None = None,
+        created_at: datetime | None = None,
     ) -> NetWorthItem:
-        return self.add(
-            NetWorthItem(
-                side=side,
-                category_id=category_id,
-                name=name,
-                currency=currency,
-                notes=notes,
-                acquired_on=acquired_on,
-                valuation_mode=valuation_mode,
-                link_type=link_type,
-                link_id=link_id,
-                include_in_net_worth=include_in_net_worth,
-                investable=investable,
-                archived_at=archived_at,
-                import_batch_id=import_batch_id,
-                import_key=import_key,
-            )
+        row = NetWorthItem(
+            side=side,
+            category_id=category_id,
+            name=name,
+            currency=currency,
+            notes=notes,
+            acquired_on=acquired_on,
+            valuation_mode=valuation_mode,
+            link_type=link_type,
+            link_id=link_id,
+            include_in_net_worth=include_in_net_worth,
+            investable=investable,
+            archived_at=archived_at,
+            import_batch_id=import_batch_id,
+            import_key=import_key,
         )
+        if created_at is not None:
+            row.created_at = created_at
+        return self.add(row)
 
     def ordered(
         self, side: str | None = None, *, include_archived: bool = True

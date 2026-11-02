@@ -117,10 +117,12 @@ full archive can restore those.
 
 Item valuations are matched by `item_id` first and by name otherwise. Names are not unique, so
 add `item_id` when **item_ambiguous** is listed; it is the lineage id written by an export. A
-row that matches a linked item is refused with **item_linked**. For the same item and date, an
-identical value is a duplicate and a different value is a conflict; the stored history is kept.
-Values must use the item's currency and exactly its minor digits; a file without `created_at`
-is stamped in row order from the import time.
+row that matches a linked item is refused with **item_linked**. A row `id` imported before is a
+duplicate even if its date or value changed. Otherwise a stored value for the same item and
+date makes an identical value a duplicate and a different value a conflict, while several
+rows in one file for the same item and date are imported in file order, so a same-day
+correction becomes the latest value. Values must use the item's currency and exactly its minor
+digits; a file without `created_at` is stamped in row order from the import time.
 
 ### Upload options
 
@@ -223,9 +225,11 @@ shows what will be removed.
   it wrote; append-only valuations are removed only through this explicit batch rollback. It is
   refused, with the reason, once anything changed after the restore: a new or edited entry,
   category, planned value or net-worth row, a closed or reopened month, a changed setting, or a
-  new recurring item, income source, work log or tax rule. A rolled-back restore does not bring
-  back the suggested categories (ledger or net-worth); use **Add suggested categories** on the
-  [Categories](categories.md) or [Net worth](net-worth.md) page if you want them.
+  new recurring item, income source, work log or tax rule. A monthly automatic net-worth
+  snapshot taken after the restore also counts as a new row and blocks rollback. A rolled-back
+  restore does not bring back the suggested categories (ledger or net-worth); use **Add
+  suggested categories** on the [Categories](categories.md) or [Net worth](net-worth.md) page
+  if you want them.
 
 The audit log records every apply and rollback with counts, never with amounts, descriptions or
 file names.

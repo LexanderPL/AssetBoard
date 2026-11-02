@@ -1448,7 +1448,7 @@ def _restore_networth(
     for category in removed:
         categories_repository.delete(category)
     category_ids: dict[UUID, UUID] = {}
-    for row in archive.rows.networth_categories:
+    for index, row in enumerate(archive.rows.networth_categories):
         category = categories_repository.create(
             name=row.name,
             name_key=name_key(row.name),
@@ -1458,12 +1458,13 @@ def _restore_networth(
             import_batch_id=batch.id,
             import_key=f"id:{row.id}",
             archived_at=parse_timestamp(row.archived_at) if row.archived_at else None,
+            created_at=restore_now + timedelta(microseconds=index),
         )
         category_ids[UUID(row.id)] = category.id
 
     items_repository = NetWorthItemRepository(session, ctx)
     item_ids: dict[UUID, UUID] = {}
-    for row in archive.rows.networth_items:
+    for index, row in enumerate(archive.rows.networth_items):
         is_linked = row.valuation_mode == "linked"
         item = items_repository.create(
             side=row.side,
@@ -1480,6 +1481,7 @@ def _restore_networth(
             archived_at=parse_timestamp(row.archived_at) if row.archived_at else None,
             import_batch_id=batch.id,
             import_key=f"id:{row.id}",
+            created_at=restore_now + timedelta(microseconds=index),
         )
         item_ids[UUID(row.id)] = item.id
 
