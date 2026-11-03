@@ -124,13 +124,22 @@ msgstr ""
 msgid "Electronics"
 msgstr ""
 
+msgid "Audio equipment"
+msgstr ""
+
+msgid "Instruments"
+msgstr ""
+
 msgid "Appliances"
 msgstr ""
 
-msgid "Furniture"
+msgid "Jewelry & watches"
 msgstr ""
 
-msgid "Jewelry & watches"
+msgid "Photography"
+msgstr ""
+
+msgid "Furniture"
 msgstr ""
 
 msgid "Art & collectibles"

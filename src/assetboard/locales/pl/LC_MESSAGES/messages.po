@@ -127,14 +127,23 @@ msgstr "Pojazdy"
 msgid "Electronics"
 msgstr "Elektronika"
 
+msgid "Audio equipment"
+msgstr "Sprzęt audio"
+
+msgid "Instruments"
+msgstr "Instrumenty"
+
 msgid "Appliances"
 msgstr "Urządzenia AGD"
 
-msgid "Furniture"
-msgstr "Meble"
-
 msgid "Jewelry & watches"
 msgstr "Biżuteria i zegarki"
+
+msgid "Photography"
+msgstr "Fotografia"
+
+msgid "Furniture"
+msgstr "Meble"
 
 msgid "Art & collectibles"
 msgstr "Sztuka i kolekcje"
