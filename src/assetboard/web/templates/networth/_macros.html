@@ -1,8 +1,8 @@
 {% from "macros/components.html" import csrf_input with context %}
 {% from "categories/_macros.html" import swatch with context %}
 
-{% macro htmx_form(action) -%}
-method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-body" hx-swap="outerHTML"
+{% macro htmx_form(action, swap="outerHTML") -%}
+method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-body" hx-swap="{{ swap }}"
 {%- endmacro %}
 
 {% macro small_button(label, attrs="") -%}
@@ -60,7 +60,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
 {% if can_edit and not item.archived %}
 <details class="mt-2" data-add-valuation{% if valuation_item_id == item.id %} open{% endif %}>
   <summary class="cursor-pointer text-xs font-medium text-primary-ink">{{ _("Add a value") }}</summary>
-  <form {{ htmx_form(scoped_url(request, 'networth_item_valuation', item_id=row_id)) }} class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] sm:items-start" novalidate>
+  <form {{ htmx_form(scoped_url(request, 'networth_item_valuation', item_id=row_id), "outerHTML show:#item-" ~ row_id ~ ":top") }} class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] sm:items-start" novalidate>
     {{ csrf_input() }}
     <input type="hidden" name="side" value="{{ side_value }}">
     <div class="space-y-1">
@@ -90,7 +90,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
 {% macro item_edit_form(item, side_value) -%}
 {% set row_id = item.id|string %}
 {% set values = edit_item_values %}
-<form {{ htmx_form(scoped_url(request, 'networth_item_update', item_id=row_id)) }} class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" novalidate data-editing>
+<form {{ htmx_form(scoped_url(request, 'networth_item_update', item_id=row_id), "outerHTML show:#item-" ~ row_id ~ ":top") }} class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" novalidate data-editing>
   {{ csrf_input() }}
   <input type="hidden" name="side" value="{{ side_value }}">
   <div class="space-y-1">

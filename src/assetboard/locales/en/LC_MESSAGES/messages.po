@@ -139,6 +139,15 @@ msgstr ""
 msgid "Photography"
 msgstr ""
 
+msgid "Furniture"
+msgstr ""
+
+msgid "Art & collectibles"
+msgstr ""
+
+msgid "Tools"
+msgstr ""
+
 msgid "Installments"
 msgstr ""
 
@@ -305,6 +314,21 @@ msgid "Category deleted"
 msgstr ""
 
 msgid "Suggested categories added"
+msgstr ""
+
+msgid "Tax rule created"
+msgstr ""
+
+msgid "Tax rule changed"
+msgstr ""
+
+msgid "Tax rule archived"
+msgstr ""
+
+msgid "Tax rate change added"
+msgstr ""
+
+msgid "Tax rate change updated"
 msgstr ""
 
 msgid "Net-worth category added"
@@ -494,6 +518,15 @@ msgid "Name"
 msgstr ""
 
 msgid "Kind"
+msgstr ""
+
+msgid "Base"
+msgstr ""
+
+msgid "Effective from"
+msgstr ""
+
+msgid "Previously effective from"
 msgstr ""
 
 msgid "Treatment"
@@ -2410,6 +2443,15 @@ msgid "Enter a payment day between 1 and 31 and choose the month."
 msgstr ""
 
 msgid "A rate change must start after the latest rate."
+msgstr ""
+
+msgid "Only a rate change that starts in the future can be edited."
+msgstr ""
+
+msgid "Another rate change already starts on that date."
+msgstr ""
+
+msgid "That rate change no longer exists."
 msgstr ""
 
 msgid "Archived taxes cannot be changed."
@@ -5308,10 +5350,16 @@ msgstr ""
 msgid "From %(date)s"
 msgstr ""
 
+msgid "Edit rate change"
+msgstr ""
+
 msgid "New rate from"
 msgstr ""
 
 msgid "Value type"
+msgstr ""
+
+msgid "Save rate change"
 msgstr ""
 
 msgid ""
@@ -6591,5 +6639,14 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Linked values arrive in a later version."
+#~ msgstr ""
+
+#~ msgid "Audio equipment"
+#~ msgstr ""
+
+#~ msgid "Instruments"
+#~ msgstr ""
+
+#~ msgid "Photography"
 #~ msgstr ""
 

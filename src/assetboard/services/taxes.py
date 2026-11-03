@@ -5,6 +5,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
+from typing import cast
 from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -72,6 +73,8 @@ class TaxRuleView:
     notes: str
     archived: bool
     versions: tuple[TaxRuleVersionView, ...]
+    # The rate effective today; future versions stay visible in ``versions``.
+    current: PercentOrFixed | None
     payment_day: int
     payment_timing: PaymentTiming
     payment_category_id: UUID | None
@@ -80,9 +83,12 @@ class TaxRuleView:
     # Kind and base are locked once posted income was calculated with the tax.
     locked: bool = False
 
-    @property
-    def current(self) -> PercentOrFixed | None:
-        return self.versions[-1].value if self.versions else None
+    def effective_on(self, day: date) -> PercentOrFixed | None:
+        value: PercentOrFixed | None = None
+        for version in self.versions:
+            if version.effective_from <= day:
+                value = version.value
+        return value
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +113,16 @@ def _value_from_row(row: TaxRuleVersion, currency: str) -> PercentOrFixed:
     return PercentOrFixed.fixed_amount(Money(row.fixed_minor, currency))
 
 
+def _effective_value(
+    versions: list[TaxRuleVersion], day: date, currency: str
+) -> PercentOrFixed | None:
+    value: PercentOrFixed | None = None
+    for version in versions:
+        if version.effective_from <= day:
+            value = _value_from_row(version, currency)
+    return value
+
+
 def _view(
     session: Session,
     ctx: Context,
@@ -129,6 +145,11 @@ def _view(
                 value=_value_from_row(version, ctx.workspace.base_currency),
             )
             for version in versions
+        ),
+        current=_effective_value(
+            versions,
+            ctx.clock.today(ctx.workspace.timezone),
+            ctx.workspace.base_currency,
         ),
         payment_day=rule.payment_day,
         payment_timing=PaymentTiming(rule.payment_timing),
@@ -171,6 +192,13 @@ def get_rule(factory: sessionmaker[Session], ctx: Context, rule_id: UUID) -> Tax
         return _view(session, ctx, rule, versions, _active_source_names(session, ctx))
 
 
+def example_paid_on(ctx: Context) -> date:
+    """The example's pay date: the 10th of next month in the workspace time zone."""
+    today = ctx.clock.today(ctx.workspace.timezone)
+    year, month = divmod(today.year * 12 + today.month, 12)
+    return date(min(year, MAX_YEAR), month + 1, 10)
+
+
 def example(
     ctx: Context,
     *,
@@ -185,9 +213,7 @@ def example(
     require_role(ctx, Role.VIEWER)
     currency = ctx.workspace.base_currency
     net = Money(EXAMPLE_NET_MAJOR * 10 ** minor_unit_for(currency), currency)
-    today = ctx.clock.today(ctx.workspace.timezone)
-    year, month = divmod(today.year * 12 + today.month, 12)
-    paid_on = date(min(year, MAX_YEAR), month + 1, 10)
+    paid_on = example_paid_on(ctx)
     if value.mode == "fixed" and (value.fixed is None or value.fixed.currency != currency):
         raise TaxRuleError("invalid_value")
     if kind == TaxKind.ADDED:
@@ -439,6 +465,70 @@ def add_version(
         return version.id
 
     return run_immediate(factory, write)
+
+
+def update_version(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    rule_id: UUID,
+    version_id: UUID,
+    *,
+    effective_from: date,
+    value: PercentOrFixed,
+) -> None:
+    """Edit a rate version that has not started yet.
+
+    Current and past versions are history and stay immutable; a future version is a draft that
+    may be corrected until its effective date.
+    """
+    require_role(ctx, Role.EDITOR)
+    _validate_day(effective_from)
+
+    def write(session: Session) -> None:
+        require_role_now(session, ctx, Role.EDITOR)
+        workspace = CurrentWorkspaceRepository(session, ctx)
+        workspace.lock(exclusive=True)
+        today = ctx.clock.today(ctx.workspace.timezone)
+        version_values = _version_fields(value, workspace.get().base_currency)
+        rule = TaxRuleRepository(session, ctx).get_or_raise(rule_id)
+        if rule.archived_at is not None:
+            raise TaxRuleError("archived")
+        versions = TaxRuleVersionRepository(session, ctx)
+        rows = versions.for_rule(rule_id)
+        target = next((row for row in rows if row.id == version_id), None)
+        if target is None:
+            raise TaxRuleError("version_missing")
+        if target.effective_from <= today or effective_from <= today:
+            raise TaxRuleError("version_not_future")
+        if any(row.id != target.id and row.effective_from == effective_from for row in rows):
+            raise TaxRuleError("version_exists")
+        previous_from = target.effective_from
+        changed = versions.update_future(
+            target.id,
+            today=today,
+            effective_from=effective_from,
+            mode=str(version_values["mode"]),
+            rate_bp=cast("int | None", version_values["rate_bp"]),
+            fixed_minor=cast("int | None", version_values["fixed_minor"]),
+            updated_at=ctx.clock.now(),
+        )
+        if changed != 1:
+            raise TaxRuleError("version_missing")
+        resync_sources_with_rule(session, ctx, rule_id)
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=ctx.user.id,
+            action="tax_rule.version_updated",
+            entity_type="tax_rule",
+            entity_id=str(rule_id),
+            ts=ctx.clock.now(),
+            data={
+                "effective_from": effective_from.isoformat(),
+                "previous_effective_from": previous_from.isoformat(),
+                "mode": str(value.mode),
+            },
+        )
+
+    run_immediate(factory, write)
 
 
 def archive_rule(factory: sessionmaker[Session], ctx: Context, rule_id: UUID) -> None:

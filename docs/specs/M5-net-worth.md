@@ -25,7 +25,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 - Changing a manual value appends an `ItemValuation` (with optional note); an "as of" date can be set (back-dating allowed).
 - Valuation history shown per item (small table + sparkline).
 - Bulk add: paste multiple lines (`name; value; category`) into a textarea → preview → create.
-- Seed categories (en + pl): assets — Vehicles, Electronics, Audio equipment, Instruments, Appliances, Jewelry & watches, Photography, Other; liabilities — Installments, Mortgage, Other.
+- Seed categories (en + pl): assets — Vehicles, Electronics, Appliances, Furniture, Jewelry & watches, Art & collectibles, Tools, Other; liabilities — Installments, Mortgage, Other.
 - Soft delete/archive keeps history.
 
 **Implementation notes (F5.1).**

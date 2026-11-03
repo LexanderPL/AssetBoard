@@ -248,11 +248,11 @@ def test_seed_one_side_has_the_manual_event_shape(team: WorkspaceDb) -> None:
     assert [category.name for category in view.categories] == [
         "Vehicles",
         "Electronics",
-        "Audio equipment",
-        "Instruments",
         "Appliances",
+        "Furniture",
         "Jewelry & watches",
-        "Photography",
+        "Art & collectibles",
+        "Tools",
         "Other",
     ]
     assert not view.can_seed

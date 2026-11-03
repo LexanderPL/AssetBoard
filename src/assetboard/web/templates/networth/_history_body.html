@@ -11,26 +11,24 @@
   {% endif %}
 
   <section class="panel p-4 sm:p-6" aria-labelledby="networth-history-heading">
-    <div class="flex flex-wrap items-start justify-between gap-4">
-      <div class="min-w-0">
-        <h2 id="networth-history-heading" class="text-base font-semibold">{{ _("History") }}</h2>
-        <p class="mt-1 text-sm text-muted">{{ _("Automatic snapshots are stored on the 1st of each month at 04:00 in the workspace time zone. Stored automatic and manual snapshots are never recalculated.") }}</p>
-      </div>
-      {% if view.can_edit %}
-      <div class="flex flex-wrap items-center gap-2" data-history-actions>
-        <form method="post" action="{{ scoped_url(request, 'networth_snapshot_take') }}">
-          {{ csrf_input() }}
-          <input type="hidden" name="range_code" value="{{ view.range_code }}">
-          <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-take-snapshot>{{ _("Take snapshot now") }}</button>
-        </form>
-        <form method="post" action="{{ scoped_url(request, 'networth_snapshot_backfill') }}">
-          {{ csrf_input() }}
-          <input type="hidden" name="range_code" value="{{ view.range_code }}">
-          <button type="submit" class="rounded-xl border border-line-strong px-4 py-2 text-sm font-semibold hover:bg-subtle" data-backfill>{{ _("Backfill from history") }}</button>
-        </form>
-      </div>
-      {% endif %}
+    <div class="min-w-0">
+      <h2 id="networth-history-heading" class="text-base font-semibold">{{ _("History") }}</h2>
+      <p class="mt-1 text-sm text-muted">{{ _("Automatic snapshots are stored on the 1st of each month at 04:00 in the workspace time zone. Stored automatic and manual snapshots are never recalculated.") }}</p>
     </div>
+    {% if view.can_edit %}
+    <div class="mt-4 flex flex-wrap items-center gap-2" data-history-actions>
+      <form method="post" action="{{ scoped_url(request, 'networth_snapshot_take') }}">
+        {{ csrf_input() }}
+        <input type="hidden" name="range_code" value="{{ view.range_code }}">
+        <button type="submit" class="btn-primary" data-take-snapshot>{{ _("Take snapshot now") }}</button>
+      </form>
+      <form method="post" action="{{ scoped_url(request, 'networth_snapshot_backfill') }}">
+        {{ csrf_input() }}
+        <input type="hidden" name="range_code" value="{{ view.range_code }}">
+        <button type="submit" class="btn" data-backfill>{{ _("Backfill from history") }}</button>
+      </form>
+    </div>
+    {% endif %}
 
     <nav class="mt-5 flex flex-wrap items-center gap-1" aria-label="{{ _('Range') }}" data-history-range>
       {% for option in view.range_options %}

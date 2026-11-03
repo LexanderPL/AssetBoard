@@ -40,7 +40,7 @@
     {% if locked %}<input type="hidden" name="kind" value="{{ values.kind }}"><input type="hidden" name="base" value="{{ values.base }}">{% endif %}
     {% if rule %}
     {# The rate is changed with Rate changes; these only feed the example panel. #}
-    <input type="hidden" name="mode" value="{{ values.mode }}"><input type="hidden" name="rate_percent" value="{{ values.rate_percent }}"><input type="hidden" name="fixed_amount" value="{{ values.fixed_amount }}">
+    <input type="hidden" name="rule_id" value="{{ rule.id }}"><input type="hidden" name="mode" value="{{ values.mode }}"><input type="hidden" name="rate_percent" value="{{ values.rate_percent }}"><input type="hidden" name="fixed_amount" value="{{ values.fixed_amount }}">
     <div class="grid gap-1">
       <p class="text-sm font-medium">{{ _("How much is it?") }}</p>
       <p class="text-sm">{{ rate_label(rule.current, locale) }} · <span class="text-muted">{{ _("Change it with Rate changes on the Taxes page; past months keep the old rate.") }}</span></p>

@@ -142,6 +142,15 @@ msgstr "Biżuteria i zegarki"
 msgid "Photography"
 msgstr "Fotografia"
 
+msgid "Furniture"
+msgstr "Meble"
+
+msgid "Art & collectibles"
+msgstr "Sztuka i kolekcje"
+
+msgid "Tools"
+msgstr "Narzędzia"
+
 msgid "Installments"
 msgstr "Raty"
 
@@ -309,6 +318,21 @@ msgstr "Usunięto kategorię"
 
 msgid "Suggested categories added"
 msgstr "Dodano proponowane kategorie"
+
+msgid "Tax rule created"
+msgstr "Utworzono regułę podatkową"
+
+msgid "Tax rule changed"
+msgstr "Zmieniono regułę podatkową"
+
+msgid "Tax rule archived"
+msgstr "Zarchiwizowano regułę podatkową"
+
+msgid "Tax rate change added"
+msgstr "Dodano zmianę stawki"
+
+msgid "Tax rate change updated"
+msgstr "Zaktualizowano zmianę stawki"
 
 msgid "Net-worth category added"
 msgstr "Dodano kategorię majątku"
@@ -498,6 +522,15 @@ msgstr "Nazwa"
 
 msgid "Kind"
 msgstr "Rodzaj"
+
+msgid "Base"
+msgstr "Podstawa"
+
+msgid "Effective from"
+msgstr "Obowiązuje od"
+
+msgid "Previously effective from"
+msgstr "Poprzednio obowiązywała od"
 
 msgid "Treatment"
 msgstr "Traktowanie"
@@ -2564,6 +2597,15 @@ msgstr "Podaj dzień płatności od 1 do 31 i wybierz miesiąc."
 
 msgid "A rate change must start after the latest rate."
 msgstr "Zmiana stawki musi obowiązywać od daty późniejszej niż ostatnia stawka."
+
+msgid "Only a rate change that starts in the future can be edited."
+msgstr "Można edytować tylko zmianę stawki, która zaczyna się w przyszłości."
+
+msgid "Another rate change already starts on that date."
+msgstr "Inna zmiana stawki zaczyna się już tego dnia."
+
+msgid "That rate change no longer exists."
+msgstr "Ta zmiana stawki już nie istnieje."
 
 msgid "Archived taxes cannot be changed."
 msgstr "Nie można zmieniać zarchiwizowanych podatków."
@@ -5734,11 +5776,17 @@ msgstr "Od początku"
 msgid "From %(date)s"
 msgstr "Od %(date)s"
 
+msgid "Edit rate change"
+msgstr "Edytuj zmianę stawki"
+
 msgid "New rate from"
 msgstr "Nowa stawka od"
 
 msgid "Value type"
 msgstr "Rodzaj wartości"
+
+msgid "Save rate change"
+msgstr "Zapisz zmianę stawki"
 
 msgid ""
 "Past months keep the old rate. Fill in the field that matches the value "
@@ -6925,4 +6973,13 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Linked values arrive in a later version."
 #~ msgstr "Wartości powiązane pojawią się w późniejszej wersji."
+
+#~ msgid "Audio equipment"
+#~ msgstr "Sprzęt audio"
+
+#~ msgid "Instruments"
+#~ msgstr "Instrumenty"
+
+#~ msgid "Photography"
+#~ msgstr "Fotografia"
 

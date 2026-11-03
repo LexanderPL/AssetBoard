@@ -29,7 +29,22 @@
     <summary class="{{ summary_button }}">{{ _("Rate changes") }}<span class="sr-only"> {{ rule.name }}</span></summary>
     <ul class="mt-3 space-y-1 text-sm">
       {% for version in rule.versions %}
-      <li>{% if loop.first and version.effective_from.year == 1900 %}{{ _("From the start") }}{% else %}{{ _("From %(date)s", date=format_day(version.effective_from, locale)) }}{% endif %} · {{ rate_label(version.value, locale) }}</li>
+      <li data-tax-version="{{ version.id }}">
+        {% if loop.first and version.effective_from.year == 1900 %}{{ _("From the start") }}{% else %}{{ _("From %(date)s", date=format_day(version.effective_from, locale)) }}{% endif %} · {{ rate_label(version.value, locale) }}
+        {% if can_edit and version.effective_from.isoformat() > today %}
+        <details class="mt-2" data-tax-version-edit>
+          <summary class="cursor-pointer text-xs font-medium text-primary-ink">{{ _("Edit rate change") }}</summary>
+          <form method="post" action="{{ scoped_url(request, 'tax_rule_version_update', rule_id=rule.id, version_id=version.id) }}" class="mt-2 grid gap-2 border border-line p-3 sm:grid-cols-4">
+            {{ csrf_input() }}
+            <label class="grid gap-1 text-sm">{{ _("New rate from") }}<input type="date" name="effective_from" value="{{ version.effective_from.isoformat() }}" required class="{{ input_class }}"></label>
+            <label class="grid gap-1 text-sm">{{ _("Value type") }}<select name="mode" class="form-select py-2"><option value="percent"{% if version.value.mode == "percent" %} selected{% endif %}>{{ _("A percentage") }}</option><option value="fixed"{% if version.value.mode == "fixed" %} selected{% endif %}>{{ _("A fixed amount each time") }}</option></select></label>
+            <label class="grid gap-1 text-sm">{{ _("Rate in %%") }}<input name="rate_percent" inputmode="decimal" value="{{ rate_input(version.value.rate_bp) if version.value.mode == 'percent' and version.value.rate_bp is not none else '' }}" class="{{ input_class }}"></label>
+            <label class="grid gap-1 text-sm">{{ _("Amount per payment (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="fixed_amount" inputmode="decimal" value="{{ format_amount_input(version.value.fixed, locale) if version.value.mode == 'fixed' and version.value.fixed is not none else '' }}" class="{{ input_class }}"></label>
+            <button type="submit" class="btn sm:col-span-4 sm:justify-self-start">{{ _("Save rate change") }}</button>
+          </form>
+        </details>
+        {% endif %}
+      </li>
       {% endfor %}
     </ul>
     {% if can_edit %}

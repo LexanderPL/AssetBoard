@@ -80,7 +80,14 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     },
     **{
         ("TaxRuleVersionRepository", method): "test_tax_rule_queries_stay_in_their_workspace"
-        for method in ("create", "for_rule", "all_for_rules", "effective", "any_fixed_amount")
+        for method in (
+            "create",
+            "for_rule",
+            "all_for_rules",
+            "effective",
+            "any_fixed_amount",
+            "update_future",
+        )
     },
     **{
         ("NotificationChannelRepository", method): (

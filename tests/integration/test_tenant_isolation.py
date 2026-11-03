@@ -1802,6 +1802,33 @@ def test_tax_rule_queries_stay_in_their_workspace(
         version_a.id,
         fixed_version_a.id,
     ]
+    updated_at = datetime(2026, 1, 1, tzinfo=UTC)
+    assert (
+        versions_b.update_future(
+            fixed_version_a.id,
+            today=date(2026, 1, 1),
+            effective_from=date(2027, 2, 1),
+            mode="percent",
+            rate_bp=1900,
+            fixed_minor=None,
+            updated_at=updated_at,
+        )
+        == 0
+    )
+    assert (
+        versions_a.update_future(
+            fixed_version_a.id,
+            today=date(2026, 1, 1),
+            effective_from=date(2027, 2, 1),
+            mode="percent",
+            rate_bp=1900,
+            fixed_minor=None,
+            updated_at=updated_at,
+        )
+        == 1
+    )
+    updated = versions_a.get(fixed_version_a.id)
+    assert updated is not None and (updated.rate_bp, updated.fixed_minor) == (1900, None)
     with pytest.raises(ForeignWorkspace):
         rules_b.create(
             workspace_id=ctx_a.workspace.id,

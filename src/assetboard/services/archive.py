@@ -55,7 +55,8 @@ from assetboard.domain.archive import (
 )
 from assetboard.domain.categories import SEED, clean_name
 from assetboard.domain.ledger_csv import plain_amount
-from assetboard.domain.networth import SEED as NETWORTH_SEED
+from assetboard.domain.networth import ASSET_SEEDS as NETWORTH_ASSET_SEEDS
+from assetboard.domain.networth import LIABILITY_SEED as NETWORTH_LIABILITY_SEED
 from assetboard.i18n import gettext
 from assetboard.i18n.locale import SUPPORTED_LOCALES
 from assetboard.services.categories import usage_by_category
@@ -155,16 +156,22 @@ def suggested_categories_to_remove(session: Session, ctx: Context) -> list[Categ
     return categories
 
 
-def _expected_suggested_networth_categories(locale: str) -> set[tuple[str, str, str, int]]:
-    positions: dict[str, int] = {}
-    expected: set[tuple[str, str, str, int]] = set()
-    for seed in NETWORTH_SEED:
-        name = clean_name(gettext(seed.name, locale))
-        side = seed.side.value
-        position = positions.get(side, 0)
-        positions[side] = position + 1
-        expected.add((name, side, seed.color, position))
-    return expected
+def _expected_suggested_networth_categories(
+    locale: str,
+) -> list[set[tuple[str, str, str, int]]]:
+    """Every shipped suggested set, so an old untouched seed still counts as empty."""
+    candidates: list[set[tuple[str, str, str, int]]] = []
+    for asset_seed in NETWORTH_ASSET_SEEDS:
+        positions: dict[str, int] = {}
+        expected: set[tuple[str, str, str, int]] = set()
+        for seed in (*asset_seed, *NETWORTH_LIABILITY_SEED):
+            name = clean_name(gettext(seed.name, locale))
+            side = seed.side.value
+            position = positions.get(side, 0)
+            positions[side] = position + 1
+            expected.add((name, side, seed.color, position))
+        candidates.append(expected)
+    return candidates
 
 
 def suggested_networth_categories_to_remove(
@@ -176,7 +183,8 @@ def suggested_networth_categories_to_remove(
     the automatic ``networth_category.seeded`` event; a later manual seed makes it user data.
     """
     categories = NetWorthCategoryRepository(session, ctx).ordered()
-    if len(categories) != len(NETWORTH_SEED):
+    candidate_sizes = {len(asset) + len(NETWORTH_LIABILITY_SEED) for asset in NETWORTH_ASSET_SEEDS}
+    if len(categories) not in candidate_sizes:
         return []
     if any(category.archived_at is not None for category in categories):
         return []
@@ -209,7 +217,9 @@ def suggested_networth_categories_to_remove(
         for category in categories
     }
     if not any(
-        actual == _expected_suggested_networth_categories(locale) for locale in SUPPORTED_LOCALES
+        actual == expected
+        for locale in SUPPORTED_LOCALES
+        for expected in _expected_suggested_networth_categories(locale)
     ):
         return []
     return list(categories)
