@@ -8,7 +8,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 
 **Data model (sketch)**
 - `NetWorthCategory(id, workspace_id, side[asset|liability], name, color, sort_order, archived_at)`
-- `NetWorthItem(id, workspace_id, side, category_id, name, currency, notes, valuation_mode[manual|linked], link_type?, link_id?, include_in_net_worth bool default true, investable bool default false, acquired_on?, archived_at)` — `currency` is the item's source of truth.
+- `NetWorthItem(id, workspace_id, side, category_id, name, currency, notes, valuation_mode[manual|linked], link_type?, link_id?, include_in_net_worth bool default true, investable bool default false, estimate_between bool (F5.6), acquired_on?, archived_at)` — `currency` is the item's source of truth.
 - `ItemValuation(id, workspace_id, item_id, as_of date, value_minor, currency, note)` — append-only; "current manual value" = latest `as_of ≤ today`. Every valuation uses its item's currency.
 - `NetWorthSnapshot(id, workspace_id, as_of date, assets_minor, liabilities_minor, net_minor, currency, breakdown JSON[{category_id, side, total_minor}], source[auto|manual|backfill])`; unique `(workspace_id, as_of, source)`.
 - `link_type` values reserved now: `portfolio_asset_class`, `portfolio_holding`, `loan_balance`. Until the owning module exists, the UI does not offer linked mode.
@@ -248,4 +248,105 @@ Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait 
 Implement F5.5 from docs/specs/M5-net-worth.md as an extension of the M4 archive (docs/specs/M4-ledger-export-import.md,
 ADR-0016): the new files with lineage ids, export, restore order incl. links, standalone item_valuations.csv import,
 emptiness checks and the extended round-trip test.
+```
+
+---
+
+## F5.6 Estimated values between entries (backfill)
+
+Owner decision, 2026-11-03: backfill estimates the months between two recorded values with a
+straight line, switchable per item.
+
+**Story:** my car was worth 100 000 four years ago and is worth 60 000 now. I recorded only those
+two values, but the history should show it losing value month by month, not a flat line with
+one drop.
+
+**Rule**
+- An item has a switch, **Estimate values between entries** (`estimate_between`).
+- With the switch on, a backfilled month-end `D` that falls strictly between two of the item's
+  recorded values gets a straight-line estimate:
+  `v0 + (v1 − v0) × (D − d0) / (d1 − d0)`.
+  - `d0` is the latest recorded date before `D` and `v0` its value.
+  - `d1` is the earliest recorded date after `D` and `v1` its value.
+  - The fraction is counted in calendar days.
+  - The result is rounded half up to the currency's minor unit once, using exact integer
+    arithmetic (no float).
+- The value used for a date is the item's effective value on that date (the latest entry on
+  that day, F5.1 order).
+- Example: 100 000.00 on 2022-11-03 and 60 000.00 on 2026-11-03 give about 90 000 after one
+  year, 80 000 after two and 70 000 after three.
+- Nothing is estimated before the first recorded value or after the last one:
+  - before the first value the item has no value (F5.3);
+  - after the last value the last value carries forward (F5.3).
+- `d1` must be on or before today in the workspace's time zone. A future-dated value is never
+  used as an end point.
+- A month-end that equals a recorded date uses that recorded value; it is not an estimate.
+- With the switch off, an item keeps the F5.3 rule (latest value on or before `D`).
+
+**Where it applies**
+- **Backfilled snapshots only** (`source=backfill`).
+- Automatic and manual snapshots stay exactly as recorded, and so do:
+  - the item's current value;
+  - the Assets/Liabilities lists;
+  - the summary (F5.2);
+  - the valuation history table and sparkline.
+- Linked items (F5.4) ignore the switch, because their resolver supplies real values.
+- The archive rule (F5.3) and the include setting still apply as before.
+- Changing the switch does not rewrite anything by itself. The item form says that a re-run of
+  **Backfill from history** applies it to past months.
+
+**Defaults**
+- New asset items: **on**, including items created by bulk add.
+- New liability items: **off**. Manual debts usually change in steps, and loans become linked
+  items in M7.
+- The migration sets existing items the same way (assets on, liabilities off).
+- The switch is editable on every manual item at any time. It is hidden on linked items.
+
+**Marking estimates**
+- The snapshot breakdown gets one additive key: `not_counted` stays as it is, and a top-level
+  `"estimated": n` counts the items whose value at that date was estimated. `v` stays 1, and
+  readers ignore unknown keys (F5.3).
+- The history table marks a backfilled row that contains estimates ("includes 3 estimated
+  values"), and the chart tooltip shows the same line.
+- Points are not drawn differently. The table note is the accessible marker.
+
+**Acceptance**
+- `NetWorthItem.estimate_between` boolean, not null; migration with server defaults by side.
+- Item form checkbox with help text, on create and edit for manual items. It is shown in the
+  item row's details, not as a separate column. Changing it is recorded in the
+  `networth_item.updated` fields; the value is not audited.
+- A pure domain function (in `domain/networth_history.py`) returns an item's value on `D` and
+  whether it was estimated, given the item's ordered valuation points, `D`, today and the switch.
+  `values_at` uses it when called for backfill, and its other callers keep the F5.3 behaviour.
+- Backfill uses it; auto and manual snapshots do not. The breakdown carries `estimated`.
+- History table and tooltip show the estimated count.
+- Archive: `networth_items.csv` gains the `estimate_between` column (`true|false`) as a minor
+  format version (1.3, ADR-0016).
+  - A 1.2 archive reads without it, and restore applies the side defaults above.
+  - Document it in `docs/archive-format.md`, with the version history, and update the golden
+    archive and the docs test.
+- Docs: `docs/net-worth.md` explains the switch, the straight-line rule, the defaults, that only
+  backfill uses it, and that backfill must be re-run after changing it.
+
+**Tests (golden oracle: a hand-computed table in the test module)**
+- The example above at every month-end between the two dates, exact minor units.
+- An end point exactly on a month-end, a same-day correction as an end point (the later entry
+  wins), a rising value, a value of 0 at either end, and a JPY item (0 minor digits).
+- Switch off: identical to F5.3 for the same data.
+- No estimate before the first value or after the last.
+- A future-dated value is never used as `d1`.
+- Linked items ignore the switch.
+- An archived item is still excluded from its archive date.
+- Auto and manual snapshots are unchanged by the switch.
+- Property tests: an estimate lies between `v0` and `v1`, is monotonic between them, and equals
+  `v0`/`v1` at `d0`/`d1`. Rounding happens once.
+- Defaults by side on create, on bulk add, in the migration and on restore of a 1.2 archive.
+- Archive round trip keeps the switch.
+
+**Agent prompt**
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F5.6 from docs/specs/M5-net-worth.md: the per-item estimate_between switch (model, migration with side defaults,
+item form), straight-line estimates between recorded values in backfill only, the "estimated" breakdown count shown in
+history, and the archive 1.3 column. Golden table and property tests as listed.
 ```
