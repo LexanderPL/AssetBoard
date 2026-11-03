@@ -486,6 +486,7 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
                 include_in_net_worth="true" if item.include_in_net_worth else "false",
                 investable="true" if item.investable else "false",
                 archived_at=timestamp_text(item.archived_at),
+                estimate_between="true" if item.estimate_between else "false",
             )
             for item in networth_items
         )

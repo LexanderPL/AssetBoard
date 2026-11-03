@@ -378,3 +378,58 @@ def test_the_page_is_translated(owner: OwnerApp) -> None:
     assert "Majątek netto" in page
     assert "Aktywa" in page and "Zobowiązania" in page
     assert "Dodaj pozycję" in page
+
+
+def test_estimate_between_defaults_by_side_and_unchecking_reaches_the_service(
+    owner: OwnerApp,
+) -> None:
+    asset_form = owner.client.get("/net-worth?side=asset").text
+    assert re.search(
+        r'name="estimate_between" value="1" checked[^>]*> Estimate values between entries',
+        asset_form,
+    )
+    liability_form = owner.client.get("/net-worth?side=liability").text
+    assert not re.search(
+        r'name="estimate_between" value="1" checked[^>]*> Estimate values between entries',
+        liability_form,
+    )
+
+    response = owner.post(
+        "/net-worth/items",
+        {
+            "side": "asset",
+            "category_id": str(_category_id(owner, "asset", "Vehicles")),
+            "name": "Car",
+            "value": "12000",
+            "currency": "EUR",
+            "estimate_between": "1",
+            "include_in_net_worth": "1",
+        },
+        token_from="/net-worth",
+    )
+    assert response.status_code == 303
+    with owner.db() as session:
+        item = session.scalars(
+            select(NetWorthItem).where(
+                NetWorthItem.workspace_id == owner.home_id, NetWorthItem.name == "Car"
+            )
+        ).one()
+        assert item.estimate_between is True
+        item_id = item.id
+
+    # An unchecked checkbox sends no field; it must still reach the service as False.
+    response = owner.post(
+        f"/net-worth/items/{item_id}",
+        {
+            "side": "asset",
+            "category_id": str(_category_id(owner, "asset", "Vehicles")),
+            "name": "Car",
+            "currency": "EUR",
+            "include_in_net_worth": "1",
+        },
+        token_from="/net-worth",
+    )
+    assert response.status_code == 303
+    with owner.db() as session:
+        item = session.get(NetWorthItem, item_id)
+        assert item is not None and item.estimate_between is False

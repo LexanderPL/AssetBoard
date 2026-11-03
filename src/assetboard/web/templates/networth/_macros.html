@@ -31,6 +31,9 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
 {% if item.valuations %}
 <details class="mt-2" data-valuations>
   <summary class="cursor-pointer text-xs font-medium text-muted">{{ _("Value history") }} <span class="font-normal">({{ item.valuations|length }})</span></summary>
+  {% if item.estimate_between %}
+  <p class="mt-2 text-xs text-muted" data-estimate-between>{{ _("Estimates values between entries") }}</p>
+  {% endif %}
   <div class="mt-2 flex flex-wrap items-center gap-4">
     {% if item.sparkline %}
     <svg viewBox="0 0 120 28" class="h-7 w-28 {{ 'text-danger' if item.side == 'liability' else 'text-primary-ink' }}" role="img" aria-label="{{ _('Value history') }}">
@@ -131,7 +134,13 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
   <div class="flex flex-wrap items-center gap-4 text-sm sm:col-span-2">
     <label class="flex items-center gap-2"><input type="checkbox" name="include_in_net_worth" value="1"{% if values.include_in_net_worth == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Include in net worth") }}</label>
     <label class="flex items-center gap-2"><input type="checkbox" name="investable" value="1"{% if values.investable == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Investable") }}</label>
+    {% if item.valuation_mode != "linked" %}
+    <label class="flex items-center gap-2" data-estimate-between-field><input type="checkbox" name="estimate_between" value="1"{% if values.estimate_between == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Estimate values between entries") }}</label>
+    {% endif %}
   </div>
+  {% if item.valuation_mode != "linked" %}
+  <p class="text-xs text-muted sm:col-span-2 lg:col-span-4">{{ _("Backfill draws a straight line between recorded values. Re-run Backfill from history after changing this.") }}</p>
+  {% endif %}
   <div class="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
     <button type="submit" class="btn-primary">{{ _("Save") }}</button>
     <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}" hx-get="{{ scoped_url(request, 'networth_item_row', item_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" class="btn">{{ _("Cancel") }}</a>

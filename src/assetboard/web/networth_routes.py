@@ -202,6 +202,7 @@ def _item_values(item: ItemView | None = None, *, base_currency: str = "EUR") ->
             "acquired_on": "",
             "include_in_net_worth": "1",
             "investable": "",
+            "estimate_between": "1",
         }
     return {
         "name": item.name,
@@ -211,10 +212,11 @@ def _item_values(item: ItemView | None = None, *, base_currency: str = "EUR") ->
         "acquired_on": item.acquired_on.isoformat() if item.acquired_on else "",
         "include_in_net_worth": "1" if item.include_in_net_worth else "",
         "investable": "1" if item.investable else "",
+        "estimate_between": "1" if item.estimate_between else "",
     }
 
 
-def _create_item_values(base_currency: str, today: str) -> dict[str, str]:
+def _create_item_values(base_currency: str, today: str, side: Side) -> dict[str, str]:
     return {
         "name": "",
         "category_id": "",
@@ -224,6 +226,7 @@ def _create_item_values(base_currency: str, today: str) -> dict[str, str]:
         "acquired_on": "",
         "include_in_net_worth": "1",
         "investable": "",
+        "estimate_between": "1" if side is Side.ASSET else "",
         "as_of": today,
         "valuation_note": "",
         "link": "",
@@ -277,7 +280,7 @@ def _body_context(
         "notice": _t(request, NOTICES[notice]) if notice in NOTICES else None,
         "error": _t(request, error) if error else None,
         "create_item_values": create_item_values
-        or _create_item_values(ctx.workspace.base_currency, today),
+        or _create_item_values(ctx.workspace.base_currency, today, side),
         "create_item_errors": {
             field: _t(request, message) for field, message in (create_item_errors or {}).items()
         },
@@ -622,6 +625,7 @@ async def networth_items_create(
     acquired_on: FormStr = "",
     include_in_net_worth: FormStr = "",
     investable: FormStr = "",
+    estimate_between: FormStr = "",
     as_of: FormStr = "",
     valuation_note: FormStr = "",
     link: FormStr = "",
@@ -639,6 +643,7 @@ async def networth_items_create(
         "acquired_on": acquired_on,
         "include_in_net_worth": include_in_net_worth,
         "investable": investable,
+        "estimate_between": estimate_between,
         "as_of": as_of or today,
         "valuation_note": valuation_note,
         "link": link,
@@ -659,6 +664,7 @@ async def networth_items_create(
                 acquired_on=_parse_date(acquired_on, "acquired_on"),
                 include_in_net_worth=_checked(include_in_net_worth),
                 investable=_checked(investable),
+                estimate_between=_checked(estimate_between),
                 as_of=_parse_date(as_of, "as_of"),
                 valuation_note=valuation_note,
                 link_type=link_type,
@@ -693,6 +699,7 @@ async def networth_item_update(
     acquired_on: FormStr = "",
     include_in_net_worth: FormStr = "",
     investable: FormStr = "",
+    estimate_between: FormStr = "",
 ) -> Response:
     target = _parse_uuid(item_id)
     factory = request.app.state.session_factory
@@ -704,6 +711,7 @@ async def networth_item_update(
         "acquired_on": acquired_on,
         "include_in_net_worth": include_in_net_worth,
         "investable": investable,
+        "estimate_between": estimate_between,
     }
     try:
         item = await run_in_threadpool(
@@ -718,6 +726,7 @@ async def networth_item_update(
                 acquired_on=_parse_date(acquired_on, "acquired_on"),
                 include_in_net_worth=_checked(include_in_net_worth),
                 investable=_checked(investable),
+                estimate_between=_checked(estimate_between),
             )
         )
     except NetWorthError as exc:

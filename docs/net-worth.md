@@ -192,9 +192,30 @@ Viewers can read everything but see no add, edit, archive or bulk controls. Edit
 can change data. Changes are recorded in the workspace audit log under **Net worth** (values and
 field names only; notes are not copied there).
 
+## Estimates between values
+
+Each manual item has **Estimate values between entries**. With it on, **Backfill from history**
+fills a month-end that falls strictly between two recorded values with a straight line:
+`v0 + (v1 - v0) × (D - d0) / (d1 - d0)`, counted in calendar days and rounded once, half up,
+to the currency's minor unit. The date `d0` is the latest recorded date before `D` and `d1` the
+earliest recorded date after it, using the latest entry on that day (the same rule as F5.1). The
+end date must be on or before today, so a future value is never used. A month-end that is a
+recorded date uses the recorded value; before the first value there is no value, and after the
+last one the last value carries forward.
+
+The switch only affects **backfilled snapshots**. Automatic and manual snapshots stay exactly as
+recorded, and so do the current value, the lists, the summary, the history table's rows and the
+sparkline. Linked items ignore the switch because their resolver supplies the value. Changing the
+switch does not rewrite stored snapshots by itself: run **Backfill from history** again to apply
+it. New assets default on and new liabilities off; the migration applies those defaults to
+existing items. The same defaults apply when a 1.2 archive is restored.
+
+A backfilled snapshot that used estimates says “includes N estimated values” in the history
+table and its chart tooltip. The breakdown also stores an `estimated` count.
+
 ## Archives and imports
 
-Net worth is part of the workspace archive (format 1.2): categories, items, value histories and
+Net worth is part of the workspace archive (format 1.3): categories, items, value histories and
 snapshots are exported with lineage ids. A restore recreates them in dependency order. Values
 keep their `created_at`, so several values for one item on one day come back in the same order
 and the current value does not change. Snapshot breakdowns keep their category lineage ids; a

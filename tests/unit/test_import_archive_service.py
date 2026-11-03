@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import csv
 import json
 import zipfile
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
-from io import BytesIO
+from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Any, Literal, cast
 from uuid import UUID, uuid4
@@ -41,6 +42,7 @@ from assetboard.domain.archive import (
     NetWorthSnapshotRow,
     ParsedArchive,
     TransactionRow,
+    manifest_bytes,
     parse_archive,
     write_archive,
 )
@@ -253,6 +255,7 @@ def _rows(*, currency: str = "EUR", name: str = "Home") -> ArchiveRows:
                 "true",
                 "false",
                 None,
+                "false",
             ),
             NetWorthItemRow(
                 str(NW_BROKERAGE),
@@ -269,6 +272,7 @@ def _rows(*, currency: str = "EUR", name: str = "Home") -> ArchiveRows:
                 "true",
                 "true",
                 None,
+                "true",
             ),
         ),
         item_valuations=(
@@ -422,6 +426,7 @@ def _source_workspace(db: WorkspaceDb) -> None:
             currency="EUR",
             notes="Family car",
             acquired_on=date(2025, 4, 1),
+            estimate_between=True,
             import_key=f"id:{NW_CAR}",
         )
         valuations = ItemValuationRepository(session, ctx)
@@ -696,6 +701,10 @@ def test_restore_into_truly_empty_workspace_applies_settings_and_rolls_back(
         assert brokerage.valuation_mode == "manual"
         assert brokerage.link_type is None and brokerage.link_id is None
         assert ItemValuationRepository(session, target_ctx).for_item(brokerage.id) == []
+        assert {row.name: row.estimate_between for row in networth_items} == {
+            "Car": False,
+            "Brokerage": True,
+        }
         car = next(row for row in networth_items if row.name == "Car")
         values = ItemValuationRepository(session, target_ctx).for_item(car.id)
         assert [row.value_minor for row in values] == [1200000, 1205000]
@@ -719,6 +728,13 @@ def test_restore_into_truly_empty_workspace_applies_settings_and_rolls_back(
         assert batch.previous_settings is not None
         assert batch.previous_settings["name"] == "Restored"
         assert batch.previous_settings["timezone"] == "UTC"
+
+    reparsed, errors = parse_archive(export_workspace(db.factory, secure_ctx).content)
+    assert errors == () and reparsed is not None
+    assert {row.name: row.estimate_between for row in reparsed.rows.networth_items} == {
+        "Car": "false",
+        "Brokerage": "true",
+    }
 
     preview = preview_rollback_import(db.factory, secure_ctx, batch_id)
     assert preview.mode == "restore"
@@ -805,11 +821,88 @@ def test_restore_reads_the_v1_2_golden_archive(db: WorkspaceDb, data_dir: Path) 
         assert [row.name for row in categories] == ["Vehicles"]
         assert [row.name for row in items] == ["Car", "Brokerage"]
         assert {row.valuation_mode for row in items} == {"manual"}
+        assert {row.name: row.estimate_between for row in items} == {
+            "Car": True,
+            "Brokerage": True,
+        }
         car = next(row for row in items if row.name == "Car")
         values = ItemValuationRepository(session, ctx).for_item(car.id)
         assert [row.value_minor for row in values] == [1200000, 1205000]
         snapshots = NetWorthSnapshotRepository(session, ctx).for_range(None)
         assert snapshots[0].breakdown["categories"][0]["category_id"] == str(categories[0].id)
+
+
+def _as_v1_2_without_estimate(content: bytes) -> bytes:
+    with zipfile.ZipFile(BytesIO(content)) as source:
+        files = {name: source.read(name) for name in source.namelist()}
+    rows = list(csv.reader(StringIO(files["networth_items.csv"].decode("utf-8"), newline="")))
+    column = rows[0].index("estimate_between")
+    for row in rows:
+        del row[column]
+    output = StringIO(newline="")
+    csv.writer(output, lineterminator="\r\n").writerows(rows)
+    files["networth_items.csv"] = output.getvalue().encode("utf-8")
+    manifest = json.loads(
+        manifest_bytes(
+            files,
+            app_name="AssetBoard",
+            app_version="test",
+            exported_at=EXPORTED_AT,
+            base_currency="EUR",
+        )
+    )
+    manifest["format_version"] = "1.2"
+    files["manifest.json"] = json.dumps(manifest).encode("utf-8")
+    archive = BytesIO()
+    with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as target:
+        for name, data in files.items():
+            target.writestr(name, data)
+    return archive.getvalue()
+
+
+def test_restore_v1_2_applies_estimate_defaults_by_side(db: WorkspaceDb, data_dir: Path) -> None:
+    rows = _rows()
+    category_id = uuid4()
+    rows = replace(
+        rows,
+        networth_categories=(
+            *rows.networth_categories,
+            NetWorthCategoryRow(str(category_id), "liability", "Mortgage", "#a35d3b", 0, None),
+        ),
+        networth_items=(
+            *rows.networth_items,
+            NetWorthItemRow(
+                str(uuid4()),
+                "liability",
+                "Mortgage",
+                str(category_id),
+                "Loan",
+                "EUR",
+                "",
+                None,
+                "manual",
+                None,
+                None,
+                "true",
+                "false",
+                None,
+                "",
+            ),
+        ),
+    )
+    content = _as_v1_2_without_estimate(_archive(rows))
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    batch_id = _upload(db, data_dir, content, ctx=ctx)
+    assert _plan(db, data_dir, batch_id, ctx=ctx)["counts"]["invalid"] == 0
+    _apply(db, data_dir, batch_id, ctx=ctx)
+    with db.factory() as session:
+        items = NetWorthItemRepository(session, ctx).ordered()
+    assert {row.name: row.estimate_between for row in items} == {
+        "Car": True,
+        "Brokerage": True,
+        "Loan": False,
+    }
 
 
 def test_restore_keeps_unknown_breakdown_category_ids(db: WorkspaceDb, data_dir: Path) -> None:

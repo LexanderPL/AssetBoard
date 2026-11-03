@@ -122,7 +122,9 @@
       <div class="flex flex-wrap items-center gap-4 text-sm sm:col-span-2 lg:col-span-4">
         <label class="flex items-center gap-2"><input type="checkbox" name="include_in_net_worth" value="1"{% if create_item_values.include_in_net_worth == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Include in net worth") }}</label>
         <label class="flex items-center gap-2"><input type="checkbox" name="investable" value="1"{% if create_item_values.investable == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Investable") }}</label>
+        <label class="flex items-center gap-2" data-estimate-between-field><input type="checkbox" name="estimate_between" value="1"{% if create_item_values.estimate_between == "1" %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ _("Estimate values between entries") }}</label>
       </div>
+      <p class="text-xs text-muted sm:col-span-2 lg:col-span-4">{{ _("Backfill draws a straight line between recorded values. Re-run Backfill from history after changing this.") }}</p>
       <p class="text-xs text-muted sm:col-span-2 lg:col-span-4">{{ _("Enter values as positive amounts. For a liability, enter the amount owed.") }}</p>
       <div class="sm:col-span-2 lg:col-span-4">
         <button type="submit" class="btn-primary" data-add-item>{{ _("Add item") }}</button>

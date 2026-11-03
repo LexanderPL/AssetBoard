@@ -154,7 +154,16 @@ def _summarize(
         ),
         currency=currency,
     )
-    return summary, snapshot_breakdown(summary)
+    estimated = sum(
+        1
+        for value in values
+        if value.estimated
+        and not value.archived
+        and value.include_in_net_worth
+        and value.value_minor is not None
+        and value.currency == currency
+    )
+    return summary, snapshot_breakdown(summary, estimated=estimated)
 
 
 def _linked_for_date(
@@ -176,9 +185,18 @@ def _summary_at(
     timezone: str,
     currency: str,
     linked: dict[UUID, Money | Unavailable] | None = None,
+    backfill: bool = False,
+    today: date | None = None,
 ) -> tuple[NetWorthSummary, dict[str, object]]:
     return _summarize(
-        values_at(histories, as_of, timezone=timezone, linked=linked),
+        values_at(
+            histories,
+            as_of,
+            timezone=timezone,
+            linked=linked,
+            backfill=backfill,
+            today=today,
+        ),
         currency=currency,
     )
 
@@ -377,6 +395,8 @@ def _backfill_write(session: Session, ctx: Context, *, today: date) -> BackfillR
             timezone=ctx.workspace.timezone,
             currency=currency,
             linked=_linked_for_date(resolved, histories, as_of),
+            backfill=True,
+            today=today,
         )
         repository.create(
             as_of=as_of,

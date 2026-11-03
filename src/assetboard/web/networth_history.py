@@ -70,6 +70,7 @@ class HistoryRow:
     charted: bool
     breakdown: tuple[BreakdownRow, ...]
     not_counted: tuple[str, ...]
+    estimated_note: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +126,17 @@ def _not_counted(point: HistorySnapshot, locale: str) -> tuple[str, ...]:
             % {"num": count}
         )
     return tuple(lines)
+
+
+def _estimated_note(point: HistorySnapshot, locale: str) -> str | None:
+    if point.breakdown.estimated <= 0:
+        return None
+    return ngettext(
+        "includes %(num)d estimated value",
+        "includes %(num)d estimated values",
+        point.breakdown.estimated,
+        locale,
+    ) % {"num": point.breakdown.estimated}
 
 
 def _breakdown(
@@ -204,6 +216,9 @@ def _chart(
             for row in _breakdown(point, categories, locale)
         ]
         lines.extend(_not_counted(point, locale))
+        estimated_note = _estimated_note(point, locale)
+        if estimated_note is not None:
+            lines.append(estimated_note)
         tooltips.append(lines)
     return {
         "labels": [_point_label(point.as_of, locale) for point in points],
@@ -259,6 +274,7 @@ def build_history_view(
             charted=point.charted,
             breakdown=_breakdown(point, data.categories, locale),
             not_counted=_not_counted(point, locale),
+            estimated_note=_estimated_note(point, locale),
         )
         for point in data.snapshots
     )

@@ -69,6 +69,7 @@ def _item(
     value: str = "100",
     currency: str = "EUR",
     include_in_net_worth: bool = True,
+    estimate_between: bool = False,
     as_of: date | None = None,
 ) -> service.ItemView:
     return create_item(
@@ -81,6 +82,7 @@ def _item(
         value=value,
         currency=currency,
         include_in_net_worth=include_in_net_worth,
+        estimate_between=estimate_between,
         as_of=as_of,
     )
 
@@ -135,6 +137,7 @@ def test_auto_snapshot_uses_the_previous_month_end_and_is_idempotent(
             }
         ],
         "not_counted": {"non_base": 0, "no_value": 0, "unavailable": 0},
+        "estimated": 0,
     }
     event = _events(team, "networth_snapshot.created")[0]
     assert event.actor_type == "system" and event.actor_user_id is None
@@ -473,3 +476,151 @@ def test_viewers_cannot_take_or_backfill_and_a_stale_editor_is_refused(
     with pytest.raises(PermissionDenied):
         take_manual_snapshot(team.factory, stale)
     assert _rows(team) == []
+
+
+def test_backfill_estimates_between_values_and_counts_one_estimate(
+    team: WorkspaceDb,
+) -> None:
+    _at(team, "2026-03-15T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    item = _item(
+        team,
+        ctx,
+        category,
+        value="100",
+        estimate_between=True,
+        as_of=date(2026, 1, 1),
+    )
+    add_valuation(team.factory, ctx, item.id, locale="en", value="200", as_of=date(2026, 2, 1))
+    add_valuation(team.factory, ctx, item.id, locale="en", value="300", as_of=date(2026, 3, 1))
+    backfill_snapshots(team.factory, ctx)
+    january = next(row for row in _rows(team) if row.as_of == date(2026, 1, 31))
+    february = next(row for row in _rows(team) if row.as_of == date(2026, 2, 28))
+    assert (january.assets_minor, february.assets_minor) == (19677, 29643)
+    assert january.breakdown["estimated"] == 1
+    assert february.breakdown["estimated"] == 1
+
+
+def test_auto_and_manual_snapshots_ignore_the_switch(team: WorkspaceDb) -> None:
+    _at(team, "2026-03-15T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    item = _item(
+        team,
+        ctx,
+        category,
+        value="100",
+        estimate_between=True,
+        as_of=date(2026, 1, 1),
+    )
+    add_valuation(team.factory, ctx, item.id, locale="en", value="300", as_of=date(2026, 3, 1))
+    take_auto_snapshot(team.factory, ctx, team.clock, "UTC")
+    take_manual_snapshot(team.factory, ctx, as_of=date(2026, 2, 28))
+    auto = next(row for row in _rows(team, source="auto"))
+    manual = next(row for row in _rows(team, source="manual"))
+    assert (auto.assets_minor, manual.assets_minor) == (10000, 10000)
+    assert auto.breakdown["estimated"] == manual.breakdown["estimated"] == 0
+    backfill_snapshots(team.factory, ctx)
+    # Only the two backfill rows are rebuilt; the real snapshots stay as recorded.
+    assert all(row.assets_minor == 10000 for row in _rows(team, source="auto"))
+    assert all(row.assets_minor == 10000 for row in _rows(team, source="manual"))
+
+
+def test_changing_the_switch_changes_nothing_until_backfill_is_rerun(
+    team: WorkspaceDb,
+) -> None:
+    _at(team, "2026-03-15T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    item = _item(
+        team,
+        ctx,
+        category,
+        value="100",
+        estimate_between=False,
+        as_of=date(2026, 1, 1),
+    )
+    add_valuation(team.factory, ctx, item.id, locale="en", value="300", as_of=date(2026, 3, 1))
+    backfill_snapshots(team.factory, ctx)
+    before = [(row.as_of, row.assets_minor) for row in _rows(team)]
+    assert before == [
+        (date(2026, 1, 31), 10000),
+        (date(2026, 2, 28), 10000),
+    ]
+    update_item(
+        team.factory,
+        ctx,
+        item.id,
+        category_id=category.id,
+        name=item.name,
+        currency=item.currency,
+        notes=item.notes,
+        acquired_on=item.acquired_on,
+        include_in_net_worth=item.include_in_net_worth,
+        investable=item.investable,
+        estimate_between=True,
+    )
+    assert [(row.as_of, row.assets_minor) for row in _rows(team)] == before
+    backfill_snapshots(team.factory, ctx)
+    assert [(row.as_of, row.assets_minor) for row in _rows(team)] == [
+        (date(2026, 1, 31), 20169),
+        (date(2026, 2, 28), 29661),
+    ]
+
+
+def test_estimated_count_only_includes_items_in_the_snapshot_totals(
+    team: WorkspaceDb,
+) -> None:
+    _at(team, "2026-03-15T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    included = _item(
+        team,
+        ctx,
+        category,
+        name="Included",
+        value="100",
+        estimate_between=True,
+        as_of=date(2026, 1, 1),
+    )
+    excluded = _item(
+        team,
+        ctx,
+        category,
+        name="Excluded",
+        value="200",
+        include_in_net_worth=False,
+        estimate_between=True,
+        as_of=date(2026, 1, 1),
+    )
+    for item in (included, excluded):
+        add_valuation(team.factory, ctx, item.id, locale="en", value="300", as_of=date(2026, 3, 1))
+    backfill_snapshots(team.factory, ctx)
+    january = next(row for row in _rows(team) if row.as_of == date(2026, 1, 31))
+    assert january.assets_minor == 20169
+    assert january.breakdown["estimated"] == 1
+
+
+def test_an_archived_item_is_excluded_even_when_its_value_would_be_estimated(
+    team: WorkspaceDb,
+) -> None:
+    _at(team, "2026-02-10T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    item = _item(
+        team,
+        ctx,
+        category,
+        value="100",
+        estimate_between=True,
+        as_of=date(2026, 1, 1),
+    )
+    add_valuation(team.factory, ctx, item.id, locale="en", value="300", as_of=date(2026, 3, 1))
+    archive_item(team.factory, ctx, item.id)
+    _at(team, "2026-03-15T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+    backfill_snapshots(team.factory, ctx)
+    by_date = {row.as_of: row.assets_minor for row in _rows(team)}
+    assert by_date[date(2026, 1, 31)] == 20169
+    assert by_date[date(2026, 2, 28)] == 0

@@ -99,6 +99,7 @@ def _item(
     acquired_on: date | None = None,
     include_in_net_worth: bool = True,
     investable: bool = False,
+    estimate_between: bool | None = None,
     as_of: date | None = None,
     valuation_note: str = "",
 ) -> service.ItemView:
@@ -115,6 +116,7 @@ def _item(
         acquired_on=acquired_on,
         include_in_net_worth=include_in_net_worth,
         investable=investable,
+        estimate_between=estimate_between,
         as_of=as_of,
         valuation_note=valuation_note,
     )
@@ -491,6 +493,7 @@ def test_item_currency_is_locked_after_a_valuation(team: WorkspaceDb) -> None:
             link_id=None,
             include_in_net_worth=True,
             investable=False,
+            estimate_between=True,
         )
         raw_id = raw.id
     changed = update_item(
@@ -820,3 +823,106 @@ def test_another_workspaces_rows_are_not_found(team: WorkspaceDb) -> None:
     with pytest.raises(NotFound):
         archive_item(team.factory, foreign, item.id)
     assert get_item(team.factory, owner_ctx, item.id).name == "Car"
+
+
+def test_estimate_between_defaults_by_side_on_create_and_bulk(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("ed", "editor")
+    asset_category = _category(team, ctx, "Vehicles")
+    liability_category = _category(team, ctx, "Mortgage", side="liability")
+    asset = _item(team, ctx, asset_category, name="Car")
+    liability = _item(team, ctx, liability_category, name="Loan", value="1000")
+    assert (asset.estimate_between, liability.estimate_between) == (True, False)
+    assert (
+        create_bulk(
+            team.factory,
+            ctx,
+            side="asset",
+            text="Bike; 100; Vehicles\n",
+            locale="en",
+        )
+        == 1
+    )
+    assert (
+        create_bulk(
+            team.factory,
+            ctx,
+            side="liability",
+            text="Card; 50; Mortgage\n",
+            locale="en",
+        )
+        == 1
+    )
+    with team.factory() as session:
+        items = NetWorthItemRepository(session, ctx).ordered()
+    assert {row.name: row.estimate_between for row in items} == {
+        "Car": True,
+        "Loan": False,
+        "Bike": True,
+        "Card": False,
+    }
+
+
+def test_estimate_between_can_be_unchecked_and_is_audited_by_field_name(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx, "Vehicles")
+    item = _item(team, ctx, category, name="Car")
+    assert item.estimate_between is True
+    updated = update_item(
+        team.factory,
+        ctx,
+        item.id,
+        category_id=category.id,
+        name=item.name,
+        currency=item.currency,
+        notes=item.notes,
+        acquired_on=item.acquired_on,
+        include_in_net_worth=item.include_in_net_worth,
+        investable=item.investable,
+        estimate_between=False,
+    )
+    assert updated.estimate_between is False
+    event = _event(team, "networth_item.updated", item.id)
+    assert event.data["fields"] == "estimate_between"
+    restored = update_item(
+        team.factory,
+        ctx,
+        item.id,
+        category_id=category.id,
+        name=item.name,
+        currency=item.currency,
+        notes=item.notes,
+        acquired_on=item.acquired_on,
+        include_in_net_worth=item.include_in_net_worth,
+        investable=item.investable,
+        estimate_between=True,
+    )
+    assert restored.estimate_between is True
+
+
+def test_estimate_between_can_be_set_on_a_manual_item_with_no_valuation(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx, "Vehicles")
+    with team.factory.begin() as session:
+        raw = NetWorthItemRepository(session, ctx).create(
+            side="asset",
+            category_id=category.id,
+            name="No value",
+            currency="EUR",
+            estimate_between=False,
+        )
+    updated = update_item(
+        team.factory,
+        ctx,
+        raw.id,
+        category_id=category.id,
+        name=raw.name,
+        currency=raw.currency,
+        estimate_between=True,
+    )
+    assert updated.estimate_between is True

@@ -20,7 +20,7 @@ from assetboard.domain.money import minor_unit_for
 from assetboard.domain.networth import MAX_ITEM_NAME_LENGTH, MAX_NOTES_LENGTH, Side
 
 FORMAT = "workspace-archive"
-FORMAT_VERSION = "1.2"
+FORMAT_VERSION = "1.3"
 # Bounds of the optional ``upcoming_days`` key (1.1); mirror ``config.MIN/MAX_UPCOMING_DAYS``.
 MIN_UPCOMING_DAYS = 1
 MAX_UPCOMING_DAYS = 365
@@ -54,6 +54,7 @@ CSV_COLUMNS = {
         "link_id",
         "include_in_net_worth",
         "investable",
+        "estimate_between",
         "archived_at",
     ),
     "item_valuations.csv": (
@@ -175,6 +176,7 @@ class NetWorthItemRow:
     include_in_net_worth: str
     investable: str
     archived_at: str | None
+    estimate_between: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -541,7 +543,7 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
             "upcoming_days",
         }
     )
-    parsed = _read_rows(files, workspace, currency, errors, warnings)
+    parsed = _read_rows(files, workspace, currency, str(version), errors, warnings)
     if errors:
         return None, tuple(errors)
     return ParsedArchive(manifest, files, parsed, tuple(warnings)), ()
@@ -599,6 +601,10 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         if chosen not in {"true", "false"}:
             raise ValueError("invalid boolean")
         return chosen
+    if column == "estimate_between":
+        if value not in {"", "true", "false"}:
+            raise ValueError("invalid boolean")
+        return value
     if column in ("archived_at", "deleted_at", "closed_at", "plan_started_at", "created_at"):
         return _parse_timestamp(value) if value else ""
     if column in ("date", "month", "as_of", "acquired_on"):
@@ -685,13 +691,24 @@ _REQUIRED_COLUMNS = {
 }
 
 
+def required_columns(version: str) -> dict[str, set[str]]:
+    """CSV columns required by a compatible ``MAJOR.MINOR`` version."""
+    columns = {name: set(names) for name, names in _REQUIRED_COLUMNS.items()}
+    major, minor = (int(part) for part in version.split(".", 1))
+    if major == 1 and minor >= 3:
+        columns["networth_items.csv"].add("estimate_between")
+    return columns
+
+
 def _read_rows(
     files: dict[str, bytes],
     workspace: dict[str, object],
     currency: str,
+    version: str,
     errors: list[ArchiveError],
     warnings: list[ArchiveError],
 ) -> ArchiveRows:
+    required = required_columns(version)
     tables: dict[str, list[dict[str, str]]] = {}
     for name, columns in CSV_COLUMNS.items():
         rows: list[dict[str, str]] = []
@@ -706,7 +723,7 @@ def _read_rows(
             if (
                 len(header) > MAX_COLUMNS
                 or len(header) != len(set(header))
-                or not _REQUIRED_COLUMNS[name] <= set(header)
+                or not required[name] <= set(header)
             ):
                 errors.append(ArchiveError(name, "invalid or missing header", 1))
                 continue
@@ -729,7 +746,7 @@ def _read_rows(
                     if column == "sort_order" and not value:
                         value = str(index)
                     try:
-                        if column in _REQUIRED_COLUMNS[name] and not value:
+                        if column in required[name] and not value:
                             raise ValueError("required value missing")
                         row[column] = _validate_cell(name, column, value, currency)
                     except ValueError as exc:
@@ -889,6 +906,7 @@ def _read_rows(
                 row["include_in_net_worth"],
                 row["investable"],
                 row["archived_at"] or None,
+                row["estimate_between"],
             )
             for row in networth_items
         ),

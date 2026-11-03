@@ -89,6 +89,7 @@
                 {% endfor %}
               </details>
               {% endif %}
+              {% if point.estimated_note %}<p class="mt-1 text-xs text-muted" data-estimated>{{ point.estimated_note }}</p>{% endif %}
             </th>
             <td class="align-top">
               {% if point.source == "manual" %}

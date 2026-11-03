@@ -1478,6 +1478,9 @@ def _restore_networth(
             link_id=None,
             include_in_net_worth=row.include_in_net_worth == "true",
             investable=row.investable == "true",
+            estimate_between=(
+                row.estimate_between == "true" if row.estimate_between else row.side == "asset"
+            ),
             archived_at=parse_timestamp(row.archived_at) if row.archived_at else None,
             import_batch_id=batch.id,
             import_key=f"id:{row.id}",

@@ -27,6 +27,7 @@ from assetboard.services.networth import (
     link_options_for_side,
     restore_item,
     unlink_item,
+    update_item,
 )
 from assetboard.services.networth_snapshots import (
     backfill_snapshots,
@@ -167,6 +168,32 @@ def test_create_linked_item_resolves_read_only_value_and_audits(
     assert "amount" not in created.data and "as_of" not in created.data
     linked = _events(team, "networth_item.linked")[-1]
     assert linked.data == {"link_type": LINK_TYPE, "target": "Holding"}
+
+
+def test_linked_items_hide_and_ignore_the_estimate_switch(
+    team: WorkspaceDb, fake_links: FakeLinks
+) -> None:
+    _at(team, "2026-03-15T12:00:00+00:00")
+    target = _target(team, values={date(2026, 3, 15): 125000})
+    fake_links.register(targets=[target])
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    item = _linked_item(team, ctx, category, target)
+    assert item.estimate_between is True  # the asset side default, hidden in the UI
+    updated = update_item(
+        team.factory,
+        ctx,
+        item.id,
+        category_id=category.id,
+        name=item.name,
+        currency=item.currency,
+        notes=item.notes,
+        acquired_on=item.acquired_on,
+        include_in_net_worth=item.include_in_net_worth,
+        investable=item.investable,
+        estimate_between=False,
+    )
+    assert updated.estimate_between is True
 
 
 def test_a_linked_item_uses_the_target_currency_and_stays_non_base(

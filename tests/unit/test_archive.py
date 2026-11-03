@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import csv
 import io
 from datetime import UTC, datetime
 from pathlib import Path
@@ -27,7 +28,8 @@ from assetboard.domain.archive import (
 from assetboard.services.archive import ARCHIVE_EXCLUDED_MODELS, ARCHIVE_INCLUDED_MODELS
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
-GOLDEN = FIXTURES / "workspace-archive-v1.2.zip"
+GOLDEN = FIXTURES / "workspace-archive-v1.3.zip"
+GOLDEN_V1_2 = FIXTURES / "workspace-archive-v1.2.zip"
 GOLDEN_V1_1 = FIXTURES / "workspace-archive-v1.1.zip"
 GOLDEN_V1_0 = FIXTURES / "workspace-archive-v1.0.zip"
 EXPORTED_AT = datetime(2026, 10, 18, 14, 30, tzinfo=UTC)
@@ -94,6 +96,7 @@ def _rows() -> ArchiveRows:
                 "true",
                 "false",
                 None,
+                "false",
             ),
             NetWorthItemRow(
                 linked_item_id,
@@ -110,6 +113,7 @@ def _rows() -> ArchiveRows:
                 "true",
                 "true",
                 None,
+                "true",
             ),
         ),
         item_valuations=(
@@ -189,7 +193,7 @@ def test_v1_1_workspace_carries_the_taxes_switch_and_upcoming_days() -> None:
     assert parsed.rows.networth_snapshots == ()
 
 
-def test_v1_2_requires_every_net_worth_file() -> None:
+def test_v1_3_requires_every_net_worth_file() -> None:
     with ZipFile(io.BytesIO(_archive())) as source:
         files = {
             name: source.read(name) for name in source.namelist() if name != "item_valuations.csv"
@@ -203,13 +207,36 @@ def test_v1_2_requires_every_net_worth_file() -> None:
     assert errors == (ArchiveError("archive", "missing required members"),)
 
 
-def test_v1_2_workspace_carries_the_net_worth_files() -> None:
-    parsed, errors = parse_archive(GOLDEN.read_bytes())
+def test_v1_2_workspace_reads_without_the_estimate_column() -> None:
+    parsed, errors = parse_archive(GOLDEN_V1_2.read_bytes())
     assert errors == ()
     assert parsed is not None and parsed.warnings == ()
     assert parsed.manifest["format_version"] == "1.2"
+    assert [row.estimate_between for row in parsed.rows.networth_items] == ["", ""]
+
+
+def test_v1_3_requires_the_estimate_column() -> None:
+    files = _files()
+    rows = list(csv.reader(io.StringIO(files["networth_items.csv"].decode("utf-8"), newline="")))
+    column = rows[0].index("estimate_between")
+    for row in rows:
+        del row[column]
+    output = io.StringIO(newline="")
+    csv.writer(output, lineterminator="\r\n").writerows(rows)
+    files["networth_items.csv"] = output.getvalue().encode("utf-8")
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    assert any(error.message == "invalid or missing header" for error in errors)
+
+
+def test_v1_3_workspace_carries_the_net_worth_files_and_estimate_switch() -> None:
+    parsed, errors = parse_archive(GOLDEN.read_bytes())
+    assert errors == ()
+    assert parsed is not None and parsed.warnings == ()
+    assert parsed.manifest["format_version"] == "1.3"
     assert len(parsed.rows.networth_categories) == 1
     assert [row.name for row in parsed.rows.networth_items] == ["Car", "Brokerage"]
+    assert [row.estimate_between for row in parsed.rows.networth_items] == ["false", "true"]
     assert [row.value for row in parsed.rows.item_valuations] == ["12000.00", "12050.00"]
     assert parsed.rows.item_valuations[0].created_at == "2026-09-01T08:00:00Z"
     assert [row.source for row in parsed.rows.networth_snapshots] == ["auto"]
