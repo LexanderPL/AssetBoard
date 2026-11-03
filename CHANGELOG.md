@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.0](https://github.com/LexanderPL/AssetBoard/compare/v0.4.1...v0.5.0) (2026-11-03)
+
+
+### Features
+
+* **networth:** F5.5 archive net worth and import valuations ([#213](https://github.com/LexanderPL/AssetBoard/issues/213)) ([8d97d33](https://github.com/LexanderPL/AssetBoard/commit/8d97d33bc4baa0787edad5e88245570b6113eabc))
+* **networth:** F5.6 estimate values between entries ([#216](https://github.com/LexanderPL/AssetBoard/issues/216)) ([0b6d64e](https://github.com/LexanderPL/AssetBoard/commit/0b6d64ea93286d1f7c9467b9d7f1bc784a9c2e10))
+* **ui:** refine history actions, asset seeds and tax rates ([#217](https://github.com/LexanderPL/AssetBoard/issues/217)) ([81e3a56](https://github.com/LexanderPL/AssetBoard/commit/81e3a56c6da710fc591fccb31cb11780e63bdfe5))
+
+
+### Documentation
+
+* **specs:** add F5.6 estimated values between entries for backfill ([#215](https://github.com/LexanderPL/AssetBoard/issues/215)) ([1699491](https://github.com/LexanderPL/AssetBoard/commit/16994914849ee8327a3f2716cc15081652273d95))
+
 ## [0.4.1](https://github.com/LexanderPL/AssetBoard/compare/v0.4.0...v0.4.1) (2026-11-02)
 
 
