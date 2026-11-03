@@ -1,4 +1,4 @@
-# Workspace archive format (v1.2)
+# Workspace archive format (v1.3)
 
 This is the reference for the files that **Export and import** writes and reads: the workspace
 archive (a ZIP) and the hand-made CSV files you can import on their own. It is normative: the
@@ -50,7 +50,8 @@ The manifest's `format_version` is `MAJOR.MINOR`.
 
 - A **newer major** version is refused ("made by a newer version of the app").
 - A **newer minor** version imports with a warning that lists the ignored files, keys and
-  columns. Minor versions only add optional data.
+  columns. Minor versions only add data; a new column may be required in that version when an
+  older archive can be read with a documented default.
 - An **older major** version would pass through the reader's upgrade functions; 1.x is the
   first format, so none exist yet.
 
@@ -59,15 +60,16 @@ The manifest's `format_version` is `MAJOR.MINOR`.
 lists them as unknown keys (a warning). 1.2: adds the four net-worth files
 (`networth_categories.csv`, `networth_items.csv`, `item_valuations.csv` and
 `networth_snapshots.csv`); they are required in a 1.2 archive and absent from 1.0/1.1 archives,
-which read with empty net-worth data. Golden archives of all three versions are in
-`tests/fixtures/`.
+which read with empty net-worth data. 1.3: `networth_items.csv` gains
+`estimate_between`; a 1.2 archive reads without it and restore uses the side default (assets on,
+liabilities off). Golden archives of all four versions are in `tests/fixtures/`.
 
 ## `manifest.json`
 
 ```json
 {
   "format": "workspace-archive",
-  "format_version": "1.1",
+  "format_version": "1.3",
   "app": {"name": "AssetBoard", "version": "0.4.0"},
   "exported_at": "2026-10-18T14:30:00Z",
   "base_currency": "EUR",
@@ -243,16 +245,18 @@ id,side,name,color,sort_order,archived_at
 | `link_id` | no | UUID of the link target's lineage id |
 | `include_in_net_worth` | no (default `true`) | `true` \| `false` |
 | `investable` | no (default `false`) | `true` \| `false` |
+| `estimate_between` | in 1.3; absent in 1.2 | `true` \| `false`: straight-line estimates in a backfill |
 | `archived_at` | no | timestamp; set = archived |
 
 A linked item keeps its `link_type` and `link_id` on export. Restore clears both and writes a
 manual item without a value, because the target's module has not yet contributed its archive
 files; the item is listed with `link_target_missing`. The M6/M7 archive extensions will resolve
-link target lineage ids.
+link target lineage ids. A missing `estimate_between` in a 1.2 archive restores the side default:
+on for assets, off for liabilities.
 
 ```csv
-id,side,category,category_id,name,currency,notes,acquired_on,valuation_mode,link_type,link_id,include_in_net_worth,investable,archived_at
-c4d5e6f7-a8b9-4c0d-9e1f-2a3b4c5d6e7f,asset,Vehicles,3f9a1c2d-4b5e-4f60-8a71-2b3c4d5e6f70,Car,EUR,Family car,2025-04-01,manual,,,true,false,
+id,side,category,category_id,name,currency,notes,acquired_on,valuation_mode,link_type,link_id,include_in_net_worth,investable,estimate_between,archived_at
+c4d5e6f7-a8b9-4c0d-9e1f-2a3b4c5d6e7f,asset,Vehicles,3f9a1c2d-4b5e-4f60-8a71-2b3c4d5e6f70,Car,EUR,Family car,2025-04-01,manual,,,true,false,true,
 ```
 
 ## `item_valuations.csv`
@@ -346,7 +350,7 @@ deflate, duplicate names, more than 64 members, a member over 100 MiB or a total
 uncompressed, or a member (1 MiB or larger) compressed more than 200:1. Unknown member names are
 listed as warnings and ignored. A file may hold at most 1 000 000 data rows and 64 columns.
 
-## Not in the archive (format 1.2)
+## Not in the archive (format 1.3)
 
 Members, invitations, users and their sessions, the audit log, import batches and saved
 mappings, and who created or closed what. Recurring items, income sources, work logs and

@@ -71,7 +71,8 @@ Restore writes, all at once:
 6. net-worth categories, items and value histories, then snapshots. Values keep their
    `created_at`, so several values on one day restore in the same order and the current value
    does not change. A linked item whose target is not in the archive becomes a manual item
-   without a value and is listed with `link_target_missing`.
+   without a value and is listed with `link_target_missing`. The estimate switch is carried; a
+   1.2 archive restores assets with it on and liabilities off.
 
 A restore needs a completely valid archive: any error blocks it, and nothing is written. The
 **Restore plan** lists what will be written, the suggested categories that will be removed, the
@@ -86,7 +87,7 @@ Merge brings an archive's ledger data into a workspace you already use, for exam
 two workspaces. Owners and editors can merge; it is the default mode.
 
 A merge writes categories, transactions and planned values only. The archive's settings,
-closed months and net-worth files are listed for information but never applied; a 1.2 archive
+closed months and net-worth files are listed for information but never applied; a 1.2+ archive
 lists its net-worth files once with a restore-only warning. The archive's base currency must
 match the workspace's; otherwise the whole archive is refused. Existing net-worth data is left
 untouched. To merge a valuation history, import its `item_valuations.csv` alone.

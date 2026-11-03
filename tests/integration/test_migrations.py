@@ -156,6 +156,76 @@ def test_0036_net_worth_archive_migration_is_reversible(tmp_path: Path) -> None:
         engine.dispose()
 
 
+def test_0037_estimate_between_migration_defaults_by_side_and_is_reversible(
+    tmp_path: Path,
+) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'estimate_between.db'}",
+    )
+    config = alembic_config(settings)
+    command.upgrade(config, "0036_f55_net_worth_archive")
+    engine = create_database_engine(settings.database_url or "")
+    stamp = "'2026-01-01 00:00:00'"
+    workspace_id = "1" * 32
+    asset_category = "2" * 32
+    liability_category = "3" * 32
+    try:
+
+        def columns() -> dict[str, bool]:
+            return {
+                column["name"]: column["nullable"]
+                for column in inspect(engine).get_columns("networth_items")
+            }
+
+        assert "estimate_between" not in columns()
+        with engine.begin() as connection:
+            connection.exec_driver_sql(
+                "INSERT INTO workspaces (id, name, base_currency, locale, timezone, "
+                f"created_at, updated_at) VALUES (?, 'Home', 'EUR', 'en', 'UTC', {stamp}, {stamp})",
+                (workspace_id,),
+            )
+            for category_id, side, name in (
+                (asset_category, "asset", "Vehicles"),
+                (liability_category, "liability", "Mortgage"),
+            ):
+                connection.exec_driver_sql(
+                    "INSERT INTO networth_categories (id, name, name_key, side, color, "
+                    "sort_order, archived_at, created_at, updated_at, workspace_id) "
+                    f"VALUES (?, ?, ?, ?, '#16a34a', 0, NULL, {stamp}, {stamp}, ?)",
+                    (category_id, name, name.casefold(), side, workspace_id),
+                )
+            for item_id, side, category_id, name in (
+                ("4" * 32, "asset", asset_category, "Car"),
+                ("5" * 32, "liability", liability_category, "Loan"),
+            ):
+                connection.exec_driver_sql(
+                    "INSERT INTO networth_items (id, side, category_id, name, currency, notes, "
+                    "acquired_on, valuation_mode, link_type, link_id, include_in_net_worth, "
+                    "investable, archived_at, created_at, updated_at, workspace_id) "
+                    f"VALUES (?, ?, ?, ?, 'EUR', '', NULL, 'manual', NULL, NULL, 1, 0, NULL, "
+                    f"{stamp}, {stamp}, ?)",
+                    (item_id, side, category_id, name, workspace_id),
+                )
+        upgrade_database(settings)
+        assert columns()["estimate_between"] is False
+        with engine.connect() as connection:
+            rows = connection.exec_driver_sql(
+                "SELECT side, estimate_between FROM networth_items ORDER BY side"
+            ).all()
+        assert rows == [("asset", 1), ("liability", 0)]
+        command.downgrade(config, "0036_f55_net_worth_archive")
+        assert "estimate_between" not in columns()
+        with engine.connect() as connection:
+            count = connection.exec_driver_sql("SELECT count(*) FROM networth_items")
+            assert count.scalar_one() == 2
+        upgrade_database(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
 def test_0034_net_worth_snapshots_migration_is_reversible(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None,

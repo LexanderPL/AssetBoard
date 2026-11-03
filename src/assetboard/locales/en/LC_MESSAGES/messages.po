@@ -1928,6 +1928,12 @@ msgid_plural "%(num)d linked items were unavailable and were not counted."
 msgstr[0] ""
 msgstr[1] ""
 
+#, python-format
+msgid "includes %(num)d estimated value"
+msgid_plural "includes %(num)d estimated values"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Deleted category"
 msgstr ""
 
@@ -4491,6 +4497,14 @@ msgstr ""
 msgid "Investable"
 msgstr ""
 
+msgid "Estimate values between entries"
+msgstr ""
+
+msgid ""
+"Backfill draws a straight line between recorded values. Re-run Backfill "
+"from history after changing this."
+msgstr ""
+
 msgid "Enter values as positive amounts. For a liability, enter the amount owed."
 msgstr ""
 
@@ -4591,6 +4605,9 @@ msgid "This value comes from the linked source and is read-only."
 msgstr ""
 
 msgid "Value history"
+msgstr ""
+
+msgid "Estimates values between entries"
 msgstr ""
 
 msgid "Value"

@@ -47,6 +47,7 @@ class ItemHistory:
     valuation_mode: str = "manual"
     link_type: str | None = None
     link_id: UUID | None = None
+    estimate_between: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -63,6 +64,7 @@ class ItemValue:
     value_minor: int | None
     value_as_of: date | None
     unavailable: bool = False
+    estimated: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -80,6 +82,7 @@ class SnapshotBreakdown:
     non_base: int
     no_value: int
     unavailable: int = 0
+    estimated: int = 0
 
 
 def month_end(day: date) -> date:
@@ -157,12 +160,49 @@ def archived_on(archived_at: datetime | None, timezone: str) -> date | None:
     return archived_at.astimezone(ZoneInfo(timezone)).date()
 
 
+def value_on(
+    valuations: Sequence[ValuationPoint],
+    day: date,
+    *,
+    today: date,
+    estimate_between: bool,
+) -> tuple[int | None, bool]:
+    """The effective value on ``day`` and whether it was interpolated.
+
+    Recorded dates use the latest entry that day (F5.1 order). With the switch on, a day
+    strictly between two recorded dates is a straight line between their effective values;
+    the end date must be on or before ``today``. Before the first value there is no value, and
+    after the last effective value the last value carries forward.
+    """
+    current = current_valuation(valuations, day)
+    if current is None or not estimate_between or current.as_of == day:
+        return (current.value_minor if current is not None else None, False)
+    next_days = [point.as_of for point in valuations if day < point.as_of <= today]
+    if not next_days:
+        return (current.value_minor, False)
+    end_day = min(next_days)
+    end = current_valuation(valuations, end_day)
+    assert end is not None  # the end day comes from a valuation point
+    span = (end_day - current.as_of).days
+    if span <= 0:  # defensive; current.as_of < day < end_day by construction
+        return (current.value_minor, False)
+    numerator = (
+        current.value_minor * (end_day - day).days + end.value_minor * (day - current.as_of).days
+    )
+    denominator = span
+    # All values are non-negative, so this is round-half-up without a sign branch.
+    rounded = (2 * numerator + denominator) // (2 * denominator)
+    return (rounded, True)
+
+
 def values_at(
     items: Sequence[ItemHistory],
     as_of: date,
     *,
     timezone: str,
     linked: Mapping[UUID, Money | Unavailable] | None = None,
+    backfill: bool = False,
+    today: date | None = None,
 ) -> tuple[ItemValue, ...]:
     """Each item's effective value and archive state on ``as_of``, in input order.
 
@@ -170,6 +210,9 @@ def values_at(
     value passed in ``linked`` (keyed by item id); a missing or ``Unavailable`` resolution means
     the value is unavailable, never zero. An item is archived from its workspace-local archive
     date onwards; that date itself is already excluded (the owner's decision).
+
+    ``backfill`` enables the F5.6 straight-line estimate for manual items whose
+    ``estimate_between`` switch is on. Every other caller keeps the F5.3 rule.
     """
     values: list[ItemValue] = []
     for item in items:
@@ -194,6 +237,20 @@ def values_at(
             )
             continue
         current = current_valuation(item.valuations, as_of)
+        value_minor = current.value_minor if current is not None else None
+        value_as_of = current.as_of if current is not None else None
+        estimated = False
+        if backfill and item.estimate_between:
+            if today is None:
+                raise ValueError("today is required for a backfill estimate")
+            value_minor, estimated = value_on(
+                item.valuations,
+                as_of,
+                today=today,
+                estimate_between=True,
+            )
+            if estimated:
+                value_as_of = as_of
         values.append(
             ItemValue(
                 id=item.id,
@@ -203,14 +260,15 @@ def values_at(
                 include_in_net_worth=item.include_in_net_worth,
                 archived_at=item.archived_at,
                 archived=archived,
-                value_minor=current.value_minor if current is not None else None,
-                value_as_of=current.as_of if current is not None else None,
+                value_minor=value_minor,
+                value_as_of=value_as_of,
+                estimated=estimated,
             )
         )
     return tuple(values)
 
 
-def snapshot_breakdown(summary: NetWorthSummary) -> dict[str, object]:
+def snapshot_breakdown(summary: NetWorthSummary, *, estimated: int = 0) -> dict[str, object]:
     """The versioned object stored in a snapshot's ``breakdown`` column."""
     categories = [
         {
@@ -228,6 +286,7 @@ def snapshot_breakdown(summary: NetWorthSummary) -> dict[str, object]:
             "no_value": len(summary.no_value_item_ids),
             "unavailable": len(summary.unavailable_item_ids),
         },
+        "estimated": estimated,
     }
 
 
@@ -269,4 +328,5 @@ def parse_breakdown(raw: object) -> SnapshotBreakdown:
         _optional_count(counts.get("non_base")),
         _optional_count(counts.get("no_value")),
         _optional_count(counts.get("unavailable")),
+        _optional_count(root.get("estimated")),
     )

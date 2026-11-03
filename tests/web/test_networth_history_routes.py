@@ -57,7 +57,7 @@ def _create_item(
         ).one()
 
 
-def _breakdown(*rows: tuple[UUID, str, int]) -> dict[str, Any]:
+def _breakdown(*rows: tuple[UUID, str, int], estimated: int = 0) -> dict[str, Any]:
     return {
         "v": 1,
         "categories": [
@@ -65,6 +65,7 @@ def _breakdown(*rows: tuple[UUID, str, int]) -> dict[str, Any]:
             for category_id, side, total in rows
         ],
         "not_counted": {"non_base": 0, "no_value": 0},
+        "estimated": estimated,
     }
 
 
@@ -302,3 +303,25 @@ def test_history_is_translated(owner: OwnerApp) -> None:
     assert "Ręczna" in page
     assert "Zakres" in page and "Cały okres" in page
     assert "Data" in page and "Źródło" in page
+
+
+def test_backfilled_estimate_count_is_marked_in_the_table_and_tooltip(
+    owner: OwnerApp,
+) -> None:
+    owner.app.state.clock = FixedClock("2026-11-02T12:00:00+00:00")
+    _snapshot(
+        owner,
+        as_of=date(2026, 10, 31),
+        source="backfill",
+        breakdown=_breakdown(estimated=3),
+    )
+    page = owner.client.get("/net-worth/history").text
+    assert "includes 3 estimated values" in page
+    assert "data-estimated" in page
+    chart = re.search(
+        r'<script type="application/json" id="networth-history-data">(.*?)</script>',
+        page,
+        re.DOTALL,
+    )
+    assert chart is not None
+    assert "includes 3 estimated values" in chart.group(1)

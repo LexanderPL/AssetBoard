@@ -2035,6 +2035,13 @@ msgstr[0] "%(num)d powiązana pozycja była niedostępna i nie została policzon
 msgstr[1] "%(num)d powiązane pozycje były niedostępne i nie zostały policzone."
 msgstr[2] "%(num)d powiązanych pozycji było niedostępnych i nie zostało policzonych."
 
+#, python-format
+msgid "includes %(num)d estimated value"
+msgid_plural "includes %(num)d estimated values"
+msgstr[0] "zawiera %(num)d szacowaną wartość"
+msgstr[1] "zawiera %(num)d szacowane wartości"
+msgstr[2] "zawiera %(num)d szacowanych wartości"
+
 msgid "Deleted category"
 msgstr "Usunięta kategoria"
 
@@ -4852,6 +4859,16 @@ msgstr "Uwzględnij w majątku netto"
 msgid "Investable"
 msgstr "Inwestycyjna"
 
+msgid "Estimate values between entries"
+msgstr "Szacuj wartości między wpisami"
+
+msgid ""
+"Backfill draws a straight line between recorded values. Re-run Backfill "
+"from history after changing this."
+msgstr ""
+"Uzupełnianie historii rysuje prostą między zapisanymi wartościami. Po "
+"zmianie tego ustawienia ponownie uruchom Uzupełnij z historii."
+
 msgid "Enter values as positive amounts. For a liability, enter the amount owed."
 msgstr ""
 "Podawaj wartości jako liczby dodatnie. W przypadku zobowiązania podaj "
@@ -4968,6 +4985,9 @@ msgstr "Ta wartość pochodzi z powiązanego źródła i jest tylko do odczytu."
 
 msgid "Value history"
 msgstr "Historia wartości"
+
+msgid "Estimates values between entries"
+msgstr "Szacuje wartości między wpisami"
 
 msgid "Value"
 msgstr "Wartość"

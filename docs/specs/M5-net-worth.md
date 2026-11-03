@@ -343,6 +343,25 @@ one drop.
 - Defaults by side on create, on bulk add, in the migration and on restore of a 1.2 archive.
 - Archive round trip keeps the switch.
 
+**Implementation notes (F5.6).**
+- `NetWorthItem.estimate_between` is non-null; migration `0037_f56_estimate_between` adds it
+  with `server_default=sa.true()`, sets liabilities to `sa.false()`, then removes the default.
+  New assets (including bulk add) default on and liabilities off; the item form edits it on
+  manual items and hides it on linked items.
+- `domain.networth_history.value_on` returns `(value_minor, estimated)` and uses the effective
+  value on `d0`/`d1` (latest entry that day). It only interpolates strictly between them, never
+  before the first value, and never uses an end date after today. The formula is
+  `(v0 × (d1 − D) + v1 × (D − d0)) / (d1 − d0)` with day ordinals, rounded half up once with
+  `(2·num + den) // (2·den)`.
+- `values_at(backfill=True, today=...)` uses the switch only for backfill; every other caller
+  keeps F5.3. Auto and manual snapshots therefore ignore the switch.
+- The breakdown always writes `estimated`; it counts only items actually in the snapshot totals
+  (not archived, included, base currency, with a value).
+- The history table and tooltip show “includes N estimated values”. The table note is the
+  accessible marker; points are not drawn differently.
+- Archive format 1.3 adds the required `estimate_between` column. A 1.2 archive reads without
+  it and restores side defaults. The v1.2 golden stays; `workspace-archive-v1.3.zip` is added.
+
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).

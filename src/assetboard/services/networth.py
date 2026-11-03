@@ -179,6 +179,7 @@ class ItemView:
     acquired_on: date | None
     include_in_net_worth: bool
     investable: bool
+    estimate_between: bool
     archived: bool
     archived_at: datetime | None
     current: Money | None
@@ -369,6 +370,7 @@ def _item_history(item: NetWorthItem, valuations: Sequence[ItemValuation]) -> It
         valuation_mode=item.valuation_mode,
         link_type=item.link_type,
         link_id=item.link_id,
+        estimate_between=item.estimate_between,
     )
 
 
@@ -413,6 +415,7 @@ def _item_view_at(
         acquired_on=item.acquired_on,
         include_in_net_worth=item.include_in_net_worth,
         investable=item.investable,
+        estimate_between=item.estimate_between,
         archived=value.archived,
         archived_at=value.archived_at,
         current=current,
@@ -1107,6 +1110,7 @@ def create_item(
     acquired_on: date | None = None,
     include_in_net_worth: bool = True,
     investable: bool = False,
+    estimate_between: bool | None = None,
     as_of: date | None = None,
     valuation_note: str = "",
     link_type: str | None = None,
@@ -1114,6 +1118,7 @@ def create_item(
 ) -> ItemView:
     require_role(ctx, Role.EDITOR)
     wanted_side = _sides(side)
+    wanted_estimate = wanted_side is Side.ASSET if estimate_between is None else estimate_between
     clean = _item_name(name)
     clean_notes_value = _notes(notes)
     wanted_acquired = _date(acquired_on, "acquired_on")
@@ -1162,6 +1167,7 @@ def create_item(
                 link_id=link_id,
                 include_in_net_worth=include_in_net_worth,
                 investable=investable,
+                estimate_between=wanted_side is Side.ASSET,
             )
             _audit(
                 session,
@@ -1209,6 +1215,7 @@ def create_item(
             link_id=None,
             include_in_net_worth=include_in_net_worth,
             investable=investable,
+            estimate_between=wanted_estimate,
         )
         ItemValuationRepository(session, ctx).create(
             item_id=item.id,
@@ -1260,6 +1267,7 @@ def update_item(
     acquired_on: date | None = None,
     include_in_net_worth: bool = True,
     investable: bool = False,
+    estimate_between: bool | None = None,
 ) -> ItemView:
     require_role(ctx, Role.EDITOR)
     clean = _item_name(name)
@@ -1283,6 +1291,11 @@ def update_item(
             raise InvalidNetWorth("currency", "linked_currency")
         if item_currency != item.currency and valuations:
             raise InvalidNetWorth("currency", "currency_locked")
+        wanted_estimate = (
+            item.estimate_between
+            if item.valuation_mode == "linked" or estimate_between is None
+            else estimate_between
+        )
         changes = {
             field: value
             for field, value in (
@@ -1293,6 +1306,7 @@ def update_item(
                 ("acquired_on", wanted_acquired),
                 ("include_in_net_worth", include_in_net_worth),
                 ("investable", investable),
+                ("estimate_between", wanted_estimate),
             )
             if getattr(item, field) != value
         }
@@ -1638,6 +1652,7 @@ def create_bulk(
                 link_id=None,
                 include_in_net_worth=True,
                 investable=False,
+                estimate_between=wanted_side is Side.ASSET,
             )
             valuations.create(
                 item_id=item.id,

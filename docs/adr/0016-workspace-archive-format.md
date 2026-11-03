@@ -41,8 +41,10 @@ The format must:
   `import_key`, so ids stay stable across export → restore → export and a merge into the source
   workspace recognises its own rows.
 - **Versioning and compatibility.**
-  - A **minor** version only adds: new optional columns, new optional keys in JSON files, new
-    files. A reader ignores what it does not know and lists it as a warning.
+  - A **minor** version only adds: new columns, new optional keys in JSON files, new files. A
+    new column may be required in the new version when older archives can still be read with a
+    documented default (for example F5.6's `estimate_between`, defaulted by side). A reader
+    ignores what it does not know and lists it as a warning.
   - A **major** version is any other change (renamed, removed or reinterpreted columns, new
     required data). The app writes only the current version, reads every major version it has
     ever written by upgrading older archives with pure, tested functions in `domain.archive`
