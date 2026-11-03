@@ -243,13 +243,16 @@ Payment due date = `due_day` of the month `pay_date.month + due_month_offset` (c
 - The workspace base currency is locked while any fixed tax version exists; percentage-only
   versions do not lock it.
 - Rate versions are append-only and a newly added version must have an `effective_from` later than
-  the latest existing version. Rule effect and base are fixed at creation; create a separate rule
-  to model a different effect or base. Archived rules are excluded from new calculator previews.
+  the latest existing version. A version whose `effective_from` is still in the future may be
+  corrected until it starts; current and past versions stay immutable. Rule effect and base are
+  fixed at creation; create a separate rule to model a different effect or base. Archived rules
+  are excluded from new calculator previews.
 - If no version is effective on the selected date, the rule is omitted from the calculation and
   named in the preview warning.
 
 **As built: tax redesign ([ADR-0022](../adr/0022-tax-kinds-and-payment-schedule.md); owner
-mockup of 2026-10-31).** This supersedes the effect/`record_as` model above.
+mockup of 2026-10-31; future-rate editing added 2026-11-03).** This supersedes the
+effect/`record_as` model above.
 - `TaxRule.kind` is `added` | `self_paid` | `payer_withheld` ("Who pays it to the tax office?").
   `calculate_taxes(net, rules)` has no `record_as`: received (the occurrence's expected amount,
   `ledger_amount`) = `net + added − payer_withheld`; payments = `added + self_paid` where

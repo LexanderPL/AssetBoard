@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 
 from sqlalchemy import select
 
+from assetboard.clock import FixedClock
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule
 from assetboard.db.models.ledger import Category
 from assetboard.db.models.scheduled import ScheduledItem
@@ -229,3 +231,71 @@ def test_income_checklist_and_switch_refusal(owner):
     assert "Taxes on this income" not in income_page
     hidden = owner.post(f"/income/{source_id}/taxes", {}, token_from="/income")
     assert hidden.status_code == 404
+
+
+def test_future_rate_is_not_shown_as_current_and_can_be_edited(owner):
+    _enable(owner)
+    assert _new_tax(owner, rate_percent="12").status_code == 303
+    with owner.db() as session:
+        rule = session.scalars(select(TaxRule)).one()
+        rule_id = rule.id
+    assert (
+        owner.post(
+            f"/taxes/{rule_id}/versions",
+            {"effective_from": "2027-01-01", "mode": "percent", "rate_percent": "19"},
+        ).status_code
+        == 303
+    )
+    owner.app.state.clock = FixedClock("2026-11-04T12:00:00+00:00")
+    page = owner.client.get("/taxes").text
+    badge = re.search(r"data-tax-rate>([^<]+)</span>", page)
+    assert badge is not None and badge.group(1) == "12%"
+    assert "From Jan 1, 2027 · 19%" in page
+    edit = owner.client.get(f"/taxes/{rule_id}/edit").text
+    assert "12%" in edit and "19%" not in edit
+
+    with owner.db() as session:
+        future = session.scalars(
+            select(TaxRuleVersion).where(TaxRuleVersion.effective_from == date(2027, 1, 1))
+        ).one()
+        future_id = future.id
+    updated = owner.post(
+        f"/taxes/{rule_id}/versions/{future_id}",
+        {"effective_from": "2027-02-01", "mode": "percent", "rate_percent": "20"},
+    )
+    assert updated.status_code == 303 and "error" not in updated.headers["location"]
+    with owner.db() as session:
+        future = session.get(TaxRuleVersion, future_id)
+        assert future is not None
+        assert (future.effective_from, future.rate_bp) == (date(2027, 2, 1), 2000)
+    page = owner.client.get("/taxes").text
+    assert "From Feb 1, 2027 · 20%" in page
+    assert "data-tax-version-edit" in page
+
+    with owner.db() as session:
+        first = session.scalars(
+            select(TaxRuleVersion).where(TaxRuleVersion.effective_from == date(1900, 1, 1))
+        ).one()
+        first_id = first.id
+    refused = owner.post(
+        f"/taxes/{rule_id}/versions/{first_id}",
+        {"effective_from": "2027-03-01", "mode": "percent", "rate_percent": "21"},
+    )
+    assert refused.status_code == 303
+    assert "error=version_not_future" in refused.headers["location"]
+
+
+def test_edit_example_uses_the_rate_for_the_example_pay_date(owner):
+    _enable(owner)
+    assert _new_tax(owner, rate_percent="12").status_code == 303
+    with owner.db() as session:
+        rule_id = session.scalars(select(TaxRule)).one().id
+    added = owner.post(
+        f"/taxes/{rule_id}/versions",
+        {"effective_from": "2026-12-01", "mode": "percent", "rate_percent": "19"},
+    )
+    assert added.status_code == 303 and "error" not in added.headers["location"], added.headers
+    owner.app.state.clock = FixedClock("2026-11-04T12:00:00+00:00")
+    edit = owner.client.get(f"/taxes/{rule_id}/edit").text
+    assert "€1,900.00" in edit
+    assert "paid on Dec 10, 2026" in edit

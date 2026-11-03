@@ -78,8 +78,8 @@ liability "Other" are fine). Categories have a colour and can be reordered with 
 A new workspace starts with these suggested categories, named in the language used when the
 workspace was created:
 
-- **Assets:** Vehicles, Electronics, Audio equipment, Instruments, Appliances, Jewelry &
-  watches, Photography, Other.
+- **Assets:** Vehicles, Electronics, Appliances, Furniture, Jewelry & watches, Art &
+  collectibles, Tools, Other.
 - **Liabilities:** Installments, Mortgage, Other.
 
 An older workspace, or one whose categories were all deleted, does not get them automatically.
@@ -168,7 +168,7 @@ The **Bulk add items** panel accepts one item per line:
 ```
 Name; value; category
 Car; 12 000; Vehicles
-Camera; 1 250,50; Photography
+Camera; 1 250,50; Electronics
 ```
 
 - Values use the interface number format (`1 234,56`, `1,234.56`, `12,5`).

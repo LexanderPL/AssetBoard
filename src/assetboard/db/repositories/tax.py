@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime
 from uuid import UUID
 
-from sqlalchemy import exists, func, select
+from sqlalchemy import exists, func, select, update
 
 from assetboard.db.models.income import IncomeSourceTaxRule
 from assetboard.db.models.scheduled import ScheduledOccurrence
@@ -115,3 +115,38 @@ class TaxRuleVersionRepository(ScopedRepository[TaxRuleVersion]):
             .limit(1)
         )
         return self._session.scalars(statement).first()
+
+    def update_future(
+        self,
+        version_id: UUID,
+        *,
+        today: date,
+        effective_from: date,
+        mode: str,
+        rate_bp: int | None,
+        fixed_minor: int | None,
+        updated_at: datetime,
+    ) -> int:
+        """Edit a future rate draft; effective and past versions stay append-only.
+
+        The ORM update/delete paths remain unsupported; this explicit scoped statement is the
+        one allowed correction path before a version starts.
+        """
+        result = self._session.execute(
+            update(TaxRuleVersion)
+            .where(
+                TaxRuleVersion.workspace_id == self._workspace_id,
+                TaxRuleVersion.id == version_id,
+                TaxRuleVersion.effective_from > today,
+            )
+            .values(
+                effective_from=effective_from,
+                mode=mode,
+                rate_bp=rate_bp,
+                fixed_minor=fixed_minor,
+                updated_at=updated_at,
+            )
+            .execution_options(synchronize_session=False)
+        )
+        self._session.expire_all()
+        return int(getattr(result, "rowcount", 0) or 0)

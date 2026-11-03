@@ -203,6 +203,14 @@ def test_edit_item_is_inline_and_does_not_append_a_valuation(owner: OwnerApp) ->
         )
 
 
+def test_edit_and_add_value_keep_the_item_in_view(owner: OwnerApp) -> None:
+    item = _create_item(owner)
+    page = owner.client.get("/net-worth").text
+    assert f'hx-swap="outerHTML show:#item-{item}:top"' in page
+    edit = owner.client.get(f"/net-worth/items/{item}/edit", headers={"HX-Request": "true"})
+    assert f'hx-swap="outerHTML show:#item-{item}:top"' in edit.text
+
+
 def test_archive_and_restore_item_keep_the_history(owner: OwnerApp) -> None:
     item = _create_item(owner)
     archived = _htmx(owner, f"/net-worth/items/{item}/archive", {"side": "asset"})
@@ -216,9 +224,9 @@ def test_archive_and_restore_item_keep_the_history(owner: OwnerApp) -> None:
 
 def test_category_crud_reorder_archive_restore_and_delete(owner: OwnerApp) -> None:
     kind = _create_category(owner, "Garden")
-    other = _create_category(owner, "Tools")
+    other = _create_category(owner, "Hardware")
     page = owner.client.get("/net-worth").text
-    assert "Garden" in page and "Tools" in page
+    assert "Garden" in page and "Hardware" in page
     moved = _htmx(owner, f"/net-worth/categories/{kind}/move", {"side": "asset", "direction": "up"})
     assert moved.status_code == 200
     updated = _htmx(

@@ -50,6 +50,9 @@ ERRORS = {
     "invalid_schedule": _("Enter a payment day between 1 and 31 and choose the month."),
     "invalid_category": _("Choose an expense category that is not a transfer."),
     "version_not_newer": _("A rate change must start after the latest rate."),
+    "version_not_future": _("Only a rate change that starts in the future can be edited."),
+    "version_exists": _("Another rate change already starts on that date."),
+    "version_missing": _("That rate change no longer exists."),
     "archived": _("Archived taxes cannot be changed."),
     "kind_locked": _(
         "Income already posted was calculated with this tax, so who pays it and its base "
@@ -165,6 +168,9 @@ def _common(request: Request) -> dict[str, object]:
         "format_amount_input": format_amount_input,
         "format_rate_basis_points": format_rate_basis_points,
         "rate_label": rate_label,
+        "rate_input": lambda rate_bp: format_quantity_input(
+            Decimal(rate_bp).scaleb(-2), request.state.locale
+        ),
     }
 
 
@@ -219,18 +225,32 @@ def _form_values(values: dict[str, str]) -> dict[str, str]:
         "payment_day": values.get("payment_day", "10"),
         "payment_timing": values.get("payment_timing", PaymentTiming.NEXT_MONTH.value),
         "payment_category_id": values.get("payment_category_id", ""),
+        "rule_id": values.get("rule_id", ""),
     }
 
 
-def _example(request: Request, ctx: Context, values: dict[str, str]) -> taxes.TaxExample | None:
+def _example(
+    request: Request,
+    ctx: Context,
+    values: dict[str, str],
+    *,
+    rule: taxes.TaxRuleView | None = None,
+) -> taxes.TaxExample | None:
     """The example for the form's values; None while they are incomplete or invalid."""
     try:
+        value = (
+            rule.effective_on(taxes.example_paid_on(ctx))
+            if rule is not None
+            else _value(values, request.state.locale, ctx.workspace.base_currency)
+        )
+        if value is None:
+            return None
         return taxes.example(
             ctx,
             name=values["name"].strip() or gettext(_("This tax"), request.state.locale),
             kind=TaxKind(values["kind"]),
             base=TaxBase(values["base"]),
-            value=_value(values, request.state.locale, ctx.workspace.base_currency),
+            value=value,
             payment_day=_int(values["payment_day"], 10),
             payment_timing=PaymentTiming(values["payment_timing"]),
         )
@@ -254,7 +274,7 @@ async def _render_form(
         context={
             "values": values,
             "rule": rule,
-            "example": _example(request, ctx, values),
+            "example": _example(request, ctx, values, rule=rule),
             "expense_categories": [
                 category
                 for category in categories.expense
@@ -278,11 +298,27 @@ async def new_page(request: Request, ctx: CurrentContext) -> Response:
 async def example_partial(request: Request, ctx: CurrentContext) -> Response:
     """The example panel for the form's current values (htmx swaps it on change)."""
     _require_taxes(ctx)
-    values = _form_values(await _values(request))
+    submitted = await _values(request)
+    values = _form_values(submitted)
+    rule: taxes.TaxRuleView | None = None
+    if values["rule_id"]:
+        try:
+            rule = await run_in_threadpool(
+                taxes.get_rule,
+                request.app.state.session_factory,
+                ctx,
+                _id(values["rule_id"]),
+            )
+        except NotFound:
+            rule = None
     return render_template(
         request,
         "taxes/_example.html",
-        context={"example": _example(request, ctx, values), "values": values, **_common(request)},
+        context={
+            "example": _example(request, ctx, values, rule=rule),
+            "values": values,
+            **_common(request),
+        },
     )
 
 
@@ -388,6 +424,33 @@ async def add_version(request: Request, ctx: CurrentContext, rule_id: str) -> Re
                 request.app.state.session_factory,
                 ctx,
                 _id(rule_id),
+                effective_from=_day(values.get("effective_from", "")),
+                value=_value(values, request.state.locale, ctx.workspace.base_currency),
+            )
+        )
+    except taxes.TaxRuleError as exc:
+        return _redirect(request, exc.code, f"rates-{rule_id}")
+    except ValueError:
+        return _redirect(request, "invalid_value", f"rates-{rule_id}")
+    return _redirect(request)
+
+
+@router.post(
+    "/taxes/{rule_id}/versions/{version_id}",
+    name="tax_rule_version_update",
+)
+async def update_version(
+    request: Request, ctx: CurrentContext, rule_id: str, version_id: str
+) -> Response:
+    _require_taxes(ctx)
+    values = await _values(request)
+    try:
+        await run_in_threadpool(
+            lambda: taxes.update_version(
+                request.app.state.session_factory,
+                ctx,
+                _id(rule_id),
+                _id(version_id),
                 effective_from=_day(values.get("effective_from", "")),
                 value=_value(values, request.state.locale, ctx.workspace.base_currency),
             )

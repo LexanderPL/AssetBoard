@@ -36,7 +36,8 @@ vehicle) had no home.
   NULL means the rule's default. The income page only offers the payment-day override.
 - **Kind and base are editable** until posted income was calculated with the tax; then they are
   locked and the user is told to create a new tax. Rates stay append-only versions; the first
-  version is valid from 1900-01-01 ("from the start").
+  version is valid from 1900-01-01 ("from the start"). A future version may be corrected until
+  its effective date; current and past versions stay immutable.
 - **Migration `0028_taxes_redesign`** maps `added` → `added`, and `withheld` → `payer_withheld`
   when any active source it is attached to recorded take-home income, otherwise `self_paid`.
   Rule defaults come from the first attachment (by creation time; offset 0 → `same_month`, any

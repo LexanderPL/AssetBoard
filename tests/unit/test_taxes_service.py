@@ -363,3 +363,79 @@ def test_other_tax_is_a_recurring_expense_marked_as_tax(team: WorkspaceDb) -> No
     scheduled.save_item(team.factory, ctx, values, settings, item_id=item_id)
     with team.factory() as session:
         assert session.get(ScheduledItem, item_id).is_tax  # type: ignore[union-attr]
+
+
+def test_current_rate_is_today_and_future_versions_are_editable(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    category = expense_category(team)
+    rule_id = create_rule(team, category)
+    taxes.add_version(
+        team.factory,
+        ctx,
+        rule_id,
+        effective_from=date(2027, 1, 1),
+        value=PercentOrFixed.percent(1900),
+    )
+    view = taxes.get_rule(team.factory, ctx, rule_id)
+    assert view.current == PercentOrFixed.percent(1200)
+    assert view.effective_on(date(2026, 3, 1)) == PercentOrFixed.percent(1200)
+    assert view.effective_on(date(2027, 1, 1)) == PercentOrFixed.percent(1900)
+    future = view.versions[-1]
+    taxes.update_version(
+        team.factory,
+        ctx,
+        rule_id,
+        future.id,
+        effective_from=date(2027, 2, 1),
+        value=PercentOrFixed.percent(2000),
+    )
+    updated = taxes.get_rule(team.factory, ctx, rule_id)
+    assert updated.versions[-1].effective_from == date(2027, 2, 1)
+    assert updated.versions[-1].value == PercentOrFixed.percent(2000)
+    assert updated.current == PercentOrFixed.percent(1200)
+
+    with pytest.raises(taxes.TaxRuleError, match="version_not_future"):
+        taxes.update_version(
+            team.factory,
+            ctx,
+            rule_id,
+            updated.versions[0].id,
+            effective_from=date(2027, 3, 1),
+            value=PercentOrFixed.percent(1300),
+        )
+    taxes.add_version(
+        team.factory,
+        ctx,
+        rule_id,
+        effective_from=date(2028, 1, 1),
+        value=PercentOrFixed.percent(2100),
+    )
+    updated = taxes.get_rule(team.factory, ctx, rule_id)
+    with pytest.raises(taxes.TaxRuleError, match="version_exists"):
+        taxes.update_version(
+            team.factory,
+            ctx,
+            rule_id,
+            updated.versions[-2].id,
+            effective_from=date(2028, 1, 1),
+            value=PercentOrFixed.percent(2200),
+        )
+    # A new date that has become current/past is refused too.
+    with pytest.raises(taxes.TaxRuleError, match="version_not_future"):
+        taxes.update_version(
+            team.factory,
+            ctx,
+            rule_id,
+            updated.versions[-2].id,
+            effective_from=date(2026, 1, 1),
+            value=PercentOrFixed.percent(2200),
+        )
+    with team.factory() as session:
+        event = session.scalars(
+            select(AuditEvent).where(AuditEvent.action == "tax_rule.version_updated")
+        ).one()
+        assert event.data == {
+            "effective_from": "2027-02-01",
+            "previous_effective_from": "2027-01-01",
+            "mode": "percent",
+        }

@@ -26,9 +26,10 @@ for 10 000 of net income; without JavaScript it shows the saved values.
 
 Each percentage is rounded half up to the currency's minor unit, once per tax. The first rate is
 valid from the start; **Rate changes** on the Taxes page add a later rate, and past months keep
-the old one. Who pays the tax and its base can change until income calculated with the tax has
-been posted; after that create a new tax. Archiving (on the edit page) stops using a tax in new
-calculations and keeps its history.
+the old one. A rate change that starts in the future can be edited until it starts; current and
+past rates stay immutable. Who pays the tax and its base can change until income calculated
+with the tax has been posted; after that create a new tax. Archiving (on the edit page) stops
+using a tax in new calculations and keeps its history.
 
 ## Other taxes
 

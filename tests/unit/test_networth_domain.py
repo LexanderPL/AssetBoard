@@ -57,11 +57,11 @@ def test_seed_sets_have_the_specified_names_and_sides() -> None:
     assert [seed.name for seed in ASSET_SEED] == [
         "Vehicles",
         "Electronics",
-        "Audio equipment",
-        "Instruments",
         "Appliances",
+        "Furniture",
         "Jewelry & watches",
-        "Photography",
+        "Art & collectibles",
+        "Tools",
         "Other",
     ]
     assert [seed.name for seed in LIABILITY_SEED] == ["Installments", "Mortgage", "Other"]
