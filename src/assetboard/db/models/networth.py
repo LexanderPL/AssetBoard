@@ -186,6 +186,7 @@ class NetWorthItem(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     investable: Mapped[bool] = mapped_column(
         Boolean(), nullable=False, default=False, server_default=false()
     )
+    estimate_between: Mapped[bool] = mapped_column(Boolean(), nullable=False)
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
 

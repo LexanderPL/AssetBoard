@@ -572,6 +572,7 @@ def test_networth_queries_stay_in_their_workspace(
         link_id=None,
         include_in_net_worth=True,
         investable=False,
+        estimate_between=True,
     )
     b_item = items_b.create(
         side="asset",
@@ -585,6 +586,7 @@ def test_networth_queries_stay_in_their_workspace(
         link_id=None,
         include_in_net_worth=True,
         investable=False,
+        estimate_between=True,
     )
     assert [row.id for row in items_a.ordered()] == [a_item.id]
     assert [row.id for row in items_b.ordered()] == [b_item.id]
@@ -602,6 +604,7 @@ def test_networth_queries_stay_in_their_workspace(
         valuation_mode="linked",
         link_type="portfolio_asset_class",
         link_id=link_id,
+        estimate_between=True,
     )
     linked_b = items_b.create(
         side="asset",
@@ -611,6 +614,7 @@ def test_networth_queries_stay_in_their_workspace(
         valuation_mode="linked",
         link_type="portfolio_asset_class",
         link_id=link_id,
+        estimate_between=True,
     )
     assert items_a.active_linked("portfolio_asset_class", link_id) is linked_a
     assert items_b.active_linked("portfolio_asset_class", link_id) is linked_b
@@ -689,6 +693,7 @@ def test_networth_queries_stay_in_their_workspace(
         currency="EUR",
         import_batch_id=batch_a.id,
         import_key=f"id:{lineage}",
+        estimate_between=True,
     )
     assert items_a.for_import_batch(batch_a.id) == [imported_item_a]
     assert items_b.for_import_batch(batch_a.id) == []

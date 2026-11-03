@@ -369,6 +369,7 @@ def make_networth_item(session: Session, workspace_id: UUID) -> NetWorthItem:
         link_id=None,
         include_in_net_worth=True,
         investable=False,
+        estimate_between=True,
     )
 
 

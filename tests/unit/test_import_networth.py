@@ -117,6 +117,7 @@ def _item(
             valuation_mode=mode,
             link_type="portfolio_holding" if mode == "linked" else None,
             link_id=link_id,
+            estimate_between=True,
         )
         return item.id
 
