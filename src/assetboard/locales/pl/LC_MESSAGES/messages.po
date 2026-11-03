@@ -310,6 +310,21 @@ msgstr "Usunięto kategorię"
 msgid "Suggested categories added"
 msgstr "Dodano proponowane kategorie"
 
+msgid "Tax rule created"
+msgstr "Utworzono regułę podatkową"
+
+msgid "Tax rule changed"
+msgstr "Zmieniono regułę podatkową"
+
+msgid "Tax rule archived"
+msgstr "Zarchiwizowano regułę podatkową"
+
+msgid "Tax rate change added"
+msgstr "Dodano zmianę stawki"
+
+msgid "Tax rate change updated"
+msgstr "Zaktualizowano zmianę stawki"
+
 msgid "Net-worth category added"
 msgstr "Dodano kategorię majątku"
 
@@ -498,6 +513,15 @@ msgstr "Nazwa"
 
 msgid "Kind"
 msgstr "Rodzaj"
+
+msgid "Base"
+msgstr "Podstawa"
+
+msgid "Effective from"
+msgstr "Obowiązuje od"
+
+msgid "Previously effective from"
+msgstr "Poprzednio obowiązywała od"
 
 msgid "Treatment"
 msgstr "Traktowanie"

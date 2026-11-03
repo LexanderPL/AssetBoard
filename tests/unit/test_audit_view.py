@@ -127,6 +127,29 @@ def test_every_category_action_has_a_label_keys_and_a_group() -> None:
         assert gettext(text, "pl") != text, f"no Polish translation for {text!r}"
 
 
+# Tax events (F3.3)
+
+TAX_ACTIONS = {
+    "tax_rule.created",
+    "tax_rule.updated",
+    "tax_rule.archived",
+    "tax_rule.version_added",
+    "tax_rule.version_updated",
+}
+
+
+def test_every_tax_action_has_a_label_keys_and_a_group() -> None:
+    assert {a for a in ACTION_LABELS if a.startswith("tax_rule.")} == TAX_ACTIONS
+    assert set(GROUPS["workspace"]["taxes"]) == TAX_ACTIONS
+    assert "taxes" in GROUP_LABELS
+    keys = {key for action in TAX_ACTIONS for key in DATA_KEYS[action]}
+    assert keys <= set(KEY_LABELS)
+    texts = [ACTION_LABELS[a] for a in TAX_ACTIONS] + [KEY_LABELS[k] for k in keys]
+    texts.append(GROUP_LABELS["taxes"])
+    for text in texts:
+        assert gettext(text, "pl") != text, f"no Polish translation for {text!r}"
+
+
 # Net-worth events (F5.1)
 
 NETWORTH_ACTIONS = {

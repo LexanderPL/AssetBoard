@@ -307,6 +307,21 @@ msgstr ""
 msgid "Suggested categories added"
 msgstr ""
 
+msgid "Tax rule created"
+msgstr ""
+
+msgid "Tax rule changed"
+msgstr ""
+
+msgid "Tax rule archived"
+msgstr ""
+
+msgid "Tax rate change added"
+msgstr ""
+
+msgid "Tax rate change updated"
+msgstr ""
+
 msgid "Net-worth category added"
 msgstr ""
 
@@ -494,6 +509,15 @@ msgid "Name"
 msgstr ""
 
 msgid "Kind"
+msgstr ""
+
+msgid "Base"
+msgstr ""
+
+msgid "Effective from"
+msgstr ""
+
+msgid "Previously effective from"
 msgstr ""
 
 msgid "Treatment"

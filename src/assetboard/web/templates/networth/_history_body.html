@@ -20,12 +20,12 @@
       <form method="post" action="{{ scoped_url(request, 'networth_snapshot_take') }}">
         {{ csrf_input() }}
         <input type="hidden" name="range_code" value="{{ view.range_code }}">
-        <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-take-snapshot>{{ _("Take snapshot now") }}</button>
+        <button type="submit" class="btn-primary" data-take-snapshot>{{ _("Take snapshot now") }}</button>
       </form>
       <form method="post" action="{{ scoped_url(request, 'networth_snapshot_backfill') }}">
         {{ csrf_input() }}
         <input type="hidden" name="range_code" value="{{ view.range_code }}">
-        <button type="submit" class="rounded-xl border border-line-strong px-4 py-2 text-sm font-semibold hover:bg-subtle" data-backfill>{{ _("Backfill from history") }}</button>
+        <button type="submit" class="btn" data-backfill>{{ _("Backfill from history") }}</button>
       </form>
     </div>
     {% endif %}

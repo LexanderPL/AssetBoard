@@ -128,6 +128,21 @@ def _(message: str) -> str:
     return message
 
 
+# The original asset list, kept so a workspace seeded before the 2026-11 refresh is still
+# recognised as untouched by the archive restore check.
+ASSET_SEED_V1: tuple[SeedNetWorthCategory, ...] = _seed(
+    (
+        _("Vehicles"),
+        _("Electronics"),
+        _("Audio equipment"),
+        _("Instruments"),
+        _("Appliances"),
+        _("Jewelry & watches"),
+        _("Photography"),
+        _("Other"),
+    ),
+    Side.ASSET,
+)
 ASSET_SEED: tuple[SeedNetWorthCategory, ...] = _seed(
     (
         _("Vehicles"),
@@ -141,6 +156,7 @@ ASSET_SEED: tuple[SeedNetWorthCategory, ...] = _seed(
     ),
     Side.ASSET,
 )
+ASSET_SEEDS: tuple[tuple[SeedNetWorthCategory, ...], ...] = (ASSET_SEED_V1, ASSET_SEED)
 LIABILITY_SEED: tuple[SeedNetWorthCategory, ...] = _seed(
     (_("Installments"), _("Mortgage"), _("Other")),
     Side.LIABILITY,

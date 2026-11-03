@@ -21,6 +21,7 @@ from assetboard.db.models.identity import AuditEvent, Workspace
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.ledger import Category
 from assetboard.db.repositories import (
+    AuditEventRepository,
     BudgetLineRepository,
     CategoryRepository,
     ItemValuationRepository,
@@ -46,8 +47,9 @@ from assetboard.domain.archive import (
     parse_archive,
     write_archive,
 )
-from assetboard.domain.categories import SEED
+from assetboard.domain.categories import SEED, name_key
 from assetboard.domain.months import YearMonth
+from assetboard.domain.networth import ASSET_SEED_V1, LIABILITY_SEED
 from assetboard.domain.networth import SEED as NETWORTH_SEED
 from assetboard.services.archive import export_workspace, workspace_is_empty
 from assetboard.services.categories import seed_into
@@ -564,6 +566,44 @@ def test_untouched_suggested_categories_are_empty_enough_and_are_removed(
         assert CategoryRepository(session, target_ctx).list() == []
         assert NetWorthCategoryRepository(session, target_ctx).list() == []
         assert workspace_is_empty(session, target_ctx)
+
+
+def test_workspace_seeded_with_the_old_asset_list_is_still_empty(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    with db.factory.begin() as session:
+        repository = NetWorthCategoryRepository(session, ctx)
+        positions: dict[str, int] = {}
+        for seed in (*ASSET_SEED_V1, *LIABILITY_SEED):
+            side = seed.side.value
+            position = positions.get(side, 0)
+            positions[side] = position + 1
+            repository.create(
+                name=seed.name,
+                name_key=name_key(seed.name),
+                side=side,
+                color=seed.color,
+                sort_order=position,
+            )
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=db.users["own"],
+            actor_type="user",
+            action="networth_category.seeded",
+            entity_type="workspace",
+            entity_id=str(target),
+            ts=db.clock.now(),
+            data={"count": len(ASSET_SEED_V1) + len(LIABILITY_SEED), "automatic": True},
+        )
+    with db.factory() as session:
+        assert workspace_is_empty(session, ctx)
+    batch_id = _upload(db, data_dir, _archive(_rows()), ctx=ctx)
+    report = _plan(db, data_dir, batch_id, ctx=ctx)
+    assert report["counts"]["invalid"] == 0, report
+    _apply(db, data_dir, batch_id, ctx=ctx)
+    with db.factory() as session:
+        assert {row.name for row in NetWorthCategoryRepository(session, ctx).list()} == {"Vehicles"}
 
 
 def test_polish_suggested_set_is_also_recognised(db: WorkspaceDb) -> None:
