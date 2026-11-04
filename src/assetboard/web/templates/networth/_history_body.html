@@ -13,7 +13,7 @@
   <section class="panel p-4 sm:p-6" aria-labelledby="networth-history-heading">
     <div class="min-w-0">
       <h2 id="networth-history-heading" class="text-base font-semibold">{{ _("History") }}</h2>
-      <p class="mt-1 text-sm text-muted">{{ _("Automatic snapshots are stored on the 1st of each month at 04:00 in the workspace time zone. Stored automatic and manual snapshots are never recalculated.") }}</p>
+      <p class="mt-1 text-sm text-muted">{{ _("Automatic snapshots are stored on the 1st of each month at 04:00 in the workspace time zone. Manual snapshots are never recalculated; Backfill rebuilds automatic rows for past months.") }}</p>
     </div>
     {% if view.can_edit %}
     <div class="mt-4 flex flex-wrap items-center gap-2" data-history-actions>

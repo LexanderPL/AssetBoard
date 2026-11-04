@@ -1,8 +1,9 @@
 """Stored net-worth snapshots and history (F5.3).
 
-Automatic and manual snapshots are written once and never recalculated. Backfill deletes and
-recreates only ``source=backfill`` rows. Every write runs in ``run_immediate``, takes the
-workspace row lock and checks the source rules inside the transaction; the unique
+Automatic snapshots are written once and are not recalculated by the monthly job; manual
+snapshots are never recalculated. Backfill deletes and recreates automatic and ``source=backfill``
+rows in its range, replacing them with estimated history. Every write runs in ``run_immediate``,
+takes the workspace row lock and checks the source rules inside the transaction; the unique
 ``(workspace_id, as_of, source)`` constraint is the final guard when the monthly job and the
 startup catch-up race.
 
@@ -230,8 +231,9 @@ def _auto_write(
     if not NetWorthItemRepository(session, scope).any_exists():
         return False
     repository = _repository(session, scope)
-    existing = repository.for_date(as_of)
-    if any(row.source in {"manual", "auto"} for row in existing):
+    # A backfilled row is the user's explicit history for that date; the monthly job must not
+    # replace it with a fresh automatic snapshot (F5.6 policy).
+    if repository.for_date(as_of):
         return False
     currency = _currency(session, scope)
     histories = load_item_histories(session, scope)
@@ -244,12 +246,9 @@ def _auto_write(
     )
     # An item created after the month-end, or a linked target that cannot resolve, has no
     # effective value there yet. Storing a zero automatic row would start the chart with a
-    # misleading drop, and backfill could never replace it because auto wins over backfill.
+    # misleading drop.
     if not any(value.value_minor is not None for value in values):
         return False
-    for row in existing:
-        if row.source == "backfill":
-            repository.delete(row)
     summary, breakdown = _summarize(values, currency=currency)
     row = repository.create(
         as_of=as_of,
@@ -376,9 +375,10 @@ def _backfill_write(session: Session, ctx: Context, *, today: date) -> BackfillR
     dates = backfill_month_ends(ItemValuationRepository(session, ctx).earliest_as_of(), today)
     repository = _repository(session, ctx)
     rows = repository.for_range(None)
-    blocking = {row.as_of for row in rows if row.source in {"manual", "auto"}}
+    manual_dates = {row.as_of for row in rows if row.source == "manual"}
+    target_dates = set(dates)
     for row in rows:
-        if row.source == "backfill":
+        if row.source == "backfill" or (row.source == "auto" and row.as_of in target_dates):
             repository.delete(row)
     if not dates:
         return BackfillResult(0, None, None)
@@ -387,7 +387,7 @@ def _backfill_write(session: Session, ctx: Context, *, today: date) -> BackfillR
     resolved = registry.resolve_many(session, ctx, histories, dates)
     created = 0
     for as_of in dates:
-        if as_of in blocking:
+        if as_of in manual_dates:
             continue
         summary, breakdown = _summary_at(
             histories,
@@ -423,7 +423,7 @@ def _backfill_write(session: Session, ctx: Context, *, today: date) -> BackfillR
 
 
 def backfill_snapshots(factory: sessionmaker[Session], ctx: Context) -> BackfillResult:
-    """Rebuild the backfill rows from valuation history; real snapshots are untouched."""
+    """Rebuild automatic and backfill rows from valuation history; manual rows are untouched."""
     require_role(ctx, Role.EDITOR)
     today = ctx.clock.today(ctx.workspace.timezone)
     return run_immediate(factory, lambda session: _backfill_write(session, ctx, today=today))
