@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.5.1](https://github.com/LexanderPL/AssetBoard/compare/v0.5.0...v0.5.1) (2026-11-04)
+
+
+### Bug Fixes
+
+* **networth:** let backfill rebuild automatic snapshots ([#218](https://github.com/LexanderPL/AssetBoard/issues/218)) ([00f5d9a](https://github.com/LexanderPL/AssetBoard/commit/00f5d9afdcf8e7658f8c79406355656b92377489))
+
 ## [0.5.0](https://github.com/LexanderPL/AssetBoard/compare/v0.4.1...v0.5.0) (2026-11-03)
 
 
