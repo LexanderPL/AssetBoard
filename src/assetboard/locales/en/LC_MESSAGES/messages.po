@@ -4593,8 +4593,8 @@ msgstr ""
 
 msgid ""
 "Automatic snapshots are stored on the 1st of each month at 04:00 in the "
-"workspace time zone. Stored automatic and manual snapshots are never "
-"recalculated."
+"workspace time zone. Manual snapshots are never recalculated; Backfill "
+"rebuilds automatic rows for past months."
 msgstr ""
 
 msgid "Take snapshot now"
@@ -6648,5 +6648,13 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Photography"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Automatic snapshots are stored on the"
+#~ " 1st of each month at 04:00 in"
+#~ " the workspace time zone. Stored "
+#~ "automatic and manual snapshots are never"
+#~ " recalculated."
 #~ msgstr ""
 

@@ -102,7 +102,7 @@ Property tests: net = assets - liabilities; category totals sum to side totals; 
 **Acceptance**
 - Monthly APScheduler job (1st of month 04:00 workspace time) stores a `NetWorthSnapshot` (values as of the last day of the previous month). Idempotent.
 - "Take snapshot now" button (editor+); the latest manual snapshot for a date replaces the previous manual one for the same date.
-- **Backfill** from valuation history: for each past month-end, compute from `ItemValuation`s (latest valuation ≤ date); marked `source=backfill` and replaceable by real snapshots.
+- **Backfill** from valuation history: for each past month-end, compute from `ItemValuation`s (latest valuation ≤ date); marked `source=backfill`. It replaces automatic rows in its range; manual rows stay immutable.
 - Line chart of net worth (with assets and liabilities lines toggleable) over time; range selector (1y/3y/5y/all); hover shows the breakdown by category.
 - Linked items are included in snapshots using their value at that moment (once M6/M7 exist); if a link cannot be resolved the snapshot records the item as "unavailable" and the report flags it.
 
@@ -111,7 +111,7 @@ excluded only when its `archived_at` falls on or before `D` in the workspace tim
 item counts in every month. Today's summary keeps the current archived rule, which is equivalent
 because an archive date is never after today. `include_in_net_worth` has no history: the current
 setting applies to every date, and changing it affects future snapshots and a rerun of the
-backfill, never stored automatic or manual snapshots.
+backfill, never stored manual snapshots.
 
 **Implementation notes (F5.3).**
 - `NetWorthSnapshot` stores `as_of`, assets/liabilities/net minor units, currency, a versioned
@@ -121,15 +121,18 @@ backfill, never stored automatic or manual snapshots.
   under `services.networth.current_values`, the auto job and the backfill. A backfill therefore
   reads items, categories and valuations once rather than once per month.
 - Auto: 1st of the month at 04:00 workspace time for the previous month-end; skipped entirely
-  when the workspace has no net-worth items (archived items count as items) or when no item had
-  an effective value on that date yet. Manual: workspace today, replaces the same date's manual
-  row, stores zero for an empty workspace. Backfill: from
-  the earliest valuation's month-end through the previous month-end; deletes and recreates only
-  `source=backfill` rows, skipping dates with `auto` or `manual`. Re-running is allowed.
-- Startup catch-up creates only the most recent previous month-end's automatic snapshot; older
-  missed months come from backfill. The job logs the workspace id and exception type only.
-- Source priority is manual > auto > backfill. A real snapshot replaces a backfill row for its
-  date; a manual snapshot replaces the manual and backfill rows for its date and leaves auto.
+  when the workspace has no net-worth items (archived items count as items), when no item had an
+  effective value on that date yet, or when any snapshot already exists for that date. Manual:
+  workspace today, replaces the same date's manual row, stores zero for an empty workspace.
+  Backfill: from the earliest valuation's month-end through the previous month-end; deletes and
+  recreates `source=auto` and `source=backfill` rows in its range and leaves manual rows alone.
+  Re-running is allowed; a rebuilt row has `source=backfill`.
+- Startup catch-up creates only the most recent previous month-end's automatic snapshot when the
+  date has no snapshot; older missed months come from backfill. The job logs the workspace id and
+  exception type only.
+- Source priority is manual > auto > backfill. Backfill replaces automatic and backfill rows in
+  its range; the monthly job never replaces an existing backfill row. A manual snapshot replaces
+  the manual and backfill rows for its date and leaves auto.
 - Snapshot writes run in `run_immediate`, check inside the transaction, take the workspace lock
   and treat a unique-constraint race as "already taken". A future `as_of` is refused.
 - History is `GET /net-worth/history`, the fourth tab, with server-side
@@ -284,12 +287,10 @@ one drop.
 - With the switch off, an item keeps the F5.3 rule (latest value on or before `D`).
 
 **Where it applies**
-- **Backfilled snapshots only** (`source=backfill`).
-- Automatic and manual snapshots stay exactly as recorded, and so do:
-  - the item's current value;
-  - the Assets/Liabilities lists;
-  - the summary (F5.2);
-  - the valuation history table and sparkline.
+- **Backfilled snapshots** (`source=backfill`). They replace automatic rows in the backfill range
+  (owner decision, 2026-11-04); manual snapshots stay exactly as recorded.
+- The item's current value, Assets/Liabilities lists, summary (F5.2), valuation history table and
+  sparkline stay unchanged.
 - Linked items (F5.4) ignore the switch, because their resolver supplies real values.
 - The archive rule (F5.3) and the include setting still apply as before.
 - Changing the switch does not rewrite anything by itself. The item form says that a re-run of
@@ -318,7 +319,9 @@ one drop.
 - A pure domain function (in `domain/networth_history.py`) returns an item's value on `D` and
   whether it was estimated, given the item's ordered valuation points, `D`, today and the switch.
   `values_at` uses it when called for backfill, and its other callers keep the F5.3 behaviour.
-- Backfill uses it; auto and manual snapshots do not. The breakdown carries `estimated`.
+- Backfill uses it. Automatic snapshots created by the monthly job do not estimate; a backfill
+  run replaces automatic rows in its range with estimates. Manual snapshots never estimate. The
+  breakdown carries `estimated`.
 - History table and tooltip show the estimated count.
 - Archive: `networth_items.csv` gains the `estimate_between` column (`true|false`) as a minor
   format version (1.3, ADR-0016).

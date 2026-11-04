@@ -29,8 +29,9 @@ liabilities therefore shows a negative net worth, the liability table, and no as
 ## History and snapshots
 
 The **History** tab stores the net-worth total over time. A snapshot keeps assets, liabilities,
-net worth, the currency used and the per-category breakdown as it was on its date. Stored
-automatic and manual snapshots are never recalculated.
+net worth, the currency used and the per-category breakdown as it was on its date. Stored manual
+snapshots are never recalculated. Backfill can rebuild automatic rows in its range, and the
+monthly automatic job leaves an existing backfilled row alone.
 
 - **Automatic snapshots** are taken on the 1st of each month at 04:00 in the workspace time zone
   and cover the previous month's last day. A workspace with no net-worth items at all is skipped,
@@ -40,9 +41,10 @@ automatic and manual snapshots are never recalculated.
 - **Take snapshot now** (editors and owners) stores the workspace's today. Taking another manual
   snapshot on the same date replaces the earlier manual one; a zero total is stored too.
 - **Backfill from history** (editors and owners) recomputes every month-end from the month of the
-  earliest stored value through the previous month-end. It deletes and recreates only rows with
-  `source=backfill`; automatic and manual snapshots are untouched. No stored values means no
-  backfill rows.
+  earliest stored value through the previous month-end. It deletes and recreates the automatic
+  and backfill rows for those dates; manual snapshots are untouched. The rebuilt rows have
+  `source=backfill`, so they clearly show estimated history. No stored values means no backfill
+  rows.
 - When several snapshots exist for one date, **manual** wins over **automatic**, and both win over
   **backfill**. The chart and table show only the preferred source for each date.
 - The chart has net worth, assets and liabilities lines; the legend toggles them. The range
@@ -58,7 +60,8 @@ item's archive date cannot be after today.
 
 **Include in net worth** has no history in this version. The current switch applies to every
 snapshot date, including backfilled ones. Changing it affects future automatic snapshots and a
-rerun of the backfill, never stored automatic or manual rows.
+rerun of the backfill, which replaces automatic rows in its range; manual snapshots are never
+changed.
 
 Snapshots keep the currency they were taken in. The chart plots only snapshots in the workspace's
 current base currency; snapshots in another currency remain in the table with their currency code
@@ -128,8 +131,8 @@ and only its side’s targets are offered.
 - **Unlink** converts the item to manual. If today’s value is available, it is kept as the first
   manual value dated today; otherwise the item becomes manual and shows **No value yet**.
   After an unlink, **Backfill from history** sees the item as manual with at most today’s value,
-  so months when it was linked are not recreated in backfilled points. Automatic and manual
-  snapshots keep the values stored while it was linked.
+  so months when it was linked are not recreated in backfilled points. Manual snapshots keep the
+  values stored while it was linked; automatic rows in a backfill range are rebuilt.
 - Two active items cannot link to the same target. Archive one before creating the other. An
   archived linked item can only be restored while no other active item links to its target.
 - Only one item can be linked to a target at a time because otherwise net worth would count it
@@ -203,12 +206,14 @@ end date must be on or before today, so a future value is never used. A month-en
 recorded date uses the recorded value; before the first value there is no value, and after the
 last one the last value carries forward.
 
-The switch only affects **backfilled snapshots**. Automatic and manual snapshots stay exactly as
-recorded, and so do the current value, the lists, the summary, the history table's rows and the
-sparkline. Linked items ignore the switch because their resolver supplies the value. Changing the
-switch does not rewrite stored snapshots by itself: run **Backfill from history** again to apply
-it. New assets default on and new liabilities off; the migration applies those defaults to
-existing items. The same defaults apply when a 1.2 archive is restored.
+The switch affects **backfilled snapshots**. Manual snapshots stay exactly as recorded. An
+automatic snapshot is replaced by a backfilled estimate when you rerun **Backfill from history**
+for its date; until then it keeps the recorded value. The monthly automatic job does not overwrite
+a backfilled row. The current value, lists, summary and sparkline are unaffected. Linked items
+ignore the switch because their resolver supplies the value. Changing the switch does not rewrite
+stored snapshots by itself: run **Backfill from history** again to apply it. New assets default on
+and new liabilities off; the migration applies those defaults to existing items. The same
+defaults apply when a 1.2 archive is restored.
 
 A backfilled snapshot that used estimates says “includes N estimated values” in the history
 table and its chart tooltip. The breakdown also stores an `estimated` count.

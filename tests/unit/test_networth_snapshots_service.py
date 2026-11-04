@@ -170,7 +170,35 @@ def test_an_archived_item_still_makes_the_workspace_eligible_for_an_auto_snapsho
     assert (row.as_of, row.assets_minor) == (date(2026, 2, 28), 0)
 
 
-def test_auto_snapshot_replaces_backfill_but_a_manual_snapshot_wins(
+def test_backfill_replaces_an_automatic_snapshot_and_the_job_leaves_it(
+    team: WorkspaceDb,
+) -> None:
+    _at(team, "2026-03-15T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    item = _item(
+        team,
+        ctx,
+        category,
+        value="100",
+        estimate_between=True,
+        as_of=date(2026, 1, 1),
+    )
+    add_valuation(team.factory, ctx, item.id, locale="en", value="300", as_of=date(2026, 3, 1))
+    assert take_auto_snapshot(team.factory, ctx, team.clock, "UTC") is True
+    february = next(row for row in _rows(team) if row.as_of == date(2026, 2, 28))
+    assert (february.source, february.assets_minor) == ("auto", 10000)
+
+    backfill_snapshots(team.factory, ctx)
+    february = next(row for row in _rows(team) if row.as_of == date(2026, 2, 28))
+    assert (february.source, february.assets_minor) == ("backfill", 29661)
+    assert february.breakdown["estimated"] == 1
+    # The monthly/startup job sees an existing row and leaves the rebuilt history alone.
+    assert take_auto_snapshot(team.factory, ctx, team.clock, "UTC") is False
+    assert next(row for row in _rows(team) if row.as_of == date(2026, 2, 28)).source == "backfill"
+
+
+def test_auto_snapshot_does_not_replace_backfill_but_manual_still_wins(
     team: WorkspaceDb,
 ) -> None:
     _at(team, "2026-03-15T12:00:00+00:00")
@@ -180,14 +208,14 @@ def test_auto_snapshot_replaces_backfill_but_a_manual_snapshot_wins(
     backfill_snapshots(team.factory, ctx)
     assert [row.source for row in _rows(team)] == ["backfill", "backfill"]
 
-    assert take_auto_snapshot(team.factory, ctx, team.clock, "UTC") is True
+    assert take_auto_snapshot(team.factory, ctx, team.clock, "UTC") is False
     february = [row for row in _rows(team) if row.as_of == date(2026, 2, 28)]
-    assert [row.source for row in february] == ["auto"]
+    assert [row.source for row in february] == ["backfill"]
 
     take_manual_snapshot(team.factory, ctx, as_of=date(2026, 2, 28))
     assert take_auto_snapshot(team.factory, ctx, team.clock, "UTC") is False
     february = [row for row in _rows(team) if row.as_of == date(2026, 2, 28)]
-    assert sorted(row.source for row in february) == ["auto", "manual"]
+    assert [row.source for row in february] == ["manual"]
 
 
 def test_manual_snapshot_uses_today_and_replaces_the_same_day(team: WorkspaceDb) -> None:
@@ -323,7 +351,7 @@ def test_a_restored_item_counts_in_every_month(team: WorkspaceDb) -> None:
     }
 
 
-def test_changing_include_changes_backfill_but_not_stored_auto_or_manual(
+def test_changing_include_changes_backfill_and_replaces_auto_but_not_manual(
     team: WorkspaceDb,
 ) -> None:
     _at(team, "2026-07-01T12:00:00+00:00")
@@ -348,15 +376,13 @@ def test_changing_include_changes_backfill_but_not_stored_auto_or_manual(
         investable=item.investable,
     )
     backfill_snapshots(team.factory, ctx)
-    auto = next(row for row in _rows(team, source="auto") if row.as_of == date(2026, 6, 30))
     manual = next(row for row in _rows(team, source="manual"))
-    assert (auto.assets_minor, manual.assets_minor) == (10000, 10000)
-    older_backfill = [
-        row for row in _rows(team, source="backfill") if row.as_of < date(2026, 6, 30)
-    ]
-    assert older_backfill and all(row.assets_minor == 0 for row in older_backfill)
-    assert [row.source for row in _rows(team) if row.as_of == date(2026, 6, 30)] == ["auto"]
+    assert manual.assets_minor == 10000
+    backfill = [row for row in _rows(team, source="backfill") if row.as_of <= date(2026, 6, 30)]
+    assert backfill and all(row.assets_minor == 0 for row in backfill)
+    assert [row.source for row in _rows(team) if row.as_of == date(2026, 6, 30)] == ["backfill"]
     assert [row.source for row in _rows(team) if row.as_of == date(2026, 7, 1)] == ["manual"]
+    assert _rows(team, source="auto") == []
 
 
 def test_backfill_exclusions_match_the_summary(team: WorkspaceDb) -> None:
@@ -522,9 +548,11 @@ def test_auto_and_manual_snapshots_ignore_the_switch(team: WorkspaceDb) -> None:
     assert (auto.assets_minor, manual.assets_minor) == (10000, 10000)
     assert auto.breakdown["estimated"] == manual.breakdown["estimated"] == 0
     backfill_snapshots(team.factory, ctx)
-    # Only the two backfill rows are rebuilt; the real snapshots stay as recorded.
-    assert all(row.assets_minor == 10000 for row in _rows(team, source="auto"))
-    assert all(row.assets_minor == 10000 for row in _rows(team, source="manual"))
+    # Backfill replaces the automatic row; the manual row keeps its recorded value.
+    assert _rows(team, source="auto") == []
+    manual = next(row for row in _rows(team, source="manual"))
+    assert manual.assets_minor == 10000 and manual.breakdown["estimated"] == 0
+    assert [row.source for row in _rows(team) if row.as_of == date(2026, 2, 28)] == ["manual"]
 
 
 def test_changing_the_switch_changes_nothing_until_backfill_is_rerun(
