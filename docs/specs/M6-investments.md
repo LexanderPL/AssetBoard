@@ -62,7 +62,7 @@ Include the golden scenario and the property tests from the spec; independent or
 ## F6.3 Prices, FX and provider interface
 
 **Acceptance**
-- **Step 0 (ADR, before code):** `docs/adr/00xx-price-providers.md` evaluating candidates for (a) FX (e.g., the NBP public API), (b) equities/ETFs (e.g., Stooq CSV, Yahoo via `yfinance`), (c) crypto (e.g., CoinGecko), (d) precious metals. For each: terms of service, rate limits, ticker coverage for UCITS ETFs on common exchanges, stability/fragility, licensing of the Python client. **Do not scrape sites whose terms forbid it.** Recommend defaults and which stay optional. I review the ADR before the implementation starts.
+- **Step 0 (ADR, before code): done — [ADR-0024](../adr/0024-price-providers.md), owner decisions of 2026-11-04.** Built-in defaults, still opt-in per workspace: **NBP** (FX vs PLN + official gold in PLN via `cenyzlota`), **ECB** (FX vs EUR) and **CoinGecko** (crypto, quoted directly in USD/EUR/PLN). Optional: **EODHD** (the only acceptable EU equities/ETFs path; keyed). **GoldAPI.io, Kraken and Frankfurter are approved but deferred** to a follow-up minor release. Equities/ETFs are **manual-first**: no clean free EU provider exists in 2026 (Stooq's CSV API is removed or anti-bot-gated; Yahoo's terms forbid automated collection). **Do not scrape sites whose terms forbid it** — stands. Claims not verified during the evaluation are marked in the ADR's register and must be re-checked at implementation time.
 - `PriceProvider` interface: `supports(instrument) -> bool`, `fetch_latest(symbols) -> dict`, `fetch_history(symbol, start, end) -> list[PricePoint]`, `rate_limit` metadata. A `ManualProvider` (user-entered price points) and a `FakeProvider` for tests ship in this feature.
 - Manual price entry UI: add/edit/delete price points per instrument (essential for real estate and illiquid assets); table + small chart.
 - `PriceService.price_at(instrument, date)` = latest point ≤ date (carry forward); `FxService.rate(from, to, date)` likewise; both return a flag when the value is stale (older than `stale_after_days`, default 5) or missing.
@@ -71,8 +71,8 @@ Include the golden scenario and the property tests from the spec; independent or
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
-Step 0: write the provider-evaluation ADR described in F6.3 of docs/specs/M6-investments.md and STOP for my review (check ToS/limits/coverage; no scraping against ToS).
-After I approve: implement the PriceProvider interface, ManualProvider, FakeProvider, PricePoint and FxRate models + migration, PriceService/FxService with carry-forward
+Implement F6.3 from docs/specs/M6-investments.md (the provider set is decided in ADR-0024): the PriceProvider interface,
+ManualProvider, FakeProvider, PricePoint and FxRate models + migration, PriceService/FxService with carry-forward
 and staleness flags, manual price entry UI. Tests: carry-forward, staleness flag, missing data, FX triangulation through base currency.
 ```
 
@@ -81,8 +81,8 @@ and staleness flags, manual price entry UI. Tests: carry-forward, staleness flag
 ## F6.4 Provider implementations and scheduled refresh
 
 **Acceptance**
-- Implement the providers approved in the ADR, each behind the interface, with timeouts, retries with backoff, response caching, and a global per-provider rate limiter. HTTP is mocked in tests (recorded fixtures); no network in CI.
-- Provider settings page (enable/disable, API keys encrypted at rest).
+- Implement the providers approved in [ADR-0024](../adr/0024-price-providers.md): **NBP, ECB and CoinGecko** (the built-in defaults, still opt-in per workspace) and **EODHD** (optional, keyed). **GoldAPI.io, Kraken and Frankfurter are approved but deferred** to a follow-up minor release — not implemented here. Each sits behind the interface with timeouts, retries with backoff, response caching, and a global per-provider rate limiter (NBP self-limited ≤1 req/s, ECB fetched ≤1/hour, CoinGecko stored data refreshed ≥ every 24 h). HTTP is mocked in tests (recorded fixtures); no network in CI.
+- Provider settings page (enable/disable, API keys encrypted at rest). The attribution UI from ADR-0024 lands with this page: ECB-sourced rates cite "European Central Bank" wherever they are shown, and a visible "Powered by CoinGecko" badge appears while that provider is enabled (translatable en/pl; the CoinGecko message keeps its exact required wording).
 - Scheduled job (daily, after market close, per provider) refreshes latest prices and FX for instruments held (quantity > 0); "Refresh now" button; first-time **history backfill** from the first transaction date.
 - Failures keep the last known price, are logged in a `provider_error` table/log, and surface as a badge on the instrument ("last updated 9 days ago — provider error").
 - Instruments choose provider + provider symbol in the instrument form; a "test lookup" button shows the fetched price before saving.

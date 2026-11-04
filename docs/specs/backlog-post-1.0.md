@@ -161,3 +161,37 @@ replaces a signed-in one, read-only enforcement in the service layer, refusal of
 routes, the scheduled reset job, rate limits, the banner. Extend the tenant-isolation test and the authorization matrix
 with a demo column. No real personal data; no email; no external calls.
 ```
+
+---
+
+## Generic user-configured HTTP price provider
+
+ADR-0024 (2026-11-04) found no clean free provider for EU equities/ETFs in 2026, so v1 ships
+equities manual-first with EODHD as the optional automated source. Some users will still want
+prices from a source the app cannot ship — one whose terms the project cannot verify, or that
+needs credentials and infrastructure we do not bundle. The escape hatch: the user configures
+their own HTTP endpoint and mapping, at their own risk. The app stays neutral — the UI never
+names or suggests specific providers, because naming one whose terms forbid automated access
+would invite the user to break them.
+
+**Acceptance sketch**
+- Per-workspace user-named sources, configured by editors/owners: a request template (URL with
+  a symbol placeholder, method, headers), an optional secret stored encrypted like other
+  provider keys, a response mapping (where in the response the price, date and currency live),
+  and a user-set rate limit.
+- A "test lookup" against a real symbol shows the parsed price before the source is saved, as
+  with the built-in providers.
+- Price points record and display the user-named source like any other source label.
+- The form says plainly that the user is responsible for complying with the source's terms;
+  the help text points at manual entry and the built-in providers as the supported paths.
+- Requests go to a user-chosen host, so the SSRF considerations of notification URLs
+  (ADR-0021) apply; the plan settles the details (scheme handling, error reporting).
+- Tests use a fake HTTP layer; no network in CI.
+
+**Agent prompt**
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement "Generic user-configured HTTP price provider" from docs/specs/backlog-post-1.0.md: user-named HTTP price sources with
+request templates, encrypted secrets, response mapping, test lookup, user-set rate limits, source labels, and terms-responsibility
+framing that never names specific providers. Tests with a fake HTTP layer only.
+```
