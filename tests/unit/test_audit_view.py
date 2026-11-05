@@ -150,6 +150,38 @@ def test_every_tax_action_has_a_label_keys_and_a_group() -> None:
         assert gettext(text, "pl") != text, f"no Polish translation for {text!r}"
 
 
+# Investment events (F6.1)
+
+INVESTMENT_ACTIONS = {
+    "asset_class.created",
+    "asset_class.updated",
+    "asset_class.archived",
+    "asset_class.restored",
+    "asset_class.seeded",
+    "instrument.created",
+    "instrument.updated",
+    "instrument.archived",
+    "instrument.restored",
+    "instrument_allocation.updated",
+}
+
+
+def test_every_investment_action_has_a_label_keys_and_a_group() -> None:
+    assert {
+        action
+        for action in ACTION_LABELS
+        if action.startswith(("asset_class.", "instrument.", "instrument_allocation."))
+    } == INVESTMENT_ACTIONS
+    assert set(GROUPS["workspace"]["investments"]) == INVESTMENT_ACTIONS
+    assert "investments" in GROUP_LABELS
+    keys = {key for action in INVESTMENT_ACTIONS for key in DATA_KEYS[action]}
+    assert keys <= set(KEY_LABELS)
+    texts = [ACTION_LABELS[a] for a in INVESTMENT_ACTIONS] + [KEY_LABELS[k] for k in keys]
+    texts.append(GROUP_LABELS["investments"])
+    for text in texts:
+        assert gettext(text, "pl").strip()
+
+
 # Net-worth events (F5.1)
 
 NETWORTH_ACTIONS = {

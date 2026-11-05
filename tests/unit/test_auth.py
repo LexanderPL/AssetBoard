@@ -944,7 +944,9 @@ def test_registration_creates_owner_workspace_and_one_workspace_audit_event(
     assert membership is not None and membership.role == "owner"
     events = db_session.scalars(
         select(AuditEvent).where(
-            AuditEvent.action.not_in(("category.seeded", "networth_category.seeded"))
+            AuditEvent.action.not_in(
+                ("category.seeded", "networth_category.seeded", "asset_class.seeded")
+            )
         )
     )
     events = events.all()
@@ -1243,6 +1245,7 @@ def test_audit_action_set_and_failed_login_never_stores_attempted_identifier(
         "setup.create_admin",
         "category.seeded",  # setup and create-admin seed their new workspaces
         "networth_category.seeded",
+        "asset_class.seeded",
         "auth.login_failure",
         "auth.login_success",
         "auth.password_change",
@@ -1291,6 +1294,9 @@ WORKSPACE_TABLES = {
     "networth_items",
     "item_valuations",
     "networth_snapshots",
+    "asset_classes",
+    "instruments",
+    "instrument_allocations",
 }
 
 

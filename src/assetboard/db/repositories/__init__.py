@@ -23,6 +23,11 @@ from assetboard.db.repositories.income import (
     WorkDayRepository,
     WorkLogRepository,
 )
+from assetboard.db.repositories.investments import (
+    AssetClassRepository,
+    InstrumentAllocationRepository,
+    InstrumentRepository,
+)
 from assetboard.db.repositories.invitation import (
     InvitationLocation,
     InvitationRepository,
@@ -61,6 +66,9 @@ from assetboard.db.repositories.workspace import (
 __all__ = [
     "NotificationChannelRepository",
     "NotificationLogRepository",
+    "AssetClassRepository",
+    "InstrumentRepository",
+    "InstrumentAllocationRepository",
     "ScheduledItemRepository",
     "ScheduledOccurrenceRepository",
     "IncomeSourceRepository",

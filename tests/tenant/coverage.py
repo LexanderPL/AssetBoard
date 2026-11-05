@@ -132,6 +132,26 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         )
     },
     **{
+        ("AssetClassRepository", method): "test_investment_queries_stay_in_their_workspace"
+        for method in (
+            "create",
+            "ordered",
+            "active_by_name_key",
+            "active_count",
+            "next_sort_order",
+        )
+    },
+    **{
+        ("InstrumentRepository", method): "test_investment_queries_stay_in_their_workspace"
+        for method in ("create", "ordered", "active_by_name_key", "get_for_update")
+    },
+    **{
+        ("InstrumentAllocationRepository", method): (
+            "test_investment_queries_stay_in_their_workspace"
+        )
+        for method in ("create", "for_instrument")
+    },
+    **{
         ("NetWorthCategoryRepository", method): "test_networth_queries_stay_in_their_workspace"
         for method in (
             "create",

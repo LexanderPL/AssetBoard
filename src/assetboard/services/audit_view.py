@@ -31,6 +31,8 @@ from assetboard.db.repositories import (
     AuditFilter,
     InstanceAuditReader,
 )
+from assetboard.domain.instruments import TYPE_LABELS as INSTRUMENT_TYPE_LABELS
+from assetboard.domain.instruments import VALUATION_SOURCE_LABELS as SOURCE_LABELS
 from assetboard.services.admin_users import AUDIT_DATA_KEYS, require_instance_admin
 from assetboard.services.context import Context, Role, require_role
 
@@ -185,6 +187,16 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     "networth_snapshot.created": ("as_of",),
     "networth_snapshot.taken": ("as_of", "replaced"),
     "networth_snapshot.backfilled": ("from", "to", "count"),
+    "asset_class.created": ("name", "investable"),
+    "asset_class.updated": ("name", "fields"),
+    "asset_class.archived": ("name",),
+    "asset_class.restored": ("name",),
+    "asset_class.seeded": ("count", "automatic"),
+    "instrument.created": ("name", "type", "currency"),
+    "instrument.updated": ("name", "fields"),
+    "instrument.archived": ("name",),
+    "instrument.restored": ("name",),
+    "instrument_allocation.updated": ("count",),
     "month.closed": ("month",),
     "month.reopened": ("month",),
     # Never the description: audit rows are append-only, free text there could not be erased.
@@ -285,6 +297,16 @@ ACTION_LABELS: dict[str, str] = {
     "networth_snapshot.created": _("Net-worth snapshot taken automatically"),
     "networth_snapshot.taken": _("Net-worth snapshot taken"),
     "networth_snapshot.backfilled": _("Net-worth history rebuilt from stored values"),
+    "asset_class.created": _("Asset class added"),
+    "asset_class.updated": _("Asset class changed"),
+    "asset_class.archived": _("Asset class archived"),
+    "asset_class.restored": _("Asset class restored"),
+    "asset_class.seeded": _("Suggested asset classes added"),
+    "instrument.created": _("Instrument added"),
+    "instrument.updated": _("Instrument changed"),
+    "instrument.archived": _("Instrument archived"),
+    "instrument.restored": _("Instrument restored"),
+    "instrument_allocation.updated": _("Instrument allocation changed"),
     "month.closed": _("Month closed"),
     "month.reopened": _("Month reopened"),
     "transaction.created": _("Transaction added"),
@@ -336,6 +358,8 @@ KEY_LABELS: dict[str, str] = {
     "transactions": _("Transactions"),
     "name": _("Name"),
     "kind": _("Kind"),
+    "type": _("Type"),
+    "investable": _("Investable"),
     "base": _("Base"),
     "effective_from": _("Effective from"),
     "previous_effective_from": _("Previously effective from"),
@@ -460,6 +484,11 @@ FIELD_LABELS: dict[str, str] = {
     "acquired_on": _("acquired on"),
     "include_in_net_worth": _("include in net worth"),
     "investable": _("investable"),
+    "type": _("type"),
+    "symbol": _("symbol"),
+    "quote_currency": _("quote currency"),
+    "unit_label": _("unit"),
+    "valuation_source": _("valuation source"),
 }
 KIND_LABELS: dict[str, str] = {
     "expense": _("expense"),
@@ -474,8 +503,16 @@ TREATMENT_LABELS: dict[str, str] = {
     "savings": _("savings"),
     "transfer": _("transfer"),
 }
+TYPE_LABELS_BY_CODE: dict[str, str] = {
+    instrument_type.value: text for instrument_type, text in INSTRUMENT_TYPE_LABELS.items()
+}
+SOURCE_LABELS_BY_CODE: dict[str, str] = {
+    source.value: text for source, text in SOURCE_LABELS.items()
+}
 VALUE_TABLES: dict[str, dict[str, str]] = {
     "role": ROLE_LABELS,
+    "type": TYPE_LABELS_BY_CODE,
+    "valuation_source": SOURCE_LABELS_BY_CODE,
     "from": ROLE_LABELS,
     "to": ROLE_LABELS,
     "reason": REASON_LABELS,
@@ -531,6 +568,18 @@ GROUPS: dict[Scope, dict[str, tuple[str, ...]]] = {
             "tax_rule.archived",
             "tax_rule.version_added",
             "tax_rule.version_updated",
+        ),
+        "investments": (
+            "asset_class.created",
+            "asset_class.updated",
+            "asset_class.archived",
+            "asset_class.restored",
+            "asset_class.seeded",
+            "instrument.created",
+            "instrument.updated",
+            "instrument.archived",
+            "instrument.restored",
+            "instrument_allocation.updated",
         ),
         "net_worth": (
             "networth_category.created",
@@ -602,6 +651,7 @@ GROUP_LABELS: dict[str, str] = {
     "import_export": _("Import and export"),
     "categories": _("Categories"),
     "taxes": _("Taxes"),
+    "investments": _("Investments"),
     "net_worth": _("Net worth"),
     "months": _("Closing months"),
     "transactions": _("Transactions"),

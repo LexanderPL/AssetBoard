@@ -1,0 +1,177 @@
+{% from "investments/_macros.html" import error, htmx_form, small_button, swatch with context %}
+{% from "investments/_tabs.html" import tabs with context %}
+{% from "macros/components.html" import csrf_input with context %}
+<div id="investments-body" class="space-y-6">
+  {% if notice %}
+  <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
+  {% endif %}
+  {% if error %}
+  <p class="border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ error }}</p>
+  {% endif %}
+
+  {{ tabs("instruments") }}
+
+  {% if page.can_seed %}
+  <section class="panel p-6 sm:p-7" aria-labelledby="seed-classes-heading" data-seed-offer>
+    <h2 id="seed-classes-heading" class="text-base font-semibold">{{ _("No asset classes yet") }}</h2>
+    {% if can_edit %}
+    <p class="mt-2 text-sm text-muted">{{ _("Add the suggested asset classes before creating instruments; every instrument's value is split across them.") }}</p>
+    <form {{ htmx_form(scoped_url(request, 'investments_classes_seed'), '#investments-body') }} class="mt-4">
+      {{ csrf_input() }}
+      <button type="submit" data-seed class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Add suggested asset classes") }}</button>
+    </form>
+    {% else %}
+    <p class="mt-2 text-sm text-muted">{{ _("An editor or owner of this workspace can add asset classes.") }}</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section class="panel p-6 sm:p-7" aria-labelledby="instruments-heading" data-section="instruments">
+    <h2 id="instruments-heading" class="text-base font-semibold">{{ _("Instruments") }}</h2>
+    <p class="mt-1 text-sm text-muted">{{ _("Record what you hold and how its value is split across asset classes.") }}</p>
+    {% if page.instruments %}
+    <ul class="mt-3 divide-y divide-line">
+      {% for i in page.instruments %}
+      <li id="instrument-{{ i.id }}" class="flex flex-wrap items-start justify-between gap-3 py-3" data-instrument="{{ i.id }}" data-instrument-name="{{ i.name }}">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="truncate text-sm font-semibold">{{ i.name }}</span>
+            {% if i.symbol %}<span class="rounded bg-subtle px-1.5 py-0.5 font-mono text-xs text-muted" data-symbol>{{ i.symbol }}</span>{% endif %}
+            <span class="rounded-full bg-primary-soft px-2 py-0.5 text-xs text-primary-ink" data-type="{{ i.type }}">{{ i.type_label }}</span>
+            <span class="text-xs text-muted">{{ i.quote_currency }} · {{ i.unit_label }}</span>
+            {% if i.terms_required %}<span class="rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning-strong" data-terms-required>{{ _("Terms needed") }}</span>{% endif %}
+          </div>
+          <p class="mt-1 text-xs text-muted">{{ i.valuation_source_label }}</p>
+          <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+            {% for a in i.allocations %}
+            <span class="inline-flex items-center gap-1.5" data-allocation="{{ a.asset_class_id }}">
+              {{ swatch(a.color) }}<span>{{ a.name }}</span><span class="tabular-nums">{{ weight_text(a.weight_bp) }}%</span>{% if a.archived_class %}<span class="text-warning-strong">({{ _("archived") }})</span>{% endif %}
+            </span>
+            {% endfor %}
+          </div>
+          {% if i.terms_required %}
+          <p class="mt-2 text-xs text-warning-strong" data-terms-note>{{ _("Bond terms are needed before this instrument can be valued. You can record purchases now; the terms form arrives in a later step.") }}</p>
+          {% endif %}
+        </div>
+        {% if can_edit %}
+        <div class="flex flex-wrap items-center gap-1">
+          <a href="{{ scoped_url(request, 'investments_instruments') }}?edit={{ i.id }}" data-edit class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink">{{ _("Edit") }}</a>
+          <form {{ htmx_form(scoped_url(request, 'investments_instrument_archive', instrument_id=i.id|string), '#investments-body') }}>{{ csrf_input() }}{{ small_button(_("Archive"), "data-archive") }}</form>
+        </div>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="mt-3 text-sm text-muted">{{ _("No active instruments.") }}</p>
+    {% endif %}
+  </section>
+
+  {% if can_edit and page.classes %}
+  <section class="panel p-6 sm:p-7" aria-labelledby="instrument-form-heading" data-instrument-form>
+    <h2 id="instrument-form-heading" class="text-base font-semibold">{% if editing %}{{ _("Edit instrument") }}{% else %}{{ _("Add an instrument") }}{% endif %}</h2>
+    {% set values = edit_values if editing else create_values %}
+    {% set errors = edit_errors if editing else create_errors %}
+    {% set rows = edit_rows if editing else create_rows %}
+    <form {{ htmx_form(scoped_url(request, 'investments_instrument_update', instrument_id=editing|string) if editing else scoped_url(request, 'investments_instrument_create'), '#investments-body') }} class="mt-4 space-y-5" novalidate data-allocation-editor>
+      {{ csrf_input() }}
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div class="space-y-1.5">
+          <label for="instrument-name" class="block text-sm font-medium">{{ _("Name") }}</label>
+          <input id="instrument-name" name="name" type="text" value="{{ values.name }}" maxlength="{{ max_name_length }}" required autocomplete="off" class="form-control w-full px-3 py-2">
+          {{ error(errors, "name") }}
+        </div>
+        <div class="space-y-1.5">
+          <label for="instrument-symbol" class="block text-sm font-medium">{{ _("Symbol") }}</label>
+          <input id="instrument-symbol" name="symbol" type="text" value="{{ values.symbol }}" maxlength="{{ max_symbol_length }}" autocomplete="off" class="form-control w-full px-3 py-2">
+          <p class="text-xs text-muted">{{ _("Optional, for example VWCE.DE or BTC.") }}</p>
+          {{ error(errors, "symbol") }}
+        </div>
+        <div class="space-y-1.5">
+          <label for="instrument-type" class="block text-sm font-medium">{{ _("Type") }}</label>
+          <select id="instrument-type" name="type" class="form-select w-full py-2">
+            {% for value, label in type_options %}<option value="{{ value }}"{% if value == values.type %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+          <p class="text-xs text-muted">{{ _("Bond (model value) instruments need terms before they can be valued; you can record purchases now.") }}</p>
+          {{ error(errors, "type") }}
+        </div>
+        <div class="space-y-1.5">
+          <label for="instrument-currency" class="block text-sm font-medium">{{ _("Quote currency") }}</label>
+          <select id="instrument-currency" name="quote_currency" class="form-select w-full py-2">
+            {% for code in currency_options %}<option value="{{ code }}"{% if code == values.quote_currency %} selected{% endif %}>{{ code }}</option>{% endfor %}
+          </select>
+          <p class="text-xs text-muted">{{ _("Unit prices and fees are in this currency.") }}</p>
+          {{ error(errors, "quote_currency") }}
+        </div>
+        <div class="space-y-1.5 sm:col-span-2">
+          <label for="instrument-unit" class="block text-sm font-medium">{{ _("Unit label") }}</label>
+          <input id="instrument-unit" name="unit_label" type="text" value="{{ values.unit_label }}" maxlength="{{ max_unit_label_length }}" autocomplete="off" class="form-control w-full px-3 py-2">
+          <p class="text-xs text-muted">{{ _("Leave empty for the type's default (share, coin, oz, property). A currency instrument always uses its currency code.") }}</p>
+          {{ error(errors, "unit_label") }}
+        </div>
+      </div>
+
+      <fieldset class="space-y-2">
+        <legend class="text-sm font-medium">{{ _("Allocation") }}</legend>
+        <p class="text-xs text-muted">{{ _("How much of this instrument's value belongs to each asset class. Use 0 to leave a class out; the weights must total exactly 100%%.") }}</p>
+        <div class="overflow-x-auto">
+          <table class="sheet w-full text-sm">
+            <thead>
+              <tr class="text-left text-xs text-muted">
+                <th scope="col" class="py-1.5 pr-2 font-medium">{{ _("Asset class") }}</th>
+                <th scope="col" class="w-32 py-1.5 pl-2 text-right font-medium">{{ _("Weight (%%)") }}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for asset_class, weight, archived in rows %}
+              <tr data-allocation-row>
+                <th scope="row" class="py-1.5 pr-2 text-left font-normal">
+                  <span class="inline-flex items-center gap-2">{{ swatch(asset_class.color) }}<span>{{ asset_class.name }}</span>{% if archived %}<span class="text-xs text-warning-strong">({{ _("archived") }})</span>{% endif %}</span>
+                </th>
+                <td class="py-1.5 pl-2 text-right">
+                  <label for="weight-{{ asset_class.id }}" class="sr-only">{{ _("Weight for %(name)s", name=asset_class.name) }}</label>
+                  <input id="weight-{{ asset_class.id }}" name="weight_{{ asset_class.id }}" type="text" inputmode="decimal" value="{{ weight }}" data-allocation-weight class="form-control w-28 px-2 py-1 text-right tabular-nums">
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {{ error(errors, "allocation") }}
+        <p class="text-sm text-muted">{{ _("Total") }}: <span data-allocation-total class="font-semibold tabular-nums">—</span></p>
+        <p class="hidden text-sm text-danger" data-allocation-warning role="alert">{{ _("Weights must total exactly 100%%.") }}</p>
+      </fieldset>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="submit" data-allocation-submit class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save instrument") }}</button>
+        {% if editing %}<a href="{{ scoped_url(request, 'investments_instruments') }}" class="rounded-xl px-3 py-2 text-sm font-medium text-muted hover:bg-subtle">{{ _("Cancel") }}</a>{% endif %}
+      </div>
+    </form>
+  </section>
+  {% endif %}
+
+  {% if page.archived_instruments %}
+  <details class="panel p-6 sm:p-7" data-archived-instruments>
+    <summary class="cursor-pointer text-base font-semibold">{{ _("Archived instruments") }} <span class="text-sm font-normal text-muted">({{ page.archived_instruments|length }})</span></summary>
+    <p class="mt-2 text-sm text-muted">{{ _("Archived instruments keep their allocation and history but cannot be traded.") }}</p>
+    <ul class="mt-3 divide-y divide-line">
+      {% for i in page.archived_instruments %}
+      <li id="instrument-{{ i.id }}" class="flex flex-wrap items-center justify-between gap-3 py-3" data-instrument="{{ i.id }}" data-instrument-name="{{ i.name }}">
+        <div class="min-w-0">
+          <div class="flex flex-wrap items-center gap-2">
+            <span class="truncate text-sm font-medium">{{ i.name }}</span>
+            <span class="text-xs text-muted">{{ i.type_label }} · {{ i.quote_currency }} · {{ i.unit_label }}</span>
+          </div>
+          <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">
+            {% for a in i.allocations %}<span class="inline-flex items-center gap-1">{{ swatch(a.color) }}{{ a.name }} <span class="tabular-nums">{{ weight_text(a.weight_bp) }}%</span></span>{% endfor %}
+          </div>
+        </div>
+        {% if can_edit %}
+        <form {{ htmx_form(scoped_url(request, 'investments_instrument_restore', instrument_id=i.id|string), '#investments-body') }}>{{ csrf_input() }}{{ small_button(_("Restore"), "data-restore") }}</form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+</div>

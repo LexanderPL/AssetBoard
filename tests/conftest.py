@@ -34,6 +34,7 @@ from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine
 from assetboard.db.migrate import upgrade_database
 from assetboard.db.models.identity import InstanceSettings, Membership, User, Workspace
+from assetboard.db.models.investments import AssetClass
 from assetboard.db.models.ledger import Category
 from assetboard.services import auth as auth_service
 from assetboard.services.auth import argon2_hash, run_initial_setup
@@ -568,6 +569,14 @@ class OwnerApp:
         with self.db() as session, session.begin():
             session.execute(
                 delete(Category).where(Category.workspace_id == (workspace_id or self.home_id))
+            )
+
+    def clear_asset_classes(self, workspace_id: UUID | None = None) -> None:
+        """Delete a workspace's asset classes (every new workspace starts with the suggested
+        set), for tests that need an empty investments page."""
+        with self.db() as session, session.begin():
+            session.execute(
+                delete(AssetClass).where(AssetClass.workspace_id == (workspace_id or self.home_id))
             )
 
     def token(self, path: str = "/") -> str:

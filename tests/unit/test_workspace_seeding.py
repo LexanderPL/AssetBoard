@@ -22,10 +22,12 @@ from assetboard.branding import ENV_PREFIX
 from assetboard.cli import app as cli_app
 from assetboard.config import Settings
 from assetboard.db.models.identity import AuditEvent, Membership, SetupState, User, Workspace
+from assetboard.db.models.investments import AssetClass
 from assetboard.db.models.ledger import Category
 from assetboard.db.models.networth import NetWorthCategory
 from assetboard.db.repositories import CategoryRepository, create_owned_workspace
 from assetboard.domain.categories import SEED
+from assetboard.domain.instruments import ASSET_CLASS_SEED
 from assetboard.domain.networth import ASSET_SEED, LIABILITY_SEED
 from assetboard.i18n import gettext
 from assetboard.services import auth, categories
@@ -97,6 +99,34 @@ def _expected_networth(locale: str) -> list[tuple[str, str, int]]:
     return sorted(rows, key=lambda row: (row[0], row[2]))
 
 
+def _asset_classes(db: WorkspaceDb, workspace_id: UUID) -> list[tuple[str, bool, int]]:
+    with db.factory() as session:
+        rows = session.scalars(
+            select(AssetClass)
+            .where(AssetClass.workspace_id == workspace_id)
+            .order_by(AssetClass.sort_order)
+        )
+        return [(row.name, row.investable, row.sort_order) for row in rows]
+
+
+def _expected_asset_classes(locale: str) -> list[tuple[str, bool, int]]:
+    return [
+        (gettext(seed.name, locale), seed.investable, position)
+        for position, seed in enumerate(ASSET_CLASS_SEED)
+    ]
+
+
+def _asset_seed_events(db: WorkspaceDb, workspace_id: UUID) -> list[tuple[str, UUID | None, Any]]:
+    with db.factory() as session:
+        events = session.scalars(
+            select(AuditEvent).where(
+                AuditEvent.workspace_id == workspace_id,
+                AuditEvent.action == "asset_class.seeded",
+            )
+        )
+        return [(e.actor_type, e.actor_user_id, e.data) for e in events]
+
+
 def _seed_events(db: WorkspaceDb, workspace_id: UUID) -> list[tuple[str, UUID | None, Any]]:
     with db.factory() as session:
         events = session.scalars(
@@ -146,9 +176,13 @@ def test_first_run_setup_seeds_in_the_page_language(
     )
     assert _categories(db, workspace.id) == _expected(locale)
     assert _networth_categories(db, workspace.id) == _expected_networth(locale)
+    assert _asset_classes(db, workspace.id) == _expected_asset_classes(locale)
     # Setup is a system action: no signed-in actor yet.
     assert _seed_events(db, workspace.id) == [
         ("system", None, {"count": len(SEED), "automatic": True})
+    ]
+    assert _asset_seed_events(db, workspace.id) == [
+        ("system", None, {"count": len(ASSET_CLASS_SEED), "automatic": True})
     ]
     assert user.id is not None
 
@@ -188,8 +222,12 @@ def test_open_registration_seeds_as_the_new_user(db: WorkspaceDb, tmp_path: Path
     assert outcome.status == "created" and outcome.user and outcome.workspace
     assert _categories(db, outcome.workspace.id) == _expected("pl")
     assert _networth_categories(db, outcome.workspace.id) == _expected_networth("pl")
+    assert _asset_classes(db, outcome.workspace.id) == _expected_asset_classes("pl")
     assert _seed_events(db, outcome.workspace.id) == [
         ("user", outcome.user.id, {"count": len(SEED), "automatic": True})
+    ]
+    assert _asset_seed_events(db, outcome.workspace.id) == [
+        ("user", outcome.user.id, {"count": len(ASSET_CLASS_SEED), "automatic": True})
     ]
 
 
@@ -211,7 +249,9 @@ def _cli(tmp_path: Path, *extra: str) -> Any:
     )
 
 
-def _cli_categories(tmp_path: Path) -> tuple[list[tuple[str, str]], list[tuple[str, str]]]:
+def _cli_categories(
+    tmp_path: Path,
+) -> tuple[list[tuple[str, str]], list[tuple[str, str]], list[tuple[str, bool, int]]]:
     connection = sqlite3.connect(tmp_path / "cli-data" / "assetboard.db")
     try:
         names = connection.execute(
@@ -220,7 +260,10 @@ def _cli_categories(tmp_path: Path) -> tuple[list[tuple[str, str]], list[tuple[s
         events = connection.execute(
             "SELECT actor_type, action FROM audit_events WHERE action = 'category.seeded'"
         ).fetchall()
-        return names, events
+        asset_classes = connection.execute(
+            "SELECT name, investable, sort_order FROM asset_classes ORDER BY sort_order"
+        ).fetchall()
+        return names, events, asset_classes
     finally:
         connection.close()
 
@@ -231,15 +274,16 @@ def test_create_admin_seeds_its_workspace_in_the_locale_option(
 ) -> None:
     result = _cli(tmp_path, "--workspace-name", "Home", *extra)
     assert result.exit_code == 0, result.output
-    names, events = _cli_categories(tmp_path)
+    names, events, asset_classes = _cli_categories(tmp_path)
     assert names == [(kind, name) for kind, _treatment, name, _order in _expected(locale)]
     assert events == [("cli", "category.seeded")]
+    assert asset_classes == _expected_asset_classes(locale)
 
 
 def test_create_admin_without_a_workspace_seeds_nothing(tmp_path: Path) -> None:
     result = _cli(tmp_path, "--no-workspace")
     assert result.exit_code == 0, result.output
-    assert _cli_categories(tmp_path) == ([], [])
+    assert _cli_categories(tmp_path) == ([], [], [])
 
 
 def _identity(issuer: str, subject: str, email: str) -> SignInIdentity:
@@ -289,8 +333,12 @@ def test_oidc_and_proxy_auto_create_seed_in_the_request_language(
     assert outcome.status == "signed_in" and outcome.created
     workspace_id = _owned_workspace(db, "ola@example.com")
     assert _categories(db, workspace_id) == _expected("pl")
+    assert _asset_classes(db, workspace_id) == _expected_asset_classes("pl")
     assert _seed_events(db, workspace_id) == [
         ("user", outcome.user_id, {"count": len(SEED), "automatic": True})
+    ]
+    assert _asset_seed_events(db, workspace_id) == [
+        ("user", outcome.user_id, {"count": len(ASSET_CLASS_SEED), "automatic": True})
     ]
 
 
@@ -367,7 +415,7 @@ def test_a_workspace_cannot_be_created_without_its_seed(db: WorkspaceDb, tmp_pat
     options = validate_workspace_options(
         base_currency="EUR", country_code=None, timezone="UTC", locale="en"
     )
-    with db.factory() as session, pytest.raises(RuntimeError, match="category seed"):
+    with db.factory() as session, pytest.raises(RuntimeError, match="needs its seed"):
         auth._create_user_records(  # pyright: ignore[reportPrivateUsage]
             session,
             email="x@example.com",

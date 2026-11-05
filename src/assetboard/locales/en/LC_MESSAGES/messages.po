@@ -118,6 +118,81 @@ msgstr ""
 msgid "Savings withdrawal"
 msgstr ""
 
+msgid "share"
+msgstr ""
+
+msgid "bond"
+msgstr ""
+
+msgid "oz"
+msgstr ""
+
+msgid "coin"
+msgstr ""
+
+msgid "property"
+msgstr ""
+
+msgid "unit"
+msgstr ""
+
+msgid "Stock"
+msgstr ""
+
+msgid "ETF"
+msgstr ""
+
+msgid "Bond (market price)"
+msgstr ""
+
+msgid "Bond (model value)"
+msgstr ""
+
+msgid "Metal"
+msgstr ""
+
+msgid "Crypto"
+msgstr ""
+
+msgid "Currency"
+msgstr ""
+
+msgid "Real estate"
+msgstr ""
+
+msgid "Price provider"
+msgstr ""
+
+msgid "Manual price"
+msgstr ""
+
+msgid "Model value (net of tax)"
+msgstr ""
+
+msgid "Safe"
+msgstr ""
+
+msgid "Growth"
+msgstr ""
+
+msgid "Speculative"
+msgstr ""
+
+msgid "Stocks"
+msgstr ""
+
+msgid "Bonds"
+msgstr ""
+
+msgid "Metals"
+msgstr ""
+
+msgid "Currencies"
+msgstr ""
+
+msgid "Primary residence"
+msgstr ""
+
 msgid "Vehicles"
 msgstr ""
 
@@ -382,6 +457,36 @@ msgstr ""
 msgid "Net-worth history rebuilt from stored values"
 msgstr ""
 
+msgid "Asset class added"
+msgstr ""
+
+msgid "Asset class changed"
+msgstr ""
+
+msgid "Asset class archived"
+msgstr ""
+
+msgid "Asset class restored"
+msgstr ""
+
+msgid "Suggested asset classes added"
+msgstr ""
+
+msgid "Instrument added"
+msgstr ""
+
+msgid "Instrument changed"
+msgstr ""
+
+msgid "Instrument archived"
+msgstr ""
+
+msgid "Instrument restored"
+msgstr ""
+
+msgid "Instrument allocation changed"
+msgstr ""
+
 msgid "Month closed"
 msgstr ""
 
@@ -520,6 +625,12 @@ msgstr ""
 msgid "Kind"
 msgstr ""
 
+msgid "Type"
+msgstr ""
+
+msgid "Investable"
+msgstr ""
+
 msgid "Base"
 msgstr ""
 
@@ -593,9 +704,6 @@ msgid "Amount"
 msgstr ""
 
 msgid "Previous amount"
-msgstr ""
-
-msgid "Currency"
 msgstr ""
 
 msgid "Previous categories"
@@ -839,6 +947,18 @@ msgid "include in net worth"
 msgstr ""
 
 msgid "investable"
+msgstr ""
+
+msgid "type"
+msgstr ""
+
+msgid "symbol"
+msgstr ""
+
+msgid "quote currency"
+msgstr ""
+
+msgid "valuation source"
 msgstr ""
 
 msgid "expense"
@@ -1753,6 +1873,81 @@ msgstr ""
 msgid "Payday"
 msgstr ""
 
+msgid "Another active asset class already has this name."
+msgstr ""
+
+msgid "Restore the asset class before changing it."
+msgstr ""
+
+msgid "The suggested asset classes can only be added when none are active."
+msgstr ""
+
+msgid "Enter a name of 1 to 200 characters, without control characters."
+msgstr ""
+
+msgid "Another active instrument already has this name."
+msgstr ""
+
+msgid "Enter a symbol of at most 32 characters."
+msgstr ""
+
+msgid "Choose an instrument type."
+msgstr ""
+
+msgid "Choose a supported currency."
+msgstr ""
+
+msgid "Enter a unit label of 1 to 32 characters."
+msgstr ""
+
+msgid "Assign at least one asset class."
+msgstr ""
+
+msgid "Allocation weights must total exactly 100%."
+msgstr ""
+
+msgid "Enter a weight between 0 and 100% with at most two decimals."
+msgstr ""
+
+msgid "Each asset class can appear only once."
+msgstr ""
+
+msgid "Choose an asset class from this workspace."
+msgstr ""
+
+msgid "This asset class is archived; restore it before allocating to it."
+msgstr ""
+
+msgid "Restore the instrument before changing it."
+msgstr ""
+
+msgid "Asset class added."
+msgstr ""
+
+msgid "Asset class saved."
+msgstr ""
+
+msgid "Asset class archived."
+msgstr ""
+
+msgid "Asset class restored."
+msgstr ""
+
+msgid "Suggested asset classes added."
+msgstr ""
+
+msgid "Instrument added."
+msgstr ""
+
+msgid "Instrument saved."
+msgstr ""
+
+msgid "Instrument archived."
+msgstr ""
+
+msgid "Instrument restored."
+msgstr ""
+
 msgid ""
 "This invitation link is not valid. It may have expired, been used or been"
 " revoked. Ask the workspace owner for a new link."
@@ -1991,9 +2186,6 @@ msgstr ""
 msgid "A snapshot cannot be dated in the future."
 msgstr ""
 
-msgid "Enter a name of 1 to 200 characters, without control characters."
-msgstr ""
-
 msgid "Enter notes of at most 200 characters."
 msgstr ""
 
@@ -2001,9 +2193,6 @@ msgid "Values cannot be negative."
 msgstr ""
 
 msgid "The value is too large."
-msgstr ""
-
-msgid "Choose a supported currency."
 msgstr ""
 
 msgid "The currency cannot change after the first value."
@@ -4077,6 +4266,143 @@ msgid ""
 "receive next."
 msgstr ""
 
+msgid "No asset classes yet"
+msgstr ""
+
+msgid ""
+"Start with the suggested classes: stocks, bonds, metals, crypto, "
+"currencies, real estate, primary residence and other. You can rename, "
+"reorder or archive them later."
+msgstr ""
+
+msgid "Add suggested asset classes"
+msgstr ""
+
+msgid "An editor or owner of this workspace can add asset classes."
+msgstr ""
+
+msgid "Asset classes"
+msgstr ""
+
+msgid ""
+"Each instrument's value is split across these classes by the allocation "
+"weights. Archiving a class keeps it on instruments that already use it."
+msgstr ""
+
+msgid "Not investable"
+msgstr ""
+
+msgid "No active asset classes."
+msgstr ""
+
+msgid "Edit asset class"
+msgstr ""
+
+msgid "Add an asset class"
+msgstr ""
+
+msgid "Used by the FIRE planner and the net-worth helper."
+msgstr ""
+
+msgid "Save asset class"
+msgstr ""
+
+msgid "Archived asset classes"
+msgstr ""
+
+msgid ""
+"Archived classes keep their place on existing instruments but cannot be "
+"chosen for new allocations."
+msgstr ""
+
+msgid ""
+"Add the suggested asset classes before creating instruments; every "
+"instrument's value is split across them."
+msgstr ""
+
+msgid "Record what you hold and how its value is split across asset classes."
+msgstr ""
+
+msgid "Terms needed"
+msgstr ""
+
+msgid ""
+"Bond terms are needed before this instrument can be valued. You can "
+"record purchases now; the terms form arrives in a later step."
+msgstr ""
+
+msgid "No active instruments."
+msgstr ""
+
+msgid "Edit instrument"
+msgstr ""
+
+msgid "Add an instrument"
+msgstr ""
+
+msgid "Symbol"
+msgstr ""
+
+msgid "Optional, for example VWCE.DE or BTC."
+msgstr ""
+
+msgid ""
+"Bond (model value) instruments need terms before they can be valued; you "
+"can record purchases now."
+msgstr ""
+
+msgid "Quote currency"
+msgstr ""
+
+msgid "Unit prices and fees are in this currency."
+msgstr ""
+
+msgid "Unit label"
+msgstr ""
+
+msgid ""
+"Leave empty for the type's default (share, coin, oz, property). A "
+"currency instrument always uses its currency code."
+msgstr ""
+
+msgid "Allocation"
+msgstr ""
+
+#, python-format
+msgid ""
+"How much of this instrument's value belongs to each asset class. Use 0 to"
+" leave a class out; the weights must total exactly 100%%."
+msgstr ""
+
+msgid "Asset class"
+msgstr ""
+
+#, python-format
+msgid "Weight (%%)"
+msgstr ""
+
+#, python-format
+msgid "Weight for %(name)s"
+msgstr ""
+
+msgid "Total"
+msgstr ""
+
+#, python-format
+msgid "Weights must total exactly 100%%."
+msgstr ""
+
+msgid "Save instrument"
+msgstr ""
+
+msgid "Archived instruments"
+msgstr ""
+
+msgid ""
+"Archived instruments keep their allocation and history but cannot be "
+"traded."
+msgstr ""
+
 msgid "Invitation"
 msgstr ""
 
@@ -4234,9 +4560,6 @@ msgid "No plan"
 msgstr ""
 
 msgid "not counted"
-msgstr ""
-
-msgid "Total"
 msgstr ""
 
 msgid "Total money out"
@@ -4534,9 +4857,6 @@ msgid "Notes (optional)"
 msgstr ""
 
 msgid "Include in net worth"
-msgstr ""
-
-msgid "Investable"
 msgstr ""
 
 msgid "Estimate values between entries"
@@ -5089,9 +5409,6 @@ msgid "Upcoming payments"
 msgstr ""
 
 msgid "Occurrence marked paid or received."
-msgstr ""
-
-msgid "Type"
 msgstr ""
 
 msgid "Add one-time payment"

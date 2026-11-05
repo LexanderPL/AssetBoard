@@ -38,6 +38,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
 
     assert tables == {
         "alembic_version",
+        "asset_classes",
         "audit_events",
         "auth_throttles",
         "budget_lines",
@@ -49,6 +50,8 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "income_source_tax_rules",
         "income_sources",
         "instance_settings",
+        "instrument_allocations",
+        "instruments",
         "invitations",
         "item_valuations",
         "login_tickets",
@@ -220,6 +223,28 @@ def test_0037_estimate_between_migration_defaults_by_side_and_is_reversible(
         with engine.connect() as connection:
             count = connection.exec_driver_sql("SELECT count(*) FROM networth_items")
             assert count.scalar_one() == 2
+        upgrade_database(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0038_investments_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'investments.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        tables = set(inspect(engine).get_table_names())
+        assert {"asset_classes", "instruments", "instrument_allocations"} <= tables
+        indexes = {index["name"] for index in inspect(engine).get_indexes("asset_classes")}
+        assert "uq_asset_classes_active_name" in indexes
+        command.downgrade(alembic_config(settings), "0037_f56_estimate_between")
+        tables = set(inspect(engine).get_table_names())
+        assert not {"asset_classes", "instruments", "instrument_allocations"} & tables
         upgrade_database(settings)
         check_database_migrations(settings)
     finally:

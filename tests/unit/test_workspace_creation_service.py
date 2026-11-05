@@ -22,6 +22,7 @@ from assetboard.db.models.identity import (
 from assetboard.db.models.ledger import Category
 from assetboard.db.models.networth import NetWorthCategory
 from assetboard.domain.categories import SEED
+from assetboard.domain.instruments import ASSET_CLASS_SEED
 from assetboard.domain.networth import ASSET_SEED, LIABILITY_SEED
 from assetboard.i18n import gettext
 from assetboard.services import workspaces
@@ -152,6 +153,7 @@ def test_the_new_workspace_is_seeded_and_audited_in_its_own_log(
     assert len(networth_names) == len(ASSET_SEED) + len(LIABILITY_SEED)
     assert gettext("Vehicles", "pl") in networth_names
     assert _events(db, workspace_id) == [
+        ("asset_class.seeded", ola, {"count": len(ASSET_CLASS_SEED), "automatic": True}),
         ("category.seeded", ola, {"count": len(SEED), "automatic": True}),
         (
             "networth_category.seeded",

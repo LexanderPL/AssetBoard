@@ -121,6 +121,81 @@ msgstr "Sprzedaż rzeczy"
 msgid "Savings withdrawal"
 msgstr "Wypłata z oszczędności"
 
+msgid "share"
+msgstr "udział"
+
+msgid "bond"
+msgstr "obligacja"
+
+msgid "oz"
+msgstr "uncja"
+
+msgid "coin"
+msgstr "moneta"
+
+msgid "property"
+msgstr "nieruchomość"
+
+msgid "unit"
+msgstr "szt."
+
+msgid "Stock"
+msgstr "Akcja"
+
+msgid "ETF"
+msgstr "ETF"
+
+msgid "Bond (market price)"
+msgstr "Obligacja (cena rynkowa)"
+
+msgid "Bond (model value)"
+msgstr "Obligacja (wartość modelowa)"
+
+msgid "Metal"
+msgstr "Metal"
+
+msgid "Crypto"
+msgstr "Krypto"
+
+msgid "Currency"
+msgstr "Waluta"
+
+msgid "Real estate"
+msgstr "Nieruchomości"
+
+msgid "Price provider"
+msgstr "Dostawca cen"
+
+msgid "Manual price"
+msgstr "Cena ręczna"
+
+msgid "Model value (net of tax)"
+msgstr "Wartość modelowa (po podatku)"
+
+msgid "Safe"
+msgstr "Bezpieczne"
+
+msgid "Growth"
+msgstr "Wzrostowe"
+
+msgid "Speculative"
+msgstr "Spekulacyjne"
+
+msgid "Stocks"
+msgstr "Akcje"
+
+msgid "Bonds"
+msgstr "Obligacje"
+
+msgid "Metals"
+msgstr "Metale"
+
+msgid "Currencies"
+msgstr "Waluty"
+
+msgid "Primary residence"
+msgstr "Dom główny"
+
 msgid "Vehicles"
 msgstr "Pojazdy"
 
@@ -385,6 +460,36 @@ msgstr "Zapisano migawkę majątku netto"
 msgid "Net-worth history rebuilt from stored values"
 msgstr "Odtworzono historię majątku netto z zapisanych wartości"
 
+msgid "Asset class added"
+msgstr "Dodano klasę aktywów"
+
+msgid "Asset class changed"
+msgstr "Zmieniono klasę aktywów"
+
+msgid "Asset class archived"
+msgstr "Zarchiwizowano klasę aktywów"
+
+msgid "Asset class restored"
+msgstr "Przywrócono klasę aktywów"
+
+msgid "Suggested asset classes added"
+msgstr "Dodano sugerowane klasy aktywów"
+
+msgid "Instrument added"
+msgstr "Dodano instrument"
+
+msgid "Instrument changed"
+msgstr "Zmieniono instrument"
+
+msgid "Instrument archived"
+msgstr "Zarchiwizowano instrument"
+
+msgid "Instrument restored"
+msgstr "Przywrócono instrument"
+
+msgid "Instrument allocation changed"
+msgstr "Zmieniono alokację instrumentu"
+
 msgid "Month closed"
 msgstr "Miesiąc zamknięty"
 
@@ -523,6 +628,12 @@ msgstr "Nazwa"
 msgid "Kind"
 msgstr "Rodzaj"
 
+msgid "Type"
+msgstr "Rodzaj"
+
+msgid "Investable"
+msgstr "Inwestycyjna"
+
 msgid "Base"
 msgstr "Podstawa"
 
@@ -597,9 +708,6 @@ msgstr "Kwota"
 
 msgid "Previous amount"
 msgstr "Poprzednia kwota"
-
-msgid "Currency"
-msgstr "Waluta"
 
 msgid "Previous categories"
 msgstr "Poprzednie kategorie"
@@ -843,6 +951,18 @@ msgstr "uwzględnij w majątku netto"
 
 msgid "investable"
 msgstr "inwestycyjna"
+
+msgid "type"
+msgstr "typ"
+
+msgid "symbol"
+msgstr "symbol"
+
+msgid "quote currency"
+msgstr "waluta notowania"
+
+msgid "valuation source"
+msgstr "źródło wyceny"
 
 msgid "expense"
 msgstr "wydatek"
@@ -1844,6 +1964,83 @@ msgstr "Podstawy"
 msgid "Payday"
 msgstr "Wypłata"
 
+msgid "Another active asset class already has this name."
+msgstr "Inna aktywna klasa aktywów ma już tę nazwę."
+
+msgid "Restore the asset class before changing it."
+msgstr "Przywróć klasę aktywów przed jej zmianą."
+
+msgid "The suggested asset classes can only be added when none are active."
+msgstr ""
+"Sugerowane klasy aktywów można dodać tylko wtedy, gdy żadna nie jest "
+"aktywna."
+
+msgid "Enter a name of 1 to 200 characters, without control characters."
+msgstr "Wpisz nazwę o długości od 1 do 200 znaków, bez znaków sterujących."
+
+msgid "Another active instrument already has this name."
+msgstr "Inny aktywny instrument ma już tę nazwę."
+
+msgid "Enter a symbol of at most 32 characters."
+msgstr "Wpisz symbol o długości do 32 znaków."
+
+msgid "Choose an instrument type."
+msgstr "Wybierz typ instrumentu."
+
+msgid "Choose a supported currency."
+msgstr "Wybierz obsługiwaną walutę."
+
+msgid "Enter a unit label of 1 to 32 characters."
+msgstr "Wpisz nazwę jednostki o długości od 1 do 32 znaków."
+
+msgid "Assign at least one asset class."
+msgstr "Przypisz co najmniej jedną klasę aktywów."
+
+msgid "Allocation weights must total exactly 100%."
+msgstr "Wagi alokacji muszą sumować się dokładnie do 100%."
+
+msgid "Enter a weight between 0 and 100% with at most two decimals."
+msgstr "Wpisz wagę od 0 do 100% z co najwyżej dwoma miejscami po przecinku."
+
+msgid "Each asset class can appear only once."
+msgstr "Każda klasa aktywów może wystąpić tylko raz."
+
+msgid "Choose an asset class from this workspace."
+msgstr "Wybierz klasę aktywów z tego obszaru roboczego."
+
+msgid "This asset class is archived; restore it before allocating to it."
+msgstr "Ta klasa aktywów jest zarchiwizowana; przywróć ją przed przypisaniem."
+
+msgid "Restore the instrument before changing it."
+msgstr "Przywróć instrument przed jego zmianą."
+
+msgid "Asset class added."
+msgstr "Dodano klasę aktywów."
+
+msgid "Asset class saved."
+msgstr "Zapisano klasę aktywów."
+
+msgid "Asset class archived."
+msgstr "Zarchiwizowano klasę aktywów."
+
+msgid "Asset class restored."
+msgstr "Przywrócono klasę aktywów."
+
+msgid "Suggested asset classes added."
+msgstr "Dodano sugerowane klasy aktywów."
+
+msgid "Instrument added."
+msgstr "Dodano instrument."
+
+msgid "Instrument saved."
+msgstr "Zapisano instrument."
+
+msgid "Instrument archived."
+msgstr "Zarchiwizowano instrument."
+
+msgid "Instrument restored."
+msgstr "Przywrócono instrument."
+
 msgid ""
 "This invitation link is not valid. It may have expired, been used or been"
 " revoked. Ask the workspace owner for a new link."
@@ -2099,9 +2296,6 @@ msgstr "Nie ma jeszcze zapisanych wartości do uzupełnienia historii."
 msgid "A snapshot cannot be dated in the future."
 msgstr "Migawka nie może mieć przyszłej daty."
 
-msgid "Enter a name of 1 to 200 characters, without control characters."
-msgstr "Wpisz nazwę o długości od 1 do 200 znaków, bez znaków sterujących."
-
 msgid "Enter notes of at most 200 characters."
 msgstr "Podaj notatki o długości do 200 znaków."
 
@@ -2110,9 +2304,6 @@ msgstr "Wartości nie mogą być ujemne."
 
 msgid "The value is too large."
 msgstr "Wartość jest za duża."
-
-msgid "Choose a supported currency."
-msgstr "Wybierz obsługiwaną walutę."
 
 msgid "The currency cannot change after the first value."
 msgstr "Nie można zmienić waluty po dodaniu pierwszej wartości."
@@ -4390,6 +4581,166 @@ msgstr ""
 "Nie ma jeszcze przychodów. Dodaj pensję lub pracę na zlecenie, aby "
 "zobaczyć, co otrzymasz w najbliższym czasie."
 
+msgid "No asset classes yet"
+msgstr "Nie ma jeszcze klas aktywów"
+
+msgid ""
+"Start with the suggested classes: stocks, bonds, metals, crypto, "
+"currencies, real estate, primary residence and other. You can rename, "
+"reorder or archive them later."
+msgstr ""
+"Zacznij od sugerowanych klas: akcje, obligacje, metale, krypto, waluty, "
+"nieruchomości, dom główny i inne. Później możesz je zmienić, uporządkować"
+" lub zarchiwizować."
+
+msgid "Add suggested asset classes"
+msgstr "Dodaj sugerowane klasy aktywów"
+
+msgid "An editor or owner of this workspace can add asset classes."
+msgstr "Redaktor lub właściciel tego obszaru roboczego może dodać klasy aktywów."
+
+msgid "Asset classes"
+msgstr "Klasy aktywów"
+
+msgid ""
+"Each instrument's value is split across these classes by the allocation "
+"weights. Archiving a class keeps it on instruments that already use it."
+msgstr ""
+"Wartość każdego instrumentu jest dzielona między te klasy według wag "
+"alokacji. Zarchiwizowanie klasy pozostawia ją na instrumentach, które już"
+" jej używają."
+
+msgid "Not investable"
+msgstr "Nieinwestycyjna"
+
+msgid "No active asset classes."
+msgstr "Brak aktywnych klas aktywów."
+
+msgid "Edit asset class"
+msgstr "Edytuj klasę aktywów"
+
+msgid "Add an asset class"
+msgstr "Dodaj klasę aktywów"
+
+msgid "Used by the FIRE planner and the net-worth helper."
+msgstr "Używana przez planer FIRE i pomocnik wartości netto."
+
+msgid "Save asset class"
+msgstr "Zapisz klasę aktywów"
+
+msgid "Archived asset classes"
+msgstr "Zarchiwizowane klasy aktywów"
+
+msgid ""
+"Archived classes keep their place on existing instruments but cannot be "
+"chosen for new allocations."
+msgstr ""
+"Zarchiwizowane klasy pozostają na istniejących instrumentach, ale nie "
+"można ich wybierać do nowych alokacji."
+
+msgid ""
+"Add the suggested asset classes before creating instruments; every "
+"instrument's value is split across them."
+msgstr ""
+"Dodaj sugerowane klasy aktywów przed utworzeniem instrumentów; wartość "
+"każdego instrumentu jest między nie dzielona."
+
+msgid "Record what you hold and how its value is split across asset classes."
+msgstr ""
+"Zapisz, co posiadasz i jak jego wartość jest dzielona między klasy "
+"aktywów."
+
+msgid "Terms needed"
+msgstr "Wymagane warunki"
+
+msgid ""
+"Bond terms are needed before this instrument can be valued. You can "
+"record purchases now; the terms form arrives in a later step."
+msgstr ""
+"Warunki obligacji są potrzebne, zanim będzie można wycenić ten "
+"instrument. Zakupy możesz już zapisywać; formularz warunków pojawi się w "
+"późniejszym kroku."
+
+msgid "No active instruments."
+msgstr "Brak aktywnych instrumentów."
+
+msgid "Edit instrument"
+msgstr "Edytuj instrument"
+
+msgid "Add an instrument"
+msgstr "Dodaj instrument"
+
+msgid "Symbol"
+msgstr "Symbol"
+
+msgid "Optional, for example VWCE.DE or BTC."
+msgstr "Opcjonalnie, na przykład VWCE.DE lub BTC."
+
+msgid ""
+"Bond (model value) instruments need terms before they can be valued; you "
+"can record purchases now."
+msgstr ""
+"Instrumenty typu obligacja (wartość modelowa) wymagają warunków, zanim "
+"będzie można je wycenić; zakupy możesz już zapisywać."
+
+msgid "Quote currency"
+msgstr "Waluta notowania"
+
+msgid "Unit prices and fees are in this currency."
+msgstr "Ceny jednostkowe i opłaty są w tej walucie."
+
+msgid "Unit label"
+msgstr "Nazwa jednostki"
+
+msgid ""
+"Leave empty for the type's default (share, coin, oz, property). A "
+"currency instrument always uses its currency code."
+msgstr ""
+"Pozostaw puste, aby użyć domyślnej nazwy typu (udział, moneta, uncja, "
+"nieruchomość). Instrument walutowy zawsze używa kodu waluty."
+
+msgid "Allocation"
+msgstr "Alokacja"
+
+#, python-format
+msgid ""
+"How much of this instrument's value belongs to each asset class. Use 0 to"
+" leave a class out; the weights must total exactly 100%%."
+msgstr ""
+"Jaka część wartości tego instrumentu należy do każdej klasy aktywów. "
+"Wpisz 0, aby pominąć klasę; wagi muszą sumować się dokładnie do 100%%."
+
+msgid "Asset class"
+msgstr "Klasa aktywów"
+
+#, python-format
+msgid "Weight (%%)"
+msgstr "Waga (%%)"
+
+#, python-format
+msgid "Weight for %(name)s"
+msgstr "Waga dla %(name)s"
+
+msgid "Total"
+msgstr "Razem"
+
+#, python-format
+msgid "Weights must total exactly 100%%."
+msgstr "Wagi muszą sumować się dokładnie do 100%%."
+
+msgid "Save instrument"
+msgstr "Zapisz instrument"
+
+msgid "Archived instruments"
+msgstr "Zarchiwizowane instrumenty"
+
+msgid ""
+"Archived instruments keep their allocation and history but cannot be "
+"traded."
+msgstr ""
+"Zarchiwizowane instrumenty zachowują alokację i historię, ale nie można "
+"nimi handlować."
+
 msgid "Invitation"
 msgstr "Zaproszenie"
 
@@ -4557,9 +4908,6 @@ msgstr "Brak planu"
 
 msgid "not counted"
 msgstr "nieliczone"
-
-msgid "Total"
-msgstr "Razem"
 
 msgid "Total money out"
 msgstr "Razem wydane i odłożone"
@@ -4897,9 +5245,6 @@ msgstr "Notatki (opcjonalnie)"
 
 msgid "Include in net worth"
 msgstr "Uwzględnij w majątku netto"
-
-msgid "Investable"
-msgstr "Inwestycyjna"
 
 msgid "Estimate values between entries"
 msgstr "Szacuj wartości między wpisami"
@@ -5506,9 +5851,6 @@ msgstr "Nadchodzące płatności"
 
 msgid "Occurrence marked paid or received."
 msgstr "Wystąpienie oznaczono jako opłacone lub otrzymane."
-
-msgid "Type"
-msgstr "Rodzaj"
 
 msgid "Add one-time payment"
 msgstr "Dodaj płatność jednorazową"

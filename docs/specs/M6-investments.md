@@ -6,11 +6,13 @@
 
 Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go)."*
 
+**Sequencing (owner decision, 2026-11-05):** F6.11 lands **before** F6.9, so the 1.4 archive covers the risk columns and `RiskTargetPolicy` in one format bump instead of F6.11 extending the archive in its own PR.
+
 **Data model (sketch)**
-- `AssetClass(id, workspace_id, name, investable bool, color, sort_order, risk_tier[safe|growth|speculative]?)`. Seed (en/pl): Stocks, Bonds, Metals, Crypto, Currencies (all investable); Real estate, Primary residence (not investable); Other. Seeded tiers: Bonds, Metals → safe; Stocks, Currencies → growth; Crypto → speculative; non-investable classes and Other → none (F6.11).
+- `AssetClass(id, workspace_id, name, investable bool, color, sort_order, archived_at, risk_tier[safe|growth|speculative]?)`. Seed (en/pl): Stocks, Bonds, Metals, Crypto, Currencies (all investable); Real estate, Primary residence (not investable); Other. Seeded tiers: Bonds, Metals → safe; Stocks, Currencies → growth; Crypto → speculative; non-investable classes and Other → none (F6.11).
 - `Instrument(id, workspace_id, name, symbol?, type[equity|etf|bond_market|bond_model|metal|crypto|currency|real_estate|other], quote_currency, unit_label, valuation_source[provider|manual|bond_model], provider_key?, provider_symbol?, risk_tier_override[safe|growth|speculative]?, archived_at)`
 - `RiskTargetPolicy(workspace_id PK, mode[fixed|age_scaled|age_in_bonds], safe_bp, growth_bp, speculative_bp, tolerance_bp)` (F6.11).
-- `InstrumentAllocation(instrument_id, asset_class_id, weight_bp)`; weights per instrument must sum to 10 000. A single instrument can be split across classes (e.g., an 80/20 stock/bond fund).
+- `InstrumentAllocation(instrument_id, asset_class_id, weight_bp)`; every instrument has at least one row and its weights must sum to exactly 10 000, enforced by the service (the editor mirrors the total client-side). A single instrument can be split across classes (e.g., an 80/20 stock/bond fund).
 - `InvestmentTransaction(id, workspace_id, instrument_id, date?, type[buy|sell|dividend|fee|split], quantity Decimal, unit_price Decimal, quote_currency, fee Money, fx_to_base Decimal?, note, import_batch_id?)`. `date` is nullable only for imported legacy lots (flagged "undated").
 - `PricePoint(instrument_id, date, price Decimal, source[provider|manual|transaction])`; unique `(instrument_id, date, source)`.
 - `FxRate(base_currency, quote_currency, date, rate Decimal, source)`.
@@ -23,9 +25,10 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 
 **Acceptance**
 - CRUD for asset classes and instruments; allocation editor with validation that weights sum to 100% (live total, blocks save otherwise).
-- Instrument types and their defaults: `crypto` (unit "coin"), `metal` (unit "oz"), `currency` (price = FX rate to base; unit = currency code), `real_estate` (quantity 1, manual valuation), `bond_model` (valuation source `bond_model`, requires `BondTerms` — F6.5).
-- Archive instruments with history instead of deleting.
-- Editors/owners only for writes.
+- Instrument types and their defaults: `crypto` (unit "coin"), `metal` (unit "oz"), `currency` (price = FX rate to base; unit = currency code, forced even if another label is typed), `real_estate` (quantity 1, manual valuation), `bond_model` (valuation source `bond_model`, requires `BondTerms` — F6.5). A `bond_model` instrument may be created in F6.1 with a "terms needed" state; the form and valuation arrive in F6.5.
+- Archive **asset classes and instruments** with their history instead of deleting; names are unique per workspace among active rows (case-insensitive), and asset classes can be reordered like F5.1 categories.
+- Instrument allocations: at least one class per instrument, weights in basis points totalling exactly 10 000; the service enforces the cross-row rule and the page mirrors the total. Archived classes may stay on an instrument that already used them, but cannot be added to a new allocation.
+- Editors/owners only for writes. New workspaces get the suggested asset classes; an older workspace with no active class gets an explicit "Add suggested asset classes" action (no automatic migration).
 
 **Agent prompt**
 ```
@@ -48,6 +51,7 @@ Tests: allocation validation, archive rules, tenant isolation test passes.
 - Holdings recomputed on read (no stored quantities); aggregation in Python.
 - Tests: golden scenario — buy 46 @ 489.5409 + fee 65.30, buy 4 @ 496.3093 + fee 14.00 → quantity 50; cost basis equals the sum of totals; sell 10 → average cost unchanged, FIFO consumes the first lot; fractional quantity `0.00924`; property test: quantity never negative, cost basis ≥ 0, realized + remaining cost basis = total bought cost − proceeds identity for both methods.
 - Undated legacy lots (date null) are allowed only via import and shown with a warning badge; they count in holdings but are excluded from time series until dated.
+- Investment transactions store `fx_to_base`, so historical FX is frozen. Once any investment transaction exists, the workspace base currency is locked (add the check to `services.workspaces.BASE_CURRENCY_LOCKS`).
 
 **Agent prompt**
 ```
@@ -177,7 +181,7 @@ the create-linked-items helper, double-counting warning. Tests: resolver values 
 ## F6.9 Archive extension: investments
 
 Replaces the former workbook "importer extension" (M4 no longer has a spreadsheet importer; owner
-decision, 2026-10-18).
+decision, 2026-10-18). It lands after F6.11 (see the sequencing note at the top).
 
 **Acceptance**
 - New archive files (a minor format version per ADR-0016) with lineage `id` columns and
