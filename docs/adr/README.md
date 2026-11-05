@@ -22,13 +22,13 @@ The decisions below are accepted unless noted otherwise.
 | [0013](0013-invitation-links.md) | Invitation links | Accepted |
 | [0014](0014-oidc-sign-in.md) | OIDC sign-in | Accepted |
 | [0015](0015-proxy-header-authentication.md) | Reverse-proxy header authentication | Accepted |
-| [0016](0016-workspace-archive-format.md) | Workspace archive format (export, import and restore) | Proposed |
+| [0016](0016-workspace-archive-format.md) | Workspace archive format (export, import and restore) | Accepted |
 | [0017](0017-email-and-account-recovery.md) | Email, verified registration and password reset | Accepted |
-| [0018](0018-recurring-items.md) | Structured recurrence and in-process generation | Proposed |
+| [0018](0018-recurring-items.md) | Structured recurrence and in-process generation | Accepted |
 | [0019](0019-local-totp.md) | Local TOTP and workspace enforcement | Accepted |
 | [0020](0020-hard-workspace-deletion.md) | Hard workspace deletion | Accepted |
-| [0021](0021-notifications.md) | Reminders through Apprise channels | Proposed |
-| [0022](0022-tax-kinds-and-payment-schedule.md) | Tax kinds and payment schedule | Proposed |
+| [0021](0021-notifications.md) | Reminders through Apprise channels | Accepted |
+| [0022](0022-tax-kinds-and-payment-schedule.md) | Tax kinds and payment schedule | Accepted |
 | [0023](0023-opt-in-update-check.md) | Opt-in update check | Accepted |
 | [0024](0024-price-providers.md) | Price and FX providers | Accepted |
 
