@@ -41,8 +41,8 @@ stays in the table as a greyed-out **Skipped** row, not counted as pending, with
 make it pending again. One-time payments can also be added and edited on the Upcoming payments
 page.
 
-A payment that was recorded from a recurring item (by **Mark paid or received**, or
-automatically) cannot be moved to a future date: its date belongs to that occurrence. The edit
+An entry recorded from a recurring item (by **Mark paid or received**, or automatically)
+cannot be moved to a future date: its date belongs to that occurrence. The edit
 is refused with a message; skip the occurrence on the Upcoming page to drop that date, or edit
 the recurring schedule to change future dates. Keeping the date today or in the past edits the
 row normally.

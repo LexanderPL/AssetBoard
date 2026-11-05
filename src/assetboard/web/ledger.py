@@ -73,7 +73,7 @@ FIELD_ERRORS: dict[str, str] = {
         "Add a description. A planned entry becomes a recurring item, so it needs a name."
     ),
     "future_date_recurring": _(
-        "A payment recorded from a recurring item cannot be moved to a future date. "
+        "An entry recorded from a recurring item cannot be moved to a future date. "
         "Skip the occurrence on the Upcoming page, or edit the recurring schedule."
     ),
     "category_required": _("Choose a category."),
