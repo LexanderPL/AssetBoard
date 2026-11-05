@@ -38,6 +38,7 @@ from assetboard.services.category_usage import CategoryUsage
 from assetboard.services.context import Context, PermissionDenied, Role
 from assetboard.services.months import MonthClosed, close_month, reopen_month
 from assetboard.services.scheduled import ScheduledInput
+from assetboard.services.summary import month_summary
 from assetboard.services.transactions import (
     InvalidTransaction,
     PlannedView,
@@ -498,6 +499,10 @@ def test_editing_to_a_future_date_makes_the_same_plan_as_creating_it(team: Works
     # Both are the same Expected amount in the target month.
     pending = occurrences.pending_for_month(team.factory, viewer, NOVEMBER)
     assert [row.expected for row in pending] == [Money(1250, "EUR")] * 2
+    # The month summary (F2.4) agrees: nothing Actual, both plans in Expected.
+    summary = month_summary(team.factory, viewer, NOVEMBER).summary
+    assert summary.block("expense").actual == Money(0, "EUR")
+    assert summary.block("expense").expected == Money(2500, "EUR")
 
 
 def test_editing_to_a_future_date_without_a_description_is_refused(team: WorkspaceDb) -> None:
@@ -531,6 +536,17 @@ def test_a_conversion_refuses_an_archived_category(team: WorkspaceDb) -> None:
         True,
         Money(1300, "EUR"),
     )
+
+
+def test_converting_an_income_transaction_to_a_future_date_plans_it(team: WorkspaceDb) -> None:
+    salary = _category(team, "Salary", kind="income")
+    view = _add(team, salary, amount="1000", direction="income", description="Salary")
+    planned = _convert(team, view, day="2026-11-03")
+    assert planned.direction == "income"
+    viewer = team.ctx("vic", "viewer")
+    assert list_month(team.factory, viewer, NOVEMBER).income == ()
+    pending = occurrences.pending_for_month(team.factory, viewer, NOVEMBER)
+    assert [(row.direction, row.expected) for row in pending] == [("income", Money(100000, "EUR"))]
 
 
 def _posted_recurring(team: WorkspaceDb, category_id: UUID) -> TransactionView:

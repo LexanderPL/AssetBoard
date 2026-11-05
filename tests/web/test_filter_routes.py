@@ -302,6 +302,24 @@ def test_a_no_javascript_edit_keeps_the_filter_and_says_when_it_hides_the_entry(
     )
 
 
+def test_an_edit_to_a_future_date_outside_the_filter_says_it_is_planned(
+    ledger: OwnerApp, golden: dict[str, UUID]
+) -> None:
+    food, fuel = golden["food"], golden["fuel"]
+    bread = _id(ledger, "Bread")
+    page = f"{PAGE}?category={fuel}"
+    edit = {"day": "31", "amount": "3", "description": "Bread",
+            "category_id": str(food), "filter": str(fuel)}  # fmt: skip
+    response = ledger.post(f"{MONTH}/transactions/{bread}", edit, token_from=page)
+    location = response.headers["location"]
+    assert response.status_code == 303
+    assert "notice=outside_filter_planned" in location and f"category={fuel}" in location
+    assert "#ledger-expense" in location
+    shown = ledger.client.get(location.split("#")[0]).text
+    assert "Entry planned. Its category is not shown while this filter is on." in shown
+    assert "Bread" not in _descriptions(_ledger(shown))
+
+
 def test_a_no_javascript_undo_keeps_the_filter(ledger: OwnerApp, golden: dict[str, UUID]) -> None:
     food, bread = golden["food"], _id(ledger, "Bread")
     page = f"{PAGE}?category={food}"
