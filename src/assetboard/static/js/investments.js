@@ -23,7 +23,8 @@ function updateAllocationEditor(editor) {
   const totalNode = editor.querySelector("[data-allocation-total]");
   const warning = editor.querySelector("[data-allocation-warning]");
   const submit = editor.querySelector("[data-allocation-submit]");
-  if (totalNode) totalNode.textContent = `${total.toFixed(2)}%`;
+  const separator = editor.getAttribute("data-decimal-separator") || ".";
+  if (totalNode) totalNode.textContent = `${total.toFixed(2).replace(".", separator)}%`;
   const valid = !invalid && total === 100;
   if (warning) warning.classList.toggle("hidden", valid);
   if (submit) submit.disabled = !valid;

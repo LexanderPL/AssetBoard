@@ -11,6 +11,7 @@ from sqlalchemy import update
 
 from assetboard.db.models.identity import AuditEvent, SetupState, User
 from assetboard.domain.categories import Kind, Treatment
+from assetboard.domain.instruments import InstrumentType, ValuationSource
 from assetboard.domain.networth import Side
 from assetboard.i18n import gettext
 from assetboard.services.admin_users import NotInstanceAdmin
@@ -180,6 +181,14 @@ def test_every_investment_action_has_a_label_keys_and_a_group() -> None:
     texts.append(GROUP_LABELS["investments"])
     for text in texts:
         assert gettext(text, "pl").strip()
+
+
+def test_every_instrument_type_and_valuation_source_has_a_label() -> None:
+    assert set(VALUE_TABLES["type"]) == {kind.value for kind in InstrumentType}
+    assert set(VALUE_TABLES["valuation_source"]) == {source.value for source in ValuationSource}
+    for table in ("type", "valuation_source"):
+        for text in VALUE_TABLES[table].values():
+            assert gettext(text, "pl").strip()
 
 
 # Net-worth events (F5.1)

@@ -6,6 +6,8 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
+from hypothesis import given
+from hypothesis import strategies as st
 
 from assetboard.domain.instruments import (
     ALLOCATION_TOTAL_BP,
@@ -153,3 +155,25 @@ def test_allocation_weights_must_total_exactly_100_percent() -> None:
 
 def test_risk_tiers_are_the_three_owner_agreed_values() -> None:
     assert {tier.value for tier in RiskTier} == {"safe", "growth", "speculative"}
+
+
+@given(st.integers(min_value=0, max_value=ALLOCATION_TOTAL_BP))
+def test_percent_to_bp_round_trips_every_basis_point(basis_points: int) -> None:
+    assert percent_to_bp(Decimal(basis_points).scaleb(-2)) == basis_points
+
+
+@given(
+    st.lists(
+        st.integers(min_value=1, max_value=ALLOCATION_TOTAL_BP),
+        min_size=1,
+        max_size=20,
+    )
+)
+def test_validate_allocation_accepts_only_exact_totals(weights: list[int]) -> None:
+    rows = [(uuid4(), weight) for weight in weights]
+    try:
+        validate_allocation(rows)
+    except InvalidAllocation:
+        assert sum(weights) != ALLOCATION_TOTAL_BP
+    else:
+        assert sum(weights) == ALLOCATION_TOTAL_BP

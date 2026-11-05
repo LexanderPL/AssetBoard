@@ -4,6 +4,9 @@ The **Investments** section records what you hold outside the ledger and how its
 across asset classes. It is the foundation for the portfolio, price and performance views that
 arrive in later updates; this page currently manages the structure.
 
+> **Backups:** investments are not part of the workspace archive yet. An export taken before the
+> investments archive extension does not contain asset classes, instruments or allocations.
+
 ## Asset classes
 
 Asset classes group instruments for the portfolio and allocation views. A new workspace starts
@@ -25,6 +28,10 @@ net-worth helper. You can rename a class, change its colour or investable flag, 
 or down; the order is used wherever classes are listed. There is no "add suggested classes"
 action while an active class exists. A workspace created before this feature can add the
 suggested set once when it has no active class; nothing is added automatically.
+
+If every class is archived, the seed action can add a fresh suggested set. The archived originals
+remain; restoring one then fails while the new class with the same name is active. Rename or
+archive the new class first if you want the original back.
 
 Archiving a class keeps it on instruments that already use it and keeps its place in history.
 It cannot be chosen for a new allocation. Restoring it puts it at the end of the list; restoring

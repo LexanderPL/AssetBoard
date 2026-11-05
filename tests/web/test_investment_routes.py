@@ -113,6 +113,20 @@ def test_an_empty_workspace_offers_the_seed_set(owner: OwnerApp) -> None:
     assert _names(page, "data-class-name")[:3] == ["Stocks", "Bonds", "Metals"]
 
 
+def test_seeding_without_javascript_from_the_instruments_tab_returns_there(
+    owner: OwnerApp,
+) -> None:
+    response = owner.post(
+        "/investments/classes/seed",
+        {"return_to": "instruments"},
+        token_from=INSTRUMENTS,
+    )
+    assert (response.status_code, response.headers["location"]) == (
+        303,
+        f"{INSTRUMENTS}?notice=classes_seeded",
+    )
+
+
 def test_the_seed_set_is_named_in_the_users_language(owner: OwnerApp) -> None:
     owner.client.headers["Accept-Language"] = "pl"
     owner.post("/investments/classes/seed", token_from=CLASSES)
@@ -294,6 +308,29 @@ def test_a_viewer_cannot_see_the_forms(owner: OwnerApp) -> None:
     assert "World ETF" not in page
     classes = owner.client.get(CLASSES).text
     assert "Add an asset class" not in classes and "data-class-form" not in classes
+
+
+def test_the_allocation_total_uses_the_locale_decimal_separator(owner: OwnerApp) -> None:
+    _class(owner, "Stocks")
+    owner.client.headers["Accept-Language"] = "pl"
+    page = owner.client.get(INSTRUMENTS).text
+    assert 'data-decimal-separator=","' in page
+
+
+def test_a_viewer_post_is_refused_by_the_service(owner: OwnerApp) -> None:
+    stocks = _class(owner, "Stocks")
+    owner.set_admin_role("viewer")
+    created = owner.post(
+        CLASSES,
+        {"name": "Bonds", "color": "#16a34a", "investable": "1"},
+        token_from=CLASSES,
+    )
+    assert created.status_code == 403
+    archived = owner.post(
+        f"{CLASSES}/{stocks}/archive",
+        token_from=CLASSES,
+    )
+    assert archived.status_code == 403
 
 
 def test_seed_from_the_instruments_page_returns_the_instruments_body(

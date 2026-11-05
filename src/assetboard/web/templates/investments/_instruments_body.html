@@ -18,6 +18,7 @@
     <p class="mt-2 text-sm text-muted">{{ _("Add the suggested asset classes before creating instruments; every instrument's value is split across them.") }}</p>
     <form {{ htmx_form(scoped_url(request, 'investments_classes_seed'), '#investments-body') }} class="mt-4">
       {{ csrf_input() }}
+      <input type="hidden" name="return_to" value="instruments">
       <button type="submit" data-seed class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Add suggested asset classes") }}</button>
     </form>
     {% else %}
@@ -73,7 +74,7 @@
     {% set values = edit_values if editing else create_values %}
     {% set errors = edit_errors if editing else create_errors %}
     {% set rows = edit_rows if editing else create_rows %}
-    <form {{ htmx_form(scoped_url(request, 'investments_instrument_update', instrument_id=editing|string) if editing else scoped_url(request, 'investments_instrument_create'), '#investments-body') }} class="mt-4 space-y-5" novalidate data-allocation-editor>
+    <form {{ htmx_form(scoped_url(request, 'investments_instrument_update', instrument_id=editing|string) if editing else scoped_url(request, 'investments_instrument_create'), '#investments-body') }} class="mt-4 space-y-5" novalidate data-allocation-editor data-decimal-separator="{{ decimal_separator }}">
       {{ csrf_input() }}
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="space-y-1.5">

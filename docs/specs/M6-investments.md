@@ -52,6 +52,7 @@ Tests: allocation validation, archive rules, tenant isolation test passes.
 - Tests: golden scenario — buy 46 @ 489.5409 + fee 65.30, buy 4 @ 496.3093 + fee 14.00 → quantity 50; cost basis equals the sum of totals; sell 10 → average cost unchanged, FIFO consumes the first lot; fractional quantity `0.00924`; property test: quantity never negative, cost basis ≥ 0, realized + remaining cost basis = total bought cost − proceeds identity for both methods.
 - Undated legacy lots (date null) are allowed only via import and shown with a warning badge; they count in holdings but are excluded from time series until dated.
 - Investment transactions store `fx_to_base`, so historical FX is frozen. Once any investment transaction exists, the workspace base currency is locked (add the check to `services.workspaces.BASE_CURRENCY_LOCKS`).
+- An instrument's `quote_currency` is locked once it has investment transactions (unit prices and fees are in that currency). A `type` change that would reinterpret existing rows is refused or migrated explicitly.
 
 **Agent prompt**
 ```

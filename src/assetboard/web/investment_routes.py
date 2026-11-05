@@ -29,7 +29,7 @@ from assetboard.domain.instruments import (
     percent_to_bp,
 )
 from assetboard.i18n import gettext
-from assetboard.i18n.numbers import format_quantity_input, parse_amount
+from assetboard.i18n.numbers import decimal_symbol, format_quantity_input, parse_amount
 from assetboard.services.context import Context, Role, has_role
 from assetboard.services.investments import (
     AssetClassView,
@@ -253,6 +253,7 @@ def _instrument_body_context(
         "type_options": _type_options(request),
         "currency_options": currency_codes(),
         "weight_text": lambda weight_bp: _weight_text(weight_bp, request.state.locale),
+        "decimal_separator": decimal_symbol(request.state.locale),
     }
 
 
@@ -597,7 +598,7 @@ async def classes_page(
 
 
 @router.post("/investments/classes/seed", name="investments_classes_seed")
-async def classes_seed(request: Request, ctx: CurrentContext) -> Response:
+async def classes_seed(request: Request, ctx: CurrentContext, return_to: FormStr = "") -> Response:
     try:
         await run_in_threadpool(
             lambda: seed_asset_classes(
@@ -627,6 +628,11 @@ async def classes_seed(request: Request, ctx: CurrentContext) -> Response:
         )
     if is_htmx_fragment_request(request) and request.headers.get("HX-Target") == "investments-body":
         return await run_in_threadpool(_instruments_done, request, ctx, "classes_seeded")
+    if not is_htmx_fragment_request(request) and return_to == "instruments":
+        return RedirectResponse(
+            request.url_for("investments_instruments").path + "?notice=classes_seeded",
+            status_code=303,
+        )
     return await run_in_threadpool(_classes_done, request, ctx, "classes_seeded")
 
 
