@@ -512,6 +512,27 @@ def test_editing_to_a_future_date_without_a_description_is_refused(team: Workspa
         assert session.scalars(select(ScheduledItem)).all() == []
 
 
+def test_a_conversion_refuses_an_archived_category(team: WorkspaceDb) -> None:
+    food = _category(team, "Food")
+    view = _add(team, food)
+    archive_category(team.factory, team.ctx("ed", "editor"), food)
+    # Planning needs a category that can still be chosen anew, as creation does.
+    assert _invalid(lambda: _edit(team, view, day="2026-11-03")) == {
+        "category": "category_archived"
+    }
+    with team.factory() as session:
+        row = session.get(Transaction, view.id)
+        assert row is not None and (row.date, row.deleted_at) == (date(2026, 10, 7), None)
+        assert session.scalars(select(ScheduledItem)).all() == []
+    # A normal edit that keeps the date today or earlier still works with the archived category.
+    kept = _edit(team, view, amount="13.00")
+    assert (kept.category_id, kept.category_archived, kept.amount) == (
+        food,
+        True,
+        Money(1300, "EUR"),
+    )
+
+
 def _posted_recurring(team: WorkspaceDb, category_id: UUID) -> TransactionView:
     ctx = team.ctx("ed", "editor")
     item_id = scheduled.save_item(
