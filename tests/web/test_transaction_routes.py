@@ -590,7 +590,7 @@ def test_a_posted_recurring_payment_cannot_be_moved_to_a_future_date(
             "category_id": str(food)}  # fmt: skip
     response = ledger.post(f"{MONTH}/transactions/{transaction_id}", data, token_from=MONTH)
     assert response.status_code == 400
-    assert "A payment recorded from a recurring item cannot be moved to a future date." in (
+    assert "An entry recorded from a recurring item cannot be moved to a future date." in (
         response.text
     )
     assert f'id="edit-{transaction_id}-day-error"' in response.text
