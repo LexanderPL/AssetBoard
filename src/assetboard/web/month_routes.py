@@ -66,6 +66,10 @@ ERRORS = {
     "month_closed": MONTH_CLOSED_MESSAGE,
     "transaction_gone": _("This entry no longer exists. It may have been deleted elsewhere."),
     "undo_expired": _("Too late to undo: the entry stays deleted."),
+    "undo_future_dated": _(
+        "This entry was dated in the future, so it became a plan. Edit the plan's date to "
+        "today or earlier to bring it back."
+    ),
     "not_pending": _("This occurrence is no longer pending."),
     "not_planned": _("Only a one-time planned entry can be deleted here."),
     "not_skipped": _("This occurrence is not skipped."),

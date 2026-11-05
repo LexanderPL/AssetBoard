@@ -1905,6 +1905,15 @@ msgstr ""
 "Dodaj opis. Zaplanowany wpis staje się pozycją cykliczną, więc wymaga "
 "nazwy."
 
+msgid ""
+"A payment recorded from a recurring item cannot be moved to a future "
+"date. Skip the occurrence on the Upcoming page, or edit the recurring "
+"schedule."
+msgstr ""
+"Płatności zapisanej z pozycji cyklicznej nie można przenieść na przyszłą "
+"datę. Pomiń wystąpienie na stronie Nadchodzące albo edytuj harmonogram "
+"cykliczny."
+
 msgid "Choose a category."
 msgstr "Wybierz kategorię."
 
@@ -1964,6 +1973,13 @@ msgstr "Ten wpis już nie istnieje. Mógł zostać usunięty gdzie indziej."
 
 msgid "Too late to undo: the entry stays deleted."
 msgstr "Za późno na cofnięcie: wpis pozostaje usunięty."
+
+msgid ""
+"This entry was dated in the future, so it became a plan. Edit the plan's "
+"date to today or earlier to bring it back."
+msgstr ""
+"Ten wpis miał przyszłą datę, więc stał się planem. Zmień datę planu na "
+"dzisiejszą lub wcześniejszą, aby go przywrócić."
 
 msgid "This occurrence is no longer pending."
 msgstr "To wystąpienie nie jest już oczekujące."
@@ -2734,6 +2750,9 @@ msgstr "Za późno na cofnięcie"
 
 msgid "The deletion can no longer be undone: the entry stays deleted."
 msgstr "Usunięcia nie można już cofnąć: wpis pozostaje usunięty."
+
+msgid "Cannot undo this entry"
+msgstr "Nie można cofnąć tego wpisu"
 
 msgid "Not saved"
 msgstr "Nie zapisano"

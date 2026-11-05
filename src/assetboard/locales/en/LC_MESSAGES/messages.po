@@ -1805,6 +1805,12 @@ msgid ""
 "a name."
 msgstr ""
 
+msgid ""
+"A payment recorded from a recurring item cannot be moved to a future "
+"date. Skip the occurrence on the Upcoming page, or edit the recurring "
+"schedule."
+msgstr ""
+
 msgid "Choose a category."
 msgstr ""
 
@@ -1861,6 +1867,11 @@ msgid "This entry no longer exists. It may have been deleted elsewhere."
 msgstr ""
 
 msgid "Too late to undo: the entry stays deleted."
+msgstr ""
+
+msgid ""
+"This entry was dated in the future, so it became a plan. Edit the plan's "
+"date to today or earlier to bring it back."
 msgstr ""
 
 msgid "This occurrence is no longer pending."
@@ -2565,6 +2576,9 @@ msgid "Too late to undo"
 msgstr ""
 
 msgid "The deletion can no longer be undone: the entry stays deleted."
+msgstr ""
+
+msgid "Cannot undo this entry"
 msgstr ""
 
 msgid "Not saved"

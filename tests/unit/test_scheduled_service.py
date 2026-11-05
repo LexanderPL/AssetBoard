@@ -11,6 +11,7 @@ from sqlalchemy import select
 from assetboard.clock import FixedClock
 from assetboard.config import Settings
 from assetboard.db.models.identity import AuditEvent, Membership, Workspace
+from assetboard.db.models.ledger import Transaction
 from assetboard.db.repositories import CategoryRepository, NotFound
 from assetboard.db.repositories.scheduled import (
     ScheduledOccurrenceRepository,
@@ -683,3 +684,58 @@ def test_update_one_time_refuses_closed_months(team):
             team.factory, ctx, row.id, one_time_input(team, day=date(2026, 4, 2))
         )
     assert rows(team, item_id)[0].due_date == date(2026, 2, 10)
+
+
+def test_editing_a_future_one_time_to_today_posts_a_manual_transaction(team):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    item_id = scheduled.create_one_time(
+        team.factory, ctx, one_time_input(team, day=date(2026, 3, 20)), settings
+    )
+    [row] = rows(team, item_id)
+    posted = scheduled.update_one_time(
+        team.factory, ctx, row.id, one_time_input(team, day=date(2026, 3, 1))
+    )
+    assert posted is not None
+    assert (posted.date, posted.amount, posted.description, posted.source) == (
+        date(2026, 3, 1),
+        Money(45000, "EUR"),
+        "Car insurance",
+        "manual",
+    )
+    # The plan is gone and no pending occurrence is left; the transaction is the only entry.
+    with pytest.raises(NotFound):
+        scheduled.get_item(team.factory, ctx, item_id)
+    assert rows(team, item_id) == []
+    with team.factory() as session:
+        [stored] = session.scalars(select(Transaction)).all()
+        assert (stored.id, stored.date, stored.amount_minor, stored.source) == (
+            posted.id,
+            date(2026, 3, 1),
+            45000,
+            "manual",
+        )
+        actions = set(session.scalars(select(AuditEvent.action)))
+    assert {"transaction.created", "scheduled.delete"} <= actions
+
+
+def test_editing_an_overdue_one_time_stays_a_plan(team):
+    ctx, settings = team.ctx("owner", "owner"), Settings(_env_file=None)
+    item_id = scheduled.create_one_time(
+        team.factory, ctx, one_time_input(team, day=date(2026, 2, 10)), settings
+    )
+    [row] = rows(team, item_id)
+    # The plan was already overdue: even a date that is today now keeps it a plan.
+    assert (
+        scheduled.update_one_time(
+            team.factory, ctx, row.id, one_time_input(team, day=date(2026, 3, 1))
+        )
+        is None
+    )
+    [moved] = rows(team, item_id)
+    assert (moved.id, moved.due_date, moved.nominal_date) == (
+        row.id,
+        date(2026, 3, 1),
+        date(2026, 3, 1),
+    )
+    with team.factory() as session:
+        assert session.scalars(select(Transaction)).all() == []

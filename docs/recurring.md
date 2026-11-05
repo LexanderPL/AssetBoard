@@ -62,6 +62,13 @@ Upcoming window. It adds to the month's pending amount ("+ … pending" under Ac
 Plan. Its expected row on the Transactions page can be confirmed or deleted; deleting removes
 the payment. A one-time item created by the Transactions page's **Plan** button is the same.
 
+Editing a one-time payment that is still in the future to **today or an earlier date records
+it**: the future date was what made it a plan, so the plan is replaced by an ordinary
+transaction for the new date (the same one the Transactions page would enter) and Upcoming
+leads to the Transactions page with a notice linking the transaction's month. Editing an
+**overdue** payment keeps it a plan, even when its new date is today; it still has to be
+confirmed. A date in a past month is allowed if that month is open.
+
 JavaScript is needed only for the live **Next dates** panel, for showing just the fields of the
 chosen frequency and for filtering the categories; without it every field is shown and the form
 can still be saved. A finite or ended rule may have fewer than five dates remaining.

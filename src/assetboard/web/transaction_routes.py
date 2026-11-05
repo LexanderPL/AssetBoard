@@ -42,6 +42,7 @@ from assetboard.services.transactions import (
     PlannedView,
     TransactionView,
     UndoExpired,
+    UndoFutureDated,
     create_entry,
     delete_transaction,
     get_transaction,
@@ -94,6 +95,11 @@ OUTSIDE_FILTER = _("Entry saved. Its category is not shown while this filter is 
 PLANNED_OUTSIDE_FILTER = _("Entry planned. Its category is not shown while this filter is on.")
 UNDO_TOO_LATE_TITLE = _("Too late to undo")
 UNDO_TOO_LATE = _("The deletion can no longer be undone: the entry stays deleted.")
+UNDO_FUTURE_TITLE = _("Cannot undo this entry")
+UNDO_FUTURE = _(
+    "This entry was dated in the future, so it became a plan. Edit the plan's date to today "
+    "or earlier to bring it back."
+)
 NOT_SAVED_TITLE = _("Not saved")
 
 
@@ -437,6 +443,7 @@ async def transaction_update(
                 factory,
                 ctx,
                 row_id,
+                settings=request.app.state.settings,
                 month=target,
                 day=day,
                 amount=amount,
@@ -471,6 +478,21 @@ async def transaction_update(
         )
         return await run_in_threadpool(
             _refused, request, ctx, target, stored.direction, state, status_code
+        )
+    if isinstance(saved, PlannedView):
+        # The edit became the same plan the create path makes: answer exactly like a creation.
+        if not is_htmx_fragment_request(request):
+            if _hidden(request, saved, target):
+                query = "notice=outside_filter_planned"
+            elif saved.month != target:
+                query = f"saved_in={saved.month}&planned=1"
+            else:
+                query = "notice=planned"
+            path = _path(request, target, query, saved.direction)
+            return RedirectResponse(f"{path}#ledger-{saved.direction}", status_code=303)
+        state = SectionState(focus="entry:day", **_moved(request, saved, target, planned=True))
+        return await run_in_threadpool(
+            lambda: _section(request, ctx, target, saved.direction, state, status="planned")
         )
     if not is_htmx_fragment_request(request):
         query = "notice=transaction_saved" if saved.month == target else f"saved_in={saved.month}"
@@ -548,6 +570,12 @@ async def transaction_undo(
                 request, 409, _t(request, UNDO_TOO_LATE_TITLE), _t(request, UNDO_TOO_LATE)
             )
         return RedirectResponse(_path(request, target, "error=undo_expired"), status_code=303)
+    except UndoFutureDated:
+        if is_htmx_fragment_request(request):
+            return error_response(
+                request, 409, _t(request, UNDO_FUTURE_TITLE), _t(request, UNDO_FUTURE)
+            )
+        return RedirectResponse(_path(request, target, "error=undo_future_dated"), status_code=303)
     if not is_htmx_fragment_request(request):
         path = _path(request, target, "notice=transaction_restored", restored.direction)
         return RedirectResponse(f"{path}#tx-{restored.id}", status_code=303)

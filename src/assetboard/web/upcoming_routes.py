@@ -19,10 +19,11 @@ from assetboard.i18n.numbers import format_amount_input, parse_amount
 from assetboard.services import occurrences, scheduled
 from assetboard.services.categories import list_categories
 from assetboard.services.context import Context, Role, has_role, require_role
-from assetboard.services.months import MonthClosed
+from assetboard.services.months import MonthClosed, current_month
 from assetboard.web.context import CurrentContext
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
+from assetboard.web.transactions_page_routes import transactions_path
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
 
@@ -266,14 +267,19 @@ async def create_one_time(request: Request, ctx: CurrentContext) -> Response:
 
 @router.post("/upcoming/{occurrence_id}/one-time", name="upcoming_one_time_update")
 async def update_one_time(request: Request, ctx: CurrentContext, occurrence_id: str) -> Response:
-    """Edit a one-time payment from its Upcoming row (it is not on the Recurring page)."""
+    """Edit a one-time payment from its Upcoming row (it is not on the Recurring page).
+
+    Moving a still-future payment to today or the past posts it (issue #164): the plan is
+    replaced by the manual transaction the Transactions page would create, so the answer
+    leads there with the existing "saved in" notice. The Upcoming page no longer lists it.
+    """
     require_role(ctx, Role.EDITOR)
     values = await _values(request)
     target = _id(occurrence_id)
     data = _one_time_input(values, ctx, request.state.locale)
     if isinstance(data, scheduled.OneTimeInput):
         try:
-            await run_in_threadpool(
+            posted = await run_in_threadpool(
                 scheduled.update_one_time,
                 request.app.state.session_factory,
                 ctx,
@@ -283,6 +289,11 @@ async def update_one_time(request: Request, ctx: CurrentContext, occurrence_id: 
         except (ValueError, MonthClosed) as exc:
             data = _one_time_code(exc)
         else:
+            if posted is not None:
+                path = transactions_path(
+                    request, current_month(ctx), urlencode({"saved_in": str(posted.month)})
+                )
+                return RedirectResponse(path, status_code=303)
             path = request.url_for("scheduled_upcoming").path
             return RedirectResponse(f"{path}?notice=one_time_saved", status_code=303)
     return await _render_with_errors(
