@@ -30,14 +30,27 @@ button that fills its cell. Type into it the way you would type into a spreadshe
 
 An entry dated after today is not posted yet: the button reads **Plan**, and saving creates a
 one-time recurring item with one pending occurrence (see [Recurring items](recurring.md)). A
-planned entry needs a description, because the recurring item is named by it. It appears in the
-month summary's Actual column as "+ … pending" until it is confirmed; its day-of-month is shown like a posted entry. **Confirm**
+planned entry needs a description, because the recurring item is named by it. Editing a saved
+entry to a future date does the same: the entry becomes that same one-time plan for its new
+date, so it leaves the posted rows (Actual) and shows as pending (Expected) in that month. It
+appears in the month summary's Actual column as "+ … pending" until it is confirmed; its day-of-month is shown like a posted entry. **Confirm**
 opens the date and amount; confirm it there when it happens, or **Cancel** closes the form
 without changing anything. **Delete** removes the planned entry and its one-time item. The
 expected row of a repeating recurring item or income has **Skip** instead of Delete: the date
 stays in the table as a greyed-out **Skipped** row, not counted as pending, with **Undo** to
 make it pending again. One-time payments can also be added and edited on the Upcoming payments
 page.
+
+A payment that was recorded from a recurring item (by **Mark paid or received**, or
+automatically) cannot be moved to a future date: its date belongs to that occurrence. The edit
+is refused with a message; skip the occurrence on the Upcoming page to drop that date, or edit
+the recurring schedule to change future dates. Keeping the date today or in the past edits the
+row normally.
+
+For now the **date decides whether an entry is planned or actual**: an entry dated today or
+earlier is an actual transaction (the payment has happened), one dated after today is a plan
+(it has not happened yet). The date is the payment date, not a separate record that the payment
+happened; an explicit **Plan**/**Record** choice is a follow-up (see the post-1.0 backlog).
 
 Keys:
 
@@ -69,11 +82,13 @@ Suggestions need JavaScript; without it, type the description and choose the cat
 - **Edit** turns the row into fields. Change what you need and press Enter (or **Save**); Esc
   (or **Cancel**) leaves the row unchanged. A row keeps its archived category if it has one,
   but archived categories cannot be chosen anew. Changing the date to another month moves the
-  entry there.
+  entry there. Changing it to a future date turns the entry into a one-time plan for that date
+  (see [Adding entries](#adding-entries)); a description is required then.
 - **Delete** removes the entry at once. A message at the bottom of the page offers **Undo** for
   ten seconds and counts them down; after that the deletion stays. Anyone who can edit can undo,
   not only the person who deleted. An entry you are typing in the entry row meanwhile stays
-  there.
+  there. An entry that became a future plan cannot be undone that way: the plan is the entry
+  now, and changing its date back to today or earlier posts it again.
 
 ## Closed months and viewers
 

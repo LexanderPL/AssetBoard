@@ -98,6 +98,23 @@ Implementation order: F3.1 → F3.2 → F3.3 → F3.4 → F3.5 → F3.6 → (F3.
   and its pending occurrence together (an overdue one moves too; the old and the new month must
   be open; the amount override is cleared). Recurring items are refused (`not_planned`).
 
+**As built: a plan becomes an actual when its date is no longer in the future (issue #164,
+owner decision of 2026-11-04):**
+- `services.scheduled.update_one_time` converts only when the stored `due_date` is **after**
+  today (workspace time zone, injected Clock) and the submitted date is **today or earlier**.
+  The future date was what made the payment a plan; a date today or in the past means the user
+  is recording it, so the plan is replaced in the same write by the manual transaction the
+  Transactions page would create for that date, amount, description and category
+  (`source=manual`). The item and its pending occurrence are removed exactly as Delete removes
+  them; the audit pair is `transaction.created` and `scheduled.delete`/`scheduled.archive`.
+  `update_one_time` returns the `TransactionView` (or `None` when the payment stays a plan), and
+  the Upcoming route sends the user to the current month's Transactions page with the existing
+  `saved_in` notice, linking the transaction's month when it is an earlier one.
+- The boundary is deliberate: an **overdue** plan (stored date today or earlier) already means
+  "not confirmed yet", so editing it keeps it a plan even when the new date is today; moving it
+  to a future date keeps it a plan too. Only future → today/past posts. The old and the new
+  date must be in open months, as before.
+
 **As built: Recurring page redesign (owner decisions, UI batch 3):**
 - The list has two sections, **Expenses** and **Income**, each a compact table (cards below
   the `sm` breakpoint, no sideways page scroll): Name (with a "paused" chip), Amount (with an
@@ -155,6 +172,12 @@ interval/end_date/max_count, determinism. Services use the injected Clock only.
   As built (UI batch 3): a recurring expected row on the month's Transactions page also has **Skip** (`upcoming_skip` with `return_month`); the skipped occurrence stays in that month's table, greyed out and labelled "Skipped", with **Undo** (`upcoming_unskip` → `services.occurrences.unskip_occurrence`: editor role, open month, not for an archived item, audited as `scheduled_occurrence.unskipped`; an income occurrence is recalculated so its tax payments return). Skipped occurrences are never pending, so the Month summary does not count them.
 - Undo of "mark paid" within 10 seconds deletes the created transaction and restores `pending`.
 - `auto_post=true` items post automatically on the due date (job runs shortly after midnight workspace time) with `source=recurring_auto`; the transaction is clearly marked and editable.
+- **Plan/actual boundary (issue #164, owner decision of 2026-11-04).** Editing a one-time
+  payment whose stored date is still in the future to today or an earlier date records it as a
+  manual transaction and removes the plan (the reverse of the ledger's edit-to-future); an
+  overdue one-time payment edited stays a plan. A transaction posted from a recurring
+  occurrence cannot be moved to a future date at all (skip the occurrence or edit the rule);
+  the whole rule is in F3.1's "a plan becomes an actual" notes and F2.2's acceptance.
 - Posting into a closed month is blocked with a clear message (the user must reopen or reschedule).
 - A posted occurrence cannot be changed by rule edits.
 
@@ -180,6 +203,12 @@ interval/end_date/max_count, determinism. Services use the injected Clock only.
   `previous_transaction_id`. Auto-post only touches occurrences that were never posted
   (`previous_transaction_id IS NULL`), so a deleted auto-posted transaction is not recreated by
   the next run; the user posts it by hand.
+- A transaction posted from a recurring item cannot be edited to a future date (issue #164,
+  owner decision of 2026-11-04). Its date belongs to its occurrence, and planning the row would
+  count the amount twice in Expected with the rule's own future occurrence. The edit is refused
+  before any change with `future_date_recurring`; the message points to skipping that
+  occurrence on Upcoming or editing the rule. Editing the same row while keeping its date today
+  or earlier works normally. Deleting it still returns the occurrence to pending, as above.
 - The window defaults to 30 days and is configurable by the operator with
   `ASSETBOARD_UPCOMING_DAYS` (1–365). UI batch 3: the owner can override it per workspace in
   Workspace settings (`workspaces.upcoming_days`, 1–365, NULL = the instance setting, migration

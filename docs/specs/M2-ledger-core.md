@@ -66,6 +66,14 @@ Tests: service rules (kind change blocked when used), role checks, tenant isolat
 - Direction must match category kind (an income category cannot be used in the expense table).
 - Closed months are read-only (F2.5). Viewers see no entry row.
 - Writes create `AuditEvent`s.
+- **A future date is a plan on every path (issue #164, owner decision of 2026-11-04).** Adding
+  an entry dated after today plans it (see M3); editing an existing entry to such a date makes
+  the same one-time plan in the same write (the posted row is soft-deleted with the edited
+  values), and the page answers like creation. A transaction recorded from a recurring
+  occurrence cannot be moved to a future date: its date belongs to the occurrence, so the edit
+  is refused with a message pointing to Upcoming's Skip or the recurring schedule. Undo never
+  restores a future-dated tombstone; editing the plan's date back to today or earlier is the
+  real undo (the reverse conversion in M3).
 - **Closed-month guard (from F2.5).** Every transaction write, inside its write transaction and
   after `require_role_now`, first calls `services.months.lock_month_writes(session, ctx)`
   **before reading any row whose date it checks**, then `ensure_date_open` (or
@@ -177,6 +185,36 @@ Tests: service rules (kind change blocked when used), role checks, tenant isolat
   link, and a field clicked in that window lost the focus to the day field, so typing meant for
   the amount went into the day (the intermittent F2.2 browser failure). No style depends on the
   settling classes.
+
+**As built: a future date is a plan on every path (issue #164, owner decision of 2026-11-04)**
+- **Editing to a future date plans.** Changing an existing entry's date to after today
+  (workspace time zone, injected Clock) no longer saves a future-dated transaction. In the same
+  write the row is updated with the submitted values, soft-deleted, and replaced by the one-time
+  `ScheduledItem` (`freq=once`) and its pending occurrence that `create_entry` produces for the
+  same values (`services.transactions._replace_with_plan` via `scheduled.save_item_in_session`;
+  the seam avoids a nested `run_immediate`, which would deadlock on SQLite). `update_transaction`
+  returns the same `PlannedView` as creation, and the route answers exactly like creation:
+  `?notice=planned` in the viewed month, `?saved_in=YYYY-MM&planned=1` for another month,
+  `?notice=outside_filter_planned` when the category filter hides it, the HTMX status line
+  "Entry planned." and `data-autofocus` on the entry day. A future edit needs a description
+  (`description_required_for_plan`) and an active category (`category_archived`), as creation
+  does. Audit: `transaction.deleted` with the standard data keys (the edited values, never the
+  description) and `scheduled.created`.
+- **A payment posted from a recurring item cannot be moved into the future.** Its date belongs
+  to its occurrence (`source` `recurring` / `recurring_auto`), and planning it would count the
+  amount twice in Expected (the rule already has its own future occurrence). The edit is refused
+  with `future_date_recurring` on the day field before any row changes, and the message points
+  to the proper flows: skip that occurrence on Upcoming, or edit the recurring schedule. Editing
+  the same row while keeping its date today or in the past works as before.
+- **Undoing a conversion is refused.** The soft-deleted row is a plan's tombstone, not a posted
+  entry: `undo_delete` raises `UndoFutureDated` (the row stays deleted) and `pending_undo`
+  returns `None`, so no Undo toast or no-JavaScript Undo form offers it. The real undo is editing
+  the plan's date back to today or earlier; the reverse conversion in M3 posts a manual
+  transaction. The guard applies to every future-dated tombstone, including imported or legacy
+  rows.
+- **Closed months and roles are unchanged.** The edit still locks and guards the stored date
+  and the new date before any change, and the role is checked both before the write and inside
+  it. A conversion in a closed month is refused and creates nothing.
 
 **Agent prompt**
 ```

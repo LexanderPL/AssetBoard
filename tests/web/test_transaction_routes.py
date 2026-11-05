@@ -35,6 +35,7 @@ PART_A_CODES = {
     "invalid_description",
     "description_too_long",
     "description_required_for_plan",
+    "future_date_recurring",
     "category_required",
     "invalid_category",
     "category_kind_mismatch",
@@ -496,6 +497,160 @@ def test_moving_an_entry_to_another_month_links_it(ledger: OwnerApp) -> None:
     response = _htmx(ledger, f"{MONTH}/transactions/{row_id}", data)
     assert "Entry saved in September 2026." in response.text
     assert _descriptions(response.text, "expense") == []
+
+
+# A future date is a plan on every path (issue #164)
+
+
+def test_editing_to_a_future_date_plans_it_like_the_create_path(ledger: OwnerApp) -> None:
+    food = _category(ledger, "Food")
+    _add(ledger, _form(food))
+    row_id = _id(ledger, "Groceries")
+    future = {"day": "31", "amount": "12.50", "description": "Christmas gifts",
+              "category_id": str(food)}  # fmt: skip
+    response = _htmx(ledger, f"{MONTH}/transactions/{row_id}", future)
+    assert response.status_code == 200
+    assert "Entry planned." in response.text
+    assert _descriptions(response.text, "expense") == []
+    assert "Christmas gifts" in response.text  # the pending occurrence is listed
+    with ledger.db() as session:
+        item = session.scalars(select(ScheduledItem)).one()
+        occurrence = session.scalars(select(ScheduledOccurrence)).one()
+    assert (item.name, item.freq, occurrence.due_date, occurrence.status) == (
+        "Christmas gifts",
+        "once",
+        date(2026, 10, 31),
+        "pending",
+    )
+
+    # A plan in another month answers like creation, with the planned variant of the link.
+    _add(ledger, _form(food, "8", description="Second"))
+    second = _id(ledger, "Second")
+    data = {"day": "2026-12-24", "amount": "99.00", "description": "Christmas gifts",
+            "category_id": str(food)}  # fmt: skip
+    plain = ledger.post(f"{MONTH}/transactions/{second}", data, token_from=MONTH)
+    assert plain.status_code == 303
+    assert plain.headers["location"] == (f"{PAGE}?saved_in=2026-12&planned=1#ledger-expense")
+    page = _page(ledger, f"{PAGE}?saved_in=2026-12&planned=1")
+    assert (
+        '<a href="/transactions/2026-12" class="font-medium underline">'
+        "Entry planned in December 2026.</a>" in page
+    )
+    assert _descriptions(page, "expense") == []  # neither row is a live transaction
+    assert all(row.deleted_at is not None for row in _rows(ledger))
+    with ledger.db() as session:
+        assert len(session.scalars(select(ScheduledItem)).all()) == 2
+
+
+def _posted_recurring_payment(app: OwnerApp, category: UUID) -> UUID:
+    created = app.post(
+        "/recurring",
+        {
+            "name": "Rent",
+            "direction": "expense",
+            "category_id": str(category),
+            "amount": "100",
+            "amount_mode": "estimate",
+            "start_date": "2026-10-14",
+            "freq": "monthly",
+            "interval": "1",
+            "month_day": "14",
+            "month": "1",
+            "weekend_policy": "none",
+        },
+        token_from="/recurring/new",
+    )
+    assert created.status_code == 303
+    with app.db() as session:
+        occurrence_id = session.scalars(
+            select(ScheduledOccurrence.id).where(
+                ScheduledOccurrence.label == "Rent",
+                ScheduledOccurrence.status == "pending",
+                ScheduledOccurrence.due_date == date(2026, 10, 14),
+            )
+        ).one()
+    posted = app.post(
+        f"/upcoming/{occurrence_id}/post",
+        {"day": "2026-10-14", "amount": "100"},
+        token_from="/upcoming",
+    )
+    assert posted.status_code == 303
+    with app.db() as session:
+        return session.scalars(
+            select(Transaction.id).where(Transaction.source == "recurring")
+        ).one()
+
+
+def test_a_posted_recurring_payment_cannot_be_moved_to_a_future_date(
+    ledger: OwnerApp,
+) -> None:
+    food = _category(ledger, "Food")
+    transaction_id = _posted_recurring_payment(ledger, food)
+    data = {"day": "2026-12-31", "amount": "20", "description": "Changed",
+            "category_id": str(food)}  # fmt: skip
+    response = ledger.post(f"{MONTH}/transactions/{transaction_id}", data, token_from=MONTH)
+    assert response.status_code == 400
+    assert "A payment recorded from a recurring item cannot be moved to a future date." in (
+        response.text
+    )
+    assert f'id="edit-{transaction_id}-day-error"' in response.text
+    with ledger.db() as session:
+        row = session.get(Transaction, transaction_id)
+        assert row is not None
+        assert (row.date, row.amount_minor, row.description, row.deleted_at) == (
+            date(2026, 10, 14),
+            10000,
+            "Rent",
+            None,
+        )
+        assert len(session.scalars(select(ScheduledItem)).all()) == 1
+    # Keeping the date today or in the past still edits the row normally.
+    changed = ledger.post(
+        f"{MONTH}/transactions/{transaction_id}",
+        {
+            "day": "2026-10-05",
+            "amount": "20",
+            "description": "Changed",
+            "category_id": str(food),
+        },  # fmt: skip
+        token_from=MONTH,
+    )
+    assert changed.status_code == 303
+    assert changed.headers["location"] == f"{PAGE}?notice=transaction_saved#tx-{transaction_id}"
+    with ledger.db() as session:
+        row = session.get(Transaction, transaction_id)
+        assert row is not None and (row.date, row.amount_minor, row.description) == (
+            date(2026, 10, 5),
+            2000,
+            "Changed",
+        )
+
+
+def test_undo_of_a_converted_entry_is_refused(ledger: OwnerApp) -> None:
+    food = _category(ledger, "Food")
+    _add(ledger, _form(food, description="Christmas gifts"))
+    row_id = _id(ledger, "Christmas gifts")
+    converted = ledger.post(
+        f"{MONTH}/transactions/{row_id}",
+        {
+            "day": "2026-12-24",
+            "amount": "12.50",
+            "description": "Christmas gifts",
+            "category_id": str(food),
+        },  # fmt: skip
+        token_from=MONTH,
+    )
+    assert converted.status_code == 303
+    response = ledger.post(f"{MONTH}/transactions/{row_id}/undo", token_from=MONTH)
+    assert response.headers["location"] == f"{PAGE}?error=undo_future_dated"
+    page = _page(ledger, f"{PAGE}?error=undo_future_dated")
+    assert "This entry was dated in the future, so it became a plan." in page
+    htmx = _htmx(ledger, f"{MONTH}/transactions/{row_id}/undo")
+    assert htmx.status_code == 409
+    assert "Cannot undo this entry" in htmx.text
+    with ledger.db() as session:
+        row = session.get(Transaction, row_id)
+        assert row is not None and row.deleted_at is not None
 
 
 # Deleting and undo

@@ -72,6 +72,10 @@ FIELD_ERRORS: dict[str, str] = {
     "description_required_for_plan": _(
         "Add a description. A planned entry becomes a recurring item, so it needs a name."
     ),
+    "future_date_recurring": _(
+        "A payment recorded from a recurring item cannot be moved to a future date. "
+        "Skip the occurrence on the Upcoming page, or edit the recurring schedule."
+    ),
     "category_required": _("Choose a category."),
     "invalid_category": _("Choose one of the listed categories."),
     "category_kind_mismatch": "",  # by direction, see KIND_MISMATCH

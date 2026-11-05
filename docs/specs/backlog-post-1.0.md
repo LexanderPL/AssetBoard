@@ -195,3 +195,49 @@ Implement "Generic user-configured HTTP price provider" from docs/specs/backlog-
 request templates, encrypted secrets, response mapping, test lookup, user-set rate limits, source labels, and terms-responsibility
 framing that never names specific providers. Tests with a fake HTTP layer only.
 ```
+
+---
+
+## Explicit Plan/Actual entry choice
+
+Owner decision, 2026-11-04 (issue #164). Today the date alone decides whether an entry is a plan
+or an actual: a date after today plans it, a date today or in the past records it, on the entry
+row, the edit row and the Upcoming one-time form. That is right for the common case, but intent
+can differ from the date: a bill paid today but dated tomorrow, a post-dated payment, or
+something deliberately planned for today all need a workaround (choose a nearby date, or plan it
+and confirm it at once). The future-date conversion added by issue #164 makes this visible
+because it can turn a posted row into a plan (and back on Upcoming) in one edit.
+
+**Acceptance sketch**
+- The entry row and the transaction edit row offer an explicit **Plan** / **Record** choice
+  (segmented control or checkbox), with the date rule as the default: future → Plan, today or
+  past → Record. The choice is kept per direction (or remembered per workspace; decide in the
+  plan) so repeated entries do not need it twice.
+- **Plan** with today or a past date creates the same one-time `ScheduledItem` and pending
+  occurrence as a future-dated plan today (overdue when the date is past), not a transaction.
+- **Record** with a future date creates a transaction with that date and marks it in the ledger
+  as future-dated (a chip or icon), so a future Actual is never mistaken for an ordinary posted
+  entry. It must not create a pending occurrence, so Actual and Expected never count the same
+  payment twice.
+- The Upcoming one-time edit offers the same choice; converting a plan to an actual when the
+  date is today or in the past (or when Record is chosen) uses the existing reverse conversion
+  and its audit pair. Converting an actual to a plan uses the existing forward conversion, and
+  the undo guard still refuses to restore its tombstone.
+- Explicit **Record** on a transaction posted from a recurring item is allowed only if it keeps
+  that occurrence's date (the occurrence owns the date); otherwise the existing refusal stays.
+  The plan decides whether a future-dated actual must still be linked to an occurrence or is
+  always manual.
+- Keyboard flow and the no-JavaScript fallback keep working, all strings go through gettext
+  (including a pl translation), and docs/transactions.md, docs/recurring.md and the M2/M3 specs
+  are updated. Tests cover both choices on create, edit and Upcoming, the defaulting rule, the
+  no-double-count invariant, and the route redirects/notices.
+
+**Agent prompt**
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement "Explicit Plan/Actual entry choice" from docs/specs/backlog-post-1.0.md (owner decision, 2026-11-04):
+add a Plan/Record choice to the entry row, the transaction edit row and the Upcoming one-time edit, defaulting from
+the date rule, keeping the chosen value, and never counting a payment as both Actual and Expected. Reuse the existing
+forward/reverse conversions and their audit pairs, keep the posted-recurring-row date ownership and the undo guard,
+translate every string (pl included), update the user docs and M2/M3 specs, and test both choices on every path.
+```

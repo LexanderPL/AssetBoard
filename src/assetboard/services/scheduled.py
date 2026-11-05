@@ -25,6 +25,7 @@ import logging
 from calendar import monthrange
 from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import TYPE_CHECKING
 from uuid import UUID
 
 import holidays as holiday_calendars
@@ -33,6 +34,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.engine import run_immediate
+from assetboard.db.models.ledger import Category
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.repositories.audit import AuditEventRepository
 from assetboard.db.repositories.base import NotFound, WorkspaceScope
@@ -42,6 +44,7 @@ from assetboard.db.repositories.scheduled import (
     ScheduledItemRepository,
     ScheduledOccurrenceRepository,
 )
+from assetboard.db.repositories.transaction import TransactionRepository
 from assetboard.db.repositories.workspace import CurrentWorkspaceRepository
 from assetboard.domain.money import Money
 from assetboard.domain.months import MAX_YEAR, YearMonth
@@ -56,11 +59,20 @@ from assetboard.domain.recurrence import (
     occurrences_with_nominal,
 )
 from assetboard.domain.scheduled import AmountMode, AmountState, ItemAction, OccurrenceStatus
-from assetboard.domain.transactions import MAX_AMOUNT_MINOR, TransactionDirection, clean_description
+from assetboard.domain.transactions import (
+    MAX_AMOUNT_MINOR,
+    Source,
+    TransactionDirection,
+    clean_description,
+    description_key,
+)
 from assetboard.services.category_usage import CategoryUsage
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.income import generate_workspace_in_session
 from assetboard.services.months import ensure_date_open
+
+if TYPE_CHECKING:
+    from assetboard.services.transactions import TransactionView
 
 logger = logging.getLogger(__name__)
 
@@ -479,6 +491,43 @@ def save_item(
     """Create or update an item. ``is_tax`` marks an "other tax" (ADR-0022); ``None`` keeps
     the stored flag on an update (off on creation)."""
     require_role(ctx, Role.EDITOR)
+
+    def write(session: Session) -> UUID:
+        return save_item_in_session(
+            session,
+            ctx,
+            values,
+            settings,
+            item_id=item_id,
+            include_past=include_past,
+            require_open=require_open,
+            require_kind=require_kind,
+            is_tax=is_tax,
+        )
+
+    return run_immediate(factory, write)
+
+
+def save_item_in_session(
+    session: Session,
+    ctx: Context,
+    values: ScheduledInput,
+    settings: Settings,
+    *,
+    item_id: UUID | None = None,
+    include_past: bool = False,
+    require_open: date | None = None,
+    require_kind: str | None = None,
+    is_tax: bool | None = None,
+) -> UUID:
+    """``save_item`` inside the caller's write transaction.
+
+    The ledger's future-date branch (issue #164) plans an edited entry while its own write is
+    still open, and a second ``run_immediate`` would deadlock on SQLite, so the item is
+    created through this seam instead. The checks and the audit are ``save_item``'s; the
+    caller has checked the editor role and holds the write, and the exclusive workspace lock
+    is taken again (harmless in the same transaction).
+    """
     name = clean_description(values.name)
     notes = clean_description(values.notes)
     if not name or not 0 < values.amount.amount_minor <= MAX_AMOUNT_MINOR:
@@ -487,72 +536,68 @@ def save_item(
         0 <= values.reminder_lead_days <= MAX_LEAD_DAYS
     ):
         raise ValueError("invalid_reminder")
-
-    def write(session: Session) -> UUID:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        if require_open is not None:
-            ensure_date_open(session, ctx, require_open)
-        workspace = CurrentWorkspaceRepository(session, ctx).get()
-        if values.amount.currency != workspace.base_currency:
-            raise ValueError("invalid_currency")
-        category = CategoryRepository(session, ctx).get_or_raise(values.category_id)
-        if category.archived_at is not None:
-            raise ValueError("invalid_category")
-        if require_kind is not None and category.kind != require_kind:
-            raise ValueError("category_kind_mismatch")
-        # The category decides the direction: the form has no separate field, and an edit that
-        # moves an item to a category of the other kind changes its direction with it.
-        direction = category.kind
-        repository = ScheduledItemRepository(session, ctx)
-        rule = normalised(values.rule)
-        fields = {
-            "name": name,
-            "notes": notes,
-            "direction": direction,
-            "category_id": values.category_id,
-            "amount_minor": values.amount.amount_minor,
-            "currency": values.amount.currency,
-            "amount_mode": values.amount_mode,
-            "start_date": rule.start_date,
-            "end_date": rule.end_date,
-            "max_count": rule.max_count,
-            "freq": rule.freq,
-            "interval": rule.interval,
-            "weekdays": list(rule.weekdays),
-            "month_day": str(rule.month_day),
-            "month": rule.month,
-            "weekend_policy": rule.weekend_policy,
-            "auto_post": values.auto_post,
-            "reminder_lead_days": values.reminder_lead_days,
-        }
-        if is_tax is not None:
-            fields["is_tax"] = is_tax
-        if item_id is None:
-            item = repository.create(**fields)
-        else:
-            item = repository.get_or_raise(item_id)
-            if item.archived_at is not None:
-                raise ValueError("archived_item")
-            item = repository.update(item_id, **fields)
-        _generate(
-            session,
-            ctx,
-            ctx.clock,
-            item,
-            settings.recurrence_horizon_months,
-            include_past=include_past if item_id is None else False,
-        )
-        AuditEventRepository(session, ctx).record(
-            actor_user_id=ctx.user.id,
-            action="scheduled.updated" if item_id else "scheduled.created",
-            entity_type="scheduled_item",
-            entity_id=str(item.id),
-            ts=ctx.clock.now(),
-        )
-        return item.id
-
-    return run_immediate(factory, write)
+    require_role_now(session, ctx, Role.EDITOR)
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+    if require_open is not None:
+        ensure_date_open(session, ctx, require_open)
+    workspace = CurrentWorkspaceRepository(session, ctx).get()
+    if values.amount.currency != workspace.base_currency:
+        raise ValueError("invalid_currency")
+    category = CategoryRepository(session, ctx).get_or_raise(values.category_id)
+    if category.archived_at is not None:
+        raise ValueError("invalid_category")
+    if require_kind is not None and category.kind != require_kind:
+        raise ValueError("category_kind_mismatch")
+    # The category decides the direction: the form has no separate field, and an edit that
+    # moves an item to a category of the other kind changes its direction with it.
+    direction = category.kind
+    repository = ScheduledItemRepository(session, ctx)
+    rule = normalised(values.rule)
+    fields = {
+        "name": name,
+        "notes": notes,
+        "direction": direction,
+        "category_id": values.category_id,
+        "amount_minor": values.amount.amount_minor,
+        "currency": values.amount.currency,
+        "amount_mode": values.amount_mode,
+        "start_date": rule.start_date,
+        "end_date": rule.end_date,
+        "max_count": rule.max_count,
+        "freq": rule.freq,
+        "interval": rule.interval,
+        "weekdays": list(rule.weekdays),
+        "month_day": str(rule.month_day),
+        "month": rule.month,
+        "weekend_policy": rule.weekend_policy,
+        "auto_post": values.auto_post,
+        "reminder_lead_days": values.reminder_lead_days,
+    }
+    if is_tax is not None:
+        fields["is_tax"] = is_tax
+    if item_id is None:
+        item = repository.create(**fields)
+    else:
+        item = repository.get_or_raise(item_id)
+        if item.archived_at is not None:
+            raise ValueError("archived_item")
+        item = repository.update(item_id, **fields)
+    _generate(
+        session,
+        ctx,
+        ctx.clock,
+        item,
+        settings.recurrence_horizon_months,
+        include_past=include_past if item_id is None else False,
+    )
+    AuditEventRepository(session, ctx).record(
+        actor_user_id=ctx.user.id,
+        action="scheduled.updated" if item_id else "scheduled.created",
+        entity_type="scheduled_item",
+        entity_id=str(item.id),
+        ts=ctx.clock.now(),
+    )
+    return item.id
 
 
 def change_state(
@@ -680,16 +725,24 @@ def create_one_time(
 
 def update_one_time(
     factory: sessionmaker[Session], ctx: Context, occurrence_id: UUID, values: OneTimeInput
-) -> None:
+) -> TransactionView | None:
     """Change a pending one-time payment from its Upcoming row: description, amount, date and
     category, on the item and its occurrence together (an overdue one moves too). Recurring
-    items are refused (``not_planned``); the old and the new date must be in open months."""
+    items are refused (``not_planned``); the old and the new date must be in open months.
+
+    A date today or in the past **posts** a payment that was still dated in the future
+    (issue #164): the future date that made it a plan is gone, so the plan is replaced by the
+    transaction entering that date directly would create, and that transaction is returned
+    (``None`` when the payment stays a plan). An overdue one-time payment is already dated
+    today or earlier, so it keeps its "not confirmed yet" meaning and stays a plan however
+    it is edited.
+    """
     require_role(ctx, Role.EDITOR)
     name = clean_description(values.name)
     if not name or not 0 < values.amount.amount_minor <= MAX_AMOUNT_MINOR:
         raise ValueError("invalid_item")
 
-    def write(session: Session) -> None:
+    def write(session: Session) -> TransactionView | None:
         require_role_now(session, ctx, Role.EDITOR)
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
         occurrences_repository = ScheduledOccurrenceRepository(session, ctx)
@@ -716,6 +769,9 @@ def update_one_time(
             raise ValueError("invalid_category")
         if category.kind != values.direction.value:
             raise ValueError("category_kind_mismatch")
+        today = ctx.clock.today(workspace.timezone)
+        if occurrence.due_date > today and values.day <= today:
+            return _post_one_time_in_session(session, ctx, item, values, name, category)
         items.update(
             item.id,
             name=name,
@@ -747,8 +803,82 @@ def update_one_time(
             entity_id=str(item.id),
             ts=ctx.clock.now(),
         )
+        return None
 
-    run_immediate(factory, write)
+    return run_immediate(factory, write)
+
+
+def _post_one_time_in_session(
+    session: Session,
+    ctx: Context,
+    item: ScheduledItem,
+    values: OneTimeInput,
+    name: str,
+    category: Category,
+) -> TransactionView:
+    """Replace a future one-time plan with the transaction its new date means (issue #164).
+
+    The mirror of the ledger's future-date branch: entering that date on the Transactions
+    page would create a manual transaction, so the edit does. The item and its occurrence
+    are removed exactly as ``delete_planned_occurrence`` removes them; the audits are the
+    standard pair (``transaction.created`` and ``scheduled.delete``/``scheduled.archive``).
+    """
+    from assetboard.services.transactions import TransactionView
+
+    transactions = TransactionRepository(session, ctx)
+    row = transactions.create(
+        direction=category.kind,
+        day=values.day,
+        amount_minor=values.amount.amount_minor,
+        currency=values.amount.currency,
+        category_id=category.id,
+        description=name,
+        description_key=description_key(name),
+        source=Source.MANUAL.value,
+        created_by_user_id=ctx.user.id,
+    )
+    items = ScheduledItemRepository(session, ctx)
+    remaining = _remove_pending(session, ctx, item.id, since=None)
+    if remaining:
+        items.update(item.id, archived_at=ctx.clock.now())
+        action = "scheduled.archive"
+    else:
+        items.delete(item.id)
+        action = "scheduled.delete"
+    audit = AuditEventRepository(session, ctx)
+    audit.record(
+        actor_user_id=ctx.user.id,
+        action="transaction.created",
+        entity_type="transaction",
+        entity_id=str(row.id),
+        ts=ctx.clock.now(),
+        data={
+            "date": row.date.isoformat(),
+            "direction": row.direction,
+            "category": category.name,
+            "amount": str(Money(row.amount_minor, row.currency).to_decimal()),
+            "currency": row.currency,
+        },
+    )
+    audit.record(
+        actor_user_id=ctx.user.id,
+        action=action,
+        entity_type="scheduled_item",
+        entity_id=str(item.id),
+        ts=ctx.clock.now(),
+    )
+    return TransactionView(
+        id=row.id,
+        direction=row.direction,
+        date=row.date,
+        amount=Money(row.amount_minor, row.currency),
+        description=row.description,
+        category_id=row.category_id,
+        category_name=category.name,
+        category_color=category.color,
+        category_archived=category.archived_at is not None,
+        source=row.source,
+    )
 
 
 def category_usage(session: Session, ctx: Context) -> dict[UUID, CategoryUsage]:

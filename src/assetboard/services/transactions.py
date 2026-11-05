@@ -13,6 +13,17 @@ Deleting a transaction posted from a scheduled occurrence (F3.2) returns that oc
 pending in the same write (its due month must be open too); restoring it re-links the
 occurrence only if it is still pending and unlinked (``services.occurrences``).
 
+**A future date is a plan on every path (issue #164, owner decision of 2026-11-04).** An
+entry dated after today (workspace time zone) is never an actual transaction: ``create_entry``
+plans it, and ``update_transaction`` does the same, replacing the edited row with the one-time
+recurring item the create path produces (the transaction no longer exists; the row is
+soft-deleted with the edited values) and returning ``PlannedView``. A payment posted from a
+recurring item (``source`` ``recurring``/``recurring_auto``) cannot be moved into the future:
+its date belongs to its occurrence, so the edit is refused (``future_date_recurring``). The
+reverse holds on the Upcoming page (``services.scheduled.update_one_time``): a one-time plan
+moved to today or a past date becomes a manual transaction. Undo never brings a future-dated
+row back as a posted entry (``UndoFutureDated``; ``pending_undo`` returns ``None``).
+
 Edit, delete and undo read the stored row with ``get_for_update`` (``FOR UPDATE`` on
 PostgreSQL, after the workspace lock), so concurrent writes to the same row are serialised.
 
@@ -92,6 +103,16 @@ class UndoExpired(TransactionError):
     """The undo window (10 seconds after the deletion) has passed."""
 
     code = "undo_expired"
+
+
+class UndoFutureDated(TransactionError):
+    """A future-dated row was never a posted entry: it became a plan (issue #164).
+
+    Undoing would restore a transaction for a date the ledger only ever plans, so the real
+    undo is editing the plan's date back to today or earlier (the reverse conversion).
+    """
+
+    code = "undo_future_dated"
 
 
 @dataclass(frozen=True, slots=True)
@@ -494,18 +515,44 @@ def _plan_entry(
     wanted: TransactionDirection,
     category_id: UUID,
 ) -> PlannedView:
-    """Create the one-time recurring item and its pending occurrence (inside ``save_item``)."""
-    from assetboard.domain.recurrence import Frequency, RecurrenceRule, WeekendPolicy
-    from assetboard.services.scheduled import ScheduledInput, save_item
+    """Create the one-time recurring item and its pending occurrence (in one write)."""
 
-    currency = ctx.workspace.base_currency
+    def write(session: Session) -> PlannedView:
+        return _plan_entry_in_session(
+            session,
+            ctx,
+            settings,
+            entry=entry,
+            wanted=wanted,
+            category_id=category_id,
+            require_open=entry.day,
+        )
+
+    return run_immediate(factory, write)
+
+
+def _plan_entry_in_session(
+    session: Session,
+    ctx: Context,
+    settings: Settings,
+    *,
+    entry: _Entry,
+    wanted: TransactionDirection,
+    category_id: UUID,
+    require_open: date | None,
+) -> PlannedView:
+    """``_plan_entry`` inside the caller's write transaction (the ledger's future-date branch)."""
+    from assetboard.domain.recurrence import Frequency, RecurrenceRule, WeekendPolicy
+    from assetboard.services.scheduled import ScheduledInput, save_item_in_session
+
+    currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
     try:
         minor = amount_minor(entry.amount, currency)
     except EntryError as exc:
         raise InvalidTransaction({"amount": exc.code}) from None
     try:
-        item_id = save_item(
-            factory,
+        item_id = save_item_in_session(
+            session,
             ctx,
             ScheduledInput(
                 name=entry.description,
@@ -521,7 +568,7 @@ def _plan_entry(
                 auto_post=False,
             ),
             settings,
-            require_open=entry.day,
+            require_open=require_open,
             require_kind=wanted.value,
         )
     except ValueError as exc:
@@ -543,17 +590,24 @@ def update_transaction(
     ctx: Context,
     transaction_id: UUID,
     *,
+    settings: Settings,
     month: YearMonth,
     day: str,
     amount: str,
     description: str,
     category_id: UUID | None,
     locale: str,
-) -> TransactionView:
+) -> TransactionView | PlannedView:
     """Change a transaction's date, amount, description or category (not its direction).
 
     Both the stored month and, when the date moves, the new month must be open. An archived
     category may stay on the row but cannot be chosen anew.
+
+    A new date after today (workspace time zone) makes the edit the plan ``create_entry`` would
+    create: the edited row is soft-deleted and replaced by the one-time item and its pending
+    occurrence, in the same write (issue #164). A payment posted from a recurring item cannot
+    be moved there — its date belongs to its occurrence — so it is refused with
+    ``future_date_recurring`` and the row stays unchanged.
     """
     require_role(ctx, Role.EDITOR)
     entry = _entry(
@@ -567,7 +621,7 @@ def update_transaction(
     )
     assert category_id is not None  # checked by _entry
 
-    def write(session: Session) -> TransactionView:
+    def write(session: Session) -> TransactionView | PlannedView:
         require_role_now(session, ctx, Role.EDITOR)
         # The lock comes before reading the row whose date the guard checks (F2.5).
         lock_month_writes(session, ctx)
@@ -576,8 +630,29 @@ def update_transaction(
         ensure_date_open(session, ctx, row.date)
         if YearMonth.from_date(entry.day) != YearMonth.from_date(row.date):
             ensure_date_open(session, ctx, entry.day)
+        workspace = CurrentWorkspaceRepository(session, ctx).get()
+        today = ctx.clock.today(workspace.timezone)
+        future = entry.day > today
+        if future and row.source in (Source.RECURRING.value, Source.RECURRING_AUTO.value):
+            raise InvalidTransaction({"day": "future_date_recurring"})
         minor = _minor(entry.amount, row.currency)
         category = _category(session, ctx, category_id, row.direction, keep=row.category_id)
+        if future:
+            if not entry.description:
+                # The same rule as the create path: a planned entry needs a name.
+                raise InvalidTransaction({"description": "description_required_for_plan"})
+            if category.archived_at is not None:
+                raise InvalidTransaction({"category": "category_archived"})
+            return _replace_with_plan(
+                session,
+                ctx,
+                settings,
+                row=row,
+                repository=repository,
+                entry=entry,
+                wanted=TransactionDirection(row.direction),
+                category=category,
+            )
         previous_date, previous_minor = row.date, row.amount_minor
         changes: dict[str, object] = {
             name: value
@@ -611,6 +686,45 @@ def update_transaction(
         return _view(row, category)
 
     return run_immediate(factory, write)
+
+
+def _replace_with_plan(
+    session: Session,
+    ctx: Context,
+    settings: Settings,
+    *,
+    row: Transaction,
+    repository: TransactionRepository,
+    entry: _Entry,
+    wanted: TransactionDirection,
+    category: Category,
+) -> PlannedView:
+    """Soft-delete the edited row and plan its future date instead (issue #164).
+
+    The row keeps the values the edit submitted, so the tombstone records what the user meant
+    to save; the audits are the pair the create path and a deletion produce
+    (``transaction.deleted`` and ``scheduled.created``). The description never enters audit
+    data.
+    """
+    repository.update(
+        row.id,
+        date=entry.day,
+        amount_minor=_minor(entry.amount, row.currency),
+        description=entry.description,
+        description_key=entry.key,
+        category_id=category.id,
+        deleted_at=ctx.clock.now(),
+    )
+    _audit(session, ctx, "transaction.deleted", row, category)
+    return _plan_entry_in_session(
+        session,
+        ctx,
+        settings,
+        entry=entry,
+        wanted=wanted,
+        category_id=category.id,
+        require_open=None,  # the edit already guarded the old and the new date
+    )
 
 
 def set_amount_in_session(
@@ -683,6 +797,11 @@ def undo_delete(
 
     Any editor or owner may undo. After the window: ``UndoExpired``. If the month was closed
     meanwhile: ``MonthClosed`` (the row stays deleted). Undoing a live row changes nothing.
+
+    A future-dated deletion is a plan's tombstone: the row was replaced by a one-time item
+    (issue #164), so undoing it would post an entry for a date that is only ever planned.
+    ``UndoFutureDated`` is raised; editing the plan's date back to today or earlier is the
+    real undo (it posts a manual transaction through the reverse conversion).
     """
     require_role(ctx, Role.EDITOR)
 
@@ -698,6 +817,9 @@ def undo_delete(
             return _view(row, category)
         if ctx.clock.now() - row.deleted_at > UNDO_WINDOW:
             raise UndoExpired
+        today = ctx.clock.today(CurrentWorkspaceRepository(session, ctx).get().timezone)
+        if row.date > today:
+            raise UndoFutureDated
         ensure_date_open(session, ctx, row.date)
         repository.update(row.id, deleted_at=None)
         _audit(session, ctx, "transaction.restored", row, category)
@@ -712,8 +834,9 @@ def pending_undo(
 ) -> DeletedTransaction | None:
     """The deletion of ``transaction_id`` while it can still be undone, else ``None``.
 
-    ``None`` for a live row, a deletion older than ``UNDO_WINDOW``, an unknown id or another
-    workspace's row. The month page offers Undo (without JavaScript) only for these.
+    ``None`` for a live row, a deletion older than ``UNDO_WINDOW``, an unknown id, another
+    workspace's row or a row dated in the future (``undo_delete`` would refuse it: a future
+    date is a plan, issue #164). The month page offers Undo (without JavaScript) only for these.
     """
     require_role(ctx, Role.VIEWER)
     with factory() as session:
@@ -721,6 +844,9 @@ def pending_undo(
         if row is None or row.deleted_at is None:
             return None
         if ctx.clock.now() - row.deleted_at > UNDO_WINDOW:
+            return None
+        today = ctx.clock.today(CurrentWorkspaceRepository(session, ctx).get().timezone)
+        if row.date > today:
             return None
         return DeletedTransaction(
             id=row.id,

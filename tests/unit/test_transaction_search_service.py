@@ -17,6 +17,7 @@ from sqlalchemy.orm import ORMExecuteState, Session
 from sqlalchemy.sql import ClauseElement
 
 from assetboard.clock import FixedClock
+from assetboard.config import Settings
 from assetboard.db.models.identity import AuditEvent, Membership
 from assetboard.db.models.ledger import Category, Transaction
 from assetboard.domain.ledger_csv import CsvOptions
@@ -763,8 +764,9 @@ def test_a_row_moved_out_of_the_filter_changes_the_selection(
     plan = preview_recategorize(team.factory, _ed(team), selection, other)
     assert plan.selected == 3
     update_transaction(
-        team.factory, _ed(team), ledger["oct"], month=YearMonth(2026, 10), day="2026-08-15",
-        amount="12.50", description="lidl", category_id=ledger["food"], locale="en",
+        team.factory, _ed(team), ledger["oct"], settings=Settings(_env_file=None),
+        month=YearMonth(2026, 10), day="2026-08-15", amount="12.50", description="lidl",
+        category_id=ledger["food"], locale="en",
     )  # fmt: skip
     with pytest.raises(SelectionChanged):
         recategorize_transactions(

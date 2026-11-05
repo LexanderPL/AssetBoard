@@ -16,11 +16,16 @@ from sqlalchemy.orm import ORMExecuteState, Session
 from sqlalchemy.sql import ClauseElement
 
 from assetboard.clock import FixedClock
+from assetboard.config import Settings
 from assetboard.db.models.identity import AuditEvent, Workspace
 from assetboard.db.models.ledger import Transaction
+from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.repositories import NotFound
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
+from assetboard.domain.recurrence import Frequency, RecurrenceRule
+from assetboard.domain.transactions import TransactionDirection
+from assetboard.services import occurrences, scheduled
 from assetboard.services import transactions as service
 from assetboard.services.categories import (
     archive_category,
@@ -32,12 +37,16 @@ from assetboard.services.categories import (
 from assetboard.services.category_usage import CategoryUsage
 from assetboard.services.context import Context, PermissionDenied, Role
 from assetboard.services.months import MonthClosed, close_month, reopen_month
+from assetboard.services.scheduled import ScheduledInput
 from assetboard.services.transactions import (
     InvalidTransaction,
+    PlannedView,
     Suggestion,
     TransactionView,
     UndoExpired,
+    UndoFutureDated,
     category_usage,
+    create_entry,
     create_transaction,
     delete_transaction,
     get_transaction,
@@ -52,6 +61,7 @@ from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 SEPTEMBER, OCTOBER, NOVEMBER = YearMonth(2026, 9), YearMonth(2026, 10), YearMonth(2026, 11)
 START = datetime(2026, 10, 14, 12, tzinfo=UTC)
+SETTINGS = Settings(_env_file=None)
 
 
 class SteppingClock(FixedClock):
@@ -109,10 +119,11 @@ def _add(
     )  # fmt: skip
 
 
-def _edit(
+def _update(
     db: WorkspaceDb, view: TransactionView, ctx: Context | None = None, **changes: Any
-) -> TransactionView:
+) -> TransactionView | PlannedView:
     values: dict[str, Any] = {
+        "settings": SETTINGS,
         "month": view.month,
         "day": str(view.date.day),
         "amount": str(view.amount.to_decimal()),
@@ -122,6 +133,22 @@ def _edit(
     }
     values |= changes
     return update_transaction(db.factory, ctx or db.ctx("ed", "editor"), view.id, **values)
+
+
+def _edit(
+    db: WorkspaceDb, view: TransactionView, ctx: Context | None = None, **changes: Any
+) -> TransactionView:
+    result = _update(db, view, ctx, **changes)
+    assert isinstance(result, TransactionView)
+    return result
+
+
+def _convert(
+    db: WorkspaceDb, view: TransactionView, ctx: Context | None = None, **changes: Any
+) -> PlannedView:
+    result = _update(db, view, ctx, **changes)
+    assert isinstance(result, PlannedView)
+    return result
 
 
 def _events(db: WorkspaceDb, prefix: str = "transaction.") -> list[AuditEvent]:
@@ -391,6 +418,204 @@ def test_a_deleted_or_foreign_transaction_cannot_be_edited(team: WorkspaceDb) ->
         _edit(team, view, amount="1")
 
 
+# A future date is a plan on every path (issue #164)
+
+
+def _plan_row(db: WorkspaceDb, plan: PlannedView) -> tuple[ScheduledItem, ScheduledOccurrence]:
+    with db.factory() as session:
+        item = session.get(ScheduledItem, plan.item_id)
+        assert item is not None
+        occurrence = session.scalars(
+            select(ScheduledOccurrence).where(ScheduledOccurrence.scheduled_item_id == item.id)
+        ).one()
+        return item, occurrence
+
+
+def test_editing_to_a_future_date_makes_the_same_plan_as_creating_it(team: WorkspaceDb) -> None:
+    food = _category(team, "Food")
+    editor = team.ctx("ed", "editor")
+    created = create_entry(
+        team.factory, editor, settings=SETTINGS, month=NOVEMBER, direction="expense",
+        day="30", amount="12,50", description="Christmas gifts", category_id=food,
+        locale="pl",
+    )  # fmt: skip
+    assert isinstance(created, PlannedView)
+    view = _add(team, food, amount="12,50", description="Christmas gifts")
+    edited = update_transaction(
+        team.factory, editor, view.id, settings=SETTINGS, month=OCTOBER,
+        day="2026-11-30", amount="12,50", description="Christmas gifts", category_id=food,
+        locale="pl",
+    )  # fmt: skip
+    assert isinstance(edited, PlannedView)
+    first_item, first_row = _plan_row(team, created)
+    second_item, second_row = _plan_row(team, edited)
+    item_fields = (
+        "name",
+        "notes",
+        "direction",
+        "category_id",
+        "amount_minor",
+        "currency",
+        "amount_mode",
+        "start_date",
+        "end_date",
+        "max_count",
+        "freq",
+        "interval",
+        "weekdays",
+        "month_day",
+        "month",
+        "weekend_policy",
+        "auto_post",
+        "reminder_lead_days",
+        "paused_at",
+        "archived_at",
+    )
+    assert {name: getattr(second_item, name) for name in item_fields} == {
+        name: getattr(first_item, name) for name in item_fields
+    }
+    occurrence_fields = (
+        "label",
+        "direction",
+        "category_id",
+        "expected_minor",
+        "currency",
+        "amount_state",
+        "amount_overridden",
+        "nominal_date",
+        "due_date",
+        "status",
+        "rescheduled_at",
+        "transaction_id",
+    )
+    assert {name: getattr(second_row, name) for name in occurrence_fields} == {
+        name: getattr(first_row, name) for name in occurrence_fields
+    }
+    viewer = team.ctx("vic", "viewer")
+    # Neither path leaves a live transaction: Actual is zero in both months.
+    assert list_month(team.factory, viewer, OCTOBER).expense == ()
+    assert list_month(team.factory, viewer, NOVEMBER).expense == ()
+    # Both are the same Expected amount in the target month.
+    pending = occurrences.pending_for_month(team.factory, viewer, NOVEMBER)
+    assert [row.expected for row in pending] == [Money(1250, "EUR")] * 2
+
+
+def test_editing_to_a_future_date_without_a_description_is_refused(team: WorkspaceDb) -> None:
+    food = _category(team, "Food")
+    view = _add(team, food, description="Lidl")
+    assert _invalid(lambda: _edit(team, view, day="2026-11-03", description="")) == {
+        "description": "description_required_for_plan"
+    }
+    with team.factory() as session:
+        row = session.get(Transaction, view.id)
+        assert row is not None and (row.date, row.deleted_at) == (date(2026, 10, 7), None)
+        assert session.scalars(select(ScheduledItem)).all() == []
+
+
+def _posted_recurring(team: WorkspaceDb, category_id: UUID) -> TransactionView:
+    ctx = team.ctx("ed", "editor")
+    item_id = scheduled.save_item(
+        team.factory,
+        ctx,
+        ScheduledInput(
+            name="Rent",
+            direction=TransactionDirection.EXPENSE,
+            category_id=category_id,
+            amount=Money(10000, "EUR"),
+            rule=RecurrenceRule(
+                start_date=date(2026, 10, 14), freq=Frequency.MONTHLY, month_day=14
+            ),
+        ),
+        SETTINGS,
+    )
+    with team.factory() as session:
+        occurrence_id = session.scalars(
+            select(ScheduledOccurrence.id).where(
+                ScheduledOccurrence.scheduled_item_id == item_id,
+                ScheduledOccurrence.due_date == date(2026, 10, 14),
+            )
+        ).one()
+    transaction_id = occurrences.post_occurrence(
+        team.factory, ctx, occurrence_id, amount_minor=10000, day=date(2026, 10, 14)
+    )
+    return get_transaction(team.factory, ctx, transaction_id)
+
+
+def test_a_posted_recurring_transaction_cannot_be_moved_to_a_future_date(
+    team: WorkspaceDb,
+) -> None:
+    food = _category(team, "Food")
+    row = _posted_recurring(team, food)
+    assert row.source == "recurring"
+    assert _invalid(lambda: _edit(team, row, day="2026-11-03", amount="20.00")) == {
+        "day": "future_date_recurring"
+    }
+    # The row is unchanged and no plan was created for it.
+    assert get_transaction(team.factory, team.ctx("ed", "editor"), row.id) == row
+    with team.factory() as session:
+        assert len(session.scalars(select(ScheduledItem)).all()) == 1
+        assert session.scalars(select(Transaction).where(Transaction.deleted_at.is_(None))).all()
+    # An edit that keeps it today or in the past works as before.
+    changed = _edit(team, row, day="2026-10-05", amount="20.00")
+    assert (changed.date, changed.amount) == (date(2026, 10, 5), Money(2000, "EUR"))
+
+
+def test_a_conversion_still_checks_the_stored_month(team: WorkspaceDb) -> None:
+    food = _category(team, "Food")
+    view = _add(team, food, day="2026-09-15")
+    close_month(team.factory, team.ctx("olga", "owner"), SEPTEMBER)
+    with pytest.raises(MonthClosed):
+        _edit(team, view, day="2026-11-03")
+    with team.factory() as session:
+        row = session.get(Transaction, view.id)
+        assert row is not None and (row.date, row.deleted_at) == (date(2026, 9, 15), None)
+        assert session.scalars(select(ScheduledItem)).all() == []
+
+
+def test_a_conversion_audits_the_deletion_and_the_plan_without_the_description(
+    team: WorkspaceDb,
+) -> None:
+    food = _category(team, "Food")
+    view = _add(team, food, description="Christmas gifts")
+    edited = _convert(
+        team, view, day="2026-12-24", amount="99.00", description="Christmas gifts 2026"
+    )
+    events = _events(team, "")
+    transaction_events = [event for event in events if event.action.startswith("transaction.")]
+    assert [event.action for event in transaction_events] == [
+        "transaction.created",
+        "transaction.deleted",
+    ]
+    deleted = transaction_events[1]
+    assert (deleted.entity_type, deleted.entity_id) == ("transaction", str(view.id))
+    assert deleted.data == {
+        "date": "2026-12-24",
+        "direction": "expense",
+        "category": "Food",
+        "amount": "99.00",
+        "currency": "EUR",
+    }
+    scheduled_events = [event for event in events if event.action == "scheduled.created"]
+    assert len(scheduled_events) == 1
+    assert scheduled_events[0].entity_type == "scheduled_item"
+    assert scheduled_events[0].entity_id == str(edited.item_id)
+    assert all("Christmas" not in str(event.data) for event in events)
+
+
+def test_undo_is_refused_for_a_future_dated_tombstone(team: WorkspaceDb) -> None:
+    food = _category(team, "Food")
+    view = _add(team, food)
+    _convert(team, view, day="2026-12-24")
+    editor = team.ctx("ed", "editor")
+    assert pending_undo(team.factory, team.ctx("vic", "viewer"), view.id) is None
+    with pytest.raises(UndoFutureDated):
+        undo_delete(team.factory, editor, view.id)
+    with team.factory() as session:
+        row = session.get(Transaction, view.id)
+        assert row is not None and row.deleted_at is not None
+    assert [event.action for event in _events(team)].count("transaction.restored") == 0
+
+
 # Soft delete and undo
 
 
@@ -465,6 +690,7 @@ WRITES: dict[str, Callable[[WorkspaceDb, Context, UUID, UUID], Any]] = {
         db.factory,
         ctx,
         tid,
+        settings=SETTINGS,
         month=OCTOBER,
         day="8",
         amount="1",
@@ -629,10 +855,10 @@ def test_the_update_guards_the_old_and_the_new_month_after_reading_the_row(
 ) -> None:
     food = _category(team, "Food")
     view = _add(team, food)
-    statements = _statements(lambda: _edit(team, view, day="2026-11-03"))
+    statements = _statements(lambda: _edit(team, view, day="2026-09-03"))
     _assert_lock_then_read_then_guard(statements)
     guards = [s for s in statements if "FROM month_states" in s]
-    assert len(guards) == 2  # October (stored) and November (new)
+    assert len(guards) == 2  # October (stored) and September (new)
 
 
 def test_create_locks_before_the_guard_and_reads_the_currency_after(team: WorkspaceDb) -> None:

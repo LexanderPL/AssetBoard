@@ -2,13 +2,15 @@ from __future__ import annotations
 
 import re
 from datetime import date
+from typing import Any
+from uuid import UUID
 
 from sqlalchemy import select
 
 from assetboard.clock import FixedClock
 from assetboard.db.models.identity import Workspace
 from assetboard.db.models.ledger import MonthState, Transaction
-from assetboard.db.models.scheduled import ScheduledOccurrence
+from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 
 
 def create_recurring(owner, **changes):
@@ -386,3 +388,83 @@ def test_a_far_one_time_payment_says_when_it_shows_and_viewers_cannot_add(owner)
         token_from="/upcoming",
     )
     assert refused.status_code == 403
+
+
+def _one_time_on_upcoming(owner, day: str) -> UUID:
+    expense = _categories(owner, "expense")[0]
+    created = owner.post(
+        "/upcoming/one-time",
+        {
+            "name": "Car insurance",
+            "amount": "450",
+            "direction": "expense",
+            "category_id": expense,
+            "day": day,
+        },
+        token_from="/upcoming",
+    )
+    assert created.status_code == 303
+    with owner.db() as session:
+        return session.scalars(
+            select(ScheduledOccurrence.id).where(ScheduledOccurrence.label == "Car insurance")
+        ).one()
+
+
+def _edit_one_time(owner, occurrence_id: UUID, day: str) -> Any:
+    return owner.post(
+        f"/upcoming/{occurrence_id}/one-time",
+        {
+            "name": "Car insurance",
+            "amount": "450",
+            "direction": "expense",
+            "category_id": _categories(owner, "expense")[0],
+            "day": day,
+        },
+        token_from="/upcoming",
+    )
+
+
+def test_editing_a_future_one_time_to_today_posts_it_and_leads_to_transactions(owner):
+    fixed_clock(owner)
+    occurrence_id = _one_time_on_upcoming(owner, "2026-03-20")
+    response = _edit_one_time(owner, occurrence_id, "2026-03-01")
+    assert response.status_code == 303
+    assert response.headers["location"] == "/transactions/2026-03?saved_in=2026-03"
+    page = owner.client.get(response.headers["location"]).text
+    assert "Car insurance" in page
+    with owner.db() as session:
+        assert session.scalars(select(ScheduledOccurrence)).all() == []
+        assert session.scalars(select(ScheduledItem)).all() == []
+        [transaction] = session.scalars(select(Transaction)).all()
+        assert (transaction.date, transaction.amount_minor, transaction.source) == (
+            date(2026, 3, 1),
+            45000,
+            "manual",
+        )
+
+
+def test_editing_a_future_one_time_to_a_past_month_links_the_transaction(owner):
+    fixed_clock(owner)
+    occurrence_id = _one_time_on_upcoming(owner, "2026-03-20")
+    response = _edit_one_time(owner, occurrence_id, "2026-02-10")
+    assert response.status_code == 303
+    assert response.headers["location"] == "/transactions/2026-03?saved_in=2026-02"
+    page = owner.client.get(response.headers["location"]).text
+    assert "Entry saved in February 2026." in page
+    assert '<a href="/transactions/2026-02"' in page
+    with owner.db() as session:
+        [transaction] = session.scalars(select(Transaction)).all()
+        assert transaction.date == date(2026, 2, 10)
+
+
+def test_editing_an_overdue_one_time_stays_on_upcoming(owner):
+    fixed_clock(owner)
+    occurrence_id = _one_time_on_upcoming(owner, "2026-02-10")
+    response = _edit_one_time(owner, occurrence_id, "2026-03-01")
+    assert response.status_code == 303
+    assert response.headers["location"] == "/upcoming?notice=one_time_saved"
+    with owner.db() as session:
+        [occurrence] = session.scalars(select(ScheduledOccurrence)).all()
+        assert occurrence.id == occurrence_id
+        assert (occurrence.due_date, occurrence.status) == (date(2026, 3, 1), "pending")
+        assert session.scalars(select(Transaction)).all() == []
