@@ -16,7 +16,12 @@ from assetboard.db.models.identity import (
 )
 from assetboard.db.models.import_batch import ImportBatch, ImportCategoryMapping
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
-from assetboard.db.models.investments import AssetClass, Instrument, InstrumentAllocation
+from assetboard.db.models.investments import (
+    AssetClass,
+    Instrument,
+    InstrumentAllocation,
+    InvestmentTransaction,
+)
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.db.models.networth import (
     ItemValuation,
@@ -41,6 +46,7 @@ __all__ = [
     "AssetClass",
     "Instrument",
     "InstrumentAllocation",
+    "InvestmentTransaction",
     "ItemValuation",
     "NetWorthCategory",
     "NetWorthItem",

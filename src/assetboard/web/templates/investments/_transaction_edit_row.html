@@ -1,0 +1,3 @@
+{% from "investments/_transaction_row.html" import edit_row with context %}
+{% set cancel_href = scoped_url(request, 'investments_transactions') if show_instrument else scoped_url(request, 'investments_instrument', instrument_id=transaction.instrument_id|string) %}
+{{ edit_row(transaction, target, values, errors, base_currency, cancel_href, "list" if show_instrument else "instrument") }}

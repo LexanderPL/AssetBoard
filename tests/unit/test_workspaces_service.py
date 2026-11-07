@@ -223,6 +223,38 @@ def test_update_settings_validates_input(
     assert _events(team) == []
 
 
+def test_investment_cost_basis_defaults_to_average_and_owners_change_it(
+    team: WorkspaceDb,
+) -> None:
+    owner = team.ctx("olga", "owner")
+    current = workspace_settings(team.factory, owner)
+    assert current.investment_cost_basis == "average"
+    saved = update_settings(
+        team.factory,
+        owner,
+        name=current.name,
+        base_currency=current.base_currency,
+        country_code=current.country_code,
+        timezone=current.timezone,
+        locale=current.locale,
+        auto_copy_plan=current.auto_copy_plan,
+        require_two_factor=current.require_two_factor,
+        upcoming_days=current.upcoming_days,
+        investment_cost_basis="fifo",
+    )
+    assert saved.investment_cost_basis == "fifo"
+    assert _events(team)[-1] == (
+        "workspace.settings_updated",
+        {"fields": "investment_cost_basis"},
+    )
+    with pytest.raises(InvalidWorkspaceSettings) as invalid:
+        update_settings(team.factory, owner, **_settings(investment_cost_basis="lifo"))
+    assert (invalid.value.field, invalid.value.code) == (
+        "investment_cost_basis",
+        "invalid_cost_basis",
+    )
+
+
 def test_upcoming_days_is_unset_by_default_and_owners_set_it(team: WorkspaceDb) -> None:
     owner = team.ctx("olga", "owner")
     assert workspace_settings(team.factory, owner).upcoming_days is None
@@ -323,6 +355,9 @@ def test_every_registered_lock_is_consulted(
     team: WorkspaceDb, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     from assetboard.services.income import workspace_has_income_amounts
+    from assetboard.services.investment_transactions import (
+        workspace_has_investment_transactions,
+    )
     from assetboard.services.scheduled import workspace_has_scheduled_amounts
 
     assert [
@@ -331,6 +366,7 @@ def test_every_registered_lock_is_consulted(
         workspace_has_scheduled_amounts,
         workspace_has_income_amounts,
         workspace_has_fixed_tax_amounts,
+        workspace_has_investment_transactions,
     ] == workspaces.BASE_CURRENCY_LOCKS
     # Any check that reports stored amounts locks it.
     monkeypatch.setattr(workspaces, "BASE_CURRENCY_LOCKS", [lambda _session, _ctx: True])

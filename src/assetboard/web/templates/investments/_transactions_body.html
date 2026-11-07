@@ -1,0 +1,106 @@
+{% from "investments/_tabs.html" import tabs with context %}
+{% from "investments/_transaction_form.html" import transaction_form with context %}
+{% from "investments/_transaction_row.html" import edit_row, row with context %}
+{% from "macros/components.html" import toast with context %}
+{% set target = "investment-transactions-body" %}
+<div id="investment-transactions-body" class="space-y-6">
+  {% if notice %}
+  <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
+  {% endif %}
+  {% if error %}
+  <p class="border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ error }}</p>
+  {% endif %}
+  {% if toast_undo %}{{ toast(toast_message, toast_undo, _("Undo"), toast_seconds) }}{% endif %}
+
+  {{ tabs("transactions") }}
+
+  {% if can_edit %}
+  <section class="panel p-6 sm:p-7" aria-labelledby="transaction-form-heading" data-transaction-create>
+    <h2 id="transaction-form-heading" class="text-base font-semibold">{{ _("Add a transaction") }}</h2>
+    {% if active_instruments %}
+    <div class="mt-4">
+      {{ transaction_form(scoped_url(request, 'investment_transaction_create'), create_values, create_errors, target, base_currency, instruments=active_instruments, submit_label=_("Add transaction")) }}
+    </div>
+    {% else %}
+    <p class="mt-2 text-sm text-muted">{{ _("Add an active instrument first.") }} <a href="{{ scoped_url(request, 'investments_instruments') }}" class="text-primary-ink underline">{{ _("Instruments") }}</a></p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section class="panel p-6 sm:p-7" aria-labelledby="transaction-history-heading" data-transaction-history>
+    <h2 id="transaction-history-heading" class="text-base font-semibold">{{ _("Transaction history") }}</h2>
+    <form method="get" action="{{ scoped_url(request, 'investments_transactions') }}" class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-transaction-filters>
+      <div class="space-y-1">
+        <label for="filter-instrument" class="block text-xs font-medium text-muted">{{ _("Instrument") }}</label>
+        <select id="filter-instrument" name="instrument" class="form-select w-full py-2">
+          <option value="">{{ _("All instruments") }}</option>
+          {% for item in instruments %}
+          <option value="{{ item.id }}"{% if filters.instrument == item.id|string %} selected{% endif %}>{{ item.name }}{% if item.archived %} ({{ _("archived") }}){% endif %}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="space-y-1">
+        <label for="filter-type" class="block text-xs font-medium text-muted">{{ _("Type") }}</label>
+        <select id="filter-type" name="type" class="form-select w-full py-2">
+          <option value="">{{ _("All types") }}</option>
+          <option value="buy"{% if filters.type == "buy" %} selected{% endif %}>{{ _("Buy") }}</option>
+          <option value="sell"{% if filters.type == "sell" %} selected{% endif %}>{{ _("Sell") }}</option>
+        </select>
+      </div>
+      <div class="space-y-1">
+        <label for="filter-from" class="block text-xs font-medium text-muted">{{ _("From") }}</label>
+        <input id="filter-from" name="from" type="date" value="{{ filters.from }}" class="form-control w-full py-2">
+      </div>
+      <div class="space-y-1">
+        <label for="filter-to" class="block text-xs font-medium text-muted">{{ _("To") }}</label>
+        <input id="filter-to" name="to" type="date" value="{{ filters.to }}" class="form-control w-full py-2">
+      </div>
+      <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
+        <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Filter") }}</button>
+        <a href="{{ scoped_url(request, 'investments_transactions') }}" class="rounded-xl border border-line px-4 py-2 text-sm font-medium hover:bg-subtle">{{ _("Clear") }}</a>
+      </div>
+    </form>
+
+    {% if result.rows %}
+    <div class="mt-4 overflow-x-auto">
+      <table class="sheet w-full text-sm">
+        <caption class="sr-only">{{ _("Investment transactions") }}</caption>
+        <thead>
+          <tr class="text-left text-xs text-muted">
+            <th scope="col" class="px-3 py-2 font-medium">{{ _("Date") }}</th>
+            <th scope="col" class="px-3 py-2 font-medium">{{ _("Instrument") }}</th>
+            <th scope="col" class="px-3 py-2 font-medium">{{ _("Type") }}</th>
+            <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Quantity") }}</th>
+            <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Unit price") }}</th>
+            <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Fee") }}</th>
+            <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("FX") }}</th>
+            <th scope="col" class="px-3 py-2 font-medium">{{ _("Note") }}</th>
+            <th scope="col" class="px-3 py-2"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for t in result.rows %}
+          {% if editing == t.id and edit_values %}
+          {{ edit_row(t, target, edit_values, edit_errors, base_currency, scoped_url(request, 'investments_transactions'), "list") }}
+          {% else %}
+          {{ row(t, true, can_edit, scoped_url(request, 'investments_transactions'), target, "list", "") }}
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-3 text-sm text-muted">{{ ngettext("Showing %(num)d transaction.", "Showing %(num)d transactions.", result.total) % {"num": result.total} }}</p>
+    <div class="mt-2 flex items-center justify-between gap-3 text-sm">
+      <div>
+        {% if result.has_previous %}<a href="{{ request.url.include_query_params(page=result.page - 1) }}" class="rounded-xl border border-line px-4 py-2 font-medium hover:bg-subtle">{{ _("Previous") }}</a>{% endif %}
+      </div>
+      <p class="text-muted">{{ _("Page %(page)d of %(pages)d", page=result.page, pages=result.pages) }}</p>
+      <div>
+        {% if result.has_next %}<a href="{{ request.url.include_query_params(page=result.page + 1) }}" class="rounded-xl border border-line px-4 py-2 font-medium hover:bg-subtle">{{ _("Next") }}</a>{% endif %}
+      </div>
+    </div>
+    {% else %}
+    <p class="mt-4 text-sm text-muted">{{ _("No investment transactions match these filters.") }}</p>
+    {% endif %}
+  </section>
+</div>

@@ -72,6 +72,39 @@ needed" badge and cannot be valued until the bond-terms form arrives in a later 
 Instruments are archived, not deleted. Archiving keeps their allocation and history and hides
 them from the active list; restoring is refused if another active instrument has the same name.
 
+## Transactions and holdings
+
+Open an instrument by clicking its name, or use the **Transactions** tab, to record a **buy** or
+**sell**:
+
+- **Date** — a trade date, not a plan. A date after today is refused.
+- **Quantity** — greater than zero, with up to 18 decimal places.
+- **Unit price** — in the instrument's quote currency; zero is allowed. A currency instrument is
+  always priced at 1, whatever is typed.
+- **Fee** — in the same quote currency, with no more decimal places than the currency has. A
+  sell's fee may be larger than its gross amount; the difference is a realized loss.
+- **FX rate to the base currency** — required when the instrument is quoted in another currency;
+  hidden and stored as 1 for a base-currency instrument. A later update will offer the stored
+  rate as the default.
+- **Note** — optional, up to 200 characters.
+
+The instrument page shows the current quantity, average cost (per unit, in the base currency),
+cost basis and realized P&L. Holdings are recomputed on read with the workspace's **Average cost**
+or **FIFO** setting (Workspace settings → Investment cost basis); switching recalculates the
+whole history and stores nothing derived.
+
+A sell that would exceed the quantity held at that point is refused, and the error names the
+failing sale's date. This is checked over the whole history on every change, including editing
+an earlier buy, back-dating a sell, deleting a buy and undoing a deleted sell.
+
+Deleting a transaction is a soft delete with the usual 10-second **Undo**; holdings ignore
+deleted rows, but deleted rows still lock the base currency and the instrument's currency/type.
+An archived instrument's history remains visible, but adding, editing, deleting or undoing its
+transactions is refused until it is restored.
+
+Undated legacy lots (created only by an import in a later update) count in current holdings but
+are excluded from dated history until they get a date.
+
 ## Allocation
 
 Every instrument's value is split across one or more asset classes with weights in percent. The

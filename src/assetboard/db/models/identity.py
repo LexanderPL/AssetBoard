@@ -89,6 +89,12 @@ class ExternalIdentity(IdMixin, TimestampMixin, Base):
 
 class Workspace(IdMixin, TimestampMixin, Base):
     __tablename__ = "workspaces"
+    __table_args__ = (
+        CheckConstraint(
+            "investment_cost_basis IN ('average', 'fifo')",
+            name="investment_cost_basis_valid",
+        ),
+    )
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
     require_two_factor: Mapped[bool] = mapped_column(
@@ -109,6 +115,10 @@ class Workspace(IdMixin, TimestampMixin, Base):
     # Days ahead shown by Upcoming payments and the Home page (1-365, validated by the service);
     # NULL: the instance setting ``upcoming_days`` applies.
     upcoming_days: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    # F6.2: average or FIFO cost basis for investment holdings; changes recompute on read.
+    investment_cost_basis: Mapped[str] = mapped_column(
+        String(8), nullable=False, default="average", server_default="average"
+    )
 
 
 class Membership(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):

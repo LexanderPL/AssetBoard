@@ -152,6 +152,21 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         for method in ("create", "for_instrument")
     },
     **{
+        ("InvestmentTransactionRepository", method): (
+            "test_investment_queries_stay_in_their_workspace"
+        )
+        for method in (
+            "create",
+            "for_instrument",
+            "live",
+            "any_for_instrument",
+            "instrument_ids",
+            "get_for_update",
+            "filtered",
+            "count_filtered",
+        )
+    },
+    **{
         ("NetWorthCategoryRepository", method): "test_networth_queries_stay_in_their_workspace"
         for method in (
             "create",

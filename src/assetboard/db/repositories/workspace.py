@@ -41,6 +41,7 @@ UPDATABLE_FIELDS = frozenset(
         "require_two_factor",
         "taxes_enabled",
         "upcoming_days",
+        "investment_cost_basis",
     }
 )
 

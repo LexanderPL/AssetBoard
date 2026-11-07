@@ -48,3 +48,41 @@ for (const eventName of ["DOMContentLoaded", "htmx:afterSwap", "htmx:oobAfterSwa
 }
 
 updateAllocationEditors();
+
+// F6.2: the global transaction form knows the selected instrument only after a change. Keep the
+// currency-instrument price at 1 and hide the FX field for base-currency instruments; the
+// server enforces both regardless of JavaScript.
+function updateTransactionForm(form) {
+  const select = form.querySelector("[data-transaction-instrument]");
+  if (!select) return;
+  const option = select.selectedOptions[0];
+  const type = option ? option.dataset.type || "" : "";
+  const currency = option ? option.dataset.currency || "" : "";
+  const price = form.querySelector("[data-transaction-price]");
+  if (price) {
+    const isCurrency = type === "currency";
+    price.readOnly = isCurrency;
+    if (isCurrency) price.value = "1";
+  }
+  const fx = form.querySelector("[data-transaction-fx]");
+  if (fx) fx.classList.toggle("hidden", currency === form.dataset.baseCurrency);
+}
+
+document.addEventListener("change", (event) => {
+  const select = event.target;
+  if (!(select instanceof Element) || !select.matches("[data-transaction-instrument]")) return;
+  const form = select.closest("[data-transaction-form]");
+  if (form) updateTransactionForm(form);
+});
+
+for (const eventName of ["DOMContentLoaded", "htmx:afterSwap", "htmx:oobAfterSwap"]) {
+  document.addEventListener(eventName, () => {
+    for (const form of document.querySelectorAll("[data-transaction-form]")) {
+      updateTransactionForm(form);
+    }
+  });
+}
+
+for (const form of document.querySelectorAll("[data-transaction-form]")) {
+  updateTransactionForm(form);
+}

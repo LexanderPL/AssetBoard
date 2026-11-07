@@ -31,6 +31,15 @@
       <p id="upcoming_days-help" class="text-xs text-muted">{{ _("How far ahead Upcoming payments and the Home page look.") }} {{ _("Empty: %(days)d days, the server default.", days=instance_upcoming_days) }}</p>
       {% if errors.get("upcoming_days") %}<p id="upcoming_days-error" class="text-sm text-danger">{{ errors.get("upcoming_days") }}</p>{% endif %}
     </div>
+    <div class="space-y-1.5" data-investment-cost-basis>
+      <label for="investment_cost_basis" class="block text-sm font-medium text-ink">{{ _("Investment cost basis") }}</label>
+      <select id="investment_cost_basis" name="investment_cost_basis"{% if errors.get("investment_cost_basis") %} aria-invalid="true" aria-describedby="investment_cost_basis-error"{% else %} aria-describedby="investment_cost_basis-help"{% endif %} class="form-select w-full">
+        <option value="average"{% if values.investment_cost_basis == "average" %} selected{% endif %}>{{ _("Average cost") }}</option>
+        <option value="fifo"{% if values.investment_cost_basis == "fifo" %} selected{% endif %}>{{ _("FIFO") }}</option>
+      </select>
+      <p id="investment_cost_basis-help" class="text-xs text-muted">{{ _("Holdings are recalculated for the whole history. Changing this recalculates realized gains and cost basis; no stored values are rewritten.") }}</p>
+      {% if errors.get("investment_cost_basis") %}<p id="investment_cost_basis-error" class="text-sm text-danger">{{ errors.get("investment_cost_basis") }}</p>{% endif %}
+    </div>
     <div class="flex items-start gap-3 sm:col-span-2" data-auto-copy-plan>
       <input id="auto_copy_plan" name="auto_copy_plan" type="checkbox" value="1"{% if values.auto_copy_plan %} checked{% endif %} aria-describedby="auto_copy_plan-help" class="mt-1 h-4 w-4 rounded border-line accent-primary">
       <div>
