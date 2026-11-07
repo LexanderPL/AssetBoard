@@ -2,23 +2,24 @@
 
 from __future__ import annotations
 
-from datetime import UTC, date, datetime
+from dataclasses import dataclass
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
+from fractions import Fraction
 from uuid import UUID, uuid4
 
 import pytest
-from hypothesis import given
+from hypothesis import given, settings
 from hypothesis import strategies as st
 
 from assetboard.domain.holdings import (
-    CostBasisMethod,
     HoldingTransaction,
     InvalidHoldingTransaction,
     InvestmentTransactionType,
     Oversell,
     compute_holdings,
 )
-from assetboard.domain.money import Money
+from assetboard.domain.money import Money, minor_unit_for
 
 BASE = "EUR"
 QUOTE = "EUR"
@@ -243,64 +244,204 @@ def test_the_accounting_identity_holds_for_a_buy_and_a_sell() -> None:
     assert holding.realized_pnl.amount_minor + cost_removed == proceeds
 
 
-@given(
-    quantity=st.decimals(min_value=Decimal("0.000001"), max_value=Decimal("100000")),
-    price=st.decimals(min_value=Decimal("0"), max_value=Decimal("100000")),
-)
-def test_selling_everything_property_zero_cost(quantity: Decimal, price: Decimal) -> None:
-    instrument = uuid4()
-    rows = [
-        _tx(
-            day=date(2026, 1, 1),
-            type="buy",
-            quantity=str(quantity),
-            price=str(price),
-            instrument_id=instrument,
-        ),
-        _tx(
-            day=date(2026, 2, 1),
-            type="sell",
-            quantity=str(quantity),
-            price="1",
-            instrument_id=instrument,
-        ),
-    ]
-    for method in (CostBasisMethod.AVERAGE, CostBasisMethod.FIFO):
-        holding = compute_holdings(rows, method, base_currency=BASE)[0]
-        assert holding.quantity == 0
-        assert holding.cost_basis_base == Money(0, BASE)
-        assert holding.realized_pnl.amount_minor >= -(10**18)
+# Independent oracle: Fraction-based, plain lots; it does not call compute_holdings.
+def _round_half_up(value: Fraction) -> int:
+    if value >= 0:
+        return (value + Fraction(1, 2)).__floor__()
+    return -((-value + Fraction(1, 2)).__floor__())
 
 
-@given(
-    buys=st.lists(
-        st.tuples(
-            st.decimals(min_value=Decimal("0.01"), max_value=Decimal("100")),
-            st.decimals(min_value=Decimal("0"), max_value=Decimal("1000")),
+def _fee(transaction: HoldingTransaction) -> Fraction:
+    return Fraction(transaction.fee_minor, 10 ** minor_unit_for(transaction.quote_currency))
+
+
+def _buy_cost_oracle(transaction: HoldingTransaction) -> int:
+    gross = Fraction(transaction.quantity) * Fraction(transaction.unit_price)
+    amount = (gross + _fee(transaction)) * Fraction(transaction.fx_to_base)
+    return _round_half_up(amount * 10 ** minor_unit_for(BASE))
+
+
+def _sell_proceeds_oracle(transaction: HoldingTransaction) -> int:
+    gross = Fraction(transaction.quantity) * Fraction(transaction.unit_price)
+    amount = (gross - _fee(transaction)) * Fraction(transaction.fx_to_base)
+    return _round_half_up(amount * 10 ** minor_unit_for(BASE))
+
+
+@dataclass(slots=True)
+class _OracleLot:
+    quantity: Fraction
+    cost_minor: int
+
+
+def _oracle_holdings(rows: list[HoldingTransaction], method: str) -> tuple[Fraction, int, int]:
+    held = Fraction(0)
+    remaining_cost = 0
+    realized = 0
+    lots: list[_OracleLot] = []
+    ordered = sorted(
+        rows,
+        key=lambda row: (
+            row.date is not None,
+            row.date or date.min,
+            row.created_at,
+            str(row.id),
         ),
-        min_size=1,
-        max_size=5,
     )
-)
-def test_quantity_and_cost_basis_are_never_negative(
-    buys: list[tuple[Decimal, Decimal]],
-) -> None:
-    instrument = uuid4()
-    rows = [
-        _tx(
-            day=date(2026, 1, 1 + index),
-            type="buy",
-            quantity=str(quantity),
-            price=str(price),
-            instrument_id=instrument,
+    for transaction in ordered:
+        quantity = Fraction(transaction.quantity)
+        if transaction.type == "buy":
+            cost = _buy_cost_oracle(transaction)
+            held += quantity
+            remaining_cost += cost
+            if method == "fifo":
+                lots.append(_OracleLot(quantity, cost))
+            continue
+        proceeds = _sell_proceeds_oracle(transaction)
+        if method == "fifo":
+            removed = 0
+            left = quantity
+            while left > 0:
+                lot = lots[0]
+                if left >= lot.quantity:
+                    removed += lot.cost_minor
+                    left -= lot.quantity
+                    lots.pop(0)
+                else:
+                    part = _round_half_up(Fraction(lot.cost_minor) * left / lot.quantity)
+                    removed += part
+                    lot.cost_minor -= part
+                    lot.quantity -= left
+                    break
+            held -= quantity
+            remaining_cost -= removed
+        else:
+            removed = (
+                remaining_cost
+                if quantity == held
+                else _round_half_up(Fraction(remaining_cost) * quantity / held)
+            )
+            held -= quantity
+            remaining_cost -= removed
+        realized += proceeds - removed
+    return held, remaining_cost, realized
+
+
+@st.composite
+def _mixed_history(draw: st.DrawFn) -> tuple[list[HoldingTransaction], Decimal]:
+    steps = draw(
+        st.lists(
+            st.tuples(
+                st.decimals(min_value=Decimal("0.001"), max_value=Decimal("100"), places=6),
+                st.decimals(min_value=Decimal("0.01"), max_value=Decimal("1000"), places=4),
+                st.integers(min_value=0, max_value=10_000),
+                st.decimals(min_value=Decimal("0.5"), max_value=Decimal("2"), places=6),
+                st.decimals(min_value=Decimal("0.01"), max_value=Decimal("1"), places=2),
+                st.decimals(min_value=Decimal("0.01"), max_value=Decimal("1000"), places=4),
+                st.integers(min_value=0, max_value=10_000),
+                st.decimals(min_value=Decimal("0.5"), max_value=Decimal("2"), places=6),
+            ),
+            min_size=1,
+            max_size=6,
         )
-        for index, (quantity, price) in enumerate(buys)
-    ]
-    for method in (CostBasisMethod.AVERAGE, CostBasisMethod.FIFO):
+    )
+    instrument = uuid4()
+    rows: list[HoldingTransaction] = []
+    held = Decimal(0)
+    for index, (
+        buy_quantity,
+        buy_price,
+        buy_fee,
+        buy_fx,
+        sell_fraction,
+        sell_price,
+        sell_fee,
+        sell_fx,
+    ) in enumerate(steps):
+        day = date(2026, 1, 1) + timedelta(days=index)
+        created = datetime(2026, 1, 1, tzinfo=UTC) + timedelta(seconds=index)
+        rows.append(
+            _tx(
+                day=day,
+                type="buy",
+                quantity=str(buy_quantity),
+                price=str(buy_price),
+                fee=buy_fee,
+                fx=str(buy_fx),
+                instrument_id=instrument,
+                created_at=created,
+            )
+        )
+        held += buy_quantity
+        sold = held * sell_fraction
+        if sold > 0:
+            rows.append(
+                _tx(
+                    day=day,
+                    type="sell",
+                    quantity=str(sold),
+                    price=str(sell_price),
+                    fee=sell_fee,
+                    fx=str(sell_fx),
+                    instrument_id=instrument,
+                    created_at=created + timedelta(milliseconds=1),
+                )
+            )
+            held -= sold
+    return rows, held
+
+
+@given(_mixed_history())
+@settings(deadline=None, max_examples=100)
+def test_mixed_histories_match_the_independent_oracle(
+    history: tuple[list[HoldingTransaction], Decimal],
+) -> None:
+    rows, _held = history
+    for method in ("average", "fifo"):
+        holding = compute_holdings(rows, method, base_currency=BASE)[0]
+        held, remaining, realized = _oracle_holdings(rows, method)
+        assert Fraction(holding.quantity) == held
+        assert holding.cost_basis_base.amount_minor == remaining
+        assert holding.realized_pnl.amount_minor == realized
+
+
+@given(_mixed_history())
+@settings(deadline=None, max_examples=100)
+def test_mixed_histories_stay_non_negative_and_keep_the_identity(
+    history: tuple[list[HoldingTransaction], Decimal],
+) -> None:
+    rows, _held = history
+    total_bought = sum(_buy_cost_oracle(row) for row in rows if row.type == "buy")
+    total_proceeds = sum(_sell_proceeds_oracle(row) for row in rows if row.type == "sell")
+    for method in ("average", "fifo"):
         holding = compute_holdings(rows, method, base_currency=BASE)[0]
         assert holding.quantity >= 0
         assert holding.cost_basis_base.amount_minor >= 0
-        assert holding.avg_cost >= 0
+        cost_removed = total_bought - holding.cost_basis_base.amount_minor
+        assert holding.realized_pnl.amount_minor + cost_removed == total_proceeds
+        assert holding.cost_basis_base.amount_minor == total_bought - cost_removed
+
+
+@given(_mixed_history())
+@settings(deadline=None, max_examples=100)
+def test_a_mixed_history_sold_to_zero_has_zero_cost(
+    history: tuple[list[HoldingTransaction], Decimal],
+) -> None:
+    rows, held = history
+    if held > 0:
+        rows.append(
+            _tx(
+                day=date(2027, 1, 1),
+                type="sell",
+                quantity=str(held),
+                price="1",
+                instrument_id=rows[0].instrument_id,
+                created_at=datetime(2027, 1, 1, tzinfo=UTC),
+            )
+        )
+    for method in ("average", "fifo"):
+        holding = compute_holdings(rows, method, base_currency=BASE)[0]
+        assert holding.quantity == 0
+        assert holding.cost_basis_base == Money(0, BASE)
 
 
 def test_transaction_type_values_are_the_spec_set() -> None:
