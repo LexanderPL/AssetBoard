@@ -1297,6 +1297,7 @@ WORKSPACE_TABLES = {
     "asset_classes",
     "instruments",
     "instrument_allocations",
+    "investment_transactions",
 }
 
 

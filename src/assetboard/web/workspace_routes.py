@@ -111,6 +111,7 @@ SETTINGS_ERRORS = {
         "requiring it for this workspace; otherwise you would lock yourself out."
     ),
     "invalid_upcoming_days": _("Enter a number of days from 1 to 365, or leave it empty."),
+    "invalid_cost_basis": _("Choose average cost or FIFO."),
 }
 MEMBER_ERRORS = {
     "last_owner": _("A workspace needs at least one owner. Make another member an owner first."),
@@ -147,6 +148,7 @@ IMPORT_SETTING_LABELS = {
     "auto_copy_plan": _("Automatic plan copy"),
     "taxes_enabled": _("Taxes"),
     "upcoming_days": _("Upcoming window"),
+    "investment_cost_basis": _("Investment cost basis"),
 }
 ROLE_LABELS = {
     Role.OWNER: _("Owner"),
@@ -631,6 +633,7 @@ async def settings_submit(
     auto_copy_plan: FormStr = "",
     require_two_factor: FormStr = "",
     upcoming_days: FormStr = "",
+    investment_cost_basis: FormStr = "average",
 ) -> Response:
     copy_plan = auto_copy_plan == "1"  # an unchecked box sends nothing
     days_text = upcoming_days.strip()
@@ -648,6 +651,7 @@ async def settings_submit(
         locale=locale,
         auto_copy_plan=copy_plan,
         require_two_factor=require_two_factor == "1",
+        investment_cost_basis=investment_cost_basis,
     )
     try:
         await run_in_threadpool(
@@ -663,6 +667,7 @@ async def settings_submit(
                 require_two_factor=require_two_factor == "1",
                 recurrence_horizon_months=request.app.state.settings.recurrence_horizon_months,
                 upcoming_days=days,
+                investment_cost_basis=investment_cost_basis,
             )
         )
     except InvalidWorkspaceSettings as exc:

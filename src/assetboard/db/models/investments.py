@@ -8,12 +8,15 @@ table is composite (docs/architecture.md).
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import (
+    BigInteger,
     Boolean,
     CheckConstraint,
+    Date,
     ForeignKeyConstraint,
     Index,
     Integer,
@@ -25,8 +28,15 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
-from assetboard.db.base import Base, IdMixin, TimestampMixin, WorkspaceScopedMixin
-from assetboard.db.types import UtcDateTime
+from assetboard.db.base import (
+    Base,
+    IdMixin,
+    SoftDeleteMixin,
+    TimestampMixin,
+    WorkspaceScopedMixin,
+)
+from assetboard.db.types import DecimalType, UtcDateTime
+from assetboard.domain.holdings import MAX_NOTE_LENGTH
 from assetboard.domain.instruments import (
     ALLOCATION_TOTAL_BP,
     MAX_ASSET_CLASS_NAME_LENGTH,
@@ -34,6 +44,7 @@ from assetboard.domain.instruments import (
     MAX_SYMBOL_LENGTH,
     MAX_UNIT_LABEL_LENGTH,
 )
+from assetboard.domain.transactions import MAX_AMOUNT_MINOR
 
 
 class AssetClass(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
@@ -173,3 +184,65 @@ class InstrumentAllocation(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     instrument_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     asset_class_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     weight_bp: Mapped[int] = mapped_column(Integer(), nullable=False)
+
+
+class InvestmentTransaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin, Base):
+    """A buy or sell of one instrument (F6.2).
+
+    ``quantity`` and ``unit_price`` are ``Decimal`` values; ``unit_price`` and ``fee_minor``
+    are in the instrument's ``quote_currency``. ``fx_to_base`` is the resolved rate to the
+    workspace base currency (``1`` for a base-currency instrument). The composite foreign key
+    keeps ``quote_currency`` equal to the instrument's currency; changing that currency is
+    refused while rows exist. ``date`` is nullable only for undated imported legacy lots (F6.9).
+    """
+
+    __tablename__ = "investment_transactions"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "id", name="uq_investment_transactions_workspace_id_id"),
+        ForeignKeyConstraint(
+            ["workspace_id", "instrument_id", "quote_currency"],
+            [
+                "instruments.workspace_id",
+                "instruments.id",
+                "instruments.quote_currency",
+            ],
+            name="fk_investment_transactions_workspace_instrument_currency",
+        ),
+        CheckConstraint(
+            "type IN ('buy', 'sell', 'dividend', 'fee', 'split')",
+            name="type_valid",
+        ),
+        CheckConstraint(
+            "date IS NULL OR (date >= '1900-01-01' AND date <= '2199-12-31')",
+            name="date_in_range",
+        ),
+        CheckConstraint("quantity >= 0", name="quantity_valid"),
+        CheckConstraint("unit_price >= 0", name="unit_price_valid"),
+        CheckConstraint(f"fee_minor >= 0 AND fee_minor <= {MAX_AMOUNT_MINOR}", name="fee_valid"),
+        CheckConstraint("fx_to_base IS NULL OR fx_to_base > 0", name="fx_valid"),
+        CheckConstraint("length(quote_currency) = 3", name="quote_currency_length"),
+        CheckConstraint(f"length(note) <= {MAX_NOTE_LENGTH}", name="note_length_valid"),
+        Index(
+            "ix_investment_transactions_workspace_instrument_date",
+            "workspace_id",
+            "instrument_id",
+            "date",
+            "created_at",
+        ),
+        Index(
+            "ix_investment_transactions_workspace_date",
+            "workspace_id",
+            "date",
+            "created_at",
+        ),
+    )
+
+    instrument_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    date: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    type: Mapped[str] = mapped_column(String(16), nullable=False)
+    quantity: Mapped[Decimal] = mapped_column(DecimalType(), nullable=False)
+    unit_price: Mapped[Decimal] = mapped_column(DecimalType(), nullable=False)
+    quote_currency: Mapped[str] = mapped_column(String(3), nullable=False)
+    fee_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+    fx_to_base: Mapped[Decimal | None] = mapped_column(DecimalType(), nullable=True)
+    note: Mapped[str] = mapped_column(String(MAX_NOTE_LENGTH), nullable=False, default="")

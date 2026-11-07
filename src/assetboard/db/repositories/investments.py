@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
+from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import case, func, select
 
-from assetboard.db.models.investments import AssetClass, Instrument, InstrumentAllocation
+from assetboard.db.models.investments import (
+    AssetClass,
+    Instrument,
+    InstrumentAllocation,
+    InvestmentTransaction,
+)
 from assetboard.db.repositories.base import ScopedRepository
 
 
@@ -149,3 +155,148 @@ class InstrumentAllocationRepository(ScopedRepository[InstrumentAllocation]):
             .order_by(InstrumentAllocation.weight_bp.desc(), InstrumentAllocation.asset_class_id)
         )
         return list(self._session.scalars(statement))
+
+
+class InvestmentTransactionRepository(ScopedRepository[InvestmentTransaction]):
+    model = InvestmentTransaction
+
+    def create(
+        self,
+        *,
+        instrument_id: UUID,
+        date: date | None,
+        type: str,
+        quantity: Decimal,
+        unit_price: Decimal,
+        quote_currency: str,
+        fee_minor: int,
+        fx_to_base: Decimal | None,
+        note: str = "",
+    ) -> InvestmentTransaction:
+        return self.add(
+            InvestmentTransaction(
+                instrument_id=instrument_id,
+                date=date,
+                type=type,
+                quantity=quantity,
+                unit_price=unit_price,
+                quote_currency=quote_currency,
+                fee_minor=fee_minor,
+                fx_to_base=fx_to_base,
+                note=note,
+            )
+        )
+
+    def for_instrument(
+        self, instrument_id: UUID, *, include_deleted: bool = False
+    ) -> list[InvestmentTransaction]:
+        """One instrument's rows in holding order (undated first, then date and entry order)."""
+        statement = self._scoped_select().where(
+            InvestmentTransaction.instrument_id == instrument_id
+        )
+        if not include_deleted:
+            statement = statement.where(InvestmentTransaction.deleted_at.is_(None))
+        statement = statement.order_by(
+            case((InvestmentTransaction.date.is_(None), 0), else_=1),
+            InvestmentTransaction.date,
+            InvestmentTransaction.created_at,
+            InvestmentTransaction.id,
+        )
+        return list(self._session.scalars(statement))
+
+    def live(self) -> list[InvestmentTransaction]:
+        statement = (
+            self._scoped_select()
+            .where(InvestmentTransaction.deleted_at.is_(None))
+            .order_by(
+                case((InvestmentTransaction.date.is_(None), 0), else_=1),
+                InvestmentTransaction.date,
+                InvestmentTransaction.created_at,
+                InvestmentTransaction.id,
+            )
+        )
+        return list(self._session.scalars(statement))
+
+    def any_for_instrument(self, instrument_id: UUID) -> bool:
+        statement = (
+            select(func.count())
+            .select_from(InvestmentTransaction)
+            .where(
+                InvestmentTransaction.workspace_id == self._workspace_id,
+                InvestmentTransaction.instrument_id == instrument_id,
+            )
+        )
+        return bool(self._session.execute(statement).scalar_one())
+
+    def instrument_ids(self) -> set[UUID]:
+        statement = self._scoped_select().with_only_columns(InvestmentTransaction.instrument_id)
+        return set(self._session.scalars(statement))
+
+    def get_for_update(self, transaction_id: UUID) -> InvestmentTransaction | None:
+        statement = (
+            self._scoped_select()
+            .where(InvestmentTransaction.id == transaction_id)
+            .with_for_update()
+        )
+        return self._session.scalars(statement).one_or_none()
+
+    def filtered(
+        self,
+        *,
+        instrument_id: UUID | None,
+        types: tuple[str, ...],
+        date_from: date | None,
+        date_to: date | None,
+        limit: int,
+        offset: int,
+    ) -> list[InvestmentTransaction]:
+        statement = self._filtered(
+            instrument_id=instrument_id,
+            types=types,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        statement = statement.order_by(
+            case((InvestmentTransaction.date.is_(None), 1), else_=0),
+            InvestmentTransaction.date.desc(),
+            InvestmentTransaction.created_at.desc(),
+            InvestmentTransaction.id.desc(),
+        )
+        return list(self._session.scalars(statement.limit(limit).offset(offset)))
+
+    def count_filtered(
+        self,
+        *,
+        instrument_id: UUID | None,
+        types: tuple[str, ...],
+        date_from: date | None,
+        date_to: date | None,
+    ) -> int:
+        statement = self._filtered(
+            instrument_id=instrument_id,
+            types=types,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        return self._session.execute(
+            select(func.count()).select_from(statement.subquery())
+        ).scalar_one()
+
+    def _filtered(
+        self,
+        *,
+        instrument_id: UUID | None,
+        types: tuple[str, ...],
+        date_from: date | None,
+        date_to: date | None,
+    ):
+        statement = self._scoped_select().where(InvestmentTransaction.deleted_at.is_(None))
+        if instrument_id is not None:
+            statement = statement.where(InvestmentTransaction.instrument_id == instrument_id)
+        if types:
+            statement = statement.where(InvestmentTransaction.type.in_(types))
+        if date_from is not None:
+            statement = statement.where(InvestmentTransaction.date >= date_from)
+        if date_to is not None:
+            statement = statement.where(InvestmentTransaction.date <= date_to)
+        return statement

@@ -88,6 +88,8 @@ INSTRUMENT_ERRORS = {
     "class_unknown": _("Choose an asset class from this workspace."),
     "class_archived": _("This asset class is archived; restore it before allocating to it."),
     "archived": _("Restore the instrument before changing it."),
+    "currency_locked": _("The quote currency cannot change: transactions exist."),
+    "type_locked": _("The type cannot change: transactions exist."),
 }
 FALLBACK_ERROR = _("The change could not be made. Reload the page and try again.")
 CLASS_NOTICES = {
@@ -243,6 +245,7 @@ def _instrument_body_context(
         "create_values": values,
         "create_errors": {f: _t(request, m) for f, m in (create_errors or {}).items()},
         "editing": editing,
+        "editing_instrument": editing_instrument,
         "edit_values": edit_values,
         "edit_errors": {f: _t(request, m) for f, m in (edit_errors or {}).items()},
         "create_rows": _form_classes(page, None, create_weights),

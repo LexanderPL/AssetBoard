@@ -36,7 +36,7 @@
       <li id="instrument-{{ i.id }}" class="flex flex-wrap items-start justify-between gap-3 py-3" data-instrument="{{ i.id }}" data-instrument-name="{{ i.name }}">
         <div class="min-w-0">
           <div class="flex flex-wrap items-center gap-2">
-            <span class="truncate text-sm font-semibold">{{ i.name }}</span>
+            <a href="{{ scoped_url(request, 'investments_instrument', instrument_id=i.id|string) }}" class="truncate text-sm font-semibold text-primary-ink underline-offset-2 hover:underline">{{ i.name }}</a>
             {% if i.symbol %}<span class="rounded bg-subtle px-1.5 py-0.5 font-mono text-xs text-muted" data-symbol>{{ i.symbol }}</span>{% endif %}
             <span class="rounded-full bg-primary-soft px-2 py-0.5 text-xs text-primary-ink" data-type="{{ i.type }}">{{ i.type_label }}</span>
             <span class="text-xs text-muted">{{ i.quote_currency }} · {{ i.unit_label }}</span>
@@ -88,20 +88,37 @@
           <p class="text-xs text-muted">{{ _("Optional, for example VWCE.DE or BTC.") }}</p>
           {{ error(errors, "symbol") }}
         </div>
+        {% set locked = editing and editing_instrument and editing_instrument.has_transactions %}
         <div class="space-y-1.5">
           <label for="instrument-type" class="block text-sm font-medium">{{ _("Type") }}</label>
+          {% if locked %}
+          <input type="hidden" name="type" value="{{ values.type }}">
+          <select id="instrument-type" disabled class="form-select w-full py-2">
+            {% for value, label in type_options %}<option value="{{ value }}"{% if value == values.type %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+          <p class="text-xs text-muted">{{ _("Locked: transactions exist. Their prices and fees depend on the instrument type.") }}</p>
+          {% else %}
           <select id="instrument-type" name="type" class="form-select w-full py-2">
             {% for value, label in type_options %}<option value="{{ value }}"{% if value == values.type %} selected{% endif %}>{{ label }}</option>{% endfor %}
           </select>
           <p class="text-xs text-muted">{{ _("Bond (model value) instruments need terms before they can be valued; you can record purchases now.") }}</p>
+          {% endif %}
           {{ error(errors, "type") }}
         </div>
         <div class="space-y-1.5">
           <label for="instrument-currency" class="block text-sm font-medium">{{ _("Quote currency") }}</label>
+          {% if locked %}
+          <input type="hidden" name="quote_currency" value="{{ values.quote_currency }}">
+          <select id="instrument-currency" disabled class="form-select w-full py-2">
+            {% for code in currency_options %}<option value="{{ code }}"{% if code == values.quote_currency %} selected{% endif %}>{{ code }}</option>{% endfor %}
+          </select>
+          <p class="text-xs text-muted">{{ _("Locked: transactions exist. Their prices and fees are stored in this currency.") }}</p>
+          {% else %}
           <select id="instrument-currency" name="quote_currency" class="form-select w-full py-2">
             {% for code in currency_options %}<option value="{{ code }}"{% if code == values.quote_currency %} selected{% endif %}>{{ code }}</option>{% endfor %}
           </select>
           <p class="text-xs text-muted">{{ _("Unit prices and fees are in this currency.") }}</p>
+          {% endif %}
           {{ error(errors, "quote_currency") }}
         </div>
         <div class="space-y-1.5 sm:col-span-2">
@@ -160,7 +177,7 @@
       <li id="instrument-{{ i.id }}" class="flex flex-wrap items-center justify-between gap-3 py-3" data-instrument="{{ i.id }}" data-instrument-name="{{ i.name }}">
         <div class="min-w-0">
           <div class="flex flex-wrap items-center gap-2">
-            <span class="truncate text-sm font-medium">{{ i.name }}</span>
+            <a href="{{ scoped_url(request, 'investments_instrument', instrument_id=i.id|string) }}" class="truncate text-sm font-medium text-primary-ink underline-offset-2 hover:underline">{{ i.name }}</a>
             <span class="text-xs text-muted">{{ i.type_label }} · {{ i.quote_currency }} · {{ i.unit_label }}</span>
           </div>
           <div class="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted">

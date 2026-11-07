@@ -12,7 +12,7 @@ The service enforces at least one class and weights totalling exactly 10 000 bas
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Literal
@@ -29,6 +29,7 @@ from assetboard.db.repositories import (
     CurrentWorkspaceRepository,
     InstrumentAllocationRepository,
     InstrumentRepository,
+    InvestmentTransactionRepository,
     NotFound,
 )
 from assetboard.db.repositories.base import WorkspaceScope
@@ -165,6 +166,7 @@ class InstrumentView:
     archived: bool
     allocations: tuple[AllocationView, ...]
     terms_required: bool
+    has_transactions: bool = False
 
     @property
     def allocation_total_bp(self) -> int:
@@ -213,6 +215,8 @@ def _instrument_view(
     classes: Mapping[UUID, AssetClass],
     allocations: Sequence[InstrumentAllocation],
     locale: str,
+    *,
+    has_transactions: bool = False,
 ) -> InstrumentView:
     instrument_type = InstrumentType(row.type)
     source = ValuationSource(row.valuation_source)
@@ -237,6 +241,7 @@ def _instrument_view(
         archived=row.archived_at is not None,
         allocations=tuple(_allocation_view(allocation, classes) for allocation in ordered),
         terms_required=instrument_type is InstrumentType.BOND_MODEL,
+        has_transactions=has_transactions,
     )
 
 
@@ -245,6 +250,7 @@ def _page(
     instruments: Sequence[Instrument],
     allocations: Sequence[InstrumentAllocation],
     locale: str,
+    locked_instruments: Collection[UUID] = (),
 ) -> InvestmentPage:
     classes_by_id = {row.id: row for row in classes}
     by_instrument: dict[UUID, list[InstrumentAllocation]] = {}
@@ -257,6 +263,7 @@ def _page(
             classes_by_id,
             by_instrument.get(row.id, ()),
             locale,
+            has_transactions=row.id in locked_instruments,
         )
         for row in instruments
     ]
@@ -274,7 +281,8 @@ def investment_page(factory: sessionmaker[Session], ctx: Context, *, locale: str
         classes = AssetClassRepository(session, ctx).ordered()
         instruments = InstrumentRepository(session, ctx).ordered()
         allocations = InstrumentAllocationRepository(session, ctx).list()
-        return _page(classes, instruments, allocations, locale)
+        locked = InvestmentTransactionRepository(session, ctx).instrument_ids()
+        return _page(classes, instruments, allocations, locale, locked)
 
 
 def get_instrument(
@@ -782,6 +790,11 @@ def update_instrument(
             raise NotFound
         if row.archived_at is not None:
             raise InstrumentArchived
+        has_transactions = InvestmentTransactionRepository(session, ctx).any_for_instrument(row.id)
+        if has_transactions and row.quote_currency != currency:
+            raise InvalidInvestment("quote_currency", "currency_locked")
+        if has_transactions and row.type != instrument_type.value:
+            raise InvalidInvestment("type", "type_locked")
         classes = {row.id: row for row in AssetClassRepository(session, ctx).ordered()}
         allocation_repository = InstrumentAllocationRepository(session, ctx)
         existing_rows = allocation_repository.for_instrument(row.id)
@@ -807,7 +820,13 @@ def update_instrument(
         }
         allocations_changed = submitted_weights != existing_weights
         if not changes and not allocations_changed:
-            return _instrument_view(row, classes, existing_rows, locale)
+            return _instrument_view(
+                row,
+                classes,
+                existing_rows,
+                locale,
+                has_transactions=has_transactions,
+            )
         if "name" in changes:
             changes["name_key"] = key
         if changes:
@@ -848,6 +867,7 @@ def update_instrument(
             classes,
             allocation_repository.for_instrument(row.id),
             locale,
+            has_transactions=has_transactions,
         )
 
     return _write(factory, write, duplicate=DuplicateInstrumentName())

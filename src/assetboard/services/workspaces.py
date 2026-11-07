@@ -51,7 +51,7 @@ from assetboard.db.repositories import (
     create_owned_workspace,
 )
 from assetboard.domain.identity import InvalidEmail, normalize_email
-from assetboard.services import categories, investments, networth
+from assetboard.services import categories, investment_transactions, investments, networth
 from assetboard.services.auth import record_auth_event
 from assetboard.services.budget import workspace_has_budget_lines
 from assetboard.services.context import (
@@ -90,6 +90,7 @@ BASE_CURRENCY_LOCKS: list[Callable[[Session, Context], bool]] = [
     workspace_has_scheduled_amounts,
     workspace_has_income_amounts,
     workspace_has_fixed_tax_amounts,
+    investment_transactions.workspace_has_investment_transactions,
 ]
 
 
@@ -184,6 +185,8 @@ class WorkspaceSettings:
     taxes_enabled: bool = False
     # Days ahead for Upcoming payments and Home; None: the instance setting applies.
     upcoming_days: int | None = None
+    # F6.2: average or FIFO cost basis; holdings are recomputed on read.
+    investment_cost_basis: str = "average"
 
 
 def _checkpoint(_name: str) -> None:
@@ -221,6 +224,7 @@ def workspace_settings(factory: sessionmaker[Session], ctx: Context) -> Workspac
             base_currency_locked=_base_currency_locked(session, ctx),
             taxes_enabled=workspace.taxes_enabled,
             upcoming_days=workspace.upcoming_days,
+            investment_cost_basis=workspace.investment_cost_basis,
         )
 
 
@@ -237,6 +241,7 @@ def update_settings(
     require_two_factor: bool = False,
     recurrence_horizon_months: int = DEFAULT_RECURRENCE_HORIZON_MONTHS,
     upcoming_days: int | None = None,
+    investment_cost_basis: str = "average",
 ) -> WorkspaceSettings:
     """Change the workspace's settings; the audit event lists changed fields, not values.
 
@@ -250,6 +255,8 @@ def update_settings(
         raise InvalidWorkspaceSettings("name", "invalid_workspace_name")
     if upcoming_days is not None and not MIN_UPCOMING_DAYS <= upcoming_days <= MAX_UPCOMING_DAYS:
         raise InvalidWorkspaceSettings("upcoming_days", "invalid_upcoming_days")
+    if investment_cost_basis not in {"average", "fifo"}:
+        raise InvalidWorkspaceSettings("investment_cost_basis", "invalid_cost_basis")
     try:
         options = validate_workspace_options(
             base_currency=base_currency,
@@ -273,6 +280,7 @@ def update_settings(
         auto_copy_plan=auto_copy_plan,
         require_two_factor=require_two_factor,
         upcoming_days=upcoming_days,
+        investment_cost_basis=investment_cost_basis,
     )
 
     def write(session: Session) -> WorkspaceSettings:
@@ -292,6 +300,7 @@ def update_settings(
                 ("auto_copy_plan", wanted.auto_copy_plan),
                 ("require_two_factor", wanted.require_two_factor),
                 ("upcoming_days", wanted.upcoming_days),
+                ("investment_cost_basis", wanted.investment_cost_basis),
             )
             if getattr(workspace, field) != value
         }

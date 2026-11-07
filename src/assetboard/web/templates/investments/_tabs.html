@@ -10,5 +10,10 @@
   {% else %}
   <a href="{{ scoped_url(request, 'investments_classes') }}" role="tab" aria-selected="false" data-classes-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Asset classes") }}</a>
   {% endif %}
+  {% if active == "transactions" %}
+  <a href="{{ scoped_url(request, 'investments_transactions') }}" role="tab" aria-selected="true" data-investment-transactions-tab class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("Transactions") }}</a>
+  {% else %}
+  <a href="{{ scoped_url(request, 'investments_transactions') }}" role="tab" aria-selected="false" data-investment-transactions-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Transactions") }}</a>
+  {% endif %}
 </div>
 {%- endmacro %}

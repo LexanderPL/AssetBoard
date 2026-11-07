@@ -52,6 +52,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "instance_settings",
         "instrument_allocations",
         "instruments",
+        "investment_transactions",
         "invitations",
         "item_valuations",
         "login_tickets",
@@ -245,6 +246,32 @@ def test_0038_investments_migration_is_reversible(tmp_path: Path) -> None:
         command.downgrade(alembic_config(settings), "0037_f56_estimate_between")
         tables = set(inspect(engine).get_table_names())
         assert not {"asset_classes", "instruments", "instrument_allocations"} & tables
+        upgrade_database(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0039_investment_transactions_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'investment_transactions.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        assert "investment_transactions" in inspector.get_table_names()
+        assert "investment_cost_basis" in {
+            column["name"] for column in inspector.get_columns("workspaces")
+        }
+        command.downgrade(alembic_config(settings), "0038_f61_investments")
+        inspector = inspect(engine)
+        assert "investment_transactions" not in inspector.get_table_names()
+        assert "investment_cost_basis" not in {
+            column["name"] for column in inspector.get_columns("workspaces")
+        }
         upgrade_database(settings)
         check_database_migrations(settings)
     finally:

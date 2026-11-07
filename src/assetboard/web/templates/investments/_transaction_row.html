@@ -1,0 +1,46 @@
+{% from "investments/_transaction_form.html" import transaction_form with context %}
+{% from "macros/components.html" import csrf_input with context %}
+
+{% macro type_label(kind) -%}
+{% if kind == "buy" %}{{ _("Buy") }}{% elif kind == "sell" %}{{ _("Sell") }}{% else %}{{ kind }}{% endif %}
+{%- endmacro %}
+
+{% macro row(t, show_instrument, can_edit, edit_href, target, return_to, instrument_id) -%}
+<tr id="transaction-{{ t.id }}" data-transaction="{{ t.id }}">
+  <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ format_day(t.date, locale) if t.date else _("Undated") }}</td>
+  {% if show_instrument %}
+  <td class="px-3 py-2">
+    <a href="{{ scoped_url(request, 'investments_instrument', instrument_id=t.instrument_id|string) }}" class="text-primary-ink underline-offset-2 hover:underline">{{ t.instrument_name }}</a>
+    {% if t.instrument_archived %}<span class="ml-1 text-xs text-warning-strong">({{ _("archived") }})</span>{% endif %}
+  </td>
+  {% endif %}
+  <td class="px-3 py-2">{{ type_label(t.type) }}</td>
+  <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_quantity_input(t.quantity, locale) }}</td>
+  <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_quantity_input(t.unit_price, locale) }} {{ t.quote_currency }}</td>
+  <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(t.fee, locale) }}</td>
+  <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_quantity_input(t.fx_to_base, locale) }}</td>
+  <td class="px-3 py-2 text-muted">{{ t.note }}</td>
+  {% if can_edit and not t.instrument_archived %}
+  <td class="cell-tight px-3 py-2">
+    <div class="flex flex-wrap items-center justify-end gap-1">
+      <a href="{{ edit_href }}?edit={{ t.id }}" hx-get="{{ scoped_url(request, 'investment_transaction_edit', transaction_id=t.id|string) }}?show_instrument={{ 1 if show_instrument else 0 }}&target={{ target }}" hx-target="#transaction-{{ t.id }}" hx-swap="outerHTML" class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink">{{ _("Edit") }}</a>
+      <form method="post" action="{{ scoped_url(request, 'investment_transaction_delete', transaction_id=t.id|string) }}" hx-post="{{ scoped_url(request, 'investment_transaction_delete', transaction_id=t.id|string) }}" hx-target="#{{ target }}" hx-swap="outerHTML" data-confirm="{{ _('Delete the transaction of %(date)s?', date=format_day(t.date, locale) if t.date else _('Undated')) }}">
+        {{ csrf_input() }}
+        <input type="hidden" name="return_to" value="{{ return_to }}">
+        {% if instrument_id %}<input type="hidden" name="instrument_id" value="{{ instrument_id }}">{% endif %}
+        <button type="submit" class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger-soft">{{ _("Delete") }}</button>
+      </form>
+    </div>
+  </td>
+  {% else %}<td class="px-3 py-2"></td>{% endif %}
+</tr>
+{%- endmacro %}
+
+{% macro edit_row(t, target, values, errors, base_currency, cancel_href, return_to) -%}
+{% set fixed = {'id': t.instrument_id, 'name': t.instrument_name, 'type': t.instrument_type, 'quote_currency': t.quote_currency, 'unit_label': t.unit_label} %}
+<tr id="transaction-{{ t.id }}" data-transaction="{{ t.id }}">
+  <td colspan="9" class="bg-subtle p-3">
+    {{ transaction_form(scoped_url(request, 'investment_transaction_update', transaction_id=t.id|string), values, errors, target, base_currency, fixed=fixed, submit_label=_("Save transaction"), cancel_href=cancel_href, return_to=return_to) }}
+  </td>
+</tr>
+{%- endmacro %}

@@ -15,6 +15,9 @@ Owners open "Workspace settings" from the workspace menu. The page has:
   of archived categories and transfers are not copied, and existing planned values are never
   overwritten. A month that once had planned values (even if they were all removed later) and
   past months are never filled automatically; they offer the copy as a button instead.
+- **Investment cost basis**: **Average cost** (the default) or **FIFO** for investment holdings
+  and realized gains. Holdings are recomputed on read, so switching recalculates the whole
+  history; nothing derived is stored. The note under the field says so.
 
 Changes are recorded in the workspace audit log under "Workspace settings" (which fields
 changed, not their values).
@@ -25,11 +28,12 @@ Categories and workspace creation/switching stay in the account menu.
 ## The base currency is locked once amounts exist
 
 Amounts are stored in the base currency and are never converted. So the base currency can be
-changed only while the workspace has no transactions and no planned values. Once one exists,
-the field is shown locked with the reason, and a change is refused. Deleted transactions count
-too: they still hold an amount in that currency and can be restored. A removed planned value
-is gone for good (there is no undo for planned values), so it no longer locks the currency:
-with no transaction and no planned value left, the currency can change again.
+changed only while the workspace has no transactions, no planned values and no investment
+transactions. Once one exists, the field is shown locked with the reason, and a change is
+refused. Deleted transactions and deleted investment transactions count too: they still hold
+an amount in that currency and can be restored. A removed planned value is gone for good
+(there is no undo for planned values), so it no longer locks the currency: with no transaction,
+no planned value and no investment transaction left, the currency can change again.
 
 Choose the base currency before you start entering amounts. All other settings can still be
 changed at any time.

@@ -1,0 +1,76 @@
+{% from "macros/components.html" import csrf_input with context %}
+
+{% macro transaction_form(action, values, errors, target, base_currency, instruments=(), fixed=None, submit_label="", cancel_href=None, return_to=None) -%}
+{% set form_return_to = return_to if return_to else ("instrument" if fixed else "list") %}
+<form method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#{{ target }}" hx-swap="outerHTML" class="grid gap-4 sm:grid-cols-2" novalidate data-transaction-form data-base-currency="{{ base_currency }}">
+  {{ csrf_input() }}
+  {% if fixed %}
+  <input type="hidden" name="instrument_id" value="{{ fixed.id }}">
+  <input type="hidden" name="return_to" value="{{ form_return_to }}">
+  <div class="space-y-1 sm:col-span-2">
+    <p class="text-sm font-medium">{{ fixed.name }}</p>
+    <p class="text-xs text-muted">{{ fixed.type_label if fixed.type_label is defined else fixed.type }} · {{ fixed.quote_currency }} · {{ fixed.unit_label }}</p>
+  </div>
+  {% else %}
+  <input type="hidden" name="return_to" value="{{ form_return_to }}">
+  <div class="space-y-1.5 sm:col-span-2">
+    <label for="transaction-instrument" class="block text-sm font-medium">{{ _("Instrument") }}</label>
+    <select id="transaction-instrument" name="instrument_id" class="form-select w-full" data-transaction-instrument>
+      <option value="">{{ _("Choose an instrument") }}</option>
+      {% for item in instruments %}
+      <option value="{{ item.id }}" data-currency="{{ item.quote_currency }}" data-type="{{ item.type }}"{% if values.instrument_id == item.id|string %} selected{% endif %}>{{ item.name }}{% if item.symbol %} ({{ item.symbol }}){% endif %}</option>
+      {% endfor %}
+    </select>
+    {% if errors.get("instrument") %}<p class="text-sm text-danger">{{ errors.get("instrument") }}</p>{% endif %}
+  </div>
+  {% endif %}
+  <div class="space-y-1.5">
+    <label for="transaction-date" class="block text-sm font-medium">{{ _("Date") }}</label>
+    <input id="transaction-date" name="date" type="date" value="{{ values.date }}" required class="form-control w-full">
+    {% if errors.get("date") %}<p class="text-sm text-danger">{{ errors.get("date") }}</p>{% endif %}
+  </div>
+  <div class="space-y-1.5">
+    <label for="transaction-type" class="block text-sm font-medium">{{ _("Type") }}</label>
+    <select id="transaction-type" name="type" class="form-select w-full">
+      <option value="buy"{% if values.type == "buy" %} selected{% endif %}>{{ _("Buy") }}</option>
+      <option value="sell"{% if values.type == "sell" %} selected{% endif %}>{{ _("Sell") }}</option>
+    </select>
+    {% if errors.get("type") %}<p class="text-sm text-danger">{{ errors.get("type") }}</p>{% endif %}
+  </div>
+  <div class="space-y-1.5">
+    <label for="transaction-quantity" class="block text-sm font-medium">{{ _("Quantity") }}</label>
+    <input id="transaction-quantity" name="quantity" type="text" inputmode="decimal" value="{{ values.quantity }}" required class="form-control w-full">
+    {% if errors.get("quantity") %}<p class="text-sm text-danger">{{ errors.get("quantity") }}</p>{% endif %}
+  </div>
+  <div class="space-y-1.5" data-transaction-price-field>
+    <label for="transaction-price" class="block text-sm font-medium">{{ _("Unit price") }}</label>
+    {% set price_value = "1" if fixed and fixed.type == "currency" else values.unit_price %}
+    <input id="transaction-price" name="unit_price" type="text" inputmode="decimal" value="{{ price_value }}"{% if fixed and fixed.type == "currency" %} readonly{% endif %} class="form-control w-full" data-transaction-price>
+    <p class="text-xs text-muted">{{ _("In the instrument's quote currency. A currency instrument is always priced at 1.") }}</p>
+    {% if errors.get("unit_price") %}<p class="text-sm text-danger">{{ errors.get("unit_price") }}</p>{% endif %}
+  </div>
+  <div class="space-y-1.5">
+    <label for="transaction-fee" class="block text-sm font-medium">{{ _("Fee") }}</label>
+    <input id="transaction-fee" name="fee" type="text" inputmode="decimal" value="{{ values.fee }}" class="form-control w-full">
+    {% if errors.get("fee") %}<p class="text-sm text-danger">{{ errors.get("fee") }}</p>{% endif %}
+  </div>
+  {% if not (fixed and fixed.quote_currency == base_currency) %}
+  <div class="space-y-1.5" data-transaction-fx>
+    <label for="transaction-fx" class="block text-sm font-medium">{{ _("FX rate to %(currency)s", currency=base_currency) }}</label>
+    <input id="transaction-fx" name="fx_to_base" type="text" inputmode="decimal" value="{{ values.fx_to_base }}" class="form-control w-full">
+    <p class="text-xs text-muted">{{ _("Required when the instrument is quoted in another currency.") }}</p>
+    {% if errors.get("fx_to_base") %}<p class="text-sm text-danger">{{ errors.get("fx_to_base") }}</p>{% endif %}
+  </div>
+  {% else %}<input type="hidden" name="fx_to_base" value="1">{% endif %}
+  <div class="space-y-1.5 sm:col-span-2">
+    <label for="transaction-note" class="block text-sm font-medium">{{ _("Note") }}</label>
+    <input id="transaction-note" name="note" type="text" value="{{ values.note }}" maxlength="200" class="form-control w-full">
+    {% if errors.get("note") %}<p class="text-sm text-danger">{{ errors.get("note") }}</p>{% endif %}
+  </div>
+  {% if errors.get("form") %}<p class="text-sm text-danger sm:col-span-2">{{ errors.get("form") }}</p>{% endif %}
+  <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+    <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ submit_label }}</button>
+    {% if cancel_href %}<a href="{{ cancel_href }}" class="rounded-xl px-3 py-2 text-sm font-medium text-muted hover:bg-subtle">{{ _("Cancel") }}</a>{% endif %}
+  </div>
+</form>
+{%- endmacro %}

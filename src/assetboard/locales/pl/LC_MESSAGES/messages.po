@@ -490,6 +490,18 @@ msgstr "Przywrócono instrument"
 msgid "Instrument allocation changed"
 msgstr "Zmieniono alokację instrumentu"
 
+msgid "Investment transaction added"
+msgstr "Dodano transakcję inwestycyjną"
+
+msgid "Investment transaction changed"
+msgstr "Zmieniono transakcję inwestycyjną"
+
+msgid "Investment transaction deleted"
+msgstr "Usunięto transakcję inwestycyjną"
+
+msgid "Investment transaction restored"
+msgstr "Przywrócono transakcję inwestycyjną"
+
 msgid "Month closed"
 msgstr "Miesiąc zamknięty"
 
@@ -633,6 +645,24 @@ msgstr "Rodzaj"
 
 msgid "Investable"
 msgstr "Inwestycyjna"
+
+msgid "Instrument"
+msgstr "Instrument"
+
+msgid "Transaction type"
+msgstr "Typ transakcji"
+
+msgid "Quantity"
+msgstr "Ilość"
+
+msgid "Unit price"
+msgstr "Cena jednostkowa"
+
+msgid "Fee"
+msgstr "Opłata"
+
+msgid "FX rate"
+msgstr "Kurs walutowy"
 
 msgid "Base"
 msgstr "Podstawa"
@@ -964,6 +994,21 @@ msgstr "waluta notowania"
 msgid "valuation source"
 msgstr "źródło wyceny"
 
+msgid "investment cost basis"
+msgstr "metoda kosztu inwestycji"
+
+msgid "transaction type"
+msgstr "typ transakcji"
+
+msgid "quantity"
+msgstr "ilość"
+
+msgid "unit price"
+msgstr "cena jednostkowa"
+
+msgid "fee"
+msgstr "opłata"
+
 msgid "expense"
 msgstr "wydatek"
 
@@ -984,6 +1029,18 @@ msgstr "oszczędności"
 
 msgid "transfer"
 msgstr "przelew własny"
+
+msgid "buy"
+msgstr "kupno"
+
+msgid "sell"
+msgstr "sprzedaż"
+
+msgid "dividend"
+msgstr "dywidenda"
+
+msgid "split"
+msgstr "podział"
 
 msgid "Members"
 msgstr "Członkowie"
@@ -2014,6 +2071,12 @@ msgstr "Ta klasa aktywów jest zarchiwizowana; przywróć ją przed przypisaniem
 msgid "Restore the instrument before changing it."
 msgstr "Przywróć instrument przed jego zmianą."
 
+msgid "The quote currency cannot change: transactions exist."
+msgstr "Nie można zmienić waluty notowania: istnieją transakcje."
+
+msgid "The type cannot change: transactions exist."
+msgstr "Nie można zmienić typu: istnieją transakcje."
+
 msgid "Asset class added."
 msgstr "Dodano klasę aktywów."
 
@@ -2040,6 +2103,72 @@ msgstr "Zarchiwizowano instrument."
 
 msgid "Instrument restored."
 msgstr "Przywrócono instrument."
+
+msgid "Choose buy or sell."
+msgstr "Wybierz kupno lub sprzedaż."
+
+msgid "Enter a valid date."
+msgstr "Wpisz prawidłową datę."
+
+msgid "Investment transactions cannot be dated in the future."
+msgstr "Transakcje inwestycyjne nie mogą mieć daty w przyszłości."
+
+msgid "Enter a quantity greater than zero."
+msgstr "Wpisz ilość większą od zera."
+
+msgid "Enter a unit price of zero or more."
+msgstr "Wpisz cenę jednostkową równą zero lub większą."
+
+msgid "Enter a fee of zero or more."
+msgstr "Wpisz opłatę równą zero lub większą."
+
+msgid "The fee has too many decimal places for its currency."
+msgstr "Opłata ma zbyt wiele miejsc po przecinku dla swojej waluty."
+
+msgid "The fee is too large."
+msgstr "Opłata jest zbyt duża."
+
+msgid "Enter a positive FX rate to the base currency."
+msgstr "Wpisz dodatni kurs walutowy do waluty bazowej."
+
+msgid "Enter a note of at most 200 characters."
+msgstr "Wpisz notatkę o długości do 200 znaków."
+
+msgid "Choose an instrument."
+msgstr "Wybierz instrument."
+
+msgid "This instrument is archived; restore it before changing its transactions."
+msgstr ""
+"Ten instrument jest zarchiwizowany; przywróć go przed zmianą jego "
+"transakcji."
+
+msgid "This transaction is deleted."
+msgstr "Ta transakcja jest usunięta."
+
+msgid "The 10-second undo window has expired."
+msgstr "Upłynął 10-sekundowy limit czasu na cofnięcie."
+
+msgid "A future-dated transaction cannot be restored."
+msgstr "Nie można przywrócić transakcji z datą w przyszłości."
+
+#, python-format
+msgid "The sale on %(date)s would exceed the quantity held."
+msgstr "Sprzedaż z dnia %(date)s przekroczyłaby posiadaną ilość."
+
+msgid "Transaction added."
+msgstr "Dodano transakcję."
+
+msgid "Transaction saved."
+msgstr "Zapisano transakcję."
+
+msgid "Transaction deleted."
+msgstr "Usunięto transakcję."
+
+msgid "Transaction restored."
+msgstr "Przywrócono transakcję."
+
+msgid "an undated transaction"
+msgstr "transakcja bez daty"
 
 msgid ""
 "This invitation link is not valid. It may have expired, been used or been"
@@ -2956,9 +3085,6 @@ msgstr ""
 msgid "This occurrence has no transaction to undo."
 msgstr "To wystąpienie nie ma transakcji, którą można cofnąć."
 
-msgid "The 10-second undo window has expired."
-msgstr "Upłynął 10-sekundowy limit czasu na cofnięcie."
-
 msgid "The occurrence category is unavailable; edit the recurring rule."
 msgstr "Kategoria wystąpienia jest niedostępna; edytuj regułę cykliczną."
 
@@ -3026,6 +3152,9 @@ msgstr ""
 
 msgid "Enter a number of days from 1 to 365, or leave it empty."
 msgstr "Podaj liczbę dni od 1 do 365 albo pozostaw pole puste."
+
+msgid "Choose average cost or FIFO."
+msgstr "Wybierz koszt średni lub FIFO."
 
 msgid "A workspace needs at least one owner. Make another member an owner first."
 msgstr ""
@@ -3098,6 +3227,9 @@ msgstr "Automatyczne kopiowanie planu"
 
 msgid "Upcoming window"
 msgstr "Okno nadchodzących"
+
+msgid "Investment cost basis"
+msgstr "Metoda kosztu inwestycji"
 
 msgid "Workspace settings saved."
 msgstr "Zapisano ustawienia obszaru roboczego."
@@ -4657,6 +4789,50 @@ msgstr ""
 "Zarchiwizowane klasy pozostają na istniejących instrumentach, ale nie "
 "można ich wybierać do nowych alokacji."
 
+msgid "Undo"
+msgstr "Cofnij"
+
+msgid "Back to instruments"
+msgstr "Wróć do instrumentów"
+
+msgid "Average cost"
+msgstr "Koszt średni"
+
+msgid "Cost basis"
+msgstr "Podstawa kosztu"
+
+msgid "Realized P&L"
+msgstr "Zrealizowany zysk/strata"
+
+msgid "Add a transaction"
+msgstr "Dodaj transakcję"
+
+msgid "Add transaction"
+msgstr "Dodaj transakcję"
+
+msgid ""
+"This instrument is archived. Restore it before adding or changing "
+"transactions."
+msgstr ""
+"Ten instrument jest zarchiwizowany. Przywróć go przed dodaniem lub zmianą"
+" transakcji."
+
+msgid "Transaction history"
+msgstr "Historia transakcji"
+
+#, python-format
+msgid "Transactions of %(name)s"
+msgstr "Transakcje: %(name)s"
+
+msgid "FX"
+msgstr "Kurs"
+
+msgid "Note"
+msgstr "Notatka"
+
+msgid "No transactions for this instrument yet."
+msgstr "Ten instrument nie ma jeszcze transakcji."
+
 msgid ""
 "Add the suggested asset classes before creating instruments; every "
 "instrument's value is split across them."
@@ -4696,6 +4872,13 @@ msgid "Optional, for example VWCE.DE or BTC."
 msgstr "Opcjonalnie, na przykład VWCE.DE lub BTC."
 
 msgid ""
+"Locked: transactions exist. Their prices and fees depend on the "
+"instrument type."
+msgstr ""
+"Zablokowane: istnieją transakcje. Ich ceny i opłaty zależą od typu "
+"instrumentu."
+
+msgid ""
 "Bond (model value) instruments need terms before they can be valued; you "
 "can record purchases now."
 msgstr ""
@@ -4704,6 +4887,13 @@ msgstr ""
 
 msgid "Quote currency"
 msgstr "Waluta notowania"
+
+msgid ""
+"Locked: transactions exist. Their prices and fees are stored in this "
+"currency."
+msgstr ""
+"Zablokowane: istnieją transakcje. Ich ceny i opłaty są zapisane w tej "
+"walucie."
 
 msgid "Unit prices and fees are in this currency."
 msgstr "Ceny jednostkowe i opłaty są w tej walucie."
@@ -4759,6 +4949,63 @@ msgid ""
 msgstr ""
 "Zarchiwizowane instrumenty zachowują alokację i historię, ale nie można "
 "nimi handlować."
+
+msgid "Choose an instrument"
+msgstr "Wybierz instrument"
+
+msgid "Buy"
+msgstr "Kupno"
+
+msgid "Sell"
+msgstr "Sprzedaż"
+
+msgid ""
+"In the instrument's quote currency. A currency instrument is always "
+"priced at 1."
+msgstr "W walucie notowania instrumentu. Instrument walutowy zawsze ma cenę 1."
+
+#, python-format
+msgid "FX rate to %(currency)s"
+msgstr "Kurs walutowy do %(currency)s"
+
+msgid "Required when the instrument is quoted in another currency."
+msgstr "Wymagany, gdy instrument jest notowany w innej walucie."
+
+msgid "Undated"
+msgstr "Bez daty"
+
+#, python-format
+msgid "Delete the transaction of %(date)s?"
+msgstr "Usunąć transakcję z dnia %(date)s?"
+
+msgid "Add an active instrument first."
+msgstr "Najpierw dodaj aktywny instrument."
+
+msgid "All instruments"
+msgstr "Wszystkie instrumenty"
+
+msgid "All types"
+msgstr "Wszystkie typy"
+
+msgid "Clear"
+msgstr "Wyczyść"
+
+msgid "Investment transactions"
+msgstr "Transakcje inwestycyjne"
+
+#, python-format
+msgid "Showing %(num)d transaction."
+msgid_plural "Showing %(num)d transactions."
+msgstr[0] "Wyświetlana jest %(num)d transakcja."
+msgstr[1] "Wyświetlane są %(num)d transakcje."
+msgstr[2] "Wyświetlanych jest %(num)d transakcji."
+
+#, python-format
+msgid "Page %(page)d of %(pages)d"
+msgstr "Strona %(page)d z %(pages)d"
+
+msgid "No investment transactions match these filters."
+msgstr "Żadna transakcja inwestycyjna nie pasuje do tych filtrów."
 
 msgid "Invitation"
 msgstr "Zaproszenie"
@@ -4858,9 +5105,6 @@ msgstr "Pominięte"
 #, python-format
 msgid "Undo skipping %(name)s on %(date)s"
 msgstr "Cofnij pominięcie %(name)s z dnia %(date)s"
-
-msgid "Undo"
-msgstr "Cofnij"
 
 msgid "No entries in this category this month."
 msgstr "Brak wpisów tej kategorii w tym miesiącu."
@@ -5399,9 +5643,6 @@ msgstr "Szacuje wartości między wpisami"
 msgid "Value"
 msgstr "Wartość"
 
-msgid "Note"
-msgstr "Notatka"
-
 msgid "future"
 msgstr "przyszła"
 
@@ -5889,9 +6130,6 @@ msgstr "Wszystkie kategorie"
 
 msgid "Apply filters"
 msgstr "Zastosuj filtry"
-
-msgid "Clear"
-msgstr "Wyczyść"
 
 #, python-format
 msgid "Showing overdue items and the next %(days)d days."
@@ -6682,6 +6920,18 @@ msgstr "Jak daleko w przód sięgają Nadchodzące płatności i strona główna
 #, python-format
 msgid "Empty: %(days)d days, the server default."
 msgstr "Puste: %(days)d dni, domyślnie dla serwera."
+
+msgid "FIFO"
+msgstr "FIFO"
+
+msgid ""
+"Holdings are recalculated for the whole history. Changing this "
+"recalculates realized gains and cost basis; no stored values are "
+"rewritten."
+msgstr ""
+"Posiadane ilości są przeliczane dla całej historii. Zmiana tego "
+"ustawienia przelicza zrealizowane zyski i podstawę kosztu; żadne zapisane"
+" wartości nie są zmieniane."
 
 msgid "Copy the previous month's plan when a month is opened for the first time"
 msgstr "Kopiuj plan z poprzedniego miesiąca przy pierwszym otwarciu miesiąca"

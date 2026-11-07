@@ -63,6 +63,7 @@ from assetboard.db.repositories import (
     InstanceAuditReader,
     InstrumentAllocationRepository,
     InstrumentRepository,
+    InvestmentTransactionRepository,
     InvitationRepository,
     InvitationTokenReader,
     ItemValuationRepository,
@@ -414,7 +415,7 @@ def test_current_workspace_repository_touches_only_its_workspace(
 
     assert {
         "name", "base_currency", "country_code", "timezone", "locale", "auto_copy_plan",
-        "require_two_factor", "taxes_enabled", "upcoming_days"
+        "require_two_factor", "taxes_enabled", "upcoming_days", "investment_cost_basis"
     } == UPDATABLE_FIELDS  # fmt: skip
     for forbidden in ("id", "created_at", "updated_at", "unknown"):
         with pytest.raises(ValueError):
@@ -615,6 +616,73 @@ def test_investment_queries_stay_in_their_workspace(
     ]
     assert [row.id for row in allocations_b.for_instrument(b_fund.id)] == [b_allocation.id]
     assert allocations_b.for_instrument(a_fund.id) == []
+
+    transactions_a = InvestmentTransactionRepository(db_session, ctx_a)
+    transactions_b = InvestmentTransactionRepository(db_session, ctx_b)
+    a_transaction = transactions_a.create(
+        instrument_id=a_fund.id,
+        date=date(2026, 3, 1),
+        type="buy",
+        quantity=Decimal("1"),
+        unit_price=Decimal("100"),
+        quote_currency="EUR",
+        fee_minor=0,
+        fx_to_base=Decimal("1"),
+    )
+    b_transaction = transactions_b.create(
+        instrument_id=b_fund.id,
+        date=date(2026, 3, 1),
+        type="buy",
+        quantity=Decimal("2"),
+        unit_price=Decimal("50"),
+        quote_currency="EUR",
+        fee_minor=0,
+        fx_to_base=Decimal("1"),
+    )
+    assert [row.id for row in transactions_a.for_instrument(a_fund.id)] == [a_transaction.id]
+    assert transactions_b.for_instrument(a_fund.id) == []
+    assert [row.id for row in transactions_a.live()] == [a_transaction.id]
+    assert [row.id for row in transactions_b.live()] == [b_transaction.id]
+    assert transactions_a.any_for_instrument(a_fund.id)
+    assert not transactions_b.any_for_instrument(a_fund.id)
+    assert transactions_a.instrument_ids() == {a_fund.id}
+    assert transactions_b.instrument_ids() == {b_fund.id}
+    assert transactions_a.get_for_update(a_transaction.id) is a_transaction
+    assert transactions_b.get_for_update(a_transaction.id) is None
+    assert [
+        row.id
+        for row in transactions_a.filtered(
+            instrument_id=a_fund.id,
+            types=("buy",),
+            date_from=None,
+            date_to=None,
+            limit=10,
+            offset=0,
+        )
+    ] == [a_transaction.id]
+    assert (
+        transactions_b.filtered(
+            instrument_id=a_fund.id,
+            types=("buy",),
+            date_from=None,
+            date_to=None,
+            limit=10,
+            offset=0,
+        )
+        == []
+    )
+    assert (
+        transactions_a.count_filtered(
+            instrument_id=a_fund.id, types=("buy",), date_from=None, date_to=None
+        )
+        == 1
+    )
+    assert (
+        transactions_b.count_filtered(
+            instrument_id=a_fund.id, types=("buy",), date_from=None, date_to=None
+        )
+        == 0
+    )
 
 
 def test_networth_queries_stay_in_their_workspace(

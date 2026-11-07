@@ -487,6 +487,18 @@ msgstr ""
 msgid "Instrument allocation changed"
 msgstr ""
 
+msgid "Investment transaction added"
+msgstr ""
+
+msgid "Investment transaction changed"
+msgstr ""
+
+msgid "Investment transaction deleted"
+msgstr ""
+
+msgid "Investment transaction restored"
+msgstr ""
+
 msgid "Month closed"
 msgstr ""
 
@@ -629,6 +641,24 @@ msgid "Type"
 msgstr ""
 
 msgid "Investable"
+msgstr ""
+
+msgid "Instrument"
+msgstr ""
+
+msgid "Transaction type"
+msgstr ""
+
+msgid "Quantity"
+msgstr ""
+
+msgid "Unit price"
+msgstr ""
+
+msgid "Fee"
+msgstr ""
+
+msgid "FX rate"
 msgstr ""
 
 msgid "Base"
@@ -961,6 +991,21 @@ msgstr ""
 msgid "valuation source"
 msgstr ""
 
+msgid "investment cost basis"
+msgstr ""
+
+msgid "transaction type"
+msgstr ""
+
+msgid "quantity"
+msgstr ""
+
+msgid "unit price"
+msgstr ""
+
+msgid "fee"
+msgstr ""
+
 msgid "expense"
 msgstr ""
 
@@ -980,6 +1025,18 @@ msgid "savings"
 msgstr ""
 
 msgid "transfer"
+msgstr ""
+
+msgid "buy"
+msgstr ""
+
+msgid "sell"
+msgstr ""
+
+msgid "dividend"
+msgstr ""
+
+msgid "split"
 msgstr ""
 
 msgid "Members"
@@ -1921,6 +1978,12 @@ msgstr ""
 msgid "Restore the instrument before changing it."
 msgstr ""
 
+msgid "The quote currency cannot change: transactions exist."
+msgstr ""
+
+msgid "The type cannot change: transactions exist."
+msgstr ""
+
 msgid "Asset class added."
 msgstr ""
 
@@ -1946,6 +2009,70 @@ msgid "Instrument archived."
 msgstr ""
 
 msgid "Instrument restored."
+msgstr ""
+
+msgid "Choose buy or sell."
+msgstr ""
+
+msgid "Enter a valid date."
+msgstr ""
+
+msgid "Investment transactions cannot be dated in the future."
+msgstr ""
+
+msgid "Enter a quantity greater than zero."
+msgstr ""
+
+msgid "Enter a unit price of zero or more."
+msgstr ""
+
+msgid "Enter a fee of zero or more."
+msgstr ""
+
+msgid "The fee has too many decimal places for its currency."
+msgstr ""
+
+msgid "The fee is too large."
+msgstr ""
+
+msgid "Enter a positive FX rate to the base currency."
+msgstr ""
+
+msgid "Enter a note of at most 200 characters."
+msgstr ""
+
+msgid "Choose an instrument."
+msgstr ""
+
+msgid "This instrument is archived; restore it before changing its transactions."
+msgstr ""
+
+msgid "This transaction is deleted."
+msgstr ""
+
+msgid "The 10-second undo window has expired."
+msgstr ""
+
+msgid "A future-dated transaction cannot be restored."
+msgstr ""
+
+#, python-format
+msgid "The sale on %(date)s would exceed the quantity held."
+msgstr ""
+
+msgid "Transaction added."
+msgstr ""
+
+msgid "Transaction saved."
+msgstr ""
+
+msgid "Transaction deleted."
+msgstr ""
+
+msgid "Transaction restored."
+msgstr ""
+
+msgid "an undated transaction"
 msgstr ""
 
 msgid ""
@@ -2779,9 +2906,6 @@ msgstr ""
 msgid "This occurrence has no transaction to undo."
 msgstr ""
 
-msgid "The 10-second undo window has expired."
-msgstr ""
-
 msgid "The occurrence category is unavailable; edit the recurring rule."
 msgstr ""
 
@@ -2838,6 +2962,9 @@ msgid ""
 msgstr ""
 
 msgid "Enter a number of days from 1 to 365, or leave it empty."
+msgstr ""
+
+msgid "Choose average cost or FIFO."
 msgstr ""
 
 msgid "A workspace needs at least one owner. Make another member an owner first."
@@ -2904,6 +3031,9 @@ msgid "Automatic plan copy"
 msgstr ""
 
 msgid "Upcoming window"
+msgstr ""
+
+msgid "Investment cost basis"
 msgstr ""
 
 msgid "Workspace settings saved."
@@ -4329,6 +4459,48 @@ msgid ""
 "chosen for new allocations."
 msgstr ""
 
+msgid "Undo"
+msgstr ""
+
+msgid "Back to instruments"
+msgstr ""
+
+msgid "Average cost"
+msgstr ""
+
+msgid "Cost basis"
+msgstr ""
+
+msgid "Realized P&L"
+msgstr ""
+
+msgid "Add a transaction"
+msgstr ""
+
+msgid "Add transaction"
+msgstr ""
+
+msgid ""
+"This instrument is archived. Restore it before adding or changing "
+"transactions."
+msgstr ""
+
+msgid "Transaction history"
+msgstr ""
+
+#, python-format
+msgid "Transactions of %(name)s"
+msgstr ""
+
+msgid "FX"
+msgstr ""
+
+msgid "Note"
+msgstr ""
+
+msgid "No transactions for this instrument yet."
+msgstr ""
+
 msgid ""
 "Add the suggested asset classes before creating instruments; every "
 "instrument's value is split across them."
@@ -4361,11 +4533,21 @@ msgid "Optional, for example VWCE.DE or BTC."
 msgstr ""
 
 msgid ""
+"Locked: transactions exist. Their prices and fees depend on the "
+"instrument type."
+msgstr ""
+
+msgid ""
 "Bond (model value) instruments need terms before they can be valued; you "
 "can record purchases now."
 msgstr ""
 
 msgid "Quote currency"
+msgstr ""
+
+msgid ""
+"Locked: transactions exist. Their prices and fees are stored in this "
+"currency."
 msgstr ""
 
 msgid "Unit prices and fees are in this currency."
@@ -4415,6 +4597,62 @@ msgstr ""
 msgid ""
 "Archived instruments keep their allocation and history but cannot be "
 "traded."
+msgstr ""
+
+msgid "Choose an instrument"
+msgstr ""
+
+msgid "Buy"
+msgstr ""
+
+msgid "Sell"
+msgstr ""
+
+msgid ""
+"In the instrument's quote currency. A currency instrument is always "
+"priced at 1."
+msgstr ""
+
+#, python-format
+msgid "FX rate to %(currency)s"
+msgstr ""
+
+msgid "Required when the instrument is quoted in another currency."
+msgstr ""
+
+msgid "Undated"
+msgstr ""
+
+#, python-format
+msgid "Delete the transaction of %(date)s?"
+msgstr ""
+
+msgid "Add an active instrument first."
+msgstr ""
+
+msgid "All instruments"
+msgstr ""
+
+msgid "All types"
+msgstr ""
+
+msgid "Clear"
+msgstr ""
+
+msgid "Investment transactions"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "Showing %(num)d transaction."
+msgid_plural "Showing %(num)d transactions."
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "Page %(page)d of %(pages)d"
+msgstr ""
+
+msgid "No investment transactions match these filters."
 msgstr ""
 
 msgid "Invitation"
@@ -4508,9 +4746,6 @@ msgstr ""
 
 #, python-format
 msgid "Undo skipping %(name)s on %(date)s"
-msgstr ""
-
-msgid "Undo"
 msgstr ""
 
 msgid "No entries in this category this month."
@@ -4989,9 +5224,6 @@ msgstr ""
 msgid "Value"
 msgstr ""
 
-msgid "Note"
-msgstr ""
-
 msgid "future"
 msgstr ""
 
@@ -5440,9 +5672,6 @@ msgid "All categories"
 msgstr ""
 
 msgid "Apply filters"
-msgstr ""
-
-msgid "Clear"
 msgstr ""
 
 #, python-format
@@ -6180,6 +6409,15 @@ msgstr ""
 
 #, python-format
 msgid "Empty: %(days)d days, the server default."
+msgstr ""
+
+msgid "FIFO"
+msgstr ""
+
+msgid ""
+"Holdings are recalculated for the whole history. Changing this "
+"recalculates realized gains and cost basis; no stored values are "
+"rewritten."
 msgstr ""
 
 msgid "Copy the previous month's plan when a month is opened for the first time"

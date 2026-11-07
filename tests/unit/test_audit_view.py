@@ -164,6 +164,10 @@ INVESTMENT_ACTIONS = {
     "instrument.archived",
     "instrument.restored",
     "instrument_allocation.updated",
+    "investment_transaction.created",
+    "investment_transaction.updated",
+    "investment_transaction.deleted",
+    "investment_transaction.restored",
 }
 
 
@@ -171,13 +175,28 @@ def test_every_investment_action_has_a_label_keys_and_a_group() -> None:
     assert {
         action
         for action in ACTION_LABELS
-        if action.startswith(("asset_class.", "instrument.", "instrument_allocation."))
+        if action.startswith(
+            (
+                "asset_class.",
+                "instrument.",
+                "instrument_allocation.",
+                "investment_transaction.",
+            )
+        )
     } == INVESTMENT_ACTIONS
     assert set(GROUPS["workspace"]["investments"]) == INVESTMENT_ACTIONS
     assert "investments" in GROUP_LABELS
     keys = {key for action in INVESTMENT_ACTIONS for key in DATA_KEYS[action]}
     assert keys <= set(KEY_LABELS)
+    assert set(VALUE_TABLES["transaction_type"]) == {
+        "buy",
+        "sell",
+        "dividend",
+        "fee",
+        "split",
+    }
     texts = [ACTION_LABELS[a] for a in INVESTMENT_ACTIONS] + [KEY_LABELS[k] for k in keys]
+    texts += list(VALUE_TABLES["transaction_type"].values())
     texts.append(GROUP_LABELS["investments"])
     for text in texts:
         assert gettext(text, "pl").strip()

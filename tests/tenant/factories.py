@@ -21,7 +21,12 @@ from sqlalchemy.orm import Session
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
 from assetboard.db.models.import_batch import ImportBatch, ImportCategoryMapping
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
-from assetboard.db.models.investments import AssetClass, Instrument, InstrumentAllocation
+from assetboard.db.models.investments import (
+    AssetClass,
+    Instrument,
+    InstrumentAllocation,
+    InvestmentTransaction,
+)
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.db.models.networth import (
     ItemValuation,
@@ -381,6 +386,24 @@ def make_instrument_allocation(session: Session, workspace_id: UUID) -> Instrume
     )
 
 
+def make_investment_transaction(session: Session, workspace_id: UUID) -> InvestmentTransaction:
+    instrument = make_instrument(session, workspace_id)
+    session.add(instrument)
+    session.flush()
+    return InvestmentTransaction(
+        workspace_id=workspace_id,
+        instrument_id=instrument.id,
+        date=date(2026, 3, 1),
+        type="buy",
+        quantity=Decimal("1"),
+        unit_price=Decimal("100"),
+        quote_currency="EUR",
+        fee_minor=0,
+        fx_to_base=Decimal("1"),
+        note="Synthetic",
+    )
+
+
 def make_networth_category(session: Session, workspace_id: UUID) -> NetWorthCategory:
     name = f"Net worth category {uuid4().hex[:8]}"
     return NetWorthCategory(
@@ -454,6 +477,9 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     Instrument: TenantCase(make_instrument, update_values={"name": "Updated instrument"}),
     InstrumentAllocation: TenantCase(
         make_instrument_allocation, update_values={"weight_bp": 5_000}
+    ),
+    InvestmentTransaction: TenantCase(
+        make_investment_transaction, update_values={"note": "Updated"}
     ),
     NetWorthCategory: TenantCase(make_networth_category, update_values={"color": "#e11d48"}),
     NetWorthItem: TenantCase(make_networth_item, update_values={"name": "Updated item"}),
