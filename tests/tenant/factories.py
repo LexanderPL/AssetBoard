@@ -35,6 +35,7 @@ from assetboard.db.models.networth import (
     NetWorthSnapshot,
 )
 from assetboard.db.models.notifications import NotificationChannel, NotificationLog
+from assetboard.db.models.prices import FxRate, PricePoint
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.models.tax import TaxRule, TaxRuleVersion
 from assetboard.services.invitations import new_token
@@ -103,6 +104,8 @@ def make_category(session: Session, workspace_id: UUID) -> Category:
 _MONTHS = itertools.count()
 # (workspace, as_of, source) is unique: each snapshot gets its own month too.
 _SNAPSHOT_MONTHS = itertools.count()
+# (workspace, base, quote, date, source) is unique: each FX row gets its own date.
+_FX_DATES = itertools.count()
 
 
 def make_month_state(session: Session, workspace_id: UUID) -> MonthState:
@@ -404,6 +407,31 @@ def make_investment_transaction(session: Session, workspace_id: UUID) -> Investm
     )
 
 
+def make_price_point(session: Session, workspace_id: UUID) -> PricePoint:
+    instrument = make_instrument(session, workspace_id)
+    session.add(instrument)
+    session.flush()
+    return PricePoint(
+        workspace_id=workspace_id,
+        instrument_id=instrument.id,
+        date=date(2026, 3, 1),
+        price=Decimal("100"),
+        source="manual",
+    )
+
+
+def make_fx_rate(session: Session, workspace_id: UUID) -> FxRate:
+    index = next(_FX_DATES)
+    return FxRate(
+        workspace_id=workspace_id,
+        base_currency="EUR",
+        quote_currency="USD",
+        date=date(2026, 1, 1) + timedelta(days=index),
+        rate=Decimal("0.92"),
+        source="manual",
+    )
+
+
 def make_networth_category(session: Session, workspace_id: UUID) -> NetWorthCategory:
     name = f"Net worth category {uuid4().hex[:8]}"
     return NetWorthCategory(
@@ -481,6 +509,8 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     InvestmentTransaction: TenantCase(
         make_investment_transaction, update_values={"note": "Updated"}
     ),
+    PricePoint: TenantCase(make_price_point, update_values={"price": Decimal("101")}),
+    FxRate: TenantCase(make_fx_rate, update_values={"rate": Decimal("0.93")}),
     NetWorthCategory: TenantCase(make_networth_category, update_values={"color": "#e11d48"}),
     NetWorthItem: TenantCase(make_networth_item, update_values={"name": "Updated item"}),
     # Valuations are append-only.

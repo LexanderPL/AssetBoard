@@ -164,7 +164,16 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "get_for_update",
             "filtered",
             "count_filtered",
+            "live_dated",
         )
+    },
+    **{
+        ("PricePointRepository", method): "test_price_queries_stay_in_their_workspace"
+        for method in ("create", "manual_on", "for_instruments_on_or_before")
+    },
+    **{
+        ("FxRateRepository", method): "test_price_queries_stay_in_their_workspace"
+        for method in ("create", "for_base_on_or_before")
     },
     **{
         ("NetWorthCategoryRepository", method): "test_networth_queries_stay_in_their_workspace"

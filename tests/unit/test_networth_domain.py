@@ -123,6 +123,13 @@ def test_sparkline_handles_empty_single_and_flat_series() -> None:
     assert {y for _x, y in flat} == {Decimal("13.50")}
 
 
+def test_sparkline_accepts_decimal_prices() -> None:
+    points = _points(sparkline_polyline([Decimal("100.25"), Decimal("101"), Decimal("99.5")]))
+    assert len(points) == 3
+    assert points[0][0] < points[1][0] < points[2][0]
+    assert all(Decimal(0) <= y <= Decimal(28) for _x, y in points)
+
+
 def test_sparkline_points_stay_inside_the_viewbox() -> None:
     points = _points(sparkline_polyline([0, 1000, 10, 500]))
     assert [x for x, _y in points] == sorted(x for x, _y in points)
