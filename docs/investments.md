@@ -58,9 +58,13 @@ else. Its fields are:
 | Bond (model value) | bond | model value from terms |
 | Metal | oz | manual price |
 | Crypto | coin | manual price |
-| Currency | the currency code | FX rate to the base currency |
+| Currency | the currency code | unit price 1 in its own currency; value converted from FX |
 | Real estate | property | manual price, quantity 1 |
 | Other | unit | manual price |
+
+A **currency** instrument's `quote_currency` is the held currency. Its unit price is always **1**
+in that currency, so there is no market price to enter or fetch; only the FX rate to the base
+currency converts it. Cash in the base currency is therefore price 1 at rate 1.
 
 A **Bond (model value)** instrument can be created before its terms exist. It shows a "Terms
 needed" badge and cannot be valued until the bond-terms form arrives in a later step.

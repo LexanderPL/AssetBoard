@@ -25,7 +25,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 
 **Acceptance**
 - CRUD for asset classes and instruments; allocation editor with validation that weights sum to 100% (live total, blocks save otherwise).
-- Instrument types and their defaults: `crypto` (unit "coin"), `metal` (unit "oz"), `currency` (price = FX rate to base; unit = currency code, forced even if another label is typed), `real_estate` (quantity 1, manual valuation), `bond_model` (valuation source `bond_model`, requires `BondTerms` — F6.5). A `bond_model` instrument may be created in F6.1 with a "terms needed" state; the form and valuation arrive in F6.5.
+- Instrument types and their defaults: `crypto` (unit "coin"), `metal` (unit "oz"), `currency` (`quote_currency` is the held currency and the unit is its code, forced even if another label is typed; the unit price is always **1** in that currency, so F6.3 fetches only the FX rate to the base currency, never a market price — cash in the base currency is price 1 at rate 1), `real_estate` (quantity 1, manual valuation), `bond_model` (valuation source `bond_model`, requires `BondTerms` — F6.5). A `bond_model` instrument may be created in F6.1 with a "terms needed" state; the form and valuation arrive in F6.5.
 - Archive **asset classes and instruments** with their history instead of deleting; names are unique per workspace among active rows (case-insensitive), and asset classes can be reordered like F5.1 categories.
 - Instrument allocations: at least one class per instrument, weights in basis points totalling exactly 10 000; the service enforces the cross-row rule and the page mirrors the total. Archived classes may stay on an instrument that already used them, but cannot be added to a new allocation.
 - Editors/owners only for writes. New workspaces get the suggested asset classes; an older workspace with no active class gets an explicit "Add suggested asset classes" action (no automatic migration).
@@ -52,7 +52,7 @@ Tests: allocation validation, archive rules, tenant isolation test passes.
 - Tests: golden scenario — buy 46 @ 489.5409 + fee 65.30, buy 4 @ 496.3093 + fee 14.00 → quantity 50; cost basis equals the sum of totals; sell 10 → average cost unchanged, FIFO consumes the first lot; fractional quantity `0.00924`; property test: quantity never negative, cost basis ≥ 0, realized + remaining cost basis = total bought cost − proceeds identity for both methods.
 - Undated legacy lots (date null) are allowed only via import and shown with a warning badge; they count in holdings but are excluded from time series until dated.
 - Investment transactions store `fx_to_base`, so historical FX is frozen. Once any investment transaction exists, the workspace base currency is locked (add the check to `services.workspaces.BASE_CURRENCY_LOCKS`).
-- An instrument's `quote_currency` is locked once it has investment transactions (unit prices and fees are in that currency). A `type` change that would reinterpret existing rows is refused or migrated explicitly.
+- `quote_currency` and `type` are **locked once the instrument has investment transactions**; changing either would reinterpret stored prices, fees and valuations. F6.2 adds both checks to the instrument service, like the net-worth item currency rule.
 
 **Agent prompt**
 ```
@@ -196,7 +196,7 @@ decision, 2026-10-18). It lands after F6.11 (see the sequencing note at the top)
   history" path: instrument by name, with the mapping step for unknown instruments like F4.3's
   categories, create with a type the user picks; an empty `date` makes an "undated lot" flagged
   for the user to fix). Other files are restore only.
-- The new models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them.
+- The new models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them. An untouched suggested asset-class set counts as empty for restore, like the ledger and net-worth suggested sets (the exact set in a supported locale, unedited, unused, with the automatic `asset_class.seeded` event); otherwise every fresh workspace would refuse a restore.
 
 **Agent prompt**
 ```

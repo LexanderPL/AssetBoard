@@ -313,7 +313,7 @@ def test_instrument_type_defaults(
     assert view.terms_required is (instrument_type == "bond_model")
 
 
-def test_currency_instrument_forces_the_unit_to_its_currency_code(
+def test_a_currency_instrument_is_the_held_currency_with_unit_price_one(
     team: WorkspaceDb,
 ) -> None:
     ctx = team.ctx("ed", "editor")
@@ -327,7 +327,9 @@ def test_currency_instrument_forces_the_unit_to_its_currency_code(
         quote_currency="usd",
         unit_label="dollar",
     )
-    assert (view.quote_currency, view.unit_label) == ("USD", "USD")
+    # The unit price of a currency instrument is 1 in its own currency; F6.3 must fetch the
+    # FX rate to base, not a market price, so the general valuation path converts it once.
+    assert (view.type, view.quote_currency, view.unit_label) == ("currency", "USD", "USD")
 
 
 def test_duplicate_instrument_names_are_refused_ignoring_case(team: WorkspaceDb) -> None:
