@@ -63,6 +63,8 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "networth_snapshots",
         "notification_channels",
         "notification_log",
+        "price_points",
+        "fx_rates",
         "setup_state",
         "transactions",
         "scheduled_items",
@@ -272,6 +274,32 @@ def test_0039_investment_transactions_migration_is_reversible(tmp_path: Path) ->
         assert "investment_cost_basis" not in {
             column["name"] for column in inspector.get_columns("workspaces")
         }
+        upgrade_database(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0040_prices_fx_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'prices.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        assert {"price_points", "fx_rates"} <= set(inspector.get_table_names())
+        assert "ix_price_points_workspace_instrument_date" in {
+            index["name"] for index in inspector.get_indexes("price_points")
+        }
+        assert "ix_fx_rates_workspace_pair_date" in {
+            index["name"] for index in inspector.get_indexes("fx_rates")
+        }
+        command.downgrade(alembic_config(settings), "0039_f62_investment_transactions")
+        tables = set(inspect(engine).get_table_names())
+        assert not {"price_points", "fx_rates"} & tables
         upgrade_database(settings)
         check_database_migrations(settings)
     finally:

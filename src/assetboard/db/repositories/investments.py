@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
@@ -214,6 +215,27 @@ class InvestmentTransactionRepository(ScopedRepository[InvestmentTransaction]):
                 InvestmentTransaction.created_at,
                 InvestmentTransaction.id,
             )
+        )
+        return list(self._session.scalars(statement))
+
+    def live_dated(
+        self,
+        on: date | None = None,
+        instrument_ids: Collection[UUID] | None = None,
+    ) -> list[InvestmentTransaction]:
+        """Live dated transactions, optionally up to ``on`` and for selected instruments."""
+        statement = self._scoped_select().where(
+            InvestmentTransaction.deleted_at.is_(None),
+            InvestmentTransaction.date.is_not(None),
+        )
+        if on is not None:
+            statement = statement.where(InvestmentTransaction.date <= on)
+        if instrument_ids is not None:
+            statement = statement.where(InvestmentTransaction.instrument_id.in_(instrument_ids))
+        statement = statement.order_by(
+            InvestmentTransaction.date,
+            InvestmentTransaction.created_at,
+            InvestmentTransaction.id,
         )
         return list(self._session.scalars(statement))
 

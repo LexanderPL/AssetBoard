@@ -58,6 +58,7 @@ from assetboard.db.repositories import (
     CategoryRepository,
     CurrentWorkspaceRepository,
     ForeignWorkspace,
+    FxRateRepository,
     ImportBatchRepository,
     ImportCategoryMappingRepository,
     InstanceAuditReader,
@@ -74,6 +75,7 @@ from assetboard.db.repositories import (
     NetWorthItemRepository,
     NetWorthSnapshotRepository,
     NotFound,
+    PricePointRepository,
     ScopedRepository,
     TransactionRepository,
     UserMembershipReader,
@@ -643,6 +645,10 @@ def test_investment_queries_stay_in_their_workspace(
     assert transactions_b.for_instrument(a_fund.id) == []
     assert [row.id for row in transactions_a.live()] == [a_transaction.id]
     assert [row.id for row in transactions_b.live()] == [b_transaction.id]
+    assert [row.id for row in transactions_a.live_dated(date(2026, 3, 1), (a_fund.id,))] == [
+        a_transaction.id
+    ]
+    assert transactions_b.live_dated(date(2026, 3, 1), (a_fund.id,)) == []
     assert transactions_a.any_for_instrument(a_fund.id)
     assert not transactions_b.any_for_instrument(a_fund.id)
     assert transactions_a.instrument_ids() == {a_fund.id}
@@ -683,6 +689,76 @@ def test_investment_queries_stay_in_their_workspace(
         )
         == 0
     )
+
+
+def test_price_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    instruments_a = InstrumentRepository(db_session, ctx_a)
+    instruments_b = InstrumentRepository(db_session, ctx_b)
+    a_fund = instruments_a.create(
+        name="World ETF",
+        name_key="world etf",
+        symbol="VWCE",
+        type="etf",
+        quote_currency="EUR",
+        unit_label="share",
+        valuation_source="manual",
+    )
+    b_fund = instruments_b.create(
+        name="World ETF",
+        name_key="world etf",
+        symbol="VWCE",
+        type="etf",
+        quote_currency="EUR",
+        unit_label="share",
+        valuation_source="manual",
+    )
+
+    prices_a = PricePointRepository(db_session, ctx_a)
+    prices_b = PricePointRepository(db_session, ctx_b)
+    a_price = prices_a.create(
+        instrument_id=a_fund.id,
+        date=date(2026, 3, 1),
+        price=Decimal("100"),
+        source="manual",
+    )
+    b_price = prices_b.create(
+        instrument_id=b_fund.id,
+        date=date(2026, 3, 1),
+        price=Decimal("50"),
+        source="manual",
+    )
+    assert prices_a.manual_on(a_fund.id, date(2026, 3, 1)) is a_price
+    assert prices_b.manual_on(a_fund.id, date(2026, 3, 1)) is None
+    assert prices_a.manual_on(b_fund.id, date(2026, 3, 1)) is None
+    assert [
+        row.id for row in prices_a.for_instruments_on_or_before((a_fund.id,), date(2026, 3, 1))
+    ] == [a_price.id]
+    assert prices_b.for_instruments_on_or_before((a_fund.id,), date(2026, 3, 1)) == []
+    assert [
+        row.id for row in prices_b.for_instruments_on_or_before((b_fund.id,), date(2026, 3, 1))
+    ] == [b_price.id]
+
+    rates_a = FxRateRepository(db_session, ctx_a)
+    rates_b = FxRateRepository(db_session, ctx_b)
+    a_rate = rates_a.create(
+        base_currency="EUR",
+        quote_currency="USD",
+        date=date(2026, 3, 1),
+        rate=Decimal("0.92"),
+        source="nbp",
+    )
+    b_rate = rates_b.create(
+        base_currency="EUR",
+        quote_currency="USD",
+        date=date(2026, 3, 1),
+        rate=Decimal("0.93"),
+        source="nbp",
+    )
+    assert [row.id for row in rates_a.for_base_on_or_before("EUR", date(2026, 3, 1))] == [a_rate.id]
+    assert [row.id for row in rates_b.for_base_on_or_before("EUR", date(2026, 3, 1))] == [b_rate.id]
 
 
 def test_networth_queries_stay_in_their_workspace(

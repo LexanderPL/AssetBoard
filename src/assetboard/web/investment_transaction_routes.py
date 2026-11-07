@@ -1,8 +1,10 @@
-"""Investment transaction history (F6.2): global history and per-instrument pages.
+"""Investment transactions and instrument prices (F6.2/F6.3).
 
+Global transaction history and per-instrument pages. The instrument page also shows the price
+panel and edits manual price points; transaction prices are derived by ``services.prices``.
 The pages are plain forms first: filters are a GET form, writes redirect (303) after success.
 HTMX gets the page body or one row back; the delete toast uses the same strict 10-second undo as
-the ledger. Authorization and validation live in ``services.investment_transactions``.
+the ledger. Authorization and validation live in the service layer.
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.repositories import NotFound
+from assetboard.domain.networth import sparkline_polyline
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day
 from assetboard.i18n.numbers import (
@@ -41,6 +44,13 @@ from assetboard.services.investment_transactions import (
     update_transaction,
 )
 from assetboard.services.investments import InstrumentView, investment_page
+from assetboard.services.prices import (
+    DEFAULT_STALE_AFTER_DAYS,
+    PriceError,
+    delete_manual_price,
+    instrument_prices,
+    save_manual_price,
+)
 from assetboard.web.context import CurrentContext
 from assetboard.web.errors import is_htmx_fragment_request
 from assetboard.web.rendering import render_template
@@ -81,11 +91,21 @@ ERRORS = {
     "oversell": _("The sale on %(date)s would exceed the quantity held."),
 }
 FALLBACK = _("The change could not be made. Reload the page and try again.")
+PRICE_ERRORS = {
+    "invalid_date": _("Enter a valid date between 1900 and 2199."),
+    "future_date": _("Manual prices cannot be dated in the future."),
+    "invalid_price": _("Enter a price of zero or more, with at most 18 decimal places."),
+    "duplicate_date": _("Another manual price already exists on this date."),
+    "instrument_archived": _("This instrument is archived; restore it before changing its prices."),
+    "not_manual": _("Only manual prices can be deleted."),
+}
 NOTICES = {
     "created": _("Transaction added."),
     "saved": _("Transaction saved."),
     "deleted": _("Transaction deleted."),
     "restored": _("Transaction restored."),
+    "price_saved": _("Price saved."),
+    "price_deleted": _("Price deleted."),
 }
 
 
@@ -114,6 +134,14 @@ def _error_text(request: Request, exc: InvestmentTransactionError) -> str:
         return _t(request, ERRORS["oversell"]) % {"date": when}
     message = ERRORS.get(exc.code, FALLBACK)
     return _t(request, message)
+
+
+def _price_error_message(exc: PriceError) -> str:
+    return PRICE_ERRORS.get(exc.code, FALLBACK)
+
+
+def _price_error_text(request: Request, exc: PriceError) -> str:
+    return _t(request, _price_error_message(exc))
 
 
 def _default_values(instrument: InstrumentView | None, today: date) -> dict[str, str]:
@@ -274,15 +302,45 @@ def _history_page(
     editing: UUID | None = None,
     edit_values: dict[str, str] | None = None,
     edit_errors: dict[str, str] | None = None,
+    editing_price: UUID | None = None,
+    price_values: dict[str, str] | None = None,
+    price_errors: dict[str, str] | None = None,
     toast_undo: str | None = None,
     toast_seconds: int = 0,
     status_code: int = 200,
 ) -> Response:
     locale = request.state.locale
     today = ctx.clock.today(ctx.workspace.timezone)
+    prices = instrument_prices(
+        request.app.state.session_factory,
+        ctx,
+        history.instrument.id,
+        on=today,
+    )
+    if price_values is None and editing_price is not None:
+        point = next(
+            (row for row in prices.points if row.id == editing_price and row.editable),
+            None,
+        )
+        if point is None:
+            editing_price = None
+        else:
+            price_values = {
+                "price_id": str(point.id),
+                "date": point.date.isoformat(),
+                "price": format_quantity_input(point.price, locale),
+            }
     context: dict[str, Any] = {
         "history": history,
         "instrument": history.instrument,
+        "prices": prices,
+        "price_values": price_values or {"price_id": "", "date": today.isoformat(), "price": ""},
+        "price_errors": {
+            field: _t(request, message) for field, message in (price_errors or {}).items()
+        },
+        "editing_price": editing_price,
+        "price_sparkline": sparkline_polyline([point.price for point in prices.effective]),
+        "default_stale_after_days": DEFAULT_STALE_AFTER_DAYS,
         "create_values": create_values or _default_values(history.instrument, today),
         "create_errors": {
             field: _t(request, message) for field, message in (create_errors or {}).items()
@@ -722,6 +780,95 @@ async def transaction_undo(request: Request, ctx: CurrentContext, transaction_id
     return await run_in_threadpool(_done, request, ctx, "restored", instrument_id=target)
 
 
+@router.post(
+    "/investments/instruments/{instrument_id}/prices",
+    name="investment_price_save",
+)
+async def price_save(
+    request: Request,
+    ctx: CurrentContext,
+    instrument_id: str,
+    price_id: FormStr = "",
+    date: FormStr = "",
+    price: FormStr = "",
+) -> Response:
+    item_id = _parse_uuid(instrument_id)
+    values = {"price_id": price_id, "date": date, "price": price}
+    editing_price: UUID | None = None
+    if price_id:
+        try:
+            editing_price = UUID(price_id)
+        except ValueError:
+            return await run_in_threadpool(
+                lambda: _render_history(
+                    request,
+                    ctx,
+                    item_id,
+                    status_code=400,
+                    price_values=values,
+                    price_errors={"price": PRICE_ERRORS["invalid_price"]},
+                )
+            )
+    try:
+        await run_in_threadpool(
+            lambda: save_manual_price(
+                request.app.state.session_factory,
+                ctx,
+                item_id,
+                price_id=editing_price,
+                date_value=date,
+                price_value=price,
+                locale=request.state.locale,
+            )
+        )
+    except PriceError as exc:
+        return await run_in_threadpool(
+            lambda error=exc: _render_history(
+                request,
+                ctx,
+                item_id,
+                status_code=400,
+                editing_price=editing_price,
+                price_values=values,
+                price_errors={error.field or "price": _price_error_message(error)},
+            )
+        )
+    return await run_in_threadpool(_done, request, ctx, "price_saved", instrument_id=item_id)
+
+
+@router.post(
+    "/investments/instruments/{instrument_id}/prices/{price_id}/delete",
+    name="investment_price_delete",
+)
+async def price_delete(
+    request: Request,
+    ctx: CurrentContext,
+    instrument_id: str,
+    price_id: str,
+) -> Response:
+    item_id = _parse_uuid(instrument_id)
+    price_item = _parse_uuid(price_id)
+    try:
+        await run_in_threadpool(
+            delete_manual_price,
+            request.app.state.session_factory,
+            ctx,
+            item_id,
+            price_item,
+        )
+    except PriceError as exc:
+        return await run_in_threadpool(
+            lambda error=exc: _render_history(
+                request,
+                ctx,
+                item_id,
+                status_code=409,
+                error=_price_error_text(request, error),
+            )
+        )
+    return await run_in_threadpool(_done, request, ctx, "price_deleted", instrument_id=item_id)
+
+
 @router.get(
     "/investments/instruments/{instrument_id}",
     name="investments_instrument",
@@ -732,6 +879,7 @@ async def instrument_page(
     item_id = _parse_uuid(instrument_id)
     editing: UUID | None = None
     values: dict[str, str] | None = None
+    editing_price: UUID | None = None
     raw_edit = request.query_params.get("edit", "")
     if raw_edit and has_role(ctx, Role.EDITOR):
         try:
@@ -752,6 +900,12 @@ async def instrument_page(
         except (ValueError, NotFound, InvestmentTransactionError):
             editing = None
             values = None
+    raw_price = request.query_params.get("edit_price", "")
+    if raw_price and has_role(ctx, Role.EDITOR):
+        try:
+            editing_price = UUID(raw_price)
+        except ValueError:
+            editing_price = None
     return await run_in_threadpool(
         lambda: _render_history(
             request,
@@ -760,5 +914,6 @@ async def instrument_page(
             notice=notice or None,
             editing=editing,
             edit_values=values,
+            editing_price=editing_price,
         )
     )

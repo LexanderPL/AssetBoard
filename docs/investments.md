@@ -5,7 +5,8 @@ across asset classes. It is the foundation for the portfolio, price and performa
 arrive in later updates; this page currently manages the structure.
 
 > **Backups:** investments are not part of the workspace archive yet. An export taken before the
-> investments archive extension does not contain asset classes, instruments or allocations.
+> investments archive extension does not contain asset classes, instruments, allocations,
+> prices or FX rates.
 
 ## Asset classes
 
@@ -104,6 +105,41 @@ transactions is refused until it is restored.
 
 Undated legacy lots (created only by an import in a later update) count in current holdings but
 are excluded from dated history until they get a date.
+
+## Prices and FX
+
+Each instrument page has a **Prices** panel: the latest price, a small line chart, a table of
+points and — for editors — a form to add, change or delete **manual prices**. Manual prices are
+the main source for real estate and other illiquid assets. A manual price cannot be dated after
+today, and the form and its actions disappear while the instrument is archived. Saving a price
+on a date that already has a manual point changes that point instead of adding a second one.
+
+Prices are in the instrument's quote currency. A **currency** instrument is always priced at 1
+in its own currency, so it has no manual price form; its base-currency value comes entirely from
+FX. Transaction unit prices also appear as prices, labelled **Transaction**. They are derived
+when the page is read, not stored, so editing or deleting a transaction immediately changes
+them.
+
+The effective price on a date is the latest observation on or before that date (carry forward).
+On the same date the order is **manual > provider > transaction**; a newer date always wins.
+A price older than the constant `DEFAULT_STALE_AFTER_DAYS` (5 days) is marked **Stale**. The
+threshold is measured against the date being valued, not against today, so historical views do
+not drift.
+
+### FX convention
+
+FX rates are stored as **base-currency units per one unit of the quote currency**. The workspace
+base currency itself is always 1. To convert between two non-base currencies, divide through the
+base currency:
+
+```text
+rate(from, to) = rate(base, from) / rate(base, to)
+```
+
+For example, with EUR as the base currency, a stored EUR/USD rate of 0.92 means one US dollar is
+worth 0.92 euro. A transaction's `fx_to_base` follows the same convention and acts as the
+lowest-priority FX source until provider rates arrive in a later update. FX rates older than the
+staleness threshold are flagged the same way as prices. There is no FX entry form yet.
 
 ## Allocation
 

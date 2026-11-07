@@ -76,9 +76,9 @@ Include the golden scenario and the property tests from the spec; independent or
 **Acceptance**
 - **Step 0 (ADR, before code): done — [ADR-0024](../adr/0024-price-providers.md), owner decisions of 2026-11-04.** Built-in defaults, still opt-in per workspace: **NBP** (FX vs PLN + official gold in PLN via `cenyzlota`), **ECB** (FX vs EUR) and **CoinGecko** (crypto, quoted directly in USD/EUR/PLN). Optional: **EODHD** (the only acceptable EU equities/ETFs path; keyed). **GoldAPI.io, Kraken and Frankfurter are approved but deferred** to a follow-up minor release. Equities/ETFs are **manual-first**: no clean free EU provider exists in 2026 (Stooq's CSV API is removed or anti-bot-gated; Yahoo's terms forbid automated collection). **Do not scrape sites whose terms forbid it** — stands. Claims not verified during the evaluation are marked in the ADR's register and must be re-checked at implementation time.
 - `PriceProvider` interface: `supports(instrument) -> bool`, `fetch_latest(symbols) -> dict`, `fetch_history(symbol, start, end) -> list[PricePoint]`, `rate_limit` metadata. A `ManualProvider` (user-entered price points) and a `FakeProvider` for tests ship in this feature.
-- Manual price entry UI: add/edit/delete price points per instrument (essential for real estate and illiquid assets); table + small chart.
-- `PriceService.price_at(instrument, date)` = latest point ≤ date (carry forward); `FxService.rate(from, to, date)` likewise; both return a flag when the value is stale (older than `stale_after_days`, default 5) or missing.
-- Price points originating from transactions (`source=transaction`) are created implicitly so an instrument always has at least its purchase price.
+- Manual price entry UI: add/edit/delete price points per instrument (essential for real estate and illiquid assets); table + small chart. Saving a manual price on an existing date updates that date's manual point; manual prices dated after today and writes to archived instruments are refused.
+- `PriceService.price_at(instrument, date)` = latest point ≤ date (carry forward); `FxService.rate(from, to, date)` likewise; both return a flag when the value is stale (older than the constant `DEFAULT_STALE_AFTER_DAYS`, 5) or missing. Staleness is measured against the requested date, not today. On one date the priority is manual > provider > transaction; a newer date always wins.
+- Prices and FX rates originating from transactions (`source=transaction`) are **derived at read time** from live investment transactions, never stored, so an instrument always has at least its purchase price and a deleted transaction stops contributing. Stored `price_points` rows are only `manual` or `provider`; stored `fx_rates` use the provider key as `source`. `FxRate.rate` is base-currency units per one quote-currency unit, with the workspace base currency as 1; `rate(from, to) = rate(base, from) / rate(base, to)`. A transaction's `fx_to_base` is the lowest-priority FX source. There is no FX entry UI in F6.3.
 
 **Agent prompt**
 ```
@@ -195,8 +195,10 @@ decision, 2026-10-18). It lands after F6.11 (see the sequencing note at the top)
 - New archive files (a minor format version per ADR-0016) with lineage `id` columns and
   references by id plus name as in M4: `asset_classes.csv`, `instruments.csv`,
   `instrument_allocations.csv`, `investment_transactions.csv`, `price_points.csv` (manual and
-  transaction prices; provider prices optional, decide in the plan), `bond_terms.csv`,
-  `price_source_configs.csv` without secrets (provider keys follow F9.3).
+  provider prices), `fx_rates.csv` (stored manual and provider FX rates), `bond_terms.csv`,
+  `price_source_configs.csv` without secrets (provider keys follow F9.3). Manual prices and
+  stored FX rates join the archive here; transaction-derived prices and rates are recomputed
+  from the archived transactions and are never exported.
 - Quantities and prices are plain decimals written from `Decimal` without loss (never through
   `float`); FX rates likewise.
 - Standalone import in merge mode: `investment_transactions.csv` (the "bring my purchase

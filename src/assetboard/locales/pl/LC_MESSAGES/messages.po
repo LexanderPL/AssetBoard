@@ -2155,6 +2155,23 @@ msgstr "Nie można przywrócić transakcji z datą w przyszłości."
 msgid "The sale on %(date)s would exceed the quantity held."
 msgstr "Sprzedaż z dnia %(date)s przekroczyłaby posiadaną ilość."
 
+msgid "Manual prices cannot be dated in the future."
+msgstr "Ceny ręczne nie mogą mieć przyszłej daty."
+
+msgid "Enter a price of zero or more, with at most 18 decimal places."
+msgstr ""
+"Podaj cenę równą zero lub większą, z co najwyżej 18 miejscami po "
+"przecinku."
+
+msgid "Another manual price already exists on this date."
+msgstr "Inna cena ręczna już istnieje tego dnia."
+
+msgid "This instrument is archived; restore it before changing its prices."
+msgstr "Ten instrument jest zarchiwizowany; przywróć go przed zmianą jego cen."
+
+msgid "Only manual prices can be deleted."
+msgstr "Można usuwać tylko ceny ręczne."
+
 msgid "Transaction added."
 msgstr "Dodano transakcję."
 
@@ -2166,6 +2183,12 @@ msgstr "Usunięto transakcję."
 
 msgid "Transaction restored."
 msgstr "Przywrócono transakcję."
+
+msgid "Price saved."
+msgstr "Zapisano cenę."
+
+msgid "Price deleted."
+msgstr "Usunięto cenę."
 
 msgid "an undated transaction"
 msgstr "transakcja bez daty"
@@ -4949,6 +4972,80 @@ msgid ""
 msgstr ""
 "Zarchiwizowane instrumenty zachowują alokację i historię, ale nie można "
 "nimi handlować."
+
+msgid "Provider"
+msgstr "Dostawca"
+
+msgid "Transaction"
+msgstr "Transakcja"
+
+msgid "Unknown"
+msgstr "Nieznane"
+
+msgid "Prices"
+msgstr "Ceny"
+
+msgid "Manual prices are used for illiquid assets; transactions fill the gaps."
+msgstr "Ceny ręczne służą do aktywów niepłynnych; transakcje uzupełniają luki."
+
+msgid "Stale price"
+msgstr "Nieaktualna cena"
+
+msgid ""
+"A currency instrument is always priced at 1 in its own currency. Its "
+"base-currency value comes from the FX rate."
+msgstr ""
+"Instrument walutowy ma zawsze cenę 1 we własnej walucie. Jego wartość w "
+"walucie bazowej wynika z kursu FX."
+
+msgid "Latest price"
+msgstr "Najnowsza cena"
+
+msgid "No price has been recorded for this instrument yet."
+msgstr "Ten instrument nie ma jeszcze zapisanej ceny."
+
+#, python-format
+msgid "As of %(date)s"
+msgstr "na dzień %(date)s"
+
+#, python-format
+msgid "older than %(days)s days"
+msgstr "starsza niż %(days)s dni"
+
+msgid "Price history"
+msgstr "Historia cen"
+
+#, python-format
+msgid "Price in %(currency)s"
+msgstr "Cena w %(currency)s"
+
+msgid ""
+"Saving a price on an existing date replaces the manual price for that "
+"date."
+msgstr "Zapisanie ceny w istniejącej dacie zastępuje cenę ręczną z tego dnia."
+
+msgid "Save price"
+msgstr "Zapisz cenę"
+
+msgid "Add price"
+msgstr "Dodaj cenę"
+
+msgid "This instrument is archived. Restore it before changing its prices."
+msgstr "Ten instrument jest zarchiwizowany. Przywróć go przed zmianą jego cen."
+
+#, python-format
+msgid "Price history of %(name)s"
+msgstr "Historia cen: %(name)s"
+
+msgid "Price"
+msgstr "Cena"
+
+#, python-format
+msgid "Delete the manual price of %(date)s?"
+msgstr "Usunąć cenę ręczną z dnia %(date)s?"
+
+msgid "No stored or transaction prices for this instrument yet."
+msgstr "Ten instrument nie ma jeszcze zapisanych cen ani cen z transakcji."
 
 msgid "Choose an instrument"
 msgstr "Wybierz instrument"

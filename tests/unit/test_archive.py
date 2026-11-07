@@ -288,6 +288,11 @@ def test_reader_checks_checksums() -> None:
     assert any(error.message == "checksum mismatch" for error in errors)
 
 
+def test_price_and_fx_models_are_excluded_until_the_f69_archive_extension() -> None:
+    assert "F6.9" in ARCHIVE_EXCLUDED_MODELS["PricePoint"]
+    assert "F6.9" in ARCHIVE_EXCLUDED_MODELS["FxRate"]
+
+
 def test_every_workspace_owned_model_is_archived_or_excluded() -> None:
     owned = {
         mapper.class_
