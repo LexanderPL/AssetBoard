@@ -1,0 +1,115 @@
+{% from "investments/_macros.html" import error, htmx_form, small_button, swatch with context %}
+{% from "investments/_tabs.html" import tabs with context %}
+{% from "macros/components.html" import csrf_input with context %}
+<div id="investments-classes-body" class="space-y-6">
+  {% if notice %}
+  <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
+  {% endif %}
+  {% if error %}
+  <p class="border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ error }}</p>
+  {% endif %}
+
+  {{ tabs("classes") }}
+
+  {% if page.can_seed %}
+  <section class="panel p-6 sm:p-7" aria-labelledby="seed-classes-heading" data-seed-offer>
+    <h2 id="seed-classes-heading" class="text-base font-semibold">{{ _("No asset classes yet") }}</h2>
+    {% if can_edit %}
+    <p class="mt-2 text-sm text-muted">{{ _("Start with the suggested classes: stocks, bonds, metals, crypto, currencies, real estate, primary residence and other. You can rename, reorder or archive them later.") }}</p>
+    <form {{ htmx_form(scoped_url(request, 'investments_classes_seed'), '#investments-classes-body') }} class="mt-4">
+      {{ csrf_input() }}
+      <button type="submit" data-seed class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Add suggested asset classes") }}</button>
+    </form>
+    {% else %}
+    <p class="mt-2 text-sm text-muted">{{ _("An editor or owner of this workspace can add asset classes.") }}</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
+  <section class="panel p-6 sm:p-7" aria-labelledby="classes-heading" data-section="classes">
+    <h2 id="classes-heading" class="text-base font-semibold">{{ _("Asset classes") }}</h2>
+    <p class="mt-1 text-sm text-muted">{{ _("Each instrument's value is split across these classes by the allocation weights. Archiving a class keeps it on instruments that already use it.") }}</p>
+    {% if page.classes %}
+    <ul class="mt-3 divide-y divide-line">
+      {% for c in page.classes %}
+      <li id="asset-class-{{ c.id }}" class="flex flex-wrap items-center justify-between gap-3 py-3" data-class="{{ c.id }}" data-class-name="{{ c.name }}">
+        <div class="flex min-w-0 items-center gap-3">
+          {{ swatch(c.color) }}
+          <span class="truncate text-sm font-medium">{{ c.name }}</span>
+          {% if c.investable %}
+          <span class="rounded-full bg-success-soft px-2 py-0.5 text-xs text-success-strong" data-investable="true">{{ _("Investable") }}</span>
+          {% else %}
+          <span class="rounded-full bg-subtle px-2 py-0.5 text-xs text-muted" data-investable="false">{{ _("Not investable") }}</span>
+          {% endif %}
+        </div>
+        {% if can_edit %}
+        <div class="flex flex-wrap items-center gap-1">
+          <form {{ htmx_form(scoped_url(request, 'investments_class_move', class_id=c.id|string), '#investments-classes-body') }}>{{ csrf_input() }}<input type="hidden" name="direction" value="up">
+            <button type="submit" data-move-up {% if loop.first %}disabled{% endif %} aria-label="{{ _('Move %(name)s up', name=c.name) }}" class="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-subtle disabled:opacity-30"><span aria-hidden="true">↑</span></button></form>
+          <form {{ htmx_form(scoped_url(request, 'investments_class_move', class_id=c.id|string), '#investments-classes-body') }}>{{ csrf_input() }}<input type="hidden" name="direction" value="down">
+            <button type="submit" data-move-down {% if loop.last %}disabled{% endif %} aria-label="{{ _('Move %(name)s down', name=c.name) }}" class="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-subtle disabled:opacity-30"><span aria-hidden="true">↓</span></button></form>
+          <a href="{{ scoped_url(request, 'investments_classes') }}?edit={{ c.id }}" data-edit class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink">{{ _("Edit") }}</a>
+          <form {{ htmx_form(scoped_url(request, 'investments_class_archive', class_id=c.id|string), '#investments-classes-body') }}>{{ csrf_input() }}{{ small_button(_("Archive"), "data-archive") }}</form>
+        </div>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="mt-3 text-sm text-muted">{{ _("No active asset classes.") }}</p>
+    {% endif %}
+  </section>
+
+  {% if can_edit %}
+  <section class="panel p-6 sm:p-7" aria-labelledby="class-form-heading" data-class-form>
+    <h2 id="class-form-heading" class="text-base font-semibold">{% if editing %}{{ _("Edit asset class") }}{% else %}{{ _("Add an asset class") }}{% endif %}</h2>
+    {% set values = edit_values if editing else create_values %}
+    {% set errors = edit_errors if editing else create_errors %}
+    <form {{ htmx_form(scoped_url(request, 'investments_class_update', class_id=editing|string) if editing else scoped_url(request, 'investments_class_create'), '#investments-classes-body') }} class="mt-4 grid gap-4 sm:grid-cols-[minmax(0,2fr)_auto_minmax(0,1fr)_auto] sm:items-start" novalidate>
+      {{ csrf_input() }}
+      <div class="space-y-1.5">
+        <label for="class-name" class="block text-sm font-medium">{{ _("Name") }}</label>
+        <input id="class-name" name="name" type="text" value="{{ values.name }}" maxlength="{{ max_name_length }}" required autocomplete="off" class="form-control w-full px-3 py-2">
+        {{ error(errors, "name") }}
+      </div>
+      <div class="space-y-1.5">
+        <label for="class-color" class="block text-sm font-medium">{{ _("Colour") }}</label>
+        <input id="class-color" name="color" type="color" value="{{ values.color }}" class="h-9 w-12 rounded-lg border border-line-strong bg-field p-1">
+        {{ error(errors, "color") }}
+      </div>
+      <div class="flex items-start gap-2 pt-6">
+        <input id="class-investable" name="investable" type="checkbox" value="1"{% if values.investable %} checked{% endif %} class="mt-1 h-4 w-4 rounded border-line accent-primary">
+        <div>
+          <label for="class-investable" class="block text-sm font-medium">{{ _("Investable") }}</label>
+          <p class="text-xs text-muted">{{ _("Used by the FIRE planner and the net-worth helper.") }}</p>
+        </div>
+      </div>
+      <div class="flex flex-wrap items-center gap-2 pt-6">
+        <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save asset class") }}</button>
+        {% if editing %}<a href="{{ scoped_url(request, 'investments_classes') }}" class="rounded-xl px-3 py-2 text-sm font-medium text-muted hover:bg-subtle">{{ _("Cancel") }}</a>{% endif %}
+      </div>
+    </form>
+  </section>
+  {% endif %}
+
+  {% if page.archived_classes %}
+  <details class="panel p-6 sm:p-7" data-archived-classes>
+    <summary class="cursor-pointer text-base font-semibold">{{ _("Archived asset classes") }} <span class="text-sm font-normal text-muted">({{ page.archived_classes|length }})</span></summary>
+    <p class="mt-2 text-sm text-muted">{{ _("Archived classes keep their place on existing instruments but cannot be chosen for new allocations.") }}</p>
+    <ul class="mt-3 divide-y divide-line">
+      {% for c in page.archived_classes %}
+      <li id="asset-class-{{ c.id }}" class="flex flex-wrap items-center justify-between gap-3 py-3" data-class="{{ c.id }}" data-class-name="{{ c.name }}">
+        <div class="flex min-w-0 items-center gap-3">
+          {{ swatch(c.color) }}
+          <span class="truncate text-sm font-medium">{{ c.name }}</span>
+          {% if c.investable %}<span class="rounded-full bg-subtle px-2 py-0.5 text-xs text-muted">{{ _("Investable") }}</span>{% endif %}
+        </div>
+        {% if can_edit %}
+        <form {{ htmx_form(scoped_url(request, 'investments_class_restore', class_id=c.id|string), '#investments-classes-body') }}>{{ csrf_input() }}{{ small_button(_("Restore"), "data-restore") }}</form>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </details>
+  {% endif %}
+</div>

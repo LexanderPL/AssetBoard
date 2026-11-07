@@ -90,10 +90,11 @@ Context exists:
 **Creating a workspace.** `db.repositories.create_owned_workspace` is the only code that
 creates a workspace: it inserts the row, makes the given user its owner and returns a
 `NewWorkspaceScope` for that workspace, so everything else written into it goes through the
-scoped repositories. Every caller then calls `services.categories.seed_into` and
-`services.networth.seed_into` in the same transaction, so each new workspace starts with the
-suggested ledger and net-worth categories, recorded as `category.seeded` and
-`networth_category.seeded` with `automatic: true`. The callers are first-run setup, open registration,
+scoped repositories. Every caller then calls `services.categories.seed_into`,
+`services.networth.seed_into` and `services.investments.seed_into` in the same transaction, so
+each new workspace starts with the suggested ledger and net-worth categories and asset classes,
+recorded as `category.seeded`, `networth_category.seeded` and `asset_class.seeded` with
+`automatic: true`. The callers are first-run setup, open registration,
 `assetboard create-admin` and OIDC or proxy auto-create, all through
 `services.auth._create_user_records`, which refuses to create a workspace without a seed, and
 self-service creation (`services.workspaces.create_own_workspace`), which needs no Context: it

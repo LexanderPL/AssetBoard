@@ -11,6 +11,7 @@ from sqlalchemy import update
 
 from assetboard.db.models.identity import AuditEvent, SetupState, User
 from assetboard.domain.categories import Kind, Treatment
+from assetboard.domain.instruments import InstrumentType, ValuationSource
 from assetboard.domain.networth import Side
 from assetboard.i18n import gettext
 from assetboard.services.admin_users import NotInstanceAdmin
@@ -148,6 +149,46 @@ def test_every_tax_action_has_a_label_keys_and_a_group() -> None:
     texts.append(GROUP_LABELS["taxes"])
     for text in texts:
         assert gettext(text, "pl") != text, f"no Polish translation for {text!r}"
+
+
+# Investment events (F6.1)
+
+INVESTMENT_ACTIONS = {
+    "asset_class.created",
+    "asset_class.updated",
+    "asset_class.archived",
+    "asset_class.restored",
+    "asset_class.seeded",
+    "instrument.created",
+    "instrument.updated",
+    "instrument.archived",
+    "instrument.restored",
+    "instrument_allocation.updated",
+}
+
+
+def test_every_investment_action_has_a_label_keys_and_a_group() -> None:
+    assert {
+        action
+        for action in ACTION_LABELS
+        if action.startswith(("asset_class.", "instrument.", "instrument_allocation."))
+    } == INVESTMENT_ACTIONS
+    assert set(GROUPS["workspace"]["investments"]) == INVESTMENT_ACTIONS
+    assert "investments" in GROUP_LABELS
+    keys = {key for action in INVESTMENT_ACTIONS for key in DATA_KEYS[action]}
+    assert keys <= set(KEY_LABELS)
+    texts = [ACTION_LABELS[a] for a in INVESTMENT_ACTIONS] + [KEY_LABELS[k] for k in keys]
+    texts.append(GROUP_LABELS["investments"])
+    for text in texts:
+        assert gettext(text, "pl").strip()
+
+
+def test_every_instrument_type_and_valuation_source_has_a_label() -> None:
+    assert set(VALUE_TABLES["type"]) == {kind.value for kind in InstrumentType}
+    assert set(VALUE_TABLES["valuation_source"]) == {source.value for source in ValuationSource}
+    for table in ("type", "valuation_source"):
+        for text in VALUE_TABLES[table].values():
+            assert gettext(text, "pl").strip()
 
 
 # Net-worth events (F5.1)

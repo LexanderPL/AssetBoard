@@ -60,7 +60,7 @@ from assetboard.domain.identity import (
     normalize_email,
     normalize_new_email,
 )
-from assetboard.services import categories, invitations, networth
+from assetboard.services import categories, investments, invitations, networth
 from assetboard.services.hash_gate import HashGate, HashGateBusy
 from assetboard.services.workspace_options import WorkspaceOptions, validate_workspace_options
 
@@ -1719,14 +1719,15 @@ def _create_user_records(
     password_hash: str | None = None,
     seed: WorkspaceSeed | None = None,
 ) -> tuple[User, Workspace | None]:
-    """Create a user and, when ``options`` is given, a workspace they own, with its categories.
+    """Create a user and, when ``options`` is given, a workspace they own, with its seeds.
 
     ``password_hash`` lets the caller hash outside the transaction; the policy is checked here
     either way. ``password=None`` creates a user without a password (OIDC, F1.3). A workspace
-    needs ``seed``: it is created with the suggested categories in ``seed.locale``.
+    needs ``seed``: it is created with the suggested categories and asset classes in
+    ``seed.locale``.
     """
     if options is not None and seed is None:
-        raise RuntimeError("A new workspace needs its category seed")
+        raise RuntimeError("A new workspace needs its seed")
     clean_display_name = _clean_display_name(display_name)
     normalized_email = normalize_new_email(email)
     if password is not None:
@@ -1776,6 +1777,15 @@ def _create_user_records(
             automatic=True,
         )
         networth.seed_into(
+            session,
+            scope,
+            locale=seed.locale,
+            actor_user_id=user.id if seed.actor_type == "user" else None,
+            actor_type=seed.actor_type,
+            now=seed.now,
+            automatic=True,
+        )
+        investments.seed_into(
             session,
             scope,
             locale=seed.locale,

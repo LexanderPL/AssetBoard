@@ -92,6 +92,9 @@ ARCHIVE_EXCLUDED_MODELS = {
     "TaxRuleVersion": "tax history requires the F3.8 archive extension",
     "NotificationChannel": "notification URLs contain secrets (F3.8/F9.3)",
     "NotificationLog": "notification delivery history is not portable (F3.8)",
+    "AssetClass": "asset classes require the F6.9 archive extension",
+    "Instrument": "instruments require the F6.9 archive extension",
+    "InstrumentAllocation": "allocation weights require the F6.9 archive extension",
 }
 
 

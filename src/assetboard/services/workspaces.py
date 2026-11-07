@@ -51,7 +51,7 @@ from assetboard.db.repositories import (
     create_owned_workspace,
 )
 from assetboard.domain.identity import InvalidEmail, normalize_email
-from assetboard.services import categories, networth
+from assetboard.services import categories, investments, networth
 from assetboard.services.auth import record_auth_event
 from assetboard.services.budget import workspace_has_budget_lines
 from assetboard.services.context import (
@@ -583,13 +583,14 @@ def create_own_workspace(
     seed_locale: str,
     clock: Clock,
 ) -> UUID:
-    """Create a workspace the user owns, with the suggested categories, and switch to it.
+    """Create a workspace the user owns, with the suggested sets, and switch to it.
 
     One ``BEGIN IMMEDIATE`` transaction re-reads the account (active?) and the instance setting
     (instance administrators may always create), creates the workspace and the owner
-    membership, seeds the categories in ``seed_locale``, records ``workspace.created`` in the
-    new workspace and selects it in the session ``session_hash``. A blank name becomes the
-    account's display name, as at first-run setup.
+    membership, seeds the ledger and net-worth categories and the asset classes in
+    ``seed_locale``, records ``workspace.created`` in the new workspace and selects it in the
+    session ``session_hash``. A blank name becomes the account's display name, as at first-run
+    setup.
     """
     clean_name = _workspace_name(name)
     try:
@@ -630,6 +631,15 @@ def create_own_workspace(
             automatic=True,
         )
         networth.seed_into(
+            session,
+            scope,
+            locale=seed_locale,
+            actor_user_id=user.id,
+            actor_type="user",
+            now=now,
+            automatic=True,
+        )
+        investments.seed_into(
             session,
             scope,
             locale=seed_locale,

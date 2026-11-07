@@ -51,6 +51,7 @@ from assetboard.db.models.identity import (
 )
 from assetboard.db.repositories import (
     UPDATABLE_FIELDS,
+    AssetClassRepository,
     AuditEventRepository,
     AuditFilter,
     BudgetLineRepository,
@@ -60,6 +61,8 @@ from assetboard.db.repositories import (
     ImportBatchRepository,
     ImportCategoryMappingRepository,
     InstanceAuditReader,
+    InstrumentAllocationRepository,
+    InstrumentRepository,
     InvitationRepository,
     InvitationTokenReader,
     ItemValuationRepository,
@@ -525,6 +528,93 @@ def test_category_queries_stay_in_their_workspace(
     assert in_a.by_lineage_ids([source_id]) == [a_food]
     assert in_b.by_lineage_ids([source_id]) == []
     assert in_b.by_lineage_ids([a_food.id]) == []
+
+
+def test_investment_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    classes_a = AssetClassRepository(db_session, ctx_a)
+    classes_b = AssetClassRepository(db_session, ctx_b)
+    a_stocks = classes_a.create(
+        name="Stocks",
+        name_key="stocks",
+        investable=True,
+        color="#2563eb",
+        sort_order=0,
+    )
+    a_bonds = classes_a.create(
+        name="Bonds",
+        name_key="bonds",
+        investable=True,
+        color="#16a34a",
+        sort_order=1,
+    )
+    b_stocks = classes_b.create(
+        name="Stocks",
+        name_key="stocks",
+        investable=True,
+        color="#2563eb",
+        sort_order=0,
+    )
+    assert [row.id for row in classes_a.ordered()] == [a_stocks.id, a_bonds.id]
+    assert [row.id for row in classes_b.ordered()] == [b_stocks.id]
+    assert classes_a.active_by_name_key("stocks") is a_stocks
+    assert classes_b.active_by_name_key("stocks") is b_stocks
+    assert classes_b.active_by_name_key("bonds") is None
+    assert (classes_a.active_count(), classes_b.active_count()) == (2, 1)
+    assert (classes_a.next_sort_order(), classes_b.next_sort_order()) == (2, 1)
+
+    instruments_a = InstrumentRepository(db_session, ctx_a)
+    instruments_b = InstrumentRepository(db_session, ctx_b)
+    a_fund = instruments_a.create(
+        name="World ETF",
+        name_key="world etf",
+        symbol="VWCE",
+        type="etf",
+        quote_currency="EUR",
+        unit_label="share",
+        valuation_source="manual",
+    )
+    b_fund = instruments_b.create(
+        name="World ETF",
+        name_key="world etf",
+        symbol="VWCE",
+        type="etf",
+        quote_currency="EUR",
+        unit_label="share",
+        valuation_source="manual",
+    )
+    assert [row.id for row in instruments_a.ordered()] == [a_fund.id]
+    assert [row.id for row in instruments_b.ordered()] == [b_fund.id]
+    assert instruments_a.active_by_name_key("world etf") is a_fund
+    assert instruments_b.active_by_name_key("world etf") is b_fund
+    assert instruments_a.get_for_update(a_fund.id) is a_fund
+    assert instruments_b.get_for_update(a_fund.id) is None
+
+    allocations_a = InstrumentAllocationRepository(db_session, ctx_a)
+    allocations_b = InstrumentAllocationRepository(db_session, ctx_b)
+    a_allocation = allocations_a.create(
+        instrument_id=a_fund.id,
+        asset_class_id=a_stocks.id,
+        weight_bp=8_000,
+    )
+    a_bonds_allocation = allocations_a.create(
+        instrument_id=a_fund.id,
+        asset_class_id=a_bonds.id,
+        weight_bp=2_000,
+    )
+    b_allocation = allocations_b.create(
+        instrument_id=b_fund.id,
+        asset_class_id=b_stocks.id,
+        weight_bp=10_000,
+    )
+    assert [row.id for row in allocations_a.for_instrument(a_fund.id)] == [
+        a_allocation.id,
+        a_bonds_allocation.id,
+    ]
+    assert [row.id for row in allocations_b.for_instrument(b_fund.id)] == [b_allocation.id]
+    assert allocations_b.for_instrument(a_fund.id) == []
 
 
 def test_networth_queries_stay_in_their_workspace(

@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}{{ _("Investments") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Investments") }}{% endblock %}
+{% block content %}
+{% include "investments/_instruments_body.html" %}
+{% endblock %}
+{% block scripts %}
+<script defer src="{{ static_url(request, 'js/investments.js') }}" referrerpolicy="no-referrer"></script>
+{% endblock %}

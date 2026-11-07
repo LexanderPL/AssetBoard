@@ -58,6 +58,11 @@ def _remove_space_groups(value: str) -> str:
     return "".join(groups)
 
 
+def decimal_symbol(locale: str) -> str:
+    """The locale's decimal separator, for small same-origin display helpers."""
+    return get_decimal_symbol(_normalize_number_locale(locale))
+
+
 def parse_amount(text: str, locale: str) -> Decimal:
     normalized_locale = _normalize_number_locale(locale)
     invalid = _invalid_amount_message(normalized_locale)

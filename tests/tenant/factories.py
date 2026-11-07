@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
 from assetboard.db.models.import_batch import ImportBatch, ImportCategoryMapping
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
+from assetboard.db.models.investments import AssetClass, Instrument, InstrumentAllocation
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.db.models.networth import (
     ItemValuation,
@@ -340,6 +341,46 @@ def make_import_category_mapping(session: Session, workspace_id: UUID) -> Import
     )
 
 
+def make_asset_class(session: Session, workspace_id: UUID) -> AssetClass:
+    name = f"Asset class {uuid4().hex[:8]}"
+    return AssetClass(
+        workspace_id=workspace_id,
+        name=name,
+        name_key=name.casefold(),
+        investable=True,
+        color="#16a34a",
+        sort_order=0,
+    )
+
+
+def make_instrument(session: Session, workspace_id: UUID) -> Instrument:
+    name = f"Instrument {uuid4().hex[:8]}"
+    return Instrument(
+        workspace_id=workspace_id,
+        name=name,
+        name_key=name.casefold(),
+        symbol="TEST",
+        type="etf",
+        quote_currency="EUR",
+        unit_label="share",
+        valuation_source="manual",
+    )
+
+
+def make_instrument_allocation(session: Session, workspace_id: UUID) -> InstrumentAllocation:
+    asset_class = make_asset_class(session, workspace_id)
+    session.add(asset_class)
+    instrument = make_instrument(session, workspace_id)
+    session.add(instrument)
+    session.flush()
+    return InstrumentAllocation(
+        workspace_id=workspace_id,
+        instrument_id=instrument.id,
+        asset_class_id=asset_class.id,
+        weight_bp=10_000,
+    )
+
+
 def make_networth_category(session: Session, workspace_id: UUID) -> NetWorthCategory:
     name = f"Net worth category {uuid4().hex[:8]}"
     return NetWorthCategory(
@@ -409,6 +450,11 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     # Invitations change only through named transitions (revoke, mark_used, ...).
     Invitation: TenantCase(make_invitation, unsupported=frozenset({"update", "delete"})),
     Category: TenantCase(make_category, update_values={"color": "#e11d48"}),
+    AssetClass: TenantCase(make_asset_class, update_values={"color": "#e11d48"}),
+    Instrument: TenantCase(make_instrument, update_values={"name": "Updated instrument"}),
+    InstrumentAllocation: TenantCase(
+        make_instrument_allocation, update_values={"weight_bp": 5_000}
+    ),
     NetWorthCategory: TenantCase(make_networth_category, update_values={"color": "#e11d48"}),
     NetWorthItem: TenantCase(make_networth_item, update_values={"name": "Updated item"}),
     # Valuations are append-only.
