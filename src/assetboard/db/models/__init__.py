@@ -30,6 +30,7 @@ from assetboard.db.models.networth import (
     NetWorthSnapshot,
 )
 from assetboard.db.models.notifications import NotificationChannel, NotificationLog
+from assetboard.db.models.prices import FxRate, PricePoint
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.models.tax import TaxRule, TaxRuleVersion
 from assetboard.db.models.totp import TotpFactor, TotpRecoveryCode
@@ -37,6 +38,8 @@ from assetboard.db.models.totp import TotpFactor, TotpRecoveryCode
 __all__ = [
     "NotificationChannel",
     "NotificationLog",
+    "FxRate",
+    "PricePoint",
     "ScheduledItem",
     "ScheduledOccurrence",
     "IncomeSource",

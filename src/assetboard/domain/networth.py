@@ -215,7 +215,7 @@ def history_points(values: Sequence[ValuationPoint], today: date) -> tuple[Histo
 
 
 def sparkline_polyline(
-    values: Sequence[int],
+    values: Sequence[int | Decimal],
     *,
     width: int = SPARKLINE_WIDTH,
     height: int = SPARKLINE_HEIGHT,

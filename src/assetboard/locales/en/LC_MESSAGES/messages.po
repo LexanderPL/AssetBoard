@@ -2060,6 +2060,21 @@ msgstr ""
 msgid "The sale on %(date)s would exceed the quantity held."
 msgstr ""
 
+msgid "Manual prices cannot be dated in the future."
+msgstr ""
+
+msgid "Enter a price of zero or more, with at most 18 decimal places."
+msgstr ""
+
+msgid "Another manual price already exists on this date."
+msgstr ""
+
+msgid "This instrument is archived; restore it before changing its prices."
+msgstr ""
+
+msgid "Only manual prices can be deleted."
+msgstr ""
+
 msgid "Transaction added."
 msgstr ""
 
@@ -2070,6 +2085,12 @@ msgid "Transaction deleted."
 msgstr ""
 
 msgid "Transaction restored."
+msgstr ""
+
+msgid "Price saved."
+msgstr ""
+
+msgid "Price deleted."
 msgstr ""
 
 msgid "an undated transaction"
@@ -4597,6 +4618,78 @@ msgstr ""
 msgid ""
 "Archived instruments keep their allocation and history but cannot be "
 "traded."
+msgstr ""
+
+msgid "Provider"
+msgstr ""
+
+msgid "Transaction"
+msgstr ""
+
+msgid "Unknown"
+msgstr ""
+
+msgid "Prices"
+msgstr ""
+
+msgid "Manual prices are used for illiquid assets; transactions fill the gaps."
+msgstr ""
+
+msgid "Stale price"
+msgstr ""
+
+msgid ""
+"A currency instrument is always priced at 1 in its own currency. Its "
+"base-currency value comes from the FX rate."
+msgstr ""
+
+msgid "Latest price"
+msgstr ""
+
+msgid "No price has been recorded for this instrument yet."
+msgstr ""
+
+#, python-format
+msgid "As of %(date)s"
+msgstr ""
+
+#, python-format
+msgid "older than %(days)s days"
+msgstr ""
+
+msgid "Price history"
+msgstr ""
+
+#, python-format
+msgid "Price in %(currency)s"
+msgstr ""
+
+msgid ""
+"Saving a price on an existing date replaces the manual price for that "
+"date."
+msgstr ""
+
+msgid "Save price"
+msgstr ""
+
+msgid "Add price"
+msgstr ""
+
+msgid "This instrument is archived. Restore it before changing its prices."
+msgstr ""
+
+#, python-format
+msgid "Price history of %(name)s"
+msgstr ""
+
+msgid "Price"
+msgstr ""
+
+#, python-format
+msgid "Delete the manual price of %(date)s?"
+msgstr ""
+
+msgid "No stored or transaction prices for this instrument yet."
 msgstr ""
 
 msgid "Choose an instrument"

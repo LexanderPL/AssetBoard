@@ -1,0 +1,111 @@
+{% from "macros/components.html" import csrf_input with context %}
+
+{% macro source_label(source) -%}
+{% if source == "manual" %}{{ _("Manual") }}{% elif source == "provider" %}{{ _("Provider") }}{% elif source == "transaction" %}{{ _("Transaction") }}{% elif source %}{{ source }}{% else %}{{ _("Unknown") }}{% endif %}
+{%- endmacro %}
+
+<section class="panel p-6 sm:p-7" aria-labelledby="instrument-prices-heading" data-price-panel>
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h2 id="instrument-prices-heading" class="text-base font-semibold">{{ _("Prices") }}</h2>
+      <p class="mt-1 text-sm text-muted">{{ _("Manual prices are used for illiquid assets; transactions fill the gaps.") }}</p>
+    </div>
+    {% if prices.latest.stale %}
+    <span class="rounded-full bg-warning-soft px-2.5 py-1 text-xs font-medium text-warning-strong" data-price-stale>{{ _("Stale price") }}</span>
+    {% endif %}
+  </div>
+
+  {% if price_errors.get("instrument") %}
+  <p class="mt-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert">{{ price_errors.get("instrument") }}</p>
+  {% endif %}
+  {% if price_errors.get("form") %}
+  <p class="mt-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert">{{ price_errors.get("form") }}</p>
+  {% endif %}
+
+  {% if instrument.type == "currency" %}
+  <p class="mt-4 border border-line bg-subtle px-4 py-3 text-sm text-muted">{{ _("A currency instrument is always priced at 1 in its own currency. Its base-currency value comes from the FX rate.") }}</p>
+  {% else %}
+  <div class="mt-5 grid gap-5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+    <div class="border border-line bg-subtle p-4" data-price-latest>
+      <p class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Latest price") }}</p>
+      {% if prices.latest.missing %}
+      <p class="mt-2 text-sm text-muted" data-price-missing>{{ _("No price has been recorded for this instrument yet.") }}</p>
+      {% else %}
+      <p class="mt-2 text-2xl font-semibold tabular-nums">{{ format_quantity_input(prices.latest.price, locale) }} {{ instrument.quote_currency }}</p>
+      <p class="mt-1 text-sm text-muted">
+        {% if prices.latest.as_of %}{{ _("As of %(date)s", date=format_day(prices.latest.as_of, locale)) }}{% endif %}
+        {% if prices.latest.source %} · {{ source_label(prices.latest.source) }}{% endif %}
+        {% if prices.latest.stale %}<span class="text-warning-strong"> · {{ _("older than %(days)s days", days=default_stale_after_days) }}</span>{% endif %}
+      </p>
+      {% endif %}
+      {% if price_sparkline %}
+      <svg viewBox="0 0 120 28" class="mt-3 h-8 w-36 text-primary-ink" role="img" aria-label="{{ _('Price history') }}" data-price-chart>
+        <polyline points="{{ price_sparkline }}" fill="none" stroke="currentColor" stroke-width="1.5" vector-effect="non-scaling-stroke"/>
+      </svg>
+      {% endif %}
+    </div>
+
+    {% if can_edit and not instrument.archived %}
+    <form method="post" action="{{ scoped_url(request, 'investment_price_save', instrument_id=instrument.id|string) }}" hx-post="{{ scoped_url(request, 'investment_price_save', instrument_id=instrument.id|string) }}" hx-target="#instrument-history-body" hx-swap="outerHTML" class="space-y-3" novalidate data-price-form>
+      {{ csrf_input() }}
+      {% if price_values.price_id %}<input type="hidden" name="price_id" value="{{ price_values.price_id }}">{% endif %}
+      <div class="space-y-1.5">
+        <label for="price-date" class="block text-sm font-medium">{{ _("Date") }}</label>
+        <input id="price-date" name="date" type="date" value="{{ price_values.date }}" required class="form-control w-full">
+        {% if price_errors.get("date") %}<p class="text-sm text-danger">{{ price_errors.get("date") }}</p>{% endif %}
+      </div>
+      <div class="space-y-1.5">
+        <label for="price-value" class="block text-sm font-medium">{{ _("Price in %(currency)s", currency=instrument.quote_currency) }}</label>
+        <input id="price-value" name="price" type="text" inputmode="decimal" value="{{ price_values.price }}" required class="form-control w-full">
+        <p class="text-xs text-muted">{{ _("Saving a price on an existing date replaces the manual price for that date.") }}</p>
+        {% if price_errors.get("price") %}<p class="text-sm text-danger">{{ price_errors.get("price") }}</p>{% endif %}
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{% if editing_price %}{{ _("Save price") }}{% else %}{{ _("Add price") }}{% endif %}</button>
+        {% if editing_price %}<a href="{{ scoped_url(request, 'investments_instrument', instrument_id=instrument.id|string) }}" class="rounded-xl px-3 py-2 text-sm font-medium text-muted hover:bg-subtle">{{ _("Cancel") }}</a>{% endif %}
+      </div>
+    </form>
+    {% elif instrument.archived %}
+    <p class="border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong">{{ _("This instrument is archived. Restore it before changing its prices.") }}</p>
+    {% endif %}
+  </div>
+
+  {% if prices.points %}
+  <div class="mt-5 overflow-x-auto">
+    <table class="sheet w-full text-sm">
+      <caption class="sr-only">{{ _("Price history of %(name)s", name=instrument.name) }}</caption>
+      <thead>
+        <tr class="text-left text-xs text-muted">
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Date") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Price") }}</th>
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Source") }}</th>
+          <th scope="col" class="px-3 py-2"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for point in prices.points %}
+        <tr data-price-point="{% if point.id %}{{ point.id }}{% endif %}" data-price-source="{{ point.source }}">
+          <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ format_day(point.date, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_quantity_input(point.price, locale) }} {{ instrument.quote_currency }}</td>
+          <td class="px-3 py-2">{{ source_label(point.source) }}</td>
+          <td class="cell-tight px-3 py-2">
+            {% if point.editable and can_edit and not instrument.archived %}
+            <div class="flex flex-wrap items-center justify-end gap-1">
+              <a href="{{ scoped_url(request, 'investments_instrument', instrument_id=instrument.id|string) }}?edit_price={{ point.id }}" class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink">{{ _("Edit") }}</a>
+              <form method="post" action="{{ scoped_url(request, 'investment_price_delete', instrument_id=instrument.id|string, price_id=point.id|string) }}" hx-post="{{ scoped_url(request, 'investment_price_delete', instrument_id=instrument.id|string, price_id=point.id|string) }}" hx-target="#instrument-history-body" hx-swap="outerHTML" data-confirm="{{ _('Delete the manual price of %(date)s?', date=format_day(point.date, locale)) }}">
+                {{ csrf_input() }}
+                <button type="submit" class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger-soft">{{ _("Delete") }}</button>
+              </form>
+            </div>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="mt-5 text-sm text-muted" data-price-empty>{{ _("No stored or transaction prices for this instrument yet.") }}</p>
+  {% endif %}
+  {% endif %}
+</section>

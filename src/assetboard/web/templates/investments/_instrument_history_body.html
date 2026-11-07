@@ -46,6 +46,8 @@
     </dl>
   </section>
 
+  {% include "investments/_prices_panel.html" %}
+
   {% if can_edit and not history.instrument.archived %}
   <section class="panel p-6 sm:p-7" aria-labelledby="instrument-transaction-heading" data-transaction-create>
     <h2 id="instrument-transaction-heading" class="text-base font-semibold">{{ _("Add a transaction") }}</h2>
