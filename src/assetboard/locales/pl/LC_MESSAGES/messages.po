@@ -2159,7 +2159,9 @@ msgid "Manual prices cannot be dated in the future."
 msgstr "Ceny ręczne nie mogą mieć przyszłej daty."
 
 msgid "Enter a price of zero or more, with at most 18 decimal places."
-msgstr "Podaj cenę równą zero lub większą, z co najwyżej 18 miejscami po przecinku."
+msgstr ""
+"Podaj cenę równą zero lub większą, z co najwyżej 18 miejscami po "
+"przecinku."
 
 msgid "Another manual price already exists on this date."
 msgstr "Inna cena ręczna już istnieje tego dnia."
