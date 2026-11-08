@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.5.4](https://github.com/LexanderPL/AssetBoard/compare/v0.5.3...v0.5.4) (2026-11-08)
+
+
+### Features
+
+* **investments:** F6.2a base-currency settlement and bulk add of transactions ([#244](https://github.com/LexanderPL/AssetBoard/issues/244)) ([33bb52f](https://github.com/LexanderPL/AssetBoard/commit/33bb52f62c63b8df956594a06ef6a336ccef8c2e))
+
+
+### Bug Fixes
+
+* **investments:** instrument form, FX error and average-cost display ([#243](https://github.com/LexanderPL/AssetBoard/issues/243)) ([e032393](https://github.com/LexanderPL/AssetBoard/commit/e0323939c3fa23439bd3d3821cb3dd3ec42804f7))
+
+
+### Documentation
+
+* **spec:** F6.2a base-currency settlement and bulk add of transactions ([#241](https://github.com/LexanderPL/AssetBoard/issues/241)) ([c97ec7b](https://github.com/LexanderPL/AssetBoard/commit/c97ec7be0cfd27a27839903a6523dc6be807592f))
+
 ## [0.5.3](https://github.com/LexanderPL/AssetBoard/compare/v0.5.2...v0.5.3) (2026-11-08)
 
 
