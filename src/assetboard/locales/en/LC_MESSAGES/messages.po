@@ -2093,6 +2093,17 @@ msgstr ""
 msgid "Enter a positive FX rate to the base currency."
 msgstr ""
 
+msgid "FX rate needed: no stored rate exists for this date, so enter one."
+msgstr ""
+
+msgid "Choose the currency of the amounts."
+msgstr ""
+
+msgid ""
+"Amounts in the base currency are only for instruments quoted in another "
+"currency."
+msgstr ""
+
 msgid "Enter a note of at most 200 characters."
 msgstr ""
 
@@ -2187,8 +2198,79 @@ msgstr ""
 msgid "Bond terms saved."
 msgstr ""
 
+msgid ""
+"Use date; instrument; type; quantity; unit price; fee; FX; amounts "
+"currency."
+msgstr ""
+
+msgid "Enter a date."
+msgstr ""
+
+msgid "Enter a date as YYYY-MM-DD or in your short date format."
+msgstr ""
+
+msgid "Enter an instrument."
+msgstr ""
+
+msgid "No active instrument has this name or symbol."
+msgstr ""
+
+msgid "More than one active instrument matches; use the other one."
+msgstr ""
+
+msgid "This instrument is archived; restore it before adding transactions."
+msgstr ""
+
+msgid "Use buy or sell (kupno, zakup, sprzedaż)."
+msgstr ""
+
+msgid "Enter a quantity."
+msgstr ""
+
+msgid "Enter a unit price."
+msgstr ""
+
+msgid "FX rate needed"
+msgstr ""
+
+msgid "This instrument is quoted in the base currency; leave FX blank or 1."
+msgstr ""
+
+msgid ""
+"Use the instrument's quote currency or the base currency, or leave it "
+"blank."
+msgstr ""
+
+msgid "This sale would exceed the quantity held."
+msgstr ""
+
+msgid "Paste at most 64 KiB of text."
+msgstr ""
+
+msgid "Paste at most 500 lines."
+msgstr ""
+
+msgid "Paste at least one line."
+msgstr ""
+
 msgid "an undated transaction"
 msgstr ""
+
+msgid "No stored FX rate for this date; enter the rate."
+msgstr ""
+
+#, python-format
+msgid "Stored rate of %(date)s (%(source)s)."
+msgstr ""
+
+msgid "manual"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d transaction added."
+msgid_plural "%(num)d transactions added."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid ""
 "This invitation link is not valid. It may have expired, been used or been"
@@ -2485,12 +2567,6 @@ msgid "Another active category of this side already has this name."
 msgstr ""
 
 msgid "The suggested categories can only be added to an empty side."
-msgstr ""
-
-msgid "Paste at most 64 KiB of text."
-msgstr ""
-
-msgid "Paste at most 500 lines."
 msgstr ""
 
 msgid "Archived because it still has items."
@@ -5190,9 +5266,31 @@ msgstr ""
 msgid "Sell"
 msgstr ""
 
+msgid "Amounts in"
+msgstr ""
+
+#, python-format
+msgid ""
+"Choose %(currency)s when your broker shows only %(currency)s amounts: the"
+" unit price and fee are then in %(currency)s and the FX rate converts "
+"them."
+msgstr ""
+
 msgid ""
 "In the instrument's quote currency. A currency instrument is always "
 "priced at 1."
+msgstr ""
+
+#, python-format
+msgid "Unit price in %(currency)s"
+msgstr ""
+
+#, python-format
+msgid "What you paid per unit in %(currency)s, as the broker shows it."
+msgstr ""
+
+#, python-format
+msgid "Fee in %(currency)s"
 msgstr ""
 
 #, python-format
@@ -5205,6 +5303,15 @@ msgstr ""
 msgid "Undated"
 msgstr ""
 
+msgid ""
+"Rate 1 for an instrument quoted in another currency: the amounts may be "
+"in the base currency. Open the row, choose the base currency and save "
+"with the stored rate."
+msgstr ""
+
+msgid "check FX rate"
+msgstr ""
+
 #, python-format
 msgid "Delete the transaction of %(date)s?"
 msgstr ""
@@ -5212,10 +5319,62 @@ msgstr ""
 msgid "Add an active instrument first."
 msgstr ""
 
+msgid "Bulk add"
+msgstr ""
+
+#, python-format
+msgid ""
+"Paste one transaction per line: date; instrument; type; quantity; unit "
+"price; fee; FX; amounts currency. Empty trailing fields can be left out "
+"and lines starting with # are ignored. Numbers use the interface number "
+"format. The amounts currency is blank or the quote currency for quote "
+"amounts, or %(currency)s for amounts in %(currency)s. A blank FX rate is "
+"taken from stored FX for the date. Nothing is created unless every line "
+"is valid."
+msgstr ""
+
+msgid "Example:"
+msgstr ""
+
+msgid "Transactions to add"
+msgstr ""
+
+msgid "Preview"
+msgstr ""
+
+msgid "Line"
+msgstr ""
+
+#, python-format
+msgid "Total in %(currency)s"
+msgstr ""
+
+msgid "Problems"
+msgstr ""
+
+#, python-format
+msgid "stored, %(date)s, %(source)s"
+msgstr ""
+
+msgid "Ready"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "Create %(num)d transaction"
+msgid_plural "Create %(num)d transactions"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Fix the lines above; nothing is created while any line has a problem."
+msgstr ""
+
 msgid "All instruments"
 msgstr ""
 
 msgid "All types"
+msgstr ""
+
+msgid "FX needs checking"
 msgstr ""
 
 msgid "Clear"
@@ -5716,9 +5875,6 @@ msgstr ""
 msgid "Items to add"
 msgstr ""
 
-msgid "Preview"
-msgstr ""
-
 msgid "Their items still count towards net worth until each item is archived."
 msgstr ""
 
@@ -5827,18 +5983,6 @@ msgid "No value yet"
 msgstr ""
 
 msgid "Unlink"
-msgstr ""
-
-msgid "Paste at least one line."
-msgstr ""
-
-msgid "Line"
-msgstr ""
-
-msgid "Problems"
-msgstr ""
-
-msgid "Ready"
 msgstr ""
 
 #, python-format

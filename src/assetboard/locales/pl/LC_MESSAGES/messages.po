@@ -2192,6 +2192,19 @@ msgstr "Opłata jest zbyt duża."
 msgid "Enter a positive FX rate to the base currency."
 msgstr "Wpisz dodatni kurs walutowy do waluty bazowej."
 
+msgid "FX rate needed: no stored rate exists for this date, so enter one."
+msgstr "Potrzebny kurs: brak zapisanego kursu na ten dzień, wpisz go."
+
+msgid "Choose the currency of the amounts."
+msgstr "Wybierz walutę kwot."
+
+msgid ""
+"Amounts in the base currency are only for instruments quoted in another "
+"currency."
+msgstr ""
+"Kwoty w walucie bazowej są tylko dla instrumentów notowanych w innej "
+"walucie."
+
 msgid "Enter a note of at most 200 characters."
 msgstr "Wpisz notatkę o długości do 200 znaków."
 
@@ -2296,8 +2309,86 @@ msgstr "Usunięto cenę."
 msgid "Bond terms saved."
 msgstr "Zapisano warunki obligacji."
 
+msgid ""
+"Use date; instrument; type; quantity; unit price; fee; FX; amounts "
+"currency."
+msgstr ""
+"Użyj formatu: data; instrument; typ; ilość; cena jednostkowa; prowizja; "
+"kurs; waluta kwot."
+
+msgid "Enter a date."
+msgstr "Wpisz datę."
+
+msgid "Enter a date as YYYY-MM-DD or in your short date format."
+msgstr "Wpisz datę jako RRRR-MM-DD lub w swoim krótkim formacie daty."
+
+msgid "Enter an instrument."
+msgstr "Wpisz instrument."
+
+msgid "No active instrument has this name or symbol."
+msgstr "Żaden aktywny instrument nie ma takiej nazwy ani symbolu."
+
+msgid "More than one active instrument matches; use the other one."
+msgstr ""
+"Pasuje więcej niż jeden aktywny instrument; użyj drugiego określenia "
+"(nazwy lub symbolu)."
+
+msgid "This instrument is archived; restore it before adding transactions."
+msgstr "Ten instrument jest zarchiwizowany; przywróć go przed dodaniem transakcji."
+
+msgid "Use buy or sell (kupno, zakup, sprzedaż)."
+msgstr "Użyj buy lub sell (kupno, zakup, sprzedaż)."
+
+msgid "Enter a quantity."
+msgstr "Wpisz ilość."
+
+msgid "Enter a unit price."
+msgstr "Wpisz cenę jednostkową."
+
+msgid "FX rate needed"
+msgstr "Potrzebny kurs"
+
+msgid "This instrument is quoted in the base currency; leave FX blank or 1."
+msgstr ""
+"Ten instrument jest notowany w walucie bazowej; zostaw kurs pusty lub "
+"wpisz 1."
+
+msgid ""
+"Use the instrument's quote currency or the base currency, or leave it "
+"blank."
+msgstr "Użyj waluty notowania instrumentu lub waluty bazowej albo zostaw puste."
+
+msgid "This sale would exceed the quantity held."
+msgstr "Ta sprzedaż przekroczyłaby posiadaną ilość."
+
+msgid "Paste at most 64 KiB of text."
+msgstr "Wklej najwyżej 64 KiB tekstu."
+
+msgid "Paste at most 500 lines."
+msgstr "Wklej najwyżej 500 wierszy."
+
+msgid "Paste at least one line."
+msgstr "Wklej co najmniej jeden wiersz."
+
 msgid "an undated transaction"
 msgstr "transakcja bez daty"
+
+msgid "No stored FX rate for this date; enter the rate."
+msgstr "Brak zapisanego kursu na ten dzień; wpisz kurs."
+
+#, python-format
+msgid "Stored rate of %(date)s (%(source)s)."
+msgstr "Zapisany kurs z %(date)s (%(source)s)."
+
+msgid "manual"
+msgstr "ręczny"
+
+#, python-format
+msgid "%(num)d transaction added."
+msgid_plural "%(num)d transactions added."
+msgstr[0] "Dodano %(num)d transakcję."
+msgstr[1] "Dodano %(num)d transakcje."
+msgstr[2] "Dodano %(num)d transakcji."
 
 msgid ""
 "This invitation link is not valid. It may have expired, been used or been"
@@ -2619,12 +2710,6 @@ msgstr "Inna aktywna kategoria po tej stronie ma już tę nazwę."
 
 msgid "The suggested categories can only be added to an empty side."
 msgstr "Proponowane kategorie można dodać tylko do pustej strony."
-
-msgid "Paste at most 64 KiB of text."
-msgstr "Wklej najwyżej 64 KiB tekstu."
-
-msgid "Paste at most 500 lines."
-msgstr "Wklej najwyżej 500 wierszy."
 
 msgid "Archived because it still has items."
 msgstr "Zarchiwizowano, ponieważ nadal ma pozycje."
@@ -5596,10 +5681,34 @@ msgstr "Kupno"
 msgid "Sell"
 msgstr "Sprzedaż"
 
+msgid "Amounts in"
+msgstr "Kwoty w"
+
+#, python-format
+msgid ""
+"Choose %(currency)s when your broker shows only %(currency)s amounts: the"
+" unit price and fee are then in %(currency)s and the FX rate converts "
+"them."
+msgstr ""
+"Wybierz %(currency)s, gdy broker pokazuje tylko kwoty w %(currency)s: "
+"cena jednostkowa i prowizja są wtedy w %(currency)s, a kurs je przelicza."
+
 msgid ""
 "In the instrument's quote currency. A currency instrument is always "
 "priced at 1."
 msgstr "W walucie notowania instrumentu. Instrument walutowy zawsze ma cenę 1."
+
+#, python-format
+msgid "Unit price in %(currency)s"
+msgstr "Cena jednostkowa w %(currency)s"
+
+#, python-format
+msgid "What you paid per unit in %(currency)s, as the broker shows it."
+msgstr "Ile zapłacono za jednostkę w %(currency)s, tak jak pokazuje broker."
+
+#, python-format
+msgid "Fee in %(currency)s"
+msgstr "Prowizja w %(currency)s"
 
 #, python-format
 msgid "FX rate to %(currency)s"
@@ -5611,6 +5720,18 @@ msgstr "Wymagany, gdy instrument jest notowany w innej walucie."
 msgid "Undated"
 msgstr "Bez daty"
 
+msgid ""
+"Rate 1 for an instrument quoted in another currency: the amounts may be "
+"in the base currency. Open the row, choose the base currency and save "
+"with the stored rate."
+msgstr ""
+"Kurs 1 dla instrumentu notowanego w innej walucie: kwoty mogą być w "
+"walucie bazowej. Otwórz wiersz, wybierz walutę bazową i zapisz z "
+"zapisanym kursem."
+
+msgid "check FX rate"
+msgstr "sprawdź kurs"
+
 #, python-format
 msgid "Delete the transaction of %(date)s?"
 msgstr "Usunąć transakcję z dnia %(date)s?"
@@ -5618,11 +5739,73 @@ msgstr "Usunąć transakcję z dnia %(date)s?"
 msgid "Add an active instrument first."
 msgstr "Najpierw dodaj aktywny instrument."
 
+msgid "Bulk add"
+msgstr "Dodaj hurtowo"
+
+#, python-format
+msgid ""
+"Paste one transaction per line: date; instrument; type; quantity; unit "
+"price; fee; FX; amounts currency. Empty trailing fields can be left out "
+"and lines starting with # are ignored. Numbers use the interface number "
+"format. The amounts currency is blank or the quote currency for quote "
+"amounts, or %(currency)s for amounts in %(currency)s. A blank FX rate is "
+"taken from stored FX for the date. Nothing is created unless every line "
+"is valid."
+msgstr ""
+"Wklej jedną transakcję w wierszu: data; instrument; typ; ilość; cena "
+"jednostkowa; prowizja; kurs; waluta kwot. Puste pola na końcu można "
+"pominąć, a wiersze zaczynające się od # są pomijane. Liczby w formacie "
+"interfejsu. Waluta kwot jest pusta lub równa walucie notowania dla kwot w"
+" walucie notowania albo %(currency)s dla kwot w %(currency)s. Pusty kurs "
+"jest brany z zapisanych kursów na dany dzień. Nic nie zostanie utworzone,"
+" dopóki każdy wiersz nie jest poprawny."
+
+msgid "Example:"
+msgstr "Przykład:"
+
+msgid "Transactions to add"
+msgstr "Transakcje do dodania"
+
+msgid "Preview"
+msgstr "Podgląd"
+
+msgid "Line"
+msgstr "Wiersz"
+
+#, python-format
+msgid "Total in %(currency)s"
+msgstr "Razem w %(currency)s"
+
+msgid "Problems"
+msgstr "Problemy"
+
+#, python-format
+msgid "stored, %(date)s, %(source)s"
+msgstr "zapisany, %(date)s, %(source)s"
+
+msgid "Ready"
+msgstr "Gotowe"
+
+#, python-format
+msgid "Create %(num)d transaction"
+msgid_plural "Create %(num)d transactions"
+msgstr[0] "Utwórz %(num)d transakcję"
+msgstr[1] "Utwórz %(num)d transakcje"
+msgstr[2] "Utwórz %(num)d transakcji"
+
+msgid "Fix the lines above; nothing is created while any line has a problem."
+msgstr ""
+"Popraw wiersze powyżej; nic nie zostanie utworzone, dopóki któryś wiersz "
+"ma błąd."
+
 msgid "All instruments"
 msgstr "Wszystkie instrumenty"
 
 msgid "All types"
 msgstr "Wszystkie typy"
+
+msgid "FX needs checking"
+msgstr "Kurs do sprawdzenia"
 
 msgid "Clear"
 msgstr "Wyczyść"
@@ -6179,9 +6362,6 @@ msgstr ""
 msgid "Items to add"
 msgstr "Pozycje do dodania"
 
-msgid "Preview"
-msgstr "Podgląd"
-
 msgid "Their items still count towards net worth until each item is archived."
 msgstr ""
 "Ich pozycje nadal wliczają się do majątku netto, dopóki każda pozycja nie"
@@ -6302,18 +6482,6 @@ msgstr "Brak wartości"
 
 msgid "Unlink"
 msgstr "Odłącz"
-
-msgid "Paste at least one line."
-msgstr "Wklej co najmniej jeden wiersz."
-
-msgid "Line"
-msgstr "Wiersz"
-
-msgid "Problems"
-msgstr "Problemy"
-
-msgid "Ready"
-msgstr "Gotowe"
 
 #, python-format
 msgid "Create %(num)d item"
