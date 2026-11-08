@@ -94,8 +94,9 @@ workspace cost-basis setting. The projected value at maturity excludes the early
 Coupons paid out annually are not part of the bond value; record them as income in the ledger.
 
 Once terms exist, the model value is the only price source: manual prices are refused and the
-provider fields are not available for this instrument type. These are estimates from the terms
-you enter, not investment advice.
+provider fields are not available for this instrument type. Each displayed line is rounded
+independently to the currency's minor unit, so gross accrued minus fee and tax can differ from
+net by one minor unit. These are estimates from the terms you enter, not investment advice.
 
 Instruments are archived, not deleted. Archiving keeps their allocation and history and hides
 them from the active list; restoring is refused if another active instrument has the same name.
