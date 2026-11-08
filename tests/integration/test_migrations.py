@@ -343,6 +343,26 @@ def test_0041_price_sources_migration_is_reversible(tmp_path: Path) -> None:
         engine.dispose()
 
 
+def test_0042_provider_quota_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'provider_quota.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        columns = {column["name"] for column in inspect(engine).get_columns("price_source_configs")}
+        assert {"daily_call_budget", "quota_day", "quota_used"} <= columns
+        command.downgrade(alembic_config(settings), "0041_f64_price_sources")
+        columns = {column["name"] for column in inspect(engine).get_columns("price_source_configs")}
+        assert not {"daily_call_budget", "quota_day", "quota_used"} & columns
+        upgrade_database(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
 def test_0034_net_worth_snapshots_migration_is_reversible(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None,

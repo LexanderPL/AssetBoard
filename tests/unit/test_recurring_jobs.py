@@ -256,6 +256,8 @@ def test_provider_jobs_are_registered_only_with_a_runtime(db):
     calls = {call.kwargs.get("id"): call for call in scheduler.add_job.call_args_list}
     assert calls["price-refresh-nbp"].kwargs["max_instances"] == 1
     assert calls["price-refresh-ecb"].kwargs["max_instances"] == 1
+    assert calls["price-refresh-coingecko"].kwargs["max_instances"] == 1
+    assert calls["price-refresh-eodhd"].kwargs["max_instances"] == 1
     fire = (
         calls["price-refresh-nbp"]
         .args[1]

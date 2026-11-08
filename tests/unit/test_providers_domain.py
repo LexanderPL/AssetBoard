@@ -7,16 +7,21 @@ from decimal import Decimal, localcontext
 import pytest
 
 from assetboard.domain.providers import (
+    COINGECKO,
     ECB,
+    EODHD,
     NBP,
     InvalidProviderRate,
+    InvalidProviderSymbol,
     UnsupportedUnit,
+    clean_provider_symbol,
     convert_to_workspace_base,
     ecb_quote_to_rate,
     nbp_gold_symbol,
     nbp_gold_to_unit,
     normalize_instrument_symbol,
     normalize_provider_decimal,
+    provider_supports_instrument,
 )
 
 
@@ -84,3 +89,30 @@ def test_provider_symbol_normalization() -> None:
     assert normalize_instrument_symbol(NBP, "GOLD") == "XAU"
     assert normalize_instrument_symbol(NBP, "XAG") is None
     assert normalize_instrument_symbol(ECB, "anything") == "anything"
+
+
+def test_coingecko_and_eodhd_symbols_are_canonicalised() -> None:
+    assert clean_provider_symbol(COINGECKO, "Bitcoin") == "bitcoin"
+    assert clean_provider_symbol(EODHD, "vwce.de") == "VWCE.DE"
+    with pytest.raises(InvalidProviderSymbol):
+        clean_provider_symbol(COINGECKO, "bad symbol!")
+    with pytest.raises(InvalidProviderSymbol):
+        clean_provider_symbol(EODHD, "bad symbol!")
+
+
+def test_provider_support_helpers_match_the_adapter_rules() -> None:
+    assert provider_supports_instrument(
+        COINGECKO, type="crypto", quote_currency="USD", provider_symbol="bitcoin"
+    )
+    assert not provider_supports_instrument(
+        COINGECKO, type="etf", quote_currency="USD", provider_symbol="bitcoin"
+    )
+    assert not provider_supports_instrument(
+        COINGECKO, type="crypto", quote_currency="CHF", provider_symbol="bitcoin"
+    )
+    assert provider_supports_instrument(
+        EODHD, type="etf", quote_currency="EUR", provider_symbol="VWCE.DE"
+    )
+    assert not provider_supports_instrument(
+        EODHD, type="crypto", quote_currency="EUR", provider_symbol="VWCE.DE"
+    )
