@@ -61,6 +61,7 @@ from assetboard.services.months import MonthClosed
 from assetboard.services.notify import Notifier
 from assetboard.services.oidc import OidcClient, UrllibTransport
 from assetboard.services.oidc_flow import ConsumedStates
+from assetboard.services.providers.registry import build_provider_runtime
 from assetboard.services.proxy_auth import RecentKeys
 from assetboard.services.update_check import GitHubReleaseSource
 from assetboard.web.account_routes import router as account_router
@@ -86,6 +87,7 @@ from assetboard.web.networth_routes import router as networth_router
 from assetboard.web.notification_routes import router as notification_router
 from assetboard.web.oidc_routes import router as oidc_router
 from assetboard.web.plan_routes import router as plan_router
+from assetboard.web.provider_routes import router as provider_router
 from assetboard.web.proxy_routes import router as proxy_router
 from assetboard.web.rendering import render_template
 from assetboard.web.routes import router as web_router
@@ -198,6 +200,12 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        provider_runtime = build_provider_runtime(
+            settings,
+            app.state.clock,
+            http=getattr(app.state, "provider_http", None),
+        )
+        app.state.provider_runtime = provider_runtime
         recurring_jobs = RecurringJobs(
             session_factory,
             settings,
@@ -205,6 +213,7 @@ def create_app(
             logger,
             notifier=lambda: app.state.notifier,
             release_source=lambda: app.state.release_source,
+            provider_runtime=provider_runtime,
         )
         app.state.recurring_jobs = recurring_jobs
         try:
@@ -267,6 +276,7 @@ def create_app(
     app.state.logger = logger
     app.state.database_engine = engine
     app.state.clock = clock
+    app.state.provider_http = None
     app.state.session_factory = session_factory
     app.state.touch_factory = touch_factory
     app.state.schema_state = None  # decided in the lifespan
@@ -323,6 +333,7 @@ def create_app(
     app.include_router(workspace_router)
     app.include_router(category_router)
     app.include_router(investment_router)
+    app.include_router(provider_router)
     app.include_router(investment_transaction_router)
     app.include_router(networth_router)
     app.include_router(networth_history_router)

@@ -22,6 +22,8 @@ from assetboard.services.networth_snapshots import take_auto_snapshot
 from assetboard.services.notifications import run_workspace as run_notifications
 from assetboard.services.notify import Notifier
 from assetboard.services.occurrences import auto_post_workspace
+from assetboard.services.price_refresh import refresh_all, refresh_provider
+from assetboard.services.providers.transport import ProviderRuntime
 from assetboard.services.scheduled import generate_workspace
 from assetboard.services.update_check import (
     ReleaseSource,
@@ -55,10 +57,12 @@ class RecurringJobs:
         notifier: Callable[[], Notifier] | None = None,
         monotonic: Callable[[], float] = time.monotonic,
         release_source: Callable[[], ReleaseSource] | None = None,
+        provider_runtime: ProviderRuntime | None = None,
     ) -> None:
         self.factory, self.settings, self.clock, self.logger = factory, settings, clock, logger
         self.notifier, self.monotonic = notifier, monotonic
         self.release_source = release_source
+        self.provider_runtime = provider_runtime
         self._last_update_attempt: datetime | None = None
         self._notify_offset = 0
         self.scheduler = BackgroundScheduler(timezone="UTC")
@@ -128,6 +132,61 @@ class RecurringJobs:
                 type(exc).__name__,
                 exc_info=True,
             )
+
+    def refresh_prices(self, provider_key: str) -> None:
+        """Daily provider refresh for every workspace that enabled it."""
+        if self.provider_runtime is None:
+            return
+        try:
+            results = refresh_all(self.factory, provider_key, self.provider_runtime, self.logger)
+            for stats in results:
+                if stats.errors:
+                    self.logger.info(
+                        "price_refresh_partial provider=%s status=%s errors=%s skipped=%s",
+                        provider_key,
+                        stats.status,
+                        stats.errors,
+                        stats.skipped,
+                    )
+        except Exception as exc:
+            self.logger.error(
+                "price_refresh_failed provider=%s exception_type=%s",
+                provider_key,
+                type(exc).__name__,
+            )
+
+    def backfill_prices(self, workspace_id: UUID, provider_key: str) -> None:
+        """One-off first history backfill, queued when a provider is enabled or assigned."""
+        if self.provider_runtime is None:
+            return
+        try:
+            refresh_provider(
+                self.factory,
+                _Scope(_Workspace(workspace_id)),
+                provider_key,
+                self.provider_runtime,
+                mode="full",
+                wait=True,
+            )
+        except Exception as exc:
+            self.logger.error(
+                "price_backfill_failed workspace=%s provider=%s exception_type=%s",
+                workspace_id,
+                provider_key,
+                type(exc).__name__,
+            )
+
+    def request_backfill(self, workspace_id: UUID, provider_key: str) -> None:
+        if not self.scheduler.running:
+            return
+        self.scheduler.add_job(
+            self.backfill_prices,
+            args=[workspace_id, provider_key],
+            id=f"price-backfill-{workspace_id}-{provider_key}",
+            replace_existing=True,
+            max_instances=1,
+            misfire_grace_time=None,
+        )
 
     def cleanup_imports(self) -> None:
         """Hourly (F4.2): expire stored import uploads older than 24 hours, per workspace."""
@@ -326,6 +385,21 @@ class RecurringJobs:
             coalesce=True,
             max_instances=1,
         )
+        if self.provider_runtime is not None:
+            for provider_key, hour, minute in (
+                ("nbp", 18, 10),
+                ("ecb", 18, 20),
+            ):
+                self.scheduler.add_job(
+                    self.refresh_prices,
+                    CronTrigger(hour=hour, minute=minute, timezone="UTC"),
+                    args=[provider_key],
+                    id=f"price-refresh-{provider_key}",
+                    replace_existing=True,
+                    coalesce=True,
+                    max_instances=1,
+                    misfire_grace_time=None,
+                )
         self.scheduler.start()
 
     def stop(self) -> None:

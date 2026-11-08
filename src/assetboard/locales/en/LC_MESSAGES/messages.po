@@ -229,6 +229,17 @@ msgstr ""
 msgid "Mortgage"
 msgstr ""
 
+msgid ""
+"Official National Bank of Poland FX rates against PLN and the official "
+"gold price."
+msgstr ""
+
+msgid "NBP gold uses XAU; the price is quoted per gram and converted to the unit."
+msgstr ""
+
+msgid "European Central Bank euro reference rates against EUR."
+msgstr ""
+
 msgid "Enter a valid amount."
 msgstr ""
 
@@ -2605,6 +2616,33 @@ msgstr ""
 msgid "Transfers are not counted in the plan: this category takes none."
 msgstr ""
 
+#, fuzzy, python-format
+msgid "Rate limited; try again in %(minutes)s minutes."
+msgstr ""
+
+#, python-format
+msgid "Refresh complete: %(prices)s prices and %(rates)s FX rates."
+msgstr ""
+
+#, python-format
+msgid "Refresh complete with %(errors)s errors."
+msgstr ""
+
+msgid "Enable the provider before refreshing."
+msgstr ""
+
+msgid "No held instruments need this provider."
+msgstr ""
+
+msgid "The provider could not be refreshed."
+msgstr ""
+
+msgid "Provider settings saved."
+msgstr ""
+
+msgid "The provider settings could not be saved."
+msgstr ""
+
 msgid ""
 "Sign-in through your proxy is not available for this request. Try again; "
 "if it keeps failing, contact your administrator."
@@ -4638,6 +4676,22 @@ msgstr ""
 msgid "Stale price"
 msgstr ""
 
+msgid "The provider is disabled; the last known price is shown."
+msgstr ""
+
+msgid "Last updated today — provider error."
+msgstr ""
+
+#, python-format
+msgid "Last updated %(days)s days ago — provider error."
+msgstr ""
+
+msgid "No provider price yet — provider error."
+msgstr ""
+
+msgid "The provider is rate limited; the last known price is shown."
+msgstr ""
+
 msgid ""
 "A currency instrument is always priced at 1 in its own currency. Its "
 "base-currency value comes from the FX rate."
@@ -4690,6 +4744,58 @@ msgid "Delete the manual price of %(date)s?"
 msgstr ""
 
 msgid "No stored or transaction prices for this instrument yet."
+msgstr ""
+
+msgid "Price providers"
+msgstr ""
+
+msgid ""
+"Providers are opt-in per workspace. Manual prices always remain "
+"available; a provider failure keeps the last known price."
+msgstr ""
+
+#, python-format
+msgid ""
+"Your base currency is %(currency)s. Rates are converted into it when the "
+"provider publishes that currency."
+msgstr ""
+
+msgid "Enabled"
+msgstr ""
+
+msgid "Disabled"
+msgstr ""
+
+msgid "Quotes in"
+msgstr ""
+
+msgid "Instruments using it"
+msgstr ""
+
+msgid "Last success"
+msgstr ""
+
+msgid "Last error"
+msgstr ""
+
+msgid ""
+"This provider does not publish your base currency, so FX rates from it "
+"are skipped."
+msgstr ""
+
+#, python-format
+msgid "Source: %(source)s"
+msgstr ""
+
+msgid "Refresh now"
+msgstr ""
+
+msgid ""
+"Scheduled refreshes run daily after market close. A provider error keeps "
+"the last known price and is shown on the instrument."
+msgstr ""
+
+msgid "Providers"
 msgstr ""
 
 msgid "Choose an instrument"
@@ -5453,9 +5559,6 @@ msgid ""
 "amounts."
 msgstr ""
 
-msgid "Enabled"
-msgstr ""
-
 msgid ""
 "Reminders for this workspace reach you through Apprise: ntfy, Gotify, "
 "Telegram, email and many other services. Your channels are yours alone; "
@@ -5465,9 +5568,6 @@ msgstr ""
 msgid ""
 "The administrator has turned notifications off on this server. Channels "
 "are kept, but nothing is sent."
-msgstr ""
-
-msgid "Disabled"
 msgstr ""
 
 msgid "Send test"

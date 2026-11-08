@@ -232,6 +232,21 @@ msgstr "Raty"
 msgid "Mortgage"
 msgstr "Kredyt hipoteczny"
 
+msgid ""
+"Official National Bank of Poland FX rates against PLN and the official "
+"gold price."
+msgstr ""
+"Oficjalne kursy walut Narodowego Banku Polskiego względem PLN i oficjalna"
+" cena złota."
+
+msgid "NBP gold uses XAU; the price is quoted per gram and converted to the unit."
+msgstr ""
+"Złoto NBP używa symbolu XAU; cena jest podawana za gram i przeliczana na "
+"jednostkę instrumentu."
+
+msgid "European Central Bank euro reference rates against EUR."
+msgstr "Referencyjne kursy euro Europejskiego Banku Centralnego względem EUR."
+
 msgid "Enter a valid amount."
 msgstr "Podaj prawidłową kwotę."
 
@@ -2750,6 +2765,33 @@ msgstr ""
 "Przelewy własne nie są liczone w planie: ta kategoria nie przyjmuje "
 "wartości planowanych."
 
+#, python-format
+msgid "Rate limited; try again in %(minutes)s minutes."
+msgstr "Ograniczenie tempa; spróbuj ponownie za %(minutes)s min."
+
+#, python-format
+msgid "Refresh complete: %(prices)s prices and %(rates)s FX rates."
+msgstr "Odświeżanie zakończone: %(prices)s cen i %(rates)s kursów FX."
+
+#, python-format
+msgid "Refresh complete with %(errors)s errors."
+msgstr "Odświeżanie zakończone z błędami: %(errors)s."
+
+msgid "Enable the provider before refreshing."
+msgstr "Włącz dostawcę przed odświeżeniem."
+
+msgid "No held instruments need this provider."
+msgstr "Żaden posiadany instrument nie potrzebuje tego dostawcy."
+
+msgid "The provider could not be refreshed."
+msgstr "Nie udało się odświeżyć dostawcy."
+
+msgid "Provider settings saved."
+msgstr "Zapisano ustawienia dostawcy."
+
+msgid "The provider settings could not be saved."
+msgstr "Nie udało się zapisać ustawień dostawcy."
+
 msgid ""
 "Sign-in through your proxy is not available for this request. Try again; "
 "if it keeps failing, contact your administrator."
@@ -4991,6 +5033,22 @@ msgstr "Ceny ręczne służą do aktywów niepłynnych; transakcje uzupełniają
 msgid "Stale price"
 msgstr "Nieaktualna cena"
 
+msgid "The provider is disabled; the last known price is shown."
+msgstr "Dostawca jest wyłączony; pokazywana jest ostatnia znana cena."
+
+msgid "Last updated today — provider error."
+msgstr "Ostatnia aktualizacja dziś — błąd dostawcy."
+
+#, python-format
+msgid "Last updated %(days)s days ago — provider error."
+msgstr "Ostatnia aktualizacja %(days)s dni temu — błąd dostawcy."
+
+msgid "No provider price yet — provider error."
+msgstr "Brak ceny dostawcy — błąd dostawcy."
+
+msgid "The provider is rate limited; the last known price is shown."
+msgstr "Dostawca ma ograniczenie tempa; pokazywana jest ostatnia znana cena."
+
 msgid ""
 "A currency instrument is always priced at 1 in its own currency. Its "
 "base-currency value comes from the FX rate."
@@ -5046,6 +5104,66 @@ msgstr "Usunąć cenę ręczną z dnia %(date)s?"
 
 msgid "No stored or transaction prices for this instrument yet."
 msgstr "Ten instrument nie ma jeszcze zapisanych cen ani cen z transakcji."
+
+msgid "Price providers"
+msgstr "Dostawcy cen"
+
+msgid ""
+"Providers are opt-in per workspace. Manual prices always remain "
+"available; a provider failure keeps the last known price."
+msgstr ""
+"Dostawcy są włączani osobno dla każdego obszaru roboczego. Ceny ręczne "
+"zawsze pozostają dostępne; awaria dostawcy zachowuje ostatnią znaną cenę."
+
+#, python-format
+msgid ""
+"Your base currency is %(currency)s. Rates are converted into it when the "
+"provider publishes that currency."
+msgstr ""
+"Twoja waluta bazowa to %(currency)s. Kursy są przeliczane na nią, gdy "
+"dostawca publikuje tę walutę."
+
+msgid "Enabled"
+msgstr "Włączony"
+
+msgid "Disabled"
+msgstr "Wyłączony"
+
+msgid "Quotes in"
+msgstr "Notowanie w"
+
+msgid "Instruments using it"
+msgstr "Instrumenty korzystające"
+
+msgid "Last success"
+msgstr "Ostatni sukces"
+
+msgid "Last error"
+msgstr "Ostatni błąd"
+
+msgid ""
+"This provider does not publish your base currency, so FX rates from it "
+"are skipped."
+msgstr ""
+"Ten dostawca nie publikuje Twojej waluty bazowej, więc jego kursy FX są "
+"pomijane."
+
+#, python-format
+msgid "Source: %(source)s"
+msgstr "Źródło: %(source)s"
+
+msgid "Refresh now"
+msgstr "Odśwież teraz"
+
+msgid ""
+"Scheduled refreshes run daily after market close. A provider error keeps "
+"the last known price and is shown on the instrument."
+msgstr ""
+"Zaplanowane odświeżania działają codziennie po zamknięciu rynku. Błąd "
+"dostawcy zachowuje ostatnią znaną cenę i jest pokazywany na instrumencie."
+
+msgid "Providers"
+msgstr "Dostawcy"
 
 msgid "Choose an instrument"
 msgstr "Wybierz instrument"
@@ -5889,9 +6007,6 @@ msgstr ""
 " po drodze. Bez tej opcji zawierają nazwę pozycji i jej datę, ale nie "
 "kwoty."
 
-msgid "Enabled"
-msgstr "Włączony"
-
 msgid ""
 "Reminders for this workspace reach you through Apprise: ntfy, Gotify, "
 "Telegram, email and many other services. Your channels are yours alone; "
@@ -5907,9 +6022,6 @@ msgid ""
 msgstr ""
 "Administrator wyłączył powiadomienia na tym serwerze. Kanały zostają "
 "zachowane, ale nic nie jest wysyłane."
-
-msgid "Disabled"
-msgstr "Wyłączony"
 
 msgid "Send test"
 msgstr "Wyślij test"

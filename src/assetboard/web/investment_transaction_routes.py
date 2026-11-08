@@ -44,6 +44,7 @@ from assetboard.services.investment_transactions import (
     update_transaction,
 )
 from assetboard.services.investments import InstrumentView, investment_page
+from assetboard.services.price_refresh import provider_status
 from assetboard.services.prices import (
     DEFAULT_STALE_AFTER_DAYS,
     PriceError,
@@ -270,6 +271,7 @@ def _list_page(
         "error": error,
         "base_currency": ctx.workspace.base_currency,
         "can_edit": has_role(ctx, Role.EDITOR),
+        "can_manage_providers": has_role(ctx, Role.OWNER),
         "today": today,
         "toast_undo": toast_undo,
         "toast_seconds": toast_seconds,
@@ -317,6 +319,16 @@ def _history_page(
         history.instrument.id,
         on=today,
     )
+    provider_state = (
+        provider_status(request.app.state.session_factory, ctx, history.instrument.id)
+        if history.instrument.provider_key
+        else None
+    )
+    provider_error_days = (
+        max(0, (today - provider_state.last_price_date).days)
+        if provider_state is not None and provider_state.last_price_date is not None
+        else 0
+    )
     if price_values is None and editing_price is not None:
         point = next(
             (row for row in prices.points if row.id == editing_price and row.editable),
@@ -334,6 +346,8 @@ def _history_page(
         "history": history,
         "instrument": history.instrument,
         "prices": prices,
+        "provider_status": provider_state,
+        "provider_error_days": provider_error_days,
         "price_values": price_values or {"price_id": "", "date": today.isoformat(), "price": ""},
         "price_errors": {
             field: _t(request, message) for field, message in (price_errors or {}).items()
@@ -354,6 +368,7 @@ def _history_page(
         "error": error,
         "base_currency": ctx.workspace.base_currency,
         "can_edit": has_role(ctx, Role.EDITOR),
+        "can_manage_providers": has_role(ctx, Role.OWNER),
         "today": today,
         "toast_undo": toast_undo,
         "toast_seconds": toast_seconds,

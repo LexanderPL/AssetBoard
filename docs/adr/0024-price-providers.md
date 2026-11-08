@@ -214,6 +214,27 @@ without re-checking at implementation time:
 - metals-api.com free quota.
 - NBP rate limits (unwritten; the ≤1/s self-limit is ours, not theirs).
 
+## Implementation notes (F6.4, first update)
+
+- NBP and ECB ship first; CoinGecko and EODHD follow in the next update. The provider runtime uses
+  the standard library only (`urllib.request`, `xml.etree`, `json`), with a 10 s timeout, bounded
+  responses, HTTPS-only URLs, retry/backoff, a bounded TTL response cache and process-wide rate
+  limits (NBP 1/s, ECB 1/h).
+- Chosen cache TTLs: NBP latest 6 h/history 24 h; ECB 1 h (the full history XML is the single
+  source for latest and history); CoinGecko latest 5 min/history 24 h; EODHD latest 15 min/history
+  24 h.
+- Daily schedule (UTC): NBP 18:10, ECB 18:20, CoinGecko 00:10, EODHD 22:40. "Refresh now" is
+  latest-only and never waits behind a long rate limit; scheduled/background jobs may wait.
+- Provider observations are converted into the workspace base currency when the provider
+  publishes that base: NBP `PLN per X ÷ PLN per base`, ECB `EUR per X ÷ EUR per base`, in an
+  80-digit `localcontext`. When the base is not published, FX from that provider is skipped with
+  `base_not_published`.
+- Provider settings are owner-only and encrypted with the shared bound-secret helper under a
+  `price-source-settings` purpose. Errors store only short codes; URLs and response bodies never
+  reach logs or audit data.
+- Still to verify in the next update: CoinGecko's current history limit and EODHD EU-exchange
+  coverage with a real key. The unverified-claims register above remains binding.
+
 ## Open items
 
 - **GoldAPI.io ToS**: read the terms manually in a real browser (the page is JS-gated for HTTP

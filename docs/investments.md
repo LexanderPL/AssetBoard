@@ -138,8 +138,41 @@ rate(from, to) = rate(base, from) / rate(base, to)
 
 For example, with EUR as the base currency, a stored EUR/USD rate of 0.92 means one US dollar is
 worth 0.92 euro. A transaction's `fx_to_base` follows the same convention and acts as the
-lowest-priority FX source until provider rates arrive in a later update. FX rates older than the
-staleness threshold are flagged the same way as prices. There is no FX entry form yet.
+lowest-priority FX source until provider rates arrive. FX rates older than the staleness
+threshold are flagged the same way as prices. There is no FX entry form yet.
+
+## Price providers
+
+Provider access is **opt-in per workspace** and only an owner can change it. The first update
+ships **NBP** and **ECB**:
+
+- **NBP** publishes PLN-based FX tables and the official gold price in PLN per gram. Gold is
+  converted to troy ounces for the default metal unit; an instrument using NBP gold must be
+  quoted in PLN.
+- **ECB** publishes EUR-based reference rates. ECB quotes "currency units per EUR", so the app
+  inverts them to the project convention.
+
+Both providers are converted into the workspace base currency before they are stored whenever
+the provider publishes that base. For example, NBP in a EUR workspace stores
+`PLN per X ÷ PLN per EUR`; ECB in a PLN workspace stores `EUR per X ÷ EUR per PLN`. If the
+provider does not publish the workspace base at all, FX from that provider is skipped and the
+provider page shows a warning. The arithmetic uses an 80-digit decimal context; no value passes
+through `float`.
+
+The **Providers** tab (owners only) enables a provider and shows its last success, last error and
+the number of instruments using it. Enabling a provider queues a one-off history backfill from
+each instrument's first transaction date; the daily job fills anything still missing. "Refresh
+now" fetches only the latest prices and FX rates and never waits behind a long rate limit: if the
+provider cannot answer within a few seconds, the page says it is rate limited and when to try
+again. Scheduled jobs may wait and are polite to the providers: NBP at most once per second,
+ECB at most once per hour (its response cache covers the daily run), and both daily after market
+close.
+
+A failed refresh keeps the last known price. The failure is recorded in `provider_errors`
+(pruned after 90 days) and the instrument shows a provider-error badge with the age of its last
+known price. Manual prices still win; transactions continue to fill gaps.
+
+CoinGecko and EODHD arrive in the next update.
 
 ## Allocation
 

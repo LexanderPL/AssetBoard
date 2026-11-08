@@ -207,6 +207,7 @@ def _class_body_context(
     return {
         "page": page,
         "can_edit": has_role(ctx, Role.EDITOR),
+        "can_manage_providers": has_role(ctx, Role.OWNER),
         "notice": _t(request, CLASS_NOTICES[notice]) if notice in CLASS_NOTICES else None,
         "error": _t(request, error) if error else None,
         "create_values": create_values or _class_values(),
@@ -240,6 +241,7 @@ def _instrument_body_context(
     return {
         "page": page,
         "can_edit": has_role(ctx, Role.EDITOR),
+        "can_manage_providers": has_role(ctx, Role.OWNER),
         "notice": _t(request, INSTRUMENT_NOTICES[notice]) if notice in INSTRUMENT_NOTICES else None,
         "error": _t(request, error) if error else None,
         "create_values": values,
