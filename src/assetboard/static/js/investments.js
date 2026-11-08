@@ -5,9 +5,11 @@
 function allocationTotal(editor) {
   let total = 0;
   let invalid = false;
+  let entered = false;
   for (const input of editor.querySelectorAll("[data-allocation-weight]")) {
     const raw = input.value.trim().replace(",", ".");
     if (raw === "") continue;
+    entered = true;
     const value = Number(raw);
     if (!Number.isFinite(value) || value < 0 || value > 100) {
       invalid = true;
@@ -15,18 +17,20 @@ function allocationTotal(editor) {
     }
     total += value;
   }
-  return { total: Math.round(total * 100) / 100, invalid };
+  return { total: Math.round(total * 100) / 100, invalid, entered };
 }
 
 function updateAllocationEditor(editor) {
-  const { total, invalid } = allocationTotal(editor);
+  const { total, invalid, entered } = allocationTotal(editor);
   const totalNode = editor.querySelector("[data-allocation-total]");
   const warning = editor.querySelector("[data-allocation-warning]");
   const submit = editor.querySelector("[data-allocation-submit]");
   const separator = editor.getAttribute("data-decimal-separator") || ".";
   if (totalNode) totalNode.textContent = `${total.toFixed(2).replace(".", separator)}%`;
   const valid = !invalid && total === 100;
-  if (warning) warning.classList.toggle("hidden", valid);
+  // A fresh form (nothing typed yet, e.g. right after a successful add) is not an error: the
+  // warning waits for the first weight. Saving still needs exactly 100%.
+  if (warning) warning.classList.toggle("hidden", valid || !entered);
   if (submit) submit.disabled = !valid;
 }
 
@@ -68,11 +72,30 @@ function updateTransactionForm(form) {
   if (fx) fx.classList.toggle("hidden", currency === form.dataset.baseCurrency);
 }
 
+// F6.3: the server renders each option's stored FX (manual or provider) for today. When the user
+// picks another instrument, a field that is empty or still holds the previous pre-fill follows
+// it; a rate the user typed is kept. Only a real change does this, so a refused form keeps
+// exactly what was submitted.
+function applyStoredFx(form) {
+  const select = form.querySelector("[data-transaction-instrument]");
+  const input = form.querySelector("[data-fx-input]");
+  if (!select || !(input instanceof HTMLInputElement)) return;
+  const option = select.selectedOptions[0];
+  if (!option || !("fx" in option.dataset)) return;
+  const previous = input.dataset.prefilled || "";
+  if (input.value === "" || input.value === previous) {
+    input.value = option.dataset.fx || "";
+    input.dataset.prefilled = input.value;
+  }
+}
+
 document.addEventListener("change", (event) => {
   const select = event.target;
   if (!(select instanceof Element) || !select.matches("[data-transaction-instrument]")) return;
   const form = select.closest("[data-transaction-form]");
-  if (form) updateTransactionForm(form);
+  if (!form) return;
+  updateTransactionForm(form);
+  applyStoredFx(form);
 });
 
 for (const eventName of ["DOMContentLoaded", "htmx:afterSwap", "htmx:oobAfterSwap"]) {
@@ -107,7 +130,7 @@ function updateInstrumentProvider(form) {
 document.addEventListener("change", (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
-  if (!target.matches("#instrument-type, [data-provider-select]")) return;
+  if (!target.matches("select[name=type], [data-provider-select]")) return;
   const form = target.closest("[data-instrument-form]");
   if (form) updateInstrumentProvider(form);
 });
