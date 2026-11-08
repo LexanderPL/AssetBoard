@@ -116,9 +116,13 @@ are the instrument's quote currency and the base currency, translatable.
   - `FxService.rate(quote, base, date)` (F6.3/F6.4), any source except `transaction`.
   - A hint shows the rate's date and source.
   - When no stored rate exists the field stays empty and is required.
-  - Re-filling for a changed date uses a small Alpine (CSP build) action that calls a read-only
-    JSON endpoint. With JavaScript off, the server pre-fills on the first render, and when the
-    rate is missing the form returns the inline error.
+  - Re-filling for a changed date (or instrument) uses a small CSP-safe script in
+    `static/js/investments.js` that calls a read-only, workspace-scoped JSON endpoint
+    (`GET /investments/fx-rate?instrument_id=…&date=…`); a rate the user typed is kept. (As
+    built: the app's other investment forms use plain delegated listeners in that file, not
+    Alpine components, so this follows them.) With JavaScript off, the server pre-fills on the
+    first render. On save, a blank rate is taken from stored FX for the transaction date (as in
+    bulk add); when none exists the form returns the inline error "FX rate needed".
 
 **What is stored in base mode** (exact `Decimal`, 80-digit `localcontext`):
 - `settlement_currency` = base
@@ -160,8 +164,9 @@ base mode (the amounts carry over, since they were entered as base), takes the p
 rate, and saves.
 
 **Audit and archive.**
-- `investment_transaction.created`/`.updated` keep their shape. Field names that changed are
-  listed; no amounts are logged at INFO.
+- `investment_transaction.created`/`.updated` keep their shape. `.updated` adds `changed`, the
+  comma-separated names of the changed fields (settlement columns included); no amounts are
+  logged at INFO.
 - F6.9 must export and restore the three columns. Add them to its file list when F6.9 is
   implemented.
 
@@ -201,7 +206,12 @@ rate, and saves.
   - Any failure, such as an oversell naming its line and date, or an archived instrument,
     refuses the whole batch.
   - The rows share one new `import_batch_id`. One audit event
-    `investment_transaction.bulk_created` records the count and instrument ids, with no amounts.
+    `investment_transaction.bulk_created` records the count, the instrument ids and the batch id,
+    with no amounts. (As built: `import_batch_id` is a plain nullable column without a foreign
+    key, since bulk add records no `import_batches` row and must not appear in the import
+    history with its rollback; F6.9 decides whether its standalone import adds one.)
+  - Same-date pasted rows keep their line order (each gets a creation time one microsecond
+    after the previous line).
   - The page shows a success toast with the count. There is no batch undo in v1; single rows keep
     their normal delete and undo.
 
