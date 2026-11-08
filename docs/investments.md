@@ -67,8 +67,35 @@ A **currency** instrument's `quote_currency` is the held currency. Its unit pric
 in that currency, so there is no market price to enter or fetch; only the FX rate to the base
 currency converts it. Cash in the base currency is therefore price 1 at rate 1.
 
-A **Bond (model value)** instrument can be created before its terms exist. It shows a "Terms
-needed" badge and cannot be valued until the bond-terms form arrives in a later step.
+### Bond model valuation
+
+A **Bond (model value)** instrument is valued from its terms instead of a market price. Open the
+instrument to enter the series code, face value per unit, maturity, interest mode, rate schedule,
+tax rate and an optional early-redemption fee. The instrument can be created and purchases
+recorded before the terms exist; until then it shows a **Terms needed** badge and uses the
+transaction prices as a fallback.
+
+The rate schedule starts on the first date and has one entry per annual anniversary. A 29
+February start uses 28 February in common years. Maturity may fall between anniversaries, so the
+last period can be partial. Leave future rates out: they default to the last rate entered.
+
+The displayed **model value (net of tax)** is a redeem-now estimate:
+
+`net = face + interest − fee − tax`, where `tax = max(0, interest − fee) × tax rate` and the
+early-redemption fee is capped at the accrued interest, so the value never falls below face.
+Interest accrues actual/actual from each purchase date (undated legacy lots start at the first
+schedule date). `capitalized_annually` compounds at period ends; `paid_out_annually` keeps only
+the current period's accrued interest and resets when a coupon is paid; `at_maturity_simple`
+adds simple interest. At or after maturity the value freezes and equals the projected net at
+maturity.
+
+Sells consume the oldest purchase lots first for interest entitlement, regardless of the
+workspace cost-basis setting. The projected value at maturity excludes the early-redemption fee.
+Coupons paid out annually are not part of the bond value; record them as income in the ledger.
+
+Once terms exist, the model value is the only price source: manual prices are refused and the
+provider fields are not available for this instrument type. These are estimates from the terms
+you enter, not investment advice.
 
 Instruments are archived, not deleted. Archiving keeps their allocation and history and hides
 them from the active list; restoring is refused if another active instrument has the same name.
