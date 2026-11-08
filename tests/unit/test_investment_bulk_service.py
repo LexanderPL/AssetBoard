@@ -218,6 +218,9 @@ def test_a_blank_fx_is_filled_from_stored_fx_and_marked_as_stored(
     [line] = preview.lines
     assert (line.fx_to_base, line.fx_stored) == (Decimal("0.9"), True)
     assert line.total == Money(18_000, "EUR")
+    # The same fill-in inside the locked write (a read session beside the write transaction).
+    assert create_bulk(team.factory, ctx, text="2026-01-05; US ETF; buy; 2; 100", locale="en") == 1
+    assert _rows(team)[0].fx_to_base == Decimal("0.9")
 
 
 def test_a_transaction_fx_rate_never_fills_a_blank_bulk_rate(
