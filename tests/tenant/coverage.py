@@ -171,6 +171,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "get_for_update",
             "filtered",
             "count_filtered",
+            "filtered_not_in_currency",
             "live_dated",
         )
     },
