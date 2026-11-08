@@ -34,7 +34,6 @@ from assetboard.domain.holdings import (
     MAX_NOTE_LENGTH,
     CostBasisMethod,
     Holding,
-    HoldingTransaction,
     InvalidHoldingTransaction,
     InvestmentTransactionType,
     Oversell,
@@ -50,6 +49,7 @@ from assetboard.domain.transactions import (
 )
 from assetboard.i18n.numbers import parse_amount
 from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.holding_rows import cost_basis_method, holding_transaction
 from assetboard.services.investments import InstrumentView, get_instrument
 
 __all__ = [
@@ -280,21 +280,6 @@ def _values_for_workspace(
     )
 
 
-def _holding_transaction(row: InvestmentTransaction) -> HoldingTransaction:
-    return HoldingTransaction(
-        id=row.id,
-        instrument_id=row.instrument_id,
-        date=row.date,
-        type=row.type,
-        quantity=row.quantity,
-        unit_price=row.unit_price,
-        fee_minor=row.fee_minor,
-        quote_currency=row.quote_currency,
-        fx_to_base=row.fx_to_base if row.fx_to_base is not None else Decimal(1),
-        created_at=row.created_at,
-    )
-
-
 def _check_oversell(
     session: Session,
     ctx: Context,
@@ -306,7 +291,7 @@ def _check_oversell(
     rows = InvestmentTransactionRepository(session, ctx).for_instrument(instrument_id)
     try:
         compute_holdings(
-            [_holding_transaction(row) for row in rows],
+            [holding_transaction(row) for row in rows],
             method,
             None,
             base_currency=base_currency,
@@ -315,14 +300,6 @@ def _check_oversell(
         raise OversellRejected(exc.on) from None
     except InvalidHoldingTransaction as exc:
         raise InvalidInvestmentTransaction("quantity", exc.code) from None
-
-
-def _method(workspace: object) -> CostBasisMethod:
-    value = getattr(workspace, "investment_cost_basis", "average")
-    try:
-        return CostBasisMethod(value)
-    except ValueError:
-        return CostBasisMethod.AVERAGE
 
 
 def _lock(session: Session, ctx: Context) -> None:
@@ -490,8 +467,8 @@ def instrument_history(
         base_currency = workspace.base_currency
         if rows:
             computed = compute_holdings(
-                [_holding_transaction(row) for row in rows],
-                _method(workspace),
+                [holding_transaction(row) for row in rows],
+                cost_basis_method(workspace),
                 None,
                 base_currency=base_currency,
             )
@@ -513,7 +490,7 @@ def instrument_history(
 
 def _workspace_values(session: Session, ctx: Context) -> tuple[str, CostBasisMethod]:
     workspace = CurrentWorkspaceRepository(session, ctx).get()
-    return workspace.base_currency, _method(workspace)
+    return workspace.base_currency, cost_basis_method(workspace)
 
 
 def create_transaction(

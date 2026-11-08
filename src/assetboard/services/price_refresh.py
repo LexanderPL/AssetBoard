@@ -33,7 +33,7 @@ from assetboard.db.repositories import (
 )
 from assetboard.db.repositories.base import WorkspaceScope
 from assetboard.db.repositories.scheduled import RecurringWorkspaceReader
-from assetboard.domain.holdings import HoldingTransaction, compute_holdings
+from assetboard.domain.holdings import compute_holdings
 from assetboard.domain.prices import (
     FxProvider,
     PriceProvider,
@@ -60,6 +60,7 @@ from assetboard.services.context import (
     require_role,
     require_role_now,
 )
+from assetboard.services.holding_rows import cost_basis_method, holding_transaction
 from assetboard.services.price_sources import provider_settings
 from assetboard.services.providers.transport import (
     ProviderPayloadError,
@@ -503,24 +504,9 @@ def _targets(
         row for row in InstrumentRepository(session, scope).ordered() if row.archived_at is None
     ]
     transactions = InvestmentTransactionRepository(session, scope).live()
-    holding_rows = [
-        HoldingTransaction(
-            id=row.id,
-            instrument_id=row.instrument_id,
-            date=row.date,
-            type=row.type,
-            quantity=row.quantity,
-            unit_price=row.unit_price,
-            fee_minor=row.fee_minor,
-            quote_currency=row.quote_currency,
-            fx_to_base=row.fx_to_base if row.fx_to_base is not None else Decimal(1),
-            created_at=row.created_at,
-        )
-        for row in transactions
-    ]
     holdings = compute_holdings(
-        holding_rows,
-        getattr(workspace, "investment_cost_basis", "average"),
+        [holding_transaction(row) for row in transactions],
+        cost_basis_method(workspace),
         None,
         base_currency=workspace.base_currency,
     )
