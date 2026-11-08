@@ -1,4 +1,4 @@
-{% from "investments/_macros.html" import error, htmx_form, small_button, swatch with context %}
+{% from "investments/_macros.html" import error as field_error, htmx_form, small_button, swatch with context %}
 {% from "investments/_tabs.html" import tabs with context %}
 {% from "macros/components.html" import csrf_input with context %}
 <div id="investments-classes-body" class="space-y-6">
@@ -70,12 +70,12 @@
       <div class="space-y-1.5">
         <label for="class-name" class="block text-sm font-medium">{{ _("Name") }}</label>
         <input id="class-name" name="name" type="text" value="{{ values.name }}" maxlength="{{ max_name_length }}" required autocomplete="off" class="form-control w-full px-3 py-2">
-        {{ error(errors, "name") }}
+        {{ field_error(errors, "name") }}
       </div>
       <div class="space-y-1.5">
         <label for="class-color" class="block text-sm font-medium">{{ _("Colour") }}</label>
         <input id="class-color" name="color" type="color" value="{{ values.color }}" class="h-9 w-12 rounded-lg border border-line-strong bg-field p-1">
-        {{ error(errors, "color") }}
+        {{ field_error(errors, "color") }}
       </div>
       <div class="flex items-start gap-2 pt-6">
         <input id="class-investable" name="investable" type="checkbox" value="1"{% if values.investable %} checked{% endif %} class="mt-1 h-4 w-4 rounded border-line accent-primary">
