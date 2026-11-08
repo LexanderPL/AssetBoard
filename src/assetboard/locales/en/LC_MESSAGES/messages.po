@@ -2654,6 +2654,12 @@ msgid "Rate limited; try again in %(minutes)s minutes."
 msgstr ""
 
 #, python-format
+msgid ""
+"Refresh complete: %(prices)s prices and %(rates)s FX rates; %(skipped)s "
+"skipped."
+msgstr ""
+
+#, python-format
 msgid "Refresh complete: %(prices)s prices and %(rates)s FX rates."
 msgstr ""
 

@@ -2803,6 +2803,14 @@ msgid "Rate limited; try again in %(minutes)s minutes."
 msgstr "Ograniczenie tempa; spróbuj ponownie za %(minutes)s min."
 
 #, python-format
+msgid ""
+"Refresh complete: %(prices)s prices and %(rates)s FX rates; %(skipped)s "
+"skipped."
+msgstr ""
+"Odświeżanie zakończone: %(prices)s cen i %(rates)s kursów FX; pominięto "
+"%(skipped)s."
+
+#, python-format
 msgid "Refresh complete: %(prices)s prices and %(rates)s FX rates."
 msgstr "Odświeżanie zakończone: %(prices)s cen i %(rates)s kursów FX."
 

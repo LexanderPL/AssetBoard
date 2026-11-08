@@ -294,6 +294,7 @@ def refresh_now(
                 "prices": stats.prices,
                 "rates": stats.rates,
                 "errors": stats.errors,
+                "skipped": stats.skipped,
                 **({"retry_after": stats.retry_after} if stats.retry_after else {}),
             },
         )

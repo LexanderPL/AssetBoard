@@ -55,6 +55,15 @@ def _refresh_message(request: Request, stats: RefreshStats) -> str | None:
             request,
             _("Rate limited; try again in %(minutes)s minutes."),
         ) % {"minutes": retry_minutes}
+    if stats.status == "ok" and stats.skipped:
+        return _t(
+            request,
+            _("Refresh complete: %(prices)s prices and %(rates)s FX rates; %(skipped)s skipped."),
+        ) % {
+            "prices": stats.prices,
+            "rates": stats.rates,
+            "skipped": stats.skipped,
+        }
     if stats.status == "ok":
         return _t(
             request,
@@ -115,6 +124,7 @@ def _query_refresh(request: Request) -> RefreshStats | None:
         rates = int(values.get("rates", "0"))
         errors = int(values.get("errors", "0"))
         retry_after = int(values.get("retry_after", "0")) or None
+        skipped = int(values.get("skipped", "0"))
     except ValueError:
         return None
     return RefreshStats(
@@ -123,6 +133,7 @@ def _query_refresh(request: Request) -> RefreshStats | None:
         prices=max(0, prices),
         rates=max(0, rates),
         errors=max(0, errors),
+        skipped=max(0, skipped),
         retry_after=retry_after,
     )
 
@@ -272,6 +283,6 @@ async def provider_refresh(
         )
     return RedirectResponse(
         f"{PATH}?refresh={stats.status}&prices={stats.prices}&rates={stats.rates}"
-        f"&errors={stats.errors}",
+        f"&errors={stats.errors}&skipped={stats.skipped}",
         status_code=303,
     )

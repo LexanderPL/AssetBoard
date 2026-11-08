@@ -456,7 +456,7 @@ async def instrument_create(
             )
         )
     try:
-        await run_in_threadpool(
+        view = await run_in_threadpool(
             lambda: create_instrument(
                 request.app.state.session_factory,
                 ctx,
@@ -481,7 +481,7 @@ async def instrument_create(
                 create_errors={error.field or "name": _error_message(INSTRUMENT_ERRORS, error)},
             )
         )
-    _queue_provider_backfill(request, ctx, provider_key)
+    _queue_provider_backfill(request, ctx, view.provider_key or "")
     return await run_in_threadpool(_instruments_done, request, ctx, "instrument_created")
 
 
@@ -528,7 +528,7 @@ async def instrument_update(
             )
         )
     try:
-        await run_in_threadpool(
+        view = await run_in_threadpool(
             lambda: update_instrument(
                 request.app.state.session_factory,
                 ctx,
@@ -566,7 +566,7 @@ async def instrument_update(
                 edit_errors={error.field or "name": _error_message(INSTRUMENT_ERRORS, error)},
             )
         )
-    _queue_provider_backfill(request, ctx, provider_key)
+    _queue_provider_backfill(request, ctx, view.provider_key or "")
     return await run_in_threadpool(_instruments_done, request, ctx, "instrument_saved")
 
 

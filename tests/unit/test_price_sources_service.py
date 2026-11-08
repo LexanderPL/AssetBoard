@@ -190,6 +190,16 @@ def test_eodhd_requires_a_key_and_stores_the_daily_budget(
     ctx = _owner(db)
     with pytest.raises(MissingProviderKey):
         save_provider_config(db.factory, ctx, SETTINGS, "eodhd", enabled=True)
+    with pytest.raises(MissingProviderKey):
+        save_provider_config(
+            db.factory,
+            ctx,
+            SETTINGS,
+            "eodhd",
+            enabled=True,
+            settings_values={"api_key": "ignored"},
+            clear_settings=True,
+        )
     save_provider_config(
         db.factory,
         ctx,

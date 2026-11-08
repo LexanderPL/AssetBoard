@@ -127,7 +127,7 @@ def save_provider_config(
             row.daily_call_budget = daily_call_budget
         if enabled and definition.requires_key:
             existing = provider_settings(settings, row) if row.settings_encrypted else {}
-            submitted = (settings_values or {}).get("api_key", "").strip()
+            submitted = "" if clear_settings else (settings_values or {}).get("api_key", "").strip()
             if not submitted and (clear_settings or not existing or not existing.get("api_key")):
                 raise MissingProviderKey
         row.enabled = enabled
