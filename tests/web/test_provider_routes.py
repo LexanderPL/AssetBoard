@@ -340,6 +340,8 @@ def test_goldapi_card_requires_a_key_and_never_echoes_it(owner: OwnerApp) -> Non
     assert GOLDAPI_KEY_SENTINEL not in page
     assert "A key is configured. Leave empty to keep it." in card
     assert "GoldAPI symbols: XAU, XAG, XPT and XPD" in card
+    assert "History covers at most the last 90 days." in card
+    assert "data-provider-history-limit" in card
     assert "0 / 4" in card
     with owner.db() as session:
         row = session.scalars(

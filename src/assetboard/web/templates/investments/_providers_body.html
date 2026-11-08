@@ -79,7 +79,8 @@
         <p class="mt-1 text-xs text-muted">{{ _("EODHD coverage for GPW, XETRA and LSE symbols is unverified; the free tier allows 20 calls per day.") }}</p>
         {% endif %}
         {% if card.definition.key == "goldapi" %}
-        <p class="mt-1 text-xs text-muted">{{ _("GoldAPI symbols: XAU, XAG, XPT and XPD; prices are per troy ounce in the instrument currency. History is limited to the latest 90 days; the free plan allows about 150 requests per month.") }}</p>
+        <p class="mt-1 text-xs text-muted">{{ _("GoldAPI symbols: XAU, XAG, XPT and XPD; prices are per troy ounce in the instrument currency. The free plan allows about 150 requests per month.") }}</p>
+        <p class="mt-1 text-xs text-muted" data-provider-history-limit>{{ _("History covers at most the last 90 days.") }}</p>
         <p class="mt-1 text-xs text-muted">{{ _("Source:") }} <a href="{{ card.definition.docs_url }}" class="underline" target="_blank" rel="noopener noreferrer" data-provider-source-link>{{ card.definition.label }}</a></p>
         {% endif %}
 

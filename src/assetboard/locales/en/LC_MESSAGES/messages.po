@@ -5060,8 +5060,10 @@ msgstr ""
 
 msgid ""
 "GoldAPI symbols: XAU, XAG, XPT and XPD; prices are per troy ounce in the "
-"instrument currency. History is limited to the latest 90 days; the free "
-"plan allows about 150 requests per month."
+"instrument currency. The free plan allows about 150 requests per month."
+msgstr ""
+
+msgid "History covers at most the last 90 days."
 msgstr ""
 
 msgid "Source:"
