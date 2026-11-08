@@ -752,9 +752,14 @@ def _refresh_quota_latest(
     run: _Run,
     options: Mapping[str, str],
 ) -> bool:
+    """Latest prices for a quota'd provider: one reservation and one call per symbol+currency.
+
+    Instruments sharing a provider symbol and quote currency share the quote, so a budget of
+    one call still prices every instrument on the same ticker or metal.
+    """
     today_utc = runtime.clock.today("UTC")
-    points: list[tuple[UUID, date, Decimal, str]] = []
-    for index, target in enumerate(targets.price_targets):
+    groups: dict[tuple[str, str], list[_InstrumentTarget]] = {}
+    for target in targets.price_targets:
         symbol = normalize_instrument_symbol(definition, target.provider_symbol)
         instrument = ProviderInstrument(
             id=target.id,
@@ -775,6 +780,10 @@ def _refresh_quota_latest(
             )
             run.errors += 1
             continue
+        groups.setdefault((symbol, target.quote_currency.upper()), []).append(target)
+    points: list[tuple[UUID, date, Decimal, str]] = []
+    ordered = list(groups.items())
+    for index, ((symbol, quote_currency), group) in enumerate(ordered):
         if not _reserve_quota(factory, scope, provider_key, today_utc):
             _record_error(
                 factory,
@@ -786,12 +795,12 @@ def _refresh_quota_latest(
                 runtime.clock.now(),
                 informational=True,
             )
-            run.skipped += len(targets.price_targets) - index
+            run.skipped += sum(len(rest) for _key, rest in ordered[index:])
             break
         try:
             quotes = provider.fetch_latest(
                 [symbol],
-                target.quote_currency,
+                quote_currency,
                 wait=wait,
                 settings=options,
             )
@@ -810,46 +819,48 @@ def _refresh_quota_latest(
             run.errors += 1
             return False
         except (ProviderTransportError, ProviderPayloadError) as error:
-            _record_error(
-                factory,
-                scope,
-                provider_key,
-                target.id,
-                "latest",
-                error.code,
-                runtime.clock.now(),
-            )
-            run.errors += 1
+            for target in group:
+                _record_error(
+                    factory,
+                    scope,
+                    provider_key,
+                    target.id,
+                    "latest",
+                    error.code,
+                    runtime.clock.now(),
+                )
+                run.errors += 1
             continue
         quote = quotes.get(symbol)
-        if quote is None:
-            _record_error(
-                factory,
-                scope,
-                provider_key,
-                target.id,
-                "latest",
-                "no_data",
-                runtime.clock.now(),
-            )
-            run.errors += 1
-            continue
-        day = min(quote.date, today)
-        try:
-            price = _price_for_target(definition, target, quote)
-        except (UnsupportedUnit, InvalidProviderRate):
-            _record_error(
-                factory,
-                scope,
-                provider_key,
-                target.id,
-                "latest",
-                "unsupported_unit",
-                runtime.clock.now(),
-            )
-            run.errors += 1
-            continue
-        points.append((target.id, day, price, provider_key))
+        for target in group:
+            if quote is None:
+                _record_error(
+                    factory,
+                    scope,
+                    provider_key,
+                    target.id,
+                    "latest",
+                    "no_data",
+                    runtime.clock.now(),
+                )
+                run.errors += 1
+                continue
+            day = min(quote.date, today)
+            try:
+                price = _price_for_target(definition, target, quote)
+            except (UnsupportedUnit, InvalidProviderRate):
+                _record_error(
+                    factory,
+                    scope,
+                    provider_key,
+                    target.id,
+                    "latest",
+                    "unsupported_unit",
+                    runtime.clock.now(),
+                )
+                run.errors += 1
+                continue
+            points.append((target.id, day, price, provider_key))
     if points:
         try:
             _upsert_prices(factory, scope, points)
@@ -1075,6 +1086,22 @@ def _backfill_prices(
             run.errors += 1
             return
         except (ProviderTransportError, ProviderPayloadError) as error:
+            if definition.default_daily_budget is not None and _permanent_history_failure(error):
+                # A quota'd provider must not spend a daily call on the same failing history
+                # request forever: mark the one-off backfill done and note the gap instead.
+                _record_error(
+                    factory,
+                    scope,
+                    provider_key,
+                    target.id,
+                    "history",
+                    "history_limited",
+                    runtime.clock.now(),
+                    informational=True,
+                )
+                _mark_backfilled(factory, scope, target.id, runtime.clock.now())
+                run.skipped += 1
+                continue
             _record_error(
                 factory,
                 scope,
@@ -1269,6 +1296,24 @@ def _backfill_fx(
     _mark_fx_backfilled(factory, scope, provider_key, completed)
     if run.rates:
         _record_success(factory, scope, provider_key, runtime.clock.now())
+
+
+_PERMANENT_HISTORY_HTTP = frozenset({"http_400", "http_404", "http_422"})
+_KEY_FAILURES = frozenset({"http_401", "http_403", "missing_api_key"})
+
+
+def _permanent_history_failure(error: ProviderTransportError | ProviderPayloadError) -> bool:
+    """Whether retrying the same history request tomorrow cannot succeed.
+
+    Bad requests and unusable payloads are permanent. Key failures are not: the owner can fix
+    the key, so they stay visible errors and the backfill is retried. Network, timeout, 5xx and
+    rate limits are transient.
+    """
+    if error.code in _KEY_FAILURES:
+        return False
+    if isinstance(error, ProviderPayloadError):
+        return True
+    return error.code in _PERMANENT_HISTORY_HTTP
 
 
 def _price_for_target(

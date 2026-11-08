@@ -266,6 +266,13 @@ without re-checking at implementation time:
   makes one request per instrument for the most recent 90-day window; when the first transaction
   is older it records the informational `history_limited`, and the one-off backfill marker
   prevents retries. No schema change was needed.
+- Quota'd providers (EODHD, GoldAPI.io) spend one reservation and one call per provider symbol
+  and quote currency, shared by every instrument on it. A history request that cannot succeed
+  on retry (HTTP 400/404/422, an unusable payload, an unsupported symbol or currency) records
+  the informational `history_limited` and sets the one-off backfill marker, so it never burns
+  the daily budget again. Key failures (HTTP 401/403, a missing key) stay visible errors and
+  are retried once the key is fixed; network, timeout, 5xx and rate limits are retried on the
+  next run.
 
 ## Open items
 

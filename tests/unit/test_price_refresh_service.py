@@ -736,6 +736,178 @@ def test_goldapi_history_is_limited_to_the_latest_90_days(
     assert len(history) == 1
 
 
+def _history_failing(response: ResponseValue):
+    def respond(url: str) -> ResponseValue:
+        if url.startswith(GOLDAPI_HISTORY_PREFIX):
+            return response
+        return _body("goldapi_latest.json")
+
+    return respond
+
+
+def _history_calls(fake: FakeProviderHttpClient) -> int:
+    return sum(1 for url, _headers in fake.calls if url.startswith(GOLDAPI_HISTORY_PREFIX))
+
+
+def _backfilled(db: WorkspaceDb, ctx, instrument_id: UUID) -> bool:
+    with db.factory() as session:
+        row = InstrumentRepository(session, ctx).get_or_raise(instrument_id)
+        return row.provider_backfilled_at is not None
+
+
+@pytest.mark.parametrize(
+    "response",
+    [
+        HttpResponse(404, b"", {}),
+        HttpResponse(400, b"", {}),
+        HttpResponse(422, b"", {}),
+        b"<html>not json</html>",
+        b'{"prices": "none"}',
+    ],
+)
+def test_goldapi_permanent_history_failure_is_marked_and_not_retried(
+    db: WorkspaceDb, team: WorkspaceDb, response: ResponseValue
+) -> None:
+    ctx = _owner(db)
+    _set_base(db, "PLN")
+    instrument_id = _goldapi_metal(db, ctx, "XAG", first_trade="2026-02-27")
+    _enable_goldapi(db, ctx)
+    fake = FakeProviderHttpClient(_history_failing(response))
+
+    stats = refresh_provider(db.factory, ctx, "goldapi", _runtime(db, fake), mode="full")
+
+    assert stats.prices == 1  # the latest price still lands
+    assert _history_calls(fake) == 1
+    assert [error.code for error in _errors(db)] == ["history_limited"]
+    assert _last_error_code(db, ctx) is None
+    assert _backfilled(db, ctx, instrument_id)
+
+    refresh_provider(db.factory, ctx, "goldapi", _runtime(db, fake), mode="full")
+    assert _history_calls(fake) == 1
+    assert _quota(db, ctx) == (date(2026, 3, 10), 3)  # latest, history, latest
+
+
+def test_goldapi_transient_history_failure_is_retried_next_run(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    _set_base(db, "PLN")
+    instrument_id = _goldapi_metal(db, ctx, "XAG", first_trade="2026-02-27")
+    _enable_goldapi(db, ctx)
+    fake = FakeProviderHttpClient(_history_failing(HttpResponse(503, b"", {})))
+
+    refresh_provider(db.factory, ctx, "goldapi", _runtime(db, fake), mode="full")
+
+    assert [error.code for error in _errors(db)] == ["http_503"]
+    assert not _backfilled(db, ctx, instrument_id)
+    first_run = _history_calls(fake)
+    assert first_run >= 1
+
+    refresh_provider(db.factory, ctx, "goldapi", _runtime(db, fake), mode="full")
+    assert _history_calls(fake) > first_run
+    assert not _backfilled(db, ctx, instrument_id)
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_goldapi_key_failure_in_history_is_shown_and_retried(
+    db: WorkspaceDb, team: WorkspaceDb, status: int
+) -> None:
+    ctx = _owner(db)
+    _set_base(db, "PLN")
+    instrument_id = _goldapi_metal(db, ctx, "XAG", first_trade="2026-02-27")
+    _enable_goldapi(db, ctx)
+    fake = FakeProviderHttpClient(_history_failing(HttpResponse(status, b"", {})))
+
+    refresh_provider(db.factory, ctx, "goldapi", _runtime(db, fake), mode="full")
+
+    assert [error.code for error in _errors(db)] == [f"http_{status}"]
+    assert _last_error_code(db, ctx) == f"http_{status}"
+    assert not _backfilled(db, ctx, instrument_id)
+    refresh_provider(db.factory, ctx, "goldapi", _runtime(db, fake), mode="full")
+    assert _history_calls(fake) == 2
+
+
+def test_eodhd_permanent_history_failure_is_marked_but_5xx_is_retried(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    missing = _instrument(db, ctx, name="Missing", quote_currency="EUR")
+    flaky = _instrument(db, ctx, name="Flaky", quote_currency="EUR")
+    for instrument, symbol in ((missing, "GONE.US"), (flaky, "FLAKY.US")):
+        _tx(db, ctx, instrument.id, fx="1")
+        _configure_provider(db, ctx, instrument.id, "eodhd", symbol)
+    save_provider_config(
+        db.factory, ctx, SETTINGS, "eodhd", enabled=True, settings_values={"api_key": "k"}
+    )
+
+    def respond(url: str) -> ResponseValue:
+        if "order=d" in url:
+            return _body("eodhd_eod.json")
+        if "GONE.US" in url:
+            return HttpResponse(404, b"", {})
+        return HttpResponse(502, b"", {})
+
+    runtime = _runtime(db, FakeProviderHttpClient(respond))
+    refresh_provider(db.factory, ctx, "eodhd", runtime, mode="full")
+
+    with db.factory() as session:
+        repository = InstrumentRepository(session, ctx)
+        assert repository.get_or_raise(missing.id).provider_backfilled_at is not None
+        assert repository.get_or_raise(flaky.id).provider_backfilled_at is None
+    assert sorted(error.code for error in _errors(db)) == ["history_limited", "http_502"]
+
+
+def test_goldapi_instruments_on_the_same_metal_share_one_call(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    _set_base(db, "PLN")
+    coins = _goldapi_metal(db, ctx, "XAU")
+    bars = _instrument(
+        db, ctx, name="Gold bars", type_value="metal", quote_currency="PLN", unit_label="g"
+    )
+    _tx(db, ctx, bars.id, fx="1")
+    _configure_provider(db, ctx, bars.id, "goldapi", "xau")
+    _enable_goldapi(db, ctx, budget=1)
+    fake = FakeProviderHttpClient(_goldapi_responder)
+
+    stats = refresh_provider(db.factory, ctx, "goldapi", _runtime(db, fake), mode="latest")
+
+    assert (stats.prices, stats.skipped) == (2, 0)
+    assert [url for url, _headers in fake.calls] == ["https://www.goldapi.io/api/XAU/PLN"]
+    assert _quota(db, ctx) == (date(2026, 3, 10), 1)
+    assert {point.instrument_id for point in _prices(db)} == {coins, bars.id}
+    assert _errors(db) == []
+
+
+def test_eodhd_instruments_on_the_same_ticker_share_one_reservation(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    for name in ("Fund A", "Fund B"):
+        instrument = _instrument(db, ctx, name=name, quote_currency="EUR")
+        _tx(db, ctx, instrument.id, fx="1")
+        _configure_provider(db, ctx, instrument.id, "eodhd", "VWCE.DE")
+    save_provider_config(
+        db.factory,
+        ctx,
+        SETTINGS,
+        "eodhd",
+        enabled=True,
+        settings_values={"api_key": "test-key"},
+        daily_call_budget=1,
+    )
+    fake = FakeProviderHttpClient(lambda _url: _body("eodhd_eod.json"))
+
+    stats = refresh_provider(db.factory, ctx, "eodhd", _runtime(db, fake), mode="latest")
+
+    assert (stats.prices, stats.skipped) == (2, 0)
+    assert len(fake.calls) == 1
+    with db.factory() as session:
+        config = PriceSourceConfigRepository(session, ctx).for_provider("eodhd")
+        assert config is not None and config.quota_used == 1
+
+
 def test_goldapi_history_inside_the_window_is_not_limited(
     db: WorkspaceDb, team: WorkspaceDb
 ) -> None:
