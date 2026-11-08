@@ -22,7 +22,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal, localcontext
 from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -146,6 +146,13 @@ class InvestmentTransactionView:
     def amounts(self) -> str:
         """``base`` when the row was entered in the base currency (F6.2a), else ``quote``."""
         return AMOUNTS_BASE if self.settlement_fee is not None else AMOUNTS_QUOTE
+
+    @property
+    def derived_price_display(self) -> Decimal:
+        """The derived quote unit price shortened for the history (6 places, half-up)."""
+        with localcontext() as context:
+            context.prec = 80
+            return self.unit_price.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
 
 
 @dataclass(frozen=True, slots=True)

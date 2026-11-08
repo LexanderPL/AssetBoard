@@ -39,7 +39,7 @@ def upgrade() -> None:
         batch_op.add_column(sa.Column("settlement_fee_minor", sa.BigInteger(), nullable=True))
         batch_op.add_column(sa.Column("import_batch_id", sa.Uuid(), nullable=True))
         batch_op.create_check_constraint(
-            "ck_investment_transactions_settlement_all_or_none", SETTLEMENT_CHECK
+            op.f("ck_investment_transactions_settlement_all_or_none"), SETTLEMENT_CHECK
         )
         batch_op.create_index(
             "ix_investment_transactions_workspace_import_batch",
@@ -51,7 +51,9 @@ def upgrade() -> None:
 def downgrade() -> None:
     with op.batch_alter_table("investment_transactions", schema=None) as batch_op:
         batch_op.drop_index("ix_investment_transactions_workspace_import_batch")
-        batch_op.drop_constraint("ck_investment_transactions_settlement_all_or_none", type_="check")
+        batch_op.drop_constraint(
+            op.f("ck_investment_transactions_settlement_all_or_none"), type_="check"
+        )
         batch_op.drop_column("import_batch_id")
         batch_op.drop_column("settlement_fee_minor")
         batch_op.drop_column("settlement_unit_price")

@@ -11,16 +11,20 @@ from __future__ import annotations
 
 import math
 from datetime import date
+from datetime import date as date_type
 from decimal import Decimal
 from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, Request
 from starlette.concurrency import run_in_threadpool
-from starlette.responses import RedirectResponse, Response
+from starlette.responses import JSONResponse, RedirectResponse, Response
 
 from assetboard.db.repositories import NotFound
+from assetboard.domain.money import Money
 from assetboard.domain.networth import sparkline_polyline
+from assetboard.domain.providers import provider_definition
+from assetboard.domain.settlement import base_values_from_quote
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day
 from assetboard.i18n.numbers import (
@@ -45,6 +49,7 @@ from assetboard.services.investment_transactions import (
     TransactionList,
     create_transaction,
     delete_transaction,
+    fx_prefill,
     get_transaction,
     instrument_history,
     list_transactions,
@@ -56,6 +61,7 @@ from assetboard.services.price_refresh import provider_status
 from assetboard.services.price_sources import provider_enabled
 from assetboard.services.prices import (
     DEFAULT_STALE_AFTER_DAYS,
+    FxAt,
     PriceError,
     delete_manual_price,
     instrument_prices,
@@ -89,6 +95,11 @@ ERRORS = {
     "amount_too_large": _("The fee is too large."),
     "invalid_fx": _("Enter a positive FX rate to the base currency."),
     "invalid_fx_to_base": _("Enter a positive FX rate to the base currency."),
+    "fx_needed": _("FX rate needed: no stored rate exists for this date, so enter one."),
+    "invalid_amounts": _("Choose the currency of the amounts."),
+    "settlement_not_allowed": _(
+        "Amounts in the base currency are only for instruments quoted in another currency."
+    ),
     "invalid_note": _("Enter a note of at most 200 characters."),
     "invalid_description_too_long": _("Enter a note of at most 200 characters."),
     "invalid_instrument": _("Choose an instrument."),
@@ -247,7 +258,68 @@ def _default_values(instrument: InstrumentView | None, today: date) -> dict[str,
     }
 
 
-def _edit_values(view: InvestmentTransactionView, locale: str) -> dict[str, str]:
+def _fx_hint(request: Request, stored: FxAt | None) -> str:
+    """The hint under the FX field: the stored rate's date and source, or that none exists."""
+    if stored is None:
+        return ""
+    if stored.rate is None or stored.as_of is None:
+        return _t(request, _("No stored FX rate for this date; enter the rate."))
+    source = stored.source or ""
+    definition = provider_definition(source)
+    if definition is not None:
+        label = definition.label
+    elif source == "manual":
+        label = _t(request, _("manual"))
+    else:
+        label = source
+    return _t(request, _("Stored rate of %(date)s (%(source)s).")) % {
+        "date": format_day(stored.as_of, request.state.locale),
+        "source": label,
+    }
+
+
+def _stored_fx(request: Request, ctx: Context, instrument_id: str, on: date) -> FxAt | None:
+    """The stored FX to pre-fill for a form's instrument and date (F6.2a), if a rate is asked."""
+    try:
+        item = UUID(instrument_id)
+    except ValueError:
+        return None
+    try:
+        return fx_prefill(request.app.state.session_factory, ctx, item, on)
+    except NotFound:
+        return None
+
+
+def _prefill_fx(request: Request, ctx: Context, values: dict[str, str], today: date) -> None:
+    """Server-side pre-fill of a new form's FX field and hint (works without JavaScript)."""
+    if not has_role(ctx, Role.EDITOR):
+        return
+    stored = _stored_fx(request, ctx, values.get("instrument_id", ""), today)
+    if stored is not None and stored.rate is not None and not values.get("fx_to_base"):
+        values["fx_to_base"] = format_quantity_input(stored.rate, request.state.locale)
+    values["fx_hint"] = _fx_hint(request, stored)
+
+
+def _edit_values(
+    view: InvestmentTransactionView, locale: str, base_currency: str
+) -> dict[str, str]:
+    """A saved row's form values; both amount modes are pre-filled so switching keeps them."""
+    base_unit_price = ""
+    base_fee = ""
+    if view.settlement_unit_price is not None and view.settlement_fee is not None:
+        base_unit_price = format_quantity_input(view.settlement_unit_price, locale)
+        base_fee = format_amount_input(view.settlement_fee, locale)
+    elif view.quote_currency != base_currency and view.instrument_type != "currency":
+        # quote -> base: base price = unit_price × fx, base fee = fee × fx (rounded once).
+        price, fee_minor = base_values_from_quote(
+            view.unit_price,
+            view.fee.amount_minor,
+            view.fx_to_base,
+            base_currency=base_currency,
+            quote_currency=view.quote_currency,
+        )
+        base_unit_price = format_quantity_input(price, locale)
+        base_fee = format_amount_input(Money(fee_minor, base_currency), locale)
     return {
         "date": view.date.isoformat() if view.date is not None else "",
         "type": view.type,
@@ -255,8 +327,15 @@ def _edit_values(view: InvestmentTransactionView, locale: str) -> dict[str, str]
         "quantity": format_quantity_input(view.quantity, locale),
         "unit_price": format_quantity_input(view.unit_price, locale),
         "fee": format_quantity_input(view.fee.to_decimal(), locale),
-        "fx_to_base": format_quantity_input(view.fx_to_base, locale),
+        "fx_to_base": (
+            ""
+            if view.quote_currency == base_currency
+            else format_quantity_input(view.fx_to_base, locale)
+        ),
         "note": view.note,
+        "amounts": view.amounts,
+        "base_unit_price": base_unit_price,
+        "base_fee": base_fee,
     }
 
 
@@ -286,6 +365,7 @@ def _filter_values(request: Request) -> dict[str, str]:
         "type": request.query_params.get("type", ""),
         "from": request.query_params.get("from", ""),
         "to": request.query_params.get("to", ""),
+        "fx": "check" if request.query_params.get("fx", "") == "check" else "",
     }
 
 
@@ -330,10 +410,14 @@ def _list_page(
             date_from=filters["from"],
             date_to=filters["to"],
             page=page_number,
+            fx_check=filters["fx"] == "check",
         )
     except InvestmentTransactionError as exc:
         result = EMPTY
         error = error or _error_text(request, exc)
+    if create_values is None:
+        create_values = _list_values(request, ctx, active_instruments, today)
+        _prefill_fx(request, ctx, create_values, today)
     editing_view: InvestmentTransactionView | None = None
     if editing is not None:
         try:
@@ -346,7 +430,7 @@ def _list_page(
         "instruments": instruments,
         "active_instruments": active_instruments,
         "filters": filters,
-        "create_values": create_values or _list_values(request, ctx, active_instruments, today),
+        "create_values": create_values,
         "create_errors": {
             field: _t(request, message) for field, message in (create_errors or {}).items()
         },
@@ -467,7 +551,7 @@ def _history_page(
         "editing_price": editing_price,
         "price_sparkline": sparkline_polyline([point.price for point in prices.effective]),
         "default_stale_after_days": DEFAULT_STALE_AFTER_DAYS,
-        "create_values": create_values or _default_values(history.instrument, today),
+        "create_values": create_values or _history_defaults(request, ctx, history, today),
         "create_errors": {
             field: _t(request, message) for field, message in (create_errors or {}).items()
         },
@@ -500,6 +584,12 @@ def _history_page(
     response = render_template(request, template, context=context, status_code=status_code)
     response.headers["Vary"] = "HX-Request"
     return response
+
+
+def _history_defaults(request: Request, ctx: Context, history: Any, today: date) -> dict[str, str]:
+    values = _default_values(history.instrument, today)
+    _prefill_fx(request, ctx, values, today)
+    return values
 
 
 def _render_history(request: Request, ctx: Context, instrument_id: UUID, **kwargs: Any) -> Response:
@@ -556,12 +646,7 @@ async def transactions_page(request: Request, ctx: CurrentContext, notice: str =
                 editing,
                 locale=request.state.locale,
             )
-            values = _edit_values(view, request.state.locale)
-            values["fx_to_base"] = (
-                ""
-                if view.quote_currency == ctx.workspace.base_currency
-                else format_quantity_input(view.fx_to_base, request.state.locale)
-            )
+            values = _edit_values(view, request.state.locale, ctx.workspace.base_currency)
         except (ValueError, NotFound, InvestmentTransactionError):
             editing = None
             values = None
@@ -589,6 +674,9 @@ async def transaction_create(
     fx_to_base: FormStr = "",
     note: FormStr = "",
     return_to: FormStr = "",
+    amounts: FormStr = "quote",
+    base_unit_price: FormStr = "",
+    base_fee: FormStr = "0",
 ) -> Response:
     values = {
         "date": date,
@@ -599,6 +687,9 @@ async def transaction_create(
         "fee": fee,
         "fx_to_base": fx_to_base,
         "note": note,
+        "amounts": amounts,
+        "base_unit_price": base_unit_price,
+        "base_fee": base_fee,
     }
     form = await request.form()
     try:
@@ -627,6 +718,9 @@ async def transaction_create(
                 fx_value=fx_to_base,
                 note_value=note,
                 locale=request.state.locale,
+                amounts_value=amounts,
+                base_unit_price_value=base_unit_price,
+                base_fee_value=base_fee,
             )
         )
     except InvestmentTransactionError as exc:
@@ -660,6 +754,41 @@ async def transaction_create(
     )
 
 
+@router.get("/investments/fx-rate", name="investment_fx_rate")
+async def fx_rate_lookup(
+    request: Request, ctx: CurrentContext, instrument_id: str = "", date: str = ""
+) -> Response:
+    """Read-only stored FX for an instrument's quote currency on a date (F6.2a form re-fill).
+
+    Workspace-scoped through the service; another workspace's instrument is 404. A rate that is
+    not asked (base-quoted instrument) or a bad date gives an empty rate.
+    """
+    item = _parse_uuid(instrument_id)
+    today = ctx.clock.today(ctx.workspace.timezone)
+    try:
+        day = date_type.fromisoformat(date) if date else today
+    except ValueError:
+        day = today
+    day = min(day, today)
+    stored = await run_in_threadpool(fx_prefill, request.app.state.session_factory, ctx, item, day)
+    rate = (
+        format_quantity_input(stored.rate, request.state.locale)
+        if stored is not None and stored.rate is not None
+        else ""
+    )
+    response = JSONResponse(
+        {
+            "asked": stored is not None,
+            "rate": rate,
+            "as_of": stored.as_of.isoformat() if stored and stored.as_of else "",
+            "source": (stored.source or "") if stored is not None else "",
+            "hint": _fx_hint(request, stored),
+        }
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @router.get(
     "/investments/transactions/{transaction_id}/edit",
     name="investment_transaction_edit",
@@ -680,12 +809,7 @@ async def transaction_edit(
         _parse_uuid(transaction_id),
         locale=request.state.locale,
     )
-    values = _edit_values(view, request.state.locale)
-    values["fx_to_base"] = (
-        ""
-        if view.quote_currency == ctx.workspace.base_currency
-        else format_quantity_input(view.fx_to_base, request.state.locale)
-    )
+    values = _edit_values(view, request.state.locale, ctx.workspace.base_currency)
     context: dict[str, Any] = {
         "transaction": view,
         "values": values,
@@ -755,6 +879,9 @@ async def transaction_update(
     note: FormStr = "",
     return_to: FormStr = "",
     instrument_id: FormStr = "",
+    amounts: FormStr = "quote",
+    base_unit_price: FormStr = "",
+    base_fee: FormStr = "0",
 ) -> Response:
     item_id = _parse_uuid(transaction_id)
     values = {
@@ -766,6 +893,9 @@ async def transaction_update(
         "fee": fee,
         "fx_to_base": fx_to_base,
         "note": note,
+        "amounts": amounts,
+        "base_unit_price": base_unit_price,
+        "base_fee": base_fee,
     }
     try:
         view = await run_in_threadpool(
@@ -781,6 +911,9 @@ async def transaction_update(
                 fx_value=fx_to_base,
                 note_value=note,
                 locale=request.state.locale,
+                amounts_value=amounts,
+                base_unit_price_value=base_unit_price,
+                base_fee_value=base_fee,
             )
         )
     except InvestmentTransactionError as exc:
@@ -1086,12 +1219,7 @@ async def instrument_page(
                 editing,
                 locale=request.state.locale,
             )
-            values = _edit_values(view, request.state.locale)
-            values["fx_to_base"] = (
-                ""
-                if view.quote_currency == ctx.workspace.base_currency
-                else format_quantity_input(view.fx_to_base, request.state.locale)
-            )
+            values = _edit_values(view, request.state.locale, ctx.workspace.base_currency)
         except (ValueError, NotFound, InvestmentTransactionError):
             editing = None
             values = None

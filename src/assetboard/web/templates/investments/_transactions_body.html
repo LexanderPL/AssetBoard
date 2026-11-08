@@ -55,6 +55,10 @@
         <label for="filter-to" class="block text-xs font-medium text-muted">{{ _("To") }}</label>
         <input id="filter-to" name="to" type="date" value="{{ filters.to }}" class="form-control w-full py-2">
       </div>
+      <div class="flex items-center gap-2 sm:col-span-2 lg:col-span-4">
+        <input id="filter-fx" name="fx" type="checkbox" value="check"{% if filters.fx == "check" %} checked{% endif %} class="h-4 w-4 rounded border-line accent-primary" data-filter-fx>
+        <label for="filter-fx" class="text-sm">{{ _("FX needs checking") }}</label>
+      </div>
       <div class="flex items-end gap-2 sm:col-span-2 lg:col-span-4">
         <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Filter") }}</button>
         <a href="{{ scoped_url(request, 'investments_transactions') }}" class="rounded-xl border border-line px-4 py-2 text-sm font-medium hover:bg-subtle">{{ _("Clear") }}</a>

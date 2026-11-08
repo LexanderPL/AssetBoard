@@ -344,6 +344,34 @@ def test_0041_price_sources_migration_is_reversible(tmp_path: Path) -> None:
         engine.dispose()
 
 
+def test_0044_settlement_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'settlement.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    added = {
+        "settlement_currency",
+        "settlement_unit_price",
+        "settlement_fee_minor",
+        "import_batch_id",
+    }
+    try:
+        inspector = inspect(engine)
+        assert added <= {c["name"] for c in inspector.get_columns("investment_transactions")}
+        checks = {c["name"] for c in inspector.get_check_constraints("investment_transactions")}
+        assert "ck_investment_transactions_settlement_all_or_none" in checks
+        command.downgrade(alembic_config(settings), "0043_f65_bond_terms")
+        inspector = inspect(engine)
+        assert not added & {c["name"] for c in inspector.get_columns("investment_transactions")}
+        upgrade_database(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
 def test_0043_bond_terms_migration_is_reversible(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None,

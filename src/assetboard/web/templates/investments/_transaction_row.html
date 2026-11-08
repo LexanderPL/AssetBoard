@@ -16,9 +16,15 @@
   {% endif %}
   <td class="px-3 py-2">{{ type_label(t.type) }}</td>
   <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_quantity_input(t.quantity, locale) }}</td>
+  {% if t.settlement_fee %}
+  {# F6.2a: entered in the base currency; the derived quote price and the rate sit beside it. #}
+  <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums" data-settled>{{ format_quantity_input(t.settlement_unit_price, locale) }} {{ t.settlement_fee.currency }}<span class="block text-xs text-muted" data-derived-quote>≈ {{ format_quantity_input(t.derived_price_display, locale) }} {{ t.quote_currency }} @ {{ format_quantity_input(t.fx_to_base, locale) }}</span></td>
+  <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(t.settlement_fee, locale) }}<span class="block text-xs text-muted">≈ {{ format_money(t.fee, locale) }}</span></td>
+  {% else %}
   <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_quantity_input(t.unit_price, locale) }} {{ t.quote_currency }}</td>
   <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(t.fee, locale) }}</td>
-  <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_quantity_input(t.fx_to_base, locale) }}</td>
+  {% endif %}
+  <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_quantity_input(t.fx_to_base, locale) }}{% if t.fx_needs_check %} <span class="ml-1 rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning-strong" title="{{ _('Rate 1 for an instrument quoted in another currency: the amounts may be in the base currency. Open the row, choose the base currency and save with the stored rate.') }}" data-fx-check>{{ _("check FX rate") }}</span>{% endif %}</td>
   <td class="px-3 py-2 text-muted">{{ t.note }}</td>
   {% if can_edit and not t.instrument_archived %}
   <td class="cell-tight px-3 py-2">
