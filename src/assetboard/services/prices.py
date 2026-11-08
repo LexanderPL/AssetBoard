@@ -82,8 +82,9 @@ class ManualProvider:
         quote_currency: str = "",
         *,
         wait: bool = True,
+        settings: Mapping[str, str] | None = None,
     ) -> Mapping[str, ProviderQuote]:
-        del symbols, quote_currency, wait
+        del symbols, quote_currency, wait, settings
         return {}
 
     def fetch_history(
@@ -94,8 +95,9 @@ class ManualProvider:
         quote_currency: str = "",
         *,
         wait: bool = True,
+        settings: Mapping[str, str] | None = None,
     ) -> Sequence[ProviderQuote]:
-        del symbol, start, end, quote_currency, wait
+        del symbol, start, end, quote_currency, wait, settings
         return ()
 
 
@@ -126,8 +128,9 @@ class FakeProvider:
         quote_currency: str = "",
         *,
         wait: bool = True,
+        settings: Mapping[str, str] | None = None,
     ) -> Mapping[str, ProviderQuote]:
-        del quote_currency, wait
+        del quote_currency, wait, settings
         return {symbol: self._latest[symbol] for symbol in symbols if symbol in self._latest}
 
     def fetch_history(
@@ -138,8 +141,9 @@ class FakeProvider:
         quote_currency: str = "",
         *,
         wait: bool = True,
+        settings: Mapping[str, str] | None = None,
     ) -> Sequence[ProviderQuote]:
-        del quote_currency, wait
+        del quote_currency, wait, settings
         return tuple(quote for quote in self._history.get(symbol, ()) if start <= quote.date <= end)
 
 

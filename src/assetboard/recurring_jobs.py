@@ -389,6 +389,8 @@ class RecurringJobs:
             for provider_key, hour, minute in (
                 ("nbp", 18, 10),
                 ("ecb", 18, 20),
+                ("coingecko", 0, 10),
+                ("eodhd", 22, 40),
             ):
                 self.scheduler.add_job(
                     self.refresh_prices,

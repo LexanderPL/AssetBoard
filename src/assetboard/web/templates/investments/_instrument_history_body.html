@@ -20,7 +20,7 @@
         <h2 id="holding-heading" class="text-lg font-semibold">{{ history.instrument.name }}</h2>
         <p class="mt-1 text-sm text-muted">
           {% if history.instrument.symbol %}{{ history.instrument.symbol }} · {% endif %}
-          {{ history.instrument.type_label }} · {{ history.instrument.quote_currency }} · {{ history.instrument.unit_label }}
+          {{ history.instrument.type_label }} · {{ history.instrument.quote_currency }} · {{ history.instrument.unit_label }}{% if history.instrument.provider_label %} · {{ history.instrument.provider_label }}{% if history.instrument.provider_symbol %} ({{ history.instrument.provider_symbol }}){% endif %}{% endif %}
           {% if history.instrument.archived %}<span class="ml-2 rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning-strong">{{ _("Archived") }}</span>{% endif %}
         </p>
       </div>

@@ -86,3 +86,40 @@ for (const eventName of ["DOMContentLoaded", "htmx:afterSwap", "htmx:oobAfterSwa
 for (const form of document.querySelectorAll("[data-transaction-form]")) {
   updateTransactionForm(form);
 }
+
+
+// F6.4: the provider fields only apply to priced instruments, not currency or bond-model rows.
+function updateInstrumentProvider(form) {
+  const fields = form.querySelector("[data-provider-fields]");
+  if (!fields) return;
+  const typeSelect = form.querySelector("select[name=type]");
+  const type = typeSelect ? typeSelect.value : "";
+  const hidden = type === "currency" || type === "bond_model";
+  fields.classList.toggle("hidden", hidden);
+  if (hidden) {
+    const provider = form.querySelector("[data-provider-select]");
+    const symbol = form.querySelector("input[name=provider_symbol]");
+    if (provider) provider.value = "";
+    if (symbol) symbol.value = "";
+  }
+}
+
+document.addEventListener("change", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  if (!target.matches("#instrument-type, [data-provider-select]")) return;
+  const form = target.closest("[data-instrument-form]");
+  if (form) updateInstrumentProvider(form);
+});
+
+for (const eventName of ["DOMContentLoaded", "htmx:afterSwap", "htmx:oobAfterSwap"]) {
+  document.addEventListener(eventName, () => {
+    for (const form of document.querySelectorAll("[data-instrument-form]")) {
+      updateInstrumentProvider(form);
+    }
+  });
+}
+
+for (const form of document.querySelectorAll("[data-instrument-form]")) {
+  updateInstrumentProvider(form);
+}

@@ -90,6 +90,13 @@ INSTRUMENT_ERRORS = {
     "archived": _("Restore the instrument before changing it."),
     "currency_locked": _("The quote currency cannot change: transactions exist."),
     "type_locked": _("The type cannot change: transactions exist."),
+    "invalid_provider": _("Choose a valid price provider for this instrument."),
+    "provider_disabled": _("Enable this provider in Providers before assigning it."),
+    "provider_unsupported": _(
+        "This provider cannot price this instrument type, currency or symbol."
+    ),
+    "provider_symbol_required": _("Enter the provider symbol."),
+    "invalid_provider_symbol": _("Enter a valid provider symbol."),
 }
 FALLBACK_ERROR = _("The change could not be made. Reload the page and try again.")
 CLASS_NOTICES = {
@@ -147,6 +154,8 @@ def _instrument_values(
             "quote_currency": base_currency,
             "unit_label": "",
             "weights": {},
+            "provider_key": "",
+            "provider_symbol": "",
         }
     return {
         "name": item.name,
@@ -154,6 +163,8 @@ def _instrument_values(
         "type": item.type,
         "quote_currency": item.quote_currency,
         "unit_label": item.unit_label,
+        "provider_key": item.provider_key or "",
+        "provider_symbol": item.provider_symbol or "",
         "weights": {
             str(allocation.asset_class_id): _weight_text(allocation.weight_bp, locale)
             for allocation in item.allocations
@@ -208,6 +219,7 @@ def _class_body_context(
         "page": page,
         "can_edit": has_role(ctx, Role.EDITOR),
         "can_manage_providers": has_role(ctx, Role.OWNER),
+        "coingecko_enabled": page.coingecko_enabled,
         "notice": _t(request, CLASS_NOTICES[notice]) if notice in CLASS_NOTICES else None,
         "error": _t(request, error) if error else None,
         "create_values": create_values or _class_values(),
@@ -242,6 +254,8 @@ def _instrument_body_context(
         "page": page,
         "can_edit": has_role(ctx, Role.EDITOR),
         "can_manage_providers": has_role(ctx, Role.OWNER),
+        "coingecko_enabled": page.coingecko_enabled,
+        "provider_choices": page.provider_choices,
         "notice": _t(request, INSTRUMENT_NOTICES[notice]) if notice in INSTRUMENT_NOTICES else None,
         "error": _t(request, error) if error else None,
         "create_values": values,
@@ -304,6 +318,15 @@ def _classes_done(request: Request, ctx: Context, notice: str) -> Response:
     return RedirectResponse(
         request.url_for("investments_classes").path + f"?notice={notice}", status_code=303
     )
+
+
+def _queue_provider_backfill(request: Request, ctx: Context, provider_key: str) -> None:
+    key = provider_key.strip().lower()
+    if not key:
+        return
+    jobs = getattr(request.app.state, "recurring_jobs", None)
+    if jobs is not None:
+        jobs.request_backfill(ctx.workspace.id, key)
 
 
 def _instruments_done(request: Request, ctx: Context, notice: str) -> Response:
@@ -407,6 +430,8 @@ async def instrument_create(
     type: FormStr = "",
     quote_currency: FormStr = "",
     unit_label: FormStr = "",
+    provider_key: FormStr = "",
+    provider_symbol: FormStr = "",
 ) -> Response:
     locale = request.state.locale
     rows, raw_weights, weight_error = await _allocation_input(request, locale)
@@ -416,6 +441,8 @@ async def instrument_create(
         "type": type,
         "quote_currency": quote_currency,
         "unit_label": unit_label,
+        "provider_key": provider_key,
+        "provider_symbol": provider_symbol,
         "weights": raw_weights,
     }
     if weight_error:
@@ -429,7 +456,7 @@ async def instrument_create(
             )
         )
     try:
-        await run_in_threadpool(
+        view = await run_in_threadpool(
             lambda: create_instrument(
                 request.app.state.session_factory,
                 ctx,
@@ -440,6 +467,8 @@ async def instrument_create(
                 unit_label=unit_label,
                 allocations=rows,
                 locale=locale,
+                provider_key=provider_key,
+                provider_symbol=provider_symbol,
             )
         )
     except InvestmentError as exc:
@@ -452,6 +481,7 @@ async def instrument_create(
                 create_errors={error.field or "name": _error_message(INSTRUMENT_ERRORS, error)},
             )
         )
+    _queue_provider_backfill(request, ctx, view.provider_key or "")
     return await run_in_threadpool(_instruments_done, request, ctx, "instrument_created")
 
 
@@ -468,6 +498,8 @@ async def instrument_update(
     type: FormStr = "",
     quote_currency: FormStr = "",
     unit_label: FormStr = "",
+    provider_key: FormStr = "",
+    provider_symbol: FormStr = "",
 ) -> Response:
     locale = request.state.locale
     item_id = _parse_uuid(instrument_id)
@@ -478,6 +510,8 @@ async def instrument_update(
         "type": type,
         "quote_currency": quote_currency,
         "unit_label": unit_label,
+        "provider_key": provider_key,
+        "provider_symbol": provider_symbol,
         "weights": raw_weights,
     }
     if weight_error:
@@ -494,7 +528,7 @@ async def instrument_update(
             )
         )
     try:
-        await run_in_threadpool(
+        view = await run_in_threadpool(
             lambda: update_instrument(
                 request.app.state.session_factory,
                 ctx,
@@ -506,6 +540,8 @@ async def instrument_update(
                 unit_label=unit_label,
                 allocations=rows,
                 locale=locale,
+                provider_key=provider_key,
+                provider_symbol=provider_symbol,
             )
         )
     except InvestmentError as exc:
@@ -530,6 +566,7 @@ async def instrument_update(
                 edit_errors={error.field or "name": _error_message(INSTRUMENT_ERRORS, error)},
             )
         )
+    _queue_provider_backfill(request, ctx, view.provider_key or "")
     return await run_in_threadpool(_instruments_done, request, ctx, "instrument_saved")
 
 

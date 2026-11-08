@@ -115,6 +115,8 @@ class PriceSourceConfig(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             "last_error_code IS NULL OR length(last_error_code) > 0",
             name="last_error_code_not_empty",
         ),
+        CheckConstraint("daily_call_budget >= 1", name="daily_call_budget_valid"),
+        CheckConstraint("quota_used >= 0", name="quota_used_valid"),
         Index(
             "ix_price_source_configs_workspace_enabled",
             "workspace_id",
@@ -126,6 +128,9 @@ class PriceSourceConfig(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     enabled: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=False)
     settings_encrypted: Mapped[str | None] = mapped_column(Text(), nullable=True)
     fx_backfilled: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    daily_call_budget: Mapped[int] = mapped_column(Integer(), nullable=False, default=20)
+    quota_day: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    quota_used: Mapped[int] = mapped_column(Integer(), nullable=False, default=0)
     last_success_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     last_error_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     last_error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)

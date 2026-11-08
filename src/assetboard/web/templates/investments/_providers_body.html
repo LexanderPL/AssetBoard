@@ -26,17 +26,22 @@
             <h2 class="text-base font-semibold">{{ card.definition.label }}</h2>
             <p class="mt-1 text-sm text-muted">{{ _(card.definition.description) }}</p>
           </div>
-          {% if card.enabled %}
-          <span class="rounded-full bg-success-soft px-2.5 py-1 text-xs font-medium text-success-strong">{{ _("Enabled") }}</span>
-          {% else %}
-          <span class="rounded-full bg-subtle px-2.5 py-1 text-xs font-medium text-muted">{{ _("Disabled") }}</span>
-          {% endif %}
+          <div class="flex flex-wrap items-center gap-2">
+            {% if card.definition.key == "coingecko" and card.enabled %}
+            <span class="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-medium text-primary-ink" data-coingecko-badge>{{ _("Powered by CoinGecko") }}</span>
+            {% endif %}
+            {% if card.enabled %}
+            <span class="rounded-full bg-success-soft px-2.5 py-1 text-xs font-medium text-success-strong">{{ _("Enabled") }}</span>
+            {% else %}
+            <span class="rounded-full bg-subtle px-2.5 py-1 text-xs font-medium text-muted">{{ _("Disabled") }}</span>
+            {% endif %}
+          </div>
         </div>
 
         <dl class="mt-4 grid gap-2 text-sm sm:grid-cols-2">
           <div>
             <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Quotes in") }}</dt>
-            <dd class="mt-0.5 font-medium">{{ card.definition.natural_base }}</dd>
+            <dd class="mt-0.5 font-medium">{% if card.definition.key == "eodhd" %}{{ _("Instrument currency") }}{% elif card.definition.quote_currencies %}{{ card.definition.quote_currencies|sort|join(", ") }}{% else %}{{ card.definition.natural_base }}{% endif %}</dd>
           </div>
           <div>
             <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Instruments using it") }}</dt>
@@ -50,8 +55,17 @@
             <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Last error") }}</dt>
             <dd class="mt-0.5">{% if card.last_error_at %}{{ format_day(card.last_error_at.date(), locale) }} · {{ card.last_error_code }}{% else %}—{% endif %}</dd>
           </div>
+          {% if card.definition.default_daily_budget %}
+          <div>
+            <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Calls today (UTC)") }}</dt>
+            <dd class="mt-0.5 font-medium tabular-nums" data-provider-quota>{{ card.quota_used }} / {{ card.daily_call_budget }}</dd>
+          </div>
+          {% endif %}
         </dl>
 
+        {% if card.definition.default_daily_budget and card.quota_used >= card.daily_call_budget %}
+        <p class="mt-3 border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning-strong" data-provider-quota-exhausted>{{ _("Daily call budget exhausted; remaining instruments keep their last prices.") }}</p>
+        {% endif %}
         {% if card.last_error_code == "base_not_published" %}
         <p class="mt-3 border border-warning-line bg-warning-soft px-3 py-2 text-xs text-warning-strong" data-base-mismatch>{{ _("This provider does not publish your base currency, so FX rates from it are skipped.") }}</p>
         {% endif %}
@@ -61,15 +75,39 @@
         {% if card.definition.key == "nbp" %}
         <p class="mt-1 text-xs text-muted">{{ _(card.definition.symbol_help) }}</p>
         {% endif %}
+        {% if card.definition.key == "eodhd" %}
+        <p class="mt-1 text-xs text-muted">{{ _("EODHD coverage for GPW, XETRA and LSE symbols is unverified; the free tier allows 20 calls per day.") }}</p>
+        {% endif %}
 
         <div class="mt-4 flex flex-wrap items-end gap-2">
-          <form method="post" action="{{ scoped_url(request, 'investments_provider_update', provider_key=card.definition.key) }}" hx-post="{{ scoped_url(request, 'investments_provider_update', provider_key=card.definition.key) }}" hx-target="#providers-body" hx-swap="outerHTML" class="flex flex-wrap items-center gap-3">
+          <form method="post" action="{{ scoped_url(request, 'investments_provider_update', provider_key=card.definition.key) }}" hx-post="{{ scoped_url(request, 'investments_provider_update', provider_key=card.definition.key) }}" hx-target="#providers-body" hx-swap="outerHTML" class="space-y-3">
             {{ csrf_input() }}
-            <label class="inline-flex items-center gap-2 text-sm">
-              <input type="checkbox" name="enabled" value="1"{% if card.enabled %} checked{% endif %} class="size-4 rounded border-line">
-              <span>{{ _("Enabled") }}</span>
-            </label>
-            <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save") }}</button>
+            {% if card.definition.key_label %}
+            <div class="space-y-1.5">
+              <label for="provider-key-{{ card.definition.key }}" class="block text-sm font-medium">{{ _(card.definition.key_label) }}</label>
+              <input id="provider-key-{{ card.definition.key }}" name="api_key" type="password" autocomplete="off" class="form-control w-full" placeholder="{% if card.settings_configured %}••••••••{% endif %}">
+              <p class="text-xs text-muted">{% if card.settings_configured %}{{ _("A key is configured. Leave empty to keep it.") }}{% else %}{{ _("The key is stored encrypted and never shown again.") }}{% endif %}</p>
+              {% if card.settings_configured %}
+              <label class="inline-flex items-center gap-2 text-xs text-muted">
+                <input type="checkbox" name="clear_key" value="1" class="size-4 rounded border-line">
+                <span>{{ _("Remove the stored key") }}</span>
+              </label>
+              {% endif %}
+            </div>
+            {% endif %}
+            {% if card.definition.default_daily_budget %}
+            <div class="space-y-1.5">
+              <label for="provider-budget-{{ card.definition.key }}" class="block text-sm font-medium">{{ _("Daily call budget (UTC)") }}</label>
+              <input id="provider-budget-{{ card.definition.key }}" name="daily_call_budget" type="number" min="1" max="100000" value="{{ card.daily_call_budget }}" class="form-control w-full">
+            </div>
+            {% endif %}
+            <div class="flex flex-wrap items-center gap-3">
+              <label class="inline-flex items-center gap-2 text-sm">
+                <input type="checkbox" name="enabled" value="1"{% if card.enabled %} checked{% endif %} class="size-4 rounded border-line">
+                <span>{{ _("Enabled") }}</span>
+              </label>
+              <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save") }}</button>
+            </div>
           </form>
           {% if card.enabled %}
           <form method="post" action="{{ scoped_url(request, 'investments_provider_refresh', provider_key=card.definition.key) }}" hx-post="{{ scoped_url(request, 'investments_provider_refresh', provider_key=card.definition.key) }}" hx-target="#providers-body" hx-swap="outerHTML">

@@ -8,6 +8,7 @@ per gram while the default metal unit is a troy ounce.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal, localcontext
 from typing import Literal
@@ -17,6 +18,11 @@ TROY_OUNCE_GRAMS = Decimal("31.1034768")
 
 NBP_KEY = "nbp"
 ECB_KEY = "ecb"
+COINGECKO_KEY = "coingecko"
+EODHD_KEY = "eodhd"
+
+_COINGECKO_SYMBOL = re.compile(r"[a-z0-9-]{1,64}")
+_EODHD_SYMBOL = re.compile(r"[A-Za-z0-9._-]{1,64}")
 
 _GRAMS = frozenset({"g", "gram", "grams", "gramy", "gramow", "gramów"})
 _TROY_OUNCES = frozenset(
@@ -53,6 +59,8 @@ class ProviderDefinition:
     symbol_help: str
     attribution: str | None
     docs_url: str
+    key_label: str = ""
+    default_daily_budget: int | None = None
 
 
 NBP = ProviderDefinition(
@@ -87,7 +95,45 @@ ECB = ProviderDefinition(
     docs_url="https://www.ecb.europa.eu/stats/eurofxref/",
 )
 
-PROVIDERS: dict[str, ProviderDefinition] = {NBP.key: NBP, ECB.key: ECB}
+COINGECKO = ProviderDefinition(
+    key=COINGECKO_KEY,
+    label="CoinGecko",
+    description=_("Crypto prices quoted directly in USD, EUR or PLN."),
+    kind="price",
+    natural_base="USD",
+    supported_types=frozenset({"crypto"}),
+    quote_currencies=frozenset({"USD", "EUR", "PLN"}),
+    requires_key=False,
+    symbol_required=True,
+    symbol_help=_("CoinGecko coin id, for example bitcoin."),
+    attribution="Powered by CoinGecko",
+    docs_url="https://docs.coingecko.com/",
+    key_label=_("Demo API key (optional)"),
+)
+
+EODHD = ProviderDefinition(
+    key=EODHD_KEY,
+    label="EODHD",
+    description=_("Optional end-of-day equities and ETFs through EODHD."),
+    kind="price",
+    natural_base="",
+    supported_types=frozenset({"equity", "etf"}),
+    quote_currencies=None,
+    requires_key=True,
+    symbol_required=True,
+    symbol_help=_("EODHD ticker with exchange suffix, for example VWCE.DE."),
+    attribution="EODHD",
+    docs_url="https://eodhd.com/pricing",
+    key_label=_("API key"),
+    default_daily_budget=20,
+)
+
+PROVIDERS: dict[str, ProviderDefinition] = {
+    NBP.key: NBP,
+    ECB.key: ECB,
+    COINGECKO.key: COINGECKO,
+    EODHD.key: EODHD,
+}
 
 
 class UnsupportedUnit(ValueError):
@@ -96,6 +142,10 @@ class UnsupportedUnit(ValueError):
 
 class InvalidProviderRate(ValueError):
     """A provider value is not a usable positive finite decimal."""
+
+
+class InvalidProviderSymbol(ValueError):
+    """A provider symbol does not fit the provider's identifier format."""
 
 
 def provider_definition(key: str) -> ProviderDefinition | None:
@@ -119,14 +169,59 @@ def nbp_gold_symbol(value: str | None) -> str | None:
     return None
 
 
+def clean_provider_symbol(
+    definition: ProviderDefinition, provider_symbol: str | None
+) -> str | None:
+    """Validate and canonicalise a provider symbol; blank means none."""
+    cleaned = (provider_symbol or "").strip()
+    if definition.key == NBP_KEY:
+        return nbp_gold_symbol(cleaned)
+    if not cleaned:
+        return None
+    if definition.key == COINGECKO_KEY:
+        normalized = cleaned.lower()
+        if _COINGECKO_SYMBOL.fullmatch(normalized) is None:
+            raise InvalidProviderSymbol
+        return normalized
+    if definition.key == EODHD_KEY:
+        normalized = cleaned.upper()
+        if _EODHD_SYMBOL.fullmatch(normalized) is None:
+            raise InvalidProviderSymbol
+        return normalized
+    return cleaned
+
+
 def normalize_instrument_symbol(
     definition: ProviderDefinition, provider_symbol: str | None
 ) -> str | None:
     """The canonical symbol a price provider expects for an instrument."""
+    try:
+        return clean_provider_symbol(definition, provider_symbol)
+    except InvalidProviderSymbol:
+        return None
+
+
+def provider_supports_instrument(
+    definition: ProviderDefinition,
+    *,
+    type: str,
+    quote_currency: str,
+    provider_symbol: str | None,
+) -> bool:
+    """Whether the definition can price this instrument shape (without I/O)."""
+    if definition.kind == "fx" or type not in definition.supported_types:
+        return False
+    if definition.quote_currencies is not None and quote_currency.upper() not in (
+        definition.quote_currencies
+    ):
+        return False
+    try:
+        symbol = clean_provider_symbol(definition, provider_symbol)
+    except InvalidProviderSymbol:
+        return False
     if definition.key == NBP_KEY:
-        return nbp_gold_symbol(provider_symbol)
-    cleaned = (provider_symbol or "").strip()
-    return cleaned or None
+        return symbol == "XAU"
+    return not (definition.symbol_required and symbol is None)
 
 
 def nbp_gold_to_unit(price_per_gram: Decimal, unit_label: str) -> Decimal:

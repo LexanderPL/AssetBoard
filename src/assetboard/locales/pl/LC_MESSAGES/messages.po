@@ -247,6 +247,24 @@ msgstr ""
 msgid "European Central Bank euro reference rates against EUR."
 msgstr "Referencyjne kursy euro Europejskiego Banku Centralnego względem EUR."
 
+msgid "Crypto prices quoted directly in USD, EUR or PLN."
+msgstr "Ceny kryptowalut podawane bezpośrednio w USD, EUR lub PLN."
+
+msgid "CoinGecko coin id, for example bitcoin."
+msgstr "Identyfikator monety CoinGecko, na przykład bitcoin."
+
+msgid "Demo API key (optional)"
+msgstr "Klucz API demo (opcjonalny)"
+
+msgid "Optional end-of-day equities and ETFs through EODHD."
+msgstr "Opcjonalne kursy zamknięcia akcji i ETF-ów przez EODHD."
+
+msgid "EODHD ticker with exchange suffix, for example VWCE.DE."
+msgstr "Ticker EODHD z sufiksem giełdy, na przykład VWCE.DE."
+
+msgid "API key"
+msgstr "Klucz API"
+
 msgid "Enter a valid amount."
 msgstr "Podaj prawidłową kwotę."
 
@@ -2092,6 +2110,21 @@ msgstr "Nie można zmienić waluty notowania: istnieją transakcje."
 msgid "The type cannot change: transactions exist."
 msgstr "Nie można zmienić typu: istnieją transakcje."
 
+msgid "Choose a valid price provider for this instrument."
+msgstr "Wybierz prawidłowego dostawcę cen dla tego instrumentu."
+
+msgid "Enable this provider in Providers before assigning it."
+msgstr "Włącz tego dostawcę na karcie Dostawcy przed przypisaniem go."
+
+msgid "This provider cannot price this instrument type, currency or symbol."
+msgstr "Ten dostawca nie obsługuje tego typu instrumentu, waluty ani symbolu."
+
+msgid "Enter the provider symbol."
+msgstr "Podaj symbol dostawcy."
+
+msgid "Enter a valid provider symbol."
+msgstr "Podaj prawidłowy symbol dostawcy."
+
 msgid "Asset class added."
 msgstr "Dodano klasę aktywów."
 
@@ -2770,6 +2803,14 @@ msgid "Rate limited; try again in %(minutes)s minutes."
 msgstr "Ograniczenie tempa; spróbuj ponownie za %(minutes)s min."
 
 #, python-format
+msgid ""
+"Refresh complete: %(prices)s prices and %(rates)s FX rates; %(skipped)s "
+"skipped."
+msgstr ""
+"Odświeżanie zakończone: %(prices)s cen i %(rates)s kursów FX; pominięto "
+"%(skipped)s."
+
+#, python-format
 msgid "Refresh complete: %(prices)s prices and %(rates)s FX rates."
 msgstr "Odświeżanie zakończone: %(prices)s cen i %(rates)s kursów FX."
 
@@ -2788,6 +2829,9 @@ msgstr "Nie udało się odświeżyć dostawcy."
 
 msgid "Provider settings saved."
 msgstr "Zapisano ustawienia dostawcy."
+
+msgid "Enter an API key and a daily call budget of at least 1."
+msgstr "Podaj klucz API i dzienny limit wywołań co najmniej 1."
 
 msgid "The provider settings could not be saved."
 msgstr "Nie udało się zapisać ustawień dostawcy."
@@ -4973,6 +5017,39 @@ msgstr ""
 "Pozostaw puste, aby użyć domyślnej nazwy typu (udział, moneta, uncja, "
 "nieruchomość). Instrument walutowy zawsze używa kodu waluty."
 
+msgid "Price source"
+msgstr "Źródło ceny"
+
+msgid "Provider"
+msgstr "Dostawca"
+
+msgid "Manual prices"
+msgstr "Ceny ręczne"
+
+msgid "disabled"
+msgstr "wyłączony"
+
+msgid "Manual prices always win; a provider fills the gaps for held instruments."
+msgstr ""
+"Ceny ręczne zawsze mają pierwszeństwo; dostawca uzupełnia luki dla "
+"posiadanych instrumentów."
+
+msgid "Provider symbol"
+msgstr "Symbol dostawcy"
+
+msgid "CoinGecko id, EODHD ticker, or XAU for NBP gold."
+msgstr "Identyfikator CoinGecko, ticker EODHD lub XAU dla złota NBP."
+
+msgid ""
+"EODHD prices come in the exchange currency; set the instrument currency "
+"to match (VWCE.DE is quoted in EUR)."
+msgstr ""
+"Ceny EODHD są podawane w walucie giełdy; ustaw walutę instrumentu "
+"odpowiednio (VWCE.DE jest notowany w EUR)."
+
+msgid "Test lookup"
+msgstr "Testowe pobranie"
+
 msgid "Allocation"
 msgstr "Alokacja"
 
@@ -5015,9 +5092,6 @@ msgstr ""
 "Zarchiwizowane instrumenty zachowują alokację i historię, ale nie można "
 "nimi handlować."
 
-msgid "Provider"
-msgstr "Dostawca"
-
 msgid "Transaction"
 msgstr "Transakcja"
 
@@ -5029,6 +5103,9 @@ msgstr "Ceny"
 
 msgid "Manual prices are used for illiquid assets; transactions fill the gaps."
 msgstr "Ceny ręczne służą do aktywów niepłynnych; transakcje uzupełniają luki."
+
+msgid "Powered by CoinGecko"
+msgstr "Powered by CoinGecko"
 
 msgid "Stale price"
 msgstr "Nieaktualna cena"
@@ -5048,6 +5125,9 @@ msgstr "Brak ceny dostawcy — błąd dostawcy."
 
 msgid "The provider is rate limited; the last known price is shown."
 msgstr "Dostawca ma ograniczenie tempa; pokazywana jest ostatnia znana cena."
+
+msgid "Some earlier price history could not be fetched from the provider."
+msgstr "Nie udało się pobrać części wcześniejszej historii cen od dostawcy."
 
 msgid ""
 "A currency instrument is always priced at 1 in its own currency. Its "
@@ -5105,6 +5185,26 @@ msgstr "Usunąć cenę ręczną z dnia %(date)s?"
 msgid "No stored or transaction prices for this instrument yet."
 msgstr "Ten instrument nie ma jeszcze zapisanych cen ani cen z transakcji."
 
+#, python-format
+msgid "Provider price: %(price)s %(currency)s as of %(date)s"
+msgstr "Cena dostawcy: %(price)s %(currency)s na dzień %(date)s"
+
+msgid "This provider is not enabled."
+msgstr "Ten dostawca nie jest włączony."
+
+msgid "This provider cannot price this instrument type or symbol."
+msgstr "Ten dostawca nie obsługuje tego typu instrumentu ani symbolu."
+
+msgid "The provider's daily call budget is exhausted."
+msgstr "Dzienny limit wywołań dostawcy został wyczerpany."
+
+#, python-format
+msgid "Lookup failed (%(code)s)."
+msgstr "Pobranie nie powiodło się (%(code)s)."
+
+msgid "The lookup could not be completed."
+msgstr "Nie udało się zakończyć pobierania."
+
 msgid "Price providers"
 msgstr "Dostawcy cen"
 
@@ -5132,6 +5232,9 @@ msgstr "Wyłączony"
 msgid "Quotes in"
 msgstr "Notowanie w"
 
+msgid "Instrument currency"
+msgstr "Waluta instrumentu"
+
 msgid "Instruments using it"
 msgstr "Instrumenty korzystające"
 
@@ -5140,6 +5243,14 @@ msgstr "Ostatni sukces"
 
 msgid "Last error"
 msgstr "Ostatni błąd"
+
+msgid "Calls today (UTC)"
+msgstr "Wywołania dziś (UTC)"
+
+msgid "Daily call budget exhausted; remaining instruments keep their last prices."
+msgstr ""
+"Dzienny limit wywołań został wyczerpany; pozostałe instrumenty zachowują "
+"ostatnie ceny."
 
 msgid ""
 "This provider does not publish your base currency, so FX rates from it "
@@ -5151,6 +5262,27 @@ msgstr ""
 #, python-format
 msgid "Source: %(source)s"
 msgstr "Źródło: %(source)s"
+
+msgid ""
+"EODHD coverage for GPW, XETRA and LSE symbols is unverified; the free "
+"tier allows 20 calls per day."
+msgstr ""
+"Pokrycie EODHD dla symboli GPW, XETRA i LSE jest niezweryfikowane; "
+"darmowy plan pozwala na 20 wywołań dziennie."
+
+msgid "A key is configured. Leave empty to keep it."
+msgstr "Klucz jest skonfigurowany. Pozostaw puste, aby go zachować."
+
+msgid "The key is stored encrypted and never shown again."
+msgstr ""
+"Klucz jest przechowywany zaszyfrowany i nigdy nie jest ponownie "
+"pokazywany."
+
+msgid "Remove the stored key"
+msgstr "Usuń zapisany klucz"
+
+msgid "Daily call budget (UTC)"
+msgstr "Dzienny limit wywołań (UTC)"
 
 msgid "Refresh now"
 msgstr "Odśwież teraz"

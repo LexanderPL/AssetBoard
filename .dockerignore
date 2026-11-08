@@ -24,6 +24,5 @@ coverage.xml
 .coverage
 dist
 build
-src/assetboard/static/css/app.css
 src/assetboard/locales/en/LC_MESSAGES/messages.mo
 src/assetboard/locales/pl/LC_MESSAGES/messages.mo

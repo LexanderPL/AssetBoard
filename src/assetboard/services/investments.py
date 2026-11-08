@@ -31,6 +31,7 @@ from assetboard.db.repositories import (
     InstrumentRepository,
     InvestmentTransactionRepository,
     NotFound,
+    PriceSourceConfigRepository,
 )
 from assetboard.db.repositories.base import WorkspaceScope
 from assetboard.domain.categories import Direction, move, name_key
@@ -56,7 +57,14 @@ from assetboard.domain.instruments import (
     parse_instrument_type,
     validate_allocation,
 )
-from assetboard.domain.providers import provider_definition
+from assetboard.domain.providers import (
+    COINGECKO_KEY,
+    InvalidProviderSymbol,
+    ProviderDefinition,
+    clean_provider_symbol,
+    provider_definition,
+    provider_supports_instrument,
+)
 from assetboard.i18n import gettext
 from assetboard.services.context import Context, Role, require_role, require_role_now
 
@@ -178,11 +186,19 @@ class InstrumentView:
 
 
 @dataclass(frozen=True, slots=True)
+class ProviderChoice:
+    definition: ProviderDefinition
+    enabled: bool
+
+
+@dataclass(frozen=True, slots=True)
 class InvestmentPage:
     classes: tuple[AssetClassView, ...]
     archived_classes: tuple[AssetClassView, ...]
     instruments: tuple[InstrumentView, ...]
     archived_instruments: tuple[InstrumentView, ...]
+    provider_choices: tuple[ProviderChoice, ...] = ()
+    coingecko_enabled: bool = False
 
     @property
     def can_seed(self) -> bool:
@@ -259,6 +275,8 @@ def _page(
     allocations: Sequence[InstrumentAllocation],
     locale: str,
     locked_instruments: Collection[UUID] = (),
+    provider_choices: tuple[ProviderChoice, ...] = (),
+    coingecko_enabled: bool = False,
 ) -> InvestmentPage:
     classes_by_id = {row.id: row for row in classes}
     by_instrument: dict[UUID, list[InstrumentAllocation]] = {}
@@ -280,6 +298,8 @@ def _page(
         archived_classes=tuple(view for view in class_views if view.archived),
         instruments=tuple(view for view in instrument_views if not view.archived),
         archived_instruments=tuple(view for view in instrument_views if view.archived),
+        provider_choices=provider_choices,
+        coingecko_enabled=coingecko_enabled,
     )
 
 
@@ -290,7 +310,26 @@ def investment_page(factory: sessionmaker[Session], ctx: Context, *, locale: str
         instruments = InstrumentRepository(session, ctx).ordered()
         allocations = InstrumentAllocationRepository(session, ctx).list()
         locked = InvestmentTransactionRepository(session, ctx).instrument_ids()
-        return _page(classes, instruments, allocations, locale, locked)
+        configs = {
+            row.provider_key: row for row in PriceSourceConfigRepository(session, ctx).list()
+        }
+        choices = tuple(
+            ProviderChoice(
+                definition,
+                bool(configs.get(definition.key) and configs[definition.key].enabled),
+            )
+            for definition in _price_provider_definitions()
+        )
+        coingecko = bool(configs.get(COINGECKO_KEY) is not None and configs[COINGECKO_KEY].enabled)
+        return _page(
+            classes,
+            instruments,
+            allocations,
+            locale,
+            locked,
+            provider_choices=choices,
+            coingecko_enabled=coingecko,
+        )
 
 
 def get_instrument(
@@ -338,6 +377,12 @@ def _write[T](
 
 def _lock(session: Session, ctx: Context, *, exclusive: bool) -> None:
     CurrentWorkspaceRepository(session, ctx).lock(exclusive=exclusive)
+
+
+def _price_provider_definitions() -> tuple[ProviderDefinition, ...]:
+    from assetboard.domain.providers import PROVIDERS
+
+    return tuple(definition for definition in PROVIDERS.values() if definition.kind != "fx")
 
 
 def _active_classes(repository: AssetClassRepository) -> list[AssetClass]:
@@ -450,6 +495,8 @@ def update_asset_class(
             return _class_view(row)
         if "name" in changes:
             changes["name_key"] = key
+        if "provider_key" in changes or "provider_symbol" in changes:
+            changes["provider_backfilled_at"] = None
         repository.update(row.id, **changes)
         _audit(
             session,
@@ -616,7 +663,19 @@ def _instrument_values(
     quote_currency: str,
     unit_label: str,
     locale: str,
-) -> tuple[str, str, str | None, InstrumentType, str, str, ValuationSource]:
+    provider_key: str = "",
+    provider_symbol: str = "",
+) -> tuple[
+    str,
+    str,
+    str | None,
+    InstrumentType,
+    str,
+    str,
+    ValuationSource,
+    str | None,
+    str | None,
+]:
     try:
         instrument_type = parse_instrument_type(type_value)
     except ValueError:
@@ -645,6 +704,33 @@ def _instrument_values(
             raise InvalidInvestment("unit_label", "invalid_unit_label") from None
     else:
         unit = gettext(defaults.unit_label, locale)
+    source = defaults.valuation_source
+    provider_key_value: str | None = None
+    provider_symbol_value: str | None = None
+    submitted_key = provider_key.strip().lower()
+    submitted_symbol = provider_symbol.strip()
+    if instrument_type not in {InstrumentType.CURRENCY, InstrumentType.BOND_MODEL}:
+        if submitted_key:
+            definition = provider_definition(submitted_key)
+            if definition is None or definition.kind == "fx":
+                raise InvalidInvestment("provider_key", "invalid_provider")
+            try:
+                provider_symbol_value = clean_provider_symbol(definition, submitted_symbol)
+            except InvalidProviderSymbol:
+                raise InvalidInvestment("provider_symbol", "invalid_provider_symbol") from None
+            if provider_symbol_value is None and definition.symbol_required:
+                raise InvalidInvestment("provider_symbol", "provider_symbol_required")
+            if not provider_supports_instrument(
+                definition,
+                type=instrument_type.value,
+                quote_currency=currency,
+                provider_symbol=provider_symbol_value,
+            ):
+                raise InvalidInvestment("provider_key", "provider_unsupported")
+            provider_key_value = definition.key
+            source = ValuationSource.PROVIDER
+        elif submitted_symbol:
+            raise InvalidInvestment("provider_key", "invalid_provider")
     return (
         clean_name_value,
         name_key(clean_name_value),
@@ -652,7 +738,9 @@ def _instrument_values(
         instrument_type,
         currency,
         unit,
-        defaults.valuation_source,
+        source,
+        provider_key_value,
+        provider_symbol_value,
     )
 
 
@@ -686,6 +774,8 @@ def create_instrument(
     unit_label: str,
     allocations: Sequence[tuple[UUID, int]],
     locale: str,
+    provider_key: str = "",
+    provider_symbol: str = "",
 ) -> InstrumentView:
     require_role(ctx, Role.EDITOR)
     (
@@ -696,6 +786,8 @@ def create_instrument(
         currency,
         unit,
         source,
+        provider_key_value,
+        provider_symbol_value,
     ) = _instrument_values(
         name=name,
         symbol=symbol,
@@ -703,6 +795,8 @@ def create_instrument(
         quote_currency=quote_currency,
         unit_label=unit_label,
         locale=locale,
+        provider_key=provider_key,
+        provider_symbol=provider_symbol,
     )
 
     def write(session: Session) -> InstrumentView:
@@ -710,6 +804,10 @@ def create_instrument(
         _lock(session, ctx, exclusive=False)
         instrument_repository = InstrumentRepository(session, ctx)
         _ensure_unique_instrument(instrument_repository, key=key)
+        if provider_key_value is not None:
+            config = PriceSourceConfigRepository(session, ctx).for_provider(provider_key_value)
+            if config is None or not config.enabled:
+                raise InvalidInvestment("provider_key", "provider_disabled")
         classes = {row.id: row for row in AssetClassRepository(session, ctx).ordered()}
         rows = _allocation_rows(allocations, classes, existing=set())
         row = instrument_repository.create(
@@ -720,6 +818,8 @@ def create_instrument(
             quote_currency=currency,
             unit_label=unit,
             valuation_source=source.value,
+            provider_key=provider_key_value,
+            provider_symbol=provider_symbol_value,
         )
         allocation_repository = InstrumentAllocationRepository(session, ctx)
         for class_id, weight_bp in rows:
@@ -770,6 +870,8 @@ def update_instrument(
     unit_label: str,
     allocations: Sequence[tuple[UUID, int]],
     locale: str,
+    provider_key: str = "",
+    provider_symbol: str = "",
 ) -> InstrumentView:
     require_role(ctx, Role.EDITOR)
     (
@@ -780,6 +882,8 @@ def update_instrument(
         currency,
         unit,
         source,
+        provider_key_value,
+        provider_symbol_value,
     ) = _instrument_values(
         name=name,
         symbol=symbol,
@@ -787,6 +891,8 @@ def update_instrument(
         quote_currency=quote_currency,
         unit_label=unit_label,
         locale=locale,
+        provider_key=provider_key,
+        provider_symbol=provider_symbol,
     )
 
     def write(session: Session) -> InstrumentView:
@@ -798,6 +904,10 @@ def update_instrument(
             raise NotFound
         if row.archived_at is not None:
             raise InstrumentArchived
+        if provider_key_value is not None:
+            config = PriceSourceConfigRepository(session, ctx).for_provider(provider_key_value)
+            if (config is None or not config.enabled) and row.provider_key != provider_key_value:
+                raise InvalidInvestment("provider_key", "provider_disabled")
         has_transactions = InvestmentTransactionRepository(session, ctx).any_for_instrument(row.id)
         if has_transactions and row.quote_currency != currency:
             raise InvalidInvestment("quote_currency", "currency_locked")
@@ -819,6 +929,8 @@ def update_instrument(
                 ("quote_currency", currency),
                 ("unit_label", unit),
                 ("valuation_source", source.value),
+                ("provider_key", provider_key_value),
+                ("provider_symbol", provider_symbol_value),
             )
             if getattr(row, field) != value
         }
@@ -837,6 +949,8 @@ def update_instrument(
             )
         if "name" in changes:
             changes["name_key"] = key
+        if "provider_key" in changes or "provider_symbol" in changes:
+            changes["provider_backfilled_at"] = None
         if changes:
             instrument_repository.update(row.id, **changes)
         if allocations_changed:

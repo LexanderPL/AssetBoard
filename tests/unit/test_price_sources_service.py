@@ -15,6 +15,8 @@ from assetboard.db.repositories import InstrumentRepository, PriceSourceConfigRe
 from assetboard.services.context import Context, PermissionDenied
 from assetboard.services.investments import create_asset_class, create_instrument
 from assetboard.services.price_sources import (
+    InvalidProviderSetting,
+    MissingProviderKey,
     UnknownProvider,
     provider_page,
     provider_settings,
@@ -84,7 +86,12 @@ def _events(db: WorkspaceDb) -> list[AuditEvent]:
 def test_provider_page_lists_nbp_and_ecb_disabled(db: WorkspaceDb, team: WorkspaceDb) -> None:
     ctx = _owner(db)
     page = provider_page(db.factory, ctx)
-    assert [card.definition.key for card in page.cards] == ["nbp", "ecb"]
+    assert [card.definition.key for card in page.cards] == [
+        "nbp",
+        "ecb",
+        "coingecko",
+        "eodhd",
+    ]
     assert all(not card.enabled for card in page.cards)
     assert all(card.instruments_using == 0 for card in page.cards)
 
@@ -119,7 +126,7 @@ def test_settings_are_encrypted_and_bound_to_the_config(db: WorkspaceDb, team: W
         SETTINGS,
         "nbp",
         enabled=True,
-        provider_settings={"api_key": "super-secret-token"},
+        settings_values={"api_key": "super-secret-token"},
     )
     with db.factory() as session:
         row = PriceSourceConfigRepository(session, ctx).for_provider("nbp")
@@ -145,7 +152,7 @@ def test_blank_save_keeps_the_existing_settings(db: WorkspaceDb, team: Workspace
         SETTINGS,
         "nbp",
         enabled=True,
-        provider_settings={"api_key": "one"},
+        settings_values={"api_key": "one"},
     )
     save_provider_config(db.factory, ctx, SETTINGS, "nbp", enabled=False)
     with db.factory() as session:
@@ -161,7 +168,7 @@ def test_clearing_settings_removes_the_ciphertext(db: WorkspaceDb, team: Workspa
         SETTINGS,
         "nbp",
         enabled=True,
-        provider_settings={"api_key": "one"},
+        settings_values={"api_key": "one"},
     )
     save_provider_config(db.factory, ctx, SETTINGS, "nbp", enabled=True, clear_settings=True)
     with db.factory() as session:
@@ -175,6 +182,56 @@ def test_instruments_using_a_provider_are_counted(db: WorkspaceDb, team: Workspa
     _configure_provider(db, instrument.id)
     page = provider_page(db.factory, ctx)
     assert next(card for card in page.cards if card.definition.key == "nbp").instruments_using == 1
+
+
+def test_eodhd_requires_a_key_and_stores_the_daily_budget(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    with pytest.raises(MissingProviderKey):
+        save_provider_config(db.factory, ctx, SETTINGS, "eodhd", enabled=True)
+    with pytest.raises(MissingProviderKey):
+        save_provider_config(
+            db.factory,
+            ctx,
+            SETTINGS,
+            "eodhd",
+            enabled=True,
+            settings_values={"api_key": "ignored"},
+            clear_settings=True,
+        )
+    save_provider_config(
+        db.factory,
+        ctx,
+        SETTINGS,
+        "eodhd",
+        enabled=True,
+        settings_values={"api_key": "eodhd-secret"},
+        daily_call_budget=7,
+    )
+    page = provider_page(db.factory, ctx)
+    card = next(card for card in page.cards if card.definition.key == "eodhd")
+    assert card.enabled and card.settings_configured
+    assert (card.daily_call_budget, card.quota_used) == (7, 0)
+    with db.factory() as session:
+        row = PriceSourceConfigRepository(session, ctx).for_provider("eodhd")
+        assert row is not None
+        assert provider_settings(SETTINGS, row) == {"api_key": "eodhd-secret"}
+
+
+def test_coingecko_key_is_optional_and_budget_must_be_positive(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    save_provider_config(db.factory, ctx, SETTINGS, "coingecko", enabled=True)
+    card = next(
+        card for card in provider_page(db.factory, ctx).cards if card.definition.key == "coingecko"
+    )
+    assert card.enabled and not card.settings_configured
+    with pytest.raises(InvalidProviderSetting):
+        save_provider_config(
+            db.factory, ctx, SETTINGS, "coingecko", enabled=True, daily_call_budget=0
+        )
 
 
 def test_only_owners_may_view_or_change_providers(db: WorkspaceDb, team: WorkspaceDb) -> None:

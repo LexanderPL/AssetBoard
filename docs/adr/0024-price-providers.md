@@ -214,9 +214,9 @@ without re-checking at implementation time:
 - metals-api.com free quota.
 - NBP rate limits (unwritten; the ≤1/s self-limit is ours, not theirs).
 
-## Implementation notes (F6.4, first update)
+## Implementation notes (F6.4)
 
-- NBP and ECB ship first; CoinGecko and EODHD follow in the next update. The provider runtime uses
+- NBP, ECB, CoinGecko and EODHD ship in F6.4. The provider runtime uses
   the standard library only (`urllib.request`, `xml.etree`, `json`), with a 10 s timeout, bounded
   responses, HTTPS-only URLs, retry/backoff, a bounded TTL response cache and process-wide rate
   limits (NBP 1/s, ECB 1/h).
@@ -235,8 +235,15 @@ without re-checking at implementation time:
 - Recent ECB history uses `eurofxref-hist-90d.xml`; older backfills use the full file. A
   per-currency `fx_backfilled` marker on the provider config keeps FX history one-off even when
   the first trade falls on a weekend or before the provider's history starts.
-- Still to verify in the next update: CoinGecko's current history limit and EODHD EU-exchange
-  coverage with a real key. The unverified-claims register above remains binding.
+- CoinGecko's current documentation (re-checked 2026-11-08) restricts the Basic plan's history
+  to the past two years; the app requests `days=max`, marks `history_limited` when the returned
+  range starts later than the first transaction, and does not promise a fixed lookback. EODHD
+  EU-exchange coverage still needs a real key; the UI marks it unverified. The unverified-claims
+  register above remains binding.
+- EODHD uses a per-workspace UTC-day call budget (default 20), spending latest calls before
+  history and skipping the remainder with `quota_exhausted`. One reservation is taken per
+  adapter request, cache hits included, and the reservation row is locked with `SELECT … FOR
+  UPDATE` on PostgreSQL; transport retries are not counted as extra reservations.
 
 ## Open items
 

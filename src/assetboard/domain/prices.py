@@ -84,6 +84,7 @@ class PriceProvider(Protocol):
         quote_currency: str = "",
         *,
         wait: bool = True,
+        settings: Mapping[str, str] | None = None,
     ) -> Mapping[str, ProviderQuote]: ...
 
     def fetch_history(
@@ -94,6 +95,7 @@ class PriceProvider(Protocol):
         quote_currency: str = "",
         *,
         wait: bool = True,
+        settings: Mapping[str, str] | None = None,
     ) -> Sequence[ProviderQuote]: ...
 
 
@@ -103,9 +105,19 @@ class FxProvider(Protocol):
     rate_limit: ProviderRateLimit
 
     def fetch_latest_fx(
-        self, currencies: Sequence[str], *, wait: bool = True
+        self,
+        currencies: Sequence[str],
+        *,
+        wait: bool = True,
+        settings: Mapping[str, str] | None = None,
     ) -> Mapping[str, ProviderRateQuote]: ...
 
     def fetch_history_fx(
-        self, currency: str, start: date, end: date, *, wait: bool = True
+        self,
+        currency: str,
+        start: date,
+        end: date,
+        *,
+        wait: bool = True,
+        settings: Mapping[str, str] | None = None,
     ) -> Sequence[ProviderRateQuote]: ...
