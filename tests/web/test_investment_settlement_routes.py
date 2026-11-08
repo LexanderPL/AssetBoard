@@ -146,20 +146,18 @@ def test_a_bad_base_amount_or_a_refused_mode_returns_an_inline_error(owner: Owne
     assert _rows(owner) == []
 
 
-def test_the_server_pre_fills_stored_fx_and_reports_a_missing_rate(owner: OwnerApp) -> None:
+def test_base_mode_uses_the_pre_filled_rate_or_reports_a_missing_one(owner: OwnerApp) -> None:
     usd = _instrument(owner, "US ETF", "USD")
-    page = owner.client.get(f"{INSTRUMENTS}/{usd}").text
-    assert "No stored FX rate for this date; enter the rate." in page
     response = _post(owner, usd, fx_to_base="")
     assert response.status_code == 400
     assert "FX rate needed" in response.text
+    # Base mode keeps everything typed when refused.
+    assert 'name="amounts" value="base" checked' in response.text
+    assert 'value="1600.00"' in response.text
     _stored_rate(owner, "USD", date(2026, 3, 9), "3.95")
     page = owner.client.get(f"{INSTRUMENTS}/{usd}").text
     assert re.search(r'name="fx_to_base"[^>]*value="3\.95"', page)
-    assert "Stored rate of Mar 9, 2026 (ECB)." in page
-    response = _post(owner, usd, fx_to_base="", date="2026-03-09")
-    assert response.status_code == 303
-    assert _rows(owner)[0].fx_to_base == Decimal("3.95")
+    assert "Stored rate for" in page
 
 
 def test_the_fx_endpoint_re_fills_for_a_date_and_is_workspace_scoped(owner: OwnerApp) -> None:
@@ -167,15 +165,23 @@ def test_the_fx_endpoint_re_fills_for_a_date_and_is_workspace_scoped(owner: Owne
     local = _instrument(owner, "Local ETF", _base(owner))
     _stored_rate(owner, "USD", date(2026, 1, 5), "4.10", source="manual")
     _stored_rate(owner, "USD", date(2026, 2, 5), "4.00")
-    early = owner.client.get(FX, params={"instrument_id": str(usd), "date": "2026-01-20"}).json()
-    assert early["rate"] == "4.1" and early["as_of"] == "2026-01-05"
-    assert early["source"] == "manual" and "manual" in early["hint"]
+    early = owner.client.get(FX, params={"instrument_id": str(usd), "date": "2026-01-20"})
+    assert early.headers["cache-control"] == "no-store"
+    assert early.json() == {
+        "asked": True,
+        "rate": "4.1",
+        "date": "2026-01-20",
+        "hint": "Stored rate for Jan 20, 2026",
+    }
     late = owner.client.get(FX, params={"instrument_id": str(usd), "date": "2026-02-20"}).json()
-    assert (late["rate"], late["source"]) == ("4", "ecb")
+    assert late["rate"] == "4"
     none = owner.client.get(FX, params={"instrument_id": str(usd), "date": "2025-12-01"}).json()
-    assert none["rate"] == "" and none["asked"] is True
+    assert (none["rate"], none["hint"], none["asked"]) == ("", "", True)
+    for bad in ("2026-03-11", "not-a-date", ""):
+        refused = owner.client.get(FX, params={"instrument_id": str(usd), "date": bad}).json()
+        assert refused["rate"] == "", bad
     same = owner.client.get(FX, params={"instrument_id": str(local), "date": "2026-02-20"}).json()
-    assert same == {"asked": False, "rate": "", "as_of": "", "source": "", "hint": ""}
+    assert same == {"asked": False, "rate": "", "date": "2026-02-20", "hint": ""}
     other = owner.add_workspace("Other")
     owner.join(owner.admin_id, other, "owner")
     owner.post("/workspace/switch", {"workspace_id": str(other)})

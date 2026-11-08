@@ -22,8 +22,8 @@ from assetboard.services.investment_transactions import (
     InvalidInvestmentTransaction,
     InvestmentTransactionView,
     create_transaction,
-    fx_prefill,
     get_transaction,
+    instrument_fx_currency,
     instrument_history,
     list_transactions,
     update_transaction,
@@ -209,42 +209,27 @@ def test_the_database_refuses_a_partial_settlement(team: WorkspaceDb) -> None:
         )
 
 
-def test_a_blank_rate_is_pre_filled_from_stored_fx_and_needed_without_one(
-    team: WorkspaceDb,
-) -> None:
+def test_a_blank_rate_on_the_form_is_needed_even_with_a_stored_rate(team: WorkspaceDb) -> None:
+    # The form pre-fills stored FX (#243); a rate the user cleared is not silently re-taken.
     ctx = team.ctx("ed", "editor")
     usd = _instrument(team, ctx)
+    _stored_rate(team, ctx, "USD", date(2026, 1, 8), "0.91", source="manual")
     with pytest.raises(InvalidInvestmentTransaction) as caught:
         _tx(team, ctx, usd, fx="")
     assert (caught.value.field, caught.value.code) == ("fx_to_base", "fx_needed")
-    _stored_rate(team, ctx, "USD", date(2026, 1, 8), "0.91", source="manual")
-    _stored_rate(team, ctx, "USD", date(2026, 1, 12), "0.95")
-    view = _tx(team, ctx, usd, fx="")
-    assert view.fx_to_base == Decimal("0.91")
-    quote = _tx(team, ctx, usd, amounts="quote", unit_price="100", fx="", date_value="2026-01-20")
-    assert quote.fx_to_base == Decimal("0.95")
 
 
-def test_fx_prefill_uses_stored_fx_only_and_is_workspace_scoped(team: WorkspaceDb) -> None:
+def test_the_fx_currency_lookup_is_workspace_scoped(team: WorkspaceDb) -> None:
     ctx = team.ctx("ed", "editor")
     usd = _instrument(team, ctx)
     eur = _instrument(team, ctx, name="EU ETF", quote_currency="EUR")
-    assert fx_prefill(team.factory, ctx, eur, date(2026, 1, 10)) is None
-    missing = fx_prefill(team.factory, ctx, usd, date(2026, 1, 10))
-    assert missing is not None and missing.rate is None
-    # A transaction-derived rate never pre-fills.
-    _tx(team, ctx, usd)
-    derived = fx_prefill(team.factory, ctx, usd, date(2026, 1, 10))
-    assert derived is not None and derived.rate is None
-    _stored_rate(team, ctx, "USD", date(2026, 1, 9), "0.92")
-    stored = fx_prefill(team.factory, ctx, usd, date(2026, 1, 10))
-    assert stored is not None
-    assert (stored.rate, stored.as_of, stored.source) == (Decimal("0.92"), date(2026, 1, 9), "ecb")
+    assert instrument_fx_currency(team.factory, ctx, usd) == "USD"
+    assert instrument_fx_currency(team.factory, ctx, eur) is None
     other_workspace = team.add_workspace("Other")
     team.add_member("ed", "owner", other_workspace)
     outsider = team.ctx("ed", "owner", other_workspace)
     with pytest.raises(NotFound):
-        fx_prefill(team.factory, outsider, usd, date(2026, 1, 10))
+        instrument_fx_currency(team.factory, outsider, usd)
 
 
 def test_switching_modes_on_edit_sets_or_clears_the_settlement(team: WorkspaceDb) -> None:

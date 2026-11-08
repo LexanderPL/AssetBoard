@@ -5,9 +5,11 @@
 function allocationTotal(editor) {
   let total = 0;
   let invalid = false;
+  let entered = false;
   for (const input of editor.querySelectorAll("[data-allocation-weight]")) {
     const raw = input.value.trim().replace(",", ".");
     if (raw === "") continue;
+    entered = true;
     const value = Number(raw);
     if (!Number.isFinite(value) || value < 0 || value > 100) {
       invalid = true;
@@ -15,18 +17,20 @@ function allocationTotal(editor) {
     }
     total += value;
   }
-  return { total: Math.round(total * 100) / 100, invalid };
+  return { total: Math.round(total * 100) / 100, invalid, entered };
 }
 
 function updateAllocationEditor(editor) {
-  const { total, invalid } = allocationTotal(editor);
+  const { total, invalid, entered } = allocationTotal(editor);
   const totalNode = editor.querySelector("[data-allocation-total]");
   const warning = editor.querySelector("[data-allocation-warning]");
   const submit = editor.querySelector("[data-allocation-submit]");
   const separator = editor.getAttribute("data-decimal-separator") || ".";
   if (totalNode) totalNode.textContent = `${total.toFixed(2).replace(".", separator)}%`;
   const valid = !invalid && total === 100;
-  if (warning) warning.classList.toggle("hidden", valid);
+  // A fresh form (nothing typed yet, e.g. right after a successful add) is not an error: the
+  // warning waits for the first weight. Saving still needs exactly 100%.
+  if (warning) warning.classList.toggle("hidden", valid || !entered);
   if (submit) submit.disabled = !valid;
 }
 
@@ -68,11 +72,71 @@ function updateTransactionForm(form) {
   if (fx) fx.classList.toggle("hidden", currency === form.dataset.baseCurrency);
 }
 
+// F6.3: the server renders each option's stored FX (manual or provider) for today. When the user
+// picks another instrument, a field that is empty or still holds the previous pre-fill follows
+// it; a rate the user typed is kept. Only a real change does this, so a refused form keeps
+// exactly what was submitted.
+function applyStoredFx(form) {
+  const select = form.querySelector("[data-transaction-instrument]");
+  const input = form.querySelector("[data-fx-input]");
+  if (!select || !(input instanceof HTMLInputElement)) return;
+  // The options' rates are for the date the form was rendered with; after a date change the
+  // F6.2a refill asks the server for the new date instead.
+  if (form.dataset.fxDateChanged === "1") {
+    refillStoredFx(form);
+    return;
+  }
+  const option = select.selectedOptions[0];
+  if (!option || !("fx" in option.dataset)) return;
+  const previous = input.dataset.prefilled || "";
+  if (input.value === "" || input.value === previous) {
+    input.value = option.dataset.fx || "";
+    input.dataset.prefilled = input.value;
+  }
+  showFxHint(form);
+}
+
+function showFxHint(form) {
+  const input = form.querySelector("[data-fx-input]");
+  const hint = form.querySelector("[data-fx-hint]");
+  if (!(input instanceof HTMLInputElement) || !hint) return;
+  const prefilled = input.dataset.prefilled || "";
+  hint.classList.toggle("hidden", prefilled === "" || input.value !== prefilled);
+}
+
+// A pre-filled stored rate belongs to the form's date. Changing the date clears a rate the user
+// has not touched (it would be the wrong day's rate, frozen into the cost basis), then F6.2a
+// re-fills it with the stored rate for the new date when one exists; a typed rate is kept.
+function dateChanged(form) {
+  form.dataset.fxDateChanged = "1";
+  const input = form.querySelector("[data-fx-input]");
+  if (!(input instanceof HTMLInputElement)) return;
+  const prefilled = input.dataset.prefilled || "";
+  const untouched = input.value === "" || (prefilled !== "" && input.value === prefilled);
+  if (prefilled !== "" && input.value === prefilled) input.value = "";
+  input.dataset.prefilled = "";
+  showFxHint(form);
+  if (untouched) refillStoredFx(form);
+}
+
+for (const eventName of ["change", "input"]) {
+  document.addEventListener(eventName, (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    const form = target.closest("[data-transaction-form]");
+    if (!form) return;
+    if (target.name === "date") dateChanged(form);
+    else if (target.matches("[data-fx-input]")) showFxHint(form);
+  });
+}
+
 document.addEventListener("change", (event) => {
   const select = event.target;
   if (!(select instanceof Element) || !select.matches("[data-transaction-instrument]")) return;
   const form = select.closest("[data-transaction-form]");
-  if (form) updateTransactionForm(form);
+  if (!form) return;
+  updateTransactionForm(form);
+  applyStoredFx(form);
 });
 
 for (const eventName of ["DOMContentLoaded", "htmx:afterSwap", "htmx:oobAfterSwap"]) {
@@ -107,7 +171,7 @@ function updateInstrumentProvider(form) {
 document.addEventListener("change", (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
-  if (!target.matches("#instrument-type, [data-provider-select]")) return;
+  if (!target.matches("select[name=type], [data-provider-select]")) return;
   const form = target.closest("[data-instrument-form]");
   if (form) updateInstrumentProvider(form);
 });
@@ -186,18 +250,20 @@ function updateAmounts(form) {
   }
 }
 
-// F6.2a: re-fill the FX field from stored FX when the date (or the instrument) changes. A rate
-// the user typed is kept: only an empty field or the previous pre-fill is replaced. The
-// endpoint is read-only and scoped to the current workspace.
+// F6.2a: after a date change, re-fill an empty FX field from the stored rate for the new date
+// (read-only, workspace-scoped endpoint). Without a stored rate the field stays empty, so a stale
+// rate never sticks. A rate typed while the request runs is kept; only the latest request counts.
+let fxRequest = 0;
+
 async function refillStoredFx(form) {
   const input = form.querySelector("[data-fx-input]");
   const url = form.dataset.fxUrl;
   if (!(input instanceof HTMLInputElement) || !url) return;
-  const previous = input.dataset.prefilled || "";
-  if (input.value !== "" && input.value !== previous) return;
+  if (input.value !== "" && input.value !== (input.dataset.prefilled || "")) return;
   const instrument = form.querySelector("[name=instrument_id]");
   const day = form.querySelector("[name=date]");
   if (!instrument || !instrument.value || !day || !day.value) return;
+  const ticket = ++fxRequest;
   const query = new URLSearchParams({ instrument_id: instrument.value, date: day.value });
   let data;
   try {
@@ -210,12 +276,13 @@ async function refillStoredFx(form) {
   } catch {
     return;
   }
-  // The user may have typed while the request was running.
-  if (input.value !== "" && input.value !== previous) return;
+  if (ticket !== fxRequest) return;
+  if (input.value !== "" && input.value !== (input.dataset.prefilled || "")) return;
   input.value = data.rate || "";
   input.dataset.prefilled = input.value;
   const hint = form.querySelector("[data-fx-hint]");
-  if (hint) hint.textContent = data.hint || "";
+  if (hint && data.hint) hint.textContent = data.hint;
+  showFxHint(form);
 }
 
 document.addEventListener("change", (event) => {
@@ -224,7 +291,6 @@ document.addEventListener("change", (event) => {
   const form = target.closest("[data-transaction-form]");
   if (!form) return;
   if (target.matches("[data-amounts-radio], [data-transaction-instrument]")) updateAmounts(form);
-  if (target.matches("[name=date], [data-transaction-instrument]")) refillStoredFx(form);
 });
 
 for (const eventName of ["DOMContentLoaded", "htmx:afterSwap", "htmx:oobAfterSwap"]) {

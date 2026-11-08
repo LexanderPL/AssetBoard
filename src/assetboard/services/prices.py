@@ -64,7 +64,6 @@ __all__ = [
     "latest_prices",
     "price_at",
     "save_manual_price",
-    "stored_fx_in_session",
 ]
 
 _DECIMAL_PRECISION = 80
@@ -513,32 +512,6 @@ def fx_rate(
         else:
             source = None
         return FxAt(rate, as_of, source, stale)
-
-
-def stored_fx_in_session(
-    session: Session,
-    ctx: Context,
-    quote_currency: str,
-    base_currency: str,
-    on: date,
-) -> FxAt:
-    """``stored_fx_rates`` for one pair inside an open session, with the rate's date and source.
-
-    F6.2a needs the observation itself (the form hint names its date and source) and needs it
-    inside the write transaction (a blank rate is filled from stored FX on save, and bulk add
-    re-validates every line in its one write). Same rule: latest manual or provider rate on or
-    before ``on``, never ``transaction``.
-    """
-    quote_currency = quote_currency.upper()
-    base_currency = base_currency.upper()
-    if quote_currency == base_currency:
-        return FxAt(Decimal(1), on, None, False)
-    candidates = [
-        _Candidate(row.date, row.source, row.created_at, row.id, row.rate)
-        for row in FxRateRepository(session, ctx).for_base_on_or_before(base_currency, on)
-        if row.quote_currency == quote_currency and row.source != "transaction"
-    ]
-    return _fx_at(_best(candidates), on)
 
 
 def _decimal(value: str, locale: str, field: str) -> Decimal:

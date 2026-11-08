@@ -8,9 +8,9 @@ a buy or restoring a deleted sell. Holdings are never stored; they are recompute
 the workspace's average/FIFO setting.
 
 Fees and unit prices are in the instrument's quote currency. ``fx_to_base`` is resolved on
-write (1 for a base-currency instrument). A non-base instrument needs a rate; a blank rate is
-taken from stored FX for the transaction date (any source except ``transaction``) and refused
-with ``fx_needed`` when none exists (F6.2a).
+write (1 for a base-currency instrument). A non-base instrument needs a rate: the form
+pre-fills it from stored FX, and a blank rate is refused with ``fx_needed``. Bulk add (F6.2a)
+passes an ``fx_lookup`` so a blank rate there is taken from stored FX for the line's date.
 
 F6.2a "amounts in the base currency": in base mode the user enters the unit price and fee in
 the workspace base currency. They are stored as the settlement, and the quote unit price and
@@ -58,7 +58,7 @@ from assetboard.i18n.numbers import parse_amount
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.holding_rows import cost_basis_method, holding_transaction
 from assetboard.services.investments import InstrumentView, get_instrument
-from assetboard.services.prices import FxAt, stored_fx_in_session
+from assetboard.services.prices import stored_fx_rates
 
 __all__ = [
     "DeletedInvestmentTransaction",
@@ -72,7 +72,7 @@ __all__ = [
     "TransactionList",
     "create_transaction",
     "delete_transaction",
-    "fx_prefill",
+    "instrument_fx_currency",
     "instrument_history",
     "list_transactions",
     "undo_delete",
@@ -86,7 +86,8 @@ MAX_YEAR = 2199
 AMOUNTS_QUOTE = "quote"
 AMOUNTS_BASE = "base"
 
-FxLookup = Callable[[date], FxAt]
+# Stored FX (base units per quote unit) for a date, or None when no rate is stored.
+FxLookup = Callable[[date], Decimal | None]
 
 
 class InvestmentTransactionError(Exception):
@@ -193,9 +194,8 @@ class TransactionValues:
     settlement_currency: str | None = None
     settlement_unit_price: Decimal | None = None
     settlement_fee_minor: int | None = None
-    # The stored FX source when a blank rate was filled in, else None (entered or base).
-    fx_source: str | None = None
-    fx_as_of: date | None = None
+    # True when a blank rate was filled in from stored FX (bulk add).
+    fx_stored: bool = False
 
 
 def _type(value: str) -> str:
@@ -269,21 +269,21 @@ def _fx(
     base_currency: str,
     day: date | None,
     lookup: FxLookup | None,
-) -> tuple[Decimal, FxAt | None]:
-    """The rate and, when a blank rate was filled from stored FX, the stored observation."""
+) -> tuple[Decimal, bool]:
+    """The rate, and whether a blank rate was filled in from stored FX."""
     if quote_currency == base_currency:
-        return Decimal(1), None
+        return Decimal(1), False
     text = value.strip()
     if not text:
         if day is not None and lookup is not None:
             stored = lookup(day)
-            if stored.rate is not None and stored.rate > 0:
-                return stored.rate, stored
+            if stored is not None and stored > 0:
+                return stored, True
         raise InvalidInvestmentTransaction("fx_to_base", "fx_needed")
     fx = _decimal(text, locale, "fx_to_base", allow_zero=False, code="invalid_fx")
     if fx <= 0:
         raise InvalidInvestmentTransaction("fx_to_base", "invalid_fx")
-    return fx, None
+    return fx, False
 
 
 def _amounts(value: str, instrument: Instrument, base_currency: str) -> str:
@@ -371,8 +371,7 @@ def transaction_values(
             settlement_currency=base_currency,
             settlement_unit_price=settlement_price,
             settlement_fee_minor=settlement_fee,
-            fx_source=stored.source if stored is not None else None,
-            fx_as_of=stored.as_of if stored is not None else None,
+            fx_stored=stored,
         )
     if instrument.type == "currency":
         unit_price = Decimal(1)
@@ -395,25 +394,20 @@ def transaction_values(
         fee_minor=fee_minor,
         fx_to_base=fx,
         note=note,
-        fx_source=stored.source if stored is not None else None,
-        fx_as_of=stored.as_of if stored is not None else None,
+        fx_stored=stored,
     )
 
 
-def stored_fx_lookup(
-    session: Session, ctx: Context, quote_currency: str, base_currency: str
-) -> FxLookup:
-    """Stored FX (any source except ``transaction``) for one pair, by date."""
+def stored_fx_lookup(factory: sessionmaker[Session], ctx: Context, quote_currency: str) -> FxLookup:
+    """Stored FX for one quote currency by date (``stored_fx_rates``, never transaction FX)."""
 
-    def lookup(day: date) -> FxAt:
-        return stored_fx_in_session(session, ctx, quote_currency, base_currency, day)
+    def lookup(day: date) -> Decimal | None:
+        return stored_fx_rates(factory, ctx, {quote_currency}, day).get(quote_currency.upper())
 
     return lookup
 
 
 def _form_values(
-    session: Session,
-    ctx: Context,
     *,
     instrument: Instrument,
     base_currency: str,
@@ -446,7 +440,6 @@ def _form_values(
         amounts_value=amounts_value,
         base_unit_price_value=base_unit_price_value,
         base_fee_value=base_fee_value,
-        fx_lookup=stored_fx_lookup(session, ctx, instrument.quote_currency, base_currency),
     )
 
 
@@ -740,8 +733,6 @@ def create_transaction(
         if instrument.archived_at is not None:
             raise InstrumentArchived
         values = _form_values(
-            session,
-            ctx,
             instrument=instrument,
             base_currency=base_currency,
             type_value=type_value,
@@ -822,8 +813,6 @@ def update_transaction(
         if instrument.archived_at is not None:
             raise InstrumentArchived
         values = _form_values(
-            session,
-            ctx,
             instrument=instrument,
             base_currency=base_currency,
             type_value=type_value,
@@ -955,16 +944,13 @@ def undo_delete(
     return run_immediate(factory, write)
 
 
-def fx_prefill(
-    factory: sessionmaker[Session],
-    ctx: Context,
-    instrument_id: UUID,
-    on: date,
-) -> FxAt | None:
-    """The stored FX rate to pre-fill for ``instrument_id`` on ``on`` (F6.2a).
+def instrument_fx_currency(
+    factory: sessionmaker[Session], ctx: Context, instrument_id: UUID
+) -> str | None:
+    """The quote currency whose FX the form asks for, or ``None`` for a base-quoted instrument.
 
-    ``None`` when the instrument is quoted in the base currency (no rate is asked). Read-only and
-    workspace-scoped: another workspace's instrument is ``NotFound``.
+    Read-only and workspace-scoped: another workspace's instrument is ``NotFound`` (F6.2a FX
+    re-fill endpoint).
     """
     require_role(ctx, Role.VIEWER)
     with factory() as session:
@@ -972,7 +958,7 @@ def fx_prefill(
         base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
         if instrument.quote_currency == base_currency:
             return None
-        return stored_fx_in_session(session, ctx, instrument.quote_currency, base_currency, on)
+        return instrument.quote_currency
 
 
 def workspace_has_investment_transactions(session: Session, ctx: Context) -> bool:

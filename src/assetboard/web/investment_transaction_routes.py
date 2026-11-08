@@ -23,7 +23,6 @@ from starlette.responses import JSONResponse, RedirectResponse, Response
 from assetboard.db.repositories import NotFound
 from assetboard.domain.money import Money
 from assetboard.domain.networth import sparkline_polyline
-from assetboard.domain.providers import provider_definition
 from assetboard.domain.settlement import base_values_from_quote
 from assetboard.i18n import gettext, ngettext
 from assetboard.i18n.dates import format_day
@@ -47,6 +46,8 @@ from assetboard.services.investment_bulk import (
     preview_bulk,
 )
 from assetboard.services.investment_transactions import (
+    MAX_YEAR,
+    MIN_YEAR,
     InvalidInvestmentTransaction,
     InvestmentTransactionError,
     InvestmentTransactionView,
@@ -55,8 +56,8 @@ from assetboard.services.investment_transactions import (
     TransactionList,
     create_transaction,
     delete_transaction,
-    fx_prefill,
     get_transaction,
+    instrument_fx_currency,
     instrument_history,
     list_transactions,
     undo_delete,
@@ -67,11 +68,11 @@ from assetboard.services.price_refresh import provider_status
 from assetboard.services.price_sources import provider_enabled
 from assetboard.services.prices import (
     DEFAULT_STALE_AFTER_DAYS,
-    FxAt,
     PriceError,
     delete_manual_price,
     instrument_prices,
     save_manual_price,
+    stored_fx_rates,
 )
 from assetboard.web.context import CurrentContext
 from assetboard.web.errors import is_htmx_fragment_request
@@ -284,38 +285,23 @@ def _bond_form_values(
     )
 
 
-def _default_values(instrument: InstrumentView | None, today: date) -> dict[str, str]:
+def _default_values(
+    instrument: InstrumentView | None,
+    today: date,
+    *,
+    unit_price: str = "",
+    fx_to_base: str = "",
+) -> dict[str, str]:
     return {
         "date": today.isoformat(),
         "type": "buy",
         "instrument_id": str(instrument.id) if instrument is not None else "",
         "quantity": "",
-        "unit_price": "",
+        "unit_price": unit_price,
         "fee": "0",
-        "fx_to_base": "",
+        "fx_to_base": fx_to_base,
         "note": "",
     }
-
-
-def _fx_hint(request: Request, stored: FxAt | None) -> str:
-    """The hint under the FX field: the stored rate's date and source, or that none exists."""
-    if stored is None:
-        return ""
-    if stored.rate is None or stored.as_of is None:
-        return _t(request, _("No stored FX rate for this date; enter the rate."))
-    return _t(request, _("Stored rate of %(date)s (%(source)s).")) % {
-        "date": format_day(stored.as_of, request.state.locale),
-        "source": _source_label(request, stored.source or ""),
-    }
-
-
-def _source_label(request: Request, source: str) -> str:
-    definition = provider_definition(source)
-    if definition is not None:
-        return definition.label
-    if source == "manual":
-        return _t(request, _("manual"))
-    return source
 
 
 def _list_notice(request: Request, notice: str | None) -> str | None:
@@ -327,26 +313,42 @@ def _list_notice(request: Request, notice: str | None) -> str | None:
     return _t(request, NOTICES[notice]) if notice in NOTICES else None
 
 
-def _stored_fx(request: Request, ctx: Context, instrument_id: str, on: date) -> FxAt | None:
-    """The stored FX to pre-fill for a form's instrument and date (F6.2a), if a rate is asked."""
+def _form_day(values: dict[str, str] | None, today: date) -> date | None:
+    """The date a create form is for: today on a fresh form, else the submitted date.
+
+    ``None`` when the submitted date is not a usable trade date, so nothing is pre-filled.
+    """
+    if values is None:
+        return today
     try:
-        item = UUID(instrument_id)
+        day = date.fromisoformat(values.get("date", "").strip())
     except ValueError:
         return None
-    try:
-        return fx_prefill(request.app.state.session_factory, ctx, item, on)
-    except NotFound:
-        return None
+    return day if day <= today else None
 
 
-def _prefill_fx(request: Request, ctx: Context, values: dict[str, str], today: date) -> None:
-    """Server-side pre-fill of a new form's FX field and hint (works without JavaScript)."""
-    if not has_role(ctx, Role.EDITOR):
-        return
-    stored = _stored_fx(request, ctx, values.get("instrument_id", ""), today)
-    if stored is not None and stored.rate is not None and not values.get("fx_to_base"):
-        values["fx_to_base"] = format_quantity_input(stored.rate, request.state.locale)
-    values["fx_hint"] = _fx_hint(request, stored)
+def _fx_defaults(
+    request: Request, ctx: Context, instruments: tuple[InstrumentView, ...], on: date | None
+) -> dict[str, str]:
+    """Stored FX on ``on`` for each foreign quote currency, formatted for the FX field.
+
+    The rate a back-dated trade gets is the one stored on or before its own date, never today's:
+    the value is frozen into ``fx_to_base`` and the cost basis.
+    """
+    if on is None or not has_role(ctx, Role.EDITOR):
+        return {}
+    currencies = {
+        item.quote_currency
+        for item in instruments
+        if item.quote_currency != ctx.workspace.base_currency
+    }
+    if not currencies:
+        return {}
+    rates = stored_fx_rates(request.app.state.session_factory, ctx, currencies, on)
+    return {
+        currency: format_quantity_input(rate, request.state.locale)
+        for currency, rate in rates.items()
+    }
 
 
 def _edit_values(
@@ -400,11 +402,12 @@ def _instruments(
 
 
 def _list_values(
-    request: Request, ctx: Context, instruments: tuple[InstrumentView, ...], today: date
+    instruments: tuple[InstrumentView, ...], today: date, fx_defaults: dict[str, str]
 ) -> dict[str, str]:
     values = _default_values(None, today)
     if instruments:
         values["instrument_id"] = str(instruments[0].id)
+        values["fx_to_base"] = fx_defaults.get(instruments[0].quote_currency, "")
     return values
 
 
@@ -450,6 +453,8 @@ def _list_page(
     locale = request.state.locale
     today = ctx.clock.today(ctx.workspace.timezone)
     active_instruments, instruments = _instruments(factory, ctx, locale)
+    fx_day = _form_day(create_values, today)
+    fx_defaults = _fx_defaults(request, ctx, active_instruments, fx_day)
     filters = _filter_values(request)
     page_number = _int(request.query_params.get("page", "1"))
     try:
@@ -467,9 +472,6 @@ def _list_page(
     except InvestmentTransactionError as exc:
         result = EMPTY
         error = error or _error_text(request, exc)
-    if create_values is None:
-        create_values = _list_values(request, ctx, active_instruments, today)
-        _prefill_fx(request, ctx, create_values, today)
     editing_view: InvestmentTransactionView | None = None
     if editing is not None:
         try:
@@ -482,7 +484,9 @@ def _list_page(
         "instruments": instruments,
         "active_instruments": active_instruments,
         "filters": filters,
-        "create_values": create_values,
+        "create_values": create_values or _list_values(active_instruments, today, fx_defaults),
+        "fx_defaults": fx_defaults,
+        "fx_prefill_date": format_day(fx_day, locale) if fx_day is not None else None,
         "create_errors": {
             field: _t(request, message) for field, message in (create_errors or {}).items()
         },
@@ -505,7 +509,6 @@ def _list_page(
         if bulk_error in BULK_INPUT_ERRORS
         else None,
         "bulk_error_labels": {code: _t(request, label) for code, label in BULK_ERRORS.items()},
-        "fx_source_label": lambda source: _source_label(request, source),
         "toast_undo": toast_undo,
         "toast_seconds": toast_seconds,
         "toast_message": _t(request, NOTICES["deleted"]) if toast_undo else None,
@@ -610,7 +613,19 @@ def _history_page(
         "editing_price": editing_price,
         "price_sparkline": sparkline_polyline([point.price for point in prices.effective]),
         "default_stale_after_days": DEFAULT_STALE_AFTER_DAYS,
-        "create_values": create_values or _history_defaults(request, ctx, history, today),
+        "create_values": create_values
+        or _default_values(
+            history.instrument,
+            today,
+            unit_price=(
+                format_amount_input(bond.terms.face_value, locale) if bond is not None else ""
+            ),
+            fx_to_base=_fx_defaults(request, ctx, (history.instrument,), today).get(
+                history.instrument.quote_currency, ""
+            ),
+        ),
+        # Only a fresh form is pre-filled (for today); a refused one keeps what was submitted.
+        "fx_prefill_date": format_day(today, locale) if create_values is None else None,
         "create_errors": {
             field: _t(request, message) for field, message in (create_errors or {}).items()
         },
@@ -643,12 +658,6 @@ def _history_page(
     response = render_template(request, template, context=context, status_code=status_code)
     response.headers["Vary"] = "HX-Request"
     return response
-
-
-def _history_defaults(request: Request, ctx: Context, history: Any, today: date) -> dict[str, str]:
-    values = _default_values(history.instrument, today)
-    _prefill_fx(request, ctx, values, today)
-    return values
 
 
 def _render_history(request: Request, ctx: Context, instrument_id: UUID, **kwargs: Any) -> Response:
@@ -881,24 +890,33 @@ async def fx_rate_lookup(
     """
     item = _parse_uuid(instrument_id)
     today = ctx.clock.today(ctx.workspace.timezone)
+    currency = await run_in_threadpool(
+        instrument_fx_currency, request.app.state.session_factory, ctx, item
+    )
     try:
-        day = date_type.fromisoformat(date) if date else today
+        day: date | None = date_type.fromisoformat(date)
     except ValueError:
-        day = today
-    day = min(day, today)
-    stored = await run_in_threadpool(fx_prefill, request.app.state.session_factory, ctx, item, day)
-    rate = (
-        format_quantity_input(stored.rate, request.state.locale)
-        if stored is not None and stored.rate is not None
+        day = None
+    if day is not None and not MIN_YEAR <= day.year <= MAX_YEAR or day is not None and day > today:
+        day = None
+    rate = ""
+    if currency is not None and day is not None:
+        rates = await run_in_threadpool(
+            stored_fx_rates, request.app.state.session_factory, ctx, {currency}, day
+        )
+        if currency in rates:
+            rate = format_quantity_input(rates[currency], request.state.locale)
+    hint = (
+        _t(request, _("Stored rate for %(date)s")) % {"date": format_day(day, request.state.locale)}
+        if rate and day is not None
         else ""
     )
     response = JSONResponse(
         {
-            "asked": stored is not None,
+            "asked": currency is not None,
             "rate": rate,
-            "as_of": stored.as_of.isoformat() if stored and stored.as_of else "",
-            "source": (stored.source or "") if stored is not None else "",
-            "hint": _fx_hint(request, stored),
+            "date": day.isoformat() if day is not None else "",
+            "hint": hint,
         }
     )
     response.headers["Cache-Control"] = "no-store"

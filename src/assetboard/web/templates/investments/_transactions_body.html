@@ -19,7 +19,7 @@
     <h2 id="transaction-form-heading" class="text-base font-semibold">{{ _("Add a transaction") }}</h2>
     {% if active_instruments %}
     <div class="mt-4">
-      {{ transaction_form(scoped_url(request, 'investment_transaction_create'), create_values, create_errors, target, base_currency, instruments=active_instruments, submit_label=_("Add transaction")) }}
+      {{ transaction_form(scoped_url(request, 'investment_transaction_create'), create_values, create_errors, target, base_currency, instruments=active_instruments, submit_label=_("Add transaction"), prefill_date=fx_prefill_date) }}
     </div>
     {% else %}
     <p class="mt-2 text-sm text-muted">{{ _("Add an active instrument first.") }} <a href="{{ scoped_url(request, 'investments_instruments') }}" class="text-primary-ink underline">{{ _("Instruments") }}</a></p>
@@ -63,7 +63,7 @@
               <td class="whitespace-nowrap text-right tabular-nums">{{ format_quantity_input(line.quantity, locale) }}</td>
               <td class="whitespace-nowrap text-right tabular-nums">{{ format_quantity_input(line.unit_price, locale) }} {{ line.entry_currency }}</td>
               <td class="whitespace-nowrap text-right tabular-nums">{{ format_money(line.fee, locale) }}</td>
-              <td class="whitespace-nowrap text-right tabular-nums">{{ format_quantity_input(line.fx_to_base, locale) }}{% if line.fx_source %}<span class="block text-muted" data-bulk-fx-source>{{ _("stored, %(date)s, %(source)s", date=format_day(line.fx_as_of, locale), source=fx_source_label(line.fx_source)) }}</span>{% endif %}</td>
+              <td class="whitespace-nowrap text-right tabular-nums">{{ format_quantity_input(line.fx_to_base, locale) }}{% if line.fx_stored %}<span class="block text-muted" data-bulk-fx-source>{{ _("Stored rate for %(date)s", date=format_day(line.day, locale)) }}</span>{% endif %}</td>
               <td class="whitespace-nowrap text-right tabular-nums">{% if line.total %}{{ format_money(line.total, locale) }}{% endif %}</td>
               {% else %}
               <td colspan="8" class="break-words font-mono text-muted">{{ line.text }}</td>

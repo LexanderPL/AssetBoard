@@ -2256,21 +2256,15 @@ msgstr ""
 msgid "an undated transaction"
 msgstr ""
 
-msgid "No stored FX rate for this date; enter the rate."
-msgstr ""
-
-#, python-format
-msgid "Stored rate of %(date)s (%(source)s)."
-msgstr ""
-
-msgid "manual"
-msgstr ""
-
 #, fuzzy, python-format
 msgid "%(num)d transaction added."
 msgid_plural "%(num)d transactions added."
 msgstr[0] ""
 msgstr[1] ""
+
+#, python-format
+msgid "Stored rate for %(date)s"
+msgstr ""
 
 msgid ""
 "This invitation link is not valid. It may have expired, been used or been"
@@ -4823,70 +4817,6 @@ msgid ""
 "chosen for new allocations."
 msgstr ""
 
-msgid "Undo"
-msgstr ""
-
-msgid "Back to instruments"
-msgstr ""
-
-msgid "Average cost"
-msgstr ""
-
-msgid "Cost basis"
-msgstr ""
-
-msgid "Realized P&L"
-msgstr ""
-
-msgid "Add a transaction"
-msgstr ""
-
-msgid "Add transaction"
-msgstr ""
-
-msgid ""
-"This instrument is archived. Restore it before adding or changing "
-"transactions."
-msgstr ""
-
-msgid "Transaction history"
-msgstr ""
-
-#, python-format
-msgid "Transactions of %(name)s"
-msgstr ""
-
-msgid "FX"
-msgstr ""
-
-msgid "Note"
-msgstr ""
-
-msgid "No transactions for this instrument yet."
-msgstr ""
-
-msgid ""
-"Add the suggested asset classes before creating instruments; every "
-"instrument's value is split across them."
-msgstr ""
-
-msgid "Record what you hold and how its value is split across asset classes."
-msgstr ""
-
-msgid ""
-"Bond terms are needed before this instrument can be valued. Open the "
-"instrument to add them; you can record purchases now."
-msgstr ""
-
-msgid "No active instruments."
-msgstr ""
-
-msgid "Edit instrument"
-msgstr ""
-
-msgid "Add an instrument"
-msgstr ""
-
 msgid "Symbol"
 msgstr ""
 
@@ -4981,6 +4911,70 @@ msgid "Weights must total exactly 100%%."
 msgstr ""
 
 msgid "Save instrument"
+msgstr ""
+
+msgid "Undo"
+msgstr ""
+
+msgid "Back to instruments"
+msgstr ""
+
+msgid "Average cost"
+msgstr ""
+
+msgid "Cost basis"
+msgstr ""
+
+msgid "Realized P&L"
+msgstr ""
+
+msgid "Add a transaction"
+msgstr ""
+
+msgid "Add transaction"
+msgstr ""
+
+msgid ""
+"This instrument is archived. Restore it before adding or changing "
+"transactions."
+msgstr ""
+
+msgid "Transaction history"
+msgstr ""
+
+#, python-format
+msgid "Transactions of %(name)s"
+msgstr ""
+
+msgid "FX"
+msgstr ""
+
+msgid "Note"
+msgstr ""
+
+msgid "No transactions for this instrument yet."
+msgstr ""
+
+msgid ""
+"Add the suggested asset classes before creating instruments; every "
+"instrument's value is split across them."
+msgstr ""
+
+msgid "Add instrument"
+msgstr ""
+
+msgid "Add an instrument"
+msgstr ""
+
+msgid "Record what you hold and how its value is split across asset classes."
+msgstr ""
+
+msgid ""
+"Bond terms are needed before this instrument can be valued. Open the "
+"instrument to add them; you can record purchases now."
+msgstr ""
+
+msgid "No active instruments."
 msgstr ""
 
 msgid "Archived instruments"
@@ -5281,6 +5275,11 @@ msgid ""
 "priced at 1."
 msgstr ""
 
+msgid ""
+"What you paid per bond (cost basis). Face value is the nominal the "
+"interest accrues on, e.g. 99.90 paid for a 100 bond on a rollover."
+msgstr ""
+
 #, python-format
 msgid "Unit price in %(currency)s"
 msgstr ""
@@ -5350,10 +5349,6 @@ msgid "Total in %(currency)s"
 msgstr ""
 
 msgid "Problems"
-msgstr ""
-
-#, python-format
-msgid "stored, %(date)s, %(source)s"
 msgstr ""
 
 msgid "Ready"
@@ -7957,5 +7952,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "CoinGecko id, EODHD ticker, or XAU for NBP gold."
+#~ msgstr ""
+
+#~ msgid "Edit instrument"
 #~ msgstr ""
 

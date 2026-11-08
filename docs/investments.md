@@ -90,6 +90,11 @@ the current period's accrued interest and resets when a coupon is paid; `at_matu
 adds simple interest. At or after maturity the value freezes and equals the projected net at
 maturity.
 
+**Face value vs. unit price.** The face value (in the terms) is the nominal the interest accrues
+on. The **unit price** of a transaction is what you actually paid per bond, your cost basis: for
+example 99.90 paid for a 100 bond on a rollover. Once terms exist, the transaction form starts
+with the face value as the unit price; change it when you paid something else.
+
 Sells consume the oldest purchase lots first for interest entitlement, regardless of the
 workspace cost-basis setting. The projected value at maturity excludes the early-redemption fee.
 Coupons paid out annually are not part of the bond value; record them as income in the ledger.
@@ -114,11 +119,12 @@ Open an instrument by clicking its name, or use the **Transactions** tab, to rec
 - **Fee** — in the same quote currency, with no more decimal places than the currency has. A
   sell's fee may be larger than its gross amount; the difference is a realized loss.
 - **FX rate to the base currency** — required when the instrument is quoted in another currency;
-  hidden and stored as 1 for a base-currency instrument. The field is pre-filled with the stored
-  FX rate (manual or provider, never one derived from your own transactions) for the
-  transaction's date, and a hint names that rate's date and source. Changing the date or the
-  instrument re-fills it unless you typed your own rate. If you leave it blank, the stored rate
-  for the date is used when you save; when there is none, the form asks for the rate.
+  hidden and stored as 1 for a base-currency instrument. A new transaction starts with the
+  stored rate for its date (the latest manual or provider rate on or before that date, marked
+  "Stored rate for …") when one exists; you can change it. Changing the date re-fills a rate you
+  have not touched with the stored rate for the new date, or clears it when none is stored, so
+  a back-dated trade never keeps today's rate by accident; a rate you typed stays. Leaving it
+  empty shows an error on the field and keeps everything you entered.
 - **Note** — optional, up to 200 characters.
 
 ### Amounts in the base currency
@@ -173,7 +179,7 @@ date; instrument; type; quantity; unit price; fee; fx; amounts currency
   currency code for [amounts in the base currency](#amounts-in-the-base-currency). Any other code
   is an error.
 - **fx** — needed for an instrument quoted in another currency. Leave it blank to use the stored
-  rate for the date (the preview shows its date and source); without one the line says
+  rate for the date (the preview marks it "Stored rate for …"); without one the line says
   *FX rate needed*. For a base-currency instrument it must be blank or 1.
 
 Example (base currency PLN):

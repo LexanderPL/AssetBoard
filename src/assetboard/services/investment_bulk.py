@@ -11,6 +11,7 @@ writes nothing unless every line is valid. Hidden preview fields are never trust
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -50,6 +51,7 @@ from assetboard.services.holding_rows import cost_basis_method, holding_transact
 from assetboard.services.investment_transactions import (
     AMOUNTS_BASE,
     AMOUNTS_QUOTE,
+    FxLookup,
     InvalidInvestmentTransaction,
     InvestmentTransactionError,
     OversellRejected,
@@ -97,9 +99,8 @@ class BulkLine:
     entry_currency: str = ""
     amounts: str = AMOUNTS_QUOTE
     fx_to_base: Decimal | None = None
-    # The stored FX source when the rate was filled in, else "" (entered, or 1 for the base).
-    fx_source: str = ""
-    fx_as_of: date | None = None
+    # True when a blank rate was taken from stored FX for the line's date.
+    fx_stored: bool = False
     total: Money | None = None
     values: TransactionValues | None = None
 
@@ -157,8 +158,7 @@ def _matches(instruments: list[Instrument], wanted: str) -> list[Instrument]:
 
 
 def _resolve_line(
-    session: Session,
-    ctx: Context,
+    fx_lookups: Callable[[str], FxLookup],
     raw_number: int,
     raw_text: str,
     *,
@@ -214,7 +214,7 @@ def _resolve_line(
             amounts_value=amounts,
             base_unit_price_value=unit_price,
             base_fee_value=fee or "0",
-            fx_lookup=stored_fx_lookup(session, ctx, quote, base_currency),
+            fx_lookup=fx_lookups(quote),
         )
     except InvalidInvestmentTransaction as exc:
         return error(exc.code)
@@ -241,8 +241,7 @@ def _resolve_line(
         entry_currency=entry_currency,
         amounts=amounts,
         fx_to_base=values.fx_to_base,
-        fx_source=values.fx_source or "",
-        fx_as_of=values.fx_as_of,
+        fx_stored=values.fx_stored,
         values=values,
     )
 
@@ -269,6 +268,7 @@ def _holding_input(
 
 
 def _build_preview(
+    factory: sessionmaker[Session],
     session: Session,
     ctx: Context,
     *,
@@ -284,6 +284,21 @@ def _build_preview(
     active = [item for item in instruments if item.archived_at is None]
     archived = [item for item in instruments if item.archived_at is not None]
     order, separator = short_date_order(locale)
+    lookups: dict[str, FxLookup] = {}
+    cache: dict[tuple[str, date], Decimal | None] = {}
+
+    def fx_lookups(quote: str) -> FxLookup:
+        if quote not in lookups:
+            stored = stored_fx_lookup(factory, ctx, quote)
+
+            def cached(day: date) -> Decimal | None:
+                if (quote, day) not in cache:
+                    cache[(quote, day)] = stored(day)
+                return cache[(quote, day)]
+
+            lookups[quote] = cached
+        return lookups[quote]
+
     raw_lines, problems = split_transaction_lines(
         text, order=order, separator=separator, today=today
     )
@@ -294,8 +309,7 @@ def _build_preview(
     for raw in raw_lines:
         lines.append(
             _resolve_line(
-                session,
-                ctx,
+                fx_lookups,
                 raw.number,
                 raw.text,
                 day=raw.day,
@@ -373,8 +387,7 @@ def _with_total(line: BulkLine, total: Money) -> BulkLine:
         entry_currency=line.entry_currency,
         amounts=line.amounts,
         fx_to_base=line.fx_to_base,
-        fx_source=line.fx_source,
-        fx_as_of=line.fx_as_of,
+        fx_stored=line.fx_stored,
         total=total,
         values=line.values,
     )
@@ -395,8 +408,7 @@ def _with_error(line: BulkLine, code: str) -> BulkLine:
         entry_currency=line.entry_currency,
         amounts=line.amounts,
         fx_to_base=line.fx_to_base,
-        fx_source=line.fx_source,
-        fx_as_of=line.fx_as_of,
+        fx_stored=line.fx_stored,
         total=line.total,
         values=line.values,
     )
@@ -411,7 +423,7 @@ def preview_bulk(
     today = ctx.clock.today(ctx.workspace.timezone)
     with factory() as session:
         return _build_preview(
-            session, ctx, text=text, locale=locale, today=today, now=ctx.clock.now()
+            factory, session, ctx, text=text, locale=locale, today=today, now=ctx.clock.now()
         )
 
 
@@ -435,7 +447,9 @@ def create_bulk(factory: sessionmaker[Session], ctx: Context, *, text: str, loca
         for item in instruments.ordered():
             if item.archived_at is None:
                 instruments.get_for_update(item.id)
-        preview = _build_preview(session, ctx, text=text, locale=locale, today=today, now=now)
+        preview = _build_preview(
+            factory, session, ctx, text=text, locale=locale, today=today, now=now
+        )
         if not preview.can_create:
             raise BulkRejected(preview)
         workspace = CurrentWorkspaceRepository(session, ctx).get()

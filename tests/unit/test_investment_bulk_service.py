@@ -209,19 +209,36 @@ def test_currency_instruments_ignore_the_price_and_base_quoted_fx_may_be_one(
     assert cash.unit_price == Decimal(1) and cash.settlement_currency is None
 
 
-def test_a_blank_fx_is_filled_from_stored_fx_and_shows_its_source(
+def test_a_blank_fx_is_filled_from_stored_fx_and_marked_as_stored(
     team: WorkspaceDb, ctx: Context
 ) -> None:
     _instrument(team, ctx, "US ETF", quote_currency="USD")
     _stored_rate(team, ctx, "USD", date(2026, 1, 2), "0.9")
     preview = preview_bulk(team.factory, ctx, text="2026-01-05; US ETF; buy; 2; 100", locale="en")
     [line] = preview.lines
-    assert (line.fx_to_base, line.fx_source, line.fx_as_of) == (
-        Decimal("0.9"),
-        "ecb",
-        date(2026, 1, 2),
-    )
+    assert (line.fx_to_base, line.fx_stored) == (Decimal("0.9"), True)
     assert line.total == Money(18_000, "EUR")
+
+
+def test_a_transaction_fx_rate_never_fills_a_blank_bulk_rate(
+    team: WorkspaceDb, ctx: Context
+) -> None:
+    us = _instrument(team, ctx, "US ETF", quote_currency="USD")
+    create_transaction(
+        team.factory,
+        ctx,
+        instrument_id=us,
+        type_value="buy",
+        date_value="2026-01-02",
+        quantity_value="1",
+        unit_price_value="10",
+        fee_value="0",
+        fx_value="0.7",
+        note_value="",
+        locale="en",
+    )
+    preview = preview_bulk(team.factory, ctx, text="2026-01-05; US ETF; buy; 2; 100", locale="en")
+    assert preview.lines[0].errors == ("fx_needed",)
 
 
 def test_polish_locale_numbers_dates_and_aliases(team: WorkspaceDb, ctx: Context) -> None:

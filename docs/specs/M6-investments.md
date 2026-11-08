@@ -48,7 +48,7 @@ Tests: allocation validation, archive rules, tenant isolation test passes.
 **Acceptance**
 - Transaction form (buy/sell): date, instrument, quantity, unit price (instrument currency), fee, optional FX-to-base override, note. The form is usable on the global history page and on an instrument's page. Inline editing in a per-instrument history table and a global history page with filters.
 - A currency instrument's unit price is always **1**; the service ignores a submitted value. Its value in base comes from FX, as recorded in F6.1.
-- **FX before F6.3:** when the instrument's `quote_currency` equals the workspace base currency, `fx_to_base` is stored as `1` and the field is not shown. Otherwise the rate is required and must be `> 0`; F6.3 will pre-fill it from stored FX, at which point the spec's “defaults to stored FX” applies. The resolved rate is stored so historical FX is frozen.
+- **FX before F6.3:** when the instrument's `quote_currency` equals the workspace base currency, `fx_to_base` is stored as `1` and the field is not shown. Otherwise the rate is required and must be `> 0`; F6.3 will pre-fill it from stored FX, at which point the spec's “defaults to stored FX” applies. The resolved rate is stored so historical FX is frozen. (Implemented: a new transaction's FX field starts with the latest stored manual or provider rate on or before the form's date, today on a fresh form; transaction-derived rates are not used, a refused form keeps the submitted value, changing the date clears an untouched pre-fill, and the user can change it.)
 - **Pure domain function** `compute_holdings(transactions, method, as_of) -> list[Holding]` with one `Holding(instrument_id, quantity, cost_basis_base, avg_cost, realized_pnl)` per instrument, grouped by instrument. Cost basis methods: `average` and `fifo` (workspace setting; default `average`). `avg_cost` is base currency per unit. Sells reduce quantity and realize P&L; selling more than held is rejected.
 - **Oversell is checked across the whole ordered history on every write** — create, update, delete and undo. Inside the write transaction (workspace lock and role re-check) the service rebuilds that instrument's ordered transactions as they would be after the change, runs `compute_holdings`, and refuses with `oversell` naming the date of the first failing sell. This covers editing an earlier buy, back-dating a sell, deleting a buy and restoring a deleted sell.
 - Total cost of a buy = `(quantity × unit_price + fee) × fx_to_base`, rounded half-up to base minor units once per transaction. Sell proceeds = `(quantity × unit_price − fee) × fx_to_base`, also rounded once; a sell fee may exceed the gross, so proceeds and realized P&L can be negative.
@@ -118,11 +118,14 @@ are the instrument's quote currency and the base currency, translatable.
   - When no stored rate exists the field stays empty and is required.
   - Re-filling for a changed date (or instrument) uses a small CSP-safe script in
     `static/js/investments.js` that calls a read-only, workspace-scoped JSON endpoint
-    (`GET /investments/fx-rate?instrument_id=…&date=…`); a rate the user typed is kept. (As
-    built: the app's other investment forms use plain delegated listeners in that file, not
-    Alpine components, so this follows them.) With JavaScript off, the server pre-fills on the
-    first render. On save, a blank rate is taken from stored FX for the transaction date (as in
-    bulk add); when none exists the form returns the inline error "FX rate needed".
+    (`GET /investments/fx-rate?instrument_id=…&date=…`, built on `stored_fx_rates`). An
+    untouched pre-fill is cleared at once and then re-filled with the new date's stored rate
+    when one exists; a rate the user typed is kept. (As built: the app's other investment forms
+    use plain delegated listeners in that file, not Alpine components, so this follows them.)
+    With JavaScript off, the server pre-fills on the first render, and when the rate is missing
+    the form returns the inline error.
+  - As built (#243): the hint reads "Stored rate for {date}" (the form's date) rather than
+    naming the observation's own date and source; `stored_fx_rates` returns only the rate.
 
 **What is stored in base mode** (exact `Decimal`, 80-digit `localcontext`):
 - `settlement_currency` = base

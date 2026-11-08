@@ -1,0 +1,127 @@
+{% from "investments/_macros.html" import error as field_error, swatch with context %}
+{% from "macros/components.html" import csrf_input with context %}
+{# The instrument form (F6.1), shared by the add form (in a disclosure above the list) and the
+   inline edit form (in the instrument's row). ``prefix`` keeps the element ids unique when both
+   are on the page; ``swap`` is the HTMX swap with the element to show afterwards; the caller
+   renders the cancel control next to the save button. #}
+{% macro instrument_form(prefix, action, swap, values, errors, rows, editing_instrument=None) -%}
+<form id="{{ prefix }}-form" method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#investments-body" hx-swap="{{ swap }}" class="space-y-5" novalidate data-allocation-editor data-instrument-form data-decimal-separator="{{ decimal_separator }}">
+  {{ csrf_input() }}
+  <div class="grid gap-4 sm:grid-cols-2">
+    <div class="space-y-1.5">
+      <label for="{{ prefix }}-name" class="block text-sm font-medium">{{ _("Name") }}</label>
+      <input id="{{ prefix }}-name" name="name" type="text" value="{{ values.name }}" maxlength="{{ max_name_length }}" required autocomplete="off" class="form-control w-full px-3 py-2">
+      {{ field_error(errors, "name") }}
+    </div>
+    <div class="space-y-1.5">
+      <label for="{{ prefix }}-symbol" class="block text-sm font-medium">{{ _("Symbol") }}</label>
+      <input id="{{ prefix }}-symbol" name="symbol" type="text" value="{{ values.symbol }}" maxlength="{{ max_symbol_length }}" autocomplete="off" class="form-control w-full px-3 py-2">
+      <p class="text-xs text-muted">{{ _("Optional, for example VWCE.DE or BTC.") }}</p>
+      {{ field_error(errors, "symbol") }}
+    </div>
+    {% set locked = editing_instrument and editing_instrument.has_transactions %}
+    <div class="space-y-1.5">
+      <label for="{{ prefix }}-type" class="block text-sm font-medium">{{ _("Type") }}</label>
+      {% if locked %}
+      <input type="hidden" name="type" value="{{ values.type }}">
+      <select id="{{ prefix }}-type" disabled class="form-select w-full py-2">
+        {% for value, label in type_options %}<option value="{{ value }}"{% if value == values.type %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <p class="text-xs text-muted">{{ _("Locked: transactions exist. Their prices and fees depend on the instrument type.") }}</p>
+      {% else %}
+      <select id="{{ prefix }}-type" name="type" class="form-select w-full py-2">
+        {% for value, label in type_options %}<option value="{{ value }}"{% if value == values.type %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <p class="text-xs text-muted">{{ _("Bond (model value) instruments need terms before they can be valued; you can record purchases now.") }}</p>
+      {% endif %}
+      {{ field_error(errors, "type") }}
+    </div>
+    <div class="space-y-1.5">
+      <label for="{{ prefix }}-currency" class="block text-sm font-medium">{{ _("Quote currency") }}</label>
+      {% if locked %}
+      <input type="hidden" name="quote_currency" value="{{ values.quote_currency }}">
+      <select id="{{ prefix }}-currency" disabled class="form-select w-full py-2">
+        {% for code in currency_options %}<option value="{{ code }}"{% if code == values.quote_currency %} selected{% endif %}>{{ code }}</option>{% endfor %}
+      </select>
+      <p class="text-xs text-muted">{{ _("Locked: transactions exist. Their prices and fees are stored in this currency.") }}</p>
+      {% else %}
+      <select id="{{ prefix }}-currency" name="quote_currency" class="form-select w-full py-2">
+        {% for code in currency_options %}<option value="{{ code }}"{% if code == values.quote_currency %} selected{% endif %}>{{ code }}</option>{% endfor %}
+      </select>
+      <p class="text-xs text-muted">{{ _("Unit prices and fees are in this currency.") }}</p>
+      {% endif %}
+      {{ field_error(errors, "quote_currency") }}
+    </div>
+    <div class="space-y-1.5 sm:col-span-2">
+      <label for="{{ prefix }}-unit" class="block text-sm font-medium">{{ _("Unit label") }}</label>
+      <input id="{{ prefix }}-unit" name="unit_label" type="text" value="{{ values.unit_label }}" maxlength="{{ max_unit_label_length }}" autocomplete="off" class="form-control w-full px-3 py-2">
+      <p class="text-xs text-muted">{{ _("Leave empty for the type's default (share, coin, oz, property). A currency instrument always uses its currency code.") }}</p>
+      {{ field_error(errors, "unit_label") }}
+    </div>
+  </div>
+
+  <fieldset class="space-y-3" data-provider-fields>
+    <legend class="text-sm font-medium">{{ _("Price source") }}</legend>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <div class="space-y-1.5">
+        <label for="{{ prefix }}-provider" class="block text-sm font-medium">{{ _("Provider") }}</label>
+        <select id="{{ prefix }}-provider" name="provider_key" class="form-select w-full py-2" data-provider-select>
+          <option value=""{% if not values.provider_key %} selected{% endif %}>{{ _("Manual prices") }}</option>
+          {% for choice in provider_choices %}
+          <option value="{{ choice.definition.key }}"{% if values.provider_key == choice.definition.key %} selected{% endif %}>{{ choice.definition.label }}{% if not choice.enabled %} ({{ _("disabled") }}){% endif %}</option>
+          {% endfor %}
+        </select>
+        <p class="text-xs text-muted">{{ _("Manual prices always win; a provider fills the gaps for held instruments.") }}</p>
+        {{ field_error(errors, "provider_key") }}
+      </div>
+      <div class="space-y-1.5">
+        <label for="{{ prefix }}-provider-symbol" class="block text-sm font-medium">{{ _("Provider symbol") }}</label>
+        <input id="{{ prefix }}-provider-symbol" name="provider_symbol" type="text" value="{{ values.provider_symbol }}" maxlength="64" autocomplete="off" class="form-control w-full px-3 py-2">
+        <p class="text-xs text-muted">{{ _("CoinGecko id, EODHD ticker, GoldAPI metal (XAU/XAG/XPT/XPD), or XAU for NBP gold.") }}</p>
+        <p class="text-xs text-muted">{{ _("EODHD prices come in the exchange currency; set the instrument currency to match (VWCE.DE is quoted in EUR).") }}</p>
+        {{ field_error(errors, "provider_symbol") }}
+      </div>
+    </div>
+    <div class="flex flex-wrap items-center gap-2">
+      <button type="button" hx-post="{{ scoped_url(request, 'investment_provider_lookup') }}" hx-target="next [data-provider-lookup]" hx-swap="outerHTML" hx-include="closest form" class="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-subtle" data-provider-lookup-button>{{ _("Test lookup") }}</button>
+      <div data-provider-lookup></div>
+    </div>
+  </fieldset>
+
+  <fieldset class="space-y-2">
+    <legend class="text-sm font-medium">{{ _("Allocation") }}</legend>
+    <p class="text-xs text-muted">{{ _("How much of this instrument's value belongs to each asset class. Use 0 to leave a class out; the weights must total exactly 100%%.") }}</p>
+    <div class="overflow-x-auto">
+      <table class="sheet w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs text-muted">
+            <th scope="col" class="py-1.5 pr-2 font-medium">{{ _("Asset class") }}</th>
+            <th scope="col" class="w-32 py-1.5 pl-2 text-right font-medium">{{ _("Weight (%%)") }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for asset_class, weight, archived in rows %}
+          <tr data-allocation-row>
+            <th scope="row" class="py-1.5 pr-2 text-left font-normal">
+              <span class="inline-flex items-center gap-2">{{ swatch(asset_class.color) }}<span>{{ asset_class.name }}</span>{% if archived %}<span class="text-xs text-warning-strong">({{ _("archived") }})</span>{% endif %}</span>
+            </th>
+            <td class="py-1.5 pl-2 text-right">
+              <label for="{{ prefix }}-weight-{{ asset_class.id }}" class="sr-only">{{ _("Weight for %(name)s", name=asset_class.name) }}</label>
+              <input id="{{ prefix }}-weight-{{ asset_class.id }}" name="weight_{{ asset_class.id }}" type="text" inputmode="decimal" value="{{ weight }}" data-allocation-weight class="form-control w-28 px-2 py-1 text-right tabular-nums">
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {{ field_error(errors, "allocation") }}
+    <p class="text-sm text-muted">{{ _("Total") }}: <span data-allocation-total class="font-semibold tabular-nums">—</span></p>
+    <p class="hidden text-sm text-danger" data-allocation-warning role="alert">{{ _("Weights must total exactly 100%%.") }}</p>
+  </fieldset>
+
+  <div class="flex flex-wrap items-center gap-2">
+    <button type="submit" data-allocation-submit class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Save instrument") }}</button>
+    {{ caller() }}
+  </div>
+</form>
+{%- endmacro %}
