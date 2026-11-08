@@ -143,14 +143,23 @@ threshold are flagged the same way as prices. There is no FX entry form yet.
 
 ## Price providers
 
-Provider access is **opt-in per workspace** and only an owner can change it. The first update
-ships **NBP** and **ECB**:
+Provider access is **opt-in per workspace** and only an owner can change providers or keys.
+Editors can assign an enabled provider to an instrument and run **Test lookup**.
 
 - **NBP** publishes PLN-based FX tables and the official gold price in PLN per gram. Gold is
   converted to troy ounces for the default metal unit; an instrument using NBP gold must be
-  quoted in PLN.
+  quoted in PLN and uses the symbol `XAU`.
 - **ECB** publishes EUR-based reference rates. ECB quotes "currency units per EUR", so the app
   inverts them to the project convention.
+- **CoinGecko** quotes crypto directly in USD, EUR or PLN; the provider symbol is the CoinGecko
+  coin id, for example `bitcoin`. A demo API key is optional. The required
+  "Powered by CoinGecko" badge appears while the provider is enabled.
+- **EODHD** is the optional keyed equities/ETFs path; the provider symbol is the ticker with its
+  exchange suffix, for example `VWCE.DE`. Its free tier has a **daily call budget** (20 by
+  default, counted per UTC day per workspace). The app refreshes latest prices first and spends
+  remaining calls on history; when the budget is used up it skips the rest and keeps the last
+  known prices. Coverage of GPW, XETRA and LSE symbols is unverified until tested with a real
+  key.
 
 Both providers are converted into the workspace base currency before they are stored whenever
 the provider publishes that base. For example, NBP in a EUR workspace stores
@@ -172,7 +181,11 @@ A failed refresh keeps the last known price. The failure is recorded in `provide
 (pruned after 90 days) and the instrument shows a provider-error badge with the age of its last
 known price. Manual prices still win; transactions continue to fill gaps.
 
-CoinGecko and EODHD arrive in the next update.
+History is backfilled once from each instrument's first transaction date. CoinGecko's
+public/demo API and Basic plan limit how far back history goes (the current Basic plan is
+restricted to the past two years per its documentation); the app requests `days=max`, stops at
+whatever the plan returns, and records a **history limited** note instead of retrying forever.
+EODHD history uses adjusted closes, so splits and distributions do not create false price jumps.
 
 ## Allocation
 
