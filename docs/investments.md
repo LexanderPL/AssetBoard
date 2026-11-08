@@ -90,6 +90,11 @@ the current period's accrued interest and resets when a coupon is paid; `at_matu
 adds simple interest. At or after maturity the value freezes and equals the projected net at
 maturity.
 
+**Face value vs. unit price.** The face value (in the terms) is the nominal the interest accrues
+on. The **unit price** of a transaction is what you actually paid per bond, your cost basis: for
+example 99.90 paid for a 100 bond on a rollover. Once terms exist, the transaction form starts
+with the face value as the unit price; change it when you paid something else.
+
 Sells consume the oldest purchase lots first for interest entitlement, regardless of the
 workspace cost-basis setting. The projected value at maturity excludes the early-redemption fee.
 Coupons paid out annually are not part of the bond value; record them as income in the ledger.
@@ -114,8 +119,9 @@ Open an instrument by clicking its name, or use the **Transactions** tab, to rec
 - **Fee** — in the same quote currency, with no more decimal places than the currency has. A
   sell's fee may be larger than its gross amount; the difference is a realized loss.
 - **FX rate to the base currency** — required when the instrument is quoted in another currency;
-  hidden and stored as 1 for a base-currency instrument. A later update will offer the stored
-  rate as the default.
+  hidden and stored as 1 for a base-currency instrument. A new transaction starts with the
+  latest stored rate (manual or provider, on or before today) when one exists; you can change it.
+  Leaving it empty shows an error on the field and keeps everything you entered.
 - **Note** — optional, up to 200 characters.
 
 The instrument page shows the current quantity, average cost (per unit, in the base currency),
