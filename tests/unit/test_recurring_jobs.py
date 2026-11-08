@@ -258,6 +258,7 @@ def test_provider_jobs_are_registered_only_with_a_runtime(db):
     assert calls["price-refresh-ecb"].kwargs["max_instances"] == 1
     assert calls["price-refresh-coingecko"].kwargs["max_instances"] == 1
     assert calls["price-refresh-eodhd"].kwargs["max_instances"] == 1
+    assert calls["price-refresh-goldapi"].kwargs["max_instances"] == 1
     fire = (
         calls["price-refresh-nbp"]
         .args[1]

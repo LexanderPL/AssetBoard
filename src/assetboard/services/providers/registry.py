@@ -7,10 +7,17 @@ from collections.abc import Callable
 
 from assetboard.clock import Clock
 from assetboard.config import Settings
-from assetboard.domain.providers import COINGECKO_KEY, ECB_KEY, EODHD_KEY, NBP_KEY
+from assetboard.domain.providers import (
+    COINGECKO_KEY,
+    ECB_KEY,
+    EODHD_KEY,
+    GOLDAPI_KEY,
+    NBP_KEY,
+)
 from assetboard.services.providers.coingecko import CoinGeckoProvider
 from assetboard.services.providers.ecb import EcbProvider
 from assetboard.services.providers.eodhd import EodhdProvider
+from assetboard.services.providers.goldapi import GoldApiProvider
 from assetboard.services.providers.nbp import NbpProvider
 from assetboard.services.providers.transport import (
     HttpClient,
@@ -55,6 +62,10 @@ def build_provider_runtime(
                     EodhdProvider.rate_limit.requests,
                     EodhdProvider.rate_limit.per_seconds,
                 ),
+                GOLDAPI_KEY: (
+                    GoldApiProvider.rate_limit.requests,
+                    GoldApiProvider.rate_limit.per_seconds,
+                ),
             },
             sleep=sleep,
             monotonic=monotonic,
@@ -65,5 +76,6 @@ def build_provider_runtime(
         ECB_KEY: EcbProvider(runtime),
         COINGECKO_KEY: CoinGeckoProvider(runtime),
         EODHD_KEY: EodhdProvider(runtime),
+        GOLDAPI_KEY: GoldApiProvider(runtime),
     }
     return runtime

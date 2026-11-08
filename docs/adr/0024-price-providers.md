@@ -40,7 +40,7 @@ automated collection outright. Equities therefore ship manual-first with one pai
 | Crypto | Kraken | no | 1 call/s public | n/a | candles (OHLC) | low-medium (broad anti-automation wording, but the API is the sanctioned interface) | no | Approved-optional, deferred |
 | Crypto | Binance | no | weight 6000/min | n/a | klines | unverified (ToS unreachable) + geo | no | Rejected |
 | Metals | NBP cenyzlota | no | unlimited (be polite) | n/a (gold, PLN/g) | 2013– | low (as NBP) | no | **Built-in default (PLN)** |
-| Metals | GoldAPI.io | yes | 300 req/mo | n/a (XAU/XAG/XPT/XPD, 72 ccy) | LBMA since 1968 | unverified ToS | no | Approved-optional, deferred |
+| Metals | GoldAPI.io | yes | ~150 req/mo | n/a (XAU/XAG/XPT/XPD, 72 ccy) | LBMA since 1968 | low-medium (display allowed, no resale) | no | **Optional (follow-up)** |
 | Metals | metals-api.com | yes | unverified | n/a | 1999– | unverified | no | Rejected |
 
 No candidate needs a Python client: everything approved is plain HTTP plus the standard
@@ -71,10 +71,10 @@ page returns HTTP 202 with an empty body to non-browser clients (unverifiable), 
 geo-fragile.
 
 **Metals.** NBP publishes official gold prices in PLN per gram. GoldAPI.io covers
-XAU/XAG/XPT/XPD in 72 currencies including PLN and EUR with the LBMA AM fix back to 1968, but
-its terms page is a JavaScript-gated SPA whose text could not be read (unverified).
-metals-api.com inverts its rate convention (`rates.XAU` = ounces per USD — a Decimal footgun)
-and its free quota is unverified.
+XAU/XAG/XPT/XPD in 72 currencies including PLN and EUR with the LBMA AM fix back to 1968. Its
+terms were read on 2026-11-08: display inside the application is allowed, resale or a competing
+API is not, and no attribution is required. metals-api.com inverts its rate convention
+(`rates.XAU` = ounces per USD — a Decimal footgun) and its free quota is unverified.
 
 ## Decision
 
@@ -125,14 +125,18 @@ without a key and must be confirmed at implementation time. Personal and commerc
 separate; redistribution is treated as not permitted (terms text not fetched — unverified).
 Plain JSON; the official SDK is not needed.
 
-**Approved-optional, deferred to a follow-up minor release (not in F6.4):**
+**Implemented optional (F6.5 follow-up):**
 
 - **GoldAPI.io** (<https://www.goldapi.io/>) — spot XAU/XAG/XPT/XPD in 72 currencies including
-  PLN and EUR, historical LBMA AM fix since 1968, key via `x-access-token`, free tier 300
-  requests/month. Its terms page is a JavaScript-gated SPA that returns no text to non-browser
-  clients, so the ToS — including any attribution requirement — is unverified and must be read
-  manually in a browser before implementation; until then, assume attribution and no
-  redistribution.
+  PLN and EUR, historical LBMA AM fix since 1968, key via `x-access-token`, free plan listed as
+  about 150 shared requests/month (older plan text said 300). The terms were read on 2026-11-08:
+  displaying the data inside the application is allowed, resale or a competing data API is not,
+  and no attribution is required. Priced per troy ounce; the adapter converts to grams or
+  kilograms. History is limited to 90 days per request, so this first integration backfills the
+  latest 90-day window and records `history_limited`.
+
+**Approved-optional, deferred to a follow-up minor release (not in F6.4):**
+
 - **Kraken public API** (<https://www.kraken.com/features/api>) — documented public REST
   market data (Ticker, OHLC, Trades), keyless; "Calling the public endpoints at a frequency of
   1 per second (or less) would remain within the rate limits". The EEA terms' definition of
@@ -204,7 +208,6 @@ without re-checking at implementation time:
 - Stooq terms text (the site is challenge-gated; the regulations page 404s).
 - Stooq behaviour from residential IPs (the live tests ran from a datacenter IP).
 - Yahoo endpoint behaviour from residential IPs (the datacenter test got HTTP 429).
-- GoldAPI.io ToS and attribution requirements (JavaScript-gated page).
 - Binance ToS text (HTTP 202 with an empty body to non-browser clients).
 - Alpha Vantage ToS page (404).
 - FMP, Twelve Data and EODHD free-tier EU-exchange coverage (all key-gated).
@@ -244,25 +247,28 @@ without re-checking at implementation time:
   history and skipping the remainder with `quota_exhausted`. One reservation is taken per
   adapter request, cache hits included, and the reservation row is locked with `SELECT … FOR
   UPDATE` on PostgreSQL; transport retries are not counted as extra reservations.
+- GoldAPI.io ships in the F6.5 follow-up: key in the `x-access-token` header, 1 request/second,
+  latest 15 min/history 24 h cache, daily schedule 22:50 UTC, and a default 4 calls/day to stay
+  under the free plan's ~150 monthly requests. History requests are clamped to the provider's
+  90-day window; the first transaction older than that is marked `history_limited`.
 
 ## Open items
 
-- **GoldAPI.io ToS**: read the terms manually in a real browser (the page is JS-gated for HTTP
-  clients) and quote them in the docs before that provider is implemented.
 - **Stooq re-check**: re-test the CSV endpoints periodically, including from a residential IP
   (which may behave differently — unverified). If they return, Stooq is the natural free EU
   ETF source and this ADR should be revisited.
 - **EODHD coverage**: verify GPW/XETRA/LSE symbols — and the commodities endpoints, if used —
   with a real key while implementing F6.4, before the UI promises them.
-- **Deferred providers**: GoldAPI.io, Kraken and Frankfurter land in a follow-up minor
-  release; `PriceSourceConfig`'s encrypted settings JSON already models keyed providers.
+- **Deferred providers**: Kraken and Frankfurter land in a follow-up minor release;
+  `PriceSourceConfig`'s encrypted settings JSON already models keyed providers.
 - **Cache TTLs** per provider are settled in the F6.4 plan.
 
 ## Consequences
 
 - Households get official, keyless FX in both common base currencies (PLN and EUR), crypto
-  quoted directly in their currency, official gold in PLN, and a workable optional path for EU
-  ETFs — with no new dependency and nothing shipped that works against a provider's terms.
+  quoted directly in their currency, official gold in PLN, optional GoldAPI metals including
+  silver in PLN/EUR, and a workable optional path for EU ETFs — with no new dependency and
+  nothing shipped that works against a provider's terms.
 - EU equities/ETFs have **no automated default**: users who want automatic ETF prices must
   configure EODHD (the free tier fits a small portfolio with strict caching; one paid month
   covers a 30-year backfill) or wait for the backlog's generic HTTP provider. Manual entry

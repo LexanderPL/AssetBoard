@@ -563,6 +563,80 @@ def test_lookup_failures_are_informational(db: WorkspaceDb, team: WorkspaceDb) -
         assert [error.code for error in errors] == ["http_500"]
 
 
+def test_goldapi_daily_quota_skips_remaining_metals(db: WorkspaceDb, team: WorkspaceDb) -> None:
+    ctx = _owner(db)
+    _set_base(db, "PLN")
+    for index, symbol in enumerate(("XAU", "XAG")):
+        instrument = _instrument(
+            db,
+            ctx,
+            name=f"Metal {index}",
+            type_value="metal",
+            quote_currency="PLN",
+            unit_label="oz",
+        )
+        _tx(db, ctx, instrument.id, date_value="2026-01-01", fx="1")
+        _configure_provider(db, ctx, instrument.id, "goldapi", symbol)
+    save_provider_config(
+        db.factory,
+        ctx,
+        SETTINGS,
+        "goldapi",
+        enabled=True,
+        settings_values={"api_key": "test-key"},
+        daily_call_budget=1,
+    )
+    fake = FakeProviderHttpClient(lambda _url: _body("goldapi_latest.json"))
+    runtime = _runtime(db, fake)
+
+    stats = refresh_provider(db.factory, ctx, "goldapi", runtime, mode="latest")
+
+    assert (stats.prices, stats.skipped) == (1, 1)
+    assert len(fake.calls) == 1
+    assert [error.code for error in _errors(db)] == ["quota_exhausted"]
+    with db.factory() as session:
+        config = PriceSourceConfigRepository(session, ctx).for_provider("goldapi")
+        assert config is not None
+        assert (config.quota_day, config.quota_used) == (date(2026, 3, 10), 1)
+
+
+def test_goldapi_history_is_limited_to_the_latest_90_days(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    _set_base(db, "PLN")
+    instrument = _instrument(
+        db, ctx, name="Silver", type_value="metal", quote_currency="PLN", unit_label="oz"
+    )
+    _tx(db, ctx, instrument.id, date_value="2020-01-01", fx="1")
+    _configure_provider(db, ctx, instrument.id, "goldapi", "XAG")
+    save_provider_config(
+        db.factory,
+        ctx,
+        SETTINGS,
+        "goldapi",
+        enabled=True,
+        settings_values={"api_key": "test-key"},
+        daily_call_budget=4,
+    )
+
+    def respond(url: str) -> bytes:
+        if "/api/price/" in url:
+            return _body("goldapi_latest.json")
+        if "/api/history/" in url:
+            return _body("goldapi_history.json")
+        raise AssertionError(url)
+
+    runtime = _runtime(db, FakeProviderHttpClient(respond))
+    stats = refresh_provider(db.factory, ctx, "goldapi", runtime, mode="full")
+
+    assert stats.status == "ok"
+    assert [error.code for error in _errors(db)] == ["history_limited"]
+    with db.factory() as session:
+        row = InstrumentRepository(session, ctx).get_or_raise(instrument.id)
+        assert row.provider_backfilled_at is not None
+
+
 def test_coingecko_utc_timestamp_is_capped_at_the_workspace_day(
     db: WorkspaceDb, team: WorkspaceDb
 ) -> None:

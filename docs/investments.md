@@ -189,6 +189,12 @@ Editors can assign an enabled provider to an instrument and run **Test lookup**.
   remaining calls on history; when the budget is used up it skips the rest and keeps the last
   known prices. Coverage of GPW, XETRA and LSE symbols is unverified until tested with a real
   key.
+- **GoldAPI.io** is the optional keyed precious-metals path: `XAU`, `XAG`, `XPT` and `XPD` in
+  many currencies, including PLN and EUR. Prices are per troy ounce and are converted to the
+  instrument's `oz`, `g` or `kg` unit. Its default budget is **4 calls/day** to stay under the
+  free plan's roughly 150 monthly requests. History is limited to the latest 90 days and the
+  instrument shows the “history limited” note when the first transaction is older. No
+  attribution badge is required; display inside the app is allowed, but resale is not.
 
 Both providers are converted into the workspace base currency before they are stored whenever
 the provider publishes that base. For example, NBP in a EUR workspace stores

@@ -135,6 +135,7 @@ def test_the_provider_page_is_owner_only_and_lists_nbp_and_ecb(owner: OwnerApp) 
     assert "Price providers" in page
     assert 'data-provider-card="nbp"' in page
     assert 'data-provider-card="ecb"' in page
+    assert 'data-provider-card="goldapi"' in page
     assert "Narodowy Bank Polski" in page
     assert "European Central Bank" in page
     assert "data-providers-tab" in page
@@ -286,6 +287,71 @@ def test_eodhd_requires_a_key_and_stores_the_budget(owner: OwnerApp) -> None:
         assert row.enabled and row.daily_call_budget == 7
         assert row.settings_encrypted is not None
         assert "EODHD-SECRET" not in row.settings_encrypted
+
+
+def test_goldapi_requires_a_key_and_shows_the_metal_help(owner: OwnerApp) -> None:
+    refused = owner.post(
+        PROVIDERS + "/goldapi",
+        {"enabled": "1"},
+        token_from=PROVIDERS,
+    )
+    assert refused.status_code == 400
+    response = owner.post(
+        PROVIDERS + "/goldapi",
+        {"enabled": "1", "api_key": "GOLDAPI-SECRET"},
+        token_from=PROVIDERS,
+    )
+    assert response.status_code == 303
+    page = owner.client.get(response.headers["location"]).text
+    assert "GOLDAPI-SECRET" not in page
+    assert "GoldAPI symbols: XAU, XAG, XPT and XPD" in page
+    assert "0 / 4" in page
+    with owner.db() as session:
+        row = session.scalars(
+            select(PriceSourceConfig).where(PriceSourceConfig.provider_key == "goldapi")
+        ).one()
+        assert row.enabled and row.daily_call_budget == 4
+        assert row.settings_encrypted is not None
+        assert "GOLDAPI-SECRET" not in row.settings_encrypted
+
+
+def test_goldapi_test_lookup_reads_the_ounce_price(
+    owner: OwnerApp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    response = owner.post(
+        PROVIDERS + "/goldapi",
+        {"enabled": "1", "api_key": "GOLDAPI-SECRET"},
+        token_from=PROVIDERS,
+    )
+    assert response.status_code == 303
+    instrument = _instrument(
+        owner,
+        "Silver",
+        type_value="metal",
+        quote_currency="PLN",
+        provider_key="goldapi",
+        provider_symbol="XAG",
+    )
+    _buy(owner, instrument)
+    url = "https://www.goldapi.io/api/price/XAG/PLN?melt_price=false&currency_info=false"
+    owner.app.state.provider_runtime = build_provider_runtime(
+        owner.app.state.settings,
+        owner.app.state.clock,
+        http=FakeProviderHttpClient({url: (FIXTURES / "goldapi_latest.json").read_bytes()}),
+    )
+    lookup = owner.post(
+        "/investments/provider-lookup",
+        {
+            "provider_key": "goldapi",
+            "provider_symbol": "XAG",
+            "type": "metal",
+            "quote_currency": "PLN",
+            "unit_label": "oz",
+        },
+        token_from=INSTRUMENTS,
+    )
+    assert lookup.status_code == 200
+    assert "Provider price: 123.4567 PLN as of Mar 2, 2026" in lookup.text
 
 
 def test_coingecko_shows_the_required_attribution_badge(owner: OwnerApp) -> None:

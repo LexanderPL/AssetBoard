@@ -10,6 +10,8 @@ from assetboard.domain.providers import (
     COINGECKO,
     ECB,
     EODHD,
+    GOLDAPI,
+    GOLDAPI_CURRENCIES,
     NBP,
     InvalidProviderRate,
     InvalidProviderSymbol,
@@ -17,6 +19,7 @@ from assetboard.domain.providers import (
     clean_provider_symbol,
     convert_to_workspace_base,
     ecb_quote_to_rate,
+    goldapi_ounce_to_unit,
     nbp_gold_symbol,
     nbp_gold_to_unit,
     normalize_instrument_symbol,
@@ -116,3 +119,33 @@ def test_provider_support_helpers_match_the_adapter_rules() -> None:
     assert not provider_supports_instrument(
         EODHD, type="crypto", quote_currency="EUR", provider_symbol="VWCE.DE"
     )
+
+
+def test_goldapi_symbols_and_currencies() -> None:
+    assert clean_provider_symbol(GOLDAPI, "xag") == "XAG"
+    assert clean_provider_symbol(GOLDAPI, "XPT") == "XPT"
+    with pytest.raises(InvalidProviderSymbol):
+        clean_provider_symbol(GOLDAPI, "XAUUSD")
+    assert {"PLN", "EUR", "USD"} <= GOLDAPI_CURRENCIES
+    assert provider_supports_instrument(
+        GOLDAPI, type="metal", quote_currency="PLN", provider_symbol="XAG"
+    )
+    assert not provider_supports_instrument(
+        GOLDAPI, type="crypto", quote_currency="PLN", provider_symbol="XAG"
+    )
+    assert not provider_supports_instrument(
+        GOLDAPI, type="metal", quote_currency="ABC", provider_symbol="XAG"
+    )
+
+
+def test_goldapi_ounce_conversion_supports_grams_and_kilograms() -> None:
+    price = Decimal("100.00")
+    assert goldapi_ounce_to_unit(price, "oz") == price
+    with localcontext() as context:
+        context.prec = 80
+        grams = price / Decimal("31.1034768")
+        kilograms = grams * Decimal(1000)
+    assert goldapi_ounce_to_unit(price, "g") == grams
+    assert goldapi_ounce_to_unit(price, "kg") == kilograms
+    with pytest.raises(UnsupportedUnit):
+        goldapi_ounce_to_unit(price, "coin")

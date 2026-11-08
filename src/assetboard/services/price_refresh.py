@@ -42,13 +42,14 @@ from assetboard.domain.prices import (
     ProviderRateQuote,
 )
 from assetboard.domain.providers import (
-    EODHD_KEY,
+    GOLDAPI_KEY,
     InvalidProviderRate,
     InvalidProviderSymbol,
     ProviderDefinition,
     UnsupportedUnit,
     clean_provider_symbol,
     convert_to_workspace_base,
+    goldapi_ounce_to_unit,
     nbp_gold_to_unit,
     normalize_instrument_symbol,
     normalize_provider_decimal,
@@ -380,7 +381,7 @@ def lookup_provider(
         provider_symbol=symbol,
     ):
         return LookupResult("unsupported", code="provider_unsupported")
-    if provider_key == EODHD_KEY and not _reserve_quota(
+    if definition.default_daily_budget is not None and not _reserve_quota(
         factory, ctx, provider_key, runtime.clock.today("UTC")
     ):
         _record_error(
@@ -581,7 +582,8 @@ def _reserve_quota(
     provider_key: str,
     today_utc: date,
 ) -> bool:
-    if provider_key != EODHD_KEY:
+    definition = provider_definition(provider_key)
+    if definition is None or definition.default_daily_budget is None:
         return True
 
     def write(session: Session) -> bool:
@@ -617,8 +619,8 @@ def _refresh_latest_prices(
     run: _Run,
     options: Mapping[str, str],
 ) -> bool:
-    if definition.key == EODHD_KEY:
-        return _refresh_eodhd_latest(
+    if definition.default_daily_budget is not None:
+        return _refresh_quota_latest(
             factory,
             scope,
             provider_key,
@@ -740,7 +742,7 @@ def _refresh_latest_prices(
     return True
 
 
-def _refresh_eodhd_latest(
+def _refresh_quota_latest(
     factory: sessionmaker[Session],
     scope: WorkspaceScope,
     provider_key: str,
@@ -1037,7 +1039,7 @@ def _backfill_prices(
             )
             run.errors += 1
             continue
-        if definition.key == EODHD_KEY and not _reserve_quota(
+        if definition.default_daily_budget is not None and not _reserve_quota(
             factory, scope, provider_key, today_utc
         ):
             _record_error(
@@ -1277,6 +1279,8 @@ def _price_for_target(
 ) -> Decimal:
     if definition.key == "nbp":
         price = nbp_gold_to_unit(quote.price, target.unit_label)
+    elif definition.key == GOLDAPI_KEY:
+        price = goldapi_ounce_to_unit(quote.price, target.unit_label)
     else:
         price = quote.price
     return normalize_provider_decimal(price, positive=True)

@@ -41,7 +41,7 @@
         <dl class="mt-4 grid gap-2 text-sm sm:grid-cols-2">
           <div>
             <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Quotes in") }}</dt>
-            <dd class="mt-0.5 font-medium">{% if card.definition.key == "eodhd" %}{{ _("Instrument currency") }}{% elif card.definition.quote_currencies %}{{ card.definition.quote_currencies|sort|join(", ") }}{% else %}{{ card.definition.natural_base }}{% endif %}</dd>
+            <dd class="mt-0.5 font-medium">{% if card.definition.key in ("eodhd", "goldapi") %}{{ _("Instrument currency") }}{% elif card.definition.quote_currencies %}{{ card.definition.quote_currencies|sort|join(", ") }}{% else %}{{ card.definition.natural_base }}{% endif %}</dd>
           </div>
           <div>
             <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Instruments using it") }}</dt>
@@ -77,6 +77,9 @@
         {% endif %}
         {% if card.definition.key == "eodhd" %}
         <p class="mt-1 text-xs text-muted">{{ _("EODHD coverage for GPW, XETRA and LSE symbols is unverified; the free tier allows 20 calls per day.") }}</p>
+        {% endif %}
+        {% if card.definition.key == "goldapi" %}
+        <p class="mt-1 text-xs text-muted">{{ _("GoldAPI symbols: XAU, XAG, XPT and XPD; prices are per troy ounce in the instrument currency. History is limited to the latest 90 days; the free plan allows about 150 requests per month.") }}</p>
         {% endif %}
 
         <div class="mt-4 flex flex-wrap items-end gap-2">

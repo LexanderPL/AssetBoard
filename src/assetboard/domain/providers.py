@@ -20,11 +20,93 @@ NBP_KEY = "nbp"
 ECB_KEY = "ecb"
 COINGECKO_KEY = "coingecko"
 EODHD_KEY = "eodhd"
+GOLDAPI_KEY = "goldapi"
 
 _COINGECKO_SYMBOL = re.compile(r"[a-z0-9-]{1,64}")
 _EODHD_SYMBOL = re.compile(r"[A-Za-z0-9._-]{1,64}")
 
+GOLDAPI_SYMBOLS = frozenset({"XAU", "XAG", "XPT", "XPD"})
+# GoldAPI documents these quote currencies. XAG and BTC are listed by the provider but are not
+# valid ISO 4217 quote currencies for an instrument, so the instrument validator filters them.
+GOLDAPI_CURRENCIES = frozenset(
+    {
+        "AED",
+        "ARS",
+        "AUD",
+        "BDT",
+        "BGN",
+        "BHD",
+        "BOB",
+        "BRL",
+        "BTC",
+        "CAD",
+        "CHF",
+        "CLP",
+        "CNY",
+        "COP",
+        "CZK",
+        "DKK",
+        "DOP",
+        "DZD",
+        "EGP",
+        "EUR",
+        "FJD",
+        "GBP",
+        "GHS",
+        "GTQ",
+        "HKD",
+        "IDR",
+        "ILS",
+        "INR",
+        "IQD",
+        "IRR",
+        "ISK",
+        "JOD",
+        "JPY",
+        "KES",
+        "KHR",
+        "KRW",
+        "KWD",
+        "LAK",
+        "LBP",
+        "LKR",
+        "MAD",
+        "MMK",
+        "MXN",
+        "MYR",
+        "NGN",
+        "NOK",
+        "NPR",
+        "NZD",
+        "OMR",
+        "PEN",
+        "PHP",
+        "PKR",
+        "PLN",
+        "PYG",
+        "QAR",
+        "RON",
+        "RUB",
+        "SAR",
+        "SEK",
+        "SGD",
+        "SYP",
+        "THB",
+        "TRY",
+        "TWD",
+        "UAH",
+        "USD",
+        "UYU",
+        "UZS",
+        "VND",
+        "XAG",
+        "YER",
+        "ZAR",
+    }
+)
+
 _GRAMS = frozenset({"g", "gram", "grams", "gramy", "gramow", "gramów"})
+_KILOGRAMS = frozenset({"kg", "kilogram", "kilograms", "kilogramy", "kilogramów"})
 _TROY_OUNCES = frozenset(
     {
         "oz",
@@ -128,11 +210,31 @@ EODHD = ProviderDefinition(
     default_daily_budget=20,
 )
 
+GOLDAPI = ProviderDefinition(
+    key=GOLDAPI_KEY,
+    label="GoldAPI.io",
+    description=_(
+        "Optional spot prices for gold, silver, platinum and palladium in many currencies."
+    ),
+    kind="price",
+    natural_base="",
+    supported_types=frozenset({"metal"}),
+    quote_currencies=GOLDAPI_CURRENCIES,
+    requires_key=True,
+    symbol_required=True,
+    symbol_help=_("GoldAPI metal symbol: XAU, XAG, XPT or XPD; the price is per troy ounce."),
+    attribution=None,
+    docs_url="https://www.goldapi.io/api-documentation",
+    key_label=_("API key"),
+    default_daily_budget=4,
+)
+
 PROVIDERS: dict[str, ProviderDefinition] = {
     NBP.key: NBP,
     ECB.key: ECB,
     COINGECKO.key: COINGECKO,
     EODHD.key: EODHD,
+    GOLDAPI.key: GOLDAPI,
 }
 
 
@@ -188,6 +290,11 @@ def clean_provider_symbol(
         if _EODHD_SYMBOL.fullmatch(normalized) is None:
             raise InvalidProviderSymbol
         return normalized
+    if definition.key == GOLDAPI_KEY:
+        normalized = cleaned.upper()
+        if normalized not in GOLDAPI_SYMBOLS:
+            raise InvalidProviderSymbol
+        return normalized
     return cleaned
 
 
@@ -235,6 +342,22 @@ def nbp_gold_to_unit(price_per_gram: Decimal, unit_label: str) -> Decimal:
         with localcontext() as context:
             context.prec = max(context.prec, PROVIDER_DECIMAL_PRECISION)
             return price_per_gram * TROY_OUNCE_GRAMS
+    raise UnsupportedUnit
+
+
+def goldapi_ounce_to_unit(price_per_ounce: Decimal, unit_label: str) -> Decimal:
+    """Convert GoldAPI's price per troy ounce to the instrument's unit."""
+    if not price_per_ounce.is_finite() or price_per_ounce < 0:
+        raise InvalidProviderRate
+    normalized = unit_label.strip().casefold()
+    if normalized in _TROY_OUNCES:
+        return price_per_ounce
+    with localcontext() as context:
+        context.prec = max(context.prec, PROVIDER_DECIMAL_PRECISION)
+        if normalized in _GRAMS:
+            return price_per_ounce / TROY_OUNCE_GRAMS
+        if normalized in _KILOGRAMS:
+            return price_per_ounce / TROY_OUNCE_GRAMS * Decimal(1000)
     raise UnsupportedUnit
 
 

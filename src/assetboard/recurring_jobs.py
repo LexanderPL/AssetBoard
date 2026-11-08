@@ -391,6 +391,7 @@ class RecurringJobs:
                 ("ecb", 18, 20),
                 ("coingecko", 0, 10),
                 ("eodhd", 22, 40),
+                ("goldapi", 22, 50),
             ):
                 self.scheduler.add_job(
                     self.refresh_prices,
