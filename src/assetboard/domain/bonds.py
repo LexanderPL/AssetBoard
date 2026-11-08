@@ -257,6 +257,8 @@ def _lot_interest(
     face = terms.face_value.to_decimal()
     mode = terms.interest_mode
     if mode is InterestMode.PAID_OUT_ANNUALLY:
+        # A coupon is paid on the period-end day, so the bond resets to face then; at maturity
+        # the same reset applies to the final coupon.
         current = _period_at(periods, stop)
         if current is None:
             return Decimal(0)

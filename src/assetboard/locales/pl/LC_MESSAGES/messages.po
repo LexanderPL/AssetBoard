@@ -4919,6 +4919,13 @@ msgid "Projected net at maturity"
 msgstr "Prognozowana wartość netto w dniu wykupu"
 
 msgid ""
+"Each line is rounded to the currency's minor unit, so the displayed "
+"amounts can differ by one minor unit."
+msgstr ""
+"Każda pozycja jest zaokrąglana do najmniejszej jednostki waluty, więc "
+"wyświetlane kwoty mogą różnić się o jedną jednostkę."
+
+msgid ""
 "Coupons paid out annually are not part of the bond value; record them as "
 "income in the ledger."
 msgstr ""

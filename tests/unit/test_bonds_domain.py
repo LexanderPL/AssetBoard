@@ -99,6 +99,36 @@ def test_paid_out_values_the_current_coupon_and_resets_at_period_ends() -> None:
     assert mid.net.amount_minor > 10_000
 
 
+def test_paid_out_resets_on_the_coupon_day() -> None:
+    terms = _terms(
+        mode=InterestMode.PAID_OUT_ANNUALLY,
+        rates=(500,),
+        maturity=date(2021, 1, 1),
+    )
+    day_before = bond_value(terms, [_lot()], date(2020, 12, 31))
+    coupon_day = bond_value(terms, [_lot()], date(2021, 1, 1))
+    with localcontext() as context:
+        context.prec = 80
+        expected = Decimal(100) + Decimal(100) * Decimal("0.05") * Decimal(365) / Decimal(366)
+    assert day_before.net == _rounded(expected)
+    assert coupon_day.net == Money(10_000, "PLN")
+
+
+def test_a_short_paid_out_bond_pays_the_final_coupon_on_maturity() -> None:
+    terms = _terms(
+        mode=InterestMode.PAID_OUT_ANNUALLY,
+        rates=(500,),
+        maturity=date(2020, 4, 1),
+    )
+    day_before = bond_value(terms, [_lot()], date(2020, 3, 31))
+    maturity = bond_value(terms, [_lot()], date(2020, 4, 1))
+    with localcontext() as context:
+        context.prec = 80
+        expected = Decimal(100) + Decimal(100) * Decimal("0.05") * Decimal(90) / Decimal(366)
+    assert day_before.net == _rounded(expected)
+    assert maturity.net == Money(10_000, "PLN")
+
+
 def test_at_maturity_simple_does_not_compound() -> None:
     terms = _terms(
         mode=InterestMode.AT_MATURITY_SIMPLE,
@@ -175,6 +205,14 @@ def test_a_partial_final_period_is_prorated_over_the_full_year() -> None:
         context.prec = 80
         expected = Decimal(100) + Decimal(100) * Decimal("0.05") * Decimal(91) / Decimal(366)
     assert valuation.net == _rounded(expected)
+
+    simple_terms = _terms(
+        mode=InterestMode.AT_MATURITY_SIMPLE,
+        rates=(500,),
+        maturity=date(2020, 4, 1),
+    )
+    simple = bond_value(simple_terms, [_lot()], date(2020, 4, 1))
+    assert simple.net == _rounded(expected)
 
 
 def test_a_leap_day_schedule_uses_the_28th_in_common_years() -> None:

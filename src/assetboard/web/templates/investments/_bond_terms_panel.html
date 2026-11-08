@@ -43,6 +43,7 @@
           <dd class="mt-0.5 font-medium tabular-nums">{{ format_money(bond.valuation.projected_net_at_maturity, locale) }}</dd>
         </div>
       </dl>
+      <p class="mt-3 text-xs text-muted" data-bond-rounding-note>{{ _("Each line is rounded to the currency's minor unit, so the displayed amounts can differ by one minor unit.") }}</p>
       {% if bond.terms.interest_mode.value == "paid_out_annually" %}
       <p class="mt-4 text-xs text-muted" data-bond-paid-out-note>{{ _("Coupons paid out annually are not part of the bond value; record them as income in the ledger.") }}</p>
       {% endif %}
