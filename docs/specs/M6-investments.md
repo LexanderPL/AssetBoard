@@ -13,7 +13,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 - `Instrument(id, workspace_id, name, symbol?, type[equity|etf|bond_market|bond_model|metal|crypto|currency|real_estate|other], quote_currency, unit_label, valuation_source[provider|manual|bond_model], provider_key?, provider_symbol?, risk_tier_override[safe|growth|speculative]?, archived_at)`
 - `RiskTargetPolicy(workspace_id PK, mode[fixed|age_scaled|age_in_bonds], safe_bp, growth_bp, speculative_bp, tolerance_bp)` (F6.11).
 - `InstrumentAllocation(instrument_id, asset_class_id, weight_bp)`; every instrument has at least one row and its weights must sum to exactly 10 000, enforced by the service (the editor mirrors the total client-side). A single instrument can be split across classes (e.g., an 80/20 stock/bond fund).
-- `InvestmentTransaction(id, workspace_id, instrument_id, date?, type[buy|sell|dividend|fee|split], quantity Decimal, unit_price Decimal, quote_currency, fee_minor, fx_to_base Decimal?, note, deleted_at?, import_batch_id?)`. `date` is nullable only for imported legacy lots (flagged "undated"); fees are in `quote_currency`.
+- `InvestmentTransaction(id, workspace_id, instrument_id, date?, type[buy|sell|dividend|fee|split], quantity Decimal, unit_price Decimal, quote_currency, fee_minor, fx_to_base Decimal?, settlement_currency?, settlement_unit_price Decimal?, settlement_fee_minor?, note, deleted_at?, import_batch_id?)` (settlement columns: F6.2a). `date` is nullable only for imported legacy lots (flagged "undated"); fees are in `quote_currency`.
 - Workspace setting `investment_cost_basis[average|fifo]` (F6.2; default `average`, owner-only, audited through `workspace.settings_updated`).
 - `PricePoint(instrument_id, date, price Decimal, source[provider|manual|transaction])`; unique `(instrument_id, date, source)`.
 - `FxRate(base_currency, quote_currency, date, rate Decimal, source)`.
@@ -67,6 +67,179 @@ Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait 
 Implement F6.2 from docs/specs/M6-investments.md: InvestmentTransaction model + migration, transaction UI (per instrument + global history),
 pure compute_holdings() with average-cost and FIFO methods, realized P&L, rejection of oversell. Use Decimal/DecimalType and Money only.
 Include the golden scenario and the property tests from the spec; independent oracle: a naive reference implementation inside the test module.
+```
+
+---
+
+## F6.2a Paid in the base currency, and bulk add of transactions
+
+**Story:** My broker shows me only PLN amounts for ETFs quoted in USD or EUR. I want to record
+exactly what I paid, without converting by hand. I also want to paste many past trades at once,
+the way I bulk-add net-worth assets.
+
+Added 2026-11-08 (owner request). It lands before F6.7. It changes only how transactions are
+entered and stored; valuation, prices and the portfolio page keep their F6.3–F6.6 rules.
+
+### Part A — amounts in the base currency ("settlement")
+
+**Why.** Before this change, users with PLN-only broker statements entered the PLN unit price as
+if it were USD, with `fx_to_base = 1`. The cost basis came out right, but the data was wrong in
+two ways that change valuation:
+- F6.3 derives a **transaction price** from each live transaction, so the instrument looked
+  priced at "1 600 USD".
+- F6.3 also derives a **transaction FX rate** (the lowest-priority FX source), so the rows said
+  USD→PLN = 1.
+
+**Data model.** `InvestmentTransaction` gains three nullable columns. They are set **all or
+none**, enforced by a check constraint:
+- `settlement_currency CHAR(3)`
+- `settlement_unit_price` (`DecimalType`)
+- `settlement_fee_minor BIGINT`, with `>= 0` and `<= MAX_AMOUNT_MINOR`
+
+Rules:
+- In this version `settlement_currency` must equal the workspace base currency. The base is
+  already locked once any investment transaction exists (F6.2).
+- Settlement is allowed only when the instrument's `quote_currency` differs from the base, and
+  never for `currency` instruments, whose unit price is always 1.
+- The migration is reversible. Existing rows stay null and behave exactly as before.
+
+**Form.** When the instrument's quote currency differs from the base, the transaction form
+(global history page and instrument page) shows a choice: **Amounts in: USD | PLN**. The labels
+are the instrument's quote currency and the base currency, translatable.
+- **Quote mode** (default; the F6.2 behaviour, unchanged).
+- **Base mode.** The user enters:
+  - quantity;
+  - **unit price in the base currency**;
+  - **fee in the base currency**;
+  - the FX rate (base units per quote unit, required, `> 0`).
+- **FX rate.** The FX field is pre-filled from stored FX for the transaction date:
+  - `FxService.rate(quote, base, date)` (F6.3/F6.4), any source except `transaction`.
+  - A hint shows the rate's date and source.
+  - When no stored rate exists the field stays empty and is required.
+  - Re-filling for a changed date uses a small Alpine (CSP build) action that calls a read-only
+    JSON endpoint. With JavaScript off, the server pre-fills on the first render, and when the
+    rate is missing the form returns the inline error.
+
+**What is stored in base mode** (exact `Decimal`, 80-digit `localcontext`):
+- `settlement_currency` = base
+- `settlement_unit_price` = the entered base unit price
+- `settlement_fee_minor` = the entered base fee
+- `fx_to_base` = the rate
+- `unit_price` = `settlement_unit_price / fx_to_base`, quantised half-up to the `DecimalType`
+  scale (18 places)
+- `fee_minor` (quote currency) = `round_half_up(settlement_fee / fx_to_base)` to quote minor units
+
+The derived quote values keep F6.3's transaction price and FX rate correct (USD price, real
+rate), and they let the row be shown in the quote currency too.
+
+**Cost basis.** This rule overrides the F6.2 formula when a settlement is present (the
+settlement currency is the base). Each is rounded once per transaction:
+- buy total cost = `round_half_up(quantity × settlement_unit_price + settlement_fee)`
+- sell proceeds = `round_half_up(quantity × settlement_unit_price − settlement_fee)`
+
+Notes:
+- The broker's FX spread is part of the cost, which is correct, because this is what left the
+  account.
+- `HoldingTransaction` gains the optional settlement fields. `compute_holdings` and
+  `realized_events` use them.
+- Every other F6.2 rule is unchanged: average/FIFO, rounding without drift, oversell, undated
+  lots.
+
+**History and editing.**
+- A base-mode row shows the base amounts it was entered with as the primary values, with the
+  derived quote unit price and the rate beside them ("1 600.00 PLN · ≈ 398.774767 USD @ 4.0123").
+- Editing opens in the mode the row was saved in.
+- Switching modes on an existing row:
+  - **quote → base:** pre-fills base price = `unit_price × fx_to_base` and base fee = `fee × fx`.
+  - **base → quote:** pre-fills the stored derived quote values and clears the settlement.
+
+**Finding rows that need fixing.** A row whose instrument quote currency differs from the base
+and whose `fx_to_base == 1` gets a **"check FX rate"** warning badge in both histories. A
+history filter "FX needs checking" lists them. To fix such a row, the user opens it, switches to
+base mode (the amounts carry over, since they were entered as base), takes the pre-filled stored
+rate, and saves.
+
+**Audit and archive.**
+- `investment_transaction.created`/`.updated` keep their shape. Field names that changed are
+  listed; no amounts are logged at INFO.
+- F6.9 must export and restore the three columns. Add them to its file list when F6.9 is
+  implemented.
+
+### Part B — bulk add of transactions
+
+- An **"Bulk add"** button on the Transactions tab (global history) reveals a textarea, in the
+  same style as F5.1's bulk add. Editors and owners only.
+- **Limits:** at most 500 non-blank lines and 64 KiB. Lines starting with `#` are ignored.
+- **Line format.** Fields are separated by `;`. Surrounding whitespace is trimmed, and empty
+  trailing fields may be left out:
+  `date; instrument; type; quantity; unit price; fee; fx; amounts currency`
+  - `date`: ISO `YYYY-MM-DD`, or the user's locale short date. Today or earlier, 1900–2199. Bulk
+    add cannot create undated lots; those stay import-only (F6.9).
+  - `instrument`: an active instrument's name or symbol, matched case-insensitively. An
+    ambiguous or unknown name is a line error. Bulk add never creates instruments.
+  - `type`: `buy` or `sell`, with Polish aliases `kupno`/`zakup` and `sprzedaż`/`sprzedaz`.
+  - `quantity`, `unit price`, `fee`: parsed with the locale number helpers. `fee` defaults to 0.
+    Currency instruments ignore the price (always 1), as the form does.
+  - `amounts currency`: blank or the instrument's quote currency means quote mode. The base
+    currency code means **base mode** (Part A): `unit price` and `fee` are base amounts. Any
+    other code is a line error.
+  - `fx`: required when the quote currency differs from the base. When blank, it is pre-filled
+    from stored FX for the date (same source as the form). If no stored rate exists, the line
+    gets the error "FX rate needed". When the quote currency equals the base, `fx` must be
+    blank or 1.
+- **Preview.**
+  - Every line is listed with its number, the parsed values (instrument, type, date, quantity,
+    price, fee, FX used and its source, total cost or proceeds in the base currency) or its
+    error.
+  - Nothing is written while any line has an error.
+  - The confirm step re-posts the same text. The server re-parses and re-validates it, and never
+    trusts hidden preview fields.
+- **Create.**
+  - **All-or-nothing** in one `run_immediate` write: workspace lock, role re-check, then the
+    whole-sequence oversell check (F6.2) per affected instrument, with the new rows merged into
+    the existing history in date order.
+  - Any failure, such as an oversell naming its line and date, or an archived instrument,
+    refuses the whole batch.
+  - The rows share one new `import_batch_id`. One audit event
+    `investment_transaction.bulk_created` records the count and instrument ids, with no amounts.
+  - The page shows a success toast with the count. There is no batch undo in v1; single rows keep
+    their normal delete and undo.
+
+### Tests
+
+- **Settlement golden test.** Buy 4 @ 1 600.00 PLN + fee 5.00 PLN with FX 4.0123:
+  - cost basis = 6 405.00 PLN exactly;
+  - `unit_price` = 398.774767… (18 places, half-up);
+  - quote `fee_minor` = round(5.00 / 4.0123).
+- **Sells.** A partial sell under average and FIFO; selling everything returns cost basis 0.
+  Mixed quote-mode and base-mode rows on one instrument.
+- **Property test.** For base-mode rows, the cost basis equals the sum of the rounded settlement
+  totals, independent of FX.
+- **Derived values.** The F6.3 transaction price and FX derived from a base-mode row are the
+  derived quote price and the entered rate, never 1.
+- **Validation.**
+  - All-or-none constraint; a settlement on a base-quoted or `currency` instrument is refused.
+  - FX pre-fill: from a stored rate; no stored rate gives an inline error; the endpoint is
+    workspace-scoped.
+  - Mode switch on edit; the "check FX rate" badge and its filter.
+  - The migration is reversible.
+- **Bulk add.**
+  - Parsing table: separators, locales, types incl. Polish aliases, comments, missing optional
+    fields, base-mode lines, FX pre-fill.
+  - Limits; ambiguous and unknown instruments.
+  - All-or-nothing on any error and on oversell, including an oversell caused only by the
+    combination of pasted rows.
+  - Re-validation on confirm.
+  - Role and CSRF; one audit event; the batch id.
+- **i18n.** The pl catalog is updated with no fuzzy entries, and `make i18n-update` leaves no
+  diff.
+
+**Agent prompt**
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F6.2a from docs/specs/M6-investments.md: settlement columns + migration, base-currency entry mode with stored-FX
+pre-fill, the settlement cost-basis rule in compute_holdings/realized_events, the "check FX rate" badge and filter,
+and the all-or-nothing bulk add with preview and re-validation. Include the settlement golden test and the property test.
 ```
 
 ---
