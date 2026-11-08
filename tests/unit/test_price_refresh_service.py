@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Iterator
+from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal, localcontext
 from pathlib import Path
@@ -14,7 +16,7 @@ from sqlalchemy import select
 
 from assetboard.clock import FixedClock
 from assetboard.config import Settings
-from assetboard.db.models.identity import Workspace
+from assetboard.db.models.identity import AuditEvent, Workspace
 from assetboard.db.models.prices import PricePoint, ProviderError
 from assetboard.db.repositories import (
     AssetClassRepository,
@@ -33,6 +35,7 @@ from assetboard.services.price_refresh import (
     lookup_provider,
     provider_status,
     refresh_all,
+    refresh_now,
     refresh_provider,
 )
 from assetboard.services.price_sources import save_provider_config
@@ -44,6 +47,7 @@ from tests.fake_provider_http import (
     FailingProviderHttpClient,
     FakeProviderHttpClient,
     FakeTime,
+    ResponseValue,
 )
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
@@ -563,41 +567,143 @@ def test_lookup_failures_are_informational(db: WorkspaceDb, team: WorkspaceDb) -
         assert [error.code for error in errors] == ["http_500"]
 
 
-def test_goldapi_daily_quota_skips_remaining_metals(db: WorkspaceDb, team: WorkspaceDb) -> None:
-    ctx = _owner(db)
-    _set_base(db, "PLN")
-    for index, symbol in enumerate(("XAU", "XAG")):
-        instrument = _instrument(
-            db,
-            ctx,
-            name=f"Metal {index}",
-            type_value="metal",
-            quote_currency="PLN",
-            unit_label="oz",
-        )
-        _tx(db, ctx, instrument.id, date_value="2026-01-01", fx="1")
-        _configure_provider(db, ctx, instrument.id, "goldapi", symbol)
+GOLDAPI_SECRET = "GOLDAPI-SENTINEL-KEY-7f3a"
+
+
+def _goldapi_metal(
+    db: WorkspaceDb,
+    ctx,
+    symbol: str,
+    *,
+    unit_label: str = "oz",
+    quote_currency: str = "PLN",
+    first_trade: str = "2026-03-01",
+) -> UUID:
+    instrument = _instrument(
+        db,
+        ctx,
+        name=f"Metal {symbol}",
+        type_value="metal",
+        quote_currency=quote_currency,
+        unit_label=unit_label,
+    )
+    _tx(db, ctx, instrument.id, date_value=first_trade, fx="1")
+    _configure_provider(db, ctx, instrument.id, "goldapi", symbol)
+    return instrument.id
+
+
+def _enable_goldapi(db: WorkspaceDb, ctx, budget: int | None = None) -> None:
     save_provider_config(
         db.factory,
         ctx,
         SETTINGS,
         "goldapi",
         enabled=True,
-        settings_values={"api_key": "test-key"},
-        daily_call_budget=1,
+        settings_values={"api_key": GOLDAPI_SECRET},
+        daily_call_budget=budget,
     )
-    fake = FakeProviderHttpClient(lambda _url: _body("goldapi_latest.json"))
+
+
+def _goldapi_responder(url: str) -> ResponseValue:
+    if url.startswith(GOLDAPI_HISTORY_PREFIX):
+        return _body("goldapi_history.json")
+    if url.startswith(GOLDAPI_PRICE_PREFIX):
+        return _body("goldapi_latest.json")
+    raise AssertionError(url)
+
+
+GOLDAPI_PRICE_PREFIX = "https://www.goldapi.io/api/X"
+GOLDAPI_HISTORY_PREFIX = "https://www.goldapi.io/api/history/"
+
+
+def _quota(db: WorkspaceDb, ctx) -> tuple[date | None, int]:
+    with db.factory() as session:
+        config = PriceSourceConfigRepository(session, ctx).for_provider("goldapi")
+        assert config is not None
+        return config.quota_day, config.quota_used
+
+
+def _last_error_code(db: WorkspaceDb, ctx) -> str | None:
+    with db.factory() as session:
+        config = PriceSourceConfigRepository(session, ctx).for_provider("goldapi")
+        assert config is not None
+        return config.last_error_code
+
+
+def test_goldapi_daily_quota_skips_remaining_metals_and_resets_next_utc_day(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    _set_base(db, "PLN")
+    _goldapi_metal(db, ctx, "XAU")
+    _goldapi_metal(db, ctx, "XAG")
+    _enable_goldapi(db, ctx, budget=1)
+    fake = FakeProviderHttpClient(_goldapi_responder)
     runtime = _runtime(db, fake)
 
     stats = refresh_provider(db.factory, ctx, "goldapi", runtime, mode="latest")
 
-    assert (stats.prices, stats.skipped) == (1, 1)
+    assert (stats.prices, stats.skipped, stats.errors) == (1, 1, 0)
     assert len(fake.calls) == 1
     assert [error.code for error in _errors(db)] == ["quota_exhausted"]
+    assert _quota(db, ctx) == (date(2026, 3, 10), 1)
+    assert _last_error_code(db, ctx) is None  # informational: no provider-card error
+
+    # The same UTC day: nothing more is spent.
+    refresh_provider(db.factory, ctx, "goldapi", runtime, mode="latest")
+    assert len(fake.calls) == 1
+
+    # The next UTC day the counter resets and the budget is available again.
+    db.clock._value += timedelta(days=1)
+    db.factory.kw["info"]["clock"] = db.clock
+    runtime = _runtime(db, fake)
+    stats = refresh_provider(db.factory, ctx, "goldapi", runtime, mode="latest")
+    assert (stats.prices, stats.skipped) == (1, 1)
+    assert len(fake.calls) == 2
+    assert _quota(db, ctx) == (date(2026, 3, 11), 1)
+
+
+def test_goldapi_spends_latest_calls_first_and_history_uses_the_remainder(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    _set_base(db, "PLN")
+    _goldapi_metal(db, ctx, "XAU", first_trade="2026-02-27")
+    _goldapi_metal(db, ctx, "XAG", first_trade="2026-02-27")
+    _enable_goldapi(db, ctx, budget=3)
+    fake = FakeProviderHttpClient(_goldapi_responder)
+
+    stats = refresh_provider(db.factory, ctx, "goldapi", _runtime(db, fake), mode="full")
+
+    urls = [url for url, _headers in fake.calls]
+    assert len(urls) == 3
+    assert all(url.startswith(GOLDAPI_PRICE_PREFIX) for url in urls[:2])
+    assert urls[2].startswith(GOLDAPI_HISTORY_PREFIX)
+    assert stats.skipped == 1
+    assert [error.code for error in _errors(db)] == ["quota_exhausted"]
+    assert _quota(db, ctx) == (date(2026, 3, 10), 3)
     with db.factory() as session:
-        config = PriceSourceConfigRepository(session, ctx).for_provider("goldapi")
-        assert config is not None
-        assert (config.quota_day, config.quota_used) == (date(2026, 3, 10), 1)
+        marked = [
+            row.provider_backfilled_at is not None
+            for row in InstrumentRepository(session, ctx).ordered()
+        ]
+    assert sorted(marked) == [False, True]
+
+
+def test_goldapi_history_waits_for_budget_after_latest(db: WorkspaceDb, team: WorkspaceDb) -> None:
+    ctx = _owner(db)
+    _set_base(db, "PLN")
+    instrument_id = _goldapi_metal(db, ctx, "XAG", first_trade="2026-02-27")
+    _enable_goldapi(db, ctx, budget=1)
+    fake = FakeProviderHttpClient(_goldapi_responder)
+
+    refresh_provider(db.factory, ctx, "goldapi", _runtime(db, fake), mode="full")
+
+    assert [url for url, _headers in fake.calls] == ["https://www.goldapi.io/api/XAG/PLN"]
+    assert [error.code for error in _errors(db)] == ["quota_exhausted"]
+    with db.factory() as session:
+        row = InstrumentRepository(session, ctx).get_or_raise(instrument_id)
+        assert row.provider_backfilled_at is None
 
 
 def test_goldapi_history_is_limited_to_the_latest_90_days(
@@ -605,36 +711,181 @@ def test_goldapi_history_is_limited_to_the_latest_90_days(
 ) -> None:
     ctx = _owner(db)
     _set_base(db, "PLN")
-    instrument = _instrument(
-        db, ctx, name="Silver", type_value="metal", quote_currency="PLN", unit_label="oz"
-    )
-    _tx(db, ctx, instrument.id, date_value="2020-01-01", fx="1")
-    _configure_provider(db, ctx, instrument.id, "goldapi", "XAG")
-    save_provider_config(
-        db.factory,
-        ctx,
-        SETTINGS,
-        "goldapi",
-        enabled=True,
-        settings_values={"api_key": "test-key"},
-        daily_call_budget=4,
-    )
+    instrument_id = _goldapi_metal(db, ctx, "XAG", first_trade="2020-01-01")
+    _enable_goldapi(db, ctx)
+    fake = FakeProviderHttpClient(_goldapi_responder)
+    runtime = _runtime(db, fake)
 
-    def respond(url: str) -> bytes:
-        if "/api/price/" in url:
-            return _body("goldapi_latest.json")
-        if "/api/history/" in url:
-            return _body("goldapi_history.json")
-        raise AssertionError(url)
-
-    runtime = _runtime(db, FakeProviderHttpClient(respond))
     stats = refresh_provider(db.factory, ctx, "goldapi", runtime, mode="full")
 
     assert stats.status == "ok"
+    history = [url for url, _headers in fake.calls if url.startswith(GOLDAPI_HISTORY_PREFIX)]
+    assert history == ["https://www.goldapi.io/api/history/XAG/PLN?from=2025-12-11&to=2026-03-10"]
     assert [error.code for error in _errors(db)] == ["history_limited"]
+    assert _last_error_code(db, ctx) is None  # informational: no provider-card error
+    assert [point.date for point in _prices(db)] == [date(2026, 2, 27), date(2026, 3, 2)]
     with db.factory() as session:
-        row = InstrumentRepository(session, ctx).get_or_raise(instrument.id)
+        row = InstrumentRepository(session, ctx).get_or_raise(instrument_id)
         assert row.provider_backfilled_at is not None
+    status = provider_status(db.factory, ctx, instrument_id)
+    assert status is not None and status.history_limited and not status.error
+
+    # The one-off marker prevents a retry of the older history.
+    refresh_provider(db.factory, ctx, "goldapi", runtime, mode="full")
+    history = [url for url, _headers in fake.calls if url.startswith(GOLDAPI_HISTORY_PREFIX)]
+    assert len(history) == 1
+
+
+def test_goldapi_history_inside_the_window_is_not_limited(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    _set_base(db, "PLN")
+    _goldapi_metal(db, ctx, "XAG", first_trade="2026-02-27")
+    _enable_goldapi(db, ctx)
+    fake = FakeProviderHttpClient(_goldapi_responder)
+
+    refresh_provider(db.factory, ctx, "goldapi", _runtime(db, fake), mode="full")
+
+    assert any(
+        url == "https://www.goldapi.io/api/history/XAG/PLN?from=2026-02-27&to=2026-03-10"
+        for url, _headers in fake.calls
+    )
+    assert _errors(db) == []
+
+
+def test_goldapi_ounce_price_is_converted_to_grams_and_kilograms(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    _set_base(db, "PLN")
+    grams = _goldapi_metal(db, ctx, "XAG", unit_label="g")
+    kilograms = _goldapi_metal(db, ctx, "XAU", unit_label="kg")
+    _enable_goldapi(db, ctx)
+
+    refresh_provider(
+        db.factory, ctx, "goldapi", _runtime(db, FakeProviderHttpClient(_goldapi_responder))
+    )
+
+    with localcontext() as context:
+        context.prec = 80
+        per_gram = Decimal("123.4567") / Decimal("31.1034768")
+        per_kilogram = Decimal("123.4567") * 1000 / Decimal("31.1034768")
+    prices = {point.instrument_id: point.price for point in _prices(db)}
+    assert prices[grams] == normalize_provider_decimal(per_gram, positive=True)
+    assert prices[kilograms] == normalize_provider_decimal(per_kilogram, positive=True)
+
+
+def test_goldapi_future_utc_day_is_capped_at_the_workspace_today(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    _set_timezone(db, "America/New_York")
+    clock = FixedClock("2026-03-10T00:10:00+00:00")
+    db.clock = clock
+    db.factory.kw["info"]["clock"] = clock
+    ctx = _owner(db)
+    _set_base(db, "PLN")
+    _goldapi_metal(db, ctx, "XAG")
+    _enable_goldapi(db, ctx)
+    body = b'{"metal": "XAG", "currency": "PLN", "price": 123.4567, "timestamp": 1773101400}'
+    runtime = _runtime(db, FakeProviderHttpClient(lambda _url: body))
+
+    stats = refresh_provider(db.factory, ctx, "goldapi", runtime, mode="latest")
+    request_ctx = replace(ctx, workspace=replace(ctx.workspace, timezone="America/New_York"))
+    result = lookup_provider(
+        db.factory,
+        request_ctx,
+        "goldapi",
+        runtime,
+        type_value="metal",
+        quote_currency="PLN",
+        unit_label="oz",
+        provider_symbol="XAG",
+    )
+
+    assert stats.status == "ok"
+    assert [point.date for point in _prices(db)] == [date(2026, 3, 9)]
+    assert (result.status, result.date) == ("ok", date(2026, 3, 9))
+
+
+def test_goldapi_lookup_reserves_quota_and_converts_the_unit(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    _enable_goldapi(db, ctx, budget=1)
+    fake = FakeProviderHttpClient(_goldapi_responder)
+    runtime = _runtime(db, fake)
+
+    def lookup():
+        return lookup_provider(
+            db.factory,
+            ctx,
+            "goldapi",
+            runtime,
+            type_value="metal",
+            quote_currency="PLN",
+            unit_label="kg",
+            provider_symbol="xag",
+        )
+
+    first = lookup()
+    with localcontext() as context:
+        context.prec = 80
+        per_kilogram = Decimal("123.4567") * 1000 / Decimal("31.1034768")
+    assert (first.status, first.currency) == ("ok", "PLN")
+    assert first.price == normalize_provider_decimal(per_kilogram, positive=True)
+    assert _quota(db, ctx) == (date(2026, 3, 10), 1)
+    second = lookup()
+    assert (second.status, second.code) == ("quota_exhausted", "quota_exhausted")
+    assert len(fake.calls) == 1
+
+
+@pytest.mark.parametrize("status", [401, 403, 429])
+def test_goldapi_key_never_reaches_logs_errors_or_audit(
+    db: WorkspaceDb, team: WorkspaceDb, caplog: pytest.LogCaptureFixture, status: int
+) -> None:
+    ctx = _owner(db)
+    _set_base(db, "PLN")
+    _goldapi_metal(db, ctx, "XAG")
+    _enable_goldapi(db, ctx)
+    runtime = _runtime(
+        db,
+        FakeProviderHttpClient(
+            lambda _url: HttpResponse(status, b'{"error": "' + GOLDAPI_SECRET.encode() + b'"}', {})
+        ),
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        stats = refresh_now(db.factory, ctx, "goldapi", runtime)
+        result = lookup_provider(
+            db.factory,
+            ctx,
+            "goldapi",
+            runtime,
+            type_value="metal",
+            quote_currency="PLN",
+            unit_label="oz",
+            provider_symbol="XAG",
+        )
+        refresh_all(db.factory, "goldapi", runtime, logging.getLogger("test.goldapi"))
+
+    assert stats.errors >= 1
+    assert result.status in {"error", "rate_limited"}
+    assert GOLDAPI_SECRET not in caplog.text
+    with db.factory() as session:
+        errors = list(session.scalars(select(ProviderError)))
+        audits = list(session.scalars(select(AuditEvent)))
+        config = PriceSourceConfigRepository(session, ctx).for_provider("goldapi")
+    assert errors
+    for error in errors:
+        stored = {column.name: getattr(error, column.name) for column in ProviderError.__table__.c}
+        assert GOLDAPI_SECRET not in repr(stored)
+    assert audits
+    for audit in audits:
+        assert GOLDAPI_SECRET not in json.dumps(audit.data, default=str)
+    assert config is not None and config.settings_encrypted is not None
+    assert GOLDAPI_SECRET not in config.settings_encrypted
+    assert config.last_error_code is None or GOLDAPI_SECRET not in config.last_error_code
 
 
 def test_coingecko_utc_timestamp_is_capped_at_the_workspace_day(

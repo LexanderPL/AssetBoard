@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 from decimal import Decimal, localcontext
+from fractions import Fraction
 
 import pytest
+from hypothesis import given, settings
+from hypothesis import strategies as st
 
 from assetboard.domain.providers import (
     COINGECKO,
@@ -24,6 +27,7 @@ from assetboard.domain.providers import (
     nbp_gold_to_unit,
     normalize_instrument_symbol,
     normalize_provider_decimal,
+    provider_price_to_unit,
     provider_supports_instrument,
 )
 
@@ -122,30 +126,84 @@ def test_provider_support_helpers_match_the_adapter_rules() -> None:
 
 
 def test_goldapi_symbols_and_currencies() -> None:
-    assert clean_provider_symbol(GOLDAPI, "xag") == "XAG"
-    assert clean_provider_symbol(GOLDAPI, "XPT") == "XPT"
-    with pytest.raises(InvalidProviderSymbol):
-        clean_provider_symbol(GOLDAPI, "XAUUSD")
-    assert {"PLN", "EUR", "USD"} <= GOLDAPI_CURRENCIES
-    assert provider_supports_instrument(
-        GOLDAPI, type="metal", quote_currency="PLN", provider_symbol="XAG"
-    )
+    for raw, expected in (("xag", "XAG"), (" XAU ", "XAU"), ("XPT", "XPT"), ("xpd", "XPD")):
+        assert clean_provider_symbol(GOLDAPI, raw) == expected
+    assert clean_provider_symbol(GOLDAPI, "") is None
+    for invalid in ("XAUUSD", "GOLD", "XRH", "BTC"):
+        with pytest.raises(InvalidProviderSymbol):
+            clean_provider_symbol(GOLDAPI, invalid)
+    assert {"PLN", "EUR", "USD", "GBP", "CHF"} <= GOLDAPI_CURRENCIES
+    assert len(GOLDAPI_CURRENCIES) == 70  # the documented list without BTC and XAG
+    assert "BTC" not in GOLDAPI_CURRENCIES and "XAG" not in GOLDAPI_CURRENCIES
+    assert GOLDAPI.requires_key and GOLDAPI.default_daily_budget == 4
+    assert GOLDAPI.attribution is None
+    for currency in ("PLN", "EUR", "USD", "GBP", "chf"):
+        assert provider_supports_instrument(
+            GOLDAPI, type="metal", quote_currency=currency, provider_symbol="XAG"
+        )
     assert not provider_supports_instrument(
         GOLDAPI, type="crypto", quote_currency="PLN", provider_symbol="XAG"
     )
     assert not provider_supports_instrument(
         GOLDAPI, type="metal", quote_currency="ABC", provider_symbol="XAG"
     )
+    assert not provider_supports_instrument(
+        GOLDAPI, type="metal", quote_currency="PLN", provider_symbol=None
+    )
 
 
-def test_goldapi_ounce_conversion_supports_grams_and_kilograms() -> None:
-    price = Decimal("100.00")
+# Oracle: exact rational arithmetic (fractions.Fraction) with the troy ounce defined as exactly
+# 31.1034768 g (International Yard and Pound Agreement, 1959).
+_OUNCE_GRAMS = Fraction("31.1034768")
+
+
+@pytest.mark.parametrize(
+    ("price", "unit", "expected"),
+    [
+        ("2391.72", "oz", Fraction("2391.72")),
+        ("2391.72", "troy ounce", Fraction("2391.72")),
+        ("2391.72", "uncja", Fraction("2391.72")),
+        ("31.1034768", "g", Fraction(1)),
+        ("31.1034768", "gram", Fraction(1)),
+        ("31.1034768", "kg", Fraction(1000)),
+        ("123.4567", "g", Fraction("123.4567") / _OUNCE_GRAMS),
+        ("123.4567", "kilogram", Fraction("123.4567") * 1000 / _OUNCE_GRAMS),
+        ("0.01", "kg", Fraction("0.01") * 1000 / _OUNCE_GRAMS),
+    ],
+)
+def test_goldapi_ounce_conversion_golden(price: str, unit: str, expected: Fraction) -> None:
+    result = goldapi_ounce_to_unit(Decimal(price), unit)
+    assert abs(Fraction(result) - expected) <= Fraction(1, 10**70)
+
+
+@settings(max_examples=200, deadline=None)
+@given(
+    st.decimals(
+        min_value=Decimal("0.0001"), max_value=Decimal("1000000"), places=4, allow_nan=False
+    )
+)
+def test_goldapi_kilogram_is_a_thousand_grams_and_an_ounce_is_31_grams(price: Decimal) -> None:
+    grams = goldapi_ounce_to_unit(price, "g")
+    kilograms = goldapi_ounce_to_unit(price, "kg")
+    assert abs(Fraction(kilograms) - Fraction(grams) * 1000) <= Fraction(1, 10**70)
+    assert abs(Fraction(grams) * _OUNCE_GRAMS - Fraction(price)) <= Fraction(1, 10**70)
     assert goldapi_ounce_to_unit(price, "oz") == price
+
+
+def test_goldapi_conversion_rejects_bad_units_and_rates() -> None:
+    with pytest.raises(UnsupportedUnit):
+        goldapi_ounce_to_unit(Decimal(100), "coin")
+    with pytest.raises(InvalidProviderRate):
+        goldapi_ounce_to_unit(Decimal(-1), "oz")
+    with pytest.raises(InvalidProviderRate):
+        goldapi_ounce_to_unit(Decimal("NaN"), "g")
+
+
+def test_provider_price_to_unit_dispatches_per_provider() -> None:
+    price = Decimal("62.2069536")
+    assert provider_price_to_unit("goldapi", price, "g") == Decimal(2)
     with localcontext() as context:
         context.prec = 80
-        grams = price / Decimal("31.1034768")
-        kilograms = grams * Decimal(1000)
-    assert goldapi_ounce_to_unit(price, "g") == grams
-    assert goldapi_ounce_to_unit(price, "kg") == kilograms
-    with pytest.raises(UnsupportedUnit):
-        goldapi_ounce_to_unit(price, "coin")
+        assert provider_price_to_unit("nbp", price, "oz") == price * Decimal("31.1034768")
+    assert provider_price_to_unit("coingecko", price, "coin") == price
+    assert provider_price_to_unit("eodhd", price, "share") == price

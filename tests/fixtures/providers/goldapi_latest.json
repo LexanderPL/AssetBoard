@@ -1,8 +1,25 @@
 {
   "timestamp": 1772409600,
-  "datetime": "2026-03-02T00:00:00Z",
   "metal": "XAG",
   "currency": "PLN",
+  "exchange": "FOREXCOM",
+  "symbol": "FOREXCOM:XAGPLN",
+  "prev_close_price": 122.9,
+  "open_price": 122.9,
+  "low_price": 121.75,
+  "high_price": 124.1,
+  "open_time": 1772409600,
   "price": 123.4567,
-  "unit": "troy_ounce"
+  "ch": 0.5567,
+  "chp": 0.45,
+  "ask": 123.52,
+  "bid": 123.39,
+  "price_gram_24k": 3.9693,
+  "price_gram_22k": 3.6385,
+  "price_gram_21k": 3.4731,
+  "price_gram_20k": 3.3077,
+  "price_gram_18k": 2.9769,
+  "price_gram_16k": 2.6462,
+  "price_gram_14k": 2.3154,
+  "price_gram_10k": 1.6539
 }
