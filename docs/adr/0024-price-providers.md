@@ -216,6 +216,10 @@ without re-checking at implementation time:
 - CoinGecko public no-key rate limit (undocumented; plan conservatively).
 - metals-api.com free quota.
 - NBP rate limits (unwritten; the ≤1/s self-limit is ours, not theirs).
+- GoldAPI.io date-range history endpoint path and response shape
+  (`/api/history/{metal}/{currency}?from=…&to=…` returning `prices: [{date, price}]`): the
+  documentation page and OpenAPI file could not be fetched from the build environment, so the
+  adapter follows the integration plan and its recorded fixture; confirm with a real key.
 
 ## Implementation notes (F6.4)
 
@@ -247,10 +251,21 @@ without re-checking at implementation time:
   history and skipping the remainder with `quota_exhausted`. One reservation is taken per
   adapter request, cache hits included, and the reservation row is locked with `SELECT … FOR
   UPDATE` on PostgreSQL; transport retries are not counted as extra reservations.
-- GoldAPI.io ships in the F6.5 follow-up: key in the `x-access-token` header, 1 request/second,
-  latest 15 min/history 24 h cache, daily schedule 22:50 UTC, and a default 4 calls/day to stay
-  under the free plan's ~150 monthly requests. History requests are clamped to the provider's
-  90-day window; the first transaction older than that is marked `history_limited`.
+- GoldAPI.io ships in the F6.5 follow-up: key in the `x-access-token` header only (never in a
+  URL, log, error code, audit event or page), 1 request/second, latest 15 min/history 24 h cache,
+  daily schedule 22:50 UTC, and a default 4 calls/day to stay under the free plan's ~150 monthly
+  requests (the owner can raise it). It shares EODHD's per-workspace UTC-day budget: latest calls
+  are reserved first, history uses what is left, a test lookup takes one reservation, and an
+  exhausted budget skips the rest with an informational `quota_exhausted`.
+- GoldAPI latest is `GET https://www.goldapi.io/api/{metal}/{currency}` (checked on 2026-11-08
+  against the provider's own published examples); `timestamp` is Unix seconds and is dated in
+  UTC, then capped at the workspace's today as for CoinGecko. Prices are per troy ounce and are
+  converted to `oz`, `g` or `kg` (1 oz t = 31.1034768 g) in an 80-digit context. Quote currencies
+  are the provider's documented list minus BTC and XAG, which are not instrument currencies.
+- GoldAPI history uses the date-range endpoint, at most 90 days per request. This integration
+  makes one request per instrument for the most recent 90-day window; when the first transaction
+  is older it records the informational `history_limited`, and the one-off backfill marker
+  prevents retries. No schema change was needed.
 
 ## Open items
 
@@ -262,6 +277,8 @@ without re-checking at implementation time:
 - **Deferred providers**: Kraken and Frankfurter land in a follow-up minor release;
   `PriceSourceConfig`'s encrypted settings JSON already models keyed providers.
 - **Cache TTLs** per provider are settled in the F6.4 plan.
+- **GoldAPI.io history**: confirm the date-range endpoint and its 90-day limit with a real key;
+  a backfill older than 90 days (several windows per instrument) is a possible follow-up.
 
 ## Consequences
 
