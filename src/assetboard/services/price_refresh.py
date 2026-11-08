@@ -42,18 +42,16 @@ from assetboard.domain.prices import (
     ProviderRateQuote,
 )
 from assetboard.domain.providers import (
-    GOLDAPI_KEY,
     InvalidProviderRate,
     InvalidProviderSymbol,
     ProviderDefinition,
     UnsupportedUnit,
     clean_provider_symbol,
     convert_to_workspace_base,
-    goldapi_ounce_to_unit,
-    nbp_gold_to_unit,
     normalize_instrument_symbol,
     normalize_provider_decimal,
     provider_definition,
+    provider_price_to_unit,
     provider_supports_instrument,
 )
 from assetboard.services.context import (
@@ -435,10 +433,9 @@ def lookup_provider(
     if quote is None:
         return LookupResult("error", code="no_data")
     try:
-        price = (
-            nbp_gold_to_unit(quote.price, unit_label) if definition.key == "nbp" else quote.price
+        price = normalize_provider_decimal(
+            provider_price_to_unit(definition.key, quote.price, unit_label), positive=True
         )
-        price = normalize_provider_decimal(price, positive=True)
     except (UnsupportedUnit, InvalidProviderRate):
         return LookupResult("error", code="unsupported_unit")
     return LookupResult(
@@ -1277,13 +1274,9 @@ def _backfill_fx(
 def _price_for_target(
     definition: ProviderDefinition, target: _InstrumentTarget, quote: ProviderQuote
 ) -> Decimal:
-    if definition.key == "nbp":
-        price = nbp_gold_to_unit(quote.price, target.unit_label)
-    elif definition.key == GOLDAPI_KEY:
-        price = goldapi_ounce_to_unit(quote.price, target.unit_label)
-    else:
-        price = quote.price
-    return normalize_provider_decimal(price, positive=True)
+    return normalize_provider_decimal(
+        provider_price_to_unit(definition.key, quote.price, target.unit_label), positive=True
+    )
 
 
 def _base_rate(

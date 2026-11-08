@@ -1,4 +1,9 @@
-"""GoldAPI.io precious-metals adapter (F6.5 follow-up)."""
+"""GoldAPI.io precious-metals adapter (F6.5 follow-up, ADR-0024).
+
+GoldAPI quotes XAU, XAG, XPT and XPD per troy ounce in the instrument's currency. The API key
+travels only in the ``x-access-token`` header, never in a URL, so it cannot reach logs, error
+codes or the response cache key in clear text (the cache key is a SHA-256 digest).
+"""
 
 from __future__ import annotations
 
@@ -21,7 +26,7 @@ from assetboard.domain.providers import (
 )
 from assetboard.services.providers.transport import ProviderPayloadError, ProviderRuntime
 
-PRICE_URL = "https://www.goldapi.io/api/price/{metal}/{currency}"
+PRICE_URL = "https://www.goldapi.io/api/{metal}/{currency}"
 HISTORY_URL = "https://www.goldapi.io/api/history/{metal}/{currency}"
 LATEST_TTL = timedelta(minutes=15)
 HISTORY_TTL = timedelta(hours=24)
@@ -59,25 +64,26 @@ class GoldApiProvider:
         quotes: dict[str, ProviderQuote] = {}
         for symbol in symbols:
             clean = _symbol(symbol)
-            query = urlencode({"melt_price": "false", "currency_info": "false"})
             body = self.runtime.fetch(
                 self.key,
-                f"{PRICE_URL.format(metal=clean, currency=currency)}?{query}",
+                PRICE_URL.format(metal=clean, currency=currency),
                 headers=_headers(token),
                 ttl=LATEST_TTL,
                 wait=wait,
                 max_wait=300.0,
             )
-            row = _payload(body)
+            row = _object(_load_json(body))
             raw_price = row.get("price")
             if raw_price is None:
                 raise ProviderPayloadError()
             price = _decimal(raw_price)
             raw_timestamp = row.get("timestamp")
+            # GoldAPI's timestamp is Unix seconds (UTC). The service caps the day at the
+            # workspace's today, as it does for CoinGecko.
             day = (
-                _seconds_date(raw_timestamp)
-                if isinstance(raw_timestamp, (int, Decimal))
-                else self.runtime.clock.today("UTC")
+                self.runtime.clock.today("UTC")
+                if raw_timestamp is None
+                else _seconds_date(raw_timestamp)
             )
             quotes[clean] = ProviderQuote(clean, day, price)
         return quotes
@@ -96,9 +102,9 @@ class GoldApiProvider:
         currency = _currency(quote_currency)
         if end < start:
             return ()
-        # The provider accepts at most 90 calendar days per request. The first implementation
-        # backfills the most recent window; the service records `history_limited` when the
-        # first transaction is older.
+        # The provider accepts at most 90 calendar days per request. This integration backfills
+        # only the most recent window (one request per instrument); the service records
+        # `history_limited` when the first transaction is older.
         window_start = max(start, end - timedelta(days=MAX_HISTORY_DAYS - 1))
         token = _token(settings)
         query = urlencode({"from": window_start.isoformat(), "to": end.isoformat()})
@@ -110,17 +116,12 @@ class GoldApiProvider:
             wait=wait,
             max_wait=300.0,
         )
-        parsed = _load_json(body)
-        if not isinstance(parsed, dict):
-            raise ProviderPayloadError()
-        prices = cast(dict[str, object], parsed).get("prices")
+        prices = _object(_load_json(body)).get("prices")
         if not isinstance(prices, list):
             raise ProviderPayloadError()
         quotes: dict[date, Decimal] = {}
         for item in cast(list[object], prices):
-            if not isinstance(item, dict):
-                raise ProviderPayloadError()
-            row = cast(dict[str, object], item)
+            row = _object(item)
             raw_date = row.get("date")
             raw_price = row.get("price")
             if not isinstance(raw_date, str) or raw_price is None:
@@ -129,11 +130,9 @@ class GoldApiProvider:
                 day = date.fromisoformat(raw_date)
             except ValueError:
                 raise ProviderPayloadError() from None
-            if start <= day <= end:
+            if window_start <= day <= end:
                 quotes[day] = _decimal(raw_price)
-        return tuple(
-            ProviderQuote(clean, day, quotes[day]) for day in sorted(quotes)
-        )
+        return tuple(ProviderQuote(clean, day, quotes[day]) for day in sorted(quotes))
 
 
 def _headers(token: str) -> dict[str, str]:
@@ -167,19 +166,18 @@ def _symbol(value: str) -> str:
 def _load_json(body: bytes) -> object:
     try:
         return json.loads(body, parse_float=Decimal)
-    except (ValueError, UnicodeDecodeError):
+    except (ValueError, UnicodeDecodeError, RecursionError):
         raise ProviderPayloadError() from None
 
 
-def _payload(body: bytes) -> dict[str, object]:
-    parsed = _load_json(body)
-    if not isinstance(parsed, dict):
+def _object(value: object) -> dict[str, object]:
+    if not isinstance(value, dict):
         raise ProviderPayloadError()
-    return cast(dict[str, object], parsed)
+    return cast(dict[str, object], value)
 
 
 def _decimal(value: object) -> Decimal:
-    if not isinstance(value, (int, Decimal)):
+    if isinstance(value, bool) or not isinstance(value, (int, Decimal)):
         raise ProviderPayloadError()
     try:
         return normalize_provider_decimal(Decimal(value), positive=True)
@@ -188,6 +186,12 @@ def _decimal(value: object) -> Decimal:
 
 
 def _seconds_date(value: object) -> date:
-    if not isinstance(value, (int, Decimal)):
+    if isinstance(value, bool) or not isinstance(value, (int, Decimal)):
         raise ProviderPayloadError()
-    return (_EPOCH + timedelta(seconds=int(value))).date()
+    seconds = Decimal(value)
+    if not seconds.is_finite() or seconds < 0:
+        raise ProviderPayloadError()
+    try:
+        return (_EPOCH + timedelta(seconds=int(seconds))).date()
+    except OverflowError:
+        raise ProviderPayloadError() from None

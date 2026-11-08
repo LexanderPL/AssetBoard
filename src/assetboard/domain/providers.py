@@ -2,8 +2,8 @@
 
 The catalogue names the built-in providers, what they can quote and the attribution they need.
 The functions below convert provider observations into the project's conventions without I/O:
-FX rates are base-currency units per one quote-currency unit, and NBP gold is published in PLN
-per gram while the default metal unit is a troy ounce.
+FX rates are base-currency units per one quote-currency unit, NBP gold is published in PLN
+per gram and GoldAPI.io metals per troy ounce, while the default metal unit is a troy ounce.
 """
 
 from __future__ import annotations
@@ -26,8 +26,9 @@ _COINGECKO_SYMBOL = re.compile(r"[a-z0-9-]{1,64}")
 _EODHD_SYMBOL = re.compile(r"[A-Za-z0-9._-]{1,64}")
 
 GOLDAPI_SYMBOLS = frozenset({"XAU", "XAG", "XPT", "XPD"})
-# GoldAPI documents these quote currencies. XAG and BTC are listed by the provider but are not
-# valid ISO 4217 quote currencies for an instrument, so the instrument validator filters them.
+# The quote currencies GoldAPI.io documents (72 codes on its supported-currencies list). Its list
+# also names BTC and XAG; neither is a currency an instrument can be quoted in here, so they are
+# left out on purpose.
 GOLDAPI_CURRENCIES = frozenset(
     {
         "AED",
@@ -38,7 +39,6 @@ GOLDAPI_CURRENCIES = frozenset(
         "BHD",
         "BOB",
         "BRL",
-        "BTC",
         "CAD",
         "CHF",
         "CLP",
@@ -99,7 +99,6 @@ GOLDAPI_CURRENCIES = frozenset(
         "UYU",
         "UZS",
         "VND",
-        "XAG",
         "YER",
         "ZAR",
     }
@@ -346,19 +345,34 @@ def nbp_gold_to_unit(price_per_gram: Decimal, unit_label: str) -> Decimal:
 
 
 def goldapi_ounce_to_unit(price_per_ounce: Decimal, unit_label: str) -> Decimal:
-    """Convert GoldAPI's price per troy ounce to the instrument's unit."""
+    """Convert GoldAPI's price per troy ounce to the instrument's unit (oz, g or kg).
+
+    One troy ounce is exactly 31.1034768 g. The gram and kilogram prices are a single division
+    in an 80-digit context, so ``g × 1000`` and ``kg`` agree to that precision.
+    """
     if not price_per_ounce.is_finite() or price_per_ounce < 0:
         raise InvalidProviderRate
     normalized = unit_label.strip().casefold()
     if normalized in _TROY_OUNCES:
         return price_per_ounce
+    if normalized in _GRAMS:
+        grams_per_unit = Decimal(1)
+    elif normalized in _KILOGRAMS:
+        grams_per_unit = Decimal(1000)
+    else:
+        raise UnsupportedUnit
     with localcontext() as context:
         context.prec = max(context.prec, PROVIDER_DECIMAL_PRECISION)
-        if normalized in _GRAMS:
-            return price_per_ounce / TROY_OUNCE_GRAMS
-        if normalized in _KILOGRAMS:
-            return price_per_ounce / TROY_OUNCE_GRAMS * Decimal(1000)
-    raise UnsupportedUnit
+        return price_per_ounce * grams_per_unit / TROY_OUNCE_GRAMS
+
+
+def provider_price_to_unit(provider_key: str, price: Decimal, unit_label: str) -> Decimal:
+    """A provider price in the instrument's unit: NBP quotes per gram, GoldAPI per troy ounce."""
+    if provider_key == NBP_KEY:
+        return nbp_gold_to_unit(price, unit_label)
+    if provider_key == GOLDAPI_KEY:
+        return goldapi_ounce_to_unit(price, unit_label)
+    return price
 
 
 def ecb_quote_to_rate(quote: Decimal) -> Decimal:
