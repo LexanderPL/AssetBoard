@@ -1,8 +1,9 @@
 # Investments
 
 The **Investments** section records what you hold outside the ledger and how its value is split
-across asset classes. It is the foundation for the portfolio, price and performance views that
-arrive in later updates; this page currently manages the structure.
+across asset classes. The **Portfolio** tab values what you hold today; the other tabs manage
+instruments, asset classes, transactions and price providers. Performance over time arrives in
+a later update.
 
 > **Backups:** investments are not part of the workspace archive yet. An export taken before the
 > investments archive extension does not contain asset classes, instruments, allocations,
@@ -240,6 +241,42 @@ mixed fund.
 An archived class that an instrument already uses stays visible in its allocation editor; you
 can keep the weight or remove it, but you cannot add a new allocation to an archived class.
 "Other" is the catch-all class.
+
+## Portfolio
+
+**Investments → Portfolio** values everything you hold today (quantity above zero), in the
+workspace base currency. It is read-only.
+
+- **Holdings**: instrument, quantity, average cost (cost basis ÷ quantity), the price used with
+  its date, value, cost basis, unrealized gain (amount and %) and share of the portfolio.
+  Archived instruments you still hold are listed with an *Archived* badge; instruments you have
+  sold completely are not listed, but their realized P&L still counts.
+- **Value** is quantity × price × FX rate, rounded once to the base currency's minor unit. Prices
+  follow the usual priority (manual, provider, transaction; the newest date wins). Bond-model
+  instruments use the model value; without bond terms they fall back to the last transaction
+  price and show *Bond terms needed*. A currency instrument is priced at 1.
+- **Stale data**: a price or FX rate older than five days is still used, with a *Stale price* or
+  *Stale FX rate* badge.
+- **Missing data**: an instrument with no price, or whose currency has no FX rate, stays in the
+  table with a warning, but its value **and its cost basis** are left out of every total, the
+  asset-class table and the chart, so the totals and gain % stay comparable. A note above the
+  table says how many holdings are left out. Nothing is ever valued at zero by accident.
+- **Totals**: value, cost basis, unrealized gain, and realized P&L for the current year (sells
+  dated from 1 January in the workspace's time zone through today) and for all time, using the
+  workspace's cost basis method. A sell of an undated imported lot counts in both when the sell
+  itself is dated; an undated sell counts in the all-time figure only.
+- **By asset class** (look-through): each instrument's value and cost are split by its
+  allocation weights. An 80/20 Stocks/Bonds fund worth 1 000.00 adds exactly 800.00 to Stocks
+  and 200.00 to Bonds. Rounding never loses or invents a cent: the class with the largest weight
+  takes the remainder (on a tie, the class listed first on the Asset classes tab). Gain % is
+  shown per class, or *—* when the class has no cost.
+- **Chart**: a donut of instrument values. Choose its scope above it: one asset class (each
+  instrument contributes only its part in that class) or the whole portfolio. It opens on the
+  class created as *Stocks* (*Akcje*) when you hold something there, otherwise on the whole
+  portfolio. Slices under 2% are grouped into *Other*. Slices use the chart palette; the class
+  colours appear in the asset-class table. Without JavaScript the chart's table is shown.
+
+Shares and percentages are rounded once for display, so they may not add up to exactly 100%.
 
 ## Roles
 

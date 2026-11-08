@@ -156,11 +156,17 @@ def savings_rate_bp(earned: int, saved: int) -> int | None:
     return _ratio(saved, earned, BASIS_POINTS)
 
 
+def ratio_tenths(part: int, whole: int) -> int | None:
+    """``part / whole`` in tenths of a percent, for display ("26.7%", "-4.1%"): rounded
+    **once** from the exact ratio, half away from zero. ``None`` when ``whole`` is 0."""
+    return _ratio(part, whole, 1000)
+
+
 def savings_rate_tenths(earned: int, saved: int) -> int | None:
     """The savings rate in tenths of a percent, for display ("26.7%"): rounded **once**, from
     the exact ratio, half up (rounding the basis points again would turn 12.3495% into
     12.4%). ``None`` when nothing was earned."""
-    return _ratio(saved, earned, 1000)
+    return ratio_tenths(saved, earned)
 
 
 FLOW_SCALE = 1000

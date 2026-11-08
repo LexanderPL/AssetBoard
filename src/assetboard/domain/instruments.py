@@ -240,10 +240,11 @@ class SeedAssetClass:
     name: str  # message id; translated when the seed runs
     investable: bool
     color: str
+    portfolio_default: bool = False  # the portfolio chart's default scope (F6.6)
 
 
 ASSET_CLASS_SEED: tuple[SeedAssetClass, ...] = (
-    SeedAssetClass(_("Stocks"), True, "#2563eb"),
+    SeedAssetClass(_("Stocks"), True, "#2563eb", portfolio_default=True),
     SeedAssetClass(_("Bonds"), True, "#16a34a"),
     SeedAssetClass(_("Metals"), True, "#eab308"),
     SeedAssetClass(_("Crypto"), True, "#f97316"),

@@ -80,6 +80,16 @@ class Holding:
     realized_pnl: Money
 
 
+@dataclass(frozen=True, slots=True)
+class RealizedEvent:
+    """The P&L one sell realized, in the base currency (rounded exactly as in ``Holding``)."""
+
+    transaction_id: UUID
+    instrument_id: UUID
+    date: date | None
+    realized: Money
+
+
 @dataclass(slots=True)
 class _Lot:
     quantity: Decimal
@@ -170,10 +180,13 @@ def _compute_instrument(
     method: CostBasisMethod,
     *,
     base_currency: str,
+    events: list[RealizedEvent] | None = None,
 ) -> Holding:
     with localcontext() as context:
         context.prec = max(context.prec, _DECIMAL_PRECISION)
-        return _compute_instrument_rows(transactions, method, base_currency=base_currency)
+        return _compute_instrument_rows(
+            transactions, method, base_currency=base_currency, events=events
+        )
 
 
 def _compute_instrument_rows(
@@ -181,6 +194,7 @@ def _compute_instrument_rows(
     method: CostBasisMethod,
     *,
     base_currency: str,
+    events: list[RealizedEvent] | None = None,
 ) -> Holding:
     instrument_id = transactions[0].instrument_id
     quantity = Decimal(0)
@@ -227,6 +241,15 @@ def _compute_instrument_rows(
                 average_cost = Decimal(0)
             # The displayed average purchase cost is unchanged by a partial sale.
         realized_minor += proceeds_minor - cost_removed_minor
+        if events is not None:
+            events.append(
+                RealizedEvent(
+                    transaction_id=transaction.id,
+                    instrument_id=instrument_id,
+                    date=transaction.date,
+                    realized=Money(proceeds_minor - cost_removed_minor, base_currency),
+                )
+            )
 
         if method is CostBasisMethod.FIFO:
             if quantity == 0:
@@ -277,6 +300,13 @@ def _consume_lots(lots: list[_Lot], sold: Decimal) -> int:
     return removed
 
 
+def _wanted_method(method: CostBasisMethod | str) -> CostBasisMethod:
+    try:
+        return CostBasisMethod(method)
+    except ValueError:
+        raise InvalidHoldingTransaction("invalid_method") from None
+
+
 def compute_holdings(
     transactions: list[HoldingTransaction],
     method: CostBasisMethod | str,
@@ -289,10 +319,7 @@ def compute_holdings(
     ``as_of=None`` means current holdings and includes undated lots; a concrete date excludes
     every undated lot. Raises ``Oversell`` at the first sell that exceeds the quantity held.
     """
-    try:
-        wanted_method = CostBasisMethod(method)
-    except ValueError:
-        raise InvalidHoldingTransaction("invalid_method") from None
+    wanted_method = _wanted_method(method)
     by_instrument: dict[UUID, list[HoldingTransaction]] = {}
     for transaction in transactions:
         if as_of is not None and (transaction.date is None or transaction.date > as_of):
@@ -303,3 +330,31 @@ def compute_holdings(
         for rows in by_instrument.values()
     ]
     return sorted(holdings, key=lambda holding: str(holding.instrument_id))
+
+
+def realized_events(
+    transactions: list[HoldingTransaction],
+    method: CostBasisMethod | str,
+    *,
+    base_currency: str,
+) -> list[RealizedEvent]:
+    """Every sell's realized P&L, from the same ordered pass as ``compute_holdings``.
+
+    The whole history is used (undated legacy lots included), so a dated sell that consumes an
+    undated lot is costed exactly as in the current holdings. The events of one instrument sum
+    to its ``Holding.realized_pnl``. Callers pick a period by the events' dates (an undated sell
+    belongs to no period). Ordered by instrument, then by the holdings order of each instrument.
+    """
+    wanted_method = _wanted_method(method)
+    by_instrument: dict[UUID, list[HoldingTransaction]] = {}
+    for transaction in transactions:
+        by_instrument.setdefault(transaction.instrument_id, []).append(transaction)
+    events: list[RealizedEvent] = []
+    for instrument_id in sorted(by_instrument, key=str):
+        _compute_instrument(
+            by_instrument[instrument_id],
+            wanted_method,
+            base_currency=base_currency,
+            events=events,
+        )
+    return events

@@ -1,0 +1,138 @@
+{# Portfolio overview and allocation (F6.6). ``view`` is web.portfolio_routes.PortfolioView. #}
+{% from "investments/_tabs.html" import tabs with context %}
+{% from "investments/_macros.html" import swatch %}
+{% from "macros/charts.html" import donut with context %}
+<div id="portfolio-body" class="space-y-6">
+  {{ tabs("portfolio") }}
+
+  <section class="panel p-6 sm:p-7" aria-labelledby="portfolio-heading" data-portfolio-totals>
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h1 id="portfolio-heading" class="text-lg font-semibold">{{ _("Portfolio") }}</h1>
+      <p class="text-sm text-muted">{{ _("Valued on %(date)s in %(currency)s", date=view.as_of, currency=view.currency) }}</p>
+    </div>
+    <dl class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div class="border border-line bg-subtle p-4">
+        <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Value") }}</dt>
+        <dd class="mt-1 text-lg font-semibold tabular-nums" data-portfolio-value>{{ view.value }}</dd>
+      </div>
+      <div class="border border-line bg-subtle p-4">
+        <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Cost basis") }}</dt>
+        <dd class="mt-1 text-lg font-semibold tabular-nums" data-portfolio-cost>{{ view.cost }}</dd>
+      </div>
+      <div class="border border-line bg-subtle p-4">
+        <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Unrealized gain") }}</dt>
+        <dd class="mt-1 text-lg font-semibold tabular-nums{% if view.gain_negative %} text-danger {% endif %}" data-portfolio-gain>{{ view.gain }}{% if view.gain_pct %} <span class="text-sm font-medium">({{ view.gain_pct }})</span>{% endif %}</dd>
+      </div>
+      <div class="border border-line bg-subtle p-4">
+        <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Realized P&L") }}</dt>
+        <dd class="mt-1 text-sm tabular-nums" data-portfolio-realized>
+          <span class="block"><span class="text-muted">{{ _("%(year)s to date", year=view.year) }}:</span> <span class="font-semibold" data-realized-ytd>{{ view.realized_ytd }}</span></span>
+          <span class="block"><span class="text-muted">{{ _("All time") }}:</span> <span class="font-semibold" data-realized-all>{{ view.realized_all }}</span></span>
+        </dd>
+      </div>
+    </dl>
+    {% if view.excluded %}
+    <p class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="status" data-portfolio-excluded>{% trans count=view.excluded %}{{ count }} holding is excluded from the totals (missing price or FX rate).{% pluralize %}{{ count }} holdings are excluded from the totals (missing price or FX rate).{% endtrans %}</p>
+    {% endif %}
+  </section>
+
+  <section class="panel p-6 sm:p-7" aria-labelledby="portfolio-holdings-heading" data-portfolio-holdings>
+    <h2 id="portfolio-holdings-heading" class="text-base font-semibold">{{ _("Holdings") }}</h2>
+    {% if view.has_rows %}
+    <div class="mt-4 overflow-x-auto">
+      <table class="sheet w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs text-muted">
+            <th scope="col" class="py-2 pr-3 font-medium">{{ _("Instrument") }}</th>
+            <th scope="col" class="py-2 pr-3 text-right font-medium">{{ _("Quantity") }}</th>
+            <th scope="col" class="py-2 pr-3 text-right font-medium">{{ _("Average cost") }}</th>
+            <th scope="col" class="py-2 pr-3 text-right font-medium">{{ _("Price") }}</th>
+            <th scope="col" class="py-2 pr-3 text-right font-medium">{{ _("Value") }}</th>
+            <th scope="col" class="py-2 pr-3 text-right font-medium">{{ _("Cost basis") }}</th>
+            <th scope="col" class="py-2 pr-3 text-right font-medium">{{ _("Unrealized gain") }}</th>
+            <th scope="col" class="py-2 text-right font-medium">{{ _("Share") }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in view.rows %}
+          <tr class="border-t border-line align-top" data-portfolio-row="{{ row.id }}"{% if row.missing %} data-excluded="{{ row.missing }}"{% endif %}>
+            <th scope="row" class="py-2 pr-3 text-left font-medium">
+              <a href="{{ row.url }}" class="font-semibold text-primary-ink underline-offset-2 hover:underline">{{ row.name }}</a>
+              {% if row.symbol %}<span class="ml-1 text-xs font-normal text-muted">{{ row.symbol }}</span>{% endif %}
+              {% if row.archived %}<span class="ml-1 rounded-full bg-warning-soft px-2 py-0.5 text-xs font-normal text-warning-strong" data-archived-badge>{{ _("Archived") }}</span>{% endif %}
+              {% if row.missing == "price" %}
+              <span class="mt-1 block text-xs font-normal text-warning-strong" data-missing-price>{{ _("Price missing: not included in the totals.") }}</span>
+              {% elif row.missing == "fx" %}
+              <span class="mt-1 block text-xs font-normal text-warning-strong" data-missing-fx>{{ _("No %(currency)s FX rate: not included in the totals.", currency=row.quote_currency) }}</span>
+              {% endif %}
+            </th>
+            <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{{ row.quantity }} <span class="text-xs text-muted">{{ row.unit_label }}</span></td>
+            <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{{ row.avg_cost }}</td>
+            <td class="py-2 pr-3 text-right tabular-nums">
+              {% if row.price is not none %}<span class="whitespace-nowrap">{{ row.price }} {{ row.quote_currency }}</span>{% else %}—{% endif %}
+              {% if row.price_date %}<span class="block text-xs text-muted">{{ row.price_date }}</span>{% endif %}
+              {% if row.price_stale %}<span class="mt-1 inline-block rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning-strong" data-price-stale>{{ _("Stale price") }}</span>{% endif %}
+              {% if row.fx_stale %}<span class="mt-1 inline-block rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning-strong" data-fx-stale>{{ _("Stale FX rate") }}</span>{% endif %}
+              {% if row.terms_missing %}<span class="mt-1 inline-block rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning-strong" data-terms-missing>{{ _("Bond terms needed") }}</span>{% endif %}
+            </td>
+            <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{{ row.value or "—" }}</td>
+            <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{{ row.cost }}</td>
+            <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums{% if row.gain_negative %} text-danger {% endif %}">{{ row.gain or "—" }}<span class="block text-xs">{{ row.gain_pct or "—" }}</span></td>
+            <td class="whitespace-nowrap py-2 text-right tabular-nums">{{ row.share or "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="mt-3 text-sm text-muted" data-portfolio-empty>{{ _("Nothing is held yet. Add buy transactions to see the portfolio.") }}</p>
+    {% if can_edit %}<p class="mt-2 text-sm"><a href="{{ scoped_url(request, 'investments_transactions') }}" class="font-medium text-primary-ink underline">{{ _("Go to transactions") }}</a></p>{% endif %}
+    {% endif %}
+  </section>
+
+  {% if view.classes %}
+  <section class="panel p-6 sm:p-7" aria-labelledby="portfolio-classes-heading" data-portfolio-classes>
+    <h2 id="portfolio-classes-heading" class="text-base font-semibold">{{ _("By asset class") }}</h2>
+    <p class="mt-1 text-sm text-muted">{{ _("Each instrument's value and cost are split by its allocation weights.") }}</p>
+    <div class="mt-4 overflow-x-auto">
+      <table class="sheet w-full text-sm">
+        <thead>
+          <tr class="text-left text-xs text-muted">
+            <th scope="col" class="py-2 pr-3 font-medium">{{ _("Asset class") }}</th>
+            <th scope="col" class="py-2 pr-3 text-right font-medium">{{ _("Value") }}</th>
+            <th scope="col" class="py-2 pr-3 text-right font-medium">{{ _("Cost basis") }}</th>
+            <th scope="col" class="py-2 pr-3 text-right font-medium">{{ _("Gain") }}</th>
+            <th scope="col" class="py-2 text-right font-medium">{{ _("Gain %%") }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for item in view.classes %}
+          <tr class="border-t border-line" data-portfolio-class>
+            <th scope="row" class="py-2 pr-3 text-left font-medium"><span class="inline-flex items-center gap-2">{% if item.color %}{{ swatch(item.color) }}{% endif %}{{ item.name }}{% if item.archived %}<span class="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-normal text-warning-strong">{{ _("Archived") }}</span>{% endif %}</span></th>
+            <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{{ item.value }}</td>
+            <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{{ item.cost }}</td>
+            <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums{% if item.gain_negative %} text-danger {% endif %}">{{ item.gain }}</td>
+            <td class="whitespace-nowrap py-2 text-right tabular-nums{% if item.gain_negative %} text-danger {% endif %}">{{ item.gain_pct or "—" }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if view.has_rows %}
+  <form method="get" action="{{ scoped_url(request, 'investments_portfolio') }}" class="panel flex flex-wrap items-end gap-3 p-4 sm:p-6" data-portfolio-scope>
+    <div class="space-y-1.5">
+      <label for="portfolio-scope" class="block text-sm font-medium">{{ _("Chart scope") }}</label>
+      <select id="portfolio-scope" name="scope" class="form-select py-2">
+        {% for option in view.scope_options %}
+        <option value="{{ option.value }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-subtle">{{ _("Show") }}</button>
+  </form>
+  {{ donut(view.donut, label=_("Instrument")) }}
+  {% endif %}
+</div>
