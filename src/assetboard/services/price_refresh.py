@@ -151,9 +151,11 @@ def refresh_provider(
         return RefreshStats(provider_key=provider_key, status="unknown_provider")
     run = _Run()
     today = runtime.clock.today(targets.timezone)
+    prices_ok = True
+    fx_ok = True
     try:
         if targets.price_targets and hasattr(provider, "fetch_latest"):
-            _refresh_latest_prices(
+            prices_ok = _refresh_latest_prices(
                 factory,
                 scope,
                 provider_key,
@@ -166,7 +168,7 @@ def refresh_provider(
                 run,
             )
         if targets.fx_currencies and hasattr(provider, "fetch_latest_fx"):
-            _refresh_latest_fx(
+            fx_ok = _refresh_latest_fx(
                 factory,
                 scope,
                 provider_key,
@@ -179,7 +181,7 @@ def refresh_provider(
                 run,
             )
         if mode == "full":
-            if targets.price_targets and hasattr(provider, "fetch_history"):
+            if prices_ok and targets.price_targets and hasattr(provider, "fetch_history"):
                 _backfill_prices(
                     factory,
                     scope,
@@ -191,7 +193,7 @@ def refresh_provider(
                     today,
                     run,
                 )
-            if targets.fx_currencies and hasattr(provider, "fetch_history_fx"):
+            if fx_ok and targets.fx_currencies and hasattr(provider, "fetch_history_fx"):
                 _backfill_fx(
                     factory,
                     scope,
@@ -402,7 +404,7 @@ def _refresh_latest_prices(
     today: date,
     wait: bool,
     run: _Run,
-) -> None:
+) -> bool:
     by_quote: dict[str, list[tuple[_InstrumentTarget, str]]] = {}
     for target in targets.price_targets:
         symbol = normalize_instrument_symbol(definition, target.provider_symbol)
@@ -443,7 +445,7 @@ def _refresh_latest_prices(
             run.status = "rate_limited"
             run.retry_after = error.retry_after_seconds
             run.errors += 1
-            return
+            return False
         except (ProviderTransportError, ProviderPayloadError) as error:
             _record_error(
                 factory,
@@ -456,7 +458,7 @@ def _refresh_latest_prices(
             )
             run.status = "error"
             run.errors += 1
-            return
+            return False
         points: list[tuple[UUID, date, Decimal, str]] = []
         for target, symbol in rows:
             quote = quotes.get(symbol)
@@ -505,6 +507,7 @@ def _refresh_latest_prices(
             run.prices += len(points)
     if run.prices:
         _record_success(factory, scope, provider_key, runtime.clock.now())
+    return True
 
 
 def _refresh_latest_fx(
@@ -518,7 +521,7 @@ def _refresh_latest_fx(
     today: date,
     wait: bool,
     run: _Run,
-) -> None:
+) -> bool:
     needed = set(targets.fx_currencies)
     if targets.base_currency != provider.natural_base:
         needed.add(targets.base_currency)
@@ -537,7 +540,7 @@ def _refresh_latest_fx(
         run.status = "rate_limited"
         run.retry_after = error.retry_after_seconds
         run.errors += 1
-        return
+        return False
     except (ProviderTransportError, ProviderPayloadError) as error:
         _record_error(
             factory,
@@ -550,7 +553,7 @@ def _refresh_latest_fx(
         )
         run.status = "error"
         run.errors += 1
-        return
+        return False
     base_rate = _base_rate(rates, targets.base_currency, provider.natural_base)
     if base_rate is None:
         _record_error(
@@ -564,7 +567,7 @@ def _refresh_latest_fx(
         )
         run.errors += 1
         run.skipped += len(targets.fx_currencies)
-        return
+        return False
     base_quote = rates.get(targets.base_currency)
     rows: list[tuple[str, str, date, Decimal, str]] = []
     for currency in sorted(targets.fx_currencies):
@@ -626,9 +629,10 @@ def _refresh_latest_fx(
                 runtime.clock.now(),
             )
             run.errors += 1
-            return
+            return False
         run.rates += len(rows)
         _record_success(factory, scope, provider_key, runtime.clock.now())
+    return True
 
 
 def _backfill_prices(
