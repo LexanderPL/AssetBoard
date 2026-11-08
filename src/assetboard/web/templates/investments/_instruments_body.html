@@ -1,4 +1,4 @@
-{% from "investments/_macros.html" import error, htmx_form, small_button, swatch with context %}
+{% from "investments/_macros.html" import error as field_error, htmx_form, small_button, swatch with context %}
 {% from "investments/_tabs.html" import tabs with context %}
 {% from "macros/components.html" import csrf_input with context %}
 <div id="investments-body" class="space-y-6">
@@ -80,13 +80,13 @@
         <div class="space-y-1.5">
           <label for="instrument-name" class="block text-sm font-medium">{{ _("Name") }}</label>
           <input id="instrument-name" name="name" type="text" value="{{ values.name }}" maxlength="{{ max_name_length }}" required autocomplete="off" class="form-control w-full px-3 py-2">
-          {{ error(errors, "name") }}
+          {{ field_error(errors, "name") }}
         </div>
         <div class="space-y-1.5">
           <label for="instrument-symbol" class="block text-sm font-medium">{{ _("Symbol") }}</label>
           <input id="instrument-symbol" name="symbol" type="text" value="{{ values.symbol }}" maxlength="{{ max_symbol_length }}" autocomplete="off" class="form-control w-full px-3 py-2">
           <p class="text-xs text-muted">{{ _("Optional, for example VWCE.DE or BTC.") }}</p>
-          {{ error(errors, "symbol") }}
+          {{ field_error(errors, "symbol") }}
         </div>
         {% set locked = editing and editing_instrument and editing_instrument.has_transactions %}
         <div class="space-y-1.5">
@@ -103,7 +103,7 @@
           </select>
           <p class="text-xs text-muted">{{ _("Bond (model value) instruments need terms before they can be valued; you can record purchases now.") }}</p>
           {% endif %}
-          {{ error(errors, "type") }}
+          {{ field_error(errors, "type") }}
         </div>
         <div class="space-y-1.5">
           <label for="instrument-currency" class="block text-sm font-medium">{{ _("Quote currency") }}</label>
@@ -119,13 +119,13 @@
           </select>
           <p class="text-xs text-muted">{{ _("Unit prices and fees are in this currency.") }}</p>
           {% endif %}
-          {{ error(errors, "quote_currency") }}
+          {{ field_error(errors, "quote_currency") }}
         </div>
         <div class="space-y-1.5 sm:col-span-2">
           <label for="instrument-unit" class="block text-sm font-medium">{{ _("Unit label") }}</label>
           <input id="instrument-unit" name="unit_label" type="text" value="{{ values.unit_label }}" maxlength="{{ max_unit_label_length }}" autocomplete="off" class="form-control w-full px-3 py-2">
           <p class="text-xs text-muted">{{ _("Leave empty for the type's default (share, coin, oz, property). A currency instrument always uses its currency code.") }}</p>
-          {{ error(errors, "unit_label") }}
+          {{ field_error(errors, "unit_label") }}
         </div>
       </div>
 
@@ -141,14 +141,14 @@
               {% endfor %}
             </select>
             <p class="text-xs text-muted">{{ _("Manual prices always win; a provider fills the gaps for held instruments.") }}</p>
-            {{ error(errors, "provider_key") }}
+            {{ field_error(errors, "provider_key") }}
           </div>
           <div class="space-y-1.5">
             <label for="instrument-provider-symbol" class="block text-sm font-medium">{{ _("Provider symbol") }}</label>
             <input id="instrument-provider-symbol" name="provider_symbol" type="text" value="{{ values.provider_symbol }}" maxlength="64" autocomplete="off" class="form-control w-full px-3 py-2">
             <p class="text-xs text-muted">{{ _("CoinGecko id, EODHD ticker, or XAU for NBP gold.") }}</p>
             <p class="text-xs text-muted">{{ _("EODHD prices come in the exchange currency; set the instrument currency to match (VWCE.DE is quoted in EUR).") }}</p>
-            {{ error(errors, "provider_symbol") }}
+            {{ field_error(errors, "provider_symbol") }}
           </div>
         </div>
         <div class="flex flex-wrap items-center gap-2">
@@ -183,7 +183,7 @@
             </tbody>
           </table>
         </div>
-        {{ error(errors, "allocation") }}
+        {{ field_error(errors, "allocation") }}
         <p class="text-sm text-muted">{{ _("Total") }}: <span data-allocation-total class="font-semibold tabular-nums">—</span></p>
         <p class="hidden text-sm text-danger" data-allocation-warning role="alert">{{ _("Weights must total exactly 100%%.") }}</p>
       </fieldset>

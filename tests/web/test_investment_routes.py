@@ -90,6 +90,15 @@ def _names(html: str, attribute: str) -> list[str]:
     return re.findall(rf'{attribute}="([^"]+)"', html)
 
 
+def test_investment_pages_do_not_render_the_field_error_macro(owner: OwnerApp) -> None:
+    stocks = _class(owner, "Stocks")
+    _instrument(owner, "World ETF", stocks)
+    for path in (INSTRUMENTS, CLASSES):
+        page = owner.client.get(path).text
+        assert "<Macro 'error'>" not in page
+        assert "data-error>" not in page
+
+
 def test_the_nav_links_to_the_investments_page(owner: OwnerApp) -> None:
     home = owner.client.get("/").text
     assert "data-investments-link" in home and f'href="{INSTRUMENTS}"' in home
