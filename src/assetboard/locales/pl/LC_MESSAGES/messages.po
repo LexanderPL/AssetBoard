@@ -5105,79 +5105,6 @@ msgstr ""
 "Zarchiwizowane klasy pozostają na istniejących instrumentach, ale nie "
 "można ich wybierać do nowych alokacji."
 
-msgid "Undo"
-msgstr "Cofnij"
-
-msgid "Back to instruments"
-msgstr "Wróć do instrumentów"
-
-msgid "Average cost"
-msgstr "Koszt średni"
-
-msgid "Cost basis"
-msgstr "Podstawa kosztu"
-
-msgid "Realized P&L"
-msgstr "Zrealizowany zysk/strata"
-
-msgid "Add a transaction"
-msgstr "Dodaj transakcję"
-
-msgid "Add transaction"
-msgstr "Dodaj transakcję"
-
-msgid ""
-"This instrument is archived. Restore it before adding or changing "
-"transactions."
-msgstr ""
-"Ten instrument jest zarchiwizowany. Przywróć go przed dodaniem lub zmianą"
-" transakcji."
-
-msgid "Transaction history"
-msgstr "Historia transakcji"
-
-#, python-format
-msgid "Transactions of %(name)s"
-msgstr "Transakcje: %(name)s"
-
-msgid "FX"
-msgstr "Kurs"
-
-msgid "Note"
-msgstr "Notatka"
-
-msgid "No transactions for this instrument yet."
-msgstr "Ten instrument nie ma jeszcze transakcji."
-
-msgid ""
-"Add the suggested asset classes before creating instruments; every "
-"instrument's value is split across them."
-msgstr ""
-"Dodaj sugerowane klasy aktywów przed utworzeniem instrumentów; wartość "
-"każdego instrumentu jest między nie dzielona."
-
-msgid "Record what you hold and how its value is split across asset classes."
-msgstr ""
-"Zapisz, co posiadasz i jak jego wartość jest dzielona między klasy "
-"aktywów."
-
-msgid ""
-"Bond terms are needed before this instrument can be valued. Open the "
-"instrument to add them; you can record purchases now."
-msgstr ""
-"Warunki obligacji są potrzebne, zanim będzie można wycenić ten "
-"instrument. Otwórz instrument, aby je dodać; zakupy możesz zapisać już "
-"teraz."
-
-msgid "No active instruments."
-msgstr "Brak aktywnych instrumentów."
-
-msgid "Edit instrument"
-msgstr "Edytuj instrument"
-
-msgid "Add an instrument"
-msgstr "Dodaj instrument"
-
 msgid "Symbol"
 msgstr "Symbol"
 
@@ -5289,6 +5216,79 @@ msgstr "Wagi muszą sumować się dokładnie do 100%%."
 
 msgid "Save instrument"
 msgstr "Zapisz instrument"
+
+msgid "Undo"
+msgstr "Cofnij"
+
+msgid "Back to instruments"
+msgstr "Wróć do instrumentów"
+
+msgid "Average cost"
+msgstr "Koszt średni"
+
+msgid "Cost basis"
+msgstr "Podstawa kosztu"
+
+msgid "Realized P&L"
+msgstr "Zrealizowany zysk/strata"
+
+msgid "Add a transaction"
+msgstr "Dodaj transakcję"
+
+msgid "Add transaction"
+msgstr "Dodaj transakcję"
+
+msgid ""
+"This instrument is archived. Restore it before adding or changing "
+"transactions."
+msgstr ""
+"Ten instrument jest zarchiwizowany. Przywróć go przed dodaniem lub zmianą"
+" transakcji."
+
+msgid "Transaction history"
+msgstr "Historia transakcji"
+
+#, python-format
+msgid "Transactions of %(name)s"
+msgstr "Transakcje: %(name)s"
+
+msgid "FX"
+msgstr "Kurs"
+
+msgid "Note"
+msgstr "Notatka"
+
+msgid "No transactions for this instrument yet."
+msgstr "Ten instrument nie ma jeszcze transakcji."
+
+msgid ""
+"Add the suggested asset classes before creating instruments; every "
+"instrument's value is split across them."
+msgstr ""
+"Dodaj sugerowane klasy aktywów przed utworzeniem instrumentów; wartość "
+"każdego instrumentu jest między nie dzielona."
+
+msgid "Add instrument"
+msgstr "Dodaj instrument"
+
+msgid "Add an instrument"
+msgstr "Dodaj instrument"
+
+msgid "Record what you hold and how its value is split across asset classes."
+msgstr ""
+"Zapisz, co posiadasz i jak jego wartość jest dzielona między klasy "
+"aktywów."
+
+msgid ""
+"Bond terms are needed before this instrument can be valued. Open the "
+"instrument to add them; you can record purchases now."
+msgstr ""
+"Warunki obligacji są potrzebne, zanim będzie można wycenić ten "
+"instrument. Otwórz instrument, aby je dodać; zakupy możesz zapisać już "
+"teraz."
+
+msgid "No active instruments."
+msgstr "Brak aktywnych instrumentów."
 
 msgid "Archived instruments"
 msgstr "Zarchiwizowane instrumenty"
@@ -5600,6 +5600,14 @@ msgid ""
 "In the instrument's quote currency. A currency instrument is always "
 "priced at 1."
 msgstr "W walucie notowania instrumentu. Instrument walutowy zawsze ma cenę 1."
+
+msgid ""
+"What you paid per bond (cost basis). Face value is the nominal the "
+"interest accrues on, e.g. 99.90 paid for a 100 bond on a rollover."
+msgstr ""
+"Ile zapłacono za jedną obligację (podstawa kosztowa). Wartość nominalna "
+"to kwota, od której naliczane są odsetki, np. 99,90 zapłacone za "
+"obligację o nominale 100 przy zamianie."
 
 #, python-format
 msgid "FX rate to %(currency)s"
@@ -8219,4 +8227,7 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Photography"
 #~ msgstr "Fotografia"
+
+#~ msgid "Edit instrument"
+#~ msgstr "Edytuj instrument"
 

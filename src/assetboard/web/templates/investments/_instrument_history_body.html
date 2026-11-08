@@ -33,7 +33,7 @@
       </div>
       <div class="border border-line bg-subtle p-4">
         <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Average cost") }}</dt>
-        <dd class="mt-1 text-lg font-semibold tabular-nums">{{ format_quantity_input(history.holding.avg_cost, locale) }} {{ base_currency }}</dd>
+        <dd class="mt-1 text-lg font-semibold tabular-nums" data-avg-cost>{{ format_money(Money.from_decimal(history.holding.avg_cost, base_currency), locale) }}</dd>
       </div>
       <div class="border border-line bg-subtle p-4">
         <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Cost basis") }}</dt>

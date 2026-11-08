@@ -60,6 +60,7 @@ from assetboard.services.prices import (
     delete_manual_price,
     instrument_prices,
     save_manual_price,
+    stored_fx_rates,
 )
 from assetboard.web.context import CurrentContext
 from assetboard.web.errors import is_htmx_fragment_request
@@ -234,16 +235,40 @@ def _bond_form_values(
     )
 
 
-def _default_values(instrument: InstrumentView | None, today: date) -> dict[str, str]:
+def _default_values(
+    instrument: InstrumentView | None,
+    today: date,
+    *,
+    unit_price: str = "",
+    fx_to_base: str = "",
+) -> dict[str, str]:
     return {
         "date": today.isoformat(),
         "type": "buy",
         "instrument_id": str(instrument.id) if instrument is not None else "",
         "quantity": "",
-        "unit_price": "",
+        "unit_price": unit_price,
         "fee": "0",
-        "fx_to_base": "",
+        "fx_to_base": fx_to_base,
         "note": "",
+    }
+
+
+def _fx_defaults(
+    request: Request, ctx: Context, instruments: tuple[InstrumentView, ...], today: date
+) -> dict[str, str]:
+    """Stored FX for each foreign quote currency, formatted for the FX field (empty: none)."""
+    currencies = {
+        item.quote_currency
+        for item in instruments
+        if item.quote_currency != ctx.workspace.base_currency
+    }
+    if not currencies:
+        return {}
+    rates = stored_fx_rates(request.app.state.session_factory, ctx, currencies, today)
+    return {
+        currency: format_quantity_input(rate, request.state.locale)
+        for currency, rate in rates.items()
     }
 
 
@@ -272,11 +297,12 @@ def _instruments(
 
 
 def _list_values(
-    request: Request, ctx: Context, instruments: tuple[InstrumentView, ...], today: date
+    instruments: tuple[InstrumentView, ...], today: date, fx_defaults: dict[str, str]
 ) -> dict[str, str]:
     values = _default_values(None, today)
     if instruments:
         values["instrument_id"] = str(instruments[0].id)
+        values["fx_to_base"] = fx_defaults.get(instruments[0].quote_currency, "")
     return values
 
 
@@ -318,6 +344,9 @@ def _list_page(
     locale = request.state.locale
     today = ctx.clock.today(ctx.workspace.timezone)
     active_instruments, instruments = _instruments(factory, ctx, locale)
+    fx_defaults = (
+        _fx_defaults(request, ctx, active_instruments, today) if has_role(ctx, Role.EDITOR) else {}
+    )
     filters = _filter_values(request)
     page_number = _int(request.query_params.get("page", "1"))
     try:
@@ -346,7 +375,8 @@ def _list_page(
         "instruments": instruments,
         "active_instruments": active_instruments,
         "filters": filters,
-        "create_values": create_values or _list_values(request, ctx, active_instruments, today),
+        "create_values": create_values or _list_values(active_instruments, today, fx_defaults),
+        "fx_defaults": fx_defaults,
         "create_errors": {
             field: _t(request, message) for field, message in (create_errors or {}).items()
         },
@@ -467,7 +497,21 @@ def _history_page(
         "editing_price": editing_price,
         "price_sparkline": sparkline_polyline([point.price for point in prices.effective]),
         "default_stale_after_days": DEFAULT_STALE_AFTER_DAYS,
-        "create_values": create_values or _default_values(history.instrument, today),
+        "create_values": create_values
+        or _default_values(
+            history.instrument,
+            today,
+            unit_price=(
+                format_amount_input(bond.terms.face_value, locale) if bond is not None else ""
+            ),
+            fx_to_base=(
+                _fx_defaults(request, ctx, (history.instrument,), today).get(
+                    history.instrument.quote_currency, ""
+                )
+                if has_role(ctx, Role.EDITOR)
+                else ""
+            ),
+        ),
         "create_errors": {
             field: _t(request, message) for field, message in (create_errors or {}).items()
         },
