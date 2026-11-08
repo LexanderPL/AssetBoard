@@ -147,6 +147,7 @@
             <label for="instrument-provider-symbol" class="block text-sm font-medium">{{ _("Provider symbol") }}</label>
             <input id="instrument-provider-symbol" name="provider_symbol" type="text" value="{{ values.provider_symbol }}" maxlength="64" autocomplete="off" class="form-control w-full px-3 py-2">
             <p class="text-xs text-muted">{{ _("CoinGecko id, EODHD ticker, or XAU for NBP gold.") }}</p>
+            <p class="text-xs text-muted">{{ _("EODHD prices come in the exchange currency; set the instrument currency to match (VWCE.DE is quoted in EUR).") }}</p>
             {{ error(errors, "provider_symbol") }}
           </div>
         </div>

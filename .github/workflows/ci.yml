@@ -42,9 +42,11 @@ jobs:
           binary=.cache/tailwindcss-v3.4.17-linux-x64
           if [ ! -x "$binary" ]; then
             asset_id=$(curl --fail --silent --show-error \
+              -H "Authorization: Bearer ${{ github.token }}" \
               "https://api.github.com/repos/tailwindlabs/tailwindcss/releases/tags/v3.4.17" \
               | jq -r '.assets[] | select(.name == "tailwindcss-linux-x64") | .id')
             curl --fail --location --silent --show-error \
+              -H "Authorization: Bearer ${{ github.token }}" \
               -H "Accept: application/octet-stream" \
               "https://api.github.com/repos/tailwindlabs/tailwindcss/releases/assets/$asset_id" \
               -o "$binary"

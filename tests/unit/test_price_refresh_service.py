@@ -30,6 +30,7 @@ from assetboard.services.investments import create_asset_class, create_instrumen
 from assetboard.services.price_refresh import (
     _prune_errors,
     _upsert_prices,
+    lookup_provider,
     provider_status,
     refresh_all,
     refresh_provider,
@@ -148,6 +149,13 @@ def _set_base(db: WorkspaceDb, currency: str) -> None:
         workspace = session.get(Workspace, db.workspace_id)
         assert workspace is not None
         workspace.base_currency = currency
+
+
+def _set_timezone(db: WorkspaceDb, timezone: str) -> None:
+    with db.factory.begin() as session:
+        workspace = session.get(Workspace, db.workspace_id)
+        assert workspace is not None
+        workspace.timezone = timezone
 
 
 def _runtime(db: WorkspaceDb, http, time_source: FakeTime | None = None):
@@ -529,6 +537,67 @@ def test_eodhd_daily_quota_skips_remaining_symbols_and_resets_next_day(
         assert config is not None
         assert (config.quota_day, config.quota_used) == (date(2026, 3, 11), 3)
     assert len(_prices(db)) == 3
+
+
+def test_lookup_failures_are_informational(db: WorkspaceDb, team: WorkspaceDb) -> None:
+    ctx = _owner(db)
+    _enable(db, ctx, "coingecko")
+    runtime = _runtime(db, FakeProviderHttpClient(lambda _url: HttpResponse(500, b"", {})))
+
+    result = lookup_provider(
+        db.factory,
+        ctx,
+        "coingecko",
+        runtime,
+        type_value="crypto",
+        quote_currency="USD",
+        unit_label="coin",
+        provider_symbol="bitcoin",
+    )
+
+    assert (result.status, result.code) == ("error", "http_500")
+    with db.factory() as session:
+        config = PriceSourceConfigRepository(session, ctx).for_provider("coingecko")
+        assert config is not None and config.last_error_code is None
+        errors = list(session.scalars(select(ProviderError)))
+        assert [error.code for error in errors] == ["http_500"]
+
+
+def test_coingecko_utc_timestamp_is_capped_at_the_workspace_day(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    _set_timezone(db, "America/New_York")
+    clock = FixedClock("2026-03-10T00:10:00+00:00")
+    db.clock = clock
+    db.factory.kw["info"]["clock"] = clock
+    instrument = _instrument(
+        db,
+        ctx,
+        name="Bitcoin",
+        type_value="crypto",
+        quote_currency="USD",
+        unit_label="coin",
+    )
+    _tx(db, ctx, instrument.id, fx="1")
+    _configure_provider(db, ctx, instrument.id, "coingecko", "bitcoin")
+    save_provider_config(db.factory, ctx, SETTINGS, "coingecko", enabled=True)
+    url = (
+        "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin"
+        "&vs_currencies=usd&include_last_updated_at=true"
+    )
+    runtime = _runtime(
+        db,
+        FakeProviderHttpClient({url: _body("coingecko_simple_ny.json")}),
+    )
+
+    stats = refresh_provider(db.factory, ctx, "coingecko", runtime, mode="latest")
+
+    assert stats.status == "ok"
+    assert [(point.date, point.price) for point in _prices(db)] == [
+        (date(2026, 3, 9), Decimal("12345.67"))
+    ]
+    assert _errors(db) == []
 
 
 def test_coingecko_history_limit_is_recorded_and_backfill_is_marked(

@@ -5040,6 +5040,13 @@ msgstr "Symbol dostawcy"
 msgid "CoinGecko id, EODHD ticker, or XAU for NBP gold."
 msgstr "Identyfikator CoinGecko, ticker EODHD lub XAU dla złota NBP."
 
+msgid ""
+"EODHD prices come in the exchange currency; set the instrument currency "
+"to match (VWCE.DE is quoted in EUR)."
+msgstr ""
+"Ceny EODHD są podawane w walucie giełdy; ustaw walutę instrumentu "
+"odpowiednio (VWCE.DE jest notowany w EUR)."
+
 msgid "Test lookup"
 msgstr "Testowe pobranie"
 

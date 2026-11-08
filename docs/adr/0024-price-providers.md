@@ -241,7 +241,9 @@ without re-checking at implementation time:
   EU-exchange coverage still needs a real key; the UI marks it unverified. The unverified-claims
   register above remains binding.
 - EODHD uses a per-workspace UTC-day call budget (default 20), spending latest calls before
-  history and skipping the remainder with `quota_exhausted`.
+  history and skipping the remainder with `quota_exhausted`. One reservation is taken per
+  adapter request, cache hits included, and the reservation row is locked with `SELECT … FOR
+  UPDATE` on PostgreSQL; transport retries are not counted as extra reservations.
 
 ## Open items
 

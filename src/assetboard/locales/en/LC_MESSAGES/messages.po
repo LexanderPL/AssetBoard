@@ -4683,6 +4683,11 @@ msgstr ""
 msgid "CoinGecko id, EODHD ticker, or XAU for NBP gold."
 msgstr ""
 
+msgid ""
+"EODHD prices come in the exchange currency; set the instrument currency "
+"to match (VWCE.DE is quoted in EUR)."
+msgstr ""
+
 msgid "Test lookup"
 msgstr ""
 

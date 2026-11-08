@@ -413,6 +413,7 @@ def lookup_provider(
             "lookup",
             "rate_limited",
             runtime.clock.now(),
+            informational=True,
         )
         return LookupResult(
             "rate_limited", code="rate_limited", retry_after=error.retry_after_seconds
@@ -426,6 +427,7 @@ def lookup_provider(
             "lookup",
             error.code,
             runtime.clock.now(),
+            informational=True,
         )
         return LookupResult("error", code=error.code)
     quote = quotes.get(symbol)
@@ -441,7 +443,7 @@ def lookup_provider(
     return LookupResult(
         "ok",
         price=price,
-        date=quote.date,
+        date=min(quote.date, runtime.clock.today(ctx.workspace.timezone)),
         currency=quote_currency.upper(),
     )
 
@@ -584,7 +586,9 @@ def _reserve_quota(
 
     def write(session: Session) -> bool:
         CurrentWorkspaceRepository(session, scope).lock(exclusive=False)
-        row = PriceSourceConfigRepository(session, scope).for_provider(provider_key)
+        row = PriceSourceConfigRepository(session, scope).for_provider(
+            provider_key, for_update=True
+        )
         if row is None:
             return False
         if row.quota_day != today_utc:
@@ -684,7 +688,7 @@ def _refresh_latest_prices(
         points: list[tuple[UUID, date, Decimal, str]] = []
         for target, symbol in rows:
             quote = quotes.get(symbol)
-            if quote is None or quote.date > today:
+            if quote is None:
                 _record_error(
                     factory,
                     scope,
@@ -696,6 +700,10 @@ def _refresh_latest_prices(
                 )
                 run.errors += 1
                 continue
+            # A live quote is the latest price as of the workspace's today. CoinGecko dates
+            # its timestamps in UTC, so the scheduled 00:10 UTC job sees tomorrow's date in
+            # western timezones; cap instead of rejecting a perfectly good price.
+            day = min(quote.date, today)
             try:
                 price = _price_for_target(definition, target, quote)
             except (UnsupportedUnit, InvalidProviderRate):
@@ -710,7 +718,7 @@ def _refresh_latest_prices(
                 )
                 run.errors += 1
                 continue
-            points.append((target.id, quote.date, price, provider_key))
+            points.append((target.id, day, price, provider_key))
         if points:
             try:
                 _upsert_prices(factory, scope, points)
@@ -815,7 +823,7 @@ def _refresh_eodhd_latest(
             run.errors += 1
             continue
         quote = quotes.get(symbol)
-        if quote is None or quote.date > today:
+        if quote is None:
             _record_error(
                 factory,
                 scope,
@@ -827,6 +835,7 @@ def _refresh_eodhd_latest(
             )
             run.errors += 1
             continue
+        day = min(quote.date, today)
         try:
             price = _price_for_target(definition, target, quote)
         except (UnsupportedUnit, InvalidProviderRate):
@@ -841,7 +850,7 @@ def _refresh_eodhd_latest(
             )
             run.errors += 1
             continue
-        points.append((target.id, quote.date, price, provider_key))
+        points.append((target.id, day, price, provider_key))
     if points:
         try:
             _upsert_prices(factory, scope, points)

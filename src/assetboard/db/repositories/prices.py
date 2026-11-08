@@ -156,8 +156,12 @@ class PriceSourceConfigRepository(ScopedRepository[PriceSourceConfig]):
     def create(self, **values: object) -> PriceSourceConfig:
         return self.add(PriceSourceConfig(**values))
 
-    def for_provider(self, provider_key: str) -> PriceSourceConfig | None:
+    def for_provider(
+        self, provider_key: str, *, for_update: bool = False
+    ) -> PriceSourceConfig | None:
         statement = self._scoped_select().where(PriceSourceConfig.provider_key == provider_key)
+        if for_update:
+            statement = statement.with_for_update()
         return self._session.scalars(statement).one_or_none()
 
     def enabled(self) -> list[PriceSourceConfig]:
