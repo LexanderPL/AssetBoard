@@ -165,6 +165,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "create",
             "for_instrument",
             "live",
+            "live_for_instruments",
             "any_for_instrument",
             "instrument_ids",
             "get_for_update",
@@ -172,6 +173,10 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "count_filtered",
             "live_dated",
         )
+    },
+    **{
+        ("BondTermsRepository", method): "test_bond_terms_queries_stay_in_their_workspace"
+        for method in ("create", "for_instrument", "for_instruments", "instrument_ids")
     },
     **{
         ("PricePointRepository", method): "test_price_queries_stay_in_their_workspace"

@@ -523,6 +523,9 @@ msgstr "Przywrócono instrument"
 msgid "Instrument allocation changed"
 msgstr "Zmieniono alokację instrumentu"
 
+msgid "Bond terms saved"
+msgstr "Zapisano warunki obligacji"
+
 msgid "Investment transaction added"
 msgstr "Dodano transakcję inwestycyjną"
 
@@ -616,6 +619,9 @@ msgstr "Hasło tymczasowe"
 msgid "Fields"
 msgstr "Pola"
 
+msgid "Instrument"
+msgstr "Instrument"
+
 msgid "From"
 msgstr "Z"
 
@@ -678,9 +684,6 @@ msgstr "Rodzaj"
 
 msgid "Investable"
 msgstr "Inwestycyjna"
-
-msgid "Instrument"
-msgstr "Instrument"
 
 msgid "Transaction type"
 msgstr "Typ transakcji"
@@ -2203,6 +2206,48 @@ msgstr "Nie można przywrócić transakcji z datą w przyszłości."
 msgid "The sale on %(date)s would exceed the quantity held."
 msgstr "Sprzedaż z dnia %(date)s przekroczyłaby posiadaną ilość."
 
+msgid "Bond terms are only available for a bond-model instrument."
+msgstr ""
+"Warunki obligacji są dostępne tylko dla instrumentu typu obligacja "
+"modelowa."
+
+msgid "This instrument is archived; restore it before changing its terms."
+msgstr ""
+"Ten instrument jest zarchiwizowany; przywróć go przed zmianą jego "
+"warunków."
+
+msgid "Enter a series code of at most 64 characters."
+msgstr "Wpisz kod serii o długości do 64 znaków."
+
+msgid "Enter a face value greater than zero."
+msgstr "Wpisz wartość nominalną większą od zera."
+
+msgid "Enter a maturity date after the first schedule date."
+msgstr "Podaj datę wykupu po pierwszej dacie harmonogramu."
+
+msgid "Choose an interest mode."
+msgstr "Wybierz tryb naliczania odsetek."
+
+msgid "Add at least one interest period."
+msgstr "Dodaj co najmniej jeden okres odsetkowy."
+
+msgid "Each period must start on the first date's anniversary."
+msgstr "Każdy okres musi zaczynać się w rocznicę pierwszej daty."
+
+msgid "Enter a rate between 0 and the allowed maximum."
+msgstr "Wpisz stopę od 0 do dozwolonego maksimum."
+
+msgid "Enter a tax rate between 0 and 100%."
+msgstr "Podaj stawkę podatku od 0 do 100%."
+
+msgid "Enter a valid early-redemption fee."
+msgstr "Podaj prawidłową opłatę za wcześniejszy wykup."
+
+msgid "This bond is valued from its terms; manual prices are not used."
+msgstr ""
+"Ta obligacja jest wyceniana na podstawie warunków; ceny ręczne nie są "
+"używane."
+
 msgid "Manual prices cannot be dated in the future."
 msgstr "Ceny ręczne nie mogą mieć przyszłej daty."
 
@@ -2237,6 +2282,9 @@ msgstr "Zapisano cenę."
 
 msgid "Price deleted."
 msgstr "Usunięto cenę."
+
+msgid "Bond terms saved."
+msgstr "Zapisano warunki obligacji."
 
 msgid "an undated transaction"
 msgstr "transakcja bez daty"
@@ -4841,6 +4889,136 @@ msgstr ""
 "Nie ma jeszcze przychodów. Dodaj pensję lub pracę na zlecenie, aby "
 "zobaczyć, co otrzymasz w najbliższym czasie."
 
+msgid "Values are estimates from user-entered terms."
+msgstr "Wartości są szacunkami na podstawie wprowadzonych warunków."
+
+msgid "Valued from terms"
+msgstr "Wycena z warunków"
+
+msgid "Terms needed"
+msgstr "Wymagane warunki"
+
+#, python-format
+msgid "As of %(date)s"
+msgstr "na dzień %(date)s"
+
+#, python-format
+msgid "Per unit: %(price)s %(currency)s"
+msgstr "Na jednostkę: %(price)s %(currency)s"
+
+msgid "Gross accrued"
+msgstr "Naliczone brutto"
+
+msgid "Tax"
+msgstr "Podatek"
+
+msgid "Early-redemption fee"
+msgstr "Opłata za wcześniejszy wykup"
+
+msgid "Projected net at maturity"
+msgstr "Prognozowana wartość netto w dniu wykupu"
+
+msgid ""
+"Each line is rounded to the currency's minor unit, so the displayed "
+"amounts can differ by one minor unit."
+msgstr ""
+"Każda pozycja jest zaokrąglana do najmniejszej jednostki waluty, więc "
+"wyświetlane kwoty mogą różnić się o jedną jednostkę."
+
+msgid ""
+"Coupons paid out annually are not part of the bond value; record them as "
+"income in the ledger."
+msgstr ""
+"Kupony wypłacane co roku nie są częścią wartości obligacji; zapisz je "
+"jako przychód w księdze."
+
+msgid "Record a purchase to value this bond."
+msgstr "Zapisz zakup, aby wycenić tę obligację."
+
+msgid ""
+"Add the bond terms to value this instrument. You can record purchases "
+"before the terms exist."
+msgstr ""
+"Dodaj warunki obligacji, aby wycenić ten instrument. Zakupy możesz "
+"zapisać już teraz."
+
+msgid "Bond terms"
+msgstr "Warunki obligacji"
+
+msgid "Series code"
+msgstr "Kod serii"
+
+#, python-format
+msgid "Face value per unit in %(currency)s"
+msgstr "Wartość nominalna jednostki w %(currency)s"
+
+msgid "Maturity date"
+msgstr "Data wykupu"
+
+msgid "Interest mode"
+msgstr "Tryb odsetek"
+
+msgid "Capitalized annually"
+msgstr "Kapitalizowane rocznie"
+
+msgid "Paid out annually"
+msgstr "Wypłacane rocznie"
+
+msgid "Simple at maturity"
+msgstr "Proste w dniu wykupu"
+
+#, python-format
+msgid "Tax rate in %%"
+msgstr "Stawka podatku w %%"
+
+msgid ""
+"Leave blank for no tax. Tax is charged on interest after the early-"
+"redemption fee."
+msgstr ""
+"Pozostaw puste, aby nie naliczać podatku. Podatek naliczany jest od "
+"odsetek po odjęciu opłaty za wcześniejszy wykup."
+
+msgid "None"
+msgstr "Brak"
+
+msgid "Percent of face value"
+msgstr "Procent wartości nominalnej"
+
+msgid "Fixed amount per unit"
+msgstr "Stała kwota na jednostkę"
+
+msgid "Fee value"
+msgstr "Wartość opłaty"
+
+#, python-format
+msgid "A percentage in %%, or an amount in %(currency)s."
+msgstr "Procent w %%, lub kwota w %(currency)s."
+
+msgid "Rate schedule"
+msgstr "Harmonogram stóp"
+
+msgid ""
+"Each period starts on an anniversary of the first date. Future periods "
+"use the last rate."
+msgstr ""
+"Każdy okres zaczyna się w rocznicę pierwszej daty. Przyszłe okresy "
+"używają ostatniej stopy."
+
+#, python-format
+msgid "Annual rate in %%"
+msgstr "Roczna stopa w %%"
+
+msgid "Add period"
+msgstr "Dodaj okres"
+
+msgid "Save bond terms"
+msgstr "Zapisz warunki obligacji"
+
+msgid "This instrument is archived. Restore it before changing its bond terms."
+msgstr ""
+"Ten instrument jest zarchiwizowany. Przywróć go przed zmianą warunków "
+"obligacji."
+
 msgid "No asset classes yet"
 msgstr "Nie ma jeszcze klas aktywów"
 
@@ -4954,16 +5132,13 @@ msgstr ""
 "Zapisz, co posiadasz i jak jego wartość jest dzielona między klasy "
 "aktywów."
 
-msgid "Terms needed"
-msgstr "Wymagane warunki"
-
 msgid ""
-"Bond terms are needed before this instrument can be valued. You can "
-"record purchases now; the terms form arrives in a later step."
+"Bond terms are needed before this instrument can be valued. Open the "
+"instrument to add them; you can record purchases now."
 msgstr ""
 "Warunki obligacji są potrzebne, zanim będzie można wycenić ten "
-"instrument. Zakupy możesz już zapisywać; formularz warunków pojawi się w "
-"późniejszym kroku."
+"instrument. Otwórz instrument, aby je dodać; zakupy możesz zapisać już "
+"teraz."
 
 msgid "No active instruments."
 msgstr "Brak aktywnych instrumentów."
@@ -5141,10 +5316,6 @@ msgstr "Najnowsza cena"
 
 msgid "No price has been recorded for this instrument yet."
 msgstr "Ten instrument nie ma jeszcze zapisanej ceny."
-
-#, python-format
-msgid "As of %(date)s"
-msgstr "na dzień %(date)s"
 
 #, python-format
 msgid "older than %(days)s days"

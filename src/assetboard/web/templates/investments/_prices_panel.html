@@ -1,7 +1,7 @@
 {% from "macros/components.html" import csrf_input with context %}
 
 {% macro source_label(source) -%}
-{% if source == "manual" %}{{ _("Manual") }}{% elif source == "provider" %}{{ _("Provider") }}{% elif source == "transaction" %}{{ _("Transaction") }}{% elif source %}{{ source }}{% else %}{{ _("Unknown") }}{% endif %}
+{% if source == "manual" %}{{ _("Manual") }}{% elif source == "provider" %}{{ _("Provider") }}{% elif source == "transaction" %}{{ _("Transaction") }}{% elif source == "bond_model" %}{{ _("Model value (net of tax)") }}{% elif source %}{{ source }}{% else %}{{ _("Unknown") }}{% endif %}
 {%- endmacro %}
 
 <section class="panel p-6 sm:p-7" aria-labelledby="instrument-prices-heading" data-price-panel>

@@ -123,3 +123,33 @@ for (const eventName of ["DOMContentLoaded", "htmx:afterSwap", "htmx:oobAfterSwa
 for (const form of document.querySelectorAll("[data-instrument-form]")) {
   updateInstrumentProvider(form);
 }
+
+// F6.5: the bond rate schedule grows and shrinks with simple row controls.
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const add = target.closest("[data-add-period]");
+  if (add) {
+    const form = add.closest("[data-bond-form]");
+    if (!form) return;
+    const first = form.querySelector("[data-bond-period]");
+    if (!first) return;
+    const clone = first.cloneNode(true);
+    for (const input of clone.querySelectorAll("input")) input.value = "";
+    add.before(clone);
+    const input = clone.querySelector("input");
+    if (input) input.focus();
+    return;
+  }
+  const remove = target.closest("[data-remove-period]");
+  if (remove) {
+    const row = remove.closest("[data-bond-period]");
+    if (!row) return;
+    const list = row.parentElement;
+    if (list && list.querySelectorAll("[data-bond-period]").length > 1) {
+      row.remove();
+    } else {
+      for (const input of row.querySelectorAll("input")) input.value = "";
+    }
+  }
+});

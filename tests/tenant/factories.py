@@ -23,6 +23,7 @@ from assetboard.db.models.import_batch import ImportBatch, ImportCategoryMapping
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
 from assetboard.db.models.investments import (
     AssetClass,
+    BondTerms,
     Instrument,
     InstrumentAllocation,
     InvestmentTransaction,
@@ -412,6 +413,24 @@ def make_investment_transaction(session: Session, workspace_id: UUID) -> Investm
     )
 
 
+def make_bond_terms(session: Session, workspace_id: UUID) -> BondTerms:
+    instrument = make_instrument(session, workspace_id)
+    instrument.type = "bond_model"
+    instrument.valuation_source = "bond_model"
+    session.add(instrument)
+    session.flush()
+    return BondTerms(
+        workspace_id=workspace_id,
+        instrument_id=instrument.id,
+        series_code="OTS",
+        face_value_minor=10_000,
+        maturity_date=date(2027, 1, 1),
+        interest_mode="capitalized_annually",
+        rate_schedule=[{"from_date": "2026-01-01", "annual_rate_bp": 500}],
+        tax_rate_bp=1_900,
+    )
+
+
 def make_price_point(session: Session, workspace_id: UUID) -> PricePoint:
     instrument = make_instrument(session, workspace_id)
     session.add(instrument)
@@ -537,6 +556,11 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     ),
     InvestmentTransaction: TenantCase(
         make_investment_transaction, update_values={"note": "Updated"}
+    ),
+    BondTerms: TenantCase(
+        make_bond_terms,
+        update_values={"series_code": "EDO"},
+        unsupported=frozenset({"delete"}),
     ),
     PricePoint: TenantCase(make_price_point, update_values={"price": Decimal("101")}),
     FxRate: TenantCase(make_fx_rate, update_values={"rate": Decimal("0.93")}),

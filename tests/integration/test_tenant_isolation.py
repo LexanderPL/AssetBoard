@@ -54,6 +54,7 @@ from assetboard.db.repositories import (
     AssetClassRepository,
     AuditEventRepository,
     AuditFilter,
+    BondTermsRepository,
     BudgetLineRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
@@ -647,6 +648,10 @@ def test_investment_queries_stay_in_their_workspace(
     assert transactions_b.for_instrument(a_fund.id) == []
     assert [row.id for row in transactions_a.live()] == [a_transaction.id]
     assert [row.id for row in transactions_b.live()] == [b_transaction.id]
+    assert [row.id for row in transactions_a.live_for_instruments((a_fund.id,))] == [
+        a_transaction.id
+    ]
+    assert transactions_b.live_for_instruments((a_fund.id,)) == []
     assert [row.id for row in transactions_a.live_dated(date(2026, 3, 1), (a_fund.id,))] == [
         a_transaction.id
     ]
@@ -761,6 +766,51 @@ def test_price_queries_stay_in_their_workspace(
     )
     assert [row.id for row in rates_a.for_base_on_or_before("EUR", date(2026, 3, 1))] == [a_rate.id]
     assert [row.id for row in rates_b.for_base_on_or_before("EUR", date(2026, 3, 1))] == [b_rate.id]
+
+
+def test_bond_terms_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    instruments_a = InstrumentRepository(db_session, ctx_a)
+    instruments_b = InstrumentRepository(db_session, ctx_b)
+    a_bond = instruments_a.create(
+        name="Treasury bonds",
+        name_key="treasury bonds",
+        symbol=None,
+        type="bond_model",
+        quote_currency="PLN",
+        unit_label="bond",
+        valuation_source="bond_model",
+    )
+    b_bond = instruments_b.create(
+        name="Treasury bonds",
+        name_key="treasury bonds",
+        symbol=None,
+        type="bond_model",
+        quote_currency="PLN",
+        unit_label="bond",
+        valuation_source="bond_model",
+    )
+    terms_a = BondTermsRepository(db_session, ctx_a)
+    terms_b = BondTermsRepository(db_session, ctx_b)
+    values = {
+        "series_code": "OTS",
+        "face_value_minor": 10_000,
+        "maturity_date": date(2027, 1, 1),
+        "interest_mode": "capitalized_annually",
+        "rate_schedule": [{"from_date": "2026-01-01", "annual_rate_bp": 500}],
+        "tax_rate_bp": 1_900,
+    }
+    a_terms = terms_a.create(instrument_id=a_bond.id, **values)
+    b_terms = terms_b.create(instrument_id=b_bond.id, **values)
+    assert terms_a.for_instrument(a_bond.id) is a_terms
+    assert terms_a.for_instrument(b_bond.id) is None
+    assert terms_b.for_instrument(a_bond.id) is None
+    assert [row.id for row in terms_a.for_instruments((a_bond.id, b_bond.id))] == [a_terms.id]
+    assert [row.id for row in terms_b.for_instruments((a_bond.id, b_bond.id))] == [b_terms.id]
+    assert terms_a.instrument_ids() == {a_bond.id}
+    assert terms_b.instrument_ids() == {b_bond.id}
 
 
 def test_price_source_queries_stay_in_their_workspace(

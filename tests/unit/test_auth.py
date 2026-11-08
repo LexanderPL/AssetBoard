@@ -1298,6 +1298,7 @@ WORKSPACE_TABLES = {
     "instruments",
     "instrument_allocations",
     "investment_transactions",
+    "bond_terms",
     "price_points",
     "fx_rates",
     "price_source_configs",

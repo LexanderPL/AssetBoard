@@ -26,6 +26,7 @@ from assetboard.db.models.investments import AssetClass, Instrument, InstrumentA
 from assetboard.db.repositories import (
     AssetClassRepository,
     AuditEventRepository,
+    BondTermsRepository,
     CurrentWorkspaceRepository,
     InstrumentAllocationRepository,
     InstrumentRepository,
@@ -237,6 +238,7 @@ def _instrument_view(
     locale: str,
     *,
     has_transactions: bool = False,
+    has_bond_terms: bool = False,
 ) -> InstrumentView:
     instrument_type = InstrumentType(row.type)
     source = ValuationSource(row.valuation_source)
@@ -261,7 +263,7 @@ def _instrument_view(
         valuation_source_label=gettext(VALUATION_SOURCE_LABELS[source], locale),
         archived=row.archived_at is not None,
         allocations=tuple(_allocation_view(allocation, classes) for allocation in ordered),
-        terms_required=instrument_type is InstrumentType.BOND_MODEL,
+        terms_required=(instrument_type is InstrumentType.BOND_MODEL and not has_bond_terms),
         has_transactions=has_transactions,
         provider_key=row.provider_key,
         provider_symbol=row.provider_symbol,
@@ -277,6 +279,7 @@ def _page(
     locked_instruments: Collection[UUID] = (),
     provider_choices: tuple[ProviderChoice, ...] = (),
     coingecko_enabled: bool = False,
+    bond_terms_instruments: Collection[UUID] = (),
 ) -> InvestmentPage:
     classes_by_id = {row.id: row for row in classes}
     by_instrument: dict[UUID, list[InstrumentAllocation]] = {}
@@ -290,6 +293,7 @@ def _page(
             by_instrument.get(row.id, ()),
             locale,
             has_transactions=row.id in locked_instruments,
+            has_bond_terms=row.id in bond_terms_instruments,
         )
         for row in instruments
     ]
@@ -310,6 +314,7 @@ def investment_page(factory: sessionmaker[Session], ctx: Context, *, locale: str
         instruments = InstrumentRepository(session, ctx).ordered()
         allocations = InstrumentAllocationRepository(session, ctx).list()
         locked = InvestmentTransactionRepository(session, ctx).instrument_ids()
+        terms_instruments = BondTermsRepository(session, ctx).instrument_ids()
         configs = {
             row.provider_key: row for row in PriceSourceConfigRepository(session, ctx).list()
         }
@@ -329,6 +334,7 @@ def investment_page(factory: sessionmaker[Session], ctx: Context, *, locale: str
             locked,
             provider_choices=choices,
             coingecko_enabled=coingecko,
+            bond_terms_instruments=terms_instruments,
         )
 
 
