@@ -168,10 +168,13 @@ def test_projection_repeats_the_last_known_rate_through_maturity() -> None:
     assert valuation.projected_net_at_maturity == _rounded(expected)
 
 
-def test_a_partial_final_period_uses_the_actual_period_length() -> None:
+def test_a_partial_final_period_is_prorated_over_the_full_year() -> None:
     terms = _terms(rates=(500,), maturity=date(2020, 4, 1))
     valuation = bond_value(terms, [_lot()], date(2020, 4, 1))
-    assert valuation.net == Money(10_500, "PLN")
+    with localcontext() as context:
+        context.prec = 80
+        expected = Decimal(100) + Decimal(100) * Decimal("0.05") * Decimal(91) / Decimal(366)
+    assert valuation.net == _rounded(expected)
 
 
 def test_a_leap_day_schedule_uses_the_28th_in_common_years() -> None:

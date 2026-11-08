@@ -320,12 +320,12 @@ def test_unit_price_keeps_decimal_type_scale_not_minor_units(
         ),
         locale="en",
     )
-    _buy(db, ctx, instrument.id, day="2026-01-01", quantity="3")
+    _buy(db, ctx, instrument.id, day="2026-01-01", quantity="7")
 
     panel = bond_panel(db.factory, ctx, instrument.id, on=date(2026, 3, 10))
     assert panel is not None
-    assert panel.valuation.net.amount_minor == 31_133
-    expected = (Decimal("311.33") / Decimal(3)).quantize(Decimal("1e-18"))
+    assert panel.valuation.net.amount_minor == 70_652
+    expected = (Decimal("706.52") / Decimal(7)).quantize(Decimal("1e-18"))
     assert panel.unit_price == expected
     assert panel.unit_price is not None and panel.unit_price.as_tuple().exponent == -18
 

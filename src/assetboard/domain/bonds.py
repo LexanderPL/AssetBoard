@@ -136,6 +136,7 @@ class BondValuation:
 class _Period:
     start: date
     end: date
+    full_end: date
     annual_rate_bp: int
 
 
@@ -232,10 +233,16 @@ def _periods(terms: BondTerms) -> list[_Period]:
         start = anniversary(first, index)
         if start >= terms.maturity_date:
             break
-        end = anniversary(first, index + 1)
-        if end > terms.maturity_date:
-            end = terms.maturity_date
-        periods.append(_Period(start=start, end=end, annual_rate_bp=by_start.get(start, last_rate)))
+        full_end = anniversary(first, index + 1)
+        end = min(full_end, terms.maturity_date)
+        periods.append(
+            _Period(
+                start=start,
+                end=end,
+                full_end=full_end,
+                annual_rate_bp=by_start.get(start, last_rate),
+            )
+        )
         index += 1
     return periods
 
@@ -291,7 +298,8 @@ def _rate(period: _Period) -> Decimal:
 
 
 def _fraction(start: date, end: date, period: _Period) -> Decimal:
-    period_days = (period.end - period.start).days
+    # Actual/actual: a partial final period is prorated over the full annual period.
+    period_days = (period.full_end - period.start).days
     if period_days <= 0:
         return Decimal(0)
     return Decimal((end - start).days) / Decimal(period_days)

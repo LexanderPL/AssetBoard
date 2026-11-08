@@ -84,7 +84,7 @@ The displayed **model value (net of tax)** is a redeem-now estimate:
 `net = face + interest − fee − tax`, where `tax = max(0, interest − fee) × tax rate` and the
 early-redemption fee is capped at the accrued interest, so the value never falls below face.
 Interest accrues actual/actual from each purchase date (undated legacy lots start at the first
-schedule date). `capitalized_annually` compounds at period ends; `paid_out_annually` keeps only
+schedule date; a partial final period is prorated over a full year). `capitalized_annually` compounds at period ends; `paid_out_annually` keeps only
 the current period's accrued interest and resets when a coupon is paid; `at_maturity_simple`
 adds simple interest. At or after maturity the value freezes and equals the projected net at
 maturity.
