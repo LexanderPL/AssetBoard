@@ -80,6 +80,9 @@ function applyStoredFx(form) {
   const select = form.querySelector("[data-transaction-instrument]");
   const input = form.querySelector("[data-fx-input]");
   if (!select || !(input instanceof HTMLInputElement)) return;
+  // The options' rates are for the date the form was rendered with; after a date change they
+  // no longer apply (F6.2a adds a date-aware refill).
+  if (form.dataset.fxDateChanged === "1") return;
   const option = select.selectedOptions[0];
   if (!option || !("fx" in option.dataset)) return;
   const previous = input.dataset.prefilled || "";
@@ -87,6 +90,39 @@ function applyStoredFx(form) {
     input.value = option.dataset.fx || "";
     input.dataset.prefilled = input.value;
   }
+  showFxHint(form);
+}
+
+function showFxHint(form) {
+  const input = form.querySelector("[data-fx-input]");
+  const hint = form.querySelector("[data-fx-hint]");
+  if (!(input instanceof HTMLInputElement) || !hint) return;
+  const prefilled = input.dataset.prefilled || "";
+  hint.classList.toggle("hidden", prefilled === "" || input.value !== prefilled);
+}
+
+// A pre-filled stored rate belongs to the form's date. Changing the date clears a rate the user
+// has not touched (it would be the wrong day's rate, frozen into the cost basis); a typed rate is
+// kept.
+function dateChanged(form) {
+  form.dataset.fxDateChanged = "1";
+  const input = form.querySelector("[data-fx-input]");
+  if (!(input instanceof HTMLInputElement)) return;
+  const prefilled = input.dataset.prefilled || "";
+  if (prefilled !== "" && input.value === prefilled) input.value = "";
+  input.dataset.prefilled = "";
+  showFxHint(form);
+}
+
+for (const eventName of ["change", "input"]) {
+  document.addEventListener(eventName, (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLInputElement)) return;
+    const form = target.closest("[data-transaction-form]");
+    if (!form) return;
+    if (target.name === "date") dateChanged(form);
+    else if (target.matches("[data-fx-input]")) showFxHint(form);
+  });
 }
 
 document.addEventListener("change", (event) => {

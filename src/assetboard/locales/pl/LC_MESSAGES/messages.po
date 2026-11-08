@@ -5616,6 +5616,10 @@ msgstr "Kurs walutowy do %(currency)s"
 msgid "Required when the instrument is quoted in another currency."
 msgstr "Wymagany, gdy instrument jest notowany w innej walucie."
 
+#, python-format
+msgid "Stored rate for %(date)s"
+msgstr "Kurs zapisany na %(date)s"
+
 msgid "Undated"
 msgstr "Bez daty"
 

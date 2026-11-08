@@ -1,6 +1,7 @@
-"""Investments instrument forms in Chromium: the add form opens from its button with no
-allocation warning, a successful add shows the notice in view (and a fresh form still has no
-warning), and editing opens in the instrument's row and cancels back to it. No CSP violations."""
+"""Investments forms in Chromium: the add form opens from its button with no allocation warning,
+a successful add shows the notice in view (and a fresh form still has no warning), editing opens
+in the instrument's row and cancels back to it, and a pre-filled stored FX rate is cleared when
+the transaction date changes while a typed rate is kept. No CSP violations."""
 
 from __future__ import annotations
 
@@ -8,14 +9,20 @@ import os
 import socket
 import threading
 import time
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
 import uvicorn
 from playwright.sync_api import expect, sync_playwright
+from sqlalchemy import select
 
 from assetboard.app import create_app
 from assetboard.config import Settings
+from assetboard.db.models.identity import Workspace
+from assetboard.db.models.investments import Instrument
+from assetboard.db.models.prices import FxRate
 from assetboard.services.auth import run_initial_setup
 
 pytestmark = pytest.mark.skipif(
@@ -112,6 +119,45 @@ def test_instrument_add_and_inline_edit_in_a_browser(tmp_path: Path) -> None:
             editing.get_by_role("link", name="Cancel").click()
             expect(page.locator("[data-editing]")).to_have_count(0)
             expect(page.locator("[data-instrument-name='World ETF'] [data-edit]")).to_be_visible()
+
+            # A foreign-quoted instrument and an old stored rate: the new transaction's FX field
+            # starts with it, a date change clears it untouched, a typed rate survives.
+            add.locator("summary").click()
+            create_form = add.locator("[data-instrument-form]")
+            create_form.get_by_label("Name", exact=True).fill("US fund")
+            create_form.get_by_label("Quote currency").select_option("USD")
+            create_form.get_by_label("Weight for Stocks").fill("100")
+            create_form.get_by_role("button", name="Save instrument").click()
+            expect(page.locator("[data-instrument-name='US fund']")).to_be_visible()
+            with app.state.session_factory.begin() as session:
+                workspace_id = session.scalars(select(Workspace.id)).one()
+                instrument_id = session.scalars(
+                    select(Instrument.id).where(Instrument.name == "US fund")
+                ).one()
+                session.add(
+                    FxRate(
+                        workspace_id=workspace_id,
+                        base_currency="EUR",
+                        quote_currency="USD",
+                        date=date(2000, 1, 3),
+                        rate=Decimal("0.9"),
+                        source="ecb",
+                    )
+                )
+            page.goto(f"{base}/investments/instruments/{instrument_id}", wait_until="networkidle")
+            fx = page.locator("#transaction-fx")
+            hint = page.locator("[data-fx-hint]")
+            expect(fx).to_have_value("0.9")
+            expect(hint).to_be_visible()
+            page.locator("#transaction-date").fill("2001-02-05")
+            expect(fx).to_have_value("")
+            expect(hint).to_be_hidden()
+            page.reload(wait_until="networkidle")
+            expect(fx).to_have_value("0.9")
+            fx.fill("0.95")
+            expect(hint).to_be_hidden()
+            page.locator("#transaction-date").fill("2001-02-05")
+            expect(fx).to_have_value("0.95")
 
             assert page.evaluate("window.__cspViolations") == []
             browser.close()

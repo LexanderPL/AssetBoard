@@ -5207,6 +5207,10 @@ msgstr ""
 msgid "Required when the instrument is quoted in another currency."
 msgstr ""
 
+#, python-format
+msgid "Stored rate for %(date)s"
+msgstr ""
+
 msgid "Undated"
 msgstr ""
 

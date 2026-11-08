@@ -254,10 +254,30 @@ def _default_values(
     }
 
 
+def _form_day(values: dict[str, str] | None, today: date) -> date | None:
+    """The date a create form is for: today on a fresh form, else the submitted date.
+
+    ``None`` when the submitted date is not a usable trade date, so nothing is pre-filled.
+    """
+    if values is None:
+        return today
+    try:
+        day = date.fromisoformat(values.get("date", "").strip())
+    except ValueError:
+        return None
+    return day if day <= today else None
+
+
 def _fx_defaults(
-    request: Request, ctx: Context, instruments: tuple[InstrumentView, ...], today: date
+    request: Request, ctx: Context, instruments: tuple[InstrumentView, ...], on: date | None
 ) -> dict[str, str]:
-    """Stored FX for each foreign quote currency, formatted for the FX field (empty: none)."""
+    """Stored FX on ``on`` for each foreign quote currency, formatted for the FX field.
+
+    The rate a back-dated trade gets is the one stored on or before its own date, never today's:
+    the value is frozen into ``fx_to_base`` and the cost basis.
+    """
+    if on is None or not has_role(ctx, Role.EDITOR):
+        return {}
     currencies = {
         item.quote_currency
         for item in instruments
@@ -265,7 +285,7 @@ def _fx_defaults(
     }
     if not currencies:
         return {}
-    rates = stored_fx_rates(request.app.state.session_factory, ctx, currencies, today)
+    rates = stored_fx_rates(request.app.state.session_factory, ctx, currencies, on)
     return {
         currency: format_quantity_input(rate, request.state.locale)
         for currency, rate in rates.items()
@@ -344,9 +364,8 @@ def _list_page(
     locale = request.state.locale
     today = ctx.clock.today(ctx.workspace.timezone)
     active_instruments, instruments = _instruments(factory, ctx, locale)
-    fx_defaults = (
-        _fx_defaults(request, ctx, active_instruments, today) if has_role(ctx, Role.EDITOR) else {}
-    )
+    fx_day = _form_day(create_values, today)
+    fx_defaults = _fx_defaults(request, ctx, active_instruments, fx_day)
     filters = _filter_values(request)
     page_number = _int(request.query_params.get("page", "1"))
     try:
@@ -377,6 +396,7 @@ def _list_page(
         "filters": filters,
         "create_values": create_values or _list_values(active_instruments, today, fx_defaults),
         "fx_defaults": fx_defaults,
+        "fx_prefill_date": format_day(fx_day, locale) if fx_day is not None else None,
         "create_errors": {
             field: _t(request, message) for field, message in (create_errors or {}).items()
         },
@@ -504,14 +524,12 @@ def _history_page(
             unit_price=(
                 format_amount_input(bond.terms.face_value, locale) if bond is not None else ""
             ),
-            fx_to_base=(
-                _fx_defaults(request, ctx, (history.instrument,), today).get(
-                    history.instrument.quote_currency, ""
-                )
-                if has_role(ctx, Role.EDITOR)
-                else ""
+            fx_to_base=_fx_defaults(request, ctx, (history.instrument,), today).get(
+                history.instrument.quote_currency, ""
             ),
         ),
+        # Only a fresh form is pre-filled (for today); a refused one keeps what was submitted.
+        "fx_prefill_date": format_day(today, locale) if create_values is None else None,
         "create_errors": {
             field: _t(request, message) for field, message in (create_errors or {}).items()
         },

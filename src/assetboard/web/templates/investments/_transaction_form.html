@@ -11,7 +11,10 @@
 {% if errors.get(name) %}<p id="{{ id }}-error" class="text-sm text-danger" data-field-error="{{ name }}">{{ errors.get(name) }}</p>{% endif %}
 {%- endmacro %}
 
-{% macro transaction_form(action, values, errors, target, base_currency, instruments=(), fixed=None, submit_label="", cancel_href=None, return_to=None) -%}
+{% macro transaction_form(action, values, errors, target, base_currency, instruments=(), fixed=None, submit_label="", cancel_href=None, return_to=None, prefill_date=None) -%}
+{# ``prefill_date`` (create forms only): the date the stored-FX defaults are for. The FX value
+   counts as pre-filled only on a fresh form; an edit form or a refused form keeps its value. #}
+{% set fx_prefilled = values.fx_to_base if (prefill_date and not errors) else "" %}
 {% set form_return_to = return_to if return_to else ("instrument" if fixed else "list") %}
 <form method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#{{ target }}" hx-swap="outerHTML" class="grid gap-4 sm:grid-cols-2" novalidate data-transaction-form data-base-currency="{{ base_currency }}">
   {{ csrf_input() }}
@@ -69,8 +72,9 @@
   {% if not (fixed and fixed.quote_currency == base_currency) %}
   <div class="space-y-1.5" data-transaction-fx>
     <label for="transaction-fx" class="block text-sm font-medium">{{ _("FX rate to %(currency)s", currency=base_currency) }}</label>
-    <input id="transaction-fx" name="fx_to_base" type="text" inputmode="decimal" value="{{ values.fx_to_base }}" data-fx-input data-prefilled="{{ values.fx_to_base if not errors else '' }}" class="form-control w-full"{{ invalid(errors, "fx_to_base", "transaction-fx") }}>
+    <input id="transaction-fx" name="fx_to_base" type="text" inputmode="decimal" value="{{ values.fx_to_base }}" data-fx-input data-prefilled="{{ fx_prefilled }}" class="form-control w-full"{{ invalid(errors, "fx_to_base", "transaction-fx") }}>
     <p class="text-xs text-muted">{{ _("Required when the instrument is quoted in another currency.") }}</p>
+    {% if prefill_date %}<p class="{% if not fx_prefilled %}hidden {% endif %}text-xs text-muted" data-fx-hint>{{ _("Stored rate for %(date)s", date=prefill_date) }}</p>{% endif %}
     {{ field_error(errors, "fx_to_base", "transaction-fx") }}
   </div>
   {% else %}<input type="hidden" name="fx_to_base" value="1">{% endif %}

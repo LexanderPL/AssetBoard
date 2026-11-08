@@ -315,6 +315,76 @@ def test_stored_fx_prefills_the_new_transaction_but_not_transaction_rates(
     )
 
 
+def _stored_eur_rates(owner: OwnerApp) -> None:
+    with owner.db() as session, session.begin():
+        for day, rate in ((date(2026, 3, 2), "4.2811"), (date(2026, 3, 9), "4.2950")):
+            session.add(
+                FxRate(
+                    workspace_id=owner.home_id,
+                    base_currency="PLN",
+                    quote_currency="EUR",
+                    date=day,
+                    rate=Decimal(rate),
+                    source="nbp",
+                )
+            )
+
+
+def test_the_fx_default_is_the_rate_stored_for_the_forms_date(owner: OwnerApp) -> None:
+    _base_to_pln(owner)
+    etf = _create(owner, "VWCE", quote_currency="EUR")
+    _stored_eur_rates(owner)
+
+    # A fresh form is for today (10 March): the 9 March rate, with its hint.
+    fresh = owner.client.get(f"{INSTRUMENTS}/{etf}").text
+    assert re.search(r'id="transaction-fx"[^>]*value="4.295"[^>]*data-prefilled="4.295"', fresh)
+    hint = re.search(r'<p class="text-xs text-muted" data-fx-hint>(.*?)</p>', fresh)
+    assert hint is not None and hint.group(1) == "Stored rate for Mar 10, 2026"
+
+    # A refused save dated 5 March: the options carry the rate stored on or before 5 March
+    # (2 March), not the newest one, and the submitted (empty) FX is never overwritten.
+    refused = owner.post(
+        TRANSACTIONS,
+        _buy(etf, "list", date="2026-03-05", quantity="1", unit_price="10", fee="0"),
+        token_from=TRANSACTIONS,
+    )
+    assert refused.status_code == 400
+    assert re.search(rf'<option value="{etf}"[^>]*data-fx="4.2811"', refused.text)
+    assert re.search(r'id="transaction-fx"[^>]*value=""[^>]*data-prefilled=""', refused.text)
+    assert re.search(
+        r'class="hidden text-xs text-muted" data-fx-hint>Stored rate for Mar 5, 2026<', refused.text
+    )
+
+    # Before the first stored rate there is nothing to offer.
+    early = owner.post(
+        TRANSACTIONS,
+        _buy(etf, "list", date="2026-03-01", quantity="1", unit_price="10", fee="0"),
+        token_from=TRANSACTIONS,
+    )
+    assert re.search(rf'<option value="{etf}"[^>]*data-fx=""', early.text)
+
+
+def test_an_edit_form_keeps_its_fx_and_has_no_prefill_hint(owner: OwnerApp) -> None:
+    _base_to_pln(owner)
+    etf = _create(owner, "VWCE", quote_currency="EUR")
+    _stored_eur_rates(owner)
+    created = owner.post(
+        TRANSACTIONS,
+        _buy(
+            etf, "list", date="2026-03-05", quantity="1", unit_price="10", fee="0", fx_to_base="4.3"
+        ),
+        token_from=TRANSACTIONS,
+    )
+    assert created.status_code == 303
+    with owner.db() as session:
+        transaction = session.scalars(select(InvestmentTransaction.id)).one()
+    page = owner.client.get(f"{TRANSACTIONS}?edit={transaction}").text
+    edit = re.search(rf'action="[^"]*/transactions/{transaction}"[^>]*>.*?</form>', page, re.S)
+    assert edit is not None and "Save transaction" in edit.group(0)
+    assert re.search(r'value="4.3"[^>]*data-prefilled=""', edit.group(0))
+    assert "data-fx-hint" not in edit.group(0)
+
+
 def test_a_base_currency_instrument_has_no_fx_field(owner: OwnerApp) -> None:
     etf = _create(owner, "Home fund")
     page = owner.client.get(f"{INSTRUMENTS}/{etf}").text
