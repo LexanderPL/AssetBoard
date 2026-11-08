@@ -1,11 +1,12 @@
-{# A category donut (F2.7). ``d`` is web.charts.DonutView. The data travels in a JSON block
+{# A category donut (F2.7). ``d`` is web.charts.DonutView; ``label`` names the table's first
+   column (default "Category"; the portfolio passes "Instrument"). The data travels in a JSON block
    (Jinja's tojson) read by static/js/charts.js, which draws the chart in the [data-chart-canvas]
    box (hidden until then, aria-hidden) and turns the table into a screen-reader-only one.
    The legend is HTML under the chart (hidden with it, aria-hidden: the table is the accessible
    version): it wraps onto as many lines as it needs instead of ECharts' paged legend, in the
    slices' colours. Without JavaScript the table stays visible in place of the chart. No inline
    script or style. #}
-{% macro donut(d) -%}
+{% macro donut(d, label=None) -%}
 <section class="panel p-4 sm:p-6" aria-labelledby="chart-{{ d.key }}-heading" data-donut="{{ d.key }}">
   <div class="flex flex-wrap items-baseline justify-between gap-2">
     <h2 id="chart-{{ d.key }}-heading" class="text-base font-semibold">{{ d.heading }}</h2>
@@ -25,7 +26,7 @@
         <caption class="sr-only">{{ d.heading }}</caption>
         <thead>
           <tr class="text-left text-xs text-muted">
-            <th scope="col" class="py-1.5 pr-2 font-medium">{{ _("Category") }}</th>
+            <th scope="col" class="py-1.5 pr-2 font-medium">{{ label or _("Category") }}</th>
             <th scope="col" class="py-1.5 pr-2 text-right font-medium">{{ _("Amount") }}</th>
             <th scope="col" class="py-1.5 text-right font-medium">{{ _("Share") }}</th>
           </tr>

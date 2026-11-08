@@ -19,7 +19,8 @@ from assetboard.i18n.numbers import format_money, format_rate_tenths
 from assetboard.services.summary import SummaryData
 
 NetWorthDonutKey = Literal["assets", "liabilities"]
-DonutKey = ChartBlock | NetWorthDonutKey
+PortfolioDonutKey = Literal["portfolio"]
+DonutKey = ChartBlock | NetWorthDonutKey | PortfolioDonutKey
 
 
 def _(message: str) -> str:

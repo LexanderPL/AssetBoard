@@ -1,0 +1,7 @@
+{% extends "base.html" %}
+{% block title %}{{ _("Portfolio") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Investments") }}{% endblock %}
+{% block content %}
+{% include "investments/_portfolio_body.html" %}
+{% endblock %}
+{% block scripts %}{% if view.has_chart %}{% include "macros/chart_scripts.html" %}{% endif %}{% endblock %}

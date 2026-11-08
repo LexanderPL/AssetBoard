@@ -87,6 +87,7 @@ from assetboard.web.networth_routes import router as networth_router
 from assetboard.web.notification_routes import router as notification_router
 from assetboard.web.oidc_routes import router as oidc_router
 from assetboard.web.plan_routes import router as plan_router
+from assetboard.web.portfolio_routes import router as portfolio_router
 from assetboard.web.provider_routes import router as provider_router
 from assetboard.web.proxy_routes import router as proxy_router
 from assetboard.web.rendering import render_template
@@ -333,6 +334,7 @@ def create_app(
     app.include_router(workspace_router)
     app.include_router(category_router)
     app.include_router(investment_router)
+    app.include_router(portfolio_router)
     app.include_router(provider_router)
     app.include_router(investment_transaction_router)
     app.include_router(networth_router)

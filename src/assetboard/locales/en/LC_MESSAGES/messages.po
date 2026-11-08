@@ -2699,6 +2699,25 @@ msgstr ""
 msgid "Transfers are not counted in the plan: this category takes none."
 msgstr ""
 
+msgid "Unallocated"
+msgstr ""
+
+msgid "Whole portfolio"
+msgstr ""
+
+msgid "Holdings in the whole portfolio"
+msgstr ""
+
+msgid "Nothing is valued in the portfolio yet."
+msgstr ""
+
+#, python-format
+msgid "Holdings in %(class)s"
+msgstr ""
+
+msgid "Nothing is held in this asset class."
+msgstr ""
+
 #, fuzzy, python-format
 msgid "Rate limited; try again in %(minutes)s minutes."
 msgstr ""
@@ -4896,6 +4915,82 @@ msgid ""
 "traded."
 msgstr ""
 
+msgid "Portfolio"
+msgstr ""
+
+#, python-format
+msgid "Valued on %(date)s in %(currency)s"
+msgstr ""
+
+msgid "Value"
+msgstr ""
+
+msgid "Unrealized gain"
+msgstr ""
+
+#, python-format
+msgid "%(year)s to date"
+msgstr ""
+
+#, python-format
+msgid "%(count)s holding is excluded from the totals (missing price or FX rate)."
+msgid_plural ""
+"%(count)s holdings are excluded from the totals (missing price or FX "
+"rate)."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Holdings"
+msgstr ""
+
+msgid "Price"
+msgstr ""
+
+msgid "Share"
+msgstr ""
+
+msgid "Price missing: not included in the totals."
+msgstr ""
+
+#, python-format
+msgid "No %(currency)s FX rate: not included in the totals."
+msgstr ""
+
+msgid "Stale price"
+msgstr ""
+
+msgid "Stale FX rate"
+msgstr ""
+
+msgid "Bond terms needed"
+msgstr ""
+
+msgid "Nothing is held yet. Add buy transactions to see the portfolio."
+msgstr ""
+
+#, fuzzy
+msgid "Go to transactions"
+msgstr ""
+
+msgid "By asset class"
+msgstr ""
+
+msgid "Each instrument's value and cost are split by its allocation weights."
+msgstr ""
+
+msgid "Gain"
+msgstr ""
+
+#, python-format
+msgid "Gain %%"
+msgstr ""
+
+msgid "Chart scope"
+msgstr ""
+
+msgid "Show"
+msgstr ""
+
 msgid "Transaction"
 msgstr ""
 
@@ -4909,9 +5004,6 @@ msgid "Manual prices are used for illiquid assets; transactions fill the gaps."
 msgstr ""
 
 msgid "Powered by CoinGecko"
-msgstr ""
-
-msgid "Stale price"
 msgstr ""
 
 msgid "The provider is disabled; the last known price is shown."
@@ -4971,9 +5063,6 @@ msgstr ""
 
 #, python-format
 msgid "Price history of %(name)s"
-msgstr ""
-
-msgid "Price"
 msgstr ""
 
 #, python-format
@@ -5167,9 +5256,6 @@ msgid "Sign in to accept"
 msgstr ""
 
 msgid "Create account and join"
-msgstr ""
-
-msgid "Share"
 msgstr ""
 
 msgid "No month"
@@ -5712,9 +5798,6 @@ msgid "Value history"
 msgstr ""
 
 msgid "Estimates values between entries"
-msgstr ""
-
-msgid "Value"
 msgstr ""
 
 msgid "future"

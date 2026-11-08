@@ -1,5 +1,10 @@
 {% macro tabs(active) -%}
 <div class="flex flex-wrap items-center gap-2" role="tablist" aria-label="{{ _('Investments') }}">
+  {% if active == "portfolio" %}
+  <a href="{{ scoped_url(request, 'investments_portfolio') }}" role="tab" aria-selected="true" data-portfolio-tab class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("Portfolio") }}</a>
+  {% else %}
+  <a href="{{ scoped_url(request, 'investments_portfolio') }}" role="tab" aria-selected="false" data-portfolio-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Portfolio") }}</a>
+  {% endif %}
   {% if active == "instruments" %}
   <a href="{{ scoped_url(request, 'investments_instruments') }}" role="tab" aria-selected="true" data-instruments-tab class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("Instruments") }}</a>
   {% else %}
