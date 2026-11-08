@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.3](https://github.com/LexanderPL/AssetBoard/compare/v0.5.2...v0.5.3) (2026-11-08)
+
+
+### Features
+
+* **investments:** F6.6 portfolio overview and allocation ([#240](https://github.com/LexanderPL/AssetBoard/issues/240)) ([c8f68e3](https://github.com/LexanderPL/AssetBoard/commit/c8f68e3f2455f7acc7569e4e53114e319a716296))
+* **providers:** GoldAPI.io precious-metals provider ([#239](https://github.com/LexanderPL/AssetBoard/issues/239)) ([4f6b239](https://github.com/LexanderPL/AssetBoard/commit/4f6b239abc4ea7c49b76dfa5d604058876c6a078))
+
+
+### Bug Fixes
+
+* **investments:** remove the &lt;Macro 'error'&gt; page banner ([#237](https://github.com/LexanderPL/AssetBoard/issues/237)) ([a8f3166](https://github.com/LexanderPL/AssetBoard/commit/a8f3166fd4ea3333a6e9ea6a4bffdf082d4c80ad))
+
 ## [0.5.2](https://github.com/LexanderPL/AssetBoard/compare/v0.5.1...v0.5.2) (2026-11-08)
 
 
