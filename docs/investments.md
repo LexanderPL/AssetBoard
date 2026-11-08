@@ -120,8 +120,10 @@ Open an instrument by clicking its name, or use the **Transactions** tab, to rec
   sell's fee may be larger than its gross amount; the difference is a realized loss.
 - **FX rate to the base currency** — required when the instrument is quoted in another currency;
   hidden and stored as 1 for a base-currency instrument. A new transaction starts with the
-  latest stored rate (manual or provider, on or before today) when one exists; you can change it.
-  Leaving it empty shows an error on the field and keeps everything you entered.
+  stored rate for its date (the latest manual or provider rate on or before that date, marked
+  "Stored rate for …") when one exists; you can change it. Changing the date clears a rate you
+  have not touched, so a back-dated trade never keeps today's rate by accident; a rate you typed
+  stays. Leaving it empty shows an error on the field and keeps everything you entered.
 - **Note** — optional, up to 200 characters.
 
 The instrument page shows the current quantity, average cost (per unit, in the base currency),
