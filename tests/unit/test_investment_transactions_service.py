@@ -232,6 +232,10 @@ def test_a_non_base_instrument_requires_an_fx_rate_and_a_base_one_stores_one(
     usd = _instrument(team, ctx, stocks.id, name="US ETF", quote_currency="USD")
     with pytest.raises(InvalidInvestmentTransaction) as caught:
         _tx(team, ctx, usd.id, fx="")
+    # F6.2a: a blank rate falls back to stored FX; with none stored the rate is needed.
+    assert caught.value.code == "fx_needed"
+    with pytest.raises(InvalidInvestmentTransaction) as caught:
+        _tx(team, ctx, usd.id, fx="0")
     assert caught.value.code == "invalid_fx"
     view = _tx(team, ctx, usd.id, fx="0.9")
     assert view.fx_to_base == Decimal("0.9")

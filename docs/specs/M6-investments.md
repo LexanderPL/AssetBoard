@@ -147,7 +147,7 @@ Notes:
 
 **History and editing.**
 - A base-mode row shows the base amounts it was entered with as the primary values, with the
-  derived quote unit price and the rate beside them ("1 600.00 PLN · ≈ 398.774767 USD @ 4.0123").
+  derived quote unit price and the rate beside them ("1 600.00 PLN · ≈ 398.773771 USD @ 4.0123").
 - Editing opens in the mode the row was saved in.
 - Switching modes on an existing row:
   - **quote → base:** pre-fills base price = `unit_price × fx_to_base` and base fee = `fee × fx`.
@@ -209,7 +209,7 @@ rate, and saves.
 
 - **Settlement golden test.** Buy 4 @ 1 600.00 PLN + fee 5.00 PLN with FX 4.0123:
   - cost basis = 6 405.00 PLN exactly;
-  - `unit_price` = 398.774767… (18 places, half-up);
+  - `unit_price` = 398.773770655235151908 (18 places, half-up);
   - quote `fee_minor` = round(5.00 / 4.0123).
 - **Sells.** A partial sell under average and FIFO; selling everything returns cost basis 0.
   Mixed quote-mode and base-mode rows on one instrument.

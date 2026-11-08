@@ -64,6 +64,7 @@ __all__ = [
     "latest_prices",
     "price_at",
     "save_manual_price",
+    "stored_fx_in_session",
 ]
 
 _DECIMAL_PRECISION = 80
@@ -430,6 +431,40 @@ def latest_fx_rates(
         return result
 
 
+def stored_fx_rates(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    currencies: Collection[str],
+    on: date,
+) -> dict[str, Decimal]:
+    """Stored FX (manual or provider rows, never transaction-derived) per currency at ``on``.
+
+    Base-currency units per one unit: the latest stored observation on or before ``on``, with the
+    usual source priority on one date. Used to pre-fill a new transaction's FX field (F6.2 spec:
+    "F6.3 will pre-fill it from stored FX"); the user can still change it. A currency without a
+    stored rate is absent, and the base currency itself is never listed.
+    """
+    require_role(ctx, Role.VIEWER)
+    wanted = {currency.upper() for currency in currencies}
+    with factory() as session:
+        base = CurrentWorkspaceRepository(session, ctx).get().base_currency
+        wanted.discard(base)
+        if not wanted:
+            return {}
+        candidates: dict[str, list[_Candidate]] = {}
+        for row in FxRateRepository(session, ctx).for_base_on_or_before(base, on):
+            if row.quote_currency in wanted and row.source != "transaction":
+                candidates.setdefault(row.quote_currency, []).append(
+                    _Candidate(row.date, row.source, row.created_at, row.id, row.rate)
+                )
+    result: dict[str, Decimal] = {}
+    for currency, rows in candidates.items():
+        best = _best(rows)
+        if best is not None:
+            result[currency] = best.value
+    return result
+
+
 def fx_rate(
     factory: sessionmaker[Session],
     ctx: Context,
@@ -478,6 +513,32 @@ def fx_rate(
         else:
             source = None
         return FxAt(rate, as_of, source, stale)
+
+
+def stored_fx_in_session(
+    session: Session,
+    ctx: Context,
+    quote_currency: str,
+    base_currency: str,
+    on: date,
+) -> FxAt:
+    """``stored_fx_rates`` for one pair inside an open session, with the rate's date and source.
+
+    F6.2a needs the observation itself (the form hint names its date and source) and needs it
+    inside the write transaction (a blank rate is filled from stored FX on save, and bulk add
+    re-validates every line in its one write). Same rule: latest manual or provider rate on or
+    before ``on``, never ``transaction``.
+    """
+    quote_currency = quote_currency.upper()
+    base_currency = base_currency.upper()
+    if quote_currency == base_currency:
+        return FxAt(Decimal(1), on, None, False)
+    candidates = [
+        _Candidate(row.date, row.source, row.created_at, row.id, row.rate)
+        for row in FxRateRepository(session, ctx).for_base_on_or_before(base_currency, on)
+        if row.quote_currency == quote_currency and row.source != "transaction"
+    ]
+    return _fx_at(_best(candidates), on)
 
 
 def _decimal(value: str, locale: str, field: str) -> Decimal:

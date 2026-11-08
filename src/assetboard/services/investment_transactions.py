@@ -8,12 +8,18 @@ a buy or restoring a deleted sell. Holdings are never stored; they are recompute
 the workspace's average/FIFO setting.
 
 Fees and unit prices are in the instrument's quote currency. ``fx_to_base`` is resolved on
-write (1 for a base-currency instrument). F6.2 requires a rate for a non-base instrument; F6.3
-will pre-fill it from stored FX.
+write (1 for a base-currency instrument). A non-base instrument needs a rate; a blank rate is
+taken from stored FX for the transaction date (any source except ``transaction``) and refused
+with ``fx_needed`` when none exists (F6.2a).
+
+F6.2a "amounts in the base currency": in base mode the user enters the unit price and fee in
+the workspace base currency. They are stored as the settlement, and the quote unit price and
+fee are derived from them with the rate (``domain.settlement``).
 """
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
@@ -40,6 +46,7 @@ from assetboard.domain.holdings import (
     compute_holdings,
 )
 from assetboard.domain.money import Money
+from assetboard.domain.settlement import derive_quote_values, needs_fx_check
 from assetboard.domain.transactions import (
     MAX_AMOUNT_MINOR,
     UNDO_WINDOW,
@@ -51,6 +58,7 @@ from assetboard.i18n.numbers import parse_amount
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.holding_rows import cost_basis_method, holding_transaction
 from assetboard.services.investments import InstrumentView, get_instrument
+from assetboard.services.prices import FxAt, stored_fx_in_session
 
 __all__ = [
     "DeletedInvestmentTransaction",
@@ -64,6 +72,7 @@ __all__ = [
     "TransactionList",
     "create_transaction",
     "delete_transaction",
+    "fx_prefill",
     "instrument_history",
     "list_transactions",
     "undo_delete",
@@ -74,6 +83,10 @@ __all__ = [
 PAGE_SIZE = 50
 MIN_YEAR = 1900
 MAX_YEAR = 2199
+AMOUNTS_QUOTE = "quote"
+AMOUNTS_BASE = "base"
+
+FxLookup = Callable[[date], FxAt]
 
 
 class InvestmentTransactionError(Exception):
@@ -125,6 +138,14 @@ class InvestmentTransactionView:
     fx_to_base: Decimal
     note: str
     instrument_archived: bool
+    settlement_unit_price: Decimal | None = None
+    settlement_fee: Money | None = None
+    fx_needs_check: bool = False
+
+    @property
+    def amounts(self) -> str:
+        """``base`` when the row was entered in the base currency (F6.2a), else ``quote``."""
+        return AMOUNTS_BASE if self.settlement_fee is not None else AMOUNTS_QUOTE
 
 
 @dataclass(frozen=True, slots=True)
@@ -152,7 +173,9 @@ class DeletedInvestmentTransaction:
 
 
 @dataclass(frozen=True, slots=True)
-class _Values:
+class TransactionValues:
+    """Validated values of one transaction; the settlement is set in base mode (F6.2a)."""
+
     day: date | None
     type: str
     quantity: Decimal
@@ -160,6 +183,12 @@ class _Values:
     fee_minor: int
     fx_to_base: Decimal
     note: str
+    settlement_currency: str | None = None
+    settlement_unit_price: Decimal | None = None
+    settlement_fee_minor: int | None = None
+    # The stored FX source when a blank rate was filled in, else None (entered or base).
+    fx_source: str | None = None
+    fx_as_of: date | None = None
 
 
 def _type(value: str) -> str:
@@ -189,45 +218,76 @@ def _day(value: str, today: date, *, required: bool) -> date | None:
     return day
 
 
-def _decimal(value: str, locale: str, field: str, *, allow_zero: bool) -> Decimal:
-    try:
-        amount = parse_amount(value, locale)
-    except ValueError:
-        raise InvalidInvestmentTransaction(field, f"invalid_{field}") from None
-    if not amount.is_finite() or amount < 0 or (amount == 0 and not allow_zero):
-        raise InvalidInvestmentTransaction(field, f"invalid_{field}")
+def _fits_decimal_type(amount: Decimal) -> bool:
     exponent = amount.as_tuple().exponent
     assert isinstance(exponent, int)
     scale = max(-exponent, 0)
     integer_digits = 0 if amount.is_zero() else max(amount.adjusted() + 1, 0)
-    if scale > 18 or integer_digits > 20 or integer_digits + scale > 38:
-        raise InvalidInvestmentTransaction(field, f"invalid_{field}")
+    return scale <= 18 and integer_digits <= 20 and integer_digits + scale <= 38
+
+
+def _decimal(
+    value: str, locale: str, field: str, *, allow_zero: bool, code: str | None = None
+) -> Decimal:
+    error = code or f"invalid_{field}"
+    try:
+        amount = parse_amount(value, locale)
+    except ValueError:
+        raise InvalidInvestmentTransaction(field, error) from None
+    if not amount.is_finite() or amount < 0 or (amount == 0 and not allow_zero):
+        raise InvalidInvestmentTransaction(field, error)
+    if not _fits_decimal_type(amount):
+        raise InvalidInvestmentTransaction(field, error)
     return amount
 
 
-def _fee_minor(value: str, locale: str, currency: str) -> int:
-    fee = _decimal(value, locale, "fee", allow_zero=True)
+def _fee_minor(value: str, locale: str, currency: str, *, field: str = "fee") -> int:
+    fee = _decimal(value or "0", locale, field, allow_zero=True, code="invalid_fee")
     if fee == 0:
         return 0
     try:
         minor = amount_minor(fee, currency)
     except EntryError as exc:
-        raise InvalidInvestmentTransaction("fee", exc.code) from None
+        raise InvalidInvestmentTransaction(field, exc.code) from None
     if minor > MAX_AMOUNT_MINOR:
-        raise InvalidInvestmentTransaction("fee", "invalid_fee")
+        raise InvalidInvestmentTransaction(field, "invalid_fee")
     return minor
 
 
-def _fx(value: str, locale: str, *, quote_currency: str, base_currency: str) -> Decimal:
+def _fx(
+    value: str,
+    locale: str,
+    *,
+    quote_currency: str,
+    base_currency: str,
+    day: date | None,
+    lookup: FxLookup | None,
+) -> tuple[Decimal, FxAt | None]:
+    """The rate and, when a blank rate was filled from stored FX, the stored observation."""
     if quote_currency == base_currency:
-        return Decimal(1)
+        return Decimal(1), None
     text = value.strip()
     if not text:
-        raise InvalidInvestmentTransaction("fx_to_base", "invalid_fx")
-    fx = _decimal(text, locale, "fx_to_base", allow_zero=False)
+        if day is not None and lookup is not None:
+            stored = lookup(day)
+            if stored.rate is not None and stored.rate > 0:
+                return stored.rate, stored
+        raise InvalidInvestmentTransaction("fx_to_base", "fx_needed")
+    fx = _decimal(text, locale, "fx_to_base", allow_zero=False, code="invalid_fx")
     if fx <= 0:
         raise InvalidInvestmentTransaction("fx_to_base", "invalid_fx")
-    return fx
+    return fx, None
+
+
+def _amounts(value: str, instrument: Instrument, base_currency: str) -> str:
+    wanted = value.strip() or AMOUNTS_QUOTE
+    if wanted not in (AMOUNTS_QUOTE, AMOUNTS_BASE):
+        raise InvalidInvestmentTransaction("amounts", "invalid_amounts")
+    if wanted == AMOUNTS_BASE and (
+        instrument.quote_currency == base_currency or instrument.type == "currency"
+    ):
+        raise InvalidInvestmentTransaction("amounts", "settlement_not_allowed")
+    return wanted
 
 
 def _note(value: str) -> str:
@@ -240,7 +300,113 @@ def _note(value: str) -> str:
     return note
 
 
-def _values_for_workspace(
+def transaction_values(
+    *,
+    instrument: Instrument,
+    base_currency: str,
+    type_value: str,
+    day: date | None,
+    quantity_value: str,
+    unit_price_value: str,
+    fee_value: str,
+    fx_value: str,
+    note_value: str,
+    locale: str,
+    amounts_value: str = AMOUNTS_QUOTE,
+    base_unit_price_value: str = "",
+    base_fee_value: str = "",
+    fx_lookup: FxLookup | None = None,
+) -> TransactionValues:
+    """Validate one transaction's fields for ``instrument`` (shared by the form and bulk add).
+
+    Raises ``InvalidInvestmentTransaction`` naming the first failing field.
+    """
+    kind = _type(type_value)
+    quantity = _decimal(quantity_value, locale, "quantity", allow_zero=False)
+    amounts = _amounts(amounts_value, instrument, base_currency)
+    note = _note(note_value)
+    if amounts == AMOUNTS_BASE:
+        settlement_price = _decimal(
+            base_unit_price_value,
+            locale,
+            "base_unit_price",
+            allow_zero=True,
+            code="invalid_unit_price",
+        )
+        settlement_fee = _fee_minor(base_fee_value, locale, base_currency, field="base_fee")
+        fx, stored = _fx(
+            fx_value,
+            locale,
+            quote_currency=instrument.quote_currency,
+            base_currency=base_currency,
+            day=day,
+            lookup=fx_lookup,
+        )
+        unit_price, fee_minor = derive_quote_values(
+            settlement_price,
+            settlement_fee,
+            fx,
+            base_currency=base_currency,
+            quote_currency=instrument.quote_currency,
+        )
+        if not _fits_decimal_type(unit_price):
+            raise InvalidInvestmentTransaction("base_unit_price", "invalid_unit_price")
+        if fee_minor > MAX_AMOUNT_MINOR:
+            raise InvalidInvestmentTransaction("base_fee", "invalid_fee")
+        return TransactionValues(
+            day=day,
+            type=kind,
+            quantity=quantity,
+            unit_price=unit_price,
+            fee_minor=fee_minor,
+            fx_to_base=fx,
+            note=note,
+            settlement_currency=base_currency,
+            settlement_unit_price=settlement_price,
+            settlement_fee_minor=settlement_fee,
+            fx_source=stored.source if stored is not None else None,
+            fx_as_of=stored.as_of if stored is not None else None,
+        )
+    if instrument.type == "currency":
+        unit_price = Decimal(1)
+    else:
+        unit_price = _decimal(unit_price_value, locale, "unit_price", allow_zero=True)
+    fee_minor = _fee_minor(fee_value, locale, instrument.quote_currency)
+    fx, stored = _fx(
+        fx_value,
+        locale,
+        quote_currency=instrument.quote_currency,
+        base_currency=base_currency,
+        day=day,
+        lookup=fx_lookup,
+    )
+    return TransactionValues(
+        day=day,
+        type=kind,
+        quantity=quantity,
+        unit_price=unit_price,
+        fee_minor=fee_minor,
+        fx_to_base=fx,
+        note=note,
+        fx_source=stored.source if stored is not None else None,
+        fx_as_of=stored.as_of if stored is not None else None,
+    )
+
+
+def stored_fx_lookup(
+    session: Session, ctx: Context, quote_currency: str, base_currency: str
+) -> FxLookup:
+    """Stored FX (any source except ``transaction``) for one pair, by date."""
+
+    def lookup(day: date) -> FxAt:
+        return stored_fx_in_session(session, ctx, quote_currency, base_currency, day)
+
+    return lookup
+
+
+def _form_values(
+    session: Session,
+    ctx: Context,
     *,
     instrument: Instrument,
     base_currency: str,
@@ -254,29 +420,26 @@ def _values_for_workspace(
     locale: str,
     today: date,
     day_required: bool,
-) -> _Values:
+    amounts_value: str,
+    base_unit_price_value: str,
+    base_fee_value: str,
+) -> TransactionValues:
     day = _day(day_value, today, required=day_required)
-    kind = _type(type_value)
-    quantity = _decimal(quantity_value, locale, "quantity", allow_zero=False)
-    if instrument.type == "currency":
-        unit_price = Decimal(1)
-    else:
-        unit_price = _decimal(unit_price_value, locale, "unit_price", allow_zero=True)
-    fee_minor = _fee_minor(fee_value, locale, instrument.quote_currency)
-    fx = _fx(
-        fx_value,
-        locale,
-        quote_currency=instrument.quote_currency,
+    return transaction_values(
+        instrument=instrument,
         base_currency=base_currency,
-    )
-    return _Values(
+        type_value=type_value,
         day=day,
-        type=kind,
-        quantity=quantity,
-        unit_price=unit_price,
-        fee_minor=fee_minor,
-        fx_to_base=fx,
-        note=_note(note_value),
+        quantity_value=quantity_value,
+        unit_price_value=unit_price_value,
+        fee_value=fee_value,
+        fx_value=fx_value,
+        note_value=note_value,
+        locale=locale,
+        amounts_value=amounts_value,
+        base_unit_price_value=base_unit_price_value,
+        base_fee_value=base_fee_value,
+        fx_lookup=stored_fx_lookup(session, ctx, instrument.quote_currency, base_currency),
     )
 
 
@@ -312,27 +475,40 @@ def _audit(
     action: str,
     row: InvestmentTransaction,
     instrument: Instrument,
+    *,
+    changed: tuple[str, ...] | None = None,
 ) -> None:
+    data: dict[str, str | int | bool] = {
+        "instrument": instrument.name,
+        "transaction_type": row.type,
+        "date": row.date.isoformat() if row.date is not None else "",
+        "quantity": format(row.quantity, "f"),
+        "price": format(row.unit_price, "f"),
+        "fee": format(Money(row.fee_minor, row.quote_currency).to_decimal(), "f"),
+        "currency": row.quote_currency,
+        "fx": format(row.fx_to_base, "f") if row.fx_to_base is not None else "",
+    }
+    if changed is not None:
+        # F6.2a: the names of the changed fields (settlement ones included), no amounts.
+        data["changed"] = ",".join(changed)
     AuditEventRepository(session, ctx).record(
         actor_user_id=ctx.user.id,
         action=action,
         entity_type="investment_transaction",
         entity_id=str(row.id),
         ts=ctx.clock.now(),
-        data={
-            "instrument": instrument.name,
-            "transaction_type": row.type,
-            "date": row.date.isoformat() if row.date is not None else "",
-            "quantity": format(row.quantity, "f"),
-            "price": format(row.unit_price, "f"),
-            "fee": format(Money(row.fee_minor, row.quote_currency).to_decimal(), "f"),
-            "currency": row.quote_currency,
-            "fx": format(row.fx_to_base, "f") if row.fx_to_base is not None else "",
-        },
+        data=data,
     )
 
 
-def _view(row: InvestmentTransaction, instrument: Instrument) -> InvestmentTransactionView:
+def _view(
+    row: InvestmentTransaction, instrument: Instrument, base_currency: str
+) -> InvestmentTransactionView:
+    settlement_fee = (
+        Money(row.settlement_fee_minor, row.settlement_currency)
+        if row.settlement_currency is not None and row.settlement_fee_minor is not None
+        else None
+    )
     return InvestmentTransactionView(
         id=row.id,
         instrument_id=row.instrument_id,
@@ -349,6 +525,13 @@ def _view(row: InvestmentTransaction, instrument: Instrument) -> InvestmentTrans
         fx_to_base=row.fx_to_base if row.fx_to_base is not None else Decimal(1),
         note=row.note,
         instrument_archived=instrument.archived_at is not None,
+        settlement_unit_price=row.settlement_unit_price if settlement_fee is not None else None,
+        settlement_fee=settlement_fee,
+        fx_needs_check=needs_fx_check(
+            quote_currency=row.quote_currency,
+            base_currency=base_currency,
+            fx_to_base=row.fx_to_base,
+        ),
     )
 
 
@@ -396,7 +579,9 @@ def list_transactions(
     date_from: str,
     date_to: str,
     page: int,
+    fx_check: bool = False,
 ) -> TransactionList:
+    """One page of live transactions; ``fx_check`` keeps only rows needing an FX check (F6.2a)."""
     require_role(ctx, Role.VIEWER)
     if type_value and type_value not in {"buy", "sell"}:
         raise InvalidInvestmentTransaction("type", "invalid_type")
@@ -405,26 +590,49 @@ def list_transactions(
     if start is not None and end is not None and end < start:
         raise InvalidInvestmentTransaction("to", "invalid_date")
     wanted_page = max(page, 1)
+    types = (type_value,) if type_value else ()
     with factory() as session:
+        base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
         repository = InvestmentTransactionRepository(session, ctx)
-        total = repository.count_filtered(
-            instrument_id=instrument_id,
-            types=(type_value,) if type_value else (),
-            date_from=start,
-            date_to=end,
-        )
-        pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-        current = _page_number(wanted_page, pages, total)
-        rows = repository.filtered(
-            instrument_id=instrument_id,
-            types=(type_value,) if type_value else (),
-            date_from=start,
-            date_to=end,
-            limit=PAGE_SIZE,
-            offset=(current - 1) * PAGE_SIZE,
-        )
+        if fx_check:
+            matching = [
+                row
+                for row in repository.filtered_not_in_currency(
+                    base_currency,
+                    instrument_id=instrument_id,
+                    types=types,
+                    date_from=start,
+                    date_to=end,
+                )
+                if needs_fx_check(
+                    quote_currency=row.quote_currency,
+                    base_currency=base_currency,
+                    fx_to_base=row.fx_to_base,
+                )
+            ]
+            total = len(matching)
+            pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+            current = _page_number(wanted_page, pages, total)
+            rows = matching[(current - 1) * PAGE_SIZE : current * PAGE_SIZE]
+        else:
+            total = repository.count_filtered(
+                instrument_id=instrument_id,
+                types=types,
+                date_from=start,
+                date_to=end,
+            )
+            pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+            current = _page_number(wanted_page, pages, total)
+            rows = repository.filtered(
+                instrument_id=instrument_id,
+                types=types,
+                date_from=start,
+                date_to=end,
+                limit=PAGE_SIZE,
+                offset=(current - 1) * PAGE_SIZE,
+            )
         instruments = _instrument_map(session, ctx)
-        views = tuple(_view(row, instruments[row.instrument_id]) for row in rows)
+        views = tuple(_view(row, instruments[row.instrument_id], base_currency) for row in rows)
     return TransactionList(
         rows=views,
         page=current,
@@ -448,7 +656,8 @@ def get_transaction(
         if row is None:
             raise NotFound
         instrument = InstrumentRepository(session, ctx).get_or_raise(row.instrument_id)
-        return _view(row, instrument)
+        base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
+        return _view(row, instrument, base_currency)
 
 
 def instrument_history(
@@ -478,7 +687,7 @@ def instrument_history(
             )
         else:
             holding = _zero_holding(instrument_id, base_currency)
-        views = tuple(_view(row, model) for row in rows)
+        views = tuple(_view(row, model, base_currency) for row in rows)
         locked = InvestmentTransactionRepository(session, ctx).any_for_instrument(instrument_id)
     return InstrumentHistory(
         instrument=instrument,
@@ -506,6 +715,9 @@ def create_transaction(
     fx_value: str,
     note_value: str,
     locale: str,
+    amounts_value: str = AMOUNTS_QUOTE,
+    base_unit_price_value: str = "",
+    base_fee_value: str = "",
 ) -> InvestmentTransactionView:
     require_role(ctx, Role.EDITOR)
     today = ctx.clock.today(ctx.workspace.timezone)
@@ -520,7 +732,9 @@ def create_transaction(
             raise NotFound
         if instrument.archived_at is not None:
             raise InstrumentArchived
-        values = _values_for_workspace(
+        values = _form_values(
+            session,
+            ctx,
             instrument=instrument,
             base_currency=base_currency,
             type_value=type_value,
@@ -533,6 +747,9 @@ def create_transaction(
             locale=locale,
             today=today,
             day_required=True,
+            amounts_value=amounts_value,
+            base_unit_price_value=base_unit_price_value,
+            base_fee_value=base_fee_value,
         )
         row = InvestmentTransactionRepository(session, ctx).create(
             instrument_id=instrument.id,
@@ -544,6 +761,9 @@ def create_transaction(
             fee_minor=values.fee_minor,
             fx_to_base=values.fx_to_base,
             note=values.note,
+            settlement_currency=values.settlement_currency,
+            settlement_unit_price=values.settlement_unit_price,
+            settlement_fee_minor=values.settlement_fee_minor,
         )
         session.flush()
         _check_oversell(
@@ -554,7 +774,7 @@ def create_transaction(
             base_currency=base_currency,
         )
         _audit(session, ctx, "investment_transaction.created", row, instrument)
-        return _view(row, instrument)
+        return _view(row, instrument, base_currency)
 
     return run_immediate(factory, write)
 
@@ -572,6 +792,9 @@ def update_transaction(
     fx_value: str,
     note_value: str,
     locale: str,
+    amounts_value: str = AMOUNTS_QUOTE,
+    base_unit_price_value: str = "",
+    base_fee_value: str = "",
 ) -> InvestmentTransactionView:
     require_role(ctx, Role.EDITOR)
     today = ctx.clock.today(ctx.workspace.timezone)
@@ -591,7 +814,9 @@ def update_transaction(
             raise NotFound
         if instrument.archived_at is not None:
             raise InstrumentArchived
-        values = _values_for_workspace(
+        values = _form_values(
+            session,
+            ctx,
             instrument=instrument,
             base_currency=base_currency,
             type_value=type_value,
@@ -604,6 +829,9 @@ def update_transaction(
             locale=locale,
             today=today,
             day_required=row.date is not None,
+            amounts_value=amounts_value,
+            base_unit_price_value=base_unit_price_value,
+            base_fee_value=base_fee_value,
         )
         changes = {
             field: value
@@ -615,11 +843,14 @@ def update_transaction(
                 ("fee_minor", values.fee_minor),
                 ("fx_to_base", values.fx_to_base),
                 ("note", values.note),
+                ("settlement_currency", values.settlement_currency),
+                ("settlement_unit_price", values.settlement_unit_price),
+                ("settlement_fee_minor", values.settlement_fee_minor),
             )
             if getattr(row, field) != value
         }
         if not changes:
-            return _view(row, instrument)
+            return _view(row, instrument, base_currency)
         repository.update(row.id, **changes)
         session.flush()
         _check_oversell(
@@ -629,8 +860,15 @@ def update_transaction(
             method=method,
             base_currency=base_currency,
         )
-        _audit(session, ctx, "investment_transaction.updated", row, instrument)
-        return _view(row, instrument)
+        _audit(
+            session,
+            ctx,
+            "investment_transaction.updated",
+            row,
+            instrument,
+            changed=tuple(sorted(changes)),
+        )
+        return _view(row, instrument, base_currency)
 
     return run_immediate(factory, write)
 
@@ -690,7 +928,7 @@ def undo_delete(
         if instrument.archived_at is not None:
             raise InstrumentArchived
         if row.deleted_at is None:
-            return _view(row, instrument)
+            return _view(row, instrument, base_currency)
         if ctx.clock.now() - row.deleted_at > UNDO_WINDOW:
             raise InvestmentUndoExpired
         if row.date is not None and row.date > today:
@@ -705,9 +943,29 @@ def undo_delete(
             base_currency=base_currency,
         )
         _audit(session, ctx, "investment_transaction.restored", row, instrument)
-        return _view(row, instrument)
+        return _view(row, instrument, base_currency)
 
     return run_immediate(factory, write)
+
+
+def fx_prefill(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    instrument_id: UUID,
+    on: date,
+) -> FxAt | None:
+    """The stored FX rate to pre-fill for ``instrument_id`` on ``on`` (F6.2a).
+
+    ``None`` when the instrument is quoted in the base currency (no rate is asked). Read-only and
+    workspace-scoped: another workspace's instrument is ``NotFound``.
+    """
+    require_role(ctx, Role.VIEWER)
+    with factory() as session:
+        instrument = InstrumentRepository(session, ctx).get_or_raise(instrument_id)
+        base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
+        if instrument.quote_currency == base_currency:
+            return None
+        return stored_fx_in_session(session, ctx, instrument.quote_currency, base_currency, on)
 
 
 def workspace_has_investment_transactions(session: Session, ctx: Context) -> bool:

@@ -9,6 +9,12 @@ Average method: buys move the average purchase cost; a sell removes
 average purchase cost unchanged. FIFO: each buy is a lot; a sell consumes the oldest lots, and
 only a partly used lot is rounded once. Every per-transaction amount is rounded half-up to the
 base currency's minor unit exactly once.
+
+Settlement (F6.2a): a row entered in the base currency carries ``settlement_unit_price`` and
+``settlement_fee_minor`` in ``settlement_currency`` (the base). Its buy cost is then
+``round_half_up(quantity × settlement_unit_price + settlement_fee)`` and its sell proceeds
+``round_half_up(quantity × settlement_unit_price − settlement_fee)``, without the FX rate; the
+broker's FX spread is part of what left the account.
 """
 
 from __future__ import annotations
@@ -50,9 +56,10 @@ class InvalidHoldingTransaction(ValueError):
 class Oversell(ValueError):
     """A sell exceeds the quantity held at its point in the ordered history."""
 
-    def __init__(self, on: date | None) -> None:
+    def __init__(self, on: date | None, transaction_id: UUID | None = None) -> None:
         super().__init__("oversell")
         self.on = on
+        self.transaction_id = transaction_id
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,6 +76,14 @@ class HoldingTransaction:
     quote_currency: str
     fx_to_base: Decimal
     created_at: datetime
+    # F6.2a: all three set (amounts entered in the base currency) or all None.
+    settlement_currency: str | None = None
+    settlement_unit_price: Decimal | None = None
+    settlement_fee_minor: int | None = None
+
+    @property
+    def settled(self) -> bool:
+        return self.settlement_currency is not None
 
 
 @dataclass(frozen=True, slots=True)
@@ -125,6 +140,27 @@ def _validate(transaction: HoldingTransaction, base_currency: str) -> None:
         raise InvalidHoldingTransaction("invalid_fx")
     minor_unit_for(transaction.quote_currency)
     minor_unit_for(base_currency)
+    _validate_settlement(transaction, base_currency)
+
+
+def _validate_settlement(transaction: HoldingTransaction, base_currency: str) -> None:
+    values = (
+        transaction.settlement_currency,
+        transaction.settlement_unit_price,
+        transaction.settlement_fee_minor,
+    )
+    if all(value is None for value in values):
+        return
+    if any(value is None for value in values):
+        raise InvalidHoldingTransaction("invalid_settlement")
+    if transaction.settlement_currency != base_currency:
+        raise InvalidHoldingTransaction("invalid_settlement")
+    price = transaction.settlement_unit_price
+    if type(price) is not Decimal or not price.is_finite() or price < 0:
+        raise InvalidHoldingTransaction("invalid_settlement")
+    fee = transaction.settlement_fee_minor
+    if type(fee) is not int or fee < 0:
+        raise InvalidHoldingTransaction("invalid_settlement")
 
 
 def _order_key(transaction: HoldingTransaction) -> tuple[bool, date, datetime, str]:
@@ -147,7 +183,20 @@ def _base_minor(amount: Decimal, base_currency: str) -> int:
         return Money.from_decimal(amount, base_currency).amount_minor
 
 
+def _settlement_amount(transaction: HoldingTransaction, sign: int) -> Decimal:
+    assert transaction.settlement_unit_price is not None
+    assert transaction.settlement_fee_minor is not None
+    assert transaction.settlement_currency is not None
+    with localcontext() as context:
+        context.prec = max(context.prec, _DECIMAL_PRECISION)
+        gross = transaction.quantity * transaction.settlement_unit_price
+        fee = _fee_decimal(transaction.settlement_fee_minor, transaction.settlement_currency)
+        return gross + sign * fee
+
+
 def _buy_cost_minor(transaction: HoldingTransaction, base_currency: str) -> int:
+    if transaction.settled:
+        return _base_minor(_settlement_amount(transaction, 1), base_currency)
     with localcontext() as context:
         context.prec = max(context.prec, _DECIMAL_PRECISION)
         gross = transaction.quantity * transaction.unit_price
@@ -158,6 +207,8 @@ def _buy_cost_minor(transaction: HoldingTransaction, base_currency: str) -> int:
 
 
 def _sell_proceeds_minor(transaction: HoldingTransaction, base_currency: str) -> int:
+    if transaction.settled:
+        return _base_minor(_settlement_amount(transaction, -1), base_currency)
     with localcontext() as context:
         context.prec = max(context.prec, _DECIMAL_PRECISION)
         gross = transaction.quantity * transaction.unit_price
@@ -165,6 +216,17 @@ def _sell_proceeds_minor(transaction: HoldingTransaction, base_currency: str) ->
             transaction.fx_to_base
         )
     return _base_minor(amount, base_currency)
+
+
+def transaction_total(transaction: HoldingTransaction, base_currency: str) -> Money:
+    """A buy's total cost or a sell's proceeds in the base currency, rounded once (F6.2/F6.2a).
+
+    Proceeds may be negative when a sell fee exceeds the gross amount.
+    """
+    _validate(transaction, base_currency)
+    if _type(transaction.type) is InvestmentTransactionType.BUY:
+        return Money(_buy_cost_minor(transaction, base_currency), base_currency)
+    return Money(_sell_proceeds_minor(transaction, base_currency), base_currency)
 
 
 def _rounded_cost(remaining_cost_minor: int, quantity: Decimal, sold: Decimal) -> int:
@@ -222,7 +284,7 @@ def _compute_instrument_rows(
             continue
 
         if transaction.quantity > quantity:
-            raise Oversell(transaction.date)
+            raise Oversell(transaction.date, transaction.id)
         proceeds_minor = _sell_proceeds_minor(transaction, base_currency)
         if method is CostBasisMethod.FIFO:
             cost_removed_minor = _consume_lots(lots, transaction.quantity)
