@@ -139,9 +139,12 @@ def refresh_provider(
         return RefreshStats(provider_key=provider_key, status="unknown_provider")
     with factory() as session:
         config = PriceSourceConfigRepository(session, scope).for_provider(provider_key)
-        if config is None or not config.enabled:
-            return RefreshStats(provider_key=provider_key, status="disabled")
-        targets = _targets(session, scope, provider_key)
+        enabled = bool(config is not None and config.enabled)
+        targets = _targets(session, scope, provider_key) if enabled else None
+    if not enabled:
+        _prune_errors(factory, scope, runtime.clock.now())
+        return RefreshStats(provider_key=provider_key, status="disabled")
+    assert targets is not None
     if not targets.price_targets and not targets.fx_currencies:
         _prune_errors(factory, scope, runtime.clock.now())
         return RefreshStats(provider_key=provider_key, status="no_targets")

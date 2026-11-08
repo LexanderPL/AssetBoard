@@ -171,11 +171,13 @@ class RetryingHttpClient:
         *,
         clock: Clock,
         sleep: Callable[[float], None] = time.sleep,
+        monotonic: Callable[[], float] = time.monotonic,
         attempts: int = RETRY_ATTEMPTS,
     ) -> None:
         self.client = client
         self.clock = clock
         self.sleep = sleep
+        self.monotonic = monotonic
         self.attempts = max(1, attempts)
 
     def get(
@@ -188,6 +190,8 @@ class RetryingHttpClient:
         wait: bool = True,
         max_wait: float = BACKGROUND_WAIT_SECONDS,
     ) -> HttpResponse:
+        del wait
+        deadline = self.monotonic() + max_wait
         last_code = "network"
         for attempt in range(self.attempts):
             try:
@@ -198,7 +202,7 @@ class RetryingHttpClient:
                 last_code = error.code
                 if error.code not in {"network", "timeout"} or attempt == self.attempts - 1:
                     raise
-                self._wait(RETRY_BASE_SECONDS * (2**attempt), wait, max_wait)
+                self._wait(RETRY_BASE_SECONDS * (2**attempt), deadline)
                 continue
 
             if 200 <= response.status < 300:
@@ -209,22 +213,21 @@ class RetryingHttpClient:
                 )
                 if attempt == self.attempts - 1:
                     raise RateLimited(delay)
-                self._wait(delay, wait, max_wait)
+                self._wait(delay, deadline)
                 last_code = "http_429"
                 continue
             if 500 <= response.status < 600:
                 if attempt == self.attempts - 1:
                     raise ProviderTransportError(f"http_{response.status}")
-                self._wait(RETRY_BASE_SECONDS * (2**attempt), wait, max_wait)
+                self._wait(RETRY_BASE_SECONDS * (2**attempt), deadline)
                 last_code = f"http_{response.status}"
                 continue
             raise ProviderTransportError(f"http_{response.status}")
         raise ProviderTransportError(last_code)
 
-    def _wait(self, delay: float, wait: bool, max_wait: float) -> None:
-        del wait
+    def _wait(self, delay: float, deadline: float) -> None:
         delay = max(0.0, delay)
-        if delay > max_wait:
+        if delay and self.monotonic() + delay > deadline:
             raise RateLimited(delay)
         if delay:
             self.sleep(delay)
