@@ -248,6 +248,17 @@ class BondTerms(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     early_redemption_fee_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
 
 
+# F6.2a: the three settlement columns are set all or none.
+SETTLEMENT_CHECK = (
+    "(settlement_currency IS NULL AND settlement_unit_price IS NULL "
+    "AND settlement_fee_minor IS NULL) OR "
+    "(settlement_currency IS NOT NULL AND settlement_unit_price IS NOT NULL "
+    "AND settlement_fee_minor IS NOT NULL "
+    "AND length(settlement_currency) = 3 "
+    f"AND settlement_fee_minor >= 0 AND settlement_fee_minor <= {MAX_AMOUNT_MINOR})"
+)
+
+
 class InvestmentTransaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin, Base):
     """A buy or sell of one instrument (F6.2).
 
@@ -256,6 +267,12 @@ class InvestmentTransaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceS
     workspace base currency (``1`` for a base-currency instrument). The composite foreign key
     keeps ``quote_currency`` equal to the instrument's currency; changing that currency is
     refused while rows exist. ``date`` is nullable only for undated imported legacy lots (F6.9).
+
+    F6.2a: a row entered in the base currency also keeps ``settlement_currency`` (the base),
+    ``settlement_unit_price`` and ``settlement_fee_minor`` as entered; all three are set or none.
+    ``unit_price`` and ``fee_minor`` then hold the quote values derived with ``fx_to_base``.
+    ``import_batch_id`` groups the rows of one bulk add; it is not a foreign key because bulk
+    add records no ``import_batches`` row.
     """
 
     __tablename__ = "investment_transactions"
@@ -284,6 +301,12 @@ class InvestmentTransaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceS
         CheckConstraint("fx_to_base IS NULL OR fx_to_base > 0", name="fx_valid"),
         CheckConstraint("length(quote_currency) = 3", name="quote_currency_length"),
         CheckConstraint(f"length(note) <= {MAX_NOTE_LENGTH}", name="note_length_valid"),
+        CheckConstraint(SETTLEMENT_CHECK, name="settlement_all_or_none"),
+        Index(
+            "ix_investment_transactions_workspace_import_batch",
+            "workspace_id",
+            "import_batch_id",
+        ),
         Index(
             "ix_investment_transactions_workspace_instrument_date",
             "workspace_id",
@@ -308,3 +331,7 @@ class InvestmentTransaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceS
     fee_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
     fx_to_base: Mapped[Decimal | None] = mapped_column(DecimalType(), nullable=True)
     note: Mapped[str] = mapped_column(String(MAX_NOTE_LENGTH), nullable=False, default="")
+    settlement_currency: Mapped[str | None] = mapped_column(String(3), nullable=True)
+    settlement_unit_price: Mapped[Decimal | None] = mapped_column(DecimalType(), nullable=True)
+    settlement_fee_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)

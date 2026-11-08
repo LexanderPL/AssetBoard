@@ -116,9 +116,16 @@ are the instrument's quote currency and the base currency, translatable.
   - `FxService.rate(quote, base, date)` (F6.3/F6.4), any source except `transaction`.
   - A hint shows the rate's date and source.
   - When no stored rate exists the field stays empty and is required.
-  - Re-filling for a changed date uses a small Alpine (CSP build) action that calls a read-only
-    JSON endpoint. With JavaScript off, the server pre-fills on the first render, and when the
-    rate is missing the form returns the inline error.
+  - Re-filling for a changed date (or instrument) uses a small CSP-safe script in
+    `static/js/investments.js` that calls a read-only, workspace-scoped JSON endpoint
+    (`GET /investments/fx-rate?instrument_id=…&date=…`, built on `stored_fx_rates`). An
+    untouched pre-fill is cleared at once and then re-filled with the new date's stored rate
+    when one exists; a rate the user typed is kept. (As built: the app's other investment forms
+    use plain delegated listeners in that file, not Alpine components, so this follows them.)
+    With JavaScript off, the server pre-fills on the first render, and when the rate is missing
+    the form returns the inline error.
+  - As built (#243): the hint reads "Stored rate for {date}" (the form's date) rather than
+    naming the observation's own date and source; `stored_fx_rates` returns only the rate.
 
 **What is stored in base mode** (exact `Decimal`, 80-digit `localcontext`):
 - `settlement_currency` = base
@@ -147,7 +154,7 @@ Notes:
 
 **History and editing.**
 - A base-mode row shows the base amounts it was entered with as the primary values, with the
-  derived quote unit price and the rate beside them ("1 600.00 PLN · ≈ 398.774767 USD @ 4.0123").
+  derived quote unit price and the rate beside them ("1 600.00 PLN · ≈ 398.773771 USD @ 4.0123").
 - Editing opens in the mode the row was saved in.
 - Switching modes on an existing row:
   - **quote → base:** pre-fills base price = `unit_price × fx_to_base` and base fee = `fee × fx`.
@@ -160,8 +167,9 @@ base mode (the amounts carry over, since they were entered as base), takes the p
 rate, and saves.
 
 **Audit and archive.**
-- `investment_transaction.created`/`.updated` keep their shape. Field names that changed are
-  listed; no amounts are logged at INFO.
+- `investment_transaction.created`/`.updated` keep their shape. `.updated` adds `changed`, the
+  comma-separated names of the changed fields (settlement columns included); no amounts are
+  logged at INFO.
 - F6.9 must export and restore the three columns. Add them to its file list when F6.9 is
   implemented.
 
@@ -201,7 +209,12 @@ rate, and saves.
   - Any failure, such as an oversell naming its line and date, or an archived instrument,
     refuses the whole batch.
   - The rows share one new `import_batch_id`. One audit event
-    `investment_transaction.bulk_created` records the count and instrument ids, with no amounts.
+    `investment_transaction.bulk_created` records the count, the instrument ids and the batch id,
+    with no amounts. (As built: `import_batch_id` is a plain nullable column without a foreign
+    key, since bulk add records no `import_batches` row and must not appear in the import
+    history with its rollback; F6.9 decides whether its standalone import adds one.)
+  - Same-date pasted rows keep their line order (each gets a creation time one microsecond
+    after the previous line).
   - The page shows a success toast with the count. There is no batch undo in v1; single rows keep
     their normal delete and undo.
 
@@ -209,7 +222,7 @@ rate, and saves.
 
 - **Settlement golden test.** Buy 4 @ 1 600.00 PLN + fee 5.00 PLN with FX 4.0123:
   - cost basis = 6 405.00 PLN exactly;
-  - `unit_price` = 398.774767… (18 places, half-up);
+  - `unit_price` = 398.773770655235151908 (18 places, half-up);
   - quote `fee_minor` = round(5.00 / 4.0123).
 - **Sells.** A partial sell under average and FIFO; selling everything returns cost basis 0.
   Mixed quote-mode and base-mode rows on one instrument.

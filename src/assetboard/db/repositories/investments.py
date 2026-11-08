@@ -213,20 +213,31 @@ class InvestmentTransactionRepository(ScopedRepository[InvestmentTransaction]):
         fee_minor: int,
         fx_to_base: Decimal | None,
         note: str = "",
+        settlement_currency: str | None = None,
+        settlement_unit_price: Decimal | None = None,
+        settlement_fee_minor: int | None = None,
+        import_batch_id: UUID | None = None,
+        created_at: datetime | None = None,
     ) -> InvestmentTransaction:
-        return self.add(
-            InvestmentTransaction(
-                instrument_id=instrument_id,
-                date=date,
-                type=type,
-                quantity=quantity,
-                unit_price=unit_price,
-                quote_currency=quote_currency,
-                fee_minor=fee_minor,
-                fx_to_base=fx_to_base,
-                note=note,
-            )
+        row = InvestmentTransaction(
+            instrument_id=instrument_id,
+            date=date,
+            type=type,
+            quantity=quantity,
+            unit_price=unit_price,
+            quote_currency=quote_currency,
+            fee_minor=fee_minor,
+            fx_to_base=fx_to_base,
+            note=note,
+            settlement_currency=settlement_currency,
+            settlement_unit_price=settlement_unit_price,
+            settlement_fee_minor=settlement_fee_minor,
+            import_batch_id=import_batch_id,
         )
+        if created_at is not None:
+            # Bulk add orders same-day rows by line; the timestamp listener keeps a set value.
+            row.created_at = created_at
+        return self.add(row)
 
     def for_instrument(
         self, instrument_id: UUID, *, include_deleted: bool = False
@@ -363,6 +374,34 @@ class InvestmentTransactionRepository(ScopedRepository[InvestmentTransaction]):
         return self._session.execute(
             select(func.count()).select_from(statement.subquery())
         ).scalar_one()
+
+    def filtered_not_in_currency(
+        self,
+        currency: str,
+        *,
+        instrument_id: UUID | None,
+        types: tuple[str, ...],
+        date_from: date | None,
+        date_to: date | None,
+    ) -> list[InvestmentTransaction]:
+        """Every filtered live row quoted in another currency, newest first (F6.2a FX check).
+
+        The caller checks ``fx_to_base`` in Python: ``DecimalType`` values are never compared
+        in SQL.
+        """
+        statement = self._filtered(
+            instrument_id=instrument_id,
+            types=types,
+            date_from=date_from,
+            date_to=date_to,
+        ).where(InvestmentTransaction.quote_currency != currency)
+        statement = statement.order_by(
+            case((InvestmentTransaction.date.is_(None), 1), else_=0),
+            InvestmentTransaction.date.desc(),
+            InvestmentTransaction.created_at.desc(),
+            InvestmentTransaction.id.desc(),
+        )
+        return list(self._session.scalars(statement))
 
     def _filtered(
         self,

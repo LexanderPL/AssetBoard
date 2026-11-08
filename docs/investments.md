@@ -121,10 +121,84 @@ Open an instrument by clicking its name, or use the **Transactions** tab, to rec
 - **FX rate to the base currency** — required when the instrument is quoted in another currency;
   hidden and stored as 1 for a base-currency instrument. A new transaction starts with the
   stored rate for its date (the latest manual or provider rate on or before that date, marked
-  "Stored rate for …") when one exists; you can change it. Changing the date clears a rate you
-  have not touched, so a back-dated trade never keeps today's rate by accident; a rate you typed
-  stays. Leaving it empty shows an error on the field and keeps everything you entered.
+  "Stored rate for …") when one exists; you can change it. Changing the date re-fills a rate you
+  have not touched with the stored rate for the new date, or clears it when none is stored, so
+  a back-dated trade never keeps today's rate by accident; a rate you typed stays. Leaving it
+  empty shows an error on the field and keeps everything you entered.
 - **Note** — optional, up to 200 characters.
+
+### Amounts in the base currency
+
+Some brokers show only base-currency amounts (for example PLN) for an ETF quoted in USD or EUR.
+For an instrument quoted in another currency, the form offers **Amounts in: USD | PLN** (the
+instrument's quote currency and your base currency). Choose the base currency and enter:
+
+- the quantity,
+- the **unit price in the base currency** and the **fee in the base currency**, exactly as the
+  broker shows them,
+- the FX rate (pre-filled from stored FX as above).
+
+The app keeps the base amounts you entered and also stores the quote unit price
+(`base price ÷ rate`, 18 decimal places) and the quote fee (`base fee ÷ rate`, rounded to the
+currency's minor unit). The cost of a buy is then exactly `quantity × base price + base fee`
+(proceeds of a sell: `quantity × base price − base fee`), rounded once, so the broker's FX
+spread is part of the cost. The derived quote price keeps the instrument's transaction price and
+transaction FX rate correct (for example "≈ 398.77 USD" at the real rate, not "1 600 USD" at
+rate 1).
+
+In the history such a row shows the base amounts first, with the derived quote price and the
+rate beside them: `1600 PLN · ≈ 398.773771 USD @ 4.0123`. Editing opens the row in the mode it
+was saved in. Switching an existing row to the base currency pre-fills `quote price × rate` and
+`quote fee × rate`; switching back keeps the derived quote values and drops the base amounts.
+
+**Fixing rows entered the old way.** If you entered base amounts as quote amounts with rate 1,
+the row gets a **check FX rate** badge (an instrument quoted in another currency at rate 1).
+Tick **FX needs checking** in the history filters to list them. To fix one, open it, switch to
+the base currency (the amounts carry over, since they were base amounts), take the pre-filled
+stored rate and save.
+
+### Bulk add
+
+The **Bulk add** panel on the Transactions tab (editors and owners) takes many past trades at
+once. Paste one transaction per line, fields separated by `;`:
+
+```
+date; instrument; type; quantity; unit price; fee; fx; amounts currency
+```
+
+- Spaces around fields are ignored and empty fields at the end may be left out. Blank lines and
+  lines starting with `#` are skipped. At most 500 lines and 64 KiB.
+- **date** — `YYYY-MM-DD` or your short date with a four-digit year (`1/15/2026` in English,
+  `15.01.2026` in Polish); today or earlier. Bulk add cannot create undated lots.
+- **instrument** — an active instrument's name or symbol, in any letter case. A name that
+  matches more than one instrument, or none, is an error; bulk add never creates instruments.
+- **type** — `buy` or `sell`; Polish `kupno`/`zakup` and `sprzedaż`/`sprzedaz` also work.
+- **quantity**, **unit price**, **fee** — in the interface number format (`1 234,56` in
+  Polish). The fee defaults to 0; a currency instrument ignores the price (always 1).
+- **amounts currency** — blank or the instrument's quote currency for quote amounts; your base
+  currency code for [amounts in the base currency](#amounts-in-the-base-currency). Any other code
+  is an error.
+- **fx** — needed for an instrument quoted in another currency. Leave it blank to use the stored
+  rate for the date (the preview marks it "Stored rate for …"); without one the line says
+  *FX rate needed*. For a base-currency instrument it must be blank or 1.
+
+Example (base currency PLN):
+
+```
+# date; instrument; type; quantity; unit price; fee; fx; amounts currency
+2026-01-15; VWCE; buy; 4; 1600,00; 5; 4,0123; PLN
+2026-02-03; World ETF; buy; 2; 101,5
+2026-03-01; vwce; sprzedaż; 1; 1700; 5; ; PLN
+```
+
+**Preview** lists every line with its values, the FX rate used and the total cost or proceeds in
+the base currency, or its error. Nothing is created while any line has an error. **Create**
+sends the same text again; the server checks it all again (including the instruments and FX
+as they are now), then creates every row or none. A sell that would exceed the quantity held is
+checked with the pasted rows merged into the existing history by date, so an oversell caused
+only by the combination of pasted rows is caught too. The rows of one bulk add share a batch id
+and one audit entry records how many were added. There is no batch undo; each row can be
+deleted (and undone) as usual.
 
 The instrument page shows the current quantity, average cost (per unit, in the base currency),
 cost basis and realized P&L. Holdings are recomputed on read with the workspace's **Average cost**
@@ -175,7 +249,8 @@ rate(from, to) = rate(base, from) / rate(base, to)
 
 For example, with EUR as the base currency, a stored EUR/USD rate of 0.92 means one US dollar is
 worth 0.92 euro. A transaction's `fx_to_base` follows the same convention and acts as the
-lowest-priority FX source until provider rates arrive. FX rates older than the staleness
+lowest-priority FX source until provider rates arrive (it is never used to pre-fill a form). FX
+rates older than the staleness
 threshold are flagged the same way as prices. There is no FX entry form yet.
 
 ## Price providers

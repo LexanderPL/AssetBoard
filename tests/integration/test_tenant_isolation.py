@@ -696,6 +696,19 @@ def test_investment_queries_stay_in_their_workspace(
         )
         == 0
     )
+    # F6.2a: the "FX needs checking" filter reads rows quoted outside a currency.
+    assert [
+        row.id
+        for row in transactions_a.filtered_not_in_currency(
+            "PLN", instrument_id=None, types=(), date_from=None, date_to=None
+        )
+    ] == [a_transaction.id]
+    assert [
+        row.id
+        for row in transactions_b.filtered_not_in_currency(
+            "PLN", instrument_id=a_fund.id, types=(), date_from=None, date_to=None
+        )
+    ] == []
 
 
 def test_price_queries_stay_in_their_workspace(

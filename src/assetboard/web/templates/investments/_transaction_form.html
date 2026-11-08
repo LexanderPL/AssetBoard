@@ -16,7 +16,13 @@
    counts as pre-filled only on a fresh form; an edit form or a refused form keeps its value. #}
 {% set fx_prefilled = values.fx_to_base if (prefill_date and not errors) else "" %}
 {% set form_return_to = return_to if return_to else ("instrument" if fixed else "list") %}
-<form method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#{{ target }}" hx-swap="outerHTML" class="grid gap-4 sm:grid-cols-2" novalidate data-transaction-form data-base-currency="{{ base_currency }}">
+{# F6.2a: "Amounts in" quote | base. Both amount groups are rendered so a saved row can switch
+   modes with its values pre-filled; investments.js shows only the chosen group. #}
+{% set ns = namespace(quote_code="") %}
+{% if fixed %}{% set ns.quote_code = fixed.quote_currency %}{% else %}{% for item in instruments %}{% if values.instrument_id == item.id|string %}{% set ns.quote_code = item.quote_currency %}{% endif %}{% endfor %}{% endif %}
+{% set show_amounts = (not fixed) or (fixed.quote_currency != base_currency and fixed.type != "currency") %}
+{% set amounts = "base" if values.get("amounts") == "base" else "quote" %}
+<form method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#{{ target }}" hx-swap="outerHTML" class="grid gap-4 sm:grid-cols-2" novalidate data-transaction-form data-base-currency="{{ base_currency }}" data-fx-url="{{ scoped_url(request, 'investment_fx_rate') }}">
   {{ csrf_input() }}
   {% if fixed %}
   <input type="hidden" name="instrument_id" value="{{ fixed.id }}">
@@ -56,7 +62,18 @@
     <input id="transaction-quantity" name="quantity" type="text" inputmode="decimal" value="{{ values.quantity }}" required class="form-control w-full"{{ invalid(errors, "quantity", "transaction-quantity") }}>
     {{ field_error(errors, "quantity", "transaction-quantity") }}
   </div>
-  <div class="space-y-1.5" data-transaction-price-field>
+  {% if show_amounts %}
+  <fieldset class="space-y-1.5 sm:col-span-2" data-amounts-choice>
+    <legend class="block text-sm font-medium">{{ _("Amounts in") }}</legend>
+    <div class="flex flex-wrap gap-4 text-sm">
+      <label class="inline-flex items-center gap-2"><input type="radio" name="amounts" value="quote"{% if amounts == "quote" %} checked{% endif %} data-amounts-radio> <span data-amounts-quote-label>{{ ns.quote_code or _("Quote currency") }}</span></label>
+      <label class="inline-flex items-center gap-2"><input type="radio" name="amounts" value="base"{% if amounts == "base" %} checked{% endif %} data-amounts-radio> <span>{{ base_currency }}</span></label>
+    </div>
+    <p class="text-xs text-muted">{{ _("Choose %(currency)s when your broker shows only %(currency)s amounts: the unit price and fee are then in %(currency)s and the FX rate converts them.", currency=base_currency) }}</p>
+    {{ field_error(errors, "amounts", "transaction-amounts") }}
+  </fieldset>
+  {% else %}<input type="hidden" name="amounts" value="quote">{% endif %}
+  <div class="space-y-1.5" data-transaction-price-field data-amounts-group="quote">
     <label for="transaction-price" class="block text-sm font-medium">{{ _("Unit price") }}</label>
     {% set price_value = "1" if fixed and fixed.type == "currency" else values.unit_price %}
     <input id="transaction-price" name="unit_price" type="text" inputmode="decimal" value="{{ price_value }}"{% if fixed and fixed.type == "currency" %} readonly{% endif %} class="form-control w-full" data-transaction-price{{ invalid(errors, "unit_price", "transaction-price") }}>
@@ -64,11 +81,24 @@
     {% if fixed and fixed.type == "bond_model" %}<p class="text-xs text-muted" data-bond-price-help>{{ _("What you paid per bond (cost basis). Face value is the nominal the interest accrues on, e.g. 99.90 paid for a 100 bond on a rollover.") }}</p>{% endif %}
     {{ field_error(errors, "unit_price", "transaction-price") }}
   </div>
-  <div class="space-y-1.5">
+  <div class="space-y-1.5" data-amounts-group="quote">
     <label for="transaction-fee" class="block text-sm font-medium">{{ _("Fee") }}</label>
     <input id="transaction-fee" name="fee" type="text" inputmode="decimal" value="{{ values.fee }}" class="form-control w-full"{{ invalid(errors, "fee", "transaction-fee") }}>
     {{ field_error(errors, "fee", "transaction-fee") }}
   </div>
+  {% if show_amounts %}
+  <div class="space-y-1.5" data-amounts-group="base">
+    <label for="transaction-base-price" class="block text-sm font-medium">{{ _("Unit price in %(currency)s", currency=base_currency) }}</label>
+    <input id="transaction-base-price" name="base_unit_price" type="text" inputmode="decimal" value="{{ values.get('base_unit_price', '') }}" class="form-control w-full"{{ invalid(errors, "base_unit_price", "transaction-base-price") }}>
+    <p class="text-xs text-muted">{{ _("What you paid per unit in %(currency)s, as the broker shows it.", currency=base_currency) }}</p>
+    {{ field_error(errors, "base_unit_price", "transaction-base-price") }}
+  </div>
+  <div class="space-y-1.5" data-amounts-group="base">
+    <label for="transaction-base-fee" class="block text-sm font-medium">{{ _("Fee in %(currency)s", currency=base_currency) }}</label>
+    <input id="transaction-base-fee" name="base_fee" type="text" inputmode="decimal" value="{{ values.get('base_fee', '0') }}" class="form-control w-full"{{ invalid(errors, "base_fee", "transaction-base-fee") }}>
+    {{ field_error(errors, "base_fee", "transaction-base-fee") }}
+  </div>
+  {% endif %}
   {% if not (fixed and fixed.quote_currency == base_currency) %}
   <div class="space-y-1.5" data-transaction-fx>
     <label for="transaction-fx" class="block text-sm font-medium">{{ _("FX rate to %(currency)s", currency=base_currency) }}</label>

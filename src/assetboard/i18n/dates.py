@@ -10,7 +10,13 @@ from datetime import date
 
 from babel import Locale
 from babel.core import UnknownLocaleError
-from babel.dates import format_date, format_skeleton, get_day_names, get_month_names
+from babel.dates import (
+    format_date,
+    format_skeleton,
+    get_date_format,
+    get_day_names,
+    get_month_names,
+)
 from babel.lists import format_list
 
 from assetboard.domain.months import YearMonth
@@ -90,3 +96,24 @@ def format_day_and_month(day: int, month: int, locale: str) -> str:
 def format_and_list(items: list[str], locale: str) -> str:
     """Items joined as the locale writes a list: "A, B and C", "A, B i C"."""
     return format_list(items, locale=_locale(locale))
+
+
+def short_date_order(locale: str) -> tuple[str, str]:
+    """The field order and separator of the locale's CLDR short date, for parsing typed dates.
+
+    ``("mdy", "/")`` for English ("M/d/yy"), ``("dmy", ".")`` for Polish ("d.MM.y"). Only the
+    order and the separator are used; parsers still require a four-digit year.
+    """
+    pattern = get_date_format("short", locale=_locale(locale)).pattern
+    order = ""
+    separator = ""
+    for char in pattern:
+        letter = char.lower()
+        if letter in "dmy":
+            if letter not in order:
+                order += letter
+        elif not separator and order and char not in "'":
+            separator = char
+    if sorted(order) != ["d", "m", "y"] or not separator.strip():
+        return ("ymd", "-")
+    return (order, separator)

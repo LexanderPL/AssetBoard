@@ -1,7 +1,8 @@
 """Investments forms in Chromium: the add form opens from its button with no allocation warning,
 a successful add shows the notice in view (and a fresh form still has no warning), editing opens
-in the instrument's row and cancels back to it, and a pre-filled stored FX rate is cleared when
-the transaction date changes while a typed rate is kept. No CSP violations."""
+in the instrument's row and cancels back to it, and a pre-filled stored FX rate follows the
+transaction date (re-filled with the new date's stored rate, cleared when none is stored) while a
+typed rate is kept. No CSP violations."""
 
 from __future__ import annotations
 
@@ -121,7 +122,8 @@ def test_instrument_add_and_inline_edit_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("[data-instrument-name='World ETF'] [data-edit]")).to_be_visible()
 
             # A foreign-quoted instrument and an old stored rate: the new transaction's FX field
-            # starts with it, a date change clears it untouched, a typed rate survives.
+            # starts with it, a date change re-fills it untouched with that date's stored rate (or
+            # clears it when none is stored), and a typed rate survives.
             add.locator("summary").click()
             create_form = add.locator("[data-instrument-form]")
             create_form.get_by_label("Name", exact=True).fill("US fund")
@@ -134,22 +136,27 @@ def test_instrument_add_and_inline_edit_in_a_browser(tmp_path: Path) -> None:
                 instrument_id = session.scalars(
                     select(Instrument.id).where(Instrument.name == "US fund")
                 ).one()
-                session.add(
-                    FxRate(
-                        workspace_id=workspace_id,
-                        base_currency="EUR",
-                        quote_currency="USD",
-                        date=date(2000, 1, 3),
-                        rate=Decimal("0.9"),
-                        source="ecb",
+                for day, rate in ((date(2000, 1, 3), "0.85"), (date(2001, 2, 1), "0.9")):
+                    session.add(
+                        FxRate(
+                            workspace_id=workspace_id,
+                            base_currency="EUR",
+                            quote_currency="USD",
+                            date=day,
+                            rate=Decimal(rate),
+                            source="ecb",
+                        )
                     )
-                )
             page.goto(f"{base}/investments/instruments/{instrument_id}", wait_until="networkidle")
             fx = page.locator("#transaction-fx")
             hint = page.locator("[data-fx-hint]")
             expect(fx).to_have_value("0.9")
             expect(hint).to_be_visible()
-            page.locator("#transaction-date").fill("2001-02-05")
+            page.locator("#transaction-date").fill("2000-06-05")
+            expect(fx).to_have_value("0.85")
+            expect(hint).to_be_visible()
+            expect(hint).to_have_text("Stored rate for Jun 5, 2000")
+            page.locator("#transaction-date").fill("1999-06-01")
             expect(fx).to_have_value("")
             expect(hint).to_be_hidden()
             page.reload(wait_until="networkidle")

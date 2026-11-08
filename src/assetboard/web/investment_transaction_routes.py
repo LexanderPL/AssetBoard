@@ -11,17 +11,20 @@ from __future__ import annotations
 
 import math
 from datetime import date
+from datetime import date as date_type
 from decimal import Decimal
 from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Form, Request
 from starlette.concurrency import run_in_threadpool
-from starlette.responses import RedirectResponse, Response
+from starlette.responses import JSONResponse, RedirectResponse, Response
 
 from assetboard.db.repositories import NotFound
+from assetboard.domain.money import Money
 from assetboard.domain.networth import sparkline_polyline
-from assetboard.i18n import gettext
+from assetboard.domain.settlement import base_values_from_quote
+from assetboard.i18n import gettext, ngettext
 from assetboard.i18n.dates import format_day
 from assetboard.i18n.numbers import (
     format_amount_input,
@@ -36,7 +39,15 @@ from assetboard.services.bonds import (
     save_bond_terms,
 )
 from assetboard.services.context import Context, PermissionDenied, Role, has_role
+from assetboard.services.investment_bulk import (
+    BulkPreview,
+    BulkRejected,
+    create_bulk,
+    preview_bulk,
+)
 from assetboard.services.investment_transactions import (
+    MAX_YEAR,
+    MIN_YEAR,
     InvalidInvestmentTransaction,
     InvestmentTransactionError,
     InvestmentTransactionView,
@@ -46,6 +57,7 @@ from assetboard.services.investment_transactions import (
     create_transaction,
     delete_transaction,
     get_transaction,
+    instrument_fx_currency,
     instrument_history,
     list_transactions,
     undo_delete,
@@ -90,6 +102,11 @@ ERRORS = {
     "amount_too_large": _("The fee is too large."),
     "invalid_fx": _("Enter a positive FX rate to the base currency."),
     "invalid_fx_to_base": _("Enter a positive FX rate to the base currency."),
+    "fx_needed": _("FX rate needed: no stored rate exists for this date, so enter one."),
+    "invalid_amounts": _("Choose the currency of the amounts."),
+    "settlement_not_allowed": _(
+        "Amounts in the base currency are only for instruments quoted in another currency."
+    ),
     "invalid_note": _("Enter a note of at most 200 characters."),
     "invalid_description_too_long": _("Enter a note of at most 200 characters."),
     "invalid_instrument": _("Choose an instrument."),
@@ -132,6 +149,39 @@ NOTICES = {
     "price_saved": _("Price saved."),
     "price_deleted": _("Price deleted."),
     "bond_terms_saved": _("Bond terms saved."),
+}
+BULK_ERRORS = {
+    "wrong_format": _(
+        "Use date; instrument; type; quantity; unit price; fee; FX; amounts currency."
+    ),
+    "date_required": _("Enter a date."),
+    "invalid_date": _("Enter a date as YYYY-MM-DD or in your short date format."),
+    "future_date": _("Investment transactions cannot be dated in the future."),
+    "instrument_required": _("Enter an instrument."),
+    "instrument_unknown": _("No active instrument has this name or symbol."),
+    "instrument_ambiguous": _("More than one active instrument matches; use the other one."),
+    "instrument_archived": _("This instrument is archived; restore it before adding transactions."),
+    "invalid_type": _("Use buy or sell (kupno, zakup, sprzedaż)."),
+    "quantity_required": _("Enter a quantity."),
+    "price_required": _("Enter a unit price."),
+    "invalid_quantity": ERRORS["invalid_quantity"],
+    "invalid_unit_price": ERRORS["invalid_unit_price"],
+    "invalid_fee": ERRORS["invalid_fee"],
+    "too_many_decimals": ERRORS["too_many_decimals"],
+    "amount_too_large": ERRORS["amount_too_large"],
+    "invalid_fx": ERRORS["invalid_fx"],
+    "fx_needed": _("FX rate needed"),
+    "fx_not_one": _("This instrument is quoted in the base currency; leave FX blank or 1."),
+    "invalid_amounts_currency": _(
+        "Use the instrument's quote currency or the base currency, or leave it blank."
+    ),
+    "settlement_not_allowed": ERRORS["settlement_not_allowed"],
+    "oversell": _("This sale would exceed the quantity held."),
+}
+BULK_INPUT_ERRORS = {
+    "bulk_too_large": _("Paste at most 64 KiB of text."),
+    "too_many_lines": _("Paste at most 500 lines."),
+    "empty": _("Paste at least one line."),
 }
 
 
@@ -254,6 +304,15 @@ def _default_values(
     }
 
 
+def _list_notice(request: Request, notice: str | None) -> str | None:
+    if notice is not None and notice.startswith("bulk_created:"):
+        count = _int(notice.removeprefix("bulk_created:"), 0)
+        return ngettext(
+            "%(num)d transaction added.", "%(num)d transactions added.", count, request.state.locale
+        ) % {"num": count}
+    return _t(request, NOTICES[notice]) if notice in NOTICES else None
+
+
 def _form_day(values: dict[str, str] | None, today: date) -> date | None:
     """The date a create form is for: today on a fresh form, else the submitted date.
 
@@ -292,7 +351,26 @@ def _fx_defaults(
     }
 
 
-def _edit_values(view: InvestmentTransactionView, locale: str) -> dict[str, str]:
+def _edit_values(
+    view: InvestmentTransactionView, locale: str, base_currency: str
+) -> dict[str, str]:
+    """A saved row's form values; both amount modes are pre-filled so switching keeps them."""
+    base_unit_price = ""
+    base_fee = ""
+    if view.settlement_unit_price is not None and view.settlement_fee is not None:
+        base_unit_price = format_quantity_input(view.settlement_unit_price, locale)
+        base_fee = format_amount_input(view.settlement_fee, locale)
+    elif view.quote_currency != base_currency and view.instrument_type != "currency":
+        # quote -> base: base price = unit_price × fx, base fee = fee × fx (rounded once).
+        price, fee_minor = base_values_from_quote(
+            view.unit_price,
+            view.fee.amount_minor,
+            view.fx_to_base,
+            base_currency=base_currency,
+            quote_currency=view.quote_currency,
+        )
+        base_unit_price = format_quantity_input(price, locale)
+        base_fee = format_amount_input(Money(fee_minor, base_currency), locale)
     return {
         "date": view.date.isoformat() if view.date is not None else "",
         "type": view.type,
@@ -300,8 +378,15 @@ def _edit_values(view: InvestmentTransactionView, locale: str) -> dict[str, str]
         "quantity": format_quantity_input(view.quantity, locale),
         "unit_price": format_quantity_input(view.unit_price, locale),
         "fee": format_quantity_input(view.fee.to_decimal(), locale),
-        "fx_to_base": format_quantity_input(view.fx_to_base, locale),
+        "fx_to_base": (
+            ""
+            if view.quote_currency == base_currency
+            else format_quantity_input(view.fx_to_base, locale)
+        ),
         "note": view.note,
+        "amounts": view.amounts,
+        "base_unit_price": base_unit_price,
+        "base_fee": base_fee,
     }
 
 
@@ -332,6 +417,7 @@ def _filter_values(request: Request) -> dict[str, str]:
         "type": request.query_params.get("type", ""),
         "from": request.query_params.get("from", ""),
         "to": request.query_params.get("to", ""),
+        "fx": "check" if request.query_params.get("fx", "") == "check" else "",
     }
 
 
@@ -359,6 +445,9 @@ def _list_page(
     toast_undo: str | None = None,
     toast_seconds: int = 0,
     status_code: int = 200,
+    bulk_text: str = "",
+    bulk_preview: BulkPreview | None = None,
+    bulk_error: str | None = None,
 ) -> Response:
     factory = request.app.state.session_factory
     locale = request.state.locale
@@ -378,6 +467,7 @@ def _list_page(
             date_from=filters["from"],
             date_to=filters["to"],
             page=page_number,
+            fx_check=filters["fx"] == "check",
         )
     except InvestmentTransactionError as exc:
         result = EMPTY
@@ -406,13 +496,19 @@ def _list_page(
         "edit_errors": {
             field: _t(request, message) for field, message in (edit_errors or {}).items()
         },
-        "notice": _t(request, NOTICES[notice]) if notice in NOTICES else None,
+        "notice": _list_notice(request, notice),
         "error": error,
         "base_currency": ctx.workspace.base_currency,
         "can_edit": has_role(ctx, Role.EDITOR),
         "can_manage_providers": has_role(ctx, Role.OWNER),
         "coingecko_enabled": provider_enabled(request.app.state.session_factory, ctx, "coingecko"),
         "today": today,
+        "bulk_text": bulk_text,
+        "bulk_preview": bulk_preview,
+        "bulk_error": _t(request, BULK_INPUT_ERRORS[bulk_error])
+        if bulk_error in BULK_INPUT_ERRORS
+        else None,
+        "bulk_error_labels": {code: _t(request, label) for code, label in BULK_ERRORS.items()},
         "toast_undo": toast_undo,
         "toast_seconds": toast_seconds,
         "toast_message": _t(request, NOTICES["deleted"]) if toast_undo else None,
@@ -618,12 +714,7 @@ async def transactions_page(request: Request, ctx: CurrentContext, notice: str =
                 editing,
                 locale=request.state.locale,
             )
-            values = _edit_values(view, request.state.locale)
-            values["fx_to_base"] = (
-                ""
-                if view.quote_currency == ctx.workspace.base_currency
-                else format_quantity_input(view.fx_to_base, request.state.locale)
-            )
+            values = _edit_values(view, request.state.locale, ctx.workspace.base_currency)
         except (ValueError, NotFound, InvestmentTransactionError):
             editing = None
             values = None
@@ -636,6 +727,63 @@ async def transactions_page(request: Request, ctx: CurrentContext, notice: str =
             edit_values=values,
         )
     )
+
+
+@router.post("/investments/transactions/bulk/preview", name="investment_transaction_bulk_preview")
+async def transaction_bulk_preview(
+    request: Request, ctx: CurrentContext, text: FormStr = ""
+) -> Response:
+    """Parse and check a pasted batch; nothing is written (F6.2a part B)."""
+    try:
+        preview = await run_in_threadpool(
+            lambda: preview_bulk(
+                request.app.state.session_factory, ctx, text=text, locale=request.state.locale
+            )
+        )
+    except InvestmentTransactionError as exc:
+        code = exc.code
+        return await run_in_threadpool(
+            lambda: _list_page(request, ctx, status_code=400, bulk_text=text, bulk_error=code)
+        )
+    status = 200 if preview.can_create else 400
+    return await run_in_threadpool(
+        lambda: _list_page(request, ctx, status_code=status, bulk_text=text, bulk_preview=preview)
+    )
+
+
+@router.post("/investments/transactions/bulk", name="investment_transaction_bulk_create")
+async def transaction_bulk_create(
+    request: Request, ctx: CurrentContext, text: FormStr = ""
+) -> Response:
+    """Re-parse and re-validate the same text, then create every row or none."""
+    try:
+        count = await run_in_threadpool(
+            lambda: create_bulk(
+                request.app.state.session_factory, ctx, text=text, locale=request.state.locale
+            )
+        )
+    except BulkRejected as exc:
+        preview = exc.preview
+        return await run_in_threadpool(
+            lambda: _list_page(request, ctx, status_code=400, bulk_text=text, bulk_preview=preview)
+        )
+    except InvestmentTransactionError as exc:
+        failure = exc
+        return await run_in_threadpool(
+            lambda: _list_page(
+                request,
+                ctx,
+                status_code=400,
+                bulk_text=text,
+                bulk_error=failure.code if failure.code in BULK_INPUT_ERRORS else None,
+                error=None if failure.code in BULK_INPUT_ERRORS else _error_text(request, failure),
+            )
+        )
+    notice = f"bulk_created:{count}"
+    if is_htmx_fragment_request(request):
+        return await run_in_threadpool(lambda: _list_page(request, ctx, notice=notice))
+    path = request.url_for("investments_transactions").path
+    return RedirectResponse(f"{path}?notice={notice}", status_code=303)
 
 
 @router.post("/investments/transactions", name="investment_transaction_create")
@@ -651,6 +799,9 @@ async def transaction_create(
     fx_to_base: FormStr = "",
     note: FormStr = "",
     return_to: FormStr = "",
+    amounts: FormStr = "quote",
+    base_unit_price: FormStr = "",
+    base_fee: FormStr = "0",
 ) -> Response:
     values = {
         "date": date,
@@ -661,6 +812,9 @@ async def transaction_create(
         "fee": fee,
         "fx_to_base": fx_to_base,
         "note": note,
+        "amounts": amounts,
+        "base_unit_price": base_unit_price,
+        "base_fee": base_fee,
     }
     form = await request.form()
     try:
@@ -689,6 +843,9 @@ async def transaction_create(
                 fx_value=fx_to_base,
                 note_value=note,
                 locale=request.state.locale,
+                amounts_value=amounts,
+                base_unit_price_value=base_unit_price,
+                base_fee_value=base_fee,
             )
         )
     except InvestmentTransactionError as exc:
@@ -722,6 +879,50 @@ async def transaction_create(
     )
 
 
+@router.get("/investments/fx-rate", name="investment_fx_rate")
+async def fx_rate_lookup(
+    request: Request, ctx: CurrentContext, instrument_id: str = "", date: str = ""
+) -> Response:
+    """Read-only stored FX for an instrument's quote currency on a date (F6.2a form re-fill).
+
+    Workspace-scoped through the service; another workspace's instrument is 404. A rate that is
+    not asked (base-quoted instrument) or a bad date gives an empty rate.
+    """
+    item = _parse_uuid(instrument_id)
+    today = ctx.clock.today(ctx.workspace.timezone)
+    currency = await run_in_threadpool(
+        instrument_fx_currency, request.app.state.session_factory, ctx, item
+    )
+    try:
+        day: date | None = date_type.fromisoformat(date)
+    except ValueError:
+        day = None
+    if day is not None and not MIN_YEAR <= day.year <= MAX_YEAR or day is not None and day > today:
+        day = None
+    rate = ""
+    if currency is not None and day is not None:
+        rates = await run_in_threadpool(
+            stored_fx_rates, request.app.state.session_factory, ctx, {currency}, day
+        )
+        if currency in rates:
+            rate = format_quantity_input(rates[currency], request.state.locale)
+    hint = (
+        _t(request, _("Stored rate for %(date)s")) % {"date": format_day(day, request.state.locale)}
+        if rate and day is not None
+        else ""
+    )
+    response = JSONResponse(
+        {
+            "asked": currency is not None,
+            "rate": rate,
+            "date": day.isoformat() if day is not None else "",
+            "hint": hint,
+        }
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 @router.get(
     "/investments/transactions/{transaction_id}/edit",
     name="investment_transaction_edit",
@@ -742,12 +943,7 @@ async def transaction_edit(
         _parse_uuid(transaction_id),
         locale=request.state.locale,
     )
-    values = _edit_values(view, request.state.locale)
-    values["fx_to_base"] = (
-        ""
-        if view.quote_currency == ctx.workspace.base_currency
-        else format_quantity_input(view.fx_to_base, request.state.locale)
-    )
+    values = _edit_values(view, request.state.locale, ctx.workspace.base_currency)
     context: dict[str, Any] = {
         "transaction": view,
         "values": values,
@@ -817,6 +1013,9 @@ async def transaction_update(
     note: FormStr = "",
     return_to: FormStr = "",
     instrument_id: FormStr = "",
+    amounts: FormStr = "quote",
+    base_unit_price: FormStr = "",
+    base_fee: FormStr = "0",
 ) -> Response:
     item_id = _parse_uuid(transaction_id)
     values = {
@@ -828,6 +1027,9 @@ async def transaction_update(
         "fee": fee,
         "fx_to_base": fx_to_base,
         "note": note,
+        "amounts": amounts,
+        "base_unit_price": base_unit_price,
+        "base_fee": base_fee,
     }
     try:
         view = await run_in_threadpool(
@@ -843,6 +1045,9 @@ async def transaction_update(
                 fx_value=fx_to_base,
                 note_value=note,
                 locale=request.state.locale,
+                amounts_value=amounts,
+                base_unit_price_value=base_unit_price,
+                base_fee_value=base_fee,
             )
         )
     except InvestmentTransactionError as exc:
@@ -1148,12 +1353,7 @@ async def instrument_page(
                 editing,
                 locale=request.state.locale,
             )
-            values = _edit_values(view, request.state.locale)
-            values["fx_to_base"] = (
-                ""
-                if view.quote_currency == ctx.workspace.base_currency
-                else format_quantity_input(view.fx_to_base, request.state.locale)
-            )
+            values = _edit_values(view, request.state.locale, ctx.workspace.base_currency)
         except (ValueError, NotFound, InvestmentTransactionError):
             editing = None
             values = None

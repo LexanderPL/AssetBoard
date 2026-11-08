@@ -2,8 +2,8 @@
 
 The holdings domain (``domain.holdings``) never sees ORM rows. Every service that computes
 holdings maps its rows here, so the instrument page, the price refresh and the portfolio page
-agree on the inputs: a missing ``fx_to_base`` (a base-currency trade) is 1, and an unknown cost
-basis setting falls back to the average method.
+agree on the inputs (the F6.2a settlement amounts included): a missing ``fx_to_base`` (a
+base-currency trade) is 1, and an unknown cost basis setting falls back to the average method.
 """
 
 from __future__ import annotations
@@ -27,6 +27,9 @@ def holding_transaction(row: InvestmentTransaction) -> HoldingTransaction:
         quote_currency=row.quote_currency,
         fx_to_base=row.fx_to_base if row.fx_to_base is not None else Decimal(1),
         created_at=row.created_at,
+        settlement_currency=row.settlement_currency,
+        settlement_unit_price=row.settlement_unit_price,
+        settlement_fee_minor=row.settlement_fee_minor,
     )
 
 
