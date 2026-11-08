@@ -1,0 +1,195 @@
+"""Provider catalogue and pure conversion rules (F6.4).
+
+The catalogue names the built-in providers, what they can quote and the attribution they need.
+The functions below convert provider observations into the project's conventions without I/O:
+FX rates are base-currency units per one quote-currency unit, and NBP gold is published in PLN
+per gram while the default metal unit is a troy ounce.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal, localcontext
+from typing import Literal
+
+PROVIDER_DECIMAL_PRECISION = 80
+TROY_OUNCE_GRAMS = Decimal("31.1034768")
+
+NBP_KEY = "nbp"
+ECB_KEY = "ecb"
+
+_GRAMS = frozenset({"g", "gram", "grams", "gramy", "gramow", "gramów"})
+_TROY_OUNCES = frozenset(
+    {
+        "oz",
+        "oz t",
+        "troy ounce",
+        "troy ounces",
+        "uncja",
+        "uncje",
+        "uncji",
+        "uncja trojanska",
+        "uncja trojańska",
+    }
+)
+
+
+def _(message: str) -> str:
+    """Marks a message for extraction; it is translated where it is rendered."""
+    return message
+
+
+@dataclass(frozen=True, slots=True)
+class ProviderDefinition:
+    key: str
+    label: str
+    description: str
+    kind: Literal["price", "fx", "both"]
+    natural_base: str
+    supported_types: frozenset[str]
+    quote_currencies: frozenset[str] | None
+    requires_key: bool
+    symbol_required: bool
+    symbol_help: str
+    attribution: str | None
+    docs_url: str
+
+
+NBP = ProviderDefinition(
+    key=NBP_KEY,
+    label="NBP",
+    description=_(
+        "Official National Bank of Poland FX rates against PLN and the official gold price."
+    ),
+    kind="both",
+    natural_base="PLN",
+    supported_types=frozenset({"metal"}),
+    quote_currencies=frozenset({"PLN"}),
+    requires_key=False,
+    symbol_required=False,
+    symbol_help=_("NBP gold uses XAU; the price is quoted per gram and converted to the unit."),
+    attribution="Narodowy Bank Polski",
+    docs_url="https://api.nbp.pl/",
+)
+
+ECB = ProviderDefinition(
+    key=ECB_KEY,
+    label="ECB",
+    description=_("European Central Bank euro reference rates against EUR."),
+    kind="fx",
+    natural_base="EUR",
+    supported_types=frozenset(),
+    quote_currencies=frozenset(),
+    requires_key=False,
+    symbol_required=False,
+    symbol_help="",
+    attribution="European Central Bank",
+    docs_url="https://www.ecb.europa.eu/stats/eurofxref/",
+)
+
+PROVIDERS: dict[str, ProviderDefinition] = {NBP.key: NBP, ECB.key: ECB}
+
+
+class UnsupportedUnit(ValueError):
+    """The instrument unit cannot be derived from the provider's quoted unit."""
+
+
+class InvalidProviderRate(ValueError):
+    """A provider value is not a usable positive finite decimal."""
+
+
+def provider_definition(key: str) -> ProviderDefinition | None:
+    return PROVIDERS.get(key)
+
+
+def provider_supports_currency(definition: ProviderDefinition, currency: str) -> bool:
+    """Whether the provider publishes instrument prices in ``currency``."""
+    if definition.kind == "fx":
+        return False
+    if definition.quote_currencies is None:
+        return True
+    return currency.upper() in definition.quote_currencies
+
+
+def nbp_gold_symbol(value: str | None) -> str | None:
+    """The canonical gold symbol, or ``None`` for anything else."""
+    cleaned = (value or "").strip().upper()
+    if cleaned in {"", "XAU", "GOLD"}:
+        return "XAU"
+    return None
+
+
+def normalize_instrument_symbol(
+    definition: ProviderDefinition, provider_symbol: str | None
+) -> str | None:
+    """The canonical symbol a price provider expects for an instrument."""
+    if definition.key == NBP_KEY:
+        return nbp_gold_symbol(provider_symbol)
+    cleaned = (provider_symbol or "").strip()
+    return cleaned or None
+
+
+def nbp_gold_to_unit(price_per_gram: Decimal, unit_label: str) -> Decimal:
+    """Convert NBP's PLN-per-gram gold price to the instrument's unit."""
+    if not price_per_gram.is_finite() or price_per_gram < 0:
+        raise InvalidProviderRate
+    normalized = unit_label.strip().casefold()
+    if normalized in _GRAMS:
+        return price_per_gram
+    if normalized in _TROY_OUNCES:
+        with localcontext() as context:
+            context.prec = max(context.prec, PROVIDER_DECIMAL_PRECISION)
+            return price_per_gram * TROY_OUNCE_GRAMS
+    raise UnsupportedUnit
+
+
+def ecb_quote_to_rate(quote: Decimal) -> Decimal:
+    """ECB publishes currency units per EUR; return EUR units per one currency unit."""
+    if not quote.is_finite() or quote <= 0:
+        raise InvalidProviderRate
+    with localcontext() as context:
+        context.prec = max(context.prec, PROVIDER_DECIMAL_PRECISION)
+        return Decimal(1) / quote
+
+
+def convert_to_workspace_base(native_per_currency: Decimal, native_per_base: Decimal) -> Decimal:
+    """Convert a provider's natural-base rate into the workspace base currency.
+
+    ``native_per_currency`` and ``native_per_base`` are both expressed in the provider's
+    natural base. The result is workspace-base units per one currency unit.
+    """
+    if (
+        not native_per_currency.is_finite()
+        or native_per_currency <= 0
+        or not native_per_base.is_finite()
+        or native_per_base <= 0
+    ):
+        raise InvalidProviderRate
+    with localcontext() as context:
+        context.prec = max(context.prec, PROVIDER_DECIMAL_PRECISION)
+        return native_per_currency / native_per_base
+
+
+def normalize_provider_decimal(value: Decimal, *, positive: bool) -> Decimal:
+    """Validate and fit a provider observation to ``DecimalType`` (38 digits, 18 decimals)."""
+    if not value.is_finite():
+        raise InvalidProviderRate
+    if value < 0 or (positive and value == 0):
+        raise InvalidProviderRate
+    exponent = value.as_tuple().exponent
+    if not isinstance(exponent, int):
+        raise InvalidProviderRate
+    scale = max(-exponent, 0)
+    integer_digits = 0 if value.is_zero() else max(value.adjusted() + 1, 0)
+    if scale > 18 or integer_digits > 20 or integer_digits + scale > 38:
+        with localcontext() as context:
+            context.prec = max(context.prec, PROVIDER_DECIMAL_PRECISION)
+            value = value.quantize(Decimal("1e-18"), rounding=ROUND_HALF_UP)
+        exponent = value.as_tuple().exponent
+        if not isinstance(exponent, int):
+            raise InvalidProviderRate
+        scale = max(-exponent, 0)
+        integer_digits = 0 if value.is_zero() else max(value.adjusted() + 1, 0)
+        if scale > 18 or integer_digits > 20 or integer_digits + scale > 38:
+            raise InvalidProviderRate
+    return value

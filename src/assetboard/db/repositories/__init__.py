@@ -46,7 +46,12 @@ from assetboard.db.repositories.notifications import (
     NotificationChannelRepository,
     NotificationLogRepository,
 )
-from assetboard.db.repositories.prices import FxRateRepository, PricePointRepository
+from assetboard.db.repositories.prices import (
+    FxRateRepository,
+    PricePointRepository,
+    PriceSourceConfigRepository,
+    ProviderErrorRepository,
+)
 from assetboard.db.repositories.scheduled import (
     ScheduledItemRepository,
     ScheduledOccurrenceRepository,
@@ -70,6 +75,8 @@ __all__ = [
     "NotificationLogRepository",
     "FxRateRepository",
     "PricePointRepository",
+    "PriceSourceConfigRepository",
+    "ProviderErrorRepository",
     "AssetClassRepository",
     "InstrumentRepository",
     "InstrumentAllocationRepository",

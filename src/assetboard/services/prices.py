@@ -12,7 +12,6 @@ from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, localcontext
-from typing import Protocol
 from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -31,6 +30,8 @@ from assetboard.db.repositories import (
 from assetboard.domain.money import minor_unit_for
 from assetboard.domain.prices import (
     DEFAULT_STALE_AFTER_DAYS,
+    FxProvider,
+    PriceProvider,
     ProviderInstrument,
     ProviderQuote,
     ProviderRateLimit,
@@ -52,6 +53,7 @@ __all__ = [
     "ProviderInstrument",
     "ProviderQuote",
     "ProviderRateLimit",
+    "FxProvider",
     "delete_manual_price",
     "fx_rate",
     "instrument_prices",
@@ -64,17 +66,6 @@ __all__ = [
 _DECIMAL_PRECISION = 80
 
 
-class PriceProvider(Protocol):
-    key: str
-    rate_limit: ProviderRateLimit
-
-    def supports(self, instrument: ProviderInstrument) -> bool: ...
-
-    def fetch_latest(self, symbols: Sequence[str]) -> Mapping[str, ProviderQuote]: ...
-
-    def fetch_history(self, symbol: str, start: date, end: date) -> Sequence[ProviderQuote]: ...
-
-
 class ManualProvider:
     """The manual path is written directly by the UI; it never fetches remote quotes."""
 
@@ -85,12 +76,26 @@ class ManualProvider:
         del instrument
         return True
 
-    def fetch_latest(self, symbols: Sequence[str]) -> Mapping[str, ProviderQuote]:
-        del symbols
+    def fetch_latest(
+        self,
+        symbols: Sequence[str],
+        quote_currency: str = "",
+        *,
+        wait: bool = True,
+    ) -> Mapping[str, ProviderQuote]:
+        del symbols, quote_currency, wait
         return {}
 
-    def fetch_history(self, symbol: str, start: date, end: date) -> Sequence[ProviderQuote]:
-        del symbol, start, end
+    def fetch_history(
+        self,
+        symbol: str,
+        start: date,
+        end: date,
+        quote_currency: str = "",
+        *,
+        wait: bool = True,
+    ) -> Sequence[ProviderQuote]:
+        del symbol, start, end, quote_currency, wait
         return ()
 
 
@@ -115,10 +120,26 @@ class FakeProvider:
     def supports(self, instrument: ProviderInstrument) -> bool:
         return not self._supported_types or instrument.type in self._supported_types
 
-    def fetch_latest(self, symbols: Sequence[str]) -> Mapping[str, ProviderQuote]:
+    def fetch_latest(
+        self,
+        symbols: Sequence[str],
+        quote_currency: str = "",
+        *,
+        wait: bool = True,
+    ) -> Mapping[str, ProviderQuote]:
+        del quote_currency, wait
         return {symbol: self._latest[symbol] for symbol in symbols if symbol in self._latest}
 
-    def fetch_history(self, symbol: str, start: date, end: date) -> Sequence[ProviderQuote]:
+    def fetch_history(
+        self,
+        symbol: str,
+        start: date,
+        end: date,
+        quote_currency: str = "",
+        *,
+        wait: bool = True,
+    ) -> Sequence[ProviderQuote]:
+        del quote_currency, wait
         return tuple(quote for quote in self._history.get(symbol, ()) if start <= quote.date <= end)
 
 
@@ -128,6 +149,7 @@ class PriceAt:
     as_of: date | None
     source: str | None
     stale: bool
+    provider_key: str | None = None
 
     @property
     def missing(self) -> bool:
@@ -153,6 +175,7 @@ class PricePointView:
     price: Decimal
     source: str
     editable: bool
+    provider_key: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,6 +192,7 @@ class _Candidate:
     created_at: datetime
     id: UUID
     value: Decimal
+    provider_key: str | None = None
 
 
 def _candidate_key(candidate: _Candidate) -> tuple[date, int, datetime, str]:
@@ -192,6 +216,7 @@ def _price_at(candidate: _Candidate | None, on: date) -> PriceAt:
         candidate.date,
         candidate.source,
         is_stale(candidate.date, on),
+        candidate.provider_key,
     )
 
 
@@ -259,11 +284,24 @@ def _latest_prices_in_session(
     candidates: dict[UUID, list[_Candidate]] = {instrument_id: [] for instrument_id in ids}
     for row in stored:
         candidates[row.instrument_id].append(
-            _Candidate(row.date, row.source, row.created_at, row.id, row.price)
+            _Candidate(
+                row.date,
+                row.source,
+                row.created_at,
+                row.id,
+                row.price,
+                row.provider_key,
+            )
         )
     for (instrument_id, day), row in transaction_prices.items():
         candidates[instrument_id].append(
-            _Candidate(day, "transaction", row.created_at, row.id, row.unit_price)
+            _Candidate(
+                day,
+                "transaction",
+                row.created_at,
+                row.id,
+                row.unit_price,
+            )
         )
     result: dict[UUID, PriceAt] = {}
     for instrument_id in ids:
@@ -537,6 +575,7 @@ def _view(row: PricePoint) -> PricePointView:
         price=row.price,
         source=row.source,
         editable=row.source == "manual",
+        provider_key=row.provider_key,
     )
 
 
@@ -567,7 +606,13 @@ def instrument_prices(
             _Candidate(row.date, row.source, row.created_at, row.id, row.price) for row in stored
         ]
         candidates += [
-            _Candidate(day, "transaction", row.created_at, row.id, row.unit_price)
+            _Candidate(
+                day,
+                "transaction",
+                row.created_at,
+                row.id,
+                row.unit_price,
+            )
             for (_instrument_id, day), row in derived.items()
         ]
         price = _price_at(_best(candidates), on)

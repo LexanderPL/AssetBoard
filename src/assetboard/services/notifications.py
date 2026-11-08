@@ -14,16 +14,13 @@ transaction, then records ``sent`` or ``failed``.
 
 from __future__ import annotations
 
-import base64
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
-from functools import lru_cache
 from uuid import UUID, uuid4
 from zoneinfo import ZoneInfo
 
-from cryptography.fernet import Fernet, InvalidToken
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.clock import Clock
@@ -61,10 +58,11 @@ from assetboard.domain.notifications import (
 )
 from assetboard.domain.transactions import clean_description
 from assetboard.i18n.locale import normalize_locale
-from assetboard.services.auth import count_limited_attempt, derive_subkey
+from assetboard.services.auth import count_limited_attempt
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.notification_messages import reminder_message, test_message
 from assetboard.services.notify import UNCERTAIN_ERRORS, InvalidNotificationUrl, Notifier
+from assetboard.services.secret_box import decrypt_secret, encrypt_secret
 
 logger = logging.getLogger(__name__)
 
@@ -143,40 +141,35 @@ class TestOutcome:
     error: str | None = None
 
 
-# Encryption (ADR-0019 pattern)
-
-
-@lru_cache(maxsize=4)
-def _cipher_for(secret_key: str) -> Fernet:
-    return Fernet(base64.urlsafe_b64encode(derive_subkey(secret_key, "notification-url")))
-
-
-def _cipher(settings: Settings) -> Fernet:
-    return _cipher_for(settings.ensure_secret_key())
+# Encryption (ADR-0019 pattern, shared with provider settings)
 
 
 def encrypt_url(settings: Settings, channel_id: UUID, url: str, now: datetime) -> str:
-    """Encrypt ``url`` bound to its channel: the plaintext is ``"<channel_id>|<url>"``."""
-    plaintext = f"{channel_id}|{url}".encode()
-    return _cipher(settings).encrypt_at_time(plaintext, int(now.timestamp())).decode()
+    """Encrypt ``url`` bound to its channel."""
+    return encrypt_secret(
+        settings,
+        purpose="notification-url",
+        binding=str(channel_id),
+        plaintext=url,
+        now=now,
+    )
 
 
 def decrypt_url(settings: Settings, channel_id: UUID, token: str) -> str | None:
     """The URL, or ``None`` when it cannot be read or belongs to another channel."""
-    try:
-        plaintext = _cipher(settings).decrypt(token).decode()
-    except InvalidToken:
+    url = decrypt_secret(
+        settings,
+        purpose="notification-url",
+        binding=str(channel_id),
+        token=token,
+    )
+    if url is None:
         logger.warning(
             "notification_url_unreadable channel=%s; the instance secret key has probably "
             "changed. The member must enter the channel URL again.",
             channel_id,
         )
-        return None
-    prefix = f"{channel_id}|"
-    if not plaintext.startswith(prefix):
-        logger.warning("notification_url_refused channel=%s reason=foreign_row", channel_id)
-        return None
-    return plaintext.removeprefix(prefix)
+    return url
 
 
 def url_scheme(url: str) -> str:
