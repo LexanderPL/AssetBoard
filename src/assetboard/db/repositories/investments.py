@@ -118,6 +118,18 @@ class InstrumentRepository(ScopedRepository[Instrument]):
         )
         return list(self._session.scalars(statement))
 
+    def provider_instruments(self, provider_key: str) -> list[Instrument]:
+        """Active instruments configured to use one provider, in name order."""
+        statement = (
+            self._scoped_select()
+            .where(
+                Instrument.provider_key == provider_key,
+                Instrument.archived_at.is_(None),
+            )
+            .order_by(Instrument.name_key, Instrument.id)
+        )
+        return list(self._session.scalars(statement))
+
     def active_by_name_key(self, name_key: str) -> Instrument | None:
         """The non-archived instrument with this name key, if any."""
         statement = self._scoped_select().where(

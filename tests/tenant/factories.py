@@ -35,7 +35,12 @@ from assetboard.db.models.networth import (
     NetWorthSnapshot,
 )
 from assetboard.db.models.notifications import NotificationChannel, NotificationLog
-from assetboard.db.models.prices import FxRate, PricePoint
+from assetboard.db.models.prices import (
+    FxRate,
+    PricePoint,
+    PriceSourceConfig,
+    ProviderError,
+)
 from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.models.tax import TaxRule, TaxRuleVersion
 from assetboard.services.invitations import new_token
@@ -432,6 +437,30 @@ def make_fx_rate(session: Session, workspace_id: UUID) -> FxRate:
     )
 
 
+def make_price_source_config(session: Session, workspace_id: UUID) -> PriceSourceConfig:
+    return PriceSourceConfig(
+        workspace_id=workspace_id,
+        provider_key=f"p{uuid4().hex[:8]}",
+        enabled=False,
+        settings_encrypted=None,
+    )
+
+
+def make_provider_error(session: Session, workspace_id: UUID) -> ProviderError:
+    instrument = make_instrument(session, workspace_id)
+    session.add(instrument)
+    session.flush()
+    return ProviderError(
+        workspace_id=workspace_id,
+        provider_key="nbp",
+        instrument_id=instrument.id,
+        scope="latest",
+        code="http_500",
+        occurred_at=session.info["clock"].now(),
+        attempts=1,
+    )
+
+
 def make_networth_category(session: Session, workspace_id: UUID) -> NetWorthCategory:
     name = f"Net worth category {uuid4().hex[:8]}"
     return NetWorthCategory(
@@ -511,6 +540,8 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     ),
     PricePoint: TenantCase(make_price_point, update_values={"price": Decimal("101")}),
     FxRate: TenantCase(make_fx_rate, update_values={"rate": Decimal("0.93")}),
+    PriceSourceConfig: TenantCase(make_price_source_config, update_values={"enabled": True}),
+    ProviderError: TenantCase(make_provider_error, unsupported=frozenset({"update"})),
     NetWorthCategory: TenantCase(make_networth_category, update_values={"color": "#e11d48"}),
     NetWorthItem: TenantCase(make_networth_item, update_values={"name": "Updated item"}),
     # Valuations are append-only.

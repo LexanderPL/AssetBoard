@@ -1,0 +1,10 @@
+[
+  {
+    "table": "B",
+    "no": "023/B/NBP/2026",
+    "effectiveDate": "2026-03-02",
+    "rates": [
+      {"currency": "forint węgierski", "code": "HUF", "mid": 0.0110}
+    ]
+  }
+]

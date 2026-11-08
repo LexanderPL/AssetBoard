@@ -15,5 +15,12 @@
   {% else %}
   <a href="{{ scoped_url(request, 'investments_transactions') }}" role="tab" aria-selected="false" data-investment-transactions-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Transactions") }}</a>
   {% endif %}
+  {% if can_manage_providers %}
+  {% if active == "providers" %}
+  <a href="{{ scoped_url(request, 'investments_providers') }}" role="tab" aria-selected="true" data-providers-tab class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("Providers") }}</a>
+  {% else %}
+  <a href="{{ scoped_url(request, 'investments_providers') }}" role="tab" aria-selected="false" data-providers-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Providers") }}</a>
+  {% endif %}
+  {% endif %}
 </div>
 {%- endmacro %}

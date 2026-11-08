@@ -56,6 +56,7 @@ from assetboard.domain.instruments import (
     parse_instrument_type,
     validate_allocation,
 )
+from assetboard.domain.providers import provider_definition
 from assetboard.i18n import gettext
 from assetboard.services.context import Context, Role, require_role, require_role_now
 
@@ -167,6 +168,9 @@ class InstrumentView:
     allocations: tuple[AllocationView, ...]
     terms_required: bool
     has_transactions: bool = False
+    provider_key: str | None = None
+    provider_symbol: str | None = None
+    provider_label: str | None = None
 
     @property
     def allocation_total_bp(self) -> int:
@@ -228,6 +232,7 @@ def _instrument_view(
             str(allocation.asset_class_id),
         ),
     )
+    provider = provider_definition(row.provider_key) if row.provider_key else None
     return InstrumentView(
         id=row.id,
         name=row.name,
@@ -242,6 +247,9 @@ def _instrument_view(
         allocations=tuple(_allocation_view(allocation, classes) for allocation in ordered),
         terms_required=instrument_type is InstrumentType.BOND_MODEL,
         has_transactions=has_transactions,
+        provider_key=row.provider_key,
+        provider_symbol=row.provider_symbol,
+        provider_label=provider.label if provider is not None else row.provider_key,
     )
 
 

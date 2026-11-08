@@ -15,6 +15,20 @@
     {% endif %}
   </div>
 
+  {% if provider_status %}
+  {% if not provider_status.enabled %}
+  <p class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-provider-disabled>{{ _("The provider is disabled; the last known price is shown.") }}</p>
+  {% elif provider_status.error %}
+  <p class="mt-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-provider-error>
+    {% if provider_status.last_price_date %}
+      {% if provider_error_days == 0 %}{{ _("Last updated today — provider error.") }}{% else %}{{ _("Last updated %(days)s days ago — provider error.", days=provider_error_days) }}{% endif %}
+    {% else %}{{ _("No provider price yet — provider error.") }}{% endif %}
+  </p>
+  {% elif provider_status.rate_limited %}
+  <p class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-provider-rate-limited>{{ _("The provider is rate limited; the last known price is shown.") }}</p>
+  {% endif %}
+  {% endif %}
+
   {% if price_errors.get("instrument") %}
   <p class="mt-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert">{{ price_errors.get("instrument") }}</p>
   {% endif %}
@@ -34,7 +48,7 @@
       <p class="mt-2 text-2xl font-semibold tabular-nums">{{ format_quantity_input(prices.latest.price, locale) }} {{ instrument.quote_currency }}</p>
       <p class="mt-1 text-sm text-muted">
         {% if prices.latest.as_of %}{{ _("As of %(date)s", date=format_day(prices.latest.as_of, locale)) }}{% endif %}
-        {% if prices.latest.source %} · {{ source_label(prices.latest.source) }}{% endif %}
+        {% if prices.latest.source %} · {{ source_label(prices.latest.source) }}{% if prices.latest.provider_key %} ({{ prices.latest.provider_key|upper }}){% endif %}{% endif %}
         {% if prices.latest.stale %}<span class="text-warning-strong"> · {{ _("older than %(days)s days", days=default_stale_after_days) }}</span>{% endif %}
       </p>
       {% endif %}
@@ -87,7 +101,7 @@
         <tr data-price-point="{% if point.id %}{{ point.id }}{% endif %}" data-price-source="{{ point.source }}">
           <td class="whitespace-nowrap px-3 py-2 tabular-nums">{{ format_day(point.date, locale) }}</td>
           <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_quantity_input(point.price, locale) }} {{ instrument.quote_currency }}</td>
-          <td class="px-3 py-2">{{ source_label(point.source) }}</td>
+          <td class="px-3 py-2">{{ source_label(point.source) }}{% if point.provider_key %} ({{ point.provider_key|upper }}){% endif %}</td>
           <td class="cell-tight px-3 py-2">
             {% if point.editable and can_edit and not instrument.archived %}
             <div class="flex flex-wrap items-center justify-end gap-1">

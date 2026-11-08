@@ -9,7 +9,9 @@ from assetboard.config import Settings
 from assetboard.db.models.identity import Workspace
 from assetboard.db.repositories.scheduled import RecurringWorkspaceReader
 from assetboard.recurring_jobs import RecurringJobs
+from assetboard.services.providers.registry import build_provider_runtime
 from tests.fake_notifier import FakeNotifier
+from tests.fake_provider_http import FailingProviderHttpClient
 from tests.tenant.workspace_db import workspace_db
 
 
@@ -229,3 +231,85 @@ def test_a_failing_reminder_run_is_logged_without_data(db, monkeypatch):
     message, *args = logger.error.call_args.args
     assert "notification_run_failed" in message
     assert "secret detail" not in message % tuple(args)
+
+
+def _mock_scheduler(jobs: RecurringJobs) -> Mock:
+    scheduler = Mock()
+    scheduler.running = False
+    jobs.scheduler = scheduler
+    return scheduler
+
+
+def test_provider_jobs_are_registered_only_with_a_runtime(db):
+    runtime = build_provider_runtime(
+        Settings(_env_file=None), db.clock, http=FailingProviderHttpClient()
+    )
+    jobs = RecurringJobs(
+        db.factory,
+        Settings(_env_file=None),
+        lambda: db.clock,
+        Mock(),
+        provider_runtime=runtime,
+    )
+    scheduler = _mock_scheduler(jobs)
+    jobs.start()
+    calls = {call.kwargs.get("id"): call for call in scheduler.add_job.call_args_list}
+    assert calls["price-refresh-nbp"].kwargs["max_instances"] == 1
+    assert calls["price-refresh-ecb"].kwargs["max_instances"] == 1
+    fire = (
+        calls["price-refresh-nbp"]
+        .args[1]
+        .get_next_fire_time(None, datetime(2026, 3, 2, 0, tzinfo=UTC))
+    )
+    assert fire.isoformat() == "2026-03-02T18:10:00+00:00"
+
+
+def test_request_backfill_adds_one_immediate_job(db, monkeypatch):
+    runtime = build_provider_runtime(
+        Settings(_env_file=None), db.clock, http=FailingProviderHttpClient()
+    )
+    jobs = RecurringJobs(
+        db.factory,
+        Settings(_env_file=None),
+        lambda: db.clock,
+        Mock(),
+        provider_runtime=runtime,
+    )
+    scheduler = Mock()
+    scheduler.running = True
+    monkeypatch.setattr(jobs, "scheduler", scheduler)
+    jobs.request_backfill(db.workspace_id, "nbp")
+    scheduler.add_job.assert_called_once()
+    kwargs = scheduler.add_job.call_args.kwargs
+    assert kwargs["id"] == f"price-backfill-{db.workspace_id}-nbp"
+    assert kwargs["max_instances"] == 1
+    assert "trigger" not in kwargs
+
+
+def test_provider_jobs_are_absent_without_a_runtime(db):
+    jobs = RecurringJobs(db.factory, Settings(_env_file=None), lambda: db.clock, Mock())
+    scheduler = _mock_scheduler(jobs)
+    jobs.start()
+    assert "price-refresh-nbp" not in {
+        call.kwargs.get("id") for call in scheduler.add_job.call_args_list
+    }
+
+
+def test_refresh_prices_with_no_config_does_not_call_the_network(db, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        "assetboard.recurring_jobs.refresh_all",
+        lambda *_args, **_kwargs: calls.append(True) or [],
+    )
+    runtime = build_provider_runtime(
+        Settings(_env_file=None), db.clock, http=FailingProviderHttpClient()
+    )
+    jobs = RecurringJobs(
+        db.factory,
+        Settings(_env_file=None),
+        lambda: db.clock,
+        Mock(),
+        provider_runtime=runtime,
+    )
+    jobs.refresh_prices("nbp")
+    assert calls == [True]

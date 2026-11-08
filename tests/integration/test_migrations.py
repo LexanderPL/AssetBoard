@@ -65,6 +65,8 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "notification_log",
         "price_points",
         "fx_rates",
+        "price_source_configs",
+        "provider_errors",
         "setup_state",
         "transactions",
         "scheduled_items",
@@ -300,6 +302,41 @@ def test_0040_prices_fx_migration_is_reversible(tmp_path: Path) -> None:
         command.downgrade(alembic_config(settings), "0039_f62_investment_transactions")
         tables = set(inspect(engine).get_table_names())
         assert not {"price_points", "fx_rates"} & tables
+        upgrade_database(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0041_price_sources_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'price_sources.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        assert {"price_source_configs", "provider_errors"} <= set(inspector.get_table_names())
+        assert "provider_key" in {
+            column["name"] for column in inspector.get_columns("price_points")
+        }
+        assert "fx_backfilled" in {
+            column["name"] for column in inspector.get_columns("price_source_configs")
+        }
+        assert "provider_backfilled_at" in {
+            column["name"] for column in inspector.get_columns("instruments")
+        }
+        command.downgrade(alembic_config(settings), "0040_f63_prices_fx")
+        inspector = inspect(engine)
+        assert not {"price_source_configs", "provider_errors"} & set(inspector.get_table_names())
+        assert "provider_key" not in {
+            column["name"] for column in inspector.get_columns("price_points")
+        }
+        assert "provider_backfilled_at" not in {
+            column["name"] for column in inspector.get_columns("instruments")
+        }
         upgrade_database(settings)
         check_database_migrations(settings)
     finally:

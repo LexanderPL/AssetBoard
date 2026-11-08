@@ -136,6 +136,7 @@ class Instrument(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     valuation_source: Mapped[str] = mapped_column(String(16), nullable=False)
     provider_key: Mapped[str | None] = mapped_column(String(32), nullable=True)
     provider_symbol: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    provider_backfilled_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     risk_tier_override: Mapped[str | None] = mapped_column(String(16), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 

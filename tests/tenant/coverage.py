@@ -143,7 +143,13 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     },
     **{
         ("InstrumentRepository", method): "test_investment_queries_stay_in_their_workspace"
-        for method in ("create", "ordered", "active_by_name_key", "get_for_update")
+        for method in (
+            "create",
+            "ordered",
+            "active_by_name_key",
+            "get_for_update",
+            "provider_instruments",
+        )
     },
     **{
         ("InstrumentAllocationRepository", method): (
@@ -169,11 +175,38 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     },
     **{
         ("PricePointRepository", method): "test_price_queries_stay_in_their_workspace"
-        for method in ("create", "manual_on", "for_instruments_on_or_before")
+        for method in (
+            "create",
+            "manual_on",
+            "for_instruments_on_or_before",
+            "provider_on",
+            "latest_provider_for_instrument",
+            "any_provider_for_instrument",
+        )
     },
     **{
         ("FxRateRepository", method): "test_price_queries_stay_in_their_workspace"
-        for method in ("create", "for_base_on_or_before")
+        for method in (
+            "create",
+            "for_base_on_or_before",
+            "rate_on",
+            "for_base_source_on_or_before",
+        )
+    },
+    **{
+        ("PriceSourceConfigRepository", method): (
+            "test_price_source_queries_stay_in_their_workspace"
+        )
+        for method in ("create", "for_provider", "enabled")
+    },
+    **{
+        ("ProviderErrorRepository", method): ("test_price_source_queries_stay_in_their_workspace")
+        for method in (
+            "create",
+            "latest_for_provider",
+            "latest_for_instrument",
+            "prune",
+        )
     },
     **{
         ("NetWorthCategoryRepository", method): "test_networth_queries_stay_in_their_workspace"

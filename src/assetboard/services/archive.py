@@ -98,6 +98,8 @@ ARCHIVE_EXCLUDED_MODELS = {
     "InvestmentTransaction": "investment transactions require the F6.9 archive extension",
     "PricePoint": "manual prices require the F6.9 archive extension",
     "FxRate": "FX rates require the F6.9 archive extension",
+    "PriceSourceConfig": "provider settings contain secrets (F6.9/F9.3)",
+    "ProviderError": "provider error logs are operational and not portable",
 }
 
 

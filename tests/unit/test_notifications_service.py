@@ -138,17 +138,24 @@ def run(
 # Channels: storage, masking, validation, ownership
 
 
-def test_url_is_encrypted_bound_to_its_channel_and_never_audited(db, settings, notifier) -> None:
+def test_url_is_encrypted_bound_to_its_channel_and_never_audited(
+    db, settings, notifier, caplog
+) -> None:
     channel_id = add_channel(db, settings, notifier)
     row = stored(db, channel_id)
     assert URL not in row.url_encrypted and "secret" not in row.url_encrypted
     assert notifications.decrypt_url(settings, channel_id, row.url_encrypted) == URL
     # A ciphertext copied to another row is refused.
     other = add_channel(db, settings, notifier, name="Laptop")
-    assert notifications.decrypt_url(settings, other, row.url_encrypted) is None
+    with caplog.at_level("WARNING"):
+        assert notifications.decrypt_url(settings, other, row.url_encrypted) is None
+        assert "reason=foreign_row" in caplog.text
+    caplog.clear()
     # Another instance secret cannot read it.
     changed = Settings(_env_file=None, data_dir=settings.data_dir, secret_key="another-secret")
-    assert notifications.decrypt_url(changed, channel_id, row.url_encrypted) is None
+    with caplog.at_level("WARNING"):
+        assert notifications.decrypt_url(changed, channel_id, row.url_encrypted) is None
+        assert "notification_url_unreadable" in caplog.text
     view = notifications.channel(db.factory, db.ctx("ana", "viewer"), channel_id)
     assert view.masked_url == "ntfys://••••••" and view.service_name == "Fake ntfys"
     with db.factory() as session:

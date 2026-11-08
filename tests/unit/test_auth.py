@@ -1300,6 +1300,8 @@ WORKSPACE_TABLES = {
     "investment_transactions",
     "price_points",
     "fx_rates",
+    "price_source_configs",
+    "provider_errors",
 }
 
 

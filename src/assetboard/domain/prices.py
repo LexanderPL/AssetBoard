@@ -7,9 +7,11 @@ Prices are Decimal values in the instrument's quote currency. FX rates are store
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
+from typing import Protocol
 from uuid import UUID
 
 DEFAULT_STALE_AFTER_DAYS = 5
@@ -56,6 +58,54 @@ class ProviderQuote:
 
 
 @dataclass(frozen=True, slots=True)
+class ProviderRateQuote:
+    """One FX observation in the provider's natural base currency."""
+
+    currency: str
+    date: date
+    rate: Decimal
+
+
+@dataclass(frozen=True, slots=True)
 class ProviderRateLimit:
     requests: int
     per_seconds: int
+
+
+class PriceProvider(Protocol):
+    key: str
+    rate_limit: ProviderRateLimit
+
+    def supports(self, instrument: ProviderInstrument) -> bool: ...
+
+    def fetch_latest(
+        self,
+        symbols: Sequence[str],
+        quote_currency: str = "",
+        *,
+        wait: bool = True,
+    ) -> Mapping[str, ProviderQuote]: ...
+
+    def fetch_history(
+        self,
+        symbol: str,
+        start: date,
+        end: date,
+        quote_currency: str = "",
+        *,
+        wait: bool = True,
+    ) -> Sequence[ProviderQuote]: ...
+
+
+class FxProvider(Protocol):
+    key: str
+    natural_base: str
+    rate_limit: ProviderRateLimit
+
+    def fetch_latest_fx(
+        self, currencies: Sequence[str], *, wait: bool = True
+    ) -> Mapping[str, ProviderRateQuote]: ...
+
+    def fetch_history_fx(
+        self, currency: str, start: date, end: date, *, wait: bool = True
+    ) -> Sequence[ProviderRateQuote]: ...
