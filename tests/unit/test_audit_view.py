@@ -164,6 +164,7 @@ INVESTMENT_ACTIONS = {
     "instrument.archived",
     "instrument.restored",
     "instrument_allocation.updated",
+    "bond_terms.saved",
     "investment_transaction.created",
     "investment_transaction.updated",
     "investment_transaction.deleted",
@@ -180,6 +181,7 @@ def test_every_investment_action_has_a_label_keys_and_a_group() -> None:
                 "asset_class.",
                 "instrument.",
                 "instrument_allocation.",
+                "bond_terms.",
                 "investment_transaction.",
             )
         )

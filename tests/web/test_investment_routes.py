@@ -361,3 +361,98 @@ def test_the_seeded_class_set_has_the_investable_flags(owner: OwnerApp) -> None:
     assert 'data-investable="true"' in page
     assert 'data-investable="false"' in page
     assert len(_names(page, "data-class-name")) == len(ASSET_CLASS_SEED)
+
+
+def test_bond_terms_form_saves_and_values_the_instrument(owner: OwnerApp) -> None:
+    bonds = _class(owner, "Bonds")
+    instrument_id = _instrument(
+        owner, "Treasury bonds", bonds, type="bond_model", quote_currency="PLN"
+    )
+    page = owner.client.get(f"{INSTRUMENTS}/{instrument_id}").text
+    assert "data-bond-panel" in page
+    assert "Terms needed" in page
+    assert "data-price-form" not in page
+
+    response = owner.post(
+        f"{INSTRUMENTS}/{instrument_id}/bond-terms",
+        {
+            "series_code": "OTS",
+            "face_value": "100",
+            "maturity_date": "2028-01-01",
+            "interest_mode": "capitalized_annually",
+            "tax_rate": "19",
+            "fee_mode": "",
+            "fee_value": "",
+            "period_from": "2026-01-01",
+            "period_rate": "5",
+        },
+        token_from=f"{INSTRUMENTS}/{instrument_id}",
+    )
+    assert response.status_code == 303
+    page = owner.client.get(response.headers["location"]).text
+    assert "Bond terms saved." in page
+    assert "Valued from terms" in page
+    assert "Model value (net of tax)" in page
+    assert "Terms needed" not in page
+
+    response = owner.post(
+        "/investments/transactions",
+        {
+            "instrument_id": str(instrument_id),
+            "type": "buy",
+            "date": "2026-01-01",
+            "quantity": "1",
+            "unit_price": "100",
+            "fee": "0",
+            "fx_to_base": "1",
+            "note": "",
+        },
+        token_from="/investments/transactions",
+    )
+    assert response.status_code == 303
+    page = owner.client.get(f"{INSTRUMENTS}/{instrument_id}").text
+    assert "100.00" in page
+    assert "Projected net at maturity" in page
+    assert "Values are estimates from user-entered terms." in page
+
+
+def test_bond_terms_validation_is_inline(owner: OwnerApp) -> None:
+    bonds = _class(owner, "Bonds")
+    instrument_id = _instrument(
+        owner, "Treasury bonds", bonds, type="bond_model", quote_currency="PLN"
+    )
+    response = owner.post(
+        f"{INSTRUMENTS}/{instrument_id}/bond-terms",
+        {
+            "series_code": "OTS",
+            "face_value": "100",
+            "maturity_date": "2028-01-01",
+            "interest_mode": "capitalized_annually",
+            "tax_rate": "19",
+            "fee_mode": "",
+            "fee_value": "",
+        },
+        token_from=f"{INSTRUMENTS}/{instrument_id}",
+    )
+    assert response.status_code == 400
+    assert "Add at least one interest period." in response.text
+    assert "data-bond-panel" in response.text
+
+
+def test_bond_terms_need_a_bond_model_instrument(owner: OwnerApp) -> None:
+    stocks = _class(owner, "Stocks")
+    instrument_id = _instrument(owner, "World ETF", stocks, type="etf")
+    response = owner.post(
+        f"{INSTRUMENTS}/{instrument_id}/bond-terms",
+        {
+            "series_code": "OTS",
+            "face_value": "100",
+            "maturity_date": "2028-01-01",
+            "interest_mode": "capitalized_annually",
+            "period_from": "2026-01-01",
+            "period_rate": "5",
+        },
+        token_from=f"{INSTRUMENTS}/{instrument_id}",
+    )
+    assert response.status_code == 400
+    assert "Bond terms are only available for a bond-model instrument." in response.text

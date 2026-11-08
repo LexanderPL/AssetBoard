@@ -40,6 +40,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "alembic_version",
         "asset_classes",
         "audit_events",
+        "bond_terms",
         "auth_throttles",
         "budget_lines",
         "categories",
@@ -337,6 +338,39 @@ def test_0041_price_sources_migration_is_reversible(tmp_path: Path) -> None:
         assert "provider_backfilled_at" not in {
             column["name"] for column in inspector.get_columns("instruments")
         }
+        upgrade_database(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0043_bond_terms_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'bond_terms.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        assert "bond_terms" in inspector.get_table_names()
+        assert {
+            "instrument_id",
+            "series_code",
+            "face_value_minor",
+            "maturity_date",
+            "interest_mode",
+            "rate_schedule",
+            "tax_rate_bp",
+            "early_redemption_fee_mode",
+            "early_redemption_fee_rate_bp",
+            "early_redemption_fee_minor",
+            "workspace_id",
+        } <= {column["name"] for column in inspector.get_columns("bond_terms")}
+        command.downgrade(alembic_config(settings), "0042_f64b_quota")
+        inspector = inspect(engine)
+        assert "bond_terms" not in inspector.get_table_names()
         upgrade_database(settings)
         check_database_migrations(settings)
     finally:
