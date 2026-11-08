@@ -59,7 +59,6 @@ from assetboard.services.providers.transport import (
 )
 
 ERROR_RETENTION_DAYS = 90
-INFORMATIONAL_CODES = frozenset({"history_limited", "rate_limited"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -297,25 +296,21 @@ def provider_status(
             instrument_id, provider_key
         )
         error = ProviderErrorRepository(session, scope).latest_for_instrument(
-            provider_key, instrument_id
+            provider_key, instrument_id, exclude=("history_limited",)
         )
-        error_is_current = (
-            error is not None
-            and (latest is None or error.occurred_at > latest.created_at)
-            and error.code not in INFORMATIONAL_CODES
+        last_success_at = latest.updated_at if latest is not None else None
+        current = error is not None and (
+            last_success_at is None or error.occurred_at > last_success_at
         )
-        rate_limited = (
-            error is not None
-            and error.code == "rate_limited"
-            and (latest is None or error.occurred_at > latest.created_at)
-        )
+        rate_limited = current and error is not None and error.code == "rate_limited"
+        error_is_current = current and not rate_limited
         return ProviderStatus(
             provider_key=provider_key,
             provider_label=definition.label if definition is not None else provider_key,
             enabled=bool(config and config.enabled),
             last_price_date=latest.date if latest is not None else None,
-            last_error_code=error.code if error is not None else None,
-            last_error_at=error.occurred_at if error is not None else None,
+            last_error_code=error.code if current and error is not None else None,
+            last_error_at=error.occurred_at if current and error is not None else None,
             error=error_is_current,
             rate_limited=rate_limited,
         )

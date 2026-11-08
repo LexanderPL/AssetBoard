@@ -501,6 +501,18 @@ def test_provider_status_tracks_errors_after_the_last_success(
             provider_key="nbp",
             instrument_id=instrument.id,
             scope="latest",
+            code="history_limited",
+            occurred_at=datetime(2026, 3, 10, 13, 30, tzinfo=UTC),
+            attempts=1,
+        )
+    still_real = provider_status(db.factory, ctx, instrument.id)
+    assert still_real is not None and still_real.error
+
+    with db.factory.begin() as session:
+        ProviderErrorRepository(session, ctx).create(
+            provider_key="nbp",
+            instrument_id=instrument.id,
+            scope="latest",
             code="rate_limited",
             occurred_at=datetime(2026, 3, 10, 14, tzinfo=UTC),
             attempts=1,
@@ -508,6 +520,39 @@ def test_provider_status_tracks_errors_after_the_last_success(
     limited = provider_status(db.factory, ctx, instrument.id)
     assert limited is not None
     assert limited.rate_limited and not limited.error
+
+
+def test_a_success_after_an_error_clears_the_badge(db: WorkspaceDb, team: WorkspaceDb) -> None:
+    ctx = _owner(db)
+    instrument = _instrument(
+        db, ctx, name="Gold", type_value="metal", quote_currency="PLN", unit_label="oz"
+    )
+    _configure_provider(db, ctx, instrument.id)
+    with db.factory.begin() as session:
+        PricePointRepository(session, ctx).create(
+            instrument_id=instrument.id,
+            date=date(2026, 3, 1),
+            price=Decimal("100"),
+            source="provider",
+            provider_key="nbp",
+        )
+    with db.factory.begin() as session:
+        ProviderErrorRepository(session, ctx).create(
+            provider_key="nbp",
+            instrument_id=instrument.id,
+            scope="latest",
+            code="http_500",
+            occurred_at=db.clock.now(),
+            attempts=1,
+        )
+    _upsert_prices(
+        db.factory,
+        ctx,
+        [(instrument.id, date(2026, 3, 1), Decimal("101"), "nbp")],
+    )
+    status = provider_status(db.factory, ctx, instrument.id)
+    assert status is not None
+    assert not status.error and not status.rate_limited
 
 
 def test_errors_older_than_ninety_days_are_pruned(db: WorkspaceDb, team: WorkspaceDb) -> None:

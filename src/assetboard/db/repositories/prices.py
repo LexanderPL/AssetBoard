@@ -186,17 +186,23 @@ class ProviderErrorRepository(ScopedRepository[ProviderError]):
         )
         return self._session.scalars(statement).one_or_none()
 
-    def latest_for_instrument(self, provider_key: str, instrument_id: UUID) -> ProviderError | None:
-        statement = (
-            self._scoped_select()
-            .where(
-                ProviderError.provider_key == provider_key,
-                (ProviderError.instrument_id == instrument_id)
-                | (ProviderError.instrument_id.is_(None)),
-            )
-            .order_by(ProviderError.occurred_at.desc(), ProviderError.id.desc())
-            .limit(1)
+    def latest_for_instrument(
+        self,
+        provider_key: str,
+        instrument_id: UUID,
+        *,
+        exclude: Collection[str] = (),
+    ) -> ProviderError | None:
+        statement = self._scoped_select().where(
+            ProviderError.provider_key == provider_key,
+            (ProviderError.instrument_id == instrument_id)
+            | (ProviderError.instrument_id.is_(None)),
         )
+        if exclude:
+            statement = statement.where(ProviderError.code.not_in(exclude))
+        statement = statement.order_by(
+            ProviderError.occurred_at.desc(), ProviderError.id.desc()
+        ).limit(1)
         return self._session.scalars(statement).one_or_none()
 
     def prune(self, before: datetime) -> int:
