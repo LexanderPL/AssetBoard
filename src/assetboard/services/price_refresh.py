@@ -42,14 +42,18 @@ from assetboard.domain.prices import (
     ProviderRateQuote,
 )
 from assetboard.domain.providers import (
+    EODHD_KEY,
     InvalidProviderRate,
+    InvalidProviderSymbol,
     ProviderDefinition,
     UnsupportedUnit,
+    clean_provider_symbol,
     convert_to_workspace_base,
     nbp_gold_to_unit,
     normalize_instrument_symbol,
     normalize_provider_decimal,
     provider_definition,
+    provider_supports_instrument,
 )
 from assetboard.services.context import (
     Context,
@@ -57,6 +61,7 @@ from assetboard.services.context import (
     require_role,
     require_role_now,
 )
+from assetboard.services.price_sources import provider_settings
 from assetboard.services.providers.transport import (
     ProviderPayloadError,
     ProviderRuntime,
@@ -79,6 +84,16 @@ class RefreshStats:
 
 
 @dataclass(frozen=True, slots=True)
+class LookupResult:
+    status: str
+    price: Decimal | None = None
+    date: date | None = None
+    currency: str | None = None
+    code: str | None = None
+    retry_after: int | None = None
+
+
+@dataclass(frozen=True, slots=True)
 class ProviderStatus:
     provider_key: str
     provider_label: str
@@ -88,6 +103,7 @@ class ProviderStatus:
     last_error_at: datetime | None
     error: bool
     rate_limited: bool
+    history_limited: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -147,6 +163,7 @@ def refresh_provider(
     with factory() as session:
         config = PriceSourceConfigRepository(session, scope).for_provider(provider_key)
         enabled = bool(config is not None and config.enabled)
+        options = provider_settings(runtime.settings, config) if config is not None else {}
         targets = (
             _targets(
                 session,
@@ -160,6 +177,17 @@ def refresh_provider(
     if not enabled:
         _prune_errors(factory, scope, runtime.clock.now())
         return RefreshStats(provider_key=provider_key, status="disabled")
+    if options is None:
+        _record_error(
+            factory,
+            scope,
+            provider_key,
+            None,
+            "latest",
+            "decrypt_failed",
+            runtime.clock.now(),
+        )
+        return RefreshStats(provider_key=provider_key, status="error", errors=1)
     assert targets is not None
     if not targets.price_targets and not targets.fx_currencies:
         _prune_errors(factory, scope, runtime.clock.now())
@@ -185,6 +213,7 @@ def refresh_provider(
                 today,
                 wait,
                 run,
+                options,
             )
         if targets.fx_currencies and hasattr(provider, "fetch_latest_fx"):
             fx_ok = _refresh_latest_fx(
@@ -198,6 +227,7 @@ def refresh_provider(
                 today,
                 wait,
                 run,
+                options,
             )
         if mode == "full":
             if prices_ok and targets.price_targets and hasattr(provider, "fetch_history"):
@@ -211,6 +241,7 @@ def refresh_provider(
                     runtime,
                     today,
                     run,
+                    options,
                 )
             if fx_ok and targets.fx_currencies and hasattr(provider, "fetch_history_fx"):
                 _backfill_fx(
@@ -223,6 +254,7 @@ def refresh_provider(
                     runtime,
                     today,
                     run,
+                    options,
                 )
     finally:
         _prune_errors(factory, scope, runtime.clock.now())
@@ -302,6 +334,117 @@ def refresh_all(
     return results
 
 
+def lookup_provider(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    provider_key: str,
+    runtime: ProviderRuntime,
+    *,
+    type_value: str,
+    quote_currency: str,
+    unit_label: str,
+    provider_symbol: str,
+) -> LookupResult:
+    """Fetch one latest quote without saving it (editor-facing test lookup)."""
+    require_role(ctx, Role.EDITOR)
+    definition = provider_definition(provider_key)
+    if definition is None or definition.kind == "fx":
+        return LookupResult("unsupported", code="unsupported_provider")
+    with factory() as session:
+        config = PriceSourceConfigRepository(session, ctx).for_provider(provider_key)
+        if config is None or not config.enabled:
+            return LookupResult("disabled", code="provider_disabled")
+        options = provider_settings(runtime.settings, config)
+    if options is None:
+        _record_error(
+            factory,
+            ctx,
+            provider_key,
+            None,
+            "lookup",
+            "decrypt_failed",
+            runtime.clock.now(),
+        )
+        return LookupResult("error", code="decrypt_failed")
+    try:
+        symbol = clean_provider_symbol(definition, provider_symbol)
+    except InvalidProviderSymbol:
+        return LookupResult("unsupported", code="invalid_provider_symbol")
+    if symbol is None:
+        return LookupResult("unsupported", code="provider_symbol_required")
+    if not provider_supports_instrument(
+        definition,
+        type=type_value,
+        quote_currency=quote_currency,
+        provider_symbol=symbol,
+    ):
+        return LookupResult("unsupported", code="provider_unsupported")
+    if provider_key == EODHD_KEY and not _reserve_quota(
+        factory, ctx, provider_key, runtime.clock.today("UTC")
+    ):
+        _record_error(
+            factory,
+            ctx,
+            provider_key,
+            None,
+            "lookup",
+            "quota_exhausted",
+            runtime.clock.now(),
+            informational=True,
+        )
+        return LookupResult("quota_exhausted", code="quota_exhausted")
+    provider = runtime.providers.get(provider_key)
+    if provider is None:
+        return LookupResult("error", code="unknown_provider")
+    try:
+        quotes = cast(PriceProvider, provider).fetch_latest(
+            [symbol],
+            quote_currency,
+            wait=False,
+            settings=options,
+        )
+    except RateLimited as error:
+        _record_error(
+            factory,
+            ctx,
+            provider_key,
+            None,
+            "lookup",
+            "rate_limited",
+            runtime.clock.now(),
+        )
+        return LookupResult(
+            "rate_limited", code="rate_limited", retry_after=error.retry_after_seconds
+        )
+    except (ProviderTransportError, ProviderPayloadError) as error:
+        _record_error(
+            factory,
+            ctx,
+            provider_key,
+            None,
+            "lookup",
+            error.code,
+            runtime.clock.now(),
+        )
+        return LookupResult("error", code=error.code)
+    quote = quotes.get(symbol)
+    if quote is None:
+        return LookupResult("error", code="no_data")
+    try:
+        price = (
+            nbp_gold_to_unit(quote.price, unit_label) if definition.key == "nbp" else quote.price
+        )
+        price = normalize_provider_decimal(price, positive=True)
+    except (UnsupportedUnit, InvalidProviderRate):
+        return LookupResult("error", code="unsupported_unit")
+    return LookupResult(
+        "ok",
+        price=price,
+        date=quote.date,
+        currency=quote_currency.upper(),
+    )
+
+
 def provider_status(
     factory: sessionmaker[Session],
     scope: WorkspaceScope,
@@ -317,15 +460,24 @@ def provider_status(
         latest = PricePointRepository(session, scope).latest_provider_for_instrument(
             instrument_id, provider_key
         )
-        error = ProviderErrorRepository(session, scope).latest_for_instrument(
-            provider_key, instrument_id, exclude=("history_limited",)
+        errors = ProviderErrorRepository(session, scope)
+        error = errors.latest_for_instrument(
+            provider_key,
+            instrument_id,
+            exclude=("history_limited", "quota_exhausted"),
         )
+        latest_any = errors.latest_for_instrument(provider_key, instrument_id)
         last_success_at = latest.updated_at if latest is not None else None
         current = error is not None and (
             last_success_at is None or error.occurred_at > last_success_at
         )
         rate_limited = current and error is not None and error.code == "rate_limited"
         error_is_current = current and not rate_limited
+        history_limited = (
+            latest_any is not None
+            and latest_any.code == "history_limited"
+            and (last_success_at is None or latest_any.occurred_at > last_success_at)
+        )
         return ProviderStatus(
             provider_key=provider_key,
             provider_label=definition.label if definition is not None else provider_key,
@@ -335,6 +487,7 @@ def provider_status(
             last_error_at=error.occurred_at if current and error is not None else None,
             error=error_is_current,
             rate_limited=rate_limited,
+            history_limited=history_limited,
         )
 
 
@@ -419,6 +572,33 @@ def _targets(
     )
 
 
+def _reserve_quota(
+    factory: sessionmaker[Session],
+    scope: WorkspaceScope,
+    provider_key: str,
+    today_utc: date,
+) -> bool:
+    if provider_key != EODHD_KEY:
+        return True
+
+    def write(session: Session) -> bool:
+        CurrentWorkspaceRepository(session, scope).lock(exclusive=False)
+        row = PriceSourceConfigRepository(session, scope).for_provider(provider_key)
+        if row is None:
+            return False
+        if row.quota_day != today_utc:
+            row.quota_day = today_utc
+            row.quota_used = 0
+        if row.quota_used >= row.daily_call_budget:
+            session.flush()
+            return False
+        row.quota_used += 1
+        session.flush()
+        return True
+
+    return run_immediate(factory, write)
+
+
 def _refresh_latest_prices(
     factory: sessionmaker[Session],
     scope: WorkspaceScope,
@@ -430,7 +610,22 @@ def _refresh_latest_prices(
     today: date,
     wait: bool,
     run: _Run,
+    options: Mapping[str, str],
 ) -> bool:
+    if definition.key == EODHD_KEY:
+        return _refresh_eodhd_latest(
+            factory,
+            scope,
+            provider_key,
+            definition,
+            provider,
+            targets,
+            runtime,
+            today,
+            wait,
+            run,
+            options,
+        )
     by_quote: dict[str, list[tuple[_InstrumentTarget, str]]] = {}
     for target in targets.price_targets:
         symbol = normalize_instrument_symbol(definition, target.provider_symbol)
@@ -457,7 +652,7 @@ def _refresh_latest_prices(
     for quote_currency, rows in by_quote.items():
         symbols = sorted({symbol for _target, symbol in rows})
         try:
-            quotes = provider.fetch_latest(symbols, quote_currency, wait=wait)
+            quotes = provider.fetch_latest(symbols, quote_currency, wait=wait, settings=options)
         except RateLimited as error:
             _record_error(
                 factory,
@@ -536,6 +731,136 @@ def _refresh_latest_prices(
     return True
 
 
+def _refresh_eodhd_latest(
+    factory: sessionmaker[Session],
+    scope: WorkspaceScope,
+    provider_key: str,
+    definition: ProviderDefinition,
+    provider: PriceProvider,
+    targets: _Targets,
+    runtime: ProviderRuntime,
+    today: date,
+    wait: bool,
+    run: _Run,
+    options: Mapping[str, str],
+) -> bool:
+    today_utc = runtime.clock.today("UTC")
+    points: list[tuple[UUID, date, Decimal, str]] = []
+    for index, target in enumerate(targets.price_targets):
+        symbol = normalize_instrument_symbol(definition, target.provider_symbol)
+        instrument = ProviderInstrument(
+            id=target.id,
+            type=target.type,
+            quote_currency=target.quote_currency,
+            provider_key=target.provider_key,
+            provider_symbol=target.provider_symbol,
+        )
+        if symbol is None or not provider.supports(instrument):
+            _record_error(
+                factory,
+                scope,
+                provider_key,
+                target.id,
+                "latest",
+                "unsupported_instrument",
+                runtime.clock.now(),
+            )
+            run.errors += 1
+            continue
+        if not _reserve_quota(factory, scope, provider_key, today_utc):
+            _record_error(
+                factory,
+                scope,
+                provider_key,
+                None,
+                "latest",
+                "quota_exhausted",
+                runtime.clock.now(),
+                informational=True,
+            )
+            run.skipped += len(targets.price_targets) - index
+            break
+        try:
+            quotes = provider.fetch_latest(
+                [symbol],
+                target.quote_currency,
+                wait=wait,
+                settings=options,
+            )
+        except RateLimited as error:
+            _record_error(
+                factory,
+                scope,
+                provider_key,
+                None,
+                "latest",
+                "rate_limited",
+                runtime.clock.now(),
+            )
+            run.status = "rate_limited"
+            run.retry_after = error.retry_after_seconds
+            run.errors += 1
+            return False
+        except (ProviderTransportError, ProviderPayloadError) as error:
+            _record_error(
+                factory,
+                scope,
+                provider_key,
+                target.id,
+                "latest",
+                error.code,
+                runtime.clock.now(),
+            )
+            run.errors += 1
+            continue
+        quote = quotes.get(symbol)
+        if quote is None or quote.date > today:
+            _record_error(
+                factory,
+                scope,
+                provider_key,
+                target.id,
+                "latest",
+                "no_data",
+                runtime.clock.now(),
+            )
+            run.errors += 1
+            continue
+        try:
+            price = _price_for_target(definition, target, quote)
+        except (UnsupportedUnit, InvalidProviderRate):
+            _record_error(
+                factory,
+                scope,
+                provider_key,
+                target.id,
+                "latest",
+                "unsupported_unit",
+                runtime.clock.now(),
+            )
+            run.errors += 1
+            continue
+        points.append((target.id, quote.date, price, provider_key))
+    if points:
+        try:
+            _upsert_prices(factory, scope, points)
+        except (IntegrityError, ProviderTransportError):
+            _record_error(
+                factory,
+                scope,
+                provider_key,
+                None,
+                "latest",
+                "write_conflict",
+                runtime.clock.now(),
+            )
+            run.errors += 1
+            return False
+        run.prices += len(points)
+        _record_success(factory, scope, provider_key, runtime.clock.now())
+    return True
+
+
 def _refresh_latest_fx(
     factory: sessionmaker[Session],
     scope: WorkspaceScope,
@@ -547,12 +872,13 @@ def _refresh_latest_fx(
     today: date,
     wait: bool,
     run: _Run,
+    options: Mapping[str, str],
 ) -> bool:
     needed = set(targets.fx_currencies)
     if targets.base_currency != provider.natural_base:
         needed.add(targets.base_currency)
     try:
-        rates = provider.fetch_latest_fx(sorted(needed), wait=wait)
+        rates = provider.fetch_latest_fx(sorted(needed), wait=wait, settings=options)
     except RateLimited as error:
         _record_error(
             factory,
@@ -671,7 +997,9 @@ def _backfill_prices(
     runtime: ProviderRuntime,
     today: date,
     run: _Run,
+    options: Mapping[str, str],
 ) -> None:
+    today_utc = runtime.clock.today("UTC")
     for target in targets.price_targets:
         if target.provider_backfilled_at is not None:
             continue
@@ -699,8 +1027,30 @@ def _backfill_prices(
             )
             run.errors += 1
             continue
+        if definition.key == EODHD_KEY and not _reserve_quota(
+            factory, scope, provider_key, today_utc
+        ):
+            _record_error(
+                factory,
+                scope,
+                provider_key,
+                None,
+                "history",
+                "quota_exhausted",
+                runtime.clock.now(),
+                informational=True,
+            )
+            run.skipped += 1
+            break
         try:
-            quotes = provider.fetch_history(symbol, first, today, target.quote_currency, wait=True)
+            quotes = provider.fetch_history(
+                symbol,
+                first,
+                today,
+                target.quote_currency,
+                wait=True,
+                settings=options,
+            )
         except RateLimited as error:
             _record_error(
                 factory,
@@ -748,7 +1098,7 @@ def _backfill_prices(
             rows.append((target.id, quote.date, price, provider_key))
         if rows:
             try:
-                _upsert_prices(factory, scope, rows)
+                _upsert_prices(factory, scope, rows, overwrite=False)
             except (IntegrityError, ProviderTransportError):
                 _record_error(
                     factory,
@@ -787,6 +1137,7 @@ def _backfill_fx(
     runtime: ProviderRuntime,
     today: date,
     run: _Run,
+    options: Mapping[str, str],
 ) -> None:
     with factory() as session:
         stored = FxRateRepository(session, scope).for_base_source_on_or_before(
@@ -810,11 +1161,15 @@ def _backfill_fx(
             completed[currency] = first
             continue
         try:
-            quotes = provider.fetch_history_fx(currency, first, today, wait=True)
+            quotes = provider.fetch_history_fx(currency, first, today, wait=True, settings=options)
             base_quotes: Sequence[ProviderRateQuote] = ()
             if targets.base_currency != provider.natural_base:
                 base_quotes = provider.fetch_history_fx(
-                    targets.base_currency, first, today, wait=True
+                    targets.base_currency,
+                    first,
+                    today,
+                    wait=True,
+                    settings=options,
                 )
         except RateLimited as error:
             _record_error(
@@ -934,6 +1289,8 @@ def _upsert_prices(
     factory: sessionmaker[Session],
     scope: WorkspaceScope,
     rows: Sequence[tuple[UUID, date, Decimal, str]],
+    *,
+    overwrite: bool = True,
 ) -> None:
     def write(session: Session) -> None:
         CurrentWorkspaceRepository(session, scope).lock(exclusive=False)
@@ -948,7 +1305,7 @@ def _upsert_prices(
                     source="provider",
                     provider_key=provider_key,
                 )
-            else:
+            elif overwrite:
                 existing.price = price
                 existing.provider_key = provider_key
         session.flush()

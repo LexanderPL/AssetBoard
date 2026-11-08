@@ -30,8 +30,13 @@ class EcbProvider:
         self.runtime = runtime
 
     def fetch_latest_fx(
-        self, currencies: Sequence[str], *, wait: bool = True
+        self,
+        currencies: Sequence[str],
+        *,
+        wait: bool = True,
+        settings: Mapping[str, str] | None = None,
     ) -> Mapping[str, ProviderRateQuote]:
+        del settings
         wanted = {currency.upper() for currency in currencies if currency.upper() != "EUR"}
         if not wanted:
             return {}
@@ -46,8 +51,15 @@ class EcbProvider:
         }
 
     def fetch_history_fx(
-        self, currency: str, start: date, end: date, *, wait: bool = True
+        self,
+        currency: str,
+        start: date,
+        end: date,
+        *,
+        wait: bool = True,
+        settings: Mapping[str, str] | None = None,
     ) -> Sequence[ProviderRateQuote]:
+        del settings
         code = currency.upper()
         if code == "EUR":
             return ()

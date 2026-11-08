@@ -10,9 +10,14 @@
       <h2 id="instrument-prices-heading" class="text-base font-semibold">{{ _("Prices") }}</h2>
       <p class="mt-1 text-sm text-muted">{{ _("Manual prices are used for illiquid assets; transactions fill the gaps.") }}</p>
     </div>
-    {% if prices.latest.stale %}
-    <span class="rounded-full bg-warning-soft px-2.5 py-1 text-xs font-medium text-warning-strong" data-price-stale>{{ _("Stale price") }}</span>
-    {% endif %}
+    <div class="flex flex-wrap items-center gap-2">
+      {% if instrument.provider_key == "coingecko" and coingecko_enabled %}
+      <span class="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-medium text-primary-ink" data-coingecko-badge>{{ _("Powered by CoinGecko") }}</span>
+      {% endif %}
+      {% if prices.latest.stale %}
+      <span class="rounded-full bg-warning-soft px-2.5 py-1 text-xs font-medium text-warning-strong" data-price-stale>{{ _("Stale price") }}</span>
+      {% endif %}
+    </div>
   </div>
 
   {% if provider_status %}
@@ -26,6 +31,8 @@
   </p>
   {% elif provider_status.rate_limited %}
   <p class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-provider-rate-limited>{{ _("The provider is rate limited; the last known price is shown.") }}</p>
+  {% elif provider_status.history_limited %}
+  <p class="mt-4 text-xs text-muted" data-provider-history-limited>{{ _("Some earlier price history could not be fetched from the provider.") }}</p>
   {% endif %}
   {% endif %}
 

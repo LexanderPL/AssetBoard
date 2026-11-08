@@ -54,7 +54,9 @@ class NbpProvider:
         quote_currency: str = "",
         *,
         wait: bool = True,
+        settings: Mapping[str, str] | None = None,
     ) -> Mapping[str, ProviderQuote]:
+        del settings
         if not symbols:
             return {}
         if quote_currency and quote_currency.upper() != "PLN":
@@ -83,7 +85,9 @@ class NbpProvider:
         quote_currency: str = "",
         *,
         wait: bool = True,
+        settings: Mapping[str, str] | None = None,
     ) -> Sequence[ProviderQuote]:
+        del settings
         if nbp_gold_symbol(symbol) != "XAU":
             raise ProviderPayloadError("unsupported_symbol")
         if quote_currency and quote_currency.upper() != "PLN":
@@ -110,8 +114,13 @@ class NbpProvider:
         return tuple(sorted(quotes, key=lambda quote: (quote.date, quote.symbol)))
 
     def fetch_latest_fx(
-        self, currencies: Sequence[str], *, wait: bool = True
+        self,
+        currencies: Sequence[str],
+        *,
+        wait: bool = True,
+        settings: Mapping[str, str] | None = None,
     ) -> Mapping[str, ProviderRateQuote]:
+        del settings
         wanted = {currency.upper() for currency in currencies if currency.upper() != "PLN"}
         if not wanted:
             return {}
@@ -122,8 +131,15 @@ class NbpProvider:
         return {currency: rates[currency] for currency in wanted if currency in rates}
 
     def fetch_history_fx(
-        self, currency: str, start: date, end: date, *, wait: bool = True
+        self,
+        currency: str,
+        start: date,
+        end: date,
+        *,
+        wait: bool = True,
+        settings: Mapping[str, str] | None = None,
     ) -> Sequence[ProviderRateQuote]:
+        del settings
         code = currency.upper()
         if code == "PLN":
             return ()

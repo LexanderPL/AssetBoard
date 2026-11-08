@@ -74,7 +74,7 @@
     {% set values = edit_values if editing else create_values %}
     {% set errors = edit_errors if editing else create_errors %}
     {% set rows = edit_rows if editing else create_rows %}
-    <form {{ htmx_form(scoped_url(request, 'investments_instrument_update', instrument_id=editing|string) if editing else scoped_url(request, 'investments_instrument_create'), '#investments-body') }} class="mt-4 space-y-5" novalidate data-allocation-editor data-decimal-separator="{{ decimal_separator }}">
+    <form id="instrument-form" {{ htmx_form(scoped_url(request, 'investments_instrument_update', instrument_id=editing|string) if editing else scoped_url(request, 'investments_instrument_create'), '#investments-body') }} class="mt-4 space-y-5" novalidate data-allocation-editor data-instrument-form data-decimal-separator="{{ decimal_separator }}">
       {{ csrf_input() }}
       <div class="grid gap-4 sm:grid-cols-2">
         <div class="space-y-1.5">
@@ -128,6 +128,33 @@
           {{ error(errors, "unit_label") }}
         </div>
       </div>
+
+      <fieldset class="space-y-3" data-provider-fields>
+        <legend class="text-sm font-medium">{{ _("Price source") }}</legend>
+        <div class="grid gap-4 sm:grid-cols-2">
+          <div class="space-y-1.5">
+            <label for="instrument-provider" class="block text-sm font-medium">{{ _("Provider") }}</label>
+            <select id="instrument-provider" name="provider_key" class="form-select w-full py-2" data-provider-select>
+              <option value=""{% if not values.provider_key %} selected{% endif %}>{{ _("Manual prices") }}</option>
+              {% for choice in provider_choices %}
+              <option value="{{ choice.definition.key }}"{% if values.provider_key == choice.definition.key %} selected{% endif %}>{{ choice.definition.label }}{% if not choice.enabled %} ({{ _("disabled") }}){% endif %}</option>
+              {% endfor %}
+            </select>
+            <p class="text-xs text-muted">{{ _("Manual prices always win; a provider fills the gaps for held instruments.") }}</p>
+            {{ error(errors, "provider_key") }}
+          </div>
+          <div class="space-y-1.5">
+            <label for="instrument-provider-symbol" class="block text-sm font-medium">{{ _("Provider symbol") }}</label>
+            <input id="instrument-provider-symbol" name="provider_symbol" type="text" value="{{ values.provider_symbol }}" maxlength="64" autocomplete="off" class="form-control w-full px-3 py-2">
+            <p class="text-xs text-muted">{{ _("CoinGecko id, EODHD ticker, or XAU for NBP gold.") }}</p>
+            {{ error(errors, "provider_symbol") }}
+          </div>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          <button type="button" hx-post="{{ scoped_url(request, 'investment_provider_lookup') }}" hx-target="#provider-lookup" hx-swap="outerHTML" hx-include="#instrument-form" class="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-subtle" data-provider-lookup-button>{{ _("Test lookup") }}</button>
+          <div id="provider-lookup" data-provider-lookup></div>
+        </div>
+      </fieldset>
 
       <fieldset class="space-y-2">
         <legend class="text-sm font-medium">{{ _("Allocation") }}</legend>

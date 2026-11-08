@@ -8,11 +8,19 @@ from fastapi import APIRouter, Depends, Form, Request
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
+from assetboard.domain.providers import PROVIDERS
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day
+from assetboard.i18n.numbers import format_quantity_input
 from assetboard.services.context import Context, Role, has_role
-from assetboard.services.price_refresh import RefreshStats, refresh_now
+from assetboard.services.price_refresh import (
+    RefreshStats,
+    lookup_provider,
+    refresh_now,
+)
 from assetboard.services.price_sources import (
+    InvalidProviderSetting,
+    MissingProviderKey,
     UnknownProvider,
     provider_page,
     save_provider_config,
@@ -77,6 +85,9 @@ def _render(
     context: dict[str, Any] = {
         "page": page,
         "can_manage_providers": has_role(ctx, Role.OWNER),
+        "coingecko_enabled": any(
+            card.definition.key == "coingecko" and card.enabled for card in page.cards
+        ),
         "base_currency": ctx.workspace.base_currency,
         "notice": _t(request, notice) if notice else None,
         "error": _t(request, error) if error else None,
@@ -134,7 +145,28 @@ async def provider_update(
     ctx: CurrentContext,
     provider_key: str,
     enabled: FormStr = "",
+    api_key: FormStr = "",
+    clear_key: FormStr = "",
+    daily_call_budget: FormStr = "",
 ) -> Response:
+    definition = PROVIDERS.get(provider_key)
+    settings_values = None
+    if definition is not None and definition.key_label and api_key.strip():
+        settings_values = {"api_key": api_key.strip()}
+    budget: int | None = None
+    budget_text = daily_call_budget.strip()
+    if budget_text:
+        try:
+            budget = int(budget_text)
+        except ValueError:
+            return await run_in_threadpool(
+                lambda: _render(
+                    request,
+                    ctx,
+                    error=_("Enter an API key and a daily call budget of at least 1."),
+                    status_code=400,
+                )
+            )
     try:
         result = await run_in_threadpool(
             lambda: save_provider_config(
@@ -143,6 +175,18 @@ async def provider_update(
                 request.app.state.settings,
                 provider_key,
                 enabled=_enabled(enabled),
+                settings_values=settings_values,
+                clear_settings=_enabled(clear_key),
+                daily_call_budget=budget,
+            )
+        )
+    except (MissingProviderKey, InvalidProviderSetting):
+        return await run_in_threadpool(
+            lambda: _render(
+                request,
+                ctx,
+                error=_("Enter an API key and a daily call budget of at least 1."),
+                status_code=400,
             )
         )
     except UnknownProvider:
@@ -163,6 +207,43 @@ async def provider_update(
             lambda: _render(request, ctx, notice=_("Provider settings saved."))
         )
     return RedirectResponse(f"{PATH}?notice=saved", status_code=303)
+
+
+@router.post(
+    "/investments/provider-lookup",
+    name="investment_provider_lookup",
+)
+async def provider_lookup(
+    request: Request,
+    ctx: CurrentContext,
+    provider_key: FormStr = "",
+    provider_symbol: FormStr = "",
+    type: FormStr = "",
+    quote_currency: FormStr = "",
+    unit_label: FormStr = "",
+) -> Response:
+    result = await run_in_threadpool(
+        lambda: lookup_provider(
+            request.app.state.session_factory,
+            ctx,
+            provider_key,
+            request.app.state.provider_runtime,
+            type_value=type,
+            quote_currency=quote_currency,
+            unit_label=unit_label,
+            provider_symbol=provider_symbol,
+        )
+    )
+    return render_template(
+        request,
+        "investments/_provider_lookup.html",
+        context={
+            "result": result,
+            "format_day": format_day,
+            "format_quantity_input": format_quantity_input,
+            "locale": request.state.locale,
+        },
+    )
 
 
 @router.post(

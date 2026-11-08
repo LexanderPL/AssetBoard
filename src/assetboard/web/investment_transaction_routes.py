@@ -45,6 +45,7 @@ from assetboard.services.investment_transactions import (
 )
 from assetboard.services.investments import InstrumentView, investment_page
 from assetboard.services.price_refresh import provider_status
+from assetboard.services.price_sources import provider_enabled
 from assetboard.services.prices import (
     DEFAULT_STALE_AFTER_DAYS,
     PriceError,
@@ -272,6 +273,7 @@ def _list_page(
         "base_currency": ctx.workspace.base_currency,
         "can_edit": has_role(ctx, Role.EDITOR),
         "can_manage_providers": has_role(ctx, Role.OWNER),
+        "coingecko_enabled": provider_enabled(request.app.state.session_factory, ctx, "coingecko"),
         "today": today,
         "toast_undo": toast_undo,
         "toast_seconds": toast_seconds,
@@ -369,6 +371,7 @@ def _history_page(
         "base_currency": ctx.workspace.base_currency,
         "can_edit": has_role(ctx, Role.EDITOR),
         "can_manage_providers": has_role(ctx, Role.OWNER),
+        "coingecko_enabled": provider_enabled(request.app.state.session_factory, ctx, "coingecko"),
         "today": today,
         "toast_undo": toast_undo,
         "toast_seconds": toast_seconds,

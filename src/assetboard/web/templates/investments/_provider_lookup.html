@@ -1,0 +1,21 @@
+<div id="provider-lookup" data-provider-lookup>
+  {% if result.status == "ok" %}
+  <p class="border border-success-line bg-success-soft px-3 py-2 text-sm text-success-strong" role="status">
+    {{ _("Provider price: %(price)s %(currency)s as of %(date)s", price=format_quantity_input(result.price, locale), currency=result.currency, date=format_day(result.date, locale)) }}
+  </p>
+  {% elif result.status == "rate_limited" %}
+  <p class="border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning-strong" role="status">
+    {{ _("Rate limited; try again in %(minutes)s minutes.", minutes=((result.retry_after or 60) + 59) // 60) }}
+  </p>
+  {% elif result.status == "disabled" %}
+  <p class="border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning-strong" role="status">{{ _("This provider is not enabled.") }}</p>
+  {% elif result.status == "unsupported" %}
+  <p class="border border-danger-line bg-danger-soft px-3 py-2 text-sm text-danger-strong" role="alert">{{ _("This provider cannot price this instrument type or symbol.") }}</p>
+  {% elif result.status == "quota_exhausted" %}
+  <p class="border border-warning-line bg-warning-soft px-3 py-2 text-sm text-warning-strong" role="status">{{ _("The provider's daily call budget is exhausted.") }}</p>
+  {% else %}
+  <p class="border border-danger-line bg-danger-soft px-3 py-2 text-sm text-danger-strong" role="alert">
+    {% if result.code %}{{ _("Lookup failed (%(code)s).", code=result.code) }}{% else %}{{ _("The lookup could not be completed.") }}{% endif %}
+  </p>
+  {% endif %}
+</div>

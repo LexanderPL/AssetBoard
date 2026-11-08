@@ -22,5 +22,8 @@
   <a href="{{ scoped_url(request, 'investments_providers') }}" role="tab" aria-selected="false" data-providers-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Providers") }}</a>
   {% endif %}
   {% endif %}
+  {% if coingecko_enabled %}
+  <span class="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-medium text-primary-ink" data-coingecko-badge>{{ _("Powered by CoinGecko") }}</span>
+  {% endif %}
 </div>
 {%- endmacro %}

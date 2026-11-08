@@ -240,6 +240,24 @@ msgstr ""
 msgid "European Central Bank euro reference rates against EUR."
 msgstr ""
 
+msgid "Crypto prices quoted directly in USD, EUR or PLN."
+msgstr ""
+
+msgid "CoinGecko coin id, for example bitcoin."
+msgstr ""
+
+msgid "Demo API key (optional)"
+msgstr ""
+
+msgid "Optional end-of-day equities and ETFs through EODHD."
+msgstr ""
+
+msgid "EODHD ticker with exchange suffix, for example VWCE.DE."
+msgstr ""
+
+msgid "API key"
+msgstr ""
+
 msgid "Enter a valid amount."
 msgstr ""
 
@@ -1995,6 +2013,21 @@ msgstr ""
 msgid "The type cannot change: transactions exist."
 msgstr ""
 
+msgid "Choose a valid price provider for this instrument."
+msgstr ""
+
+msgid "Enable this provider in Providers before assigning it."
+msgstr ""
+
+msgid "This provider cannot price this instrument type, currency or symbol."
+msgstr ""
+
+msgid "Enter the provider symbol."
+msgstr ""
+
+msgid "Enter a valid provider symbol."
+msgstr ""
+
 msgid "Asset class added."
 msgstr ""
 
@@ -2638,6 +2671,9 @@ msgid "The provider could not be refreshed."
 msgstr ""
 
 msgid "Provider settings saved."
+msgstr ""
+
+msgid "Enter an API key and a daily call budget of at least 1."
 msgstr ""
 
 msgid "The provider settings could not be saved."
@@ -4620,6 +4656,30 @@ msgid ""
 "currency instrument always uses its currency code."
 msgstr ""
 
+msgid "Price source"
+msgstr ""
+
+msgid "Provider"
+msgstr ""
+
+msgid "Manual prices"
+msgstr ""
+
+msgid "disabled"
+msgstr ""
+
+msgid "Manual prices always win; a provider fills the gaps for held instruments."
+msgstr ""
+
+msgid "Provider symbol"
+msgstr ""
+
+msgid "CoinGecko id, EODHD ticker, or XAU for NBP gold."
+msgstr ""
+
+msgid "Test lookup"
+msgstr ""
+
 msgid "Allocation"
 msgstr ""
 
@@ -4658,9 +4718,6 @@ msgid ""
 "traded."
 msgstr ""
 
-msgid "Provider"
-msgstr ""
-
 msgid "Transaction"
 msgstr ""
 
@@ -4671,6 +4728,9 @@ msgid "Prices"
 msgstr ""
 
 msgid "Manual prices are used for illiquid assets; transactions fill the gaps."
+msgstr ""
+
+msgid "Powered by CoinGecko"
 msgstr ""
 
 msgid "Stale price"
@@ -4690,6 +4750,9 @@ msgid "No provider price yet — provider error."
 msgstr ""
 
 msgid "The provider is rate limited; the last known price is shown."
+msgstr ""
+
+msgid "Some earlier price history could not be fetched from the provider."
 msgstr ""
 
 msgid ""
@@ -4746,6 +4809,26 @@ msgstr ""
 msgid "No stored or transaction prices for this instrument yet."
 msgstr ""
 
+#, python-format
+msgid "Provider price: %(price)s %(currency)s as of %(date)s"
+msgstr ""
+
+msgid "This provider is not enabled."
+msgstr ""
+
+msgid "This provider cannot price this instrument type or symbol."
+msgstr ""
+
+msgid "The provider's daily call budget is exhausted."
+msgstr ""
+
+#, python-format
+msgid "Lookup failed (%(code)s)."
+msgstr ""
+
+msgid "The lookup could not be completed."
+msgstr ""
+
 msgid "Price providers"
 msgstr ""
 
@@ -4769,6 +4852,9 @@ msgstr ""
 msgid "Quotes in"
 msgstr ""
 
+msgid "Instrument currency"
+msgstr ""
+
 msgid "Instruments using it"
 msgstr ""
 
@@ -4778,6 +4864,12 @@ msgstr ""
 msgid "Last error"
 msgstr ""
 
+msgid "Calls today (UTC)"
+msgstr ""
+
+msgid "Daily call budget exhausted; remaining instruments keep their last prices."
+msgstr ""
+
 msgid ""
 "This provider does not publish your base currency, so FX rates from it "
 "are skipped."
@@ -4785,6 +4877,23 @@ msgstr ""
 
 #, python-format
 msgid "Source: %(source)s"
+msgstr ""
+
+msgid ""
+"EODHD coverage for GPW, XETRA and LSE symbols is unverified; the free "
+"tier allows 20 calls per day."
+msgstr ""
+
+msgid "A key is configured. Leave empty to keep it."
+msgstr ""
+
+msgid "The key is stored encrypted and never shown again."
+msgstr ""
+
+msgid "Remove the stored key"
+msgstr ""
+
+msgid "Daily call budget (UTC)"
 msgstr ""
 
 msgid "Refresh now"
