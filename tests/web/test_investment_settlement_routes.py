@@ -219,3 +219,55 @@ def test_the_check_fx_rate_badge_and_filter(owner: OwnerApp) -> None:
     filtered = owner.client.get(TX, params={"fx": "check"}).text
     assert "Showing 1 transaction." in filtered
     assert 'name="fx" type="checkbox" value="check" checked' in filtered
+
+
+BULK_PREVIEW = f"{TX}/bulk/preview"
+BULK = f"{TX}/bulk"
+
+
+def test_bulk_add_previews_then_creates_all_rows(owner: OwnerApp) -> None:
+    _instrument(owner, "World ETF", _base(owner))
+    page = owner.client.get(TX).text
+    assert "data-bulk" in page and "Bulk add" in page
+    text = "2026-01-05; World ETF; buy; 10; 100\n2026-01-06; world etf; sell; 4; 110\n"
+    preview = owner.post(BULK_PREVIEW, {"text": text}, token_from=TX)
+    assert preview.status_code == 200
+    assert preview.text.count("data-bulk-line=") == 2
+    assert "Create 2 transactions" in preview.text
+    assert _rows(owner) == []
+    created = owner.post(BULK, {"text": text}, token_from=TX)
+    assert (created.status_code, created.headers["location"]) == (
+        303,
+        f"{TX}?notice=bulk_created:2",
+    )
+    assert "2 transactions added." in owner.client.get(created.headers["location"]).text
+    assert len(_rows(owner)) == 2
+
+
+def test_bulk_add_shows_line_errors_and_creates_nothing(owner: OwnerApp) -> None:
+    _instrument(owner, "World ETF", _base(owner))
+    text = "2026-01-05; World ETF; buy; 10; 100\n2026-01-06; Nope; buy; 1; 1\n"
+    preview = owner.post(BULK_PREVIEW, {"text": text}, token_from=TX)
+    assert preview.status_code == 400
+    assert "No active instrument has this name or symbol." in preview.text
+    assert "data-bulk-create" not in preview.text
+    # Hidden preview fields are never trusted: confirm re-parses the posted text.
+    refused = owner.post(BULK, {"text": text}, token_from=TX)
+    assert refused.status_code == 400
+    assert _rows(owner) == []
+    too_many = owner.post(BULK_PREVIEW, {"text": "x\n" * 501}, token_from=TX)
+    assert too_many.status_code == 400 and "Paste at most 500 lines." in too_many.text
+
+
+def test_bulk_add_needs_csrf_and_an_editor(owner: OwnerApp) -> None:
+    _instrument(owner, "World ETF", _base(owner))
+    text = "2026-01-05; World ETF; buy; 10; 100"
+    response = owner.client.post(BULK, data={"text": text}, follow_redirects=False)
+    assert response.status_code == 403
+    assert _rows(owner) == []
+    owner.set_admin_role("viewer")
+    assert "data-bulk" not in owner.client.get(TX).text
+    for path in (BULK_PREVIEW, BULK):
+        response = owner.post(path, {"text": text}, token_from=TX)
+        assert response.status_code == 403, path
+    assert _rows(owner) == []

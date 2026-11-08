@@ -1,7 +1,7 @@
 {% from "investments/_tabs.html" import tabs with context %}
 {% from "investments/_transaction_form.html" import transaction_form with context %}
 {% from "investments/_transaction_row.html" import edit_row, row with context %}
-{% from "macros/components.html" import toast with context %}
+{% from "macros/components.html" import csrf_input, toast with context %}
 {% set target = "investment-transactions-body" %}
 <div id="investment-transactions-body" class="space-y-6">
   {% if notice %}
@@ -25,6 +25,71 @@
     <p class="mt-2 text-sm text-muted">{{ _("Add an active instrument first.") }} <a href="{{ scoped_url(request, 'investments_instruments') }}" class="text-primary-ink underline">{{ _("Instruments") }}</a></p>
     {% endif %}
   </section>
+  {% endif %}
+
+  {% if can_edit and active_instruments %}
+  {# F6.2a part B: the confirm step re-posts the same text; the server checks it all again. #}
+  <details class="panel p-6 sm:p-7" data-bulk{% if bulk_text or bulk_preview or bulk_error %} open{% endif %}>
+    <summary class="cursor-pointer text-base font-semibold">{{ _("Bulk add") }}</summary>
+    <p class="mt-2 text-sm text-muted">{{ _("Paste one transaction per line: date; instrument; type; quantity; unit price; fee; FX; amounts currency. Empty trailing fields can be left out and lines starting with # are ignored. Numbers use the interface number format. The amounts currency is blank or the quote currency for quote amounts, or %(currency)s for amounts in %(currency)s. A blank FX rate is taken from stored FX for the date. Nothing is created unless every line is valid.", currency=base_currency) }}</p>
+    <p class="mt-1 text-xs text-muted">{{ _("Example:") }} <code>2026-01-15; VWCE; buy; 4; 1600,00; 5; ; {{ base_currency }}</code></p>
+    <form method="post" action="{{ scoped_url(request, 'investment_transaction_bulk_preview') }}" hx-post="{{ scoped_url(request, 'investment_transaction_bulk_preview') }}" hx-target="#{{ target }}" hx-swap="outerHTML" class="mt-3 space-y-2">
+      {{ csrf_input() }}
+      <label for="bulk-transactions-text" class="sr-only">{{ _("Transactions to add") }}</label>
+      <textarea id="bulk-transactions-text" name="text" rows="6" maxlength="65536" class="form-control w-full font-mono text-xs" data-bulk-text>{{ bulk_text }}</textarea>
+      {% if bulk_error %}<p class="text-sm text-danger" role="alert" data-bulk-error>{{ bulk_error }}</p>{% endif %}
+      <button type="submit" class="rounded-xl border border-line px-4 py-2 text-sm font-medium hover:bg-subtle" data-bulk-preview-button>{{ _("Preview") }}</button>
+    </form>
+    {% if bulk_preview %}
+    <div class="mt-3 space-y-3" data-bulk-preview>
+      {% if bulk_preview.input_error == "empty" %}<p class="text-sm text-danger" role="alert">{{ _("Paste at least one line.") }}</p>{% endif %}
+      {% if bulk_preview.batch_error == "oversell" %}<p class="text-sm text-danger" role="alert" data-bulk-batch-error>{{ _("The sale on %(date)s would exceed the quantity held.", date=format_day(bulk_preview.batch_error_on, locale) if bulk_preview.batch_error_on else _("an undated transaction")) }}</p>{% elif bulk_preview.batch_error %}<p class="text-sm text-danger" role="alert" data-bulk-batch-error>{{ _("The change could not be made. Reload the page and try again.") }}</p>{% endif %}
+      {% if bulk_preview.lines %}
+      <div class="overflow-x-auto">
+        <table class="sheet w-full text-xs">
+          <thead><tr class="text-left text-muted">
+            <th scope="col">{{ _("Line") }}</th><th scope="col">{{ _("Date") }}</th><th scope="col">{{ _("Instrument") }}</th><th scope="col">{{ _("Type") }}</th>
+            <th scope="col" class="text-right">{{ _("Quantity") }}</th><th scope="col" class="text-right">{{ _("Unit price") }}</th><th scope="col" class="text-right">{{ _("Fee") }}</th>
+            <th scope="col" class="text-right">{{ _("FX") }}</th><th scope="col" class="text-right">{{ _("Total in %(currency)s", currency=base_currency) }}</th><th scope="col">{{ _("Problems") }}</th>
+          </tr></thead>
+          <tbody>
+            {% for line in bulk_preview.lines %}
+            <tr data-bulk-line="{{ line.number }}"{% if line.errors %} data-invalid{% endif %}>
+              <td class="whitespace-nowrap tabular-nums">{{ line.number }}</td>
+              {% if line.instrument_id %}
+              <td class="whitespace-nowrap tabular-nums">{{ format_day(line.day, locale) }}</td>
+              <td class="break-words">{{ line.instrument_name }}</td>
+              <td>{% if line.type == "buy" %}{{ _("Buy") }}{% else %}{{ _("Sell") }}{% endif %}</td>
+              <td class="whitespace-nowrap text-right tabular-nums">{{ format_quantity_input(line.quantity, locale) }}</td>
+              <td class="whitespace-nowrap text-right tabular-nums">{{ format_quantity_input(line.unit_price, locale) }} {{ line.entry_currency }}</td>
+              <td class="whitespace-nowrap text-right tabular-nums">{{ format_money(line.fee, locale) }}</td>
+              <td class="whitespace-nowrap text-right tabular-nums">{{ format_quantity_input(line.fx_to_base, locale) }}{% if line.fx_source %}<span class="block text-muted" data-bulk-fx-source>{{ _("stored, %(date)s, %(source)s", date=format_day(line.fx_as_of, locale), source=fx_source_label(line.fx_source)) }}</span>{% endif %}</td>
+              <td class="whitespace-nowrap text-right tabular-nums">{% if line.total %}{{ format_money(line.total, locale) }}{% endif %}</td>
+              {% else %}
+              <td colspan="8" class="break-words font-mono text-muted">{{ line.text }}</td>
+              {% endif %}
+              <td class="space-y-1">
+                {% for code in line.errors %}<span class="block text-danger">{{ bulk_error_labels.get(code, code) }}</span>{% endfor %}
+                {% if not line.errors %}<span class="text-muted">{{ _("Ready") }}</span>{% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+      {% if bulk_preview.can_create %}
+      <form method="post" action="{{ scoped_url(request, 'investment_transaction_bulk_create') }}" hx-post="{{ scoped_url(request, 'investment_transaction_bulk_create') }}" hx-target="#{{ target }}" hx-swap="outerHTML">
+        {{ csrf_input() }}
+        <input type="hidden" name="text" value="{{ bulk_preview.text }}">
+        <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-bulk-create>{{ ngettext("Create %(num)d transaction", "Create %(num)d transactions", bulk_preview.lines|length) }}</button>
+      </form>
+      {% else %}
+      <p class="text-sm text-danger" data-bulk-blocked>{{ _("Fix the lines above; nothing is created while any line has a problem.") }}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+  </details>
   {% endif %}
 
   <section class="panel p-6 sm:p-7" aria-labelledby="transaction-history-heading" data-transaction-history>

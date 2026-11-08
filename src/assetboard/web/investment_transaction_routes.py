@@ -25,7 +25,7 @@ from assetboard.domain.money import Money
 from assetboard.domain.networth import sparkline_polyline
 from assetboard.domain.providers import provider_definition
 from assetboard.domain.settlement import base_values_from_quote
-from assetboard.i18n import gettext
+from assetboard.i18n import gettext, ngettext
 from assetboard.i18n.dates import format_day
 from assetboard.i18n.numbers import (
     format_amount_input,
@@ -40,6 +40,12 @@ from assetboard.services.bonds import (
     save_bond_terms,
 )
 from assetboard.services.context import Context, PermissionDenied, Role, has_role
+from assetboard.services.investment_bulk import (
+    BulkPreview,
+    BulkRejected,
+    create_bulk,
+    preview_bulk,
+)
 from assetboard.services.investment_transactions import (
     InvalidInvestmentTransaction,
     InvestmentTransactionError,
@@ -142,6 +148,39 @@ NOTICES = {
     "price_saved": _("Price saved."),
     "price_deleted": _("Price deleted."),
     "bond_terms_saved": _("Bond terms saved."),
+}
+BULK_ERRORS = {
+    "wrong_format": _(
+        "Use date; instrument; type; quantity; unit price; fee; FX; amounts currency."
+    ),
+    "date_required": _("Enter a date."),
+    "invalid_date": _("Enter a date as YYYY-MM-DD or in your short date format."),
+    "future_date": _("Investment transactions cannot be dated in the future."),
+    "instrument_required": _("Enter an instrument."),
+    "instrument_unknown": _("No active instrument has this name or symbol."),
+    "instrument_ambiguous": _("More than one active instrument matches; use the other one."),
+    "instrument_archived": _("This instrument is archived; restore it before adding transactions."),
+    "invalid_type": _("Use buy or sell (kupno, zakup, sprzedaż)."),
+    "quantity_required": _("Enter a quantity."),
+    "price_required": _("Enter a unit price."),
+    "invalid_quantity": ERRORS["invalid_quantity"],
+    "invalid_unit_price": ERRORS["invalid_unit_price"],
+    "invalid_fee": ERRORS["invalid_fee"],
+    "too_many_decimals": ERRORS["too_many_decimals"],
+    "amount_too_large": ERRORS["amount_too_large"],
+    "invalid_fx": ERRORS["invalid_fx"],
+    "fx_needed": _("FX rate needed"),
+    "fx_not_one": _("This instrument is quoted in the base currency; leave FX blank or 1."),
+    "invalid_amounts_currency": _(
+        "Use the instrument's quote currency or the base currency, or leave it blank."
+    ),
+    "settlement_not_allowed": ERRORS["settlement_not_allowed"],
+    "oversell": _("This sale would exceed the quantity held."),
+}
+BULK_INPUT_ERRORS = {
+    "bulk_too_large": _("Paste at most 64 KiB of text."),
+    "too_many_lines": _("Paste at most 500 lines."),
+    "empty": _("Paste at least one line."),
 }
 
 
@@ -264,18 +303,28 @@ def _fx_hint(request: Request, stored: FxAt | None) -> str:
         return ""
     if stored.rate is None or stored.as_of is None:
         return _t(request, _("No stored FX rate for this date; enter the rate."))
-    source = stored.source or ""
-    definition = provider_definition(source)
-    if definition is not None:
-        label = definition.label
-    elif source == "manual":
-        label = _t(request, _("manual"))
-    else:
-        label = source
     return _t(request, _("Stored rate of %(date)s (%(source)s).")) % {
         "date": format_day(stored.as_of, request.state.locale),
-        "source": label,
+        "source": _source_label(request, stored.source or ""),
     }
+
+
+def _source_label(request: Request, source: str) -> str:
+    definition = provider_definition(source)
+    if definition is not None:
+        return definition.label
+    if source == "manual":
+        return _t(request, _("manual"))
+    return source
+
+
+def _list_notice(request: Request, notice: str | None) -> str | None:
+    if notice is not None and notice.startswith("bulk_created:"):
+        count = _int(notice.removeprefix("bulk_created:"), 0)
+        return ngettext(
+            "%(num)d transaction added.", "%(num)d transactions added.", count, request.state.locale
+        ) % {"num": count}
+    return _t(request, NOTICES[notice]) if notice in NOTICES else None
 
 
 def _stored_fx(request: Request, ctx: Context, instrument_id: str, on: date) -> FxAt | None:
@@ -393,6 +442,9 @@ def _list_page(
     toast_undo: str | None = None,
     toast_seconds: int = 0,
     status_code: int = 200,
+    bulk_text: str = "",
+    bulk_preview: BulkPreview | None = None,
+    bulk_error: str | None = None,
 ) -> Response:
     factory = request.app.state.session_factory
     locale = request.state.locale
@@ -440,13 +492,20 @@ def _list_page(
         "edit_errors": {
             field: _t(request, message) for field, message in (edit_errors or {}).items()
         },
-        "notice": _t(request, NOTICES[notice]) if notice in NOTICES else None,
+        "notice": _list_notice(request, notice),
         "error": error,
         "base_currency": ctx.workspace.base_currency,
         "can_edit": has_role(ctx, Role.EDITOR),
         "can_manage_providers": has_role(ctx, Role.OWNER),
         "coingecko_enabled": provider_enabled(request.app.state.session_factory, ctx, "coingecko"),
         "today": today,
+        "bulk_text": bulk_text,
+        "bulk_preview": bulk_preview,
+        "bulk_error": _t(request, BULK_INPUT_ERRORS[bulk_error])
+        if bulk_error in BULK_INPUT_ERRORS
+        else None,
+        "bulk_error_labels": {code: _t(request, label) for code, label in BULK_ERRORS.items()},
+        "fx_source_label": lambda source: _source_label(request, source),
         "toast_undo": toast_undo,
         "toast_seconds": toast_seconds,
         "toast_message": _t(request, NOTICES["deleted"]) if toast_undo else None,
@@ -659,6 +718,63 @@ async def transactions_page(request: Request, ctx: CurrentContext, notice: str =
             edit_values=values,
         )
     )
+
+
+@router.post("/investments/transactions/bulk/preview", name="investment_transaction_bulk_preview")
+async def transaction_bulk_preview(
+    request: Request, ctx: CurrentContext, text: FormStr = ""
+) -> Response:
+    """Parse and check a pasted batch; nothing is written (F6.2a part B)."""
+    try:
+        preview = await run_in_threadpool(
+            lambda: preview_bulk(
+                request.app.state.session_factory, ctx, text=text, locale=request.state.locale
+            )
+        )
+    except InvestmentTransactionError as exc:
+        code = exc.code
+        return await run_in_threadpool(
+            lambda: _list_page(request, ctx, status_code=400, bulk_text=text, bulk_error=code)
+        )
+    status = 200 if preview.can_create else 400
+    return await run_in_threadpool(
+        lambda: _list_page(request, ctx, status_code=status, bulk_text=text, bulk_preview=preview)
+    )
+
+
+@router.post("/investments/transactions/bulk", name="investment_transaction_bulk_create")
+async def transaction_bulk_create(
+    request: Request, ctx: CurrentContext, text: FormStr = ""
+) -> Response:
+    """Re-parse and re-validate the same text, then create every row or none."""
+    try:
+        count = await run_in_threadpool(
+            lambda: create_bulk(
+                request.app.state.session_factory, ctx, text=text, locale=request.state.locale
+            )
+        )
+    except BulkRejected as exc:
+        preview = exc.preview
+        return await run_in_threadpool(
+            lambda: _list_page(request, ctx, status_code=400, bulk_text=text, bulk_preview=preview)
+        )
+    except InvestmentTransactionError as exc:
+        failure = exc
+        return await run_in_threadpool(
+            lambda: _list_page(
+                request,
+                ctx,
+                status_code=400,
+                bulk_text=text,
+                bulk_error=failure.code if failure.code in BULK_INPUT_ERRORS else None,
+                error=None if failure.code in BULK_INPUT_ERRORS else _error_text(request, failure),
+            )
+        )
+    notice = f"bulk_created:{count}"
+    if is_htmx_fragment_request(request):
+        return await run_in_threadpool(lambda: _list_page(request, ctx, notice=notice))
+    path = request.url_for("investments_transactions").path
+    return RedirectResponse(f"{path}?notice={notice}", status_code=303)
 
 
 @router.post("/investments/transactions", name="investment_transaction_create")
