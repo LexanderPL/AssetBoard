@@ -125,6 +125,7 @@ class PriceSourceConfig(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     provider_key: Mapped[str] = mapped_column(String(32), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean(), nullable=False, default=False)
     settings_encrypted: Mapped[str | None] = mapped_column(Text(), nullable=True)
+    fx_backfilled: Mapped[str | None] = mapped_column(Text(), nullable=True)
     last_success_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     last_error_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     last_error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)

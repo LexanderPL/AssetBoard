@@ -16,6 +16,7 @@ from assetboard.services.providers.transport import (
 )
 
 HISTORY_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist.xml"
+HISTORY_90D_URL = "https://www.ecb.europa.eu/stats/eurofxref/eurofxref-hist-90d.xml"
 CACHE_TTL = timedelta(hours=1)
 _NAMESPACE = "{http://www.ecb.int/vocabulary/2002-08-01/eurofxref}"
 
@@ -50,18 +51,21 @@ class EcbProvider:
         code = currency.upper()
         if code == "EUR":
             return ()
-        rows = self._rows(wait=wait)
+        today = self.runtime.clock.today("UTC")
+        url = HISTORY_90D_URL if start >= today - timedelta(days=90) else HISTORY_URL
+        rows = self._rows(wait=wait, url=url)
         return tuple(
             ProviderRateQuote(code, day, ecb_quote_to_rate(day_rows[code]))
             for day, day_rows in sorted(rows.items())
             if start <= day <= end and code in day_rows
         )
 
-    def _rows(self, *, wait: bool) -> dict[date, dict[str, Decimal]]:
+    def _rows(self, *, wait: bool, url: str = HISTORY_URL) -> dict[date, dict[str, Decimal]]:
+        # The latest refresh still reads the full history file. It is a few MB today; if it
+        # approaches MAX_RESPONSE_BYTES, switch latest to eurofxref-daily.xml and split the
+        # cache from the history backfill.
         try:
-            body = self.runtime.fetch(
-                self.key, HISTORY_URL, ttl=CACHE_TTL, wait=wait, max_wait=300.0
-            )
+            body = self.runtime.fetch(self.key, url, ttl=CACHE_TTL, wait=wait, max_wait=300.0)
         except ProviderTransportError as error:
             if error.code == "http_404":
                 return {}

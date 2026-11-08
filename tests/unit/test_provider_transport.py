@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import time
 from datetime import timedelta
+from urllib.error import URLError
 
 import pytest
 
@@ -80,11 +81,23 @@ def test_web_wait_budget_returns_rate_limited_instead_of_sleeping() -> None:
 
 def test_window_rate_limiter_never_sleeps_for_a_web_request() -> None:
     time = FakeTime()
-    limiter = WindowRateLimiter(1, 60, sleep=time.sleep, monotonic=time.monotonic)
+    limiter = WindowRateLimiter(1, 2, sleep=time.sleep, monotonic=time.monotonic)
     limiter.acquire(wait=True, max_wait=120)
     with pytest.raises(RateLimited):
         limiter.acquire(wait=False, max_wait=3)
     assert time.sleeps == []
+
+
+def test_a_web_429_does_not_retry_or_sleep() -> None:
+    time = FakeTime()
+    client = FakeProviderHttpClient(
+        {"https://provider.test/data": HttpResponse(429, b"", {"Retry-After": "2"})}
+    )
+    retrying = RetryingHttpClient(client, clock=NOW, sleep=time.sleep)
+    with pytest.raises(RateLimited):
+        retrying.get("https://provider.test/data", wait=False, max_wait=3)
+    assert time.sleeps == []
+    assert len(client.calls) == 1
 
 
 def test_window_rate_limiter_waits_in_background_jobs() -> None:
@@ -102,6 +115,26 @@ def test_registry_uses_the_provider_limit() -> None:
     with pytest.raises(RateLimited):
         registry.acquire("nbp", wait=False, max_wait=0)
     assert time.sleeps == []
+
+
+def test_transport_errors_do_not_contain_urls(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    sentinel = "https://provider.test/data?apikey=SENTINEL-123"
+
+    class _Opener:
+        def open(self, _request, timeout: float):
+            del timeout
+            raise URLError(f"failed to reach {sentinel}")
+
+    client = UrllibHttpClient()
+    monkeypatch.setattr(client, "_opener", _Opener())
+    with caplog.at_level("DEBUG"), pytest.raises(ProviderTransportError) as caught:
+        client.get(sentinel)
+    assert caught.value.code == "network"
+    assert "SENTINEL-123" not in str(caught.value)
+    assert "SENTINEL-123" not in repr(caught.value)
+    assert "SENTINEL-123" not in caplog.text
 
 
 def test_urllib_client_enforces_the_response_size_limit(monkeypatch: pytest.MonkeyPatch) -> None:

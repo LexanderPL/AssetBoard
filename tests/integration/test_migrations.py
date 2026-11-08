@@ -322,6 +322,9 @@ def test_0041_price_sources_migration_is_reversible(tmp_path: Path) -> None:
         assert "provider_key" in {
             column["name"] for column in inspector.get_columns("price_points")
         }
+        assert "fx_backfilled" in {
+            column["name"] for column in inspector.get_columns("price_source_configs")
+        }
         assert "provider_backfilled_at" in {
             column["name"] for column in inspector.get_columns("instruments")
         }

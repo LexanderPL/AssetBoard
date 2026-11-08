@@ -433,6 +433,60 @@ def test_full_refresh_backfills_fx_history_through_the_provider_base(
         assert row.rate == normalize_provider_decimal(expected, positive=True)
 
 
+def test_three_currency_cross_matches_the_provider_snapshot(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    _set_base(db, "PLN")
+    usd = _instrument(db, ctx, name="US fund", quote_currency="USD")
+    chf = _instrument(db, ctx, name="Swiss fund", quote_currency="CHF")
+    _tx(db, ctx, usd.id, fx="4.30")
+    _tx(db, ctx, chf.id, fx="4.30")
+    _enable(db, ctx, "ecb")
+    runtime = _runtime(db, FakeProviderHttpClient({HISTORY_URL: _body("ecb_history.xml")}))
+
+    refresh_provider(db.factory, ctx, "ecb", runtime, mode="latest")
+
+    with db.factory() as session:
+        repository = FxRateRepository(session, ctx)
+        pln_usd = repository.rate_on("PLN", "USD", date(2026, 3, 2), "ecb")
+        pln_chf = repository.rate_on("PLN", "CHF", date(2026, 3, 2), "ecb")
+        assert pln_usd is not None and pln_chf is not None
+        with localcontext() as context:
+            context.prec = 80
+            cross = pln_usd.rate / pln_chf.rate
+            provider_cross = Decimal("0.9500") / Decimal("1.1000")
+        assert normalize_provider_decimal(cross, positive=True) == (
+            normalize_provider_decimal(provider_cross, positive=True)
+        )
+
+
+def test_fx_backfill_is_one_off_even_when_the_first_date_is_a_weekend(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    _set_base(db, "EUR")
+    instrument = _instrument(db, ctx, name="US fund", quote_currency="USD")
+    _tx(db, ctx, instrument.id, date_value="2026-02-28", fx="0.90")
+    _enable(db, ctx, "nbp")
+    latest_url = "https://api.nbp.pl/api/exchangerates/tables/a/?format=json"
+    range_url = "https://api.nbp.pl/api/exchangerates/tables/a/2026-02-28/2026-03-10/?format=json"
+    fake = FakeProviderHttpClient(
+        {latest_url: _body("nbp_table_a.json"), range_url: _body("nbp_table_a.json")}
+    )
+    runtime = _runtime(db, fake)
+
+    refresh_provider(db.factory, ctx, "nbp", runtime, mode="full")
+    calls_after_first = len(fake.calls)
+    with db.factory() as session:
+        config = PriceSourceConfigRepository(session, ctx).for_provider("nbp")
+        assert config is not None and config.fx_backfilled is not None
+        assert "2026-02-28" in config.fx_backfilled
+
+    refresh_provider(db.factory, ctx, "nbp", runtime, mode="full")
+    assert len(fake.calls) == calls_after_first
+
+
 def test_a_unique_clash_is_retried_as_an_update(
     db: WorkspaceDb, team: WorkspaceDb, monkeypatch: pytest.MonkeyPatch
 ) -> None:

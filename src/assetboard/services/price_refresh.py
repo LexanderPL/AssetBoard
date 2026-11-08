@@ -8,6 +8,7 @@ writer inserted the same observation first; the batch is retried once as an upda
 
 from __future__ import annotations
 
+import json
 import logging
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
@@ -50,7 +51,12 @@ from assetboard.domain.providers import (
     normalize_provider_decimal,
     provider_definition,
 )
-from assetboard.services.context import Context, Role, require_role
+from assetboard.services.context import (
+    Context,
+    Role,
+    require_role,
+    require_role_now,
+)
 from assetboard.services.providers.transport import (
     ProviderPayloadError,
     ProviderRuntime,
@@ -103,6 +109,7 @@ class _Targets:
     fx_currencies: set[str]
     first_transaction_dates: dict[UUID, date]
     currency_first_dates: dict[str, date]
+    fx_backfilled: dict[str, date]
 
 
 @dataclass(slots=True)
@@ -140,7 +147,16 @@ def refresh_provider(
     with factory() as session:
         config = PriceSourceConfigRepository(session, scope).for_provider(provider_key)
         enabled = bool(config is not None and config.enabled)
-        targets = _targets(session, scope, provider_key) if enabled else None
+        targets = (
+            _targets(
+                session,
+                scope,
+                provider_key,
+                _parse_fx_backfilled(config.fx_backfilled if config is not None else None),
+            )
+            if enabled
+            else None
+        )
     if not enabled:
         _prune_errors(factory, scope, runtime.clock.now())
         return RefreshStats(provider_key=provider_key, status="disabled")
@@ -232,6 +248,7 @@ def refresh_now(
     stats = refresh_provider(factory, ctx, provider_key, runtime, mode="latest", wait=False)
 
     def audit(session: Session) -> None:
+        require_role_now(session, ctx, Role.OWNER)
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=False)
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
@@ -321,7 +338,12 @@ def provider_status(
         )
 
 
-def _targets(session: Session, scope: WorkspaceScope, provider_key: str) -> _Targets:
+def _targets(
+    session: Session,
+    scope: WorkspaceScope,
+    provider_key: str,
+    fx_backfilled: dict[str, date],
+) -> _Targets:
     workspace = CurrentWorkspaceRepository(session, scope).get()
     instruments = [
         row for row in InstrumentRepository(session, scope).ordered() if row.archived_at is None
@@ -393,6 +415,7 @@ def _targets(session: Session, scope: WorkspaceScope, provider_key: str) -> _Tar
         fx_currencies=fx_currencies,
         first_transaction_dates=first_dates,
         currency_first_dates=currency_first_dates,
+        fx_backfilled=fx_backfilled,
     )
 
 
@@ -774,12 +797,17 @@ def _backfill_fx(
         previous = coverage.get(row.quote_currency)
         if previous is None or row.date < previous:
             coverage[row.quote_currency] = row.date
+    completed: dict[str, date] = {}
     for currency in sorted(targets.fx_currencies):
         first = targets.currency_first_dates.get(currency)
         if first is None:
             run.skipped += 1
             continue
+        covered = targets.fx_backfilled.get(currency)
+        if covered is not None and covered <= first:
+            continue
         if currency in coverage and coverage[currency] <= first:
+            completed[currency] = first
             continue
         try:
             quotes = provider.fetch_history_fx(currency, first, today, wait=True)
@@ -801,6 +829,7 @@ def _backfill_fx(
             run.status = "rate_limited"
             run.retry_after = error.retry_after_seconds
             run.errors += 1
+            _mark_fx_backfilled(factory, scope, provider_key, completed)
             return
         except (ProviderTransportError, ProviderPayloadError) as error:
             _record_error(
@@ -810,6 +839,18 @@ def _backfill_fx(
                 None,
                 "fx",
                 error.code,
+                runtime.clock.now(),
+            )
+            run.errors += 1
+            continue
+        if targets.base_currency != provider.natural_base and not base_quotes:
+            _record_error(
+                factory,
+                scope,
+                provider_key,
+                None,
+                "fx",
+                "base_not_published",
                 runtime.clock.now(),
             )
             run.errors += 1
@@ -860,6 +901,8 @@ def _backfill_fx(
                 runtime.clock.now(),
                 informational=True,
             )
+        completed[currency] = first
+    _mark_fx_backfilled(factory, scope, provider_key, completed)
     if run.rates:
         _record_success(factory, scope, provider_key, runtime.clock.now())
 
@@ -942,6 +985,54 @@ def _upsert_rates(
         run_immediate(factory, write)
     except IntegrityError:
         run_immediate(factory, write)
+
+
+def _parse_fx_backfilled(value: str | None) -> dict[str, date]:
+    if not value:
+        return {}
+    try:
+        parsed = json.loads(value)
+    except (ValueError, UnicodeDecodeError):
+        return {}
+    if not isinstance(parsed, dict):
+        return {}
+    result: dict[str, date] = {}
+    for key, day in cast(dict[object, object], parsed).items():
+        if not isinstance(key, str) or not isinstance(day, str):
+            continue
+        try:
+            result[key.upper()] = date.fromisoformat(day)
+        except ValueError:
+            continue
+    return result
+
+
+def _mark_fx_backfilled(
+    factory: sessionmaker[Session],
+    scope: WorkspaceScope,
+    provider_key: str,
+    updates: Mapping[str, date],
+) -> None:
+    if not updates:
+        return
+
+    def write(session: Session) -> None:
+        CurrentWorkspaceRepository(session, scope).lock(exclusive=False)
+        row = PriceSourceConfigRepository(session, scope).for_provider(provider_key)
+        if row is None:
+            return
+        current = _parse_fx_backfilled(row.fx_backfilled)
+        for currency, day in updates.items():
+            previous = current.get(currency)
+            current[currency] = day if previous is None else min(previous, day)
+        row.fx_backfilled = json.dumps(
+            {currency: day.isoformat() for currency, day in current.items()},
+            sort_keys=True,
+            separators=(",", ":"),
+        )
+        session.flush()
+
+    run_immediate(factory, write)
 
 
 def _mark_backfilled(

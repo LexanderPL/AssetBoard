@@ -11,7 +11,11 @@ import pytest
 from assetboard.clock import FixedClock
 from assetboard.config import Settings
 from assetboard.domain.providers import ECB_KEY, ecb_quote_to_rate
-from assetboard.services.providers.ecb import HISTORY_URL, EcbProvider
+from assetboard.services.providers.ecb import (
+    HISTORY_90D_URL,
+    HISTORY_URL,
+    EcbProvider,
+)
 from assetboard.services.providers.registry import build_provider_runtime
 from assetboard.services.providers.transport import ProviderPayloadError
 from tests.fake_provider_http import FakeProviderHttpClient, FakeTime
@@ -26,7 +30,7 @@ def _provider(body: bytes) -> EcbProvider:
     runtime = build_provider_runtime(
         SETTINGS,
         NOW,
-        http=FakeProviderHttpClient({HISTORY_URL: body}),
+        http=FakeProviderHttpClient({HISTORY_URL: body, HISTORY_90D_URL: body}),
         sleep=time_source.sleep,
         monotonic=time_source.monotonic,
     )
@@ -50,6 +54,27 @@ def test_history_returns_one_observation_per_published_date() -> None:
     assert [(quote.date, quote.rate) for quote in quotes] == [
         (date(2026, 2, 27), ecb_quote_to_rate(Decimal("1.0900")))
     ]
+
+
+def test_recent_history_uses_the_90_day_file() -> None:
+    time_source = FakeTime()
+    client = FakeProviderHttpClient(
+        {
+            HISTORY_90D_URL: (FIXTURES / "ecb_history.xml").read_bytes(),
+            HISTORY_URL: b"<not-used>",
+        }
+    )
+    runtime = build_provider_runtime(
+        SETTINGS,
+        NOW,
+        http=client,
+        sleep=time_source.sleep,
+        monotonic=time_source.monotonic,
+    )
+    provider = runtime.providers[ECB_KEY]
+    assert isinstance(provider, EcbProvider)
+    provider.fetch_history_fx("USD", date(2026, 2, 27), date(2026, 3, 1))
+    assert [url for url, _headers in client.calls] == [HISTORY_90D_URL]
 
 
 def test_missing_currency_is_omitted() -> None:

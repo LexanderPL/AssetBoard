@@ -4,11 +4,13 @@
     <Cube time="2026-02-27">
       <Cube currency="USD" rate="1.0900"/>
       <Cube currency="PLN" rate="4.2500"/>
+      <Cube currency="CHF" rate="0.9400"/>
       <Cube currency="GBP" rate="0.8400"/>
     </Cube>
     <Cube time="2026-03-02">
       <Cube currency="USD" rate="1.1000"/>
       <Cube currency="PLN" rate="4.3000"/>
+      <Cube currency="CHF" rate="0.9500"/>
       <Cube currency="GBP" rate="0.8500"/>
     </Cube>
   </Cube>

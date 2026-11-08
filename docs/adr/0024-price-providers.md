@@ -232,6 +232,9 @@ without re-checking at implementation time:
 - Provider settings are owner-only and encrypted with the shared bound-secret helper under a
   `price-source-settings` purpose. Errors store only short codes; URLs and response bodies never
   reach logs or audit data.
+- Recent ECB history uses `eurofxref-hist-90d.xml`; older backfills use the full file. A
+  per-currency `fx_backfilled` marker on the provider config keeps FX history one-off even when
+  the first trade falls on a weekend or before the provider's history starts.
 - Still to verify in the next update: CoinGecko's current history limit and EODHD EU-exchange
   coverage with a real key. The unverified-claims register above remains binding.
 

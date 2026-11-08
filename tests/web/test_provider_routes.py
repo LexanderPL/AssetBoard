@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, date, datetime
 from decimal import Decimal
 from pathlib import Path
@@ -11,14 +12,15 @@ import pytest
 from sqlalchemy import select
 
 from assetboard.clock import FixedClock
-from assetboard.db.models.identity import Workspace
+from assetboard.db.models.identity import AuditEvent, Workspace
 from assetboard.db.models.investments import AssetClass, Instrument
 from assetboard.db.models.prices import PricePoint, PriceSourceConfig, ProviderError
 from assetboard.services.price_refresh import RefreshStats
 from assetboard.services.providers.nbp import GOLD_LATEST
 from assetboard.services.providers.registry import build_provider_runtime
+from assetboard.services.providers.transport import HttpResponse, ProviderTransportError
 from tests.conftest import OwnerApp
-from tests.fake_provider_http import FakeProviderHttpClient
+from tests.fake_provider_http import FakeProviderHttpClient, FakeTime
 
 NOW = "2026-03-10T12:00:00+00:00"
 INSTRUMENTS = "/investments/instruments"
@@ -245,6 +247,57 @@ def test_the_provider_card_shows_the_base_currency_mismatch(owner: OwnerApp) -> 
     page = owner.client.get(PROVIDERS).text
     assert "This provider does not publish your base currency" in page
     assert "data-base-mismatch" in page
+
+
+@pytest.mark.parametrize(
+    ("response", "code"),
+    [
+        (ProviderTransportError("network"), "network"),
+        (HttpResponse(500, b"", {}), "http_500"),
+        (b"SENTINEL-123", "malformed_response"),
+    ],
+)
+def test_provider_failures_do_not_leak_request_urls(
+    owner: OwnerApp,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+    response,
+    code: str,
+) -> None:
+    sentinel = "SENTINEL-123"
+    url = f"https://api.nbp.pl/api/cenyzlota/?format=json&apikey={sentinel}"
+    monkeypatch.setattr("assetboard.services.providers.nbp.GOLD_LATEST", url)
+    _base_to_pln(owner)
+    instrument = _instrument(owner, "Gold")
+    _buy(owner, instrument)
+    _configure_provider(owner, instrument)
+    _enable_nbp(owner)
+    time_source = FakeTime()
+    owner.app.state.provider_runtime = build_provider_runtime(
+        owner.app.state.settings,
+        owner.app.state.clock,
+        http=FakeProviderHttpClient({url: response}),
+        sleep=time_source.sleep,
+        monotonic=time_source.monotonic,
+    )
+    with caplog.at_level(logging.DEBUG):
+        page = owner.client.post(
+            PROVIDERS + "/nbp/refresh",
+            data={"csrf_token": owner.token(PROVIDERS)},
+            follow_redirects=True,
+        ).text
+        instrument_page = owner.client.get(f"{INSTRUMENTS}/{instrument}").text
+    assert sentinel not in page
+    assert sentinel not in instrument_page
+    assert sentinel not in caplog.text
+    with owner.db() as session:
+        errors = list(session.scalars(select(ProviderError)))
+        assert errors and errors[-1].code == code
+        assert all(sentinel not in str(error.code) for error in errors)
+        events = list(
+            session.scalars(select(AuditEvent).where(AuditEvent.action == "price_source.refreshed"))
+        )
+        assert events and all(sentinel not in str(event.data) for event in events)
 
 
 def test_htmx_save_returns_the_provider_fragment(owner: OwnerApp) -> None:

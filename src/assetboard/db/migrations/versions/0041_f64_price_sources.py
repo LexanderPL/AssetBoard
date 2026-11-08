@@ -28,6 +28,7 @@ def upgrade() -> None:
         sa.Column("provider_key", sa.String(length=32), nullable=False),
         sa.Column("enabled", sa.Boolean(), nullable=False),
         sa.Column("settings_encrypted", sa.Text(), nullable=True),
+        sa.Column("fx_backfilled", sa.Text(), nullable=True),
         sa.Column("last_success_at", UtcDateTime(), nullable=True),
         sa.Column("last_error_at", UtcDateTime(), nullable=True),
         sa.Column("last_error_code", sa.String(length=64), nullable=True),

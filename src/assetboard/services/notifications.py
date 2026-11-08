@@ -62,7 +62,11 @@ from assetboard.services.auth import count_limited_attempt
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.notification_messages import reminder_message, test_message
 from assetboard.services.notify import UNCERTAIN_ERRORS, InvalidNotificationUrl, Notifier
-from assetboard.services.secret_box import decrypt_secret, encrypt_secret
+from assetboard.services.secret_box import (
+    SecretFailure,
+    decrypt_secret_result,
+    encrypt_secret,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -157,19 +161,21 @@ def encrypt_url(settings: Settings, channel_id: UUID, url: str, now: datetime) -
 
 def decrypt_url(settings: Settings, channel_id: UUID, token: str) -> str | None:
     """The URL, or ``None`` when it cannot be read or belongs to another channel."""
-    url = decrypt_secret(
+    result = decrypt_secret_result(
         settings,
         purpose="notification-url",
         binding=str(channel_id),
         token=token,
     )
-    if url is None:
+    if result.failure is SecretFailure.FOREIGN:
+        logger.warning("notification_url_refused channel=%s reason=foreign_row", channel_id)
+    elif result.failure is SecretFailure.INVALID:
         logger.warning(
             "notification_url_unreadable channel=%s; the instance secret key has probably "
             "changed. The member must enter the channel URL again.",
             channel_id,
         )
-    return url
+    return result.plaintext
 
 
 def url_scheme(url: str) -> str:

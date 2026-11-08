@@ -190,7 +190,6 @@ class RetryingHttpClient:
         wait: bool = True,
         max_wait: float = BACKGROUND_WAIT_SECONDS,
     ) -> HttpResponse:
-        del wait
         deadline = self.monotonic() + max_wait
         last_code = "network"
         for attempt in range(self.attempts):
@@ -211,7 +210,7 @@ class RetryingHttpClient:
                 delay = _retry_after(response, self.clock.now()) or RETRY_BASE_SECONDS * (
                     2**attempt
                 )
-                if attempt == self.attempts - 1:
+                if not wait or attempt == self.attempts - 1:
                     raise RateLimited(delay)
                 self._wait(delay, deadline)
                 last_code = "http_429"
@@ -313,7 +312,7 @@ class WindowRateLimiter:
                 delay = self._calls[0] + self.per_seconds - now
             if delay <= 0:
                 continue
-            if delay > max_wait:
+            if not wait or delay > max_wait:
                 raise RateLimited(delay)
             self.sleep(delay)
 
