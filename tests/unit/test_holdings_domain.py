@@ -17,7 +17,9 @@ from assetboard.domain.holdings import (
     InvalidHoldingTransaction,
     InvestmentTransactionType,
     Oversell,
+    RealizedEvent,
     compute_holdings,
+    realized_events,
 )
 from assetboard.domain.money import Money, minor_unit_for
 
@@ -442,6 +444,63 @@ def test_a_mixed_history_sold_to_zero_has_zero_cost(
         holding = compute_holdings(rows, method, base_currency=BASE)[0]
         assert holding.quantity == 0
         assert holding.cost_basis_base == Money(0, BASE)
+
+
+@given(_mixed_history())
+@settings(deadline=None, max_examples=100)
+def test_realized_events_sum_to_the_holding_realized_pnl(
+    history: tuple[list[HoldingTransaction], Decimal],
+) -> None:
+    rows, _held = history
+    sells = [row for row in rows if row.type == "sell"]
+    for method in ("average", "fifo"):
+        holding = compute_holdings(rows, method, base_currency=BASE)[0]
+        events = realized_events(rows, method, base_currency=BASE)
+        assert [event.transaction_id for event in events] == [row.id for row in sells]
+        assert sum(event.realized.amount_minor for event in events) == (
+            holding.realized_pnl.amount_minor
+        )
+
+
+def test_realized_events_name_each_sell_and_its_date() -> None:
+    instrument = uuid4()
+    buy = _buy(instrument, "10", "10", day=date(2025, 6, 1))
+    first = _sell(instrument, "4", "12", day=date(2025, 12, 31))
+    second = _sell(instrument, "6", "9", fee=100, day=date(2026, 1, 2))
+    events = realized_events([second, buy, first], "average", base_currency=BASE)
+    assert events == [
+        RealizedEvent(first.id, instrument, date(2025, 12, 31), Money(800, BASE)),
+        RealizedEvent(second.id, instrument, date(2026, 1, 2), Money(-700, BASE)),
+    ]
+
+
+def test_a_dated_sell_of_an_undated_lot_has_an_event_and_does_not_oversell() -> None:
+    instrument = uuid4()
+    legacy = _tx(day=None, type="buy", quantity="5", price="20", instrument_id=instrument)
+    sell = _sell(instrument, "5", "30", day=date(2026, 2, 1))
+    for method in ("average", "fifo"):
+        [event] = realized_events([legacy, sell], method, base_currency=BASE)
+        assert (event.date, event.realized) == (date(2026, 2, 1), Money(5000, BASE))
+    with pytest.raises(Oversell):  # why the portfolio must not subtract dated holdings
+        compute_holdings([legacy, sell], "average", date(2026, 12, 31), base_currency=BASE)
+
+
+def test_realized_events_cover_every_instrument_and_refuse_a_bad_method() -> None:
+    first, second = uuid4(), uuid4()
+    rows = [
+        _buy(first, "1", "10"),
+        _sell(first, "1", "11"),
+        _buy(second, "2", "10"),
+        _sell(second, "1", "8"),
+    ]
+    events = realized_events(rows, "fifo", base_currency=BASE)
+    assert {event.instrument_id: event.realized for event in events} == {
+        first: Money(100, BASE),
+        second: Money(-200, BASE),
+    }
+    assert realized_events([_buy(first, "1", "10")], "average", base_currency=BASE) == []
+    with pytest.raises(InvalidHoldingTransaction):
+        realized_events(rows, "lifo", base_currency=BASE)
 
 
 def test_transaction_type_values_are_the_spec_set() -> None:

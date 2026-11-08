@@ -185,3 +185,31 @@ def test_slices_add_up_to_the_block_total(month, block, max_slices) -> None:
     for s in named:
         assert by_id[s.category_id].kind == block
         assert by_id[s.category_id].treatment == "regular"
+
+
+def test_a_minimum_share_groups_the_small_amounts_without_a_slice_limit() -> None:
+    ids = [uuid4() for _ in range(5)]
+    amounts = [5_000, 3_000, 1_800, 199, 1]  # of 10 000: 50%, 30%, 18%, 1.99%, 0.01%
+    rows = [CategoryAmount(i, Money(a, "EUR")) for i, a in zip(ids, amounts, strict=True)]
+    slices = category_slices(rows, currency="EUR", max_slices=None, min_share_bp=200)
+    assert [(s.category_id, s.amount.amount_minor, s.grouped) for s in slices] == [
+        (ids[0], 5_000, 1),
+        (ids[1], 3_000, 1),
+        (ids[2], 1_800, 1),
+        (None, 200, 2),
+    ]
+    # Exactly 2% is kept (the rule is "under 2%"), compared in integers.
+    edge = [CategoryAmount(ids[0], Money(98, "EUR")), CategoryAmount(ids[1], Money(2, "EUR"))]
+    assert [s.category_id for s in category_slices(edge, currency="EUR", min_share_bp=200)] == [
+        ids[0],
+        ids[1],
+    ]
+    # Both rules together: the count limit still applies after the share threshold.
+    many = [CategoryAmount(uuid4(), Money(100, "EUR")) for _ in range(10)]
+    capped = category_slices(many, currency="EUR", max_slices=4, min_share_bp=200)
+    assert [s.grouped for s in capped] == [1, 1, 1, 7]
+    assert category_slices(rows, currency="EUR", max_slices=None) == category_slices(
+        rows, currency="EUR", max_slices=100
+    )
+    with pytest.raises(ValueError):
+        category_slices(rows, currency="EUR", min_share_bp=-1)
