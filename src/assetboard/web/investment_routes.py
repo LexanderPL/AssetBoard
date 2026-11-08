@@ -421,6 +421,46 @@ async def instruments_page(
     )
 
 
+@router.get(
+    "/investments/instruments/{instrument_id}/edit",
+    name="investments_instrument_edit",
+)
+async def instrument_edit(request: Request, ctx: CurrentContext, instrument_id: str) -> Response:
+    """The instrument's row as an inline edit form (HTMX); a plain request gets the full page
+    with the form in that row, scrolled to it by its anchor."""
+    item_id = _parse_uuid(instrument_id)
+    locale = request.state.locale
+    if not is_htmx_fragment_request(request):
+        path = request.url_for("investments_instruments").path
+        return RedirectResponse(f"{path}?edit={item_id}#instrument-{item_id}", status_code=303)
+    item = await run_in_threadpool(_instrument_or_404, request, ctx, item_id, locale=locale)
+    if item.archived or not has_role(ctx, Role.EDITOR):
+        return await run_in_threadpool(lambda: _render_instruments(request, ctx))
+    return await run_in_threadpool(
+        lambda: _render_instruments(
+            request,
+            ctx,
+            editing=item.id,
+            edit_values=_instrument_values(item, ctx.workspace.base_currency, locale),
+            editing_instrument=item,
+        )
+    )
+
+
+@router.get(
+    "/investments/instruments/{instrument_id}/row",
+    name="investments_instrument_row",
+)
+async def instrument_row(request: Request, ctx: CurrentContext, instrument_id: str) -> Response:
+    """Cancel an inline edit: the list without the form (HTMX), or the plain page."""
+    item_id = _parse_uuid(instrument_id)
+    if not is_htmx_fragment_request(request):
+        path = request.url_for("investments_instruments").path
+        return RedirectResponse(f"{path}#instrument-{item_id}", status_code=303)
+    await run_in_threadpool(_instrument_or_404, request, ctx, item_id, locale=request.state.locale)
+    return await run_in_threadpool(lambda: _render_instruments(request, ctx))
+
+
 @router.post("/investments/instruments", name="investments_instrument_create")
 async def instrument_create(
     request: Request,

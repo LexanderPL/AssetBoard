@@ -39,6 +39,7 @@ from assetboard.services.prices import (
     latest_prices,
     price_at,
     save_manual_price,
+    stored_fx_rates,
 )
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
@@ -799,3 +800,31 @@ def test_rows_of_another_workspace_are_not_found(db: WorkspaceDb, team: Workspac
     assert other_point.id is not None
     with pytest.raises(NotFound):
         delete_manual_price(db.factory, mine, my_instrument.id, other_point.id)
+
+
+def test_stored_fx_rates_prefill_skips_transaction_rates(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    usd = _instrument(db, ctx, name="US fund", quote_currency="USD")
+    _tx(db, ctx, usd.id, date_value="2026-03-09", fx="0.5")  # transaction-derived: not a default
+    _stored_rate(db, ctx, quote_currency="USD", date_value=date(2026, 3, 2), rate="0.91")
+    _stored_rate(
+        db, ctx, quote_currency="USD", date_value=date(2026, 3, 5), rate="0.92", source="ecb"
+    )
+    _stored_rate(
+        db, ctx, quote_currency="USD", date_value=date(2026, 3, 5), rate="0.93", source="manual"
+    )
+    _stored_rate(db, ctx, quote_currency="USD", date_value=date(2026, 3, 11), rate="0.99")
+    _tx(db, ctx, _instrument(db, ctx, name="UK fund", quote_currency="GBP").id, fx="1.17")
+
+    rates = stored_fx_rates(db.factory, ctx, ["usd", "GBP", "EUR", "CHF"], date(2026, 3, 10))
+
+    # Latest on or before the date, manual over provider on that date; GBP has only a
+    # transaction rate, CHF nothing, and the base currency is never listed.
+    assert rates == {"USD": Decimal("0.93")}
+    assert stored_fx_rates(db.factory, ctx, ["EUR"], date(2026, 3, 10)) == {}
+    viewer = db.ctx("vic", "viewer")
+    assert stored_fx_rates(db.factory, viewer, ["USD"], date(2026, 3, 4)) == {
+        "USD": Decimal("0.91")
+    }
