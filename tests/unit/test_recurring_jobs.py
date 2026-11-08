@@ -258,12 +258,20 @@ def test_provider_jobs_are_registered_only_with_a_runtime(db):
     assert calls["price-refresh-ecb"].kwargs["max_instances"] == 1
     assert calls["price-refresh-coingecko"].kwargs["max_instances"] == 1
     assert calls["price-refresh-eodhd"].kwargs["max_instances"] == 1
+    assert calls["price-refresh-goldapi"].kwargs["max_instances"] == 1
     fire = (
         calls["price-refresh-nbp"]
         .args[1]
         .get_next_fire_time(None, datetime(2026, 3, 2, 0, tzinfo=UTC))
     )
     assert fire.isoformat() == "2026-03-02T18:10:00+00:00"
+    goldapi = calls["price-refresh-goldapi"]
+    assert goldapi.args[0] == jobs.refresh_prices
+    assert goldapi.kwargs["args"] == ["goldapi"]
+    assert goldapi.kwargs["coalesce"] is True
+    assert goldapi.kwargs["misfire_grace_time"] is None
+    goldapi_fire = goldapi.args[1].get_next_fire_time(None, datetime(2026, 3, 2, 0, tzinfo=UTC))
+    assert goldapi_fire.isoformat() == "2026-03-02T22:50:00+00:00"
 
 
 def test_request_backfill_adds_one_immediate_job(db, monkeypatch):

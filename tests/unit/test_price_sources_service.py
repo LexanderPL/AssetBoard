@@ -91,6 +91,7 @@ def test_provider_page_lists_nbp_and_ecb_disabled(db: WorkspaceDb, team: Workspa
         "ecb",
         "coingecko",
         "eodhd",
+        "goldapi",
     ]
     assert all(not card.enabled for card in page.cards)
     assert all(card.instruments_using == 0 for card in page.cards)
@@ -217,6 +218,48 @@ def test_eodhd_requires_a_key_and_stores_the_daily_budget(
         row = PriceSourceConfigRepository(session, ctx).for_provider("eodhd")
         assert row is not None
         assert provider_settings(SETTINGS, row) == {"api_key": "eodhd-secret"}
+
+
+def test_goldapi_requires_a_key_and_defaults_to_four_calls_per_day(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    secret = "GOLDAPI-SENTINEL-KEY-7f3a"
+    card = next(
+        card for card in provider_page(db.factory, ctx).cards if card.definition.key == "goldapi"
+    )
+    assert (card.enabled, card.daily_call_budget) == (False, 4)
+    with pytest.raises(MissingProviderKey):
+        save_provider_config(db.factory, ctx, SETTINGS, "goldapi", enabled=True)
+    save_provider_config(
+        db.factory,
+        ctx,
+        SETTINGS,
+        "goldapi",
+        enabled=True,
+        settings_values={"api_key": secret},
+    )
+    card = next(
+        card for card in provider_page(db.factory, ctx).cards if card.definition.key == "goldapi"
+    )
+    assert card.enabled and card.settings_configured
+    assert (card.daily_call_budget, card.quota_used) == (4, 0)
+    assert secret not in repr(card)
+    with db.factory() as session:
+        row = PriceSourceConfigRepository(session, ctx).for_provider("goldapi")
+        assert row is not None
+        assert row.daily_call_budget == 4
+        assert row.settings_encrypted is not None and secret not in row.settings_encrypted
+        assert provider_settings(SETTINGS, row) == {"api_key": secret}
+        audits = list(session.scalars(select(AuditEvent)))
+    assert audits and all(secret not in repr(audit.data) for audit in audits)
+
+    # The owner can raise the budget; a blank key keeps the stored one.
+    save_provider_config(db.factory, ctx, SETTINGS, "goldapi", enabled=True, daily_call_budget=10)
+    with db.factory() as session:
+        row = PriceSourceConfigRepository(session, ctx).for_provider("goldapi")
+        assert row is not None and row.daily_call_budget == 10
+        assert provider_settings(SETTINGS, row) == {"api_key": secret}
 
 
 def test_coingecko_key_is_optional_and_budget_must_be_positive(

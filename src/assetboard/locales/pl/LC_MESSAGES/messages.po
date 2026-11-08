@@ -265,6 +265,16 @@ msgstr "Ticker EODHD z sufiksem giełdy, na przykład VWCE.DE."
 msgid "API key"
 msgstr "Klucz API"
 
+msgid ""
+"Optional spot prices for gold, silver, platinum and palladium in many "
+"currencies."
+msgstr "Opcjonalne bieżące ceny złota, srebra, platyny i palladu w wielu walutach."
+
+msgid "GoldAPI metal symbol: XAU, XAG, XPT or XPD; the price is per troy ounce."
+msgstr ""
+"Symbol metalu w GoldAPI: XAU, XAG, XPT lub XPD; cena dotyczy uncji "
+"trojańskiej."
+
 msgid "Enter a valid amount."
 msgstr "Podaj prawidłową kwotę."
 
@@ -5212,8 +5222,12 @@ msgstr ""
 msgid "Provider symbol"
 msgstr "Symbol dostawcy"
 
-msgid "CoinGecko id, EODHD ticker, or XAU for NBP gold."
-msgstr "Identyfikator CoinGecko, ticker EODHD lub XAU dla złota NBP."
+msgid ""
+"CoinGecko id, EODHD ticker, GoldAPI metal (XAU/XAG/XPT/XPD), or XAU for "
+"NBP gold."
+msgstr ""
+"Identyfikator CoinGecko, ticker EODHD, metal GoldAPI (XAU/XAG/XPT/XPD) "
+"lub XAU dla złota NBP."
 
 msgid ""
 "EODHD prices come in the exchange currency; set the instrument currency "
@@ -5440,6 +5454,20 @@ msgid ""
 msgstr ""
 "Pokrycie EODHD dla symboli GPW, XETRA i LSE jest niezweryfikowane; "
 "darmowy plan pozwala na 20 wywołań dziennie."
+
+msgid ""
+"GoldAPI symbols: XAU, XAG, XPT and XPD; prices are per troy ounce in the "
+"instrument currency. The free plan allows about 150 requests per month."
+msgstr ""
+"Symbole GoldAPI: XAU, XAG, XPT i XPD; ceny dotyczą uncji trojańskiej w "
+"walucie instrumentu. Darmowy plan pozwala na około 150 zapytań "
+"miesięcznie."
+
+msgid "History covers at most the last 90 days."
+msgstr "Historia obejmuje najwyżej ostatnie 90 dni."
+
+msgid "Source:"
+msgstr "Źródło:"
 
 msgid "A key is configured. Leave empty to keep it."
 msgstr "Klucz jest skonfigurowany. Pozostaw puste, aby go zachować."

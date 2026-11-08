@@ -258,6 +258,14 @@ msgstr ""
 msgid "API key"
 msgstr ""
 
+msgid ""
+"Optional spot prices for gold, silver, platinum and palladium in many "
+"currencies."
+msgstr ""
+
+msgid "GoldAPI metal symbol: XAU, XAG, XPT or XPD; the price is per troy ounce."
+msgstr ""
+
 msgid "Enter a valid amount."
 msgstr ""
 
@@ -4837,7 +4845,9 @@ msgstr ""
 msgid "Provider symbol"
 msgstr ""
 
-msgid "CoinGecko id, EODHD ticker, or XAU for NBP gold."
+msgid ""
+"CoinGecko id, EODHD ticker, GoldAPI metal (XAU/XAG/XPT/XPD), or XAU for "
+"NBP gold."
 msgstr ""
 
 msgid ""
@@ -5046,6 +5056,17 @@ msgstr ""
 msgid ""
 "EODHD coverage for GPW, XETRA and LSE symbols is unverified; the free "
 "tier allows 20 calls per day."
+msgstr ""
+
+msgid ""
+"GoldAPI symbols: XAU, XAG, XPT and XPD; prices are per troy ounce in the "
+"instrument currency. The free plan allows about 150 requests per month."
+msgstr ""
+
+msgid "History covers at most the last 90 days."
+msgstr ""
+
+msgid "Source:"
 msgstr ""
 
 msgid "A key is configured. Leave empty to keep it."
@@ -7706,5 +7727,8 @@ msgstr ""
 #~ "instrument can be valued. You can "
 #~ "record purchases now; the terms form "
 #~ "arrives in a later step."
+#~ msgstr ""
+
+#~ msgid "CoinGecko id, EODHD ticker, or XAU for NBP gold."
 #~ msgstr ""
 

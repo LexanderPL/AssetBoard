@@ -135,6 +135,7 @@ def test_the_provider_page_is_owner_only_and_lists_nbp_and_ecb(owner: OwnerApp) 
     assert "Price providers" in page
     assert 'data-provider-card="nbp"' in page
     assert 'data-provider-card="ecb"' in page
+    assert 'data-provider-card="goldapi"' in page
     assert "Narodowy Bank Polski" in page
     assert "European Central Bank" in page
     assert "data-providers-tab" in page
@@ -286,6 +287,191 @@ def test_eodhd_requires_a_key_and_stores_the_budget(owner: OwnerApp) -> None:
         assert row.enabled and row.daily_call_budget == 7
         assert row.settings_encrypted is not None
         assert "EODHD-SECRET" not in row.settings_encrypted
+
+
+GOLDAPI_KEY_SENTINEL = "GOLDAPI-SENTINEL-KEY-7f3a"
+GOLDAPI_XAG_PLN = "https://www.goldapi.io/api/XAG/PLN"
+GOLDAPI_XAU_PLN = "https://www.goldapi.io/api/XAU/PLN"
+
+
+def _enable_goldapi(owner: OwnerApp, budget: str = "") -> None:
+    data = {"enabled": "1", "api_key": GOLDAPI_KEY_SENTINEL}
+    if budget:
+        data["daily_call_budget"] = budget
+    response = owner.post(PROVIDERS + "/goldapi", data, token_from=PROVIDERS)
+    assert response.status_code == 303, response.text
+
+
+def _goldapi_runtime(
+    owner: OwnerApp, responses, time_source: FakeTime | None = None
+) -> FakeProviderHttpClient:
+    client = FakeProviderHttpClient(responses)
+    time_source = time_source or FakeTime()
+    owner.app.state.provider_runtime = build_provider_runtime(
+        owner.app.state.settings,
+        owner.app.state.clock,
+        http=client,
+        sleep=time_source.sleep,
+        monotonic=time_source.monotonic,
+    )
+    return client
+
+
+def _goldapi_card(page: str) -> str:
+    start = page.index('data-provider-card="goldapi"')
+    return page[start : page.index("</article>", start)]
+
+
+def test_goldapi_card_requires_a_key_and_never_echoes_it(owner: OwnerApp) -> None:
+    card = _goldapi_card(owner.client.get(PROVIDERS).text)
+    assert 'name="api_key" type="password"' in card
+    assert 'name="daily_call_budget" type="number" min="1" max="100000" value="4"' in card
+    assert "0 / 4" in card
+    assert 'href="https://www.goldapi.io/api-documentation"' in card
+    assert "data-provider-source-link" in card
+    assert "data-coingecko-badge" not in card
+    refused = owner.post(PROVIDERS + "/goldapi", {"enabled": "1"}, token_from=PROVIDERS)
+    assert refused.status_code == 400
+
+    _enable_goldapi(owner)
+
+    page = owner.client.get(PROVIDERS).text
+    card = _goldapi_card(page)
+    assert GOLDAPI_KEY_SENTINEL not in page
+    assert "A key is configured. Leave empty to keep it." in card
+    assert "GoldAPI symbols: XAU, XAG, XPT and XPD" in card
+    assert "History covers at most the last 90 days." in card
+    assert "data-provider-history-limit" in card
+    assert "0 / 4" in card
+    with owner.db() as session:
+        row = session.scalars(
+            select(PriceSourceConfig).where(PriceSourceConfig.provider_key == "goldapi")
+        ).one()
+        assert row.enabled and row.daily_call_budget == 4
+        assert row.settings_encrypted is not None
+        assert GOLDAPI_KEY_SENTINEL not in row.settings_encrypted
+
+    # The owner can raise the budget without re-entering the key.
+    response = owner.post(
+        PROVIDERS + "/goldapi",
+        {"enabled": "1", "daily_call_budget": "10"},
+        token_from=PROVIDERS,
+    )
+    assert response.status_code == 303
+    assert "0 / 10" in _goldapi_card(owner.client.get(PROVIDERS).text)
+
+
+def test_goldapi_test_lookup_reads_the_ounce_price(owner: OwnerApp) -> None:
+    _enable_goldapi(owner)
+    client = _goldapi_runtime(
+        owner, {GOLDAPI_XAG_PLN: (FIXTURES / "goldapi_latest.json").read_bytes()}
+    )
+    lookup = owner.post(
+        "/investments/provider-lookup",
+        {
+            "provider_key": "goldapi",
+            "provider_symbol": "XAG",
+            "type": "metal",
+            "quote_currency": "PLN",
+            "unit_label": "oz",
+        },
+        token_from=INSTRUMENTS,
+    )
+    assert lookup.status_code == 200
+    assert "Provider price: 123.4567 PLN as of Mar 2, 2026" in lookup.text
+    assert GOLDAPI_KEY_SENTINEL not in lookup.text
+    assert [url for url, _headers in client.calls] == [GOLDAPI_XAG_PLN]
+    assert "1 / 4" in _goldapi_card(owner.client.get(PROVIDERS).text)
+
+
+def test_goldapi_refresh_now_stores_the_price_and_counts_the_call(owner: OwnerApp) -> None:
+    _base_to_pln(owner)
+    _enable_goldapi(owner)
+    instrument = _instrument(owner, "Silver", provider_key="goldapi", provider_symbol="XAG")
+    _buy(owner, instrument)
+    _goldapi_runtime(owner, {GOLDAPI_XAG_PLN: (FIXTURES / "goldapi_latest.json").read_bytes()})
+
+    response = owner.client.post(
+        PROVIDERS + "/goldapi/refresh",
+        data={"csrf_token": owner.token(PROVIDERS)},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert "Refresh complete: 1 prices and 0 FX rates." in response.text
+    assert "1 / 4" in _goldapi_card(response.text)
+    with owner.db() as session:
+        points = list(session.scalars(select(PricePoint)))
+    assert [(point.date, point.price, point.provider_key) for point in points] == [
+        (date(2026, 3, 2), Decimal("123.4567"), "goldapi")
+    ]
+
+
+def test_goldapi_quota_warning_when_the_budget_is_spent(owner: OwnerApp) -> None:
+    _base_to_pln(owner)
+    _enable_goldapi(owner, budget="1")
+    for name, symbol in (("Gold", "XAU"), ("Silver", "XAG")):
+        instrument = _instrument(owner, name, provider_key="goldapi", provider_symbol=symbol)
+        _buy(owner, instrument)
+    body = (FIXTURES / "goldapi_latest.json").read_bytes()
+    client = _goldapi_runtime(owner, {GOLDAPI_XAG_PLN: body, GOLDAPI_XAU_PLN: body})
+
+    response = owner.client.post(
+        PROVIDERS + "/goldapi/refresh",
+        data={"csrf_token": owner.token(PROVIDERS)},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert len(client.calls) == 1
+    card = _goldapi_card(response.text)
+    assert "1 / 1" in card
+    assert "data-provider-quota-exhausted" in card
+    assert "Daily call budget exhausted; remaining instruments keep their last prices." in card
+
+
+@pytest.mark.parametrize("status", [401, 403])
+def test_goldapi_failure_does_not_leak_the_key(
+    owner: OwnerApp, caplog: pytest.LogCaptureFixture, status: int
+) -> None:
+    _base_to_pln(owner)
+    _enable_goldapi(owner)
+    instrument = _instrument(owner, "Silver", provider_key="goldapi", provider_symbol="XAG")
+    _buy(owner, instrument)
+    echoed = b'{"error": "bad key ' + GOLDAPI_KEY_SENTINEL.encode() + b'"}'
+    time_source = FakeTime()
+    _goldapi_runtime(owner, lambda _url: HttpResponse(status, echoed, {}), time_source)
+    with caplog.at_level(logging.DEBUG):
+        page = owner.client.post(
+            PROVIDERS + "/goldapi/refresh",
+            data={"csrf_token": owner.token(PROVIDERS)},
+            follow_redirects=True,
+        ).text
+        time_source.value += 2  # past the 1 request/second window; web calls never sleep
+        lookup = owner.post(
+            "/investments/provider-lookup",
+            {
+                "provider_key": "goldapi",
+                "provider_symbol": "XAG",
+                "type": "metal",
+                "quote_currency": "PLN",
+                "unit_label": "oz",
+            },
+            token_from=INSTRUMENTS,
+        ).text
+        instrument_page = owner.client.get(f"{INSTRUMENTS}/{instrument}").text
+    assert f"http_{status}" in lookup
+    for text in (page, lookup, instrument_page, caplog.text):
+        assert GOLDAPI_KEY_SENTINEL not in text
+    with owner.db() as session:
+        errors = list(session.scalars(select(ProviderError)))
+        assert errors and {error.code for error in errors} == {f"http_{status}"}
+        events = list(session.scalars(select(AuditEvent)))
+        assert events and all(GOLDAPI_KEY_SENTINEL not in str(event.data) for event in events)
+        row = session.scalars(
+            select(PriceSourceConfig).where(PriceSourceConfig.provider_key == "goldapi")
+        ).one()
+        assert row.last_error_code == f"http_{status}"
 
 
 def test_coingecko_shows_the_required_attribution_badge(owner: OwnerApp) -> None:

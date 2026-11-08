@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import re
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -336,10 +337,14 @@ def test_reset_by_email_keeps_the_second_factor_and_its_mail_does_not_mention_it
         session.add(TotpRecoveryCode(user_id=user_id, code_hash=recovery_hash("recovery-one")))
     assert _forgot(client, web, web.admin_email).status_code == 200
     [message] = web.sent_mail(app)
-    body = mail_body(message).lower()
-    for word in ("two-factor", "authenticator", "recovery", "mfa", "2fa"):
-        assert word not in body
+    body = mail_body(message)
     link = mail_link(message, "/password/reset/")
+    assert link in body
+    # The reset link carries a random token that can contain e.g. "2fa"; check the wording only.
+    wording = re.sub(r"https?://\S+", "", body).lower()
+    assert "/password/reset/" not in wording
+    for word in ("two-factor", "second factor", "authenticator", "recovery", "mfa", "2fa", "totp"):
+        assert word not in wording
     page = client.get(link)
     done = client.post(
         link,

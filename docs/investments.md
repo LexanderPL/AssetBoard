@@ -189,6 +189,19 @@ Editors can assign an enabled provider to an instrument and run **Test lookup**.
   remaining calls on history; when the budget is used up it skips the rest and keeps the last
   known prices. Coverage of GPW, XETRA and LSE symbols is unverified until tested with a real
   key.
+- **GoldAPI.io** is the optional keyed precious-metals path: `XAU`, `XAG`, `XPT` and `XPD` in
+  the provider's documented currencies, including PLN, EUR, USD, GBP and CHF. Set the provider
+  symbol to the metal code and the instrument currency to the currency you want quotes in.
+  Prices are per troy ounce and are converted to the instrument's `oz`, `g` or `kg` unit. The
+  API key is required; it is stored encrypted and never shown again. Its default budget is
+  **4 calls/day** (UTC) to stay under the free plan's roughly 150 monthly requests; the owner can
+  raise it on the provider card, which also shows the calls used today. Latest prices are
+  fetched before history, and a test lookup uses one call. History is limited to the latest 90
+  days: the first backfill fetches that window once, and the instrument shows the “history
+  limited” note when the first transaction is older (enter older prices manually if you need
+  them). No attribution badge is required; displaying prices inside the app is allowed, but
+  reselling the data or building a competing API is not. The scheduled refresh runs at 22:50
+  UTC.
 
 Both providers are converted into the workspace base currency before they are stored whenever
 the provider publishes that base. For example, NBP in a EUR workspace stores
