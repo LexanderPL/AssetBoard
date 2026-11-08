@@ -149,6 +149,16 @@ and property tests (value monotonic in time for non-negative rates; tax never ne
 - **Pie/donut chart of stock values:** proportion of each instrument's value; a selector chooses the scope: one asset class (default Stocks) or the whole portfolio; small slices (<2%) group into "Other".
 - Foreign-currency holdings are converted using FX at the valuation date; missing FX shows a visible warning and excludes the instrument from totals (never silently zero).
 - Pure domain function `value_portfolio(holdings, prices, fx, allocations, as_of)`; golden test: an 80/20 stock/bond fund of value 1 000.00 contributes 800.00 to Stocks and 200.00 to Bonds, with rounding remainder assigned to the largest class so totals match exactly.
+- **As built (owner review of the plan, 2026-11):**
+  - A missing **price** is handled like missing FX. In both cases the instrument's value **and its cost basis** are left out of every total (portfolio, classes, shares, chart), so the totals and gain % stay consistent. The row stays with a warning, and a note counts the excluded holdings. A stale price or FX rate is valued, with a badge.
+  - Look-through rounding: every class except the largest weight gets `floor(amount × weight / 10 000)`, and the largest gets the remainder. Equal largest weights are broken by the class's sort order, then its id. Value and cost are split separately.
+  - Realized P&L: `domain.holdings.realized_events` lists each sell's realized P&L from the same ordered pass as `compute_holdings`. All time is their sum; YTD sums the events dated from 1 January of the workspace's current year. YTD is not computed by subtracting a dated holdings run, which excludes undated legacy lots.
+  - Chart:
+    - With a class scope, each instrument's slice is its look-through part in that class. With the whole-portfolio scope, it is the full value.
+    - Small slices use the shared donut slicer (`category_slices`, now with a minimum-share option).
+    - Slice colours come from the categorical palette by position. Class colours stay on the class table.
+  - Default scope: the active class whose name key matches the seed name of Stocks in any supported language (en "Stocks", pl "Akcje"). If there is none, or nothing is held in it, the whole portfolio. An unknown scope falls back to that default.
+  - The domain function takes the base currency as a keyword: `value_portfolio(holdings, prices, fx, allocations, as_of, *, base_currency)`.
 
 **Agent prompt**
 ```
