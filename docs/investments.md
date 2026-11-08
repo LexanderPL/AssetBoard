@@ -155,8 +155,9 @@ Editors can assign an enabled provider to an instrument and run **Test lookup**.
   coin id, for example `bitcoin`. A demo API key is optional. The required
   "Powered by CoinGecko" badge appears while the provider is enabled.
 - **EODHD** is the optional keyed equities/ETFs path; the provider symbol is the ticker with its
-  exchange suffix, for example `VWCE.DE`. Its free tier has a **daily call budget** (20 by
-  default, counted per UTC day per workspace). The app refreshes latest prices first and spends
+  exchange suffix, for example `VWCE.DE`; the instrument's quote currency must match the
+  exchange's currency. Its free tier has a **daily call budget** (20 by default, counted per
+  UTC day per workspace). The app refreshes latest prices first and spends
   remaining calls on history; when the budget is used up it skips the rest and keeps the last
   known prices. Coverage of GPW, XETRA and LSE symbols is unverified until tested with a real
   key.
