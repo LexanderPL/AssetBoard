@@ -76,6 +76,8 @@ from assetboard.db.repositories import (
     NetWorthSnapshotRepository,
     NotFound,
     PricePointRepository,
+    PriceSourceConfigRepository,
+    ProviderErrorRepository,
     ScopedRepository,
     TransactionRepository,
     UserMembershipReader,
@@ -759,6 +761,127 @@ def test_price_queries_stay_in_their_workspace(
     )
     assert [row.id for row in rates_a.for_base_on_or_before("EUR", date(2026, 3, 1))] == [a_rate.id]
     assert [row.id for row in rates_b.for_base_on_or_before("EUR", date(2026, 3, 1))] == [b_rate.id]
+
+
+def test_price_source_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    instruments_a = InstrumentRepository(db_session, ctx_a)
+    instruments_b = InstrumentRepository(db_session, ctx_b)
+    a_fund = instruments_a.create(
+        name="Gold",
+        name_key="gold",
+        symbol="XAU",
+        type="metal",
+        quote_currency="PLN",
+        unit_label="oz",
+        valuation_source="provider",
+        provider_key="nbp",
+        provider_symbol="XAU",
+    )
+    b_fund = instruments_b.create(
+        name="Gold",
+        name_key="gold",
+        symbol="XAU",
+        type="metal",
+        quote_currency="PLN",
+        unit_label="oz",
+        valuation_source="provider",
+        provider_key="nbp",
+        provider_symbol="XAU",
+    )
+    assert [row.id for row in instruments_a.provider_instruments("nbp")] == [a_fund.id]
+    assert [row.id for row in instruments_b.provider_instruments("nbp")] == [b_fund.id]
+
+    configs_a = PriceSourceConfigRepository(db_session, ctx_a)
+    configs_b = PriceSourceConfigRepository(db_session, ctx_b)
+    a_config = configs_a.create(provider_key="nbp", enabled=True, settings_encrypted=None)
+    b_config = configs_b.create(provider_key="nbp", enabled=False, settings_encrypted=None)
+    assert configs_a.for_provider("nbp") is a_config
+    assert configs_b.for_provider("nbp") is b_config
+    assert [row.id for row in configs_a.enabled()] == [a_config.id]
+    assert configs_b.enabled() == []
+
+    now = datetime(2026, 3, 1, 12, tzinfo=UTC)
+    errors_a = ProviderErrorRepository(db_session, ctx_a)
+    errors_b = ProviderErrorRepository(db_session, ctx_b)
+    old = errors_a.create(
+        provider_key="nbp",
+        instrument_id=a_fund.id,
+        scope="latest",
+        code="http_500",
+        occurred_at=now - timedelta(days=100),
+        attempts=1,
+    )
+    new = errors_a.create(
+        provider_key="nbp",
+        instrument_id=a_fund.id,
+        scope="history",
+        code="timeout",
+        occurred_at=now,
+        attempts=2,
+    )
+    theirs = errors_b.create(
+        provider_key="nbp",
+        instrument_id=b_fund.id,
+        scope="latest",
+        code="http_500",
+        occurred_at=now,
+        attempts=1,
+    )
+    assert errors_a.latest_for_provider("nbp") is new
+    assert errors_a.latest_for_instrument("nbp", a_fund.id) is new
+    assert errors_b.latest_for_provider("nbp") is theirs
+    assert errors_b.latest_for_instrument("nbp", a_fund.id) is None
+    assert errors_a.prune(now - timedelta(days=90)) == 1
+    assert errors_a.get(old.id) is None
+
+    prices_a = PricePointRepository(db_session, ctx_a)
+    prices_b = PricePointRepository(db_session, ctx_b)
+    a_price = prices_a.create(
+        instrument_id=a_fund.id,
+        date=date(2026, 3, 1),
+        price=Decimal("100"),
+        source="provider",
+        provider_key="nbp",
+    )
+    prices_b.create(
+        instrument_id=b_fund.id,
+        date=date(2026, 3, 1),
+        price=Decimal("50"),
+        source="provider",
+        provider_key="nbp",
+    )
+    assert prices_a.provider_on(a_fund.id, date(2026, 3, 1)) is a_price
+    assert prices_a.provider_on(b_fund.id, date(2026, 3, 1)) is None
+    assert prices_a.latest_provider_for_instrument(a_fund.id, "nbp") is a_price
+    assert prices_b.latest_provider_for_instrument(a_fund.id, "nbp") is None
+    assert prices_a.any_provider_for_instrument(a_fund.id, "nbp")
+    assert not prices_b.any_provider_for_instrument(a_fund.id, "nbp")
+
+    rates_a = FxRateRepository(db_session, ctx_a)
+    rates_b = FxRateRepository(db_session, ctx_b)
+    a_rate = rates_a.create(
+        base_currency="PLN",
+        quote_currency="EUR",
+        date=date(2026, 3, 1),
+        rate=Decimal("4.30"),
+        source="nbp",
+    )
+    rates_b.create(
+        base_currency="PLN",
+        quote_currency="EUR",
+        date=date(2026, 3, 1),
+        rate=Decimal("4.31"),
+        source="nbp",
+    )
+    assert rates_a.rate_on("PLN", "EUR", date(2026, 3, 1), "nbp") is a_rate
+    assert rates_b.rate_on("PLN", "EUR", date(2026, 3, 1), "nbp") is not a_rate
+    assert [
+        row.id for row in rates_a.for_base_source_on_or_before("PLN", "nbp", date(2026, 3, 1))
+    ] == [a_rate.id]
+    assert len(rates_b.for_base_source_on_or_before("PLN", "nbp", date(2026, 3, 1))) == 1
 
 
 def test_networth_queries_stay_in_their_workspace(

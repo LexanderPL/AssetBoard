@@ -189,6 +189,17 @@ def no_update_check_network(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 @pytest.fixture(autouse=True)
+def no_provider_network(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Apps built by tests never reach a real price provider; provider tests inject fixtures."""
+    from tests.fake_provider_http import FailingProviderHttpClient
+
+    monkeypatch.setattr(
+        "assetboard.services.providers.registry.UrllibHttpClient",
+        FailingProviderHttpClient,
+    )
+
+
+@pytest.fixture(autouse=True)
 def cheap_password_hashing(monkeypatch: pytest.MonkeyPatch) -> None:
     """Test-only seam: production hashing keeps argon2-cffi's default parameters."""
     monkeypatch.setattr(auth_service, "ARGON2_PARAMETERS", profiles.CHEAPEST)
