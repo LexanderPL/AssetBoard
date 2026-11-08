@@ -9,7 +9,7 @@ one quote-currency unit, so ``rate(from, to) = rate(base, from) / rate(base, to)
 from __future__ import annotations
 
 from collections.abc import Collection, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from decimal import Decimal, localcontext
 from uuid import UUID
@@ -21,12 +21,14 @@ from assetboard.db.models.investments import Instrument, InvestmentTransaction
 from assetboard.db.models.prices import PricePoint
 from assetboard.db.repositories import (
     AuditEventRepository,
+    BondTermsRepository,
     CurrentWorkspaceRepository,
     FxRateRepository,
     InstrumentRepository,
     InvestmentTransactionRepository,
     PricePointRepository,
 )
+from assetboard.domain.bonds import bond_value
 from assetboard.domain.money import minor_unit_for
 from assetboard.domain.prices import (
     DEFAULT_STALE_AFTER_DAYS,
@@ -39,6 +41,7 @@ from assetboard.domain.prices import (
     source_rank,
 )
 from assetboard.i18n.numbers import parse_amount
+from assetboard.services.bonds import bond_unit_price, remaining_lots, terms_from_row
 from assetboard.services.context import Context, Role, require_role, require_role_now
 
 __all__ = [
@@ -154,6 +157,7 @@ class PriceAt:
     source: str | None
     stale: bool
     provider_key: str | None = None
+    terms_missing: bool = False
 
     @property
     def missing(self) -> bool:
@@ -284,6 +288,13 @@ def _latest_prices_in_session(
     stored = PricePointRepository(session, ctx).for_instruments_on_or_before(ids, on)
     transactions = InvestmentTransactionRepository(session, ctx).live_dated(on, ids)
     transaction_prices = _latest_transaction_price(transactions)
+    bond_rows = {
+        row.instrument_id: row for row in BondTermsRepository(session, ctx).for_instruments(ids)
+    }
+    today = ctx.clock.today(ctx.workspace.timezone)
+    current = on == today
+    if current and bond_rows:
+        transactions = InvestmentTransactionRepository(session, ctx).live_for_instruments(bond_rows)
 
     candidates: dict[UUID, list[_Candidate]] = {instrument_id: [] for instrument_id in ids}
     for row in stored:
@@ -314,6 +325,34 @@ def _latest_prices_in_session(
             continue
         if instrument.type == "currency":
             result[instrument_id] = PriceAt(Decimal(1), on, None, False)
+        elif instrument.type == "bond_model":
+            bond_row = bond_rows.get(instrument_id)
+            if bond_row is None:
+                transaction_only = [
+                    candidate
+                    for candidate in candidates[instrument_id]
+                    if candidate.source == "transaction"
+                ]
+                result[instrument_id] = replace(
+                    _price_at(_best(transaction_only), on), terms_missing=True
+                )
+            else:
+                terms = terms_from_row(bond_row, instrument)
+                lots = remaining_lots(
+                    [row for row in transactions if row.instrument_id == instrument_id],
+                    terms,
+                    current=current,
+                )
+                valuation = bond_value(terms, lots, on)
+                unit_price = bond_unit_price(
+                    valuation, sum((lot.quantity for lot in lots), Decimal(0))
+                )
+                result[instrument_id] = PriceAt(
+                    unit_price,
+                    on if unit_price is not None else None,
+                    "bond_model",
+                    False,
+                )
         else:
             result[instrument_id] = _price_at(_best(candidates[instrument_id]), on)
     return result
@@ -516,6 +555,8 @@ def save_manual_price(
         instrument = InstrumentRepository(session, ctx).get_or_raise(instrument_id)
         if instrument.archived_at is not None:
             raise PriceError("instrument", "instrument_archived")
+        if instrument.type == "bond_model":
+            raise PriceError("instrument", "bond_model_priced")
         repository = PricePointRepository(session, ctx)
         existing = repository.manual_on(instrument_id, day)
         if price_id is not None:
@@ -599,8 +640,40 @@ def instrument_prices(
                 effective=(),
                 latest=PriceAt(Decimal(1), on, None, False),
             )
-        stored = PricePointRepository(session, ctx).for_instruments_on_or_before(
-            (instrument_id,), on
+        bond_row = (
+            BondTermsRepository(session, ctx).for_instrument(instrument_id)
+            if instrument.type == "bond_model"
+            else None
+        )
+        if bond_row is not None:
+            today = ctx.clock.today(ctx.workspace.timezone)
+            current = on == today
+            transaction_repository = InvestmentTransactionRepository(session, ctx)
+            transactions = (
+                transaction_repository.live_for_instruments((instrument_id,))
+                if current
+                else transaction_repository.live_dated(on, (instrument_id,))
+            )
+            terms = terms_from_row(bond_row, instrument)
+            lots = remaining_lots(transactions, terms, current=current)
+            valuation = bond_value(terms, lots, on)
+            unit_price = bond_unit_price(valuation, sum((lot.quantity for lot in lots), Decimal(0)))
+            return PricePanel(
+                points=(),
+                effective=(),
+                latest=PriceAt(
+                    unit_price,
+                    on if unit_price is not None else None,
+                    "bond_model",
+                    False,
+                ),
+            )
+        stored = (
+            []
+            if instrument.type == "bond_model"
+            else PricePointRepository(session, ctx).for_instruments_on_or_before(
+                (instrument_id,), on
+            )
         )
         transactions = InvestmentTransactionRepository(session, ctx).live_dated(
             on, (instrument_id,)
@@ -620,6 +693,8 @@ def instrument_prices(
             for (_instrument_id, day), row in derived.items()
         ]
         price = _price_at(_best(candidates), on)
+        if instrument.type == "bond_model":
+            price = replace(price, terms_missing=True)
         points = [_view(row) for row in stored]
         points += [
             PricePointView(

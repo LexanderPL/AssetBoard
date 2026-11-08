@@ -10,9 +10,11 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     CheckConstraint,
@@ -36,6 +38,7 @@ from assetboard.db.base import (
     WorkspaceScopedMixin,
 )
 from assetboard.db.types import DecimalType, UtcDateTime
+from assetboard.domain.bonds import MAX_SERIES_CODE_LENGTH
 from assetboard.domain.holdings import MAX_NOTE_LENGTH
 from assetboard.domain.instruments import (
     ALLOCATION_TOTAL_BP,
@@ -185,6 +188,64 @@ class InstrumentAllocation(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     instrument_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     asset_class_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     weight_bp: Mapped[int] = mapped_column(Integer(), nullable=False)
+
+
+class BondTerms(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
+    """The editable terms of one bond-model instrument (F6.5).
+
+    A bond-model instrument is valued from these terms instead of a market price. The face value
+    and any fixed early-redemption fee are in the instrument's ``quote_currency``; no currency
+    column is stored here, so changing the currency before transactions exist re-labels the
+    terms. The rate schedule is an ordered JSON list of annual periods.
+    """
+
+    __tablename__ = "bond_terms"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "id", name="uq_bond_terms_workspace_id_id"),
+        UniqueConstraint(
+            "workspace_id",
+            "instrument_id",
+            name="uq_bond_terms_workspace_instrument",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "instrument_id"],
+            ["instruments.workspace_id", "instruments.id"],
+            name="fk_bond_terms_workspace_instrument",
+        ),
+        CheckConstraint("face_value_minor > 0", name="face_value_valid"),
+        CheckConstraint("tax_rate_bp BETWEEN 0 AND 10000", name="tax_rate_valid"),
+        CheckConstraint(
+            "interest_mode IN ('capitalized_annually', 'paid_out_annually', 'at_maturity_simple')",
+            name="interest_mode_valid",
+        ),
+        CheckConstraint(
+            "(early_redemption_fee_mode IS NULL "
+            "AND early_redemption_fee_rate_bp IS NULL "
+            "AND early_redemption_fee_minor IS NULL) OR "
+            "(early_redemption_fee_mode = 'percent' "
+            "AND early_redemption_fee_rate_bp IS NOT NULL "
+            "AND early_redemption_fee_rate_bp BETWEEN 0 AND 10000 "
+            "AND early_redemption_fee_minor IS NULL) OR "
+            "(early_redemption_fee_mode = 'fixed' "
+            "AND early_redemption_fee_rate_bp IS NULL "
+            "AND early_redemption_fee_minor IS NOT NULL "
+            "AND early_redemption_fee_minor >= 0)",
+            name="early_redemption_fee_valid",
+        ),
+    )
+
+    instrument_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    series_code: Mapped[str | None] = mapped_column(String(MAX_SERIES_CODE_LENGTH), nullable=True)
+    face_value_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+    maturity_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    interest_mode: Mapped[str] = mapped_column(String(32), nullable=False)
+    rate_schedule: Mapped[list[dict[str, Any]]] = mapped_column(JSON(), nullable=False)
+    tax_rate_bp: Mapped[int] = mapped_column(
+        Integer(), nullable=False, default=0, server_default="0"
+    )
+    early_redemption_fee_mode: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    early_redemption_fee_rate_bp: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    early_redemption_fee_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
 
 
 class InvestmentTransaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin, Base):

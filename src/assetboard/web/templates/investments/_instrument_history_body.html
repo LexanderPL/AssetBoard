@@ -46,7 +46,11 @@
     </dl>
   </section>
 
+  {% if instrument.type == "bond_model" %}
+  {% include "investments/_bond_terms_panel.html" %}
+  {% else %}
   {% include "investments/_prices_panel.html" %}
+  {% endif %}
 
   {% if can_edit and not history.instrument.archived %}
   <section class="panel p-6 sm:p-7" aria-labelledby="instrument-transaction-heading" data-transaction-create>

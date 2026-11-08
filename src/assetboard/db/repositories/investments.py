@@ -11,6 +11,7 @@ from sqlalchemy import case, func, select
 
 from assetboard.db.models.investments import (
     AssetClass,
+    BondTerms,
     Instrument,
     InstrumentAllocation,
     InvestmentTransaction,
@@ -170,6 +171,33 @@ class InstrumentAllocationRepository(ScopedRepository[InstrumentAllocation]):
         return list(self._session.scalars(statement))
 
 
+class BondTermsRepository(ScopedRepository[BondTerms]):
+    model = BondTerms
+    # Terms are edited in place until the instrument is archived; they are removed with the
+    # workspace, never individually.
+    unsupported = frozenset({"delete"})
+
+    def create(self, **values: object) -> BondTerms:
+        return self.add(BondTerms(**values))
+
+    def for_instrument(self, instrument_id: UUID, *, for_update: bool = False) -> BondTerms | None:
+        statement = self._scoped_select().where(BondTerms.instrument_id == instrument_id)
+        if for_update:
+            statement = statement.with_for_update()
+        return self._session.scalars(statement).one_or_none()
+
+    def for_instruments(self, instrument_ids: Collection[UUID]) -> list[BondTerms]:
+        ids = tuple(dict.fromkeys(instrument_ids))
+        if not ids:
+            return []
+        statement = self._scoped_select().where(BondTerms.instrument_id.in_(ids))
+        return list(self._session.scalars(statement))
+
+    def instrument_ids(self) -> set[UUID]:
+        statement = self._scoped_select().with_only_columns(BondTerms.instrument_id)
+        return set(self._session.scalars(statement))
+
+
 class InvestmentTransactionRepository(ScopedRepository[InvestmentTransaction]):
     model = InvestmentTransaction
 
@@ -221,6 +249,26 @@ class InvestmentTransactionRepository(ScopedRepository[InvestmentTransaction]):
         statement = (
             self._scoped_select()
             .where(InvestmentTransaction.deleted_at.is_(None))
+            .order_by(
+                case((InvestmentTransaction.date.is_(None), 0), else_=1),
+                InvestmentTransaction.date,
+                InvestmentTransaction.created_at,
+                InvestmentTransaction.id,
+            )
+        )
+        return list(self._session.scalars(statement))
+
+    def live_for_instruments(self, instrument_ids: Collection[UUID]) -> list[InvestmentTransaction]:
+        """Live rows for selected instruments, including undated legacy lots."""
+        ids = tuple(dict.fromkeys(instrument_ids))
+        if not ids:
+            return []
+        statement = (
+            self._scoped_select()
+            .where(
+                InvestmentTransaction.deleted_at.is_(None),
+                InvestmentTransaction.instrument_id.in_(ids),
+            )
             .order_by(
                 case((InvestmentTransaction.date.is_(None), 0), else_=1),
                 InvestmentTransaction.date,

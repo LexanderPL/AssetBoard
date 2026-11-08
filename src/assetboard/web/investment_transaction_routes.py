@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import math
 from datetime import date
+from decimal import Decimal
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -26,6 +27,13 @@ from assetboard.i18n.numbers import (
     format_amount_input,
     format_money,
     format_quantity_input,
+)
+from assetboard.services.bonds import (
+    BondTermsError,
+    BondTermsInput,
+    BondTermsView,
+    bond_panel,
+    save_bond_terms,
 )
 from assetboard.services.context import Context, PermissionDenied, Role, has_role
 from assetboard.services.investment_transactions import (
@@ -93,8 +101,22 @@ ERRORS = {
     "oversell": _("The sale on %(date)s would exceed the quantity held."),
 }
 FALLBACK = _("The change could not be made. Reload the page and try again.")
+BOND_ERRORS = {
+    "not_bond_model": _("Bond terms are only available for a bond-model instrument."),
+    "instrument_archived": _("This instrument is archived; restore it before changing its terms."),
+    "invalid_series": _("Enter a series code of at most 64 characters."),
+    "invalid_face_value": _("Enter a face value greater than zero."),
+    "invalid_maturity": _("Enter a maturity date after the first schedule date."),
+    "invalid_interest_mode": _("Choose an interest mode."),
+    "empty_schedule": _("Add at least one interest period."),
+    "invalid_schedule": _("Each period must start on the first date's anniversary."),
+    "invalid_rate": _("Enter a rate between 0 and the allowed maximum."),
+    "invalid_tax": _("Enter a tax rate between 0 and 100%."),
+    "invalid_fee": _("Enter a valid early-redemption fee."),
+}
 PRICE_ERRORS = {
     "invalid_date": _("Enter a valid date between 1900 and 2199."),
+    "bond_model_priced": _("This bond is valued from its terms; manual prices are not used."),
     "future_date": _("Manual prices cannot be dated in the future."),
     "invalid_price": _("Enter a price of zero or more, with at most 18 decimal places."),
     "duplicate_date": _("Another manual price already exists on this date."),
@@ -108,6 +130,7 @@ NOTICES = {
     "restored": _("Transaction restored."),
     "price_saved": _("Price saved."),
     "price_deleted": _("Price deleted."),
+    "bond_terms_saved": _("Bond terms saved."),
 }
 
 
@@ -144,6 +167,71 @@ def _price_error_message(exc: PriceError) -> str:
 
 def _price_error_text(request: Request, exc: PriceError) -> str:
     return _t(request, _price_error_message(exc))
+
+
+def _bond_error_message(exc: BondTermsError) -> str:
+    return BOND_ERRORS.get(exc.code, FALLBACK)
+
+
+def _bond_input_values(values: BondTermsInput) -> dict[str, str]:
+    return {
+        "series_code": values.series_code,
+        "face_value": values.face_value,
+        "maturity_date": values.maturity_date,
+        "interest_mode": values.interest_mode,
+        "tax_rate": values.tax_rate,
+        "fee_mode": values.fee_mode,
+        "fee_value": values.fee_value,
+    }
+
+
+def _bond_form_values(
+    terms: BondTermsView | None, today: date, locale: str
+) -> tuple[dict[str, str], list[dict[str, str]]]:
+    if terms is None:
+        return (
+            {
+                "series_code": "",
+                "face_value": "",
+                "maturity_date": "",
+                "interest_mode": "capitalized_annually",
+                "tax_rate": "",
+                "fee_mode": "",
+                "fee_value": "",
+            },
+            [{"from_date": today.isoformat(), "rate": ""}],
+        )
+    fee = terms.early_redemption_fee
+    if fee is None:
+        fee_mode, fee_value = "", ""
+    elif fee.mode == "percent" and fee.rate_bp is not None:
+        fee_mode = "percent"
+        fee_value = format_quantity_input(Decimal(fee.rate_bp).scaleb(-2), locale)
+    else:
+        fee_mode = "fixed"
+        fee_value = format_amount_input(fee.fixed, locale) if fee.fixed is not None else ""
+    return (
+        {
+            "series_code": terms.series_code or "",
+            "face_value": format_amount_input(terms.face_value, locale),
+            "maturity_date": terms.maturity_date.isoformat(),
+            "interest_mode": terms.interest_mode.value,
+            "tax_rate": (
+                ""
+                if terms.tax_rate_bp == 0
+                else format_quantity_input(Decimal(terms.tax_rate_bp).scaleb(-2), locale)
+            ),
+            "fee_mode": fee_mode,
+            "fee_value": fee_value,
+        },
+        [
+            {
+                "from_date": period.from_date.isoformat(),
+                "rate": format_quantity_input(Decimal(period.annual_rate_bp).scaleb(-2), locale),
+            }
+            for period in terms.rate_schedule
+        ],
+    )
 
 
 def _default_values(instrument: InstrumentView | None, today: date) -> dict[str, str]:
@@ -309,6 +397,9 @@ def _history_page(
     editing_price: UUID | None = None,
     price_values: dict[str, str] | None = None,
     price_errors: dict[str, str] | None = None,
+    bond_values: dict[str, str] | None = None,
+    bond_schedule: list[dict[str, str]] | None = None,
+    bond_errors: dict[str, str] | None = None,
     toast_undo: str | None = None,
     toast_seconds: int = 0,
     status_code: int = 200,
@@ -320,6 +411,19 @@ def _history_page(
         ctx,
         history.instrument.id,
         on=today,
+    )
+    bond = (
+        bond_panel(
+            request.app.state.session_factory,
+            ctx,
+            history.instrument.id,
+            on=None,
+        )
+        if history.instrument.type == "bond_model"
+        else None
+    )
+    bond_default_values, bond_default_schedule = _bond_form_values(
+        bond.terms if bond is not None else None, today, locale
     )
     provider_state = (
         provider_status(request.app.state.session_factory, ctx, history.instrument.id)
@@ -348,6 +452,12 @@ def _history_page(
         "history": history,
         "instrument": history.instrument,
         "prices": prices,
+        "bond": bond,
+        "bond_values": bond_values or bond_default_values,
+        "bond_schedule": bond_schedule or bond_default_schedule,
+        "bond_errors": {
+            field: _t(request, message) for field, message in (bond_errors or {}).items()
+        },
         "provider_status": provider_state,
         "provider_error_days": provider_error_days,
         "price_values": price_values or {"price_id": "", "date": today.isoformat(), "price": ""},
@@ -796,6 +906,73 @@ async def transaction_undo(request: Request, ctx: CurrentContext, transaction_id
         )
     target = target or (view.instrument_id if return_to == "instrument" else None)
     return await run_in_threadpool(_done, request, ctx, "restored", instrument_id=target)
+
+
+@router.post(
+    "/investments/instruments/{instrument_id}/bond-terms",
+    name="investment_bond_terms_save",
+)
+async def bond_terms_save(
+    request: Request,
+    ctx: CurrentContext,
+    instrument_id: str,
+    series_code: FormStr = "",
+    face_value: FormStr = "",
+    maturity_date: FormStr = "",
+    interest_mode: FormStr = "",
+    tax_rate: FormStr = "",
+    fee_mode: FormStr = "",
+    fee_value: FormStr = "",
+) -> Response:
+    item_id = _parse_uuid(instrument_id)
+    form = await request.form()
+    periods = tuple(
+        (str(day), str(rate))
+        for day, rate in zip(form.getlist("period_from"), form.getlist("period_rate"), strict=False)
+    )
+    values = BondTermsInput(
+        series_code=series_code,
+        face_value=face_value,
+        maturity_date=maturity_date,
+        interest_mode=interest_mode,
+        rate_periods=periods,
+        tax_rate=tax_rate,
+        fee_mode=fee_mode,
+        fee_value=fee_value,
+    )
+    try:
+        await run_in_threadpool(
+            lambda: save_bond_terms(
+                request.app.state.session_factory,
+                ctx,
+                item_id,
+                values=values,
+                locale=request.state.locale,
+            )
+        )
+    except BondTermsError as exc:
+        if exc.code in {"not_bond_model", "instrument_archived"}:
+            return await run_in_threadpool(
+                lambda error=exc: _render_history(
+                    request,
+                    ctx,
+                    item_id,
+                    status_code=400,
+                    error=_t(request, _bond_error_message(error)),
+                )
+            )
+        return await run_in_threadpool(
+            lambda error=exc: _render_history(
+                request,
+                ctx,
+                item_id,
+                status_code=400,
+                bond_values=_bond_input_values(values),
+                bond_schedule=[{"from_date": day, "rate": rate} for day, rate in periods],
+                bond_errors={error.field or "schedule": _bond_error_message(error)},
+            )
+        )
+    return await run_in_threadpool(_done, request, ctx, "bond_terms_saved", instrument_id=item_id)
 
 
 @router.post(

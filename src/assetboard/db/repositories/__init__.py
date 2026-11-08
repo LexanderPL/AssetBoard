@@ -25,6 +25,7 @@ from assetboard.db.repositories.income import (
 )
 from assetboard.db.repositories.investments import (
     AssetClassRepository,
+    BondTermsRepository,
     InstrumentAllocationRepository,
     InstrumentRepository,
     InvestmentTransactionRepository,
@@ -78,6 +79,7 @@ __all__ = [
     "PriceSourceConfigRepository",
     "ProviderErrorRepository",
     "AssetClassRepository",
+    "BondTermsRepository",
     "InstrumentRepository",
     "InstrumentAllocationRepository",
     "InvestmentTransactionRepository",

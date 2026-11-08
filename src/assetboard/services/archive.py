@@ -96,6 +96,7 @@ ARCHIVE_EXCLUDED_MODELS = {
     "Instrument": "instruments require the F6.9 archive extension",
     "InstrumentAllocation": "allocation weights require the F6.9 archive extension",
     "InvestmentTransaction": "investment transactions require the F6.9 archive extension",
+    "BondTerms": "bond terms require the F6.9 archive extension",
     "PricePoint": "manual prices require the F6.9 archive extension",
     "FxRate": "FX rates require the F6.9 archive extension",
     "PriceSourceConfig": "provider settings contain secrets (F6.9/F9.3)",
