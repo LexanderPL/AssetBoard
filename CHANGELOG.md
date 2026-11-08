@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.5.2](https://github.com/LexanderPL/AssetBoard/compare/v0.5.1...v0.5.2) (2026-11-08)
+
+
+### Features
+
+* **investments:** F6.1 asset classes and instruments ([#227](https://github.com/LexanderPL/AssetBoard/issues/227)) ([35d5ceb](https://github.com/LexanderPL/AssetBoard/commit/35d5ceb8f1fecb802673ffbe9d8af3b8c4d37d3e))
+* **investments:** F6.2 transactions and holdings ([#232](https://github.com/LexanderPL/AssetBoard/issues/232)) ([fb6b067](https://github.com/LexanderPL/AssetBoard/commit/fb6b067b125b41363aea03842f360722b2da7477))
+* **investments:** F6.3 prices, FX and manual price entry ([#233](https://github.com/LexanderPL/AssetBoard/issues/233)) ([3197ae5](https://github.com/LexanderPL/AssetBoard/commit/3197ae5bb382332886714657a0bf7459e3edebd4))
+* **investments:** F6.5 bond model valuation ([#236](https://github.com/LexanderPL/AssetBoard/issues/236)) ([8ca38cb](https://github.com/LexanderPL/AssetBoard/commit/8ca38cb4b8ff6f34a045b8915e7f7ad0085c31e3))
+* **providers:** F6.4a provider core, NBP/ECB, refresh and settings ([#234](https://github.com/LexanderPL/AssetBoard/issues/234)) ([90bf1a2](https://github.com/LexanderPL/AssetBoard/commit/90bf1a238342be235f7acf91c12754a83197a4ab))
+* **providers:** F6.4b CoinGecko, EODHD, provider fields and quota ([#235](https://github.com/LexanderPL/AssetBoard/issues/235)) ([a9480a4](https://github.com/LexanderPL/AssetBoard/commit/a9480a4ab0fa8b98e5390f18b06beb3df40bdd03))
+
+
+### Bug Fixes
+
+* **transactions:** a future date is a plan on every path ([#164](https://github.com/LexanderPL/AssetBoard/issues/164)) ([#222](https://github.com/LexanderPL/AssetBoard/issues/222)) ([b584dfc](https://github.com/LexanderPL/AssetBoard/commit/b584dfc9ab6cbe14ce47a885cf5691eb66dcd767))
+* **transactions:** refine the future-date refusal wording and coverage ([#226](https://github.com/LexanderPL/AssetBoard/issues/226)) ([493ff6d](https://github.com/LexanderPL/AssetBoard/commit/493ff6d484ba9a99fcb93c45121e7ef1f24d2d79))
+
+
+### Documentation
+
+* **adr:** approve price and FX providers (F6.3 step 0) ([#220](https://github.com/LexanderPL/AssetBoard/issues/220)) ([e47574b](https://github.com/LexanderPL/AssetBoard/commit/e47574b8218f2e63a4642cae71411e1371f94f9d))
+* **adr:** mark accepted decisions whose features shipped ([#225](https://github.com/LexanderPL/AssetBoard/issues/225)) ([c4e7d53](https://github.com/LexanderPL/AssetBoard/commit/c4e7d537d18f2465f399707c19dd13cbfcf214a2))
+
 ## [0.5.1](https://github.com/LexanderPL/AssetBoard/compare/v0.5.0...v0.5.1) (2026-11-04)
 
 
