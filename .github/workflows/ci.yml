@@ -16,6 +16,9 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
+    env:
+      # The runner image already has the Python tool cache; do not download a standalone build.
+      UV_PYTHON_PREFERENCE: only-system
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -27,7 +30,27 @@ jobs:
           enable-cache: true
 
       - name: Set up Python
-        run: uv python install 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      # GitHub's release-download endpoint occasionally returns 504 while the asset API is
+      # healthy. Seed the same binary the Makefile caches, then let its SHA-256 check run.
+      - name: Seed the Tailwind CLI
+        run: |
+          mkdir -p .cache
+          binary=.cache/tailwindcss-v3.4.17-linux-x64
+          if [ ! -x "$binary" ]; then
+            asset_id=$(curl --fail --silent --show-error \
+              "https://api.github.com/repos/tailwindlabs/tailwindcss/releases/tags/v3.4.17" \
+              | jq -r '.assets[] | select(.name == "tailwindcss-linux-x64") | .id')
+            curl --fail --location --silent --show-error \
+              -H "Accept: application/octet-stream" \
+              "https://api.github.com/repos/tailwindlabs/tailwindcss/releases/assets/$asset_id" \
+              -o "$binary"
+            chmod +x "$binary"
+          fi
+          test -x "$binary"
 
       - name: Verify locked dependencies
         run: uv lock --check

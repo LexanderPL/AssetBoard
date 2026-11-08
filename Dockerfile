@@ -4,17 +4,6 @@ FROM python:3.14-slim-bookworm@sha256:48b13b003dda20b16f9442b8475aa05fe21bf6579a
 
 FROM ghcr.io/astral-sh/uv:0.13.7@sha256:96f40d3904aad8d0bd010539001d36c8e2188b981e1334471a90c4a1d93bb490 AS uv
 
-FROM --platform=$BUILDPLATFORM python:3.14-slim-bookworm@sha256:48b13b003dda20b16f9442b8475aa05fe21bf6579a8c881db92ffb4d8fd20f83 AS assets
-
-WORKDIR /build
-
-RUN apt-get update \
-    && apt-get install --no-install-recommends -y ca-certificates curl make \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY . .
-RUN make css
-
 FROM base AS builder
 
 COPY --from=uv /uv /uvx /bin/
@@ -29,8 +18,8 @@ WORKDIR /build
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-default-groups --no-install-project
 
+# The committed app.css is used as-is; CI rebuilds it and fails on a diff.
 COPY . .
-COPY --from=assets /build/src/assetboard/static/css/app.css src/assetboard/static/css/app.css
 
 # The wheel's build hook (hatch_build.py) compiles the gettext .mo catalogs from the committed
 # .po files, so they ship in the wheel and the runtime image; fail the build if they do not.
