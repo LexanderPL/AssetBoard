@@ -1,4 +1,4 @@
-"""Chart data (F2.7): the slices of the Home and Month donuts.
+"""Chart data (F2.7): the slices of the Home and Month donuts (also net worth and portfolio).
 
 Pure: no I/O, no clock. A slice is one category's actual amount in one summary block, in integer
 minor units, with its share of the block's total in tenths of a percent (rounded half up once per
@@ -56,16 +56,25 @@ def category_slices(
     amounts: Iterable[CategoryAmount],
     *,
     currency: str,
-    max_slices: int = DEFAULT_MAX_SLICES,
+    max_slices: int | None = DEFAULT_MAX_SLICES,
+    min_share_bp: int = 0,
 ) -> tuple[Slice, ...]:
     """The donut slices of category totals, in ``currency`` (see the module docstring).
 
-    This is the shared core of the month and net-worth donuts: positive amounts only, largest
-    first with stable ties, the top ``max_slices - 1`` kept and the tail grouped into one
-    "Other" slice. Shares use ``share_tenths`` (rounded once, half up).
+    This is the shared core of the month, net-worth and portfolio donuts: positive amounts only,
+    largest first with stable ties, and a tail grouped into one "Other" slice. Two rules pick the
+    tail and may be combined:
+
+    - ``min_share_bp``: every amount below this share of the total, in basis points, is grouped
+      (``amount × 10 000 < min_share_bp × total``, compared in integers);
+    - ``max_slices``: at most this many slices, "Other" included (``None``: no limit).
+
+    Shares use ``share_tenths`` (rounded once, half up).
     """
-    if max_slices < 2:
+    if max_slices is not None and max_slices < 2:
         raise ValueError("max_slices must be at least 2")
+    if min_share_bp < 0:
+        raise ValueError("min_share_bp must not be negative")
     rows = list(amounts)
     for row in rows:
         if row.amount.currency != currency:
@@ -74,10 +83,10 @@ def category_slices(
     # sorted() is stable: equal amounts keep the input (category) order.
     rows = sorted(rows, key=lambda row: -row.amount.amount_minor)
     total = sum(row.amount.amount_minor for row in rows)
-    if len(rows) > max_slices:
+    kept = [row for row in rows if row.amount.amount_minor * 10_000 >= min_share_bp * total]
+    rest = rows[len(kept) :]  # sorted descending, so the small amounts are the tail
+    if max_slices is not None and len(kept) + (1 if rest else 0) > max_slices:
         kept, rest = rows[: max_slices - 1], rows[max_slices - 1 :]
-    else:
-        kept, rest = rows, []
     slices = [
         Slice(
             row.category_id,
