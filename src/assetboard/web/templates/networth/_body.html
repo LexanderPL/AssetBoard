@@ -191,6 +191,14 @@
       <button type="submit" class="btn-primary">{{ _("Add category") }}</button>
     </form>
     {% endif %}
+    {% if can_edit and view.can_add_suggested %}
+    <form {{ htmx_form(scoped_url(request, 'networth_categories_seed')) }} class="mt-4 flex flex-wrap items-center gap-3" data-add-missing-suggested>
+      {{ csrf_input() }}
+      <input type="hidden" name="side" value="{{ side_value }}">
+      <button type="submit" class="btn">{{ _("Add missing suggested categories") }}</button>
+      <p class="text-xs text-muted">{{ _("Adds the suggested categories this side does not have yet. Existing and archived ones stay as they are.") }}</p>
+    </form>
+    {% endif %}
     {% if view.categories %}
     <ul class="mt-3 divide-y divide-line">
       {% for category in view.categories %}{{ category_row(category, side_value, loop.first, loop.last) }}{% endfor %}

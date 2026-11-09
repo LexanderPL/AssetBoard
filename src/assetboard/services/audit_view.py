@@ -167,7 +167,7 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     "networth_category.archived": ("name", "in_use"),
     "networth_category.restored": ("name",),
     "networth_category.deleted": ("name", "side"),
-    "networth_category.seeded": ("count", "automatic", "side"),
+    "networth_category.seeded": ("count", "automatic", "side", "names"),
     "networth_item.created": (
         "name",
         "side",
@@ -421,6 +421,7 @@ KEY_LABELS: dict[str, str] = {
     "affected_transactions": _("Transactions affected"),
     "in_use": _("In use"),
     "count": _("Number"),
+    "names": _("Names"),
     "replaced": _("Replaced an earlier snapshot"),
     "link_type": _("Link type"),
     "target": _("Linked to"),
