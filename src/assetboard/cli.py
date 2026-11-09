@@ -333,7 +333,13 @@ def demo_seed_command(
             if not workspace_is_empty(session, ctx):
                 raise CommandError("the workspace is not empty")
         plan = plan_for_workspace(ctx, reference_date)
-        result = build_demo_workspace(factory, ctx, plan, data_dir=settings.data_dir)
+        result = build_demo_workspace(
+            factory,
+            ctx,
+            plan,
+            data_dir=settings.data_dir,
+            horizon_months=settings.recurrence_horizon_months,
+        )
         with factory.begin() as session:
             ensure_demo_profile(session, workspace, reference_date=reference_date)
     except (CommandError, DemoBuildError, ValueError, OSError, RuntimeError) as exc:

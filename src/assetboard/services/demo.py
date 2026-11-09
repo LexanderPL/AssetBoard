@@ -35,7 +35,7 @@ from zoneinfo import ZoneInfo
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.clock import FixedClock
-from assetboard.config import Settings
+from assetboard.config import DEFAULT_RECURRENCE_HORIZON_MONTHS, Settings
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.identity import User, Workspace
 from assetboard.db.models.income import WorkDay
@@ -124,8 +124,9 @@ __all__ = [
 ]
 
 # The demo generates the same horizon the scheduler would use, so an occurrence is pending for
-# every month the reset job will skip (F9.11b).
-DEMO_RECURRENCE_HORIZON_MONTHS = 12
+# every month the reset job will skip (F9.11b). The CLI/writer passes the instance value; this is
+# only the fallback for tests and direct callers.
+DEMO_RECURRENCE_HORIZON_MONTHS = DEFAULT_RECURRENCE_HORIZON_MONTHS
 
 
 class DemoBuildError(Exception):
@@ -327,9 +328,14 @@ def _scheduled_input(row: DemoRecurring, category_id: UUID) -> ScheduledInput:
 
 
 def _write_recurring(
-    session: Session, ctx: Context, plan: DemoPlan, lookup: _Lookup
+    session: Session,
+    ctx: Context,
+    plan: DemoPlan,
+    lookup: _Lookup,
+    *,
+    horizon_months: int,
 ) -> tuple[int, int]:
-    settings = Settings(_env_file=None, recurrence_horizon_months=DEMO_RECURRENCE_HORIZON_MONTHS)
+    settings = Settings(_env_file=None, recurrence_horizon_months=horizon_months)
     items = 0
     occurrences_written = 0
     for row in plan.recurring:
@@ -830,6 +836,7 @@ def build_demo_workspace(
     plan: DemoPlan,
     *,
     data_dir: Path,
+    horizon_months: int = DEMO_RECURRENCE_HORIZON_MONTHS,
 ) -> DemoBuildResult:
     """Fill an empty workspace with ``plan`` in one write; returns counts only."""
     require_role(ctx, Role.OWNER)
@@ -852,7 +859,7 @@ def build_demo_workspace(
 
         _write_transactions(session, tctx, plan, lookup)
         _write_planned_values(session, tctx, plan, lookup)
-        _write_recurring(session, tctx, plan, lookup)
+        _write_recurring(session, tctx, plan, lookup, horizon_months=horizon_months)
         _write_income(session, tctx, plan, lookup)
         _write_networth(session, tctx, plan, lookup)
         _write_investments(session, tctx, plan, lookup)
