@@ -429,6 +429,64 @@ document.addEventListener("change", (event) => {
 });
 document.addEventListener("DOMContentLoaded", applyHiddenWhen);
 
+// CSV import category mapping (F4.3): each source category shows only the fields of its chosen
+// action (map, create or ignore), and the filter box hides rows whose source category name or
+// kind does not contain the typed text. The server also renders the inactive fields hidden, so
+// the form works without this script.
+function applyMappingFields() {
+  document.querySelectorAll("[data-mapping-action]").forEach((select) => {
+    if (!(select instanceof HTMLSelectElement)) return;
+    const fieldset = select.closest("fieldset");
+    fieldset?.querySelectorAll("[data-mapping-fields]").forEach((fields) => {
+      if (fields instanceof HTMLElement) {
+        fields.hidden = fields.dataset.mappingFields !== select.value;
+      }
+    });
+  });
+}
+
+function applyMappingFilter() {
+  const input = document.querySelector("[data-mapping-filter]");
+  if (!(input instanceof HTMLInputElement)) return;
+  const needle = input.value.trim().toLocaleLowerCase();
+  document.querySelectorAll("[data-mapping-row]").forEach((row) => {
+    if (!(row instanceof HTMLElement)) return;
+    const text = (row.dataset.mappingSearch ?? "").toLocaleLowerCase();
+    row.hidden = needle !== "" && !text.includes(needle);
+  });
+}
+
+document.addEventListener("change", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLSelectElement && target.matches("[data-mapping-action]")) {
+    applyMappingFields();
+  }
+});
+document.addEventListener("input", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLInputElement && target.matches("[data-mapping-filter]")) {
+    applyMappingFilter();
+  }
+});
+document.addEventListener("keydown", (event) => {
+  const target = event.target;
+  if (
+    event.key === "Enter" &&
+    target instanceof HTMLInputElement &&
+    target.matches("[data-mapping-filter]")
+  ) {
+    // Enter filters; it must not submit the mapping form and apply the import.
+    event.preventDefault();
+    applyMappingFilter();
+  }
+});
+for (const eventName of ["DOMContentLoaded", "htmx:afterSwap", "htmx:oobAfterSwap", "htmx:load"]) {
+  document.addEventListener(eventName, () => {
+    applyMappingFields();
+    applyMappingFilter();
+  });
+}
+
 // Buttons marked data-copy-target copy the referenced input's value (invitation links).
 document.addEventListener("click", async (event) => {
   const target = event.target;

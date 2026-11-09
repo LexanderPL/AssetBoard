@@ -2,6 +2,9 @@
 {% block title %}{{ _("Export and import") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Export and import") }}{% endblock %}
 {% block content %}
+{% if notice %}
+<p class="mb-6 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-import-notice>{{ notice }}</p>
+{% endif %}
 <section class="panel max-w-2xl p-6">
   <h2 class="text-lg font-semibold">{{ _("Download workspace archive") }}</h2>
   <p class="mt-2 text-sm text-muted">{{ _("Save this workspace’s ledger, including categories, planned values, transactions, and month status.") }}</p>
@@ -186,6 +189,16 @@
   {% if selected_batch.report.archive_closed_months %}
   <p class="mt-2 text-sm"><span class="font-medium">{{ _("Closed months in the archive (not applied in merge mode):") }}</span> {{ selected_batch.report.archive_closed_months|join(", ") }}</p>
   {% endif %}
+  {% if selected_batch.status == 'applied' %}
+  <div class="mt-6 rounded-xl border border-line p-4" data-close-imported-months>
+    <h3 class="font-semibold">{{ _("Close imported months") }}</h3>
+    <p class="mt-1 text-sm text-muted">{{ _("Close every past month that received rows from this import and is still open. Months already closed stay as they are; the current and future months are never closed. Rolling back this import then needs those months reopened first.") }}</p>
+    <form method="post" action="{{ scoped_url(request, 'workspace_data_import_close_months', batch_id=selected_batch.id) }}" class="mt-3">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
+      <button type="submit" class="rounded-xl border border-line-strong px-4 py-2.5 text-sm font-semibold">{{ _("Close past imported months") }}</button>
+    </form>
+  </div>
+  {% endif %}
   {% endif %}
   {% elif selected_batch.status == 'planned' %}
   <p class="mt-2 text-sm text-muted">{{ _("The file was checked, but there is no importer for this kind of file yet.") }}</p>
@@ -195,11 +208,26 @@
     <form method="post" action="{{ scoped_url(request, 'workspace_data_import_apply', batch_id=selected_batch.id) }}" class="mt-4 space-y-4">
       <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
       {% if selected_batch.report.mapping %}
+      {% set mapping = selected_batch.report.mapping %}
       <h3 class="font-semibold">{{ _("Category mapping") }}</h3>
       <p class="mt-1 text-sm text-muted">{{ _("Map each category in the file to one of yours, create a new category, or ignore its rows. The defaults are already applied; change them and update the preview to check the totals before applying.") }}</p>
+      <dl class="mt-3 flex flex-wrap gap-x-6 gap-y-2 text-sm" data-mapping-summary>
+        <div><dt class="text-muted">{{ _("Categories in the file") }}</dt><dd class="font-medium" data-mapping-count="total">{{ mapping|length }}</dd></div>
+        <div><dt class="text-muted">{{ _("Mapped") }}</dt><dd class="font-medium" data-mapping-count="mapped">{{ mapping|selectattr("action", "equalto", "map")|list|length }}</dd></div>
+        <div><dt class="text-muted">{{ _("To create") }}</dt><dd class="font-medium" data-mapping-count="create">{{ mapping|selectattr("action", "equalto", "create")|list|length }}</dd></div>
+        <div><dt class="text-muted">{{ _("Ignored") }}</dt><dd class="font-medium" data-mapping-count="ignore">{{ mapping|selectattr("action", "equalto", "ignore")|list|length }}</dd></div>
+        <div><dt class="text-muted">{{ _("Unresolved") }}</dt><dd class="font-medium" data-mapping-count="unresolved">{{ selected_batch.report.counts.mapping_invalid|default(0) }}</dd></div>
+        <div><dt class="text-muted">{{ _("Rows") }}</dt><dd class="font-medium" data-mapping-count="rows">{{ mapping|sum(attribute="rows") }}</dd></div>
+      </dl>
+      <div class="mt-4">
+        <label class="block text-sm" for="mapping-filter">{{ _("Filter categories") }}
+          <input id="mapping-filter" type="search" data-mapping-filter class="form-control mt-1 w-full px-3 py-2" placeholder="{{ _('Type a category name or kind') }}">
+        </label>
+      </div>
       {% for entry in selected_batch.report.mapping %}
       {% set index = loop.index0 %}
-      <fieldset class="rounded-xl border border-line p-4">
+      {% set kind_label = _("Expense") if entry.kind == 'expense' else _("Income") %}
+      <fieldset class="rounded-xl border border-line p-4" data-mapping-row data-mapping-search="{{ entry.kind }} {{ kind_label }} {{ entry.source_name }}">
         <input type="hidden" name="mapping_source_id_{{ index }}" value="{{ entry.source_id|default('') }}">
         <input type="hidden" name="mapping_kind_{{ index }}" value="{{ entry.kind }}">
         <input type="hidden" name="mapping_key_{{ index }}" value="{{ entry.source_name_key }}">
@@ -210,33 +238,41 @@
         </legend>
         <div class="mt-3 grid gap-3 sm:grid-cols-2">
           <label class="block text-sm">{{ _("Action") }}
-            <select name="mapping_action_{{ index }}" class="form-select mt-1 w-full">
+            <select name="mapping_action_{{ index }}" data-mapping-action class="form-select mt-1 w-full">
               <option value="map" {% if entry.action == 'map' %}selected{% endif %}>{{ _("Map to an existing category") }}</option>
               <option value="create" {% if entry.action == 'create' %}selected{% endif %}>{{ _("Create a new category") }}</option>
               <option value="ignore" {% if entry.action == 'ignore' %}selected{% endif %}>{{ _("Ignore its rows") }}</option>
             </select>
           </label>
-          <label class="block text-sm">{{ _("Existing category") }}
-            <select name="mapping_category_{{ index }}" class="form-select mt-1 w-full">
-              <option value="">{{ _("Choose a category") }}</option>
-              {% for category in mapping_categories if category.kind == entry.kind %}
-              <option value="{{ category.id }}" {% if entry.category_id == category.id %}selected{% endif %}>{{ category.name }}{% if category.archived %} ({{ _("Archived") }}){% endif %}</option>
-              {% endfor %}
-            </select>
-          </label>
-          <label class="block text-sm">{{ _("New category name") }}
-            <input type="text" name="mapping_name_{{ index }}" value="{{ entry.create_name }}" maxlength="80" class="form-control mt-1 w-full px-3 py-2">
-          </label>
-          <label class="block text-sm">{{ _("Treatment") }}
-            <select name="mapping_treatment_{{ index }}" class="form-select mt-1 w-full">
-              <option value="regular" {% if entry.create_treatment == 'regular' %}selected{% endif %}>{{ _("Regular") }}</option>
-              <option value="savings" {% if entry.create_treatment == 'savings' %}selected{% endif %}>{{ _("Savings") }}</option>
-              <option value="transfer" {% if entry.create_treatment == 'transfer' %}selected{% endif %}>{{ _("Transfer") }}</option>
-            </select>
-          </label>
-          <label class="block text-sm">{{ _("Colour") }}
-            <input type="color" name="mapping_color_{{ index }}" value="{{ entry.create_color or '#16a34a' }}" class="mt-1 h-9 w-12 rounded-lg border border-line-strong bg-field p-1">
-          </label>
+          <div data-mapping-fields="map"{% if entry.action != 'map' %} hidden{% endif %}>
+            <label class="block text-sm">{{ _("Existing category") }}
+              <select name="mapping_category_{{ index }}" class="form-select mt-1 w-full">
+                <option value="">{{ _("Choose a category") }}</option>
+                {% for category in mapping_categories if category.kind == entry.kind %}
+                <option value="{{ category.id }}" {% if entry.category_id == category.id %}selected{% endif %}>{{ category.name }}{% if category.archived %} ({{ _("Archived") }}){% endif %}</option>
+                {% endfor %}
+              </select>
+            </label>
+          </div>
+          <div data-mapping-fields="create"{% if entry.action != 'create' %} hidden{% endif %}>
+            <label class="block text-sm">{{ _("New category name") }}
+              <input type="text" name="mapping_name_{{ index }}" value="{{ entry.create_name }}" maxlength="80" class="form-control mt-1 w-full px-3 py-2">
+            </label>
+          </div>
+          <div data-mapping-fields="create"{% if entry.action != 'create' %} hidden{% endif %}>
+            <label class="block text-sm">{{ _("Treatment") }}
+              <select name="mapping_treatment_{{ index }}" class="form-select mt-1 w-full">
+                <option value="regular" {% if entry.create_treatment == 'regular' %}selected{% endif %}>{{ _("Regular") }}</option>
+                <option value="savings" {% if entry.create_treatment == 'savings' %}selected{% endif %}>{{ _("Savings") }}</option>
+                <option value="transfer" {% if entry.create_treatment == 'transfer' %}selected{% endif %}>{{ _("Transfer") }}</option>
+              </select>
+            </label>
+          </div>
+          <div data-mapping-fields="create"{% if entry.action != 'create' %} hidden{% endif %}>
+            <label class="block text-sm">{{ _("Colour") }}
+              <input type="color" name="mapping_color_{{ index }}" value="{{ entry.create_color or '#16a34a' }}" class="mt-1 h-9 w-12 rounded-lg border border-line-strong bg-field p-1">
+            </label>
+          </div>
         </div>
         {% if entry.error %}<p class="mt-2 text-sm text-danger">{{ import_message({"code": entry.error, "message": entry.error}) }}</p>{% endif %}
       </fieldset>

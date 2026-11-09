@@ -25,7 +25,7 @@ from assetboard.db.engine import run_immediate
 from assetboard.domain.identity import MAX_EMAIL_LENGTH
 from assetboard.domain.import_csv import TEMPLATE_FILES
 from assetboard.domain.instruments import TYPE_LABELS, InstrumentType
-from assetboard.i18n import gettext
+from assetboard.i18n import gettext, ngettext
 from assetboard.i18n.dates import format_day
 from assetboard.services import taxes
 from assetboard.services.archive import export_workspace, restore_available
@@ -44,6 +44,7 @@ from assetboard.services.imports import (
     ImportUnavailable,
     apply_import,
     cancel_import,
+    close_imported_months,
     get_import_batch,
     list_import_batches,
     plan_import,
@@ -132,6 +133,7 @@ INVITATION_ERRORS = {
 MEMBER_ERROR_FALLBACK = _("The change could not be made. Reload the page and try again.")
 UPLOAD_TOO_LARGE = _("The upload is too large.")
 IMPORT_FAILED = _("The import could not be completed. Review the report and try again.")
+NO_IMPORTED_MONTHS_TO_CLOSE = _("No past imported months needed closing.")
 IMPORT_NOT_AVAILABLE = _("There is no import handler available for this file yet.")
 IMPORT_REFUSED = _("This archive cannot be imported into this workspace.")
 IMPORT_RESTORE_NOT_EMPTY = _(
@@ -168,6 +170,26 @@ ROLE_LABELS = {
 
 def _t(request: Request, message: str) -> str:
     return gettext(message, request.state.locale)
+
+
+def _import_notice(request: Request) -> str | None:
+    """The notice after closing an applied merge import's past months."""
+    notice = request.query_params.get("notice", "")
+    if notice == "months_closed":
+        raw_count = request.query_params.get("count", "")
+        valid_count = raw_count.isascii() and raw_count.isdigit() and len(raw_count) <= 6
+        count = int(raw_count) if valid_count else 0
+        if count < 1:
+            return None
+        return ngettext(
+            "Closed %(num)d imported month.",
+            "Closed %(num)d imported months.",
+            count,
+            request.state.locale,
+        ) % {"num": count}
+    if notice == "no_months_closed":
+        return _t(request, NO_IMPORTED_MONTHS_TO_CLOSE)
+    return None
 
 
 def _import_setting_labels(request: Request) -> dict[str, str]:
@@ -327,6 +349,7 @@ async def workspace_data(request: Request, ctx: CurrentContext) -> Response:
         context={
             "import_batches": batches,
             "selected_batch": selected,
+            "notice": _import_notice(request),
             "available_import_sources": request.app.state.import_adapters.sources,
             "import_message": partial(report_message, locale=request.state.locale),
             "mapping_categories": await run_in_threadpool(
@@ -485,6 +508,31 @@ async def workspace_data_import_apply(
         message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
         raise HTTPException(status_code=409, detail=_t(request, message)) from None
     return RedirectResponse(request.url_for("workspace_data").path, status_code=303)
+
+
+@router.post(
+    "/workspace/data/import/{batch_id}/close-months",
+    name="workspace_data_import_close_months",
+)
+async def workspace_data_import_close_months(
+    request: Request, ctx: CurrentContext, batch_id: str
+) -> Response:
+    """Close the past months an applied merge import filled (editors and owners)."""
+    require_role(ctx, Role.EDITOR)
+    try:
+        identifier = _parse_uuid(batch_id)
+    except WorkspaceNotAvailable:
+        raise HTTPException(status_code=404) from None
+    try:
+        closed = await run_in_threadpool(
+            close_imported_months, request.app.state.session_factory, ctx, identifier
+        )
+    except ImportError as error:
+        message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED
+        raise HTTPException(status_code=409, detail=_t(request, message)) from None
+    page = request.url_for("workspace_data").path
+    notice = f"notice=months_closed&count={len(closed)}" if closed else "notice=no_months_closed"
+    return RedirectResponse(f"{page}?batch={identifier}&{notice}", status_code=303)
 
 
 @router.post("/workspace/data/import/{batch_id}/preview")

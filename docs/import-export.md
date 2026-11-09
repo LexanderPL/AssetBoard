@@ -14,6 +14,7 @@ import. The exact files and columns are described in the
 - [Importing a CSV file](#importing-a-csv-file)
 - [The dry-run report](#the-dry-run-report)
 - [Category mapping](#category-mapping)
+- [Closing imported months](#closing-imported-months)
 - [What is skipped](#what-is-skipped)
 - [Rolling back an import](#rolling-back-an-import)
 - [Limits](#limits)
@@ -241,10 +242,25 @@ A CSV file maps categories **by name**: a `category_id` from another workspace i
 by `id`, or by name and kind among active categories) at the end of their list, archived ones as
 archived. Existing categories are never changed; differences are listed.
 
+## Closing imported months
+
+The report of an applied merge or CSV import offers **Close past imported months**. Pressing it
+closes every month **before the current month** that received entries or planned values from
+that import and is still open. Months already closed stay as they are, and the current and
+future months are never closed. The action records each month as closed by you in the audit log.
+
+The report says how many months were closed, or that no past imported months needed closing.
+Restores have no such button: they bring their own closed months from the archive.
+
+Rolling back such an import is still refused while any affected month is closed; an owner has to
+reopen those months first (see [Rolling back an import](#rolling-back-an-import)).
+
 ## What is skipped
 
 - **Closed months:** rows dated in a closed month are skipped and listed. Reopen the month first
-  if you want to import into it. A merge never closes or reopens months.
+  if you want to import into it. Importing never closes months by itself; use **Close past
+  imported months** on an applied merge report (see
+  [Closing imported months](#closing-imported-months)).
 - **Future dates:** a transaction dated after today, in the workspace's time zone, is skipped.
   In the app a future entry is a one-off planned item, not an actual transaction. Planned values
   for future months import normally.
@@ -269,9 +285,9 @@ shows what will be removed.
   are still used. Remembered mappings that point at categories it created are removed. If the
   import set a month's plan-start marker and no planned values remain there, the marker is
   cleared. A rollback is refused while any affected month is closed; the page lists those
-  months. An investment transaction import soft-deletes its imported rows. An instrument it
-  created is deleted when it has no remaining history; otherwise it is archived, like a
-  category that is still referenced.
+  months, and an owner must reopen them first. An investment transaction import soft-deletes its
+  imported rows. An instrument it created is deleted when it has no remaining history; otherwise
+  it is archived, like a category that is still referenced.
 - **Restore:** owners only. It removes everything the restore wrote, for good, and puts the
   previous workspace settings back, so the workspace is empty again and you can restore a
   corrected archive. It also removes the net-worth categories, items, valuations and snapshots

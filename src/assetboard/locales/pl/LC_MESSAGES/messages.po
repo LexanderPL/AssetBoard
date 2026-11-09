@@ -3849,6 +3849,9 @@ msgstr "Przesyłany plik jest za duży."
 msgid "The import could not be completed. Review the report and try again."
 msgstr "Nie udało się wykonać importu. Sprawdź raport i spróbuj ponownie."
 
+msgid "No past imported months needed closing."
+msgstr "Żadne minione zaimportowane miesiące nie wymagały zamknięcia."
+
 msgid "There is no import handler available for this file yet."
 msgstr "Nie ma jeszcze procedury importu dla tego pliku."
 
@@ -3905,6 +3908,13 @@ msgstr "Metoda kosztu inwestycji"
 
 msgid "Risk targets"
 msgstr "Cele ryzyka"
+
+#, python-format
+msgid "Closed %(num)d imported month."
+msgid_plural "Closed %(num)d imported months."
+msgstr[0] "Zamknięto %(num)d zaimportowany miesiąc."
+msgstr[1] "Zamknięto %(num)d zaimportowane miesiące."
+msgstr[2] "Zamknięto %(num)d zaimportowanych miesięcy."
 
 msgid "Workspace settings saved."
 msgstr "Zapisano ustawienia obszaru roboczego."
@@ -8229,6 +8239,23 @@ msgstr "Ustawienia, które się różnią (nie są stosowane w trybie scalania):
 msgid "Closed months in the archive (not applied in merge mode):"
 msgstr "Zamknięte miesiące w archiwum (nie są stosowane w trybie scalania):"
 
+msgid "Close imported months"
+msgstr "Zamknij zaimportowane miesiące"
+
+msgid ""
+"Close every past month that received rows from this import and is still "
+"open. Months already closed stay as they are; the current and future "
+"months are never closed. Rolling back this import then needs those months"
+" reopened first."
+msgstr ""
+"Zamknij każdy miniony miesiąc, do którego ten import dodał wiersze, jeśli "
+"jest jeszcze otwarty. Miesiące już zamknięte pozostają bez zmian; bieżący "
+"i przyszłe miesiące nigdy nie są zamykane. Wycofanie tego importu będzie "
+"wtedy wymagało uprzedniego ponownego otwarcia tych miesięcy."
+
+msgid "Close past imported months"
+msgstr "Zamknij minione zaimportowane miesiące"
+
 msgid "The file was checked, but there is no importer for this kind of file yet."
 msgstr "Plik został sprawdzony, ale nie ma jeszcze importu dla tego rodzaju pliku."
 
@@ -8244,6 +8271,27 @@ msgstr ""
 "kategorię albo zignoruj jej wiersze. Domyślne ustawienia są już "
 "zastosowane; zmień je i zaktualizuj podgląd, aby sprawdzić sumy przed "
 "zastosowaniem."
+
+msgid "Categories in the file"
+msgstr "Kategorie w pliku"
+
+msgid "Mapped"
+msgstr "Przypisane"
+
+msgid "Ignored"
+msgstr "Zignorowane"
+
+msgid "Unresolved"
+msgstr "Nierozwiązane"
+
+msgid "Rows"
+msgstr "Wiersze"
+
+msgid "Filter categories"
+msgstr "Filtruj kategorie"
+
+msgid "Type a category name or kind"
+msgstr "Wpisz nazwę kategorii lub rodzaj"
 
 #, python-format
 msgid "%(num)d row"
