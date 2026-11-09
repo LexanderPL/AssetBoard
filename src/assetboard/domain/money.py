@@ -28,6 +28,9 @@ CURRENCY_MINOR_UNITS = {
     **_currency_units("CLF UYW", 4),
 }
 
+# Not an ISO 4217 currency, but a crypto instrument may be quoted in bitcoin: eight decimals.
+_NON_ISO_MINOR_UNITS = {"BTC": 8}
+
 
 def _require_currency_string(currency: object) -> str:
     if not isinstance(currency, str):
@@ -41,6 +44,10 @@ def minor_unit_for(currency: object) -> int:
         raise ValueError("currency must be a three-letter ISO currency code")
     try:
         return CURRENCY_MINOR_UNITS[normalized]
+    except KeyError:
+        pass
+    try:
+        return _NON_ISO_MINOR_UNITS[normalized]
     except KeyError:
         raise ValueError(f"unsupported currency: {normalized}") from None
 

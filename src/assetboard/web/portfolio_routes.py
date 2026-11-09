@@ -21,6 +21,7 @@ from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
 from assetboard.domain.categories import PALETTE
+from assetboard.domain.charts import share_tenths
 from assetboard.domain.instruments import RISK_TIER_LABELS, RISK_TIER_SUBTITLES
 from assetboard.domain.money import Money
 from assetboard.domain.risk import (
@@ -37,6 +38,7 @@ from assetboard.i18n.numbers import (
     format_rate_tenths,
 )
 from assetboard.services.context import Context, Role, has_role
+from assetboard.services.investments import apply_suggested_risk_tiers
 from assetboard.services.portfolio import ALL_SCOPE, PortfolioPage, portfolio_page
 from assetboard.services.price_sources import provider_enabled
 from assetboard.services.risk import PortfolioRisk, save_risk_policy
@@ -60,7 +62,11 @@ def _(message: str) -> str:
 OTHER = _("Other")
 UNALLOCATED = _("Unallocated")
 WHOLE_PORTFOLIO = _("Whole portfolio")
-PORTFOLIO_NOTICES = {"risk_policy_saved": _("Risk targets saved.")}
+PORTFOLIO_NOTICES = {
+    "risk_policy_saved": _("Risk targets saved."),
+    "risk_tiers_suggested": _("Suggested risk tiers applied."),
+    "risk_tiers_complete": _("Every matching asset class already has a risk tier."),
+}
 RISK_ERRORS = {
     "invalid_mode": _("Choose a target mode."),
     "invalid_percent": _("Enter a percentage between 0 and 100 with at most two decimals."),
@@ -151,6 +157,8 @@ class RiskView:
     age_mode_without_birth_year: bool
     form_values: dict[str, str]
     errors: dict[str, str]
+    has_unassigned: bool
+    can_apply_risk_tiers: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,6 +177,7 @@ class PortfolioView:
     year: int
     excluded: int
     scope_options: tuple[ScopeOption, ...]
+    class_donut: DonutView
     donut: DonutView
     risk: RiskView
 
@@ -281,6 +290,8 @@ def _risk_view(
         ),
         form_values=form_values or _risk_form_values(risk, locale),
         errors=errors or {},
+        has_unassigned=balance.unassigned.amount_minor > 0,
+        can_apply_risk_tiers=risk.can_apply_risk_tiers,
     )
 
 
@@ -366,6 +377,7 @@ def build_view(
         year=page.today.year,
         excluded=valuation.excluded,
         scope_options=tuple(options),
+        class_donut=_class_donut(page, locale),
         donut=_donut(page, locale),
         risk=_risk_view(
             page,
@@ -373,6 +385,41 @@ def build_view(
             form_values=risk_form_values,
             errors=risk_errors,
         ),
+    )
+
+
+def _class_donut(page: PortfolioPage, locale: str) -> DonutView:
+    """The look-through value of every asset class with a positive value, plus Unallocated."""
+    totals = {total.asset_class_id: total for total in page.valuation.classes}
+    total_minor = page.valuation.value.amount_minor
+    slices: list[DonutSlice] = []
+    for row in page.class_rows:
+        class_id = row.asset_class.id if row.asset_class is not None else None
+        total = totals.get(class_id)
+        if total is None or total.value.amount_minor <= 0:
+            continue
+        if row.asset_class is None:
+            name, color = gettext(UNALLOCATED, locale), None
+        else:
+            name, color = row.asset_class.name, row.asset_class.color
+        slices.append(
+            DonutSlice(
+                name=name,
+                color=color,
+                amount_minor=total.value.amount_minor,
+                amount=format_money(total.value, locale),
+                share=format_rate_tenths(
+                    share_tenths(total.value.amount_minor, total_minor), locale
+                ),
+            )
+        )
+    return DonutView(
+        key="portfolio-classes",
+        heading=gettext(_("Asset classes"), locale),
+        empty=gettext(_("Nothing is valued in the portfolio yet."), locale),
+        currency=page.currency,
+        total=format_money(page.valuation.value, locale),
+        slices=tuple(slices),
     )
 
 
@@ -396,10 +443,12 @@ def _donut(page: PortfolioPage, locale: str) -> DonutView:
         )
     total = sum(item.amount.amount_minor for item in page.slices)
     if page.scope is None:
-        heading = gettext(_("Holdings in the whole portfolio"), locale)
+        heading = gettext(_("Holdings by instrument"), locale)
         empty = gettext(_("Nothing is valued in the portfolio yet."), locale)
     else:
-        heading = gettext(_("Holdings in %(class)s"), locale) % {"class": page.scope.name}
+        heading = gettext(_("Holdings by instrument in %(class)s"), locale) % {
+            "class": page.scope.name
+        }
         empty = gettext(_("Nothing is held in this asset class."), locale)
     return DonutView(
         key="portfolio",
@@ -460,6 +509,22 @@ async def portfolio(
 ) -> Response:
     return await run_in_threadpool(
         lambda: _render(request, ctx, scope.strip(), notice=notice or None)
+    )
+
+
+@router.post(
+    "/investments/portfolio/apply-risk-tiers", name="investments_portfolio_apply_risk_tiers"
+)
+async def risk_tiers_apply(request: Request, ctx: CurrentContext) -> Response:
+    count = await run_in_threadpool(
+        apply_suggested_risk_tiers,
+        request.app.state.session_factory,
+        ctx,
+    )
+    notice = "risk_tiers_suggested" if count else "risk_tiers_complete"
+    return RedirectResponse(
+        request.url_for("investments_portfolio").path + f"?notice={notice}",
+        status_code=303,
     )
 
 

@@ -6,23 +6,30 @@
    version): it wraps onto as many lines as it needs instead of ECharts' paged legend, in the
    slices' colours. Without JavaScript the table stays visible in place of the chart. No inline
    script or style. #}
-{% macro donut(d, label=None) -%}
-<section class="panel p-4 sm:p-6" aria-labelledby="chart-{{ d.key }}-heading" data-donut="{{ d.key }}">
+{% macro donut(d, label=None, compact=false) -%}
+{% set wrapper_class = "min-w-0" if compact else "panel p-4 sm:p-6" %}
+{% set heading_class = "text-sm font-semibold" if compact else "text-base font-semibold" %}
+{% set total_class = "text-xs tabular-nums text-muted" if compact else "text-sm tabular-nums text-muted" %}
+{% set canvas_class = "mt-2 h-40 w-full" if compact else "mt-3 h-80 w-full" %}
+{% set legend_class = "mt-2 flex flex-wrap justify-center gap-x-3 gap-y-1.5 text-xs" if compact else "mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-sm" %}
+{% set table_wrap_class = "mt-2 relative overflow-x-auto" if compact else "mt-3 relative overflow-x-auto" %}
+{% set table_class = "sheet w-full text-xs" if compact else "sheet w-full text-sm" %}
+<section class="{{ wrapper_class }}" aria-labelledby="chart-{{ d.key }}-heading" data-donut="{{ d.key }}"{% if compact %} data-donut-compact{% endif %}>
   <div class="flex flex-wrap items-baseline justify-between gap-2">
-    <h2 id="chart-{{ d.key }}-heading" class="text-base font-semibold">{{ d.heading }}</h2>
-    {% if d.slices %}<p class="text-sm tabular-nums text-muted" data-chart-total>{{ d.total }}</p>{% endif %}
+    <h2 id="chart-{{ d.key }}-heading" class="{{ heading_class }}">{{ d.heading }}</h2>
+    {% if d.slices %}<p class="{{ total_class }}" data-chart-total>{{ d.total }}</p>{% endif %}
   </div>
   {% if d.slices %}
   <div data-chart="donut" data-chart-source="chart-{{ d.key }}-data">
     <script type="application/json" id="chart-{{ d.key }}-data">{{ d.data|tojson }}</script>
-    <div class="mt-3 h-80 w-full" hidden aria-hidden="true" data-chart-canvas></div>
-    <ul class="mt-3 flex flex-wrap justify-center gap-x-4 gap-y-1.5 text-sm" hidden aria-hidden="true" data-chart-legend>
+    <div class="{{ canvas_class }}" hidden aria-hidden="true" data-chart-canvas></div>
+    <ul class="{{ legend_class }}" hidden aria-hidden="true" data-chart-legend>
       {% for s in d.slices %}
       <li class="flex items-center gap-1.5" data-chart-legend-item><svg class="h-3 w-3 shrink-0" viewBox="0 0 12 12" focusable="false"><rect width="12" height="12"{% if s.color %} fill="{{ s.color }}"{% else %} class="fill-line-strong"{% endif %}/></svg><span>{{ s.name }}</span><span class="tabular-nums text-muted">{{ s.share }}</span></li>
       {% endfor %}
     </ul>
-    <div class="relative mt-3 overflow-x-auto" data-chart-table>
-      <table class="sheet w-full text-sm">
+    <div class="{{ table_wrap_class }}" data-chart-table>
+      <table class="{{ table_class }}">
         <caption class="sr-only">{{ d.heading }}</caption>
         <thead>
           <tr class="text-left text-xs text-muted">

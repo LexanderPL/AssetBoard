@@ -151,16 +151,11 @@ spread is part of the cost. The derived quote price keeps the instrument's trans
 transaction FX rate correct (for example "≈ 398.77 USD" at the real rate, not "1 600 USD" at
 rate 1).
 
-In the history such a row shows the base amounts first, with the derived quote price and the
-rate beside them: `1600 PLN · ≈ 398.773771 USD @ 4.0123`. Editing opens the row in the mode it
-was saved in. Switching an existing row to the base currency pre-fills `quote price × rate` and
-`quote fee × rate`; switching back keeps the derived quote values and drops the base amounts.
-
-**Fixing rows entered the old way.** If you entered base amounts as quote amounts with rate 1,
-the row gets a **check FX rate** badge (an instrument quoted in another currency at rate 1).
-Tick **FX needs checking** in the history filters to list them. To fix one, open it, switch to
-the base currency (the amounts carry over, since they were base amounts), take the pre-filled
-stored rate and save.
+In the history such a row shows the base amounts first, with the derived quote price (rounded to
+the quote currency's minor unit) and the rate beside them:
+`1600 PLN · ≈ 398.77 USD @ 4.0123`. Editing opens the row in the mode it was saved in. Switching
+an existing row to the base currency pre-fills `quote price × rate` and `quote fee × rate`;
+switching back keeps the derived quote values and drops the base amounts.
 
 ### Dividends, interest and splits
 
@@ -383,11 +378,15 @@ workspace base currency. It is read-only.
   takes the remainder (on a tie, the class listed first on the Asset classes tab). Gain % is
   shown per class, or *—* when the class has no cost. A class that is not investable is marked
   *not counted in FIRE*; it still counts in every total and in the chart.
-- **Chart**: a donut of instrument values. Choose its scope above it: one asset class (each
-  instrument contributes only its part in that class) or the whole portfolio. It opens on the
-  class created as *Stocks* (*Akcje*) when you hold something there, otherwise on the whole
-  portfolio. Slices under 2% are grouped into *Other*. Slices use the chart palette; the class
-  colours appear in the asset-class table. Without JavaScript the chart's table is shown.
+- **Class donut**: the totals box also shows a compact donut of the look-through value by asset
+  class, in the classes' colours, including archived classes and an *Unallocated* slice for
+  instruments without an allocation. Its total is the portfolio value.
+- **Chart**: a donut of instrument values, titled *Holdings by instrument*. Choose its scope above
+  it: one asset class (each instrument contributes only its part in that class) or the whole
+  portfolio. It opens on the class created as *Stocks* (*Akcje*) when you hold something there,
+  otherwise on the whole portfolio. Slices under 2% are grouped into *Other*. Slices use the
+  chart palette; the class colours appear in the asset-class table. Without JavaScript the
+  chart's table is shown.
 
 Shares and percentages are rounded once for display, so they may not add up to exactly 100%.
 
@@ -401,7 +400,11 @@ Safe class contributes 80% to Growth and 20% to Safe unless it has an override.
 
 A class with no tier is **Unassigned**. Its value is shown separately and left out of the tier
 percentages, so the three tiers always add up to 100% of the assigned value. An instrument
-excluded from the portfolio because it has no price or FX rate is also excluded here.
+excluded from the portfolio because it has no price or FX rate is also excluded here. The
+balance is recomputed on every page load; there is no daily cache. When anything is unassigned,
+a warning under the table shows the unassigned amount and share, explains that the classes need
+a risk tier and links to the Asset classes tab. If any of them match a suggested class name, the
+warning also offers **Apply suggested risk tiers**, which fills only empty tiers in one click.
 
 The workspace has a target policy, editable by editors and owners under **Edit target
 allocation**:

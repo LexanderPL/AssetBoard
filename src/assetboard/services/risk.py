@@ -33,6 +33,7 @@ from assetboard.domain.risk import (
 )
 from assetboard.i18n.numbers import parse_amount
 from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.investments import suggested_risk_tier_changes
 
 if TYPE_CHECKING:
     from assetboard.services.portfolio import CurrentPortfolioData
@@ -48,6 +49,7 @@ class PortfolioRisk:
     birth_year: int | None
     life_expectancy: int
     balance: RiskBalance
+    can_apply_risk_tiers: bool = False
 
 
 def load_policy(session: Session, ctx: Context) -> tuple[RiskPolicy, bool]:
@@ -125,6 +127,7 @@ def risk_for_portfolio(
         birth_year=birth_year,
         life_expectancy=life_expectancy,
         balance=balance,
+        can_apply_risk_tiers=bool(suggested_risk_tier_changes(session, ctx)),
     )
 
 
