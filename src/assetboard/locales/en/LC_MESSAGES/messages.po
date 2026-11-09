@@ -2751,6 +2751,33 @@ msgstr ""
 msgid "This confirmation expired. Start over to sign in."
 msgstr ""
 
+msgid "Year to date"
+msgstr ""
+
+msgid "1 month"
+msgstr ""
+
+msgid "3 months"
+msgstr ""
+
+msgid "Whole portfolio"
+msgstr ""
+
+msgid "Value"
+msgstr ""
+
+msgid "Invested capital"
+msgstr ""
+
+msgid "Gain"
+msgstr ""
+
+msgid "Annualised XIRR"
+msgstr ""
+
+msgid "Period return"
+msgstr ""
+
 msgid "Saved / invested"
 msgstr ""
 
@@ -2770,9 +2797,6 @@ msgid "Transfers are not counted in the plan: this category takes none."
 msgstr ""
 
 msgid "Unallocated"
-msgstr ""
-
-msgid "Whole portfolio"
 msgstr ""
 
 msgid "Holdings in the whole portfolio"
@@ -4985,14 +5009,98 @@ msgid ""
 "traded."
 msgstr ""
 
+msgid "Performance"
+msgstr ""
+
+#, python-format
+msgid "Value and invested capital on %(date)s in %(currency)s"
+msgstr ""
+
+msgid "Range"
+msgstr ""
+
+msgid "Class filter"
+msgstr ""
+
+msgid "Show"
+msgstr ""
+
+#, python-format
+msgid "%(count)s undated legacy transaction is not included in the series."
+msgid_plural "%(count)s undated legacy transactions are not included in the series."
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy
+msgid "Open transactions"
+msgstr ""
+
+#, fuzzy, python-format
+msgid ""
+"%(count)s chart point is incomplete because an instrument has no price or"
+" FX rate."
+msgid_plural ""
+"%(count)s chart points are incomplete because an instrument has no price "
+"or FX rate."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Value and invested capital"
+msgstr ""
+
+msgid "Plotted data"
+msgstr ""
+
+msgid "Plotted performance data"
+msgstr ""
+
+msgid "Period returns"
+msgstr ""
+
+msgid ""
+"Value change includes new deposits; the last columns isolate investment "
+"gain and the money-weighted return."
+msgstr ""
+
+msgid "Performance by period"
+msgstr ""
+
+msgid "Period"
+msgstr ""
+
+msgid "Change"
+msgstr ""
+
+#, python-format
+msgid "Change %%"
+msgstr ""
+
+msgid "Net flows"
+msgstr ""
+
+msgid "Δ value − net flows"
+msgstr ""
+
+msgid "Return"
+msgstr ""
+
+msgid "Incomplete data"
+msgstr ""
+
+msgid ""
+"No dated investment transactions yet. Record a purchase to see "
+"performance."
+msgstr ""
+
+#, fuzzy
+msgid "Go to transactions"
+msgstr ""
+
 msgid "Portfolio"
 msgstr ""
 
 #, python-format
 msgid "Valued on %(date)s in %(currency)s"
-msgstr ""
-
-msgid "Value"
 msgstr ""
 
 msgid "Unrealized gain"
@@ -5038,17 +5146,10 @@ msgstr ""
 msgid "Nothing is held yet. Add buy transactions to see the portfolio."
 msgstr ""
 
-#, fuzzy
-msgid "Go to transactions"
-msgstr ""
-
 msgid "By asset class"
 msgstr ""
 
 msgid "Each instrument's value and cost are split by its allocation weights."
-msgstr ""
-
-msgid "Gain"
 msgstr ""
 
 #, python-format
@@ -5056,9 +5157,6 @@ msgid "Gain %%"
 msgstr ""
 
 msgid "Chart scope"
-msgstr ""
-
-msgid "Show"
 msgstr ""
 
 msgid "Transaction"
@@ -5900,9 +5998,6 @@ msgid "Take snapshot now"
 msgstr ""
 
 msgid "Backfill from history"
-msgstr ""
-
-msgid "Range"
 msgstr ""
 
 #, fuzzy, python-format
