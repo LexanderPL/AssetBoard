@@ -222,6 +222,10 @@ def save_risk_policy(
                 "tolerance_bp": policy.tolerance_bp,
             },
         )
+        # Local import: portfolio_links reads the portfolio, which imports this module.
+        from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
+        ensure_networth_items_for_asset_classes(session, ctx)
         return policy
 
     return run_immediate(factory, write)

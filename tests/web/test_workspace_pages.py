@@ -288,6 +288,24 @@ def test_owners_turn_the_automatic_plan_copy_on_and_off(owner: OwnerApp) -> None
         assert session.scalars(select(Workspace.auto_copy_plan)).one() is False
 
 
+def test_owners_turn_automatic_portfolio_linking_on_and_off(owner: OwnerApp) -> None:
+    page = owner.client.get("/workspace/settings").text
+    assert "checked" in page.split('id="auto_link_portfolio"')[1].split(">")[0]
+    form = {"name": "Home", "base_currency": "EUR", "timezone": "UTC", "locale": "en"}
+    owner.post("/workspace/settings", form, token_from="/workspace/settings")
+    with owner.db() as session:
+        assert session.scalars(select(Workspace.auto_link_portfolio)).one() is False
+    owner.post(
+        "/workspace/settings",
+        form | {"auto_link_portfolio": "1"},
+        token_from="/workspace/settings",
+    )
+    with owner.db() as session:
+        assert session.scalars(select(Workspace.auto_link_portfolio)).one() is True
+    polish = owner.client.get("/workspace/settings", headers={"Accept-Language": "pl"}).text
+    assert "Automatycznie łącz klasy aktywów inwestycyjnych z majątkiem netto" in polish
+
+
 def test_a_locked_base_currency_change_is_refused_on_the_field(owner: OwnerApp) -> None:
     _plant_transaction(owner, deleted=False)
     form = {"name": "Family", "base_currency": "PLN", "timezone": "UTC", "locale": "en"}

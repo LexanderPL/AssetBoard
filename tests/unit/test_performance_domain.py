@@ -339,6 +339,114 @@ def test_series_excludes_undated_and_marks_missing_data() -> None:
     assert missing[0].incomplete
 
 
+def test_series_backfills_a_leading_price_and_fx_observation() -> None:
+    instrument_id = uuid4()
+    transactions = (
+        _tx(
+            instrument_id=instrument_id,
+            quantity="10",
+            unit_price="100",
+            quote_currency="USD",
+            fx="0.9",
+        ),
+    )
+    prices = {instrument_id: _price((date(2020, 1, 3), "110"))}
+    fx = {"USD": _rate((date(2020, 1, 3), "0.92"))}
+    end = date(2020, 1, 3)
+
+    conservative = portfolio_series(
+        transactions, prices, fx, DAY, end, Step.DAY, base_currency="EUR"
+    )
+    assert conservative[0].incomplete
+    assert conservative[0].value == Money(0, "EUR")
+    assert conservative[0].net_invested == Money(0, "EUR")
+
+    backfilled = portfolio_series(
+        transactions,
+        prices,
+        fx,
+        DAY,
+        end,
+        Step.DAY,
+        base_currency="EUR",
+        backfill_leading=True,
+    )
+    assert [point.value for point in backfilled] == [Money(101_200, "EUR")] * 3
+    assert [point.net_invested for point in backfilled] == [Money(90_000, "EUR")] * 3
+    assert not any(point.incomplete for point in backfilled)
+
+
+def test_series_backfilled_price_is_adjusted_for_a_later_split() -> None:
+    instrument_id = uuid4()
+    transactions = (
+        _tx(instrument_id=instrument_id, day=date(2020, 1, 1), quantity="10", unit_price="100"),
+        _tx(
+            instrument_id=instrument_id,
+            day=date(2020, 1, 2),
+            type="split",
+            quantity="2",
+            unit_price="1",
+        ),
+    )
+    # The feed starts after the 2-for-1 split, so the only raw price is post-split.
+    prices = {instrument_id: _price((date(2020, 1, 3), "50"))}
+
+    points = portfolio_series(
+        transactions,
+        prices,
+        {},
+        date(2020, 1, 1),
+        date(2020, 1, 3),
+        Step.DAY,
+        base_currency="EUR",
+        backfill_leading=True,
+    )
+
+    # The pre-split point uses 50 × 2 = 100 per old unit; later points use 20 units × 50.
+    assert [point.value for point in points] == [Money(100_000, "EUR")] * 3
+    assert [point.net_invested for point in points] == [Money(100_000, "EUR")] * 3
+    assert not any(point.incomplete for point in points)
+
+
+def test_series_backfill_keeps_carry_forward_as_the_primary_rule() -> None:
+    instrument_id = uuid4()
+    transactions = (_tx(instrument_id=instrument_id, quantity="10"),)
+    prices = {instrument_id: _price((DAY, "100"), (date(2020, 1, 3), "200"))}
+
+    points = portfolio_series(
+        transactions,
+        prices,
+        {},
+        date(2020, 1, 2),
+        date(2020, 1, 2),
+        Step.DAY,
+        base_currency="EUR",
+        backfill_leading=True,
+    )
+
+    assert points[0].value == Money(100_000, "EUR")
+
+
+def test_series_backfill_does_not_invent_missing_data() -> None:
+    instrument_id = uuid4()
+    transactions = (_tx(instrument_id=instrument_id, quantity="10"),)
+
+    points = portfolio_series(
+        transactions,
+        {},
+        {},
+        DAY,
+        DAY,
+        Step.DAY,
+        base_currency="EUR",
+        backfill_leading=True,
+    )
+
+    assert points[0].incomplete
+    assert points[0].value == Money(0, "EUR")
+    assert points[0].net_invested == Money(0, "EUR")
+
+
 def test_class_series_sums_exactly_to_the_total_series() -> None:
     instrument_id = uuid4()
     stocks, bonds = uuid4(), uuid4()

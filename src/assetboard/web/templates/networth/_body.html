@@ -26,7 +26,7 @@
   </section>
   {% endif %}
 
-  {% if side_value == "asset" and can_edit %}
+  {% if side_value == "asset" and can_edit and not page.auto_link_portfolio and page.portfolio_link_candidates %}
   <section class="panel p-4 sm:p-6" data-portfolio-links>
     <h2 class="text-base font-semibold">{{ _("Portfolio holdings in net worth") }}</h2>
     <p class="mt-1 text-sm text-muted">{{ _("Create one linked asset item for each asset class with a value. Existing links and empty classes are skipped; the items go into the Investments category.") }}</p>

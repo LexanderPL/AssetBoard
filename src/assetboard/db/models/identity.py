@@ -129,6 +129,11 @@ class Workspace(IdMixin, TimestampMixin, Base):
     investment_cost_basis: Mapped[str] = mapped_column(
         String(8), nullable=False, default="average", server_default="average"
     )
+    # F6.8: keep one linked net-worth item per active asset class with a value (off for
+    # workspaces created before this setting; new workspaces turn it on explicitly).
+    auto_link_portfolio: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
 
 
 class Membership(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):

@@ -1028,6 +1028,9 @@ class InvestmentTransactionsCsvAdapter(ImportAdapter):
                 created_at=match.created_at,
             )
             created += 1
+        from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
+        ensure_networth_items_for_asset_classes(session, ctx)
         return {
             "created": created,
             "duplicates": sum(1 for entry in plan.skipped if entry["code"] == "already_imported"),

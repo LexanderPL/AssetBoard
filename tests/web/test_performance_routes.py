@@ -171,3 +171,55 @@ def test_undated_rows_are_reported(owner: OwnerApp) -> None:
     page = owner.client.get(PERFORMANCE).text
     assert "undated legacy transaction" in page
     assert "data-performance-undated" in page
+
+
+def _incomplete_page() -> Any:
+    from assetboard.domain.money import Money
+    from assetboard.domain.performance import SeriesPoint
+    from assetboard.services.performance import PerformancePage
+
+    return PerformancePage(
+        currency="EUR",
+        today=date(2026, 3, 10),
+        range_code="1y",
+        range_start=date(2025, 3, 10),
+        class_scope=None,
+        class_options=(),
+        chart=(SeriesPoint(date(2026, 1, 10), Money(0, "EUR"), Money(0, "EUR"), incomplete=True),),
+        periods=(),
+        undated_count=0,
+        incomplete_points=1,
+        first_date=date(2026, 1, 10),
+    )
+
+
+def test_chart_json_uses_nulls_and_the_table_uses_a_dash_for_incomplete_points(
+    owner: OwnerApp, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import assetboard.web.performance_routes as performance_routes
+
+    monkeypatch.setattr(
+        performance_routes, "performance_page", lambda *args, **kwargs: _incomplete_page()
+    )
+
+    page = owner.client.get(PERFORMANCE).text
+    data = _chart_data(page)
+
+    assert data["value"] == [None]
+    assert data["invested"] == [None]
+    assert data["gain"] == [None]
+    assert data["tooltips"] == [["Incomplete: an instrument has no price or FX rate."]]
+    assert "data-performance-incomplete" in page
+    assert '<td class="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">—</td>' in page
+    assert "Incomplete data" in page
+
+
+def test_the_chart_does_not_start_with_a_zero_prefix(owner: OwnerApp) -> None:
+    _fund(owner)
+
+    page = owner.client.get(f"{PERFORMANCE}?range=all").text
+    data = _chart_data(page)
+
+    assert data["labels"][0] == "Jan 7, 2024"
+    assert data["value"][0] and data["invested"][0]
+    assert all(value is not None for value in data["value"])

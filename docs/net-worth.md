@@ -157,14 +157,25 @@ continuous.
 
 ### Portfolio links
 
-On **Net Worth → Assets**, editors and owners also see **Create net-worth items from asset
-classes**. It creates one linked asset item for every active asset class with a value, and puts
-them in an **Investments** category. That category is created on demand (in your workspace
-language: **Inwestycje** in Polish) and appended to the asset categories; the suggested category
-sets do not include it. Classes with no value, classes whose value is unavailable through a
-missing price or exchange rate, and classes already linked are skipped. Run the button again
-after adding a class or a value; it only creates what is missing. Classes marked *not counted in
-FIRE* produce items with **Investable** off.
+New workspaces turn on **Keep investment asset classes linked in net worth automatically** in
+Workspace settings. While it is on, adding or changing investments keeps one linked asset item
+per active asset class with a value, in an **Investments** category created on demand (in your
+workspace language: **Inwestycje** in Polish); the manual box is hidden. Workspaces created
+before this setting start with it off.
+
+With the setting off, editors and owners see **Create net-worth items from asset classes** on
+**Net Worth → Assets** while an eligible class has no link. It creates one linked asset item for
+every active asset class with a value, and puts them in the same **Investments** category. That
+category is appended to the asset categories; the suggested category sets do not include it.
+Classes with no value, classes whose value is unavailable through a missing price or exchange
+rate, and classes already linked are skipped. Run the button again after adding a class or a
+value; it only creates what is missing. Classes marked *not counted in FIRE* produce items with
+**Investable** off.
+
+An archived linked item stays archived: automatic and manual linking both skip a class that
+already has an active or archived link, so deleting a link from net worth is respected.
+Turning the setting off keeps existing links working and brings the manual box back while
+eligible classes lack a link.
 
 The picker also offers individual portfolio holdings: active instruments you currently hold.
 A sold-out or archived target is no longer offered for a new link, but an item already linked to
@@ -177,9 +188,11 @@ A portfolio-linked item does not store its own values:
   available ones.
 - **In a past snapshot or a backfill** it uses the **Performance** history: only dated
   transactions, prices and exchange rates carried forward from the latest observation on or
-  before the date, and the bond model value for each date. Undated lots are not in that history,
-  so the first month-end snapshot can be lower than today's value when such lots exist. This is
-  the same step the Performance chart shows; the link itself is not recalculated.
+  before the date, and the bond model value for each date. Unlike the Performance chart it does
+  not backfill a leading gap from a later observation: a date before the first known
+  observation stays unavailable. Undated lots are not in that history, so the first month-end
+  snapshot can be lower than today's value when such lots exist. The link itself is not
+  recalculated.
 - A class value is shown as **Value unavailable** if even one held instrument allocated to it is
   missing a price or exchange rate. It is never shown as a partial class total. An individual
   held instrument behaves the same way; an instrument you no longer hold is worth zero.

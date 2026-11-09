@@ -1692,3 +1692,25 @@ def test_0048_income_link_and_source_migration_is_reversible(tmp_path: Path) -> 
         check_database_migrations(settings)
     finally:
         engine.dispose()
+
+
+def test_0049_auto_link_portfolio_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'auto_link.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        columns = {column["name"] for column in inspect(engine).get_columns("workspaces")}
+        assert "auto_link_portfolio" in columns
+        command.downgrade(alembic_config(settings), "0048_f610_income_splits")
+        columns = {column["name"] for column in inspect(engine).get_columns("workspaces")}
+        assert "auto_link_portfolio" not in columns
+        upgrade_database(settings)
+        columns = {column["name"] for column in inspect(engine).get_columns("workspaces")}
+        assert "auto_link_portfolio" in columns
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()

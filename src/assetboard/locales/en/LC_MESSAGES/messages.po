@@ -3087,6 +3087,10 @@ msgstr ""
 msgid "Whole portfolio"
 msgstr ""
 
+#, fuzzy
+msgid "Incomplete: an instrument has no price or FX rate."
+msgstr ""
+
 msgid "Value"
 msgstr ""
 
@@ -5485,6 +5489,9 @@ msgstr ""
 msgid "Plotted performance data"
 msgstr ""
 
+msgid "Incomplete data"
+msgstr ""
+
 msgid "Period returns"
 msgstr ""
 
@@ -5513,9 +5520,6 @@ msgid "Δ value − net flows"
 msgstr ""
 
 msgid "Return"
-msgstr ""
-
-msgid "Incomplete data"
 msgstr ""
 
 msgid ""
@@ -7941,6 +7945,14 @@ msgid ""
 "Holdings are recalculated for the whole history. Changing this "
 "recalculates realized gains and cost basis; no stored values are "
 "rewritten."
+msgstr ""
+
+msgid "Keep investment asset classes linked in net worth automatically"
+msgstr ""
+
+msgid ""
+"Creates and keeps one linked asset item for every asset class with a "
+"value. Off: manage the links yourself on the Net worth page."
 msgstr ""
 
 msgid "Copy the previous month's plan when a month is opened for the first time"
