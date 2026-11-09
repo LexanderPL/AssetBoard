@@ -12,6 +12,7 @@ from uuid import UUID
 import pytest
 from sqlalchemy import select
 
+from assetboard.db.models.identity import AuditEvent
 from assetboard.db.models.import_batch import ImportBatch, ImportCategoryMapping
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.db.repositories import (
@@ -19,6 +20,7 @@ from assetboard.db.repositories import (
     ImportCategoryMappingRepository,
 )
 from assetboard.domain.categories import PALETTE, name_key
+from assetboard.domain.months import YearMonth
 from assetboard.services.context import PermissionDenied
 from assetboard.services.import_csv import default_import_adapters, mapping_category_options
 from assetboard.services.imports import (
@@ -26,11 +28,16 @@ from assetboard.services.imports import (
     ImportConfirmationRequired,
     ImportMappingInvalid,
     apply_import,
+    close_imported_months,
     plan_import,
     rollback_import,
     update_import_preview,
     upload_import,
 )
+from assetboard.services.imports import (
+    ImportError as ImportServiceError,
+)
+from assetboard.services.months import close_month
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 UPLOAD = "upload.csv"
@@ -940,3 +947,174 @@ def test_mapping_categories_include_archived_targets(db: WorkspaceDb) -> None:
 
     assert {option.name for option in options} == {"Food", "Retired"}
     assert {option.archived for option in options} == {False, True}
+
+
+# --- closing the past months of an applied merge import ----------------------
+
+
+def _import_batch(db: WorkspaceDb, *, mode: str, status: str) -> UUID:
+    """A batch row without an upload, for eligibility checks."""
+    with db.factory.begin() as session:
+        batch = ImportBatch(
+            workspace_id=db.workspace_id,
+            source="archive",
+            mode=mode,
+            filename="archive.zip",
+            file_sha256="0" * 64,
+            size_bytes=0,
+            options={},
+            status=status,
+        )
+        session.add(batch)
+        session.flush()
+        return batch.id
+
+
+def _month_closed_events(db: WorkspaceDb) -> list[AuditEvent]:
+    with db.factory() as session:
+        return list(
+            session.scalars(
+                select(AuditEvent)
+                .where(AuditEvent.action == "month.closed")
+                .order_by(AuditEvent.ts, AuditEvent.id)
+            )
+        )
+
+
+def test_close_imported_months_closes_past_months_only_and_audits(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    _category(db, "Food")
+    batch_id = _upload(
+        db,
+        data_dir,
+        b"date,direction,amount,category\n"
+        b"2026-01-10,expense,10,Food\n"
+        b"2026-02-10,expense,20,Food\n"
+        b"2026-02-20,expense,30,Food\n"
+        b"2026-03-10,expense,40,Food\n",
+    )
+    _plan(db, data_dir, batch_id)
+    _apply(db, data_dir, batch_id)
+
+    closed = close_imported_months(db.factory, _ctx(db), batch_id)
+
+    assert [str(month) for month in closed] == ["2026-01", "2026-02"]
+    january = _month_state(db, "2026-01")
+    february = _month_state(db, "2026-02")
+    assert january is not None and january.closed_at == db.clock.now()
+    assert february is not None and february.closed_at == db.clock.now()
+    assert january.closed_by_user_id == db.users["ed"]
+    assert february.closed_by_user_id == db.users["ed"]
+    assert _month_state(db, "2026-03") is None
+    events = _month_closed_events(db)
+    assert sorted(event.data["month"] for event in events) == ["2026-01", "2026-02"]
+    assert {event.actor_user_id for event in events} == {db.users["ed"]}
+
+
+def test_close_imported_months_includes_planned_months_but_skips_current_and_future(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    _category(db, "Food")
+    batch_id = _upload(
+        db,
+        data_dir,
+        b"month,kind,category,planned\n"
+        b"2026-01,expense,Food,10\n"
+        b"2026-02,expense,Food,20\n"
+        b"2026-03,expense,Food,30\n"
+        b"2026-04,expense,Food,40\n",
+    )
+    _plan(db, data_dir, batch_id)
+    _apply(db, data_dir, batch_id)
+
+    closed = close_imported_months(db.factory, _ctx(db), batch_id)
+
+    assert [str(month) for month in closed] == ["2026-01", "2026-02"]
+    march = _month_state(db, "2026-03")
+    april = _month_state(db, "2026-04")
+    assert march is not None and march.closed_at is None
+    assert april is not None and april.closed_at is None
+
+
+def test_close_imported_months_leaves_already_closed_months_alone(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    _category(db, "Food")
+    batch_id = _upload(
+        db,
+        data_dir,
+        b"date,direction,amount,category\n2026-01-10,expense,10,Food\n2026-02-10,expense,20,Food\n",
+    )
+    _plan(db, data_dir, batch_id)
+    _apply(db, data_dir, batch_id)
+    assert close_month(db.factory, _ctx(db), YearMonth(2026, 1)) is True
+    january = _month_state(db, "2026-01")
+    assert january is not None
+
+    closed = close_imported_months(db.factory, _ctx(db), batch_id)
+
+    assert [str(month) for month in closed] == ["2026-02"]
+    refreshed = _month_state(db, "2026-01")
+    assert refreshed is not None and refreshed.closed_at == january.closed_at
+    assert sorted(event.data["month"] for event in _month_closed_events(db)) == [
+        "2026-01",
+        "2026-02",
+    ]
+
+
+def test_close_imported_months_ignores_soft_deleted_transactions(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    _category(db, "Food")
+    batch_id = _upload(
+        db,
+        data_dir,
+        b"date,direction,amount,category\n2026-01-10,expense,10,Food\n2026-02-10,expense,20,Food\n",
+    )
+    _plan(db, data_dir, batch_id)
+    _apply(db, data_dir, batch_id)
+    with db.factory.begin() as session:
+        january_row = session.scalars(
+            select(Transaction).where(Transaction.date == date(2026, 1, 10))
+        ).one()
+        january_row.deleted_at = db.clock.now()
+
+    closed = close_imported_months(db.factory, _ctx(db), batch_id)
+
+    assert [str(month) for month in closed] == ["2026-02"]
+    assert _month_state(db, "2026-01") is None
+
+
+def test_close_imported_months_requires_an_editor_and_rechecks_the_role(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    _category(db, "Food")
+    batch_id = _upload(
+        db,
+        data_dir,
+        b"date,direction,amount,category\n2026-01-10,expense,10,Food\n",
+    )
+    _plan(db, data_dir, batch_id)
+    _apply(db, data_dir, batch_id)
+
+    with pytest.raises(PermissionDenied):
+        close_imported_months(db.factory, _ctx(db, "vic", "viewer"), batch_id)
+    assert _month_state(db, "2026-01") is None
+
+    db.add_member("dee", "viewer")
+    with pytest.raises(PermissionDenied):
+        close_imported_months(db.factory, _ctx(db, "dee", "editor"), batch_id)
+    assert _month_state(db, "2026-01") is None
+
+
+def test_close_imported_months_refuses_restore_and_non_applied_batches(
+    db: WorkspaceDb,
+) -> None:
+    restore_id = _import_batch(db, mode="restore", status="applied")
+    with pytest.raises(ImportServiceError):
+        close_imported_months(db.factory, _ctx(db), restore_id)
+
+    planned_id = _import_batch(db, mode="merge", status="planned")
+    with pytest.raises(ImportServiceError):
+        close_imported_months(db.factory, _ctx(db), planned_id)

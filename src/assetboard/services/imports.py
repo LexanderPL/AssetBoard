@@ -110,7 +110,7 @@ from assetboard.services.archive import workspace_is_empty
 from assetboard.services.categories import usage_by_category
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.holding_rows import holding_transaction
-from assetboard.services.months import lock_month_writes
+from assetboard.services.months import close_month_state, current_month, lock_month_writes
 
 MAX_IMPORT_SECONDS = 60
 MAX_IMPORT_QUEUE_SECONDS = 60
@@ -1161,6 +1161,42 @@ def update_import_preview(
 
     run_immediate(factory, prepare)
     return plan_import(factory, ctx, data_dir, batch_id, adapters)
+
+
+def close_imported_months(
+    factory: sessionmaker[Session], ctx: Context, batch_id: UUID
+) -> list[YearMonth]:
+    """Close the past months that an applied merge import wrote to (F4.3).
+
+    Only months before the current workspace month are closed. Months already closed are left
+    untouched, and the current and future months are never closed. A restore batch is never
+    eligible: it carries its own month states. The closes run in one transaction with the month
+    close's locks, and each records a ``month.closed`` audit event.
+    """
+    require_role(ctx, Role.EDITOR)
+    current = current_month(ctx)
+
+    def close(session: Session) -> list[YearMonth]:
+        require_role_now(session, ctx, Role.EDITOR)
+        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+        lock_month_writes(session, ctx)
+        batch = ImportBatchRepository(session, ctx).get_for_update(batch_id)
+        if batch is None or batch.status != "applied" or batch.mode != "merge":
+            raise ImportError("batch cannot close imported months")
+        months: set[YearMonth] = set()
+        # Archive merges and CSV imports alike set import_batch_id on the rows they write.
+        for transaction in TransactionRepository(session, ctx).for_import_batch(batch.id):
+            if transaction.deleted_at is None:
+                months.add(YearMonth.from_date(transaction.date))
+        for line in BudgetLineRepository(session, ctx).for_import_batch(batch.id):
+            months.add(YearMonth.from_date(line.month))
+        closed: list[YearMonth] = []
+        for month in sorted(months):
+            if month < current and close_month_state(session, ctx, month):
+                closed.append(month)
+        return closed
+
+    return run_immediate(factory, close)
 
 
 @dataclass(frozen=True, slots=True)

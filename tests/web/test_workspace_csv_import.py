@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+from datetime import date
 from io import BytesIO
 from typing import Any, cast
 from uuid import UUID
@@ -10,8 +11,9 @@ from zipfile import ZipFile
 
 from sqlalchemy import select
 
+from assetboard.clock import FixedClock
 from assetboard.db.models.import_batch import ImportBatch, ImportCategoryMapping
-from assetboard.db.models.ledger import Category, Transaction
+from assetboard.db.models.ledger import Category, MonthState, Transaction
 from assetboard.db.repositories import CategoryRepository
 from assetboard.domain.categories import PALETTE, name_key
 from assetboard.domain.import_csv import TEMPLATE_FILES
@@ -154,6 +156,43 @@ def test_default_mapping_is_applied_in_one_step(owner: OwnerApp) -> None:
     assert _batch(owner, batch_id).status == "applied"
     assert [row.amount_minor for row in _transactions(owner)] == [1250, 300000]
     assert {category.name for category in _categories(owner)} == {"Food", "Salary"}
+
+
+def test_mapping_step_has_dynamic_fields_summary_and_filter(owner: OwnerApp) -> None:
+    owner.clear_categories()
+    _category(owner, "Food")
+    batch_id = _upload(
+        owner,
+        b"date,direction,amount,category\n"
+        b"2026-01-02,expense,10,Food\n"
+        b"2026-01-03,expense,20,New stuff\n",
+    )
+
+    page = owner.client.get(f"/workspace/data?batch={batch_id}").text
+
+    assert page.count("data-mapping-row") == 2
+    assert page.count("data-mapping-action") == 2
+    assert page.count('data-mapping-fields="map"') == 2
+    assert page.count('data-mapping-fields="create"') == 6
+    assert "data-mapping-filter" in page
+    assert 'data-mapping-search="expense Expense Food"' in page
+    assert 'data-mapping-search="expense Expense New stuff"' in page
+    assert "data-mapping-summary" in page
+    for name, value in (
+        ("total", 2),
+        ("mapped", 1),
+        ("create", 1),
+        ("ignore", 0),
+        ("unresolved", 0),
+        ("rows", 2),
+    ):
+        assert f'data-mapping-count="{name}">{value}<' in page
+
+    # The server renders the inactive fields hidden; the list stays usable without JavaScript.
+    assert page.count('<div data-mapping-fields="map" hidden>') == 1
+    assert page.count('<div data-mapping-fields="create" hidden>') == 3
+    assert page.count('<div data-mapping-fields="map">') == 1
+    assert page.count('<div data-mapping-fields="create">') == 3
 
 
 def test_mapping_form_matches_choices_by_key_not_row_position() -> None:
@@ -414,6 +453,60 @@ def test_future_dated_rows_are_counted_and_listed(owner: OwnerApp) -> None:
 
     assert _apply(owner, batch_id).status_code == 303
     assert _transactions(owner) == []
+
+
+def test_applied_merge_report_offers_closing_past_months(owner: OwnerApp) -> None:
+    owner.clear_categories()
+    _category(owner, "Food")
+    clock = FixedClock("2026-03-01T12:00:00+00:00")
+    owner.app.state.clock = clock
+    owner.app.state.session_factory.configure(info={"clock": clock})
+    batch_id = _upload(
+        owner,
+        b"date,direction,amount,category\n"
+        b"2026-01-10,expense,10,Food\n"
+        b"2026-02-10,expense,20,Food\n"
+        b"2026-03-10,expense,30,Food\n",
+    )
+    assert (
+        "data-close-imported-months"
+        not in owner.client.get(f"/workspace/data?batch={batch_id}").text
+    )
+
+    assert _apply(owner, batch_id).status_code == 303
+    page = owner.client.get(f"/workspace/data?batch={batch_id}").text
+    assert "data-close-imported-months" in page
+    assert f"/workspace/data/import/{batch_id}/close-months" in page
+    assert "Close past imported months" in page
+
+    path = f"/workspace/data/import/{batch_id}/close-months"
+    assert owner.client.post(path, follow_redirects=False).status_code == 403
+
+    closed = owner.post(path, token_from=f"/workspace/data?batch={batch_id}")
+    assert closed.status_code == 303
+    assert closed.headers["location"] == (
+        f"/workspace/data?batch={batch_id}&notice=months_closed&count=2"
+    )
+    notice = owner.client.get(closed.headers["location"]).text
+    assert "Closed 2 imported months." in notice
+    assert "data-import-notice" in notice
+
+    with owner.db() as session:
+        states = list(session.scalars(select(MonthState).order_by(MonthState.month)))
+    assert [state.month for state in states] == [date(2026, 1, 1), date(2026, 2, 1)]
+    assert {state.closed_by_user_id for state in states} == {owner.admin_id}
+
+    owner.set_admin_role("editor")
+    again = owner.post(path, token_from=f"/workspace/data?batch={batch_id}")
+    assert again.status_code == 303
+    assert again.headers["location"].endswith("notice=no_months_closed")
+    assert (
+        "No past imported months needed closing."
+        in owner.client.get(again.headers["location"]).text
+    )
+
+    owner.set_admin_role("viewer")
+    assert owner.client.get(f"/workspace/data?batch={batch_id}").status_code == 403
 
 
 def test_remember_mappings_checkbox_saves_them_on_apply(owner: OwnerApp) -> None:

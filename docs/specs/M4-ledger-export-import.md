@@ -72,6 +72,7 @@ synthetic too).
 |---|---|---|---|
 | Export the archive (F4.1) | no (open question) | yes | yes |
 | Import a lone CSV or merge an archive (F4.3, F4.4) | no | yes | yes |
+| Close past months after a merge import (F4.3) | no | yes | yes |
 | Roll back a merge batch | no | yes | yes |
 | Restore an archive into an empty workspace, incl. settings and closed months (F4.4) | no | no | yes |
 | Roll back a restore | no | no | yes |
@@ -82,9 +83,11 @@ Roles are checked on the Context and again with `require_role_now` inside every 
 **Closed months (owner decision, 2026-10-18, closes the F2.5 open question):** rows (transactions
 or planned values) dated in a month that is closed in the target workspace are **skipped and
 listed** in the dry-run report; they never refuse the whole import. A restore into an empty
-workspace recreates closed months itself, **after** all data is written (order in F4.4).
-Rolling back a batch that has rows in a month closed since then is refused as a whole, listing
-those months (the same rule as F2.6's bulk recategorize).
+workspace recreates closed months itself, **after** all data is written (order in F4.4). A merge
+import never closes months by itself, but its applied report offers an explicit action to close
+the past months it filled (F4.3). Rolling back a batch that has rows in a month closed since then
+is refused as a whole, listing those months (the same rule as F2.6's bulk recategorize); the
+months must be reopened first.
 
 ---
 
@@ -280,6 +283,17 @@ made from my spreadsheet, map its categories onto mine, check the totals and imp
   wrong-kind target, an empty or invalid create name, a create name that already exists, or two
   creates with the same kind + name key is a `mapping_invalid` error, shown on the page and
   refused again at apply. `categories.csv` has no mapping step.
+- **Closing past imported months (post-apply action):** the report of an applied merge batch
+  (a lone CSV or an archive merge; never a restore) offers **Close past imported months**
+  (editors and owners; CSRF). In one transaction it re-checks the role, takes the workspace lock
+  and `lock_month_writes`, and closes every month **before the current workspace month** that
+  received at least one non-deleted transaction or budget line from the batch and is not closed
+  already. Already closed months are left untouched; the current and future months are never
+  closed. Each close sets `closed_at = clock.now()` and `closed_by_user_id`, and records the
+  normal `month.closed` audit event. The result is reported as a notice ("closed N months" or
+  "no past months needed closing"). A batch that is not an applied merge is refused. Rollback
+  semantics do not change: a batch whose months are now closed is still refused and lists them,
+  and an owner must reopen them first.
 - Lone files map categories **by name**; a `category_id` in the file is ignored (only a full
   restore uses ids).
 - Direction must equal the category's kind (mapping is per kind, so it does). Rows of
