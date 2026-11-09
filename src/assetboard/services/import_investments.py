@@ -872,6 +872,7 @@ class InvestmentTransactionsCsvAdapter(ImportAdapter):
         if any(match.new_instrument is not None for match in plan.matches) and target_class is None:
             raise ValueError("the workspace has no active asset class")
         instruments = InstrumentRepository(session, ctx)
+        active_by_id = {row.id: row for row in instruments.ordered() if row.archived_at is None}
         allocations = InstrumentAllocationRepository(session, ctx)
         created_instruments: dict[str, Instrument] = {}
         audit = AuditEventRepository(session, ctx)
@@ -923,7 +924,7 @@ class InvestmentTransactionsCsvAdapter(ImportAdapter):
         created = 0
         for match in plan.matches:
             instrument = (
-                active_instrument(session, ctx, match.instrument_id)
+                active_by_id.get(match.instrument_id)
                 if match.instrument_id is not None
                 else created_instruments.get(match.new_instrument.key)  # type: ignore[union-attr]
             )
@@ -955,14 +956,3 @@ class InvestmentTransactionsCsvAdapter(ImportAdapter):
             "instruments_created": len(created_instruments),
             "investment_transactions_created": created,
         }
-
-
-def active_instrument(session: Session, ctx: Context, instrument_id: UUID) -> Instrument | None:
-    return next(
-        (
-            row
-            for row in InstrumentRepository(session, ctx).ordered()
-            if row.id == instrument_id and row.archived_at is None
-        ),
-        None,
-    )

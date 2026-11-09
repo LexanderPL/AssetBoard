@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -23,6 +23,7 @@ from assetboard.services.import_csv import default_import_adapters
 from assetboard.services.imports import (
     ImportAdapterRegistry,
     ImportMappingInvalid,
+    ImportRollbackOversell,
     apply_import,
     plan_import,
     preview_rollback_import,
@@ -402,7 +403,7 @@ def test_undated_lots_are_imported_and_listed(db: WorkspaceDb, data_dir: Path) -
         assert InvestmentTransactionRepository(session, _ctx(db)).list()[0].date is None
 
 
-def test_rollback_soft_deletes_transactions_and_removes_a_created_instrument(
+def test_rollback_soft_deletes_transactions_and_archives_a_created_instrument(
     db: WorkspaceDb, data_dir: Path
 ) -> None:
     other = _class(db, "Other")
@@ -446,4 +447,93 @@ def test_rollback_soft_deletes_transactions_and_removes_a_created_instrument(
         instruments = InstrumentRepository(session, _ctx(db)).list()
         assert len(instruments) == 1 and instruments[0].archived_at is not None
         assert len(InstrumentAllocationRepository(session, _ctx(db)).list()) == 1
+        assert AssetClassRepository(session, _ctx(db)).get(other) is not None
+
+
+def test_rollback_refuses_an_oversold_remaining_history(db: WorkspaceDb, data_dir: Path) -> None:
+    class_id = _class(db, "Stocks")
+    instrument_id = _instrument(db, class_id)
+    content = HEADER + _row(
+        instrument="World ETF",
+        date="2026-02-01",
+        type="buy",
+        quantity="1",
+        unit_price="10",
+        quote_currency="EUR",
+        fee="0",
+        fx_to_base="1",
+    )
+    batch_id = _upload(db, data_dir, content)
+    _plan(db, data_dir, batch_id)
+    _apply(db, data_dir, batch_id)
+    with db.factory.begin() as session:
+        InvestmentTransactionRepository(session, _ctx(db)).create(
+            instrument_id=instrument_id,
+            date=date(2026, 2, 2),
+            type="sell",
+            quantity=Decimal("2"),
+            unit_price=Decimal("10"),
+            quote_currency="EUR",
+            fee_minor=0,
+            fx_to_base=Decimal("1"),
+        )
+    preview = preview_rollback_import(db.factory, _ctx(db), batch_id)
+    assert preview.oversells == (("World ETF", date(2026, 2, 2)),)
+    with pytest.raises(ImportRollbackOversell):
+        rollback_import(db.factory, _ctx(db), batch_id)
+    with db.factory() as session:
+        assert len(InvestmentTransactionRepository(session, _ctx(db)).live()) == 2
+
+
+def test_rollback_keeps_rows_edited_after_the_import(db: WorkspaceDb, data_dir: Path) -> None:
+    other = _class(db, "Other")
+    content = HEADER + _row(
+        instrument="Gold",
+        date="2026-02-01",
+        type="buy",
+        quantity="1",
+        unit_price="10",
+        quote_currency="EUR",
+        fee="0",
+        fx_to_base="1",
+    )
+    batch_id = _upload(db, data_dir, content)
+    _plan(db, data_dir, batch_id)
+    update_import_preview(
+        db.factory,
+        _ctx(db),
+        data_dir,
+        batch_id,
+        _adapters(),
+        options={
+            "instrument_mappings": [
+                _mapping(
+                    source_name_key="gold",
+                    action="create",
+                    create_name="Gold",
+                    create_type="metal",
+                    create_unit_label="oz",
+                )
+            ]
+        },
+    )
+    _apply(db, data_dir, batch_id)
+    db.clock._value += timedelta(seconds=1)
+    with db.factory.begin() as session:
+        transaction = InvestmentTransactionRepository(session, _ctx(db)).list()[0]
+        InvestmentTransactionRepository(session, _ctx(db)).update(
+            transaction.id, note="edited after import"
+        )
+    preview = preview_rollback_import(db.factory, _ctx(db), batch_id)
+    assert preview.counts["deleted"] == 0
+    assert preview.counts["edited"] == 1
+    assert preview.counts["instruments_kept"] == 1
+    rollback_import(db.factory, _ctx(db), batch_id)
+    with db.factory() as session:
+        live = InvestmentTransactionRepository(session, _ctx(db)).live()
+        assert len(live) == 1 and live[0].note == "edited after import"
+        instrument = InstrumentRepository(session, _ctx(db)).get(
+            InvestmentTransactionRepository(session, _ctx(db)).live()[0].instrument_id
+        )
+        assert instrument is not None and instrument.archived_at is None
         assert AssetClassRepository(session, _ctx(db)).get(other) is not None

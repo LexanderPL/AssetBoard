@@ -26,6 +26,7 @@ from assetboard.domain.identity import MAX_EMAIL_LENGTH
 from assetboard.domain.import_csv import TEMPLATE_FILES
 from assetboard.domain.instruments import TYPE_LABELS, InstrumentType
 from assetboard.i18n import gettext
+from assetboard.i18n.dates import format_day
 from assetboard.services import taxes
 from assetboard.services.archive import export_workspace, restore_available
 from assetboard.services.context import Role, WorkspaceNotAvailable, require_role, select_workspace
@@ -39,6 +40,7 @@ from assetboard.services.imports import (
     ImportRestoreRequiresArchive,
     ImportRestoreRollbackBlocked,
     ImportRestoreUnavailable,
+    ImportRollbackOversell,
     ImportUnavailable,
     apply_import,
     cancel_import,
@@ -140,6 +142,11 @@ ROLLBACK_CLOSED_MONTH = _("Rollback was refused because these months are closed:
 ROLLBACK_RESTORE_CHANGED = _(
     "Rollback was refused because the workspace changed after the restore: %(reasons)s"
 )
+ROLLBACK_OVERSELL = _(
+    "Rollback was refused because the remaining history for %(instrument)s would oversell on "
+    "%(date)s."
+)
+ROLLBACK_OVERSELL_UNDATED = _("an undated transaction")
 IMPORT_SETTING_LABELS = {
     "name": _("Workspace name"),
     "base_currency": _("Base currency"),
@@ -561,6 +568,7 @@ async def workspace_data_import_rollback_confirm(
         context={
             "preview": preview,
             "blocked_reasons": blocked_reasons,
+            "format_day": format_day,
             "import_setting_labels": _import_setting_labels(request),
         },
     )
@@ -590,6 +598,15 @@ async def workspace_data_import_rollback(
             for reason in error.reasons
         )
         detail = _t(request, ROLLBACK_RESTORE_CHANGED) % {"reasons": reasons}
+        raise HTTPException(status_code=409, detail=detail) from None
+    except ImportRollbackOversell as error:
+        instrument, day = error.oversells[0]
+        detail = _t(request, ROLLBACK_OVERSELL) % {
+            "instrument": instrument,
+            "date": format_day(day, request.state.locale)
+            if day is not None
+            else _t(request, ROLLBACK_OVERSELL_UNDATED),
+        }
         raise HTTPException(status_code=409, detail=detail) from None
     except (ImportError, ImportUnavailable) as error:
         message = IMPORT_NOT_AVAILABLE if isinstance(error, ImportUnavailable) else IMPORT_FAILED

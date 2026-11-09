@@ -775,7 +775,7 @@ def test_investment_transaction_csv_mapping_from_the_data_page(owner: OwnerApp) 
     assert "instrument_action_0" in preview_page
     response = _apply(owner, batch_id, **mapping)
     assert response.status_code == 303
-    with owner.db() as session:
+    with owner.db() as session, session.begin():
         instrument = session.scalars(
             select(Instrument).where(
                 Instrument.workspace_id == owner.home_id,
@@ -791,3 +791,20 @@ def test_investment_transaction_csv_mapping_from_the_data_page(owner: OwnerApp) 
         ).one()
         assert transaction.quantity == Decimal("2")
         assert transaction.fx_to_base == Decimal("1")
+        sell = InvestmentTransaction(
+            workspace_id=owner.home_id,
+            instrument_id=instrument.id,
+            date=date(2026, 10, 2),
+            type="sell",
+            quantity=Decimal("3"),
+            unit_price=Decimal("2000"),
+            quote_currency="EUR",
+            fee_minor=0,
+            fx_to_base=Decimal("1"),
+        )
+        session.add(sell)
+        session.flush()
+    page = owner.client.get(f"/workspace/data/import/{batch_id}/rollback")
+    assert "would oversell" in page.text
+    assert "Rollback is not possible" in page.text
+    assert "Confirm rollback" not in page.text

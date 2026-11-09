@@ -90,6 +90,13 @@ from assetboard.db.repositories import (
 )
 from assetboard.db.repositories.base import WorkspaceScope
 from assetboard.domain.archive import ArchiveError
+from assetboard.domain.holdings import (
+    CostBasisMethod,
+    HoldingTransaction,
+    InvalidHoldingTransaction,
+    Oversell,
+    compute_holdings,
+)
 from assetboard.domain.import_upload import (
     ZIP_LOCAL_FILE_SIGNATURE,
     ParsedUpload,
@@ -102,6 +109,7 @@ from assetboard.i18n import gettext
 from assetboard.services.archive import workspace_is_empty
 from assetboard.services.categories import usage_by_category
 from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.holding_rows import holding_transaction
 from assetboard.services.months import lock_month_writes
 
 MAX_IMPORT_SECONDS = 60
@@ -489,6 +497,14 @@ class ImportRestoreRollbackBlocked(ImportError):
         self.reasons = reasons
 
 
+class ImportRollbackOversell(ImportError):
+    """Removing an investment import's rows would leave an oversold history."""
+
+    def __init__(self, oversells: tuple[tuple[str, date | None], ...]) -> None:
+        super().__init__("the remaining investment history would oversell")
+        self.oversells = oversells
+
+
 @dataclass(frozen=True, slots=True)
 class RollbackPreview:
     """The rollback confirmation page, for a merge or a restore batch."""
@@ -499,6 +515,7 @@ class RollbackPreview:
     closed_months: tuple[str, ...] = ()
     blocked_reasons: tuple[str, ...] = ()
     settings_restored: tuple[str, ...] = ()
+    oversells: tuple[tuple[str, date | None], ...] = ()
 
 
 def _never() -> bool:
@@ -1540,13 +1557,64 @@ def _instrument_has_other_references(session: Session, ctx: Context, instrument_
     )
 
 
+def _investment_rollback_oversells(
+    session: Session, ctx: Context, batch: ImportBatch
+) -> tuple[tuple[str, date | None], ...]:
+    """Oversells left in the history after deleting this batch's unedited rows."""
+    applied_at = batch.applied_at
+    base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
+    transactions = InvestmentTransactionRepository(session, ctx).for_import_batch(batch.id)
+    instrument_ids = {row.instrument_id for row in transactions}
+    instruments = {
+        row.id: row
+        for row in InstrumentRepository(session, ctx).ordered()
+        if row.id in instrument_ids
+    }
+    oversells: list[tuple[str, date | None]] = []
+    repository = InvestmentTransactionRepository(session, ctx)
+    for instrument_id in sorted(instrument_ids, key=str):
+        rows: list[HoldingTransaction] = []
+        for row in repository.for_instrument(instrument_id):
+            if row.import_batch_id == batch.id and (
+                applied_at is None or row.updated_at <= applied_at
+            ):
+                continue
+            if row.type not in {"buy", "sell"}:
+                continue
+            rows.append(holding_transaction(row))
+        try:
+            compute_holdings(
+                rows,
+                CostBasisMethod.AVERAGE,
+                None,
+                base_currency=base_currency,
+            )
+        except Oversell as exc:
+            instrument = instruments.get(instrument_id)
+            oversells.append((instrument.name if instrument else "", exc.on))
+        except InvalidHoldingTransaction:
+            instrument = instruments.get(instrument_id)
+            oversells.append((instrument.name if instrument else "", None))
+    return tuple(oversells)
+
+
 def _investment_rollback_decision(
     session: Session, ctx: Context, batch: ImportBatch, instrument: Instrument
 ) -> str:
     rows = InvestmentTransactionRepository(session, ctx).for_instrument(
         instrument.id, include_deleted=True
     )
-    if any(row.deleted_at is None and row.import_batch_id != batch.id for row in rows):
+    applied_at = batch.applied_at
+    kept = [
+        row
+        for row in rows
+        if row.deleted_at is None
+        and (
+            row.import_batch_id != batch.id
+            or (applied_at is not None and row.updated_at > applied_at)
+        )
+    ]
+    if kept:
         return "keep"
     # Soft-deleted imported rows still reference the instrument, so an instrument with any
     # history is archived instead of deleted, like a category that remains referenced.
@@ -1556,19 +1624,29 @@ def _investment_rollback_decision(
         return "archive"
     if _instrument_has_other_references(session, ctx, instrument.id):
         return "archive"
+    # Normally a created instrument keeps its soft-deleted imported rows and is archived; this
+    # branch covers a created instrument whose rows were removed by a later explicit cleanup.
     return "delete"
 
 
 def _investment_rollback_counts(
     session: Session, ctx: Context, batch: ImportBatch
 ) -> dict[str, int]:
+    applied_at = batch.applied_at
     transactions = InvestmentTransactionRepository(session, ctx).for_import_batch(batch.id)
     instruments = InstrumentRepository(session, ctx).for_import_batch(batch.id)
     decisions = [
         _investment_rollback_decision(session, ctx, batch, instrument) for instrument in instruments
     ]
     return {
-        "deleted": sum(row.deleted_at is None for row in transactions),
+        "deleted": sum(
+            row.deleted_at is None and (applied_at is None or row.updated_at <= applied_at)
+            for row in transactions
+        ),
+        "edited": sum(
+            row.deleted_at is None and applied_at is not None and row.updated_at > applied_at
+            for row in transactions
+        ),
         "instruments_deleted": decisions.count("delete"),
         "instruments_archived": decisions.count("archive"),
         "instruments_kept": decisions.count("keep"),
@@ -1583,11 +1661,15 @@ def _investment_rollback_counts(
 def _rollback_investment_import(
     session: Session, ctx: Context, batch: ImportBatch
 ) -> dict[str, int]:
+    oversells = _investment_rollback_oversells(session, ctx, batch)
+    if oversells:
+        raise ImportRollbackOversell(oversells)
     counts = _investment_rollback_counts(session, ctx, batch)
     now = ctx.clock.now()
+    applied_at = batch.applied_at
     transactions = InvestmentTransactionRepository(session, ctx)
     for row in transactions.for_import_batch(batch.id):
-        if row.deleted_at is None:
+        if row.deleted_at is None and (applied_at is None or row.updated_at <= applied_at):
             transactions.update(row.id, deleted_at=now)
     allocations = InstrumentAllocationRepository(session, ctx)
     instruments = InstrumentRepository(session, ctx)
@@ -1614,6 +1696,7 @@ def _rollback_investment_import(
             "source": batch.source,
             "mode": "merge",
             "investment_transactions_deleted": counts["deleted"],
+            "investment_transactions_edited_kept": counts["edited"],
             "instruments_deleted": counts["instruments_deleted"],
             "instruments_archived": counts["instruments_archived"],
             "instrument_allocations_deleted": counts["instrument_allocations_deleted"],
@@ -1738,6 +1821,7 @@ def preview_rollback_import(
                 batch=_batch_view(batch),
                 mode="merge",
                 counts=_investment_rollback_counts(session, ctx, batch),
+                oversells=_investment_rollback_oversells(session, ctx, batch),
             )
         plan = _rollback_plan(session, ctx, batch, lock=False)
         return RollbackPreview(

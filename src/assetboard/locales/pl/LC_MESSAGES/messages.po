@@ -3784,6 +3784,15 @@ msgstr ""
 "Nie można cofnąć przywracania, ponieważ obszar roboczy zmienił się po "
 "przywróceniu: %(reasons)s"
 
+#, python-format
+msgid ""
+"Rollback was refused because the remaining history for %(instrument)s "
+"would oversell on %(date)s."
+msgstr ""
+"Przywrócenie zostało odrzucone, ponieważ pozostała historia dla "
+"%(instrument)s spowodowałaby sprzedaż większą niż posiadana w dniu "
+"%(date)s."
+
 msgid "Workspace name"
 msgstr "Nazwa obszaru roboczego"
 
@@ -8247,9 +8256,6 @@ msgstr "Migawki majątku netto do usunięcia"
 msgid "Settings to restore:"
 msgstr "Ustawienia do przywrócenia:"
 
-msgid "Rollback is not possible:"
-msgstr "Cofnięcie nie jest możliwe:"
-
 msgid "Budget lines kept (changed since the import)"
 msgstr "Zachowane wartości planowane (zmienione po imporcie)"
 
@@ -8258,6 +8264,19 @@ msgstr "Kategorie do usunięcia"
 
 msgid "Categories to archive"
 msgstr "Kategorie do zarchiwizowania"
+
+msgid "Instruments to delete"
+msgstr "Instrumenty do usunięcia"
+
+msgid "Instruments to archive"
+msgstr "Instrumenty do zarchiwizowania"
+
+msgid "Instruments kept"
+msgstr "Instrumenty zachowane"
+
+#, python-format
+msgid "%(count)s of the transactions were edited after the import; they are kept."
+msgstr "%(count)s transakcji zostało edytowanych po imporcie; są zachowane."
 
 #, python-format
 msgid ""
@@ -8268,6 +8287,15 @@ msgstr "Transakcje edytowane po imporcie: %(count)s; one również zostaną usun
 #, python-format
 msgid "Rollback is not possible while these months are closed: %(months)s"
 msgstr "Nie można cofnąć importu, dopóki te miesiące są zamknięte: %(months)s"
+
+msgid "Rollback is not possible:"
+msgstr "Cofnięcie nie jest możliwe:"
+
+#, python-format
+msgid "The remaining history for %(instrument)s would oversell on %(date)s."
+msgstr ""
+"Pozostała historia dla %(instrument)s spowodowałaby sprzedaż większą niż "
+"posiadana w dniu %(date)s."
 
 msgid "Confirm rollback"
 msgstr "Potwierdź cofnięcie"

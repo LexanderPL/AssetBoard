@@ -3546,6 +3546,12 @@ msgid ""
 "%(reasons)s"
 msgstr ""
 
+#, python-format
+msgid ""
+"Rollback was refused because the remaining history for %(instrument)s "
+"would oversell on %(date)s."
+msgstr ""
+
 msgid "Workspace name"
 msgstr ""
 
@@ -7606,9 +7612,6 @@ msgstr ""
 msgid "Settings to restore:"
 msgstr ""
 
-msgid "Rollback is not possible:"
-msgstr ""
-
 msgid "Budget lines kept (changed since the import)"
 msgstr ""
 
@@ -7616,6 +7619,19 @@ msgid "Categories to delete"
 msgstr ""
 
 msgid "Categories to archive"
+msgstr ""
+
+msgid "Instruments to delete"
+msgstr ""
+
+msgid "Instruments to archive"
+msgstr ""
+
+msgid "Instruments kept"
+msgstr ""
+
+#, python-format
+msgid "%(count)s of the transactions were edited after the import; they are kept."
 msgstr ""
 
 #, python-format
@@ -7626,6 +7642,13 @@ msgstr ""
 
 #, python-format
 msgid "Rollback is not possible while these months are closed: %(months)s"
+msgstr ""
+
+msgid "Rollback is not possible:"
+msgstr ""
+
+#, python-format
+msgid "The remaining history for %(instrument)s would oversell on %(date)s."
 msgstr ""
 
 msgid "Confirm rollback"
