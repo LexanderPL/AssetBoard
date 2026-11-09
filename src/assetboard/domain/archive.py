@@ -12,15 +12,33 @@ import zipfile
 import zlib
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
+from decimal import Decimal, InvalidOperation
 from typing import cast
 from uuid import UUID
 
+from assetboard.domain.bonds import (
+    MAX_ANNUAL_RATE_BP,
+    MAX_SERIES_CODE_LENGTH,
+    BondRatePeriod,
+    InterestMode,
+    validate_rate_schedule,
+)
 from assetboard.domain.categories import Kind, Treatment, name_key
+from assetboard.domain.holdings import MAX_NOTE_LENGTH, InvestmentTransactionType
+from assetboard.domain.instruments import (
+    MAX_ASSET_CLASS_NAME_LENGTH,
+    MAX_INSTRUMENT_NAME_LENGTH,
+    MAX_SYMBOL_LENGTH,
+    MAX_UNIT_LABEL_LENGTH,
+    InstrumentType,
+    RiskTier,
+    ValuationSource,
+)
 from assetboard.domain.money import minor_unit_for
 from assetboard.domain.networth import MAX_ITEM_NAME_LENGTH, MAX_NOTES_LENGTH, Side
 
 FORMAT = "workspace-archive"
-FORMAT_VERSION = "1.3"
+FORMAT_VERSION = "1.4"
 # Bounds of the optional ``upcoming_days`` key (1.1); mirror ``config.MIN/MAX_UPCOMING_DAYS``.
 MIN_UPCOMING_DAYS = 1
 MAX_UPCOMING_DAYS = 365
@@ -76,6 +94,92 @@ CSV_COLUMNS = {
         "breakdown",
         "source",
     ),
+    "asset_classes.csv": (
+        "id",
+        "name",
+        "investable",
+        "color",
+        "sort_order",
+        "risk_tier",
+        "archived_at",
+    ),
+    "instruments.csv": (
+        "id",
+        "name",
+        "symbol",
+        "type",
+        "quote_currency",
+        "unit_label",
+        "valuation_source",
+        "provider_key",
+        "provider_symbol",
+        "provider_backfilled_at",
+        "risk_tier_override",
+        "archived_at",
+    ),
+    "instrument_allocations.csv": (
+        "id",
+        "instrument_id",
+        "instrument",
+        "asset_class_id",
+        "asset_class",
+        "weight_bp",
+    ),
+    "investment_transactions.csv": (
+        "id",
+        "instrument_id",
+        "instrument",
+        "date",
+        "type",
+        "quantity",
+        "unit_price",
+        "quote_currency",
+        "fee",
+        "fx_to_base",
+        "note",
+        "settlement_currency",
+        "settlement_unit_price",
+        "settlement_fee",
+        "deleted_at",
+    ),
+    "bond_terms.csv": (
+        "id",
+        "instrument_id",
+        "instrument",
+        "series_code",
+        "face_value",
+        "maturity_date",
+        "interest_mode",
+        "rate_schedule",
+        "tax_rate_bp",
+        "early_redemption_fee_mode",
+        "early_redemption_fee_rate_bp",
+        "early_redemption_fee",
+    ),
+    "price_points.csv": (
+        "id",
+        "instrument_id",
+        "instrument",
+        "date",
+        "price",
+        "source",
+        "provider_key",
+    ),
+    "fx_rates.csv": (
+        "id",
+        "base_currency",
+        "quote_currency",
+        "date",
+        "rate",
+        "source",
+    ),
+    "price_source_configs.csv": (
+        "id",
+        "provider_key",
+        "enabled",
+        "daily_call_budget",
+        "fx_backfilled",
+    ),
 }
 BASE_CSV_FILES = ("categories.csv", "budget_lines.csv", "transactions.csv", "months.csv")
 NETWORTH_CSV_FILES = (
@@ -83,6 +187,16 @@ NETWORTH_CSV_FILES = (
     "networth_items.csv",
     "item_valuations.csv",
     "networth_snapshots.csv",
+)
+INVESTMENT_CSV_FILES = (
+    "asset_classes.csv",
+    "instruments.csv",
+    "instrument_allocations.csv",
+    "investment_transactions.csv",
+    "bond_terms.csv",
+    "price_points.csv",
+    "fx_rates.csv",
+    "price_source_configs.csv",
 )
 FILE_ORDER = ("workspace.json", *CSV_COLUMNS)
 REQUIRED_FILES = ("manifest.json", *FILE_ORDER)
@@ -106,6 +220,8 @@ def required_files(version: str) -> tuple[str, ...]:
     if major != 1:
         return REQUIRED_FILES
     csv_files = BASE_CSV_FILES + (NETWORTH_CSV_FILES if minor >= 2 else ())
+    if minor >= 4:
+        csv_files += INVESTMENT_CSV_FILES
     return ("manifest.json", "workspace.json", *csv_files)
 
 
@@ -203,6 +319,117 @@ class NetWorthSnapshotRow:
 
 
 @dataclass(frozen=True, slots=True)
+class AssetClassRow:
+    id: str
+    name: str
+    investable: str
+    color: str
+    sort_order: int
+    risk_tier: str
+    archived_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class InstrumentRow:
+    id: str
+    name: str
+    symbol: str
+    type: str
+    quote_currency: str
+    unit_label: str
+    valuation_source: str
+    provider_key: str
+    provider_symbol: str
+    provider_backfilled_at: str | None
+    risk_tier_override: str
+    archived_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class InstrumentAllocationRow:
+    id: str
+    instrument_id: str
+    instrument: str
+    asset_class_id: str
+    asset_class: str
+    weight_bp: int
+
+
+@dataclass(frozen=True, slots=True)
+class InvestmentTransactionRow:
+    id: str
+    instrument_id: str
+    instrument: str
+    date: str | None
+    type: str
+    quantity: str
+    unit_price: str
+    quote_currency: str
+    fee: str
+    fx_to_base: str
+    note: str
+    settlement_currency: str
+    settlement_unit_price: str
+    settlement_fee: str
+    deleted_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class BondTermsRow:
+    id: str
+    instrument_id: str
+    instrument: str
+    series_code: str
+    face_value: str
+    maturity_date: str
+    interest_mode: str
+    rate_schedule: str
+    tax_rate_bp: int
+    early_redemption_fee_mode: str
+    early_redemption_fee_rate_bp: int | None
+    early_redemption_fee: str
+
+
+@dataclass(frozen=True, slots=True)
+class PricePointRow:
+    id: str
+    instrument_id: str
+    instrument: str
+    date: str
+    price: str
+    source: str
+    provider_key: str
+
+
+@dataclass(frozen=True, slots=True)
+class FxRateRow:
+    id: str
+    base_currency: str
+    quote_currency: str
+    date: str
+    rate: str
+    source: str
+
+
+@dataclass(frozen=True, slots=True)
+class PriceSourceConfigRow:
+    id: str
+    provider_key: str
+    enabled: str
+    daily_call_budget: int
+    fx_backfilled: str
+
+
+@dataclass(frozen=True, slots=True)
+class RiskTargetPolicyRow:
+    mode: str
+    safe_bp: int
+    growth_bp: int
+    speculative_bp: int
+    tolerance_bp: int
+
+
+@dataclass(frozen=True, slots=True)
 class ArchiveRows:
     workspace: dict[str, object]
     categories: tuple[CategoryRow, ...]
@@ -213,6 +440,15 @@ class ArchiveRows:
     networth_items: tuple[NetWorthItemRow, ...] = ()
     item_valuations: tuple[ItemValuationRow, ...] = ()
     networth_snapshots: tuple[NetWorthSnapshotRow, ...] = ()
+    asset_classes: tuple[AssetClassRow, ...] = ()
+    instruments: tuple[InstrumentRow, ...] = ()
+    instrument_allocations: tuple[InstrumentAllocationRow, ...] = ()
+    investment_transactions: tuple[InvestmentTransactionRow, ...] = ()
+    bond_terms: tuple[BondTermsRow, ...] = ()
+    price_points: tuple[PricePointRow, ...] = ()
+    fx_rates: tuple[FxRateRow, ...] = ()
+    price_source_configs: tuple[PriceSourceConfigRow, ...] = ()
+    risk_target_policy: RiskTargetPolicyRow | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -283,6 +519,20 @@ def build_files(rows: ArchiveRows) -> dict[str, bytes]:
         "networth_items.csv": csv_bytes("networth_items.csv", rows.networth_items),
         "item_valuations.csv": csv_bytes("item_valuations.csv", rows.item_valuations),
         "networth_snapshots.csv": csv_bytes("networth_snapshots.csv", rows.networth_snapshots),
+        "asset_classes.csv": csv_bytes("asset_classes.csv", rows.asset_classes),
+        "instruments.csv": csv_bytes("instruments.csv", rows.instruments),
+        "instrument_allocations.csv": csv_bytes(
+            "instrument_allocations.csv", rows.instrument_allocations
+        ),
+        "investment_transactions.csv": csv_bytes(
+            "investment_transactions.csv", rows.investment_transactions
+        ),
+        "bond_terms.csv": csv_bytes("bond_terms.csv", rows.bond_terms),
+        "price_points.csv": csv_bytes("price_points.csv", rows.price_points),
+        "fx_rates.csv": csv_bytes("fx_rates.csv", rows.fx_rates),
+        "price_source_configs.csv": csv_bytes(
+            "price_source_configs.csv", rows.price_source_configs
+        ),
     }
 
 
@@ -330,6 +580,18 @@ def timestamp_text(value: datetime | None) -> str | None:
         .isoformat(timespec="microseconds" if value.microsecond else "seconds")
         .replace("+00:00", "Z")
     )
+
+
+def decimal_text(value: Decimal) -> str:
+    """Plain decimal text, never an exponent and without trailing fractional zeros (F6.9).
+
+    ``Decimal("12.3400")`` becomes ``"12.34"`` and ``Decimal("0.000")`` becomes ``"0"``. The
+    value is not rounded; ``Decimal`` parses the text back exactly.
+    """
+    text = format(value, "f")
+    if "." in text:
+        text = text.rstrip("0").rstrip(".")
+    return text or "0"
 
 
 def lineage_id(row_id: UUID, import_key: str | None) -> UUID:
@@ -527,8 +789,22 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
         )
         or ("taxes_enabled" in workspace and type(workspace["taxes_enabled"]) is not bool)
         or not _valid_upcoming_days(workspace.get("upcoming_days"))
+        or not _valid_cost_basis(workspace.get("investment_cost_basis", "average"))
     ):
         return None, (ArchiveError("workspace.json", "invalid workspace settings"),)
+    risk_policy: RiskTargetPolicyRow | None = None
+    raw_policy = workspace.get("risk_target_policy")
+    if raw_policy is not None:
+        try:
+            risk_policy = _risk_target_policy(raw_policy)
+        except ValueError:
+            return None, (ArchiveError("workspace.json", "invalid workspace settings"),)
+        if isinstance(raw_policy, dict):
+            warnings.extend(
+                ArchiveError("workspace.json", f"unknown key: risk_target_policy.{key}")
+                for key in cast("dict[object, object]", raw_policy).keys()
+                - {"mode", "safe_bp", "growth_bp", "speculative_bp", "tolerance_bp"}
+            )
     warnings.extend(
         ArchiveError("workspace.json", f"unknown key: {key}")
         for key in workspace.keys()
@@ -541,9 +817,13 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
             "auto_copy_plan",
             "taxes_enabled",
             "upcoming_days",
+            "investment_cost_basis",
+            "risk_target_policy",
         }
     )
-    parsed = _read_rows(files, workspace, currency, str(version), errors, warnings)
+    parsed = _read_rows(
+        files, workspace, currency, str(version), errors, warnings, risk_policy=risk_policy
+    )
     if errors:
         return None, tuple(errors)
     return ParsedArchive(manifest, files, parsed, tuple(warnings)), ()
@@ -552,6 +832,38 @@ def parse_archive(data: bytes) -> tuple[ParsedArchive | None, tuple[ArchiveError
 def _valid_upcoming_days(value: object) -> bool:
     """``upcoming_days`` (1.1) is optional: absent or ``null`` means the instance default."""
     return value is None or (type(value) is int and MIN_UPCOMING_DAYS <= value <= MAX_UPCOMING_DAYS)
+
+
+def _valid_cost_basis(value: object) -> bool:
+    return isinstance(value, str) and value in {"average", "fifo"}
+
+
+def _risk_target_policy(value: object) -> RiskTargetPolicyRow:
+    """Validate the optional 1.4 ``risk_target_policy`` object with the editor's rules."""
+    data = _string_keyed_object(value)
+    if data is None:
+        raise ValueError("invalid risk target policy")
+    mode = data.get("mode")
+    if mode not in {"fixed", "age_scaled", "age_in_bonds"}:
+        raise ValueError("invalid risk target policy")
+    values: dict[str, int] = {}
+    for key in ("safe_bp", "growth_bp", "speculative_bp", "tolerance_bp"):
+        number = data.get(key)
+        if type(number) is not int or not 0 <= number <= 10_000:
+            raise ValueError("invalid risk target policy")
+        values[key] = number
+    if (
+        mode == "fixed"
+        and values["safe_bp"] + values["growth_bp"] + values["speculative_bp"] != 10_000
+    ):
+        raise ValueError("invalid risk target policy")
+    return RiskTargetPolicyRow(
+        mode=cast("str", mode),
+        safe_bp=values["safe_bp"],
+        growth_bp=values["growth_bp"],
+        speculative_bp=values["speculative_bp"],
+        tolerance_bp=values["tolerance_bp"],
+    )
 
 
 def _parse_timestamp(value: str) -> str:
@@ -578,8 +890,121 @@ def _decimal_text(value: str, currency: str, *, allow_zero: bool) -> str:
     return value
 
 
+def _plain_decimal(value: str, *, allow_zero: bool) -> str:
+    """A positive plain decimal that fits ``DecimalType``; no exponent or locale format."""
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", value):
+        raise ValueError("invalid decimal")
+    try:
+        number = Decimal(value)
+    except InvalidOperation:
+        raise ValueError("invalid decimal") from None
+    if not number.is_finite() or number < 0 or (number == 0 and not allow_zero):
+        raise ValueError("invalid decimal")
+    exponent = number.as_tuple().exponent
+    if not isinstance(exponent, int):
+        raise ValueError("invalid decimal")
+    scale = max(-exponent, 0)
+    integer_digits = 0 if number.is_zero() else max(number.adjusted() + 1, 0)
+    if scale > 18 or integer_digits > 20 or integer_digits + scale > 38:
+        raise ValueError("invalid decimal")
+    return value
+
+
+def _money_minor(value: str, currency: str, *, allow_zero: bool) -> int:
+    """A currency amount with at most the currency's minor digits, returned as minor units."""
+    text = value or "0"
+    try:
+        number = Decimal(text)
+    except InvalidOperation:
+        raise ValueError("invalid decimal") from None
+    if not number.is_finite() or number < 0:
+        raise ValueError("invalid decimal")
+    minor = number.scaleb(minor_unit_for(currency))
+    if minor != minor.to_integral_value():
+        raise ValueError("too many decimals")
+    result = int(minor)
+    if result == 0 and not allow_zero:
+        raise ValueError("amount must be positive")
+    return result
+
+
+def _valid_currency(value: str) -> str:
+    code = value.upper()
+    if not code:
+        raise ValueError("required value missing")
+    try:
+        minor_unit_for(code)
+    except ValueError:
+        raise ValueError("invalid currency") from None
+    return code
+
+
+def _valid_fx_backfilled(value: str) -> str:
+    if not value:
+        return ""
+    try:
+        parsed = json.loads(value)
+    except (ValueError, RecursionError):
+        raise ValueError("invalid fx history") from None
+    if not isinstance(parsed, dict):
+        raise ValueError("invalid fx history")
+    normalized: dict[str, str] = {}
+    for currency, day in cast("dict[object, object]", parsed).items():
+        if not isinstance(currency, str) or not isinstance(day, str):
+            raise ValueError("invalid fx history")
+        try:
+            code = _valid_currency(currency)
+            date.fromisoformat(day)
+        except ValueError:
+            raise ValueError("invalid fx history") from None
+        normalized[code] = day
+    return json.dumps(normalized, ensure_ascii=False, separators=(",", ":"), sort_keys=True)
+
+
+def _valid_rate_schedule(value: str) -> str:
+    try:
+        parsed = json.loads(value)
+    except (ValueError, RecursionError):
+        raise ValueError("invalid rate schedule") from None
+    if not isinstance(parsed, list) or not parsed:
+        raise ValueError("invalid rate schedule")
+    entries: list[object] = cast("list[object]", parsed)
+    periods: list[BondRatePeriod] = []
+    for entry in entries:
+        row = _string_keyed_object(entry)
+        if row is None or set(row) != {"from_date", "annual_rate_bp"}:
+            raise ValueError("invalid rate schedule")
+        day, rate = row["from_date"], row["annual_rate_bp"]
+        if not isinstance(day, str) or type(rate) is not int or not 0 <= rate <= MAX_ANNUAL_RATE_BP:
+            raise ValueError("invalid rate schedule")
+        try:
+            periods.append(BondRatePeriod(date.fromisoformat(day), rate))
+        except ValueError:
+            raise ValueError("invalid rate schedule") from None
+    if any(
+        periods[index].from_date <= periods[index - 1].from_date for index in range(1, len(periods))
+    ):
+        raise ValueError("invalid rate schedule")
+    return json.dumps(
+        [
+            {"from_date": period.from_date.isoformat(), "annual_rate_bp": period.annual_rate_bp}
+            for period in periods
+        ],
+        ensure_ascii=False,
+        separators=(",", ":"),
+        sort_keys=True,
+    )
+
+
 def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
-    if column in ("id", "category_id", "item_id", "link_id"):
+    if column in (
+        "id",
+        "category_id",
+        "item_id",
+        "link_id",
+        "instrument_id",
+        "asset_class_id",
+    ):
         return str(UUID(value)) if value else ""
     if column in ("kind", "direction"):
         return Kind(value).value if value else ""
@@ -595,8 +1020,11 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         if value and value not in LINK_TYPES:
             raise ValueError("invalid link type")
         return value
-    if column in ("include_in_net_worth", "investable"):
-        default = "true" if column == "include_in_net_worth" else "false"
+    if column in ("include_in_net_worth", "investable", "enabled"):
+        if column == "investable":
+            default = "true" if file == "asset_classes.csv" else "false"
+        else:
+            default = "true" if column == "include_in_net_worth" else "false"
         chosen = value or default
         if chosen not in {"true", "false"}:
             raise ValueError("invalid boolean")
@@ -605,10 +1033,17 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         if value not in {"", "true", "false"}:
             raise ValueError("invalid boolean")
         return value
-    if column in ("archived_at", "deleted_at", "closed_at", "plan_started_at", "created_at"):
+    if column in (
+        "archived_at",
+        "deleted_at",
+        "closed_at",
+        "plan_started_at",
+        "created_at",
+        "provider_backfilled_at",
+    ):
         return _parse_timestamp(value) if value else ""
-    if column in ("date", "month", "as_of", "acquired_on"):
-        if not value and column == "acquired_on":
+    if column in ("date", "month", "as_of", "acquired_on", "maturity_date"):
+        if not value and (column == "acquired_on" or file == "investment_transactions.csv"):
             return ""
         pattern = r"[0-9]{4}-[0-9]{2}" + ("" if column == "month" else r"-[0-9]{2}")
         if not re.fullmatch(pattern, value):
@@ -627,29 +1062,118 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         )
     if column == "currency":
         if file in {"networth_items.csv", "item_valuations.csv", "networth_snapshots.csv"}:
-            code = value.upper()
-            if not code:
-                raise ValueError("required value missing")
-            try:
-                minor_unit_for(code)
-            except ValueError:
-                raise ValueError("invalid currency") from None
-            return code
+            return _valid_currency(value)
         if value and value != currency:
             raise ValueError("currency differs from workspace")
         return currency
+    if column in ("quote_currency", "settlement_currency", "base_currency"):
+        if column == "settlement_currency" and not value:
+            return ""
+        return _valid_currency(value)
+    if column in ("quantity", "unit_price", "price", "settlement_unit_price"):
+        if column == "settlement_unit_price" and not value:
+            return ""
+        return _plain_decimal(value, allow_zero=True)
+    if column in ("rate", "fx_to_base"):
+        if column == "fx_to_base" and not value:
+            return ""
+        return _plain_decimal(value, allow_zero=False)
+    if column == "fee":
+        return _plain_decimal(value or "0", allow_zero=True)
+    if column == "settlement_fee":
+        return _plain_decimal(value, allow_zero=True) if value else ""
+    if column == "early_redemption_fee":
+        return _plain_decimal(value, allow_zero=True) if value else ""
+    if column == "face_value":
+        return _plain_decimal(value, allow_zero=False)
+    if column in ("risk_tier", "risk_tier_override"):
+        if value and value not in {tier.value for tier in RiskTier}:
+            raise ValueError("invalid risk tier")
+        return value
+    if column == "type":
+        if file == "instruments.csv":
+            if value not in {kind.value for kind in InstrumentType}:
+                raise ValueError("invalid instrument type")
+            return value
+        if value not in {kind.value for kind in InvestmentTransactionType}:
+            raise ValueError("invalid transaction type")
+        return value
+    if column == "valuation_source":
+        if value not in {source.value for source in ValuationSource}:
+            raise ValueError("invalid valuation source")
+        return value
+    if column == "interest_mode":
+        if value not in {mode.value for mode in InterestMode}:
+            raise ValueError("invalid interest mode")
+        return value
+    if column == "early_redemption_fee_mode":
+        if value not in {"", "percent", "fixed"}:
+            raise ValueError("invalid early redemption fee")
+        return value
+    if column in ("weight_bp", "tax_rate_bp", "daily_call_budget"):
+        if not re.fullmatch(r"[0-9]{1,6}", value):
+            raise ValueError("invalid whole number")
+        number = int(value)
+        if column == "weight_bp" and not 1 <= number <= 10_000:
+            raise ValueError("invalid allocation weight")
+        if column == "tax_rate_bp" and not 0 <= number <= 10_000:
+            raise ValueError("invalid tax rate")
+        if column == "daily_call_budget" and not 1 <= number <= 100_000:
+            raise ValueError("invalid daily call budget")
+        return str(number)
+    if column == "early_redemption_fee_rate_bp":
+        if value and not re.fullmatch(r"[0-9]{1,5}", value):
+            raise ValueError("invalid early redemption fee")
+        if value and not 0 <= int(value) <= 10_000:
+            raise ValueError("invalid early redemption fee")
+        return value
+    if column == "fx_backfilled":
+        return _valid_fx_backfilled(value)
+    if column == "rate_schedule":
+        return _valid_rate_schedule(value)
     if column == "category":
         if not 1 <= len(value) <= 80:
             raise ValueError("invalid category name")
-    elif column == "name":
-        maximum = MAX_ITEM_NAME_LENGTH if file == "networth_items.csv" else 80
+    elif column in ("name", "instrument", "asset_class"):
+        if column == "instrument":
+            maximum = MAX_INSTRUMENT_NAME_LENGTH
+        elif column == "asset_class":
+            maximum = MAX_ASSET_CLASS_NAME_LENGTH
+        elif file == "networth_items.csv":
+            maximum = MAX_ITEM_NAME_LENGTH
+        elif file == "instruments.csv":
+            maximum = MAX_INSTRUMENT_NAME_LENGTH
+        else:
+            maximum = MAX_ASSET_CLASS_NAME_LENGTH
         if not 1 <= len(value) <= maximum:
             raise ValueError("invalid name")
     elif column == "item":
         if not 1 <= len(value) <= MAX_ITEM_NAME_LENGTH:
             raise ValueError("invalid item name")
-    elif column in ("description", "notes"):
-        if len(value) > (MAX_NOTES_LENGTH if column == "notes" else 200):
+    elif column in (
+        "description",
+        "notes",
+        "note",
+        "provider_symbol",
+        "symbol",
+        "unit_label",
+        "provider_key",
+        "series_code",
+    ):
+        limits = {
+            "description": 200,
+            "notes": MAX_NOTES_LENGTH,
+            "note": MAX_NOTE_LENGTH,
+            "provider_symbol": 64,
+            "symbol": MAX_SYMBOL_LENGTH,
+            "unit_label": MAX_UNIT_LABEL_LENGTH,
+            "provider_key": 32,
+            "series_code": MAX_SERIES_CODE_LENGTH,
+        }
+        limit = limits[column]
+        if column == "unit_label" and not value:
+            raise ValueError("required value missing")
+        if len(value) > limit:
             raise ValueError("text too long")
     elif column == "color":
         if value and not re.fullmatch(r"#[0-9a-f]{6}", value):
@@ -659,7 +1183,13 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         if not re.fullmatch(r"[0-9]{1,9}", value):
             raise ValueError("invalid sort order")
     elif column == "source":
-        if value not in SNAPSHOT_SOURCES:
+        if file == "price_points.csv":
+            if value not in {"manual", "provider"}:
+                raise ValueError("invalid price source")
+        elif file == "fx_rates.csv":
+            if not value or len(value) > 32:
+                raise ValueError("invalid FX source")
+        elif value not in SNAPSHOT_SOURCES:
             raise ValueError("invalid snapshot source")
     elif column == "breakdown":
         try:
@@ -688,6 +1218,58 @@ _REQUIRED_COLUMNS = {
         "breakdown",
         "source",
     },
+    "asset_classes.csv": {"id", "name"},
+    "instruments.csv": {
+        "id",
+        "name",
+        "type",
+        "quote_currency",
+        "unit_label",
+        "valuation_source",
+    },
+    "instrument_allocations.csv": {
+        "id",
+        "instrument_id",
+        "instrument",
+        "asset_class_id",
+        "asset_class",
+        "weight_bp",
+    },
+    "investment_transactions.csv": {
+        "id",
+        "instrument_id",
+        "instrument",
+        "date",
+        "type",
+        "quantity",
+        "unit_price",
+        "quote_currency",
+    },
+    "bond_terms.csv": {
+        "id",
+        "instrument_id",
+        "instrument",
+        "face_value",
+        "maturity_date",
+        "interest_mode",
+        "rate_schedule",
+        "tax_rate_bp",
+    },
+    "price_points.csv": {"id", "instrument_id", "instrument", "date", "price", "source"},
+    "fx_rates.csv": {
+        "id",
+        "base_currency",
+        "quote_currency",
+        "date",
+        "rate",
+        "source",
+    },
+    "price_source_configs.csv": {
+        "id",
+        "provider_key",
+        "enabled",
+        "daily_call_budget",
+    },
 }
 
 
@@ -707,6 +1289,8 @@ def _read_rows(
     version: str,
     errors: list[ArchiveError],
     warnings: list[ArchiveError],
+    *,
+    risk_policy: RiskTargetPolicyRow | None = None,
 ) -> ArchiveRows:
     required = required_columns(version)
     tables: dict[str, list[dict[str, str]]] = {}
@@ -746,7 +1330,11 @@ def _read_rows(
                     if column == "sort_order" and not value:
                         value = str(index)
                     try:
-                        if column in required[name] and not value:
+                        if (
+                            column in required[name]
+                            and not value
+                            and not (name == "investment_transactions.csv" and column == "date")
+                        ):
                             raise ValueError("required value missing")
                         row[column] = _validate_cell(name, column, value, currency)
                     except ValueError as exc:
@@ -804,6 +1392,7 @@ def _read_rows(
     networth_items_by_id = {row["id"]: row for row in networth_items}
     if len(networth_items_by_id) != len(networth_items):
         errors.append(ArchiveError("networth_items.csv", "duplicate net-worth item id"))
+    active_links: set[tuple[str, str]] = set()
     for row in networth_items:
         category = networth_by_id.get(row["category_id"])
         if (
@@ -817,6 +1406,11 @@ def _read_rows(
         linked = row["valuation_mode"] == "linked"
         if linked != bool(row["link_type"] and row["link_id"]):
             errors.append(ArchiveError("networth_items.csv", "invalid link"))
+        elif linked and not row["archived_at"]:
+            key = (row["link_type"], row["link_id"])
+            if key in active_links:
+                errors.append(ArchiveError("networth_items.csv", "duplicate active link"))
+            active_links.add(key)
 
     item_valuations = tables["item_valuations.csv"]
     seen_valuations: set[str] = set()
@@ -845,6 +1439,210 @@ def _read_rows(
         if row["id"] in seen_snapshot_ids:
             errors.append(ArchiveError("networth_snapshots.csv", "duplicate snapshot id"))
         seen_snapshot_ids.add(row["id"])
+
+    asset_classes = tables["asset_classes.csv"]
+    asset_classes_by_id = {row["id"]: row for row in asset_classes}
+    if len(asset_classes_by_id) != len(asset_classes):
+        errors.append(ArchiveError("asset_classes.csv", "duplicate asset class id"))
+    active_asset_names: set[str] = set()
+    for row in asset_classes:
+        if not row["archived_at"]:
+            key = name_key(row["name"])
+            if key in active_asset_names:
+                errors.append(
+                    ArchiveError("asset_classes.csv", "duplicate active asset class name")
+                )
+            active_asset_names.add(key)
+
+    instruments = tables["instruments.csv"]
+    instruments_by_id = {row["id"]: row for row in instruments}
+    if len(instruments_by_id) != len(instruments):
+        errors.append(ArchiveError("instruments.csv", "duplicate instrument id"))
+    active_instrument_names: set[str] = set()
+    for row in instruments:
+        if row["type"] == "currency" and row["unit_label"] != row["quote_currency"]:
+            errors.append(ArchiveError("instruments.csv", "currency unit label mismatch"))
+        if not row["archived_at"]:
+            key = name_key(row["name"])
+            if key in active_instrument_names:
+                errors.append(ArchiveError("instruments.csv", "duplicate active instrument name"))
+            active_instrument_names.add(key)
+
+    allocations = tables["instrument_allocations.csv"]
+    allocation_ids: set[str] = set()
+    allocation_pairs: set[tuple[str, str]] = set()
+    weights: dict[str, int] = {}
+    for row in allocations:
+        if row["id"] in allocation_ids:
+            errors.append(ArchiveError("instrument_allocations.csv", "duplicate allocation id"))
+        allocation_ids.add(row["id"])
+        instrument = instruments_by_id.get(row["instrument_id"])
+        asset_class = asset_classes_by_id.get(row["asset_class_id"])
+        if (
+            instrument is None
+            or asset_class is None
+            or row["instrument"] != instrument["name"]
+            or row["asset_class"] != asset_class["name"]
+        ):
+            errors.append(
+                ArchiveError("instrument_allocations.csv", "allocation reference mismatch")
+            )
+        pair = (row["instrument_id"], row["asset_class_id"])
+        if pair in allocation_pairs:
+            errors.append(ArchiveError("instrument_allocations.csv", "duplicate allocation row"))
+        allocation_pairs.add(pair)
+        weights[row["instrument_id"]] = weights.get(row["instrument_id"], 0) + int(row["weight_bp"])
+    for instrument in instruments:
+        if weights.get(instrument["id"]) != 10_000:
+            errors.append(
+                ArchiveError("instrument_allocations.csv", "allocation weights must total 100%")
+            )
+
+    transactions = tables["investment_transactions.csv"]
+    transaction_ids: set[str] = set()
+    for row in transactions:
+        if row["id"] in transaction_ids:
+            errors.append(
+                ArchiveError("investment_transactions.csv", "duplicate investment transaction id")
+            )
+        transaction_ids.add(row["id"])
+        instrument = instruments_by_id.get(row["instrument_id"])
+        if (
+            instrument is None
+            or row["instrument"] != instrument["name"]
+            or row["quote_currency"] != instrument["quote_currency"]
+        ):
+            errors.append(
+                ArchiveError("investment_transactions.csv", "instrument reference mismatch")
+            )
+        try:
+            _money_minor(row["fee"], row["quote_currency"], allow_zero=True)
+        except ValueError as exc:
+            errors.append(ArchiveError("investment_transactions.csv", str(exc), column="fee"))
+        settlement = (
+            row["settlement_currency"],
+            row["settlement_unit_price"],
+            row["settlement_fee"],
+        )
+        if any(settlement) and not all(settlement):
+            errors.append(
+                ArchiveError("investment_transactions.csv", "settlement fields must be all or none")
+            )
+        elif row["settlement_currency"]:
+            if row["settlement_currency"] != currency:
+                errors.append(
+                    ArchiveError(
+                        "investment_transactions.csv",
+                        "settlement currency differs from workspace",
+                    )
+                )
+            if instrument is not None and (
+                instrument["quote_currency"] == currency or instrument["type"] == "currency"
+            ):
+                errors.append(
+                    ArchiveError("investment_transactions.csv", "settlement is not allowed here")
+                )
+            try:
+                _money_minor(row["settlement_fee"], row["settlement_currency"], allow_zero=True)
+            except ValueError as exc:
+                errors.append(
+                    ArchiveError("investment_transactions.csv", str(exc), column="settlement_fee")
+                )
+
+    bonds = tables["bond_terms.csv"]
+    bond_ids: set[str] = set()
+    bond_instruments: set[str] = set()
+    for row in bonds:
+        if row["id"] in bond_ids:
+            errors.append(ArchiveError("bond_terms.csv", "duplicate bond terms id"))
+        bond_ids.add(row["id"])
+        instrument = instruments_by_id.get(row["instrument_id"])
+        if (
+            instrument is None
+            or row["instrument"] != instrument["name"]
+            or instrument["type"] != "bond_model"
+        ):
+            errors.append(ArchiveError("bond_terms.csv", "bond terms reference mismatch"))
+        if row["instrument_id"] in bond_instruments:
+            errors.append(ArchiveError("bond_terms.csv", "duplicate bond terms instrument"))
+        bond_instruments.add(row["instrument_id"])
+        try:
+            _money_minor(
+                row["face_value"],
+                instrument["quote_currency"] if instrument else currency,
+                allow_zero=False,
+            )
+        except ValueError as exc:
+            errors.append(ArchiveError("bond_terms.csv", str(exc), column="face_value"))
+        mode = row["early_redemption_fee_mode"]
+        rate_set = bool(row["early_redemption_fee_rate_bp"])
+        fee_set = bool(row["early_redemption_fee"])
+        if (
+            (mode == "" and (rate_set or fee_set))
+            or (mode == "percent" and (not rate_set or fee_set))
+            or (mode == "fixed" and (rate_set or not fee_set))
+        ):
+            errors.append(ArchiveError("bond_terms.csv", "invalid early redemption fee"))
+        if mode == "fixed" and instrument is not None:
+            try:
+                _money_minor(
+                    row["early_redemption_fee"], instrument["quote_currency"], allow_zero=True
+                )
+            except ValueError as exc:
+                errors.append(
+                    ArchiveError("bond_terms.csv", str(exc), column="early_redemption_fee")
+                )
+        try:
+            periods = [
+                BondRatePeriod(
+                    date.fromisoformat(str(item["from_date"])),
+                    int(str(item["annual_rate_bp"])),
+                )
+                for item in cast("list[dict[str, object]]", json.loads(row["rate_schedule"]))
+            ]
+            validate_rate_schedule(periods, date.fromisoformat(row["maturity_date"]))
+        except (ValueError, KeyError, TypeError):
+            errors.append(ArchiveError("bond_terms.csv", "invalid rate schedule"))
+
+    prices = tables["price_points.csv"]
+    price_ids: set[str] = set()
+    price_keys: set[tuple[str, str, str]] = set()
+    for row in prices:
+        if row["id"] in price_ids:
+            errors.append(ArchiveError("price_points.csv", "duplicate price point id"))
+        price_ids.add(row["id"])
+        instrument = instruments_by_id.get(row["instrument_id"])
+        if instrument is None or row["instrument"] != instrument["name"]:
+            errors.append(ArchiveError("price_points.csv", "price point reference mismatch"))
+        key = (row["instrument_id"], row["date"], row["source"])
+        if key in price_keys:
+            errors.append(ArchiveError("price_points.csv", "duplicate instrument, date and source"))
+        price_keys.add(key)
+
+    fx_rates = tables["fx_rates.csv"]
+    fx_ids: set[str] = set()
+    fx_keys: set[tuple[str, str, str, str]] = set()
+    for row in fx_rates:
+        if row["id"] in fx_ids:
+            errors.append(ArchiveError("fx_rates.csv", "duplicate FX rate id"))
+        fx_ids.add(row["id"])
+        if row["base_currency"] != currency:
+            errors.append(ArchiveError("fx_rates.csv", "FX base currency differs from workspace"))
+        key = (row["base_currency"], row["quote_currency"], row["date"], row["source"])
+        if key in fx_keys:
+            errors.append(ArchiveError("fx_rates.csv", "duplicate FX pair, date and source"))
+        fx_keys.add(key)
+
+    configs = tables["price_source_configs.csv"]
+    config_ids: set[str] = set()
+    config_providers: set[str] = set()
+    for row in configs:
+        if row["id"] in config_ids:
+            errors.append(ArchiveError("price_source_configs.csv", "duplicate provider config id"))
+        config_ids.add(row["id"])
+        if row["provider_key"] in config_providers:
+            errors.append(ArchiveError("price_source_configs.csv", "duplicate provider config"))
+        config_providers.add(row["provider_key"])
 
     return ArchiveRows(
         workspace=workspace,
@@ -935,4 +1733,117 @@ def _read_rows(
             )
             for row in networth_snapshots
         ),
+        asset_classes=tuple(
+            AssetClassRow(
+                row["id"],
+                row["name"],
+                row["investable"],
+                row["color"],
+                int(row["sort_order"]),
+                row["risk_tier"],
+                row["archived_at"] or None,
+            )
+            for row in asset_classes
+        ),
+        instruments=tuple(
+            InstrumentRow(
+                row["id"],
+                row["name"],
+                row["symbol"],
+                row["type"],
+                row["quote_currency"],
+                row["unit_label"],
+                row["valuation_source"],
+                row["provider_key"],
+                row["provider_symbol"],
+                row["provider_backfilled_at"] or None,
+                row["risk_tier_override"],
+                row["archived_at"] or None,
+            )
+            for row in instruments
+        ),
+        instrument_allocations=tuple(
+            InstrumentAllocationRow(
+                row["id"],
+                row["instrument_id"],
+                row["instrument"],
+                row["asset_class_id"],
+                row["asset_class"],
+                int(row["weight_bp"]),
+            )
+            for row in allocations
+        ),
+        investment_transactions=tuple(
+            InvestmentTransactionRow(
+                row["id"],
+                row["instrument_id"],
+                row["instrument"],
+                row["date"] or None,
+                row["type"],
+                row["quantity"],
+                row["unit_price"],
+                row["quote_currency"],
+                row["fee"],
+                row["fx_to_base"],
+                row["note"],
+                row["settlement_currency"],
+                row["settlement_unit_price"],
+                row["settlement_fee"],
+                row["deleted_at"] or None,
+            )
+            for row in transactions
+        ),
+        bond_terms=tuple(
+            BondTermsRow(
+                row["id"],
+                row["instrument_id"],
+                row["instrument"],
+                row["series_code"],
+                row["face_value"],
+                row["maturity_date"],
+                row["interest_mode"],
+                row["rate_schedule"],
+                int(row["tax_rate_bp"]),
+                row["early_redemption_fee_mode"],
+                int(row["early_redemption_fee_rate_bp"])
+                if row["early_redemption_fee_rate_bp"]
+                else None,
+                row["early_redemption_fee"],
+            )
+            for row in bonds
+        ),
+        price_points=tuple(
+            PricePointRow(
+                row["id"],
+                row["instrument_id"],
+                row["instrument"],
+                row["date"],
+                row["price"],
+                row["source"],
+                row["provider_key"],
+            )
+            for row in prices
+        ),
+        fx_rates=tuple(
+            FxRateRow(
+                row["id"],
+                row["base_currency"],
+                row["quote_currency"],
+                row["date"],
+                row["rate"],
+                row["source"],
+            )
+            for row in fx_rates
+        ),
+        price_source_configs=tuple(
+            PriceSourceConfigRow(
+                row["id"],
+                row["provider_key"],
+                row["enabled"],
+                int(row["daily_call_budget"]),
+                row["fx_backfilled"],
+            )
+            for row in configs
+        ),
+        risk_target_policy=risk_policy,
     )

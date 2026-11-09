@@ -418,12 +418,30 @@ decision, 2026-10-18). It lands after F6.11 (see the sequencing note at the top)
   stored FX rates join the archive here; transaction-derived prices and rates are recomputed
   from the archived transactions and are never exported.
 - Quantities and prices are plain decimals written from `Decimal` without loss (never through
-  `float`); FX rates likewise.
+  `float`); FX rates likewise. Values are written with `format(value, "f")` and trailing
+  fractional zeros removed, and read with `Decimal(text)`; a Hypothesis round-trip test covers
+  quantity, unit price, price, rate, `fx_to_base` and `settlement_unit_price` across the
+  `DecimalType` range.
 - Standalone import in merge mode: `investment_transactions.csv` (the "bring my purchase
   history" path: instrument by name, with the mapping step for unknown instruments like F4.3's
   categories, create with a type the user picks; an empty `date` makes an "undated lot" flagged
   for the user to fix). Other files are restore only.
-- The new models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them. An untouched suggested asset-class set (the current seed or the pre-2026-11-09 seed with Real estate and Primary residence) counts as empty for restore, like the ledger and net-worth suggested sets (the exact set in a supported locale, unedited, unused, with the automatic `asset_class.seeded` event); otherwise every fresh workspace would refuse a restore.
+- The standalone import refuses to apply while any instrument's combined stored and incoming
+  history oversells, naming the instrument, line and date; the user fixes the file or chooses
+  **Ignore** for that instrument in the mapping. Rows are never silently skipped to make the
+  history fit. FX fallback uses the latest stored manual or provider rate on or before the date
+  and otherwise reports `fx_needed`; it is never used for a settlement row, which must carry its
+  own `fx_to_base`.
+- Provider settings are archived without secrets. Keyless providers (NBP, ECB, CoinGecko)
+  restore with their saved enabled state; providers that need a key (EODHD, GoldAPI) restore
+  disabled with the report line "Re-enter the API key and enable {provider}". The daily call
+  budget and the `fx_backfilled` marker are kept; `provider_backfilled_at` on an instrument is
+  kept too.
+- Net-worth items linked to a portfolio class or holding resolve their lineage ids in a 1.4
+  archive; a 1.3 archive (or any missing target) keeps the existing `link_target_missing`
+  fallback and restores the item as manual without a value. Profile `birth_year` and
+  `life_expectancy` are user data, not workspace data, and are not archived.
+- The new models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them. An untouched suggested asset-class set (the current seed or the pre-2026-11-09 seed with Real estate and Primary residence) counts as empty for restore, like the ledger and net-worth suggested sets (the exact set in a supported locale, unedited, unused, with the automatic `asset_class.seeded` event); otherwise every fresh workspace would refuse a restore. `RiskTargetPolicy` is included through `workspace.json`; `ProviderError` stays excluded.
 
 **Agent prompt**
 ```

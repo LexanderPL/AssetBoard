@@ -124,15 +124,28 @@
       <div><dt class="text-muted">{{ _("Net-worth items") }}</dt><dd>{{ selected_batch.report.counts.networth_items_created|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Item valuations") }}</dt><dd>{{ selected_batch.report.counts.item_valuations_created|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Net-worth snapshots") }}</dt><dd>{{ selected_batch.report.counts.networth_snapshots_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Asset classes") }}</dt><dd>{{ selected_batch.report.counts.asset_classes_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Instruments") }}</dt><dd>{{ selected_batch.report.counts.instruments_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Instrument allocations") }}</dt><dd>{{ selected_batch.report.counts.instrument_allocations_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Investment transactions") }}</dt><dd>{{ selected_batch.report.counts.investment_transactions_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Bond terms") }}</dt><dd>{{ selected_batch.report.counts.bond_terms_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Price points") }}</dt><dd>{{ selected_batch.report.counts.price_points_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("FX rates") }}</dt><dd>{{ selected_batch.report.counts.fx_rates_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Provider settings") }}</dt><dd>{{ selected_batch.report.counts.price_source_configs_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Risk targets restored") }}</dt><dd>{{ selected_batch.report.counts.risk_policy_restored|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Linked items restored as manual") }}</dt><dd>{{ selected_batch.report.counts.linked_items_unlinked|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Suggested categories to remove") }}</dt><dd>{{ selected_batch.report.counts.suggested_categories_removed|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Suggested net-worth categories to remove") }}</dt><dd>{{ selected_batch.report.counts.suggested_networth_categories_removed|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("Suggested asset classes to remove") }}</dt><dd>{{ selected_batch.report.counts.suggested_asset_classes_removed|default(0) }}</dd></div>
     </dl>
     {% if selected_batch.report.suggested_categories_removed %}
     <p class="mt-2 text-sm text-muted">{{ _("Removed before restoring: %(names)s", names=selected_batch.report.suggested_categories_removed|join(", ")) }}</p>
     {% endif %}
     {% if selected_batch.report.suggested_networth_categories_removed %}
     <p class="mt-2 text-sm text-muted">{{ _("Removed net-worth categories before restoring: %(names)s", names=selected_batch.report.suggested_networth_categories_removed|join(", ")) }}</p>
+    {% endif %}
+    {% if selected_batch.report.suggested_asset_classes_removed %}
+    <p class="mt-2 text-sm text-muted">{{ _("Removed asset classes before restoring: %(names)s", names=selected_batch.report.suggested_asset_classes_removed|join(", ")) }}</p>
     {% endif %}
     {% if selected_batch.report.settings_diff %}
     <p class="mt-3 text-sm"><span class="font-medium">{{ _("Settings the restore will replace:") }}</span>

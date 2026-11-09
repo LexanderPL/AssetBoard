@@ -11,6 +11,7 @@ from sqlalchemy.exc import IntegrityError
 
 from assetboard.db.models.identity import AuditEvent, Membership
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
+from assetboard.db.repositories import PriceSourceConfigRepository, RiskTargetPolicyRepository
 from assetboard.domain.archive import lineage_id, parse_archive
 from assetboard.services.archive import export_workspace
 from assetboard.services.context import PermissionDenied
@@ -116,6 +117,14 @@ def test_export_complete_scoped_deterministic_and_lineage(team: WorkspaceDb) -> 
             "networth_items": 0,
             "item_valuations": 0,
             "networth_snapshots": 0,
+            "asset_classes": 0,
+            "instruments": 0,
+            "instrument_allocations": 0,
+            "investment_transactions": 0,
+            "bond_terms": 0,
+            "price_points": 0,
+            "fx_rates": 0,
+            "price_source_configs": 0,
         }
     # Uniqueness is per workspace, including deleted/archived rows; NULLs remain allowed.
     with pytest.raises(IntegrityError), team.factory.begin() as session:
@@ -281,7 +290,7 @@ def test_export_includes_the_taxes_switch_and_upcoming_days(team: WorkspaceDb) -
 
     parsed, _ = parse_archive(export_workspace(team.factory, team.ctx("editor", "editor")).content)
     assert parsed is not None
-    assert parsed.manifest["format_version"] == "1.3"
+    assert parsed.manifest["format_version"] == "1.4"
     assert parsed.rows.workspace["taxes_enabled"] is False
     assert parsed.rows.workspace["upcoming_days"] is None
 
@@ -295,3 +304,36 @@ def test_export_includes_the_taxes_switch_and_upcoming_days(team: WorkspaceDb) -
     assert errors == () and parsed is not None and parsed.warnings == ()
     assert parsed.rows.workspace["taxes_enabled"] is True
     assert parsed.rows.workspace["upcoming_days"] == 30
+
+
+def test_export_includes_risk_policy_and_never_provider_secrets(team: WorkspaceDb) -> None:
+    ctx = team.ctx("editor", "editor")
+    with team.factory.begin() as session:
+        RiskTargetPolicyRepository(session, ctx).create(
+            mode="age_in_bonds",
+            safe_bp=0,
+            growth_bp=9000,
+            speculative_bp=1000,
+            tolerance_bp=300,
+        )
+        PriceSourceConfigRepository(session, ctx).create(
+            provider_key="eodhd",
+            enabled=True,
+            settings_encrypted="secret-api-key",
+            fx_backfilled='{"USD":"2026-02-01"}',
+            daily_call_budget=7,
+        )
+    result = export_workspace(team.factory, ctx)
+    assert b"secret-api-key" not in result.content
+    parsed, errors = parse_archive(result.content)
+    assert errors == () and parsed is not None
+    assert parsed.rows.workspace["risk_target_policy"] == {
+        "mode": "age_in_bonds",
+        "safe_bp": 0,
+        "growth_bp": 9000,
+        "speculative_bp": 1000,
+        "tolerance_bp": 300,
+    }
+    assert [row.provider_key for row in parsed.rows.price_source_configs] == ["eodhd"]
+    assert parsed.rows.price_source_configs[0].daily_call_budget == 7
+    assert parsed.rows.price_source_configs[0].fx_backfilled == '{"USD":"2026-02-01"}'

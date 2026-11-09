@@ -18,6 +18,7 @@ the original ``message`` (adapters may add their own codes).
 
 from __future__ import annotations
 
+import contextlib
 import csv
 import hashlib
 import io
@@ -40,6 +41,14 @@ from sqlalchemy.orm import Session, sessionmaker
 from assetboard.clock import Clock
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.import_batch import ImportBatch
+from assetboard.db.models.investments import (
+    AssetClass,
+    BondTerms,
+    Instrument,
+    InstrumentAllocation,
+    InvestmentTransaction,
+    RiskTargetPolicy,
+)
 from assetboard.db.models.ledger import BudgetLine, Category, Transaction
 from assetboard.db.models.networth import (
     ItemValuation,
@@ -47,20 +56,30 @@ from assetboard.db.models.networth import (
     NetWorthItem,
     NetWorthSnapshot,
 )
+from assetboard.db.models.prices import FxRate, PricePoint, PriceSourceConfig
 from assetboard.db.repositories import (
+    AssetClassRepository,
     AuditEventRepository,
+    BondTermsRepository,
     BudgetLineRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
+    FxRateRepository,
     ImportBatchRepository,
     ImportCategoryMappingRepository,
     IncomeSourceRepository,
     IncomeSourceTaxRuleRepository,
+    InstrumentAllocationRepository,
+    InstrumentRepository,
+    InvestmentTransactionRepository,
     ItemValuationRepository,
     MonthStateRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
     NetWorthSnapshotRepository,
+    PricePointRepository,
+    PriceSourceConfigRepository,
+    RiskTargetPolicyRepository,
     ScheduledItemRepository,
     ScheduledOccurrenceRepository,
     TaxRuleRepository,
@@ -196,6 +215,54 @@ REPORT_MESSAGES: dict[str, str] = {
     "networth_restore_only": _(
         "Net-worth files are restored only; they were ignored in this merge."
     ),
+    "investment_restore_only": _(
+        "Investment files are restored only; they were ignored in this merge."
+    ),
+    "provider_key_required": _("Re-enter the API key and enable %(provider)s."),
+    "duplicate_asset_class": _("An asset class id appears more than once."),
+    "duplicate_asset_class_name": _("Two active asset classes have the same name."),
+    "duplicate_instrument": _("An instrument id appears more than once."),
+    "duplicate_instrument_name": _("Two active instruments have the same name."),
+    "currency_unit_label": _("A currency instrument's unit label must be its currency code."),
+    "duplicate_allocation": _("An allocation id appears more than once."),
+    "allocation_reference": _("An allocation references an unknown or differently named row."),
+    "duplicate_allocation_row": _("The same instrument and asset class are allocated twice."),
+    "allocation_total": _("An instrument's allocation weights must total exactly 100%."),
+    "duplicate_investment_transaction": _("An investment transaction id appears more than once."),
+    "investment_transaction_reference": _(
+        "An investment transaction references an unknown or differently named instrument, or "
+        "the wrong quote currency."
+    ),
+    "invalid_settlement": _("The settlement fields must be set together and only where allowed."),
+    "duplicate_bond_terms": _("A bond terms id appears more than once."),
+    "bond_terms_reference": _("Bond terms reference an unknown instrument or the wrong type."),
+    "duplicate_bond_terms_instrument": _("An instrument has more than one bond terms row."),
+    "invalid_early_redemption": _("The early-redemption fee is inconsistent."),
+    "invalid_rate_schedule": _("The bond rate schedule is invalid."),
+    "duplicate_price_point": _("A price point id appears more than once."),
+    "price_point_reference": _(
+        "A price point references an unknown or differently named instrument."
+    ),
+    "duplicate_price_date": _("The same instrument, date and source appear twice."),
+    "duplicate_fx_rate": _("An FX rate id appears more than once."),
+    "fx_base_mismatch": _("An FX rate's base currency differs from the workspace."),
+    "duplicate_fx_pair": _("The same FX pair, date and source appear twice."),
+    "duplicate_provider_config": _("A provider config id or provider appears more than once."),
+    "invalid_risk_tier": _("A risk tier is not one of safe, growth or speculative."),
+    "invalid_instrument_type": _("An instrument type is not supported."),
+    "invalid_transaction_type": _("An investment transaction type is not supported."),
+    "invalid_valuation_source": _("An instrument valuation source is not supported."),
+    "invalid_interest_mode": _("A bond interest mode is not supported."),
+    "invalid_whole_number": _("A whole-number field is invalid."),
+    "invalid_allocation_weight": _("An allocation weight must be between 1 and 10 000 bp."),
+    "invalid_tax_rate": _("A tax rate must be between 0 and 10 000 bp."),
+    "invalid_daily_budget": _("A provider daily call budget must be between 1 and 100 000."),
+    "invalid_price_source": _("A price source must be manual or provider."),
+    "invalid_fx_source": _("An FX source is invalid."),
+    "invalid_fx_history": _("A provider's FX backfill marker is invalid."),
+    "invalid_decimal": _("A decimal value is invalid or outside the supported range."),
+    "positive_amount_required": _("The amount must be greater than zero."),
+    "too_many_currency_decimals": _("The amount has more decimals than its currency allows."),
     "duplicate_networth_category": _("A net-worth category id appears more than once."),
     "duplicate_networth_category_name": _(
         "Two active net-worth categories have the same side and name."
@@ -205,6 +272,7 @@ REPORT_MESSAGES: dict[str, str] = {
         "A net-worth item references a category of another side or with another name."
     ),
     "invalid_networth_link": _("A linked net-worth item has an invalid link."),
+    "duplicate_networth_link": _("Two active net-worth items link to the same target."),
     "duplicate_item_valuation": _("An item valuation id appears more than once."),
     "item_valuation_reference": _(
         "An item valuation references an unknown item or a different name."
@@ -292,12 +360,57 @@ _PARSER_CODES: dict[str, str] = {
     "duplicate net-worth item id": "duplicate_networth_item",
     "net-worth category reference mismatch": "networth_category_reference",
     "invalid link": "invalid_networth_link",
+    "duplicate active link": "duplicate_networth_link",
     "duplicate item valuation id": "duplicate_item_valuation",
     "item valuation reference mismatch": "item_valuation_reference",
     "item valuation currency differs": "item_valuation_reference",
     "linked item has valuations": "linked_item_valuation",
     "duplicate snapshot id": "duplicate_networth_snapshot",
     "duplicate snapshot date and source": "duplicate_snapshot_date",
+    # Investment archive rows (F6.9).
+    "duplicate asset class id": "duplicate_asset_class",
+    "duplicate active asset class name": "duplicate_asset_class_name",
+    "duplicate instrument id": "duplicate_instrument",
+    "duplicate active instrument name": "duplicate_instrument_name",
+    "currency unit label mismatch": "currency_unit_label",
+    "duplicate allocation id": "duplicate_allocation",
+    "allocation reference mismatch": "allocation_reference",
+    "duplicate allocation row": "duplicate_allocation_row",
+    "allocation weights must total 100%": "allocation_total",
+    "duplicate investment transaction id": "duplicate_investment_transaction",
+    "instrument reference mismatch": "investment_transaction_reference",
+    "settlement fields must be all or none": "invalid_settlement",
+    "settlement currency differs from workspace": "invalid_settlement",
+    "settlement is not allowed here": "invalid_settlement",
+    "invalid settlement": "invalid_settlement",
+    "duplicate bond terms id": "duplicate_bond_terms",
+    "bond terms reference mismatch": "bond_terms_reference",
+    "duplicate bond terms instrument": "duplicate_bond_terms_instrument",
+    "invalid early redemption fee": "invalid_early_redemption",
+    "invalid rate schedule": "invalid_rate_schedule",
+    "duplicate price point id": "duplicate_price_point",
+    "price point reference mismatch": "price_point_reference",
+    "duplicate instrument, date and source": "duplicate_price_date",
+    "duplicate FX rate id": "duplicate_fx_rate",
+    "FX base currency differs from workspace": "fx_base_mismatch",
+    "duplicate FX pair, date and source": "duplicate_fx_pair",
+    "duplicate provider config id": "duplicate_provider_config",
+    "duplicate provider config": "duplicate_provider_config",
+    "invalid risk tier": "invalid_risk_tier",
+    "invalid instrument type": "invalid_instrument_type",
+    "invalid transaction type": "invalid_transaction_type",
+    "invalid valuation source": "invalid_valuation_source",
+    "invalid interest mode": "invalid_interest_mode",
+    "invalid whole number": "invalid_whole_number",
+    "invalid allocation weight": "invalid_allocation_weight",
+    "invalid tax rate": "invalid_tax_rate",
+    "invalid daily call budget": "invalid_daily_budget",
+    "invalid price source": "invalid_price_source",
+    "invalid FX source": "invalid_fx_source",
+    "invalid fx history": "invalid_fx_history",
+    "invalid decimal": "invalid_decimal",
+    "amount must be positive": "positive_amount_required",
+    "too many decimals": "too_many_currency_decimals",
 }
 
 
@@ -305,7 +418,14 @@ def report_message(entry: Mapping[str, Any], locale: str) -> str:
     """The text of a report entry in ``locale``: its code's message, else its own message."""
     known = REPORT_MESSAGES.get(str(entry.get("code", "")))
     if known is not None:
-        return gettext(known, locale)
+        text = gettext(known, locale)
+        params = {
+            name: entry[name] for name in re.findall(r"%\(([a-z_]+)\)", text) if name in entry
+        }
+        if params:
+            with contextlib.suppress(KeyError, TypeError, ValueError):
+                return text % params
+        return text
     return str(entry.get("message", ""))
 
 
@@ -1041,6 +1161,15 @@ class _RestoreRollbackPlan:
     networth_items: tuple[NetWorthItem, ...]
     valuations: tuple[ItemValuation, ...]
     snapshots: tuple[NetWorthSnapshot, ...]
+    asset_classes: tuple[AssetClass, ...]
+    instruments: tuple[Instrument, ...]
+    allocations: tuple[InstrumentAllocation, ...]
+    investment_transactions: tuple[InvestmentTransaction, ...]
+    bond_terms: tuple[BondTerms, ...]
+    price_points: tuple[PricePoint, ...]
+    fx_rates: tuple[FxRate, ...]
+    provider_configs: tuple[PriceSourceConfig, ...]
+    risk_policies: tuple[RiskTargetPolicy, ...]
     reasons: tuple[str, ...]
     settings: dict[str, object]
 
@@ -1054,6 +1183,15 @@ class _RestoreRollbackPlan:
             "networth_items": len(self.networth_items),
             "valuations": len(self.valuations),
             "snapshots": len(self.snapshots),
+            "asset_classes": len(self.asset_classes),
+            "instruments": len(self.instruments),
+            "instrument_allocations": len(self.allocations),
+            "investment_transactions": len(self.investment_transactions),
+            "bond_terms": len(self.bond_terms),
+            "price_points": len(self.price_points),
+            "fx_rates": len(self.fx_rates),
+            "price_source_configs": len(self.provider_configs),
+            "risk_policies": len(self.risk_policies),
         }
 
 
@@ -1098,6 +1236,28 @@ def _restore_rollback_plan(
     all_networth_items = NetWorthItemRepository(session, ctx).list()
     all_valuations = ItemValuationRepository(session, ctx).list()
     all_snapshots = NetWorthSnapshotRepository(session, ctx).list()
+    asset_classes = AssetClassRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    instruments = InstrumentRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    allocations = InstrumentAllocationRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    investment_transactions = InvestmentTransactionRepository(session, ctx).for_import_batch(
+        batch.id, lock=lock
+    )
+    bond_terms = BondTermsRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    price_points = PricePointRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    fx_rates = FxRateRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    provider_configs = PriceSourceConfigRepository(session, ctx).for_import_batch(
+        batch.id, lock=lock
+    )
+    risk_policies = RiskTargetPolicyRepository(session, ctx).for_import_batch(batch.id, lock=lock)
+    all_asset_classes = AssetClassRepository(session, ctx).list()
+    all_instruments = InstrumentRepository(session, ctx).list()
+    all_allocations = InstrumentAllocationRepository(session, ctx).list()
+    all_investment_transactions = InvestmentTransactionRepository(session, ctx).list()
+    all_bond_terms = BondTermsRepository(session, ctx).list()
+    all_price_points = PricePointRepository(session, ctx).list()
+    all_fx_rates = FxRateRepository(session, ctx).list()
+    all_provider_configs = PriceSourceConfigRepository(session, ctx).list()
+    all_risk_policies = RiskTargetPolicyRepository(session, ctx).list()
     reasons: set[str] = set()
     if (
         len(all_transactions) != len(transactions)
@@ -1114,6 +1274,24 @@ def _restore_rollback_plan(
         or any(row.import_batch_id != batch.id for row in all_valuations)
         or len(all_snapshots) != len(snapshots)
         or any(row.import_batch_id != batch.id for row in all_snapshots)
+        or len(all_asset_classes) != len(asset_classes)
+        or any(row.import_batch_id != batch.id for row in all_asset_classes)
+        or len(all_instruments) != len(instruments)
+        or any(row.import_batch_id != batch.id for row in all_instruments)
+        or len(all_allocations) != len(allocations)
+        or any(row.import_batch_id != batch.id for row in all_allocations)
+        or len(all_investment_transactions) != len(investment_transactions)
+        or any(row.import_batch_id != batch.id for row in all_investment_transactions)
+        or len(all_bond_terms) != len(bond_terms)
+        or any(row.import_batch_id != batch.id for row in all_bond_terms)
+        or len(all_price_points) != len(price_points)
+        or any(row.import_batch_id != batch.id for row in all_price_points)
+        or len(all_fx_rates) != len(fx_rates)
+        or any(row.import_batch_id != batch.id for row in all_fx_rates)
+        or len(all_provider_configs) != len(provider_configs)
+        or any(row.import_batch_id != batch.id for row in all_provider_configs)
+        or len(all_risk_policies) != len(risk_policies)
+        or any(row.import_batch_id != batch.id for row in all_risk_policies)
     ):
         reasons.add("restore_rows_added")
     if (
@@ -1123,6 +1301,15 @@ def _restore_rollback_plan(
         or any(row.updated_at > applied_at for row in networth_categories)
         or any(row.updated_at > applied_at for row in networth_items)
         or any(row.updated_at > applied_at for row in snapshots)
+        or any(row.updated_at > applied_at for row in asset_classes)
+        or any(row.updated_at > applied_at for row in instruments)
+        or any(row.updated_at > applied_at for row in allocations)
+        or any(row.updated_at > applied_at for row in investment_transactions)
+        or any(row.updated_at > applied_at for row in bond_terms)
+        or any(row.updated_at > applied_at for row in price_points)
+        or any(row.updated_at > applied_at for row in fx_rates)
+        or any(row.updated_at > applied_at for row in provider_configs)
+        or any(row.updated_at > applied_at for row in risk_policies)
     ):
         reasons.add("restore_rows_changed")
     raw_months = (batch.report or {}).get("restore_months")
@@ -1170,6 +1357,15 @@ def _restore_rollback_plan(
         networth_items=tuple(networth_items),
         valuations=tuple(valuations),
         snapshots=tuple(snapshots),
+        asset_classes=tuple(asset_classes),
+        instruments=tuple(instruments),
+        allocations=tuple(allocations),
+        investment_transactions=tuple(investment_transactions),
+        bond_terms=tuple(bond_terms),
+        price_points=tuple(price_points),
+        fx_rates=tuple(fx_rates),
+        provider_configs=tuple(provider_configs),
+        risk_policies=tuple(risk_policies),
         reasons=tuple(sorted(reasons)),
         settings=cast("dict[str, object]", previous),
     )
@@ -1180,6 +1376,32 @@ def _rollback_restore(
 ) -> dict[str, int]:
     if plan.reasons:
         raise ImportRestoreRollbackBlocked(plan.reasons)
+    investments = InvestmentTransactionRepository(session, ctx)
+    for row in plan.investment_transactions:
+        investments.delete(row)
+    BondTermsRepository(session, ctx).delete_for_import_batch(batch.id)
+    prices = PricePointRepository(session, ctx)
+    for row in plan.price_points:
+        prices.delete(row)
+    rates = FxRateRepository(session, ctx)
+    for row in plan.fx_rates:
+        rates.delete(row)
+    allocations = InstrumentAllocationRepository(session, ctx)
+    for row in plan.allocations:
+        allocations.delete(row)
+    instruments = InstrumentRepository(session, ctx)
+    for row in plan.instruments:
+        instruments.delete(row)
+    asset_classes = AssetClassRepository(session, ctx)
+    for row in plan.asset_classes:
+        asset_classes.delete(row)
+    configs = PriceSourceConfigRepository(session, ctx)
+    for row in plan.provider_configs:
+        configs.delete(row)
+    policies = RiskTargetPolicyRepository(session, ctx)
+    for row in plan.risk_policies:
+        policies.delete(row)
+    session.flush()
     TransactionRepository(session, ctx).delete_for_import_batch(batch.id)
     ItemValuationRepository(session, ctx).delete_for_import_batch(batch.id)
     snapshots = NetWorthSnapshotRepository(session, ctx)
@@ -1222,6 +1444,15 @@ def _rollback_restore(
             "networth_items_deleted": len(plan.networth_items),
             "item_valuations_deleted": len(plan.valuations),
             "networth_snapshots_deleted": len(plan.snapshots),
+            "asset_classes_deleted": len(plan.asset_classes),
+            "instruments_deleted": len(plan.instruments),
+            "instrument_allocations_deleted": len(plan.allocations),
+            "investment_transactions_deleted": len(plan.investment_transactions),
+            "bond_terms_deleted": len(plan.bond_terms),
+            "price_points_deleted": len(plan.price_points),
+            "fx_rates_deleted": len(plan.fx_rates),
+            "price_source_configs_deleted": len(plan.provider_configs),
+            "risk_policies_deleted": len(plan.risk_policies),
             "settings_restored": ",".join(sorted(plan.settings)),
         },
     )

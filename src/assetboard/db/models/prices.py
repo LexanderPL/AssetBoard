@@ -23,6 +23,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -57,6 +58,20 @@ class PricePoint(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             "instrument_id",
             "date",
         ),
+        Index(
+            "uq_price_points_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
+        Index("ix_price_points_workspace_import_batch", "workspace_id", "import_batch_id"),
+        ForeignKeyConstraint(
+            ["workspace_id", "import_batch_id"],
+            ["import_batches.workspace_id", "import_batches.id"],
+            name="fk_price_points_import_batch",
+        ),
     )
 
     instrument_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
@@ -64,6 +79,8 @@ class PricePoint(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     price: Mapped[Decimal] = mapped_column(DecimalType(), nullable=False)
     source: Mapped[str] = mapped_column(String(16), nullable=False)
     provider_key: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
 
 
 class FxRate(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
@@ -92,6 +109,20 @@ class FxRate(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             "quote_currency",
             "date",
         ),
+        Index(
+            "uq_fx_rates_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
+        Index("ix_fx_rates_workspace_import_batch", "workspace_id", "import_batch_id"),
+        ForeignKeyConstraint(
+            ["workspace_id", "import_batch_id"],
+            ["import_batches.workspace_id", "import_batches.id"],
+            name="fk_fx_rates_import_batch",
+        ),
     )
 
     base_currency: Mapped[str] = mapped_column(String(3), nullable=False)
@@ -99,6 +130,8 @@ class FxRate(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     date: Mapped[date] = mapped_column(Date(), nullable=False)
     rate: Mapped[Decimal] = mapped_column(DecimalType(), nullable=False)
     source: Mapped[str] = mapped_column(String(32), nullable=False)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
 
 
 class PriceSourceConfig(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
@@ -122,6 +155,24 @@ class PriceSourceConfig(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             "workspace_id",
             "enabled",
         ),
+        Index(
+            "uq_price_source_configs_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
+        Index(
+            "ix_price_source_configs_workspace_import_batch",
+            "workspace_id",
+            "import_batch_id",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "import_batch_id"],
+            ["import_batches.workspace_id", "import_batches.id"],
+            name="fk_price_source_configs_import_batch",
+        ),
     )
 
     provider_key: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -134,6 +185,8 @@ class PriceSourceConfig(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     last_success_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     last_error_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     last_error_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
 
 
 class ProviderError(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):

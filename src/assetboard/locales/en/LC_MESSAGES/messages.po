@@ -1398,6 +1398,129 @@ msgstr ""
 msgid "Net-worth files are restored only; they were ignored in this merge."
 msgstr ""
 
+msgid "Investment files are restored only; they were ignored in this merge."
+msgstr ""
+
+#, python-format
+msgid "Re-enter the API key and enable %(provider)s."
+msgstr ""
+
+msgid "An asset class id appears more than once."
+msgstr ""
+
+msgid "Two active asset classes have the same name."
+msgstr ""
+
+msgid "An instrument id appears more than once."
+msgstr ""
+
+msgid "Two active instruments have the same name."
+msgstr ""
+
+msgid "A currency instrument's unit label must be its currency code."
+msgstr ""
+
+msgid "An allocation id appears more than once."
+msgstr ""
+
+msgid "An allocation references an unknown or differently named row."
+msgstr ""
+
+msgid "The same instrument and asset class are allocated twice."
+msgstr ""
+
+msgid "An instrument's allocation weights must total exactly 100%."
+msgstr ""
+
+msgid "An investment transaction id appears more than once."
+msgstr ""
+
+msgid ""
+"An investment transaction references an unknown or differently named "
+"instrument, or the wrong quote currency."
+msgstr ""
+
+msgid "The settlement fields must be set together and only where allowed."
+msgstr ""
+
+msgid "A bond terms id appears more than once."
+msgstr ""
+
+msgid "Bond terms reference an unknown instrument or the wrong type."
+msgstr ""
+
+msgid "An instrument has more than one bond terms row."
+msgstr ""
+
+msgid "The early-redemption fee is inconsistent."
+msgstr ""
+
+msgid "The bond rate schedule is invalid."
+msgstr ""
+
+msgid "A price point id appears more than once."
+msgstr ""
+
+msgid "A price point references an unknown or differently named instrument."
+msgstr ""
+
+msgid "The same instrument, date and source appear twice."
+msgstr ""
+
+msgid "An FX rate id appears more than once."
+msgstr ""
+
+msgid "An FX rate's base currency differs from the workspace."
+msgstr ""
+
+msgid "The same FX pair, date and source appear twice."
+msgstr ""
+
+msgid "A provider config id or provider appears more than once."
+msgstr ""
+
+msgid "A risk tier is not one of safe, growth or speculative."
+msgstr ""
+
+msgid "An instrument type is not supported."
+msgstr ""
+
+msgid "An investment transaction type is not supported."
+msgstr ""
+
+msgid "An instrument valuation source is not supported."
+msgstr ""
+
+msgid "A bond interest mode is not supported."
+msgstr ""
+
+msgid "A whole-number field is invalid."
+msgstr ""
+
+msgid "An allocation weight must be between 1 and 10 000 bp."
+msgstr ""
+
+msgid "A tax rate must be between 0 and 10 000 bp."
+msgstr ""
+
+msgid "A provider daily call budget must be between 1 and 100 000."
+msgstr ""
+
+msgid "A price source must be manual or provider."
+msgstr ""
+
+msgid "An FX source is invalid."
+msgstr ""
+
+msgid "A provider's FX backfill marker is invalid."
+msgstr ""
+
+msgid "A decimal value is invalid or outside the supported range."
+msgstr ""
+
+msgid "The amount has more decimals than its currency allows."
+msgstr ""
+
 msgid "A net-worth category id appears more than once."
 msgstr ""
 
@@ -1413,6 +1536,9 @@ msgid ""
 msgstr ""
 
 msgid "A linked net-worth item has an invalid link."
+msgstr ""
+
+msgid "Two active net-worth items link to the same target."
 msgstr ""
 
 msgid "An item valuation id appears more than once."
@@ -3402,6 +3528,9 @@ msgid "Upcoming window"
 msgstr ""
 
 msgid "Investment cost basis"
+msgstr ""
+
+msgid "Risk targets"
 msgstr ""
 
 msgid "Workspace settings saved."
@@ -7207,10 +7336,28 @@ msgstr ""
 msgid "Month states"
 msgstr ""
 
+msgid "Instrument allocations"
+msgstr ""
+
+msgid "Price points"
+msgstr ""
+
+msgid "FX rates"
+msgstr ""
+
+msgid "Provider settings"
+msgstr ""
+
+msgid "Risk targets restored"
+msgstr ""
+
 msgid "Suggested categories to remove"
 msgstr ""
 
 msgid "Suggested net-worth categories to remove"
+msgstr ""
+
+msgid "Suggested asset classes to remove"
 msgstr ""
 
 #, python-format
@@ -7219,6 +7366,10 @@ msgstr ""
 
 #, python-format
 msgid "Removed net-worth categories before restoring: %(names)s"
+msgstr ""
+
+#, python-format
+msgid "Removed asset classes before restoring: %(names)s"
 msgstr ""
 
 msgid "Settings the restore will replace:"

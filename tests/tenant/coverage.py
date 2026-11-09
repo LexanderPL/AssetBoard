@@ -139,6 +139,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "active_by_name_key",
             "active_count",
             "next_sort_order",
+            "for_import_batch",
         )
     },
     **{
@@ -149,17 +150,18 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "active_by_name_key",
             "get_for_update",
             "provider_instruments",
+            "for_import_batch",
         )
     },
     **{
         ("RiskTargetPolicyRepository", method): "test_risk_policy_queries"
-        for method in ("create", "for_workspace")
+        for method in ("create", "for_workspace", "for_import_batch")
     },
     **{
         ("InstrumentAllocationRepository", method): (
             "test_investment_queries_stay_in_their_workspace"
         )
-        for method in ("create", "for_instrument")
+        for method in ("create", "for_instrument", "for_import_batch")
     },
     **{
         ("InvestmentTransactionRepository", method): (
@@ -177,11 +179,19 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "count_filtered",
             "filtered_not_in_currency",
             "live_dated",
+            "for_import_batch",
         )
     },
     **{
         ("BondTermsRepository", method): "test_bond_terms_queries_stay_in_their_workspace"
-        for method in ("create", "for_instrument", "for_instruments", "instrument_ids")
+        for method in (
+            "create",
+            "for_instrument",
+            "for_instruments",
+            "instrument_ids",
+            "for_import_batch",
+            "delete_for_import_batch",
+        )
     },
     **{
         ("PricePointRepository", method): "test_price_queries_stay_in_their_workspace"
@@ -192,6 +202,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "provider_on",
             "latest_provider_for_instrument",
             "any_provider_for_instrument",
+            "for_import_batch",
         )
     },
     **{
@@ -201,13 +212,14 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "for_base_on_or_before",
             "rate_on",
             "for_base_source_on_or_before",
+            "for_import_batch",
         )
     },
     **{
         ("PriceSourceConfigRepository", method): (
             "test_price_source_queries_stay_in_their_workspace"
         )
-        for method in ("create", "for_provider", "enabled")
+        for method in ("create", "for_provider", "enabled", "for_import_batch")
     },
     **{
         ("ProviderErrorRepository", method): ("test_price_source_queries_stay_in_their_workspace")

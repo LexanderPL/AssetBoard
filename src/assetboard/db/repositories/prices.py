@@ -26,16 +26,22 @@ class PricePointRepository(ScopedRepository[PricePoint]):
         price: Decimal,
         source: str,
         provider_key: str | None = None,
+        import_key: str | None = None,
+        import_batch_id: UUID | None = None,
+        created_at: datetime | None = None,
     ) -> PricePoint:
-        return self.add(
-            PricePoint(
-                instrument_id=instrument_id,
-                date=date,
-                price=price,
-                source=source,
-                provider_key=provider_key,
-            )
+        row = PricePoint(
+            instrument_id=instrument_id,
+            date=date,
+            price=price,
+            source=source,
+            provider_key=provider_key,
+            import_key=import_key,
+            import_batch_id=import_batch_id,
         )
+        if created_at is not None:
+            row.created_at = created_at
+        return self.add(row)
 
     def manual_on(self, instrument_id: UUID, date: date) -> PricePoint | None:
         statement = self._scoped_select().where(
@@ -96,6 +102,12 @@ class PricePointRepository(ScopedRepository[PricePoint]):
         )
         return list(self._session.scalars(statement))
 
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[PricePoint]:
+        statement = self._scoped_select().where(PricePoint.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(self._session.scalars(statement.order_by(PricePoint.id)))
+
 
 class FxRateRepository(ScopedRepository[FxRate]):
     model = FxRate
@@ -108,18 +120,24 @@ class FxRateRepository(ScopedRepository[FxRate]):
         date: date,
         rate: Decimal,
         source: str,
+        import_key: str | None = None,
+        import_batch_id: UUID | None = None,
+        created_at: datetime | None = None,
     ) -> FxRate:
         if not rate.is_finite() or rate <= 0:
             raise ValueError("FX rate must be a positive finite value")
-        return self.add(
-            FxRate(
-                base_currency=base_currency,
-                quote_currency=quote_currency,
-                date=date,
-                rate=rate,
-                source=source,
-            )
+        row = FxRate(
+            base_currency=base_currency,
+            quote_currency=quote_currency,
+            date=date,
+            rate=rate,
+            source=source,
+            import_key=import_key,
+            import_batch_id=import_batch_id,
         )
+        if created_at is not None:
+            row.created_at = created_at
+        return self.add(row)
 
     def for_base_on_or_before(self, base_currency: str, on: date) -> list[FxRate]:
         statement = self._scoped_select().where(
@@ -149,6 +167,12 @@ class FxRateRepository(ScopedRepository[FxRate]):
         )
         return list(self._session.scalars(statement))
 
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[FxRate]:
+        statement = self._scoped_select().where(FxRate.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(self._session.scalars(statement.order_by(FxRate.id)))
+
 
 class PriceSourceConfigRepository(ScopedRepository[PriceSourceConfig]):
     model = PriceSourceConfig
@@ -171,6 +195,12 @@ class PriceSourceConfigRepository(ScopedRepository[PriceSourceConfig]):
                 statement.order_by(PriceSourceConfig.provider_key, PriceSourceConfig.id)
             )
         )
+
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[PriceSourceConfig]:
+        statement = self._scoped_select().where(PriceSourceConfig.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(self._session.scalars(statement.order_by(PriceSourceConfig.provider_key)))
 
 
 class ProviderErrorRepository(ScopedRepository[ProviderError]):

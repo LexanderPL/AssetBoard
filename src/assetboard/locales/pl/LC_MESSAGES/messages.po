@@ -1417,6 +1417,141 @@ msgstr ""
 "Pliki majątku netto służą tylko do przywracania; zostały pominięte w tym "
 "scalaniu."
 
+msgid "Investment files are restored only; they were ignored in this merge."
+msgstr ""
+"Pliki inwestycji służą tylko do przywracania; zostały pominięte w tym "
+"scalaniu."
+
+#, python-format
+msgid "Re-enter the API key and enable %(provider)s."
+msgstr "Wprowadź ponownie klucz API i włącz %(provider)s."
+
+msgid "An asset class id appears more than once."
+msgstr "Identyfikator klasy aktywów występuje więcej niż raz."
+
+msgid "Two active asset classes have the same name."
+msgstr "Dwie aktywne klasy aktywów mają tę samą nazwę."
+
+msgid "An instrument id appears more than once."
+msgstr "Identyfikator instrumentu występuje więcej niż raz."
+
+msgid "Two active instruments have the same name."
+msgstr "Dwa aktywne instrumenty mają tę samą nazwę."
+
+msgid "A currency instrument's unit label must be its currency code."
+msgstr "Etykieta jednostki instrumentu walutowego musi być kodem jego waluty."
+
+msgid "An allocation id appears more than once."
+msgstr "Identyfikator alokacji występuje więcej niż raz."
+
+msgid "An allocation references an unknown or differently named row."
+msgstr "Alokacja odwołuje się do nieznanego wiersza lub wiersza o innej nazwie."
+
+msgid "The same instrument and asset class are allocated twice."
+msgstr "Ten sam instrument i klasa aktywów są przypisane dwukrotnie."
+
+msgid "An instrument's allocation weights must total exactly 100%."
+msgstr "Wagi alokacji instrumentu muszą sumować się dokładnie do 100%."
+
+msgid "An investment transaction id appears more than once."
+msgstr "Identyfikator transakcji inwestycyjnej występuje więcej niż raz."
+
+msgid ""
+"An investment transaction references an unknown or differently named "
+"instrument, or the wrong quote currency."
+msgstr ""
+"Transakcja inwestycyjna odwołuje się do nieznanego lub inaczej nazwanego "
+"instrumentu albo do niewłaściwej waluty wyceny."
+
+msgid "The settlement fields must be set together and only where allowed."
+msgstr ""
+"Pola rozliczenia muszą być ustawione razem i tylko tam, gdzie jest to "
+"dozwolone."
+
+msgid "A bond terms id appears more than once."
+msgstr "Identyfikator warunków obligacji występuje więcej niż raz."
+
+msgid "Bond terms reference an unknown instrument or the wrong type."
+msgstr ""
+"Warunki obligacji odwołują się do nieznanego instrumentu lub "
+"niewłaściwego typu."
+
+msgid "An instrument has more than one bond terms row."
+msgstr "Instrument ma więcej niż jeden wiersz warunków obligacji."
+
+msgid "The early-redemption fee is inconsistent."
+msgstr "Opłata za wcześniejszy wykup jest niespójna."
+
+msgid "The bond rate schedule is invalid."
+msgstr "Harmonogram oprocentowania obligacji jest nieprawidłowy."
+
+msgid "A price point id appears more than once."
+msgstr "Identyfikator punktu cenowego występuje więcej niż raz."
+
+msgid "A price point references an unknown or differently named instrument."
+msgstr "Punkt cenowy odwołuje się do nieznanego lub inaczej nazwanego instrumentu."
+
+msgid "The same instrument, date and source appear twice."
+msgstr "Ten sam instrument, data i źródło występują dwukrotnie."
+
+msgid "An FX rate id appears more than once."
+msgstr "Identyfikator kursu walutowego występuje więcej niż raz."
+
+msgid "An FX rate's base currency differs from the workspace."
+msgstr ""
+"Waluta bazowa kursu walutowego różni się od waluty bazowej obszaru "
+"roboczego."
+
+msgid "The same FX pair, date and source appear twice."
+msgstr "Ta sama para walut, data i źródło występują dwukrotnie."
+
+msgid "A provider config id or provider appears more than once."
+msgstr ""
+"Identyfikator konfiguracji dostawcy lub nazwa dostawcy występują więcej "
+"niż raz."
+
+msgid "A risk tier is not one of safe, growth or speculative."
+msgstr "Poziom ryzyka nie jest jednym z: bezpieczny, wzrostowy lub spekulacyjny."
+
+msgid "An instrument type is not supported."
+msgstr "Typ instrumentu nie jest obsługiwany."
+
+msgid "An investment transaction type is not supported."
+msgstr "Typ transakcji inwestycyjnej nie jest obsługiwany."
+
+msgid "An instrument valuation source is not supported."
+msgstr "Źródło wyceny instrumentu nie jest obsługiwane."
+
+msgid "A bond interest mode is not supported."
+msgstr "Tryb oprocentowania obligacji nie jest obsługiwany."
+
+msgid "A whole-number field is invalid."
+msgstr "Pole liczby całkowitej jest nieprawidłowe."
+
+msgid "An allocation weight must be between 1 and 10 000 bp."
+msgstr "Waga alokacji musi mieścić się między 1 a 10 000 bp."
+
+msgid "A tax rate must be between 0 and 10 000 bp."
+msgstr "Stawka podatku musi mieścić się między 0 a 10 000 bp."
+
+msgid "A provider daily call budget must be between 1 and 100 000."
+msgstr "Dzienny limit wywołań dostawcy musi mieścić się między 1 a 100 000."
+
+msgid "A price source must be manual or provider."
+msgstr "Źródło ceny musi być ręczne lub pochodzić od dostawcy."
+
+msgid "An FX source is invalid."
+msgstr "Źródło kursu walutowego jest nieprawidłowe."
+
+msgid "A provider's FX backfill marker is invalid."
+msgstr "Znacznik uzupełniania kursów walutowych dostawcy jest nieprawidłowy."
+
+msgid "A decimal value is invalid or outside the supported range."
+msgstr "Wartość dziesiętna jest nieprawidłowa lub poza obsługiwanym zakresem."
+
+msgid "The amount has more decimals than its currency allows."
+msgstr "Kwota ma więcej miejsc po przecinku, niż pozwala jej waluta."
+
 msgid "A net-worth category id appears more than once."
 msgstr "Identyfikator kategorii majątku występuje więcej niż raz."
 
@@ -1433,6 +1568,9 @@ msgstr "Pozycja majątku odwołuje się do kategorii innej strony lub o innej na
 
 msgid "A linked net-worth item has an invalid link."
 msgstr "Powiązana pozycja majątku ma nieprawidłowe powiązanie."
+
+msgid "Two active net-worth items link to the same target."
+msgstr "Dwie aktywne pozycje majątku netto prowadzą do tego samego celu."
 
 msgid "An item valuation id appears more than once."
 msgstr "Identyfikator wyceny pozycji występuje więcej niż raz."
@@ -3625,6 +3763,9 @@ msgstr "Okno nadchodzących"
 
 msgid "Investment cost basis"
 msgstr "Metoda kosztu inwestycji"
+
+msgid "Risk targets"
+msgstr "Cele ryzyka"
 
 msgid "Workspace settings saved."
 msgstr "Zapisano ustawienia obszaru roboczego."
@@ -7809,11 +7950,29 @@ msgstr "Przywrócone usunięte transakcje"
 msgid "Month states"
 msgstr "Stany miesięcy"
 
+msgid "Instrument allocations"
+msgstr "Alokacje instrumentów"
+
+msgid "Price points"
+msgstr "Punkty cenowe"
+
+msgid "FX rates"
+msgstr "Kursy walutowe"
+
+msgid "Provider settings"
+msgstr "Ustawienia dostawcy"
+
+msgid "Risk targets restored"
+msgstr "Przywrócone cele ryzyka"
+
 msgid "Suggested categories to remove"
 msgstr "Proponowane kategorie do usunięcia"
 
 msgid "Suggested net-worth categories to remove"
 msgstr "Proponowane kategorie majątku do usunięcia"
+
+msgid "Suggested asset classes to remove"
+msgstr "Sugerowane klasy aktywów do usunięcia"
 
 #, python-format
 msgid "Removed before restoring: %(names)s"
@@ -7822,6 +7981,10 @@ msgstr "Usunięto przed przywróceniem: %(names)s"
 #, python-format
 msgid "Removed net-worth categories before restoring: %(names)s"
 msgstr "Usunięte kategorie majątku przed przywróceniem: %(names)s"
+
+#, python-format
+msgid "Removed asset classes before restoring: %(names)s"
+msgstr "Usunięte klasy aktywów przed przywróceniem: %(names)s"
 
 msgid "Settings the restore will replace:"
 msgstr "Ustawienia, które zastąpi przywracanie:"

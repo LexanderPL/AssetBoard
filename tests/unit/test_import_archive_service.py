@@ -8,6 +8,7 @@ import zipfile
 from collections.abc import Iterator
 from dataclasses import replace
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from io import BytesIO, StringIO
 from pathlib import Path
 from typing import Any, Literal, cast
@@ -21,33 +22,52 @@ from assetboard.db.models.identity import AuditEvent, Workspace
 from assetboard.db.models.import_batch import ImportBatch
 from assetboard.db.models.ledger import Category
 from assetboard.db.repositories import (
+    AssetClassRepository,
     AuditEventRepository,
+    BondTermsRepository,
     BudgetLineRepository,
     CategoryRepository,
+    FxRateRepository,
+    InstrumentAllocationRepository,
+    InstrumentRepository,
+    InvestmentTransactionRepository,
     ItemValuationRepository,
     MonthStateRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
     NetWorthSnapshotRepository,
+    PricePointRepository,
+    PriceSourceConfigRepository,
+    RiskTargetPolicyRepository,
     ScheduledItemRepository,
     TransactionRepository,
 )
 from assetboard.domain.archive import (
     ArchiveRows,
+    AssetClassRow,
+    BondTermsRow,
     BudgetLineRow,
     CategoryRow,
+    FxRateRow,
+    InstrumentAllocationRow,
+    InstrumentRow,
+    InvestmentTransactionRow,
     ItemValuationRow,
     MonthRow,
     NetWorthCategoryRow,
     NetWorthItemRow,
     NetWorthSnapshotRow,
     ParsedArchive,
+    PricePointRow,
+    PriceSourceConfigRow,
+    RiskTargetPolicyRow,
     TransactionRow,
     manifest_bytes,
     parse_archive,
     write_archive,
 )
 from assetboard.domain.categories import SEED, name_key
+from assetboard.domain.instruments import ASSET_CLASS_SEED, ASSET_CLASS_SEED_V1
 from assetboard.domain.months import YearMonth
 from assetboard.domain.networth import (
     ASSET_SEED,
@@ -80,6 +100,7 @@ from assetboard.services.imports import (
 from assetboard.services.imports import (
     ImportError as ServiceImportError,
 )
+from assetboard.services.investments import seed_into as investment_seed_into
 from assetboard.services.networth import seed_categories as networth_seed_categories
 from assetboard.services.networth import seed_into as networth_seed_into
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
@@ -96,6 +117,16 @@ NW_FIRST_VALUE = UUID("88888888-8888-4888-8888-888888888888")
 NW_SECOND_VALUE = UUID("99999999-9999-4999-8999-999999999999")
 NW_SNAPSHOT = UUID("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa")
 NW_LINK = UUID("bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb")
+AC_STOCKS = UUID("c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1")
+AC_BONDS = UUID("c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2")
+INSTRUMENT_BOND = UUID("d1d1d1d1-d1d1-4d1d-8d1d-d1d1d1d1d1d1")
+ALLOC_STOCKS = UUID("e1e1e1e1-e1e1-4e1e-8e1e-e1e1e1e1e1e1")
+ALLOC_BONDS = UUID("e2e2e2e2-e2e2-4e2e-8e2e-e2e2e2e2e2e2")
+INVESTMENT_TX = UUID("f1f1f1f1-f1f1-4f1f-8f1f-f1f1f1f1f1f1")
+BOND_TERMS = UUID("f2f2f2f2-f2f2-4f2f-8f2f-f2f2f2f2f2f2")
+PRICE_POINT = UUID("a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1")
+FX_RATE = UUID("a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2")
+PROVIDER_CONFIG = UUID("a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a3")
 
 
 @pytest.fixture
@@ -192,6 +223,14 @@ def _rows(*, currency: str = "EUR", name: str = "Home") -> ArchiveRows:
             "auto_copy_plan": True,
             "taxes_enabled": True,
             "upcoming_days": 30,
+            "investment_cost_basis": "fifo",
+            "risk_target_policy": {
+                "mode": "fixed",
+                "safe_bp": 6000,
+                "growth_bp": 3000,
+                "speculative_bp": 1000,
+                "tolerance_bp": 500,
+            },
         },
         categories=(
             CategoryRow(str(FOOD), "expense", "Food", "regular", "#4f9d69", 0, None),
@@ -323,6 +362,109 @@ def _rows(*, currency: str = "EUR", name: str = "Home") -> ArchiveRows:
                 "auto",
             ),
         ),
+        asset_classes=(
+            AssetClassRow(str(AC_STOCKS), "Stocks", "true", "#2563eb", 0, "growth", None),
+            AssetClassRow(str(AC_BONDS), "Bonds", "true", "#16a34a", 1, "safe", None),
+        ),
+        instruments=(
+            InstrumentRow(
+                str(NW_LINK),
+                "World ETF",
+                "VWCE",
+                "etf",
+                currency,
+                "share",
+                "manual",
+                "",
+                "",
+                None,
+                "",
+                None,
+            ),
+            InstrumentRow(
+                str(INSTRUMENT_BOND),
+                "Treasury bond",
+                "",
+                "bond_model",
+                currency,
+                "bond",
+                "bond_model",
+                "",
+                "",
+                None,
+                "",
+                None,
+            ),
+        ),
+        instrument_allocations=(
+            InstrumentAllocationRow(
+                str(ALLOC_STOCKS),
+                str(NW_LINK),
+                "World ETF",
+                str(AC_STOCKS),
+                "Stocks",
+                10_000,
+            ),
+            InstrumentAllocationRow(
+                str(ALLOC_BONDS),
+                str(INSTRUMENT_BOND),
+                "Treasury bond",
+                str(AC_BONDS),
+                "Bonds",
+                10_000,
+            ),
+        ),
+        investment_transactions=(
+            InvestmentTransactionRow(
+                str(INVESTMENT_TX),
+                str(NW_LINK),
+                "World ETF",
+                "2026-02-01",
+                "buy",
+                "10",
+                "100.5",
+                currency,
+                "1.00",
+                "1",
+                "First lot",
+                "",
+                "",
+                "",
+                None,
+            ),
+        ),
+        bond_terms=(
+            BondTermsRow(
+                str(BOND_TERMS),
+                str(INSTRUMENT_BOND),
+                "Treasury bond",
+                "EDO",
+                "1000.00",
+                "2030-01-01",
+                "capitalized_annually",
+                '[{"annual_rate_bp":500,"from_date":"2026-01-01"}]',
+                1900,
+                "percent",
+                100,
+                "",
+            ),
+        ),
+        price_points=(
+            PricePointRow(
+                str(PRICE_POINT),
+                str(NW_LINK),
+                "World ETF",
+                "2026-02-01",
+                "101.25",
+                "manual",
+                "",
+            ),
+        ),
+        fx_rates=(FxRateRow(str(FX_RATE), currency, "USD", "2026-02-01", "0.92", "nbp"),),
+        price_source_configs=(
+            PriceSourceConfigRow(str(PROVIDER_CONFIG), "nbp", "true", 20, '{"USD":"2026-02-01"}'),
+        ),
+        risk_target_policy=RiskTargetPolicyRow("fixed", 6000, 3000, 1000, 500),
     )
 
 
@@ -476,6 +618,126 @@ def _source_workspace(db: WorkspaceDb) -> None:
             source="auto",
             import_key=f"id:{NW_SNAPSHOT}",
         )
+        asset_classes = AssetClassRepository(session, ctx)
+        stocks = asset_classes.create(
+            name="Stocks",
+            name_key="stocks",
+            investable=True,
+            color="#2563eb",
+            sort_order=0,
+            risk_tier="growth",
+            import_key=f"id:{AC_STOCKS}",
+        )
+        bond_class = asset_classes.create(
+            name="Bonds",
+            name_key="bonds",
+            investable=True,
+            color="#16a34a",
+            sort_order=1,
+            risk_tier="safe",
+            import_key=f"id:{AC_BONDS}",
+        )
+        instruments = InstrumentRepository(session, ctx)
+        etf = instruments.create(
+            name="World ETF",
+            name_key="world etf",
+            symbol="VWCE",
+            type="etf",
+            quote_currency="EUR",
+            unit_label="share",
+            valuation_source="manual",
+            import_key=f"id:{NW_LINK}",
+        )
+        bond = instruments.create(
+            name="Treasury bond",
+            name_key="treasury bond",
+            symbol=None,
+            type="bond_model",
+            quote_currency="EUR",
+            unit_label="bond",
+            valuation_source="bond_model",
+            import_key=f"id:{INSTRUMENT_BOND}",
+        )
+        allocations = InstrumentAllocationRepository(session, ctx)
+        allocations.create(
+            instrument_id=etf.id,
+            asset_class_id=stocks.id,
+            weight_bp=10_000,
+            import_key=f"id:{ALLOC_STOCKS}",
+        )
+        allocations.create(
+            instrument_id=bond.id,
+            asset_class_id=bond_class.id,
+            weight_bp=10_000,
+            import_key=f"id:{ALLOC_BONDS}",
+        )
+        InvestmentTransactionRepository(session, ctx).create(
+            instrument_id=etf.id,
+            date=date(2026, 2, 1),
+            type="buy",
+            quantity=Decimal("10"),
+            unit_price=Decimal("100.5"),
+            quote_currency="EUR",
+            fee_minor=100,
+            fx_to_base=Decimal("1"),
+            note="First lot",
+            import_key=f"id:{INVESTMENT_TX}",
+            created_at=datetime(2026, 2, 1, 8, 0, tzinfo=UTC),
+        )
+        BondTermsRepository(session, ctx).create(
+            instrument_id=bond.id,
+            series_code="EDO",
+            face_value_minor=100000,
+            maturity_date=date(2030, 1, 1),
+            interest_mode="capitalized_annually",
+            rate_schedule=[{"from_date": "2026-01-01", "annual_rate_bp": 500}],
+            tax_rate_bp=1900,
+            early_redemption_fee_mode="percent",
+            early_redemption_fee_rate_bp=100,
+            import_key=f"id:{BOND_TERMS}",
+        )
+        PricePointRepository(session, ctx).create(
+            instrument_id=etf.id,
+            date=date(2026, 2, 1),
+            price=Decimal("101.25"),
+            source="manual",
+            import_key=f"id:{PRICE_POINT}",
+        )
+        FxRateRepository(session, ctx).create(
+            base_currency="EUR",
+            quote_currency="USD",
+            date=date(2026, 2, 1),
+            rate=Decimal("0.92"),
+            source="nbp",
+            import_key=f"id:{FX_RATE}",
+        )
+        PriceSourceConfigRepository(session, ctx).create(
+            provider_key="nbp",
+            enabled=True,
+            settings_encrypted=None,
+            fx_backfilled='{"USD":"2026-02-01"}',
+            daily_call_budget=20,
+            import_key=f"id:{PROVIDER_CONFIG}",
+        )
+        RiskTargetPolicyRepository(session, ctx).create(
+            mode="fixed",
+            safe_bp=6000,
+            growth_bp=3000,
+            speculative_bp=1000,
+            tolerance_bp=500,
+        )
+        networth_items.create(
+            side="asset",
+            category_id=vehicles.id,
+            name="Brokerage",
+            currency="EUR",
+            valuation_mode="linked",
+            link_type="portfolio_holding",
+            link_id=etf.id,
+            investable=True,
+            estimate_between=True,
+            import_key=f"id:{NW_BROKERAGE}",
+        )
 
 
 def _target(db: WorkspaceDb) -> UUID:
@@ -509,6 +771,14 @@ def test_restore_round_trip_is_byte_identical(db: WorkspaceDb, data_dir: Path) -
         "networth_items.csv",
         "item_valuations.csv",
         "networth_snapshots.csv",
+        "asset_classes.csv",
+        "instruments.csv",
+        "instrument_allocations.csv",
+        "investment_transactions.csv",
+        "bond_terms.csv",
+        "price_points.csv",
+        "fx_rates.csv",
+        "price_source_configs.csv",
     ):
         assert first_parsed.files[name] == second_parsed.files[name]
     assert first_parsed.manifest["files"] == second_parsed.manifest["files"]
@@ -574,6 +844,89 @@ def test_untouched_suggested_categories_are_empty_enough_and_are_removed(
         assert CategoryRepository(session, target_ctx).list() == []
         assert NetWorthCategoryRepository(session, target_ctx).list() == []
         assert workspace_is_empty(session, target_ctx)
+
+
+def test_untouched_suggested_asset_classes_are_empty_enough_and_are_removed(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    with db.factory.begin() as session:
+        investment_seed_into(
+            session,
+            ctx,
+            locale="en",
+            actor_user_id=db.users["own"],
+            actor_type="user",
+            now=db.clock.now(),
+            automatic=True,
+        )
+    with db.factory() as session:
+        assert workspace_is_empty(session, ctx)
+        assert len(AssetClassRepository(session, ctx).list()) == len(ASSET_CLASS_SEED)
+    batch_id = _upload(db, data_dir, _archive(_rows()), ctx=ctx)
+    report = _plan(db, data_dir, batch_id, ctx=ctx)
+    assert report["counts"]["invalid"] == 0, report
+    assert report["counts"]["suggested_asset_classes_removed"] == len(ASSET_CLASS_SEED)
+    _apply(db, data_dir, batch_id, ctx=ctx)
+    with db.factory() as session:
+        assert [row.name for row in AssetClassRepository(session, ctx).ordered()] == [
+            "Stocks",
+            "Bonds",
+        ]
+    rollback_import(db.factory, ctx, batch_id)
+    with db.factory() as session:
+        assert AssetClassRepository(session, ctx).list() == []
+        assert workspace_is_empty(session, ctx)
+
+
+def test_old_suggested_asset_classes_without_tiers_are_still_empty(
+    db: WorkspaceDb,
+) -> None:
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    with db.factory.begin() as session:
+        repository = AssetClassRepository(session, ctx)
+        for position, seed in enumerate(ASSET_CLASS_SEED_V1):
+            name = gettext(seed.name, "en")
+            repository.create(
+                name=name,
+                name_key=name_key(name),
+                investable=seed.investable,
+                color=seed.color,
+                sort_order=position,
+                risk_tier=None,
+            )
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=db.users["own"],
+            actor_type="user",
+            action="asset_class.seeded",
+            entity_type="workspace",
+            entity_id=str(target),
+            ts=db.clock.now(),
+            data={"count": len(ASSET_CLASS_SEED_V1), "automatic": True},
+        )
+    with db.factory() as session:
+        assert workspace_is_empty(session, ctx)
+
+
+def test_edited_suggested_asset_classes_are_not_empty(db: WorkspaceDb) -> None:
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    with db.factory.begin() as session:
+        investment_seed_into(
+            session,
+            ctx,
+            locale="en",
+            actor_user_id=db.users["own"],
+            actor_type="user",
+            now=db.clock.now(),
+            automatic=True,
+        )
+        asset_class = AssetClassRepository(session, ctx).ordered()[0]
+        AssetClassRepository(session, ctx).update(asset_class.id, name="Changed")
+    with db.factory() as session:
+        assert not workspace_is_empty(session, ctx)
 
 
 @pytest.mark.parametrize(
@@ -796,8 +1149,11 @@ def test_restore_into_truly_empty_workspace_applies_settings_and_rolls_back(
         networth_items = NetWorthItemRepository(session, target_ctx).ordered()
         assert {row.name: row for row in networth_items}.keys() == {"Car", "Brokerage"}
         brokerage = next(row for row in networth_items if row.name == "Brokerage")
-        assert brokerage.valuation_mode == "manual"
-        assert brokerage.link_type is None and brokerage.link_id is None
+        instruments = InstrumentRepository(session, target_ctx).ordered()
+        world_etf = next(row for row in instruments if row.name == "World ETF")
+        assert brokerage.valuation_mode == "linked"
+        assert brokerage.link_type == "portfolio_holding"
+        assert brokerage.link_id == world_etf.id
         assert ItemValuationRepository(session, target_ctx).for_item(brokerage.id) == []
         assert {row.name: row.estimate_between for row in networth_items} == {
             "Car": False,
@@ -816,6 +1172,34 @@ def test_restore_into_truly_empty_workspace_applies_settings_and_rolls_back(
         assert snapshots[0].breakdown["categories"][0]["category_id"] == str(
             networth_categories[0].id
         )
+        asset_classes = AssetClassRepository(session, target_ctx).ordered()
+        assert [row.name for row in asset_classes] == ["Stocks", "Bonds"]
+        assert [row.risk_tier for row in asset_classes] == ["growth", "safe"]
+        assert [row.name for row in instruments] == ["Treasury bond", "World ETF"]
+        assert world_etf.import_key == f"id:{NW_LINK}"
+        assert world_etf.provider_backfilled_at is None
+        assert len(InstrumentAllocationRepository(session, target_ctx).list()) == 2
+        transactions = InvestmentTransactionRepository(session, target_ctx).list()
+        assert len(transactions) == 1
+        assert transactions[0].quantity == 10
+        assert transactions[0].unit_price == 100.5
+        assert transactions[0].fee_minor == 100
+        assert transactions[0].import_key == f"id:{INVESTMENT_TX}"
+        terms = BondTermsRepository(session, target_ctx).list()
+        assert len(terms) == 1 and terms[0].series_code == "EDO"
+        assert len(PricePointRepository(session, target_ctx).list()) == 1
+        assert len(FxRateRepository(session, target_ctx).list()) == 1
+        configs = PriceSourceConfigRepository(session, target_ctx).list()
+        assert len(configs) == 1 and configs[0].provider_key == "nbp"
+        assert configs[0].enabled is True and configs[0].fx_backfilled == '{"USD":"2026-02-01"}'
+        policy = RiskTargetPolicyRepository(session, target_ctx).for_workspace()
+        assert policy is not None
+        assert (policy.mode, policy.safe_bp, policy.growth_bp, policy.speculative_bp) == (
+            "fixed",
+            6000,
+            3000,
+            1000,
+        )
         actions = [
             event.action for event in session.query(AuditEvent).order_by(AuditEvent.ts).all()
         ]
@@ -833,6 +1217,15 @@ def test_restore_into_truly_empty_workspace_applies_settings_and_rolls_back(
         "Car": "false",
         "Brokerage": "true",
     }
+    assert reparsed.rows.workspace["investment_cost_basis"] == "fifo"
+    assert reparsed.rows.risk_target_policy == RiskTargetPolicyRow("fixed", 6000, 3000, 1000, 500)
+    assert [row.name for row in reparsed.rows.asset_classes] == ["Stocks", "Bonds"]
+    assert [row.name for row in reparsed.rows.instruments] == ["Treasury bond", "World ETF"]
+    assert reparsed.rows.investment_transactions[0].quantity == "10"
+    assert reparsed.rows.investment_transactions[0].unit_price == "100.5"
+    assert reparsed.rows.price_points[0].price == "101.25"
+    assert reparsed.rows.fx_rates[0].rate == "0.92"
+    assert reparsed.rows.price_source_configs[0].provider_key == "nbp"
 
     preview = preview_rollback_import(db.factory, secure_ctx, batch_id)
     assert preview.mode == "restore"
@@ -847,6 +1240,15 @@ def test_restore_into_truly_empty_workspace_applies_settings_and_rolls_back(
         assert NetWorthItemRepository(session, target_ctx).list() == []
         assert ItemValuationRepository(session, target_ctx).list() == []
         assert NetWorthSnapshotRepository(session, target_ctx).list() == []
+        assert AssetClassRepository(session, target_ctx).list() == []
+        assert InstrumentRepository(session, target_ctx).list() == []
+        assert InstrumentAllocationRepository(session, target_ctx).list() == []
+        assert InvestmentTransactionRepository(session, target_ctx).list() == []
+        assert BondTermsRepository(session, target_ctx).list() == []
+        assert PricePointRepository(session, target_ctx).list() == []
+        assert FxRateRepository(session, target_ctx).list() == []
+        assert PriceSourceConfigRepository(session, target_ctx).list() == []
+        assert RiskTargetPolicyRepository(session, target_ctx).list() == []
         workspace = session.get(Workspace, target)
         assert workspace is not None and workspace.name == "Restored"
         event = session.query(AuditEvent).filter(AuditEvent.action == "import.rolled_back").one()
@@ -928,6 +1330,66 @@ def test_restore_reads_the_v1_2_golden_archive(db: WorkspaceDb, data_dir: Path) 
         assert [row.value_minor for row in values] == [1200000, 1205000]
         snapshots = NetWorthSnapshotRepository(session, ctx).for_range(None)
         assert snapshots[0].breakdown["categories"][0]["category_id"] == str(categories[0].id)
+
+
+def test_v1_3_portfolio_link_restores_through_the_missing_target_fallback(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    content = (Path(__file__).parents[1] / "fixtures" / "workspace-archive-v1.3.zip").read_bytes()
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    batch_id = _upload(db, data_dir, content, ctx=ctx)
+    report = _plan(db, data_dir, batch_id, ctx=ctx)
+    assert report["counts"]["invalid"] == 0, report
+    assert report["counts"]["linked_items_unlinked"] == 1
+    assert [warning["code"] for warning in report["warnings"]] == ["link_target_missing"]
+    _apply(db, data_dir, batch_id, ctx=ctx)
+    with db.factory() as session:
+        items = NetWorthItemRepository(session, ctx).ordered()
+        brokerage = next(row for row in items if row.name == "Brokerage")
+        assert brokerage.valuation_mode == "manual"
+        assert brokerage.link_type is None and brokerage.link_id is None
+        assert AssetClassRepository(session, ctx).list() == []
+        assert InstrumentRepository(session, ctx).list() == []
+
+
+def test_keyed_providers_restore_disabled_with_a_reentry_warning(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    rows = replace(
+        _rows(),
+        price_source_configs=(
+            *_rows().price_source_configs,
+            PriceSourceConfigRow(str(uuid4()), "eodhd", "true", 20, '{"USD":"2026-02-01"}'),
+        ),
+    )
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    batch_id = _upload(db, data_dir, _archive(rows), ctx=ctx)
+    report = _plan(db, data_dir, batch_id, ctx=ctx)
+    assert report["counts"]["invalid"] == 0, report
+    warnings = [
+        warning for warning in report["warnings"] if warning["code"] == "provider_key_required"
+    ]
+    assert warnings == [
+        {
+            "file": "price_source_configs.csv",
+            "line": 3,
+            "column": "provider_key",
+            "code": "provider_key_required",
+            "message": "provider_key_required",
+            "provider": "eodhd",
+        }
+    ]
+    _apply(db, data_dir, batch_id, ctx=ctx)
+    with db.factory() as session:
+        configs = {
+            row.provider_key: row for row in PriceSourceConfigRepository(session, ctx).list()
+        }
+    assert configs["nbp"].enabled is True
+    assert configs["eodhd"].enabled is False
+    assert configs["eodhd"].settings_encrypted is None
+    assert configs["eodhd"].fx_backfilled == '{"USD":"2026-02-01"}'
 
 
 def _as_v1_2_without_estimate(content: bytes) -> bytes:
@@ -1272,12 +1734,15 @@ def test_merge_into_source_workspace_creates_nothing(db: WorkspaceDb, data_dir: 
     batch_id = _upload(db, data_dir, content, ctx=db.ctx("own", "owner"), mode="merge")
     report = _plan(db, data_dir, batch_id, ctx=db.ctx("own", "owner"))
     assert report["counts"]["to_create"] == 0, report
-    assert [warning["code"] for warning in report["warnings"]] == ["networth_restore_only"]
+    assert [warning["code"] for warning in report["warnings"]] == [
+        "networth_restore_only",
+        "investment_restore_only",
+    ]
     _apply(db, data_dir, batch_id, ctx=db.ctx("own", "owner"))
     with db.factory() as session:
         assert len(CategoryRepository(session, db.ctx("own", "owner")).list()) == 3
         assert len(TransactionRepository(session, db.ctx("own", "owner")).list()) == 3
-        assert len(NetWorthItemRepository(session, db.ctx("own", "owner")).list()) == 1
+        assert len(NetWorthItemRepository(session, db.ctx("own", "owner")).list()) == 2
         assert len(ItemValuationRepository(session, db.ctx("own", "owner")).list()) == 2
 
 
@@ -1292,6 +1757,12 @@ def test_merge_into_another_workspace_keeps_settings_and_maps_archived(
     assert report["counts"]["invalid"] == 0, report
     assert report["archive_closed_months"] == ["2026-02"]
     assert "timezone" in report["settings_diff"]
+    assert "investment_cost_basis" in report["settings_diff"]
+    assert "risk_target_policy" in report["settings_diff"]
+    assert [warning["code"] for warning in report["warnings"]] == [
+        "networth_restore_only",
+        "investment_restore_only",
+    ]
     _apply(db, data_dir, batch_id, ctx=target_ctx)
     with db.factory() as session:
         assert CategoryRepository(session, target_ctx).list()

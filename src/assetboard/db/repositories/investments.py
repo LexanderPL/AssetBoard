@@ -7,7 +7,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, delete, func, select
 
 from assetboard.db.models.investments import (
     AssetClass,
@@ -33,18 +33,24 @@ class AssetClassRepository(ScopedRepository[AssetClass]):
         sort_order: int,
         risk_tier: str | None = None,
         archived_at: datetime | None = None,
+        import_key: str | None = None,
+        import_batch_id: UUID | None = None,
+        created_at: datetime | None = None,
     ) -> AssetClass:
-        return self.add(
-            AssetClass(
-                name=name,
-                name_key=name_key,
-                investable=investable,
-                color=color,
-                sort_order=sort_order,
-                risk_tier=risk_tier,
-                archived_at=archived_at,
-            )
+        row = AssetClass(
+            name=name,
+            name_key=name_key,
+            investable=investable,
+            color=color,
+            sort_order=sort_order,
+            risk_tier=risk_tier,
+            archived_at=archived_at,
+            import_key=import_key,
+            import_batch_id=import_batch_id,
         )
+        if created_at is not None:
+            row.created_at = created_at
+        return self.add(row)
 
     def ordered(self) -> list[AssetClass]:
         """All classes in display order, archived ones included."""
@@ -78,6 +84,12 @@ class AssetClassRepository(ScopedRepository[AssetClass]):
         orders = [row.sort_order for row in self._session.scalars(statement)]
         return max(orders) + 1 if orders else 0
 
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[AssetClass]:
+        statement = self._scoped_select().where(AssetClass.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(self._session.scalars(statement.order_by(AssetClass.id)))
+
 
 class RiskTargetPolicyRepository(ScopedRepository[RiskTargetPolicy]):
     model = RiskTargetPolicy
@@ -90,16 +102,20 @@ class RiskTargetPolicyRepository(ScopedRepository[RiskTargetPolicy]):
         growth_bp: int,
         speculative_bp: int,
         tolerance_bp: int,
+        import_batch_id: UUID | None = None,
+        created_at: datetime | None = None,
     ) -> RiskTargetPolicy:
-        return self.add(
-            RiskTargetPolicy(
-                mode=mode,
-                safe_bp=safe_bp,
-                growth_bp=growth_bp,
-                speculative_bp=speculative_bp,
-                tolerance_bp=tolerance_bp,
-            )
+        row = RiskTargetPolicy(
+            mode=mode,
+            safe_bp=safe_bp,
+            growth_bp=growth_bp,
+            speculative_bp=speculative_bp,
+            tolerance_bp=tolerance_bp,
+            import_batch_id=import_batch_id,
         )
+        if created_at is not None:
+            row.created_at = created_at
+        return self.add(row)
 
     def for_workspace(self, *, for_update: bool = False) -> RiskTargetPolicy | None:
         """The current workspace's singleton policy, if it has been saved."""
@@ -107,6 +123,12 @@ class RiskTargetPolicyRepository(ScopedRepository[RiskTargetPolicy]):
         if for_update:
             statement = statement.with_for_update()
         return self._session.scalars(statement).one_or_none()
+
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[RiskTargetPolicy]:
+        statement = self._scoped_select().where(RiskTargetPolicy.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(self._session.scalars(statement.order_by(RiskTargetPolicy.id)))
 
 
 class InstrumentRepository(ScopedRepository[Instrument]):
@@ -126,22 +148,30 @@ class InstrumentRepository(ScopedRepository[Instrument]):
         provider_symbol: str | None = None,
         risk_tier_override: str | None = None,
         archived_at: datetime | None = None,
+        provider_backfilled_at: datetime | None = None,
+        import_key: str | None = None,
+        import_batch_id: UUID | None = None,
+        created_at: datetime | None = None,
     ) -> Instrument:
-        return self.add(
-            Instrument(
-                name=name,
-                name_key=name_key,
-                symbol=symbol,
-                type=type,
-                quote_currency=quote_currency,
-                unit_label=unit_label,
-                valuation_source=valuation_source,
-                provider_key=provider_key,
-                provider_symbol=provider_symbol,
-                risk_tier_override=risk_tier_override,
-                archived_at=archived_at,
-            )
+        row = Instrument(
+            name=name,
+            name_key=name_key,
+            symbol=symbol,
+            type=type,
+            quote_currency=quote_currency,
+            unit_label=unit_label,
+            valuation_source=valuation_source,
+            provider_key=provider_key,
+            provider_symbol=provider_symbol,
+            risk_tier_override=risk_tier_override,
+            archived_at=archived_at,
+            provider_backfilled_at=provider_backfilled_at,
+            import_key=import_key,
+            import_batch_id=import_batch_id,
         )
+        if created_at is not None:
+            row.created_at = created_at
+        return self.add(row)
 
     def ordered(self) -> list[Instrument]:
         """All instruments, active first, each group by name."""
@@ -176,6 +206,12 @@ class InstrumentRepository(ScopedRepository[Instrument]):
         statement = self._scoped_select().where(Instrument.id == instrument_id).with_for_update()
         return self._session.scalars(statement).one_or_none()
 
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[Instrument]:
+        statement = self._scoped_select().where(Instrument.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(self._session.scalars(statement.order_by(Instrument.id)))
+
 
 class InstrumentAllocationRepository(ScopedRepository[InstrumentAllocation]):
     model = InstrumentAllocation
@@ -186,14 +222,20 @@ class InstrumentAllocationRepository(ScopedRepository[InstrumentAllocation]):
         instrument_id: UUID,
         asset_class_id: UUID,
         weight_bp: int,
+        import_key: str | None = None,
+        import_batch_id: UUID | None = None,
+        created_at: datetime | None = None,
     ) -> InstrumentAllocation:
-        return self.add(
-            InstrumentAllocation(
-                instrument_id=instrument_id,
-                asset_class_id=asset_class_id,
-                weight_bp=weight_bp,
-            )
+        row = InstrumentAllocation(
+            instrument_id=instrument_id,
+            asset_class_id=asset_class_id,
+            weight_bp=weight_bp,
+            import_key=import_key,
+            import_batch_id=import_batch_id,
         )
+        if created_at is not None:
+            row.created_at = created_at
+        return self.add(row)
 
     def for_instrument(self, instrument_id: UUID) -> list[InstrumentAllocation]:
         statement = (
@@ -202,6 +244,12 @@ class InstrumentAllocationRepository(ScopedRepository[InstrumentAllocation]):
             .order_by(InstrumentAllocation.weight_bp.desc(), InstrumentAllocation.asset_class_id)
         )
         return list(self._session.scalars(statement))
+
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[InstrumentAllocation]:
+        statement = self._scoped_select().where(InstrumentAllocation.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(self._session.scalars(statement.order_by(InstrumentAllocation.id)))
 
 
 class BondTermsRepository(ScopedRepository[BondTerms]):
@@ -230,6 +278,22 @@ class BondTermsRepository(ScopedRepository[BondTerms]):
         statement = self._scoped_select().with_only_columns(BondTerms.instrument_id)
         return set(self._session.scalars(statement))
 
+    def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[BondTerms]:
+        statement = self._scoped_select().where(BondTerms.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(self._session.scalars(statement.order_by(BondTerms.id)))
+
+    def delete_for_import_batch(self, batch_id: UUID) -> int:
+        """Hard-delete a restore batch's terms; the explicit rollback path."""
+        result = self._session.execute(
+            delete(BondTerms).where(
+                BondTerms.workspace_id == self._workspace_id,
+                BondTerms.import_batch_id == batch_id,
+            )
+        )
+        return int(getattr(result, "rowcount", 0) or 0)
+
 
 class InvestmentTransactionRepository(ScopedRepository[InvestmentTransaction]):
     model = InvestmentTransaction
@@ -250,6 +314,7 @@ class InvestmentTransactionRepository(ScopedRepository[InvestmentTransaction]):
         settlement_unit_price: Decimal | None = None,
         settlement_fee_minor: int | None = None,
         import_batch_id: UUID | None = None,
+        import_key: str | None = None,
         created_at: datetime | None = None,
     ) -> InvestmentTransaction:
         row = InvestmentTransaction(
@@ -266,6 +331,7 @@ class InvestmentTransactionRepository(ScopedRepository[InvestmentTransaction]):
             settlement_unit_price=settlement_unit_price,
             settlement_fee_minor=settlement_fee_minor,
             import_batch_id=import_batch_id,
+            import_key=import_key,
         )
         if created_at is not None:
             # Bulk add orders same-day rows by line; the timestamp listener keeps a set value.
@@ -365,6 +431,23 @@ class InvestmentTransactionRepository(ScopedRepository[InvestmentTransaction]):
             .with_for_update()
         )
         return self._session.scalars(statement).one_or_none()
+
+    def for_import_batch(
+        self, batch_id: UUID, *, lock: bool = False
+    ) -> list[InvestmentTransaction]:
+        statement = self._scoped_select().where(InvestmentTransaction.import_batch_id == batch_id)
+        if lock:
+            statement = statement.with_for_update()
+        return list(
+            self._session.scalars(
+                statement.order_by(
+                    InvestmentTransaction.instrument_id,
+                    InvestmentTransaction.date,
+                    InvestmentTransaction.created_at,
+                    InvestmentTransaction.id,
+                )
+            )
+        )
 
     def filtered(
         self,
