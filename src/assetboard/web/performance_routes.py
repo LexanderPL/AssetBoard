@@ -79,6 +79,7 @@ class ChartPointView:
     date: str
     value: str
     invested: str
+    incomplete: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,8 +138,8 @@ def _nice_step(span: int) -> int:
 
 
 def _axis(values: list[int], currency: str, locale: str) -> tuple[int, int, int, dict[str, str]]:
-    low_value = min(0, *values)
-    high_value = max(0, *values)
+    low_value = min((0, *values))
+    high_value = max((0, *values))
     if high_value == low_value:
         high_value = low_value + 1
     step = _nice_step(high_value - low_value)
@@ -156,11 +157,35 @@ def _axis(values: list[int], currency: str, locale: str) -> tuple[int, int, int,
 def _chart(page: PerformancePage, locale: str) -> dict[str, Any] | None:
     if not page.chart:
         return None
-    values = [point.value.amount_minor for point in page.chart]
-    invested = [point.net_invested.amount_minor for point in page.chart]
-    gain = [value - cost for value, cost in zip(values, invested, strict=True)]
-    gain_money = [Money(amount, page.currency) for amount in gain]
-    low, high, step, axis_labels = _axis(values + invested, page.currency, locale)
+    values: list[int | None] = [
+        None if point.incomplete else point.value.amount_minor for point in page.chart
+    ]
+    invested: list[int | None] = [
+        None if point.incomplete else point.net_invested.amount_minor for point in page.chart
+    ]
+    gain: list[int | None] = [
+        None if value is None or cost is None else value - cost
+        for value, cost in zip(values, invested, strict=True)
+    ]
+    complete = [value for value in (*values, *invested) if value is not None]
+    low, high, step, axis_labels = _axis(complete, page.currency, locale)
+    dash = "—"
+    incomplete_text = gettext("Incomplete: an instrument has no price or FX rate.", locale)
+    tooltips: list[list[str]] = []
+    for point in page.chart:
+        if point.incomplete:
+            tooltips.append([incomplete_text])
+            continue
+        gain_minor = point.value.amount_minor - point.net_invested.amount_minor
+        tooltips.append(
+            [
+                f"{gettext('Value', locale)}: {format_money(point.value, locale)}",
+                f"{gettext('Invested capital', locale)}: "
+                f"{format_money(point.net_invested, locale)}",
+                f"{gettext('Gain', locale)}: "
+                f"{format_money(Money(gain_minor, page.currency), locale)}",
+            ]
+        )
     return {
         "labels": [format_day(point.date, locale) for point in page.chart],
         "y_min": low,
@@ -170,18 +195,19 @@ def _chart(page: PerformancePage, locale: str) -> dict[str, Any] | None:
         "value": values,
         "invested": invested,
         "gain": gain,
-        "value_amounts": [format_money(point.value, locale) for point in page.chart],
-        "invested_amounts": [format_money(point.net_invested, locale) for point in page.chart],
-        "gain_amounts": [format_money(amount, locale) for amount in gain_money],
-        "tooltips": [
-            [
-                f"{gettext('Value', locale)}: {format_money(point.value, locale)}",
-                f"{gettext('Invested capital', locale)}: "
-                f"{format_money(point.net_invested, locale)}",
-                f"{gettext('Gain', locale)}: {format_money(gain_money[index], locale)}",
-            ]
-            for index, point in enumerate(page.chart)
+        "value_amounts": [
+            dash if amount is None else format_money(Money(amount, page.currency), locale)
+            for amount in values
         ],
+        "invested_amounts": [
+            dash if amount is None else format_money(Money(amount, page.currency), locale)
+            for amount in invested
+        ],
+        "gain_amounts": [
+            dash if amount is None else format_money(Money(amount, page.currency), locale)
+            for amount in gain
+        ],
+        "tooltips": tooltips,
         "legend": {
             "value": gettext("Value", locale),
             "invested": gettext("Invested capital", locale),
@@ -235,8 +261,9 @@ def build_view(request: Request, page: PerformancePage, locale: str) -> Performa
     points = tuple(
         ChartPointView(
             date=format_day(point.date, locale),
-            value=format_money(point.value, locale),
-            invested=format_money(point.net_invested, locale),
+            value="—" if point.incomplete else format_money(point.value, locale),
+            invested="—" if point.incomplete else format_money(point.net_invested, locale),
+            incomplete=point.incomplete,
         )
         for point in page.chart
     )

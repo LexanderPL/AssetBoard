@@ -505,6 +505,9 @@ def create_bulk(factory: sessionmaker[Session], ctx: Context, *, text: str, loca
                 "batch": str(batch_id),
             },
         )
+        from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
+        ensure_networth_items_for_asset_classes(session, ctx)
         return len(preview.lines)
 
     return run_immediate(factory, write)

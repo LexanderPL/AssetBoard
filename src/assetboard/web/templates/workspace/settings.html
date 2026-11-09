@@ -41,6 +41,13 @@
       <p id="investment_cost_basis-help" class="text-xs text-muted">{{ _("Holdings are recalculated for the whole history. Changing this recalculates realized gains and cost basis; no stored values are rewritten.") }}</p>
       {% if errors.get("investment_cost_basis") %}<p id="investment_cost_basis-error" class="text-sm text-danger">{{ errors.get("investment_cost_basis") }}</p>{% endif %}
     </div>
+    <div class="flex items-start gap-3 sm:col-span-2" data-auto-link-portfolio>
+      <input id="auto_link_portfolio" name="auto_link_portfolio" type="checkbox" value="1"{% if values.auto_link_portfolio %} checked{% endif %} aria-describedby="auto_link_portfolio-help" class="mt-1 h-4 w-4 rounded border-line accent-primary">
+      <div>
+        <label for="auto_link_portfolio" class="block text-sm font-medium text-ink">{{ _("Keep investment asset classes linked in net worth automatically") }}</label>
+        <p id="auto_link_portfolio-help" class="text-xs text-muted">{{ _("Creates and keeps one linked asset item for every asset class with a value. Off: manage the links yourself on the Net worth page.") }}</p>
+      </div>
+    </div>
     <div class="flex items-start gap-3 sm:col-span-2" data-auto-copy-plan>
       <input id="auto_copy_plan" name="auto_copy_plan" type="checkbox" value="1"{% if values.auto_copy_plan %} checked{% endif %} aria-describedby="auto_copy_plan-help" class="mt-1 h-4 w-4 rounded border-line accent-primary">
       <div>

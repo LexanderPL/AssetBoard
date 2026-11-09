@@ -169,6 +169,7 @@ Tests with the fixed Clock: month-end selection, idempotency, backfill semantics
   `describe(link_id)` and `choices()`; a registry where later modules register resolvers.
 - UI: item form shows "Link to…" only for registered link types; linked items display value read-only with a "linked to <name>" chip and a click-through.
 - A linked item cannot be given manual valuations; unlinking converts to manual keeping the last resolved value as a first valuation.
+- Workspace setting `auto_link_portfolio` keeps portfolio asset-class links current: off for workspaces created before it, on for new workspaces. When on, portfolio writes create missing links automatically; when off, the Net Worth page shows the manual "Create net-worth items from asset classes" helper only while an eligible unlinked class exists. Archived linked items are left archived and are never recreated.
 - Tests with a fake resolver.
 
 **Implementation notes (F5.4).**
@@ -197,6 +198,10 @@ Tests with the fixed Clock: month-end selection, idempotency, backfill semantics
   `not_counted.unavailable`; unavailable linked items do not make an auto snapshot eligible.
 - Follow-up: list pages still call `describe` once per linked item. A batched `describe_many`
   on the protocol would let M6 avoid one lookup per holding; not required for F5.4.
+- The automatic portfolio linking (F6.8) is a workspace setting, not an item flag. Turning it
+  off leaves existing links working and brings the manual helper back while eligible classes
+  lack a link. The setting is not part of the archive format (like `require_two_factor`); a
+  restore leaves it unchanged, so there is no archive version bump.
 
 **Agent prompt**
 ```

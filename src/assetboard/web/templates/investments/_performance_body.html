@@ -62,7 +62,7 @@
           <thead><tr class="text-left text-xs text-muted"><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Date") }}</th><th scope="col" class="py-1.5 pr-3 text-right font-medium">{{ _("Value") }}</th><th scope="col" class="py-1.5 text-right font-medium">{{ _("Invested capital") }}</th></tr></thead>
           <tbody>
             {% for point in view.points %}
-            <tr><th scope="row" class="py-1.5 pr-3 text-left font-normal">{{ point.date }}</th><td class="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{{ point.value }}</td><td class="whitespace-nowrap py-1.5 text-right tabular-nums">{{ point.invested }}</td></tr>
+            <tr{% if point.incomplete %} data-incomplete="true"{% endif %}><th scope="row" class="py-1.5 pr-3 text-left font-normal">{{ point.date }}{% if point.incomplete %}<span class="mt-1 block text-xs text-warning-strong">{{ _("Incomplete data") }}</span>{% endif %}</th><td class="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{{ point.value }}</td><td class="whitespace-nowrap py-1.5 text-right tabular-nums">{{ point.invested }}</td></tr>
             {% endfor %}
           </tbody>
         </table>

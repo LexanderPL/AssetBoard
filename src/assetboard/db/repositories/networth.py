@@ -182,6 +182,19 @@ class NetWorthItemRepository(ScopedRepository[NetWorthItem]):
         )
         return self._session.scalars(statement).one_or_none()
 
+    def linked_any(self, link_type: str, link_id: UUID) -> NetWorthItem | None:
+        """Any item, archived or active, linking to this target."""
+        statement = (
+            self._scoped_select()
+            .where(
+                NetWorthItem.valuation_mode == "linked",
+                NetWorthItem.link_type == link_type,
+                NetWorthItem.link_id == link_id,
+            )
+            .limit(1)
+        )
+        return self._session.scalars(statement).first()
+
     def for_import_batch(self, batch_id: UUID, *, lock: bool = False) -> list[NetWorthItem]:
         statement = self._scoped_select().where(NetWorthItem.import_batch_id == batch_id)
         if lock:

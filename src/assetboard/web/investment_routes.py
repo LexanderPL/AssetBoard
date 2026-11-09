@@ -429,7 +429,7 @@ async def _allocation_input(
 
 @router.get("/investments", name="investments")
 async def investments_root(request: Request, ctx: CurrentContext) -> Response:
-    return RedirectResponse(request.url_for("investments_instruments").path, status_code=307)
+    return RedirectResponse(request.url_for("investments_portfolio").path, status_code=307)
 
 
 @router.get("/investments/income", name="investments_income")

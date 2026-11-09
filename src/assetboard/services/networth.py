@@ -80,6 +80,7 @@ from assetboard.services.networth_links import (
 from assetboard.services.portfolio_links import (
     LinkedNetWorthItem,
     PortfolioLinkWarning,
+    portfolio_link_candidates,
     portfolio_warnings,
     real_estate_category_ids,
 )
@@ -252,6 +253,8 @@ class NetWorthPage:
     asset: SideView
     liability: SideView
     portfolio_warnings: tuple[PortfolioLinkWarning, ...] = ()
+    auto_link_portfolio: bool = False
+    portfolio_link_candidates: int = 0
 
     def side_view(self, side: Side) -> SideView:
         return self.asset if side is Side.ASSET else self.liability
@@ -603,7 +606,9 @@ def list_networth(factory: sessionmaker[Session], ctx: Context) -> NetWorthPage:
     require_role(ctx, Role.VIEWER)
     today = ctx.clock.today(ctx.workspace.timezone)
     with factory() as session:
-        base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
+        workspace = CurrentWorkspaceRepository(session, ctx).get()
+        base_currency = workspace.base_currency
+        auto_link_portfolio = workspace.auto_link_portfolio
         categories = NetWorthCategoryRepository(session, ctx).ordered()
         items = current_values(
             session,
@@ -637,6 +642,7 @@ def list_networth(factory: sessionmaker[Session], ctx: Context) -> NetWorthPage:
             linked_items=linked_items,
             property_item_names=property_names,
         )
+        candidates = 0 if auto_link_portfolio else portfolio_link_candidates(session, ctx)
     return NetWorthPage(
         asset=_side_view(
             Side.ASSET,
@@ -651,6 +657,8 @@ def list_networth(factory: sessionmaker[Session], ctx: Context) -> NetWorthPage:
             base_currency=base_currency,
         ),
         portfolio_warnings=warnings,
+        auto_link_portfolio=auto_link_portfolio,
+        portfolio_link_candidates=candidates,
     )
 
 

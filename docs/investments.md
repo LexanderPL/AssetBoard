@@ -151,16 +151,11 @@ spread is part of the cost. The derived quote price keeps the instrument's trans
 transaction FX rate correct (for example "≈ 398.77 USD" at the real rate, not "1 600 USD" at
 rate 1).
 
-In the history such a row shows the base amounts first, with the derived quote price and the
-rate beside them: `1600 PLN · ≈ 398.773771 USD @ 4.0123`. Editing opens the row in the mode it
-was saved in. Switching an existing row to the base currency pre-fills `quote price × rate` and
-`quote fee × rate`; switching back keeps the derived quote values and drops the base amounts.
-
-**Fixing rows entered the old way.** If you entered base amounts as quote amounts with rate 1,
-the row gets a **check FX rate** badge (an instrument quoted in another currency at rate 1).
-Tick **FX needs checking** in the history filters to list them. To fix one, open it, switch to
-the base currency (the amounts carry over, since they were base amounts), take the pre-filled
-stored rate and save.
+In the history such a row shows the base amounts first, with the derived quote price (rounded to
+the quote currency's minor unit) and the rate beside them:
+`1600 PLN · ≈ 398.77 USD @ 4.0123`. Editing opens the row in the mode it was saved in. Switching
+an existing row to the base currency pre-fills `quote price × rate` and `quote fee × rate`;
+switching back keeps the derived quote values and drops the base amounts.
 
 ### Dividends, interest and splits
 
@@ -383,11 +378,15 @@ workspace base currency. It is read-only.
   takes the remainder (on a tie, the class listed first on the Asset classes tab). Gain % is
   shown per class, or *—* when the class has no cost. A class that is not investable is marked
   *not counted in FIRE*; it still counts in every total and in the chart.
-- **Chart**: a donut of instrument values. Choose its scope above it: one asset class (each
-  instrument contributes only its part in that class) or the whole portfolio. It opens on the
-  class created as *Stocks* (*Akcje*) when you hold something there, otherwise on the whole
-  portfolio. Slices under 2% are grouped into *Other*. Slices use the chart palette; the class
-  colours appear in the asset-class table. Without JavaScript the chart's table is shown.
+- **Class donut**: the totals box also shows a compact donut of the look-through value by asset
+  class, in the classes' colours, including archived classes and an *Unallocated* slice for
+  instruments without an allocation. Its total is the portfolio value.
+- **Chart**: a donut of instrument values, titled *Holdings by instrument*. Choose its scope above
+  it: one asset class (each instrument contributes only its part in that class) or the whole
+  portfolio. It opens on the class created as *Stocks* (*Akcje*) when you hold something there,
+  otherwise on the whole portfolio. Slices under 2% are grouped into *Other*. Slices use the
+  chart palette; the class colours appear in the asset-class table. Without JavaScript the
+  chart's table is shown.
 
 Shares and percentages are rounded once for display, so they may not add up to exactly 100%.
 
@@ -401,7 +400,11 @@ Safe class contributes 80% to Growth and 20% to Safe unless it has an override.
 
 A class with no tier is **Unassigned**. Its value is shown separately and left out of the tier
 percentages, so the three tiers always add up to 100% of the assigned value. An instrument
-excluded from the portfolio because it has no price or FX rate is also excluded here.
+excluded from the portfolio because it has no price or FX rate is also excluded here. The
+balance is recomputed on every page load; there is no daily cache. When anything is unassigned,
+a warning under the table shows the unassigned amount and share, explains that the classes need
+a risk tier and links to the Asset classes tab. If any of them match a suggested class name, the
+warning also offers **Apply suggested risk tiers**, which fills only empty tiers in one click.
 
 The workspace has a target policy, editable by editors and owners under **Edit target
 allocation**:
@@ -440,14 +443,18 @@ time, and the money-weighted return for standard periods. It is read-only.
 - **Series**: value and cumulative net invested capital, in the base currency. Quantity comes
   from dated buy/sell transactions and splits; undated legacy lots are excluded and a note links
   to the transaction history. Prices and FX rates carry forward from the latest observation on or
-  before each point, with a price observed before a split multiplied by old/new. A
+  before each point, with a price observed before a split multiplied by old/new. When a holding
+  has no observation on or before a point, the chart backfills it from the first known later
+  observation, so a price history that starts after the purchase does not draw a zero dip. A
   transaction-derived price and FX rate cover every instrument from its first buy.
 - **Dividends and splits**: a dividend's net amount in the base currency is a positive XIRR cash
   flow and reduces net invested capital; splits are not cash flows. Neither is used as a
   transaction-price observation.
 - **Ranges**: the chart opens on **1 year**. YTD, 3 years, 5 years and all time are also
   available. Ranges up to 90 days use daily points; longer ranges use weekly points, and an
-  all-time range over five years uses monthly points. The end date is always included.
+  all-time range over five years uses monthly points. The end date is always included. Points
+  before the first dated transaction are dropped, so the chart does not start with a flat zero
+  prefix.
 - **Class filter**: the default is the whole portfolio. Choosing an asset class applies the
   same look-through weights as the Portfolio tab to both value and invested capital, so an
   80/20 fund contributes 80% to Stocks. Class series add up exactly to the whole-portfolio
@@ -456,10 +463,11 @@ time, and the money-weighted return for standard periods. It is read-only.
   static price series. Coupon resets and capitalisation therefore appear at the right dates.
 - **Settlement rows**: amounts entered in the base currency use their exact stored base total for
   net invested and XIRR; the broker's FX spread is part of the flow.
-- **Missing data**: if a held instrument has no price or FX rate at a point, both its value and
-  its net invested contribution are left out there and the point is marked incomplete. This
-  avoids drawing a fake loss. A period whose start or end is incomplete shows its value change
-  with a warning and its XIRR is undefined.
+- **Missing data**: if a held instrument has no price or FX rate at a point even after leading
+  backfill, both its value and its net invested contribution are left out there and the point is
+  marked incomplete. The chart draws a gap there (it does not connect across it) and the
+  plotted-data table shows “—”, so missing data never appears as a fake zero. A period whose
+  start or end is incomplete shows its value change with a warning and its XIRR is undefined.
 - **Periods**: 1 month, 3 months, year to date, 1 year and all time. The table shows start and
   end value, absolute and percentage value change, net flows, **Δ value − net flows** (the gain
   not explained by deposits or withdrawals), and the return.
@@ -474,13 +482,17 @@ time, and the money-weighted return for standard periods. It is read-only.
 
 ## Net worth
 
-Asset classes and individual holdings can feed **Net Worth → Assets** as linked items. An
-editor or owner sees **Create net-worth items from asset classes** there; it creates one linked
-asset item per active class with a value, in an **Investments** category created on demand (pl
-**Inwestycje**). Empty classes, classes whose value is unavailable because of a missing price or
-FX rate, and classes already linked are skipped. The **Link to…** picker also offers active
-instruments you currently hold. Sold-out and archived targets are not offered for new links, but
-existing links keep resolving.
+Asset classes and individual holdings can feed **Net Worth → Assets** as linked items. New
+workspaces keep one linked asset item per active class up to date automatically (the
+**Keep investment asset classes linked in net worth automatically** setting under Workspace
+settings). Existing workspaces start with it off and can turn it on. When it is off, an editor
+or owner sees **Create net-worth items from asset classes** on the Assets page while at least
+one eligible class has no link; it creates one linked asset item per active class with a value,
+in an **Investments** category created on demand (pl **Inwestycje**). Empty classes, classes whose
+value is unavailable because of a missing price or FX rate, and classes already linked are
+skipped. Archiving a linked item is respected: neither automatic nor manual linking recreates
+it. The **Link to…** picker also offers active instruments you currently hold. Sold-out and
+archived targets are not offered for new links, but existing links keep resolving.
 
 The linked value is read-only. For today it matches the **Portfolio** tab exactly, including
 undated imported lots and the latest prices and FX rates. For a past snapshot or a backfill it

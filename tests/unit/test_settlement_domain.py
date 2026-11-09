@@ -23,11 +23,7 @@ from assetboard.domain.holdings import (
     transaction_total,
 )
 from assetboard.domain.money import Money
-from assetboard.domain.settlement import (
-    base_values_from_quote,
-    derive_quote_values,
-    needs_fx_check,
-)
+from assetboard.domain.settlement import base_values_from_quote, derive_quote_values
 
 BASE = "PLN"
 QUOTE = "USD"
@@ -187,7 +183,7 @@ def test_a_settlement_must_be_complete_and_in_the_base_currency() -> None:
         compute_holdings([row], "average", base_currency="EUR")
 
 
-def test_quote_to_base_switch_values_and_the_fx_check_flag() -> None:
+def test_quote_to_base_switch_values() -> None:
     price, fee = base_values_from_quote(
         Decimal("398.5"), 125, Decimal("4.0123"), base_currency=BASE, quote_currency=QUOTE
     )
@@ -195,9 +191,6 @@ def test_quote_to_base_switch_values_and_the_fx_check_flag() -> None:
     assert fee == _half_up_minor(Decimal("1.25") * Decimal("4.0123")) == 502
     with pytest.raises(ValueError):
         derive_quote_values(Decimal(1), 0, Decimal(0), base_currency=BASE, quote_currency=QUOTE)
-    assert needs_fx_check(quote_currency="USD", base_currency="PLN", fx_to_base=Decimal("1.000"))
-    assert not needs_fx_check(quote_currency="USD", base_currency="PLN", fx_to_base=Decimal("4"))
-    assert not needs_fx_check(quote_currency="PLN", base_currency="PLN", fx_to_base=Decimal(1))
 
 
 _prices = st.decimals(min_value=Decimal("0"), max_value=Decimal("100000"), places=4)

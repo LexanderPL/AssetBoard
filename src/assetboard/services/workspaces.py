@@ -187,6 +187,8 @@ class WorkspaceSettings:
     upcoming_days: int | None = None
     # F6.2: average or FIFO cost basis; holdings are recomputed on read.
     investment_cost_basis: str = "average"
+    # F6.8: keep a linked net-worth item per active asset class with a value.
+    auto_link_portfolio: bool = False
 
 
 def _checkpoint(_name: str) -> None:
@@ -225,6 +227,7 @@ def workspace_settings(factory: sessionmaker[Session], ctx: Context) -> Workspac
             taxes_enabled=workspace.taxes_enabled,
             upcoming_days=workspace.upcoming_days,
             investment_cost_basis=workspace.investment_cost_basis,
+            auto_link_portfolio=workspace.auto_link_portfolio,
         )
 
 
@@ -242,6 +245,7 @@ def update_settings(
     recurrence_horizon_months: int = DEFAULT_RECURRENCE_HORIZON_MONTHS,
     upcoming_days: int | None = None,
     investment_cost_basis: str = "average",
+    auto_link_portfolio: bool = False,
 ) -> WorkspaceSettings:
     """Change the workspace's settings; the audit event lists changed fields, not values.
 
@@ -281,6 +285,7 @@ def update_settings(
         require_two_factor=require_two_factor,
         upcoming_days=upcoming_days,
         investment_cost_basis=investment_cost_basis,
+        auto_link_portfolio=auto_link_portfolio,
     )
 
     def write(session: Session) -> WorkspaceSettings:
@@ -301,6 +306,7 @@ def update_settings(
                 ("require_two_factor", wanted.require_two_factor),
                 ("upcoming_days", wanted.upcoming_days),
                 ("investment_cost_basis", wanted.investment_cost_basis),
+                ("auto_link_portfolio", wanted.auto_link_portfolio),
             )
             if getattr(workspace, field) != value
         }

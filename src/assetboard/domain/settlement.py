@@ -73,8 +73,3 @@ def base_values_from_quote(
         fee = Decimal(fee_minor).scaleb(-minor_unit_for(quote_currency)) * fx_to_base
         base_fee_minor = Money.from_decimal(fee, base_currency).amount_minor
     return price, base_fee_minor
-
-
-def needs_fx_check(*, quote_currency: str, base_currency: str, fx_to_base: Decimal | None) -> bool:
-    """A non-base instrument's row stored at rate 1: likely base amounts entered as quote ones."""
-    return quote_currency != base_currency and fx_to_base is not None and fx_to_base == 1

@@ -994,6 +994,9 @@ def _create_instrument_in_session(
         row.id,
         {"count": len(rows)},
     )
+    from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
+    ensure_networth_items_for_asset_classes(session, ctx)
     return _instrument_view(
         row,
         classes,
@@ -1137,6 +1140,9 @@ def update_instrument(
                 row.id,
                 {"count": len(rows)},
             )
+        from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
+        ensure_networth_items_for_asset_classes(session, ctx)
         return _instrument_view(
             row,
             classes,
@@ -1169,6 +1175,9 @@ def archive_instrument(factory: sessionmaker[Session], ctx: Context, instrument_
             row.id,
             {"name": row.name},
         )
+        from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
+        ensure_networth_items_for_asset_classes(session, ctx)
 
     run_immediate(factory, write)
 
@@ -1195,5 +1204,8 @@ def restore_instrument(factory: sessionmaker[Session], ctx: Context, instrument_
             row.id,
             {"name": row.name},
         )
+        from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
+        ensure_networth_items_for_asset_classes(session, ctx)
 
     _write(factory, write, duplicate=DuplicateInstrumentName())

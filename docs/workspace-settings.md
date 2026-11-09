@@ -18,6 +18,10 @@ Owners open "Workspace settings" from the workspace menu. The page has:
 - **Investment cost basis**: **Average cost** (the default) or **FIFO** for investment holdings
   and realized gains. Holdings are recomputed on read, so switching recalculates the whole
   history; nothing derived is stored. The note under the field says so.
+- **Keep investment asset classes linked in net worth automatically** (on for new workspaces,
+  off for workspaces created before this setting): investment writes create and keep one linked
+  asset item per active asset class with a value. Turning it off leaves existing links working
+  and shows the manual linking button on the Net Worth page while a class still needs a link.
 
 Changes are recorded in the workspace audit log under "Workspace settings" (which fields
 changed, not their values).

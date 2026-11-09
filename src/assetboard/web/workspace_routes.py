@@ -757,6 +757,7 @@ async def settings_submit(
     require_two_factor: FormStr = "",
     upcoming_days: FormStr = "",
     investment_cost_basis: FormStr = "average",
+    auto_link_portfolio: FormStr = "",
 ) -> Response:
     copy_plan = auto_copy_plan == "1"  # an unchecked box sends nothing
     days_text = upcoming_days.strip()
@@ -775,6 +776,7 @@ async def settings_submit(
         auto_copy_plan=copy_plan,
         require_two_factor=require_two_factor == "1",
         investment_cost_basis=investment_cost_basis,
+        auto_link_portfolio=auto_link_portfolio == "1",
     )
     try:
         await run_in_threadpool(
@@ -791,6 +793,7 @@ async def settings_submit(
                 recurrence_horizon_months=request.app.state.settings.recurrence_horizon_months,
                 upcoming_days=days,
                 investment_cost_basis=investment_cost_basis,
+                auto_link_portfolio=auto_link_portfolio == "1",
             )
         )
     except InvalidWorkspaceSettings as exc:

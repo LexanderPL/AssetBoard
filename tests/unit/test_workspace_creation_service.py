@@ -128,6 +128,7 @@ def test_any_signed_in_user_creates_a_workspace_they_own(db: WorkspaceDb, tmp_pa
             workspace.timezone,
             workspace.locale,
         ) == ("Side project", "PLN", "PL", "Europe/Warsaw", "pl")
+        assert workspace.auto_link_portfolio is True
         roles = session.scalars(
             select(Membership.role).where(Membership.workspace_id == workspace_id)
         ).all()

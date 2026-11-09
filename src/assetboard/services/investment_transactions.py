@@ -48,7 +48,7 @@ from assetboard.domain.holdings import (
     compute_holdings,
 )
 from assetboard.domain.money import Money, minor_unit_for
-from assetboard.domain.settlement import derive_quote_values, needs_fx_check
+from assetboard.domain.settlement import derive_quote_values
 from assetboard.domain.transactions import (
     MAX_AMOUNT_MINOR,
     UNDO_WINDOW,
@@ -150,7 +150,6 @@ class InvestmentTransactionView:
     instrument_archived: bool
     settlement_unit_price: Decimal | None = None
     settlement_fee: Money | None = None
-    fx_needs_check: bool = False
     income_transaction_id: UUID | None = None
     income_category_id: UUID | None = None
 
@@ -161,10 +160,12 @@ class InvestmentTransactionView:
 
     @property
     def derived_price_display(self) -> Decimal:
-        """The derived quote unit price shortened for the history (6 places, half-up)."""
+        """The derived quote unit price rounded to the quote currency's minor unit (half-up)."""
         with localcontext() as context:
             context.prec = 80
-            return self.unit_price.quantize(Decimal("0.000001"), rounding=ROUND_HALF_UP)
+            return self.unit_price.quantize(
+                Decimal(1).scaleb(-minor_unit_for(self.quote_currency)), rounding=ROUND_HALF_UP
+            )
 
 
 @dataclass(frozen=True, slots=True)
@@ -579,9 +580,7 @@ def _audit(
     )
 
 
-def _view(
-    row: InvestmentTransaction, instrument: Instrument, base_currency: str
-) -> InvestmentTransactionView:
+def _view(row: InvestmentTransaction, instrument: Instrument) -> InvestmentTransactionView:
     settlement_fee = (
         Money(row.settlement_fee_minor, row.settlement_currency)
         if row.settlement_currency is not None and row.settlement_fee_minor is not None
@@ -606,11 +605,6 @@ def _view(
         settlement_unit_price=row.settlement_unit_price if settlement_fee is not None else None,
         settlement_fee=settlement_fee,
         income_transaction_id=row.income_transaction_id,
-        fx_needs_check=needs_fx_check(
-            quote_currency=row.quote_currency,
-            base_currency=base_currency,
-            fx_to_base=row.fx_to_base,
-        ),
     )
 
 
@@ -658,9 +652,8 @@ def list_transactions(
     date_from: str,
     date_to: str,
     page: int,
-    fx_check: bool = False,
 ) -> TransactionList:
-    """One page of live transactions; ``fx_check`` keeps only rows needing an FX check (F6.2a)."""
+    """One page of live transactions, newest first."""
     require_role(ctx, Role.VIEWER)
     if type_value and type_value not in {"buy", "sell"}:
         raise InvalidInvestmentTransaction("type", "invalid_type")
@@ -671,47 +664,25 @@ def list_transactions(
     wanted_page = max(page, 1)
     types = (type_value,) if type_value else ()
     with factory() as session:
-        base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
         repository = InvestmentTransactionRepository(session, ctx)
-        if fx_check:
-            matching = [
-                row
-                for row in repository.filtered_not_in_currency(
-                    base_currency,
-                    instrument_id=instrument_id,
-                    types=types,
-                    date_from=start,
-                    date_to=end,
-                )
-                if needs_fx_check(
-                    quote_currency=row.quote_currency,
-                    base_currency=base_currency,
-                    fx_to_base=row.fx_to_base,
-                )
-            ]
-            total = len(matching)
-            pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-            current = _page_number(wanted_page, pages, total)
-            rows = matching[(current - 1) * PAGE_SIZE : current * PAGE_SIZE]
-        else:
-            total = repository.count_filtered(
-                instrument_id=instrument_id,
-                types=types,
-                date_from=start,
-                date_to=end,
-            )
-            pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
-            current = _page_number(wanted_page, pages, total)
-            rows = repository.filtered(
-                instrument_id=instrument_id,
-                types=types,
-                date_from=start,
-                date_to=end,
-                limit=PAGE_SIZE,
-                offset=(current - 1) * PAGE_SIZE,
-            )
+        total = repository.count_filtered(
+            instrument_id=instrument_id,
+            types=types,
+            date_from=start,
+            date_to=end,
+        )
+        pages = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+        current = _page_number(wanted_page, pages, total)
+        rows = repository.filtered(
+            instrument_id=instrument_id,
+            types=types,
+            date_from=start,
+            date_to=end,
+            limit=PAGE_SIZE,
+            offset=(current - 1) * PAGE_SIZE,
+        )
         instruments = _instrument_map(session, ctx)
-        views = tuple(_view(row, instruments[row.instrument_id], base_currency) for row in rows)
+        views = tuple(_view(row, instruments[row.instrument_id]) for row in rows)
     return TransactionList(
         rows=views,
         page=current,
@@ -735,8 +706,7 @@ def get_transaction(
         if row is None:
             raise NotFound
         instrument = InstrumentRepository(session, ctx).get_or_raise(row.instrument_id)
-        base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
-        view = _view(row, instrument, base_currency)
+        view = _view(row, instrument)
         if row.income_transaction_id is not None:
             income = TransactionRepository(session, ctx).get(row.income_transaction_id)
             if income is not None:
@@ -771,7 +741,7 @@ def instrument_history(
             )
         else:
             holding = _zero_holding(instrument_id, base_currency)
-        views = tuple(_view(row, model, base_currency) for row in rows)
+        views = tuple(_view(row, model) for row in rows)
         locked = InvestmentTransactionRepository(session, ctx).any_for_instrument(instrument_id)
     return InstrumentHistory(
         instrument=instrument,
@@ -927,7 +897,10 @@ def _create_transaction_in_session(
         base_currency=base_currency,
     )
     _audit(session, ctx, "investment_transaction.created", row, instrument)
-    return _view(row, instrument, base_currency)
+    from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
+    ensure_networth_items_for_asset_classes(session, ctx)
+    return _view(row, instrument)
 
 
 def update_transaction(
@@ -1046,7 +1019,7 @@ def update_transaction(
                 repository.update(row.id, income_transaction_id=income_id)
                 changes["income_transaction_id"] = income_id
         if not changes and old_income_id == row.income_transaction_id:
-            return _view(row, instrument, base_currency)
+            return _view(row, instrument)
         session.flush()
         _check_oversell(
             session,
@@ -1063,7 +1036,10 @@ def update_transaction(
             instrument,
             changed=tuple(sorted(changes)),
         )
-        return _view(row, instrument, base_currency)
+        from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
+        ensure_networth_items_for_asset_classes(session, ctx)
+        return _view(row, instrument)
 
     return run_immediate(factory, write)
 
@@ -1101,6 +1077,9 @@ def delete_transaction(
                 base_currency=base_currency,
             )
             _audit(session, ctx, "investment_transaction.deleted", row, instrument)
+            from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
+            ensure_networth_items_for_asset_classes(session, ctx)
         assert row.deleted_at is not None
         return DeletedInvestmentTransaction(id=row.id, undo_until=row.deleted_at + UNDO_WINDOW)
 
@@ -1128,7 +1107,7 @@ def undo_delete(
         if instrument.archived_at is not None:
             raise InstrumentArchived
         if row.deleted_at is None:
-            return _view(row, instrument, base_currency)
+            return _view(row, instrument)
         if ctx.clock.now() - row.deleted_at > UNDO_WINDOW:
             raise InvestmentUndoExpired
         if row.date is not None and row.date > today:
@@ -1146,7 +1125,10 @@ def undo_delete(
             base_currency=base_currency,
         )
         _audit(session, ctx, "investment_transaction.restored", row, instrument)
-        return _view(row, instrument, base_currency)
+        from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
+        ensure_networth_items_for_asset_classes(session, ctx)
+        return _view(row, instrument)
 
     return run_immediate(factory, write)
 

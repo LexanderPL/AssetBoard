@@ -154,17 +154,12 @@ Notes:
 
 **History and editing.**
 - A base-mode row shows the base amounts it was entered with as the primary values, with the
-  derived quote unit price and the rate beside them ("1 600.00 PLN · ≈ 398.773771 USD @ 4.0123").
+  derived quote unit price (rounded to the quote currency's minor unit) and the rate beside them
+  ("1 600.00 PLN · ≈ 398.77 USD @ 4.0123").
 - Editing opens in the mode the row was saved in.
 - Switching modes on an existing row:
   - **quote → base:** pre-fills base price = `unit_price × fx_to_base` and base fee = `fee × fx`.
   - **base → quote:** pre-fills the stored derived quote values and clears the settlement.
-
-**Finding rows that need fixing.** A row whose instrument quote currency differs from the base
-and whose `fx_to_base == 1` gets a **"check FX rate"** warning badge in both histories. A
-history filter "FX needs checking" lists them. To fix such a row, the user opens it, switches to
-base mode (the amounts carry over, since they were entered as base), takes the pre-filled stored
-rate, and saves.
 
 **Audit and archive.**
 - `investment_transaction.created`/`.updated` keep their shape. `.updated` adds `changed`, the
@@ -234,7 +229,7 @@ rate, and saves.
   - All-or-none constraint; a settlement on a base-quoted or `currency` instrument is refused.
   - FX pre-fill: from a stored rate; no stored rate gives an inline error; the endpoint is
     workspace-scoped.
-  - Mode switch on edit; the "check FX rate" badge and its filter.
+  - Mode switch on edit.
   - The migration is reversible.
 - **Bulk add.**
   - Parsing table: separators, locales, types incl. Polish aliases, comments, missing optional
@@ -251,7 +246,7 @@ rate, and saves.
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
 Implement F6.2a from docs/specs/M6-investments.md: settlement columns + migration, base-currency entry mode with stored-FX
-pre-fill, the settlement cost-basis rule in compute_holdings/realized_events, the "check FX rate" badge and filter,
+pre-fill, the settlement cost-basis rule in compute_holdings/realized_events,
 and the all-or-nothing bulk add with preview and re-validation. Include the settlement golden test and the property test.
 ```
 
@@ -341,6 +336,8 @@ and property tests (value monotonic in time for non-negative rates; tax never ne
   - Look-through rounding: every class except the largest weight gets `floor(amount × weight / 10 000)`, and the largest gets the remainder. Equal largest weights are broken by the class's sort order, then its id. Value and cost are split separately.
   - Realized P&L: `domain.holdings.realized_events` lists each sell's realized P&L from the same ordered pass as `compute_holdings`. All time is their sum; YTD sums the events dated from 1 January of the workspace's current year. YTD is not computed by subtracting a dated holdings run, which excludes undated legacy lots.
   - Chart:
+    - The totals box also shows a compact look-through **asset-class donut**: positive class values in the classes' colours, archived classes included, plus an *Unallocated* slice when an instrument has no allocation. Its total is the portfolio value and it has no small-slice grouping.
+    - The instrument donut below is titled **Holdings by instrument**.
     - With a class scope, each instrument's slice is its look-through part in that class. With the whole-portfolio scope, it is the full value.
     - Small slices use the shared donut slicer (`category_slices`, now with a minimum-share option).
     - Slice colours come from the categorical palette by position. Class colours stay on the class table.
@@ -360,9 +357,9 @@ Property tests: class totals sum exactly to the portfolio total; allocation weig
 ## F6.7 Performance over time and XIRR
 
 **Acceptance**
-- `portfolio_series(transactions, prices, fx, start, end, step[day|week|month]) -> list[Point(date, value, net_invested)]`: quantity at each date from transactions ≤ date; price = latest ≤ date (carry forward); FX likewise. `net_invested` = cumulative buys + fees − sell proceeds − net dividends in base currency. Undated legacy lots are excluded from the series and counted in a page note. A point with a held instrument missing a price or FX rate is marked incomplete and leaves both that instrument's value and net invested out.
+- `portfolio_series(transactions, prices, fx, start, end, step[day|week|month]) -> list[Point(date, value, net_invested)]`: quantity at each date from transactions ≤ date; price = latest ≤ date (carry forward); FX likewise. Lead gaps (no observation on or before the point) can be backfilled from the earliest later observation when the caller asks for it; the Performance chart does, so it does not open with a zero dip. Genuinely missing data (no observation at all) stays incomplete. `net_invested` = cumulative buys + fees − sell proceeds − net dividends in base currency. Undated legacy lots are excluded from the series and counted in a page note. A point with a held instrument missing a price or FX rate is marked incomplete and leaves both that instrument's value and net invested out.
 - F6.10 extends the series: a split scales the quantity from its date (`new/old`), dividends do not change quantity, and a raw price observed at `p` is multiplied by `old/new` for every split in `(p, date]`. Dividends are positive XIRR cash flows equal to their net base amount; splits are not cash flows. Splits and dividends are never transaction-price observations.
-- Chart: value line + invested-capital line (area between = gain), range selector (YTD/1y/3y/5y/all; default 1y), per-class filter (default whole portfolio, look-through weights applied to value and net invested). Ranges up to 90 days step daily; longer ranges step weekly, and all-time spans over five years step monthly. Bond-model instruments are priced with `bond_value` for the lots held at each point.
+- Chart: value line + invested-capital line (area between = gain), range selector (YTD/1y/3y/5y/all; default 1y), per-class filter (default whole portfolio, look-through weights applied to value and net invested). Leading points before the first dated transaction are dropped rather than drawn as a zero prefix. An incomplete point is a gap in both lines (`null`, never connected); its plotted-data row shows “—” and says it is incomplete. Ranges up to 90 days step daily; longer ranges step weekly, and all-time spans over five years step monthly. Bond-model instruments are priced with `bond_value` for the lots held at each point.
 - Table of period changes (1M, 3M, YTD, 1Y, all-time): absolute and % change of value, net flows, **Δ value − net flows**, and the contribution-adjusted return via XIRR. The start value is a negative cashflow at the end of the start date (after that day's trades), later buys are negative and sells positive, and the end value is positive. All-time starts at zero on the day before the first dated transaction. Periods under 365 days show the period money-weighted return `(1 + r)^(days/365) − 1`; periods of 365 days or more (1 year, or an all-time history at least that long) show the annualised XIRR. An incomplete start or end makes the XIRR undefined.
 - Pure `xirr(cashflows)` (Newton with bracketing/bisection fallback; actual/365 day count). Tests: 1 000 invested on 2020-01-01 and 1 100 received on 2021-01-01 gives ≈ 9.97% (366-day year); additional vectors cross-checked against `scipy.optimize.brentq` as a **dev-only** oracle; no-solution cases return a clear "undefined" result.
 - Performance requirement: 5 years × 30 instruments × weekly points computed in < 500 ms (benchmark test with generous CI margin).
@@ -384,10 +381,11 @@ Tests: golden XIRR vector from the spec, scipy cross-check (dev dependency only)
 - Value dates follow the two portfolio rules:
   - On or after the workspace's today, use the F6.6 current valuation: current holdings include undated legacy lots and take the latest prices and FX rates. The linked class or instrument value matches the **Portfolio** page exactly.
   - For past dates (manual snapshots dated earlier, backfill, the automatic month-end snapshot), use the F6.7 series rules: dated transactions only, prices and FX carried forward from the latest observation on or before the date, and the per-date bond model.
-  - Because the historical path excludes undated legacy lots, the first historical snapshot after such lots appear can be lower than today's value. The resolver introduces no step of its own; this one is inherent to F6.7 and is documented for users.
+  - Because the historical path excludes undated legacy lots, the first historical snapshot after such lots appear can be lower than today's value. The resolver introduces no step of its own; this one is inherent to F6.7 and is documented for users. F6.8 keeps the conservative series rule: there is no leading-observation backfill, so a date before the first known observation stays `Unavailable` rather than borrowing a later value.
 - A class link is `Unavailable` when any held instrument allocated to it lacks a price or FX rate. A holding link is `Unavailable` when the instrument is held and missing a price or FX rate, and zero when it is not held. Resolvers never return a silently partial class value.
 - Sold-out and archived targets still resolve existing links. Pickers offer active asset classes and active instruments with quantity above zero; a sold-out or archived target is no longer offered for new links.
 - Helper button "Create net-worth items from asset classes" creates linked asset items, one per active class with a complete value above zero, skipping archived classes, classes with a missing price or FX member and classes already linked. Classes with `investable=false` are created with `investable=false`. The items go into a dedicated **Investments** asset category (pl **Inwestycje**), created on demand when no active category with that name key exists in any supported locale, appended at the end of the category list and audited as `networth_category.created` in the same write. It is not added to the suggested category seed set. The helper re-checks existing links inside its locked write, so two simultaneous clicks create no duplicates. Each item gets one `networth_item.created` and one `networth_item.linked` audit event; `estimate_between` keeps the side default.
+- Workspace setting `auto_link_portfolio`: off for workspaces created before the setting (migration default), on for new workspaces (set explicitly at creation). When on, investment writes (instruments and allocations, transactions including bulk and standalone import, and the risk policy save) ensure one linked item per active class with a complete value above zero in the same transaction, using the same Investments category logic. Classes with an active **or archived** linked item are skipped, so archiving an item is respected. When off, the Net Worth Assets page shows the manual helper only while at least one eligible unlinked class exists.
 - Warnings appear only on **Net Worth → Assets**, are advisory and never block or change a value:
   - when an active class link and an active holding link for one of its currently held instruments would both count in net worth;
   - when an active `real_estate` instrument and an active item in the **Real estate** category both have a positive current value (legacy workspaces seeded before 2026-11-09).
@@ -478,6 +476,7 @@ Owner decision (2026-10): investments are grouped into three risk tiers so users
   - The difference is current value minus target value, in money.
   - The hint moves `min(largest overweight amount, largest underweight amount)` from the most overweight tier to the most underweight tier. No hint is shown when the largest absolute gap is within the tolerance.
   - The risk balance uses the same included rows as the Portfolio page: a holding excluded there for a missing price or FX rate is excluded from the tiers too. A class without a tier (including a non-investable or Other class) appears under **Unassigned** and is excluded from the tier percentages.
+  - **As built (UI polish):** the balance is recomputed on every request; there is no daily cache. When the unassigned amount is above zero, the Portfolio page shows a warning with that amount and share, a sentence that the classes need a risk tier and a link to the Asset classes tab. When `suggested_risk_tier_changes` finds matching empty classes, the warning also offers a one-click **Apply suggested risk tiers** action (`POST /investments/portfolio/apply-risk-tiers`), which redirects back with a notice.
 - Pure domain functions: `risk_targets(policy, age, life_expectancy) -> dict[tier, bp]` and `risk_balance(class_values, tiers, overrides, targets, tolerance)`. Golden tests: the 45/45/10 example above; 50/40/10 fixed; age_in_bonds at age 35 with X = 10 → 35/55/10; capping at age ≥ life expectancy. Property tests: targets always sum to 10 000; current tier percentages sum to 10 000 when any tier has value; monotonic: an older age never lowers `safe`.
 - Not investment advice: the section shows the same "illustrative, not advice" notice as the FIRE planner. The age used for the current viewer comes from their profile; the page says so and links to Profile when a birth year is missing. Profile `birth_year`/`life_expectancy` (M8 uses the latter as the default `horizon_age`) are added here because M8 has not landed yet.
 

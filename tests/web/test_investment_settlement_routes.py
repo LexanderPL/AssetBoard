@@ -130,8 +130,7 @@ def test_a_base_mode_buy_is_saved_and_shown_with_its_derived_quote_price(owner: 
     history = owner.client.get(f"{INSTRUMENTS}/{usd}").text
     assert "data-settled" in history
     assert f"1600 {base}" in history
-    assert "≈ 398.773771 USD @ 4.0123" in history
-    assert "data-fx-check" not in history
+    assert "≈ 398.77 USD @ 4.0123" in history
 
 
 def test_a_bad_base_amount_or_a_refused_mode_returns_an_inline_error(owner: OwnerApp) -> None:
@@ -214,19 +213,6 @@ def test_editing_opens_in_the_saved_mode_and_pre_fills_the_other(owner: OwnerApp
     assert 'name="base_fee" type="text" inputmode="decimal" value="6.00"' in edit
 
 
-def test_the_check_fx_rate_badge_and_filter(owner: OwnerApp) -> None:
-    usd = _instrument(owner, "US ETF", "USD")
-    _post(owner, usd, amounts="quote", unit_price="1600", fx_to_base="1", base_unit_price="")
-    _post(owner, usd, amounts="quote", unit_price="400", fx_to_base="4", date="2026-03-02")
-    page = owner.client.get(TX).text
-    assert page.count("data-fx-check>") == 1
-    assert "check FX rate" in page
-    assert owner.client.get(f"{INSTRUMENTS}/{usd}").text.count("data-fx-check>") == 1
-    filtered = owner.client.get(TX, params={"fx": "check"}).text
-    assert "Showing 1 transaction." in filtered
-    assert 'name="fx" type="checkbox" value="check" checked' in filtered
-
-
 BULK_PREVIEW = f"{TX}/bulk/preview"
 BULK = f"{TX}/bulk"
 
@@ -235,11 +221,14 @@ def test_bulk_add_previews_then_creates_all_rows(owner: OwnerApp) -> None:
     _instrument(owner, "World ETF", _base(owner))
     page = owner.client.get(TX).text
     assert "data-bulk" in page and "Bulk add" in page
+    assert 'id="investment-bulk-panel"' in page
+    assert 'hx-swap="outerHTML show:#investment-bulk-panel:top"' in page
     text = "2026-01-05; World ETF; buy; 10; 100\n2026-01-06; world etf; sell; 4; 110\n"
     preview = owner.post(BULK_PREVIEW, {"text": text}, token_from=TX)
     assert preview.status_code == 200
     assert preview.text.count("data-bulk-line=") == 2
     assert "Create 2 transactions" in preview.text
+    assert preview.text.count('hx-swap="outerHTML show:#investment-bulk-panel:top"') == 2
     assert _rows(owner) == []
     created = owner.post(BULK, {"text": text}, token_from=TX)
     assert (created.status_code, created.headers["location"]) == (

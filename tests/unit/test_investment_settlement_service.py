@@ -1,4 +1,4 @@
-"""Amounts in the base currency (F6.2a): service writes, refusals, FX pre-fill, FX check filter."""
+"""Amounts in the base currency (F6.2a): service writes, refusals, FX pre-fill."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal, localcontext
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import pytest
 from sqlalchemy import select, update
@@ -25,7 +25,6 @@ from assetboard.services.investment_transactions import (
     get_transaction,
     instrument_fx_currency,
     instrument_history,
-    list_transactions,
     update_transaction,
 )
 from assetboard.services.investments import create_asset_class, create_instrument
@@ -120,6 +119,38 @@ def _stored_rate(
         )
 
 
+@pytest.mark.parametrize(
+    ("currency", "expected"),
+    [
+        ("USD", Decimal("398.77")),
+        ("PLN", Decimal("398.77")),
+        ("EUR", Decimal("398.77")),
+        ("JPY", Decimal("399")),
+    ],
+)
+def test_derived_price_display_uses_the_quote_currencys_minor_unit(
+    currency: str, expected: Decimal
+) -> None:
+    view = InvestmentTransactionView(
+        id=uuid4(),
+        instrument_id=uuid4(),
+        instrument_name="Fund",
+        instrument_symbol=None,
+        instrument_type="etf",
+        unit_label="share",
+        quote_currency=currency,
+        date=None,
+        type="buy",
+        quantity=Decimal(1),
+        unit_price=Decimal("398.773770655235151908"),
+        fee=Money(0, currency),
+        fx_to_base=Decimal(1),
+        note="",
+        instrument_archived=False,
+    )
+    assert view.derived_price_display == expected
+
+
 def test_base_mode_stores_the_settlement_and_derived_quote_values(team: WorkspaceDb) -> None:
     ctx = team.ctx("ed", "editor")
     usd = _instrument(team, ctx)
@@ -135,7 +166,7 @@ def test_base_mode_stores_the_settlement_and_derived_quote_values(team: Workspac
     assert view.unit_price == expected_price
     assert view.fee == Money(125, "USD")
     assert view.fx_to_base == Decimal("4.0123")
-    assert view.derived_price_display == Decimal("398.773771")
+    assert view.derived_price_display == Decimal("398.77")
     with team.factory() as session:
         row = InvestmentTransactionRepository(session, ctx).get(view.id)
         assert row is not None
@@ -236,7 +267,6 @@ def test_switching_modes_on_edit_sets_or_clears_the_settlement(team: WorkspaceDb
     ctx = team.ctx("ed", "editor")
     usd = _instrument(team, ctx)
     quote = _tx(team, ctx, usd, amounts="quote", unit_price="1600", fee="5", fx="1")
-    assert quote.fx_needs_check
     # quote -> base: the amounts were base amounts entered at rate 1; take the real rate.
     based = update_transaction(
         team.factory,
@@ -255,7 +285,6 @@ def test_switching_modes_on_edit_sets_or_clears_the_settlement(team: WorkspaceDb
         base_fee_value="5",
     )
     assert based.amounts == "base"
-    assert not based.fx_needs_check
     assert based.fee == Money(125, "USD")
     events = _events(team, "investment_transaction.updated")
     changed = str(events[-1].data["changed"]).split(",")
@@ -279,39 +308,6 @@ def test_switching_modes_on_edit_sets_or_clears_the_settlement(team: WorkspaceDb
     assert back.amounts == "quote"
     assert back.settlement_fee is None and back.settlement_unit_price is None
     assert get_transaction(team.factory, ctx, quote.id, locale="en").unit_price == based.unit_price
-
-
-def test_the_fx_check_flag_and_filter(team: WorkspaceDb) -> None:
-    ctx = team.ctx("ed", "editor")
-    usd = _instrument(team, ctx)
-    eur = _instrument(team, ctx, name="EU ETF", quote_currency="EUR")
-    suspect = _tx(team, ctx, usd, amounts="quote", unit_price="1600", fx="1.000")
-    fine = _tx(team, ctx, usd, amounts="quote", unit_price="400", fx="4")
-    base_row = _tx(team, ctx, eur, amounts="quote", unit_price="10", fx="")
-    assert suspect.fx_needs_check
-    assert not fine.fx_needs_check and not base_row.fx_needs_check
-    every = list_transactions(
-        team.factory,
-        ctx,
-        instrument_id=None,
-        type_value="",
-        date_from="",
-        date_to="",
-        page=1,
-    )
-    assert every.total == 3
-    flagged = list_transactions(
-        team.factory,
-        team.ctx("vic", "viewer"),
-        instrument_id=None,
-        type_value="",
-        date_from="",
-        date_to="",
-        page=1,
-        fx_check=True,
-    )
-    assert [row.id for row in flagged.rows] == [suspect.id]
-    assert flagged.total == 1 and flagged.pages == 1
 
 
 def _events(db: WorkspaceDb, prefix: str) -> list[AuditEvent]:

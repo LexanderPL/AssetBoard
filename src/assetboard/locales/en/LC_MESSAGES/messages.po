@@ -3300,6 +3300,10 @@ msgstr ""
 msgid "Whole portfolio"
 msgstr ""
 
+#, fuzzy
+msgid "Incomplete: an instrument has no price or FX rate."
+msgstr ""
+
 msgid "Value"
 msgstr ""
 
@@ -3351,14 +3355,17 @@ msgstr ""
 msgid "Set your birth year in Profile before using age-based targets."
 msgstr ""
 
-msgid "Holdings in the whole portfolio"
+msgid "Asset classes"
 msgstr ""
 
 msgid "Nothing is valued in the portfolio yet."
 msgstr ""
 
+msgid "Holdings by instrument"
+msgstr ""
+
 #, python-format
-msgid "Holdings in %(class)s"
+msgid "Holdings by instrument in %(class)s"
 msgstr ""
 
 msgid "Nothing is held in this asset class."
@@ -5410,9 +5417,6 @@ msgstr ""
 msgid "Apply suggested risk tiers"
 msgstr ""
 
-msgid "Asset classes"
-msgstr ""
-
 msgid ""
 "Each instrument's value is split across these classes by the allocation "
 "weights. Archiving a class keeps it on instruments that already use it."
@@ -5695,6 +5699,9 @@ msgstr ""
 msgid "Plotted performance data"
 msgstr ""
 
+msgid "Incomplete data"
+msgstr ""
+
 msgid "Period returns"
 msgstr ""
 
@@ -5723,9 +5730,6 @@ msgid "Δ value − net flows"
 msgstr ""
 
 msgid "Return"
-msgstr ""
-
-msgid "Incomplete data"
 msgstr ""
 
 msgid ""
@@ -5833,6 +5837,18 @@ msgstr ""
 msgid "Outside tolerance"
 msgstr ""
 
+#, python-format
+msgid "Unassigned: %(amount)s (%(share)s of the portfolio)"
+msgstr ""
+
+msgid ""
+"Asset classes without a risk tier are left out of the tier percentages. "
+"Set a tier on the Asset classes tab."
+msgstr ""
+
+msgid "Open Asset classes"
+msgstr ""
+
 msgid ""
 "Tier percentages use the assigned value; Unassigned classes are shown "
 "separately."
@@ -5867,11 +5883,14 @@ msgstr ""
 msgid "The fixed targets must total exactly 100%%."
 msgstr ""
 
-msgid "Age-based settings"
+#, python-format
+msgid "Age-scaled: speculative %%"
 msgstr ""
 
 #, python-format
-msgid "Age-scaled: speculative %%"
+msgid ""
+"Age-scaled: safe = (100%% − speculative) × age ÷ life expectancy. The "
+"remaining share is Growth."
 msgstr ""
 
 #, python-format
@@ -5879,9 +5898,7 @@ msgid "Age in bonds: speculative %%"
 msgstr ""
 
 #, python-format
-msgid ""
-"Age-scaled: safe = (100%% − speculative) × age ÷ life expectancy. Age in "
-"bonds: safe = age%%. The remaining share is Growth."
+msgid "Age in bonds: safe = age%%. The remaining share is Growth."
 msgstr ""
 
 msgid "Tolerance (percentage points)"
@@ -6189,15 +6206,6 @@ msgstr ""
 msgid "Undated"
 msgstr ""
 
-msgid ""
-"Rate 1 for an instrument quoted in another currency: the amounts may be "
-"in the base currency. Open the row, choose the base currency and save "
-"with the stored rate."
-msgstr ""
-
-msgid "check FX rate"
-msgstr ""
-
 #, python-format
 msgid "Delete the transaction of %(date)s?"
 msgstr ""
@@ -6254,9 +6262,6 @@ msgid "All instruments"
 msgstr ""
 
 msgid "All types"
-msgstr ""
-
-msgid "FX needs checking"
 msgstr ""
 
 msgid "Clear"
@@ -8150,6 +8155,14 @@ msgid ""
 "Holdings are recalculated for the whole history. Changing this "
 "recalculates realized gains and cost basis; no stored values are "
 "rewritten."
+msgstr ""
+
+msgid "Keep investment asset classes linked in net worth automatically"
+msgstr ""
+
+msgid ""
+"Creates and keeps one linked asset item for every asset class with a "
+"value. Off: manage the links yourself on the Net worth page."
 msgstr ""
 
 msgid "Copy the previous month's plan when a month is opened for the first time"

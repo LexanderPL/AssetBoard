@@ -186,6 +186,28 @@ def test_update_settings_changes_the_workspace_and_audits_field_names(team: Work
     assert len(_events(team)) == 1
 
 
+def test_auto_link_portfolio_is_off_for_existing_workspaces_and_owners_change_it(
+    team: WorkspaceDb,
+) -> None:
+    owner = team.ctx("olga", "owner")
+    assert workspace_settings(team.factory, owner).auto_link_portfolio is False
+
+    saved = update_settings(team.factory, owner, **_settings(auto_link_portfolio=True))
+    assert saved.auto_link_portfolio is True
+    assert workspace_settings(team.factory, owner).auto_link_portfolio is True
+    assert _events(team)[-1] == (
+        "workspace.settings_updated",
+        {"fields": "auto_link_portfolio,base_currency,country_code,locale,name,timezone"},
+    )
+
+    update_settings(team.factory, owner, **SETTINGS)
+    assert workspace_settings(team.factory, owner).auto_link_portfolio is False
+    assert _events(team)[-1] == (
+        "workspace.settings_updated",
+        {"fields": "auto_link_portfolio"},
+    )
+
+
 def test_auto_copy_plan_is_off_by_default_and_owners_turn_it_on(team: WorkspaceDb) -> None:
     owner = team.ctx("olga", "owner")
     assert workspace_settings(team.factory, owner).auto_copy_plan is False
