@@ -734,6 +734,9 @@ msgstr "W użyciu"
 msgid "Number"
 msgstr "Liczba"
 
+msgid "Names"
+msgstr "Nazwy"
+
 msgid "Replaced an earlier snapshot"
 msgstr "Zastąpiono wcześniejszą migawkę"
 
@@ -2702,11 +2705,14 @@ msgstr "Przywróć pozycję, zanim ją zmienisz."
 msgid "Another active category of this side already has this name."
 msgstr "Inna aktywna kategoria po tej stronie ma już tę nazwę."
 
-msgid "The suggested categories can only be added to an empty side."
-msgstr "Proponowane kategorie można dodać tylko do pustej strony."
+msgid "The categories changed meanwhile. Reload the page and try again."
+msgstr "Kategorie zmieniły się w międzyczasie. Odśwież stronę i spróbuj ponownie."
 
 msgid "Archived because it still has items."
 msgstr "Zarchiwizowano, ponieważ nadal ma pozycje."
+
+msgid "Every suggested category is already on this side."
+msgstr "Wszystkie proponowane kategorie są już po tej stronie."
 
 msgid "Item added."
 msgstr "Dodano pozycję."
@@ -5561,6 +5567,9 @@ msgstr "Wartość i koszt każdego instrumentu są dzielone według jego wag alo
 msgid "Gain %%"
 msgstr "Zysk w %%"
 
+msgid "not counted in FIRE"
+msgstr "nie liczy się do FIRE"
+
 msgid "Chart scope"
 msgstr "Zakres wykresu"
 
@@ -6477,6 +6486,16 @@ msgstr "Kategorie po tej stronie"
 
 msgid "Add category"
 msgstr "Dodaj kategorię"
+
+msgid "Add missing suggested categories"
+msgstr "Dodaj brakujące proponowane kategorie"
+
+msgid ""
+"Adds the suggested categories this side does not have yet. Existing and "
+"archived ones stay as they are."
+msgstr ""
+"Dodaje proponowane kategorie, których ta strona jeszcze nie ma. "
+"Istniejące i zarchiwizowane pozostają bez zmian."
 
 msgid "No active categories on this side."
 msgstr "Brak aktywnych kategorii po tej stronie."
@@ -8507,4 +8526,7 @@ msgstr "Usuń obszar roboczy…"
 #~ "%(count)s punktów wykresu jest niekompletnych,"
 #~ " ponieważ instrumenty nie mają ceny "
 #~ "lub kursu walutowego."
+
+#~ msgid "The suggested categories can only be added to an empty side."
+#~ msgstr "Proponowane kategorie można dodać tylko do pustej strony."
 

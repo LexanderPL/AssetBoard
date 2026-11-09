@@ -22,7 +22,6 @@ from assetboard.domain.networth import Side
 from assetboard.services import networth as service
 from assetboard.services.context import Context, PermissionDenied
 from assetboard.services.networth import (
-    AlreadySeeded,
     BulkRejected,
     DuplicateCategoryName,
     InvalidNetWorth,
@@ -238,41 +237,107 @@ def test_category_delete_only_removes_an_unused_category(team: WorkspaceDb) -> N
     assert get_category(team.factory, ctx, used.id).archived
 
 
-def test_seed_one_side_has_the_manual_event_shape(team: WorkspaceDb) -> None:
+SUGGESTED_ASSETS = [
+    "Real estate",
+    "Vehicles",
+    "Electronics",
+    "Appliances",
+    "Furniture",
+    "Jewelry & watches",
+    "Art & collectibles",
+    "Tools",
+    "Other",
+]
+
+
+def _names(view: service.SideView) -> list[str]:
+    return [category.name for category in view.categories]
+
+
+def test_seed_an_empty_side_adds_the_whole_set_with_the_manual_event_shape(
+    team: WorkspaceDb,
+) -> None:
     ctx = team.ctx("ed", "editor")
-    assert seed_categories(team.factory, ctx, side="asset", locale="en") == 8
+    assert seed_categories(team.factory, ctx, side="asset", locale="en") == SUGGESTED_ASSETS
     event = _event(team, "networth_category.seeded")
-    assert event.data == {"count": 8, "side": "asset"}
+    assert event.data == {
+        "count": 9,
+        "side": "asset",
+        "names": ", ".join(SUGGESTED_ASSETS),
+    }
     assert event.actor_user_id == team.users["ed"]
     view = _side(team, ctx)
-    assert [category.name for category in view.categories] == [
-        "Vehicles",
+    assert _names(view) == SUGGESTED_ASSETS
+    assert [category.sort_order for category in view.categories] == list(range(9))
+    assert not view.can_seed and not view.can_add_suggested
+    liability_view = _side(team, ctx, Side.LIABILITY)
+    assert liability_view.categories == ()
+    assert liability_view.can_seed and not liability_view.can_add_suggested
+    assert seed_categories(team.factory, ctx, side="liability", locale="pl") == [
+        "Raty",
+        "Kredyt hipoteczny",
+        "Inne",
+    ]
+    assert _names(_side(team, ctx, Side.LIABILITY)) == ["Raty", "Kredyt hipoteczny", "Inne"]
+
+
+def test_seed_a_partial_side_appends_only_the_missing_ones_in_seed_order(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("ed", "editor")
+    _category(team, ctx, "Tools")
+    _category(team, ctx, "My boat")
+    _category(team, ctx, "Pojazdy")  # Vehicles in Polish: present in either language
+    view = _side(team, ctx)
+    assert view.can_add_suggested and not view.can_seed
+
+    created = seed_categories(team.factory, ctx, side="asset", locale="en")
+
+    assert created == [
+        "Real estate",
         "Electronics",
         "Appliances",
         "Furniture",
         "Jewelry & watches",
         "Art & collectibles",
-        "Tools",
         "Other",
     ]
-    assert not view.can_seed
-    liability_view = _side(team, ctx, Side.LIABILITY)
-    assert liability_view.categories == ()
-    assert liability_view.can_seed
-    assert seed_categories(team.factory, ctx, side="liability", locale="pl") == 3
-    assert [category.name for category in _side(team, ctx, Side.LIABILITY).categories] == [
-        "Raty",
-        "Kredyt hipoteczny",
-        "Inne",
-    ]
+    view = _side(team, ctx)
+    assert _names(view) == ["Tools", "My boat", "Pojazdy", *created]
+    assert [category.sort_order for category in view.categories] == list(range(10))
+    assert not view.can_add_suggested
 
 
-def test_seed_refuses_a_side_with_any_category_even_archived(team: WorkspaceDb) -> None:
+def test_seed_adds_the_original_of_a_renamed_category_but_not_an_archived_one(
+    team: WorkspaceDb,
+) -> None:
     ctx = team.ctx("ed", "editor")
-    category = _category(team, ctx, "Custom")
-    archive_category(team.factory, ctx, category.id)
-    with pytest.raises(AlreadySeeded):
-        seed_categories(team.factory, ctx, side="asset", locale="en")
+    assert seed_categories(team.factory, ctx, side="asset", locale="en") == SUGGESTED_ASSETS
+    categories = {category.name: category for category in _side(team, ctx).categories}
+    update_category(team.factory, ctx, categories["Vehicles"].id, name="Cars", color="#16a34a")
+    archive_category(team.factory, ctx, categories["Real estate"].id)
+
+    assert seed_categories(team.factory, ctx, side="asset", locale="en") == ["Vehicles"]
+
+    view = _side(team, ctx)
+    assert "Real estate" not in _names(view)  # archived counts as present: the user restores it
+    assert [category.name for category in view.archived_categories] == ["Real estate"]
+    assert _names(view)[0] == "Cars" and _names(view)[-1] == "Vehicles"
+
+
+def test_seed_is_idempotent_and_a_no_op_writes_no_event(team: WorkspaceDb) -> None:
+    ctx = team.ctx("ed", "editor")
+    seed_categories(team.factory, ctx, side="asset", locale="pl")
+    assert seed_categories(team.factory, ctx, side="asset", locale="en") == []
+    assert seed_categories(team.factory, ctx, side="asset", locale="pl") == []
+    assert len(_side(team, ctx).categories) == 9
+    assert len([e for e in _events(team) if e.action == "networth_category.seeded"]) == 1
+
+
+def test_seed_needs_an_editor(team: WorkspaceDb) -> None:
+    with pytest.raises(PermissionDenied):
+        seed_categories(team.factory, team.ctx("vic", "viewer"), side="asset", locale="en")
+    assert _side(team, team.ctx("olga", "owner")).categories == ()
 
 
 def test_workspace_creation_seed_writes_both_sides_and_one_automatic_event(
@@ -299,12 +364,13 @@ def test_workspace_creation_seed_writes_both_sides_and_one_automatic_event(
             automatic=True,
         )
         workspace_id = workspace.id
-    assert count == 11
+    assert count == 12
     event = _event(team, "networth_category.seeded")
     assert event.workspace_id == workspace_id
-    assert event.data == {"count": 11, "automatic": True}
+    assert event.data == {"count": 12, "automatic": True}
     listed = list_networth(team.factory, team.ctx("olga", "owner", workspace_id))
-    assert len(listed.asset.categories) == 8
+    assert [category.name for category in listed.asset.categories][0] == "Nieruchomości"
+    assert len(listed.asset.categories) == 9
     assert len(listed.liability.categories) == 3
 
 

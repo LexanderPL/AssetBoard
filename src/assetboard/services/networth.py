@@ -39,6 +39,7 @@ from assetboard.domain.networth import (
     BulkTooLarge,
     InvalidItemName,
     InvalidNotes,
+    SeedNetWorthCategory,
     Side,
     TooManyBulkLines,
     ValuationPoint,
@@ -67,6 +68,7 @@ from assetboard.domain.text import text_key
 from assetboard.domain.transactions import EntryError
 from assetboard.domain.transactions import amount_minor as positive_amount_minor
 from assetboard.i18n import gettext
+from assetboard.i18n.locale import SUPPORTED_LOCALES
 from assetboard.i18n.numbers import parse_amount
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.networth_links import (
@@ -235,7 +237,8 @@ class SideView:
     archived_items: tuple[ItemView, ...]
     categories: tuple[CategoryView, ...]
     archived_categories: tuple[CategoryView, ...]
-    can_seed: bool
+    can_seed: bool  # the side has no category at all: offer the whole suggested set
+    can_add_suggested: bool = False  # a non-empty side misses some suggested categories (F5.7)
 
 
 @dataclass(frozen=True, slots=True)
@@ -581,6 +584,8 @@ def _side_view(
         categories=categories_view,
         archived_categories=archived_categories_view,
         can_seed=not any(category.side == side.value for category in categories),
+        can_add_suggested=any(category.side == side.value for category in categories)
+        and bool(missing_suggested(categories, side)),
     )
 
 
@@ -984,26 +989,68 @@ def seed_into(
     return total
 
 
-def seed_categories(factory: sessionmaker[Session], ctx: Context, *, side: str, locale: str) -> int:
-    """The suggested categories for one empty side; never for a side with any category."""
+def _seed_keys(seed: SeedNetWorthCategory) -> frozenset[str]:
+    """A suggested category's name key in every supported language."""
+    return frozenset(
+        category_name_key(clean_name(gettext(seed.name, language)))
+        for language in SUPPORTED_LOCALES
+    )
+
+
+def missing_suggested(
+    categories: Sequence[NetWorthCategory], side: Side
+) -> list[SeedNetWorthCategory]:
+    """The suggested categories of ``side`` with no category of that side under their name.
+
+    A category counts as present under any supported language's name, archived or not (an
+    archived one is the user's to restore). Seed order is kept.
+    """
+    present = {category.name_key for category in categories if category.side == side.value}
+    return [seed for seed in seed_for(side) if not (_seed_keys(seed) & present)]
+
+
+def seed_categories(
+    factory: sessionmaker[Session], ctx: Context, *, side: str, locale: str
+) -> list[str]:
+    """Add the suggested categories missing from one side (F5.7); the names created.
+
+    Each missing suggested category is appended in seed order, named in ``locale``. Existing
+    categories are never renamed, restored or reordered, so a second run adds nothing. On an
+    empty side this is the whole suggested set, as before. One write under the workspace lock;
+    audited as ``networth_category.seeded`` with the created names when anything was created.
+    """
     require_role(ctx, Role.EDITOR)
     wanted_side = _sides(side)
 
-    def write(session: Session) -> int:
+    def write(session: Session) -> list[str]:
         require_role_now(session, ctx, Role.EDITOR)
         _lock(session, ctx, exclusive=True)
-        if NetWorthCategoryRepository(session, ctx).count(wanted_side.value) > 0:
-            raise AlreadySeeded
-        return seed_into(
-            session,
-            ctx,
-            locale=locale,
+        repository = NetWorthCategoryRepository(session, ctx)
+        missing = missing_suggested(repository.ordered(wanted_side.value), wanted_side)
+        if not missing:
+            return []
+        position = repository.next_sort_order(wanted_side.value)
+        created: list[str] = []
+        for offset, seed in enumerate(missing):
+            name = clean_name(gettext(seed.name, locale))
+            repository.create(
+                name=name,
+                name_key=category_name_key(name),
+                side=wanted_side.value,
+                color=seed.color,
+                sort_order=position + offset,
+            )
+            created.append(name)
+        AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,
             actor_type="user",
-            now=ctx.clock.now(),
-            automatic=False,
-            sides=(wanted_side,),
+            action="networth_category.seeded",
+            entity_type="workspace",
+            entity_id=str(ctx.workspace.id),
+            ts=ctx.clock.now(),
+            data={"count": len(created), "side": wanted_side.value, "names": ", ".join(created)},
         )
+        return created
 
     try:
         return run_immediate(factory, write)

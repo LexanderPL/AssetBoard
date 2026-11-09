@@ -108,7 +108,7 @@
         <tbody>
           {% for item in view.classes %}
           <tr class="border-t border-line" data-portfolio-class>
-            <th scope="row" class="py-2 pr-3 text-left font-medium"><span class="inline-flex items-center gap-2">{% if item.color %}{{ swatch(item.color) }}{% endif %}{{ item.name }}{% if item.archived %}<span class="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-normal text-warning-strong">{{ _("Archived") }}</span>{% endif %}</span></th>
+            <th scope="row" class="py-2 pr-3 text-left font-medium"><span class="inline-flex items-center gap-2">{% if item.color %}{{ swatch(item.color) }}{% endif %}{{ item.name }}{% if item.archived %}<span class="rounded-full bg-warning-soft px-2 py-0.5 text-xs font-normal text-warning-strong">{{ _("Archived") }}</span>{% endif %}{% if item.not_in_fire %}<span class="rounded-full bg-subtle px-2 py-0.5 text-xs font-normal text-muted" data-not-in-fire>{{ _("not counted in FIRE") }}</span>{% endif %}</span></th>
             <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{{ item.value }}</td>
             <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{{ item.cost }}</td>
             <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums{% if item.gain_negative %} text-danger {% endif %}">{{ item.gain }}</td>

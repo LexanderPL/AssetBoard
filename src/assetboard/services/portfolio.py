@@ -68,6 +68,7 @@ class PortfolioClass:
     name: str
     color: str
     archived: bool
+    investable: bool = True  # False: not counted in FIRE (M8); the portfolio counts it anyway
 
 
 @dataclass(frozen=True, slots=True)
@@ -102,7 +103,9 @@ def default_scope_keys() -> frozenset[str]:
 
 
 def _class(row: AssetClass) -> PortfolioClass:
-    return PortfolioClass(row.id, row.name, row.color, row.archived_at is not None)
+    return PortfolioClass(
+        row.id, row.name, row.color, row.archived_at is not None, investable=row.investable
+    )
 
 
 def _resolve_scope(

@@ -725,6 +725,9 @@ msgstr ""
 msgid "Number"
 msgstr ""
 
+msgid "Names"
+msgstr ""
+
 msgid "Replaced an earlier snapshot"
 msgstr ""
 
@@ -2560,10 +2563,13 @@ msgstr ""
 msgid "Another active category of this side already has this name."
 msgstr ""
 
-msgid "The suggested categories can only be added to an empty side."
+msgid "The categories changed meanwhile. Reload the page and try again."
 msgstr ""
 
 msgid "Archived because it still has items."
+msgstr ""
+
+msgid "Every suggested category is already on this side."
 msgstr ""
 
 msgid "Item added."
@@ -5156,6 +5162,9 @@ msgstr ""
 msgid "Gain %%"
 msgstr ""
 
+msgid "not counted in FIRE"
+msgstr ""
+
 msgid "Chart scope"
 msgstr ""
 
@@ -5975,6 +5984,14 @@ msgid "Categories on this side"
 msgstr ""
 
 msgid "Add category"
+msgstr ""
+
+msgid "Add missing suggested categories"
+msgstr ""
+
+msgid ""
+"Adds the suggested categories this side does not have yet. Existing and "
+"archived ones stay as they are."
 msgstr ""
 
 msgid "No active categories on this side."
@@ -8050,5 +8067,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Edit instrument"
+#~ msgstr ""
+
+#~ msgid "The suggested categories can only be added to an empty side."
 #~ msgstr ""
 

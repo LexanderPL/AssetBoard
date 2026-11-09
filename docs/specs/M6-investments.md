@@ -1,6 +1,6 @@
 # M6 — Investments
 
-**Goal:** record purchase (and sale) history for stocks/ETFs, bonds, metals, crypto, currencies and real estate; see current value, gains, allocation and value over time.
+**Goal:** record purchase (and sale) history for stocks/ETFs, bonds, metals, crypto and currencies (property lives in net worth, F5.7); see current value, gains, allocation and value over time.
 
 **Exit criteria:** holdings are computed from transactions; prices come from pluggable providers with manual fallback; the portfolio page shows value, cost, gain, allocation by instrument and by asset class, a pie chart of stock values, and a value-over-time chart with an invested-capital line and XIRR; portfolio values feed net worth.
 
@@ -9,7 +9,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 **Sequencing (owner decision, 2026-11-05):** F6.11 lands **before** F6.9, so the 1.4 archive covers the risk columns and `RiskTargetPolicy` in one format bump instead of F6.11 extending the archive in its own PR.
 
 **Data model (sketch)**
-- `AssetClass(id, workspace_id, name, investable bool, color, sort_order, archived_at, risk_tier[safe|growth|speculative]?)`. Seed (en/pl): Stocks, Bonds, Metals, Crypto, Currencies (all investable); Real estate, Primary residence (not investable); Other. Seeded tiers: Bonds, Metals → safe; Stocks, Currencies → growth; Crypto → speculative; non-investable classes and Other → none (F6.11).
+- `AssetClass(id, workspace_id, name, investable bool, color, sort_order, archived_at, risk_tier[safe|growth|speculative]?)`. Seed (en/pl): Stocks, Bonds, Metals, Crypto, Currencies, Other (all investable). **Owner decision 2026-11-09:** property is tracked in net worth (F5.7), not as an investment, so Real estate and Primary residence are no longer seeded; workspaces seeded before keep them as user data. `investable` only decides what FIRE (M8) counts as the starting portfolio (e.g. an emergency fund or money earmarked for a purchase); it never hides anything in Investments. Seeded tiers: Bonds, Metals → safe; Stocks, Currencies → growth; Crypto → speculative; Other and non-investable classes → none (F6.11).
 - `Instrument(id, workspace_id, name, symbol?, type[equity|etf|bond_market|bond_model|metal|crypto|currency|real_estate|other], quote_currency, unit_label, valuation_source[provider|manual|bond_model], provider_key?, provider_symbol?, risk_tier_override[safe|growth|speculative]?, archived_at)`
 - `RiskTargetPolicy(workspace_id PK, mode[fixed|age_scaled|age_in_bonds], safe_bp, growth_bp, speculative_bp, tolerance_bp)` (F6.11).
 - `InstrumentAllocation(instrument_id, asset_class_id, weight_bp)`; every instrument has at least one row and its weights must sum to exactly 10 000, enforced by the service (the editor mirrors the total client-side). A single instrument can be split across classes (e.g., an 80/20 stock/bond fund).
@@ -335,6 +335,7 @@ and property tests (value monotonic in time for non-negative rates; tax never ne
 - **Pie/donut chart of stock values:** proportion of each instrument's value; a selector chooses the scope: one asset class (default Stocks) or the whole portfolio; small slices (<2%) group into "Other".
 - Foreign-currency holdings are converted using FX at the valuation date; missing FX shows a visible warning and excludes the instrument from totals (never silently zero).
 - Pure domain function `value_portfolio(holdings, prices, fx, allocations, as_of)`; golden test: an 80/20 stock/bond fund of value 1 000.00 contributes 800.00 to Stocks and 200.00 to Bonds, with rounding remainder assigned to the largest class so totals match exactly.
+- **Non-investable classes (owner decision 2026-11-09):** every class counts in the portfolio totals, the class table and the chart. A class with `investable=false` gets a "not counted in FIRE" badge in the class table; nothing is excluded or hidden.
 - **As built (owner review of the plan, 2026-11):**
   - A missing **price** is handled like missing FX. In both cases the instrument's value **and its cost basis** are left out of every total (portfolio, classes, shares, chart), so the totals and gain % stay consistent. The row stays with a warning, and a note counts the excluded holdings. A stale price or FX rate is valued, with a badge.
   - Look-through rounding: every class except the largest weight gets `floor(amount × weight / 10 000)`, and the largest gets the remainder. Equal largest weights are broken by the class's sort order, then its id. Value and cost are split separately.
@@ -379,7 +380,8 @@ Tests: golden XIRR vector from the spec, scipy cross-check (dev dependency only)
 
 **Acceptance**
 - Register resolvers for `portfolio_asset_class` (class value, look-through, base currency) and `portfolio_holding` (instrument value) with the M5 `ValuationResolver` registry; both support historical `as_of` (used by snapshots).
-- Helper button "Create net-worth items from asset classes" creates linked asset items (one per class with value > 0), skipping classes already linked; classes with `investable=false` are created with `investable=false`.
+- Helper button "Create net-worth items from asset classes" creates linked asset items (one per active class with value > 0), skipping archived classes and classes already linked; classes with `investable=false` are created with `investable=false`.
+- Property is a net-worth item (F5.7). Workspaces seeded before 2026-11-09 may still hold property as a `real_estate` instrument; when such an instrument and a net-worth item in the Real estate category both have value, show the double-counting warning too.
 - Warning when both a class and one of its holdings are linked (double counting).
 - Net-worth snapshots (M5.3) pick up linked values automatically.
 
@@ -411,7 +413,7 @@ decision, 2026-10-18). It lands after F6.11 (see the sequencing note at the top)
   history" path: instrument by name, with the mapping step for unknown instruments like F4.3's
   categories, create with a type the user picks; an empty `date` makes an "undated lot" flagged
   for the user to fix). Other files are restore only.
-- The new models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them. An untouched suggested asset-class set counts as empty for restore, like the ledger and net-worth suggested sets (the exact set in a supported locale, unedited, unused, with the automatic `asset_class.seeded` event); otherwise every fresh workspace would refuse a restore.
+- The new models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them. An untouched suggested asset-class set (the current seed or the pre-2026-11-09 seed with Real estate and Primary residence) counts as empty for restore, like the ledger and net-worth suggested sets (the exact set in a supported locale, unedited, unused, with the automatic `asset_class.seeded` event); otherwise every fresh workspace would refuse a restore.
 
 **Agent prompt**
 ```
