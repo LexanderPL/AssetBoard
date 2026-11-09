@@ -25,7 +25,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 - Changing a manual value appends an `ItemValuation` (with optional note); an "as of" date can be set (back-dating allowed).
 - Valuation history shown per item (small table + sparkline).
 - Bulk add: paste multiple lines (`name; value; category`) into a textarea → preview → create.
-- Seed categories (en + pl): assets — Vehicles, Electronics, Appliances, Furniture, Jewelry & watches, Art & collectibles, Tools, Other; liabilities — Installments, Mortgage, Other.
+- Seed categories (en + pl): assets — Real estate (F5.7), Vehicles, Electronics, Appliances, Furniture, Jewelry & watches, Art & collectibles, Tools, Other; liabilities — Installments, Mortgage, Other.
 - Soft delete/archive keeps history.
 
 **Implementation notes (F5.1).**
@@ -239,7 +239,7 @@ decision, 2026-10-18).
 - All four models have `import_key`/`import_batch_id` with partial unique indexes on SQLite and
   PostgreSQL. Restore removes a batch's append-only valuations through an explicit
   workspace-and-batch-scoped SQL delete; repository `update`/`delete` stay unsupported.
-- Untouched suggested net-worth categories use the ledger rule: automatic
+- Untouched suggested net-worth categories use the ledger rule (the current seed or the seed before F5.7, without Real estate, both count): automatic
   `networth_category.seeded`, exact suggested set, unedited, unused, within five seconds. A
   later manual seed makes them user data.
 - A full archive merge is restore-only for net-worth files and lists that once; only a lone
@@ -371,4 +371,59 @@ Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait 
 Implement F5.6 from docs/specs/M5-net-worth.md: the per-item estimate_between switch (model, migration with side defaults,
 item form), straight-line estimates between recorded values in backfill only, the "estimated" breakdown count shown in
 history, and the archive 1.3 column. Golden table and property tests as listed.
+```
+
+---
+
+## F5.7 Real estate in net worth
+
+**Story:** My home and other property are part of what I own, not investments. I record them in
+net worth, with their value history, and later see the mortgage against them.
+
+**Owner decision 2026-11-09.** Property is tracked as a net-worth asset item, not as an M6
+instrument. M6 stops seeding the Real estate and Primary residence asset classes (see the M6 data
+model), and F7.6 links a loan to a net-worth item.
+
+**Acceptance**
+- The asset seed gains **Real estate** (pl "Nieruchomości"), first in the asset order. New
+  workspaces get it in the workspace-creation transaction with the rest of the set.
+- **"Add missing suggested categories"** action per side (editors and owners): it creates each
+  suggested category whose name key (in either supported language) has no category on that side
+  (an archived one counts as present), appended in seed order, in one `run_immediate` write with the workspace lock and a role
+  re-check. It never renames, restores or reorders existing categories, and it is idempotent
+  (a second run adds nothing). Audited as `networth_category.seeded` with the created names, like
+  the empty-side action. It replaces the empty-side-only action: on an empty side it adds the
+  whole set, as before.
+- Existing workspaces are not migrated; the action is how they get Real estate.
+- Property items use the existing F5.1 item fields and valuation history, F5.4 links and F5.6
+  estimates; nothing about items changes. `investable` defaults to off for new Real estate items
+  (a home is not FIRE money), as for every new asset item.
+- M6 (same change): the asset-class seed drops Real estate and Primary residence; Other becomes
+  investable; the portfolio page counts every class and badges non-investable ones ("not
+  counted in FIRE"). Existing workspaces keep their classes and instruments untouched (user data).
+  The F6.8 helper skips archived classes and warns about double counting between a `real_estate`
+  instrument and a Real estate net-worth item.
+- Archive restore keeps accepting the pre-F5.7 untouched seed sets on both sides (net-worth
+  categories without Real estate; asset classes with Real estate and Primary residence) as empty.
+
+**Tests:**
+- Seed sets in en and pl, with Real estate first.
+- The add-missing action on:
+  - an empty side (the whole set);
+  - a partial side (only the missing ones);
+  - a side where a suggested category was renamed (the original name is added) or archived.
+    An archived category counts as present and is not re-created; the user restores it.
+- Idempotence, role, CSRF and the audit event.
+- Restore treats the old and new untouched seed sets as empty.
+- The M6 seed has neither property class, and Other is investable.
+- The portfolio badge shows on a non-investable class, and every class still counts in the
+  totals.
+- The F6.8 helper skips archived classes (when F6.8 lands).
+
+**Agent prompt**
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F5.7 from docs/specs/M5-net-worth.md together with its M6 seed changes: the Real estate net-worth seed (en/pl),
+the "Add missing suggested categories" action, the new M6 asset-class seed (no Real estate / Primary residence, Other investable),
+the "not counted in FIRE" badge on the portfolio class table, and restore emptiness accepting old and new seed sets.
 ```
