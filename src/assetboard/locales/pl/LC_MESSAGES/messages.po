@@ -3332,15 +3332,18 @@ msgstr "Stałe cele muszą sumować się dokładnie do 100%%."
 msgid "Set your birth year in Profile before using age-based targets."
 msgstr "Ustaw rok urodzenia w profilu, zanim użyjesz celów zależnych od wieku."
 
-msgid "Holdings in the whole portfolio"
-msgstr "Pozycje w całym portfelu"
+msgid "Asset classes"
+msgstr "Klasy aktywów"
 
 msgid "Nothing is valued in the portfolio yet."
 msgstr "W portfelu nie ma jeszcze wycenionych pozycji."
 
+msgid "Holdings by instrument"
+msgstr "Pozycje według instrumentu"
+
 #, python-format
-msgid "Holdings in %(class)s"
-msgstr "Pozycje w klasie %(class)s"
+msgid "Holdings by instrument in %(class)s"
+msgstr "Pozycje według instrumentu w klasie %(class)s"
 
 msgid "Nothing is held in this asset class."
 msgstr "W tej klasie aktywów nie ma żadnych pozycji."
@@ -5601,9 +5604,6 @@ msgstr ""
 msgid "Apply suggested risk tiers"
 msgstr "Zastosuj proponowane poziomy ryzyka"
 
-msgid "Asset classes"
-msgstr "Klasy aktywów"
-
 msgid ""
 "Each instrument's value is split across these classes by the allocation "
 "weights. Archiving a class keeps it on instruments that already use it."
@@ -6075,6 +6075,20 @@ msgstr "Różnica"
 msgid "Outside tolerance"
 msgstr "Poza tolerancją"
 
+#, python-format
+msgid "Unassigned: %(amount)s (%(share)s of the portfolio)"
+msgstr "Nieprzypisane: %(amount)s (%(share)s portfela)"
+
+msgid ""
+"Asset classes without a risk tier are left out of the tier percentages. "
+"Set a tier on the Asset classes tab."
+msgstr ""
+"Klasy aktywów bez poziomu ryzyka są pomijane w procentach poziomów. Ustaw"
+" poziom na karcie Klasy aktywów."
+
+msgid "Open Asset classes"
+msgstr "Otwórz klasy aktywów"
+
 msgid ""
 "Tier percentages use the assigned value; Unassigned classes are shown "
 "separately."
@@ -6111,25 +6125,25 @@ msgstr "Spekulacyjne %%"
 msgid "The fixed targets must total exactly 100%%."
 msgstr "Stałe cele muszą sumować się dokładnie do 100%%."
 
-msgid "Age-based settings"
-msgstr "Ustawienia zależne od wieku"
-
 #, python-format
 msgid "Age-scaled: speculative %%"
 msgstr "Skalowane wiekiem: spekulacyjne %%"
+
+#, python-format
+msgid ""
+"Age-scaled: safe = (100%% − speculative) × age ÷ life expectancy. The "
+"remaining share is Growth."
+msgstr ""
+"Skalowane wiekiem: bezpieczne = (100%% − spekulacyjne) × wiek ÷ "
+"oczekiwana długość życia. Pozostała część to wzrost."
 
 #, python-format
 msgid "Age in bonds: speculative %%"
 msgstr "Wiek w obligacjach: spekulacyjne %%"
 
 #, python-format
-msgid ""
-"Age-scaled: safe = (100%% − speculative) × age ÷ life expectancy. Age in "
-"bonds: safe = age%%. The remaining share is Growth."
-msgstr ""
-"Skalowane wiekiem: bezpieczne = (100%% − spekulacyjne) × wiek ÷ "
-"oczekiwana długość życia. Wiek w obligacjach: bezpieczne = wiek%%. "
-"Pozostała część to wzrost."
+msgid "Age in bonds: safe = age%%. The remaining share is Growth."
+msgstr "Wiek w obligacjach: bezpieczne = wiek%%. Pozostała część to wzrost."
 
 msgid "Tolerance (percentage points)"
 msgstr "Tolerancja (punkty procentowe)"
@@ -6468,18 +6482,6 @@ msgstr "Wymagany, gdy instrument jest notowany w innej walucie."
 msgid "Undated"
 msgstr "Bez daty"
 
-msgid ""
-"Rate 1 for an instrument quoted in another currency: the amounts may be "
-"in the base currency. Open the row, choose the base currency and save "
-"with the stored rate."
-msgstr ""
-"Kurs 1 dla instrumentu notowanego w innej walucie: kwoty mogą być w "
-"walucie bazowej. Otwórz wiersz, wybierz walutę bazową i zapisz z "
-"zapisanym kursem."
-
-msgid "check FX rate"
-msgstr "sprawdź kurs"
-
 #, python-format
 msgid "Delete the transaction of %(date)s?"
 msgstr "Usunąć transakcję z dnia %(date)s?"
@@ -6547,9 +6549,6 @@ msgstr "Wszystkie instrumenty"
 
 msgid "All types"
 msgstr "Wszystkie typy"
-
-msgid "FX needs checking"
-msgstr "Kurs do sprawdzenia"
 
 msgid "Clear"
 msgstr "Wyczyść"

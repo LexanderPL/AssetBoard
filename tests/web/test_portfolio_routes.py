@@ -92,6 +92,16 @@ def _chart_data(page: str) -> dict[str, object]:
     return json.loads(match.group(1))
 
 
+def _class_chart_data(page: str) -> dict[str, object]:
+    match = re.search(
+        r'<script type="application/json" id="chart-portfolio-classes-data">(.*?)</script>',
+        page,
+        re.S,
+    )
+    assert match is not None
+    return json.loads(match.group(1))
+
+
 def _set_tier(owner: OwnerApp, class_id: UUID, tier: str | None) -> None:
     with owner.db() as session, session.begin():
         row = session.get(AssetClass, class_id)
@@ -118,7 +128,7 @@ def test_the_tab_and_the_empty_state(owner: OwnerApp) -> None:
     assert (
         owner.client.get("/investments", follow_redirects=False)
         .headers["location"]
-        .endswith(INSTRUMENTS)
+        .endswith(PORTFOLIO)
     )
 
 
@@ -145,7 +155,19 @@ def test_holdings_totals_classes_and_the_default_stocks_chart(owner: OwnerApp) -
     assert len(classes) == 2
     assert "Stocks" in classes[0] and "€880.00" in classes[0] and "€800.00" in classes[0]
     assert "Bonds" in classes[1] and "€220.00" in classes[1] and "€200.00" in classes[1]
-    assert "Holdings in Stocks" in page
+    totals = re.search(r"data-portfolio-totals.*?</section>", page, re.S)
+    assert totals is not None
+    assert 'data-donut="portfolio-classes"' in totals.group(0)
+    class_data = _class_chart_data(page)
+    class_slices = class_data["slices"]
+    assert isinstance(class_slices, list) and len(class_slices) == 2
+    assert [(s["name"], s["value"], s["share"], s["color"]) for s in class_slices] == [
+        ("Stocks", 88_000, "80.0%", "#2563eb"),
+        ("Bonds", 22_000, "20.0%", "#16a34a"),
+    ]
+    assert class_data["total"] == "€1,100.00"
+    assert "Asset classes" in page
+    assert "Holdings by instrument in Stocks" in page
     data = _chart_data(page)
     assert data["key"] == "portfolio"
     slices = data["slices"]
@@ -160,16 +182,16 @@ def test_holdings_totals_classes_and_the_default_stocks_chart(owner: OwnerApp) -
 def test_scope_selector_whole_portfolio_class_and_unknown(owner: OwnerApp) -> None:
     _fund_id, classes = _fund(owner)
     whole = owner.client.get(PORTFOLIO, params={"scope": "all"}).text
-    assert "Holdings in the whole portfolio" in whole
+    assert "Holdings by instrument" in whole
     assert _chart_data(whole)["slices"][0]["value"] == 100_000  # type: ignore[index]
     assert re.search(r'<option value="all" selected>Whole portfolio</option>', whole)
     bonds = owner.client.get(PORTFOLIO, params={"scope": str(classes["Bonds"])}).text
-    assert "Holdings in Bonds" in bonds
+    assert "Holdings by instrument in Bonds" in bonds
     assert _chart_data(bonds)["slices"][0]["value"] == 20_000  # type: ignore[index]
     for unknown in ("00000000-0000-0000-0000-000000000000", "nonsense"):
         fallback = owner.client.get(PORTFOLIO, params={"scope": unknown})
         assert fallback.status_code == 200
-        assert "Holdings in Stocks" in fallback.text
+        assert "Holdings by instrument in Stocks" in fallback.text
 
 
 def test_missing_price_is_warned_and_excluded_from_the_totals(owner: OwnerApp) -> None:
@@ -268,6 +290,117 @@ def test_a_non_investable_class_is_badged_and_still_counted(owner: OwnerApp) -> 
     assert {s["name"] for s in _chart_data(page)["slices"]} == {"Balanced fund", "Cash fund"}  # type: ignore[index]
 
 
+def test_the_class_donut_includes_the_unallocated_bucket(owner: OwnerApp) -> None:
+    _fund(owner)
+    with owner.db() as session, session.begin():
+        legacy = Instrument(
+            workspace_id=owner.home_id,
+            name="Legacy fund",
+            name_key="legacy fund",
+            type="etf",
+            quote_currency="EUR",
+            unit_label="share",
+            valuation_source="manual",
+        )
+        session.add(legacy)
+        session.flush()
+        session.add(
+            InvestmentTransaction(
+                workspace_id=owner.home_id,
+                instrument_id=legacy.id,
+                date=date(2026, 3, 9),
+                type="buy",
+                quantity=Decimal("5"),
+                unit_price=Decimal("50"),
+                quote_currency="EUR",
+                fee_minor=0,
+                fx_to_base=None,
+                note="",
+            )
+        )
+
+    page = owner.client.get(PORTFOLIO).text
+
+    slices = _class_chart_data(page)["slices"]
+    by_name = {slice["name"]: slice for slice in slices}  # type: ignore[index,union-attr]
+    assert by_name["Unallocated"]["value"] == 25_000
+    assert by_name["Unallocated"]["color"] is None
+    assert by_name["Stocks"]["value"] == 80_000
+    assert _class_chart_data(page)["total"] == "€1,250.00"  # type: ignore[index]
+    assert "Unallocated" in page
+
+
+def test_the_unassigned_help_and_one_click_suggested_tiers(owner: OwnerApp) -> None:
+    _fund_id, classes = _fund(owner)
+    assert "data-risk-unassigned-help" not in owner.client.get(PORTFOLIO).text
+
+    _set_tier(owner, classes["Bonds"], None)
+    page = owner.client.get(PORTFOLIO).text
+    assert "data-risk-unassigned-help" in page
+    assert "Unassigned: €200.00 (20% of the portfolio)" in page
+    assert "Open Asset classes" in page
+    assert "data-apply-risk-tiers" in page
+
+    response = owner.post(f"{PORTFOLIO}/apply-risk-tiers", token_from=PORTFOLIO)
+
+    assert response.status_code == 303
+    assert response.headers["location"].endswith("?notice=risk_tiers_suggested")
+    page = owner.client.get(response.headers["location"]).text
+    assert "Suggested risk tiers applied." in page
+    assert "data-risk-unassigned-help" not in page
+    with owner.db() as session:
+        assert session.get(AssetClass, classes["Bonds"]).risk_tier == "safe"  # type: ignore[union-attr]
+
+    response = owner.post(f"{PORTFOLIO}/apply-risk-tiers", token_from=PORTFOLIO)
+    assert response.headers["location"].endswith("?notice=risk_tiers_complete")
+    assert (
+        "Every matching asset class already has a risk tier."
+        in owner.client.get(response.headers["location"]).text
+    )
+
+
+def test_the_unassigned_help_has_no_button_without_suggestions(owner: OwnerApp) -> None:
+    classes = _classes(owner)
+    catch_all = _instrument(owner, "Catch-all fund", {classes["Other"]: "100"})
+    _buy(owner, catch_all, "1", "100")
+
+    page = owner.client.get(PORTFOLIO).text
+
+    assert "data-risk-unassigned-help" in page
+    assert "Unassigned: €100.00 (100% of the portfolio)" in page
+    assert "data-apply-risk-tiers" not in page
+
+
+def test_only_editors_can_apply_suggested_risk_tiers_from_the_portfolio(owner: OwnerApp) -> None:
+    _fund_id, classes = _fund(owner)
+    _set_tier(owner, classes["Bonds"], None)
+    owner.set_admin_role("viewer")
+
+    page = owner.client.get(PORTFOLIO).text
+
+    assert "data-risk-unassigned-help" in page
+    assert "data-apply-risk-tiers" not in page
+    response = owner.post(f"{PORTFOLIO}/apply-risk-tiers", token_from=PORTFOLIO)
+    assert response.status_code == 403
+
+
+def test_the_class_donut_includes_archived_classes(owner: OwnerApp) -> None:
+    _fund(owner)
+    classes = _classes(owner)
+    with owner.db() as session, session.begin():
+        stocks = session.get(AssetClass, classes["Stocks"])
+        assert stocks is not None
+        stocks.archived_at = stocks.created_at
+
+    page = owner.client.get(PORTFOLIO).text
+
+    slices = _class_chart_data(page)["slices"]
+    by_name = {slice["name"]: slice for slice in slices}  # type: ignore[index,union-attr]
+    assert by_name["Stocks"]["value"] == 80_000
+    assert by_name["Stocks"]["color"] == "#2563eb"
+    assert "Archived" in page
+
+
 def test_risk_balance_defaults_flags_and_hint(owner: OwnerApp) -> None:
     fund, classes = _fund(owner)
     _set_tier(owner, classes["Stocks"], "growth")
@@ -334,6 +467,41 @@ def test_invalid_risk_policy_is_refused_with_a_message(owner: OwnerApp) -> None:
 
     assert response.status_code == 400
     assert "The fixed targets must total exactly 100%." in response.text
+
+
+def test_the_risk_editor_shows_only_the_fields_of_the_selected_mode(owner: OwnerApp) -> None:
+    _fund(owner)
+    page = owner.client.get(PORTFOLIO).text
+    assert "data-risk-mode" in page
+    assert re.search(r'data-risk-fields="fixed">', page)
+    assert re.search(r'data-risk-fields="age_scaled" hidden>', page)
+    assert re.search(r'data-risk-fields="age_in_bonds" hidden>', page)
+    assert 'id="risk-tolerance"' in page
+
+    with owner.db() as session, session.begin():
+        user = session.get(User, owner.admin_id)
+        assert user is not None
+        user.birth_year = 1986
+        user.life_expectancy = 80
+    response = owner.post(
+        f"{PORTFOLIO}/risk-targets",
+        {
+            "mode": "age_scaled",
+            "safe": "20",
+            "growth": "70",
+            "fixed_speculative": "10",
+            "age_scaled_speculative": "10",
+            "age_in_bonds_speculative": "0",
+            "tolerance": "5",
+        },
+        token_from=PORTFOLIO,
+    )
+    assert response.status_code == 303
+    page = owner.client.get(response.headers["location"]).text
+    assert re.search(r'data-risk-fields="fixed" hidden>', page)
+    assert re.search(r'data-risk-fields="age_scaled">', page)
+    assert re.search(r'data-risk-fields="age_in_bonds" hidden>', page)
+    assert 'id="risk-tolerance"' in page
 
 
 def test_age_mode_requires_a_birth_year(owner: OwnerApp) -> None:

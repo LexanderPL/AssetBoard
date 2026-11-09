@@ -15,27 +15,30 @@
       <h1 id="portfolio-heading" class="text-lg font-semibold">{{ _("Portfolio") }}</h1>
       <p class="text-sm text-muted">{{ _("Valued on %(date)s in %(currency)s", date=view.as_of, currency=view.currency) }}</p>
     </div>
-    <dl class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-      <div class="border border-line bg-subtle p-4">
-        <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Value") }}</dt>
-        <dd class="mt-1 text-lg font-semibold tabular-nums" data-portfolio-value>{{ view.value }}</dd>
-      </div>
-      <div class="border border-line bg-subtle p-4">
-        <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Cost basis") }}</dt>
-        <dd class="mt-1 text-lg font-semibold tabular-nums" data-portfolio-cost>{{ view.cost }}</dd>
-      </div>
-      <div class="border border-line bg-subtle p-4">
-        <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Unrealized gain") }}</dt>
-        <dd class="mt-1 text-lg font-semibold tabular-nums{% if view.gain_negative %} text-danger {% endif %}" data-portfolio-gain>{{ view.gain }}{% if view.gain_pct %} <span class="text-sm font-medium">({{ view.gain_pct }})</span>{% endif %}</dd>
-      </div>
-      <div class="border border-line bg-subtle p-4">
-        <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Realized P&L") }}</dt>
-        <dd class="mt-1 text-sm tabular-nums" data-portfolio-realized>
-          <span class="block"><span class="text-muted">{{ _("%(year)s to date", year=view.year) }}:</span> <span class="font-semibold" data-realized-ytd>{{ view.realized_ytd }}</span></span>
-          <span class="block"><span class="text-muted">{{ _("All time") }}:</span> <span class="font-semibold" data-realized-all>{{ view.realized_all }}</span></span>
-        </dd>
-      </div>
-    </dl>
+    <div class="mt-5 grid gap-4{% if view.class_donut.slices %} lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start{% endif %}">
+      <dl class="grid gap-4 sm:grid-cols-2">
+        <div class="border border-line bg-subtle p-4">
+          <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Value") }}</dt>
+          <dd class="mt-1 text-lg font-semibold tabular-nums" data-portfolio-value>{{ view.value }}</dd>
+        </div>
+        <div class="border border-line bg-subtle p-4">
+          <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Cost basis") }}</dt>
+          <dd class="mt-1 text-lg font-semibold tabular-nums" data-portfolio-cost>{{ view.cost }}</dd>
+        </div>
+        <div class="border border-line bg-subtle p-4">
+          <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Unrealized gain") }}</dt>
+          <dd class="mt-1 text-lg font-semibold tabular-nums{% if view.gain_negative %} text-danger {% endif %}" data-portfolio-gain>{{ view.gain }}{% if view.gain_pct %} <span class="text-sm font-medium">({{ view.gain_pct }})</span>{% endif %}</dd>
+        </div>
+        <div class="border border-line bg-subtle p-4">
+          <dt class="text-xs font-medium uppercase tracking-wide text-muted">{{ _("Realized P&L") }}</dt>
+          <dd class="mt-1 text-sm tabular-nums" data-portfolio-realized>
+            <span class="block"><span class="text-muted">{{ _("%(year)s to date", year=view.year) }}:</span> <span class="font-semibold" data-realized-ytd>{{ view.realized_ytd }}</span></span>
+            <span class="block"><span class="text-muted">{{ _("All time") }}:</span> <span class="font-semibold" data-realized-all>{{ view.realized_all }}</span></span>
+          </dd>
+        </div>
+      </dl>
+      {% if view.class_donut.slices %}{{ donut(view.class_donut, label=_("Asset class"), compact=true) }}{% endif %}
+    </div>
     {% if view.excluded %}
     <p class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="status" data-portfolio-excluded>{% trans count=view.excluded %}{{ count }} holding is excluded from the totals (missing price or FX rate).{% pluralize %}{{ count }} holdings are excluded from the totals (missing price or FX rate).{% endtrans %}</p>
     {% endif %}
@@ -167,6 +170,18 @@
         </tbody>
       </table>
     </div>
+    {% if view.risk.has_unassigned %}
+    <div class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="status" data-risk-unassigned-help>
+      <p class="font-medium" data-risk-unassigned-amount>{{ _("Unassigned: %(amount)s (%(share)s of the portfolio)", amount=view.risk.unassigned, share=view.risk.unassigned_share or "—") }}</p>
+      <p class="mt-1">{{ _("Asset classes without a risk tier are left out of the tier percentages. Set a tier on the Asset classes tab.") }} <a href="{{ scoped_url(request, 'investments_classes') }}" class="font-semibold underline">{{ _("Open Asset classes") }}</a></p>
+      {% if can_edit and view.risk.can_apply_risk_tiers %}
+      <form method="post" action="{{ scoped_url(request, 'investments_portfolio_apply_risk_tiers') }}" class="mt-3">
+        {{ csrf_input() }}
+        <button type="submit" class="rounded-xl border border-warning-line bg-surface px-4 py-2 text-sm font-semibold text-warning-strong hover:bg-subtle" data-apply-risk-tiers>{{ _("Apply suggested risk tiers") }}</button>
+      </form>
+      {% endif %}
+    </div>
+    {% endif %}
     <p class="mt-3 text-xs text-muted">{{ _("Tier percentages use the assigned value; Unassigned classes are shown separately.") }}</p>
     {% if view.risk.hint %}
     <p class="mt-3 text-sm font-medium" data-risk-hint>{{ _("Move about %(amount)s from %(from)s to %(to)s.", amount=view.risk.hint.amount, from=view.risk.hint.from_label, to=view.risk.hint.to_label) }}</p>
@@ -180,14 +195,14 @@
         <input type="hidden" name="scope" value="{{ request.query_params.get('scope', '') }}">
         <div class="max-w-xs space-y-1.5">
           <label for="risk-mode" class="block text-sm font-medium">{{ _("Target mode") }}</label>
-          <select id="risk-mode" name="mode" class="form-select w-full py-2">
+          <select id="risk-mode" name="mode" class="form-select w-full py-2" data-risk-mode>
             <option value="fixed"{% if view.risk.form_values.mode == "fixed" %} selected{% endif %}>{{ _("Fixed targets") }}</option>
             <option value="age_scaled"{% if view.risk.form_values.mode == "age_scaled" %} selected{% endif %}{% if not view.risk.age_modes_enabled %} disabled{% endif %}>{{ _("Age-scaled") }}</option>
             <option value="age_in_bonds"{% if view.risk.form_values.mode == "age_in_bonds" %} selected{% endif %}{% if not view.risk.age_modes_enabled %} disabled{% endif %}>{{ _("Age in bonds") }}</option>
           </select>
           {% if view.risk.errors.get("mode") %}<p class="text-sm text-danger">{{ view.risk.errors.mode }}</p>{% endif %}
         </div>
-        <fieldset class="space-y-2">
+        <fieldset class="space-y-2" data-risk-fields="fixed"{% if view.risk.form_values.mode != "fixed" %} hidden{% endif %}>
           <legend class="text-sm font-medium">{{ _("Fixed targets") }}</legend>
           <div class="grid gap-3 sm:grid-cols-3">
             <div class="space-y-1"><label for="risk-safe" class="block text-xs text-muted">{{ _("Safe %%") }}</label><input id="risk-safe" name="safe" value="{{ view.risk.form_values.safe }}" inputmode="decimal" class="form-control w-full px-2 py-1.5"></div>
@@ -197,13 +212,15 @@
           <p class="text-xs text-muted">{{ _("The fixed targets must total exactly 100%%.") }}</p>
           {% if view.risk.errors.get("targets") %}<p class="text-sm text-danger">{{ view.risk.errors.targets }}</p>{% endif %}
         </fieldset>
-        <fieldset class="space-y-2">
-          <legend class="text-sm font-medium">{{ _("Age-based settings") }}</legend>
-          <div class="grid gap-3 sm:grid-cols-2">
-            <div class="space-y-1"><label for="risk-age-scaled" class="block text-xs text-muted">{{ _("Age-scaled: speculative %%") }}</label><input id="risk-age-scaled" name="age_scaled_speculative" value="{{ view.risk.form_values.age_scaled_speculative }}" inputmode="decimal" class="form-control w-full px-2 py-1.5"></div>
-            <div class="space-y-1"><label for="risk-age-bonds" class="block text-xs text-muted">{{ _("Age in bonds: speculative %%") }}</label><input id="risk-age-bonds" name="age_in_bonds_speculative" value="{{ view.risk.form_values.age_in_bonds_speculative }}" inputmode="decimal" class="form-control w-full px-2 py-1.5"></div>
-          </div>
-          <p class="text-xs text-muted">{{ _("Age-scaled: safe = (100%% − speculative) × age ÷ life expectancy. Age in bonds: safe = age%%. The remaining share is Growth.") }}</p>
+        <fieldset class="space-y-2" data-risk-fields="age_scaled"{% if view.risk.form_values.mode != "age_scaled" %} hidden{% endif %}>
+          <legend class="text-sm font-medium">{{ _("Age-scaled") }}</legend>
+          <div class="max-w-xs space-y-1"><label for="risk-age-scaled" class="block text-xs text-muted">{{ _("Age-scaled: speculative %%") }}</label><input id="risk-age-scaled" name="age_scaled_speculative" value="{{ view.risk.form_values.age_scaled_speculative }}" inputmode="decimal" class="form-control w-full px-2 py-1.5"></div>
+          <p class="text-xs text-muted">{{ _("Age-scaled: safe = (100%% − speculative) × age ÷ life expectancy. The remaining share is Growth.") }}</p>
+        </fieldset>
+        <fieldset class="space-y-2" data-risk-fields="age_in_bonds"{% if view.risk.form_values.mode != "age_in_bonds" %} hidden{% endif %}>
+          <legend class="text-sm font-medium">{{ _("Age in bonds") }}</legend>
+          <div class="max-w-xs space-y-1"><label for="risk-age-bonds" class="block text-xs text-muted">{{ _("Age in bonds: speculative %%") }}</label><input id="risk-age-bonds" name="age_in_bonds_speculative" value="{{ view.risk.form_values.age_in_bonds_speculative }}" inputmode="decimal" class="form-control w-full px-2 py-1.5"></div>
+          <p class="text-xs text-muted">{{ _("Age in bonds: safe = age%%. The remaining share is Growth.") }}</p>
         </fieldset>
         <div class="max-w-xs space-y-1">
           <label for="risk-tolerance" class="block text-sm font-medium">{{ _("Tolerance (percentage points)") }}</label>

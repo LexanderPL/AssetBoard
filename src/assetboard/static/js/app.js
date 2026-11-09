@@ -429,6 +429,29 @@ document.addEventListener("change", (event) => {
 });
 document.addEventListener("DOMContentLoaded", applyHiddenWhen);
 
+// The portfolio's target-allocation form shows only the fields of the chosen target mode. The
+// server renders the initial state; this keeps it in step while editing and after HTMX swaps.
+function applyRiskMode(select) {
+  if (!(select instanceof HTMLSelectElement) || !select.matches("[data-risk-mode]")) return;
+  const form = select.closest("form");
+  if (!form) return;
+  form.querySelectorAll("[data-risk-fields]").forEach((group) => {
+    if (group instanceof HTMLElement) group.hidden = group.dataset.riskFields !== select.value;
+  });
+}
+function applyRiskModes() {
+  document.querySelectorAll("[data-risk-mode]").forEach(applyRiskMode);
+}
+document.addEventListener("change", (event) => {
+  const target = event.target;
+  if (target instanceof HTMLSelectElement && target.matches("[data-risk-mode]")) {
+    applyRiskMode(target);
+  }
+});
+document.addEventListener("htmx:afterSwap", applyRiskModes);
+document.addEventListener("DOMContentLoaded", applyRiskModes);
+applyRiskModes();
+
 // CSV import category mapping (F4.3): each source category shows only the fields of its chosen
 // action (map, create or ignore), and the filter box hides rows whose source category name or
 // kind does not contain the typed text. The server also renders the inactive fields hidden, so
@@ -566,6 +589,11 @@ function restoreKeepVisible() {
 }
 document.addEventListener("htmx:afterSettle", restoreKeepVisible);
 document.addEventListener("htmx:afterSwap", restoreKeepVisible);
+// Nothing swapped, so there is no position to restore; do not let a failed request affect the
+// next unrelated swap.
+for (const eventName of ["htmx:sendError", "htmx:timeout"]) {
+  document.addEventListener(eventName, () => keepVisible.clear());
+}
 
 // Entry rows survive swaps of their table. After Enter the row is reset at once (the request
 // already holds its values), so typing goes on; whatever is typed before the response arrives

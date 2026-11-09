@@ -487,7 +487,6 @@ def _filter_values(request: Request) -> dict[str, str]:
         "type": request.query_params.get("type", ""),
         "from": request.query_params.get("from", ""),
         "to": request.query_params.get("to", ""),
-        "fx": "check" if request.query_params.get("fx", "") == "check" else "",
     }
 
 
@@ -538,7 +537,6 @@ def _list_page(
             date_from=filters["from"],
             date_to=filters["to"],
             page=page_number,
-            fx_check=filters["fx"] == "check",
         )
     except InvestmentTransactionError as exc:
         result = EMPTY

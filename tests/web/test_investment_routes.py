@@ -108,8 +108,9 @@ def test_investment_pages_do_not_render_the_field_error_macro(owner: OwnerApp) -
 
 
 def test_the_nav_links_to_the_investments_page(owner: OwnerApp) -> None:
+    portfolio = "/investments/portfolio"
     home = owner.client.get("/").text
-    assert "data-investments-link" in home and f'href="{INSTRUMENTS}"' in home
+    assert "data-investments-link" in home and f'href="{portfolio}"' in home
     page = owner.client.get(INSTRUMENTS).text
     assert 'data-investments-link aria-current="page"' in page
     classes = owner.client.get(CLASSES).text

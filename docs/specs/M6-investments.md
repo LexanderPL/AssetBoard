@@ -154,17 +154,12 @@ Notes:
 
 **History and editing.**
 - A base-mode row shows the base amounts it was entered with as the primary values, with the
-  derived quote unit price and the rate beside them ("1 600.00 PLN · ≈ 398.773771 USD @ 4.0123").
+  derived quote unit price (rounded to the quote currency's minor unit) and the rate beside them
+  ("1 600.00 PLN · ≈ 398.77 USD @ 4.0123").
 - Editing opens in the mode the row was saved in.
 - Switching modes on an existing row:
   - **quote → base:** pre-fills base price = `unit_price × fx_to_base` and base fee = `fee × fx`.
   - **base → quote:** pre-fills the stored derived quote values and clears the settlement.
-
-**Finding rows that need fixing.** A row whose instrument quote currency differs from the base
-and whose `fx_to_base == 1` gets a **"check FX rate"** warning badge in both histories. A
-history filter "FX needs checking" lists them. To fix such a row, the user opens it, switches to
-base mode (the amounts carry over, since they were entered as base), takes the pre-filled stored
-rate, and saves.
 
 **Audit and archive.**
 - `investment_transaction.created`/`.updated` keep their shape. `.updated` adds `changed`, the
@@ -234,7 +229,7 @@ rate, and saves.
   - All-or-none constraint; a settlement on a base-quoted or `currency` instrument is refused.
   - FX pre-fill: from a stored rate; no stored rate gives an inline error; the endpoint is
     workspace-scoped.
-  - Mode switch on edit; the "check FX rate" badge and its filter.
+  - Mode switch on edit.
   - The migration is reversible.
 - **Bulk add.**
   - Parsing table: separators, locales, types incl. Polish aliases, comments, missing optional
@@ -251,7 +246,7 @@ rate, and saves.
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
 Implement F6.2a from docs/specs/M6-investments.md: settlement columns + migration, base-currency entry mode with stored-FX
-pre-fill, the settlement cost-basis rule in compute_holdings/realized_events, the "check FX rate" badge and filter,
+pre-fill, the settlement cost-basis rule in compute_holdings/realized_events,
 and the all-or-nothing bulk add with preview and re-validation. Include the settlement golden test and the property test.
 ```
 
@@ -341,6 +336,8 @@ and property tests (value monotonic in time for non-negative rates; tax never ne
   - Look-through rounding: every class except the largest weight gets `floor(amount × weight / 10 000)`, and the largest gets the remainder. Equal largest weights are broken by the class's sort order, then its id. Value and cost are split separately.
   - Realized P&L: `domain.holdings.realized_events` lists each sell's realized P&L from the same ordered pass as `compute_holdings`. All time is their sum; YTD sums the events dated from 1 January of the workspace's current year. YTD is not computed by subtracting a dated holdings run, which excludes undated legacy lots.
   - Chart:
+    - The totals box also shows a compact look-through **asset-class donut**: positive class values in the classes' colours, archived classes included, plus an *Unallocated* slice when an instrument has no allocation. Its total is the portfolio value and it has no small-slice grouping.
+    - The instrument donut below is titled **Holdings by instrument**.
     - With a class scope, each instrument's slice is its look-through part in that class. With the whole-portfolio scope, it is the full value.
     - Small slices use the shared donut slicer (`category_slices`, now with a minimum-share option).
     - Slice colours come from the categorical palette by position. Class colours stay on the class table.
@@ -478,6 +475,7 @@ Owner decision (2026-10): investments are grouped into three risk tiers so users
   - The difference is current value minus target value, in money.
   - The hint moves `min(largest overweight amount, largest underweight amount)` from the most overweight tier to the most underweight tier. No hint is shown when the largest absolute gap is within the tolerance.
   - The risk balance uses the same included rows as the Portfolio page: a holding excluded there for a missing price or FX rate is excluded from the tiers too. A class without a tier (including a non-investable or Other class) appears under **Unassigned** and is excluded from the tier percentages.
+  - **As built (UI polish):** the balance is recomputed on every request; there is no daily cache. When the unassigned amount is above zero, the Portfolio page shows a warning with that amount and share, a sentence that the classes need a risk tier and a link to the Asset classes tab. When `suggested_risk_tier_changes` finds matching empty classes, the warning also offers a one-click **Apply suggested risk tiers** action (`POST /investments/portfolio/apply-risk-tiers`), which redirects back with a notice.
 - Pure domain functions: `risk_targets(policy, age, life_expectancy) -> dict[tier, bp]` and `risk_balance(class_values, tiers, overrides, targets, tolerance)`. Golden tests: the 45/45/10 example above; 50/40/10 fixed; age_in_bonds at age 35 with X = 10 → 35/55/10; capping at age ≥ life expectancy. Property tests: targets always sum to 10 000; current tier percentages sum to 10 000 when any tier has value; monotonic: an older age never lowers `safe`.
 - Not investment advice: the section shows the same "illustrative, not advice" notice as the FIRE planner. The age used for the current viewer comes from their profile; the page says so and links to Profile when a birth year is missing. Profile `birth_year`/`life_expectancy` (M8 uses the latter as the default `horizon_age`) are added here because M8 has not landed yet.
 

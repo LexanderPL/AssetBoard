@@ -516,34 +516,6 @@ class InvestmentTransactionRepository(ScopedRepository[InvestmentTransaction]):
             select(func.count()).select_from(statement.subquery())
         ).scalar_one()
 
-    def filtered_not_in_currency(
-        self,
-        currency: str,
-        *,
-        instrument_id: UUID | None,
-        types: tuple[str, ...],
-        date_from: date | None,
-        date_to: date | None,
-    ) -> list[InvestmentTransaction]:
-        """Every filtered live row quoted in another currency, newest first (F6.2a FX check).
-
-        The caller checks ``fx_to_base`` in Python: ``DecimalType`` values are never compared
-        in SQL.
-        """
-        statement = self._filtered(
-            instrument_id=instrument_id,
-            types=types,
-            date_from=date_from,
-            date_to=date_to,
-        ).where(InvestmentTransaction.quote_currency != currency)
-        statement = statement.order_by(
-            case((InvestmentTransaction.date.is_(None), 1), else_=0),
-            InvestmentTransaction.date.desc(),
-            InvestmentTransaction.created_at.desc(),
-            InvestmentTransaction.id.desc(),
-        )
-        return list(self._session.scalars(statement))
-
     def _filtered(
         self,
         *,
