@@ -548,6 +548,7 @@ def _plan(
     now = ctx.clock.now()
     today = ctx.clock.today(ctx.workspace.timezone)
     match_index = 0
+    seen_create_keys: set[str] = set()
     for mapping in mappings:
         entry: dict[str, object] = {
             "source_name_key": mapping.key,
@@ -567,6 +568,14 @@ def _plan(
                 _entry("invalid_instrument_mapping", mapping.line, "instrument")
             )
             continue
+        if mapping.action == "create":
+            create_key = name_key(mapping.create_name)
+            if create_key in seen_create_keys:
+                plan.mapping_errors.append(
+                    _entry("duplicate_instrument_name", mapping.line, "create_name")
+                )
+                continue
+            seen_create_keys.add(create_key)
         if mapping.action == "ignore":
             plan.skipped.extend(
                 _entry(
@@ -658,8 +667,13 @@ def _plan(
                         _entry("invalid_settlement", row.line, "settlement_currency")
                     )
                     continue
-                if quote_currency == base_currency or (
-                    instrument is not None and instrument.type == InstrumentType.CURRENCY.value
+                if (
+                    quote_currency == base_currency
+                    or (instrument is not None and instrument.type == InstrumentType.CURRENCY.value)
+                    or (
+                        new_instrument is not None
+                        and new_instrument.type == InstrumentType.CURRENCY.value
+                    )
                 ):
                     plan.errors.append(
                         _entry("invalid_settlement", row.line, "settlement_currency")
