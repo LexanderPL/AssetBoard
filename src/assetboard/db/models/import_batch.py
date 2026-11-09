@@ -27,7 +27,7 @@ class ImportBatch(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         UniqueConstraint("workspace_id", "id", name="uq_import_batches_workspace_id_id"),
         CheckConstraint(
             "source IN ('archive', 'transactions_csv', 'budget_lines_csv', 'categories_csv', "
-            "'item_valuations_csv')",
+            "'item_valuations_csv', 'investment_transactions_csv')",
             name="source_valid",
         ),
         CheckConstraint("mode IN ('restore', 'merge')", name="mode_valid"),

@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from collections.abc import Callable
 from datetime import date, timedelta
+from decimal import Decimal
 from io import BytesIO
 from typing import Any
 from uuid import NAMESPACE_URL, UUID, uuid4, uuid5
@@ -14,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from assetboard.db.models.identity import AuditEvent
 from assetboard.db.models.import_batch import ImportBatch
+from assetboard.db.models.investments import AssetClass, Instrument, InvestmentTransaction
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.db.repositories import (
     BudgetLineRepository,
@@ -728,3 +730,64 @@ def test_report_message_falls_back_to_the_entry_message() -> None:
     assert report_message({"code": "adapter_specific", "message": "Kept as is"}, "en") == (
         "Kept as is"
     )
+
+
+def test_investment_transaction_csv_mapping_from_the_data_page(owner: OwnerApp) -> None:
+    with owner.db() as session, session.begin():
+        if not session.scalars(
+            select(AssetClass).where(AssetClass.workspace_id == owner.home_id)
+        ).all():
+            session.add(
+                AssetClass(
+                    workspace_id=owner.home_id,
+                    name="Other",
+                    name_key="other",
+                    investable=True,
+                    color="#475569",
+                    sort_order=0,
+                )
+            )
+    content = (
+        b"instrument,date,type,quantity,unit_price,quote_currency,fee,fx_to_base\n"
+        b"Gold,2026-10-01,buy,2,2000,EUR,0,1\n"
+    )
+    batch_id = _upload(owner, content, name="investment_transactions.csv")
+    page = owner.client.get(f"/workspace/data?batch={batch_id}").text
+    assert "Instrument mapping" in page
+    assert "instrument_action_0" in page
+    assert "Gold" in page
+
+    mapping = {
+        "instrument_key_0": "gold",
+        "instrument_action_0": "create",
+        "instrument_name_0": "Gold",
+        "instrument_type_0": "metal",
+        "instrument_unit_0": "oz",
+        "instrument_currency_0": "EUR",
+    }
+    preview = owner.post(
+        f"/workspace/data/import/{batch_id}/preview",
+        token_from="/workspace/data",
+        data=mapping,
+    )
+    assert preview.status_code == 303
+    preview_page = owner.client.get(preview.headers["location"]).text
+    assert "instrument_action_0" in preview_page
+    response = _apply(owner, batch_id, **mapping)
+    assert response.status_code == 303
+    with owner.db() as session:
+        instrument = session.scalars(
+            select(Instrument).where(
+                Instrument.workspace_id == owner.home_id,
+                Instrument.name == "Gold",
+            )
+        ).one()
+        assert instrument.type == "metal"
+        assert instrument.quote_currency == "EUR"
+        transaction = session.scalars(
+            select(InvestmentTransaction).where(
+                InvestmentTransaction.instrument_id == instrument.id
+            )
+        ).one()
+        assert transaction.quantity == Decimal("2")
+        assert transaction.fx_to_base == Decimal("1")

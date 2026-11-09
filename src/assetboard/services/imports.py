@@ -31,7 +31,7 @@ from collections.abc import Callable, Mapping
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Any, Literal, cast
 from uuid import UUID
@@ -249,7 +249,7 @@ REPORT_MESSAGES: dict[str, str] = {
     "duplicate_fx_pair": _("The same FX pair, date and source appear twice."),
     "duplicate_provider_config": _("A provider config id or provider appears more than once."),
     "invalid_risk_tier": _("A risk tier is not one of safe, growth or speculative."),
-    "invalid_instrument_type": _("An instrument type is not supported."),
+    "invalid_instrument_type": _("Choose a valid instrument type."),
     "invalid_transaction_type": _("An investment transaction type is not supported."),
     "invalid_valuation_source": _("An instrument valuation source is not supported."),
     "invalid_interest_mode": _("A bond interest mode is not supported."),
@@ -263,6 +263,20 @@ REPORT_MESSAGES: dict[str, str] = {
     "invalid_decimal": _("A decimal value is invalid or outside the supported range."),
     "positive_amount_required": _("The amount must be greater than zero."),
     "too_many_currency_decimals": _("The amount has more decimals than its currency allows."),
+    # Standalone investment transaction import (F6.9).
+    "invalid_instrument_name": _("Enter an instrument name of 1 to 200 characters."),
+    "instrument_not_found": _("No active instrument with this name or id exists."),
+    "instrument_currency_mismatch": _("The file's quote currency differs from the instrument's."),
+    "no_active_asset_class": _("Create or activate an asset class before importing instruments."),
+    "invalid_unit_label": _("Enter a unit label of 1 to 32 characters."),
+    "oversell": _("The combined history would oversell %(instrument)s on %(date)s."),
+    "invalid_investment_history": _("The combined history for %(instrument)s is invalid."),
+    "fx_needed": _("No stored FX rate for %(currency)s on or before %(date)s; enter fx_to_base."),
+    "settlement_fx_required": _("A settlement row must carry its own fx_to_base."),
+    "undated_lot": _("Undated lot: %(instrument)s will be imported without a date."),
+    "ignored_instrument": _("Rows for %(instrument)s are ignored for this import."),
+    "invalid_instrument_mapping": _("The instrument mapping is incomplete or invalid."),
+    "invalid_note": _("The note is invalid or too long."),
     "duplicate_networth_category": _("A net-worth category id appears more than once."),
     "duplicate_networth_category_name": _(
         "Two active net-worth categories have the same side and name."
@@ -905,8 +919,6 @@ def cancel_import(
 def _mapping_signature(options: Mapping[str, object]) -> tuple[tuple[str, ...], ...]:
     """A stable comparison of the posted mapping choices (order does not matter)."""
     raw = options.get("mappings")
-    if not isinstance(raw, list):
-        return ()
     fields = (
         "source_id",
         "kind",
@@ -918,11 +930,30 @@ def _mapping_signature(options: Mapping[str, object]) -> tuple[tuple[str, ...], 
         "create_color",
     )
     entries: list[tuple[str, ...]] = []
-    for raw_item in cast("list[object]", raw):
-        if not isinstance(raw_item, dict):
-            continue
-        item = cast("dict[str, object]", raw_item)
-        entries.append(tuple(str(item.get(field, "")) for field in fields))
+    if isinstance(raw, list):
+        for raw_item in cast("list[object]", raw):
+            if not isinstance(raw_item, dict):
+                continue
+            item = cast("dict[str, object]", raw_item)
+            entries.append(tuple(str(item.get(field, "")) for field in fields))
+    raw_instruments = options.get("instrument_mappings")
+    instrument_fields = (
+        "source_name_key",
+        "action",
+        "instrument_id",
+        "create_name",
+        "create_type",
+        "create_unit_label",
+        "quote_currency",
+    )
+    if isinstance(raw_instruments, list):
+        for raw_item in cast("list[object]", raw_instruments):
+            if not isinstance(raw_item, dict):
+                continue
+            item = cast("dict[str, object]", raw_item)
+            entries.append(
+                tuple(f"instrument:{str(item.get(field, ''))}" for field in instrument_fields)
+            )
     return tuple(sorted(entries))
 
 
@@ -961,10 +992,17 @@ def apply_import(
         if batch.mode == "restore":
             require_role_now(session, ctx, Role.OWNER)
         previous_mapping = (batch.report or {}).get("mapping", [])
+        previous_instrument_mapping = (batch.report or {}).get("instrument_mapping", [])
         choices_changed = (
             isinstance(options, Mapping)
-            and "mappings" in options
-            and _mapping_signature(options) != _mapping_signature({"mappings": previous_mapping})
+            and ("mappings" in options or "instrument_mappings" in options)
+            and _mapping_signature(options)
+            != _mapping_signature(
+                {
+                    "mappings": previous_mapping,
+                    "instrument_mappings": previous_instrument_mapping,
+                }
+            )
         )
         new_options = _merged_options(batch.options, options)
         batch.options = new_options
@@ -1490,6 +1528,100 @@ def _rollback_restore(
     return plan.counts()
 
 
+def _instrument_has_other_references(session: Session, ctx: Context, instrument_id: UUID) -> bool:
+    if BondTermsRepository(session, ctx).for_instrument(instrument_id) is not None:
+        return True
+    if PricePointRepository(session, ctx).for_instruments_on_or_before(
+        [instrument_id], date(2199, 12, 31)
+    ):
+        return True
+    return any(
+        item.link_id == instrument_id for item in NetWorthItemRepository(session, ctx).list()
+    )
+
+
+def _investment_rollback_decision(
+    session: Session, ctx: Context, batch: ImportBatch, instrument: Instrument
+) -> str:
+    rows = InvestmentTransactionRepository(session, ctx).for_instrument(
+        instrument.id, include_deleted=True
+    )
+    if any(row.deleted_at is None and row.import_batch_id != batch.id for row in rows):
+        return "keep"
+    # Soft-deleted imported rows still reference the instrument, so an instrument with any
+    # history is archived instead of deleted, like a category that remains referenced.
+    if rows:
+        return "archive"
+    if instrument.updated_at > (batch.applied_at or instrument.updated_at):
+        return "archive"
+    if _instrument_has_other_references(session, ctx, instrument.id):
+        return "archive"
+    return "delete"
+
+
+def _investment_rollback_counts(
+    session: Session, ctx: Context, batch: ImportBatch
+) -> dict[str, int]:
+    transactions = InvestmentTransactionRepository(session, ctx).for_import_batch(batch.id)
+    instruments = InstrumentRepository(session, ctx).for_import_batch(batch.id)
+    decisions = [
+        _investment_rollback_decision(session, ctx, batch, instrument) for instrument in instruments
+    ]
+    return {
+        "deleted": sum(row.deleted_at is None for row in transactions),
+        "instruments_deleted": decisions.count("delete"),
+        "instruments_archived": decisions.count("archive"),
+        "instruments_kept": decisions.count("keep"),
+        "instrument_allocations_deleted": sum(
+            len(InstrumentAllocationRepository(session, ctx).for_instrument(instrument.id))
+            for instrument, decision in zip(instruments, decisions, strict=True)
+            if decision == "delete"
+        ),
+    }
+
+
+def _rollback_investment_import(
+    session: Session, ctx: Context, batch: ImportBatch
+) -> dict[str, int]:
+    counts = _investment_rollback_counts(session, ctx, batch)
+    now = ctx.clock.now()
+    transactions = InvestmentTransactionRepository(session, ctx)
+    for row in transactions.for_import_batch(batch.id):
+        if row.deleted_at is None:
+            transactions.update(row.id, deleted_at=now)
+    allocations = InstrumentAllocationRepository(session, ctx)
+    instruments = InstrumentRepository(session, ctx)
+    for instrument in instruments.for_import_batch(batch.id):
+        decision = _investment_rollback_decision(session, ctx, batch, instrument)
+        if decision == "archive":
+            if instrument.archived_at is None:
+                instruments.update(instrument.id, archived_at=now)
+            continue
+        if decision != "delete":
+            continue
+        for allocation in allocations.for_instrument(instrument.id):
+            allocations.delete(allocation)
+        instruments.delete(instrument)
+    batch.status = "rolled_back"
+    batch.rolled_back_at = now
+    AuditEventRepository(session, ctx).record(
+        actor_user_id=ctx.user.id,
+        action="import.rolled_back",
+        entity_type="import_batch",
+        entity_id=str(batch.id),
+        ts=now,
+        data={
+            "source": batch.source,
+            "mode": "merge",
+            "investment_transactions_deleted": counts["deleted"],
+            "instruments_deleted": counts["instruments_deleted"],
+            "instruments_archived": counts["instruments_archived"],
+            "instrument_allocations_deleted": counts["instrument_allocations_deleted"],
+        },
+    )
+    return counts
+
+
 def rollback_import(
     factory: sessionmaker[Session],
     ctx: Context,
@@ -1516,6 +1648,8 @@ def rollback_import(
             return _rollback_restore(session, ctx, batch, restore_plan)
         if batch.mode != "merge":
             raise ImportError("batch cannot be rolled back")
+        if batch.source == "investment_transactions_csv":
+            return _rollback_investment_import(session, ctx, batch)
         plan = _rollback_plan(session, ctx, batch, lock=True)
         if plan.closed_months:
             raise ImportClosedMonths(plan.closed_months)
@@ -1599,6 +1733,12 @@ def preview_rollback_import(
             )
         if batch.mode != "merge":
             raise ImportError("batch cannot be rolled back")
+        if batch.source == "investment_transactions_csv":
+            return RollbackPreview(
+                batch=_batch_view(batch),
+                mode="merge",
+                counts=_investment_rollback_counts(session, ctx, batch),
+            )
         plan = _rollback_plan(session, ctx, batch, lock=False)
         return RollbackPreview(
             batch=_batch_view(batch),

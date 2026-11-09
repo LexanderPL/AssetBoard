@@ -22,6 +22,7 @@ TRANSACTIONS = "transactions_csv"
 BUDGET_LINES = "budget_lines_csv"
 CATEGORIES = "categories_csv"
 ITEM_VALUATIONS = "item_valuations_csv"
+INVESTMENT_TRANSACTIONS = "investment_transactions_csv"
 MONTHS = "months_csv"
 
 KNOWN_COLUMNS: dict[str, frozenset[str]] = {
@@ -45,6 +46,25 @@ KNOWN_COLUMNS: dict[str, frozenset[str]] = {
     ITEM_VALUATIONS: frozenset(
         {"id", "item_id", "item", "as_of", "value", "currency", "note", "created_at"}
     ),
+    INVESTMENT_TRANSACTIONS: frozenset(
+        {
+            "id",
+            "instrument_id",
+            "instrument",
+            "date",
+            "type",
+            "quantity",
+            "unit_price",
+            "quote_currency",
+            "fee",
+            "fx_to_base",
+            "note",
+            "settlement_currency",
+            "settlement_unit_price",
+            "settlement_fee",
+            "deleted_at",
+        }
+    ),
     MONTHS: frozenset({"month", "closed_at", "plan_started_at"}),
 }
 
@@ -53,6 +73,7 @@ REQUIRED_COLUMNS: dict[str, frozenset[str]] = {
     BUDGET_LINES: frozenset({"month", "category", "planned"}),
     CATEGORIES: frozenset({"kind", "name"}),
     ITEM_VALUATIONS: frozenset({"item", "as_of", "value"}),
+    INVESTMENT_TRANSACTIONS: frozenset({"instrument", "date", "type", "quantity", "unit_price"}),
     MONTHS: frozenset({"month"}),
 }
 
@@ -122,8 +143,15 @@ def classify_header(cells: tuple[str, ...] | list[str]) -> HeaderClassification:
         raise HeaderError("unknown_file")
     scores = {source: len(set(columns) & known) for source, known in KNOWN_COLUMNS.items()}
     # Ties prefer transactions, then planned values, then categories, then item valuations,
-    # then months.
-    order = (TRANSACTIONS, BUDGET_LINES, CATEGORIES, ITEM_VALUATIONS, MONTHS)
+    # then investment transactions, then months.
+    order = (
+        TRANSACTIONS,
+        BUDGET_LINES,
+        CATEGORIES,
+        ITEM_VALUATIONS,
+        INVESTMENT_TRANSACTIONS,
+        MONTHS,
+    )
     source = max(order, key=lambda item: (scores[item], -order.index(item)))
     if scores[source] == 0:
         raise HeaderError("unknown_file")

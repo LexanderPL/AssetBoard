@@ -24,11 +24,12 @@ from starlette.responses import RedirectResponse, Response
 from assetboard.db.engine import run_immediate
 from assetboard.domain.identity import MAX_EMAIL_LENGTH
 from assetboard.domain.import_csv import TEMPLATE_FILES
+from assetboard.domain.instruments import TYPE_LABELS, InstrumentType
 from assetboard.i18n import gettext
 from assetboard.services import taxes
 from assetboard.services.archive import export_workspace, restore_available
 from assetboard.services.context import Role, WorkspaceNotAvailable, require_role, select_workspace
-from assetboard.services.import_csv import mapping_category_options
+from assetboard.services.import_csv import mapping_category_options, mapping_instrument_options
 from assetboard.services.imports import (
     ImportClosedMonths,
     ImportConfirmationRequired,
@@ -181,68 +182,120 @@ def _mapping_options_from_form(
     Returns an empty mapping when the form has no mapping controls (for example the compact
     Apply button in the recent-imports list), so those requests keep the stored choices.
     """
+    result: dict[str, object] = {}
     entries = (report or {}).get("mapping")
-    if not isinstance(entries, list) or not entries:
-        return {}
-    if not any(str(key).startswith("mapping_action_") for key in form):
-        return {}
-    entries_by_key = {
-        (
-            str(entry.get("source_id", "")),
-            str(entry.get("kind", "")),
-            str(entry.get("source_name_key", "")),
-        ): entry
-        for entry in entries
-        if isinstance(entry, dict)
-    }
-    mapping_prefix = "mapping_action_"
-    indices = sorted(
-        int(str(key)[len(mapping_prefix) :])
-        for key in form
-        if str(key).startswith(mapping_prefix) and str(key)[len(mapping_prefix) :].isdigit()
-    )
-    mappings: list[dict[str, str]] = []
-    for index in indices:
-        source_id = str(form.get(f"mapping_source_id_{index}", ""))
-        kind = str(form.get(f"mapping_kind_{index}", ""))
-        source_name_key = str(form.get(f"mapping_key_{index}", ""))
-        # Match the posted choice to the current report by identity, not by row position: a
-        # preview in another tab may have changed the report since this form was rendered.
-        entry = entries_by_key.get((source_id, kind, source_name_key))
-        if entry is None:
-            continue
-        action = str(form.get(f"mapping_action_{index}", entry.get("action", "ignore")))
-        if action not in {"map", "create", "ignore"}:
-            action = "ignore"
-        mappings.append(
-            {
-                "source_id": source_id,
-                "kind": kind,
-                "source_name_key": source_name_key,
-                "action": action,
-                "category_id": str(form.get(f"mapping_category_{index}", "") or ""),
-                "create_name": str(
-                    form.get(f"mapping_name_{index}", entry.get("create_name", "")) or ""
-                ),
-                "create_treatment": str(
-                    form.get(f"mapping_treatment_{index}", entry.get("create_treatment", "regular"))
-                    or "regular"
-                ),
-                "create_color": str(
-                    form.get(f"mapping_color_{index}", entry.get("create_color", "")) or ""
-                ),
-            }
+    if isinstance(entries, list) and any(str(key).startswith("mapping_action_") for key in form):
+        entries_by_key = {
+            (
+                str(entry.get("source_id", "")),
+                str(entry.get("kind", "")),
+                str(entry.get("source_name_key", "")),
+            ): entry
+            for entry in entries
+            if isinstance(entry, dict)
+        }
+        mapping_prefix = "mapping_action_"
+        indices = sorted(
+            int(str(key)[len(mapping_prefix) :])
+            for key in form
+            if str(key).startswith(mapping_prefix) and str(key)[len(mapping_prefix) :].isdigit()
         )
-    return {
-        "mappings": mappings,
-        "remember_mappings": str(form.get("remember_mappings", ""))
-        in {
+        mappings: list[dict[str, str]] = []
+        for index in indices:
+            source_id = str(form.get(f"mapping_source_id_{index}", ""))
+            kind = str(form.get(f"mapping_kind_{index}", ""))
+            source_name_key = str(form.get(f"mapping_key_{index}", ""))
+            # Match the posted choice to the current report by identity, not by row position: a
+            # preview in another tab may have changed the report since this form was rendered.
+            entry = entries_by_key.get((source_id, kind, source_name_key))
+            if entry is None:
+                continue
+            action = str(form.get(f"mapping_action_{index}", entry.get("action", "ignore")))
+            if action not in {"map", "create", "ignore"}:
+                action = "ignore"
+            mappings.append(
+                {
+                    "source_id": source_id,
+                    "kind": kind,
+                    "source_name_key": source_name_key,
+                    "action": action,
+                    "category_id": str(form.get(f"mapping_category_{index}", "") or ""),
+                    "create_name": str(
+                        form.get(f"mapping_name_{index}", entry.get("create_name", "")) or ""
+                    ),
+                    "create_treatment": str(
+                        form.get(
+                            f"mapping_treatment_{index}",
+                            entry.get("create_treatment", "regular"),
+                        )
+                        or "regular"
+                    ),
+                    "create_color": str(
+                        form.get(f"mapping_color_{index}", entry.get("create_color", "")) or ""
+                    ),
+                }
+            )
+        result["mappings"] = mappings
+        result["remember_mappings"] = str(form.get("remember_mappings", "")) in {
             "1",
             "true",
             "on",
             "yes",
-        },
-    }
+        }
+
+    instrument_entries = (report or {}).get("instrument_mapping")
+    if isinstance(instrument_entries, list) and any(
+        str(key).startswith("instrument_action_") for key in form
+    ):
+        by_key = {
+            str(entry.get("source_name_key", "")): entry
+            for entry in instrument_entries
+            if isinstance(entry, dict)
+        }
+        prefix = "instrument_action_"
+        indices = sorted(
+            int(str(key)[len(prefix) :])
+            for key in form
+            if str(key).startswith(prefix) and str(key)[len(prefix) :].isdigit()
+        )
+        instrument_mappings: list[dict[str, str]] = []
+        for index in indices:
+            key = str(form.get(f"instrument_key_{index}", ""))
+            entry = by_key.get(key)
+            if entry is None:
+                continue
+            action = str(form.get(f"instrument_action_{index}", entry.get("action", "ignore")))
+            if action not in {"map", "create", "ignore"}:
+                action = "ignore"
+            instrument_mappings.append(
+                {
+                    "source_name_key": key,
+                    "action": action,
+                    "instrument_id": str(form.get(f"instrument_id_{index}", "") or ""),
+                    "create_name": str(
+                        form.get(f"instrument_name_{index}", entry.get("create_name", "")) or ""
+                    ),
+                    "create_type": str(
+                        form.get(f"instrument_type_{index}", entry.get("create_type", "")) or ""
+                    ),
+                    "create_unit_label": str(
+                        form.get(
+                            f"instrument_unit_{index}",
+                            entry.get("create_unit_label", ""),
+                        )
+                        or ""
+                    ),
+                    "quote_currency": str(
+                        form.get(
+                            f"instrument_currency_{index}",
+                            entry.get("quote_currency", ""),
+                        )
+                        or ""
+                    ).upper(),
+                }
+            )
+        result["instrument_mappings"] = instrument_mappings
+    return result
 
 
 @router.get("/workspace/data", name="workspace_data")
@@ -272,6 +325,10 @@ async def workspace_data(request: Request, ctx: CurrentContext) -> Response:
             "mapping_categories": await run_in_threadpool(
                 mapping_category_options, request.app.state.session_factory, ctx
             ),
+            "mapping_instruments": await run_in_threadpool(
+                mapping_instrument_options, request.app.state.session_factory, ctx
+            ),
+            "instrument_types": [(kind.value, TYPE_LABELS[kind]) for kind in InstrumentType],
             "can_restore": await run_in_threadpool(
                 restore_available, request.app.state.session_factory, ctx
             ),

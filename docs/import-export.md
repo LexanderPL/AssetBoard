@@ -132,6 +132,7 @@ file name:
 | Planned values | `month,kind,category,planned` | `kind` may be left out when the category name belongs to only one kind (an existing category or a remembered mapping) |
 | Categories | `kind,name` | `id`, `treatment`, `color`, `sort_order` and `archived_at` are optional |
 | Item valuations | `item,as_of,value` | `currency`, `note` and `item_id` are optional; `id` and `created_at` are accepted for an exported file |
+| Investment transactions | `instrument,date,type,quantity,unit_price` | `quote_currency`, `fee`, `fx_to_base`, `note`, the three settlement fields and `id` are optional; `instrument_id` is ignored and the instrument is matched by name |
 
 Download a ready-made template for transactions, planned values or item valuations from the
 links under the upload form. A `months.csv` or `workspace.json` on its own is refused: only a
@@ -145,6 +146,22 @@ date makes an identical value a duplicate and a different value a conflict, whil
 rows in one file for the same item and date are imported in file order, so a same-day
 correction becomes the latest value. Values must use the item's currency and exactly its minor
 digits; a file without `created_at` is stamped in row order from the import time.
+
+Investment transactions are matched by instrument name. A name that matches an active instrument
+is mapped automatically; an unknown name needs the **Instrument mapping** step: map it to an
+existing active instrument, create one (the type and unit label are required, and the quote
+currency defaults to the file's `quote_currency` column and then the base currency), or ignore
+all its rows. A created instrument is allocated 100% to the active **Other** class, or to the
+first active class when there is no Other.
+
+Each imported row is checked against the instrument's whole stored history. The import is
+refused while any instrument's combined history would oversell; the report names the
+instrument, line and date, and the fix is either a corrected file or **Ignore** for that
+instrument in the mapping. An empty `date` creates an undated lot, listed in the report. When
+`fx_to_base` is empty, the latest stored manual or provider rate on or before the date is used;
+a row with no stored rate is listed as `fx_needed` and can be skipped like other invalid rows.
+Settlement rows are the exception: they must carry their own `fx_to_base`. An exported
+`investment_transactions.csv` from a 1.4 archive reads directly.
 
 ### Upload options
 
@@ -240,7 +257,9 @@ shows what will be removed.
   are still used. Remembered mappings that point at categories it created are removed. If the
   import set a month's plan-start marker and no planned values remain there, the marker is
   cleared. A rollback is refused while any affected month is closed; the page lists those
-  months.
+  months. An investment transaction import soft-deletes its imported rows. An instrument it
+  created is deleted when it has no remaining history; otherwise it is archived, like a
+  category that is still referenced.
 - **Restore:** owners only. It removes everything the restore wrote, for good, and puts the
   previous workspace settings back, so the workspace is empty again and you can restore a
   corrected archive. It also removes the net-worth categories, items, valuations and snapshots

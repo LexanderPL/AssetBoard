@@ -453,6 +453,32 @@ def latest_fx_rates(
         return result
 
 
+def stored_fx_rates_in_session(
+    session: Session,
+    ctx: Context,
+    currencies: Collection[str],
+    on: date,
+) -> dict[str, Decimal]:
+    """Stored FX rates in an existing session (manual or provider, never transaction-derived)."""
+    base = CurrentWorkspaceRepository(session, ctx).get().base_currency
+    wanted = {currency.upper() for currency in currencies}
+    wanted.discard(base)
+    if not wanted:
+        return {}
+    candidates: dict[str, list[_Candidate]] = {}
+    for row in FxRateRepository(session, ctx).for_base_on_or_before(base, on):
+        if row.quote_currency in wanted and row.source != "transaction":
+            candidates.setdefault(row.quote_currency, []).append(
+                _Candidate(row.date, row.source, row.created_at, row.id, row.rate)
+            )
+    result: dict[str, Decimal] = {}
+    for currency, rows in candidates.items():
+        best = _best(rows)
+        if best is not None:
+            result[currency] = best.value
+    return result
+
+
 def stored_fx_rates(
     factory: sessionmaker[Session],
     ctx: Context,
@@ -467,24 +493,8 @@ def stored_fx_rates(
     stored rate is absent, and the base currency itself is never listed.
     """
     require_role(ctx, Role.VIEWER)
-    wanted = {currency.upper() for currency in currencies}
     with factory() as session:
-        base = CurrentWorkspaceRepository(session, ctx).get().base_currency
-        wanted.discard(base)
-        if not wanted:
-            return {}
-        candidates: dict[str, list[_Candidate]] = {}
-        for row in FxRateRepository(session, ctx).for_base_on_or_before(base, on):
-            if row.quote_currency in wanted and row.source != "transaction":
-                candidates.setdefault(row.quote_currency, []).append(
-                    _Candidate(row.date, row.source, row.created_at, row.id, row.rate)
-                )
-    result: dict[str, Decimal] = {}
-    for currency, rows in candidates.items():
-        best = _best(rows)
-        if best is not None:
-            result[currency] = best.value
-    return result
+        return stored_fx_rates_in_session(session, ctx, currencies, on)
 
 
 def fx_rate(
