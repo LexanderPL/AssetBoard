@@ -137,6 +137,23 @@ def source_candidate(source: str, created_at: object, row_id: object) -> tuple[o
     return (-source_rank(source), created_at, str(row_id))
 
 
+def _trim_leading_empty(
+    points: tuple[SeriesPoint, ...], first_date: date | None
+) -> tuple[SeriesPoint, ...]:
+    """Drop the flat zero prefix before the first dated transaction."""
+    if first_date is None:
+        return points
+    index = 0
+    while (
+        index < len(points)
+        and points[index].date < first_date
+        and points[index].value.amount_minor == 0
+        and points[index].net_invested.amount_minor == 0
+    ):
+        index += 1
+    return points[index:]
+
+
 def price_observations(
     price_rows: Sequence[PricePoint],
     transaction_rows: Sequence[InvestmentTransaction],
@@ -300,10 +317,12 @@ def performance_page(
             base_currency=base,
             allocations=allocation_map,
             asset_class_id=class_scope.id if class_scope is not None else None,
+            backfill_leading=True,
         )
         if dated_rows
         else ()
     )
+    chart = _trim_leading_empty(chart, first_date)
     periods = tuple(
         _period(
             code, today, first_date, transactions, prices, fx, base, allocation_map, class_scope

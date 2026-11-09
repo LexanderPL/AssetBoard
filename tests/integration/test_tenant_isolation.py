@@ -450,7 +450,8 @@ def test_current_workspace_repository_touches_only_its_workspace(
 
     assert {
         "name", "base_currency", "country_code", "timezone", "locale", "auto_copy_plan",
-        "require_two_factor", "taxes_enabled", "upcoming_days", "investment_cost_basis"
+        "require_two_factor", "taxes_enabled", "upcoming_days", "investment_cost_basis",
+        "auto_link_portfolio"
     } == UPDATABLE_FIELDS  # fmt: skip
     for forbidden in ("id", "created_at", "updated_at", "unknown"):
         with pytest.raises(ValueError):
@@ -1124,6 +1125,9 @@ def test_networth_queries_stay_in_their_workspace(
     assert items_a.active_linked("portfolio_asset_class", link_id) is linked_a
     assert items_b.active_linked("portfolio_asset_class", link_id) is linked_b
     assert items_b.active_linked("portfolio_asset_class", uuid4()) is None
+    assert items_a.linked_any("portfolio_asset_class", link_id) is linked_a
+    assert items_b.linked_any("portfolio_asset_class", link_id) is linked_b
+    assert items_b.linked_any("portfolio_asset_class", uuid4()) is None
 
     valuations_a = ItemValuationRepository(db_session, ctx_a)
     valuations_b = ItemValuationRepository(db_session, ctx_b)

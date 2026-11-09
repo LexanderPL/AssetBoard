@@ -42,6 +42,7 @@ UPDATABLE_FIELDS = frozenset(
         "taxes_enabled",
         "upcoming_days",
         "investment_cost_basis",
+        "auto_link_portfolio",
     }
 )
 
@@ -173,6 +174,9 @@ def create_owned_workspace(
     """Create a workspace and make ``owner_user_id`` its owner, in the caller's transaction.
 
     The values are validated by the caller (``services.workspace_options``).
+
+    New workspaces keep portfolio asset classes linked in net worth automatically; the column
+    default stays off so workspaces created before the setting keep their manual links.
     """
     workspace = Workspace(
         name=name,
@@ -180,6 +184,7 @@ def create_owned_workspace(
         country_code=country_code,
         timezone=timezone,
         locale=locale,
+        auto_link_portfolio=True,
     )
     session.add(workspace)
     session.flush()

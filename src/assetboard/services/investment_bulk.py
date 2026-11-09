@@ -59,6 +59,7 @@ from assetboard.services.investment_transactions import (
     stored_fx_lookup,
     transaction_values,
 )
+from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
 
 __all__ = [
     "BulkLine",
@@ -505,6 +506,7 @@ def create_bulk(factory: sessionmaker[Session], ctx: Context, *, text: str, loca
                 "batch": str(batch_id),
             },
         )
+        ensure_networth_items_for_asset_classes(session, ctx)
         return len(preview.lines)
 
     return run_immediate(factory, write)

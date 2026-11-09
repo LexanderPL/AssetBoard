@@ -13,7 +13,7 @@ it to a period return with ``period_return``.
 from __future__ import annotations
 
 import calendar
-from bisect import bisect_right
+from bisect import bisect_left, bisect_right
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date, timedelta
@@ -100,6 +100,13 @@ class Observations:
     def latest_with_date(self, on: date) -> tuple[date, Decimal] | None:
         index = bisect_right(self.dates, on) - 1
         if index < 0:
+            return None
+        return self.dates[index], self.values[index]
+
+    def earliest_with_date(self, on: date) -> tuple[date, Decimal] | None:
+        """The first observation on or after ``on``; used to backfill a leading gap."""
+        index = bisect_left(self.dates, on)
+        if index >= len(self.dates):
             return None
         return self.dates[index], self.values[index]
 
@@ -191,6 +198,7 @@ def portfolio_series(
     base_currency: str,
     allocations: Mapping[UUID, Sequence[PortfolioAllocation]] | None = None,
     asset_class_id: UUID | None = None,
+    backfill_leading: bool = False,
 ) -> tuple[SeriesPoint, ...]:
     """Value the dated transaction history at the step dates in ``[start, end]``.
 
@@ -198,6 +206,9 @@ def portfolio_series(
     ``asset_class_id`` selects a look-through class; values and transaction totals are split
     with the same largest-remainder rule as the portfolio page. A point is incomplete when a
     held instrument has no price or FX; that instrument is omitted from both lines there.
+    ``backfill_leading`` values a leading gap (no observation on or before the point) from the
+    earliest later observation. Carry-forward stays the primary rule; genuinely missing data
+    stays incomplete.
     """
     if start > end:
         raise ValueError("start must not be after end")
@@ -297,12 +308,20 @@ def portfolio_series(
                 continue
             price = price_series.get(instrument_id)
             currency = rows[0].quote_currency
-            rate = (
-                Decimal(1)
-                if currency == base_currency
-                else fx_series.get(currency, Observations((), ())).latest(point)
-            )
+            rate: Decimal | None
+            if currency == base_currency:
+                rate = Decimal(1)
+            else:
+                rate_series = fx_series.get(currency)
+                rate_observation = (
+                    rate_series.latest_with_date(point) if rate_series is not None else None
+                )
+                if rate_observation is None and backfill_leading and rate_series is not None:
+                    rate_observation = rate_series.earliest_with_date(point)
+                rate = rate_observation[1] if rate_observation is not None else None
             observation = price.latest_with_date(point) if price is not None else None
+            if observation is None and backfill_leading and price is not None:
+                observation = price.earliest_with_date(point)
             price_value = (
                 observation[1]
                 * split_factor(splits_by_instrument.get(instrument_id, ()), observation[0], point)

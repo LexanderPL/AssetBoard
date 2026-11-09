@@ -15,10 +15,10 @@ from unittest.mock import Mock
 from uuid import UUID, uuid4
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from assetboard.config import Settings
-from assetboard.db.models.identity import AuditEvent
+from assetboard.db.models.identity import AuditEvent, Workspace
 from assetboard.db.models.networth import NetWorthCategory, NetWorthItem, NetWorthSnapshot
 from assetboard.db.repositories import FxRateRepository, InvestmentTransactionRepository
 from assetboard.domain.money import Money
@@ -31,6 +31,7 @@ from assetboard.services.investments import (
     archive_instrument,
     create_asset_class,
     create_instrument,
+    update_instrument,
 )
 from assetboard.services.networth import (
     archive_category,
@@ -44,9 +45,12 @@ from assetboard.services.networth_snapshots import take_auto_snapshot, take_manu
 from assetboard.services.portfolio import portfolio_page
 from assetboard.services.portfolio_links import (
     create_networth_items_from_asset_classes,
+    ensure_networth_items_for_asset_classes,
+    portfolio_link_candidates,
     register_portfolio_resolvers,
 )
 from assetboard.services.prices import save_manual_price
+from assetboard.services.risk import save_risk_policy
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 TODAY = date(2026, 3, 1)  # the workspace_db test clock
@@ -80,6 +84,15 @@ def _portfolio_registry() -> Iterator[None]:
 
 def _editor(team: WorkspaceDb) -> Context:
     return team.ctx("ed", "editor")
+
+
+def _set_auto_link(team: WorkspaceDb, enabled: bool = True) -> None:
+    with team.factory.begin() as session:
+        session.execute(
+            update(Workspace)
+            .where(Workspace.id == team.workspace_id)
+            .values(auto_link_portfolio=enabled)
+        )
 
 
 def _class(
@@ -763,3 +776,172 @@ def test_side_views_keep_the_same_linked_values(team: WorkspaceDb) -> None:
         Money(100_000, "EUR")
     ]
     assert page.side_view(Side.LIABILITY).groups == ()
+
+
+def test_ensure_creates_links_once_and_leaves_archived_items_alone(
+    team: WorkspaceDb,
+) -> None:
+    stocks = _class(team)
+    instrument = _instrument(team, stocks)
+    _trade(team, instrument)
+    _set_auto_link(team)
+
+    def ensure() -> Any:
+        with team.factory.begin() as session:
+            return ensure_networth_items_for_asset_classes(session, _editor(team))
+
+    first = ensure()
+    assert first.created == ("Stocks",)
+    assert first.category_created is True
+    assert [(item.name, item.link_type, item.link_id) for item in _items(team)] == [
+        ("Stocks", CLASS_LINK, stocks)
+    ]
+
+    second = ensure()
+    assert second.created == ()
+    assert len(_items(team)) == 1
+
+    archive_item(team.factory, _editor(team), _items(team)[0].id)
+    assert ensure().created == ()
+    assert len(_items(team)) == 1
+
+
+def test_ensure_is_a_no_op_while_the_setting_is_off(team: WorkspaceDb) -> None:
+    stocks = _class(team)
+    instrument = _instrument(team, stocks)
+    _trade(team, instrument)
+
+    with team.factory.begin() as session:
+        result = ensure_networth_items_for_asset_classes(session, _editor(team))
+
+    assert result.created == ()
+    assert _items(team) == []
+    assert portfolio_link_candidates(_session(team), _editor(team)) == 1
+
+
+def _session(team: WorkspaceDb) -> Any:
+    return team.factory()
+
+
+def test_ensure_skips_a_class_with_missing_price_or_fx(team: WorkspaceDb) -> None:
+    unpriced = _class(team, "Unpriced")
+    unpriced_fund = _instrument(team, unpriced, name="Legacy")
+    _undated(team, unpriced_fund)
+    foreign = _class(team, "Foreign")
+    foreign_fund = _instrument(team, foreign, name="Legacy USD", currency="USD")
+    _undated(team, foreign_fund, currency="USD", fx=None)
+    _set_auto_link(team)
+
+    with team.factory.begin() as session:
+        result = ensure_networth_items_for_asset_classes(session, _editor(team))
+
+    assert result.created == ()
+    assert _items(team) == []
+
+
+def test_a_transaction_write_creates_the_link_when_enabled(team: WorkspaceDb) -> None:
+    _set_auto_link(team)
+    stocks = _class(team)
+    instrument = _instrument(team, stocks)
+
+    _trade(team, instrument)
+
+    assert [(item.name, item.link_type, item.link_id) for item in _items(team)] == [
+        ("Stocks", CLASS_LINK, stocks)
+    ]
+
+
+def test_an_allocation_update_creates_links_for_the_new_classes(
+    team: WorkspaceDb,
+) -> None:
+    stocks = _class(team, "Stocks")
+    bonds = _class(team, "Bonds")
+    instrument = _instrument(team, stocks)
+    _trade(team, instrument)
+    _set_auto_link(team)
+
+    update_instrument(
+        team.factory,
+        _editor(team),
+        instrument,
+        name="World ETF",
+        symbol="",
+        type="etf",
+        quote_currency="EUR",
+        unit_label="share",
+        allocations=[(stocks, 5000), (bonds, 5000)],
+        locale="en",
+    )
+
+    assert {item.name for item in _items(team)} == {"Stocks", "Bonds"}
+
+
+def test_saving_the_risk_policy_creates_links_when_enabled(team: WorkspaceDb) -> None:
+    stocks = _class(team)
+    instrument = _instrument(team, stocks)
+    _trade(team, instrument)
+    _set_auto_link(team)
+
+    save_risk_policy(
+        team.factory,
+        _editor(team),
+        mode="fixed",
+        safe="60",
+        growth="30",
+        speculative="10",
+        tolerance="5",
+        locale="en",
+    )
+
+    assert [(item.name, item.link_id) for item in _items(team)] == [("Stocks", stocks)]
+
+
+def test_link_candidates_are_workspace_scoped(team: WorkspaceDb) -> None:
+    stocks = _class(team)
+    instrument = _instrument(team, stocks)
+    _trade(team, instrument)
+
+    other_id = team.add_workspace("Other")
+    team.add_member("olga", "owner", workspace_id=other_id)
+    other = team.ctx("olga", "owner", workspace_id=other_id)
+    other_class = create_asset_class(
+        team.factory, other, name="Bonds", color="#0f766e", investable=True
+    ).id
+    other_instrument = create_instrument(
+        team.factory,
+        other,
+        name="Bond fund",
+        symbol="",
+        type="etf",
+        quote_currency="EUR",
+        unit_label="share",
+        allocations=[(other_class, 10_000)],
+        locale="en",
+    ).id
+    create_transaction(
+        team.factory,
+        other,
+        instrument_id=other_instrument,
+        type_value="buy",
+        date_value="2026-01-10",
+        quantity_value="10",
+        unit_price_value="100",
+        fee_value="0",
+        fx_value="1",
+        note_value="",
+        locale="en",
+    )
+
+    first_session = _session(team)
+    try:
+        assert portfolio_link_candidates(first_session, _editor(team)) == 1
+        assert portfolio_link_candidates(first_session, other) == 1
+    finally:
+        first_session.close()
+    create_networth_items_from_asset_classes(team.factory, _editor(team))
+    first_session = _session(team)
+    try:
+        assert portfolio_link_candidates(first_session, _editor(team)) == 0
+        assert portfolio_link_candidates(first_session, other) == 1
+    finally:
+        first_session.close()

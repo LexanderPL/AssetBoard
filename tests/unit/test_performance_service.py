@@ -202,6 +202,23 @@ def test_short_all_time_history_shows_the_period_return(db: WorkspaceDb, team: W
     assert all_time.display_rate == period_return(all_time.xirr.rate, days)
 
 
+def test_chart_drops_the_zero_prefix_before_the_first_transaction(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    instrument = _instrument(db, ctx)
+    _tx(db, ctx, instrument.id, day="2026-01-10", fx="0.9")
+
+    page = performance_page(db.factory, ctx, range_code="all")
+
+    assert page.chart
+    assert page.chart[0].date == date(2026, 1, 10)
+    assert all(
+        point.value.amount_minor != 0 or point.net_invested.amount_minor != 0
+        for point in page.chart
+    )
+
+
 def test_class_scope_uses_look_through_weights(db: WorkspaceDb, team: WorkspaceDb) -> None:
     ctx = _owner(db)
     stocks = _class_id(db, ctx, "Stocks")

@@ -3277,6 +3277,10 @@ msgstr "3 miesiące"
 msgid "Whole portfolio"
 msgstr "Cały portfel"
 
+#, python-format
+msgid "Incomplete: an instrument has no price or FX rate."
+msgstr "Niekompletne: instrument nie ma ceny lub kursu walutowego."
+
 msgid "Value"
 msgstr "Wartość"
 
@@ -5929,6 +5933,9 @@ msgstr "Dane wykresu"
 msgid "Plotted performance data"
 msgstr "Dane wykresu wyników"
 
+msgid "Incomplete data"
+msgstr "Niekompletne dane"
+
 msgid "Period returns"
 msgstr "Stopy zwrotu w okresach"
 
@@ -5960,9 +5967,6 @@ msgstr "Δ wartości − przepływy netto"
 
 msgid "Return"
 msgstr "Stopa zwrotu"
-
-msgid "Incomplete data"
-msgstr "Niekompletne dane"
 
 msgid ""
 "No dated investment transactions yet. Record a purchase to see "
@@ -8623,6 +8627,17 @@ msgstr ""
 "Posiadane ilości są przeliczane dla całej historii. Zmiana tego "
 "ustawienia przelicza zrealizowane zyski i podstawę kosztu; żadne zapisane"
 " wartości nie są zmieniane."
+
+msgid "Keep investment asset classes linked in net worth automatically"
+msgstr "Automatycznie łącz klasy aktywów inwestycyjnych z majątkiem netto"
+
+msgid ""
+"Creates and keeps one linked asset item for every asset class with a "
+"value. Off: manage the links yourself on the Net worth page."
+msgstr ""
+"Tworzy i utrzymuje jedną powiązaną pozycję aktywów dla każdej klasy "
+"aktywów z wartością. Wyłączone: samodzielnie zarządzaj powiązaniami na "
+"stronie Majątek netto."
 
 msgid "Copy the previous month's plan when a month is opened for the first time"
 msgstr "Kopiuj plan z poprzedniego miesiąca przy pierwszym otwarciu miesiąca"

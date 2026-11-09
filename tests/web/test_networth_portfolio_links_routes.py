@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from assetboard.clock import FixedClock
 from assetboard.db.models.identity import Workspace
@@ -128,7 +128,17 @@ def _create_links(owner: OwnerApp, token_from: str = ASSETS):
     return owner.post("/net-worth/link-asset-classes", {}, token_from=token_from)
 
 
+def _set_auto_link(owner: OwnerApp, enabled: bool) -> None:
+    with owner.db() as session, session.begin():
+        session.execute(
+            update(Workspace)
+            .where(Workspace.id == owner.home_id)
+            .values(auto_link_portfolio=enabled)
+        )
+
+
 def test_helper_is_assets_only_and_creates_linked_items(owner: OwnerApp) -> None:
+    _set_auto_link(owner, False)
     clock = FixedClock(NOW)
     owner.app.state.clock = clock
     owner.app.state.session_factory.configure(info={"clock": clock})
@@ -183,6 +193,7 @@ def test_viewers_do_not_see_or_cannot_use_the_helper(owner: OwnerApp) -> None:
 
 
 def test_warnings_are_rendered_on_assets_only(owner: OwnerApp) -> None:
+    _set_auto_link(owner, False)
     clock = FixedClock(NOW)
     owner.app.state.clock = clock
     owner.app.state.session_factory.configure(info={"clock": clock})
@@ -222,6 +233,7 @@ def test_warnings_are_rendered_on_assets_only(owner: OwnerApp) -> None:
 
 
 def test_the_helper_and_warnings_are_translated(owner: OwnerApp) -> None:
+    _set_auto_link(owner, False)
     clock = FixedClock(NOW)
     owner.app.state.clock = clock
     owner.app.state.session_factory.configure(info={"clock": clock})
@@ -229,6 +241,8 @@ def test_the_helper_and_warnings_are_translated(owner: OwnerApp) -> None:
     instrument = _instrument(owner, "World ETF", stocks)
     _buy(owner, instrument)
     assert _create_links(owner).status_code == 303
+    bonds = _class_id(owner, "Bonds")
+    _buy(owner, _instrument(owner, "Bond fund", bonds))
     owner.client.headers["Accept-Language"] = "pl"
 
     page = owner.client.get(ASSETS).text
@@ -238,6 +252,7 @@ def test_the_helper_and_warnings_are_translated(owner: OwnerApp) -> None:
 
 
 def test_the_linked_item_links_back_to_the_portfolio(owner: OwnerApp) -> None:
+    _set_auto_link(owner, False)
     clock = FixedClock(NOW)
     owner.app.state.clock = clock
     owner.app.state.session_factory.configure(info={"clock": clock})
@@ -256,6 +271,7 @@ def test_the_linked_item_links_back_to_the_portfolio(owner: OwnerApp) -> None:
 def test_the_helper_category_is_created_in_the_workspace_locale(
     owner: OwnerApp,
 ) -> None:
+    _set_auto_link(owner, False)
     clock = FixedClock(NOW)
     owner.app.state.clock = clock
     owner.app.state.session_factory.configure(info={"clock": clock})
@@ -278,3 +294,35 @@ def test_the_helper_category_is_created_in_the_workspace_locale(
             select(NetWorthItem).where(NetWorthItem.workspace_id == owner.home_id)
         ).one()
     assert item.category_id == whose
+
+
+def test_automatic_linking_hides_the_box_and_keeps_items_current(owner: OwnerApp) -> None:
+    stocks = _class_id(owner)
+    instrument = _instrument(owner, "World ETF", stocks)
+    _buy(owner, instrument)
+
+    with owner.db() as session:
+        workspace = session.get(Workspace, owner.home_id)
+        assert workspace is not None and workspace.auto_link_portfolio is True
+        items = list(
+            session.scalars(select(NetWorthItem).where(NetWorthItem.workspace_id == owner.home_id))
+        )
+    assert [(item.name, item.link_type, item.link_id) for item in items] == [
+        ("Stocks", "portfolio_asset_class", stocks)
+    ]
+    page = owner.client.get(ASSETS).text
+    assert "data-create-portfolio-links" not in page
+    assert "Linked to Stocks" in page
+
+
+def test_the_manual_box_needs_the_setting_off_and_an_eligible_class(owner: OwnerApp) -> None:
+    _set_auto_link(owner, False)
+    assert "data-create-portfolio-links" not in owner.client.get(ASSETS).text
+
+    stocks = _class_id(owner)
+    instrument = _instrument(owner, "World ETF", stocks)
+    _buy(owner, instrument)
+
+    assert "data-create-portfolio-links" in owner.client.get(ASSETS).text
+    assert _create_links(owner).status_code == 303
+    assert "data-create-portfolio-links" not in owner.client.get(ASSETS).text

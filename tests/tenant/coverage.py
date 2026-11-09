@@ -250,6 +250,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "by_ids",
             "counts_by_category",
             "active_linked",
+            "linked_any",
             "for_import_batch",
             "by_lineage_ids",
         )
