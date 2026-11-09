@@ -361,6 +361,42 @@ workspace base currency. It is read-only.
 
 Shares and percentages are rounded once for display, so they may not add up to exactly 100%.
 
+## Performance
+
+**Investments → Performance** shows how the portfolio's value and invested capital changed over
+time, and the money-weighted return for standard periods. It is read-only.
+
+- **Series**: value and cumulative net invested capital, in the base currency. Quantity comes
+  from dated buy/sell transactions; undated legacy lots are excluded and a note links to the
+  transaction history. Prices and FX rates carry forward from the latest observation on or before
+  each point. A transaction-derived price and FX rate cover every instrument from its first buy.
+- **Ranges**: the chart opens on **1 year**. YTD, 3 years, 5 years and all time are also
+  available. Ranges up to 90 days use daily points; longer ranges use weekly points, and an
+  all-time range over five years uses monthly points. The end date is always included.
+- **Class filter**: the default is the whole portfolio. Choosing an asset class applies the
+  same look-through weights as the Portfolio tab to both value and invested capital, so an
+  80/20 fund contributes 80% to Stocks. Class series add up exactly to the whole-portfolio
+  series.
+- **Bond models**: each point uses the F6.5 model value for the lots held at that date, not a
+  static price series. Coupon resets and capitalisation therefore appear at the right dates.
+- **Settlement rows**: amounts entered in the base currency use their exact stored base total for
+  net invested and XIRR; the broker's FX spread is part of the flow.
+- **Missing data**: if a held instrument has no price or FX rate at a point, both its value and
+  its net invested contribution are left out there and the point is marked incomplete. This
+  avoids drawing a fake loss. A period whose start or end is incomplete shows its value change
+  with a warning and its XIRR is undefined.
+- **Periods**: 1 month, 3 months, year to date, 1 year and all time. The table shows start and
+  end value, absolute and percentage value change, net flows, **Δ value − net flows** (the gain
+  not explained by deposits or withdrawals), and the return.
+- **XIRR**: start value is a negative cashflow at the end of the start date (after that day's
+  trades); buys after the start are negative and sells positive; the end value is positive.
+  All-time starts at zero on the day before the first dated transaction, so every flow is
+  included. XIRR uses actual/365. Periods shorter than 365 days show the period money-weighted
+  return, `(1 + annual rate)^(days/365) − 1`, labelled *Period return*; 1 year and all time show
+  the annualised XIRR.
+- **Chart and table**: the value line and invested-capital line enclose the gain band. Without
+  JavaScript the period table and the plotted-data table remain available.
+
 ## Roles
 
 Everyone in the workspace can read the Investments pages. Adding, editing, reordering,
