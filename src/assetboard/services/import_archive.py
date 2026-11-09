@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 
 from assetboard.db.models.identity import Workspace
 from assetboard.db.models.import_batch import ImportBatch
-from assetboard.db.models.investments import AssetClass
+from assetboard.db.models.investments import AssetClass, RiskTargetPolicy
 from assetboard.db.models.ledger import Category
 from assetboard.db.models.networth import NetWorthCategory
 from assetboard.db.repositories import (
@@ -1874,18 +1874,6 @@ def _restore_investments(
             created_at=restore_now + timedelta(microseconds=index),
         )
 
-    if archive.rows.risk_target_policy is not None:
-        policy = archive.rows.risk_target_policy
-        RiskTargetPolicyRepository(session, ctx).create(
-            mode=policy.mode,
-            safe_bp=policy.safe_bp,
-            growth_bp=policy.growth_bp,
-            speculative_bp=policy.speculative_bp,
-            tolerance_bp=policy.tolerance_bp,
-            import_batch_id=batch.id,
-            created_at=restore_now,
-        )
-
     return (
         {
             "asset_classes_created": len(archive.rows.asset_classes),
@@ -1896,11 +1884,64 @@ def _restore_investments(
             "price_points_created": len(archive.rows.price_points),
             "fx_rates_created": len(archive.rows.fx_rates),
             "price_source_configs_created": len(archive.rows.price_source_configs),
-            "risk_policy_restored": 1 if archive.rows.risk_target_policy is not None else 0,
         },
         asset_class_ids,
         instrument_ids,
     )
+
+
+def _policy_values(row: RiskTargetPolicy) -> dict[str, object]:
+    return {
+        "mode": row.mode,
+        "safe_bp": row.safe_bp,
+        "growth_bp": row.growth_bp,
+        "speculative_bp": row.speculative_bp,
+        "tolerance_bp": row.tolerance_bp,
+    }
+
+
+def _apply_restore_risk_policy(
+    session: Session,
+    ctx: Context,
+    batch: ImportBatch,
+    archive: ParsedArchive,
+    *,
+    restore_now: datetime,
+) -> int:
+    """Replace the workspace's policy and remember the previous one for rollback."""
+    repository = RiskTargetPolicyRepository(session, ctx)
+    current = repository.for_workspace(for_update=True)
+    previous = _policy_values(current) if current is not None else None
+    batch.previous_settings = {
+        **(batch.previous_settings or {}),
+        "risk_target_policy": previous,
+    }
+    policy = archive.rows.risk_target_policy
+    if policy is None:
+        if current is not None:
+            repository.delete(current)
+        return 0
+    if current is None:
+        repository.create(
+            mode=policy.mode,
+            safe_bp=policy.safe_bp,
+            growth_bp=policy.growth_bp,
+            speculative_bp=policy.speculative_bp,
+            tolerance_bp=policy.tolerance_bp,
+            import_batch_id=batch.id,
+            created_at=restore_now,
+        )
+    else:
+        repository.update(
+            current.id,
+            mode=policy.mode,
+            safe_bp=policy.safe_bp,
+            growth_bp=policy.growth_bp,
+            speculative_bp=policy.speculative_bp,
+            tolerance_bp=policy.tolerance_bp,
+            import_batch_id=batch.id,
+        )
+    return 1
 
 
 def _apply_restore(
@@ -2006,6 +2047,9 @@ def _apply_restore(
         archive,
         restore_now=restore_now,
         removed=removed_assets,
+    )
+    investment_counts["risk_policy_restored"] = _apply_restore_risk_policy(
+        session, ctx, batch, archive, restore_now=restore_now
     )
     linked_items = _resolve_networth_links(
         session,

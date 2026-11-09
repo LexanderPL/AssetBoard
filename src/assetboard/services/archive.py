@@ -393,10 +393,6 @@ def _has_price_source_configs(session: Session, ctx: Context) -> bool:
     return PriceSourceConfigRepository(session, ctx).any_exists()
 
 
-def _has_risk_target_policy(session: Session, ctx: Context) -> bool:
-    return RiskTargetPolicyRepository(session, ctx).any_exists()
-
-
 def _has_transactions(session: Session, ctx: Context) -> bool:
     return TransactionRepository(session, ctx).any_exists()
 
@@ -466,7 +462,6 @@ EMPTINESS_CHECKS = (
     _has_price_points,
     _has_fx_rates,
     _has_price_source_configs,
-    _has_risk_target_policy,
 )
 
 

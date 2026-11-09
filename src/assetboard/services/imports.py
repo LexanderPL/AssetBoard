@@ -1170,6 +1170,7 @@ class _RestoreRollbackPlan:
     fx_rates: tuple[FxRate, ...]
     provider_configs: tuple[PriceSourceConfig, ...]
     risk_policies: tuple[RiskTargetPolicy, ...]
+    previous_risk_policy: dict[str, object] | None
     reasons: tuple[str, ...]
     settings: dict[str, object]
 
@@ -1332,6 +1333,15 @@ def _restore_rollback_plan(
     if not isinstance(previous, dict):
         reasons.add("restore_previous_settings_missing")
         previous = {}
+    raw_previous_policy = previous.get("risk_target_policy")
+    previous_policy = (
+        cast("dict[str, object]", raw_previous_policy)
+        if isinstance(raw_previous_policy, dict)
+        else None
+    )
+    workspace_settings = {
+        key: value for key, value in previous.items() if key != "risk_target_policy"
+    }
     category_ids = {row.id for row in categories}
     transaction_ids = {row.id for row in transactions}
     for repository_class in _M3_REPOSITORIES:
@@ -1366,8 +1376,9 @@ def _restore_rollback_plan(
         fx_rates=tuple(fx_rates),
         provider_configs=tuple(provider_configs),
         risk_policies=tuple(risk_policies),
+        previous_risk_policy=previous_policy,
         reasons=tuple(sorted(reasons)),
-        settings=cast("dict[str, object]", previous),
+        settings=workspace_settings,
     )
 
 
@@ -1401,6 +1412,15 @@ def _rollback_restore(
     policies = RiskTargetPolicyRepository(session, ctx)
     for row in plan.risk_policies:
         policies.delete(row)
+    if plan.previous_risk_policy is not None:
+        previous = plan.previous_risk_policy
+        policies.create(
+            mode=cast("str", previous["mode"]),
+            safe_bp=cast("int", previous["safe_bp"]),
+            growth_bp=cast("int", previous["growth_bp"]),
+            speculative_bp=cast("int", previous["speculative_bp"]),
+            tolerance_bp=cast("int", previous["tolerance_bp"]),
+        )
     session.flush()
     TransactionRepository(session, ctx).delete_for_import_batch(batch.id)
     ItemValuationRepository(session, ctx).delete_for_import_batch(batch.id)
@@ -1453,7 +1473,18 @@ def _rollback_restore(
             "fx_rates_deleted": len(plan.fx_rates),
             "price_source_configs_deleted": len(plan.provider_configs),
             "risk_policies_deleted": len(plan.risk_policies),
-            "settings_restored": ",".join(sorted(plan.settings)),
+            "settings_restored": ",".join(
+                sorted(
+                    {
+                        *plan.settings,
+                        *(
+                            {"risk_target_policy"}
+                            if plan.risk_policies or plan.previous_risk_policy
+                            else set()
+                        ),
+                    }
+                )
+            ),
         },
     )
     return plan.counts()

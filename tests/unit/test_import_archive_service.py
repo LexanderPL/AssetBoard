@@ -880,6 +880,58 @@ def test_untouched_suggested_asset_classes_are_empty_enough_and_are_removed(
         assert workspace_is_empty(session, ctx)
 
 
+def test_saved_risk_policy_does_not_make_the_workspace_non_empty(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    with db.factory.begin() as session:
+        seed_into(
+            session,
+            ctx,
+            locale="en",
+            actor_user_id=db.users["own"],
+            actor_type="user",
+            now=db.clock.now(),
+            automatic=True,
+        )
+        investment_seed_into(
+            session,
+            ctx,
+            locale="en",
+            actor_user_id=db.users["own"],
+            actor_type="user",
+            now=db.clock.now(),
+            automatic=True,
+        )
+        RiskTargetPolicyRepository(session, ctx).create(
+            mode="fixed",
+            safe_bp=5000,
+            growth_bp=4000,
+            speculative_bp=1000,
+            tolerance_bp=500,
+        )
+    with db.factory() as session:
+        assert workspace_is_empty(session, ctx)
+
+    batch_id = _upload(db, data_dir, _archive(_rows()), ctx=ctx)
+    report = _plan(db, data_dir, batch_id, ctx=ctx)
+    assert report["counts"]["invalid"] == 0, report
+    _apply(db, data_dir, batch_id, ctx=ctx)
+    with db.factory() as session:
+        policy = RiskTargetPolicyRepository(session, ctx).for_workspace()
+    assert policy is not None
+    assert (policy.safe_bp, policy.growth_bp, policy.speculative_bp) == (6000, 3000, 1000)
+
+    preview = preview_rollback_import(db.factory, ctx, batch_id)
+    assert preview.blocked_reasons == ()
+    rollback_import(db.factory, ctx, batch_id)
+    with db.factory() as session:
+        policy = RiskTargetPolicyRepository(session, ctx).for_workspace()
+    assert policy is not None
+    assert (policy.safe_bp, policy.growth_bp, policy.speculative_bp) == (5000, 4000, 1000)
+
+
 def test_old_suggested_asset_classes_without_tiers_are_still_empty(
     db: WorkspaceDb,
 ) -> None:

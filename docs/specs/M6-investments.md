@@ -441,7 +441,7 @@ decision, 2026-10-18). It lands after F6.11 (see the sequencing note at the top)
   archive; a 1.3 archive (or any missing target) keeps the existing `link_target_missing`
   fallback and restores the item as manual without a value. Profile `birth_year` and
   `life_expectancy` are user data, not workspace data, and are not archived.
-- The new models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them. An untouched suggested asset-class set (the current seed or the pre-2026-11-09 seed with Real estate and Primary residence) counts as empty for restore, like the ledger and net-worth suggested sets (the exact set in a supported locale, unedited, unused, with the automatic `asset_class.seeded` event); otherwise every fresh workspace would refuse a restore. `RiskTargetPolicy` is included through `workspace.json`; `ProviderError` stays excluded.
+- The new investment data models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them. An untouched suggested asset-class set (the current seed or the pre-2026-11-09 seed with Real estate and Primary residence) counts as empty for restore, like the ledger and net-worth suggested sets (the exact set in a supported locale, unedited, unused, with the automatic `asset_class.seeded` event); otherwise every fresh workspace would refuse a restore. `RiskTargetPolicy` is a workspace setting carried in `workspace.json`: restore applies it and merge reports it in the settings diff, but a saved policy does not make the workspace non-empty. `ProviderError` stays excluded.
 
 **Agent prompt**
 ```
