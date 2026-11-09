@@ -119,6 +119,8 @@ Key fields for the shared entities:
 | M9 | Dashboard, reports, export/backup, API, hardening | all | v1.0 |
 | M10 | Reports: income vs expenses, savings rate, expenses by category over the years; later net worth and portfolio value | Phase A: M2 (after F2.7); Phase B: M5, M6 | Phase A: any minor before v1.0; Phase B: with or after M6 |
 
+F9.11 (demo data builder and demo mode) is pulled forward and lands before M7; every later milestone extends its builder.
+
 The number does not set the order: M10 Phase A (ledger reports) can ship as soon as M2 and F2.7 are done, before M5/M6. F2.7 (navigation restructure: Home, Month, Transactions, History) lands before F3.5.
 
 M3 and M5–M8 each end with an "archive extension" feature that adds the module's data to the workspace archive of M4 (export, restore, and standalone CSV import where it makes sense), following [ADR-0016](../adr/0016-workspace-archive-format.md).
