@@ -48,7 +48,6 @@ from assetboard.i18n import gettext
 from assetboard.services.context import Context
 from assetboard.services.holding_rows import holding_transaction
 from assetboard.services.imports import ImportAdapter
-from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
 from assetboard.services.prices import stored_fx_rates_in_session
 
 FILE = "investment_transactions.csv"
@@ -1029,6 +1028,8 @@ class InvestmentTransactionsCsvAdapter(ImportAdapter):
                 created_at=match.created_at,
             )
             created += 1
+        from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
         ensure_networth_items_for_asset_classes(session, ctx)
         return {
             "created": created,

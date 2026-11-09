@@ -67,7 +67,6 @@ from assetboard.services.investment_income import (
 )
 from assetboard.services.investments import InstrumentView, get_instrument
 from assetboard.services.months import ensure_date_open, lock_month_writes
-from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
 from assetboard.services.prices import stored_fx_rates
 
 __all__ = [
@@ -852,6 +851,8 @@ def create_transaction(
             base_currency=base_currency,
         )
         _audit(session, ctx, "investment_transaction.created", row, instrument)
+        from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
         ensure_networth_items_for_asset_classes(session, ctx)
         return _view(row, instrument)
 
@@ -991,6 +992,8 @@ def update_transaction(
             instrument,
             changed=tuple(sorted(changes)),
         )
+        from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
         ensure_networth_items_for_asset_classes(session, ctx)
         return _view(row, instrument)
 
@@ -1030,6 +1033,8 @@ def delete_transaction(
                 base_currency=base_currency,
             )
             _audit(session, ctx, "investment_transaction.deleted", row, instrument)
+            from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
             ensure_networth_items_for_asset_classes(session, ctx)
         assert row.deleted_at is not None
         return DeletedInvestmentTransaction(id=row.id, undo_until=row.deleted_at + UNDO_WINDOW)
@@ -1076,6 +1081,8 @@ def undo_delete(
             base_currency=base_currency,
         )
         _audit(session, ctx, "investment_transaction.restored", row, instrument)
+        from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
         ensure_networth_items_for_asset_classes(session, ctx)
         return _view(row, instrument)
 
