@@ -178,6 +178,9 @@ msgstr ""
 msgid "Speculative"
 msgstr ""
 
+msgid "Play money"
+msgstr ""
+
 msgid "Stocks"
 msgstr ""
 
@@ -264,6 +267,15 @@ msgid ""
 msgstr ""
 
 msgid "GoldAPI metal symbol: XAU, XAG, XPT or XPD; the price is per troy ounce."
+msgstr ""
+
+msgid "Fixed targets"
+msgstr ""
+
+msgid "Age-scaled"
+msgstr ""
+
+msgid "Age in bonds"
 msgstr ""
 
 msgid "Enter a valid amount."
@@ -509,6 +521,9 @@ msgstr ""
 msgid "Suggested asset classes added"
 msgstr ""
 
+msgid "Suggested risk tiers applied"
+msgstr ""
+
 msgid "Instrument added"
 msgstr ""
 
@@ -525,6 +540,9 @@ msgid "Instrument allocation changed"
 msgstr ""
 
 msgid "Bond terms saved"
+msgstr ""
+
+msgid "Risk targets saved"
 msgstr ""
 
 msgid "Investment transaction added"
@@ -839,6 +857,27 @@ msgstr ""
 msgid "Net-worth snapshots deleted"
 msgstr ""
 
+msgid "risk tier"
+msgstr ""
+
+msgid "risk tier override"
+msgstr ""
+
+msgid "safe target"
+msgstr ""
+
+msgid "growth target"
+msgstr ""
+
+msgid "speculative target"
+msgstr ""
+
+msgid "tolerance"
+msgstr ""
+
+msgid "classes"
+msgstr ""
+
 msgid "owner"
 msgstr ""
 
@@ -942,6 +981,9 @@ msgid "other devices"
 msgstr ""
 
 msgid "the identity provider's group"
+msgstr ""
+
+msgid "mode"
 msgstr ""
 
 msgid "linking an identity provider"
@@ -1515,6 +1557,12 @@ msgstr ""
 msgid "Choose one of the listed themes."
 msgstr ""
 
+msgid "Enter a birth year between 1900 and this year, or leave it empty."
+msgstr ""
+
+msgid "Enter a life expectancy between 50 and 120 years."
+msgstr ""
+
 #, python-format
 msgid ""
 "Your account is already linked to %(provider)s. Remove that link first to"
@@ -1988,6 +2036,9 @@ msgstr ""
 msgid "The suggested asset classes can only be added when none are active."
 msgstr ""
 
+msgid "Choose a valid risk tier."
+msgstr ""
+
 msgid "Enter a name of 1 to 200 characters, without control characters."
 msgstr ""
 
@@ -2048,6 +2099,9 @@ msgstr ""
 msgid "Enter a valid provider symbol."
 msgstr ""
 
+msgid "Choose a valid risk tier override."
+msgstr ""
+
 msgid "Asset class added."
 msgstr ""
 
@@ -2063,6 +2117,12 @@ msgstr ""
 msgid "Suggested asset classes added."
 msgstr ""
 
+msgid "Suggested risk tiers applied."
+msgstr ""
+
+msgid "Every matching asset class already has a risk tier."
+msgstr ""
+
 msgid "Instrument added."
 msgstr ""
 
@@ -2073,6 +2133,12 @@ msgid "Instrument archived."
 msgstr ""
 
 msgid "Instrument restored."
+msgstr ""
+
+msgid "Unassigned"
+msgstr ""
+
+msgid "Use the class tier"
 msgstr ""
 
 msgid "Choose buy or sell."
@@ -2817,6 +2883,21 @@ msgstr ""
 msgid "Unallocated"
 msgstr ""
 
+msgid "Risk targets saved."
+msgstr ""
+
+msgid "Choose a target mode."
+msgstr ""
+
+msgid "Enter a percentage between 0 and 100 with at most two decimals."
+msgstr ""
+
+msgid "The fixed targets must total exactly 100%."
+msgstr ""
+
+msgid "Set your birth year in Profile before using age-based targets."
+msgstr ""
+
 msgid "Holdings in the whole portfolio"
 msgstr ""
 
@@ -3460,6 +3541,26 @@ msgid "Display name"
 msgstr ""
 
 msgid "Theme"
+msgstr ""
+
+msgid "Planning"
+msgstr ""
+
+msgid ""
+"Used for age-based investment risk targets and the FIRE projection. Your "
+"age is the current year minus your birth year."
+msgstr ""
+
+msgid "Birth year (optional)"
+msgstr ""
+
+msgid "Leave empty to disable age-based risk targets."
+msgstr ""
+
+msgid "Life expectancy"
+msgstr ""
+
+msgid "Between 50 and 120 years; defaults to 90."
 msgstr ""
 
 msgid "Highlight large transactions"
@@ -4830,6 +4931,17 @@ msgstr ""
 msgid "An editor or owner of this workspace can add asset classes."
 msgstr ""
 
+msgid "Suggested risk tiers"
+msgstr ""
+
+msgid ""
+"Set the suggested tier on classes whose name matches a suggested class "
+"and that have no tier yet. Existing tiers are never overwritten."
+msgstr ""
+
+msgid "Apply suggested risk tiers"
+msgstr ""
+
 msgid "Asset classes"
 msgstr ""
 
@@ -4848,6 +4960,9 @@ msgid "Edit asset class"
 msgstr ""
 
 msgid "Add an asset class"
+msgstr ""
+
+msgid "Risk tier"
 msgstr ""
 
 msgid "Used by the FIRE planner and the net-worth helper."
@@ -4889,6 +5004,14 @@ msgid ""
 msgstr ""
 
 msgid "Unit prices and fees are in this currency."
+msgstr ""
+
+msgid "Risk tier override"
+msgstr ""
+
+msgid ""
+"Blank uses the tier of each allocated asset class; an override puts the "
+"whole instrument in one tier."
 msgstr ""
 
 msgid "Unit label"
@@ -5177,6 +5300,111 @@ msgid "Gain %%"
 msgstr ""
 
 msgid "not counted in FIRE"
+msgstr ""
+
+msgid "Risk balance"
+msgstr ""
+
+#, python-format
+msgid "based on your age %(age)s and life expectancy %(life)s"
+msgstr ""
+
+msgid ""
+"Age-based targets are unavailable until you set your birth year in "
+"Profile."
+msgstr ""
+
+msgid "Open Profile"
+msgstr ""
+
+msgid "Set your birth year in Profile to use age-based targets."
+msgstr ""
+
+msgid "Tier"
+msgstr ""
+
+msgid "Current"
+msgstr ""
+
+msgid "Target"
+msgstr ""
+
+msgid "Difference"
+msgstr ""
+
+msgid "Outside tolerance"
+msgstr ""
+
+msgid ""
+"Tier percentages use the assigned value; Unassigned classes are shown "
+"separately."
+msgstr ""
+
+#, python-format
+msgid "Move about %(amount)s from %(from)s to %(to)s."
+msgstr ""
+
+msgid "Risk targets are illustrative only and are not investment advice."
+msgstr ""
+
+msgid "Edit target allocation"
+msgstr ""
+
+msgid "Target mode"
+msgstr ""
+
+#, python-format
+msgid "Safe %%"
+msgstr ""
+
+#, python-format
+msgid "Growth %%"
+msgstr ""
+
+#, python-format
+msgid "Speculative %%"
+msgstr ""
+
+#, python-format
+msgid "The fixed targets must total exactly 100%%."
+msgstr ""
+
+msgid "Age-based settings"
+msgstr ""
+
+#, python-format
+msgid "Age-scaled: speculative %%"
+msgstr ""
+
+#, python-format
+msgid "Age in bonds: speculative %%"
+msgstr ""
+
+#, python-format
+msgid ""
+"Age-scaled: safe = (100%% − speculative) × age ÷ life expectancy. Age in "
+"bonds: safe = age%%. The remaining share is Growth."
+msgstr ""
+
+msgid "Tolerance (percentage points)"
+msgstr ""
+
+msgid ""
+"A tier is flagged when its current share differs from the target by more "
+"than this."
+msgstr ""
+
+msgid "Your profile"
+msgstr ""
+
+#, python-format
+msgid "Birth year %(year)s, life expectancy %(life)s years. Age %(age)s."
+msgstr ""
+
+msgid "Birth year not set; age-based modes are disabled."
+msgstr ""
+
+msgid "Save risk targets"
 msgstr ""
 
 msgid "Chart scope"
@@ -5834,9 +6062,6 @@ msgstr[0] ""
 msgstr[1] ""
 
 msgid "Actual"
-msgstr ""
-
-msgid "Difference"
 msgstr ""
 
 msgid "Summary"

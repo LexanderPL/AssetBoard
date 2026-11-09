@@ -64,6 +64,8 @@ PROFILE_ERRORS = {
     ),
     "locale": _("Choose one of the listed languages."),
     "theme": _("Choose one of the listed themes."),
+    "birth_year": _("Enter a birth year between 1900 and this year, or leave it empty."),
+    "life_expectancy": _("Enter a life expectancy between 50 and 120 years."),
 }
 # One linked identity per provider (the configured OIDC issuer, or the proxy).
 ONE_PER_PROVIDER = {
@@ -169,6 +171,8 @@ async def _profile_page(
                 "locale": user.locale or BROWSER_LOCALE,
                 "theme": user.theme,
                 "highlight_large_amounts": user.highlight_large_amounts,
+                "birth_year": str(user.birth_year) if user.birth_year is not None else "",
+                "life_expectancy": str(user.life_expectancy),
             },
             "languages": [(BROWSER_LOCALE, _t(request, _("Browser language")))]
             + [(code, LANGUAGE_NAMES[code]) for code in sorted(SUPPORTED_LOCALES)],
@@ -207,6 +211,8 @@ async def profile_submit(
     locale: FormStr = "",
     theme: FormStr = "",
     highlight_large_amounts: FormStr = "",  # a checkbox: absent when unchecked
+    birth_year: FormStr = "",
+    life_expectancy: FormStr = "90",
 ) -> Response:
     current = _require_session(request)
     state = _state(request)
@@ -218,6 +224,9 @@ async def profile_submit(
             locale=locale,
             theme=theme,
             highlight_large_amounts=highlight_large_amounts == "1",
+            birth_year=birth_year,
+            life_expectancy=life_expectancy,
+            today=state.clock.today("UTC"),
         )
     )
     if problem is not None:

@@ -62,6 +62,7 @@ from assetboard.services.prices import (
     latest_fx_rates_in_session,
     latest_prices_in_session,
 )
+from assetboard.services.risk import PortfolioRisk, risk_for_portfolio
 
 ALL_SCOPE = "all"
 
@@ -122,6 +123,7 @@ class PortfolioPage:
     scope: PortfolioClass | None  # None: the whole portfolio
     scope_options: tuple[PortfolioClass, ...]
     slices: tuple[Slice, ...]
+    risk: PortfolioRisk
 
 
 def default_scope_keys() -> frozenset[str]:
@@ -236,6 +238,7 @@ def portfolio_page(
     require_role(ctx, Role.VIEWER)
     with factory() as session:
         data = current_portfolio_data_in_session(session, ctx)
+        risk = risk_for_portfolio(session, ctx, data)
     classes = data.classes
     valuation = data.valuation
     totals = {total.asset_class_id: total for total in valuation.classes}
@@ -277,4 +280,5 @@ def portfolio_page(
         scope=_class(chosen) if chosen is not None else None,
         scope_options=tuple(row.asset_class for row in class_rows if row.asset_class is not None),
         slices=portfolio_slices(valuation, chosen.id if chosen is not None else None),
+        risk=risk,
     )

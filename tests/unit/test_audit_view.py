@@ -159,6 +159,8 @@ INVESTMENT_ACTIONS = {
     "asset_class.archived",
     "asset_class.restored",
     "asset_class.seeded",
+    "asset_class.risk_tiers_suggested",
+    "risk_policy.saved",
     "instrument.created",
     "instrument.updated",
     "instrument.archived",
@@ -182,6 +184,7 @@ def test_every_investment_action_has_a_label_keys_and_a_group() -> None:
                 "instrument.",
                 "instrument_allocation.",
                 "bond_terms.",
+                "risk_policy.",
                 "investment_transaction.",
             )
         )

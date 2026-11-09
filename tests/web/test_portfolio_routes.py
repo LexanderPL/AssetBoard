@@ -12,7 +12,13 @@ import pytest
 from sqlalchemy import select
 
 from assetboard.clock import FixedClock
-from assetboard.db.models.investments import AssetClass, Instrument, InvestmentTransaction
+from assetboard.db.models.identity import User
+from assetboard.db.models.investments import (
+    AssetClass,
+    Instrument,
+    InvestmentTransaction,
+    RiskTargetPolicy,
+)
 from assetboard.db.models.prices import PricePoint
 from tests.conftest import OwnerApp
 
@@ -84,6 +90,13 @@ def _chart_data(page: str) -> dict[str, object]:
     )
     assert match is not None
     return json.loads(match.group(1))
+
+
+def _set_tier(owner: OwnerApp, class_id: UUID, tier: str | None) -> None:
+    with owner.db() as session, session.begin():
+        row = session.get(AssetClass, class_id)
+        assert row is not None
+        row.risk_tier = tier
 
 
 def _fund(owner: OwnerApp) -> tuple[UUID, dict[str, UUID]]:
@@ -253,3 +266,120 @@ def test_a_non_investable_class_is_badged_and_still_counted(owner: OwnerApp) -> 
     assert re.search(r"data-portfolio-value>€1,500\.00<", page)
     assert "€500.00" in by_name["Emergency fund"]
     assert {s["name"] for s in _chart_data(page)["slices"]} == {"Balanced fund", "Cash fund"}  # type: ignore[index]
+
+
+def test_risk_balance_defaults_flags_and_hint(owner: OwnerApp) -> None:
+    fund, classes = _fund(owner)
+    _set_tier(owner, classes["Stocks"], "growth")
+    _set_tier(owner, classes["Bonds"], "safe")
+    _set_tier(owner, classes["Crypto"], "speculative")
+
+    page = owner.client.get(PORTFOLIO).text
+
+    assert "data-risk-balance" in page
+    assert "Risk balance" in page
+    assert 'data-risk-tier="growth"' in page
+    assert "Outside tolerance" in page
+    assert "Move about €300.00 from Growth to Safe." in page
+    assert "data-risk-unassigned" in page
+    assert "not investment advice" in page.lower()
+
+
+def test_risk_policy_editor_saves_and_recomputes(owner: OwnerApp) -> None:
+    _fund(owner)
+
+    response = owner.post(
+        f"{PORTFOLIO}/risk-targets",
+        {
+            "mode": "fixed",
+            "safe": "20",
+            "growth": "70",
+            "fixed_speculative": "10",
+            "age_scaled_speculative": "10",
+            "age_in_bonds_speculative": "0",
+            "tolerance": "5",
+        },
+        token_from=PORTFOLIO,
+    )
+
+    assert response.status_code == 303
+    assert "notice=risk_policy_saved" in response.headers["location"]
+    page = owner.client.get(response.headers["location"]).text
+    assert "Risk targets saved." in page
+    assert "20%" in page and "70%" in page
+    with owner.db() as session:
+        row = session.scalars(select(RiskTargetPolicy)).one()
+    assert (row.mode, row.safe_bp, row.growth_bp, row.speculative_bp) == (
+        "fixed",
+        2000,
+        7000,
+        1000,
+    )
+
+
+def test_invalid_risk_policy_is_refused_with_a_message(owner: OwnerApp) -> None:
+    response = owner.post(
+        f"{PORTFOLIO}/risk-targets",
+        {
+            "mode": "fixed",
+            "safe": "50",
+            "growth": "40",
+            "fixed_speculative": "20",
+            "age_scaled_speculative": "10",
+            "age_in_bonds_speculative": "0",
+            "tolerance": "5",
+        },
+        token_from=PORTFOLIO,
+    )
+
+    assert response.status_code == 400
+    assert "The fixed targets must total exactly 100%." in response.text
+
+
+def test_age_mode_requires_a_birth_year(owner: OwnerApp) -> None:
+    response = owner.post(
+        f"{PORTFOLIO}/risk-targets",
+        {
+            "mode": "age_scaled",
+            "safe": "50",
+            "growth": "40",
+            "fixed_speculative": "10",
+            "age_scaled_speculative": "10",
+            "age_in_bonds_speculative": "0",
+            "tolerance": "5",
+        },
+        token_from=PORTFOLIO,
+    )
+    assert response.status_code == 400
+    assert "Set your birth year in Profile" in response.text
+
+    with owner.db() as session, session.begin():
+        user = session.get(User, owner.admin_id)
+        assert user is not None
+        user.birth_year = 1986
+        user.life_expectancy = 80
+    response = owner.post(
+        f"{PORTFOLIO}/risk-targets",
+        {
+            "mode": "age_scaled",
+            "safe": "50",
+            "growth": "40",
+            "fixed_speculative": "10",
+            "age_scaled_speculative": "10",
+            "age_in_bonds_speculative": "0",
+            "tolerance": "5",
+        },
+        token_from=PORTFOLIO,
+    )
+    assert response.status_code == 303
+    page = owner.client.get(response.headers["location"]).text
+    assert "based on your age" in page
+
+
+def test_the_risk_editor_is_only_for_editors(owner: OwnerApp) -> None:
+    owner.set_admin_role("viewer")
+
+    page = owner.client.get(PORTFOLIO).text
+
+    assert "data-risk-policy" not in page
+    assert "Risk balance" in page

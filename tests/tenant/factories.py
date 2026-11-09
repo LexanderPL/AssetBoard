@@ -27,6 +27,7 @@ from assetboard.db.models.investments import (
     Instrument,
     InstrumentAllocation,
     InvestmentTransaction,
+    RiskTargetPolicy,
 )
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.db.models.networth import (
@@ -367,6 +368,17 @@ def make_asset_class(session: Session, workspace_id: UUID) -> AssetClass:
     )
 
 
+def make_risk_target_policy(session: Session, workspace_id: UUID) -> RiskTargetPolicy:
+    return RiskTargetPolicy(
+        workspace_id=workspace_id,
+        mode="fixed",
+        safe_bp=5000,
+        growth_bp=4000,
+        speculative_bp=1000,
+        tolerance_bp=500,
+    )
+
+
 def make_instrument(session: Session, workspace_id: UUID) -> Instrument:
     name = f"Instrument {uuid4().hex[:8]}"
     return Instrument(
@@ -551,6 +563,7 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     Category: TenantCase(make_category, update_values={"color": "#e11d48"}),
     AssetClass: TenantCase(make_asset_class, update_values={"color": "#e11d48"}),
     Instrument: TenantCase(make_instrument, update_values={"name": "Updated instrument"}),
+    RiskTargetPolicy: TenantCase(make_risk_target_policy, update_values={"mode": "age_scaled"}),
     InstrumentAllocation: TenantCase(
         make_instrument_allocation, update_values={"weight_bp": 5_000}
     ),

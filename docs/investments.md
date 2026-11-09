@@ -14,14 +14,14 @@ a later update.
 Asset classes group instruments for the portfolio and allocation views. A new workspace starts
 with the suggested set:
 
-| Class | Investable |
-|---|---|
-| Stocks | yes |
-| Bonds | yes |
-| Metals | yes |
-| Crypto | yes |
-| Currencies | yes |
-| Other | yes |
+| Class | Investable | Risk tier |
+|---|---|---|
+| Stocks | yes | Growth |
+| Bonds | yes | Safe |
+| Metals | yes | Safe |
+| Crypto | yes | Speculative |
+| Currencies | yes | Growth |
+| Other | yes | Unassigned |
 
 Property is not an investment here: record your home and other real estate in **Net worth**, in
 the **Real estate** category. Workspaces created before this change also have the **Real
@@ -366,6 +366,47 @@ workspace base currency. It is read-only.
   colours appear in the asset-class table. Without JavaScript the chart's table is shown.
 
 Shares and percentages are rounded once for display, so they may not add up to exactly 100%.
+
+## Risk balance
+
+**Risk balance** on the Portfolio tab groups the included portfolio value into three tiers:
+**Safe** (bonds, metals, deposits), **Growth** (broad funds, currencies) and **Speculative**
+(play money: crypto and single-company shares). Each asset class has an optional tier; an
+instrument can override it for its whole value. An instrument split 80/20 between a Growth and a
+Safe class contributes 80% to Growth and 20% to Safe unless it has an override.
+
+A class with no tier is **Unassigned**. Its value is shown separately and left out of the tier
+percentages, so the three tiers always add up to 100% of the assigned value. An instrument
+excluded from the portfolio because it has no price or FX rate is also excluded here.
+
+The workspace has a target policy, editable by editors and owners under **Edit target
+allocation**:
+
+- **Fixed targets** (the default): Safe 50%, Growth 40%, Speculative 10%. The three must total
+  exactly 100%.
+- **Age-scaled**: speculative is a fixed share (default 10%); Safe is
+  `(100% − speculative) × age ÷ life expectancy`; Growth is the rest. Safe is capped at
+  `100% − speculative` once age reaches life expectancy.
+- **Age in bonds**: Safe is your age as a percentage, speculative is a fixed share (default 0%),
+  and Growth is the rest; Safe is capped the same way.
+
+Age and life expectancy come from **your Profile**, not from another member's profile: the
+policy belongs to the workspace, but the age used for the targets belongs to whoever is
+viewing it. Set **Birth year** and **Life expectancy** in Profile; age-based modes are disabled
+until a birth year exists. The fixed targets stay stored when you switch modes, so switching
+back does not lose them.
+
+Per tier the table shows the current value, current share, target share and the difference in
+percentage points and money. A tier is marked **Outside tolerance** when the absolute difference
+exceeds the tolerance (default 5 percentage points). When a gap is outside tolerance, the section
+suggests moving the smaller of the largest overweight and largest underweight amounts, for example
+“Move about €300.00 from Growth to Safe”. The section is illustrative only and is not investment
+advice.
+
+Existing workspaces whose classes predate tiers can use **Apply suggested risk tiers** on the
+Asset classes tab. It fills an empty tier when the class name matches a suggested class name in
+English or Polish (including the older suggested set with Real estate and Primary residence).
+It never overwrites a tier you set, and running it again changes nothing.
 
 ## Performance
 

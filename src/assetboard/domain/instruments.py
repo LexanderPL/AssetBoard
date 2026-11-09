@@ -192,6 +192,9 @@ RISK_TIER_LABELS: dict[RiskTier, str] = {
     RiskTier.GROWTH: _("Growth"),
     RiskTier.SPECULATIVE: _("Speculative"),
 }
+RISK_TIER_SUBTITLES: dict[RiskTier, str] = {
+    RiskTier.SPECULATIVE: _("Play money"),
+}
 
 
 def parse_instrument_type(value: str) -> InstrumentType:
@@ -206,6 +209,17 @@ def parse_valuation_source(value: str) -> ValuationSource:
         return ValuationSource(value)
     except ValueError:
         raise ValueError("invalid_valuation_source") from None
+
+
+def parse_risk_tier(value: str) -> RiskTier | None:
+    """A blank value means no tier; otherwise one of the three owner-agreed tokens."""
+    text = value.strip()
+    if not text:
+        return None
+    try:
+        return RiskTier(text)
+    except ValueError:
+        raise ValueError("invalid_risk_tier") from None
 
 
 def percent_to_bp(value: Decimal) -> int:
@@ -241,17 +255,18 @@ class SeedAssetClass:
     investable: bool
     color: str
     portfolio_default: bool = False  # the portfolio chart's default scope (F6.6)
+    risk_tier: RiskTier | None = None
 
 
 # The set shipped until the owner decision of 2026-11-09 (F5.7: property lives in net worth).
 # Kept frozen so a workspace seeded with it is still recognised as an untouched suggested set
 # (the F6.9 restore check); workspaces seeded with it keep these classes as user data.
 ASSET_CLASS_SEED_V1: tuple[SeedAssetClass, ...] = (
-    SeedAssetClass(_("Stocks"), True, "#2563eb", portfolio_default=True),
-    SeedAssetClass(_("Bonds"), True, "#16a34a"),
-    SeedAssetClass(_("Metals"), True, "#eab308"),
-    SeedAssetClass(_("Crypto"), True, "#f97316"),
-    SeedAssetClass(_("Currencies"), True, "#0ea5e9"),
+    SeedAssetClass(_("Stocks"), True, "#2563eb", portfolio_default=True, risk_tier=RiskTier.GROWTH),
+    SeedAssetClass(_("Bonds"), True, "#16a34a", risk_tier=RiskTier.SAFE),
+    SeedAssetClass(_("Metals"), True, "#eab308", risk_tier=RiskTier.SAFE),
+    SeedAssetClass(_("Crypto"), True, "#f97316", risk_tier=RiskTier.SPECULATIVE),
+    SeedAssetClass(_("Currencies"), True, "#0ea5e9", risk_tier=RiskTier.GROWTH),
     SeedAssetClass(_("Real estate"), False, "#8b5cf6"),
     SeedAssetClass(_("Primary residence"), False, "#64748b"),
     SeedAssetClass(_("Other"), False, "#475569"),
@@ -259,11 +274,11 @@ ASSET_CLASS_SEED_V1: tuple[SeedAssetClass, ...] = (
 # F5.7: no property classes, and Other is investable (``investable`` only decides what FIRE
 # counts as the starting portfolio; the portfolio page counts every class).
 ASSET_CLASS_SEED: tuple[SeedAssetClass, ...] = (
-    SeedAssetClass(_("Stocks"), True, "#2563eb", portfolio_default=True),
-    SeedAssetClass(_("Bonds"), True, "#16a34a"),
-    SeedAssetClass(_("Metals"), True, "#eab308"),
-    SeedAssetClass(_("Crypto"), True, "#f97316"),
-    SeedAssetClass(_("Currencies"), True, "#0ea5e9"),
+    SeedAssetClass(_("Stocks"), True, "#2563eb", portfolio_default=True, risk_tier=RiskTier.GROWTH),
+    SeedAssetClass(_("Bonds"), True, "#16a34a", risk_tier=RiskTier.SAFE),
+    SeedAssetClass(_("Metals"), True, "#eab308", risk_tier=RiskTier.SAFE),
+    SeedAssetClass(_("Crypto"), True, "#f97316", risk_tier=RiskTier.SPECULATIVE),
+    SeedAssetClass(_("Currencies"), True, "#0ea5e9", risk_tier=RiskTier.GROWTH),
     SeedAssetClass(_("Other"), True, "#475569"),
 )
 # Every shipped set, oldest first, for comparisons with an untouched seed.

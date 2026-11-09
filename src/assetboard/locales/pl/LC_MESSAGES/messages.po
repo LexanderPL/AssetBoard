@@ -181,6 +181,9 @@ msgstr "Wzrostowe"
 msgid "Speculative"
 msgstr "Spekulacyjne"
 
+msgid "Play money"
+msgstr "Na zabawę"
+
 msgid "Stocks"
 msgstr "Akcje"
 
@@ -274,6 +277,15 @@ msgid "GoldAPI metal symbol: XAU, XAG, XPT or XPD; the price is per troy ounce."
 msgstr ""
 "Symbol metalu w GoldAPI: XAU, XAG, XPT lub XPD; cena dotyczy uncji "
 "trojańskiej."
+
+msgid "Fixed targets"
+msgstr "Stałe cele"
+
+msgid "Age-scaled"
+msgstr "Skalowane wiekiem"
+
+msgid "Age in bonds"
+msgstr "Wiek w obligacjach"
 
 msgid "Enter a valid amount."
 msgstr "Podaj prawidłową kwotę."
@@ -518,6 +530,9 @@ msgstr "Przywrócono klasę aktywów"
 msgid "Suggested asset classes added"
 msgstr "Dodano sugerowane klasy aktywów"
 
+msgid "Suggested risk tiers applied"
+msgstr "Zastosowano proponowane poziomy ryzyka"
+
 msgid "Instrument added"
 msgstr "Dodano instrument"
 
@@ -535,6 +550,9 @@ msgstr "Zmieniono alokację instrumentu"
 
 msgid "Bond terms saved"
 msgstr "Zapisano warunki obligacji"
+
+msgid "Risk targets saved"
+msgstr "Zapisano cele ryzyka"
 
 msgid "Investment transaction added"
 msgstr "Dodano transakcję inwestycyjną"
@@ -848,6 +866,27 @@ msgstr "Usunięte wyceny pozycji"
 msgid "Net-worth snapshots deleted"
 msgstr "Usunięte migawki majątku netto"
 
+msgid "risk tier"
+msgstr "poziom ryzyka"
+
+msgid "risk tier override"
+msgstr "nadpisanie poziomu ryzyka"
+
+msgid "safe target"
+msgstr "cel bezpieczny"
+
+msgid "growth target"
+msgstr "cel wzrostowy"
+
+msgid "speculative target"
+msgstr "cel spekulacyjny"
+
+msgid "tolerance"
+msgstr "tolerancja"
+
+msgid "classes"
+msgstr "klasy"
+
 msgid "owner"
 msgstr "właściciel"
 
@@ -952,6 +991,9 @@ msgstr "inne urządzenia"
 
 msgid "the identity provider's group"
 msgstr "grupa u dostawcy tożsamości"
+
+msgid "mode"
+msgstr "tryb"
 
 msgid "linking an identity provider"
 msgstr "powiązanie dostawcy tożsamości"
@@ -1549,6 +1591,12 @@ msgstr "Wybierz jeden z języków z listy."
 msgid "Choose one of the listed themes."
 msgstr "Wybierz jeden z motywów z listy."
 
+msgid "Enter a birth year between 1900 and this year, or leave it empty."
+msgstr "Podaj rok urodzenia od 1900 do bieżącego roku albo pozostaw pole puste."
+
+msgid "Enter a life expectancy between 50 and 120 years."
+msgstr "Podaj oczekiwaną długość życia od 50 do 120 lat."
+
 #, python-format
 msgid ""
 "Your account is already linked to %(provider)s. Remove that link first to"
@@ -2087,6 +2135,9 @@ msgstr ""
 "Sugerowane klasy aktywów można dodać tylko wtedy, gdy żadna nie jest "
 "aktywna."
 
+msgid "Choose a valid risk tier."
+msgstr "Wybierz prawidłowy poziom ryzyka."
+
 msgid "Enter a name of 1 to 200 characters, without control characters."
 msgstr "Wpisz nazwę o długości od 1 do 200 znaków, bez znaków sterujących."
 
@@ -2147,6 +2198,9 @@ msgstr "Podaj symbol dostawcy."
 msgid "Enter a valid provider symbol."
 msgstr "Podaj prawidłowy symbol dostawcy."
 
+msgid "Choose a valid risk tier override."
+msgstr "Wybierz prawidłowe nadpisanie poziomu ryzyka."
+
 msgid "Asset class added."
 msgstr "Dodano klasę aktywów."
 
@@ -2162,6 +2216,12 @@ msgstr "Przywrócono klasę aktywów."
 msgid "Suggested asset classes added."
 msgstr "Dodano sugerowane klasy aktywów."
 
+msgid "Suggested risk tiers applied."
+msgstr "Zastosowano proponowane poziomy ryzyka."
+
+msgid "Every matching asset class already has a risk tier."
+msgstr "Każda pasująca klasa aktywów ma już poziom ryzyka."
+
 msgid "Instrument added."
 msgstr "Dodano instrument."
 
@@ -2173,6 +2233,12 @@ msgstr "Zarchiwizowano instrument."
 
 msgid "Instrument restored."
 msgstr "Przywrócono instrument."
+
+msgid "Unassigned"
+msgstr "Nieprzypisane"
+
+msgid "Use the class tier"
+msgstr "Użyj poziomu klasy"
 
 msgid "Choose buy or sell."
 msgstr "Wybierz kupno lub sprzedaż."
@@ -2983,6 +3049,21 @@ msgstr ""
 msgid "Unallocated"
 msgstr "Bez przydziału"
 
+msgid "Risk targets saved."
+msgstr "Zapisano cele ryzyka."
+
+msgid "Choose a target mode."
+msgstr "Wybierz tryb celu."
+
+msgid "Enter a percentage between 0 and 100 with at most two decimals."
+msgstr "Wpisz procent od 0 do 100 z co najwyżej dwoma miejscami po przecinku."
+
+msgid "The fixed targets must total exactly 100%."
+msgstr "Stałe cele muszą sumować się dokładnie do 100%%."
+
+msgid "Set your birth year in Profile before using age-based targets."
+msgstr "Ustaw rok urodzenia w profilu, zanim użyjesz celów zależnych od wieku."
+
 msgid "Holdings in the whole portfolio"
 msgstr "Pozycje w całym portfelu"
 
@@ -3691,6 +3772,28 @@ msgstr "Wyświetlana nazwa"
 
 msgid "Theme"
 msgstr "Motyw"
+
+msgid "Planning"
+msgstr "Planowanie"
+
+msgid ""
+"Used for age-based investment risk targets and the FIRE projection. Your "
+"age is the current year minus your birth year."
+msgstr ""
+"Używane do celów ryzyka inwestycyjnego zależnych od wieku i prognozy "
+"FIRE. Wiek to bieżący rok minus rok urodzenia."
+
+msgid "Birth year (optional)"
+msgstr "Rok urodzenia (opcjonalnie)"
+
+msgid "Leave empty to disable age-based risk targets."
+msgstr "Pozostaw puste, aby wyłączyć cele ryzyka zależne od wieku."
+
+msgid "Life expectancy"
+msgstr "Oczekiwana długość życia"
+
+msgid "Between 50 and 120 years; defaults to 90."
+msgstr "Od 50 do 120 lat; domyślnie 90."
 
 msgid "Highlight large transactions"
 msgstr "Wyróżniaj duże transakcje"
@@ -5194,6 +5297,20 @@ msgstr "Dodaj sugerowane klasy aktywów"
 msgid "An editor or owner of this workspace can add asset classes."
 msgstr "Redaktor lub właściciel tego obszaru roboczego może dodać klasy aktywów."
 
+msgid "Suggested risk tiers"
+msgstr "Proponowane poziomy ryzyka"
+
+msgid ""
+"Set the suggested tier on classes whose name matches a suggested class "
+"and that have no tier yet. Existing tiers are never overwritten."
+msgstr ""
+"Ustaw proponowany poziom ryzyka w klasach, których nazwa odpowiada "
+"proponowanej klasie i które nie mają jeszcze poziomu. Istniejące poziomy "
+"nigdy nie są nadpisywane."
+
+msgid "Apply suggested risk tiers"
+msgstr "Zastosuj proponowane poziomy ryzyka"
+
 msgid "Asset classes"
 msgstr "Klasy aktywów"
 
@@ -5216,6 +5333,9 @@ msgstr "Edytuj klasę aktywów"
 
 msgid "Add an asset class"
 msgstr "Dodaj klasę aktywów"
+
+msgid "Risk tier"
+msgstr "Poziom ryzyka"
 
 msgid "Used by the FIRE planner and the net-worth helper."
 msgstr "Używana przez planer FIRE i pomocnik wartości netto."
@@ -5265,6 +5385,16 @@ msgstr ""
 
 msgid "Unit prices and fees are in this currency."
 msgstr "Ceny jednostkowe i opłaty są w tej walucie."
+
+msgid "Risk tier override"
+msgstr "Nadpisanie poziomu ryzyka"
+
+msgid ""
+"Blank uses the tier of each allocated asset class; an override puts the "
+"whole instrument in one tier."
+msgstr ""
+"Puste używa poziomu każdej przypisanej klasy aktywów; nadpisanie "
+"przypisuje cały instrument do jednego poziomu."
 
 msgid "Unit label"
 msgstr "Nazwa jednostki"
@@ -5585,6 +5715,124 @@ msgstr "Zysk w %%"
 
 msgid "not counted in FIRE"
 msgstr "nie liczy się do FIRE"
+
+msgid "Risk balance"
+msgstr "Bilans ryzyka"
+
+#, python-format
+msgid "based on your age %(age)s and life expectancy %(life)s"
+msgstr ""
+"na podstawie Twojego wieku %(age)s lat i oczekiwanej długości życia "
+"%(life)s lat"
+
+msgid ""
+"Age-based targets are unavailable until you set your birth year in "
+"Profile."
+msgstr ""
+"Cele zależne od wieku są niedostępne, dopóki nie ustawisz roku urodzenia "
+"w profilu."
+
+msgid "Open Profile"
+msgstr "Otwórz profil"
+
+msgid "Set your birth year in Profile to use age-based targets."
+msgstr "Ustaw rok urodzenia w profilu, aby używać celów zależnych od wieku."
+
+msgid "Tier"
+msgstr "Poziom"
+
+msgid "Current"
+msgstr "Bieżący"
+
+msgid "Target"
+msgstr "Cel"
+
+msgid "Difference"
+msgstr "Różnica"
+
+msgid "Outside tolerance"
+msgstr "Poza tolerancją"
+
+msgid ""
+"Tier percentages use the assigned value; Unassigned classes are shown "
+"separately."
+msgstr ""
+"Procenty poziomów dotyczą przypisanej wartości; klasy nieprzypisane są "
+"pokazane osobno."
+
+#, python-format
+msgid "Move about %(amount)s from %(from)s to %(to)s."
+msgstr "Przenieś około %(amount)s z %(from)s do %(to)s."
+
+msgid "Risk targets are illustrative only and are not investment advice."
+msgstr "Cele ryzyka są wyłącznie ilustracyjne i nie stanowią porady inwestycyjnej."
+
+msgid "Edit target allocation"
+msgstr "Edytuj cele alokacji"
+
+msgid "Target mode"
+msgstr "Tryb celu"
+
+#, python-format
+msgid "Safe %%"
+msgstr "Bezpieczne %%"
+
+#, python-format
+msgid "Growth %%"
+msgstr "Wzrostowe %%"
+
+#, python-format
+msgid "Speculative %%"
+msgstr "Spekulacyjne %%"
+
+#, python-format
+msgid "The fixed targets must total exactly 100%%."
+msgstr "Stałe cele muszą sumować się dokładnie do 100%%."
+
+msgid "Age-based settings"
+msgstr "Ustawienia zależne od wieku"
+
+#, python-format
+msgid "Age-scaled: speculative %%"
+msgstr "Skalowane wiekiem: spekulacyjne %%"
+
+#, python-format
+msgid "Age in bonds: speculative %%"
+msgstr "Wiek w obligacjach: spekulacyjne %%"
+
+#, python-format
+msgid ""
+"Age-scaled: safe = (100%% − speculative) × age ÷ life expectancy. Age in "
+"bonds: safe = age%%. The remaining share is Growth."
+msgstr ""
+"Skalowane wiekiem: bezpieczne = (100%% − spekulacyjne) × wiek ÷ "
+"oczekiwana długość życia. Wiek w obligacjach: bezpieczne = wiek%%. "
+"Pozostała część to wzrost."
+
+msgid "Tolerance (percentage points)"
+msgstr "Tolerancja (punkty procentowe)"
+
+msgid ""
+"A tier is flagged when its current share differs from the target by more "
+"than this."
+msgstr ""
+"Poziom jest oznaczony, gdy jego bieżący udział różni się od celu bardziej"
+" niż o tę wartość."
+
+msgid "Your profile"
+msgstr "Twój profil"
+
+#, python-format
+msgid "Birth year %(year)s, life expectancy %(life)s years. Age %(age)s."
+msgstr ""
+"Rok urodzenia %(year)s, oczekiwana długość życia %(life)s lat. Wiek "
+"%(age)s."
+
+msgid "Birth year not set; age-based modes are disabled."
+msgstr "Rok urodzenia nie jest ustawiony; tryby zależne od wieku są wyłączone."
+
+msgid "Save risk targets"
+msgstr "Zapisz cele ryzyka"
 
 msgid "Chart scope"
 msgstr "Zakres wykresu"
@@ -6315,9 +6563,6 @@ msgstr[2] ""
 
 msgid "Actual"
 msgstr "Wykonanie"
-
-msgid "Difference"
-msgstr "Różnica"
 
 msgid "Summary"
 msgstr "Podsumowanie"

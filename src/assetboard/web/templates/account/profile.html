@@ -17,6 +17,14 @@
       {{ field("display_name", _("Display name"), value=values.display_name, error=errors.get("display_name"), required=true, autocomplete="name", maxlength=120) }}
       {{ select("locale", _("Language"), languages, selected=values.locale, error=errors.get("locale")) }}
       {{ select("theme", _("Theme"), themes, selected=values.theme, error=errors.get("theme")) }}
+      <div class="border-t border-line pt-4">
+        <h3 class="text-sm font-semibold">{{ _("Planning") }}</h3>
+        <p class="mt-1 text-xs text-muted">{{ _("Used for age-based investment risk targets and the FIRE projection. Your age is the current year minus your birth year.") }}</p>
+        <div class="mt-3 grid gap-4 sm:grid-cols-2">
+          {{ field("birth_year", _("Birth year (optional)"), type="number", value=values.birth_year, error=errors.get("birth_year"), autocomplete="bday-year", min=1900, help=_("Leave empty to disable age-based risk targets.")) }}
+          {{ field("life_expectancy", _("Life expectancy"), type="number", value=values.life_expectancy, error=errors.get("life_expectancy"), min=50, help=_("Between 50 and 120 years; defaults to 90.")) }}
+        </div>
+      </div>
       <label class="flex items-start gap-2 text-sm">
         <input type="checkbox" name="highlight_large_amounts" value="1"{% if values.highlight_large_amounts %} checked{% endif %} aria-describedby="highlight-help" data-highlight-setting class="mt-0.5 h-4 w-4 rounded border-line accent-primary">
         <span>{{ _("Highlight large transactions") }}

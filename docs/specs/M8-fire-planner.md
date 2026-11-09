@@ -35,7 +35,7 @@ Computed outputs: **FIRE age/year** = first row where `expenses_t < gain_t` (ret
 
 **Acceptance**
 - Scenario CRUD with all fields above; duplicate scenario; mark one as default.
-- Rates are entered as percentages and stored as basis points. Birth year is prefilled from the user profile (optional profile field `birth_year`, added here).
+- Rates are entered as percentages and stored as basis points. Birth year is prefilled from the user profile (optional profile field `birth_year`, added in F6.11); `life_expectancy` is also a profile field from F6.11 and defaults to 90.
 - Contribution overrides editor (table: year → amount, add a row or paste a column) and events editor.
 - Validation: horizon_age > current age; stop_working_age ≥ current age; rates within sane ranges (confirm outside).
 - Plain-language tooltips explain each input; a notice states that projections are illustrative, not advice.

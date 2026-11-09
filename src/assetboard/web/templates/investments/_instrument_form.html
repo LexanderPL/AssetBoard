@@ -52,6 +52,14 @@
       {% endif %}
       {{ field_error(errors, "quote_currency") }}
     </div>
+    <div class="space-y-1.5">
+      <label for="{{ prefix }}-risk-tier" class="block text-sm font-medium">{{ _("Risk tier override") }}</label>
+      <select id="{{ prefix }}-risk-tier" name="risk_tier_override" class="form-select w-full py-2">
+        {% for value, label in risk_tier_options %}<option value="{{ value }}"{% if value == values.risk_tier_override %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <p class="text-xs text-muted">{{ _("Blank uses the tier of each allocated asset class; an override puts the whole instrument in one tier.") }}</p>
+      {{ field_error(errors, "risk_tier") }}
+    </div>
     <div class="space-y-1.5 sm:col-span-2">
       <label for="{{ prefix }}-unit" class="block text-sm font-medium">{{ _("Unit label") }}</label>
       <input id="{{ prefix }}-unit" name="unit_label" type="text" value="{{ values.unit_label }}" maxlength="{{ max_unit_label_length }}" autocomplete="off" class="form-control w-full px-3 py-2">

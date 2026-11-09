@@ -79,6 +79,7 @@ from assetboard.db.repositories import (
     PricePointRepository,
     PriceSourceConfigRepository,
     ProviderErrorRepository,
+    RiskTargetPolicyRepository,
     ScopedRepository,
     TransactionRepository,
     UserMembershipReader,
@@ -175,6 +176,8 @@ def test_user_b_cannot_read_update_or_delete_user_a_rows(
     repository = repositories_for(Base)[model]
     assert repository.unsupported == case.unsupported, "unsupported operations changed"
     ctx_a, ctx_b = two_workspaces
+    if model.__name__ == "RiskTargetPolicy":
+        pytest.skip("singleton: covered by test_risk_policy_singleton_isolation")
     check_isolation(
         db_session,
         model,
@@ -184,6 +187,33 @@ def test_user_b_cannot_read_update_or_delete_user_a_rows(
         ctx_a,
         ctx_b,
     )
+
+
+def test_risk_policy_singleton_isolation(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    ctx_a, ctx_b = two_workspaces
+    policies_a = RiskTargetPolicyRepository(db_session, ctx_a)
+    policies_b = RiskTargetPolicyRepository(db_session, ctx_b)
+    a_policy = policies_a.create(
+        mode="fixed", safe_bp=5000, growth_bp=4000, speculative_bp=1000, tolerance_bp=500
+    )
+    b_policy = policies_b.create(
+        mode="fixed", safe_bp=5000, growth_bp=4000, speculative_bp=1000, tolerance_bp=500
+    )
+    assert policies_a.for_workspace() is a_policy
+    assert policies_b.for_workspace() is b_policy
+    assert policies_a.get(b_policy.id) is None
+    assert policies_b.get(a_policy.id) is None
+    with pytest.raises(NotFound):
+        policies_a.update(b_policy.id, tolerance_bp=700)
+    with pytest.raises(NotFound):
+        policies_a.delete(b_policy.id)
+    policies_a.update(a_policy.id, tolerance_bp=700)
+    assert a_policy.tolerance_bp == 700
+    policies_a.delete(a_policy.id)
+    assert policies_a.for_workspace() is None
+    assert policies_b.for_workspace() is b_policy
 
 
 def test_add_refuses_rows_of_another_workspace_or_type(
@@ -709,6 +739,24 @@ def test_investment_queries_stay_in_their_workspace(
             "PLN", instrument_id=a_fund.id, types=(), date_from=None, date_to=None
         )
     ] == []
+
+
+def test_risk_policy_queries(db_session: Session, two_workspaces: tuple[Any, Any]) -> None:
+    ctx_a, ctx_b = two_workspaces
+    policies_a = RiskTargetPolicyRepository(db_session, ctx_a)
+    policies_b = RiskTargetPolicyRepository(db_session, ctx_b)
+    a_policy = policies_a.create(
+        mode="fixed", safe_bp=5000, growth_bp=4000, speculative_bp=1000, tolerance_bp=500
+    )
+    b_policy = policies_b.create(
+        mode="age_scaled", safe_bp=5000, growth_bp=4000, speculative_bp=1000, tolerance_bp=500
+    )
+    assert policies_a.for_workspace() is a_policy
+    assert policies_b.for_workspace() is b_policy
+    assert policies_a.for_workspace(for_update=True) is a_policy
+    assert policies_b.for_workspace(for_update=True) is b_policy
+    assert policies_a.get(b_policy.id) is None
+    assert policies_b.get(a_policy.id) is None
 
 
 def test_price_queries_stay_in_their_workspace(

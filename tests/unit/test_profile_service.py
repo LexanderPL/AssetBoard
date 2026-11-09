@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-from datetime import timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -252,6 +252,79 @@ def test_update_profile_locale(
     with db.factory() as session:
         user = session.get(User, user_id)
         assert user is not None and user.locale == (stored if error is None else None)
+
+
+def test_planning_profile_fields_default_and_update(db: WorkspaceDb) -> None:
+    user_id = add_user(db)
+    with db.factory() as session:
+        user = session.get(User, user_id)
+        assert user is not None
+        assert (user.birth_year, user.life_expectancy) == (None, 90)
+
+    result = update_profile(
+        db.factory,
+        user_id=user_id,
+        display_name="Ola",
+        locale="en",
+        theme="system",
+        birth_year="1986",
+        life_expectancy="80",
+        today=date(2026, 3, 1),
+    )
+
+    assert result is None
+    with db.factory() as session:
+        user = session.get(User, user_id)
+        assert user is not None
+        assert (user.birth_year, user.life_expectancy) == (1986, 80)
+
+    assert (
+        update_profile(
+            db.factory,
+            user_id=user_id,
+            display_name="Ola",
+            locale="en",
+            theme="system",
+            birth_year="",
+            life_expectancy="90",
+            today=date(2026, 3, 1),
+        )
+        is None
+    )
+    with db.factory() as session:
+        user = session.get(User, user_id)
+        assert user is not None and user.birth_year is None
+
+
+@pytest.mark.parametrize(
+    ("birth_year", "life_expectancy", "error"),
+    [
+        ("1899", "90", "birth_year"),
+        ("2027", "90", "birth_year"),
+        ("soon", "90", "birth_year"),
+        ("1986", "49", "life_expectancy"),
+        ("1986", "121", "life_expectancy"),
+        ("1986", "old", "life_expectancy"),
+    ],
+)
+def test_planning_profile_validation(
+    db: WorkspaceDb,
+    birth_year: str,
+    life_expectancy: str,
+    error: str,
+) -> None:
+    user_id = add_user(db)
+    result = update_profile(
+        db.factory,
+        user_id=user_id,
+        display_name="Ola",
+        locale="en",
+        theme="system",
+        birth_year=birth_year,
+        life_expectancy=life_expectancy,
+        today=date(2026, 3, 1),
+    )
+    assert result == error
 
 
 # Unlink: never the last usable sign-in method

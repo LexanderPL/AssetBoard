@@ -152,6 +152,10 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         )
     },
     **{
+        ("RiskTargetPolicyRepository", method): "test_risk_policy_queries"
+        for method in ("create", "for_workspace")
+    },
+    **{
         ("InstrumentAllocationRepository", method): (
             "test_investment_queries_stay_in_their_workspace"
         )

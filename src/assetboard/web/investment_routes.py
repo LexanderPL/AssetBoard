@@ -23,9 +23,12 @@ from assetboard.domain.instruments import (
     MAX_INSTRUMENT_NAME_LENGTH,
     MAX_SYMBOL_LENGTH,
     MAX_UNIT_LABEL_LENGTH,
+    RISK_TIER_LABELS,
+    RISK_TIER_SUBTITLES,
     TYPE_LABELS,
     InstrumentType,
     InvalidAllocation,
+    RiskTier,
     percent_to_bp,
 )
 from assetboard.i18n import gettext
@@ -36,6 +39,7 @@ from assetboard.services.investments import (
     InstrumentView,
     InvestmentError,
     InvestmentPage,
+    apply_suggested_risk_tiers,
     archive_asset_class,
     archive_instrument,
     create_asset_class,
@@ -73,6 +77,7 @@ CLASS_ERRORS = {
     "archived": _("Restore the asset class before changing it."),
     "already_seeded": _("The suggested asset classes can only be added when none are active."),
     "invalid_direction": _("The change could not be made. Reload the page and try again."),
+    "invalid_risk_tier": _("Choose a valid risk tier."),
 }
 INSTRUMENT_ERRORS = {
     "invalid_name": _("Enter a name of 1 to 200 characters, without control characters."),
@@ -97,6 +102,7 @@ INSTRUMENT_ERRORS = {
     ),
     "provider_symbol_required": _("Enter the provider symbol."),
     "invalid_provider_symbol": _("Enter a valid provider symbol."),
+    "invalid_risk_tier": _("Choose a valid risk tier override."),
 }
 FALLBACK_ERROR = _("The change could not be made. Reload the page and try again.")
 CLASS_NOTICES = {
@@ -105,6 +111,8 @@ CLASS_NOTICES = {
     "class_archived": _("Asset class archived."),
     "class_restored": _("Asset class restored."),
     "classes_seeded": _("Suggested asset classes added."),
+    "risk_tiers_suggested": _("Suggested risk tiers applied."),
+    "risk_tiers_complete": _("Every matching asset class already has a risk tier."),
 }
 INSTRUMENT_NOTICES = {
     "instrument_created": _("Instrument added."),
@@ -133,14 +141,38 @@ def _type_options(request: Request) -> list[tuple[str, str]]:
     ]
 
 
+def _risk_tier_options(request: Request, *, blank_label: str) -> list[tuple[str, str]]:
+    return [("", blank_label)] + [
+        (tier.value, _t(request, RISK_TIER_LABELS[tier])) for tier in RiskTier
+    ]
+
+
+def _risk_tier_labels(request: Request) -> dict[str, str]:
+    return {tier.value: _t(request, RISK_TIER_LABELS[tier]) for tier in RiskTier}
+
+
+def _risk_tier_subtitles(request: Request) -> dict[str, str]:
+    return {tier.value: _t(request, RISK_TIER_SUBTITLES[tier]) for tier in RISK_TIER_SUBTITLES}
+
+
 def _weight_text(weight_bp: int, locale: str) -> str:
     return format_quantity_input(Decimal(weight_bp).scaleb(-2), locale)
 
 
 def _class_values(item: AssetClassView | None = None) -> dict[str, object]:
     if item is None:
-        return {"name": "", "color": DEFAULT_COLOR, "investable": True}
-    return {"name": item.name, "color": item.color, "investable": item.investable}
+        return {
+            "name": "",
+            "color": DEFAULT_COLOR,
+            "investable": True,
+            "risk_tier": "",
+        }
+    return {
+        "name": item.name,
+        "color": item.color,
+        "investable": item.investable,
+        "risk_tier": item.risk_tier or "",
+    }
 
 
 def _instrument_values(
@@ -156,6 +188,7 @@ def _instrument_values(
             "weights": {},
             "provider_key": "",
             "provider_symbol": "",
+            "risk_tier_override": "",
         }
     return {
         "name": item.name,
@@ -165,6 +198,7 @@ def _instrument_values(
         "unit_label": item.unit_label,
         "provider_key": item.provider_key or "",
         "provider_symbol": item.provider_symbol or "",
+        "risk_tier_override": item.risk_tier_override or "",
         "weights": {
             str(allocation.asset_class_id): _weight_text(allocation.weight_bp, locale)
             for allocation in item.allocations
@@ -228,6 +262,8 @@ def _class_body_context(
         "edit_values": edit_values,
         "edit_errors": {f: _t(request, m) for f, m in (edit_errors or {}).items()},
         "max_name_length": MAX_ASSET_CLASS_NAME_LENGTH,
+        "risk_tier_options": _risk_tier_options(request, blank_label=_("Unassigned")),
+        "risk_tier_labels": _risk_tier_labels(request),
     }
 
 
@@ -270,6 +306,9 @@ def _instrument_body_context(
         "max_symbol_length": MAX_SYMBOL_LENGTH,
         "max_unit_label_length": MAX_UNIT_LABEL_LENGTH,
         "type_options": _type_options(request),
+        "risk_tier_options": _risk_tier_options(request, blank_label=_("Use the class tier")),
+        "risk_tier_labels": _risk_tier_labels(request),
+        "risk_tier_subtitles": _risk_tier_subtitles(request),
         "currency_options": currency_codes(),
         "weight_text": lambda weight_bp: _weight_text(weight_bp, request.state.locale),
         "decimal_separator": decimal_symbol(request.state.locale),
@@ -472,6 +511,7 @@ async def instrument_create(
     unit_label: FormStr = "",
     provider_key: FormStr = "",
     provider_symbol: FormStr = "",
+    risk_tier_override: FormStr = "",
 ) -> Response:
     locale = request.state.locale
     rows, raw_weights, weight_error = await _allocation_input(request, locale)
@@ -483,6 +523,7 @@ async def instrument_create(
         "unit_label": unit_label,
         "provider_key": provider_key,
         "provider_symbol": provider_symbol,
+        "risk_tier_override": risk_tier_override,
         "weights": raw_weights,
     }
     if weight_error:
@@ -509,6 +550,7 @@ async def instrument_create(
                 locale=locale,
                 provider_key=provider_key,
                 provider_symbol=provider_symbol,
+                risk_tier_override=risk_tier_override,
             )
         )
     except InvestmentError as exc:
@@ -540,6 +582,7 @@ async def instrument_update(
     unit_label: FormStr = "",
     provider_key: FormStr = "",
     provider_symbol: FormStr = "",
+    risk_tier_override: FormStr = "",
 ) -> Response:
     locale = request.state.locale
     item_id = _parse_uuid(instrument_id)
@@ -552,6 +595,7 @@ async def instrument_update(
         "unit_label": unit_label,
         "provider_key": provider_key,
         "provider_symbol": provider_symbol,
+        "risk_tier_override": risk_tier_override,
         "weights": raw_weights,
     }
     if weight_error:
@@ -582,6 +626,7 @@ async def instrument_update(
                 locale=locale,
                 provider_key=provider_key,
                 provider_symbol=provider_symbol,
+                risk_tier_override=risk_tier_override,
             )
         )
     except InvestmentError as exc:
@@ -725,8 +770,14 @@ async def class_create(
     name: FormStr = "",
     color: FormStr = "",
     investable: FormStr = "",
+    risk_tier: FormStr = "",
 ) -> Response:
-    values = {"name": name, "color": color, "investable": investable == "1"}
+    values = {
+        "name": name,
+        "color": color,
+        "investable": investable == "1",
+        "risk_tier": risk_tier,
+    }
     try:
         await run_in_threadpool(
             lambda: create_asset_class(
@@ -735,6 +786,7 @@ async def class_create(
                 name=name,
                 color=color,
                 investable=investable == "1",
+                risk_tier=risk_tier,
             )
         )
     except InvestmentError as exc:
@@ -750,6 +802,21 @@ async def class_create(
     return await run_in_threadpool(_classes_done, request, ctx, "class_created")
 
 
+@router.post("/investments/classes/apply-risk-tiers", name="investments_classes_apply_risk_tiers")
+async def class_apply_risk_tiers(request: Request, ctx: CurrentContext) -> Response:
+    count = await run_in_threadpool(
+        apply_suggested_risk_tiers,
+        request.app.state.session_factory,
+        ctx,
+    )
+    return await run_in_threadpool(
+        _classes_done,
+        request,
+        ctx,
+        "risk_tiers_suggested" if count else "risk_tiers_complete",
+    )
+
+
 @router.post("/investments/classes/{class_id}", name="investments_class_update")
 async def class_update(
     request: Request,
@@ -758,9 +825,15 @@ async def class_update(
     name: FormStr = "",
     color: FormStr = "",
     investable: FormStr = "",
+    risk_tier: FormStr = "",
 ) -> Response:
     item_id = _parse_uuid(class_id)
-    values = {"name": name, "color": color, "investable": investable == "1"}
+    values = {
+        "name": name,
+        "color": color,
+        "investable": investable == "1",
+        "risk_tier": risk_tier,
+    }
     try:
         await run_in_threadpool(
             lambda: update_asset_class(
@@ -770,6 +843,7 @@ async def class_update(
                 name=name,
                 color=color,
                 investable=investable == "1",
+                risk_tier=risk_tier,
             )
         )
     except InvestmentError as exc:

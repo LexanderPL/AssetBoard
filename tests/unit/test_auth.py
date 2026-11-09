@@ -1303,6 +1303,7 @@ WORKSPACE_TABLES = {
     "fx_rates",
     "price_source_configs",
     "provider_errors",
+    "risk_target_policies",
 }
 
 

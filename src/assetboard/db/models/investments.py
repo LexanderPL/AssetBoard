@@ -64,6 +64,10 @@ class AssetClass(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         CheckConstraint("length(name) > 0", name="name_not_empty"),
         CheckConstraint("length(color) = 7", name="color_length"),
         CheckConstraint("sort_order >= 0", name="sort_order_valid"),
+        CheckConstraint(
+            "risk_tier IS NULL OR risk_tier IN ('safe', 'growth', 'speculative')",
+            name="risk_tier_valid",
+        ),
         Index(
             "uq_asset_classes_active_name",
             "workspace_id",
@@ -82,7 +86,39 @@ class AssetClass(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     )
     color: Mapped[str] = mapped_column(String(7), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer(), nullable=False)
+    risk_tier: Mapped[str | None] = mapped_column(String(16), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+
+
+class RiskTargetPolicy(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
+    """The workspace's target allocation and tolerance (F6.11).
+
+    One row per workspace. ``safe_bp``/``growth_bp``/``speculative_bp`` are the fixed targets;
+    age-based modes use ``speculative_bp`` as X and compute the safe/growth split from the
+    viewer's profile, keeping the fixed values for when the mode is switched back.
+    """
+
+    __tablename__ = "risk_target_policies"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", name="uq_risk_target_policies_workspace_id"),
+        CheckConstraint("mode IN ('fixed', 'age_scaled', 'age_in_bonds')", name="mode_valid"),
+        CheckConstraint(
+            "safe_bp BETWEEN 0 AND 10000 AND growth_bp BETWEEN 0 AND 10000 "
+            "AND speculative_bp BETWEEN 0 AND 10000",
+            name="targets_valid",
+        ),
+        CheckConstraint(
+            "mode != 'fixed' OR safe_bp + growth_bp + speculative_bp = 10000",
+            name="fixed_targets_total",
+        ),
+        CheckConstraint("tolerance_bp BETWEEN 0 AND 10000", name="tolerance_valid"),
+    )
+
+    mode: Mapped[str] = mapped_column(String(16), nullable=False, default="fixed")
+    safe_bp: Mapped[int] = mapped_column(Integer(), nullable=False, default=5000)
+    growth_bp: Mapped[int] = mapped_column(Integer(), nullable=False, default=4000)
+    speculative_bp: Mapped[int] = mapped_column(Integer(), nullable=False, default=1000)
+    tolerance_bp: Mapped[int] = mapped_column(Integer(), nullable=False, default=500)
 
 
 class Instrument(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):

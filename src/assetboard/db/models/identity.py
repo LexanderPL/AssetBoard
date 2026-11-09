@@ -36,6 +36,11 @@ class User(IdMixin, TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("email", name="uq_users_email_normalized"),
         CheckConstraint("email = lower(email)", name="email_lowercase"),
+        CheckConstraint(
+            "birth_year IS NULL OR birth_year BETWEEN 1900 AND 2199",
+            name="birth_year_valid",
+        ),
+        CheckConstraint("life_expectancy BETWEEN 50 AND 120", name="life_expectancy_valid"),
     )
 
     email: Mapped[str] = mapped_column(String(320), nullable=False)
@@ -58,6 +63,11 @@ class User(IdMixin, TimestampMixin, Base):
     # The profile setting that tints larger rows on the Transactions page (on by default).
     highlight_large_amounts: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=True, server_default=true()
+    )
+    # F6.11: age-based risk targets (and later the FIRE planner) use these optional fields.
+    birth_year: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    life_expectancy: Mapped[int] = mapped_column(
+        Integer(), nullable=False, default=90, server_default="90"
     )
     last_login_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 

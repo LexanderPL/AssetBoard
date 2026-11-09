@@ -15,6 +15,7 @@ from assetboard.db.models.investments import (
     Instrument,
     InstrumentAllocation,
     InvestmentTransaction,
+    RiskTargetPolicy,
 )
 from assetboard.db.repositories.base import ScopedRepository
 
@@ -30,6 +31,7 @@ class AssetClassRepository(ScopedRepository[AssetClass]):
         investable: bool,
         color: str,
         sort_order: int,
+        risk_tier: str | None = None,
         archived_at: datetime | None = None,
     ) -> AssetClass:
         return self.add(
@@ -39,6 +41,7 @@ class AssetClassRepository(ScopedRepository[AssetClass]):
                 investable=investable,
                 color=color,
                 sort_order=sort_order,
+                risk_tier=risk_tier,
                 archived_at=archived_at,
             )
         )
@@ -74,6 +77,36 @@ class AssetClassRepository(ScopedRepository[AssetClass]):
         statement = self._scoped_select()
         orders = [row.sort_order for row in self._session.scalars(statement)]
         return max(orders) + 1 if orders else 0
+
+
+class RiskTargetPolicyRepository(ScopedRepository[RiskTargetPolicy]):
+    model = RiskTargetPolicy
+
+    def create(
+        self,
+        *,
+        mode: str,
+        safe_bp: int,
+        growth_bp: int,
+        speculative_bp: int,
+        tolerance_bp: int,
+    ) -> RiskTargetPolicy:
+        return self.add(
+            RiskTargetPolicy(
+                mode=mode,
+                safe_bp=safe_bp,
+                growth_bp=growth_bp,
+                speculative_bp=speculative_bp,
+                tolerance_bp=tolerance_bp,
+            )
+        )
+
+    def for_workspace(self, *, for_update: bool = False) -> RiskTargetPolicy | None:
+        """The current workspace's singleton policy, if it has been saved."""
+        statement = self._scoped_select()
+        if for_update:
+            statement = statement.with_for_update()
+        return self._session.scalars(statement).one_or_none()
 
 
 class InstrumentRepository(ScopedRepository[Instrument]):

@@ -19,7 +19,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Literal
 from uuid import UUID
 
@@ -151,7 +151,7 @@ def confirm_sensitive[T](
 # Profile settings
 
 
-ProfileError = Literal["display_name", "locale", "theme"]
+ProfileError = Literal["display_name", "locale", "theme", "birth_year", "life_expectancy"]
 
 
 def update_profile(
@@ -162,12 +162,15 @@ def update_profile(
     locale: str,
     theme: str,
     highlight_large_amounts: bool = True,
+    birth_year: str = "",
+    life_expectancy: str = "90",
+    today: date | None = None,
 ) -> ProfileError | None:
-    """Display name (``normalize_display_name``), locale, theme and the amount shading of the
-    Transactions page (``highlight_large_amounts``).
+    """Display name, locale, theme, amount shading and the planning profile fields.
 
     ``locale`` is a supported language, or ``""`` / ``"browser"`` for none (stored as NULL:
-    the browser's ``Accept-Language`` applies).
+    the browser's ``Accept-Language`` applies). ``birth_year`` is optional; age-based risk
+    targets and the later FIRE planner use it. ``life_expectancy`` defaults to 90.
     """
     try:
         # The same rule as setup, registration and invitation sign-up.
@@ -179,12 +182,30 @@ def update_profile(
         return "locale"
     if theme not in THEMES:
         return "theme"
+    raw_birth_year = birth_year.strip()
+    saved_birth_year: int | None = None
+    if raw_birth_year:
+        try:
+            saved_birth_year = int(raw_birth_year)
+        except ValueError:
+            return "birth_year"
+        upper_year = today.year if today is not None else 2199
+        if not 1900 <= saved_birth_year <= upper_year:
+            return "birth_year"
+    try:
+        saved_life_expectancy = int(str(life_expectancy).strip() or "90")
+    except ValueError:
+        return "life_expectancy"
+    if not 50 <= saved_life_expectancy <= 120:
+        return "life_expectancy"
 
     def save(session: Session) -> None:
         user = session.get(User, user_id)
         if user is not None:
             user.display_name, user.locale, user.theme = name, saved_locale, theme
             user.highlight_large_amounts = highlight_large_amounts
+            user.birth_year = saved_birth_year
+            user.life_expectancy = saved_life_expectancy
 
     run_immediate(factory, save)
     return None
