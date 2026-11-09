@@ -1141,6 +1141,11 @@ def _apply_import_in_session(
         base_currency=base_currency,
         skip_invalid=skip_invalid,
     )
+    # Keep the applied report on the batch even when the caller (the demo builder) created the
+    # batch directly instead of going through plan_import, so the data page still shows it.
+    # A planned report already holds apply-time extras such as ``plan_started_months``.
+    if not batch.report:
+        batch.report = report
     now = ctx.clock.now()
     batch.status = "applied"
     batch.applied_at = now

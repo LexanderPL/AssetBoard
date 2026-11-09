@@ -87,6 +87,7 @@ from assetboard.domain.scheduled import AmountMode
 from assetboard.domain.taxes import PaymentTiming, TaxBase, TaxKind
 from assetboard.domain.transactions import TransactionDirection, description_key
 from assetboard.i18n import gettext
+from assetboard.i18n.numbers import format_quantity_input
 from assetboard.services import (
     archive,
     bonds,
@@ -645,25 +646,39 @@ def _write_investments(
             instrument_id=instrument_ids[trade.instrument],
             type_value=trade.type,
             date_value=trade.day.isoformat(),
-            quantity_value=format(trade.quantity, "f"),
-            unit_price_value=format(trade.unit_price, "f"),
-            fee_value=format(trade.fee.to_decimal(), "f"),
-            fx_value=format(trade.fx_to_base, "f") if trade.fx_to_base is not None else "",
+            quantity_value=format_quantity_input(trade.quantity, plan.locale),
+            unit_price_value=format_quantity_input(trade.unit_price, plan.locale),
+            fee_value=format_quantity_input(trade.fee.to_decimal(), plan.locale),
+            fx_value=(
+                format_quantity_input(trade.fx_to_base, plan.locale)
+                if trade.fx_to_base is not None
+                else ""
+            ),
             note_value=trade.note,
-            locale="en",
+            locale=plan.locale,
             amounts_value=trade.amounts,
             base_unit_price_value=(
-                format(trade.base_unit_price, "f") if trade.base_unit_price is not None else ""
+                format_quantity_input(trade.base_unit_price, plan.locale)
+                if trade.base_unit_price is not None
+                else ""
             ),
             base_fee_value=(
-                format(trade.base_fee.to_decimal(), "f") if trade.base_fee is not None else ""
+                format_quantity_input(trade.base_fee.to_decimal(), plan.locale)
+                if trade.base_fee is not None
+                else ""
             ),
             record_income=trade.record_income,
             income_category_id=income_category_id,
         )
         trade_written += 1
 
-    _write_bond_terms(session, ctx, plan.bond_terms, instrument_ids[plan.bond_terms.instrument])
+    _write_bond_terms(
+        session,
+        ctx,
+        plan.bond_terms,
+        instrument_ids[plan.bond_terms.instrument],
+        locale=plan.locale,
+    )
     _use(session, ctx)
     policy = plan.risk_policy
     risk._save_risk_policy_in_session(
@@ -683,21 +698,26 @@ def _write_investments(
 
 
 def _write_bond_terms(
-    session: Session, ctx: Context, terms: DemoBondTerms, instrument_id: UUID
+    session: Session,
+    ctx: Context,
+    terms: DemoBondTerms,
+    instrument_id: UUID,
+    *,
+    locale: str,
 ) -> None:
     _use(session, ctx)
     values = bonds.BondTermsInput(
         series_code=terms.series_code,
-        face_value=format(terms.face_value.to_decimal(), "f"),
+        face_value=format_quantity_input(terms.face_value.to_decimal(), locale),
         maturity_date=terms.maturity_date.isoformat(),
         interest_mode=terms.interest_mode,
         rate_periods=tuple(
-            (from_date.isoformat(), format(Decimal(rate_bp) / 100, "f"))
+            (from_date.isoformat(), format_quantity_input(Decimal(rate_bp) / 100, locale))
             for from_date, rate_bp in terms.rate_schedule
         ),
-        tax_rate=format(Decimal(terms.tax_rate_bp) / 100, "f"),
+        tax_rate=format_quantity_input(Decimal(terms.tax_rate_bp) / 100, locale),
     )
-    bonds._save_bond_terms_in_session(session, ctx, instrument_id, values=values, locale="en")
+    bonds._save_bond_terms_in_session(session, ctx, instrument_id, values=values, locale=locale)
 
 
 def _write_snapshots(session: Session, ctx: Context, plan: DemoPlan) -> int:
