@@ -3087,7 +3087,7 @@ msgstr ""
 msgid "Whole portfolio"
 msgstr ""
 
-#, fuzzy, python-format
+#, fuzzy
 msgid "Incomplete: an instrument has no price or FX rate."
 msgstr ""
 

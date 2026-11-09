@@ -3277,7 +3277,6 @@ msgstr "3 miesiące"
 msgid "Whole portfolio"
 msgstr "Cały portfel"
 
-#, python-format
 msgid "Incomplete: an instrument has no price or FX rate."
 msgstr "Niekompletne: instrument nie ma ceny lub kursu walutowego."
 
