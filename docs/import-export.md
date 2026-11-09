@@ -22,12 +22,15 @@ import. The exact files and columns are described in the
 ## Exporting
 
 Select **Download archive**. The ZIP contains the current workspace's settings (including the
-Taxes switch and the Upcoming window), all categories (including archived categories),
-transactions (including deleted entries), planned values, stored month states (closed months
-and plan-start markers), and all net-worth categories, items, value histories and snapshots.
+Taxes switch, the Upcoming window, the investment cost basis and the saved risk targets), all
+categories (including archived categories), transactions (including deleted entries), planned
+values, stored month states (closed months and plan-start markers), all net-worth categories,
+items, value histories and snapshots, and the whole investment history: asset classes,
+instruments, allocations, buy/sell transactions (undated lots included), bond terms, stored
+manual and provider prices, stored FX rates, and provider settings without their API keys.
 Recurring items, income sources, work logs and calendars, and tax rules are not in this archive
 version yet. Notification channels and delivery logs are never exported, because channel URLs
-can contain secrets.
+can contain secrets; provider API keys are not exported either.
 
 The download is a copy: exporting does not change the ledger. The audit log records the export
 and the number of rows of each kind, without descriptions or amounts.
@@ -56,8 +59,9 @@ them and puts the archive's categories in their place. Recurring items, income s
 logs and calendars, and tax rules make the workspace non-empty, because the archive cannot
 carry them yet. The suggested net-worth categories follow the same rule as the ledger ones:
 untouched, unused and seeded automatically, they are removed before the archive's net-worth
-categories are written. Edited categories, items, values or snapshots make the workspace
-non-empty.
+categories are written. The suggested asset classes follow the same rule: untouched, unused and
+seeded automatically, they are removed before the archive's classes are written. Edited
+categories, items, values, snapshots or asset classes make the workspace non-empty.
 
 Restore writes, all at once:
 
@@ -70,9 +74,23 @@ Restore writes, all at once:
 5. month states exactly as stored: closed months and plan-start markers;
 6. net-worth categories, items and value histories, then snapshots. Values keep their
    `created_at`, so several values on one day restore in the same order and the current value
-   does not change. A linked item whose target is not in the archive becomes a manual item
-   without a value and is listed with `link_target_missing`. The estimate switch is carried; a
-   1.2 archive restores assets with it on and liabilities off.
+   does not change. The estimate switch is carried; a 1.2 archive restores assets with it on
+   and liabilities off;
+7. asset classes, instruments and their allocations, then investment transactions (including
+   undated legacy lots and deleted rows), bond terms, stored prices and FX rates, and provider
+   settings. Investment quantities, prices and FX rates are restored from their plain decimal
+   text without going through `float`;
+8. the saved risk targets and the investment cost basis.
+
+A net-worth item linked to a portfolio class or holding is linked to the restored row when the
+archive carries its target (1.4 archives do). A link whose target is not in the archive —
+including every portfolio link in a 1.3 archive — becomes a manual item without a value and is
+listed with `link_target_missing`.
+
+Provider settings never include API keys. A keyless provider (NBP, ECB, CoinGecko) keeps its
+saved enabled state. A provider that needs a key (EODHD, GoldAPI) is restored **disabled**, and
+the report says to re-enter the API key and enable it; leaving it enabled would only fail on
+every scheduled refresh. The daily call budget and the one-off backfill markers are kept.
 
 A restore needs a completely valid archive: any error blocks it, and nothing is written. The
 **Restore plan** lists what will be written, the suggested categories that will be removed, the
@@ -87,10 +105,13 @@ Merge brings an archive's ledger data into a workspace you already use, for exam
 two workspaces. Owners and editors can merge; it is the default mode.
 
 A merge writes categories, transactions and planned values only. The archive's settings,
-closed months and net-worth files are listed for information but never applied; a 1.2+ archive
-lists its net-worth files once with a restore-only warning. The archive's base currency must
-match the workspace's; otherwise the whole archive is refused. Existing net-worth data is left
-untouched. To merge a valuation history, import its `item_valuations.csv` alone.
+closed months, net-worth files and investment files are listed for information but never
+applied; a 1.2+ archive lists its net-worth files once with a restore-only warning, and a 1.4
+archive lists its investment files once with the same kind of warning. The settings diff also
+reports the investment cost basis and risk targets when they differ. The archive's base currency
+must match the workspace's; otherwise the whole archive is refused. Existing net-worth and
+investment data is left untouched. To merge a valuation history, import its
+`item_valuations.csv` alone.
 
 Each category in the archive is a row in the [category mapping](#category-mapping) step, so an
 active and an archived category with the same name stay separate. By default, a category the
@@ -223,14 +244,16 @@ shows what will be removed.
 - **Restore:** owners only. It removes everything the restore wrote, for good, and puts the
   previous workspace settings back, so the workspace is empty again and you can restore a
   corrected archive. It also removes the net-worth categories, items, valuations and snapshots
-  it wrote; append-only valuations are removed only through this explicit batch rollback. It is
-  refused, with the reason, once anything changed after the restore: a new or edited entry,
-  category, planned value or net-worth row, a closed or reopened month, a changed setting, or a
-  new recurring item, income source, work log or tax rule. A monthly automatic net-worth
-  snapshot taken after the restore also counts as a new row and blocks rollback. A rolled-back
-  restore does not bring back the suggested categories (ledger or net-worth); use **Add
-  suggested categories** on the [Categories](categories.md) or [Net worth](net-worth.md) page
-  if you want them.
+  and the investment classes, instruments, allocations, transactions, bond terms, prices, FX
+  rates, provider settings and risk targets it wrote; append-only valuations are removed only
+  through this explicit batch rollback. It is refused, with the reason, once anything changed
+  after the restore: a new or edited entry, category, planned value, net-worth or investment
+  row, a closed or reopened month, a changed setting, or a new recurring item, income source,
+  work log or tax rule. A monthly automatic net-worth snapshot taken after the restore also
+  counts as a new row and blocks rollback. A rolled-back restore does not bring back the
+  suggested categories or asset classes; use **Add suggested categories** on the
+  [Categories](categories.md) or [Net worth](net-worth.md) page, or **Add suggested asset
+  classes** on the [Investments](investments.md) page, if you want them.
 
 The audit log records every apply and rollback with counts, never with amounts, descriptions or
 file names.

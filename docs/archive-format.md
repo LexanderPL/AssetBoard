@@ -1,4 +1,4 @@
-# Workspace archive format (v1.3)
+# Workspace archive format (v1.4)
 
 This is the reference for the files that **Export and import** writes and reads: the workspace
 archive (a ZIP) and the hand-made CSV files you can import on their own. It is normative: the
@@ -22,7 +22,15 @@ assetboard-home-20261018-143000Z.zip
 ├── networth_categories.csv
 ├── networth_items.csv
 ├── item_valuations.csv
-└── networth_snapshots.csv
+├── networth_snapshots.csv
+├── asset_classes.csv
+├── instruments.csv
+├── instrument_allocations.csv
+├── investment_transactions.csv
+├── bond_terms.csv
+├── price_points.csv
+├── fx_rates.csv
+└── price_source_configs.csv
 ```
 
 All members sit at the root of the ZIP (no folders). Every file is required in an archive, even
@@ -62,14 +70,18 @@ lists them as unknown keys (a warning). 1.2: adds the four net-worth files
 `networth_snapshots.csv`); they are required in a 1.2 archive and absent from 1.0/1.1 archives,
 which read with empty net-worth data. 1.3: `networth_items.csv` gains
 `estimate_between`; a 1.2 archive reads without it and restore uses the side default (assets on,
-liabilities off). Golden archives of all four versions are in `tests/fixtures/`.
+liabilities off). 1.4 (additive): adds the eight investment files below,
+`workspace.json` gains the optional `investment_cost_basis` and `risk_target_policy` keys, and
+`asset_classes.csv` carries the F6.11 risk tiers. A 1.3 archive reads with no investment rows
+and the default average cost basis; a 1.4 archive requires every new file (header only when
+empty). Golden archives of all five versions are in `tests/fixtures/`.
 
 ## `manifest.json`
 
 ```json
 {
   "format": "workspace-archive",
-  "format_version": "1.3",
+  "format_version": "1.4",
   "app": {"name": "AssetBoard", "version": "0.4.0"},
   "exported_at": "2026-10-18T14:30:00Z",
   "base_currency": "EUR",
@@ -99,7 +111,15 @@ count.
   "locale": "pl",
   "auto_copy_plan": false,
   "taxes_enabled": true,
-  "upcoming_days": null
+  "upcoming_days": null,
+  "investment_cost_basis": "fifo",
+  "risk_target_policy": {
+    "mode": "fixed",
+    "safe_bp": 6000,
+    "growth_bp": 3000,
+    "speculative_bp": 1000,
+    "tolerance_bp": 500
+  }
 }
 ```
 
@@ -113,6 +133,24 @@ count.
 | `auto_copy_plan` | 1.0 | yes | `true` \| `false`: copy the previous month's plan automatically |
 | `taxes_enabled` | 1.1 | no (absent = off) | `true` \| `false`: the workspace's Taxes switch |
 | `upcoming_days` | 1.1 | no (absent = `null`) | integer 1–365, or `null` for the instance default |
+| `investment_cost_basis` | 1.4 | no (absent = `average`) | `average` \| `fifo` |
+| `risk_target_policy` | 1.4 | no (absent = defaults) | object; see below |
+
+`risk_target_policy` is the workspace's saved target allocation (F6.11). It is absent when the
+workspace never saved one, in which case the defaults apply. All five keys are required when
+the object is present:
+
+| Field | Values |
+|---|---|
+| `mode` | `fixed` \| `age_scaled` \| `age_in_bonds` |
+| `safe_bp` | integer 0–10 000 |
+| `growth_bp` | integer 0–10 000 |
+| `speculative_bp` | integer 0–10 000; in age modes this is X |
+| `tolerance_bp` | integer 0–10 000 |
+
+The targets must total exactly 10 000 basis points in `fixed` mode. A merge reports
+`risk_target_policy` and `investment_cost_basis` in its settings diff but never applies them;
+only a restore does.
 
 Later settings are added as optional keys (a minor version). A merge reports settings that
 differ from the workspace's but never applies them; only a restore does.
@@ -342,6 +380,182 @@ month,closed_at,plan_started_at
 2026-09,,2026-09-01T06:30:12Z
 ```
 
+## `asset_classes.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `name` | yes | 1–80 characters; unique among active classes |
+| `investable` | no (default `true`) | `true` \| `false` |
+| `color` | no (default from the palette) | `#rrggbb` |
+| `sort_order` | no (default: file order) | integer ≥ 0 |
+| `risk_tier` | no | `safe` \| `growth` \| `speculative`; blank = unassigned |
+| `archived_at` | no | timestamp; set = archived |
+
+Export order: active before archived, `sort_order`, name key, lineage id.
+
+```csv
+id,name,investable,color,sort_order,risk_tier,archived_at
+0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d,Stocks,true,#2563eb,0,growth,
+1b2c3d4e-5f60-4b7c-9d8e-0f1a2b3c4d5e,Bonds,true,#16a34a,1,safe,
+```
+
+## `instruments.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `name` | yes | 1–200 characters; unique among active instruments |
+| `symbol` | no | at most 32 characters |
+| `type` | yes | `equity` \| `etf` \| `bond_market` \| `bond_model` \| `metal` \| `crypto` \| `currency` \| `real_estate` \| `other` |
+| `quote_currency` | yes | ISO 4217 code |
+| `unit_label` | yes | 1–32 characters; a currency instrument's label is its code |
+| `valuation_source` | yes | `provider` \| `manual` \| `bond_model` |
+| `provider_key` | no | at most 32 characters |
+| `provider_symbol` | no | at most 64 characters |
+| `provider_backfilled_at` | no | timestamp of the last full provider backfill |
+| `risk_tier_override` | no | `safe` \| `growth` \| `speculative`; blank = use the class tiers |
+| `archived_at` | no | timestamp; set = archived |
+
+Export order: active before archived, name key, lineage id.
+
+```csv
+id,name,symbol,type,quote_currency,unit_label,valuation_source,provider_key,provider_symbol,provider_backfilled_at,risk_tier_override,archived_at
+2c3d4e5f-6071-4c8d-ae9f-1a2b3c4d5e6f,World ETF,VWCE,etf,EUR,share,manual,,,,,
+3d4e5f60-7182-4d9e-bfa0-2b3c4d5e6f70,Treasury bond,,bond_model,EUR,bond,bond_model,,,,,
+```
+
+## `instrument_allocations.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `instrument_id` | yes | instrument lineage id |
+| `instrument` | yes | instrument name (must match `instrument_id`) |
+| `asset_class_id` | yes | asset class lineage id |
+| `asset_class` | yes | asset class name (must match `asset_class_id`) |
+| `weight_bp` | yes | integer 1–10 000; every instrument's weights total exactly 10 000 |
+
+Export order: instrument order, weight descending, asset class order, lineage id.
+
+```csv
+id,instrument_id,instrument,asset_class_id,asset_class,weight_bp
+4e5f6071-8293-4eaf-80b1-3c4d5e6f7081,2c3d4e5f-6071-4c8d-ae9f-1a2b3c4d5e6f,World ETF,0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d,Stocks,10000
+5f607182-93a4-4fb0-91c2-4d5e6f708192,3d4e5f60-7182-4d9e-bfa0-2b3c4d5e6f70,Treasury bond,1b2c3d4e-5f60-4b7c-9d8e-0f1a2b3c4d5e,Bonds,10000
+```
+
+## `investment_transactions.csv`
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `instrument_id` | yes | instrument lineage id |
+| `instrument` | yes | instrument name (must match `instrument_id`) |
+| `date` | yes (may be blank) | `YYYY-MM-DD`; blank = undated imported legacy lot |
+| `type` | yes | `buy` \| `sell` \| `dividend` \| `fee` \| `split` |
+| `quantity` | yes | plain positive decimal, at most 18 fractional digits |
+| `unit_price` | yes | plain decimal ≥ 0 in `quote_currency`, at most 18 fractional digits |
+| `quote_currency` | yes | must equal the instrument's quote currency |
+| `fee` | no (default `0`) | decimal in `quote_currency` with its minor digits |
+| `fx_to_base` | no | positive plain decimal; base-currency units per quote-currency unit |
+| `note` | no | at most 200 characters |
+| `settlement_currency` | no | ISO 4217 code; the three settlement fields are set together |
+| `settlement_unit_price` | no | plain decimal ≥ 0 in `settlement_currency` |
+| `settlement_fee` | no | decimal in `settlement_currency` with its minor digits |
+| `deleted_at` | no | timestamp; set = soft-deleted |
+
+A settlement row must use the workspace base currency and is allowed only when the instrument's
+quote currency differs from the base and the instrument is not a `currency` instrument. Export
+order: instrument order, undated before dated, date, entry time, lineage id. Quantities, prices
+and FX rates are written with `format(value, "f")`, never an exponent or `float`, with trailing
+fractional zeros removed; import reads them with `Decimal(text)`.
+
+```csv
+id,instrument_id,instrument,date,type,quantity,unit_price,quote_currency,fee,fx_to_base,note,settlement_currency,settlement_unit_price,settlement_fee,deleted_at
+60718293-a4b5-40c1-82d3-5e6f708192a3,2c3d4e5f-6071-4c8d-ae9f-1a2b3c4d5e6f,World ETF,2026-09-01,buy,10,100.5,EUR,1.00,1,First lot,,,,
+```
+
+## `bond_terms.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `instrument_id` | yes | bond-model instrument lineage id |
+| `instrument` | yes | instrument name (must match `instrument_id`) |
+| `series_code` | no | at most 64 characters |
+| `face_value` | yes | decimal > 0 in the instrument's quote currency |
+| `maturity_date` | yes | `YYYY-MM-DD` |
+| `interest_mode` | yes | `capitalized_annually` \| `paid_out_annually` \| `at_maturity_simple` |
+| `rate_schedule` | yes | compact JSON list of `{from_date, annual_rate_bp}` |
+| `tax_rate_bp` | yes | integer 0–10 000 |
+| `early_redemption_fee_mode` | no | `percent` \| `fixed`; blank = no early-redemption fee |
+| `early_redemption_fee_rate_bp` | no | integer 0–10 000 for `percent` |
+| `early_redemption_fee` | no | decimal in the instrument's quote currency for `fixed` |
+
+```csv
+id,instrument_id,instrument,series_code,face_value,maturity_date,interest_mode,rate_schedule,tax_rate_bp,early_redemption_fee_mode,early_redemption_fee_rate_bp,early_redemption_fee
+718293a4-b5c6-41d2-93e4-6f708192a3b4,3d4e5f60-7182-4d9e-bfa0-2b3c4d5e6f70,Treasury bond,EDO,1000.00,2030-01-01,capitalized_annually,"[{""annual_rate_bp"":500,""from_date"":""2026-01-01""}]",1900,percent,100,
+```
+
+## `price_points.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `instrument_id` | yes | instrument lineage id |
+| `instrument` | yes | instrument name (must match `instrument_id`) |
+| `date` | yes | `YYYY-MM-DD` |
+| `price` | yes | plain decimal ≥ 0 in the instrument's quote currency |
+| `source` | yes | `manual` \| `provider` |
+| `provider_key` | no | at most 32 characters; set for provider rows |
+
+Only manual and provider observations are exported; transaction-derived prices are recomputed.
+Export order: instrument order, date, source, entry time, lineage id.
+
+```csv
+id,instrument_id,instrument,date,price,source,provider_key
+8293a4b5-c6d7-42e3-84f5-708192a3b4c5,2c3d4e5f-6071-4c8d-ae9f-1a2b3c4d5e6f,World ETF,2026-09-01,101.25,manual,
+```
+
+## `fx_rates.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `base_currency` | yes | must equal the workspace base currency |
+| `quote_currency` | yes | ISO 4217 code |
+| `date` | yes | `YYYY-MM-DD` |
+| `rate` | yes | positive plain decimal: base-currency units per one quote-currency unit |
+| `source` | yes | `manual` or a provider key |
+
+Only stored manual and provider rates are exported; transaction-derived FX is recomputed. Export
+order: base, quote, date, source, entry time, lineage id.
+
+```csv
+id,base_currency,quote_currency,date,rate,source
+93a4b5c6-d7e8-43f4-a506-8192a3b4c5d6,EUR,USD,2026-09-01,0.92,nbp
+```
+
+## `price_source_configs.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `provider_key` | yes | provider key, unique per workspace |
+| `enabled` | yes | `true` \| `false` |
+| `daily_call_budget` | yes | integer 1–100 000 |
+| `fx_backfilled` | no | compact JSON object of currency → date; the one-off FX backfill marker |
+
+Provider API keys and other encrypted settings are **never** exported (F9.3). On restore a
+keyless provider (NBP, ECB, CoinGecko) keeps its saved enabled state. A provider that requires a
+key (EODHD, GoldAPI) is restored **disabled** and the restore report says to re-enter the API key
+and enable it; leaving it enabled would only log `missing_api_key` on every scheduled run.
+
+```csv
+id,provider_key,enabled,daily_call_budget,fx_backfilled
+a4b5c6d7-e8f9-44a5-b617-92a3b4c5d6e7,nbp,true,20,"{""USD"":""2026-09-01""}"
+```
+
 ## Reader limits
 
 An uploaded archive is never extracted to disk. It is refused when it has members in folders or
@@ -350,13 +564,20 @@ deflate, duplicate names, more than 64 members, a member over 100 MiB or a total
 uncompressed, or a member (1 MiB or larger) compressed more than 200:1. Unknown member names are
 listed as warnings and ignored. A file may hold at most 1 000 000 data rows and 64 columns.
 
-## Not in the archive (format 1.3)
+## Not in the archive (format 1.4)
 
 Members, invitations, users and their sessions, the audit log, import batches and saved
 mappings, and who created or closed what. Recurring items, income sources, work logs and
 calendars, and tax rules are added by a later archive extension as new files (a minor version);
 until then, a restore requires a workspace without them. Notification channels are never
-exported, because their URLs can contain secrets.
+exported, because their URLs can contain secrets. Provider error logs are operational and not
+portable.
 
-Net-worth files are restore-only in a full archive merge: they are ignored and listed once as a
-warning. Only a lone `item_valuations.csv` merges.
+The profile's `birth_year` and `life_expectancy` are user data, not workspace data, so they are
+not archived. `investment_cost_basis` and `risk_target_policy` are workspace settings and live
+in `workspace.json`.
+
+Net-worth and investment files are restore-only in a full archive merge: they are ignored and
+listed once as a warning (`networth_restore_only` and `investment_restore_only`). A lone
+`item_valuations.csv` and, from F6.9's standalone importer, a lone
+`investment_transactions.csv` can be merged.

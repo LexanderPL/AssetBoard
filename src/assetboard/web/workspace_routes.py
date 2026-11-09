@@ -149,6 +149,7 @@ IMPORT_SETTING_LABELS = {
     "taxes_enabled": _("Taxes"),
     "upcoming_days": _("Upcoming window"),
     "investment_cost_basis": _("Investment cost basis"),
+    "risk_target_policy": _("Risk targets"),
 }
 ROLE_LABELS = {
     Role.OWNER: _("Owner"),

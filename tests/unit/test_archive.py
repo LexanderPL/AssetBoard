@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Callable
+from dataclasses import replace
 from datetime import UTC, datetime
+from decimal import Decimal
 from pathlib import Path
+from uuid import uuid4
 from zipfile import ZIP_BZIP2, ZIP_DEFLATED, ZIP_STORED, ZipFile, ZipInfo
 
 import pytest
@@ -14,21 +18,32 @@ from assetboard.db.base import Base, WorkspaceOwned
 from assetboard.domain.archive import (
     ArchiveError,
     ArchiveRows,
+    AssetClassRow,
+    BondTermsRow,
     BudgetLineRow,
     CategoryRow,
+    FxRateRow,
+    InstrumentAllocationRow,
+    InstrumentRow,
+    InvestmentTransactionRow,
     ItemValuationRow,
     MonthRow,
     NetWorthCategoryRow,
     NetWorthItemRow,
     NetWorthSnapshotRow,
+    PricePointRow,
+    PriceSourceConfigRow,
+    RiskTargetPolicyRow,
     TransactionRow,
+    decimal_text,
     parse_archive,
     write_archive,
 )
 from assetboard.services.archive import ARCHIVE_EXCLUDED_MODELS, ARCHIVE_INCLUDED_MODELS
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
-GOLDEN = FIXTURES / "workspace-archive-v1.3.zip"
+GOLDEN = FIXTURES / "workspace-archive-v1.4.zip"
+GOLDEN_V1_3 = FIXTURES / "workspace-archive-v1.3.zip"
 GOLDEN_V1_2 = FIXTURES / "workspace-archive-v1.2.zip"
 GOLDEN_V1_1 = FIXTURES / "workspace-archive-v1.1.zip"
 GOLDEN_V1_0 = FIXTURES / "workspace-archive-v1.0.zip"
@@ -44,6 +59,17 @@ def _rows() -> ArchiveRows:
     first_valuation_id = "e6f7a8b9-c0d1-4e2f-9a3b-4c5d6e7f8091"
     second_valuation_id = "f7a8b9c0-d1e2-4f3a-8b4c-5d6e7f8091a2"
     snapshot_id = "a8b9c0d1-e2f3-4a4b-9c5d-6e7f8091a2b3"
+    asset_class_id = "0a1b2c3d-4e5f-4a6b-8c7d-9e0f1a2b3c4d"
+    bond_class_id = "1b2c3d4e-5f60-4b7c-9d8e-0f1a2b3c4d5e"
+    instrument_id = "2c3d4e5f-6071-4c8d-ae9f-1a2b3c4d5e6f"
+    bond_instrument_id = "3d4e5f60-7182-4d9e-bfa0-2b3c4d5e6f70"
+    allocation_id = "4e5f6071-8293-4eaf-80b1-3c4d5e6f7081"
+    bond_allocation_id = "5f607182-93a4-4fb0-91c2-4d5e6f708192"
+    investment_transaction_id = "60718293-a4b5-40c1-82d3-5e6f708192a3"
+    bond_terms_id = "718293a4-b5c6-41d2-93e4-6f708192a3b4"
+    price_point_id = "8293a4b5-c6d7-42e3-84f5-708192a3b4c5"
+    fx_rate_id = "93a4b5c6-d7e8-43f4-a506-8192a3b4c5d6"
+    provider_config_id = "a4b5c6d7-e8f9-44a5-b617-92a3b4c5d6e7"
     breakdown = (
         '{"categories":[{"category_id":"'
         + networth_category_id
@@ -60,6 +86,14 @@ def _rows() -> ArchiveRows:
             "auto_copy_plan": False,
             "taxes_enabled": True,
             "upcoming_days": 14,
+            "investment_cost_basis": "fifo",
+            "risk_target_policy": {
+                "mode": "fixed",
+                "safe_bp": 6000,
+                "growth_bp": 3000,
+                "speculative_bp": 1000,
+                "tolerance_bp": 500,
+            },
         },
         categories=(CategoryRow(category_id, "expense", "Food", "regular", "#4f9d69", 0, None),),
         budget_lines=(BudgetLineRow("2026-09", "expense", "Food", "550.00", "EUR", category_id),),
@@ -109,7 +143,7 @@ def _rows() -> ArchiveRows:
                 None,
                 "linked",
                 "portfolio_holding",
-                "b9c0d1e2-f3a4-4b5c-8d6e-7f8091a2b3c4",
+                instrument_id,
                 "true",
                 "true",
                 None,
@@ -149,12 +183,110 @@ def _rows() -> ArchiveRows:
                 "auto",
             ),
         ),
+        asset_classes=(
+            AssetClassRow(asset_class_id, "Stocks", "true", "#2563eb", 0, "growth", None),
+            AssetClassRow(bond_class_id, "Bonds", "true", "#16a34a", 1, "safe", None),
+        ),
+        instruments=(
+            InstrumentRow(
+                instrument_id,
+                "World ETF",
+                "VWCE",
+                "etf",
+                "EUR",
+                "share",
+                "manual",
+                "",
+                "",
+                None,
+                "",
+                None,
+            ),
+            InstrumentRow(
+                bond_instrument_id,
+                "Treasury bond",
+                "",
+                "bond_model",
+                "EUR",
+                "bond",
+                "bond_model",
+                "",
+                "",
+                None,
+                "",
+                None,
+            ),
+        ),
+        instrument_allocations=(
+            InstrumentAllocationRow(
+                allocation_id, instrument_id, "World ETF", asset_class_id, "Stocks", 10_000
+            ),
+            InstrumentAllocationRow(
+                bond_allocation_id,
+                bond_instrument_id,
+                "Treasury bond",
+                bond_class_id,
+                "Bonds",
+                10_000,
+            ),
+        ),
+        investment_transactions=(
+            InvestmentTransactionRow(
+                investment_transaction_id,
+                instrument_id,
+                "World ETF",
+                "2026-09-01",
+                "buy",
+                "10",
+                "100.5",
+                "EUR",
+                "1.00",
+                "1",
+                "First lot",
+                "",
+                "",
+                "",
+                None,
+            ),
+        ),
+        bond_terms=(
+            BondTermsRow(
+                bond_terms_id,
+                bond_instrument_id,
+                "Treasury bond",
+                "EDO",
+                "1000.00",
+                "2030-01-01",
+                "capitalized_annually",
+                '[{"annual_rate_bp":500,"from_date":"2026-01-01"}]',
+                1900,
+                "percent",
+                100,
+                "",
+            ),
+        ),
+        price_points=(
+            PricePointRow(
+                price_point_id,
+                instrument_id,
+                "World ETF",
+                "2026-09-01",
+                "101.25",
+                "manual",
+                "",
+            ),
+        ),
+        fx_rates=(FxRateRow(fx_rate_id, "EUR", "USD", "2026-09-01", "0.92", "nbp"),),
+        price_source_configs=(
+            PriceSourceConfigRow(provider_config_id, "nbp", "true", 20, '{"USD":"2026-09-01"}'),
+        ),
+        risk_target_policy=RiskTargetPolicyRow("fixed", 6000, 3000, 1000, 500),
     )
 
 
-def _archive() -> bytes:
+def _archive(rows: ArchiveRows | None = None) -> bytes:
     return write_archive(
-        _rows(),
+        rows or _rows(),
         app_name="AssetBoard",
         app_version="0.4.0",
         exported_at=EXPORTED_AT,
@@ -230,7 +362,7 @@ def test_v1_3_requires_the_estimate_column() -> None:
 
 
 def test_v1_3_workspace_carries_the_net_worth_files_and_estimate_switch() -> None:
-    parsed, errors = parse_archive(GOLDEN.read_bytes())
+    parsed, errors = parse_archive(GOLDEN_V1_3.read_bytes())
     assert errors == ()
     assert parsed is not None and parsed.warnings == ()
     assert parsed.manifest["format_version"] == "1.3"
@@ -240,6 +372,28 @@ def test_v1_3_workspace_carries_the_net_worth_files_and_estimate_switch() -> Non
     assert [row.value for row in parsed.rows.item_valuations] == ["12000.00", "12050.00"]
     assert parsed.rows.item_valuations[0].created_at == "2026-09-01T08:00:00Z"
     assert [row.source for row in parsed.rows.networth_snapshots] == ["auto"]
+    assert parsed.rows.asset_classes == ()
+    assert parsed.rows.instruments == ()
+    assert parsed.rows.risk_target_policy is None
+
+
+def test_v1_4_workspace_carries_investments_and_risk_targets() -> None:
+    parsed, errors = parse_archive(GOLDEN.read_bytes())
+    assert errors == ()
+    assert parsed is not None and parsed.warnings == ()
+    assert parsed.manifest["format_version"] == "1.4"
+    assert [row.name for row in parsed.rows.asset_classes] == ["Stocks", "Bonds"]
+    assert [row.risk_tier for row in parsed.rows.asset_classes] == ["growth", "safe"]
+    assert [row.name for row in parsed.rows.instruments] == ["World ETF", "Treasury bond"]
+    assert [row.weight_bp for row in parsed.rows.instrument_allocations] == [10_000, 10_000]
+    assert parsed.rows.investment_transactions[0].quantity == "10"
+    assert parsed.rows.investment_transactions[0].unit_price == "100.5"
+    assert parsed.rows.investment_transactions[0].fee == "1.00"
+    assert parsed.rows.price_points[0].price == "101.25"
+    assert parsed.rows.fx_rates[0].rate == "0.92"
+    assert parsed.rows.price_source_configs[0].enabled == "true"
+    assert parsed.rows.risk_target_policy == RiskTargetPolicyRow("fixed", 6000, 3000, 1000, 500)
+    assert parsed.rows.workspace["investment_cost_basis"] == "fifo"
 
 
 @pytest.mark.parametrize(
@@ -288,11 +442,20 @@ def test_reader_checks_checksums() -> None:
     assert any(error.message == "checksum mismatch" for error in errors)
 
 
-def test_price_and_fx_models_are_excluded_until_the_f69_archive_extension() -> None:
-    assert "F6.9" in ARCHIVE_EXCLUDED_MODELS["PricePoint"]
-    assert "F6.9" in ARCHIVE_EXCLUDED_MODELS["FxRate"]
-    assert "F6.9" in ARCHIVE_EXCLUDED_MODELS["BondTerms"]
-    assert "F6.9" in ARCHIVE_EXCLUDED_MODELS["RiskTargetPolicy"]
+def test_investment_models_are_archived_in_1_4() -> None:
+    for model in (
+        "AssetClass",
+        "RiskTargetPolicy",
+        "Instrument",
+        "InstrumentAllocation",
+        "InvestmentTransaction",
+        "BondTerms",
+        "PricePoint",
+        "FxRate",
+        "PriceSourceConfig",
+    ):
+        assert model in ARCHIVE_INCLUDED_MODELS
+    assert "ProviderError" in ARCHIVE_EXCLUDED_MODELS
 
 
 def test_every_workspace_owned_model_is_archived_or_excluded() -> None:
@@ -497,6 +660,131 @@ def test_zip_metadata_and_lossless_text() -> None:
             assert member.extra == b""
 
 
+@given(
+    st.decimals(
+        min_value=Decimal("0"),
+        max_value=Decimal("99999999999999999999.999999999999999999"),
+        places=18,
+    )
+)
+def test_decimal_text_is_plain_lossless_and_without_trailing_zeros(value: Decimal) -> None:
+    text = decimal_text(value)
+    assert "e" not in text.lower()
+    assert Decimal(text) == value
+    if "." in text:
+        assert not text.endswith("0")
+
+
+@pytest.mark.parametrize(
+    ("change", "message", "file"),
+    [
+        (
+            lambda rows: replace(
+                rows,
+                instrument_allocations=(
+                    replace(rows.instrument_allocations[0], weight_bp=9_000),
+                    *rows.instrument_allocations[1:],
+                ),
+            ),
+            "allocation weights must total 100%",
+            "instrument_allocations.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                investment_transactions=(
+                    replace(rows.investment_transactions[0], quote_currency="USD"),
+                ),
+            ),
+            "instrument reference mismatch",
+            "investment_transactions.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                investment_transactions=(
+                    replace(
+                        rows.investment_transactions[0],
+                        settlement_currency="EUR",
+                        settlement_unit_price="1",
+                        settlement_fee="1.00",
+                    ),
+                ),
+            ),
+            "settlement is not allowed here",
+            "investment_transactions.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                asset_classes=(
+                    replace(rows.asset_classes[0], risk_tier="risky"),
+                    *rows.asset_classes[1:],
+                ),
+            ),
+            "invalid risk tier",
+            "asset_classes.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                price_source_configs=(
+                    *rows.price_source_configs,
+                    replace(rows.price_source_configs[0], id=str(uuid4())),
+                ),
+            ),
+            "duplicate provider config",
+            "price_source_configs.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                bond_terms=(
+                    replace(
+                        rows.bond_terms[0],
+                        rate_schedule=(
+                            '[{"annual_rate_bp":500,"from_date":"2026-01-01"},'
+                            '{"annual_rate_bp":600,"from_date":"2026-01-01"}]'
+                        ),
+                    ),
+                ),
+            ),
+            "invalid rate schedule",
+            "bond_terms.csv",
+        ),
+    ],
+)
+def test_reader_rejects_invalid_investment_rows(
+    change: Callable[[ArchiveRows], ArchiveRows], message: str, file: str
+) -> None:
+    rows = change(_rows())
+    parsed, errors = parse_archive(_archive(rows))
+    assert parsed is None
+    assert any(error.message == message and error.file == file for error in errors), errors
+
+
+def test_reader_rejects_an_invalid_risk_policy() -> None:
+    rows = _rows()
+    workspace = dict(rows.workspace)
+    workspace["risk_target_policy"] = {
+        "mode": "fixed",
+        "safe_bp": 5000,
+        "growth_bp": 4000,
+        "speculative_bp": 500,
+        "tolerance_bp": 500,
+    }
+    parsed, errors = parse_archive(_archive(replace(rows, workspace=workspace)))
+    assert parsed is None
+    assert errors == (ArchiveError("workspace.json", "invalid workspace settings"),)
+
+
+def test_decimal_text_examples() -> None:
+    assert decimal_text(Decimal("0.000")) == "0"
+    assert decimal_text(Decimal("12.3400")) == "12.34"
+    assert decimal_text(Decimal("100.5")) == "100.5"
+    assert decimal_text(Decimal("0.00924")) == "0.00924"
+
+
 def test_reader_warns_about_unknown_files() -> None:
     import hashlib
     import json
@@ -688,7 +976,7 @@ def test_reader_caps_errors(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_reader_caps_data_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     import assetboard.domain.archive as archive
 
-    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 10)
+    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 21)
     assert parse_archive(_archive())[1] == ()
-    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 9)
+    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 20)
     assert parse_archive(_archive())[1] == (ArchiveError("archive", "too many data rows"),)

@@ -18,6 +18,7 @@ from collections import OrderedDict
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
+from decimal import Decimal
 from typing import Any, cast
 from uuid import UUID
 
@@ -25,26 +26,38 @@ from sqlalchemy.orm import Session
 
 from assetboard.db.models.identity import Workspace
 from assetboard.db.models.import_batch import ImportBatch
+from assetboard.db.models.investments import AssetClass, RiskTargetPolicy
 from assetboard.db.models.ledger import Category
 from assetboard.db.models.networth import NetWorthCategory
 from assetboard.db.repositories import (
+    AssetClassRepository,
     AuditEventRepository,
+    BondTermsRepository,
     BudgetLineRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
+    FxRateRepository,
     ImportCategoryMappingRepository,
+    InstrumentAllocationRepository,
+    InstrumentRepository,
+    InvestmentTransactionRepository,
     ItemValuationRepository,
     MonthStateRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
     NetWorthSnapshotRepository,
+    PricePointRepository,
+    PriceSourceConfigRepository,
+    RiskTargetPolicyRepository,
     TransactionRepository,
 )
 from assetboard.domain.archive import (
+    INVESTMENT_CSV_FILES,
     NETWORTH_CSV_FILES,
     ArchiveRows,
     BudgetLineRow,
     CategoryRow,
+    NetWorthItemRow,
     ParsedArchive,
     TransactionRow,
 )
@@ -59,9 +72,12 @@ from assetboard.domain.import_csv import (
 )
 from assetboard.domain.import_upload import DEADLINE_CHECK_ROWS, ParsedUpload, ParseTimeout
 from assetboard.domain.ledger_csv import plain_amount
+from assetboard.domain.money import minor_unit_for
 from assetboard.domain.months import YearMonth
+from assetboard.domain.providers import PROVIDERS
 from assetboard.domain.transactions import EntryError, description_key
 from assetboard.services.archive import (
+    suggested_asset_classes_to_remove,
     suggested_categories_to_remove,
     suggested_networth_categories_to_remove,
     workspace_is_empty,
@@ -88,6 +104,7 @@ RESTORE_SETTINGS_FIELDS = (
     "auto_copy_plan",
     "taxes_enabled",
     "upcoming_days",
+    "investment_cost_basis",
 )
 
 
@@ -126,6 +143,16 @@ def _restore_counts(**values: int) -> dict[str, int]:
         "item_valuations_created": 0,
         "networth_snapshots_created": 0,
         "linked_items_unlinked": 0,
+        "asset_classes_created": 0,
+        "instruments_created": 0,
+        "instrument_allocations_created": 0,
+        "investment_transactions_created": 0,
+        "bond_terms_created": 0,
+        "price_points_created": 0,
+        "fx_rates_created": 0,
+        "price_source_configs_created": 0,
+        "risk_policy_restored": 0,
+        "suggested_asset_classes_removed": 0,
         **values,
     }
 
@@ -163,6 +190,7 @@ class _RestoreSettings:
     auto_copy_plan: bool
     taxes_enabled: bool
     upcoming_days: int | None
+    investment_cost_basis: str
 
     def values(self) -> dict[str, object]:
         return {field: getattr(self, field) for field in RESTORE_SETTINGS_FIELDS}
@@ -198,6 +226,15 @@ def _restore_settings(
         errors.append(
             _entry("invalid_workspace_settings", file="workspace.json", column="taxes_enabled")
         )
+    cost_basis = workspace.get("investment_cost_basis", "average")
+    if cost_basis not in {"average", "fifo"}:
+        errors.append(
+            _entry(
+                "invalid_workspace_settings",
+                file="workspace.json",
+                column="investment_cost_basis",
+            )
+        )
     if errors:
         return None, errors
     return (
@@ -210,6 +247,7 @@ def _restore_settings(
             auto_copy_plan=bool(workspace.get("auto_copy_plan", False)),
             taxes_enabled=cast("bool", taxes),
             upcoming_days=cast("int | None", upcoming),
+            investment_cost_basis=cast("str", cost_basis),
         ),
         [],
     )
@@ -232,7 +270,25 @@ def _archive_setting_values(workspace: Mapping[str, object]) -> dict[str, object
         "auto_copy_plan": bool(workspace.get("auto_copy_plan", False)),
         "taxes_enabled": workspace.get("taxes_enabled", False),
         "upcoming_days": workspace.get("upcoming_days"),
+        "investment_cost_basis": workspace.get("investment_cost_basis", "average"),
     }
+
+
+def _risk_policy_tuple(values: object) -> tuple[object, ...] | None:
+    if values is None:
+        return None
+    return (
+        getattr(values, "mode", None),
+        getattr(values, "safe_bp", None),
+        getattr(values, "growth_bp", None),
+        getattr(values, "speculative_bp", None),
+        getattr(values, "tolerance_bp", None),
+    )
+
+
+def _current_risk_policy(session: Session, ctx: Context) -> tuple[object, ...] | None:
+    row = RiskTargetPolicyRepository(session, ctx).for_workspace()
+    return _risk_policy_tuple(row)
 
 
 def _duplicate_active_categories(rows: tuple[CategoryRow, ...]) -> set[tuple[str, str]]:
@@ -249,11 +305,15 @@ def _duplicate_active_categories(rows: tuple[CategoryRow, ...]) -> set[tuple[str
 
 
 def _restore_counts_for(
-    rows: ArchiveRows, *, removed: int, removed_networth: int
+    rows: ArchiveRows, *, removed: int, removed_networth: int, removed_assets: int
 ) -> dict[str, int]:
     budget_lines = sum(1 for row in rows.budget_lines if _planned_minor(row))
     deleted = sum(1 for row in rows.transactions if row.deleted_at)
-    linked = sum(1 for row in rows.networth_items if row.valuation_mode == "linked")
+    asset_class_ids = {UUID(row.id) for row in rows.asset_classes}
+    instrument_ids = {UUID(row.id) for row in rows.instruments}
+    linked = sum(
+        _link_target_missing(row, asset_class_ids, instrument_ids) for row in rows.networth_items
+    )
     return _restore_counts(
         to_create=(
             len(rows.categories)
@@ -264,6 +324,15 @@ def _restore_counts_for(
             + len(rows.networth_items)
             + len(rows.item_valuations)
             + len(rows.networth_snapshots)
+            + len(rows.asset_classes)
+            + len(rows.instruments)
+            + len(rows.instrument_allocations)
+            + len(rows.investment_transactions)
+            + len(rows.bond_terms)
+            + len(rows.price_points)
+            + len(rows.fx_rates)
+            + len(rows.price_source_configs)
+            + (1 if rows.risk_target_policy is not None else 0)
         ),
         categories_created=len(rows.categories),
         transactions_created=len(rows.transactions),
@@ -277,6 +346,16 @@ def _restore_counts_for(
         item_valuations_created=len(rows.item_valuations),
         networth_snapshots_created=len(rows.networth_snapshots),
         linked_items_unlinked=linked,
+        asset_classes_created=len(rows.asset_classes),
+        instruments_created=len(rows.instruments),
+        instrument_allocations_created=len(rows.instrument_allocations),
+        investment_transactions_created=len(rows.investment_transactions),
+        bond_terms_created=len(rows.bond_terms),
+        price_points_created=len(rows.price_points),
+        fx_rates_created=len(rows.fx_rates),
+        price_source_configs_created=len(rows.price_source_configs),
+        risk_policy_restored=1 if rows.risk_target_policy is not None else 0,
+        suggested_asset_classes_removed=removed_assets,
     )
 
 
@@ -1302,12 +1381,14 @@ def _merge(
     )
     workspace = CurrentWorkspaceRepository(session, ctx).get()
     settings_diff = _settings_diff(workspace, _archive_setting_values(archive.rows.workspace))
+    if _risk_policy_tuple(archive.rows.risk_target_policy) != _current_risk_policy(session, ctx):
+        settings_diff.append("risk_target_policy")
     archive_closed = sorted(row.month for row in archive.rows.months if row.closed_at)
-    warnings = (
-        [_entry("networth_restore_only", file="archive")]
-        if any(name in archive.files for name in NETWORTH_CSV_FILES)
-        else []
-    )
+    warnings: list[dict[str, object]] = []
+    if any(name in archive.files for name in NETWORTH_CSV_FILES):
+        warnings.append(_entry("networth_restore_only", file="archive"))
+    if any(name in archive.files for name in INVESTMENT_CSV_FILES):
+        warnings.append(_entry("investment_restore_only", file="archive"))
     report = _empty_report(
         counts=counts,
         months=months_report,
@@ -1350,10 +1431,17 @@ def _restore_report(
         if workspace_is_empty(session, ctx)
         else []
     )
+    removed_assets = (
+        suggested_asset_classes_to_remove(session, ctx) if workspace_is_empty(session, ctx) else []
+    )
     counts = _restore_counts_for(
-        archive.rows, removed=len(removed), removed_networth=len(removed_networth)
+        archive.rows,
+        removed=len(removed),
+        removed_networth=len(removed_networth),
+        removed_assets=len(removed_assets),
     )
     counts["invalid"] = len(errors)
+    asset_class_ids, instrument_ids = _archived_link_targets(archive)
     warnings = [
         _entry(
             "link_target_missing",
@@ -1362,8 +1450,15 @@ def _restore_report(
             column="link_id",
         )
         for line, row in enumerate(archive.rows.networth_items, start=2)
-        if row.valuation_mode == "linked"
+        if _link_target_missing(row, asset_class_ids, instrument_ids)
     ]
+    warnings.extend(
+        _provider_key_warning(row.provider_key, line)
+        for line, row in enumerate(archive.rows.price_source_configs, start=2)
+        if row.enabled == "true"
+        and (definition := PROVIDERS.get(row.provider_key)) is not None
+        and definition.requires_key
+    )
     report = _empty_report(
         counts=counts,
         errors=errors,
@@ -1372,6 +1467,7 @@ def _restore_report(
         archive_closed_months=sorted(row.month for row in archive.rows.months if row.closed_at),
         suggested_categories_removed=[category.name for category in removed],
         suggested_networth_categories_removed=[category.name for category in removed_networth],
+        suggested_asset_classes_removed=[asset_class.name for asset_class in removed_assets],
         settings_diff=(
             _settings_diff(CurrentWorkspaceRepository(session, ctx).get(), settings.values())
             if settings is not None
@@ -1379,6 +1475,17 @@ def _restore_report(
         ),
     )
     return report
+
+
+def _provider_key_warning(provider_key: str, line: int) -> dict[str, object]:
+    entry = _entry(
+        "provider_key_required",
+        file="price_source_configs.csv",
+        line=line,
+        column="provider_key",
+    )
+    entry["provider"] = provider_key
+    return entry
 
 
 def _plan_restore(
@@ -1406,6 +1513,19 @@ def _plan_restore(
     for number, _row in enumerate(archive.rows.budget_lines, start=1):
         if number % DEADLINE_CHECK_ROWS == 0 and out_of_time():
             raise ParseTimeout
+    for rows in (
+        archive.rows.asset_classes,
+        archive.rows.instruments,
+        archive.rows.instrument_allocations,
+        archive.rows.investment_transactions,
+        archive.rows.bond_terms,
+        archive.rows.price_points,
+        archive.rows.fx_rates,
+        archive.rows.price_source_configs,
+    ):
+        for number, _row in enumerate(rows, start=1):
+            if number % DEADLINE_CHECK_ROWS == 0 and out_of_time():
+                raise ParseTimeout
     return _restore_report(session, ctx, archive, settings=settings, errors=errors)
 
 
@@ -1434,6 +1554,67 @@ def _restore_breakdown(raw: str, category_ids: Mapping[UUID, UUID]) -> dict[str,
     return data
 
 
+def _archived_link_targets(archive: ParsedArchive) -> tuple[set[UUID], set[UUID]]:
+    """Lineage ids of the portfolio targets this archive can resolve (F6.9)."""
+    return (
+        {UUID(row.id) for row in archive.rows.asset_classes},
+        {UUID(row.id) for row in archive.rows.instruments},
+    )
+
+
+def _link_target_missing(
+    row: NetWorthItemRow,
+    asset_class_ids: set[UUID],
+    instrument_ids: set[UUID],
+) -> bool:
+    if row.valuation_mode != "linked":
+        return False
+    link_type = row.link_type
+    raw_id = row.link_id
+    if not isinstance(raw_id, str):
+        return True
+    try:
+        target = UUID(raw_id)
+    except ValueError:
+        return True
+    if link_type == "portfolio_asset_class":
+        return target not in asset_class_ids
+    if link_type == "portfolio_holding":
+        return target not in instrument_ids
+    return True
+
+
+def _resolve_networth_links(
+    session: Session,
+    ctx: Context,
+    archive: ParsedArchive,
+    item_ids: Mapping[UUID, UUID],
+    asset_class_ids: Mapping[UUID, UUID],
+    instrument_ids: Mapping[UUID, UUID],
+) -> int:
+    """Point restored net-worth items at the portfolio rows; count missing targets."""
+    repository = NetWorthItemRepository(session, ctx)
+    missing = 0
+    for row in archive.rows.networth_items:
+        if row.valuation_mode != "linked":
+            continue
+        target: UUID | None = None
+        if row.link_type == "portfolio_asset_class" and row.link_id:
+            target = asset_class_ids.get(UUID(row.link_id))
+        elif row.link_type == "portfolio_holding" and row.link_id:
+            target = instrument_ids.get(UUID(row.link_id))
+        if target is None:
+            missing += 1
+            continue
+        repository.update(
+            item_ids[UUID(row.id)],
+            valuation_mode="linked",
+            link_type=row.link_type,
+            link_id=target,
+        )
+    return missing
+
+
 def _restore_networth(
     session: Session,
     ctx: Context,
@@ -1442,7 +1623,7 @@ def _restore_networth(
     *,
     restore_now: datetime,
     removed: list[NetWorthCategory],
-) -> None:
+) -> dict[UUID, UUID]:
     """Recreate categories, items, valuations and snapshots after the ledger rows."""
     categories_repository = NetWorthCategoryRepository(session, ctx)
     for category in removed:
@@ -1518,6 +1699,249 @@ def _restore_networth(
             import_batch_id=batch.id,
             import_key=f"id:{row.id}",
         )
+    return item_ids
+
+
+def _money_minor(value: str, currency: str, *, allow_zero: bool) -> int:
+    text = value or "0"
+    number = Decimal(text)
+    minor = number.scaleb(minor_unit_for(currency))
+    if minor != minor.to_integral_value():
+        raise ImportServiceError("the archive has an amount with too many decimals")
+    result = int(minor)
+    if result == 0 and not allow_zero:
+        raise ImportServiceError("the archive has a non-positive amount")
+    return result
+
+
+def _restore_investments(
+    session: Session,
+    ctx: Context,
+    batch: ImportBatch,
+    archive: ParsedArchive,
+    *,
+    restore_now: datetime,
+    removed: list[AssetClass],
+) -> tuple[dict[str, int], dict[UUID, UUID], dict[UUID, UUID]]:
+    """Recreate classes, instruments, holdings, prices, FX and provider settings."""
+    classes = AssetClassRepository(session, ctx)
+    for asset_class in removed:
+        classes.delete(asset_class)
+    asset_class_ids: dict[UUID, UUID] = {}
+    for index, row in enumerate(archive.rows.asset_classes):
+        asset_class = classes.create(
+            name=row.name,
+            name_key=name_key(row.name),
+            investable=row.investable == "true",
+            color=row.color,
+            sort_order=row.sort_order,
+            risk_tier=row.risk_tier or None,
+            archived_at=parse_timestamp(row.archived_at) if row.archived_at else None,
+            import_key=f"id:{row.id}",
+            import_batch_id=batch.id,
+            created_at=restore_now + timedelta(microseconds=index),
+        )
+        asset_class_ids[UUID(row.id)] = asset_class.id
+
+    instruments_repo = InstrumentRepository(session, ctx)
+    instrument_ids: dict[UUID, UUID] = {}
+    for index, row in enumerate(archive.rows.instruments):
+        instrument = instruments_repo.create(
+            name=row.name,
+            name_key=name_key(row.name),
+            symbol=row.symbol or None,
+            type=row.type,
+            quote_currency=row.quote_currency,
+            unit_label=row.unit_label,
+            valuation_source=row.valuation_source,
+            provider_key=row.provider_key or None,
+            provider_symbol=row.provider_symbol or None,
+            provider_backfilled_at=(
+                parse_timestamp(row.provider_backfilled_at) if row.provider_backfilled_at else None
+            ),
+            risk_tier_override=row.risk_tier_override or None,
+            archived_at=parse_timestamp(row.archived_at) if row.archived_at else None,
+            import_key=f"id:{row.id}",
+            import_batch_id=batch.id,
+            created_at=restore_now + timedelta(microseconds=index),
+        )
+        instrument_ids[UUID(row.id)] = instrument.id
+
+    allocations = InstrumentAllocationRepository(session, ctx)
+    for index, row in enumerate(archive.rows.instrument_allocations):
+        allocations.create(
+            instrument_id=instrument_ids[UUID(row.instrument_id)],
+            asset_class_id=asset_class_ids[UUID(row.asset_class_id)],
+            weight_bp=row.weight_bp,
+            import_key=f"id:{row.id}",
+            import_batch_id=batch.id,
+            created_at=restore_now + timedelta(microseconds=index),
+        )
+
+    transactions = InvestmentTransactionRepository(session, ctx)
+    for index, row in enumerate(archive.rows.investment_transactions):
+        transactions.create(
+            instrument_id=instrument_ids[UUID(row.instrument_id)],
+            date=parse_date(row.date) if row.date else None,
+            type=row.type,
+            quantity=Decimal(row.quantity),
+            unit_price=Decimal(row.unit_price),
+            quote_currency=row.quote_currency,
+            fee_minor=_money_minor(row.fee, row.quote_currency, allow_zero=True),
+            fx_to_base=Decimal(row.fx_to_base) if row.fx_to_base else None,
+            note=row.note,
+            settlement_currency=row.settlement_currency or None,
+            settlement_unit_price=(
+                Decimal(row.settlement_unit_price) if row.settlement_unit_price else None
+            ),
+            settlement_fee_minor=(
+                _money_minor(row.settlement_fee, row.settlement_currency, allow_zero=True)
+                if row.settlement_currency
+                else None
+            ),
+            import_batch_id=batch.id,
+            import_key=f"id:{row.id}",
+            created_at=restore_now + timedelta(microseconds=index),
+        )
+
+    bonds = BondTermsRepository(session, ctx)
+    for index, row in enumerate(archive.rows.bond_terms):
+        instrument = next(item for item in archive.rows.instruments if item.id == row.instrument_id)
+        bonds.create(
+            instrument_id=instrument_ids[UUID(row.instrument_id)],
+            series_code=row.series_code or None,
+            face_value_minor=_money_minor(
+                row.face_value, instrument.quote_currency, allow_zero=False
+            ),
+            maturity_date=parse_date(row.maturity_date),
+            interest_mode=row.interest_mode,
+            rate_schedule=json.loads(row.rate_schedule),
+            tax_rate_bp=row.tax_rate_bp,
+            early_redemption_fee_mode=row.early_redemption_fee_mode or None,
+            early_redemption_fee_rate_bp=row.early_redemption_fee_rate_bp,
+            early_redemption_fee_minor=(
+                _money_minor(
+                    row.early_redemption_fee,
+                    instrument.quote_currency,
+                    allow_zero=True,
+                )
+                if row.early_redemption_fee_mode == "fixed"
+                else None
+            ),
+            import_key=f"id:{row.id}",
+            import_batch_id=batch.id,
+            created_at=restore_now + timedelta(microseconds=index),
+        )
+
+    prices = PricePointRepository(session, ctx)
+    for index, row in enumerate(archive.rows.price_points):
+        prices.create(
+            instrument_id=instrument_ids[UUID(row.instrument_id)],
+            date=parse_date(row.date),
+            price=Decimal(row.price),
+            source=row.source,
+            provider_key=row.provider_key or None,
+            import_key=f"id:{row.id}",
+            import_batch_id=batch.id,
+            created_at=restore_now + timedelta(microseconds=index),
+        )
+
+    rates = FxRateRepository(session, ctx)
+    for index, row in enumerate(archive.rows.fx_rates):
+        rates.create(
+            base_currency=row.base_currency,
+            quote_currency=row.quote_currency,
+            date=parse_date(row.date),
+            rate=Decimal(row.rate),
+            source=row.source,
+            import_key=f"id:{row.id}",
+            import_batch_id=batch.id,
+            created_at=restore_now + timedelta(microseconds=index),
+        )
+
+    configs = PriceSourceConfigRepository(session, ctx)
+    for index, row in enumerate(archive.rows.price_source_configs):
+        definition = PROVIDERS.get(row.provider_key)
+        requires_key = definition is not None and definition.requires_key
+        configs.create(
+            provider_key=row.provider_key,
+            enabled=row.enabled == "true" and not requires_key,
+            settings_encrypted=None,
+            fx_backfilled=row.fx_backfilled or None,
+            daily_call_budget=row.daily_call_budget,
+            import_key=f"id:{row.id}",
+            import_batch_id=batch.id,
+            created_at=restore_now + timedelta(microseconds=index),
+        )
+
+    return (
+        {
+            "asset_classes_created": len(archive.rows.asset_classes),
+            "instruments_created": len(archive.rows.instruments),
+            "instrument_allocations_created": len(archive.rows.instrument_allocations),
+            "investment_transactions_created": len(archive.rows.investment_transactions),
+            "bond_terms_created": len(archive.rows.bond_terms),
+            "price_points_created": len(archive.rows.price_points),
+            "fx_rates_created": len(archive.rows.fx_rates),
+            "price_source_configs_created": len(archive.rows.price_source_configs),
+        },
+        asset_class_ids,
+        instrument_ids,
+    )
+
+
+def _policy_values(row: RiskTargetPolicy) -> dict[str, object]:
+    return {
+        "mode": row.mode,
+        "safe_bp": row.safe_bp,
+        "growth_bp": row.growth_bp,
+        "speculative_bp": row.speculative_bp,
+        "tolerance_bp": row.tolerance_bp,
+    }
+
+
+def _apply_restore_risk_policy(
+    session: Session,
+    ctx: Context,
+    batch: ImportBatch,
+    archive: ParsedArchive,
+    *,
+    restore_now: datetime,
+) -> int:
+    """Replace the workspace's policy and remember the previous one for rollback."""
+    repository = RiskTargetPolicyRepository(session, ctx)
+    current = repository.for_workspace(for_update=True)
+    previous = _policy_values(current) if current is not None else None
+    batch.previous_settings = {
+        **(batch.previous_settings or {}),
+        "risk_target_policy": previous,
+    }
+    policy = archive.rows.risk_target_policy
+    if policy is None:
+        if current is not None:
+            repository.delete(current)
+        return 0
+    if current is None:
+        repository.create(
+            mode=policy.mode,
+            safe_bp=policy.safe_bp,
+            growth_bp=policy.growth_bp,
+            speculative_bp=policy.speculative_bp,
+            tolerance_bp=policy.tolerance_bp,
+            import_batch_id=batch.id,
+            created_at=restore_now,
+        )
+    else:
+        repository.update(
+            current.id,
+            mode=policy.mode,
+            safe_bp=policy.safe_bp,
+            growth_bp=policy.growth_bp,
+            speculative_bp=policy.speculative_bp,
+            tolerance_bp=policy.tolerance_bp,
+            import_batch_id=batch.id,
+        )
+    return 1
 
 
 def _apply_restore(
@@ -1544,6 +1968,7 @@ def _apply_restore(
     CurrentWorkspaceRepository(session, ctx).update(**settings.values())
     removed = suggested_categories_to_remove(session, ctx)
     removed_networth = suggested_networth_categories_to_remove(session, ctx)
+    removed_assets = suggested_asset_classes_to_remove(session, ctx)
     categories = CategoryRepository(session, ctx)
     for category in removed:
         categories.delete(category)
@@ -1607,7 +2032,7 @@ def _apply_restore(
             created_at=restore_now,
             updated_at=restore_now,
         )
-    _restore_networth(
+    networth_item_ids = _restore_networth(
         session,
         ctx,
         batch,
@@ -1615,8 +2040,26 @@ def _apply_restore(
         restore_now=restore_now,
         removed=removed_networth,
     )
+    investment_counts, asset_class_ids, instrument_ids = _restore_investments(
+        session,
+        ctx,
+        batch,
+        archive,
+        restore_now=restore_now,
+        removed=removed_assets,
+    )
+    investment_counts["risk_policy_restored"] = _apply_restore_risk_policy(
+        session, ctx, batch, archive, restore_now=restore_now
+    )
+    linked_items = _resolve_networth_links(
+        session,
+        ctx,
+        archive,
+        networth_item_ids,
+        asset_class_ids,
+        instrument_ids,
+    )
     session.flush()
-    linked_items = sum(1 for row in archive.rows.networth_items if row.valuation_mode == "linked")
     AuditEventRepository(session, ctx).record(
         actor_user_id=ctx.user.id,
         action="workspace.restored",
@@ -1634,9 +2077,19 @@ def _apply_restore(
             "item_valuations": len(archive.rows.item_valuations),
             "networth_snapshots": len(archive.rows.networth_snapshots),
             "linked_items_unlinked": linked_items,
+            "asset_classes": len(archive.rows.asset_classes),
+            "instruments": len(archive.rows.instruments),
+            "instrument_allocations": len(archive.rows.instrument_allocations),
+            "investment_transactions": len(archive.rows.investment_transactions),
+            "bond_terms": len(archive.rows.bond_terms),
+            "price_points": len(archive.rows.price_points),
+            "fx_rates": len(archive.rows.fx_rates),
+            "price_source_configs": len(archive.rows.price_source_configs),
+            "risk_policy": archive.rows.risk_target_policy is not None,
             "settings_fields": ",".join(settings_diff),
             "suggested_categories_removed": len(removed),
             "suggested_networth_categories_removed": len(removed_networth),
+            "suggested_asset_classes_removed": len(removed_assets),
         },
     )
     return {
@@ -1651,11 +2104,13 @@ def _apply_restore(
         "deleted_transactions": deleted,
         "suggested_categories_removed": len(removed),
         "suggested_networth_categories_removed": len(removed_networth),
+        "suggested_asset_classes_removed": len(removed_assets),
         "networth_categories_created": len(archive.rows.networth_categories),
         "networth_items_created": len(archive.rows.networth_items),
         "item_valuations_created": len(archive.rows.item_valuations),
         "networth_snapshots_created": len(archive.rows.networth_snapshots),
         "linked_items_unlinked": linked_items,
+        **investment_counts,
     }
 
 

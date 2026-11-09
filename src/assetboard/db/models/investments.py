@@ -77,6 +77,20 @@ class AssetClass(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             postgresql_where=text("archived_at IS NULL"),
         ),
         Index("ix_asset_classes_workspace_order", "workspace_id", "sort_order"),
+        Index(
+            "uq_asset_classes_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
+        Index("ix_asset_classes_workspace_import_batch", "workspace_id", "import_batch_id"),
+        ForeignKeyConstraint(
+            ["workspace_id", "import_batch_id"],
+            ["import_batches.workspace_id", "import_batches.id"],
+            name="fk_asset_classes_import_batch",
+        ),
     )
 
     name: Mapped[str] = mapped_column(String(MAX_ASSET_CLASS_NAME_LENGTH), nullable=False)
@@ -87,6 +101,8 @@ class AssetClass(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     color: Mapped[str] = mapped_column(String(7), nullable=False)
     sort_order: Mapped[int] = mapped_column(Integer(), nullable=False)
     risk_tier: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
 
@@ -112,6 +128,16 @@ class RiskTargetPolicy(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             name="fixed_targets_total",
         ),
         CheckConstraint("tolerance_bp BETWEEN 0 AND 10000", name="tolerance_valid"),
+        Index(
+            "ix_risk_target_policies_workspace_import_batch",
+            "workspace_id",
+            "import_batch_id",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "import_batch_id"],
+            ["import_batches.workspace_id", "import_batches.id"],
+            name="fk_risk_target_policies_import_batch",
+        ),
     )
 
     mode: Mapped[str] = mapped_column(String(16), nullable=False, default="fixed")
@@ -119,6 +145,7 @@ class RiskTargetPolicy(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     growth_bp: Mapped[int] = mapped_column(Integer(), nullable=False, default=4000)
     speculative_bp: Mapped[int] = mapped_column(Integer(), nullable=False, default=1000)
     tolerance_bp: Mapped[int] = mapped_column(Integer(), nullable=False, default=500)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
 
 
 class Instrument(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
@@ -164,6 +191,20 @@ class Instrument(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             postgresql_where=text("archived_at IS NULL"),
         ),
         Index("ix_instruments_workspace_type", "workspace_id", "type"),
+        Index(
+            "uq_instruments_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
+        Index("ix_instruments_workspace_import_batch", "workspace_id", "import_batch_id"),
+        ForeignKeyConstraint(
+            ["workspace_id", "import_batch_id"],
+            ["import_batches.workspace_id", "import_batches.id"],
+            name="fk_instruments_import_batch",
+        ),
     )
 
     name: Mapped[str] = mapped_column(String(MAX_INSTRUMENT_NAME_LENGTH), nullable=False)
@@ -177,6 +218,8 @@ class Instrument(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     provider_symbol: Mapped[str | None] = mapped_column(String(64), nullable=True)
     provider_backfilled_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     risk_tier_override: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
 
@@ -219,11 +262,31 @@ class InstrumentAllocation(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             "workspace_id",
             "asset_class_id",
         ),
+        Index(
+            "uq_instrument_allocations_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
+        Index(
+            "ix_instrument_allocations_workspace_import_batch",
+            "workspace_id",
+            "import_batch_id",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "import_batch_id"],
+            ["import_batches.workspace_id", "import_batches.id"],
+            name="fk_instrument_allocations_import_batch",
+        ),
     )
 
     instrument_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     asset_class_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     weight_bp: Mapped[int] = mapped_column(Integer(), nullable=False)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
 
 
 class BondTerms(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
@@ -268,6 +331,20 @@ class BondTerms(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             "AND early_redemption_fee_minor >= 0)",
             name="early_redemption_fee_valid",
         ),
+        Index(
+            "uq_bond_terms_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
+        Index("ix_bond_terms_workspace_import_batch", "workspace_id", "import_batch_id"),
+        ForeignKeyConstraint(
+            ["workspace_id", "import_batch_id"],
+            ["import_batches.workspace_id", "import_batches.id"],
+            name="fk_bond_terms_import_batch",
+        ),
     )
 
     instrument_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
@@ -282,6 +359,8 @@ class BondTerms(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     early_redemption_fee_mode: Mapped[str | None] = mapped_column(String(8), nullable=True)
     early_redemption_fee_rate_bp: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     early_redemption_fee_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
+    import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
 
 
 # F6.2a: the three settlement columns are set all or none.
@@ -356,6 +435,14 @@ class InvestmentTransaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceS
             "date",
             "created_at",
         ),
+        Index(
+            "uq_investment_transactions_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
     )
 
     instrument_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
@@ -371,3 +458,4 @@ class InvestmentTransaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceS
     settlement_unit_price: Mapped[Decimal | None] = mapped_column(DecimalType(), nullable=True)
     settlement_fee_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
     import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
