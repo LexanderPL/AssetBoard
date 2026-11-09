@@ -392,8 +392,8 @@ time, and the money-weighted return for standard periods. It is read-only.
   trades); buys after the start are negative and sells positive; the end value is positive.
   All-time starts at zero on the day before the first dated transaction, so every flow is
   included. XIRR uses actual/365. Periods shorter than 365 days show the period money-weighted
-  return, `(1 + annual rate)^(days/365) − 1`, labelled *Period return*; 1 year and all time show
-  the annualised XIRR.
+  return, `(1 + annual rate)^(days/365) − 1`, labelled *Period return*; periods of 365 days or
+  more (1 year, or an all-time history at least that long) show the annualised XIRR.
 - **Chart and table**: the value line and invested-capital line enclose the gain band. Without
   JavaScript the period table and the plotted-data table remain available.
 

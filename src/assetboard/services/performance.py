@@ -374,7 +374,7 @@ def _period(
             )
         )
     days = (today - start).days
-    annualized = code in {"1y", "all"}
+    annualized = days >= 365
     display_rate = result.rate
     if result.rate is not None and not annualized and days < 365:
         display_rate = period_return(result.rate, days)

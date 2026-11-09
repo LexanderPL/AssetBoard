@@ -19,6 +19,7 @@ from assetboard.db.repositories import (
     InvestmentTransactionRepository,
     PricePointRepository,
 )
+from assetboard.domain.performance import period_return
 from assetboard.services.bonds import BondTermsInput, save_bond_terms
 from assetboard.services.context import Context
 from assetboard.services.investment_transactions import create_transaction
@@ -185,6 +186,20 @@ def test_short_ranges_use_daily_points(db: WorkspaceDb, team: WorkspaceDb) -> No
     assert page.chart
     assert (page.chart[1].date - page.chart[0].date).days == 1
     assert len(page.chart) >= 60
+
+
+def test_short_all_time_history_shows_the_period_return(db: WorkspaceDb, team: WorkspaceDb) -> None:
+    ctx = _owner(db)
+    instrument = _instrument(db, ctx)
+    _tx(db, ctx, instrument.id, day="2026-01-10", fx="0.9")
+    _price(db, ctx, instrument.id, "2026-03-10", "110")
+    page = performance_page(db.factory, ctx)
+    all_time = next(period for period in page.periods if period.code == "all")
+    assert not all_time.annualized
+    assert all_time.start == date(2026, 1, 9)
+    assert all_time.xirr.rate is not None and all_time.display_rate is not None
+    days = (page.today - all_time.start).days
+    assert all_time.display_rate == period_return(all_time.xirr.rate, days)
 
 
 def test_class_scope_uses_look_through_weights(db: WorkspaceDb, team: WorkspaceDb) -> None:
