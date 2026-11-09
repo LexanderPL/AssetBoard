@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.5.5](https://github.com/LexanderPL/AssetBoard/compare/v0.5.4...v0.5.5) (2026-11-09)
+
+
+### Features
+
+* **investments:** F6.10 dividends, interest and splits ([#254](https://github.com/LexanderPL/AssetBoard/issues/254)) ([6cb24bf](https://github.com/LexanderPL/AssetBoard/commit/6cb24bf0edc51a8093b6e32369e268e7ee06af5e))
+* **investments:** F6.11 risk tiers and target allocation ([#251](https://github.com/LexanderPL/AssetBoard/issues/251)) ([9434ed7](https://github.com/LexanderPL/AssetBoard/commit/9434ed76e4384e308280df8b54e68304702617ca))
+* **investments:** F6.7 performance over time and XIRR ([#247](https://github.com/LexanderPL/AssetBoard/issues/247)) ([2cccb2f](https://github.com/LexanderPL/AssetBoard/commit/2cccb2faecb5a0f9962b55d107766059a4001c7e))
+* **investments:** F6.8 net-worth links ([#250](https://github.com/LexanderPL/AssetBoard/issues/250)) ([693ead9](https://github.com/LexanderPL/AssetBoard/commit/693ead99abe54f0ba67438645c873714d9b7c7e6))
+* **investments:** F6.9 archive extension for investments ([#252](https://github.com/LexanderPL/AssetBoard/issues/252)) ([25fdc78](https://github.com/LexanderPL/AssetBoard/commit/25fdc782a4e28914a68fb734ccfad99a9989e6d1))
+* **investments:** F6.9 standalone investment transaction import ([#253](https://github.com/LexanderPL/AssetBoard/issues/253)) ([ba2f06f](https://github.com/LexanderPL/AssetBoard/commit/ba2f06fe00f24fec6723787ff3afe8d64b7de887))
+* **networth:** F5.7 real estate in net worth and investment seed changes ([#248](https://github.com/LexanderPL/AssetBoard/issues/248)) ([eb7b355](https://github.com/LexanderPL/AssetBoard/commit/eb7b35549317c593d75406b5001172ad5bca50f2))
+
+
+### Bug Fixes
+
+* **recurring:** refuse future payment dates on mark paid ([#249](https://github.com/LexanderPL/AssetBoard/issues/249)) ([665ee05](https://github.com/LexanderPL/AssetBoard/commit/665ee052df7bcd0c977cfaa8b90af88ef29a650b))
+
+
+### Documentation
+
+* **spec:** move property to net worth (F5.7) and adjust M6/M7 ([#245](https://github.com/LexanderPL/AssetBoard/issues/245)) ([f8a7227](https://github.com/LexanderPL/AssetBoard/commit/f8a722740e9de57096aed244233899eea97d6c1a))
+
 ## [0.5.4](https://github.com/LexanderPL/AssetBoard/compare/v0.5.3...v0.5.4) (2026-11-08)
 
 
