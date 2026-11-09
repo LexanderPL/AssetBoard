@@ -65,6 +65,10 @@ ERRORS = {
     "month_in_future": _("Future months cannot be closed; they stay open for planning."),
     "month_closed": MONTH_CLOSED_MESSAGE,
     "transaction_gone": _("This entry no longer exists. It may have been deleted elsewhere."),
+    "investment_income_linked": _(
+        "This entry is managed by its investment dividend. Open it from the “from investment "
+        "income” link in the row."
+    ),
     "undo_expired": _("Too late to undo: the entry stays deleted."),
     "undo_future_dated": _(
         "This entry was dated in the future, so it became a plan. Edit the plan's date to "

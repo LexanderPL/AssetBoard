@@ -142,7 +142,7 @@
 <tr id="tx-{{ row_id }}" data-transaction="{{ row_id }}"{% if tint %} class="{{ tint }}" data-shade="{{ r.shade }}"{% endif %}>
   <td class="py-2 pr-2 tabular-nums"><time datetime="{{ r.t.date.isoformat() }}"><span aria-hidden="true">{{ r.t.date.day }}</span><span class="sr-only">{{ r.full_date }}</span></time></td>
   <td class="whitespace-nowrap py-2 pr-2 text-right tabular-nums" data-amount>{{ r.amount }}</td>
-  <td class="break-words py-2 pr-2" data-description>{{ r.t.description }}{% if r.t.source == "recurring_auto" %} <span class="text-xs {{ label_class }}">{{ _("Automatically posted") }}</span>{% endif %}</td>
+  <td class="break-words py-2 pr-2" data-description>{{ r.t.description }}{% if r.t.source == "recurring_auto" %} <span class="text-xs {{ label_class }}">{{ _("Automatically posted") }}</span>{% endif %}{% if r.t.source == "investment" %} {% if r.t.investment_transaction_id %}<a href="{{ scoped_url(request, 'investments_transactions') }}?edit={{ r.t.investment_transaction_id }}" class="text-xs {{ label_class }} underline-offset-2 hover:underline" data-investment-income-link>{{ _("from investment income") }}</a>{% else %}<span class="text-xs {{ label_class }}">{{ _("from investment income") }}</span>{% endif %}{% endif %}</td>
   <td class="py-2 pr-2"><span class="flex items-center gap-2">{{ swatch(r.t.category_color) }}<span data-category-name>{{ r.t.category_name }}</span>{% if r.t.category_archived %}<span class="text-xs {{ label_class }}">{{ _("archived") }}</span>{% endif %}</span></td>
   {% if ledger.can_write %}
   <td class="cell-tight whitespace-nowrap text-right">

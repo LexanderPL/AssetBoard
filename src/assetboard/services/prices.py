@@ -29,6 +29,7 @@ from assetboard.db.repositories import (
     PricePointRepository,
 )
 from assetboard.domain.bonds import bond_value
+from assetboard.domain.holdings import HoldingTransaction, split_factor
 from assetboard.domain.money import minor_unit_for
 from assetboard.domain.prices import (
     DEFAULT_STALE_AFTER_DAYS,
@@ -43,6 +44,7 @@ from assetboard.domain.prices import (
 from assetboard.i18n.numbers import parse_amount
 from assetboard.services.bonds import bond_unit_price, remaining_lots, terms_from_row
 from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.holding_rows import holding_transaction
 
 __all__ = [
     "DEFAULT_STALE_AFTER_DAYS",
@@ -246,7 +248,7 @@ def _latest_transaction_price(
 ) -> dict[tuple[UUID, date], InvestmentTransaction]:
     latest: dict[tuple[UUID, date], InvestmentTransaction] = {}
     for row in transactions:
-        if row.date is None:
+        if row.date is None or row.type not in {"buy", "sell"}:
             continue
         key = (row.instrument_id, row.date)
         previous = latest.get(key)
@@ -264,6 +266,9 @@ def _latest_transaction_fx(
     latest: dict[tuple[str, date], InvestmentTransaction] = {}
     for row in transactions:
         if row.date is None or row.fx_to_base is None or row.quote_currency == base_currency:
+            continue
+        if row.type == "split":
+            # A split stores no FX: its 1 is an encoding placeholder, not a rate observation.
             continue
         key = (row.quote_currency, row.date)
         previous = latest.get(key)
@@ -289,6 +294,10 @@ def _latest_prices_in_session(
     }
     stored = PricePointRepository(session, ctx).for_instruments_on_or_before(ids, on)
     transactions = InvestmentTransactionRepository(session, ctx).live_dated(on, ids)
+    splits: dict[UUID, list[HoldingTransaction]] = {}
+    for row in transactions:
+        if row.type == "split":
+            splits.setdefault(row.instrument_id, []).append(holding_transaction(row))
     transaction_prices = _latest_transaction_price(transactions)
     bond_rows = {
         row.instrument_id: row for row in BondTermsRepository(session, ctx).for_instruments(ids)
@@ -356,7 +365,14 @@ def _latest_prices_in_session(
                     False,
                 )
         else:
-            result[instrument_id] = _price_at(_best(candidates[instrument_id]), on)
+            best = _best(candidates[instrument_id])
+            price = _price_at(best, on)
+            if best is not None and price.price is not None:
+                price = replace(
+                    price,
+                    price=price.price * split_factor(splits.get(instrument_id, ()), best.date, on),
+                )
+            result[instrument_id] = price
     return result
 
 
@@ -759,7 +775,18 @@ def instrument_prices(
             )
             for (_instrument_id, day), row in derived.items()
         ]
-        price = _price_at(_best(candidates), on)
+        best = _best(candidates)
+        price = _price_at(best, on)
+        if best is not None and price.price is not None:
+            price = replace(
+                price,
+                price=price.price
+                * split_factor(
+                    [holding_transaction(row) for row in transactions if row.type == "split"],
+                    best.date,
+                    on,
+                ),
+            )
         if instrument.type == "bond_model":
             price = replace(price, terms_missing=True)
         points = [_view(row) for row in stored]

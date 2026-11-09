@@ -47,6 +47,7 @@ class Source(StrEnum):
     RECURRING = "recurring"
     RECURRING_AUTO = "recurring_auto"
     IMPORT = "import"
+    INVESTMENT = "investment"
 
 
 class EntryError(ValueError):

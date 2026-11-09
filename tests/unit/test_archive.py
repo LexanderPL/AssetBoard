@@ -717,6 +717,157 @@ def test_decimal_text_is_plain_lossless_and_without_trailing_zeros(value: Decima
         (
             lambda rows: replace(
                 rows,
+                investment_transactions=(
+                    replace(
+                        rows.investment_transactions[0],
+                        type="dividend",
+                        quantity="2",
+                        unit_price="10",
+                        fx_to_base="1",
+                    ),
+                ),
+            ),
+            "invalid dividend encoding",
+            "investment_transactions.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                investment_transactions=(
+                    replace(
+                        rows.investment_transactions[0],
+                        type="dividend",
+                        quantity="1",
+                        unit_price="10",
+                        fee="10.01",
+                        fx_to_base="1",
+                    ),
+                ),
+            ),
+            "withholding exceeds the gross amount",
+            "investment_transactions.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                investment_transactions=(
+                    replace(
+                        rows.investment_transactions[0],
+                        type="dividend",
+                        quantity="1",
+                        unit_price="10",
+                        fx_to_base="2",
+                    ),
+                ),
+            ),
+            "invalid dividend FX",
+            "investment_transactions.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                investment_transactions=(
+                    replace(
+                        rows.investment_transactions[0],
+                        type="dividend",
+                        quantity="1",
+                        unit_price="10",
+                        fx_to_base="1",
+                        settlement_currency="EUR",
+                        settlement_unit_price="1",
+                        settlement_fee="0.00",
+                    ),
+                ),
+            ),
+            "dividend has settlement fields",
+            "investment_transactions.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                investment_transactions=(
+                    replace(
+                        rows.investment_transactions[0],
+                        type="split",
+                        quantity="2",
+                        unit_price="2",
+                        fee="0",
+                        fx_to_base="",
+                    ),
+                ),
+            ),
+            "invalid split encoding",
+            "investment_transactions.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                investment_transactions=(
+                    replace(
+                        rows.investment_transactions[0],
+                        type="split",
+                        quantity="2",
+                        unit_price="1",
+                        fee="1.00",
+                        fx_to_base="",
+                    ),
+                ),
+            ),
+            "split fee must be zero",
+            "investment_transactions.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                investment_transactions=(
+                    replace(
+                        rows.investment_transactions[0],
+                        type="split",
+                        quantity="2",
+                        unit_price="1",
+                        fee="0",
+                        fx_to_base="1",
+                    ),
+                ),
+            ),
+            "split must not have FX",
+            "investment_transactions.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                investment_transactions=(
+                    replace(
+                        rows.investment_transactions[0],
+                        instrument_id=rows.instruments[1].id,
+                        instrument=rows.instruments[1].name,
+                        type="split",
+                        quantity="2",
+                        unit_price="1",
+                        fee="0",
+                        fx_to_base="",
+                    ),
+                ),
+            ),
+            "split is not allowed for this instrument",
+            "investment_transactions.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                investment_transactions=(
+                    replace(
+                        rows.investment_transactions[0],
+                        income_transaction_id=str(uuid4()),
+                    ),
+                ),
+            ),
+            "income link is only for dividends",
+            "investment_transactions.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
                 asset_classes=(
                     replace(rows.asset_classes[0], risk_tier="risky"),
                     *rows.asset_classes[1:],
@@ -761,6 +912,38 @@ def test_reader_rejects_invalid_investment_rows(
     parsed, errors = parse_archive(_archive(rows))
     assert parsed is None
     assert any(error.message == message and error.file == file for error in errors), errors
+
+
+def test_reader_accepts_dividends_splits_and_an_income_link() -> None:
+    rows = _rows()
+    template = rows.investment_transactions[0]
+    income_id = "5c7d8e9f-0a1b-4c2d-9e3f-4a5b6c7d8e02"
+    dividend = replace(
+        template,
+        type="dividend",
+        quantity="1",
+        unit_price="10",
+        fee="1.00",
+        fx_to_base="1",
+        income_transaction_id=income_id,
+    )
+    split = replace(
+        template,
+        id=str(uuid4()),
+        type="split",
+        quantity="2",
+        unit_price="1",
+        fee="0.00",
+        fx_to_base="",
+        income_transaction_id=None,
+    )
+    parsed, errors = parse_archive(
+        _archive(replace(rows, investment_transactions=(dividend, split)))
+    )
+    assert errors == ()
+    assert parsed is not None
+    assert parsed.rows.investment_transactions[0].income_transaction_id == income_id
+    assert parsed.rows.investment_transactions[1].type == "split"
 
 
 def test_reader_rejects_an_invalid_risk_policy() -> None:

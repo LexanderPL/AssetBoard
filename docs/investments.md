@@ -162,6 +162,28 @@ Tick **FX needs checking** in the history filters to list them. To fix one, open
 the base currency (the amounts carry over, since they were base amounts), take the pre-filled
 stored rate and save.
 
+### Dividends, interest and splits
+
+Choose **Dividend / interest** to record investment income. Enter the **gross amount** in the
+instrument's quote currency and the optional **withholding** (tax withheld). The net amount is
+gross − withholding. Tick **Record as income** to add the net to the ledger as income and choose
+an income category: the form preselects the most recent dividend's category, otherwise the
+suggested **Interest** category when it is active. The ledger row is managed through the
+dividend — edit or delete it from the Investments transaction, not from the month page — and it
+shows a **from investment income** badge there. Recording income for a dividend in a closed
+month is refused; an unlinked dividend is not affected.
+
+The **Income** tab shows gross, withholding, net and the number of payments per calendar year,
+newest first. Linked ledger rows are not counted twice. Undated legacy dividends are excluded
+from the years and noted.
+
+Choose **Split** for a split or reverse split and enter the **new units** and **old units**: a
+2-for-1 split is 2 and 1; a 1-for-10 reverse split is 1 and 10. The holding quantity scales and
+the cost basis stays the same. Splits are not available for currency or bond-model instruments.
+A price observed before a split is multiplied by old/new when it is carried forward, so the
+value does not jump on the split date. Deleting or editing a split can leave a later sell
+overselling; that is refused, like any other oversell.
+
 ### Bulk add
 
 The **Bulk add** panel on the Transactions tab (editors and owners) takes many past trades at
@@ -316,7 +338,9 @@ History is backfilled once from each instrument's first transaction date. CoinGe
 public/demo API and Basic plan limit how far back history goes (the current Basic plan is
 restricted to the past two years per its documentation); the app requests `days=max`, stops at
 whatever the plan returns, and records a **history limited** note instead of retrying forever.
-EODHD history uses adjusted closes, so splits and distributions do not create false price jumps.
+EODHD history stores the raw `close`, falling back to `adjusted_close` only when `close` is
+missing. The app adjusts raw prices across splits itself, so pre-F6.10 history that was
+backfilled with adjusted closes may still show a step until it is backfilled again.
 
 ## Allocation
 
@@ -414,9 +438,13 @@ It never overwrites a tier you set, and running it again changes nothing.
 time, and the money-weighted return for standard periods. It is read-only.
 
 - **Series**: value and cumulative net invested capital, in the base currency. Quantity comes
-  from dated buy/sell transactions; undated legacy lots are excluded and a note links to the
-  transaction history. Prices and FX rates carry forward from the latest observation on or before
-  each point. A transaction-derived price and FX rate cover every instrument from its first buy.
+  from dated buy/sell transactions and splits; undated legacy lots are excluded and a note links
+  to the transaction history. Prices and FX rates carry forward from the latest observation on or
+  before each point, with a price observed before a split multiplied by old/new. A
+  transaction-derived price and FX rate cover every instrument from its first buy.
+- **Dividends and splits**: a dividend's net amount in the base currency is a positive XIRR cash
+  flow and reduces net invested capital; splits are not cash flows. Neither is used as a
+  transaction-price observation.
 - **Ranges**: the chart opens on **1 year**. YTD, 3 years, 5 years and all time are also
   available. Ranges up to 90 days use daily points; longer ranges use weekly points, and an
   all-time range over five years uses monthly points. The end date is always included.

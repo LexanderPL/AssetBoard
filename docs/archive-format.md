@@ -463,12 +463,26 @@ id,instrument_id,instrument,asset_class_id,asset_class,weight_bp
 | `settlement_unit_price` | no | plain decimal ≥ 0 in `settlement_currency` |
 | `settlement_fee` | no | decimal in `settlement_currency` with its minor digits |
 | `deleted_at` | no | timestamp; set = soft-deleted |
+| `income_transaction_id` | no | UUID of the linked ledger income row; dividends only |
 
 A settlement row must use the workspace base currency and is allowed only when the instrument's
 quote currency differs from the base and the instrument is not a `currency` instrument. Export
 order: instrument order, undated before dated, date, entry time, lineage id. Quantities, prices
 and FX rates are written with `format(value, "f")`, never an exponent or `float`, with trailing
 fractional zeros removed; import reads them with `Decimal(text)`.
+
+Dividends and splits reuse the quantity, unit price and fee columns:
+
+- `dividend`: `quantity` is exactly `1`, `unit_price` is the gross amount in the quote currency,
+  `fee` is the withholding, `fx_to_base` is required when the quote currency is not the base and
+  is `1` otherwise, no settlement fields. Gross must be positive and fit the currency's minor
+  unit; `0 ≤ withholding ≤ gross`.
+- `split`: `quantity` is the number of new units and `unit_price` the number of old units (a
+  2-for-1 split is `2` and `1`; a 1-for-10 reverse split is `1` and `10`). Both are positive and
+  different, `fee` is `0`, and there is no FX or settlement. Splits are refused for `currency`
+  and `bond_model` instruments.
+- `income_transaction_id` links a dividend to its ledger income row. A target missing from the
+  archive restores the dividend unlinked and is listed in the restore report.
 
 The file can also be imported alone in merge mode (the "bring my purchase history" path). The
 minimal header is `instrument,date,type,quantity,unit_price`; `quote_currency` is optional and
@@ -482,8 +496,8 @@ instrument; the report names the instrument, line and date, and the user fixes t
 ignores that instrument.
 
 ```csv
-id,instrument_id,instrument,date,type,quantity,unit_price,quote_currency,fee,fx_to_base,note,settlement_currency,settlement_unit_price,settlement_fee,deleted_at
-60718293-a4b5-40c1-82d3-5e6f708192a3,2c3d4e5f-6071-4c8d-ae9f-1a2b3c4d5e6f,World ETF,2026-09-01,buy,10,100.5,EUR,1.00,1,First lot,,,,
+id,instrument_id,instrument,date,type,quantity,unit_price,quote_currency,fee,fx_to_base,note,settlement_currency,settlement_unit_price,settlement_fee,deleted_at,income_transaction_id
+60718293-a4b5-40c1-82d3-5e6f708192a3,2c3d4e5f-6071-4c8d-ae9f-1a2b3c4d5e6f,World ETF,2026-09-01,buy,10,100.5,EUR,1.00,1,First lot,,,,,
 ```
 
 ## `bond_terms.csv` (restore only)

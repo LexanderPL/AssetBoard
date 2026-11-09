@@ -573,6 +573,7 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             TransactionRepository(session, ctx).list(),
             key=lambda row: (row.date, row.created_at, row.id),
         )
+        transaction_lineage = {row.id: lineage_id(row.id, row.import_key) for row in transactions}
         transaction_rows = tuple(
             TransactionRow(
                 date=row.date.isoformat(),
@@ -789,7 +790,11 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
                 unit_price=decimal_text(row.unit_price),
                 quote_currency=row.quote_currency,
                 fee=plain_amount(row.fee_minor, row.quote_currency),
-                fx_to_base=decimal_text(row.fx_to_base) if row.fx_to_base is not None else "",
+                fx_to_base=(
+                    ""
+                    if row.type == "split" or row.fx_to_base is None
+                    else decimal_text(row.fx_to_base)
+                ),
                 note=row.note,
                 settlement_currency=row.settlement_currency or "",
                 settlement_unit_price=(
@@ -803,6 +808,15 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
                     else ""
                 ),
                 deleted_at=timestamp_text(row.deleted_at),
+                income_transaction_id=(
+                    str(
+                        transaction_lineage.get(
+                            row.income_transaction_id, row.income_transaction_id
+                        )
+                    )
+                    if row.income_transaction_id is not None
+                    else None
+                ),
             )
             for row in investment_transactions
         )

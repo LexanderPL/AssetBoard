@@ -302,6 +302,37 @@ def _parse_rows(
                 deleted_at = parse_timestamp(raw_deleted)
             except EntryError as error:
                 row_errors.append(_entry(error.code, line, "deleted_at"))
+        if (
+            type_value
+            in {
+                InvestmentTransactionType.DIVIDEND.value,
+                InvestmentTransactionType.SPLIT.value,
+            }
+            and day is None
+        ):
+            row_errors.append(_entry("invalid_date", line, "date"))
+        if type_value == InvestmentTransactionType.DIVIDEND.value:
+            if quantity != 1:
+                row_errors.append(_entry("invalid_quantity", line, "quantity"))
+            if unit_price <= 0:
+                row_errors.append(_entry("invalid_amount", line, "unit_price"))
+        if type_value == InvestmentTransactionType.SPLIT.value:
+            if quantity <= 0 or unit_price <= 0 or quantity == unit_price:
+                row_errors.append(_entry("invalid_split", line, "unit_price"))
+            if record.get("fx_to_base", "").strip():
+                row_errors.append(_entry("invalid_split", line, "fx_to_base"))
+        if type_value in {
+            InvestmentTransactionType.DIVIDEND.value,
+            InvestmentTransactionType.SPLIT.value,
+        } and any(
+            record.get(column, "").strip()
+            for column in (
+                "settlement_currency",
+                "settlement_unit_price",
+                "settlement_fee",
+            )
+        ):
+            row_errors.append(_entry("invalid_settlement", line, "settlement_currency"))
         if row_errors:
             errors.extend(row_errors)
             continue
@@ -637,59 +668,106 @@ def _plan(
                 code = getattr(error, "code", "invalid_amount")
                 plan.errors.append(_entry(code, row.line, "fee"))
                 continue
-            unit_price = row.unit_price
-            if (instrument is not None and instrument.type == InstrumentType.CURRENCY.value) or (
-                new_instrument is not None and new_instrument.type == InstrumentType.CURRENCY.value
-            ):
-                unit_price = Decimal(1)
-            fx_to_base = row.fx_to_base
-            if quote_currency == base_currency:
-                fx_to_base = fx_to_base or Decimal(1)
-            elif fx_to_base is None:
-                if row.settlement_currency is not None:
-                    plan.errors.append(_entry("settlement_fx_required", row.line, "fx_to_base"))
+            target_type = (
+                instrument.type
+                if instrument is not None
+                else (new_instrument.type if new_instrument is not None else "")
+            )
+            if row.type == InvestmentTransactionType.SPLIT.value:
+                if target_type in {
+                    InstrumentType.CURRENCY.value,
+                    InstrumentType.BOND_MODEL.value,
+                }:
+                    plan.errors.append(_entry("split_not_allowed", row.line, "type"))
                     continue
-                fx_to_base = _stored_fx(session, ctx, quote_currency, row.day)
-                if fx_to_base is None:
-                    plan.errors.append(
-                        _entry(
-                            "fx_needed",
-                            row.line,
-                            "fx_to_base",
-                            currency=quote_currency,
-                            date=row.day.isoformat() if row.day else "",
-                        )
-                    )
+                if fee_minor != 0:
+                    plan.errors.append(_entry("invalid_fee", row.line, "fee"))
                     continue
-            if row.settlement_currency is not None:
-                if row.settlement_currency != base_currency:
-                    plan.errors.append(
-                        _entry("invalid_settlement", row.line, "settlement_currency")
-                    )
-                    continue
-                if (
-                    quote_currency == base_currency
-                    or (instrument is not None and instrument.type == InstrumentType.CURRENCY.value)
-                    or (
-                        new_instrument is not None
-                        and new_instrument.type == InstrumentType.CURRENCY.value
-                    )
-                ):
-                    plan.errors.append(
-                        _entry("invalid_settlement", row.line, "settlement_currency")
-                    )
-                    continue
+                unit_price = row.unit_price
+                fx_to_base = Decimal(1)
+                settlement_fee_minor = None
+            elif row.type == InvestmentTransactionType.DIVIDEND.value:
                 try:
-                    settlement_fee_minor = planned_minor(
-                        _decimal_text(row.settlement_fee_text, allow_zero=True),
-                        base_currency,
-                    )
+                    gross_minor = planned_minor(row.unit_price, quote_currency)
                 except (EntryError, ValueError) as error:
                     code = getattr(error, "code", "invalid_amount")
-                    plan.errors.append(_entry(code, row.line, "settlement_fee"))
+                    plan.errors.append(_entry(code, row.line, "unit_price"))
                     continue
-            else:
+                if gross_minor <= 0:
+                    plan.errors.append(_entry("invalid_amount", row.line, "unit_price"))
+                    continue
+                if fee_minor > gross_minor:
+                    plan.errors.append(_entry("withholding_exceeds_gross", row.line, "fee"))
+                    continue
+                if quote_currency == base_currency:
+                    fx_to_base = Decimal(1)
+                elif row.fx_to_base is None:
+                    plan.errors.append(_entry("fx_needed", row.line, "fx_to_base"))
+                    continue
+                else:
+                    fx_to_base = row.fx_to_base
+                unit_price = row.unit_price
                 settlement_fee_minor = None
+            else:
+                unit_price = row.unit_price
+                if (
+                    instrument is not None and instrument.type == InstrumentType.CURRENCY.value
+                ) or (
+                    new_instrument is not None
+                    and new_instrument.type == InstrumentType.CURRENCY.value
+                ):
+                    unit_price = Decimal(1)
+                fx_to_base = row.fx_to_base
+                if quote_currency == base_currency:
+                    fx_to_base = fx_to_base or Decimal(1)
+                elif fx_to_base is None:
+                    if row.settlement_currency is not None:
+                        plan.errors.append(_entry("settlement_fx_required", row.line, "fx_to_base"))
+                        continue
+                    fx_to_base = _stored_fx(session, ctx, quote_currency, row.day)
+                    if fx_to_base is None:
+                        plan.errors.append(
+                            _entry(
+                                "fx_needed",
+                                row.line,
+                                "fx_to_base",
+                                currency=quote_currency,
+                                date=row.day.isoformat() if row.day else "",
+                            )
+                        )
+                        continue
+                if row.settlement_currency is not None:
+                    if row.settlement_currency != base_currency:
+                        plan.errors.append(
+                            _entry("invalid_settlement", row.line, "settlement_currency")
+                        )
+                        continue
+                    if (
+                        quote_currency == base_currency
+                        or (
+                            instrument is not None
+                            and instrument.type == InstrumentType.CURRENCY.value
+                        )
+                        or (
+                            new_instrument is not None
+                            and new_instrument.type == InstrumentType.CURRENCY.value
+                        )
+                    ):
+                        plan.errors.append(
+                            _entry("invalid_settlement", row.line, "settlement_currency")
+                        )
+                        continue
+                    try:
+                        settlement_fee_minor = planned_minor(
+                            _decimal_text(row.settlement_fee_text, allow_zero=True),
+                            base_currency,
+                        )
+                    except (EntryError, ValueError) as error:
+                        code = getattr(error, "code", "invalid_amount")
+                        plan.errors.append(_entry(code, row.line, "settlement_fee"))
+                        continue
+                else:
+                    settlement_fee_minor = None
             transaction_id = row.source_id or uuid.uuid4()
             match_index += 1
             plan.matches.append(
@@ -721,6 +799,7 @@ def _plan(
         if row.type not in {
             InvestmentTransactionType.BUY.value,
             InvestmentTransactionType.SELL.value,
+            InvestmentTransactionType.SPLIT.value,
         }:
             continue
         existing_rows.setdefault(row.instrument_id, []).append(row)
@@ -732,6 +811,7 @@ def _plan(
             in {
                 InvestmentTransactionType.BUY.value,
                 InvestmentTransactionType.SELL.value,
+                InvestmentTransactionType.SPLIT.value,
             }
         ]
         if not quantity_matches:

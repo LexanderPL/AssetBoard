@@ -145,7 +145,8 @@ class Transaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceScopedMixin
         ),
         CheckConstraint("length(currency) = 3", name="currency_length"),
         CheckConstraint(
-            "source IN ('manual', 'recurring', 'recurring_auto', 'import')", name="source_valid"
+            "source IN ('manual', 'recurring', 'recurring_auto', 'import', 'investment')",
+            name="source_valid",
         ),
         CheckConstraint("date >= '1900-01-01' AND date <= '2199-12-31'", name="date_in_range"),
         Index(

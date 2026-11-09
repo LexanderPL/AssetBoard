@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 from fractions import Fraction
@@ -19,7 +19,9 @@ from assetboard.domain.holdings import (
     Oversell,
     RealizedEvent,
     compute_holdings,
+    dividend_amounts,
     realized_events,
+    split_factor,
 )
 from assetboard.domain.money import Money, minor_unit_for
 
@@ -97,6 +99,43 @@ def _sell(
     )
 
 
+def _split(
+    instrument_id: UUID,
+    new_units: str,
+    old_units: str,
+    *,
+    day: date = date(2026, 2, 1),
+) -> HoldingTransaction:
+    return _tx(
+        day=day,
+        type="split",
+        quantity=new_units,
+        price=old_units,
+        instrument_id=instrument_id,
+    )
+
+
+def _dividend(
+    instrument_id: UUID,
+    gross: str,
+    *,
+    withholding: int = 0,
+    day: date = date(2026, 2, 1),
+    fx: str = "1",
+    quote_currency: str = QUOTE,
+) -> HoldingTransaction:
+    return _tx(
+        day=day,
+        type="dividend",
+        quantity="1",
+        price=gross,
+        fee=withholding,
+        fx=fx,
+        instrument_id=instrument_id,
+        quote_currency=quote_currency,
+    )
+
+
 def _holding(rows: list[HoldingTransaction], method: str = "average"):
     return compute_holdings(rows, method, base_currency=BASE)[0]
 
@@ -112,6 +151,169 @@ def test_the_golden_scenario_uses_the_sum_of_transaction_costs() -> None:
     assert holding.cost_basis_base == Money(2_458_342, BASE)
     assert holding.avg_cost == Decimal("491.6684")
     assert holding.realized_pnl == Money(0, BASE)
+
+
+def test_a_2_for_1_split_scales_quantity_and_keeps_cost_basis() -> None:
+    instrument = uuid4()
+    rows = [
+        _buy(instrument, "10", "100", day=date(2026, 1, 1)),
+        _split(instrument, "2", "1", day=date(2026, 2, 1)),
+    ]
+    holding = _holding(rows)
+    assert holding.quantity == Decimal("20")
+    assert holding.cost_basis_base == Money(100_000, BASE)
+    assert holding.avg_cost == Decimal("50")
+
+
+def test_a_1_for_3_reverse_split_is_exact_to_the_decimal_type_scale() -> None:
+    instrument = uuid4()
+    rows = [
+        _buy(instrument, "10", "100", day=date(2026, 1, 1)),
+        _split(instrument, "1", "3", day=date(2026, 2, 1)),
+    ]
+    holding = _holding(rows)
+    assert holding.quantity == Decimal("3.333333333333333333")
+    assert holding.quantity.as_tuple().exponent == -18
+    assert holding.cost_basis_base == Money(100_000, BASE)
+
+
+def test_a_3_for_2_split_scales_fifo_lots_without_changing_cost() -> None:
+    instrument = uuid4()
+    rows = [
+        _buy(instrument, "4", "100", day=date(2026, 1, 1)),
+        _buy(instrument, "6", "200", day=date(2026, 1, 2)),
+        _split(instrument, "3", "2", day=date(2026, 2, 1)),
+        _sell(instrument, "10", "100", day=date(2026, 3, 1)),
+    ]
+    holding = _holding(rows, "fifo")
+    assert holding.quantity == Decimal("5")
+    assert holding.cost_basis_base == Money(66_667, BASE)
+    assert holding.realized_pnl == Money(6_667, BASE)
+
+
+def test_a_dividend_does_not_change_holdings() -> None:
+    instrument = uuid4()
+    rows = [
+        _buy(instrument, "10", "100", day=date(2026, 1, 1)),
+        _dividend(instrument, "5", withholding=50, day=date(2026, 2, 1)),
+    ]
+    holding = _holding(rows)
+    assert holding.quantity == Decimal("10")
+    assert holding.cost_basis_base == Money(100_000, BASE)
+    assert holding.realized_pnl == Money(0, BASE)
+
+
+def test_split_factor_uses_old_over_new_in_the_interval() -> None:
+    instrument = uuid4()
+    rows = [
+        _split(instrument, "2", "1", day=date(2026, 2, 1)),
+        _split(instrument, "1", "3", day=date(2026, 3, 1)),
+    ]
+    assert split_factor(rows, date(2026, 1, 1), date(2026, 2, 1)) == Decimal("0.5")
+    assert split_factor(rows, date(2026, 1, 1), date(2026, 3, 1)) == Decimal("1.5")
+    assert split_factor(rows, date(2026, 2, 1), date(2026, 3, 1)) == Decimal("3")
+
+
+def test_a_split_applies_to_undated_legacy_lots_first() -> None:
+    instrument = uuid4()
+    rows = [
+        _tx(day=None, type="buy", quantity="10", price="100", instrument_id=instrument),
+        _split(instrument, "2", "1", day=date(2026, 2, 1)),
+    ]
+    holding = _holding(rows)
+    assert holding.quantity == Decimal("20")
+    assert holding.cost_basis_base == Money(100_000, BASE)
+
+
+def test_dividend_amounts_round_gross_and_withholding_once() -> None:
+    instrument = uuid4()
+    row = _dividend(instrument, "10.01", withholding=5, fx="1.2345", quote_currency="USD")
+    amounts = dividend_amounts(row, BASE)
+    assert amounts.gross == Money(1_236, BASE)  # 12.357345 -> 12.36
+    assert amounts.withholding == Money(6, BASE)  # 0.061725 -> 0.06
+    assert amounts.net == Money(1_230, BASE)
+
+
+def test_dividend_and_split_encoding_is_validated() -> None:
+    instrument = uuid4()
+    with pytest.raises(InvalidHoldingTransaction, match="invalid_quantity"):
+        _holding([replace(_dividend(instrument, "10"), quantity=Decimal("2"))])
+    with pytest.raises(InvalidHoldingTransaction, match="invalid_amount_precision"):
+        _holding([_dividend(instrument, "1.234")])
+    with pytest.raises(InvalidHoldingTransaction, match="invalid_fee"):
+        _holding([_dividend(instrument, "1", withholding=101)])
+    with pytest.raises(InvalidHoldingTransaction, match="invalid_settlement"):
+        _holding(
+            [
+                replace(
+                    _dividend(instrument, "1"),
+                    settlement_currency=BASE,
+                    settlement_unit_price=Decimal("1"),
+                    settlement_fee_minor=0,
+                )
+            ]
+        )
+    with pytest.raises(InvalidHoldingTransaction, match="invalid_split"):
+        _holding([_split(instrument, "2", "2")])
+    with pytest.raises(InvalidHoldingTransaction, match="invalid_fee"):
+        _holding([replace(_split(instrument, "2", "1"), fee_minor=1)])
+    with pytest.raises(InvalidHoldingTransaction, match="invalid_fx"):
+        _holding([replace(_split(instrument, "2", "1"), fx_to_base=Decimal("1.5"))])
+    with pytest.raises(InvalidHoldingTransaction, match="invalid_settlement"):
+        _holding(
+            [
+                replace(
+                    _split(instrument, "2", "1"),
+                    settlement_currency=BASE,
+                    settlement_unit_price=Decimal("1"),
+                    settlement_fee_minor=0,
+                )
+            ]
+        )
+
+
+@pytest.mark.parametrize("method", ["average", "fifo"])
+def test_the_quantity_displayed_after_a_split_can_be_sold(method: str) -> None:
+    instrument = uuid4()
+    rows = [
+        _buy(instrument, "10", "100", day=date(2026, 1, 1)),
+        _split(instrument, "2", "3", day=date(2026, 2, 1)),
+    ]
+    holding = _holding(rows, method)
+    assert holding.quantity == Decimal("6.666666666666666667")
+    sold = _holding(
+        [*rows, _sell(instrument, str(holding.quantity), "100", day=date(2026, 3, 1))],
+        method,
+    )
+    assert sold.quantity == 0
+    assert sold.cost_basis_base == Money(0, BASE)
+
+
+@given(st.integers(min_value=1, max_value=100), st.integers(min_value=1, max_value=100))
+@settings(max_examples=50)
+def test_a_split_and_its_inverse_leave_a_sellable_quantity_and_cost(
+    new_units: int, old_units: int
+) -> None:
+    if new_units == old_units:
+        return
+    instrument = uuid4()
+    rows = [
+        _buy(instrument, "4", "100", day=date(2026, 1, 1)),
+        _buy(instrument, "6", "200", day=date(2026, 1, 2)),
+        _split(instrument, str(new_units), str(old_units), day=date(2026, 2, 1)),
+        _split(instrument, str(old_units), str(new_units), day=date(2026, 3, 1)),
+    ]
+    for method in ("average", "fifo"):
+        holding = _holding(rows, method)
+        # Two 18-place quantizations per lot; the residual is bounded by the ratio (≤ 100).
+        assert abs(holding.quantity - Decimal("10")) <= Decimal("1e-16")
+        assert holding.cost_basis_base == Money(160_000, BASE)
+        sold = _holding(
+            [*rows, _sell(instrument, str(holding.quantity), "100", day=date(2026, 4, 1))],
+            method,
+        )
+        assert sold.quantity == 0
+        assert sold.cost_basis_base == Money(0, BASE)
 
 
 def test_average_cost_is_unchanged_by_a_partial_sale_and_removes_exact_cost() -> None:
@@ -223,7 +425,14 @@ def test_compute_holdings_returns_one_holding_per_instrument() -> None:
 def test_invalid_transaction_fields_are_refused() -> None:
     with pytest.raises(InvalidHoldingTransaction):
         compute_holdings(
-            [_tx(day=date(2026, 1, 1), type="dividend", quantity="1", price="1")],
+            [
+                _tx(
+                    day=date(2026, 1, 1),
+                    type="dividend",
+                    quantity="2",
+                    price="1",
+                )
+            ],
             "average",
             base_currency=BASE,
         )

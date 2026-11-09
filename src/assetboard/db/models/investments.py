@@ -443,6 +443,16 @@ class InvestmentTransaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceS
             sqlite_where=text("import_key IS NOT NULL"),
             postgresql_where=text("import_key IS NOT NULL"),
         ),
+        Index(
+            "ix_investment_transactions_workspace_income",
+            "workspace_id",
+            "income_transaction_id",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "income_transaction_id"],
+            ["transactions.workspace_id", "transactions.id"],
+            name="fk_investment_transactions_workspace_income",
+        ),
     )
 
     instrument_id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
@@ -459,3 +469,4 @@ class InvestmentTransaction(IdMixin, TimestampMixin, SoftDeleteMixin, WorkspaceS
     settlement_fee_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
     import_batch_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)
     import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
+    income_transaction_id: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True), nullable=True)

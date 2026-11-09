@@ -32,8 +32,14 @@ from assetboard.domain.instruments import (
     percent_to_bp,
 )
 from assetboard.i18n import gettext
-from assetboard.i18n.numbers import decimal_symbol, format_quantity_input, parse_amount
+from assetboard.i18n.numbers import (
+    decimal_symbol,
+    format_money,
+    format_quantity_input,
+    parse_amount,
+)
 from assetboard.services.context import Context, Role, has_role
+from assetboard.services.investment_income import investment_income_page
 from assetboard.services.investments import (
     AssetClassView,
     InstrumentView,
@@ -424,6 +430,22 @@ async def _allocation_input(
 @router.get("/investments", name="investments")
 async def investments_root(request: Request, ctx: CurrentContext) -> Response:
     return RedirectResponse(request.url_for("investments_instruments").path, status_code=307)
+
+
+@router.get("/investments/income", name="investments_income")
+async def income_page(request: Request, ctx: CurrentContext) -> Response:
+    page = await run_in_threadpool(investment_income_page, request.app.state.session_factory, ctx)
+    return await run_in_threadpool(
+        lambda: render_template(
+            request,
+            "investments/income.html",
+            context={
+                "page": page,
+                "locale": request.state.locale,
+                "format_money": format_money,
+            },
+        )
+    )
 
 
 @router.get("/investments/instruments", name="investments_instruments")

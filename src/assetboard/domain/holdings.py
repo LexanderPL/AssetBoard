@@ -19,6 +19,7 @@ broker's FX spread is part of what left the account.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal, localcontext
@@ -29,6 +30,7 @@ from assetboard.domain.money import Money, minor_unit_for
 
 # Enough room for 18-decimal quantities and prices multiplied together, without float.
 _DECIMAL_PRECISION = 80
+_DECIMAL_QUANTUM = Decimal("1e-18")
 MAX_NOTE_LENGTH = 200
 
 
@@ -96,6 +98,13 @@ class Holding:
 
 
 @dataclass(frozen=True, slots=True)
+class DividendAmounts:
+    gross: Money
+    withholding: Money
+    net: Money
+
+
+@dataclass(frozen=True, slots=True)
 class RealizedEvent:
     """The P&L one sell realized, in the base currency (rounded exactly as in ``Holding``)."""
 
@@ -118,19 +127,37 @@ def _type(value: InvestmentTransactionType | str) -> InvestmentTransactionType:
         raise InvalidHoldingTransaction("invalid_type") from None
 
 
+def _validate_amount_precision(amount: Decimal, currency: str) -> None:
+    minor_unit = minor_unit_for(currency)
+    quantum = Decimal(1).scaleb(-minor_unit)
+    with localcontext() as context:
+        context.prec = max(context.prec, _DECIMAL_PRECISION)
+        if amount != amount.quantize(quantum):
+            raise InvalidHoldingTransaction("invalid_amount_precision")
+
+
 def _validate(transaction: HoldingTransaction, base_currency: str) -> None:
-    if _type(transaction.type) not in (
+    kind = _type(transaction.type)
+    if kind not in (
         InvestmentTransactionType.BUY,
         InvestmentTransactionType.SELL,
+        InvestmentTransactionType.DIVIDEND,
+        InvestmentTransactionType.SPLIT,
     ):
         raise InvalidHoldingTransaction("unsupported_type")
     if type(transaction.quantity) is not Decimal or not transaction.quantity.is_finite():
         raise InvalidHoldingTransaction("invalid_quantity")
-    if transaction.quantity <= 0:
+    if kind is InvestmentTransactionType.DIVIDEND:
+        if transaction.quantity != 1:
+            raise InvalidHoldingTransaction("invalid_quantity")
+    elif transaction.quantity <= 0:
         raise InvalidHoldingTransaction("invalid_quantity")
     if type(transaction.unit_price) is not Decimal or not transaction.unit_price.is_finite():
         raise InvalidHoldingTransaction("invalid_price")
-    if transaction.unit_price < 0:
+    if kind is InvestmentTransactionType.DIVIDEND:
+        if transaction.unit_price <= 0:
+            raise InvalidHoldingTransaction("invalid_price")
+    elif transaction.unit_price < 0:
         raise InvalidHoldingTransaction("invalid_price")
     if type(transaction.fee_minor) is not int or transaction.fee_minor < 0:
         raise InvalidHoldingTransaction("invalid_fee")
@@ -140,6 +167,38 @@ def _validate(transaction: HoldingTransaction, base_currency: str) -> None:
         raise InvalidHoldingTransaction("invalid_fx")
     minor_unit_for(transaction.quote_currency)
     minor_unit_for(base_currency)
+    if kind is InvestmentTransactionType.DIVIDEND:
+        _validate_amount_precision(transaction.unit_price, transaction.quote_currency)
+        gross_minor = int(transaction.unit_price.scaleb(minor_unit_for(transaction.quote_currency)))
+        if transaction.fee_minor > gross_minor:
+            raise InvalidHoldingTransaction("invalid_fee")
+        if any(
+            value is not None
+            for value in (
+                transaction.settlement_currency,
+                transaction.settlement_unit_price,
+                transaction.settlement_fee_minor,
+            )
+        ):
+            raise InvalidHoldingTransaction("invalid_settlement")
+        return
+    if kind is InvestmentTransactionType.SPLIT:
+        if transaction.unit_price <= 0 or transaction.quantity == transaction.unit_price:
+            raise InvalidHoldingTransaction("invalid_split")
+        if transaction.fee_minor != 0:
+            raise InvalidHoldingTransaction("invalid_fee")
+        if transaction.fx_to_base != 1:
+            raise InvalidHoldingTransaction("invalid_fx")
+        if any(
+            value is not None
+            for value in (
+                transaction.settlement_currency,
+                transaction.settlement_unit_price,
+                transaction.settlement_fee_minor,
+            )
+        ):
+            raise InvalidHoldingTransaction("invalid_settlement")
+        return
     _validate_settlement(transaction, base_currency)
 
 
@@ -171,6 +230,35 @@ def _order_key(transaction: HoldingTransaction) -> tuple[bool, date, datetime, s
         transaction.created_at,
         str(transaction.id),
     )
+
+
+def split_factor(
+    splits: Iterable[HoldingTransaction],
+    from_date: date,
+    to_date: date,
+) -> Decimal:
+    """The cumulative old/new factor for splits in ``(from_date, to_date]``.
+
+    A raw price per unit observed at ``from_date`` is multiplied by this factor when it is
+    carried forward to ``to_date``. ``quantity`` is the new units and ``unit_price`` the old
+    units of a split, so the factor is ``unit_price / quantity`` (a 2-for-1 split is 0.5).
+    """
+    factor = Decimal(1)
+    with localcontext() as context:
+        context.prec = max(context.prec, _DECIMAL_PRECISION)
+        for row in splits:
+            if InvestmentTransactionType(row.type) is not InvestmentTransactionType.SPLIT:
+                continue
+            if row.date is None or not (from_date < row.date <= to_date):
+                continue
+            factor *= row.unit_price / row.quantity
+    return factor
+
+
+def quantize_quantity(value: Decimal) -> Decimal:
+    with localcontext() as context:
+        context.prec = max(context.prec, _DECIMAL_PRECISION)
+        return value.quantize(_DECIMAL_QUANTUM, rounding=ROUND_HALF_UP)
 
 
 def _fee_decimal(fee_minor: int, quote_currency: str) -> Decimal:
@@ -224,9 +312,34 @@ def transaction_total(transaction: HoldingTransaction, base_currency: str) -> Mo
     Proceeds may be negative when a sell fee exceeds the gross amount.
     """
     _validate(transaction, base_currency)
-    if _type(transaction.type) is InvestmentTransactionType.BUY:
+    kind = _type(transaction.type)
+    if kind is InvestmentTransactionType.BUY:
         return Money(_buy_cost_minor(transaction, base_currency), base_currency)
-    return Money(_sell_proceeds_minor(transaction, base_currency), base_currency)
+    if kind is InvestmentTransactionType.SELL:
+        return Money(_sell_proceeds_minor(transaction, base_currency), base_currency)
+    raise InvalidHoldingTransaction("unsupported_type")
+
+
+def dividend_amounts(transaction: HoldingTransaction, base_currency: str) -> DividendAmounts:
+    """Gross, withholding and net in the base currency, each rounded half-up once."""
+    _validate(transaction, base_currency)
+    if _type(transaction.type) is not InvestmentTransactionType.DIVIDEND:
+        raise InvalidHoldingTransaction("unsupported_type")
+    with localcontext() as context:
+        context.prec = max(context.prec, _DECIMAL_PRECISION)
+        gross = Money.from_decimal(
+            transaction.quantity * transaction.unit_price * transaction.fx_to_base,
+            base_currency,
+        )
+        withholding_quote = Decimal(transaction.fee_minor).scaleb(
+            -minor_unit_for(transaction.quote_currency)
+        )
+        withholding = Money.from_decimal(withholding_quote * transaction.fx_to_base, base_currency)
+    return DividendAmounts(
+        gross=gross,
+        withholding=withholding,
+        net=Money(gross.amount_minor - withholding.amount_minor, base_currency),
+    )
 
 
 def _rounded_cost(remaining_cost_minor: int, quantity: Decimal, sold: Decimal) -> int:
@@ -283,6 +396,28 @@ def _compute_instrument_rows(
                     )
             continue
 
+        if kind is InvestmentTransactionType.DIVIDEND:
+            continue
+
+        if kind is InvestmentTransactionType.SPLIT:
+            with localcontext() as context:
+                context.prec = max(context.prec, _DECIMAL_PRECISION)
+                ratio = transaction.quantity / transaction.unit_price
+                if method is CostBasisMethod.FIFO:
+                    for lot in lots:
+                        lot.quantity = quantize_quantity(lot.quantity * ratio)
+                    quantity = sum((lot.quantity for lot in lots), Decimal(0))
+                else:
+                    quantity = quantize_quantity(quantity * ratio)
+                if quantity > 0:
+                    average_cost = (
+                        Decimal(remaining_cost_minor).scaleb(-minor_unit_for(base_currency))
+                        / quantity
+                    )
+                else:
+                    average_cost = Decimal(0)
+            continue
+
         if transaction.quantity > quantity:
             raise Oversell(transaction.date, transaction.id)
         proceeds_minor = _sell_proceeds_minor(transaction, base_currency)
@@ -333,7 +468,7 @@ def _compute_instrument_rows(
         average_cost = Decimal(0)
     return Holding(
         instrument_id=instrument_id,
-        quantity=quantity,
+        quantity=quantize_quantity(quantity),
         cost_basis_base=Money(remaining_cost_minor, base_currency),
         avg_cost=average_cost,
         realized_pnl=Money(realized_minor, base_currency),

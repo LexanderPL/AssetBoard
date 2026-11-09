@@ -24,6 +24,9 @@ from uuid import UUID
 from assetboard.domain.holdings import (
     HoldingTransaction,
     InvestmentTransactionType,
+    dividend_amounts,
+    quantize_quantity,
+    split_factor,
     transaction_total,
 )
 from assetboard.domain.money import Money
@@ -93,6 +96,12 @@ class Observations:
     def latest(self, on: date) -> Decimal | None:
         index = bisect_right(self.dates, on) - 1
         return self.values[index] if index >= 0 else None
+
+    def latest_with_date(self, on: date) -> tuple[date, Decimal] | None:
+        index = bisect_right(self.dates, on) - 1
+        if index < 0:
+            return None
+        return self.dates[index], self.values[index]
 
 
 def _observations(
@@ -206,6 +215,10 @@ def portfolio_series(
     by_instrument: dict[UUID, list[HoldingTransaction]] = {}
     for row in dated:
         by_instrument.setdefault(row.instrument_id, []).append(row)
+    splits_by_instrument: dict[UUID, list[HoldingTransaction]] = {}
+    for row in dated:
+        if InvestmentTransactionType(row.type) is InvestmentTransactionType.SPLIT:
+            splits_by_instrument.setdefault(row.instrument_id, []).append(row)
     quantities: dict[UUID, Decimal] = {}
     net_invested: dict[UUID, int] = {}
     class_invested: dict[UUID, int] = {}
@@ -221,22 +234,34 @@ def portfolio_series(
                 break
             pointer += 1
             kind = InvestmentTransactionType(row.type)
+            if kind is InvestmentTransactionType.SPLIT:
+                with localcontext() as context:
+                    context.prec = max(context.prec, _DECIMAL_PRECISION)
+                    ratio = row.quantity / row.unit_price
+                    quantities[row.instrument_id] = quantize_quantity(
+                        quantities.get(row.instrument_id, Decimal(0)) * ratio
+                    )
+                continue
             if kind not in (
                 InvestmentTransactionType.BUY,
                 InvestmentTransactionType.SELL,
+                InvestmentTransactionType.DIVIDEND,
             ):
                 continue
-            total = transaction_total(row, base_currency)
-            if kind is InvestmentTransactionType.BUY:
-                quantities[row.instrument_id] = (
-                    quantities.get(row.instrument_id, Decimal(0)) + row.quantity
-                )
-                signed_total = total.amount_minor
+            if kind is InvestmentTransactionType.DIVIDEND:
+                signed_total = -dividend_amounts(row, base_currency).net.amount_minor
             else:
-                quantities[row.instrument_id] = (
-                    quantities.get(row.instrument_id, Decimal(0)) - row.quantity
-                )
-                signed_total = -total.amount_minor
+                total = transaction_total(row, base_currency)
+                if kind is InvestmentTransactionType.BUY:
+                    quantities[row.instrument_id] = (
+                        quantities.get(row.instrument_id, Decimal(0)) + row.quantity
+                    )
+                    signed_total = total.amount_minor
+                else:
+                    quantities[row.instrument_id] = (
+                        quantities.get(row.instrument_id, Decimal(0)) - row.quantity
+                    )
+                    signed_total = -total.amount_minor
             net_invested[row.instrument_id] = net_invested.get(row.instrument_id, 0) + signed_total
             if asset_class_id is not None:
                 class_invested[row.instrument_id] = class_invested.get(
@@ -277,7 +302,13 @@ def portfolio_series(
                 if currency == base_currency
                 else fx_series.get(currency, Observations((), ())).latest(point)
             )
-            price_value = price.latest(point) if price is not None else None
+            observation = price.latest_with_date(point) if price is not None else None
+            price_value = (
+                observation[1]
+                * split_factor(splits_by_instrument.get(instrument_id, ()), observation[0], point)
+                if observation is not None
+                else None
+            )
             if quantity > 0 and (price_value is None or rate is None):
                 incomplete = True
                 continue
@@ -353,6 +384,17 @@ def cashflows_for_period(
         if row.date is None or not (start < row.date <= end):
             continue
         kind = InvestmentTransactionType(row.type)
+        if kind is InvestmentTransactionType.SPLIT:
+            continue
+        if kind is InvestmentTransactionType.DIVIDEND:
+            amount = _class_amount(
+                dividend_amounts(row, base_currency).net.amount_minor,
+                allocation_map.get(row.instrument_id, ()),
+                asset_class_id,
+            )
+            if amount != 0:
+                flows.append(CashFlow(row.date, Money(amount, base_currency)))
+            continue
         if kind not in (InvestmentTransactionType.BUY, InvestmentTransactionType.SELL):
             continue
         total = transaction_total(row, base_currency)

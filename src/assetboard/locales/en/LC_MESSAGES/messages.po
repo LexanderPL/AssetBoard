@@ -1564,6 +1564,52 @@ msgstr ""
 msgid "The instrument mapping is incomplete or invalid."
 msgstr ""
 
+msgid ""
+"The dividend's linked ledger income is not in this archive; it was "
+"restored unlinked."
+msgstr ""
+
+msgid "The dividend's quantity, gross amount or withholding is invalid."
+msgstr ""
+
+msgid "Enter a valid quantity."
+msgstr ""
+
+msgid "A split needs different positive new and old units, no fee and no FX."
+msgstr ""
+
+msgid "Enter a valid fee or withholding amount."
+msgstr ""
+
+msgid ""
+"A dividend needs a positive FX rate, and 1 when quoted in the base "
+"currency."
+msgstr ""
+
+msgid "A dividend cannot have settlement fields."
+msgstr ""
+
+msgid "A split needs different positive new and old units."
+msgstr ""
+
+msgid "A split cannot have a fee."
+msgstr ""
+
+msgid "A split cannot have an FX rate."
+msgstr ""
+
+msgid "A split cannot have settlement fields."
+msgstr ""
+
+msgid "Splits are not available for currency or bond-model instruments."
+msgstr ""
+
+msgid "Only a dividend can link to a ledger income row."
+msgstr ""
+
+msgid "Withholding cannot exceed the gross amount."
+msgstr ""
+
 msgid "A net-worth category id appears more than once."
 msgstr ""
 
@@ -1646,6 +1692,10 @@ msgstr ""
 
 #, python-format
 msgid "%(tax)s: %(source)s"
+msgstr ""
+
+#, python-format
+msgid "Investment income: %(instrument)s"
 msgstr ""
 
 #, python-format
@@ -2307,7 +2357,26 @@ msgstr ""
 msgid "Use the class tier"
 msgstr ""
 
-msgid "Choose buy or sell."
+msgid "Choose buy, sell, dividend/interest or split."
+msgstr ""
+
+msgid ""
+"A split needs different positive new and old units, and is not available "
+"for currency or bond-model instruments."
+msgstr ""
+
+msgid "Enter an amount with at most the currency's decimal places."
+msgstr ""
+
+msgid "Choose an income category when recording the dividend as income."
+msgstr ""
+
+msgid ""
+"The net dividend is zero; reduce the withholding or untick “Record as "
+"income”."
+msgstr ""
+
+msgid "Only a dividend can be recorded as income."
 msgstr ""
 
 msgid "Enter a valid date."
@@ -2618,6 +2687,11 @@ msgid "Future months cannot be closed; they stay open for planning."
 msgstr ""
 
 msgid "This entry no longer exists. It may have been deleted elsewhere."
+msgstr ""
+
+msgid ""
+"This entry is managed by its investment dividend. Open it from the “from "
+"investment income” link in the row."
 msgstr ""
 
 msgid "Too late to undo: the entry stays deleted."
@@ -5154,6 +5228,36 @@ msgid ""
 "chosen for new allocations."
 msgstr ""
 
+msgid "Income from investments"
+msgstr ""
+
+#, python-format
+msgid "Dividends and interest by calendar year, in %(currency)s."
+msgstr ""
+
+msgid "Year"
+msgstr ""
+
+msgid "Gross"
+msgstr ""
+
+msgid "Withholding"
+msgstr ""
+
+msgid "Payments"
+msgstr ""
+
+msgid "No dividends or interest recorded yet."
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(count)s undated dividends are not included in the yearly report."
+msgstr ""
+
+#, python-format
+msgid "%(count)s dividends have an invalid amount and are not included."
+msgstr ""
+
 msgid "Symbol"
 msgstr ""
 
@@ -5784,6 +5888,46 @@ msgstr ""
 msgid "Sell"
 msgstr ""
 
+msgid "Dividend / interest"
+msgstr ""
+
+msgid "Split"
+msgstr ""
+
+msgid "Gross amount"
+msgstr ""
+
+msgid "In the instrument's quote currency."
+msgstr ""
+
+msgid ""
+"Optional tax withheld; it is stored on the dividend and not posted as an "
+"expense."
+msgstr ""
+
+msgid "Record as income"
+msgstr ""
+
+msgid ""
+"Add the net amount to the ledger as income. The category is required when"
+" this is ticked."
+msgstr ""
+
+msgid "Choose an income category"
+msgstr ""
+
+msgid "New units"
+msgstr ""
+
+msgid "For a 2-for-1 split enter 2 new units and 1 old unit."
+msgstr ""
+
+msgid "Old units"
+msgstr ""
+
+msgid "For a 1-for-10 reverse split enter 1 new unit and 10 old units."
+msgstr ""
+
 msgid "Amounts in"
 msgstr ""
 
@@ -5939,9 +6083,6 @@ msgstr ""
 msgid "No month"
 msgstr ""
 
-msgid "Year"
-msgstr ""
-
 msgid "No year"
 msgstr ""
 
@@ -5974,6 +6115,9 @@ msgid "Earlier descriptions"
 msgstr ""
 
 msgid "Plan"
+msgstr ""
+
+msgid "from investment income"
 msgstr ""
 
 #, python-format
@@ -8590,5 +8734,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Fix the category mappings above before applying."
+#~ msgstr ""
+
+#~ msgid "Choose buy or sell."
 #~ msgstr ""
 

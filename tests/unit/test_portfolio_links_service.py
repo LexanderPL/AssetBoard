@@ -321,6 +321,23 @@ def test_today_uses_the_current_portfolio_and_past_dates_use_the_series(
     assert history_holding[(instrument, MONTH_END)] == Money(110_000, "EUR")
 
 
+def test_a_split_adjusts_the_historical_carried_forward_price(team: WorkspaceDb) -> None:
+    stocks = _class(team)
+    instrument = _instrument(team, stocks)
+    _trade(team, instrument, day="2026-01-10", quantity="10", price="100")
+    _price(team, instrument, "2026-01-10", "100")
+    _trade(team, instrument, day="2026-02-01", kind="split", quantity="2", price="1")
+
+    history = _resolve(
+        team,
+        HOLDING_LINK,
+        [instrument],
+        [date(2026, 1, 31), date(2026, 2, 28)],
+    )
+    assert history[(instrument, date(2026, 1, 31))] == Money(100_000, "EUR")
+    assert history[(instrument, date(2026, 2, 28))] == Money(100_000, "EUR")
+
+
 def test_class_values_follow_the_same_look_through_as_the_portfolio_page(
     team: WorkspaceDb,
 ) -> None:

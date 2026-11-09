@@ -1,0 +1,43 @@
+{% from "investments/_tabs.html" import tabs with context %}
+<div id="income-body" class="space-y-6">
+  {{ tabs("income") }}
+
+  <section class="panel p-6 sm:p-7" aria-labelledby="income-heading" data-investment-income>
+    <h1 id="income-heading" class="text-lg font-semibold">{{ _("Income from investments") }}</h1>
+    <p class="mt-1 text-sm text-muted">{{ _("Dividends and interest by calendar year, in %(currency)s.", currency=page.currency) }}</p>
+    {% if page.years %}
+    <div class="mt-5 overflow-x-auto">
+      <table class="w-full text-left text-sm">
+        <thead>
+          <tr>
+            <th class="py-2 pr-4">{{ _("Year") }}</th>
+            <th class="py-2 pr-4 text-right">{{ _("Gross") }}</th>
+            <th class="py-2 pr-4 text-right">{{ _("Withholding") }}</th>
+            <th class="py-2 pr-4 text-right">{{ _("Net") }}</th>
+            <th class="py-2 text-right">{{ _("Payments") }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for year in page.years %}
+          <tr class="border-t border-line">
+            <td class="py-2 pr-4 tabular-nums">{{ year.year }}</td>
+            <td class="py-2 pr-4 text-right tabular-nums">{{ format_money(year.gross, locale) }}</td>
+            <td class="py-2 pr-4 text-right tabular-nums">{{ format_money(year.withholding, locale) }}</td>
+            <td class="py-2 pr-4 text-right tabular-nums">{{ format_money(year.net, locale) }}</td>
+            <td class="py-2 text-right tabular-nums">{{ year.payments }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <p class="mt-4 text-sm text-muted" data-income-empty>{{ _("No dividends or interest recorded yet.") }}</p>
+    {% endif %}
+    {% if page.undated_count %}
+    <p class="mt-4 text-sm text-muted">{{ _("%(count)s undated dividends are not included in the yearly report.", count=page.undated_count) }}</p>
+    {% endif %}
+    {% if page.invalid_count %}
+    <p class="mt-2 text-sm text-danger">{{ _("%(count)s dividends have an invalid amount and are not included.", count=page.invalid_count) }}</p>
+    {% endif %}
+  </section>
+</div>

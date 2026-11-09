@@ -162,11 +162,14 @@ class TransactionRepository(ScopedRepository[Transaction]):
         created_by_user_id: UUID | None,
         created_at: datetime,
         deleted_at: datetime | None,
+        source: str = "import",
     ) -> Transaction:
         """Create a transaction from a restore, keeping its entry order and deletion state.
 
         ``created_at`` and ``updated_at`` are both set explicitly: a restore must not leave
         timestamps that the clock listener could push past the batch's ``applied_at``.
+        ``source`` is ``investment`` for a row linked to a restored dividend, so the ledger
+        keeps refusing direct edits of it.
         """
         return self.add(
             Transaction(
@@ -177,7 +180,7 @@ class TransactionRepository(ScopedRepository[Transaction]):
                 category_id=category_id,
                 description=description,
                 description_key=description_key,
-                source="import",
+                source=source,
                 created_by_user_id=created_by_user_id,
                 import_batch_id=import_batch_id,
                 import_key=import_key,

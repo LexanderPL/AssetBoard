@@ -103,6 +103,7 @@ from assetboard.services.imports import (
 from assetboard.services.investments import seed_into as investment_seed_into
 from assetboard.services.networth import seed_categories as networth_seed_categories
 from assetboard.services.networth import seed_into as networth_seed_into
+from assetboard.services.transactions import get_transaction as get_ledger_transaction
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
 EXPORTED_AT = datetime(2026, 3, 1, 12, 0, 0, tzinfo=UTC)
@@ -127,6 +128,8 @@ BOND_TERMS = UUID("f2f2f2f2-f2f2-4f2f-8f2f-f2f2f2f2f2f2")
 PRICE_POINT = UUID("a1a1a1a1-a1a1-4a1a-8a1a-a1a1a1a1a1a1")
 FX_RATE = UUID("a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2")
 PROVIDER_CONFIG = UUID("a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a3")
+DIVIDEND_INCOME = UUID("a4a4a4a4-a4a4-4a4a-8a4a-a4a4a4a4a4a4")
+DIVIDEND_TX = UUID("a5a5a5a5-a5a5-4a5a-8a5a-a5a5a5a5a5a5")
 
 
 @pytest.fixture
@@ -541,6 +544,18 @@ def _source_workspace(db: WorkspaceDb) -> None:
         second.deleted_at = datetime(2026, 2, 3, 7, 12, tzinfo=UTC)
         first.created_at = datetime(2026, 2, 3, 8, 0, tzinfo=UTC)
         second.created_at = datetime(2026, 2, 3, 9, 0, tzinfo=UTC)
+        dividend_income = transactions.create(
+            direction="income",
+            day=date(2026, 2, 10),
+            amount_minor=900,
+            currency="EUR",
+            category_id=salary.id,
+            description="World ETF dividend",
+            description_key="world etf dividend",
+            source="investment",
+            import_key=f"id:{DIVIDEND_INCOME}",
+            created_by_user_id=db.users["own"],
+        )
         BudgetLineRepository(session, ctx).create(
             month=YearMonth(2026, 2),
             category_id=food.id,
@@ -671,7 +686,8 @@ def _source_workspace(db: WorkspaceDb) -> None:
             weight_bp=10_000,
             import_key=f"id:{ALLOC_BONDS}",
         )
-        InvestmentTransactionRepository(session, ctx).create(
+        investment_transactions = InvestmentTransactionRepository(session, ctx)
+        investment_transactions.create(
             instrument_id=etf.id,
             date=date(2026, 2, 1),
             type="buy",
@@ -683,6 +699,19 @@ def _source_workspace(db: WorkspaceDb) -> None:
             note="First lot",
             import_key=f"id:{INVESTMENT_TX}",
             created_at=datetime(2026, 2, 1, 8, 0, tzinfo=UTC),
+        )
+        investment_transactions.create(
+            instrument_id=etf.id,
+            date=date(2026, 2, 10),
+            type="dividend",
+            quantity=Decimal("1"),
+            unit_price=Decimal("10"),
+            quote_currency="EUR",
+            fee_minor=100,
+            fx_to_base=Decimal("1"),
+            income_transaction_id=dividend_income.id,
+            import_key=f"id:{DIVIDEND_TX}",
+            created_at=datetime(2026, 2, 10, 8, 0, tzinfo=UTC),
         )
         BondTermsRepository(session, ctx).create(
             instrument_id=bond.id,
@@ -782,6 +811,71 @@ def test_restore_round_trip_is_byte_identical(db: WorkspaceDb, data_dir: Path) -
     ):
         assert first_parsed.files[name] == second_parsed.files[name]
     assert first_parsed.manifest["files"] == second_parsed.manifest["files"]
+
+
+def test_restore_preserves_a_linked_dividend_and_its_source(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    _source_workspace(db)
+    content = export_workspace(db.factory, db.ctx("own", "owner")).content
+    target = _target(db)
+    target_ctx = db.ctx("own", "owner", workspace_id=target)
+    batch_id = _upload(db, data_dir, content, ctx=target_ctx)
+    report = _plan(db, data_dir, batch_id, ctx=target_ctx)
+    assert report["counts"]["invalid"] == 0, report
+    assert not any(w["code"] == "income_target_missing" for w in report["warnings"])
+    _apply(db, data_dir, batch_id, ctx=target_ctx)
+
+    with db.factory() as session:
+        dividend = next(
+            row
+            for row in InvestmentTransactionRepository(session, target_ctx).list()
+            if row.type == "dividend"
+        )
+        assert dividend.income_transaction_id is not None
+        income = TransactionRepository(session, target_ctx).get(dividend.income_transaction_id)
+        assert income is not None
+        assert income.direction == "income"
+        assert income.amount_minor == 900
+        assert income.source == "investment"
+        assert income.category_id is not None
+    view = get_ledger_transaction(db.factory, target_ctx, dividend.income_transaction_id)
+    assert view.investment_transaction_id == dividend.id
+
+
+def test_restore_unlinks_a_dividend_with_a_missing_income_target(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    _source_workspace(db)
+    content = export_workspace(db.factory, db.ctx("own", "owner")).content
+    parsed, errors = parse_archive(content)
+    assert errors == () and parsed is not None
+    missing = uuid4()
+    changed = replace(
+        parsed.rows,
+        investment_transactions=tuple(
+            replace(row, income_transaction_id=str(missing)) if row.type == "dividend" else row
+            for row in parsed.rows.investment_transactions
+        ),
+    )
+    content = _archive(changed)
+    target = _target(db)
+    target_ctx = db.ctx("own", "owner", workspace_id=target)
+    batch_id = _upload(db, data_dir, content, ctx=target_ctx)
+    report = _plan(db, data_dir, batch_id, ctx=target_ctx)
+    assert report["counts"]["invalid"] == 0, report
+    assert any(
+        entry["code"] == "income_target_missing" and entry["file"] == "investment_transactions.csv"
+        for entry in report["warnings"]
+    )
+    _apply(db, data_dir, batch_id, ctx=target_ctx)
+    with db.factory() as session:
+        dividend = next(
+            row
+            for row in InvestmentTransactionRepository(session, target_ctx).list()
+            if row.type == "dividend"
+        )
+        assert dividend.income_transaction_id is None
 
 
 def test_restore_refuses_non_empty_workspace_and_editor(db: WorkspaceDb, data_dir: Path) -> None:
@@ -1793,7 +1887,7 @@ def test_merge_into_source_workspace_creates_nothing(db: WorkspaceDb, data_dir: 
     _apply(db, data_dir, batch_id, ctx=db.ctx("own", "owner"))
     with db.factory() as session:
         assert len(CategoryRepository(session, db.ctx("own", "owner")).list()) == 3
-        assert len(TransactionRepository(session, db.ctx("own", "owner")).list()) == 3
+        assert len(TransactionRepository(session, db.ctx("own", "owner")).list()) == 4
         assert len(NetWorthItemRepository(session, db.ctx("own", "owner")).list()) == 2
         assert len(ItemValuationRepository(session, db.ctx("own", "owner")).list()) == 2
 

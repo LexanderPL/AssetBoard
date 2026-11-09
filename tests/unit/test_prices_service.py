@@ -248,6 +248,66 @@ def test_a_manual_price_is_carried_forward_and_stales_after_five_days(
     assert panel.effective[0].price == Decimal("1234.56")
 
 
+def test_a_pre_split_price_is_halved_when_carried_forward(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    instrument = _instrument(db, ctx)
+    _manual(db, ctx, instrument.id, date_value="2026-03-01", price_value="100")
+    create_transaction(
+        db.factory,
+        ctx,
+        instrument_id=instrument.id,
+        type_value="split",
+        date_value="2026-03-05",
+        quantity_value="2",
+        unit_price_value="1",
+        fee_value="0",
+        fx_value="",
+        note_value="",
+        locale="en",
+    )
+
+    after = price_at(db.factory, ctx, instrument.id, date(2026, 3, 6))
+    assert after.price == Decimal("50")
+    assert after.as_of == date(2026, 3, 1)
+    assert after.source == "manual"
+    panel = instrument_prices(db.factory, ctx, instrument.id, on=date(2026, 3, 6))
+    assert panel.latest.price == Decimal("50")
+
+    batched = latest_prices(db.factory, ctx, [instrument.id], date(2026, 3, 6))
+    assert batched[instrument.id].price == Decimal("50")
+
+
+def test_a_transaction_price_is_halved_after_a_split_and_the_split_is_not_a_price(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    instrument = _instrument(db, ctx)
+    _tx(db, ctx, instrument.id, unit_price="100")
+    create_transaction(
+        db.factory,
+        ctx,
+        instrument_id=instrument.id,
+        type_value="split",
+        date_value="2026-03-05",
+        quantity_value="2",
+        unit_price_value="1",
+        fee_value="0",
+        fx_value="",
+        note_value="",
+        locale="en",
+    )
+    after = price_at(db.factory, ctx, instrument.id, date(2026, 3, 6))
+    assert (after.price, after.as_of, after.source) == (
+        Decimal("50"),
+        date(2026, 3, 1),
+        "transaction",
+    )
+    panel = instrument_prices(db.factory, ctx, instrument.id, on=date(2026, 3, 6))
+    assert [point.source for point in panel.points] == ["transaction"]
+
+
 def test_transaction_prices_are_derived_and_deleted_transactions_stop_contributing(
     db: WorkspaceDb, team: WorkspaceDb
 ) -> None:

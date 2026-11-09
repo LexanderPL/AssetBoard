@@ -54,16 +54,57 @@
     <select id="transaction-type" name="type" class="form-select w-full"{{ invalid(errors, "type", "transaction-type") }}>
       <option value="buy"{% if values.type == "buy" %} selected{% endif %}>{{ _("Buy") }}</option>
       <option value="sell"{% if values.type == "sell" %} selected{% endif %}>{{ _("Sell") }}</option>
+      <option value="dividend"{% if values.type == "dividend" %} selected{% endif %}>{{ _("Dividend / interest") }}</option>
+      <option value="split"{% if values.type == "split" %} selected{% endif %}>{{ _("Split") }}</option>
     </select>
     {{ field_error(errors, "type", "transaction-type") }}
   </div>
-  <div class="space-y-1.5">
+  <div class="space-y-1.5" data-dividend-field>
+    <label for="transaction-dividend-gross" class="block text-sm font-medium">{{ _("Gross amount") }}</label>
+    <input id="transaction-dividend-gross" name="dividend_gross" type="text" inputmode="decimal" value="{{ values.dividend_gross }}" class="form-control w-full">
+    <p class="text-xs text-muted">{{ _("In the instrument's quote currency.") }}</p>
+    {{ field_error(errors, "unit_price", "transaction-dividend-gross") }}
+  </div>
+  <div class="space-y-1.5" data-dividend-field>
+    <label for="transaction-dividend-withholding" class="block text-sm font-medium">{{ _("Withholding") }}</label>
+    <input id="transaction-dividend-withholding" name="dividend_withholding" type="text" inputmode="decimal" value="{{ values.dividend_withholding or '0' }}" class="form-control w-full">
+    <p class="text-xs text-muted">{{ _("Optional tax withheld; it is stored on the dividend and not posted as an expense.") }}</p>
+    {{ field_error(errors, "fee", "transaction-dividend-withholding") }}
+  </div>
+  <div class="space-y-1.5" data-dividend-field>
+    <label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="record_income" value="true"{% if values.record_income %} checked{% endif %}> {{ _("Record as income") }}</label>
+    <p class="text-xs text-muted">{{ _("Add the net amount to the ledger as income. The category is required when this is ticked.") }}</p>
+  </div>
+  <div class="space-y-1.5" data-dividend-field>
+    <label for="transaction-income-category" class="block text-sm font-medium">{{ _("Income category") }}</label>
+    {% set chosen_income = values.income_category_id or default_income_category_id %}
+    <select id="transaction-income-category" name="income_category_id" class="form-select w-full">
+      <option value="">{{ _("Choose an income category") }}</option>
+      {% for category_id, name in income_categories %}
+      <option value="{{ category_id }}"{% if chosen_income == category_id %} selected{% endif %}>{{ name }}</option>
+      {% endfor %}
+    </select>
+    {{ field_error(errors, "income_category", "transaction-income-category") }}
+  </div>
+  <div class="space-y-1.5" data-split-field>
+    <label for="transaction-split-new" class="block text-sm font-medium">{{ _("New units") }}</label>
+    <input id="transaction-split-new" name="split_new" type="text" inputmode="decimal" value="{{ values.split_new }}" class="form-control w-full">
+    <p class="text-xs text-muted">{{ _("For a 2-for-1 split enter 2 new units and 1 old unit.") }}</p>
+    {{ field_error(errors, "quantity", "transaction-split-new") }}
+  </div>
+  <div class="space-y-1.5" data-split-field>
+    <label for="transaction-split-old" class="block text-sm font-medium">{{ _("Old units") }}</label>
+    <input id="transaction-split-old" name="split_old" type="text" inputmode="decimal" value="{{ values.split_old }}" class="form-control w-full">
+    <p class="text-xs text-muted">{{ _("For a 1-for-10 reverse split enter 1 new unit and 10 old units.") }}</p>
+    {{ field_error(errors, "unit_price", "transaction-split-old") }}
+  </div>
+  <div class="space-y-1.5" data-trade-field>
     <label for="transaction-quantity" class="block text-sm font-medium">{{ _("Quantity") }}</label>
     <input id="transaction-quantity" name="quantity" type="text" inputmode="decimal" value="{{ values.quantity }}" required class="form-control w-full"{{ invalid(errors, "quantity", "transaction-quantity") }}>
     {{ field_error(errors, "quantity", "transaction-quantity") }}
   </div>
   {% if show_amounts %}
-  <fieldset class="space-y-1.5 sm:col-span-2" data-amounts-choice>
+  <fieldset class="space-y-1.5 sm:col-span-2" data-amounts-choice data-trade-field>
     <legend class="block text-sm font-medium">{{ _("Amounts in") }}</legend>
     <div class="flex flex-wrap gap-4 text-sm">
       <label class="inline-flex items-center gap-2"><input type="radio" name="amounts" value="quote"{% if amounts == "quote" %} checked{% endif %} data-amounts-radio> <span data-amounts-quote-label>{{ ns.quote_code or _("Quote currency") }}</span></label>
@@ -73,7 +114,7 @@
     {{ field_error(errors, "amounts", "transaction-amounts") }}
   </fieldset>
   {% else %}<input type="hidden" name="amounts" value="quote">{% endif %}
-  <div class="space-y-1.5" data-transaction-price-field data-amounts-group="quote">
+  <div class="space-y-1.5" data-transaction-price-field data-amounts-group="quote" data-trade-field>
     <label for="transaction-price" class="block text-sm font-medium">{{ _("Unit price") }}</label>
     {% set price_value = "1" if fixed and fixed.type == "currency" else values.unit_price %}
     <input id="transaction-price" name="unit_price" type="text" inputmode="decimal" value="{{ price_value }}"{% if fixed and fixed.type == "currency" %} readonly{% endif %} class="form-control w-full" data-transaction-price{{ invalid(errors, "unit_price", "transaction-price") }}>
@@ -81,19 +122,19 @@
     {% if fixed and fixed.type == "bond_model" %}<p class="text-xs text-muted" data-bond-price-help>{{ _("What you paid per bond (cost basis). Face value is the nominal the interest accrues on, e.g. 99.90 paid for a 100 bond on a rollover.") }}</p>{% endif %}
     {{ field_error(errors, "unit_price", "transaction-price") }}
   </div>
-  <div class="space-y-1.5" data-amounts-group="quote">
+  <div class="space-y-1.5" data-amounts-group="quote" data-trade-field>
     <label for="transaction-fee" class="block text-sm font-medium">{{ _("Fee") }}</label>
     <input id="transaction-fee" name="fee" type="text" inputmode="decimal" value="{{ values.fee }}" class="form-control w-full"{{ invalid(errors, "fee", "transaction-fee") }}>
     {{ field_error(errors, "fee", "transaction-fee") }}
   </div>
   {% if show_amounts %}
-  <div class="space-y-1.5" data-amounts-group="base">
+  <div class="space-y-1.5" data-amounts-group="base" data-trade-field>
     <label for="transaction-base-price" class="block text-sm font-medium">{{ _("Unit price in %(currency)s", currency=base_currency) }}</label>
     <input id="transaction-base-price" name="base_unit_price" type="text" inputmode="decimal" value="{{ values.get('base_unit_price', '') }}" class="form-control w-full"{{ invalid(errors, "base_unit_price", "transaction-base-price") }}>
     <p class="text-xs text-muted">{{ _("What you paid per unit in %(currency)s, as the broker shows it.", currency=base_currency) }}</p>
     {{ field_error(errors, "base_unit_price", "transaction-base-price") }}
   </div>
-  <div class="space-y-1.5" data-amounts-group="base">
+  <div class="space-y-1.5" data-amounts-group="base" data-trade-field>
     <label for="transaction-base-fee" class="block text-sm font-medium">{{ _("Fee in %(currency)s", currency=base_currency) }}</label>
     <input id="transaction-base-fee" name="base_fee" type="text" inputmode="decimal" value="{{ values.get('base_fee', '0') }}" class="form-control w-full"{{ invalid(errors, "base_fee", "transaction-base-fee") }}>
     {{ field_error(errors, "base_fee", "transaction-base-fee") }}

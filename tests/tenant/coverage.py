@@ -180,6 +180,8 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "filtered_not_in_currency",
             "live_dated",
             "for_import_batch",
+            "for_income_transaction",
+            "income_links",
         )
     },
     **{

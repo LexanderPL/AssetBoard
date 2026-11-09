@@ -150,7 +150,7 @@ def price_observations(
         if previous is None or candidate > previous[0]:
             best[key] = (candidate, row.price)
     for row in transaction_rows:
-        if row.date is None:
+        if row.date is None or row.type not in {"buy", "sell"}:
             continue
         key = (row.instrument_id, row.date)
         candidate = source_candidate("transaction", row.created_at, row.id)
@@ -179,7 +179,8 @@ def fx_observations(
         if previous is None or candidate > previous[0]:
             best[key] = (candidate, row.rate)
     for row in transaction_rows:
-        if row.date is None or row.quote_currency == base_currency:
+        if row.date is None or row.quote_currency == base_currency or row.type == "split":
+            # A split stores no FX: its 1 is an encoding placeholder, not a rate observation.
             continue
         rate = row.fx_to_base if row.fx_to_base is not None else Decimal(1)
         if rate <= 0:

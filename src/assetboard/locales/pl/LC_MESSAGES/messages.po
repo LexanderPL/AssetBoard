@@ -1599,6 +1599,58 @@ msgstr "Wiersze dla %(instrument)s są pomijane w tym imporcie."
 msgid "The instrument mapping is incomplete or invalid."
 msgstr "Mapowanie instrumentów jest niekompletne lub nieprawidłowe."
 
+msgid ""
+"The dividend's linked ledger income is not in this archive; it was "
+"restored unlinked."
+msgstr ""
+"Powiązany przychód dywidendy nie znajduje się w tym archiwum; przywrócono"
+" dywidendę bez powiązania."
+
+msgid "The dividend's quantity, gross amount or withholding is invalid."
+msgstr "Ilość, kwota brutto lub podatek potrącony dywidendy są nieprawidłowe."
+
+msgid "Enter a valid quantity."
+msgstr "Wpisz prawidłową ilość."
+
+msgid "A split needs different positive new and old units, no fee and no FX."
+msgstr ""
+"Podział wymaga różnych dodatnich nowych i starych jednostek, bez opłaty i"
+" bez kursu walutowego."
+
+msgid "Enter a valid fee or withholding amount."
+msgstr "Wpisz prawidłową opłatę lub kwotę podatku potrąconego."
+
+msgid ""
+"A dividend needs a positive FX rate, and 1 when quoted in the base "
+"currency."
+msgstr ""
+"Dywidenda wymaga dodatniego kursu walutowego, a przy walucie bazowej "
+"wartości 1."
+
+msgid "A dividend cannot have settlement fields."
+msgstr "Dywidenda nie może mieć pól rozliczenia."
+
+msgid "A split needs different positive new and old units."
+msgstr "Podział wymaga różnych dodatnich nowych i starych jednostek."
+
+msgid "A split cannot have a fee."
+msgstr "Podział nie może mieć opłaty."
+
+msgid "A split cannot have an FX rate."
+msgstr "Podział nie może mieć kursu walutowego."
+
+msgid "A split cannot have settlement fields."
+msgstr "Podział nie może mieć pól rozliczenia."
+
+msgid "Splits are not available for currency or bond-model instruments."
+msgstr "Podziały nie są dostępne dla instrumentów walutowych ani modeli obligacji."
+
+msgid "Only a dividend can link to a ledger income row."
+msgstr "Tylko dywidenda może być powiązana z pozycją przychodu w księdze."
+
+msgid "Withholding cannot exceed the gross amount."
+msgstr "Podatek potrącony nie może przekraczać kwoty brutto."
+
 msgid "A net-worth category id appears more than once."
 msgstr "Identyfikator kategorii majątku występuje więcej niż raz."
 
@@ -1690,6 +1742,10 @@ msgstr "To przywracanie nie zapisało ustawień obszaru roboczego, które zastą
 #, python-format
 msgid "%(tax)s: %(source)s"
 msgstr "%(tax)s: %(source)s"
+
+#, python-format
+msgid "Investment income: %(instrument)s"
+msgstr "Przychód z inwestycji: %(instrument)s"
 
 #, python-format
 msgid "Confirm your email address for %(app)s"
@@ -2422,8 +2478,31 @@ msgstr "Nieprzypisane"
 msgid "Use the class tier"
 msgstr "Użyj poziomu klasy"
 
-msgid "Choose buy or sell."
-msgstr "Wybierz kupno lub sprzedaż."
+msgid "Choose buy, sell, dividend/interest or split."
+msgstr "Wybierz kupno, sprzedaż, dywidendę/odsetki lub podział."
+
+msgid ""
+"A split needs different positive new and old units, and is not available "
+"for currency or bond-model instruments."
+msgstr ""
+"Podział wymaga różnych dodatnich nowych i starych jednostek i nie jest "
+"dostępny dla instrumentów walutowych ani modeli obligacji."
+
+msgid "Enter an amount with at most the currency's decimal places."
+msgstr "Wpisz kwotę z co najwyżej tyloma miejscami po przecinku, ile ma waluta."
+
+msgid "Choose an income category when recording the dividend as income."
+msgstr "Wybierz kategorię przychodów, gdy zapisujesz dywidendę jako przychód."
+
+msgid ""
+"The net dividend is zero; reduce the withholding or untick “Record as "
+"income”."
+msgstr ""
+"Dywidenda netto wynosi zero; zmniejsz podatek potrącony lub odznacz "
+"„Zapisz jako przychód”."
+
+msgid "Only a dividend can be recorded as income."
+msgstr "Tylko dywidendę można zapisać jako przychód."
 
 msgid "Enter a valid date."
 msgstr "Wpisz prawidłową datę."
@@ -2767,6 +2846,13 @@ msgstr "Przyszłych miesięcy nie można zamykać; pozostają otwarte do planowa
 
 msgid "This entry no longer exists. It may have been deleted elsewhere."
 msgstr "Ten wpis już nie istnieje. Mógł zostać usunięty gdzie indziej."
+
+msgid ""
+"This entry is managed by its investment dividend. Open it from the “from "
+"investment income” link in the row."
+msgstr ""
+"Ta pozycja jest zarządzana przez swoją dywidendę. Otwórz ją z linku „z "
+"przychodu inwestycyjnego” w wierszu."
 
 msgid "Too late to undo: the entry stays deleted."
 msgstr "Za późno na cofnięcie: wpis pozostaje usunięty."
@@ -5547,6 +5633,38 @@ msgstr ""
 "Zarchiwizowane klasy pozostają na istniejących instrumentach, ale nie "
 "można ich wybierać do nowych alokacji."
 
+msgid "Income from investments"
+msgstr "Przychody z inwestycji"
+
+#, python-format
+msgid "Dividends and interest by calendar year, in %(currency)s."
+msgstr "Dywidendy i odsetki według roku kalendarzowego, w %(currency)s."
+
+msgid "Year"
+msgstr "Rok"
+
+msgid "Gross"
+msgstr "Brutto"
+
+msgid "Withholding"
+msgstr "Podatek potrącony"
+
+msgid "Payments"
+msgstr "Płatności"
+
+msgid "No dividends or interest recorded yet."
+msgstr "Nie zapisano jeszcze dywidend ani odsetek."
+
+#, python-format
+msgid "%(count)s undated dividends are not included in the yearly report."
+msgstr "Liczba dywidend bez daty nieuwzględnionych w raporcie rocznym: %(count)s."
+
+#, python-format
+msgid "%(count)s dividends have an invalid amount and are not included."
+msgstr ""
+"Liczba dywidend z nieprawidłową kwotą, nieuwzględnionych w raporcie: "
+"%(count)s."
+
 msgid "Symbol"
 msgstr "Symbol"
 
@@ -6249,6 +6367,50 @@ msgstr "Kupno"
 msgid "Sell"
 msgstr "Sprzedaż"
 
+msgid "Dividend / interest"
+msgstr "Dywidenda / odsetki"
+
+msgid "Split"
+msgstr "Podział"
+
+msgid "Gross amount"
+msgstr "Kwota brutto"
+
+msgid "In the instrument's quote currency."
+msgstr "W walucie notowania instrumentu."
+
+msgid ""
+"Optional tax withheld; it is stored on the dividend and not posted as an "
+"expense."
+msgstr ""
+"Opcjonalny podatek potrącony; jest zapisywany przy dywidendzie i nie jest"
+" księgowany jako wydatek."
+
+msgid "Record as income"
+msgstr "Zapisz jako przychód"
+
+msgid ""
+"Add the net amount to the ledger as income. The category is required when"
+" this is ticked."
+msgstr ""
+"Dodaj kwotę netto do księgi jako przychód. Kategoria jest wymagana, gdy "
+"opcja jest zaznaczona."
+
+msgid "Choose an income category"
+msgstr "Wybierz kategorię przychodów"
+
+msgid "New units"
+msgstr "Nowe jednostki"
+
+msgid "For a 2-for-1 split enter 2 new units and 1 old unit."
+msgstr "Dla podziału 2:1 wpisz 2 nowe jednostki i 1 starą jednostkę."
+
+msgid "Old units"
+msgstr "Stare jednostki"
+
+msgid "For a 1-for-10 reverse split enter 1 new unit and 10 old units."
+msgstr "Dla scalenia 1:10 wpisz 1 nową jednostkę i 10 starych jednostek."
+
 msgid "Amounts in"
 msgstr "Kwoty w"
 
@@ -6425,9 +6587,6 @@ msgstr "Utwórz konto i dołącz"
 msgid "No month"
 msgstr "Bez miesiąca"
 
-msgid "Year"
-msgstr "Rok"
-
 msgid "No year"
 msgstr "Bez roku"
 
@@ -6465,6 +6624,9 @@ msgstr "Wcześniejsze opisy"
 
 msgid "Plan"
 msgstr "Plan"
+
+msgid "from investment income"
+msgstr "z przychodu inwestycyjnego"
 
 #, python-format
 msgid "Edit the entry of %(date)s, %(amount)s"
@@ -9100,4 +9262,7 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "An instrument type is not supported."
 #~ msgstr "Typ instrumentu nie jest obsługiwany."
+
+#~ msgid "Choose buy or sell."
+#~ msgstr "Wybierz kupno lub sprzedaż."
 

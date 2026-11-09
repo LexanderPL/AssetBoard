@@ -740,6 +740,57 @@ def test_investment_queries_stay_in_their_workspace(
         )
     ] == []
 
+    a_income_category = CategoryRepository(db_session, ctx_a).create(
+        name="Interest",
+        name_key="interest",
+        kind="income",
+        treatment="regular",
+        color="#16a34a",
+        sort_order=0,
+    )
+    b_income_category = CategoryRepository(db_session, ctx_b).create(
+        name="Interest",
+        name_key="interest",
+        kind="income",
+        treatment="regular",
+        color="#16a34a",
+        sort_order=0,
+    )
+    a_income = TransactionRepository(db_session, ctx_a).create(
+        direction="income",
+        day=date(2026, 3, 1),
+        amount_minor=100,
+        currency="EUR",
+        category_id=a_income_category.id,
+        description="Dividend",
+        description_key="dividend",
+        source="investment",
+        created_by_user_id=None,
+    )
+    b_income = TransactionRepository(db_session, ctx_b).create(
+        direction="income",
+        day=date(2026, 3, 1),
+        amount_minor=200,
+        currency="EUR",
+        category_id=b_income_category.id,
+        description="Dividend",
+        description_key="dividend",
+        source="investment",
+        created_by_user_id=None,
+    )
+    transactions_a.update(a_transaction.id, income_transaction_id=a_income.id)
+    transactions_b.update(b_transaction.id, income_transaction_id=b_income.id)
+    assert transactions_a.for_income_transaction(a_income.id) is a_transaction
+    assert transactions_a.for_income_transaction(b_income.id) is None
+    assert transactions_b.for_income_transaction(b_income.id) is b_transaction
+    assert transactions_b.for_income_transaction(a_income.id) is None
+    assert transactions_a.income_links([a_income.id, b_income.id]) == {
+        a_income.id: a_transaction.id
+    }
+    assert transactions_b.income_links([a_income.id, b_income.id]) == {
+        b_income.id: b_transaction.id
+    }
+
 
 def test_risk_policy_queries(db_session: Session, two_workspaces: tuple[Any, Any]) -> None:
     ctx_a, ctx_b = two_workspaces

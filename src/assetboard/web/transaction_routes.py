@@ -39,6 +39,7 @@ from assetboard.services.context import Context
 from assetboard.services.months import MonthClosed, get_month
 from assetboard.services.transactions import (
     InvalidTransaction,
+    InvestmentIncomeLinked,
     PlannedView,
     TransactionView,
     UndoExpired,
@@ -454,6 +455,8 @@ async def transaction_update(
         )
     except NotFound:
         return _redirect(request, target, "error=transaction_gone", status_code=404)
+    except InvestmentIncomeLinked:
+        return _redirect(request, target, "error=investment_income_linked", status_code=409)
     except (InvalidTransaction, MonthClosed) as exc:
         if isinstance(exc, MonthClosed) and exc.month == target:
             return _redirect(request, target, "error=month_closed", status_code=409)
@@ -523,6 +526,8 @@ async def transaction_delete(
         deleted = await run_in_threadpool(delete_transaction, factory, ctx, row_id)
     except NotFound:
         return _redirect(request, target, "error=transaction_gone", status_code=404)
+    except InvestmentIncomeLinked:
+        return _redirect(request, target, "error=investment_income_linked", status_code=409)
     except MonthClosed:
         return _redirect(request, target, "error=month_closed", status_code=409)
     if not is_htmx_fragment_request(request):
@@ -562,6 +567,8 @@ async def transaction_undo(
         )
     except NotFound:
         return _redirect(request, target, "error=transaction_gone", status_code=404)
+    except InvestmentIncomeLinked:
+        return _redirect(request, target, "error=investment_income_linked", status_code=409)
     except MonthClosed:
         return _redirect(request, target, "error=month_closed", status_code=409)
     except UndoExpired:

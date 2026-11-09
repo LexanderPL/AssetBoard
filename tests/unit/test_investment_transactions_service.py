@@ -14,13 +14,21 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from assetboard.clock import FixedClock
+from assetboard.config import Settings
 from assetboard.db.models.identity import AuditEvent
 from assetboard.db.models.investments import InvestmentTransaction
 from assetboard.db.repositories import (
+    CategoryRepository,
     InvestmentTransactionRepository,
+    TransactionRepository,
 )
 from assetboard.domain.money import Money
+from assetboard.domain.months import YearMonth
 from assetboard.services.context import Context, PermissionDenied
+from assetboard.services.investment_income import (
+    default_income_category_id,
+    investment_income_page,
+)
 from assetboard.services.investment_transactions import (
     InstrumentArchived,
     InvalidInvestmentTransaction,
@@ -41,6 +49,19 @@ from assetboard.services.investments import (
     create_asset_class,
     create_instrument,
     update_instrument,
+)
+from assetboard.services.months import MonthClosed, close_month
+from assetboard.services.transactions import (
+    InvestmentIncomeLinked,
+)
+from assetboard.services.transactions import (
+    delete_transaction as delete_ledger_transaction,
+)
+from assetboard.services.transactions import (
+    get_transaction as get_ledger_transaction,
+)
+from assetboard.services.transactions import (
+    update_transaction as update_ledger_transaction,
 )
 from assetboard.services.workspaces import (
     BaseCurrencyLocked,
@@ -133,6 +154,58 @@ def _tx(
         note_value=note,
         locale="en",
     )
+
+
+def _income_category(
+    db: WorkspaceDb, ctx: Context, name: str = "Interest", *, archived: bool = False
+) -> UUID:
+    with db.factory.begin() as session:
+        row = CategoryRepository(session, ctx).create(
+            name=name,
+            name_key=name.casefold(),
+            kind="income",
+            treatment="regular",
+            color="#16a34a",
+            sort_order=0,
+            archived_at=db.clock.now() if archived else None,
+        )
+        return row.id
+
+
+def _linked_dividend(
+    db: WorkspaceDb,
+    ctx: Context,
+    instrument_id: UUID,
+    category_id: UUID | None,
+    *,
+    date_value: str = "2026-02-01",
+    gross: str = "10",
+    withholding: str = "0",
+    fx: str = "1",
+) -> InvestmentTransactionView:
+    return create_transaction(
+        db.factory,
+        ctx,
+        instrument_id=instrument_id,
+        type_value="dividend",
+        date_value=date_value,
+        quantity_value="1",
+        unit_price_value=gross,
+        fee_value=withholding,
+        fx_value=fx,
+        note_value="",
+        locale="en",
+        record_income=True,
+        income_category_id=category_id,
+    )
+
+
+def _ledger_row(db: WorkspaceDb, ctx: Context, transaction_id: UUID | None):
+    assert transaction_id is not None
+    with db.factory() as session:
+        row = TransactionRepository(session, ctx).get(transaction_id)
+    assert row is not None
+    return row
 
 
 def _events(db: WorkspaceDb, prefix: str) -> list[AuditEvent]:
@@ -649,3 +722,429 @@ def test_deleted_and_undated_editing_rules(team: WorkspaceDb) -> None:
         locale="en",
     )
     assert updated.date == date(2026, 2, 1)
+
+
+def test_a_dividend_can_create_the_linked_net_income_row(team: WorkspaceDb) -> None:
+    ctx = team.ctx("ed", "editor")
+    stocks = _class(team, ctx)
+    instrument = _instrument(team, ctx, stocks.id, quote_currency="USD")
+    category = _income_category(team, ctx)
+
+    view = _linked_dividend(
+        team, ctx, instrument.id, category, gross="10.01", withholding="0.05", fx="1.2345"
+    )
+    assert view.quantity == Decimal("1")
+    assert view.unit_price == Decimal("10.01")
+    assert view.fee == Money(5, "USD")
+    assert view.income_transaction_id is not None
+
+    income = _ledger_row(team, ctx, view.income_transaction_id)
+    assert income.direction == "income"
+    assert income.amount_minor == 1_230  # 12.36 gross − 0.06 withholding
+    assert income.currency == "EUR"
+    assert income.category_id == category
+    assert income.source == "investment"
+    assert income.date == date(2026, 2, 1)
+    assert income.description == "Investment income: World ETF"
+    assert (
+        get_ledger_transaction(
+            team.factory, ctx, view.income_transaction_id
+        ).investment_transaction_id
+        == view.id
+    )
+    assert _events(team, "transaction.created")[-1].data["source"] == "investment"
+
+    page = investment_income_page(team.factory, ctx)
+    assert page.years == (
+        type(page.years[0])(
+            year=2026,
+            gross=Money(1_236, "EUR"),
+            withholding=Money(6, "EUR"),
+            net=Money(1_230, "EUR"),
+            payments=1,
+        ),
+    )
+    with team.factory() as session:
+        assert default_income_category_id(session, ctx) == category
+
+
+def test_recording_income_requires_an_active_income_category(team: WorkspaceDb) -> None:
+    ctx = team.ctx("ed", "editor")
+    stocks = _class(team, ctx)
+    instrument = _instrument(team, ctx, stocks.id)
+    category = _income_category(team, ctx)
+
+    with pytest.raises(InvalidInvestmentTransaction) as missing:
+        _linked_dividend(team, ctx, instrument.id, None)
+    assert (missing.value.field, missing.value.code) == (
+        "income_category",
+        "income_category_required",
+    )
+
+    with pytest.raises(InvalidInvestmentTransaction) as archived:
+        _linked_dividend(
+            team, ctx, instrument.id, _income_category(team, ctx, "Old", archived=True)
+        )
+    assert archived.value.code == "income_category_invalid"
+
+    with pytest.raises(InvalidInvestmentTransaction) as zero:
+        _linked_dividend(team, ctx, instrument.id, category, gross="1", withholding="1")
+    assert zero.value.code == "income_zero"
+
+    with pytest.raises(InvalidInvestmentTransaction) as wrong_type:
+        create_transaction(
+            team.factory,
+            ctx,
+            instrument_id=instrument.id,
+            type_value="buy",
+            date_value="2026-02-01",
+            quantity_value="1",
+            unit_price_value="10",
+            fee_value="0",
+            fx_value="",
+            note_value="",
+            locale="en",
+            record_income=True,
+            income_category_id=category,
+        )
+    assert wrong_type.value.code == "invalid_income"
+
+
+def test_editing_unticking_and_deleting_a_linked_dividend_keep_the_ledger_in_sync(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("ed", "editor")
+    stocks = _class(team, ctx)
+    instrument = _instrument(team, ctx, stocks.id)
+    first_category = _income_category(team, ctx, "Interest")
+    second_category = _income_category(team, ctx, "Dividends")
+    view = _linked_dividend(team, ctx, instrument.id, first_category, gross="10", withholding="1")
+    income_id = view.income_transaction_id
+    assert _ledger_row(team, ctx, income_id).amount_minor == 900
+
+    edited = update_transaction(
+        team.factory,
+        ctx,
+        view.id,
+        type_value="dividend",
+        date_value="2026-02-03",
+        quantity_value="1",
+        unit_price_value="20",
+        fee_value="2",
+        fx_value="1",
+        note_value="",
+        locale="en",
+        record_income=True,
+        income_category_id=second_category,
+    )
+    assert edited.income_transaction_id == income_id
+    income = _ledger_row(team, ctx, income_id)
+    assert income.amount_minor == 1_800
+    assert income.category_id == second_category
+    assert income.date == date(2026, 2, 3)
+
+    unticked = update_transaction(
+        team.factory,
+        ctx,
+        view.id,
+        type_value="dividend",
+        date_value="2026-02-03",
+        quantity_value="1",
+        unit_price_value="30",
+        fee_value="0",
+        fx_value="1",
+        note_value="",
+        locale="en",
+        record_income=False,
+        income_category_id=None,
+    )
+    assert unticked.income_transaction_id is None
+    assert _ledger_row(team, ctx, income_id).deleted_at is not None
+
+    reticked = update_transaction(
+        team.factory,
+        ctx,
+        view.id,
+        type_value="dividend",
+        date_value="2026-02-04",
+        quantity_value="1",
+        unit_price_value="40",
+        fee_value="0",
+        fx_value="1",
+        note_value="",
+        locale="en",
+        record_income=True,
+        income_category_id=first_category,
+    )
+    new_id = reticked.income_transaction_id
+    assert new_id is not None and new_id != income_id
+    assert _ledger_row(team, ctx, new_id).amount_minor == 4_000
+
+    delete_transaction(team.factory, ctx, view.id)
+    assert _ledger_row(team, ctx, new_id).deleted_at is not None
+    undo_delete(team.factory, ctx, view.id)
+    assert _ledger_row(team, ctx, new_id).deleted_at is None
+
+
+def test_closed_months_refuse_only_linked_dividend_writes(team: WorkspaceDb) -> None:
+    ctx = team.ctx("ed", "editor")
+    stocks = _class(team, ctx)
+    instrument = _instrument(team, ctx, stocks.id)
+    category = _income_category(team, ctx)
+
+    close_month(team.factory, ctx, YearMonth(2026, 1))
+    with pytest.raises(MonthClosed):
+        _linked_dividend(team, ctx, instrument.id, category, date_value="2026-01-15")
+    # Unlinked dividends and splits do not touch the ledger: closed months allow them.
+    _tx(
+        team,
+        ctx,
+        instrument.id,
+        type_value="dividend",
+        date_value="2026-01-15",
+        unit_price="10",
+    )
+    _tx(
+        team,
+        ctx,
+        instrument.id,
+        type_value="split",
+        date_value="2026-01-15",
+        quantity="2",
+        unit_price="1",
+    )
+
+    movable = _linked_dividend(team, ctx, instrument.id, category, date_value="2026-02-20")
+    with pytest.raises(MonthClosed):
+        update_transaction(
+            team.factory,
+            ctx,
+            movable.id,
+            type_value="dividend",
+            date_value="2026-01-15",
+            quantity_value="1",
+            unit_price_value="10",
+            fee_value="0",
+            fx_value="1",
+            note_value="",
+            locale="en",
+            record_income=True,
+            income_category_id=category,
+        )
+
+    edited = _linked_dividend(team, ctx, instrument.id, category, date_value="2026-02-01")
+    deleted = _linked_dividend(team, ctx, instrument.id, category, date_value="2026-02-05")
+    undone = _linked_dividend(team, ctx, instrument.id, category, date_value="2026-02-10")
+    delete_transaction(team.factory, ctx, undone.id)
+    close_month(team.factory, ctx, YearMonth(2026, 2))
+
+    with pytest.raises(MonthClosed):
+        update_transaction(
+            team.factory,
+            ctx,
+            edited.id,
+            type_value="dividend",
+            date_value="2026-02-02",
+            quantity_value="1",
+            unit_price_value="11",
+            fee_value="0",
+            fx_value="1",
+            note_value="",
+            locale="en",
+            record_income=True,
+            income_category_id=category,
+        )
+    with pytest.raises(MonthClosed):
+        delete_transaction(team.factory, ctx, deleted.id)
+    with pytest.raises(MonthClosed):
+        undo_delete(team.factory, ctx, undone.id)
+
+
+def test_the_ledger_refuses_changes_to_a_linked_income_row(team: WorkspaceDb) -> None:
+    ctx = team.ctx("ed", "editor")
+    stocks = _class(team, ctx)
+    instrument = _instrument(team, ctx, stocks.id)
+    category = _income_category(team, ctx)
+    view = _linked_dividend(team, ctx, instrument.id, category)
+    income_id = view.income_transaction_id
+    assert income_id is not None
+
+    with pytest.raises(InvestmentIncomeLinked) as caught:
+        update_ledger_transaction(
+            team.factory,
+            ctx,
+            income_id,
+            settings=Settings(_env_file=None),
+            month=YearMonth(2026, 2),
+            day="2026-02-02",
+            amount="1",
+            description="Edited",
+            category_id=category,
+            locale="en",
+        )
+    assert caught.value.investment_transaction_id == view.id
+
+    with pytest.raises(InvestmentIncomeLinked) as deleted:
+        delete_ledger_transaction(team.factory, ctx, income_id)
+    assert deleted.value.investment_transaction_id == view.id
+    assert _ledger_row(team, ctx, income_id).deleted_at is None
+
+
+def test_splits_change_the_holding_and_take_part_in_oversell_checks(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("ed", "editor")
+    stocks = _class(team, ctx)
+    instrument = _instrument(team, ctx, stocks.id)
+    _tx(team, ctx, instrument.id, date_value="2026-01-01", quantity="10", unit_price="100")
+    split = _tx(
+        team,
+        ctx,
+        instrument.id,
+        type_value="split",
+        date_value="2026-02-01",
+        quantity="2",
+        unit_price="1",
+    )
+    assert instrument_history(
+        team.factory, ctx, instrument.id, locale="en"
+    ).holding.quantity == Decimal("20")
+    _tx(
+        team,
+        ctx,
+        instrument.id,
+        type_value="sell",
+        date_value="2026-03-01",
+        quantity="20",
+        unit_price="60",
+    )
+
+    with pytest.raises(OversellRejected):
+        delete_transaction(team.factory, ctx, split.id)
+    with pytest.raises(OversellRejected):
+        update_transaction(
+            team.factory,
+            ctx,
+            split.id,
+            type_value="split",
+            date_value="2026-02-01",
+            quantity_value="1",
+            unit_price_value="2",
+            fee_value="0",
+            fx_value="",
+            note_value="",
+            locale="en",
+        )
+
+    with pytest.raises(InvalidInvestmentTransaction) as equal:
+        update_transaction(
+            team.factory,
+            ctx,
+            split.id,
+            type_value="split",
+            date_value="2026-02-01",
+            quantity_value="1",
+            unit_price_value="1",
+            fee_value="0",
+            fx_value="",
+            note_value="",
+            locale="en",
+        )
+    assert equal.value.code == "invalid_split"
+
+
+def test_splits_are_refused_for_currency_and_bond_instruments(team: WorkspaceDb) -> None:
+    ctx = team.ctx("ed", "editor")
+    stocks = _class(team, ctx)
+    currency = _instrument(team, ctx, stocks.id, name="Euro", type="currency", unit_label="EUR")
+    bond = _instrument(team, ctx, stocks.id, name="Bond", type="bond_model", unit_label="bond")
+    with pytest.raises(InvalidInvestmentTransaction) as currency_error:
+        _tx(
+            team,
+            ctx,
+            currency.id,
+            type_value="split",
+            date_value="2026-02-01",
+            quantity="2",
+            unit_price="1",
+        )
+    assert currency_error.value.code == "invalid_split"
+    with pytest.raises(InvalidInvestmentTransaction) as bond_error:
+        _tx(
+            team,
+            ctx,
+            bond.id,
+            type_value="split",
+            date_value="2026-02-01",
+            quantity="2",
+            unit_price="1",
+        )
+    assert bond_error.value.code == "invalid_split"
+
+    # A split without a holding is a no-op and is accepted.
+    _tx(
+        team,
+        ctx,
+        _instrument(team, ctx, stocks.id, name="Empty").id,
+        type_value="split",
+        date_value="2026-02-01",
+        quantity="2",
+        unit_price="1",
+    )
+
+
+def test_the_income_report_groups_by_year_and_is_viewer_readable(team: WorkspaceDb) -> None:
+    ctx = team.ctx("ed", "editor")
+    stocks = _class(team, ctx)
+    instrument = _instrument(team, ctx, stocks.id)
+    category = _income_category(team, ctx)
+    _linked_dividend(
+        team,
+        ctx,
+        instrument.id,
+        category,
+        date_value="2025-12-01",
+        gross="10",
+        withholding="1",
+    )
+    _linked_dividend(
+        team,
+        ctx,
+        instrument.id,
+        category,
+        date_value="2026-01-15",
+        gross="20",
+        withholding="2",
+    )
+    _tx(
+        team,
+        ctx,
+        instrument.id,
+        type_value="dividend",
+        date_value="2026-02-01",
+        unit_price="5",
+    )
+    with team.factory.begin() as session:
+        InvestmentTransactionRepository(session, ctx).create(
+            instrument_id=instrument.id,
+            date=None,
+            type="dividend",
+            quantity=Decimal("1"),
+            unit_price=Decimal("7"),
+            quote_currency="EUR",
+            fee_minor=0,
+            fx_to_base=Decimal("1"),
+        )
+
+    viewer = team.ctx("vic", "viewer")
+    page = investment_income_page(team.factory, viewer)
+    assert [year.year for year in page.years] == [2026, 2025]
+    assert page.years[0].gross == Money(2_500, "EUR")
+    assert page.years[0].withholding == Money(200, "EUR")
+    assert page.years[0].net == Money(2_300, "EUR")
+    assert page.years[0].payments == 2
+    assert page.years[1].gross == Money(1_000, "EUR")
+    assert page.years[1].withholding == Money(100, "EUR")
+    assert page.years[1].net == Money(900, "EUR")
+    assert page.years[1].payments == 1
+    assert page.undated_count == 1

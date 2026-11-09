@@ -284,6 +284,26 @@ REPORT_MESSAGES: dict[str, str] = {
     "undated_lot": _("Undated lot: %(instrument)s will be imported without a date."),
     "ignored_instrument": _("Rows for %(instrument)s are ignored for this import."),
     "invalid_instrument_mapping": _("The instrument mapping is incomplete or invalid."),
+    "income_target_missing": _(
+        "The dividend's linked ledger income is not in this archive; it was restored unlinked."
+    ),
+    "invalid_dividend_encoding": _(
+        "The dividend's quantity, gross amount or withholding is invalid."
+    ),
+    "invalid_quantity": _("Enter a valid quantity."),
+    "invalid_split": _("A split needs different positive new and old units, no fee and no FX."),
+    "invalid_fee": _("Enter a valid fee or withholding amount."),
+    "invalid_dividend_fx": _(
+        "A dividend needs a positive FX rate, and 1 when quoted in the base currency."
+    ),
+    "dividend_settlement": _("A dividend cannot have settlement fields."),
+    "invalid_split_encoding": _("A split needs different positive new and old units."),
+    "split_fee": _("A split cannot have a fee."),
+    "split_fx": _("A split cannot have an FX rate."),
+    "split_settlement": _("A split cannot have settlement fields."),
+    "split_not_allowed": _("Splits are not available for currency or bond-model instruments."),
+    "income_link_only_dividend": _("Only a dividend can link to a ledger income row."),
+    "withholding_exceeds_gross": _("Withholding cannot exceed the gross amount."),
     "invalid_note": _("The note is invalid or too long."),
     "duplicate_networth_category": _("A net-worth category id appears more than once."),
     "duplicate_networth_category_name": _(
@@ -433,6 +453,16 @@ _PARSER_CODES: dict[str, str] = {
     "invalid decimal": "invalid_decimal",
     "amount must be positive": "positive_amount_required",
     "too many decimals": "too_many_currency_decimals",
+    "invalid dividend encoding": "invalid_dividend_encoding",
+    "invalid dividend FX": "invalid_dividend_fx",
+    "dividend has settlement fields": "dividend_settlement",
+    "invalid split encoding": "invalid_split_encoding",
+    "split fee must be zero": "split_fee",
+    "split must not have FX": "split_fx",
+    "split has settlement fields": "split_settlement",
+    "split is not allowed for this instrument": "split_not_allowed",
+    "income link is only for dividends": "income_link_only_dividend",
+    "withholding exceeds the gross amount": "withholding_exceeds_gross",
 }
 
 
@@ -1579,7 +1609,7 @@ def _investment_rollback_oversells(
                 applied_at is None or row.updated_at <= applied_at
             ):
                 continue
-            if row.type not in {"buy", "sell"}:
+            if row.type not in {"buy", "sell", "split"}:
                 continue
             rows.append(holding_transaction(row))
         try:

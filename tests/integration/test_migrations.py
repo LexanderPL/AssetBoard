@@ -1658,3 +1658,37 @@ def test_0030_update_check_round_trip_starts_off_and_keeps_the_settings_row(
         check_database_migrations(settings)
     finally:
         engine.dispose()
+
+
+def test_0048_income_link_and_source_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'income_splits.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        assert "income_transaction_id" in {
+            column["name"] for column in inspector.get_columns("investment_transactions")
+        }
+        assert any(
+            "investment" in (check.get("sqltext") or "")
+            for check in inspector.get_check_constraints("transactions")
+        )
+
+        command.downgrade(alembic_config(settings), "0047_f69_investment_import")
+        inspector = inspect(engine)
+        assert "income_transaction_id" not in {
+            column["name"] for column in inspector.get_columns("investment_transactions")
+        }
+        assert not any(
+            "investment" in (check.get("sqltext") or "")
+            for check in inspector.get_check_constraints("transactions")
+        )
+
+        upgrade_database(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
