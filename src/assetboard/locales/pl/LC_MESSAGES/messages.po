@@ -2919,6 +2919,33 @@ msgstr "Hasło jest nieprawidłowe. Spróbuj ponownie lub zacznij od nowa."
 msgid "This confirmation expired. Start over to sign in."
 msgstr "To potwierdzenie wygasło. Zacznij od nowa, aby się zalogować."
 
+msgid "Year to date"
+msgstr "Od początku roku"
+
+msgid "1 month"
+msgstr "1 miesiąc"
+
+msgid "3 months"
+msgstr "3 miesiące"
+
+msgid "Whole portfolio"
+msgstr "Cały portfel"
+
+msgid "Value"
+msgstr "Wartość"
+
+msgid "Invested capital"
+msgstr "Zainwestowany kapitał"
+
+msgid "Gain"
+msgstr "Zysk"
+
+msgid "Annualised XIRR"
+msgstr "Roczna stopa XIRR"
+
+msgid "Period return"
+msgstr "Stopa zwrotu za okres"
+
 msgid "Saved / invested"
 msgstr "Zaoszczędzone / zainwestowane"
 
@@ -2943,9 +2970,6 @@ msgstr ""
 
 msgid "Unallocated"
 msgstr "Bez przydziału"
-
-msgid "Whole portfolio"
-msgstr "Cały portfel"
 
 msgid "Holdings in the whole portfolio"
 msgstr "Pozycje w całym portfelu"
@@ -5385,15 +5409,107 @@ msgstr ""
 "Zarchiwizowane instrumenty zachowują alokację i historię, ale nie można "
 "nimi handlować."
 
+msgid "Performance"
+msgstr "Wyniki"
+
+#, python-format
+msgid "Value and invested capital on %(date)s in %(currency)s"
+msgstr "Wartość i zainwestowany kapitał na %(date)s w %(currency)s"
+
+msgid "Range"
+msgstr "Zakres"
+
+msgid "Class filter"
+msgstr "Filtr klasy"
+
+msgid "Show"
+msgstr "Pokaż"
+
+#, python-format
+msgid "%(count)s undated legacy transaction is not included in the series."
+msgid_plural "%(count)s undated legacy transactions are not included in the series."
+msgstr[0] "%(count)s transakcja bez daty nie jest uwzględniona w serii."
+msgstr[1] "%(count)s transakcje bez daty nie są uwzględnione w serii."
+msgstr[2] "%(count)s transakcji bez daty nie jest uwzględnionych w serii."
+
+msgid "Open transactions"
+msgstr "Otwórz transakcje"
+
+#, python-format
+msgid ""
+"%(count)s chart point is incomplete because an instrument has no price or"
+" FX rate."
+msgid_plural ""
+"%(count)s chart points are incomplete because an instrument has no price "
+"or FX rate."
+msgstr[0] ""
+"%(count)s punkt wykresu jest niekompletny, ponieważ instrument nie ma "
+"ceny lub kursu walutowego."
+msgstr[1] ""
+"%(count)s punkty wykresu są niekompletne, ponieważ instrumenty nie mają "
+"ceny lub kursu walutowego."
+msgstr[2] ""
+"%(count)s punktów wykresu jest niekompletnych, ponieważ instrumenty nie "
+"mają ceny lub kursu walutowego."
+
+msgid "Value and invested capital"
+msgstr "Wartość i zainwestowany kapitał"
+
+msgid "Plotted data"
+msgstr "Dane wykresu"
+
+msgid "Plotted performance data"
+msgstr "Dane wykresu wyników"
+
+msgid "Period returns"
+msgstr "Stopy zwrotu w okresach"
+
+msgid ""
+"Value change includes new deposits; the last columns isolate investment "
+"gain and the money-weighted return."
+msgstr ""
+"Zmiana wartości obejmuje nowe wpłaty; ostatnie kolumny wyodrębniają zysk "
+"inwestycyjny i stopę zwrotu ważoną przepływami."
+
+msgid "Performance by period"
+msgstr "Wyniki według okresów"
+
+msgid "Period"
+msgstr "Okres"
+
+msgid "Change"
+msgstr "Zmiana"
+
+#, python-format
+msgid "Change %%"
+msgstr "Zmiana %%"
+
+msgid "Net flows"
+msgstr "Przepływy netto"
+
+msgid "Δ value − net flows"
+msgstr "Δ wartości − przepływy netto"
+
+msgid "Return"
+msgstr "Stopa zwrotu"
+
+msgid "Incomplete data"
+msgstr "Niekompletne dane"
+
+msgid ""
+"No dated investment transactions yet. Record a purchase to see "
+"performance."
+msgstr "Brak transakcji inwestycyjnych z datą. Zapisz zakup, aby zobaczyć wyniki."
+
+msgid "Go to transactions"
+msgstr "Przejdź do transakcji"
+
 msgid "Portfolio"
 msgstr "Portfel"
 
 #, python-format
 msgid "Valued on %(date)s in %(currency)s"
 msgstr "Wycena na %(date)s w %(currency)s"
-
-msgid "Value"
-msgstr "Wartość"
 
 msgid "Unrealized gain"
 msgstr "Zysk niezrealizowany"
@@ -5441,17 +5557,11 @@ msgstr ""
 "Nie masz jeszcze żadnych pozycji. Dodaj transakcje kupna, aby zobaczyć "
 "portfel."
 
-msgid "Go to transactions"
-msgstr "Przejdź do transakcji"
-
 msgid "By asset class"
 msgstr "Według klas aktywów"
 
 msgid "Each instrument's value and cost are split by its allocation weights."
 msgstr "Wartość i koszt każdego instrumentu są dzielone według jego wag alokacji."
-
-msgid "Gain"
-msgstr "Zysk"
 
 #, python-format
 msgid "Gain %%"
@@ -5462,9 +5572,6 @@ msgstr "nie liczy się do FIRE"
 
 msgid "Chart scope"
 msgstr "Zakres wykresu"
-
-msgid "Show"
-msgstr "Pokaż"
 
 msgid "Transaction"
 msgstr "Transakcja"
@@ -6418,9 +6525,6 @@ msgstr "Zrób migawkę teraz"
 
 msgid "Backfill from history"
 msgstr "Uzupełnij historię"
-
-msgid "Range"
-msgstr "Zakres"
 
 #, python-format
 msgid "%(num)d snapshot is in another currency and is not charted."
@@ -8407,6 +8511,21 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Edit instrument"
 #~ msgstr "Edytuj instrument"
+
+#~ msgid ""
+#~ msgid_plural ""
+#~ msgstr[0] ""
+#~ "%(count)s punkt wykresu jest niekompletny, "
+#~ "ponieważ instrument nie ma ceny lub "
+#~ "kursu walutowego."
+#~ msgstr[1] ""
+#~ "%(count)s punkty wykresu są niekompletne, "
+#~ "ponieważ instrumenty nie mają ceny lub"
+#~ " kursu walutowego."
+#~ msgstr[2] ""
+#~ "%(count)s punktów wykresu jest niekompletnych,"
+#~ " ponieważ instrumenty nie mają ceny "
+#~ "lub kursu walutowego."
 
 #~ msgid "The suggested categories can only be added to an empty side."
 #~ msgstr "Proponowane kategorie można dodać tylko do pustej strony."

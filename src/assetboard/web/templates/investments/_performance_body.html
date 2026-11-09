@@ -1,0 +1,119 @@
+{% from "investments/_tabs.html" import tabs with context %}
+<div id="performance-body" class="space-y-6">
+  {{ tabs("performance") }}
+
+  <section class="panel p-6 sm:p-7" aria-labelledby="performance-heading">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <div>
+        <h1 id="performance-heading" class="text-lg font-semibold">{{ _("Performance") }}</h1>
+        <p class="mt-1 text-sm text-muted">{{ _("Value and invested capital on %(date)s in %(currency)s", date=view.today, currency=view.currency) }}</p>
+      </div>
+    </div>
+
+    <nav class="mt-5 flex flex-wrap items-center gap-1" aria-label="{{ _('Range') }}" data-performance-range>
+      {% for option in view.range_options %}
+        {% if option.active %}
+        <span aria-current="true" class="rounded-lg bg-primary-soft px-3 py-1.5 text-sm font-semibold text-primary-ink" data-performance-range-option="{{ option.code }}">{{ option.label }}</span>
+        {% else %}
+        <a href="{{ scoped_url(request, 'investments_performance') }}?range={{ option.code }}{% for choice in view.class_options %}{% if choice.selected and choice.value %}&class_id={{ choice.value }}{% endif %}{% endfor %}" class="rounded-lg px-3 py-1.5 text-sm font-medium text-muted hover:bg-subtle hover:text-ink" data-performance-range-option="{{ option.code }}">{{ option.label }}</a>
+        {% endif %}
+      {% endfor %}
+    </nav>
+
+    <form method="get" action="{{ scoped_url(request, 'investments_performance') }}" class="mt-4 flex flex-wrap items-end gap-3" data-performance-class>
+      <input type="hidden" name="range" value="{{ view.range_code }}">
+      <div class="space-y-1.5">
+        <label for="performance-class" class="block text-sm font-medium">{{ _("Class filter") }}</label>
+        <select id="performance-class" name="class_id" class="form-select py-2">
+          {% for option in view.class_options %}
+          <option value="{{ option.value }}"{% if option.selected %} selected{% endif %}>{{ option.label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-subtle">{{ _("Show") }}</button>
+    </form>
+  </section>
+
+  {% if view.undated_count %}
+  <p class="border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-performance-undated>
+    {% trans count=view.undated_count %}{{ count }} undated legacy transaction is not included in the series.{% pluralize %}{{ count }} undated legacy transactions are not included in the series.{% endtrans %}
+    <a href="{{ scoped_url(request, 'investments_transactions') }}" class="font-medium underline">{{ _("Open transactions") }}</a>
+  </p>
+  {% endif %}
+  {% if view.incomplete_points %}
+  <p class="border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-performance-incomplete>
+    {% trans count=view.incomplete_points %}{{ count }} chart point is incomplete because an instrument has no price or FX rate.{% pluralize %}{{ count }} chart points are incomplete because an instrument has no price or FX rate.{% endtrans %}
+  </p>
+  {% endif %}
+
+  {% if view.has_data %}
+  {% if view.chart %}
+  <section class="panel p-4 sm:p-6" aria-labelledby="performance-chart-heading" data-performance-chart>
+    <h2 id="performance-chart-heading" class="text-base font-semibold">{{ _("Value and invested capital") }}</h2>
+    <div class="mt-4" data-chart="performance" data-chart-source="performance-data">
+      <script type="application/json" id="performance-data">{{ view.chart|tojson }}</script>
+      <div class="h-80 w-full" hidden aria-hidden="true" data-chart-canvas></div>
+    </div>
+    <details class="mt-3" data-performance-points>
+      <summary class="cursor-pointer text-sm font-medium text-muted">{{ _("Plotted data") }}</summary>
+      <div class="mt-3 overflow-x-auto">
+        <table class="sheet w-full text-sm">
+          <caption class="sr-only">{{ _("Plotted performance data") }}</caption>
+          <thead><tr class="text-left text-xs text-muted"><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Date") }}</th><th scope="col" class="py-1.5 pr-3 text-right font-medium">{{ _("Value") }}</th><th scope="col" class="py-1.5 text-right font-medium">{{ _("Invested capital") }}</th></tr></thead>
+          <tbody>
+            {% for point in view.points %}
+            <tr><th scope="row" class="py-1.5 pr-3 text-left font-normal">{{ point.date }}</th><td class="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{{ point.value }}</td><td class="whitespace-nowrap py-1.5 text-right tabular-nums">{{ point.invested }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+  {% endif %}
+
+  <section class="panel p-6 sm:p-7" aria-labelledby="performance-periods-heading" data-performance-periods>
+    <h2 id="performance-periods-heading" class="text-base font-semibold">{{ _("Period returns") }}</h2>
+    <p class="mt-1 text-sm text-muted">{{ _("Value change includes new deposits; the last columns isolate investment gain and the money-weighted return.") }}</p>
+    <div class="mt-4 overflow-x-auto">
+      <table class="sheet w-full text-sm">
+        <caption class="sr-only">{{ _("Performance by period") }}</caption>
+        <thead>
+          <tr class="text-left text-xs text-muted">
+            <th scope="col" class="py-2 pr-3 font-medium">{{ _("Period") }}</th>
+            <th scope="col" class="py-2 pr-3 font-medium">{{ _("From") }}</th>
+            <th scope="col" class="py-2 pr-3 font-medium">{{ _("To") }}</th>
+            <th scope="col" class="py-2 pr-3 text-right font-medium">{{ _("Change") }}</th>
+            <th scope="col" class="py-2 pr-3 text-right font-medium">{{ _("Change %%") }}</th>
+            <th scope="col" class="py-2 pr-3 text-right font-medium">{{ _("Net flows") }}</th>
+            <th scope="col" class="py-2 pr-3 text-right font-medium">{{ _("Δ value − net flows") }}</th>
+            <th scope="col" class="py-2 text-right font-medium">{{ _("Return") }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in view.periods %}
+          <tr class="border-t border-line" data-performance-period="{{ row.code }}"{% if row.incomplete %} data-incomplete="true"{% endif %}>
+            <th scope="row" class="py-2 pr-3 text-left font-medium">{{ row.label }}</th>
+            <td class="whitespace-nowrap py-2 pr-3">{{ row.start }}</td>
+            <td class="whitespace-nowrap py-2 pr-3">{{ row.end }}</td>
+            <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{{ row.change }}</td>
+            <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{{ row.change_pct or "—" }}</td>
+            <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{{ row.net_flows }}</td>
+            <td class="whitespace-nowrap py-2 pr-3 text-right tabular-nums">{{ row.change_excluding_flows }}</td>
+            <td class="whitespace-nowrap py-2 text-right tabular-nums">
+              {% if row.return_value %}{{ row.return_value }}{% else %}—{% endif %}
+              <span class="block text-xs text-muted">{{ row.return_label }}</span>
+              {% if row.incomplete %}<span class="mt-1 inline-block rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning-strong">{{ _("Incomplete data") }}</span>{% endif %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  {% else %}
+  <section class="panel p-6 sm:p-7" data-performance-empty>
+    <p class="text-sm text-muted">{{ _("No dated investment transactions yet. Record a purchase to see performance.") }}</p>
+    {% if can_edit %}<p class="mt-2 text-sm"><a href="{{ scoped_url(request, 'investments_transactions') }}" class="font-medium text-primary-ink underline">{{ _("Go to transactions") }}</a></p>{% endif %}
+  </section>
+  {% endif %}
+</div>

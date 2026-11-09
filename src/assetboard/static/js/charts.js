@@ -89,6 +89,75 @@
     return lines.join("\n");
   }
 
+
+  function performanceOptions(data) {
+    const ink = token("ink");
+    const surface = token("surface");
+    const line = token("line");
+    const investedColor = token("muted");
+    const valueColor = token("primary-ink");
+    const gainColor = token("success");
+    return {
+      animation: false,
+      aria: { enabled: false }, // the plotted-data table is the accessible version
+      legend: {
+        top: 0,
+        textStyle: { color: ink },
+        data: [data.legend.value, data.legend.invested],
+      },
+      grid: { left: 8, right: 16, top: 42, bottom: 8, containLabel: true },
+      tooltip: {
+        trigger: "axis",
+        renderMode: "richText",
+        backgroundColor: surface,
+        borderColor: line,
+        textStyle: { color: ink },
+        formatter: (params) => {
+          if (!Array.isArray(params) || params.length === 0) return "";
+          const index = params[0].dataIndex;
+          return [data.labels[index], ...(data.tooltips[index] || [])].join("\n");
+        },
+      },
+      xAxis: {
+        type: "category",
+        data: data.labels,
+        boundaryGap: false,
+        axisLabel: { color: ink },
+        axisLine: { lineStyle: { color: line } },
+      },
+      yAxis: {
+        type: "value",
+        min: data.y_min,
+        max: data.y_max,
+        interval: data.y_interval,
+        axisLabel: { color: ink, formatter: (value) => data.y_labels[String(value)] || "" },
+        splitLine: { lineStyle: { color: line } },
+      },
+      series: [
+        {
+          name: data.legend.invested,
+          type: "line",
+          stack: "performance",
+          data: data.invested,
+          showSymbol: false,
+          lineStyle: { width: 2, color: investedColor },
+          itemStyle: { color: investedColor },
+        },
+        {
+          // The visible line is at invested + gain = value; the data is the gain band.
+          name: data.legend.value,
+          type: "line",
+          stack: "performance",
+          data: data.gain,
+          showSymbol: false,
+          lineStyle: { width: 2, color: valueColor },
+          itemStyle: { color: valueColor },
+          areaStyle: { color: gainColor, opacity: 0.2 },
+        },
+      ],
+    };
+  }
+
   function lineOptions(data) {
     const ink = token("ink");
     const surface = token("surface");
@@ -154,6 +223,8 @@
       element.querySelector("[data-chart-table]")?.classList.add("sr-only");
     } else if (kind === "line" && Array.isArray(data.series)) {
       option = lineOptions(data);
+    } else if (kind === "performance" && Array.isArray(data.value)) {
+      option = performanceOptions(data);
     } else {
       return;
     }
@@ -168,7 +239,7 @@
   }
 
   function drawAll() {
-    document.querySelectorAll('[data-chart="donut"], [data-chart="line"]').forEach(draw);
+    document.querySelectorAll('[data-chart="donut"], [data-chart="line"], [data-chart="performance"]').forEach(draw);
   }
 
   function start() {
