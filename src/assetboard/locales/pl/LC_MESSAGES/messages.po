@@ -1603,8 +1603,8 @@ msgid ""
 "The dividend's linked ledger income is not in this archive; it was "
 "restored unlinked."
 msgstr ""
-"Powiązany przychód dywidendy nie znajduje się w tym archiwum; przywrócono "
-"dywidendę bez powiązania."
+"Powiązany przychód dywidendy nie znajduje się w tym archiwum; przywrócono"
+" dywidendę bez powiązania."
 
 msgid "The dividend's quantity, gross amount or withholding is invalid."
 msgstr "Ilość, kwota brutto lub podatek potrącony dywidendy są nieprawidłowe."
@@ -1614,8 +1614,8 @@ msgstr "Wpisz prawidłową ilość."
 
 msgid "A split needs different positive new and old units, no fee and no FX."
 msgstr ""
-"Podział wymaga różnych dodatnich nowych i starych jednostek, bez opłaty i "
-"bez kursu walutowego."
+"Podział wymaga różnych dodatnich nowych i starych jednostek, bez opłaty i"
+" bez kursu walutowego."
 
 msgid "Enter a valid fee or withholding amount."
 msgstr "Wpisz prawidłową opłatę lub kwotę podatku potrąconego."
@@ -1643,8 +1643,7 @@ msgid "A split cannot have settlement fields."
 msgstr "Podział nie może mieć pól rozliczenia."
 
 msgid "Splits are not available for currency or bond-model instruments."
-msgstr ""
-"Podziały nie są dostępne dla instrumentów walutowych ani modeli obligacji."
+msgstr "Podziały nie są dostępne dla instrumentów walutowych ani modeli obligacji."
 
 msgid "Only a dividend can link to a ledger income row."
 msgstr "Tylko dywidenda może być powiązana z pozycją przychodu w księdze."
@@ -2490,8 +2489,7 @@ msgstr ""
 "dostępny dla instrumentów walutowych ani modeli obligacji."
 
 msgid "Enter an amount with at most the currency's decimal places."
-msgstr ""
-"Wpisz kwotę z co najwyżej tyloma miejscami po przecinku, ile ma waluta."
+msgstr "Wpisz kwotę z co najwyżej tyloma miejscami po przecinku, ile ma waluta."
 
 msgid "Choose an income category when recording the dividend as income."
 msgstr "Wybierz kategorię przychodów, gdy zapisujesz dywidendę jako przychód."
@@ -5659,8 +5657,7 @@ msgstr "Nie zapisano jeszcze dywidend ani odsetek."
 
 #, python-format
 msgid "%(count)s undated dividends are not included in the yearly report."
-msgstr ""
-"Liczba dywidend bez daty nieuwzględnionych w raporcie rocznym: %(count)s."
+msgstr "Liczba dywidend bez daty nieuwzględnionych w raporcie rocznym: %(count)s."
 
 #, python-format
 msgid "%(count)s dividends have an invalid amount and are not included."
@@ -6386,8 +6383,8 @@ msgid ""
 "Optional tax withheld; it is stored on the dividend and not posted as an "
 "expense."
 msgstr ""
-"Opcjonalny podatek potrącony; jest zapisywany przy dywidendzie i nie jest "
-"księgowany jako wydatek."
+"Opcjonalny podatek potrącony; jest zapisywany przy dywidendzie i nie jest"
+" księgowany jako wydatek."
 
 msgid "Record as income"
 msgstr "Zapisz jako przychód"
