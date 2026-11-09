@@ -853,38 +853,53 @@ def create_source(
     )
 
     def write(session: Session) -> UUID:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        workspace = CurrentWorkspaceRepository(session, ctx).get()
-        category = CategoryRepository(session, ctx).get_or_raise(category_id)
-        if category.kind != "income" or category.archived_at is not None:
-            raise IncomeError("invalid_category")
-        _check_working_days(fields, workspace.country_code)
-        row = IncomeSourceRepository(session, ctx).create(
-            **fields.as_dict(), currency=workspace.base_currency
-        )
-        AuditEventRepository(session, ctx).record(
-            actor_user_id=ctx.user.id,
-            action="income_source.created",
-            entity_type="income_source",
-            entity_id=str(row.id),
-            ts=ctx.clock.now(),
-            data={"name": fields.name, "kind": fields.kind},
-        )
-        for rule_id in dict.fromkeys(tax_rule_ids):
-            _attach(
-                session,
-                ctx,
-                row,
-                rule_id,
-                payment_category_id=None,
-                due_day=None,
-                due_month_offset=None,
-                generate_payment=True,
-            )
-        return row.id
+        return _create_source_in_session(session, ctx, fields=fields, tax_rule_ids=tax_rule_ids)
 
     return run_immediate(factory, write)
+
+
+def _create_source_in_session(
+    session: Session,
+    ctx: Context,
+    *,
+    fields: _IncomeSourceValues,
+    tax_rule_ids: tuple[UUID, ...] = (),
+) -> UUID:
+    """``create_source`` inside the caller's write transaction.
+
+    ``fields`` has passed ``_source_fields``. The role re-read, lock, category check, audit and
+    tax attachments are the public write's.
+    """
+    require_role_now(session, ctx, Role.EDITOR)
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+    workspace = CurrentWorkspaceRepository(session, ctx).get()
+    category = CategoryRepository(session, ctx).get_or_raise(fields.category_id)
+    if category.kind != "income" or category.archived_at is not None:
+        raise IncomeError("invalid_category")
+    _check_working_days(fields, workspace.country_code)
+    row = IncomeSourceRepository(session, ctx).create(
+        **fields.as_dict(), currency=workspace.base_currency
+    )
+    AuditEventRepository(session, ctx).record(
+        actor_user_id=ctx.user.id,
+        action="income_source.created",
+        entity_type="income_source",
+        entity_id=str(row.id),
+        ts=ctx.clock.now(),
+        data={"name": fields.name, "kind": fields.kind},
+    )
+    for rule_id in dict.fromkeys(tax_rule_ids):
+        _attach(
+            session,
+            ctx,
+            row,
+            rule_id,
+            payment_category_id=None,
+            due_day=None,
+            due_month_offset=None,
+            generate_payment=True,
+        )
+    return row.id
 
 
 def update_source(
@@ -1028,25 +1043,53 @@ def attach_tax_rule(
     _check_overrides(due_day, due_month_offset)
 
     def write(session: Session) -> UUID:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        source = IncomeSourceRepository(session, ctx).get_or_raise(source_id)
-        if source.archived_at is not None:
-            raise IncomeError("archived")
-        attachment = _attach(
+        return _attach_tax_rule_in_session(
             session,
             ctx,
-            source,
-            tax_rule_id,
+            source_id,
+            tax_rule_id=tax_rule_id,
             payment_category_id=payment_category_id,
             due_day=due_day,
             due_month_offset=due_month_offset,
             generate_payment=generate_payment,
         )
-        _resync_tax_months(session, ctx, source)
-        return attachment.id
 
     return run_immediate(factory, write)
+
+
+def _attach_tax_rule_in_session(
+    session: Session,
+    ctx: Context,
+    source_id: UUID,
+    *,
+    tax_rule_id: UUID,
+    payment_category_id: UUID | None = None,
+    due_day: int | None = None,
+    due_month_offset: int | None = None,
+    generate_payment: bool = True,
+) -> UUID:
+    """``attach_tax_rule`` inside the caller's write transaction.
+
+    ``_check_overrides`` ran before the public write; role, lock, checks, audit and the pending
+    months' resync are the public write's.
+    """
+    require_role_now(session, ctx, Role.EDITOR)
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+    source = IncomeSourceRepository(session, ctx).get_or_raise(source_id)
+    if source.archived_at is not None:
+        raise IncomeError("archived")
+    attachment = _attach(
+        session,
+        ctx,
+        source,
+        tax_rule_id,
+        payment_category_id=payment_category_id,
+        due_day=due_day,
+        due_month_offset=due_month_offset,
+        generate_payment=generate_payment,
+    )
+    _resync_tax_months(session, ctx, source)
+    return attachment.id
 
 
 def _resync_tax_months(session: Session, ctx: Context, source: IncomeSource) -> None:
@@ -1469,40 +1512,55 @@ def log_work(
         raise IncomeError("invalid_units")
 
     def write(session: Session) -> bool:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        sources = IncomeSourceRepository(session, ctx)
-        source = sources.get_or_raise(source_id)
-        if source.archived_at is not None or source.kind != IncomeKind.VARIABLE.value:
-            raise IncomeError("invalid_source")
-        occurrence = _check_work_month_writable(session, ctx, source, work_month, override=override)
-        _check_units_size(units)
-        repo = WorkLogRepository(session, ctx)
-        row = next(
-            (log for log in repo.for_source(source_id) if log.work_month == work_month), None
-        )
-        if row is not None and row.derived_from_days:
-            # F3.7: the month is the sum of its calendar days; change the days instead.
-            raise IncomeError("derived_work_log")
-        if row is None:
-            row = repo.create(income_source_id=source_id, work_month=work_month, units=units)
-        else:
-            repo.update(row.id, units=units)
-        if occurrence is not None and occurrence.status == "posted":
-            _record_after_posting(session, ctx, source_id, work_month)
-            return True
-        _sync_work_month(session, ctx, ctx.clock, source, work_month, allow_past=True)
-        AuditEventRepository(session, ctx).record(
-            actor_user_id=ctx.user.id,
-            action="work_log.saved",
-            entity_type="income_source",
-            entity_id=str(source_id),
-            ts=ctx.clock.now(),
-            data={"work_month": work_month.isoformat()},
-        )
-        return False
+        return _log_work_in_session(session, ctx, source_id, work_month, units, override=override)
 
     return run_immediate(factory, write)
+
+
+def _log_work_in_session(
+    session: Session,
+    ctx: Context,
+    source_id: UUID,
+    work_month: date,
+    units: Decimal,
+    *,
+    override: bool = False,
+) -> bool:
+    """``log_work`` inside the caller's write transaction.
+
+    The caller validated the month and units; role, lock, source checks, the derived-log lock,
+    occurrence sync and audit are the public write's.
+    """
+    require_role_now(session, ctx, Role.EDITOR)
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+    sources = IncomeSourceRepository(session, ctx)
+    source = sources.get_or_raise(source_id)
+    if source.archived_at is not None or source.kind != IncomeKind.VARIABLE.value:
+        raise IncomeError("invalid_source")
+    occurrence = _check_work_month_writable(session, ctx, source, work_month, override=override)
+    _check_units_size(units)
+    repo = WorkLogRepository(session, ctx)
+    row = next((log for log in repo.for_source(source_id) if log.work_month == work_month), None)
+    if row is not None and row.derived_from_days:
+        # F3.7: the month is the sum of its calendar days; change the days instead.
+        raise IncomeError("derived_work_log")
+    if row is None:
+        row = repo.create(income_source_id=source_id, work_month=work_month, units=units)
+    else:
+        repo.update(row.id, units=units)
+    if occurrence is not None and occurrence.status == "posted":
+        _record_after_posting(session, ctx, source_id, work_month)
+        return True
+    _sync_work_month(session, ctx, ctx.clock, source, work_month, allow_past=True)
+    AuditEventRepository(session, ctx).record(
+        actor_user_id=ctx.user.id,
+        action="work_log.saved",
+        entity_type="income_source",
+        entity_id=str(source_id),
+        ts=ctx.clock.now(),
+        data={"work_month": work_month.isoformat()},
+    )
+    return False
 
 
 def _check_units_size(units: Decimal) -> None:
@@ -1644,50 +1702,69 @@ def _change_work_days(
     _valid_month(month)
 
     def write(session: Session) -> bool:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        source = IncomeSourceRepository(session, ctx).get_or_raise(source_id)
-        if source.archived_at is not None or source.kind != IncomeKind.VARIABLE.value:
-            raise IncomeError("invalid_source")
-        occurrence = _check_work_month_writable(session, ctx, source, month, override=override)
-        days = _month_days(month)
-        repository = WorkDayRepository(session, ctx)
-        entries = {row.work_date: row for row in repository.for_month(source_id, days[0], days[-1])}
-        workspace = CurrentWorkspaceRepository(session, ctx).get()
-        change(repository, entries, _calendar_holidays(workspace.country_code, month.year))
-        session.flush()
-        remaining = repository.for_month(source_id, days[0], days[-1])
-        logs = WorkLogRepository(session, ctx)
-        log = next((row for row in logs.for_source(source_id) if row.work_month == month), None)
-        if remaining:
-            total = sum((row.units for row in remaining), Decimal(0))
-            _check_units_size(total)
-            if log is None:
-                log = logs.create(
-                    income_source_id=source_id,
-                    work_month=month,
-                    units=total,
-                    derived_from_days=True,
-                )
-            else:
-                logs.update(log.id, units=total, derived_from_days=True)
-        elif log is not None and log.derived_from_days:
-            logs.delete(log)
-        if occurrence is not None and occurrence.status == "posted":
-            _record_after_posting(session, ctx, source_id, month)
-            return True
-        _sync_work_month(session, ctx, ctx.clock, source, month, allow_past=True)
-        AuditEventRepository(session, ctx).record(
-            actor_user_id=ctx.user.id,
-            action=action,
-            entity_type="income_source",
-            entity_id=str(source_id),
-            ts=ctx.clock.now(),
-            data={"work_month": month.isoformat()},
+        return _change_work_days_in_session(
+            session, ctx, source_id, month, change, action, override
         )
-        return False
 
     return run_immediate(factory, write)
+
+
+def _change_work_days_in_session(
+    session: Session,
+    ctx: Context,
+    source_id: UUID,
+    month: date,
+    change: Callable[[WorkDayRepository, dict[date, WorkDay], set[date]], None],
+    action: str,
+    override: bool,
+) -> bool:
+    """``_change_work_days`` inside the caller's write transaction.
+
+    The caller validated the month and (``set_work_day``) the day units; role, lock, source
+    checks, derived work log, occurrence sync and audit are the public path's.
+    """
+    require_role_now(session, ctx, Role.EDITOR)
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+    source = IncomeSourceRepository(session, ctx).get_or_raise(source_id)
+    if source.archived_at is not None or source.kind != IncomeKind.VARIABLE.value:
+        raise IncomeError("invalid_source")
+    occurrence = _check_work_month_writable(session, ctx, source, month, override=override)
+    days = _month_days(month)
+    repository = WorkDayRepository(session, ctx)
+    entries = {row.work_date: row for row in repository.for_month(source_id, days[0], days[-1])}
+    workspace = CurrentWorkspaceRepository(session, ctx).get()
+    change(repository, entries, _calendar_holidays(workspace.country_code, month.year))
+    session.flush()
+    remaining = repository.for_month(source_id, days[0], days[-1])
+    logs = WorkLogRepository(session, ctx)
+    log = next((row for row in logs.for_source(source_id) if row.work_month == month), None)
+    if remaining:
+        total = sum((row.units for row in remaining), Decimal(0))
+        _check_units_size(total)
+        if log is None:
+            log = logs.create(
+                income_source_id=source_id,
+                work_month=month,
+                units=total,
+                derived_from_days=True,
+            )
+        else:
+            logs.update(log.id, units=total, derived_from_days=True)
+    elif log is not None and log.derived_from_days:
+        logs.delete(log)
+    if occurrence is not None and occurrence.status == "posted":
+        _record_after_posting(session, ctx, source_id, month)
+        return True
+    _sync_work_month(session, ctx, ctx.clock, source, month, allow_past=True)
+    AuditEventRepository(session, ctx).record(
+        actor_user_id=ctx.user.id,
+        action=action,
+        entity_type="income_source",
+        entity_id=str(source_id),
+        ts=ctx.clock.now(),
+        data={"work_month": month.isoformat()},
+    )
+    return False
 
 
 def toggle_work_day(

@@ -306,30 +306,35 @@ def skip_occurrence(factory: sessionmaker[Session], ctx: Context, occurrence_id:
     require_role(ctx, Role.EDITOR)
 
     def write(session: Session) -> None:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=False)
-        repository = ScheduledOccurrenceRepository(session, ctx)
-        occurrence = repository.get_for_update(occurrence_id)
-        if occurrence is None:
-            raise NotFound
-        if occurrence.status == OccurrenceStatus.SKIPPED:
-            return
-        if occurrence.status != OccurrenceStatus.PENDING:
-            raise OccurrenceError("not_pending")
-        _ensure_open(session, ctx, occurrence.due_date)
-        for child in repository.children(occurrence.id):
-            if child.status == OccurrenceStatus.PENDING:
-                repository.delete(child)
-        repository.update(occurrence.id, status=OccurrenceStatus.SKIPPED)
-        AuditEventRepository(session, ctx).record(
-            actor_user_id=ctx.user.id,
-            action="scheduled_occurrence.skipped",
-            entity_type="scheduled_occurrence",
-            entity_id=str(occurrence.id),
-            ts=ctx.clock.now(),
-        )
+        _skip_in_session(session, ctx, occurrence_id)
 
     run_immediate(factory, write)
+
+
+def _skip_in_session(session: Session, ctx: Context, occurrence_id: UUID) -> None:
+    """``skip_occurrence`` inside the caller's write transaction."""
+    require_role_now(session, ctx, Role.EDITOR)
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=False)
+    repository = ScheduledOccurrenceRepository(session, ctx)
+    occurrence = repository.get_for_update(occurrence_id)
+    if occurrence is None:
+        raise NotFound
+    if occurrence.status == OccurrenceStatus.SKIPPED:
+        return
+    if occurrence.status != OccurrenceStatus.PENDING:
+        raise OccurrenceError("not_pending")
+    _ensure_open(session, ctx, occurrence.due_date)
+    for child in repository.children(occurrence.id):
+        if child.status == OccurrenceStatus.PENDING:
+            repository.delete(child)
+    repository.update(occurrence.id, status=OccurrenceStatus.SKIPPED)
+    AuditEventRepository(session, ctx).record(
+        actor_user_id=ctx.user.id,
+        action="scheduled_occurrence.skipped",
+        entity_type="scheduled_occurrence",
+        entity_id=str(occurrence.id),
+        ts=ctx.clock.now(),
+    )
 
 
 def unskip_occurrence(factory: sessionmaker[Session], ctx: Context, occurrence_id: UUID) -> None:

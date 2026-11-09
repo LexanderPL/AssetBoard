@@ -303,42 +303,60 @@ def set_planned(
     value = _parse(amount, locale)  # refuse malformed input before the write
 
     def write(session: Session) -> SavedLine:
-        _begin_write(session, ctx, month)
-        currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
-        minor = _minor(value, currency)
-        category = CategoryRepository(session, ctx).get(category_id)
-        if category is None:
-            raise NotFound
-        repository = BudgetLineRepository(session, ctx)
-        line = repository.line(month, category.id)
-        if line is None:
-            if minor == 0:
-                return SavedLine("unchanged", category.id, None)
-            if category.archived_at is not None:
-                raise InvalidPlannedValue("category_archived")
-            if category.treatment == Treatment.TRANSFER:
-                raise InvalidPlannedValue("category_transfer")
-            line = repository.create(
-                month=month, category_id=category.id, planned_minor=minor, currency=currency
-            )
-            _audit_line(session, ctx, "budget_line.created", line, category)
-            _mark_started(session, ctx, month)
-            return SavedLine("created", category.id, Money(minor, currency))
-        if minor == 0:
-            _audit_line(session, ctx, "budget_line.deleted", line, category)
-            repository.delete(line)
-            _mark_started(session, ctx, month)
-            return SavedLine("removed", category.id, None)
-        if line.planned_minor == minor:
-            return SavedLine("unchanged", category.id, Money(minor, line.currency))
-        previous = line.planned_minor
-        repository.update(line.id, planned_minor=minor)
-        extra = {"previous_amount": _amount_text(previous, line.currency)}
-        _audit_line(session, ctx, "budget_line.updated", line, category, extra)
-        _mark_started(session, ctx, month)
-        return SavedLine("updated", category.id, Money(minor, line.currency))
+        return _set_planned_in_session(
+            session, ctx, month=month, category_id=category_id, value=value
+        )
 
     return run_immediate(factory, write)
+
+
+def _set_planned_in_session(
+    session: Session,
+    ctx: Context,
+    *,
+    month: YearMonth,
+    category_id: UUID,
+    value: Decimal,
+) -> SavedLine:
+    """``set_planned`` inside the caller's write transaction.
+
+    ``value`` has already passed ``_parse``: the demo builder passes a planned amount it
+    computed in the base currency. Role, lock, month guard and audit are the public write's.
+    """
+    _begin_write(session, ctx, month)
+    currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
+    minor = _minor(value, currency)
+    category = CategoryRepository(session, ctx).get(category_id)
+    if category is None:
+        raise NotFound
+    repository = BudgetLineRepository(session, ctx)
+    line = repository.line(month, category.id)
+    if line is None:
+        if minor == 0:
+            return SavedLine("unchanged", category.id, None)
+        if category.archived_at is not None:
+            raise InvalidPlannedValue("category_archived")
+        if category.treatment == Treatment.TRANSFER:
+            raise InvalidPlannedValue("category_transfer")
+        line = repository.create(
+            month=month, category_id=category.id, planned_minor=minor, currency=currency
+        )
+        _audit_line(session, ctx, "budget_line.created", line, category)
+        _mark_started(session, ctx, month)
+        return SavedLine("created", category.id, Money(minor, currency))
+    if minor == 0:
+        _audit_line(session, ctx, "budget_line.deleted", line, category)
+        repository.delete(line)
+        _mark_started(session, ctx, month)
+        return SavedLine("removed", category.id, None)
+    if line.planned_minor == minor:
+        return SavedLine("unchanged", category.id, Money(minor, line.currency))
+    previous = line.planned_minor
+    repository.update(line.id, planned_minor=minor)
+    extra = {"previous_amount": _amount_text(previous, line.currency)}
+    _audit_line(session, ctx, "budget_line.updated", line, category, extra)
+    _mark_started(session, ctx, month)
+    return SavedLine("updated", category.id, Money(minor, line.currency))
 
 
 def _copy(

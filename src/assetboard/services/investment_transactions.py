@@ -806,84 +806,128 @@ def create_transaction(
     income_category_id: UUID | None = None,
 ) -> InvestmentTransactionView:
     require_role(ctx, Role.EDITOR)
-    today = ctx.clock.today(ctx.workspace.timezone)
 
     def write(session: Session) -> InvestmentTransactionView:
-        require_role_now(session, ctx, Role.EDITOR)
-        _lock(session, ctx)
-        lock_month_writes(session, ctx)
-        base_currency, method = _workspace_values(session, ctx)
-        instruments = InstrumentRepository(session, ctx)
-        instrument = instruments.get_for_update(instrument_id)
-        if instrument is None:
-            raise NotFound
-        if instrument.archived_at is not None:
-            raise InstrumentArchived
-        values = _form_values(
-            instrument=instrument,
-            base_currency=base_currency,
+        return _create_transaction_in_session(
+            session,
+            ctx,
+            instrument_id=instrument_id,
             type_value=type_value,
-            day_value=date_value,
+            date_value=date_value,
             quantity_value=quantity_value,
             unit_price_value=unit_price_value,
             fee_value=fee_value,
             fx_value=fx_value,
             note_value=note_value,
             locale=locale,
-            today=today,
-            day_required=True,
             amounts_value=amounts_value,
             base_unit_price_value=base_unit_price_value,
             base_fee_value=base_fee_value,
+            record_income=record_income,
+            income_category_id=income_category_id,
         )
-        category_id: UUID | None = None
-        if record_income:
-            if values.type != InvestmentTransactionType.DIVIDEND.value:
-                raise InvalidInvestmentTransaction("income_category", "invalid_income")
-            category_id = _income_category(session, ctx, income_category_id)
-            if values.day is not None:
-                ensure_date_open(session, ctx, values.day)
-        repository = InvestmentTransactionRepository(session, ctx)
-        row = repository.create(
-            instrument_id=instrument.id,
-            date=values.day,
-            type=values.type,
-            quantity=values.quantity,
-            unit_price=values.unit_price,
-            quote_currency=instrument.quote_currency,
-            fee_minor=values.fee_minor,
-            fx_to_base=values.fx_to_base,
-            note=values.note,
-            settlement_currency=values.settlement_currency,
-            settlement_unit_price=values.settlement_unit_price,
-            settlement_fee_minor=values.settlement_fee_minor,
-        )
-        if category_id is not None:
-            try:
-                income_id = create_linked_income(
-                    session,
-                    ctx,
-                    instrument=instrument,
-                    dividend=row,
-                    category_id=category_id,
-                    base_currency=base_currency,
-                    locale=locale,
-                )
-            except ValueError:
-                raise InvalidInvestmentTransaction("income_category", "income_zero") from None
-            repository.update(row.id, income_transaction_id=income_id)
-        session.flush()
-        _check_oversell(
-            session,
-            ctx,
-            instrument.id,
-            method=method,
-            base_currency=base_currency,
-        )
-        _audit(session, ctx, "investment_transaction.created", row, instrument)
-        return _view(row, instrument, base_currency)
 
     return run_immediate(factory, write)
+
+
+def _create_transaction_in_session(
+    session: Session,
+    ctx: Context,
+    *,
+    instrument_id: UUID,
+    type_value: str,
+    date_value: str,
+    quantity_value: str,
+    unit_price_value: str,
+    fee_value: str,
+    fx_value: str,
+    note_value: str,
+    locale: str,
+    amounts_value: str = AMOUNTS_QUOTE,
+    base_unit_price_value: str = "",
+    base_fee_value: str = "",
+    record_income: bool = False,
+    income_category_id: UUID | None = None,
+) -> InvestmentTransactionView:
+    """``create_transaction`` inside the caller's write transaction.
+
+    Field parsing (``transaction_values``), settlement, linked income, the oversell check and
+    audit are exactly the public write's; only the per-call transaction is skipped.
+    """
+    today = ctx.clock.today(ctx.workspace.timezone)
+    require_role_now(session, ctx, Role.EDITOR)
+    _lock(session, ctx)
+    lock_month_writes(session, ctx)
+    base_currency, method = _workspace_values(session, ctx)
+    instruments = InstrumentRepository(session, ctx)
+    instrument = instruments.get_for_update(instrument_id)
+    if instrument is None:
+        raise NotFound
+    if instrument.archived_at is not None:
+        raise InstrumentArchived
+    values = _form_values(
+        instrument=instrument,
+        base_currency=base_currency,
+        type_value=type_value,
+        day_value=date_value,
+        quantity_value=quantity_value,
+        unit_price_value=unit_price_value,
+        fee_value=fee_value,
+        fx_value=fx_value,
+        note_value=note_value,
+        locale=locale,
+        today=today,
+        day_required=True,
+        amounts_value=amounts_value,
+        base_unit_price_value=base_unit_price_value,
+        base_fee_value=base_fee_value,
+    )
+    category_id: UUID | None = None
+    if record_income:
+        if values.type != InvestmentTransactionType.DIVIDEND.value:
+            raise InvalidInvestmentTransaction("income_category", "invalid_income")
+        category_id = _income_category(session, ctx, income_category_id)
+        if values.day is not None:
+            ensure_date_open(session, ctx, values.day)
+    repository = InvestmentTransactionRepository(session, ctx)
+    row = repository.create(
+        instrument_id=instrument.id,
+        date=values.day,
+        type=values.type,
+        quantity=values.quantity,
+        unit_price=values.unit_price,
+        quote_currency=instrument.quote_currency,
+        fee_minor=values.fee_minor,
+        fx_to_base=values.fx_to_base,
+        note=values.note,
+        settlement_currency=values.settlement_currency,
+        settlement_unit_price=values.settlement_unit_price,
+        settlement_fee_minor=values.settlement_fee_minor,
+    )
+    if category_id is not None:
+        try:
+            income_id = create_linked_income(
+                session,
+                ctx,
+                instrument=instrument,
+                dividend=row,
+                category_id=category_id,
+                base_currency=base_currency,
+                locale=locale,
+            )
+        except ValueError:
+            raise InvalidInvestmentTransaction("income_category", "income_zero") from None
+        repository.update(row.id, income_transaction_id=income_id)
+    session.flush()
+    _check_oversell(
+        session,
+        ctx,
+        instrument.id,
+        method=method,
+        base_currency=base_currency,
+    )
+    _audit(session, ctx, "investment_transaction.created", row, instrument)
+    return _view(row, instrument, base_currency)
 
 
 def update_transaction(

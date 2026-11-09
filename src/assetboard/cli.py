@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import sys
 from collections.abc import Callable
+from datetime import date, datetime
 from typing import Any
+from uuid import UUID
+from zoneinfo import ZoneInfo
 
 import typer
 from sqlalchemy.exc import IntegrityError
@@ -11,7 +14,7 @@ from starlette.types import ASGIApp
 
 from assetboard.app import create_app
 from assetboard.branding import APP_NAME, CLI_NAME
-from assetboard.clock import Clock
+from assetboard.clock import Clock, FixedClock
 from assetboard.config import Settings
 from assetboard.db.engine import create_database_engine
 from assetboard.db.migrate import (
@@ -20,13 +23,23 @@ from assetboard.db.migrate import (
     database_is_at_head,
     upgrade_database,
 )
+from assetboard.db.models.identity import Workspace
 from assetboard.domain.identity import InvalidEmail, normalize_email
 from assetboard.middleware import PeerMiddleware
+from assetboard.services.archive import workspace_is_empty
 from assetboard.services.auth import (
     EmailAlreadyRegistered,
     create_admin_cli,
     reset_user_password,
     reset_user_two_factor,
+)
+from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
+from assetboard.services.demo import (
+    DemoBuildError,
+    build_demo_workspace,
+    ensure_demo_profile,
+    plan_for_workspace,
+    workspace_owner,
 )
 from assetboard.services.mail import Mailer, MailJob, SmtpMailer, send_now
 
@@ -258,6 +271,82 @@ def reset_mfa_command(
         typer.echo(str(exc), err=True)
         raise typer.Exit(code=1) from exc
     typer.echo(f"Two-factor authentication reset for {user.email}; {revoked} session(s) ended.")
+
+
+@app.command("demo-seed")
+def demo_seed_command(
+    workspace: UUID = typer.Option(..., "--workspace", help="Workspace id to fill."),  # noqa: B008
+    date_value: str | None = typer.Option(  # noqa: B008
+        None,
+        "--date",
+        help="Reference date T as YYYY-MM-DD (default: today in the workspace time zone).",
+    ),
+) -> None:
+    """Fill an existing empty workspace with the deterministic demo dataset (F9.11a)."""
+    settings: Settings | None = None
+    engine = None
+    try:
+        settings = Settings()
+        _ensure_schema(settings)
+        if settings.database_url is None:
+            raise CommandError("DATABASE_URL was not configured")
+        reference = date.fromisoformat(date_value) if date_value is not None else None
+        engine = create_database_engine(settings.database_url)
+        real_clock = Clock()
+        factory = sessionmaker(
+            engine, class_=Session, info={"clock": real_clock}, expire_on_commit=False
+        )
+        with factory() as session:
+            workspace_row = session.get(Workspace, workspace)
+            if workspace_row is None:
+                raise CommandError("the workspace does not exist")
+            owner = workspace_owner(session, workspace)
+            if owner is None:
+                raise CommandError("the workspace has no owner")
+            reference_date = reference or real_clock.today(workspace_row.timezone)
+            stamp = datetime(
+                reference_date.year,
+                reference_date.month,
+                reference_date.day,
+                12,
+                tzinfo=ZoneInfo(workspace_row.timezone),
+            )
+            ctx = Context(
+                user=UserRef(
+                    id=owner.id,
+                    email=owner.email,
+                    display_name=owner.display_name,
+                    locale=owner.locale,
+                    is_instance_admin=owner.is_instance_admin,
+                ),
+                workspace=WorkspaceRef(
+                    id=workspace_row.id,
+                    name=workspace_row.name,
+                    base_currency=workspace_row.base_currency,
+                    locale=workspace_row.locale,
+                    timezone=workspace_row.timezone,
+                    country_code=workspace_row.country_code,
+                ),
+                role=Role.OWNER,
+                clock=FixedClock(stamp.isoformat()),
+            )
+            if not workspace_is_empty(session, ctx):
+                raise CommandError("the workspace is not empty")
+        plan = plan_for_workspace(ctx, reference_date)
+        result = build_demo_workspace(factory, ctx, plan, data_dir=settings.data_dir)
+        with factory.begin() as session:
+            ensure_demo_profile(session, workspace, reference_date=reference_date)
+    except (CommandError, DemoBuildError, ValueError, OSError, RuntimeError) as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    finally:
+        if engine is not None:
+            engine.dispose()
+    typer.echo(
+        f"Built demo workspace {workspace} at {reference_date.isoformat()} "
+        f"(dataset v{result.version})."
+    )
+    typer.echo("Created: " + ", ".join(f"{key}={value}" for key, value in result.counts.items()))
 
 
 def mail_test_mailer(settings: Settings) -> Mailer:

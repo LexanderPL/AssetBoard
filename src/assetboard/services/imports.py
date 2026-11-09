@@ -1027,100 +1027,15 @@ def apply_import(
     stored_path = _upload_path(data_dir, ctx.workspace.id, batch_id)
 
     def apply(session: Session) -> dict[str, Any]:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        lock_month_writes(session, ctx)
-        batch = ImportBatchRepository(session, ctx).get_for_update(batch_id)
-        if batch is None or batch.status != "planned":
-            raise ImportError("batch is not ready to apply")
-        adapter = adapters.for_source(batch.source)
-        if adapter is None:
-            raise ImportUnavailable("No importer is registered for this upload type.")
-        if batch.mode == "restore":
-            require_role_now(session, ctx, Role.OWNER)
-        previous_mapping = (batch.report or {}).get("mapping", [])
-        previous_instrument_mapping = (batch.report or {}).get("instrument_mapping", [])
-        choices_changed = (
-            isinstance(options, Mapping)
-            and ("mappings" in options or "instrument_mappings" in options)
-            and _mapping_signature(options)
-            != _mapping_signature(
-                {
-                    "mappings": previous_mapping,
-                    "instrument_mappings": previous_instrument_mapping,
-                }
-            )
-        )
-        new_options = _merged_options(batch.options, options)
-        batch.options = new_options
-        try:
-            content = stored_path.read_bytes()
-        except FileNotFoundError:
-            batch.status = "failed"
-            batch.report = _failure("stored_file_missing", "stored upload is missing")
-            return {"_failed": True, "report": batch.report}
-        if hashlib.sha256(content).hexdigest() != batch.file_sha256:
-            batch.status = "failed"
-            batch.report = _failure("stored_checksum_mismatch", "stored upload checksum mismatch")
-            return {"_failed": True, "report": batch.report}
-        status, base_report, parsed = _plan_file(
-            content, delimiter=_delimiter_option(batch.options)
-        )
-        if status == "failed" or parsed is None:
-            batch.status = "failed"
-            batch.report = base_report
-            return {"_failed": True, "report": base_report}
-        base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
-        report = _merge_adapter_report(
-            base_report,
-            adapter.plan(session, ctx, batch, parsed, base_currency=base_currency),
-        )
-        report["source"] = parsed.source
-        if report.get("refused"):
-            batch.report = report
-            return {"_refused": True, "report": report}
-        if report["counts"].get("mapping_invalid", 0):
-            batch.report = report
-            return {"_mapping_invalid": True, "report": report}
-        if choices_changed or report["counts"] != (batch.report or {}).get("counts", {}):
-            batch.report = report
-            return {"_confirmation_required": True, "report": report}
-        if batch.mode == "restore" and report["counts"].get("invalid", 0):
-            batch.report = report
-            errors = cast("list[dict[str, object]]", report.get("errors", []))
-            if any(entry.get("code") == "workspace_not_empty" for entry in errors):
-                return {"_restore_unavailable": True, "report": report}
-            raise ImportError("restore requires a completely valid upload")
-        if report["counts"].get("invalid", 0) and not skip_invalid:
-            raise ImportError("confirm skipping invalid rows before applying")
-        counts = adapter.apply(
+        return _apply_import_in_session(
             session,
             ctx,
-            batch,
-            parsed,
-            base_currency=base_currency,
+            stored_path=stored_path,
+            batch_id=batch_id,
+            adapters=adapters,
             skip_invalid=skip_invalid,
+            options=options,
         )
-        now = ctx.clock.now()
-        batch.status = "applied"
-        batch.applied_at = now
-        if batch.mode != "restore":
-            AuditEventRepository(session, ctx).record(
-                actor_user_id=ctx.user.id,
-                action="import.applied",
-                entity_type="import_batch",
-                entity_id=str(batch.id),
-                ts=now,
-                data={
-                    "source": batch.source,
-                    "mode": batch.mode,
-                    "transactions_created": counts.get("created", 0),
-                    "duplicates": counts.get("duplicates", 0),
-                    "conflicts": counts.get("conflicts", 0),
-                    "rows_skipped": counts.get("skipped", 0),
-                },
-            )
-        return {"counts": counts, "report": report}
 
     result = run_immediate(factory, apply)
     if result.get("_failed"):
@@ -1136,6 +1051,116 @@ def apply_import(
         raise ImportConfirmationRequired(result["report"])
     _delete_upload(stored_path)
     return result
+
+
+def _apply_import_in_session(
+    session: Session,
+    ctx: Context,
+    *,
+    stored_path: Path,
+    batch_id: UUID,
+    adapters: ImportAdapterRegistry,
+    skip_invalid: bool = False,
+    options: Mapping[str, object] | None = None,
+) -> dict[str, Any]:
+    """``apply_import``'s write body, shared with the demo builder.
+
+    Role, locks, the stored file checksum, the adapter plan/apply, batch status and the
+    ``import.applied`` audit are exactly the public path's. The caller deletes the upload file
+    after its transaction commits.
+    """
+    require_role_now(session, ctx, Role.EDITOR)
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+    lock_month_writes(session, ctx)
+    batch = ImportBatchRepository(session, ctx).get_for_update(batch_id)
+    if batch is None or batch.status != "planned":
+        raise ImportError("batch is not ready to apply")
+    adapter = adapters.for_source(batch.source)
+    if adapter is None:
+        raise ImportUnavailable("No importer is registered for this upload type.")
+    if batch.mode == "restore":
+        require_role_now(session, ctx, Role.OWNER)
+    previous_mapping = (batch.report or {}).get("mapping", [])
+    previous_instrument_mapping = (batch.report or {}).get("instrument_mapping", [])
+    choices_changed = (
+        isinstance(options, Mapping)
+        and ("mappings" in options or "instrument_mappings" in options)
+        and _mapping_signature(options)
+        != _mapping_signature(
+            {
+                "mappings": previous_mapping,
+                "instrument_mappings": previous_instrument_mapping,
+            }
+        )
+    )
+    new_options = _merged_options(batch.options, options)
+    batch.options = new_options
+    try:
+        content = stored_path.read_bytes()
+    except FileNotFoundError:
+        batch.status = "failed"
+        batch.report = _failure("stored_file_missing", "stored upload is missing")
+        return {"_failed": True, "report": batch.report}
+    if hashlib.sha256(content).hexdigest() != batch.file_sha256:
+        batch.status = "failed"
+        batch.report = _failure("stored_checksum_mismatch", "stored upload checksum mismatch")
+        return {"_failed": True, "report": batch.report}
+    status, base_report, parsed = _plan_file(content, delimiter=_delimiter_option(batch.options))
+    if status == "failed" or parsed is None:
+        batch.status = "failed"
+        batch.report = base_report
+        return {"_failed": True, "report": base_report}
+    base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
+    report = _merge_adapter_report(
+        base_report,
+        adapter.plan(session, ctx, batch, parsed, base_currency=base_currency),
+    )
+    report["source"] = parsed.source
+    if report.get("refused"):
+        batch.report = report
+        return {"_refused": True, "report": report}
+    if report["counts"].get("mapping_invalid", 0):
+        batch.report = report
+        return {"_mapping_invalid": True, "report": report}
+    if choices_changed or report["counts"] != (batch.report or {}).get("counts", {}):
+        batch.report = report
+        return {"_confirmation_required": True, "report": report}
+    if batch.mode == "restore" and report["counts"].get("invalid", 0):
+        batch.report = report
+        errors = cast("list[dict[str, object]]", report.get("errors", []))
+        if any(entry.get("code") == "workspace_not_empty" for entry in errors):
+            return {"_restore_unavailable": True, "report": report}
+        raise ImportError("restore requires a completely valid upload")
+    if report["counts"].get("invalid", 0) and not skip_invalid:
+        raise ImportError("confirm skipping invalid rows before applying")
+    counts = adapter.apply(
+        session,
+        ctx,
+        batch,
+        parsed,
+        base_currency=base_currency,
+        skip_invalid=skip_invalid,
+    )
+    now = ctx.clock.now()
+    batch.status = "applied"
+    batch.applied_at = now
+    if batch.mode != "restore":
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=ctx.user.id,
+            action="import.applied",
+            entity_type="import_batch",
+            entity_id=str(batch.id),
+            ts=now,
+            data={
+                "source": batch.source,
+                "mode": batch.mode,
+                "transactions_created": counts.get("created", 0),
+                "duplicates": counts.get("duplicates", 0),
+                "conflicts": counts.get("conflicts", 0),
+                "rows_skipped": counts.get("skipped", 0),
+            },
+        )
+    return {"counts": counts, "report": report}
 
 
 def update_import_preview(

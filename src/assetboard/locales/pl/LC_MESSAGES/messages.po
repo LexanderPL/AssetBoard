@@ -121,17 +121,257 @@ msgstr "Sprzedaż rzeczy"
 msgid "Savings withdrawal"
 msgstr "Wypłata z oszczędności"
 
+msgid "Bakery"
+msgstr "Piekarnia"
+
+msgid "Supermarket"
+msgstr "Supermarket"
+
+msgid "Farmers market"
+msgstr "Targ"
+
+msgid "Corner shop"
+msgstr "Sklepik"
+
+msgid "Groceries"
+msgstr "Zakupy spożywcze"
+
+msgid "Pizza night"
+msgstr "Wieczór z pizzą"
+
+msgid "Coffee"
+msgstr "Kawa"
+
+msgid "Lunch"
+msgstr "Obiad"
+
+msgid "Sushi"
+msgstr "Sushi"
+
+msgid "Brunch"
+msgstr "Brunch"
+
+msgid "Fuel"
+msgstr "Paliwo"
+
+msgid "Train ticket"
+msgstr "Bilet kolejowy"
+
+msgid "Bus pass"
+msgstr "Bilet miesięczny"
+
+msgid "Parking"
+msgstr "Parking"
+
+msgid "Bike repair"
+msgstr "Naprawa roweru"
+
+msgid "Hardware store"
+msgstr "Sklep budowlany"
+
+msgid "Furniture"
+msgstr "Meble"
+
+msgid "Water bill"
+msgstr "Rachunek za wodę"
+
+msgid "Pharmacy"
+msgstr "Apteka"
+
+msgid "Dentist"
+msgstr "Dentysta"
+
+msgid "Haircut"
+msgstr "Strzyżenie"
+
+msgid "Drugstore"
+msgstr "Drogeria"
+
+msgid "Bookshop"
+msgstr "Księgarnia"
+
+msgid "Board game"
+msgstr "Gra planszowa"
+
+msgid "Train trip"
+msgstr "Podróż pociągiem"
+
+msgid "Hotel"
+msgstr "Hotel"
+
+msgid "Cinema"
+msgstr "Kino"
+
+msgid "Concert"
+msgstr "Koncert"
+
+msgid "Language course"
+msgstr "Kurs językowy"
+
+msgid "Online course"
+msgstr "Kurs online"
+
+msgid "Birthday gift"
+msgstr "Prezent urodzinowy"
+
+msgid "Charity"
+msgstr "Datek charytatywny"
+
+msgid "T-shirt"
+msgstr "Koszulka"
+
+msgid "Shoes"
+msgstr "Buty"
+
+msgid "Stationery"
+msgstr "Artykuły biurowe"
+
+msgid "Household items"
+msgstr "Artykuły domowe"
+
+msgid "Monthly savings"
+msgstr "Miesięczne oszczędności"
+
+msgid "Broker transfer"
+msgstr "Przelew do brokera"
+
+msgid "Savings interest"
+msgstr "Odsetki od oszczędności"
+
+msgid "Sold an old chair"
+msgstr "Sprzedane stare krzesło"
+
+msgid "Rent"
+msgstr "Czynsz"
+
+msgid "Electricity and gas"
+msgstr "Prąd i gaz"
+
+msgid "Streaming subscription"
+msgstr "Subskrypcja streamingowa"
+
+msgid "Music subscription"
+msgstr "Subskrypcja muzyczna"
+
+msgid "Internet"
+msgstr "Internet"
+
+msgid "Phone in 12 installments"
+msgstr "Telefon w 12 ratach"
+
+msgid "Saturday market"
+msgstr "Sobotni targ"
+
+msgid "Home insurance"
+msgstr "Ubezpieczenie domu"
+
+msgid "Bike service"
+msgstr "Serwis roweru"
+
+msgid "Hourly consulting"
+msgstr "Konsulting godzinowy"
+
+msgid "hour"
+msgstr "godzinę"
+
+msgid "Income tax"
+msgstr "Podatek dochodowy"
+
+msgid "Current account"
+msgstr "Konto bieżące"
+
+msgid "Savings account"
+msgstr "Konto oszczędnościowe"
+
+msgid "Emergency fund"
+msgstr "Poduszka finansowa"
+
+msgid "Car"
+msgstr "Samochód"
+
+msgid "Vehicles"
+msgstr "Pojazdy"
+
+msgid "Apartment"
+msgstr "Mieszkanie"
+
+msgid "Real estate"
+msgstr "Nieruchomości"
+
+msgid "Mortgage"
+msgstr "Kredyt hipoteczny"
+
+msgid "Credit card"
+msgstr "Karta kredytowa"
+
+msgid "Global ETF"
+msgstr "Globalny ETF"
+
 msgid "share"
 msgstr "udział"
 
-msgid "bond"
-msgstr "obligacja"
+msgid "Stocks"
+msgstr "Akcje"
+
+msgid "Balanced 80/20 fund"
+msgstr "Zrównoważony fundusz 80/20"
+
+msgid "Bonds"
+msgstr "Obligacje"
+
+msgid "US stock"
+msgstr "Akcja amerykańska"
+
+msgid "Gold"
+msgstr "Złoto"
 
 msgid "oz"
 msgstr "uncja"
 
+msgid "Metals"
+msgstr "Metale"
+
+msgid "Bitcoin"
+msgstr "Bitcoin"
+
 msgid "coin"
 msgstr "moneta"
+
+msgid "Crypto"
+msgstr "Krypto"
+
+msgid "Government bond"
+msgstr "Obligacja skarbowa"
+
+msgid "bond"
+msgstr "obligacja"
+
+msgid "Currency cash"
+msgstr "Gotówka w walucie"
+
+msgid "Currencies"
+msgstr "Waluty"
+
+msgid "2-for-1 split"
+msgstr "Podział akcji 2:1"
+
+msgid "Settled in the base currency"
+msgstr "Rozliczone w walucie podstawowej"
+
+msgid "Rebalancing sale"
+msgstr "Sprzedaż na potrzeby rebalansu"
+
+msgid "Quarterly dividend"
+msgstr "Dywidenda kwartalna"
+
+msgid "Imported bookshop"
+msgstr "Zaimportowana księgarnia"
+
+msgid "Imported market"
+msgstr "Zaimportowany targ"
+
+msgid "Imported refund"
+msgstr "Zaimportowany zwrot"
 
 msgid "property"
 msgstr "nieruchomość"
@@ -154,14 +394,8 @@ msgstr "Obligacja (wartość modelowa)"
 msgid "Metal"
 msgstr "Metal"
 
-msgid "Crypto"
-msgstr "Krypto"
-
 msgid "Currency"
 msgstr "Waluta"
-
-msgid "Real estate"
-msgstr "Nieruchomości"
 
 msgid "Price provider"
 msgstr "Dostawca cen"
@@ -184,23 +418,8 @@ msgstr "Spekulacyjne"
 msgid "Play money"
 msgstr "Na zabawę"
 
-msgid "Stocks"
-msgstr "Akcje"
-
-msgid "Bonds"
-msgstr "Obligacje"
-
-msgid "Metals"
-msgstr "Metale"
-
-msgid "Currencies"
-msgstr "Waluty"
-
 msgid "Primary residence"
 msgstr "Dom główny"
-
-msgid "Vehicles"
-msgstr "Pojazdy"
 
 msgid "Electronics"
 msgstr "Elektronika"
@@ -220,9 +439,6 @@ msgstr "Biżuteria i zegarki"
 msgid "Photography"
 msgstr "Fotografia"
 
-msgid "Furniture"
-msgstr "Meble"
-
 msgid "Art & collectibles"
 msgstr "Sztuka i kolekcje"
 
@@ -231,9 +447,6 @@ msgstr "Narzędzia"
 
 msgid "Installments"
 msgstr "Raty"
-
-msgid "Mortgage"
-msgstr "Kredyt hipoteczny"
 
 msgid ""
 "Official National Bank of Poland FX rates against PLN and the official "
@@ -5186,9 +5399,6 @@ msgstr "Za"
 
 msgid "day"
 msgstr "dzień"
-
-msgid "hour"
-msgstr "godzinę"
 
 msgid "something else"
 msgstr "coś innego"

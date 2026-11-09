@@ -301,67 +301,75 @@ def create_networth_items_from_asset_classes(
     require_role(ctx, Role.EDITOR)
 
     def write(session: Session) -> CreatedLinks:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        data = current_portfolio_data_in_session(session, ctx)
-        active = [row for row in data.classes if row.archived_at is None]
-        eligible: list[AssetClass] = []
-        skipped = 0
-        for row in active:
-            value = data.valuation.class_value(row.id)
-            if value <= 0 or _class_missing(data, row.id):
-                skipped += 1
-                continue
-            if (
-                NetWorthItemRepository(session, ctx).active_linked("portfolio_asset_class", row.id)
-                is not None
-            ):
-                skipped += 1
-                continue
-            eligible.append(row)
-        if not eligible:
-            return CreatedLinks((), skipped, False)
-        category, created_category = _investments_category(session, ctx)
-        created: list[str] = []
-        for row in eligible:
-            item = NetWorthItemRepository(session, ctx).create(
-                side=Side.ASSET.value,
-                category_id=category.id,
-                name=row.name,
-                currency=data.currency,
-                valuation_mode="linked",
-                link_type="portfolio_asset_class",
-                link_id=row.id,
-                include_in_net_worth=True,
-                investable=row.investable,
-                estimate_between=True,
-            )
-            AuditEventRepository(session, ctx).record(
-                actor_user_id=ctx.user.id,
-                action="networth_item.created",
-                entity_type="networth_item",
-                entity_id=str(item.id),
-                ts=ctx.clock.now(),
-                data={
-                    "name": row.name,
-                    "side": Side.ASSET.value,
-                    "category": category.name,
-                    "currency": data.currency,
-                    "link_type": "portfolio_asset_class",
-                },
-            )
-            AuditEventRepository(session, ctx).record(
-                actor_user_id=ctx.user.id,
-                action="networth_item.linked",
-                entity_type="networth_item",
-                entity_id=str(item.id),
-                ts=ctx.clock.now(),
-                data={"link_type": "portfolio_asset_class", "target": row.name},
-            )
-            created.append(row.name)
-        return CreatedLinks(tuple(created), skipped, created_category)
+        return _create_missing_links_in_session(session, ctx)
 
     return run_immediate(factory, write)
+
+
+def _create_missing_links_in_session(session: Session, ctx: Context) -> CreatedLinks:
+    """``create_networth_items_from_asset_classes`` inside the caller's write transaction.
+
+    Role, lock, the current portfolio read, link creation and audit are the public helper's.
+    """
+    require_role_now(session, ctx, Role.EDITOR)
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+    data = current_portfolio_data_in_session(session, ctx)
+    active = [row for row in data.classes if row.archived_at is None]
+    eligible: list[AssetClass] = []
+    skipped = 0
+    for row in active:
+        value = data.valuation.class_value(row.id)
+        if value <= 0 or _class_missing(data, row.id):
+            skipped += 1
+            continue
+        if (
+            NetWorthItemRepository(session, ctx).active_linked("portfolio_asset_class", row.id)
+            is not None
+        ):
+            skipped += 1
+            continue
+        eligible.append(row)
+    if not eligible:
+        return CreatedLinks((), skipped, False)
+    category, created_category = _investments_category(session, ctx)
+    created: list[str] = []
+    for row in eligible:
+        item = NetWorthItemRepository(session, ctx).create(
+            side=Side.ASSET.value,
+            category_id=category.id,
+            name=row.name,
+            currency=data.currency,
+            valuation_mode="linked",
+            link_type="portfolio_asset_class",
+            link_id=row.id,
+            include_in_net_worth=True,
+            investable=row.investable,
+            estimate_between=True,
+        )
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=ctx.user.id,
+            action="networth_item.created",
+            entity_type="networth_item",
+            entity_id=str(item.id),
+            ts=ctx.clock.now(),
+            data={
+                "name": row.name,
+                "side": Side.ASSET.value,
+                "category": category.name,
+                "currency": data.currency,
+                "link_type": "portfolio_asset_class",
+            },
+        )
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=ctx.user.id,
+            action="networth_item.linked",
+            entity_type="networth_item",
+            entity_id=str(item.id),
+            ts=ctx.clock.now(),
+            data={"link_type": "portfolio_asset_class", "target": row.name},
+        )
+        created.append(row.name)
+    return CreatedLinks(tuple(created), skipped, created_category)
 
 
 def portfolio_warnings(
