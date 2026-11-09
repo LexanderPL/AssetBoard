@@ -21,12 +21,17 @@ with the suggested set:
 | Metals | yes |
 | Crypto | yes |
 | Currencies | yes |
-| Real estate | no |
-| Primary residence | no |
-| Other | no |
+| Other | yes |
+
+Property is not an investment here: record your home and other real estate in **Net worth**, in
+the **Real estate** category. Workspaces created before this change also have the **Real
+estate** and **Primary residence** classes (not investable); they stay as you left them, and you
+can archive them once nothing uses them.
 
 **Investable** marks the classes that count as invested capital for the FIRE planner and the
-net-worth helper. You can rename a class, change its colour or investable flag, and move it up
+net-worth helper. It never hides anything in Investments: the portfolio counts every class and
+marks a non-investable one *not counted in FIRE* (for example an emergency fund or money set
+aside for a purchase). You can rename a class, change its colour or investable flag, and move it up
 or down; the order is used wherever classes are listed. There is no "add suggested classes"
 action while an active class exists. A workspace created before this feature can add the
 suggested set once when it has no active class; nothing is added automatically.
@@ -61,7 +66,7 @@ else. Its fields are:
 | Metal | oz | manual price |
 | Crypto | coin | manual price |
 | Currency | the currency code | unit price 1 in its own currency; value converted from FX |
-| Real estate | property | manual price, quantity 1 |
+| Real estate | property | manual price, quantity 1 (prefer a net-worth item, see above) |
 | Other | unit | manual price |
 
 A **currency** instrument's `quote_currency` is the held currency. Its unit price is always **1**
@@ -352,7 +357,8 @@ workspace base currency. It is read-only.
   allocation weights. An 80/20 Stocks/Bonds fund worth 1 000.00 adds exactly 800.00 to Stocks
   and 200.00 to Bonds. Rounding never loses or invents a cent: the class with the largest weight
   takes the remainder (on a tie, the class listed first on the Asset classes tab). Gain % is
-  shown per class, or *—* when the class has no cost.
+  shown per class, or *—* when the class has no cost. A class that is not investable is marked
+  *not counted in FIRE*; it still counts in every total and in the chart.
 - **Chart**: a donut of instrument values. Choose its scope above it: one asset class (each
   instrument contributes only its part in that class) or the whole portfolio. It opens on the
   class created as *Stocks* (*Akcje*) when you hold something there, otherwise on the whole

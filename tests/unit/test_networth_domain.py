@@ -12,6 +12,9 @@ from hypothesis import strategies as st
 
 from assetboard.domain.networth import (
     ASSET_SEED,
+    ASSET_SEED_V1,
+    ASSET_SEED_V2,
+    ASSET_SEEDS,
     LIABILITY_SEED,
     MAX_BULK_BYTES,
     MAX_BULK_LINES,
@@ -27,9 +30,11 @@ from assetboard.domain.networth import (
     duplicate_name_lines,
     history_points,
     ordered_valuations,
+    seed_for,
     sparkline_polyline,
     split_bulk_lines,
 )
+from assetboard.i18n import gettext
 
 TODAY = date(2026, 11, 2)
 
@@ -54,7 +59,9 @@ def _points(text: str) -> list[tuple[Decimal, Decimal]]:
 
 
 def test_seed_sets_have_the_specified_names_and_sides() -> None:
+    # F5.7: Real estate first; the rest as before, with their colours unchanged.
     assert [seed.name for seed in ASSET_SEED] == [
+        "Real estate",
         "Vehicles",
         "Electronics",
         "Appliances",
@@ -68,6 +75,26 @@ def test_seed_sets_have_the_specified_names_and_sides() -> None:
     assert {seed.side for seed in ASSET_SEED} == {Side.ASSET}
     assert {seed.side for seed in LIABILITY_SEED} == {Side.LIABILITY}
     assert all(seed.color.startswith("#") and len(seed.color) == 7 for seed in ASSET_SEED)
+    assert len({seed.color for seed in ASSET_SEED}) == len(ASSET_SEED)
+    assert ASSET_SEED[1:] == ASSET_SEED_V2
+    assert seed_for(Side.ASSET) == ASSET_SEED and seed_for(Side.LIABILITY) == LIABILITY_SEED
+
+
+def test_every_shipped_asset_seed_is_kept_for_restore() -> None:
+    assert ASSET_SEEDS == (ASSET_SEED_V1, ASSET_SEED_V2, ASSET_SEED)
+    assert "Real estate" not in {seed.name for seed in (*ASSET_SEED_V1, *ASSET_SEED_V2)}
+
+
+@pytest.mark.parametrize(
+    ("locale", "first", "names"),
+    [("en", "Real estate", 9), ("pl", "Nieruchomości", 9)],
+)
+def test_the_seed_translates_with_real_estate_first(locale: str, first: str, names: int) -> None:
+    translated = [gettext(seed.name, locale) for seed in ASSET_SEED]
+    assert translated[0] == first
+    assert len(set(translated)) == names
+    if locale == "pl":
+        assert all(name != seed.name for name, seed in zip(translated, ASSET_SEED, strict=True))
 
 
 def test_item_names_and_notes_follow_the_shared_text_rules() -> None:

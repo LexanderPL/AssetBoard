@@ -243,7 +243,10 @@ class SeedAssetClass:
     portfolio_default: bool = False  # the portfolio chart's default scope (F6.6)
 
 
-ASSET_CLASS_SEED: tuple[SeedAssetClass, ...] = (
+# The set shipped until the owner decision of 2026-11-09 (F5.7: property lives in net worth).
+# Kept frozen so a workspace seeded with it is still recognised as an untouched suggested set
+# (the F6.9 restore check); workspaces seeded with it keep these classes as user data.
+ASSET_CLASS_SEED_V1: tuple[SeedAssetClass, ...] = (
     SeedAssetClass(_("Stocks"), True, "#2563eb", portfolio_default=True),
     SeedAssetClass(_("Bonds"), True, "#16a34a"),
     SeedAssetClass(_("Metals"), True, "#eab308"),
@@ -253,3 +256,15 @@ ASSET_CLASS_SEED: tuple[SeedAssetClass, ...] = (
     SeedAssetClass(_("Primary residence"), False, "#64748b"),
     SeedAssetClass(_("Other"), False, "#475569"),
 )
+# F5.7: no property classes, and Other is investable (``investable`` only decides what FIRE
+# counts as the starting portfolio; the portfolio page counts every class).
+ASSET_CLASS_SEED: tuple[SeedAssetClass, ...] = (
+    SeedAssetClass(_("Stocks"), True, "#2563eb", portfolio_default=True),
+    SeedAssetClass(_("Bonds"), True, "#16a34a"),
+    SeedAssetClass(_("Metals"), True, "#eab308"),
+    SeedAssetClass(_("Crypto"), True, "#f97316"),
+    SeedAssetClass(_("Currencies"), True, "#0ea5e9"),
+    SeedAssetClass(_("Other"), True, "#475569"),
+)
+# Every shipped set, oldest first, for comparisons with an untouched seed.
+ASSET_CLASS_SEEDS: tuple[tuple[SeedAssetClass, ...], ...] = (ASSET_CLASS_SEED_V1, ASSET_CLASS_SEED)

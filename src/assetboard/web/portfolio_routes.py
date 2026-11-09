@@ -77,6 +77,7 @@ class ClassRowView:
     name: str
     color: str | None
     archived: bool
+    not_in_fire: bool
     value: str
     cost: str
     gain: str
@@ -176,6 +177,7 @@ def build_view(request: Request, page: PortfolioPage, locale: str) -> PortfolioV
             ),
             color=item.asset_class.color if item.asset_class is not None else None,
             archived=bool(item.asset_class and item.asset_class.archived),
+            not_in_fire=bool(item.asset_class and not item.asset_class.investable),
             value=format_money(item.total.value, locale),
             cost=format_money(item.total.cost, locale),
             gain=format_money(item.total.gain, locale),

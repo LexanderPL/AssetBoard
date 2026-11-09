@@ -81,13 +81,26 @@ liability "Other" are fine). Categories have a colour and can be reordered with 
 A new workspace starts with these suggested categories, named in the language used when the
 workspace was created:
 
-- **Assets:** Vehicles, Electronics, Appliances, Furniture, Jewelry & watches, Art &
-  collectibles, Tools, Other.
+- **Assets:** Real estate, Vehicles, Electronics, Appliances, Furniture, Jewelry & watches,
+  Art & collectibles, Tools, Other.
 - **Liabilities:** Installments, Mortgage, Other.
 
-An older workspace, or one whose categories were all deleted, does not get them automatically.
-A side with no categories offers **Add suggested categories**; the action is optional and does
-not come back once the side has a category.
+**Property** (your home, a flat you rent out, land) belongs here, as an item in **Real estate**,
+not in Investments: record its value and add new values as it changes, like any other item. A
+home is usually not money for financial independence, so leave **Investable** off unless you
+mean to sell it for that. Estimates between values and links work as for every item.
+
+An older workspace, or one whose categories were all deleted, does not get the suggested
+categories automatically:
+
+- A side with no categories offers **Add suggested categories**, which adds the whole set.
+- A side that already has categories offers **Add missing suggested categories** (editors and
+  owners) while a suggested one is missing. It adds each suggested category that has no category
+  of that name on that side, in English or Polish, at the end of the list in the suggested order.
+  It never renames, reorders or restores anything: a renamed suggested category gets its
+  original back next to it, and an archived one counts as present (restore it instead). Running
+  it again adds nothing. This is how a workspace created before Real estate was suggested gets
+  it.
 
 Archiving a category hides it from new items but keeps its items and their history. Its items
 still count towards net worth under an **Archived categories** heading until each item is
@@ -241,5 +254,6 @@ order from the import time.
 
 Restoring removes untouched suggested net-worth categories exactly as it removes the ledger
 suggested categories: only the automatic `networth_category.seeded` set, unedited, unused and
-created within five seconds of the event. A later manual **Add suggested categories** makes that
-set user data.
+created within five seconds of the event. Every set ever suggested counts, so a workspace
+created before Real estate was suggested is still recognised. A later manual **Add suggested
+categories** or **Add missing suggested categories** makes that set user data.

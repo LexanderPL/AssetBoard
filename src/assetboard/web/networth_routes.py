@@ -100,7 +100,7 @@ ERRORS = {
     "archived": _("Restore the category before changing it."),
     "item_archived": _("Restore the item before changing it."),
     "duplicate_name": _("Another active category of this side already has this name."),
-    "already_seeded": _("The suggested categories can only be added to an empty side."),
+    "already_seeded": _("The categories changed meanwhile. Reload the page and try again."),
     "bulk_too_large": _("Paste at most 64 KiB of text."),
     "too_many_lines": _("Paste at most 500 lines."),
 }
@@ -113,6 +113,7 @@ NOTICES = {
     "category_restored": _("Category restored."),
     "category_deleted": _("Category deleted."),
     "categories_seeded": _("Suggested categories added."),
+    "categories_complete": _("Every suggested category is already on this side."),
     "item_created": _("Item added."),
     "item_saved": _("Item saved."),
     "item_archived": _("Item archived."),
@@ -463,7 +464,7 @@ async def networth_categories_seed(
     selected = _selected_side(side)
     locale = request.state.locale
     try:
-        await run_in_threadpool(
+        created = await run_in_threadpool(
             lambda: seed_categories(
                 request.app.state.session_factory, ctx, side=side, locale=locale
             )
@@ -471,7 +472,8 @@ async def networth_categories_seed(
     except NetWorthError as exc:
         code = exc.code
         return await run_in_threadpool(lambda: _failed(request, ctx, selected, code))
-    return await run_in_threadpool(lambda: _done(request, ctx, "categories_seeded", selected))
+    notice = "categories_seeded" if created else "categories_complete"
+    return await run_in_threadpool(lambda: _done(request, ctx, notice, selected))
 
 
 @router.post("/net-worth/categories/{category_id}", name="networth_category_update")
