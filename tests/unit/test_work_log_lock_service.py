@@ -134,7 +134,7 @@ def test_received_calendar_month_is_refused_without_override(team: WorkspaceDb) 
 
 
 def test_closed_month_refuses_changes_even_with_override(team: WorkspaceDb) -> None:
-    january = date(2026, 1, 1)  # received on 10 February; the test clock is in March
+    january = date(2026, 1, 1)  # received on 10 February; the test clock is in September
     ctx, source_id, transaction_id = _received(team, calendar=True, month=january)
     close_month(team.factory, ctx, YearMonth(2026, 2))
     calls = (
