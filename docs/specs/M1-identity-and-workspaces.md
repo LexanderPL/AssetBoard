@@ -259,6 +259,8 @@ Add a prominent warning section to docs/auth/proxy-auth.md.
 
 **Acceptance**
 - Profile page: display name, locale, theme, password (if local), linked identities (unlink if another login method remains).
+  Profile cards and Workspace settings cards share one consistent `max-w-3xl` single-column layout
+  (owner, 2026-11); no half-width card leaves an empty column.
   Locale: "Browser language" (stored as NULL, the default for every account) follows
   Accept-Language; a saved language wins over it. Sensitive actions (link, unlink, sign out
   everywhere) are confirmed with the password, or without one by a sign-in from the last

@@ -205,10 +205,13 @@ def test_edit_item_is_inline_and_does_not_append_a_valuation(owner: OwnerApp) ->
 
 def test_edit_and_add_value_keep_the_item_in_view(owner: OwnerApp) -> None:
     item = _create_item(owner)
+    marker = f'data-keep-visible="#item-{item}"'
     page = owner.client.get("/net-worth").text
-    assert f'hx-swap="outerHTML show:#item-{item}:top"' in page
+    assert marker in page
+    assert f"show:#item-{item}:top" not in page
     edit = owner.client.get(f"/net-worth/items/{item}/edit", headers={"HX-Request": "true"})
-    assert f'hx-swap="outerHTML show:#item-{item}:top"' in edit.text
+    assert marker in edit.text
+    assert f"show:#item-{item}:top" not in edit.text
 
 
 def test_archive_and_restore_item_keep_the_history(owner: OwnerApp) -> None:

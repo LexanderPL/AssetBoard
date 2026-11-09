@@ -655,8 +655,11 @@ read-only enforcement in the service layer (not only the UI). Tests for enforcem
 - Pages of 50 with "51–100 of 312" and Previous/Next links that keep the filters; a page past
   the end shows the last page. Rows in closed months are marked "closed"; each date links to
   its month page (where entries are edited).
+- **Toolbar (owner, 2026-11):** the Filters and Export CSV buttons sit in a toolbar directly
+  below the page title, not in the page header. This keeps the title and the actions on one
+  vertical axis on narrow screens.
 - **Export UI (owner, 2026-10-24):** the options are not shown on the page; an "Export CSV"
-  button in the page header opens them in a native modal `<dialog>` (`app.js`:
+  button in the toolbar opens them in a native modal `<dialog>` (`app.js`:
   `data-dialog-open`, `data-dialog-close`, Esc; no inline script or style). The button is a
   link to `/transactions?<filters>&export=1`, which renders the dialog open in the page flow,
   so the export works without JavaScript; a refused option renders the page with the dialog

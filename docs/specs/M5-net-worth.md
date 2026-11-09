@@ -45,6 +45,9 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
   the end of its side and is refused on an active name clash.
 - Bulk add accepts at most 500 non-blank lines and 64 KiB of text, previews every line, and is
   all-or-nothing.
+- Inline edit and add-value swaps keep the item at the same viewport position (`data-keep-visible`
+  in `app.js`); they do not force the row to the top, so saving from the middle of a long list
+  does not jump the page.
 - F5.1 creates manual valuations only. The link columns are reserved for F5.4.
 
 **Agent prompt**

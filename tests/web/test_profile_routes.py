@@ -216,6 +216,13 @@ def test_profile_shows_the_planning_fields_with_defaults(h: Harness) -> None:
     assert 'value="90"' in page
 
 
+def test_profile_cards_share_one_column(h: Harness) -> None:
+    page = admin(h).get("/account").text
+    assert '<div class="max-w-3xl space-y-6">' in page
+    assert "lg:col-span-2" not in page
+    assert "lg:grid-cols-2" not in page
+
+
 def test_profile_saves_birth_year_and_life_expectancy(h: Harness) -> None:
     client = admin(h)
     response = client.post(

@@ -479,6 +479,36 @@ document.addEventListener("htmx:load", (event) => {
   }
 });
 
+// Keep a replaced row where it was on screen. A whole-section swap would otherwise move the
+// viewport when the content above the row changes height; the form/link names the row that
+// should stay put with data-keep-visible="#item-<id>".
+const keepVisible = new Map(); // selector -> viewport top before the request
+
+document.addEventListener("htmx:beforeRequest", (event) => {
+  const trigger = event.detail?.elt;
+  if (!(trigger instanceof Element)) return;
+  const holder = trigger.closest("[data-keep-visible]");
+  const selector = holder?.getAttribute("data-keep-visible");
+  if (!selector) return;
+  const target = document.querySelector(selector);
+  if (target instanceof HTMLElement) {
+    keepVisible.set(selector, target.getBoundingClientRect().top);
+  }
+});
+
+function restoreKeepVisible() {
+  if (keepVisible.size === 0) return;
+  for (const [selector, top] of keepVisible) {
+    const target = document.querySelector(selector);
+    if (!(target instanceof HTMLElement)) continue;
+    const delta = target.getBoundingClientRect().top - top;
+    if (Math.abs(delta) > 0.5) window.scrollBy(0, delta);
+  }
+  keepVisible.clear();
+}
+document.addEventListener("htmx:afterSettle", restoreKeepVisible);
+document.addEventListener("htmx:afterSwap", restoreKeepVisible);
+
 // Entry rows survive swaps of their table. After Enter the row is reset at once (the request
 // already holds its values), so typing goes on; whatever is typed before the response arrives
 // is carried into the new section with the focus and the selection. The same holds when

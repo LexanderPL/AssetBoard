@@ -267,13 +267,19 @@ def _export_dialog(html: str) -> str:
     return match.group(0)
 
 
-def test_the_export_options_are_a_dialog_behind_a_header_button(
+def test_the_export_options_are_a_dialog_behind_a_toolbar_button(
     ledger: OwnerApp, rows: dict
 ) -> None:
     html = _page(ledger, "?q=a&sort=amount")
-    header = html[html.index("<header") : html.index("</header>")]
-    button = re.search(r'<a href="([^"]+)" data-dialog-open="export-dialog"[^>]*>', header)
-    assert button is not None and "Export CSV" in header
+    toolbar = re.search(
+        r'<div class="flex flex-wrap items-center gap-2" data-history-toolbar>(.*?)</div>',
+        html,
+        re.S,
+    )
+    assert toolbar is not None
+    block = toolbar.group(1)
+    button = re.search(r'<a href="([^"]+)" data-dialog-open="export-dialog"[^>]*>', block)
+    assert button is not None and "Export CSV" in block and "Filters" in block
     # Without JavaScript the button is a link that renders the dialog open.
     assert button.group(1) == "/history?q=a&amp;sort=amount&amp;export=1#export-dialog"
     assert " open" not in _export_dialog(html)
