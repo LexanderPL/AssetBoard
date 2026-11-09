@@ -12,6 +12,8 @@ from hypothesis import strategies as st
 from assetboard.domain.instruments import (
     ALLOCATION_TOTAL_BP,
     ASSET_CLASS_SEED,
+    ASSET_CLASS_SEED_V1,
+    ASSET_CLASS_SEEDS,
     TYPE_DEFAULTS,
     TYPE_LABELS,
     VALUATION_SOURCE_LABELS,
@@ -47,7 +49,23 @@ def test_type_defaults_match_the_spec() -> None:
 
 
 def test_the_seed_has_the_spec_names_order_and_investable_flags() -> None:
+    # F5.7 (owner decision 2026-11-09): property lives in net worth, so neither property class
+    # is seeded, and Other is investable.
     assert [seed.name for seed in ASSET_CLASS_SEED] == [
+        "Stocks",
+        "Bonds",
+        "Metals",
+        "Crypto",
+        "Currencies",
+        "Other",
+    ]
+    assert all(seed.investable for seed in ASSET_CLASS_SEED)
+    assert all(len(seed.color) == 7 for seed in ASSET_CLASS_SEED)
+
+
+def test_the_pre_f57_seed_is_kept_for_untouched_set_checks() -> None:
+    assert ASSET_CLASS_SEEDS == (ASSET_CLASS_SEED_V1, ASSET_CLASS_SEED)
+    assert [seed.name for seed in ASSET_CLASS_SEED_V1] == [
         "Stocks",
         "Bonds",
         "Metals",
@@ -57,7 +75,7 @@ def test_the_seed_has_the_spec_names_order_and_investable_flags() -> None:
         "Primary residence",
         "Other",
     ]
-    assert [seed.investable for seed in ASSET_CLASS_SEED] == [
+    assert [seed.investable for seed in ASSET_CLASS_SEED_V1] == [
         True,
         True,
         True,
@@ -67,7 +85,9 @@ def test_the_seed_has_the_spec_names_order_and_investable_flags() -> None:
         False,
         False,
     ]
-    assert all(len(seed.color) == 7 for seed in ASSET_CLASS_SEED)
+    # Unchanged classes keep their colours, so both sets compare as shipped.
+    v1 = {seed.name: seed.color for seed in ASSET_CLASS_SEED_V1}
+    assert all(v1[seed.name] == seed.color for seed in ASSET_CLASS_SEED)
 
 
 def test_asset_class_names_are_cleaned_and_bounded() -> None:

@@ -367,9 +367,12 @@ def test_a_bond_model_instrument_can_be_created_before_its_terms_exist(
 def test_the_seeded_class_set_has_the_investable_flags(owner: OwnerApp) -> None:
     owner.post("/investments/classes/seed", token_from=CLASSES)
     page = owner.client.get(CLASSES).text
+    # F5.7: every suggested class is investable, and neither property class is offered.
     assert 'data-investable="true"' in page
-    assert 'data-investable="false"' in page
-    assert len(_names(page, "data-class-name")) == len(ASSET_CLASS_SEED)
+    assert 'data-investable="false"' not in page
+    names = _names(page, "data-class-name")
+    assert len(names) == len(ASSET_CLASS_SEED)
+    assert "Real estate" not in names and "Primary residence" not in names
 
 
 def test_bond_terms_form_saves_and_values_the_instrument(owner: OwnerApp) -> None:

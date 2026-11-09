@@ -49,8 +49,15 @@ from assetboard.domain.archive import (
 )
 from assetboard.domain.categories import SEED, name_key
 from assetboard.domain.months import YearMonth
-from assetboard.domain.networth import ASSET_SEED_V1, LIABILITY_SEED
+from assetboard.domain.networth import (
+    ASSET_SEED,
+    ASSET_SEED_V1,
+    ASSET_SEED_V2,
+    LIABILITY_SEED,
+    SeedNetWorthCategory,
+)
 from assetboard.domain.networth import SEED as NETWORTH_SEED
+from assetboard.i18n import gettext
 from assetboard.services.archive import export_workspace, workspace_is_empty
 from assetboard.services.categories import seed_into
 from assetboard.services.context import PermissionDenied
@@ -73,6 +80,7 @@ from assetboard.services.imports import (
 from assetboard.services.imports import (
     ImportError as ServiceImportError,
 )
+from assetboard.services.networth import seed_categories as networth_seed_categories
 from assetboard.services.networth import seed_into as networth_seed_into
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
@@ -568,21 +576,31 @@ def test_untouched_suggested_categories_are_empty_enough_and_are_removed(
         assert workspace_is_empty(session, target_ctx)
 
 
+@pytest.mark.parametrize(
+    ("asset_seed", "locale"),
+    [
+        (ASSET_SEED_V1, "en"),
+        (ASSET_SEED_V2, "en"),
+        (ASSET_SEED_V2, "pl"),  # the pre-F5.7 set (no Real estate)
+        (ASSET_SEED, "pl"),  # the current set, Real estate first
+    ],
+)
 def test_workspace_seeded_with_the_old_asset_list_is_still_empty(
-    db: WorkspaceDb, data_dir: Path
+    db: WorkspaceDb, data_dir: Path, asset_seed: tuple[SeedNetWorthCategory, ...], locale: str
 ) -> None:
     target = _target(db)
     ctx = db.ctx("own", "owner", workspace_id=target)
     with db.factory.begin() as session:
         repository = NetWorthCategoryRepository(session, ctx)
         positions: dict[str, int] = {}
-        for seed in (*ASSET_SEED_V1, *LIABILITY_SEED):
+        for seed in (*asset_seed, *LIABILITY_SEED):
             side = seed.side.value
             position = positions.get(side, 0)
             positions[side] = position + 1
+            name = gettext(seed.name, locale)
             repository.create(
-                name=seed.name,
-                name_key=name_key(seed.name),
+                name=name,
+                name_key=name_key(name),
                 side=side,
                 color=seed.color,
                 sort_order=position,
@@ -594,7 +612,7 @@ def test_workspace_seeded_with_the_old_asset_list_is_still_empty(
             entity_type="workspace",
             entity_id=str(target),
             ts=db.clock.now(),
-            data={"count": len(ASSET_SEED_V1) + len(LIABILITY_SEED), "automatic": True},
+            data={"count": len(asset_seed) + len(LIABILITY_SEED), "automatic": True},
         )
     with db.factory() as session:
         assert workspace_is_empty(session, ctx)
@@ -604,6 +622,46 @@ def test_workspace_seeded_with_the_old_asset_list_is_still_empty(
     _apply(db, data_dir, batch_id, ctx=ctx)
     with db.factory() as session:
         assert {row.name for row in NetWorthCategoryRepository(session, ctx).list()} == {"Vehicles"}
+
+
+def test_adding_missing_suggestions_makes_the_seed_user_data(db: WorkspaceDb) -> None:
+    """An untouched pre-F5.7 workspace is empty; once the user adds Real estate with the
+    "Add missing suggested categories" action, the set is a user action and no longer empty."""
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    with db.factory.begin() as session:
+        repository = NetWorthCategoryRepository(session, ctx)
+        for position, seed in enumerate(ASSET_SEED_V2):
+            repository.create(
+                name=seed.name,
+                name_key=name_key(seed.name),
+                side=seed.side.value,
+                color=seed.color,
+                sort_order=position,
+            )
+        for position, seed in enumerate(LIABILITY_SEED):
+            repository.create(
+                name=seed.name,
+                name_key=name_key(seed.name),
+                side=seed.side.value,
+                color=seed.color,
+                sort_order=position,
+            )
+        AuditEventRepository(session, ctx).record(
+            actor_user_id=db.users["own"],
+            actor_type="user",
+            action="networth_category.seeded",
+            entity_type="workspace",
+            entity_id=str(target),
+            ts=db.clock.now(),
+            data={"count": len(ASSET_SEED_V2) + len(LIABILITY_SEED), "automatic": True},
+        )
+    with db.factory() as session:
+        assert workspace_is_empty(session, ctx)
+    db.clock._value += timedelta(minutes=1)
+    assert networth_seed_categories(db.factory, ctx, side="asset", locale="en") == ["Real estate"]
+    with db.factory() as session:
+        assert not workspace_is_empty(session, ctx)
 
 
 def test_polish_suggested_set_is_also_recognised(db: WorkspaceDb) -> None:

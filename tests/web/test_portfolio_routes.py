@@ -228,3 +228,28 @@ def test_polish_page(owner: OwnerApp) -> None:
     assert "Cały portfel" in page
     assert "data-portfolio-value>1\u00a0000,00\u00a0€<" in page  # EUR in the Polish locale
     assert "100,0%" in page  # the share, with the Polish decimal comma
+
+
+def test_a_non_investable_class_is_badged_and_still_counted(owner: OwnerApp) -> None:
+    response = owner.post(
+        "/investments/classes",
+        {"name": "Emergency fund", "color": "#0ea5e9"},  # investable unchecked
+        token_from="/investments/classes",
+    )
+    assert response.status_code == 303, response.text
+    classes = _classes(owner)
+    cash = _instrument(owner, "Cash fund", {classes["Emergency fund"]: "100"})
+    _buy(owner, cash, "1", "500")
+    _fund(owner)
+
+    page = owner.client.get(PORTFOLIO, params={"scope": "all"}).text
+
+    rows = re.findall(r"data-portfolio-class>.*?</tr>", page, re.S)
+    by_name = {("Emergency fund" if "Emergency fund" in row else "other"): row for row in rows}
+    assert "data-not-in-fire" in by_name["Emergency fund"]
+    assert "not counted in FIRE" in by_name["Emergency fund"]
+    assert all("data-not-in-fire" not in row for row in rows if "Emergency fund" not in row)
+    # Every class counts: 1 000.00 (fund) + 500.00 (cash) in the totals and the chart.
+    assert re.search(r"data-portfolio-value>€1,500\.00<", page)
+    assert "€500.00" in by_name["Emergency fund"]
+    assert {s["name"] for s in _chart_data(page)["slices"]} == {"Balanced fund", "Cash fund"}  # type: ignore[index]
