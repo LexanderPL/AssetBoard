@@ -299,9 +299,14 @@ def _auto_link_enabled(session: Session, ctx: Context) -> bool:
 
 
 def _eligible_classes(
-    session: Session, ctx: Context, data: CurrentPortfolioData
+    session: Session, ctx: Context, data: CurrentPortfolioData, *, include_archived: bool
 ) -> tuple[list[AssetClass], int]:
-    """Active complete classes with a positive value and no linked item yet."""
+    """Active complete classes with a positive value and no linked item yet.
+
+    ``include_archived=False`` checks only active links, so the explicit manual action can
+    recreate a link the user archived. ``include_archived=True`` checks every link, so the
+    automatic hook respects an archived item instead of recreating it.
+    """
     items = NetWorthItemRepository(session, ctx)
     eligible: list[AssetClass] = []
     skipped = 0
@@ -310,18 +315,25 @@ def _eligible_classes(
         if value <= 0 or _class_missing(data, row.id):
             skipped += 1
             continue
-        if items.linked_any("portfolio_asset_class", row.id) is not None:
+        linked = (
+            items.linked_any("portfolio_asset_class", row.id)
+            if include_archived
+            else items.active_linked("portfolio_asset_class", row.id)
+        )
+        if linked is not None:
             skipped += 1
             continue
         eligible.append(row)
     return eligible, skipped
 
 
-def _create_missing_links(session: Session, ctx: Context) -> CreatedLinks:
+def _create_missing_links(
+    session: Session, ctx: Context, *, include_archived: bool
+) -> CreatedLinks:
     """Create links for eligible classes in the caller's transaction, role and lock taken."""
     session.flush()
     data = current_portfolio_data_in_session(session, ctx)
-    eligible, skipped = _eligible_classes(session, ctx, data)
+    eligible, skipped = _eligible_classes(session, ctx, data, include_archived=include_archived)
     if not eligible:
         return CreatedLinks((), skipped, False)
     category, created_category = _investments_category(session, ctx)
@@ -373,13 +385,13 @@ def ensure_networth_items_for_asset_classes(session: Session, ctx: Context) -> C
     """
     if not _auto_link_enabled(session, ctx):
         return CreatedLinks((), 0, False)
-    return _create_missing_links(session, ctx)
+    return _create_missing_links(session, ctx, include_archived=True)
 
 
 def portfolio_link_candidates(session: Session, ctx: Context) -> int:
-    """Active classes with a complete value but no linked item, for the Net Worth page."""
+    """Active classes with a complete value but no active link, for the Net Worth page."""
     data = current_portfolio_data_in_session(session, ctx)
-    eligible, _skipped = _eligible_classes(session, ctx, data)
+    eligible, _skipped = _eligible_classes(session, ctx, data, include_archived=False)
     return len(eligible)
 
 
@@ -392,7 +404,7 @@ def create_networth_items_from_asset_classes(
     def write(session: Session) -> CreatedLinks:
         require_role_now(session, ctx, Role.EDITOR)
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        return _create_missing_links(session, ctx)
+        return _create_missing_links(session, ctx, include_archived=False)
 
     return run_immediate(factory, write)
 

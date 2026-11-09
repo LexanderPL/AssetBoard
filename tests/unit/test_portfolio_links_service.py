@@ -806,6 +806,24 @@ def test_ensure_creates_links_once_and_leaves_archived_items_alone(
     assert len(_items(team)) == 1
 
 
+def test_manual_helper_recreates_a_link_the_user_archived(team: WorkspaceDb) -> None:
+    stocks = _class(team)
+    instrument = _instrument(team, stocks)
+    _trade(team, instrument)
+
+    first = create_networth_items_from_asset_classes(team.factory, _editor(team))
+    assert first.created == ("Stocks",)
+    archive_item(team.factory, _editor(team), _items(team)[0].id)
+
+    again = create_networth_items_from_asset_classes(team.factory, _editor(team))
+
+    assert again.created == ("Stocks",)
+    assert sorted((item.name, item.archived_at is not None) for item in _items(team)) == [
+        ("Stocks", False),
+        ("Stocks", True),
+    ]
+
+
 def test_ensure_is_a_no_op_while_the_setting_is_off(team: WorkspaceDb) -> None:
     stocks = _class(team)
     instrument = _instrument(team, stocks)

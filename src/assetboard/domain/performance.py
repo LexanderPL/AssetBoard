@@ -322,12 +322,18 @@ def portfolio_series(
             observation = price.latest_with_date(point) if price is not None else None
             if observation is None and backfill_leading and price is not None:
                 observation = price.earliest_with_date(point)
-            price_value = (
-                observation[1]
-                * split_factor(splits_by_instrument.get(instrument_id, ()), observation[0], point)
-                if observation is not None
-                else None
-            )
+            price_value: Decimal | None = None
+            if observation is not None:
+                splits = splits_by_instrument.get(instrument_id, ())
+                if observation[0] > point:
+                    # A backfilled observation is dated after the point. The split factor is
+                    # old/new for (from, to]; walking backwards needs its inverse, so a
+                    # post-split price is turned back into a pre-split price.
+                    with localcontext() as context:
+                        context.prec = max(context.prec, _DECIMAL_PRECISION)
+                        price_value = observation[1] / split_factor(splits, point, observation[0])
+                else:
+                    price_value = observation[1] * split_factor(splits, observation[0], point)
             if quantity > 0 and (price_value is None or rate is None):
                 incomplete = True
                 continue
