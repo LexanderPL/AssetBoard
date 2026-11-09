@@ -49,6 +49,7 @@ planned-vs-actual, recurring items, variable income, net worth, investments, loa
 - Every service function and domain function has tests. Domain logic: table-driven tests plus property-based tests (`hypothesis`) where invariants exist.
 - Finance math needs **golden tests** against an independent oracle named in the spec.
 - Every workspace-owned model is covered by the automated tenant-isolation test (see M1.F1.2).
+- Every workspace-owned model has demo data in the demo builder or a reasoned exclusion (see F9.11a).
 - A feature is not done if `make check` fails.
 
 ## Commands (created in M0.F0.1; keep them working)
