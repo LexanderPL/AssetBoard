@@ -321,6 +321,58 @@ def test_class_net_invested_uses_each_transaction_total() -> None:
     assert point.net_invested == Money(120_000, "EUR")
 
 
+@given(
+    stocks_weight=st.integers(min_value=0, max_value=10_000),
+    quantity=st.decimals(min_value=Decimal("1"), max_value=Decimal("100"), places=2),
+    price=st.decimals(min_value=Decimal("1"), max_value=Decimal("1000"), places=2),
+)
+def test_class_series_sums_to_the_total_property(
+    stocks_weight: int, quantity: Decimal, price: Decimal
+) -> None:
+    instrument_id = uuid4()
+    stocks, bonds = uuid4(), uuid4()
+    allocations = {
+        instrument_id: (
+            PortfolioAllocation(instrument_id, stocks, stocks_weight, 0),
+            PortfolioAllocation(instrument_id, bonds, 10_000 - stocks_weight, 1),
+        )
+    }
+    transactions = (
+        _tx(
+            instrument_id=instrument_id,
+            quantity=str(quantity),
+            unit_price=str(price),
+            fee=0,
+        ),
+    )
+    prices = {instrument_id: _price((DAY, str(price)))}
+    total = portfolio_series(transactions, prices, {}, DAY, DAY, Step.DAY, base_currency="EUR")[0]
+    stocks_point = portfolio_series(
+        transactions,
+        prices,
+        {},
+        DAY,
+        DAY,
+        Step.DAY,
+        base_currency="EUR",
+        allocations=allocations,
+        asset_class_id=stocks,
+    )[0]
+    bonds_point = portfolio_series(
+        transactions,
+        prices,
+        {},
+        DAY,
+        DAY,
+        Step.DAY,
+        base_currency="EUR",
+        allocations=allocations,
+        asset_class_id=bonds,
+    )[0]
+    assert stocks_point.value + bonds_point.value == total.value
+    assert stocks_point.net_invested + bonds_point.net_invested == total.net_invested
+
+
 def test_step_generation_includes_the_end_and_handles_calendar_months() -> None:
     assert step_dates(DAY, date(2020, 1, 15), Step.WEEK) == [
         DAY,

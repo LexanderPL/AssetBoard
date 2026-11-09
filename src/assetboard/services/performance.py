@@ -62,7 +62,6 @@ from assetboard.services.holding_rows import holding_transaction
 DEFAULT_RANGE = "1y"
 RANGES: tuple[str, ...] = ("ytd", "1y", "3y", "5y", "all")
 PERIODS: tuple[str, ...] = ("1m", "3m", "ytd", "1y", "all")
-_MAX_BOND_DATES = 10_000
 
 
 @dataclass(frozen=True, slots=True)
