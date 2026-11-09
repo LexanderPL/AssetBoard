@@ -135,7 +135,7 @@ optional ledger transaction link. Tests: re-anchoring changes the future schedul
 
 **Acceptance**
 - Register `loan_balance` resolver (M5 framework) returning remaining principal at any `as_of` (uses recorded checkpoints/payments where available, projection otherwise); helper creates a linked liability item in the Mortgage category.
-- Link a loan to a property `Instrument` (M6, real estate) → show **LTV** = remaining principal / property value, and equity = value − remaining principal.
+- Link a loan to a property **net-worth asset item** (F5.7, Real estate category; owner decision 2026-11-09, replacing the M6 instrument link) → show **LTV** = remaining principal / the item's effective value, and equity = value − remaining principal, both in the base currency and at any `as_of` (the item's valuation history, F5.6 estimates included). An item in another currency, or without a value at that date, shows LTV as unavailable with the reason.
 - **Scheduled payment generation:** one click creates/maintains a `ScheduledItem`-backed series of installment occurrences (category selectable), `amount_mode=from_loan`: expected amount for each due date comes from the engine (so a rate change updates future pending occurrences automatically).
 - Disabling generation removes pending future occurrences only.
 
