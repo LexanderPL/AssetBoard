@@ -403,14 +403,19 @@ def _compute_instrument_rows(
             with localcontext() as context:
                 context.prec = max(context.prec, _DECIMAL_PRECISION)
                 ratio = transaction.quantity / transaction.unit_price
-                quantity = quantity * ratio
-                for lot in lots:
-                    lot.quantity = lot.quantity * ratio
-                if method is CostBasisMethod.AVERAGE and quantity > 0:
+                if method is CostBasisMethod.FIFO:
+                    for lot in lots:
+                        lot.quantity = quantize_quantity(lot.quantity * ratio)
+                    quantity = sum((lot.quantity for lot in lots), Decimal(0))
+                else:
+                    quantity = quantize_quantity(quantity * ratio)
+                if quantity > 0:
                     average_cost = (
                         Decimal(remaining_cost_minor).scaleb(-minor_unit_for(base_currency))
                         / quantity
                     )
+                else:
+                    average_cost = Decimal(0)
             continue
 
         if transaction.quantity > quantity:

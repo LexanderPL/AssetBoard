@@ -272,20 +272,48 @@ def test_dividend_and_split_encoding_is_validated() -> None:
         )
 
 
+@pytest.mark.parametrize("method", ["average", "fifo"])
+def test_the_quantity_displayed_after_a_split_can_be_sold(method: str) -> None:
+    instrument = uuid4()
+    rows = [
+        _buy(instrument, "10", "100", day=date(2026, 1, 1)),
+        _split(instrument, "2", "3", day=date(2026, 2, 1)),
+    ]
+    holding = _holding(rows, method)
+    assert holding.quantity == Decimal("6.666666666666666667")
+    sold = _holding(
+        [*rows, _sell(instrument, str(holding.quantity), "100", day=date(2026, 3, 1))],
+        method,
+    )
+    assert sold.quantity == 0
+    assert sold.cost_basis_base == Money(0, BASE)
+
+
 @given(st.integers(min_value=1, max_value=100), st.integers(min_value=1, max_value=100))
 @settings(max_examples=50)
-def test_a_split_and_its_inverse_restore_quantity_and_cost(new_units: int, old_units: int) -> None:
+def test_a_split_and_its_inverse_leave_a_sellable_quantity_and_cost(
+    new_units: int, old_units: int
+) -> None:
     if new_units == old_units:
         return
     instrument = uuid4()
     rows = [
-        _buy(instrument, "10", "100", day=date(2026, 1, 1)),
+        _buy(instrument, "4", "100", day=date(2026, 1, 1)),
+        _buy(instrument, "6", "200", day=date(2026, 1, 2)),
         _split(instrument, str(new_units), str(old_units), day=date(2026, 2, 1)),
         _split(instrument, str(old_units), str(new_units), day=date(2026, 3, 1)),
     ]
-    holding = _holding(rows)
-    assert abs(holding.quantity - Decimal("10")) <= Decimal("1e-18")
-    assert holding.cost_basis_base == Money(100_000, BASE)
+    for method in ("average", "fifo"):
+        holding = _holding(rows, method)
+        # Two 18-place quantizations per lot; the residual is bounded by the ratio (≤ 100).
+        assert abs(holding.quantity - Decimal("10")) <= Decimal("1e-16")
+        assert holding.cost_basis_base == Money(160_000, BASE)
+        sold = _holding(
+            [*rows, _sell(instrument, str(holding.quantity), "100", day=date(2026, 4, 1))],
+            method,
+        )
+        assert sold.quantity == 0
+        assert sold.cost_basis_base == Money(0, BASE)
 
 
 def test_average_cost_is_unchanged_by_a_partial_sale_and_removes_exact_cost() -> None:
