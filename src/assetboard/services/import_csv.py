@@ -25,6 +25,7 @@ from assetboard.db.repositories import (
     BudgetLineRepository,
     CategoryRepository,
     ImportCategoryMappingRepository,
+    InstrumentRepository,
     MonthStateRepository,
     TransactionRepository,
 )
@@ -64,6 +65,7 @@ from assetboard.services.import_dedupe import (
     match_budget_lines,
     match_transactions,
 )
+from assetboard.services.import_investments import InvestmentTransactionsCsvAdapter
 from assetboard.services.import_networth import ItemValuationsCsvAdapter
 from assetboard.services.imports import ImportAdapter
 from assetboard.services.imports import ImportError as ImportServiceError
@@ -1393,6 +1395,7 @@ def default_import_adapters() -> dict[str, ImportAdapter]:
         "budget_lines_csv": BudgetLinesCsvAdapter(),
         "categories_csv": CategoriesCsvAdapter(),
         "item_valuations_csv": ItemValuationsCsvAdapter(),
+        "investment_transactions_csv": InvestmentTransactionsCsvAdapter(),
         "archive": ArchiveImportAdapter(),
     }
 
@@ -1419,4 +1422,28 @@ def mapping_category_options(
                 archived=category.archived_at is not None,
             )
             for category in CategoryRepository(session, ctx).ordered()
+        ]
+
+
+@dataclass(frozen=True, slots=True)
+class MappingInstrumentView:
+    id: str
+    name: str
+    quote_currency: str
+
+
+def mapping_instrument_options(
+    factory: sessionmaker[Session], ctx: Context
+) -> list[MappingInstrumentView]:
+    """Active instruments a transaction import may map a name to."""
+    require_role(ctx, Role.EDITOR)
+    with factory() as session:
+        return [
+            MappingInstrumentView(
+                id=str(instrument.id),
+                name=instrument.name,
+                quote_currency=instrument.quote_currency,
+            )
+            for instrument in InstrumentRepository(session, ctx).ordered()
+            if instrument.archived_at is None
         ]

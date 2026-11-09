@@ -1513,8 +1513,8 @@ msgstr ""
 msgid "A risk tier is not one of safe, growth or speculative."
 msgstr "Poziom ryzyka nie jest jednym z: bezpieczny, wzrostowy lub spekulacyjny."
 
-msgid "An instrument type is not supported."
-msgstr "Typ instrumentu nie jest obsługiwany."
+msgid "Choose a valid instrument type."
+msgstr "Wybierz prawidłowy typ instrumentu."
 
 msgid "An investment transaction type is not supported."
 msgstr "Typ transakcji inwestycyjnej nie jest obsługiwany."
@@ -1551,6 +1551,53 @@ msgstr "Wartość dziesiętna jest nieprawidłowa lub poza obsługiwanym zakrese
 
 msgid "The amount has more decimals than its currency allows."
 msgstr "Kwota ma więcej miejsc po przecinku, niż pozwala jej waluta."
+
+msgid "Enter an instrument name of 1 to 200 characters."
+msgstr "Podaj nazwę instrumentu o długości od 1 do 200 znaków."
+
+msgid "No active instrument with this name or id exists."
+msgstr "Nie istnieje aktywny instrument o tej nazwie lub identyfikatorze."
+
+msgid "The file's quote currency differs from the instrument's."
+msgstr "Waluta wyceny w pliku różni się od waluty instrumentu."
+
+msgid "Create or activate an asset class before importing instruments."
+msgstr "Utwórz lub aktywuj klasę aktywów przed importem instrumentów."
+
+msgid "Enter a unit label of 1 to 32 characters."
+msgstr "Wpisz nazwę jednostki o długości od 1 do 32 znaków."
+
+#, python-format
+msgid "The combined history would oversell %(instrument)s on %(date)s."
+msgstr ""
+"Połączona historia spowodowałaby sprzedaż większą niż posiadana dla "
+"%(instrument)s w dniu %(date)s."
+
+#, python-format
+msgid "The combined history for %(instrument)s is invalid."
+msgstr "Połączona historia dla %(instrument)s jest nieprawidłowa."
+
+#, python-format
+msgid ""
+"No stored FX rate for %(currency)s on or before %(date)s; enter "
+"fx_to_base."
+msgstr ""
+"Brak zapisanego kursu dla %(currency)s w dniu %(date)s lub wcześniej; "
+"wpisz fx_to_base."
+
+msgid "A settlement row must carry its own fx_to_base."
+msgstr "Wiersz rozliczenia musi zawierać własny fx_to_base."
+
+#, python-format
+msgid "Undated lot: %(instrument)s will be imported without a date."
+msgstr "Pozycja bez daty: %(instrument)s zostanie zaimportowany bez daty."
+
+#, python-format
+msgid "Rows for %(instrument)s are ignored for this import."
+msgstr "Wiersze dla %(instrument)s są pomijane w tym imporcie."
+
+msgid "The instrument mapping is incomplete or invalid."
+msgstr "Mapowanie instrumentów jest niekompletne lub nieprawidłowe."
 
 msgid "A net-worth category id appears more than once."
 msgstr "Identyfikator kategorii majątku występuje więcej niż raz."
@@ -2290,9 +2337,6 @@ msgstr "Wybierz typ instrumentu."
 
 msgid "Choose a supported currency."
 msgstr "Wybierz obsługiwaną walutę."
-
-msgid "Enter a unit label of 1 to 32 characters."
-msgstr "Wpisz nazwę jednostki o długości od 1 do 32 znaków."
 
 msgid "Assign at least one asset class."
 msgstr "Przypisz co najmniej jedną klasę aktywów."
@@ -3739,6 +3783,15 @@ msgid ""
 msgstr ""
 "Nie można cofnąć przywracania, ponieważ obszar roboczy zmienił się po "
 "przywróceniu: %(reasons)s"
+
+#, python-format
+msgid ""
+"Rollback was refused because the remaining history for %(instrument)s "
+"would oversell on %(date)s."
+msgstr ""
+"Przywrócenie zostało odrzucone, ponieważ pozostała historia dla "
+"%(instrument)s spowodowałaby sprzedaż większą niż posiadana w dniu "
+"%(date)s."
 
 msgid "Workspace name"
 msgstr "Nazwa obszaru roboczego"
@@ -8058,11 +8111,49 @@ msgstr "Nazwa nowej kategorii"
 msgid "Remember these mappings for later imports"
 msgstr "Zapamiętaj te mapowania na potrzeby późniejszych importów"
 
+msgid "Instrument mapping"
+msgstr "Mapowanie instrumentów"
+
+#, python-format
+msgid ""
+"Map each instrument in the file to one of yours, create a new instrument,"
+" or ignore its rows. A new instrument needs a type and a unit label; it "
+"is allocated 100%% to your active Other class, or the first active class."
+msgstr ""
+"Przypisz każdy instrument z pliku do jednego ze swoich, utwórz nowy "
+"instrument albo zignoruj jego wiersze. Nowy instrument wymaga typu i "
+"etykiety jednostki; otrzymuje 100%% alokacji w aktywnej klasie Inne lub w"
+" pierwszej aktywnej klasie."
+
+msgid "Map to an existing instrument"
+msgstr "Przypisz do istniejącego instrumentu"
+
+msgid "Create a new instrument"
+msgstr "Utwórz nowy instrument"
+
+msgid "Existing instrument"
+msgstr "Istniejący instrument"
+
+msgid "New instrument name"
+msgstr "Nazwa nowego instrumentu"
+
+msgid "Instrument type"
+msgstr "Typ instrumentu"
+
+msgid "Choose a type"
+msgstr "Wybierz typ"
+
 msgid "Update preview"
 msgstr "Zaktualizuj podgląd"
 
 msgid "Fix the category mappings above before applying."
 msgstr "Popraw mapowania kategorii powyżej przed zastosowaniem."
+
+msgid "Fix the highlighted mappings above before applying."
+msgstr "Popraw wyróżnione mapowania powyżej przed zastosowaniem."
+
+msgid "Mapping problems"
+msgstr "Problemy z mapowaniem"
 
 msgid "Warnings"
 msgstr "Ostrzeżenia"
@@ -8165,9 +8256,6 @@ msgstr "Migawki majątku netto do usunięcia"
 msgid "Settings to restore:"
 msgstr "Ustawienia do przywrócenia:"
 
-msgid "Rollback is not possible:"
-msgstr "Cofnięcie nie jest możliwe:"
-
 msgid "Budget lines kept (changed since the import)"
 msgstr "Zachowane wartości planowane (zmienione po imporcie)"
 
@@ -8176,6 +8264,19 @@ msgstr "Kategorie do usunięcia"
 
 msgid "Categories to archive"
 msgstr "Kategorie do zarchiwizowania"
+
+msgid "Instruments to delete"
+msgstr "Instrumenty do usunięcia"
+
+msgid "Instruments to archive"
+msgstr "Instrumenty do zarchiwizowania"
+
+msgid "Instruments kept"
+msgstr "Instrumenty zachowane"
+
+#, python-format
+msgid "%(count)s of the transactions were edited after the import; they are kept."
+msgstr "%(count)s transakcji zostało edytowanych po imporcie; są zachowane."
 
 #, python-format
 msgid ""
@@ -8186,6 +8287,15 @@ msgstr "Transakcje edytowane po imporcie: %(count)s; one również zostaną usun
 #, python-format
 msgid "Rollback is not possible while these months are closed: %(months)s"
 msgstr "Nie można cofnąć importu, dopóki te miesiące są zamknięte: %(months)s"
+
+msgid "Rollback is not possible:"
+msgstr "Cofnięcie nie jest możliwe:"
+
+#, python-format
+msgid "The remaining history for %(instrument)s would oversell on %(date)s."
+msgstr ""
+"Pozostała historia dla %(instrument)s spowodowałaby sprzedaż większą niż "
+"posiadana w dniu %(date)s."
 
 msgid "Confirm rollback"
 msgstr "Potwierdź cofnięcie"
@@ -8987,4 +9097,7 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "The suggested categories can only be added to an empty side."
 #~ msgstr "Proponowane kategorie można dodać tylko do pustej strony."
+
+#~ msgid "An instrument type is not supported."
+#~ msgstr "Typ instrumentu nie jest obsługiwany."
 

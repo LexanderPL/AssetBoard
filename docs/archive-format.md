@@ -470,6 +470,17 @@ order: instrument order, undated before dated, date, entry time, lineage id. Qua
 and FX rates are written with `format(value, "f")`, never an exponent or `float`, with trailing
 fractional zeros removed; import reads them with `Decimal(text)`.
 
+The file can also be imported alone in merge mode (the "bring my purchase history" path). The
+minimal header is `instrument,date,type,quantity,unit_price`; `quote_currency` is optional and
+defaults to the instrument's currency and then the base currency. Rows match an instrument by
+name; unknown names go through the instrument mapping, where they can be created (type and unit
+label required), mapped to an active instrument, or ignored. `instrument_id` is ignored in a
+lone file. An empty `date` creates an undated lot. A missing `fx_to_base` uses the latest stored
+manual or provider rate on or before the date and otherwise reports `fx_needed`; settlement rows
+must carry their own `fx_to_base`. Apply is refused while the combined history would oversell an
+instrument; the report names the instrument, line and date, and the user fixes the file or
+ignores that instrument.
+
 ```csv
 id,instrument_id,instrument,date,type,quantity,unit_price,quote_currency,fee,fx_to_base,note,settlement_currency,settlement_unit_price,settlement_fee,deleted_at
 60718293-a4b5-40c1-82d3-5e6f708192a3,2c3d4e5f-6071-4c8d-ae9f-1a2b3c4d5e6f,World ETF,2026-09-01,buy,10,100.5,EUR,1.00,1,First lot,,,,

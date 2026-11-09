@@ -22,12 +22,6 @@
     {% for field in preview.settings_restored %}{{ import_setting_labels.get(field, field) }}{% if not loop.last %}, {% endif %}{% endfor %}
   </p>
   {% endif %}
-  {% if blocked_reasons %}
-  <div class="mt-4 text-sm text-danger">
-    <p class="font-medium">{{ _("Rollback is not possible:") }}</p>
-    <ul class="mt-1 list-disc pl-5">{% for reason in blocked_reasons %}<li>{{ reason }}</li>{% endfor %}</ul>
-  </div>
-  {% endif %}
   {% else %}
   <dl class="mt-5 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
     <div><dt class="text-muted">{{ _("Transactions to remove") }}</dt><dd>{{ preview.counts.deleted|default(0) }}</dd></div>
@@ -37,12 +31,34 @@
     <div><dt class="text-muted">{{ _("Categories to delete") }}</dt><dd>{{ preview.counts.categories_to_delete|default(0) }}</dd></div>
     <div><dt class="text-muted">{{ _("Categories to archive") }}</dt><dd>{{ preview.counts.categories_to_archive|default(0) }}</dd></div>
     <div><dt class="text-muted">{{ _("Item valuations to remove") }}</dt><dd>{{ preview.counts.valuations|default(0) }}</dd></div>
+    {% if preview.batch.source == 'investment_transactions_csv' %}
+    <div><dt class="text-muted">{{ _("Instruments to delete") }}</dt><dd>{{ preview.counts.instruments_deleted|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Instruments to archive") }}</dt><dd>{{ preview.counts.instruments_archived|default(0) }}</dd></div>
+    <div><dt class="text-muted">{{ _("Instruments kept") }}</dt><dd>{{ preview.counts.instruments_kept|default(0) }}</dd></div>
+    {% endif %}
   </dl>
-  {% if preview.counts.edited %}<p class="mt-4 text-sm">{{ _("%(count)s of the transactions were edited after the import; they are removed too.", count=preview.counts.edited) }}</p>{% endif %}
+  {% if preview.counts.edited %}
+  <p class="mt-4 text-sm">
+    {% if preview.batch.source == 'investment_transactions_csv' %}
+    {{ _("%(count)s of the transactions were edited after the import; they are kept.", count=preview.counts.edited) }}
+    {% else %}
+    {{ _("%(count)s of the transactions were edited after the import; they are removed too.", count=preview.counts.edited) }}
+    {% endif %}
+  </p>
+  {% endif %}
   {% if preview.closed_months %}<p class="mt-4 text-sm text-danger">{{ _("Rollback is not possible while these months are closed: %(months)s", months=preview.closed_months|join(", ")) }}</p>{% endif %}
   {% endif %}
+  {% if blocked_reasons or preview.oversells %}
+  <div class="mt-4 text-sm text-danger">
+    <p class="font-medium">{{ _("Rollback is not possible:") }}</p>
+    <ul class="mt-1 list-disc pl-5">
+      {% for reason in blocked_reasons %}<li>{{ reason }}</li>{% endfor %}
+      {% for instrument, day in preview.oversells %}<li>{{ _("The remaining history for %(instrument)s would oversell on %(date)s.", instrument=instrument, date=format_day(day, locale) if day else _("an undated transaction")) }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
   <div class="mt-6 flex items-center gap-4">
-    {% if not blocked_reasons and not preview.closed_months %}
+    {% if not blocked_reasons and not preview.oversells and not preview.closed_months %}
     <form method="post" action="{{ scoped_url(request, 'workspace_data_import_rollback', batch_id=preview.batch.id) }}">
       <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
       <button type="submit" class="rounded-xl border border-danger-line bg-danger-soft px-4 py-2.5 text-sm font-semibold text-danger-strong">{{ _("Confirm rollback") }}</button>

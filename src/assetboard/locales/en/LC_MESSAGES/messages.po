@@ -1482,7 +1482,7 @@ msgstr ""
 msgid "A risk tier is not one of safe, growth or speculative."
 msgstr ""
 
-msgid "An instrument type is not supported."
+msgid "Choose a valid instrument type."
 msgstr ""
 
 msgid "An investment transaction type is not supported."
@@ -1519,6 +1519,49 @@ msgid "A decimal value is invalid or outside the supported range."
 msgstr ""
 
 msgid "The amount has more decimals than its currency allows."
+msgstr ""
+
+msgid "Enter an instrument name of 1 to 200 characters."
+msgstr ""
+
+msgid "No active instrument with this name or id exists."
+msgstr ""
+
+msgid "The file's quote currency differs from the instrument's."
+msgstr ""
+
+msgid "Create or activate an asset class before importing instruments."
+msgstr ""
+
+msgid "Enter a unit label of 1 to 32 characters."
+msgstr ""
+
+#, python-format
+msgid "The combined history would oversell %(instrument)s on %(date)s."
+msgstr ""
+
+#, python-format
+msgid "The combined history for %(instrument)s is invalid."
+msgstr ""
+
+#, python-format
+msgid ""
+"No stored FX rate for %(currency)s on or before %(date)s; enter "
+"fx_to_base."
+msgstr ""
+
+msgid "A settlement row must carry its own fx_to_base."
+msgstr ""
+
+#, python-format
+msgid "Undated lot: %(instrument)s will be imported without a date."
+msgstr ""
+
+#, python-format
+msgid "Rows for %(instrument)s are ignored for this import."
+msgstr ""
+
+msgid "The instrument mapping is incomplete or invalid."
 msgstr ""
 
 msgid "A net-worth category id appears more than once."
@@ -2178,9 +2221,6 @@ msgid "Choose an instrument type."
 msgstr ""
 
 msgid "Choose a supported currency."
-msgstr ""
-
-msgid "Enter a unit label of 1 to 32 characters."
 msgstr ""
 
 msgid "Assign at least one asset class."
@@ -3504,6 +3544,12 @@ msgstr ""
 msgid ""
 "Rollback was refused because the workspace changed after the restore: "
 "%(reasons)s"
+msgstr ""
+
+#, python-format
+msgid ""
+"Rollback was refused because the remaining history for %(instrument)s "
+"would oversell on %(date)s."
 msgstr ""
 
 msgid "Workspace name"
@@ -7437,10 +7483,44 @@ msgstr ""
 msgid "Remember these mappings for later imports"
 msgstr ""
 
+msgid "Instrument mapping"
+msgstr ""
+
+#, python-format
+msgid ""
+"Map each instrument in the file to one of yours, create a new instrument,"
+" or ignore its rows. A new instrument needs a type and a unit label; it "
+"is allocated 100%% to your active Other class, or the first active class."
+msgstr ""
+
+msgid "Map to an existing instrument"
+msgstr ""
+
+msgid "Create a new instrument"
+msgstr ""
+
+msgid "Existing instrument"
+msgstr ""
+
+msgid "New instrument name"
+msgstr ""
+
+msgid "Instrument type"
+msgstr ""
+
+msgid "Choose a type"
+msgstr ""
+
 msgid "Update preview"
 msgstr ""
 
 msgid "Fix the category mappings above before applying."
+msgstr ""
+
+msgid "Fix the highlighted mappings above before applying."
+msgstr ""
+
+msgid "Mapping problems"
 msgstr ""
 
 msgid "Warnings"
@@ -7532,9 +7612,6 @@ msgstr ""
 msgid "Settings to restore:"
 msgstr ""
 
-msgid "Rollback is not possible:"
-msgstr ""
-
 msgid "Budget lines kept (changed since the import)"
 msgstr ""
 
@@ -7542,6 +7619,19 @@ msgid "Categories to delete"
 msgstr ""
 
 msgid "Categories to archive"
+msgstr ""
+
+msgid "Instruments to delete"
+msgstr ""
+
+msgid "Instruments to archive"
+msgstr ""
+
+msgid "Instruments kept"
+msgstr ""
+
+#, python-format
+msgid "%(count)s of the transactions were edited after the import; they are kept."
 msgstr ""
 
 #, python-format
@@ -7552,6 +7642,13 @@ msgstr ""
 
 #, python-format
 msgid "Rollback is not possible while these months are closed: %(months)s"
+msgstr ""
+
+msgid "Rollback is not possible:"
+msgstr ""
+
+#, python-format
+msgid "The remaining history for %(instrument)s would oversell on %(date)s."
 msgstr ""
 
 msgid "Confirm rollback"
@@ -8487,5 +8584,11 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "The suggested categories can only be added to an empty side."
+#~ msgstr ""
+
+#~ msgid "An instrument type is not supported."
+#~ msgstr ""
+
+#~ msgid "Fix the category mappings above before applying."
 #~ msgstr ""
 

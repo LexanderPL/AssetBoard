@@ -140,6 +140,7 @@ def test_0036_net_worth_archive_migration_is_reversible(tmp_path: Path) -> None:
             if check["name"] == "ck_import_batches_source_valid"
         )
         assert "item_valuations_csv" in str(source_check["sqltext"])
+        assert "investment_transactions_csv" in str(source_check["sqltext"])
 
         command.downgrade(alembic_config(settings), "0035_f54_net_worth_links")
         inspector = inspect(engine)
@@ -159,6 +160,7 @@ def test_0036_net_worth_archive_migration_is_reversible(tmp_path: Path) -> None:
             if "source_valid" in (check["name"] or "")
         )
         assert "item_valuations_csv" not in str(source_check["sqltext"])
+        assert "investment_transactions_csv" not in str(source_check["sqltext"])
 
         upgrade_database(settings)
         check_database_migrations(settings)

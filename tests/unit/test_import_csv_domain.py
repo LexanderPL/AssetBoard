@@ -24,6 +24,7 @@ from assetboard.domain.category_mapping import (
 from assetboard.domain.import_csv import (
     BUDGET_LINES,
     CATEGORIES,
+    INVESTMENT_TRANSACTIONS,
     MONTHS,
     TEMPLATE_FILES,
     TRANSACTIONS,
@@ -92,6 +93,7 @@ def test_headers_are_trimmed_and_case_insensitive() -> None:
         (("date", "direction", "amount", "category"), TRANSACTIONS),
         (("month", "kind", "category", "planned"), BUDGET_LINES),
         (("kind", "name"), CATEGORIES),
+        (("instrument", "date", "type", "quantity", "unit_price"), INVESTMENT_TRANSACTIONS),
         (("month", "closed_at"), MONTHS),
     ],
 )
