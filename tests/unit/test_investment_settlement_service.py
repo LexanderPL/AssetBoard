@@ -126,7 +126,6 @@ def _stored_rate(
         ("PLN", Decimal("398.77")),
         ("EUR", Decimal("398.77")),
         ("JPY", Decimal("399")),
-        ("BTC", Decimal("398.77377066")),
     ],
 )
 def test_derived_price_display_uses_the_quote_currencys_minor_unit(

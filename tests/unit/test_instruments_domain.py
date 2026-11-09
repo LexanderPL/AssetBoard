@@ -143,6 +143,10 @@ def test_quote_currency_is_uppercased_and_validated() -> None:
         clean_quote_currency("XXX")
     with pytest.raises(InvalidQuoteCurrency):
         clean_quote_currency("EU")
+    # BTC is a symbol, not an ISO 4217 quote currency; it must not become one just because a
+    # crypto instrument can be quoted in USD.
+    with pytest.raises(InvalidQuoteCurrency):
+        clean_quote_currency("BTC")
 
 
 def test_a_currency_instrument_always_uses_its_currency_code_as_the_unit() -> None:
