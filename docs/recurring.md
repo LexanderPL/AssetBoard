@@ -129,7 +129,10 @@ server default applies: 30 days, or what the operator set with `ASSETBOARD_UPCOM
 When occurrences are overdue, the **Upcoming** link in the navigation shows how many.
 
 Editors and owners can mark an occurrence paid or received, skip it, reschedule just that
-occurrence, or edit its expected amount. A recurring occurrence's expected row on the month's
+occurrence, or edit its expected amount. **Mark paid or received** refuses a payment date after
+today in the workspace time zone: an actual event cannot be dated in the future, so record it
+when it happens or edit the recurring rule. The occurrence stays pending and no transaction or
+tax line is created. A recurring occurrence's expected row on the month's
 Transactions page also has **Skip** next to Confirm. A skipped occurrence stays in its month
 there as a greyed-out **Skipped** row with **Undo**, which makes it pending again (an income
 occurrence gets its planned tax payments back); skipped dates never count as pending. Undo is

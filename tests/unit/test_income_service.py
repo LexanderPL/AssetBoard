@@ -4,8 +4,10 @@ from decimal import Decimal
 import pytest
 from sqlalchemy import select
 
+from assetboard.clock import FixedClock
 from assetboard.config import Settings
 from assetboard.db.models.identity import AuditEvent
+from assetboard.db.models.ledger import Transaction
 from assetboard.db.models.scheduled import ScheduledOccurrence
 from assetboard.db.repositories import (
     CategoryRepository,
@@ -125,6 +127,77 @@ def test_income_source_golden_example_generates_tax_payment(team: WorkspaceDb) -
     assert source.work_logs[0].units == Decimal("19")
 
 
+def test_a_future_income_payment_date_does_not_move_or_create_tax_payments(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("owner", "owner")
+    income_category, expense_category = categories(team, ctx)
+    rule_id = taxes.create_rule(
+        team.factory,
+        ctx,
+        name="VAT",
+        kind="added",
+        payment_category_id=expense_category,
+        base="net",
+        notes="",
+        effective_from=date(2026, 1, 1),
+        value=PercentOrFixed.percent(2300),
+    )
+    source_id = income.create_source(
+        team.factory,
+        ctx,
+        name="Contract work",
+        kind="variable",
+        category_id=income_category,
+        fixed_minor=None,
+        rate_minor=123_000,
+        unit_label="day",
+        pay_day_value=10,
+        pay_lag_months=1,
+        expected_mode="manual",
+        expected_units_value=None,
+        average_months=3,
+        active_from=date(2026, 1, 1),
+        active_to=None,
+    )
+    income.attach_tax_rule(
+        team.factory,
+        ctx,
+        source_id,
+        tax_rule_id=rule_id,
+        payment_category_id=expense_category,
+        due_day=20,
+        due_month_offset=0,
+        generate_payment=True,
+    )
+    income.log_work(team.factory, ctx, source_id, date(2026, 8, 1), Decimal("19"))
+    with team.factory() as session:
+        parent = ScheduledOccurrenceRepository(session, ctx).for_income_work_month(
+            source_id, date(2026, 8, 1)
+        )
+        assert parent is not None
+        child = ScheduledOccurrenceRepository(session, ctx).children(parent.id)[0]
+        parent_id, child_id, amount = parent.id, child.id, parent.expected_minor
+        child_due = child.due_date
+
+    with pytest.raises(occurrences.OccurrenceError) as caught:
+        occurrences.post_occurrence(
+            team.factory,
+            ctx,
+            parent_id,
+            amount_minor=amount,
+            day=date(2026, 9, 11),
+        )
+    assert caught.value.code == "future_date"
+    with team.factory() as session:
+        stored_parent = session.get(ScheduledOccurrence, parent_id)
+        stored_child = session.get(ScheduledOccurrence, child_id)
+        assert stored_parent is not None and stored_parent.status == "pending"
+        assert stored_child is not None and stored_child.status == "pending"
+        assert stored_child.due_date == child_due == date(2026, 9, 20)
+        assert session.scalars(select(Transaction)).all() == []
+
+
 def test_posted_income_occurrence_is_not_recalculated(team: WorkspaceDb) -> None:
     ctx = team.ctx("owner", "owner")
     income_category, _expense_category = categories(team, ctx)
@@ -154,6 +227,10 @@ def test_posted_income_occurrence_is_not_recalculated(team: WorkspaceDb) -> None
         occurrence_id, amount = occurrence.id, occurrence.expected_minor
     from assetboard.services.occurrences import post_occurrence
 
+    clock = FixedClock("2026-09-10T12:00:00+00:00")
+    team.clock = clock
+    team.factory.configure(info={"clock": clock})
+    ctx = team.ctx("owner", "owner")
     post_occurrence(
         team.factory,
         ctx,

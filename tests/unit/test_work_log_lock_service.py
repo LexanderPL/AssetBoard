@@ -11,6 +11,7 @@ from uuid import UUID
 import pytest
 from sqlalchemy import select
 
+from assetboard.clock import FixedClock
 from assetboard.db.models.identity import AuditEvent
 from assetboard.db.models.ledger import Transaction
 from assetboard.domain.money import Money
@@ -28,6 +29,9 @@ AUGUST = date(2026, 8, 1)  # paid on 10 September (lag 1)
 @pytest.fixture
 def team(tmp_path):
     for db in workspace_db(tmp_path):
+        clock = FixedClock("2026-09-10T12:00:00+00:00")
+        db.clock = clock
+        db.factory.configure(info={"clock": clock})
         db.add_member("owner", "owner")
         db.add_member("editor", "editor")
         db.add_member("viewer", "viewer")

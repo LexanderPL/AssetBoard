@@ -3386,6 +3386,13 @@ msgstr "Kategoria wystąpienia jest niedostępna; edytuj regułę cykliczną."
 msgid "Check the amount and date, then try again."
 msgstr "Sprawdź kwotę i datę, a następnie spróbuj ponownie."
 
+msgid ""
+"A payment cannot be recorded in the future. Choose today or an earlier "
+"date, or edit the recurring rule."
+msgstr ""
+"Nie można zapisać płatności z przyszłą datą. Wybierz dzisiejszą lub "
+"wcześniejszą datę albo zmień regułę cykliczną."
+
 msgid "Choose a valid direction."
 msgstr "Wybierz prawidłowy kierunek."
 

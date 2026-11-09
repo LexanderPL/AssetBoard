@@ -3182,6 +3182,11 @@ msgstr ""
 msgid "Check the amount and date, then try again."
 msgstr ""
 
+msgid ""
+"A payment cannot be recorded in the future. Choose today or an earlier "
+"date, or edit the recurring rule."
+msgstr ""
+
 msgid "Choose a valid direction."
 msgstr ""
 
