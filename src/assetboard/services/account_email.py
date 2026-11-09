@@ -153,6 +153,10 @@ def _issue_token(
     ).all()
     for row in live[: max(0, len(live) - (MAX_LIVE_TOKENS - 1))]:
         session.delete(row)
+    # Keep links strictly ordered by creation even when two requests share a clock reading, so
+    # "drop the oldest" never falls back to the random id order.
+    if live and live[-1].created_at >= now:
+        now = live[-1].created_at + timedelta(microseconds=1)
     token = secrets.token_urlsafe(32)
     session.add(
         EmailToken(

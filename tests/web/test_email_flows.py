@@ -471,6 +471,31 @@ def test_live_links_are_capped_at_three_per_address(
     assert account_email.registration_email(app.state.session_factory, token, expired) is None
 
 
+def test_the_oldest_link_is_dropped_even_when_requests_share_a_clock_reading(
+    mail: tuple[FastAPI, TestClient],
+) -> None:
+    app, _client = mail
+    clock = FixedClock(app.state.clock.now().isoformat())
+    request = MailRequest("register", "same-instant@example.com", "en", None)
+    links = []
+    for _ in range(4):
+        job = account_email.resolve_mail_request(
+            app.state.session_factory,
+            app.state.settings,
+            clock,
+            request,
+            log_key=b"k" * 32,
+        )
+        assert job is not None
+        links.append(str(job.params["link"]).rsplit("/", 1)[1])
+    rows = sorted(_tokens(app, "register"), key=lambda row: row.created_at)
+    assert len(rows) == 3
+    assert len({row.created_at for row in rows}) == 3
+    kept = {row.token_hash for row in rows}
+    assert hashlib.sha256(links[0].encode()).hexdigest() not in kept
+    assert {hashlib.sha256(link.encode()).hexdigest() for link in links[1:]} == kept
+
+
 # Availability and the instance setting
 
 
