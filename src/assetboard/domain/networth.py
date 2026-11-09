@@ -143,7 +143,9 @@ ASSET_SEED_V1: tuple[SeedNetWorthCategory, ...] = _seed(
     ),
     Side.ASSET,
 )
-ASSET_SEED: tuple[SeedNetWorthCategory, ...] = _seed(
+# The list shipped from the 2026-11 refresh until F5.7 (owner decision 2026-11-09), kept for the
+# same reason as ``ASSET_SEED_V1``.
+ASSET_SEED_V2: tuple[SeedNetWorthCategory, ...] = _seed(
     (
         _("Vehicles"),
         _("Electronics"),
@@ -156,7 +158,18 @@ ASSET_SEED: tuple[SeedNetWorthCategory, ...] = _seed(
     ),
     Side.ASSET,
 )
-ASSET_SEEDS: tuple[tuple[SeedNetWorthCategory, ...], ...] = (ASSET_SEED_V1, ASSET_SEED)
+# F5.7: property is a net-worth asset, first in the list. The other categories keep their
+# colours from ``ASSET_SEED_V2``; Real estate takes a palette colour none of them uses.
+REAL_ESTATE_COLOR = "#a16207"
+ASSET_SEED: tuple[SeedNetWorthCategory, ...] = (
+    SeedNetWorthCategory(_("Real estate"), Side.ASSET, REAL_ESTATE_COLOR),
+    *ASSET_SEED_V2,
+)
+ASSET_SEEDS: tuple[tuple[SeedNetWorthCategory, ...], ...] = (
+    ASSET_SEED_V1,
+    ASSET_SEED_V2,
+    ASSET_SEED,
+)
 LIABILITY_SEED: tuple[SeedNetWorthCategory, ...] = _seed(
     (_("Installments"), _("Mortgage"), _("Other")),
     Side.LIABILITY,
