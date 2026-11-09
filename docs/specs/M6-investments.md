@@ -379,17 +379,27 @@ Tests: golden XIRR vector from the spec, scipy cross-check (dev dependency only)
 ## F6.8 Net-worth links
 
 **Acceptance**
-- Register resolvers for `portfolio_asset_class` (class value, look-through, base currency) and `portfolio_holding` (instrument value) with the M5 `ValuationResolver` registry; both support historical `as_of` (used by snapshots).
-- Helper button "Create net-worth items from asset classes" creates linked asset items (one per active class with value > 0), skipping archived classes and classes already linked; classes with `investable=false` are created with `investable=false`.
-- Property is a net-worth item (F5.7). Workspaces seeded before 2026-11-09 may still hold property as a `real_estate` instrument; when such an instrument and a net-worth item in the Real estate category both have value, show the double-counting warning too.
-- Warning when both a class and one of its holdings are linked (double counting).
-- Net-worth snapshots (M5.3) pick up linked values automatically.
+- Register resolvers for `portfolio_asset_class` (class value, look-through, base currency) and `portfolio_holding` (instrument value) with the M5 `ValuationResolver` registry. Registration is idempotent and runs in the app factory, so web reads and the scheduler's automatic snapshot job both run with the resolvers registered.
+- Value dates follow the two portfolio rules:
+  - On or after the workspace's today, use the F6.6 current valuation: current holdings include undated legacy lots and take the latest prices and FX rates. The linked class or instrument value matches the **Portfolio** page exactly.
+  - For past dates (manual snapshots dated earlier, backfill, the automatic month-end snapshot), use the F6.7 series rules: dated transactions only, prices and FX carried forward from the latest observation on or before the date, and the per-date bond model.
+  - Because the historical path excludes undated legacy lots, the first historical snapshot after such lots appear can be lower than today's value. The resolver introduces no step of its own; this one is inherent to F6.7 and is documented for users.
+- A class link is `Unavailable` when any held instrument allocated to it lacks a price or FX rate. A holding link is `Unavailable` when the instrument is held and missing a price or FX rate, and zero when it is not held. Resolvers never return a silently partial class value.
+- Sold-out and archived targets still resolve existing links. Pickers offer active asset classes and active instruments with quantity above zero; a sold-out or archived target is no longer offered for new links.
+- Helper button "Create net-worth items from asset classes" creates linked asset items, one per active class with a complete value above zero, skipping archived classes, classes with a missing price or FX member and classes already linked. Classes with `investable=false` are created with `investable=false`. The items go into a dedicated **Investments** asset category (pl **Inwestycje**), created on demand when no active category with that name key exists in any supported locale, appended at the end of the category list and audited as `networth_category.created` in the same write. It is not added to the suggested category seed set. The helper re-checks existing links inside its locked write, so two simultaneous clicks create no duplicates. Each item gets one `networth_item.created` and one `networth_item.linked` audit event; `estimate_between` keeps the side default.
+- Warnings appear only on **Net Worth → Assets**, are advisory and never block or change a value:
+  - when an active class link and an active holding link for one of its currently held instruments would both count in net worth;
+  - when an active `real_estate` instrument and an active item in the **Real estate** category both have a positive current value (legacy workspaces seeded before 2026-11-09).
+- Net-worth snapshots (M5.3) pick up linked values automatically: a manual snapshot dated today uses the current path, while past, backfilled and automatic month-end snapshots use the historical path.
+- `resolve_many` loads the portfolio history once for all requested dates and targets; a 60 month-end × 30 instrument resolution stays well below two seconds in CI.
 
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
-Implement F6.8 from docs/specs/M6-investments.md: ValuationResolver implementations for portfolio_asset_class and portfolio_holding (with as_of support),
-the create-linked-items helper, double-counting warning. Tests: resolver values match value_portfolio(), historical as_of, snapshot integration.
+Implement F6.8 from docs/specs/M6-investments.md: ValuationResolver implementations for portfolio_asset_class and portfolio_holding
+(current F6.6 path for today, F6.7 history for past dates), the create-linked-items helper with an on-demand Investments category,
+the double-counting warnings on Net Worth -> Assets. Tests: resolver values match the Portfolio page, historical as_of, snapshots through
+the scheduler job, the helper's audit/idempotence/concurrency, missing data, warnings and resolution timing.
 ```
 
 ---

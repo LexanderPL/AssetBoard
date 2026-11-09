@@ -127,7 +127,7 @@ value; it only changes which items currently count towards the subtotals.
 ## Linked values
 
 Some items can take their value from another feature instead of a manual value. The first sources
-are portfolio asset classes and holdings (M6) and loan balances (M7); until those modules register
+are portfolio asset classes and holdings (M6); loan balances follow in M7. Until a module registers
 a resolver, the **Link to…** picker does not appear. A resolver belongs to assets or liabilities,
 and only its side’s targets are offered.
 
@@ -154,6 +154,45 @@ and only its side’s targets are offered.
 To replace an existing manual item with a linked one, archive the manual item and create a new
 linked item. Archived items count in snapshots up to their archive date, so the history stays
 continuous.
+
+### Portfolio links
+
+On **Net Worth → Assets**, editors and owners also see **Create net-worth items from asset
+classes**. It creates one linked asset item for every active asset class with a value, and puts
+them in an **Investments** category. That category is created on demand (in your workspace
+language: **Inwestycje** in Polish) and appended to the asset categories; the suggested category
+sets do not include it. Classes with no value, classes whose value is unavailable through a
+missing price or exchange rate, and classes already linked are skipped. Run the button again
+after adding a class or a value; it only creates what is missing. Classes marked *not counted in
+FIRE* produce items with **Investable** off.
+
+The picker also offers individual portfolio holdings: active instruments you currently hold.
+A sold-out or archived target is no longer offered for a new link, but an item already linked to
+it keeps working.
+
+A portfolio-linked item does not store its own values:
+
+- **Today** it shows exactly the value from the **Portfolio** page. Current holdings include
+  *undated* lots imported from an older record, and prices and exchange rates are the latest
+  available ones.
+- **In a past snapshot or a backfill** it uses the **Performance** history: only dated
+  transactions, prices and exchange rates carried forward from the latest observation on or
+  before the date, and the bond model value for each date. Undated lots are not in that history,
+  so the first month-end snapshot can be lower than today's value when such lots exist. This is
+  the same step the Performance chart shows; the link itself is not recalculated.
+- A class value is shown as **Value unavailable** if even one held instrument allocated to it is
+  missing a price or exchange rate. It is never shown as a partial class total. An individual
+  held instrument behaves the same way; an instrument you no longer hold is worth zero.
+
+The Assets page also shows advisory **Possible double counting** warnings. They do not change any
+total:
+
+- when a linked asset class and a linked holding of a currently held instrument in that class
+  would both be counted;
+- when a workspace created before the property change still holds real estate as an investment
+  instrument and also has a **Real estate** item with a positive value.
+
+Archive the duplicate item or unlink it if you want only one of the two values in net worth.
 
 ## Value history
 

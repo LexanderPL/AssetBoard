@@ -11,6 +11,32 @@
 
   {{ tabs(side_value) }}
 
+  {% if side_value == "asset" and page.portfolio_warnings %}
+  <section class="panel border border-warning-line bg-warning-soft p-4 sm:p-6" aria-labelledby="portfolio-warnings-heading" data-portfolio-warnings>
+    <h2 id="portfolio-warnings-heading" class="text-base font-semibold text-warning-strong">{{ _("Possible double counting") }}</h2>
+    <ul class="mt-2 space-y-2 text-sm text-warning-strong">
+      {% for warning in page.portfolio_warnings %}
+      {% if warning.code == "class_holding" %}
+      <li data-portfolio-warning="class_holding">{{ _("The asset class %(class)s and the linked holding(s) %(holdings)s are both counted in net worth.", class=warning.class_name, holdings=warning.holding_names|join(", ")) }}</li>
+      {% else %}
+      <li data-portfolio-warning="legacy_property">{{ _("The legacy real-estate instrument(s) %(instruments)s and the Real estate item(s) %(items)s are both counted in net worth.", instruments=warning.instrument_names|join(", "), items=warning.item_names|join(", ")) }}</li>
+      {% endif %}
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+
+  {% if side_value == "asset" and can_edit %}
+  <section class="panel p-4 sm:p-6" data-portfolio-links>
+    <h2 class="text-base font-semibold">{{ _("Portfolio holdings in net worth") }}</h2>
+    <p class="mt-1 text-sm text-muted">{{ _("Create one linked asset item for each asset class with a value. Existing links and empty classes are skipped; the items go into the Investments category.") }}</p>
+    <form method="post" action="{{ scoped_url(request, 'networth_create_portfolio_links') }}" class="mt-3">
+      {{ csrf_input() }}
+      <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-create-portfolio-links>{{ _("Create net-worth items from asset classes") }}</button>
+    </form>
+  </section>
+  {% endif %}
+
   {% if view.can_seed %}
   <section class="panel p-6 sm:p-7" aria-labelledby="seed-heading" data-seed-offer>
     <h2 id="seed-heading" class="text-base font-semibold">{{ _("No categories on this side yet") }}</h2>

@@ -86,7 +86,7 @@ class XirrResult:
 
 
 @dataclass(frozen=True, slots=True)
-class _Observations:
+class Observations:
     dates: tuple[date, ...]
     values: tuple[Decimal, ...]
 
@@ -97,7 +97,7 @@ class _Observations:
 
 def _observations(
     values: Iterable[PriceObservation | RateObservation],
-) -> _Observations:
+) -> Observations:
     rows = sorted(
         (
             (row.date, row.price if isinstance(row, PriceObservation) else row.rate)
@@ -105,7 +105,7 @@ def _observations(
         ),
         key=lambda row: row[0],
     )
-    return _Observations(dates=tuple(row[0] for row in rows), values=tuple(row[1] for row in rows))
+    return Observations(dates=tuple(row[0] for row in rows), values=tuple(row[1] for row in rows))
 
 
 def step_dates(start: date, end: date, step: Step) -> list[date]:
@@ -275,7 +275,7 @@ def portfolio_series(
             rate = (
                 Decimal(1)
                 if currency == base_currency
-                else fx_series.get(currency, _Observations((), ())).latest(point)
+                else fx_series.get(currency, Observations((), ())).latest(point)
             )
             price_value = price.latest(point) if price is not None else None
             if quantity > 0 and (price_value is None or rate is None):

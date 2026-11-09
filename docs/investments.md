@@ -403,6 +403,29 @@ time, and the money-weighted return for standard periods. It is read-only.
 - **Chart and table**: the value line and invested-capital line enclose the gain band. Without
   JavaScript the period table and the plotted-data table remain available.
 
+## Net worth
+
+Asset classes and individual holdings can feed **Net Worth → Assets** as linked items. An
+editor or owner sees **Create net-worth items from asset classes** there; it creates one linked
+asset item per active class with a value, in an **Investments** category created on demand (pl
+**Inwestycje**). Empty classes, classes whose value is unavailable because of a missing price or
+FX rate, and classes already linked are skipped. The **Link to…** picker also offers active
+instruments you currently hold. Sold-out and archived targets are not offered for new links, but
+existing links keep resolving.
+
+The linked value is read-only. For today it matches the **Portfolio** tab exactly, including
+undated imported lots and the latest prices and FX rates. For a past snapshot or a backfill it
+uses the **Performance** history: dated transactions only, carried-forward observations and the
+per-date bond value. Undated lots are therefore absent from historical snapshots, so the first
+month-end snapshot can be lower than today's value when such lots exist. A linked class is
+**Value unavailable** when any held instrument in it lacks a price or FX rate; it never shows a
+partial class total.
+
+The Assets page warns about possible double counting when a class and one of its holdings are
+both linked, or when a legacy real-estate instrument and a **Real estate** item both have a
+positive value. Warnings never change a total. See `docs/net-worth.md` for the linked-item
+details.
+
 ## Roles
 
 Everyone in the workspace can read the Investments pages. Adding, editing, reordering,

@@ -1521,6 +1521,12 @@ msgstr ""
 "To wiadomość testowa z %(app)s. Przypomnienia będą przychodzić na ten "
 "kanał."
 
+msgid "Asset class"
+msgstr "Klasa aktywów"
+
+msgid "Holding"
+msgstr "Pozycja"
+
 msgid "Same as the system"
 msgstr "Jak w systemie"
 
@@ -2737,6 +2743,12 @@ msgstr "Dodano wartość."
 
 msgid "Items added."
 msgstr "Dodano pozycje."
+
+msgid "Net-worth items created from asset classes."
+msgstr "Utworzono pozycje majątku na podstawie klas aktywów."
+
+msgid "No asset classes with a value need linking."
+msgstr "Żadna klasa aktywów z wartością nie wymaga powiązania."
 
 msgid "Use name; value; category on each line."
 msgstr "Użyj formatu nazwa; wartość; kategoria w każdym wierszu."
@@ -5312,9 +5324,6 @@ msgstr ""
 "Jaka część wartości tego instrumentu należy do każdej klasy aktywów. "
 "Wpisz 0, aby pominąć klasę; wagi muszą sumować się dokładnie do 100%%."
 
-msgid "Asset class"
-msgstr "Klasa aktywów"
-
 #, python-format
 msgid "Weight (%%)"
 msgstr "Waga (%%)"
@@ -6379,6 +6388,40 @@ msgstr "Zamknięcie chroni miesiąc przed przypadkowymi zmianami."
 
 msgid "Future months stay open for planning."
 msgstr "Przyszłe miesiące pozostają otwarte do planowania."
+
+msgid "Possible double counting"
+msgstr "Możliwe podwójne liczenie"
+
+#, python-format
+msgid ""
+"The asset class %(class)s and the linked holding(s) %(holdings)s are both"
+" counted in net worth."
+msgstr ""
+"Klasa aktywów %(class)s i powiązane pozycje %(holdings)s są jednocześnie "
+"liczone w majątku netto."
+
+#, python-format
+msgid ""
+"The legacy real-estate instrument(s) %(instruments)s and the Real estate "
+"item(s) %(items)s are both counted in net worth."
+msgstr ""
+"Instrumenty nieruchomości %(instruments)s i pozycje w kategorii "
+"Nieruchomości %(items)s są jednocześnie liczone w majątku netto."
+
+msgid "Portfolio holdings in net worth"
+msgstr "Pozycje portfela w majątku netto"
+
+msgid ""
+"Create one linked asset item for each asset class with a value. Existing "
+"links and empty classes are skipped; the items go into the Investments "
+"category."
+msgstr ""
+"Utwórz po jednej powiązanej pozycji aktywów dla każdej klasy aktywów z "
+"wartością. Istniejące powiązania i puste klasy są pomijane; pozycje "
+"trafiają do kategorii Inwestycje."
+
+msgid "Create net-worth items from asset classes"
+msgstr "Utwórz pozycje majątku z klas aktywów"
 
 msgid "No categories on this side yet"
 msgstr "Ta strona nie ma jeszcze kategorii"

@@ -1489,6 +1489,12 @@ msgid ""
 "channel."
 msgstr ""
 
+msgid "Asset class"
+msgstr ""
+
+msgid "Holding"
+msgstr ""
+
 msgid "Same as the system"
 msgstr ""
 
@@ -2594,6 +2600,12 @@ msgid "Value added."
 msgstr ""
 
 msgid "Items added."
+msgstr ""
+
+msgid "Net-worth items created from asset classes."
+msgstr ""
+
+msgid "No asset classes with a value need linking."
 msgstr ""
 
 msgid "Use name; value; category on each line."
@@ -4927,9 +4939,6 @@ msgid ""
 " leave a class out; the weights must total exactly 100%%."
 msgstr ""
 
-msgid "Asset class"
-msgstr ""
-
 #, python-format
 msgid "Weight (%%)"
 msgstr ""
@@ -5890,6 +5899,33 @@ msgid "Closing protects the month from accidental changes."
 msgstr ""
 
 msgid "Future months stay open for planning."
+msgstr ""
+
+msgid "Possible double counting"
+msgstr ""
+
+#, python-format
+msgid ""
+"The asset class %(class)s and the linked holding(s) %(holdings)s are both"
+" counted in net worth."
+msgstr ""
+
+#, python-format
+msgid ""
+"The legacy real-estate instrument(s) %(instruments)s and the Real estate "
+"item(s) %(items)s are both counted in net worth."
+msgstr ""
+
+msgid "Portfolio holdings in net worth"
+msgstr ""
+
+msgid ""
+"Create one linked asset item for each asset class with a value. Existing "
+"links and empty classes are skipped; the items go into the Investments "
+"category."
+msgstr ""
+
+msgid "Create net-worth items from asset classes"
 msgstr ""
 
 msgid "No categories on this side yet"
