@@ -39,9 +39,12 @@
 
 {% block title %}{{ _("History") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("History") }}{% endblock %}
-{% block header_actions %}<a href="{{ filters_url }}" data-dialog-open="filters-dialog" aria-haspopup="dialog" class="btn" data-filters-open>{{ _("Filters") }}</a> <a href="{{ export_url }}" data-dialog-open="export-dialog" aria-haspopup="dialog" class="btn" data-export-open>{{ _("Export CSV") }}</a>{% endblock %}
 {% block content %}
 <div class="space-y-6" data-transaction-list>
+  <div class="flex flex-wrap items-center gap-2" data-history-toolbar>
+    <a href="{{ filters_url }}" data-dialog-open="filters-dialog" aria-haspopup="dialog" class="btn" data-filters-open>{{ _("Filters") }}</a>
+    <a href="{{ export_url }}" data-dialog-open="export-dialog" aria-haspopup="dialog" class="btn" data-export-open>{{ _("Export CSV") }}</a>
+  </div>
   {% if notice %}
   <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
   {% endif %}

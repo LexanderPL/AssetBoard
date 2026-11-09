@@ -1,8 +1,8 @@
 {% from "macros/components.html" import csrf_input with context %}
 {% from "categories/_macros.html" import swatch with context %}
 
-{% macro htmx_form(action, swap="outerHTML") -%}
-method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-body" hx-swap="{{ swap }}"
+{% macro htmx_form(action, swap="outerHTML", keep_visible="") -%}
+method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-body" hx-swap="{{ swap }}"{% if keep_visible %} data-keep-visible="#item-{{ keep_visible }}"{% endif %}
 {%- endmacro %}
 
 {% macro small_button(label, attrs="") -%}
@@ -60,7 +60,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
 {% if can_edit and not item.archived %}
 <details class="mt-2" data-add-valuation{% if valuation_item_id == item.id %} open{% endif %}>
   <summary class="cursor-pointer text-xs font-medium text-primary-ink">{{ _("Add a value") }}</summary>
-  <form {{ htmx_form(scoped_url(request, 'networth_item_valuation', item_id=row_id), "outerHTML show:#item-" ~ row_id ~ ":top") }} class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] sm:items-start" novalidate>
+  <form {{ htmx_form(scoped_url(request, 'networth_item_valuation', item_id=row_id), keep_visible=row_id) }} class="mt-2 grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] sm:items-start" novalidate>
     {{ csrf_input() }}
     <input type="hidden" name="side" value="{{ side_value }}">
     <div class="space-y-1">
@@ -90,7 +90,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
 {% macro item_edit_form(item, side_value) -%}
 {% set row_id = item.id|string %}
 {% set values = edit_item_values %}
-<form {{ htmx_form(scoped_url(request, 'networth_item_update', item_id=row_id), "outerHTML show:#item-" ~ row_id ~ ":top") }} class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" novalidate data-editing>
+<form {{ htmx_form(scoped_url(request, 'networth_item_update', item_id=row_id), keep_visible=row_id) }} class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" novalidate data-editing>
   {{ csrf_input() }}
   <input type="hidden" name="side" value="{{ side_value }}">
   <div class="space-y-1">
@@ -143,7 +143,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
   {% endif %}
   <div class="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
     <button type="submit" class="btn-primary">{{ _("Save") }}</button>
-    <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}" hx-get="{{ scoped_url(request, 'networth_item_row', item_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" class="btn">{{ _("Cancel") }}</a>
+    <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}" hx-get="{{ scoped_url(request, 'networth_item_row', item_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" data-keep-visible="#item-{{ row_id }}" class="btn">{{ _("Cancel") }}</a>
   </div>
 </form>
 {%- endmacro %}
@@ -171,7 +171,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
         {% if item.archived %}
         <form {{ htmx_form(scoped_url(request, 'networth_item_restore', item_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Restore"), "data-restore") }}</form>
         {% else %}
-        <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&edit_item={{ row_id }}" hx-get="{{ scoped_url(request, 'networth_item_edit', item_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink" data-edit>{{ _("Edit") }}</a>
+        <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&edit_item={{ row_id }}" hx-get="{{ scoped_url(request, 'networth_item_edit', item_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" data-keep-visible="#item-{{ row_id }}" class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink" data-edit>{{ _("Edit") }}</a>
         {% if item.valuation_mode == "linked" %}
         <form {{ htmx_form(scoped_url(request, 'networth_item_unlink', item_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Unlink"), "data-unlink") }}</form>
         {% endif %}

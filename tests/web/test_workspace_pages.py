@@ -131,6 +131,12 @@ def test_pages_without_a_context_render_without_workspace_parts(owner: OwnerApp,
 # Settings
 
 
+def test_settings_cards_share_one_column(owner: OwnerApp) -> None:
+    page = owner.client.get("/workspace/settings").text
+    assert page.count('<div class="max-w-3xl space-y-6">') == 1
+    assert "panel max-w-2xl" not in page
+
+
 def test_owner_updates_workspace_settings(owner: OwnerApp) -> None:
     form = owner.client.get("/workspace/settings")
     assert form.status_code == 200 and 'value="Home"' in form.text
