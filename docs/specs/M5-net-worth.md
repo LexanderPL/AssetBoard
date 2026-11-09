@@ -406,6 +406,18 @@ model), and F7.6 links a loan to a net-worth item.
 - Archive restore keeps accepting the pre-F5.7 untouched seed sets on both sides (net-worth
   categories without Real estate; asset classes with Real estate and Primary residence) as empty.
 
+**As built:**
+- Real estate takes a palette colour the other suggested categories don't use; the others keep
+  their colours, so every shipped set (`ASSET_SEED_V1`, `ASSET_SEED_V2`, `ASSET_SEED`) still
+  compares exactly in the restore check.
+- The audit event lists the created names as one comma-separated `names` string (audit data
+  holds scalars). A run that creates nothing writes no event, so a no-op click never turns an
+  untouched seed into user data for restore.
+- The empty-side offer keeps its "Add suggested categories" wording; a non-empty side shows
+  "Add missing suggested categories" only while a suggested category is missing.
+- The asset-class seed keeps the pre-F5.7 set as `ASSET_CLASS_SEED_V1` (in
+  `ASSET_CLASS_SEEDS`) for the F6.9 restore check; asset classes are not in the archive yet.
+
 **Tests:**
 - Seed sets in en and pl, with Real estate first.
 - The add-missing action on:
