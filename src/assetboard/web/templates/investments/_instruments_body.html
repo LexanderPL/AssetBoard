@@ -62,6 +62,7 @@
             {% if i.symbol %}<span class="rounded bg-subtle px-1.5 py-0.5 font-mono text-xs text-muted" data-symbol>{{ i.symbol }}</span>{% endif %}
             <span class="rounded-full bg-primary-soft px-2 py-0.5 text-xs text-primary-ink" data-type="{{ i.type }}">{{ i.type_label }}</span>
             <span class="text-xs text-muted">{{ i.quote_currency }} · {{ i.unit_label }}</span>
+            {% if i.risk_tier_override %}<span class="rounded-full bg-primary-soft px-2 py-0.5 text-xs text-primary-ink" data-risk-tier-override="{{ i.risk_tier_override }}">{{ risk_tier_labels[i.risk_tier_override] }}{% if risk_tier_subtitles.get(i.risk_tier_override) %} · {{ risk_tier_subtitles[i.risk_tier_override] }}{% endif %}</span>{% endif %}
             {% if i.terms_required %}<span class="rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning-strong" data-terms-required>{{ _("Terms needed") }}</span>{% endif %}
           </div>
           <p class="mt-1 text-xs text-muted">{{ i.valuation_source_label }}{% if i.provider_label %} · {{ i.provider_label }}{% if i.provider_symbol %} ({{ i.provider_symbol }}){% endif %}{% endif %}</p>

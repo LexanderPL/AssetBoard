@@ -94,6 +94,7 @@ ARCHIVE_EXCLUDED_MODELS = {
     "NotificationLog": "notification delivery history is not portable (F3.8)",
     "AssetClass": "asset classes require the F6.9 archive extension",
     "Instrument": "instruments require the F6.9 archive extension",
+    "RiskTargetPolicy": "risk targets require the F6.9 archive extension",
     "InstrumentAllocation": "allocation weights require the F6.9 archive extension",
     "InvestmentTransaction": "investment transactions require the F6.9 archive extension",
     "BondTerms": "bond terms require the F6.9 archive extension",

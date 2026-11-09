@@ -208,6 +208,61 @@ def test_profile_page_and_nav_link(h: Harness) -> None:
     assert 'value="browser" selected' in page.text  # new accounts follow the browser
 
 
+def test_profile_shows_the_planning_fields_with_defaults(h: Harness) -> None:
+    client = admin(h)
+    page = client.get("/account").text
+    assert 'name="birth_year"' in page
+    assert 'name="life_expectancy"' in page
+    assert 'value="90"' in page
+
+
+def test_profile_saves_birth_year_and_life_expectancy(h: Harness) -> None:
+    client = admin(h)
+    response = client.post(
+        "/account/profile",
+        data={
+            "display_name": "Admin",
+            "locale": "en",
+            "theme": "system",
+            "birth_year": "1986",
+            "life_expectancy": "80",
+            "csrf_token": h.token(client),
+        },
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    saved = h.user(h.web.admin_email)
+    assert (saved.birth_year, saved.life_expectancy) == (1986, 80)
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("birth_year", "1899"),
+        ("birth_year", "2999"),
+        ("life_expectancy", "49"),
+        ("life_expectancy", "121"),
+    ],
+)
+def test_invalid_planning_profile_values_are_field_errors(
+    h: Harness, field: str, value: str
+) -> None:
+    client = admin(h)
+    form = {
+        "display_name": "Admin",
+        "locale": "en",
+        "theme": "system",
+        "birth_year": "1986",
+        "life_expectancy": "90",
+    }
+    form[field] = value
+    response = client.post(
+        "/account/profile", data={**form, "csrf_token": h.token(client)}, follow_redirects=False
+    )
+    assert response.status_code == 400
+    assert f'id="{field}-error"' in response.text
+
+
 def test_two_factor_moves_from_the_profile_to_account_security(h: Harness) -> None:
     client = admin(h)
     profile = client.get("/account").text

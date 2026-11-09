@@ -49,10 +49,16 @@ def _class(
     *,
     color: str = "#2563eb",
     investable: str = "1",
+    risk_tier: str = "",
 ) -> UUID:
     response = owner.post(
         CLASSES,
-        {"name": name, "color": color, "investable": investable},
+        {
+            "name": name,
+            "color": color,
+            "investable": investable,
+            "risk_tier": risk_tier,
+        },
         token_from=CLASSES,
     )
     assert response.status_code == 303, response.text
@@ -69,6 +75,7 @@ def _instrument(
     quote_currency: str = "EUR",
     unit_label: str = "",
     symbol: str = "VWCE",
+    risk_tier_override: str = "",
 ) -> UUID:
     response = owner.post(
         INSTRUMENTS,
@@ -78,6 +85,7 @@ def _instrument(
             "type": type,
             "quote_currency": quote_currency,
             "unit_label": unit_label,
+            "risk_tier_override": risk_tier_override,
             f"weight_{class_id}": weight,
         },
         token_from=INSTRUMENTS,
@@ -468,3 +476,65 @@ def test_bond_terms_need_a_bond_model_instrument(owner: OwnerApp) -> None:
     )
     assert response.status_code == 400
     assert "Bond terms are only available for a bond-model instrument." in response.text
+
+
+def test_class_risk_tier_is_shown_and_can_be_cleared(owner: OwnerApp) -> None:
+    stocks = _class(owner, "Stocks", risk_tier="growth")
+    page = owner.client.get(CLASSES).text
+    assert 'data-risk-tier="growth"' in page
+    with owner.db() as session:
+        assert session.get(AssetClass, stocks).risk_tier == "growth"  # type: ignore[union-attr]
+
+    response = owner.post(
+        f"{CLASSES}/{stocks}",
+        {
+            "name": "Stocks",
+            "color": "#2563eb",
+            "investable": "1",
+            "risk_tier": "",
+        },
+        token_from=CLASSES,
+    )
+    assert response.status_code == 303
+    page = owner.client.get(CLASSES).text
+    assert 'data-risk-tier="growth"' not in page
+
+
+def test_instrument_override_is_shown_and_can_be_cleared(owner: OwnerApp) -> None:
+    stocks = _class(owner, "Stocks", risk_tier="growth")
+    instrument = _instrument(owner, "Fund", stocks, risk_tier_override="speculative")
+    page = owner.client.get(INSTRUMENTS).text
+    assert 'data-risk-tier-override="speculative"' in page
+
+    response = owner.post(
+        f"{INSTRUMENTS}/{instrument}",
+        {
+            "name": "Fund",
+            "symbol": "VWCE",
+            "type": "etf",
+            "quote_currency": "EUR",
+            "unit_label": "share",
+            "risk_tier_override": "",
+            f"weight_{stocks}": "100",
+        },
+        token_from=f"{INSTRUMENTS}?edit={instrument}",
+    )
+    assert response.status_code == 303
+    page = owner.client.get(INSTRUMENTS).text
+    assert 'data-risk-tier-override="speculative"' not in page
+
+
+def test_apply_suggested_risk_tiers_from_the_classes_page(owner: OwnerApp) -> None:
+    stocks = _class(owner, "Stocks")
+    page = owner.client.get(CLASSES).text
+    assert "data-apply-risk-tiers" in page
+
+    response = owner.post("/investments/classes/apply-risk-tiers", token_from=CLASSES)
+
+    assert response.status_code == 303
+    page = owner.client.get(response.headers["location"]).text
+    assert "Suggested risk tiers applied." in page
+    assert 'data-risk-tier="growth"' in page
+    assert "data-apply-risk-tiers" not in page
+    with owner.db() as session:
+        assert session.get(AssetClass, stocks).risk_tier == "growth"  # type: ignore[union-attr]

@@ -90,7 +90,7 @@ their own account; use the account security page instead. An operator with shell
 also run `assetboard reset-mfa <email>` (see [administrator commands](deployment.md#administrator-commands)).
 A CLI password reset does not remove your second factor.
 
-## Details, language and theme
+## Details, language, theme and planning
 
 - **Display name**: 1 to 120 characters, no control or invisible characters.
 - **Language**: "Browser language" (the default) follows your browser's language setting;
@@ -99,6 +99,9 @@ A CLI password reset does not remove your second factor.
   the theme on one device only; "Use the saved theme on this device" undoes that.
 - **Highlight large transactions** (on by default): tints larger entries on the Transactions
   page, red for expenses and green for income (see [Transactions](transactions.md)).
+- **Birth year** (optional) and **Life expectancy** (50–120, default 90): used by age-based
+  investment risk targets (see [Investments](investments.md#risk-balance)) and by the FIRE
+  projection. Leave the birth year empty to disable age-based targets for yourself.
 
 ## Sign-in methods
 

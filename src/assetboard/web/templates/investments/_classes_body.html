@@ -26,6 +26,17 @@
   </section>
   {% endif %}
 
+  {% if can_edit and page.can_suggest_risk_tiers %}
+  <section class="panel p-6 sm:p-7" aria-labelledby="suggested-risk-heading" data-suggested-risk-tiers>
+    <h2 id="suggested-risk-heading" class="text-base font-semibold">{{ _("Suggested risk tiers") }}</h2>
+    <p class="mt-1 text-sm text-muted">{{ _("Set the suggested tier on classes whose name matches a suggested class and that have no tier yet. Existing tiers are never overwritten.") }}</p>
+    <form {{ htmx_form(scoped_url(request, 'investments_classes_apply_risk_tiers'), '#investments-classes-body') }} class="mt-3">
+      {{ csrf_input() }}
+      <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-apply-risk-tiers>{{ _("Apply suggested risk tiers") }}</button>
+    </form>
+  </section>
+  {% endif %}
+
   <section class="panel p-6 sm:p-7" aria-labelledby="classes-heading" data-section="classes">
     <h2 id="classes-heading" class="text-base font-semibold">{{ _("Asset classes") }}</h2>
     <p class="mt-1 text-sm text-muted">{{ _("Each instrument's value is split across these classes by the allocation weights. Archiving a class keeps it on instruments that already use it.") }}</p>
@@ -41,6 +52,7 @@
           {% else %}
           <span class="rounded-full bg-subtle px-2 py-0.5 text-xs text-muted" data-investable="false">{{ _("Not investable") }}</span>
           {% endif %}
+          {% if c.risk_tier %}<span class="rounded-full bg-primary-soft px-2 py-0.5 text-xs text-primary-ink" data-risk-tier="{{ c.risk_tier }}">{{ risk_tier_labels[c.risk_tier] }}</span>{% endif %}
         </div>
         {% if can_edit %}
         <div class="flex flex-wrap items-center gap-1">
@@ -65,7 +77,7 @@
     <h2 id="class-form-heading" class="text-base font-semibold">{% if editing %}{{ _("Edit asset class") }}{% else %}{{ _("Add an asset class") }}{% endif %}</h2>
     {% set values = edit_values if editing else create_values %}
     {% set errors = edit_errors if editing else create_errors %}
-    <form {{ htmx_form(scoped_url(request, 'investments_class_update', class_id=editing|string) if editing else scoped_url(request, 'investments_class_create'), '#investments-classes-body') }} class="mt-4 grid gap-4 sm:grid-cols-[minmax(0,2fr)_auto_minmax(0,1fr)_auto] sm:items-start" novalidate>
+    <form {{ htmx_form(scoped_url(request, 'investments_class_update', class_id=editing|string) if editing else scoped_url(request, 'investments_class_create'), '#investments-classes-body') }} class="mt-4 grid gap-4 sm:grid-cols-[minmax(0,2fr)_auto_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start" novalidate>
       {{ csrf_input() }}
       <div class="space-y-1.5">
         <label for="class-name" class="block text-sm font-medium">{{ _("Name") }}</label>
@@ -76,6 +88,13 @@
         <label for="class-color" class="block text-sm font-medium">{{ _("Colour") }}</label>
         <input id="class-color" name="color" type="color" value="{{ values.color }}" class="h-9 w-12 rounded-lg border border-line-strong bg-field p-1">
         {{ field_error(errors, "color") }}
+      </div>
+      <div class="space-y-1.5">
+        <label for="class-risk-tier" class="block text-sm font-medium">{{ _("Risk tier") }}</label>
+        <select id="class-risk-tier" name="risk_tier" class="form-select w-full py-2">
+          {% for value, label in risk_tier_options %}<option value="{{ value }}"{% if value == values.risk_tier %} selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+        {{ field_error(errors, "risk_tier") }}
       </div>
       <div class="flex items-start gap-2 pt-6">
         <input id="class-investable" name="investable" type="checkbox" value="1"{% if values.investable %} checked{% endif %} class="mt-1 h-4 w-4 rounded border-line accent-primary">
@@ -103,6 +122,7 @@
           {{ swatch(c.color) }}
           <span class="truncate text-sm font-medium">{{ c.name }}</span>
           {% if c.investable %}<span class="rounded-full bg-subtle px-2 py-0.5 text-xs text-muted">{{ _("Investable") }}</span>{% endif %}
+          {% if c.risk_tier %}<span class="rounded-full bg-subtle px-2 py-0.5 text-xs text-muted" data-risk-tier="{{ c.risk_tier }}">{{ risk_tier_labels[c.risk_tier] }}</span>{% endif %}
         </div>
         {% if can_edit %}
         <form {{ htmx_form(scoped_url(request, 'investments_class_restore', class_id=c.id|string), '#investments-classes-body') }}>{{ csrf_input() }}{{ small_button(_("Restore"), "data-restore") }}</form>

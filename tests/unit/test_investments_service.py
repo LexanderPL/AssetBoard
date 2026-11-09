@@ -13,7 +13,7 @@ from sqlalchemy import select
 from assetboard.clock import FixedClock
 from assetboard.db.models.identity import AuditEvent
 from assetboard.db.repositories import create_owned_workspace
-from assetboard.domain.instruments import ASSET_CLASS_SEED
+from assetboard.domain.instruments import ASSET_CLASS_SEED, RiskTier
 from assetboard.i18n import gettext
 from assetboard.services import investments as service
 from assetboard.services.context import Context, PermissionDenied
@@ -25,6 +25,7 @@ from assetboard.services.investments import (
     DuplicateInstrumentName,
     InstrumentArchived,
     InvestmentError,
+    apply_suggested_risk_tiers,
     archive_asset_class,
     archive_instrument,
     create_asset_class,
@@ -136,7 +137,7 @@ def test_create_asset_class_appends_and_audits(team: WorkspaceDb) -> None:
     ]
     events = _events(team, "asset_class.created")
     assert [event.entity_id for event in events] == [str(first.id), str(second.id)]
-    assert events[-1].data == {"name": "Bonds", "investable": False}
+    assert events[-1].data == {"name": "Bonds", "investable": False, "risk_tier": ""}
 
 
 def test_duplicate_active_asset_class_names_are_refused_ignoring_case(
@@ -559,3 +560,135 @@ def test_viewers_cannot_write(
     ctx = team.ctx("vic", "viewer")
     with pytest.raises(PermissionDenied):
         operation(team, ctx)
+
+
+def test_asset_class_risk_tier_is_created_updated_and_cleared(team: WorkspaceDb) -> None:
+    ctx = team.ctx("ed", "editor")
+    created = create_asset_class(
+        team.factory,
+        ctx,
+        name="Stocks",
+        color="#2563eb",
+        investable=True,
+        risk_tier="growth",
+    )
+    assert created.risk_tier == "growth"
+    assert _event(team, "asset_class.created").data["risk_tier"] == "growth"
+
+    updated = update_asset_class(
+        team.factory,
+        ctx,
+        created.id,
+        name="Stocks",
+        color="#2563eb",
+        investable=True,
+        risk_tier="",
+    )
+    assert updated.risk_tier is None
+    assert "risk_tier" in _event(team, "asset_class.updated").data["fields"]
+
+    with pytest.raises(InvestmentError) as caught:
+        update_asset_class(
+            team.factory,
+            ctx,
+            created.id,
+            name="Stocks",
+            color="#2563eb",
+            investable=True,
+            risk_tier="risky",
+        )
+    assert (caught.value.field, caught.value.code) == ("risk_tier", "invalid_risk_tier")
+
+
+def test_instrument_risk_tier_override_is_created_updated_and_cleared(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("ed", "editor")
+    stocks = _class(team, ctx, "Stocks")
+    instrument = create_instrument(
+        team.factory,
+        ctx,
+        name="Fund",
+        symbol="",
+        type="etf",
+        quote_currency="EUR",
+        unit_label="share",
+        allocations=[(stocks.id, 10_000)],
+        locale="en",
+        risk_tier_override="speculative",
+    )
+    assert instrument.risk_tier_override == "speculative"
+    assert _event(team, "instrument.created").data["risk_tier_override"] == "speculative"
+
+    cleared = update_instrument(
+        team.factory,
+        ctx,
+        instrument.id,
+        name="Fund",
+        symbol="",
+        type="etf",
+        quote_currency="EUR",
+        unit_label="share",
+        allocations=[(stocks.id, 10_000)],
+        locale="en",
+        risk_tier_override="",
+    )
+    assert cleared.risk_tier_override is None
+    assert "risk_tier_override" in _event(team, "instrument.updated").data["fields"]
+
+    with pytest.raises(InvestmentError) as caught:
+        update_instrument(
+            team.factory,
+            ctx,
+            instrument.id,
+            name="Fund",
+            symbol="",
+            type="etf",
+            quote_currency="EUR",
+            unit_label="share",
+            allocations=[(stocks.id, 10_000)],
+            locale="en",
+            risk_tier_override="risky",
+        )
+    assert (caught.value.field, caught.value.code) == (
+        "risk_tier",
+        "invalid_risk_tier",
+    )
+
+
+def test_apply_suggested_risk_tiers_sets_only_empty_matching_classes(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("ed", "editor")
+    _class(team, ctx, "Stocks")
+    bonds = create_asset_class(
+        team.factory,
+        ctx,
+        name="Bonds",
+        color="#16a34a",
+        investable=True,
+        risk_tier="growth",
+    )
+    other = _class(team, ctx, "My own class")
+    assert investment_page(team.factory, ctx, locale="en").can_suggest_risk_tiers
+
+    assert apply_suggested_risk_tiers(team.factory, ctx) == 1
+    page = investment_page(team.factory, ctx, locale="en")
+    by_name = {row.name: row.risk_tier for row in page.classes}
+    assert by_name == {"Stocks": "growth", "Bonds": "growth", "My own class": None}
+    assert not page.can_suggest_risk_tiers
+    event = _event(team, "asset_class.risk_tiers_suggested")
+    assert event.data == {"count": 1, "classes": "Stocks"}
+
+    assert apply_suggested_risk_tiers(team.factory, ctx) == 0
+    assert bonds.risk_tier == "growth"
+    assert other.id in {row.id for row in page.classes}
+    assert len(_events(team, "asset_class.risk_tiers_suggested")) == 1
+
+
+def test_apply_suggested_risk_tiers_matches_polish_seed_names(team: WorkspaceDb) -> None:
+    ctx = team.ctx("ed", "editor")
+    _class(team, ctx, gettext("Stocks", "pl"))
+    assert apply_suggested_risk_tiers(team.factory, ctx) == 1
+    page = investment_page(team.factory, ctx, locale="en")
+    assert page.classes[0].risk_tier == RiskTier.GROWTH.value

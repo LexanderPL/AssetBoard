@@ -31,6 +31,7 @@ from assetboard.domain.instruments import (
     clean_quote_currency,
     clean_symbol,
     clean_unit_label,
+    parse_risk_tier,
     percent_to_bp,
     validate_allocation,
 )
@@ -61,6 +62,14 @@ def test_the_seed_has_the_spec_names_order_and_investable_flags() -> None:
     ]
     assert all(seed.investable for seed in ASSET_CLASS_SEED)
     assert all(len(seed.color) == 7 for seed in ASSET_CLASS_SEED)
+    assert {seed.name: seed.risk_tier for seed in ASSET_CLASS_SEED} == {
+        "Stocks": RiskTier.GROWTH,
+        "Bonds": RiskTier.SAFE,
+        "Metals": RiskTier.SAFE,
+        "Crypto": RiskTier.SPECULATIVE,
+        "Currencies": RiskTier.GROWTH,
+        "Other": None,
+    }
 
 
 def test_the_pre_f57_seed_is_kept_for_untouched_set_checks() -> None:
@@ -88,6 +97,16 @@ def test_the_pre_f57_seed_is_kept_for_untouched_set_checks() -> None:
     # Unchanged classes keep their colours, so both sets compare as shipped.
     v1 = {seed.name: seed.color for seed in ASSET_CLASS_SEED_V1}
     assert all(v1[seed.name] == seed.color for seed in ASSET_CLASS_SEED)
+    assert {seed.name: seed.risk_tier for seed in ASSET_CLASS_SEED_V1} == {
+        "Stocks": RiskTier.GROWTH,
+        "Bonds": RiskTier.SAFE,
+        "Metals": RiskTier.SAFE,
+        "Crypto": RiskTier.SPECULATIVE,
+        "Currencies": RiskTier.GROWTH,
+        "Real estate": None,
+        "Primary residence": None,
+        "Other": None,
+    }
 
 
 def test_asset_class_names_are_cleaned_and_bounded() -> None:
@@ -175,6 +194,10 @@ def test_allocation_weights_must_total_exactly_100_percent() -> None:
 
 def test_risk_tiers_are_the_three_owner_agreed_values() -> None:
     assert {tier.value for tier in RiskTier} == {"safe", "growth", "speculative"}
+    assert parse_risk_tier(" growth ") is RiskTier.GROWTH
+    assert parse_risk_tier("") is None
+    with pytest.raises(ValueError):
+        parse_risk_tier("risky")
 
 
 @given(st.integers(min_value=0, max_value=ALLOCATION_TOTAL_BP))

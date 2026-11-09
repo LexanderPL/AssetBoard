@@ -29,6 +29,7 @@ from assetboard.db.repositories.investments import (
     InstrumentAllocationRepository,
     InstrumentRepository,
     InvestmentTransactionRepository,
+    RiskTargetPolicyRepository,
 )
 from assetboard.db.repositories.invitation import (
     InvitationLocation,
@@ -83,6 +84,7 @@ __all__ = [
     "InstrumentRepository",
     "InstrumentAllocationRepository",
     "InvestmentTransactionRepository",
+    "RiskTargetPolicyRepository",
     "ScheduledItemRepository",
     "ScheduledOccurrenceRepository",
     "IncomeSourceRepository",

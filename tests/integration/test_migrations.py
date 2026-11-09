@@ -68,6 +68,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "fx_rates",
         "price_source_configs",
         "provider_errors",
+        "risk_target_policies",
         "setup_state",
         "transactions",
         "scheduled_items",

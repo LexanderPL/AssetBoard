@@ -38,6 +38,7 @@ from assetboard.db.repositories.base import WorkspaceScope
 from assetboard.domain.categories import Direction, move, name_key
 from assetboard.domain.instruments import (
     ASSET_CLASS_SEED,
+    ASSET_CLASS_SEEDS,
     TYPE_DEFAULTS,
     TYPE_LABELS,
     VALUATION_SOURCE_LABELS,
@@ -48,6 +49,7 @@ from assetboard.domain.instruments import (
     InvalidQuoteCurrency,
     InvalidSymbol,
     InvalidUnitLabel,
+    RiskTier,
     ValuationSource,
     clean_asset_class_name,
     clean_colour,
@@ -56,6 +58,7 @@ from assetboard.domain.instruments import (
     clean_symbol,
     clean_unit_label,
     parse_instrument_type,
+    parse_risk_tier,
     validate_allocation,
 )
 from assetboard.domain.providers import (
@@ -67,6 +70,7 @@ from assetboard.domain.providers import (
     provider_supports_instrument,
 )
 from assetboard.i18n import gettext
+from assetboard.i18n.locale import SUPPORTED_LOCALES
 from assetboard.services.context import Context, Role, require_role, require_role_now
 
 __all__ = [
@@ -81,6 +85,7 @@ __all__ = [
     "InvestmentError",
     "InvestmentPage",
     "AllocationRejected",
+    "apply_suggested_risk_tiers",
     "archive_asset_class",
     "archive_instrument",
     "create_asset_class",
@@ -92,6 +97,7 @@ __all__ = [
     "restore_instrument",
     "seed_asset_classes",
     "seed_into",
+    "suggested_risk_tier_changes",
     "update_asset_class",
     "update_instrument",
 ]
@@ -151,6 +157,7 @@ class AssetClassView:
     color: str
     sort_order: int
     archived: bool
+    risk_tier: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -180,6 +187,7 @@ class InstrumentView:
     provider_key: str | None = None
     provider_symbol: str | None = None
     provider_label: str | None = None
+    risk_tier_override: str | None = None
 
     @property
     def allocation_total_bp(self) -> int:
@@ -200,6 +208,7 @@ class InvestmentPage:
     archived_instruments: tuple[InstrumentView, ...]
     provider_choices: tuple[ProviderChoice, ...] = ()
     coingecko_enabled: bool = False
+    can_suggest_risk_tiers: bool = False
 
     @property
     def can_seed(self) -> bool:
@@ -215,6 +224,7 @@ def _class_view(row: AssetClass) -> AssetClassView:
         color=row.color,
         sort_order=row.sort_order,
         archived=row.archived_at is not None,
+        risk_tier=row.risk_tier,
     )
 
 
@@ -268,6 +278,7 @@ def _instrument_view(
         provider_key=row.provider_key,
         provider_symbol=row.provider_symbol,
         provider_label=provider.label if provider is not None else row.provider_key,
+        risk_tier_override=row.risk_tier_override,
     )
 
 
@@ -280,6 +291,7 @@ def _page(
     provider_choices: tuple[ProviderChoice, ...] = (),
     coingecko_enabled: bool = False,
     bond_terms_instruments: Collection[UUID] = (),
+    can_suggest_risk_tiers: bool = False,
 ) -> InvestmentPage:
     classes_by_id = {row.id: row for row in classes}
     by_instrument: dict[UUID, list[InstrumentAllocation]] = {}
@@ -304,6 +316,7 @@ def _page(
         archived_instruments=tuple(view for view in instrument_views if view.archived),
         provider_choices=provider_choices,
         coingecko_enabled=coingecko_enabled,
+        can_suggest_risk_tiers=can_suggest_risk_tiers,
     )
 
 
@@ -335,6 +348,7 @@ def investment_page(factory: sessionmaker[Session], ctx: Context, *, locale: str
             provider_choices=choices,
             coingecko_enabled=coingecko,
             bond_terms_instruments=terms_instruments,
+            can_suggest_risk_tiers=bool(_suggestions_for_classes(classes)),
         )
 
 
@@ -415,6 +429,75 @@ def _ensure_unique_instrument(
         raise DuplicateInstrumentName
 
 
+def _risk_tier_value(value: str | None) -> str | None:
+    if value is None:
+        return None
+    try:
+        tier = parse_risk_tier(value)
+    except ValueError:
+        raise InvalidInvestment("risk_tier", "invalid_risk_tier") from None
+    return tier.value if tier is not None else None
+
+
+def _seed_risk_tier_keys() -> dict[str, str]:
+    tiers: dict[str, str] = {}
+    for seeds in ASSET_CLASS_SEEDS:
+        for seed in seeds:
+            if seed.risk_tier is None:
+                continue
+            for locale in SUPPORTED_LOCALES:
+                key = name_key(gettext(seed.name, locale))
+                tiers[key] = seed.risk_tier.value
+    return tiers
+
+
+def _suggestions_for_classes(
+    classes: Sequence[AssetClass],
+) -> list[tuple[AssetClass, RiskTier]]:
+    keys = _seed_risk_tier_keys()
+    return [
+        (row, RiskTier(keys[row.name_key]))
+        for row in classes
+        if row.risk_tier is None and row.name_key in keys
+    ]
+
+
+def suggested_risk_tier_changes(
+    session: Session, ctx: Context
+) -> list[tuple[AssetClass, RiskTier]]:
+    """Classes whose empty tier matches a suggested class name in a supported language."""
+    return _suggestions_for_classes(AssetClassRepository(session, ctx).ordered())
+
+
+def apply_suggested_risk_tiers(factory: sessionmaker[Session], ctx: Context) -> int:
+    """Set the seed tier on matching empty classes; never overwrites a user-set tier."""
+    require_role(ctx, Role.EDITOR)
+
+    def write(session: Session) -> int:
+        require_role_now(session, ctx, Role.EDITOR)
+        _lock(session, ctx, exclusive=True)
+        changes = suggested_risk_tier_changes(session, ctx)
+        if not changes:
+            return 0
+        repository = AssetClassRepository(session, ctx)
+        for row, tier in changes:
+            repository.update(row.id, risk_tier=tier.value)
+        _audit(
+            session,
+            ctx,
+            "asset_class.risk_tiers_suggested",
+            "workspace",
+            ctx.workspace.id,
+            {
+                "count": len(changes),
+                "classes": ", ".join(row.name for row, _tier in changes),
+            },
+        )
+        return len(changes)
+
+    return run_immediate(factory, write)
+
+
 def create_asset_class(
     factory: sessionmaker[Session],
     ctx: Context,
@@ -422,6 +505,7 @@ def create_asset_class(
     name: str,
     color: str,
     investable: bool,
+    risk_tier: str = "",
 ) -> AssetClassView:
     require_role(ctx, Role.EDITOR)
     try:
@@ -433,6 +517,7 @@ def create_asset_class(
     except ValueError:
         raise InvalidInvestment("color", "invalid_color") from None
     key = name_key(clean)
+    wanted_risk_tier = _risk_tier_value(risk_tier)
 
     def write(session: Session) -> AssetClassView:
         require_role_now(session, ctx, Role.EDITOR)
@@ -445,6 +530,7 @@ def create_asset_class(
             investable=investable,
             color=colour,
             sort_order=_next_sort_order(repository),
+            risk_tier=wanted_risk_tier,
         )
         _audit(
             session,
@@ -452,7 +538,11 @@ def create_asset_class(
             "asset_class.created",
             "asset_class",
             row.id,
-            {"name": clean, "investable": investable},
+            {
+                "name": clean,
+                "investable": investable,
+                "risk_tier": wanted_risk_tier or "",
+            },
         )
         return _class_view(row)
 
@@ -467,6 +557,7 @@ def update_asset_class(
     name: str,
     color: str,
     investable: bool,
+    risk_tier: str | None = None,
 ) -> AssetClassView:
     require_role(ctx, Role.EDITOR)
     try:
@@ -478,6 +569,7 @@ def update_asset_class(
     except ValueError:
         raise InvalidInvestment("color", "invalid_color") from None
     key = name_key(clean)
+    wanted_risk_tier = _risk_tier_value(risk_tier) if risk_tier is not None else None
 
     def write(session: Session) -> AssetClassView:
         require_role_now(session, ctx, Role.EDITOR)
@@ -494,6 +586,7 @@ def update_asset_class(
                 ("name", clean),
                 ("investable", investable),
                 ("color", colour),
+                *((("risk_tier", wanted_risk_tier),) if risk_tier is not None else ()),
             )
             if getattr(row, field) != value
         }
@@ -620,6 +713,7 @@ def seed_into(
             investable=seed.investable,
             color=seed.color,
             sort_order=position,
+            risk_tier=seed.risk_tier.value if seed.risk_tier is not None else None,
         )
     data: dict[str, str | int | bool] = {"count": len(ASSET_CLASS_SEED)}
     if automatic:
@@ -782,8 +876,10 @@ def create_instrument(
     locale: str,
     provider_key: str = "",
     provider_symbol: str = "",
+    risk_tier_override: str = "",
 ) -> InstrumentView:
     require_role(ctx, Role.EDITOR)
+    wanted_risk_override = _risk_tier_value(risk_tier_override)
     (
         clean,
         key,
@@ -826,6 +922,7 @@ def create_instrument(
             valuation_source=source.value,
             provider_key=provider_key_value,
             provider_symbol=provider_symbol_value,
+            risk_tier_override=wanted_risk_override,
         )
         allocation_repository = InstrumentAllocationRepository(session, ctx)
         for class_id, weight_bp in rows:
@@ -844,6 +941,7 @@ def create_instrument(
                 "name": clean,
                 "type": instrument_type.value,
                 "currency": currency,
+                "risk_tier_override": wanted_risk_override or "",
             },
         )
         _audit(
@@ -878,8 +976,12 @@ def update_instrument(
     locale: str,
     provider_key: str = "",
     provider_symbol: str = "",
+    risk_tier_override: str | None = None,
 ) -> InstrumentView:
     require_role(ctx, Role.EDITOR)
+    wanted_risk_override = (
+        _risk_tier_value(risk_tier_override) if risk_tier_override is not None else None
+    )
     (
         clean,
         key,
@@ -937,6 +1039,11 @@ def update_instrument(
                 ("valuation_source", source.value),
                 ("provider_key", provider_key_value),
                 ("provider_symbol", provider_symbol_value),
+                *(
+                    (("risk_tier_override", wanted_risk_override),)
+                    if risk_tier_override is not None
+                    else ()
+                ),
             )
             if getattr(row, field) != value
         }
