@@ -73,22 +73,29 @@ def test_supports_equities_and_etfs_with_a_ticker() -> None:
     assert not provider.supports(ProviderInstrument(uuid4(), "etf", "EUR", "eodhd", ""))
 
 
-def test_latest_uses_adjusted_close() -> None:
+def test_latest_uses_the_raw_close() -> None:
     provider, _ = _provider({_latest_url(): (FIXTURES / "eodhd_eod.json").read_bytes()})
     quotes = provider.fetch_latest(["VWCE.DE"], "", settings={"api_key": SECRET})
-    assert quotes["VWCE.DE"].price == Decimal("101.5")
+    assert quotes["VWCE.DE"].price == Decimal("102.0")
     assert quotes["VWCE.DE"].date == date(2026, 3, 2)
 
 
-def test_history_returns_adjusted_close_in_date_order() -> None:
+def test_history_returns_raw_close_in_date_order() -> None:
     provider, _ = _provider({_history_url(): (FIXTURES / "eodhd_eod.json").read_bytes()})
     quotes = provider.fetch_history(
         "VWCE.DE", date(2026, 2, 27), date(2026, 3, 2), settings={"api_key": SECRET}
     )
     assert [(quote.date, quote.price) for quote in quotes] == [
-        (date(2026, 2, 27), Decimal("99.5")),
-        (date(2026, 3, 2), Decimal("101.5")),
+        (date(2026, 2, 27), Decimal("100.0")),
+        (date(2026, 3, 2), Decimal("102.0")),
     ]
+
+
+def test_missing_close_falls_back_to_adjusted_close() -> None:
+    body = b'[{"date": "2026-03-02", "adjusted_close": 101.5}]'
+    provider, _ = _provider({_latest_url(): body})
+    quotes = provider.fetch_latest(["VWCE.DE"], "", settings={"api_key": SECRET})
+    assert quotes["VWCE.DE"].price == Decimal("101.5")
 
 
 def test_missing_key_is_refused() -> None:

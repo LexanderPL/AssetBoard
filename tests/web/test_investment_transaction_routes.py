@@ -11,6 +11,7 @@ from sqlalchemy import select
 
 from assetboard.clock import FixedClock
 from assetboard.db.models.investments import AssetClass, Instrument
+from assetboard.db.models.ledger import Category, Transaction
 from tests.conftest import OwnerApp
 
 NOW = "2026-03-10T12:00:00+00:00"
@@ -102,6 +103,44 @@ def _tx(
             "fee": fee,
             "fx_to_base": fx,
             "note": note,
+        },
+        token_from=TX,
+    )
+
+
+def _interest_id(owner: OwnerApp) -> UUID:
+    with owner.db() as session:
+        return session.scalars(
+            select(Category.id).where(Category.name == "Interest", Category.kind == "income")
+        ).one()
+
+
+def _dividend(
+    owner: OwnerApp,
+    instrument_id: UUID,
+    *,
+    gross: str = "10",
+    withholding: str = "1",
+    record_income: bool = True,
+    category_id: UUID | None = None,
+) -> Any:
+    return owner.post(
+        TX,
+        {
+            "instrument_id": str(instrument_id),
+            "type": "dividend",
+            "date": "2026-03-01",
+            "quantity": "",
+            "unit_price": "",
+            "fee": "0",
+            "fx_to_base": "",
+            "note": "",
+            "dividend_gross": gross,
+            "dividend_withholding": withholding,
+            "record_income": "true" if record_income else "",
+            "income_category_id": str(category_id) if category_id is not None else "",
+            "split_new": "",
+            "split_old": "",
         },
         token_from=TX,
     )
@@ -294,3 +333,111 @@ def test_workspace_cost_basis_setting_round_trips(owner: OwnerApp) -> None:
     assert response.status_code == 303
     page = owner.client.get("/workspace/settings").text
     assert 'value="fifo" selected' in page
+
+
+def test_the_form_offers_dividends_splits_and_income(owner: OwnerApp) -> None:
+    _instrument(owner, "World ETF")
+    page = owner.client.get(TX).text
+    assert "Dividend / interest" in page
+    assert "Record as income" in page
+    assert "Income category" in page
+    assert "New units" in page
+    assert "Old units" in page
+
+
+def test_a_dividend_records_the_net_income_and_the_income_tab_shows_it(
+    owner: OwnerApp,
+) -> None:
+    instrument = _instrument(owner, "World ETF")
+    interest = _interest_id(owner)
+    response = _dividend(owner, instrument, gross="10", withholding="1", category_id=interest)
+    assert (response.status_code, response.headers["location"]) == (
+        303,
+        f"{TX}?notice=created",
+    )
+
+    page = owner.client.get(TX).text
+    assert "Dividend / interest" in page
+    assert "10 EUR" in page and "€1.00" in page
+
+    ledger = owner.client.get("/transactions/2026-03").text
+    assert "Investment income: World ETF" in ledger
+    assert "from investment income" in ledger
+
+    income = owner.client.get("/investments/income").text
+    assert "Income from investments" in income
+    assert "2026" in income
+    assert "€10.00" in income and "€1.00" in income and "€9.00" in income
+    assert "data-income-tab" in income
+
+    owner.set_admin_role("viewer")
+    assert owner.client.get("/investments/income").status_code == 200
+
+
+def test_recording_income_without_a_category_is_refused(owner: OwnerApp) -> None:
+    instrument = _instrument(owner, "World ETF")
+    response = _dividend(owner, instrument, gross="10", withholding="0", category_id=None)
+    assert response.status_code == 400
+    assert "Choose an income category when recording the dividend as income." in response.text
+
+
+def test_the_ledger_refuses_deleting_a_linked_income_row(owner: OwnerApp) -> None:
+    instrument = _instrument(owner, "World ETF")
+    assert (
+        _dividend(
+            owner, instrument, gross="10", withholding="1", category_id=_interest_id(owner)
+        ).status_code
+        == 303
+    )
+    with owner.db() as session:
+        row = session.scalars(select(Transaction).where(Transaction.source == "investment")).one()
+        income_id = row.id
+        assert row.direction == "income"
+    response = owner.post(
+        f"/m/2026-03/transactions/{income_id}/delete", {}, token_from="/m/2026-03"
+    )
+    assert response.status_code == 303
+    assert "error=investment_income_linked" in response.headers["location"]
+    page = owner.client.get(response.headers["location"]).text
+    assert "managed by its investment dividend" in page
+
+
+def test_a_split_can_be_created_from_the_form(owner: OwnerApp) -> None:
+    instrument = _instrument(owner, "World ETF")
+    assert _tx(owner, instrument, quantity="10", unit_price="100").status_code == 303
+    response = owner.post(
+        TX,
+        {
+            "instrument_id": str(instrument),
+            "type": "split",
+            "date": "2026-03-01",
+            "quantity": "",
+            "unit_price": "",
+            "fee": "0",
+            "fx_to_base": "",
+            "note": "",
+            "dividend_gross": "",
+            "dividend_withholding": "0",
+            "record_income": "",
+            "income_category_id": "",
+            "split_new": "2",
+            "split_old": "1",
+        },
+        token_from=TX,
+    )
+    assert response.status_code == 303
+    page = owner.client.get(TX).text
+    assert "2 : 1" in page
+    detail = owner.client.get(f"{INSTRUMENTS}/{instrument}").text
+    assert "data-holding-summary" in detail and "20" in detail
+
+
+def test_a_closed_month_refuses_only_the_linked_dividend(owner: OwnerApp) -> None:
+    instrument = _instrument(owner, "World ETF")
+    assert owner.post("/m/2026-03/close", {}, token_from="/m/2026-03").status_code == 303
+    interest = _interest_id(owner)
+    response = _dividend(owner, instrument, gross="10", withholding="0", category_id=interest)
+    assert response.status_code == 409
+    assert "This month is closed" in response.text
+    unlinked = _dividend(owner, instrument, gross="10", withholding="0", record_income=False)
+    assert unlinked.status_code == 303

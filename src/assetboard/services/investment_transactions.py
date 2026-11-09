@@ -20,7 +20,7 @@ fee are derived from them with the rate (``domain.settlement``).
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal, localcontext
 from uuid import UUID
@@ -31,10 +31,12 @@ from assetboard.db.engine import run_immediate
 from assetboard.db.models.investments import Instrument, InvestmentTransaction
 from assetboard.db.repositories import (
     AuditEventRepository,
+    CategoryRepository,
     CurrentWorkspaceRepository,
     InstrumentRepository,
     InvestmentTransactionRepository,
     NotFound,
+    TransactionRepository,
 )
 from assetboard.domain.holdings import (
     MAX_NOTE_LENGTH,
@@ -45,7 +47,7 @@ from assetboard.domain.holdings import (
     Oversell,
     compute_holdings,
 )
-from assetboard.domain.money import Money
+from assetboard.domain.money import Money, minor_unit_for
 from assetboard.domain.settlement import derive_quote_values, needs_fx_check
 from assetboard.domain.transactions import (
     MAX_AMOUNT_MINOR,
@@ -57,7 +59,14 @@ from assetboard.domain.transactions import (
 from assetboard.i18n.numbers import parse_amount
 from assetboard.services.context import Context, Role, require_role, require_role_now
 from assetboard.services.holding_rows import cost_basis_method, holding_transaction
+from assetboard.services.investment_income import (
+    create_linked_income,
+    remove_linked_income,
+    restore_linked_income,
+    update_linked_income,
+)
 from assetboard.services.investments import InstrumentView, get_instrument
+from assetboard.services.months import ensure_date_open, lock_month_writes
 from assetboard.services.prices import stored_fx_rates
 
 __all__ = [
@@ -142,6 +151,8 @@ class InvestmentTransactionView:
     settlement_unit_price: Decimal | None = None
     settlement_fee: Money | None = None
     fx_needs_check: bool = False
+    income_transaction_id: UUID | None = None
+    income_category_id: UUID | None = None
 
     @property
     def amounts(self) -> str:
@@ -203,7 +214,12 @@ def _type(value: str) -> str:
         kind = InvestmentTransactionType(value)
     except ValueError:
         raise InvalidInvestmentTransaction("type", "invalid_type") from None
-    if kind not in (InvestmentTransactionType.BUY, InvestmentTransactionType.SELL):
+    if kind not in (
+        InvestmentTransactionType.BUY,
+        InvestmentTransactionType.SELL,
+        InvestmentTransactionType.DIVIDEND,
+        InvestmentTransactionType.SPLIT,
+    ):
         raise InvalidInvestmentTransaction("type", "invalid_type")
     return kind.value
 
@@ -246,6 +262,14 @@ def _decimal(
     if not _fits_decimal_type(amount):
         raise InvalidInvestmentTransaction(field, error)
     return amount
+
+
+def _currency_amount(value: Decimal, currency: str) -> Decimal:
+    minor_unit = minor_unit_for(currency)
+    quantum = Decimal(1).scaleb(-minor_unit)
+    if value != value.quantize(quantum):
+        raise InvalidInvestmentTransaction("unit_price", "invalid_amount_precision")
+    return value
 
 
 def _fee_minor(value: str, locale: str, currency: str, *, field: str = "fee") -> int:
@@ -307,6 +331,15 @@ def _note(value: str) -> str:
     return note
 
 
+def _income_category(session: Session, ctx: Context, category_id: UUID | None) -> UUID:
+    if category_id is None:
+        raise InvalidInvestmentTransaction("income_category", "income_category_required")
+    category = CategoryRepository(session, ctx).get(category_id)
+    if category is None or category.kind != "income" or category.archived_at is not None:
+        raise InvalidInvestmentTransaction("income_category", "income_category_invalid")
+    return category.id
+
+
 def transaction_values(
     *,
     instrument: Instrument,
@@ -329,6 +362,51 @@ def transaction_values(
     Raises ``InvalidInvestmentTransaction`` naming the first failing field.
     """
     kind = _type(type_value)
+    if kind == InvestmentTransactionType.DIVIDEND.value:
+        if day is None:
+            raise InvalidInvestmentTransaction("date", "invalid_date")
+        gross = _decimal(unit_price_value, locale, "unit_price", allow_zero=False)
+        _currency_amount(gross, instrument.quote_currency)
+        withholding = _fee_minor(fee_value or "0", locale, instrument.quote_currency)
+        gross_minor = int(gross.scaleb(minor_unit_for(instrument.quote_currency)))
+        if withholding > gross_minor:
+            raise InvalidInvestmentTransaction("fee", "invalid_fee")
+        fx, stored = _fx(
+            fx_value,
+            locale,
+            quote_currency=instrument.quote_currency,
+            base_currency=base_currency,
+            day=day,
+            lookup=fx_lookup,
+        )
+        return TransactionValues(
+            day=day,
+            type=kind,
+            quantity=Decimal(1),
+            unit_price=gross,
+            fee_minor=withholding,
+            fx_to_base=fx,
+            note=_note(note_value),
+            fx_stored=stored,
+        )
+    if kind == InvestmentTransactionType.SPLIT.value:
+        if day is None:
+            raise InvalidInvestmentTransaction("date", "invalid_date")
+        if instrument.type in {"currency", "bond_model"}:
+            raise InvalidInvestmentTransaction("type", "invalid_split")
+        new_units = _decimal(quantity_value, locale, "quantity", allow_zero=False)
+        old_units = _decimal(unit_price_value, locale, "unit_price", allow_zero=False)
+        if new_units == old_units:
+            raise InvalidInvestmentTransaction("unit_price", "invalid_split")
+        return TransactionValues(
+            day=day,
+            type=kind,
+            quantity=new_units,
+            unit_price=old_units,
+            fee_minor=0,
+            fx_to_base=Decimal(1),
+            note=_note(note_value),
+        )
     quantity = _decimal(quantity_value, locale, "quantity", allow_zero=False)
     amounts = _amounts(amounts_value, instrument, base_currency)
     note = _note(note_value)
@@ -527,6 +605,7 @@ def _view(
         instrument_archived=instrument.archived_at is not None,
         settlement_unit_price=row.settlement_unit_price if settlement_fee is not None else None,
         settlement_fee=settlement_fee,
+        income_transaction_id=row.income_transaction_id,
         fx_needs_check=needs_fx_check(
             quote_currency=row.quote_currency,
             base_currency=base_currency,
@@ -657,7 +736,12 @@ def get_transaction(
             raise NotFound
         instrument = InstrumentRepository(session, ctx).get_or_raise(row.instrument_id)
         base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
-        return _view(row, instrument, base_currency)
+        view = _view(row, instrument, base_currency)
+        if row.income_transaction_id is not None:
+            income = TransactionRepository(session, ctx).get(row.income_transaction_id)
+            if income is not None:
+                view = replace(view, income_category_id=income.category_id)
+        return view
 
 
 def instrument_history(
@@ -718,6 +802,8 @@ def create_transaction(
     amounts_value: str = AMOUNTS_QUOTE,
     base_unit_price_value: str = "",
     base_fee_value: str = "",
+    record_income: bool = False,
+    income_category_id: UUID | None = None,
 ) -> InvestmentTransactionView:
     require_role(ctx, Role.EDITOR)
     today = ctx.clock.today(ctx.workspace.timezone)
@@ -725,6 +811,7 @@ def create_transaction(
     def write(session: Session) -> InvestmentTransactionView:
         require_role_now(session, ctx, Role.EDITOR)
         _lock(session, ctx)
+        lock_month_writes(session, ctx)
         base_currency, method = _workspace_values(session, ctx)
         instruments = InstrumentRepository(session, ctx)
         instrument = instruments.get_for_update(instrument_id)
@@ -749,7 +836,15 @@ def create_transaction(
             base_unit_price_value=base_unit_price_value,
             base_fee_value=base_fee_value,
         )
-        row = InvestmentTransactionRepository(session, ctx).create(
+        category_id: UUID | None = None
+        if record_income:
+            if values.type != InvestmentTransactionType.DIVIDEND.value:
+                raise InvalidInvestmentTransaction("income_category", "invalid_income")
+            category_id = _income_category(session, ctx, income_category_id)
+            if values.day is not None:
+                ensure_date_open(session, ctx, values.day)
+        repository = InvestmentTransactionRepository(session, ctx)
+        row = repository.create(
             instrument_id=instrument.id,
             date=values.day,
             type=values.type,
@@ -763,6 +858,20 @@ def create_transaction(
             settlement_unit_price=values.settlement_unit_price,
             settlement_fee_minor=values.settlement_fee_minor,
         )
+        if category_id is not None:
+            try:
+                income_id = create_linked_income(
+                    session,
+                    ctx,
+                    instrument=instrument,
+                    dividend=row,
+                    category_id=category_id,
+                    base_currency=base_currency,
+                    locale=locale,
+                )
+            except ValueError:
+                raise InvalidInvestmentTransaction("income_category", "income_zero") from None
+            repository.update(row.id, income_transaction_id=income_id)
         session.flush()
         _check_oversell(
             session,
@@ -793,6 +902,8 @@ def update_transaction(
     amounts_value: str = AMOUNTS_QUOTE,
     base_unit_price_value: str = "",
     base_fee_value: str = "",
+    record_income: bool = False,
+    income_category_id: UUID | None = None,
 ) -> InvestmentTransactionView:
     require_role(ctx, Role.EDITOR)
     today = ctx.clock.today(ctx.workspace.timezone)
@@ -800,6 +911,7 @@ def update_transaction(
     def write(session: Session) -> InvestmentTransactionView:
         require_role_now(session, ctx, Role.EDITOR)
         _lock(session, ctx)
+        lock_month_writes(session, ctx)
         base_currency, method = _workspace_values(session, ctx)
         repository = InvestmentTransactionRepository(session, ctx)
         row = repository.get_for_update(transaction_id)
@@ -829,7 +941,17 @@ def update_transaction(
             base_unit_price_value=base_unit_price_value,
             base_fee_value=base_fee_value,
         )
-        changes = {
+        old_income_id = row.income_transaction_id
+        new_income = values.type == InvestmentTransactionType.DIVIDEND.value and record_income
+        if record_income and not new_income:
+            raise InvalidInvestmentTransaction("income_category", "invalid_income")
+        category_id = _income_category(session, ctx, income_category_id) if new_income else None
+        if old_income_id is not None or new_income:
+            if row.date is not None:
+                ensure_date_open(session, ctx, row.date)
+            if values.day is not None:
+                ensure_date_open(session, ctx, values.day)
+        changes: dict[str, object] = {
             field: value
             for field, value in (
                 ("date", values.day),
@@ -845,9 +967,42 @@ def update_transaction(
             )
             if getattr(row, field) != value
         }
-        if not changes:
+        if old_income_id is not None and not new_income:
+            remove_linked_income(session, ctx, row, now=ctx.clock.now())
+            changes["income_transaction_id"] = None
+        if changes:
+            repository.update(row.id, **changes)
+        if new_income:
+            if old_income_id is not None and row.type == InvestmentTransactionType.DIVIDEND.value:
+                try:
+                    update_linked_income(
+                        session,
+                        ctx,
+                        instrument=instrument,
+                        dividend=row,
+                        category_id=category_id,  # type: ignore[arg-type]
+                        base_currency=base_currency,
+                        locale=locale,
+                    )
+                except ValueError:
+                    raise InvalidInvestmentTransaction("income_category", "income_zero") from None
+            else:
+                try:
+                    income_id = create_linked_income(
+                        session,
+                        ctx,
+                        instrument=instrument,
+                        dividend=row,
+                        category_id=category_id,  # type: ignore[arg-type]
+                        base_currency=base_currency,
+                        locale=locale,
+                    )
+                except ValueError:
+                    raise InvalidInvestmentTransaction("income_category", "income_zero") from None
+                repository.update(row.id, income_transaction_id=income_id)
+                changes["income_transaction_id"] = income_id
+        if not changes and old_income_id == row.income_transaction_id:
             return _view(row, instrument, base_currency)
-        repository.update(row.id, **changes)
         session.flush()
         _check_oversell(
             session,
@@ -877,6 +1032,7 @@ def delete_transaction(
     def write(session: Session) -> DeletedInvestmentTransaction:
         require_role_now(session, ctx, Role.EDITOR)
         _lock(session, ctx)
+        lock_month_writes(session, ctx)
         base_currency, method = _workspace_values(session, ctx)
         repository = InvestmentTransactionRepository(session, ctx)
         row = repository.get_for_update(transaction_id)
@@ -888,6 +1044,9 @@ def delete_transaction(
         if instrument.archived_at is not None:
             raise InstrumentArchived
         if row.deleted_at is None:
+            if row.income_transaction_id is not None and row.date is not None:
+                ensure_date_open(session, ctx, row.date)
+                remove_linked_income(session, ctx, row, now=ctx.clock.now())
             repository.update(row.id, deleted_at=ctx.clock.now())
             session.flush()
             _check_oversell(
@@ -913,6 +1072,7 @@ def undo_delete(
     def write(session: Session) -> InvestmentTransactionView:
         require_role_now(session, ctx, Role.EDITOR)
         _lock(session, ctx)
+        lock_month_writes(session, ctx)
         base_currency, method = _workspace_values(session, ctx)
         repository = InvestmentTransactionRepository(session, ctx)
         row = repository.get_for_update(transaction_id)
@@ -929,6 +1089,9 @@ def undo_delete(
             raise InvestmentUndoExpired
         if row.date is not None and row.date > today:
             raise InvalidInvestmentTransaction("date", "future_date")
+        if row.income_transaction_id is not None and row.date is not None:
+            ensure_date_open(session, ctx, row.date)
+            restore_linked_income(session, ctx, row)
         repository.update(row.id, deleted_at=None)
         session.flush()
         _check_oversell(

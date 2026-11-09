@@ -1459,6 +1459,17 @@ def _restore_report(
         and (definition := PROVIDERS.get(row.provider_key)) is not None
         and definition.requires_key
     )
+    ledger_ids = {UUID(row.id) for row in archive.rows.transactions}
+    warnings.extend(
+        _entry(
+            "income_target_missing",
+            file="investment_transactions.csv",
+            line=line,
+            column="income_transaction_id",
+        )
+        for line, row in enumerate(archive.rows.investment_transactions, start=2)
+        if row.income_transaction_id and UUID(row.income_transaction_id) not in ledger_ids
+    )
     report = _empty_report(
         counts=counts,
         errors=errors,
@@ -1722,6 +1733,7 @@ def _restore_investments(
     *,
     restore_now: datetime,
     removed: list[AssetClass],
+    transaction_ids: Mapping[UUID, UUID],
 ) -> tuple[dict[str, int], dict[UUID, UUID], dict[UUID, UUID]]:
     """Recreate classes, instruments, holdings, prices, FX and provider settings."""
     classes = AssetClassRepository(session, ctx)
@@ -1801,6 +1813,11 @@ def _restore_investments(
             ),
             import_batch_id=batch.id,
             import_key=f"id:{row.id}",
+            income_transaction_id=(
+                transaction_ids.get(UUID(row.income_transaction_id))
+                if row.income_transaction_id
+                else None
+            ),
             created_at=restore_now + timedelta(microseconds=index),
         )
 
@@ -2004,11 +2021,18 @@ def _apply_restore(
     transactions = TransactionRepository(session, ctx)
     total = len(archive.rows.transactions)
     base = restore_now - timedelta(microseconds=total)
+    linked_ledger_ids = {
+        UUID(row.income_transaction_id)
+        for row in archive.rows.investment_transactions
+        if row.type == "dividend" and row.income_transaction_id
+    }
     deleted = 0
+    transaction_ids: dict[UUID, UUID] = {}
     for index, row in enumerate(archive.rows.transactions):
         if row.deleted_at:
             deleted += 1
-        transactions.create_restored(
+        row_id = UUID(row.id) if row.id else None
+        transaction = transactions.create_restored(
             direction=row.direction,
             day=parse_date(row.date),
             amount_minor=parse_transaction_amount(row.amount, row.currency, decimal="dot"),
@@ -2021,7 +2045,10 @@ def _apply_restore(
             created_by_user_id=ctx.user.id,
             created_at=base + timedelta(microseconds=index),
             deleted_at=parse_timestamp(row.deleted_at) if row.deleted_at else None,
+            source="investment" if row_id in linked_ledger_ids else "import",
         )
+        if row_id is not None:
+            transaction_ids[row_id] = transaction.id
     months = MonthStateRepository(session, ctx)
     for row in archive.rows.months:
         months.create_restored(
@@ -2047,6 +2074,7 @@ def _apply_restore(
         archive,
         restore_now=restore_now,
         removed=removed_assets,
+        transaction_ids=transaction_ids,
     )
     investment_counts["risk_policy_restored"] = _apply_restore_risk_policy(
         session, ctx, batch, archive, restore_now=restore_now

@@ -286,6 +286,52 @@ def test_transaction_prices_and_fx_keep_the_series_complete(
     assert all(point.value.amount_minor > 0 for point in page.chart)
 
 
+def test_a_split_adjusts_the_carried_forward_transaction_price(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    instrument = _instrument(db, ctx, quote_currency="EUR")
+    _tx(db, ctx, instrument.id, day="2025-03-01", unit_price="100", fx="1")
+    _tx(
+        db,
+        ctx,
+        instrument.id,
+        day="2025-06-01",
+        type_value="split",
+        quantity="2",
+        unit_price="1",
+        fx="",
+    )
+    page = performance_page(db.factory, ctx)
+    before = [point for point in page.chart if point.date < date(2025, 6, 1)]
+    after = [point for point in page.chart if point.date >= date(2025, 6, 1)]
+    assert before and after
+    assert before[-1].value.amount_minor == after[0].value.amount_minor == 100_000
+
+
+def test_a_dividend_reduces_net_invested_without_changing_value(
+    db: WorkspaceDb, team: WorkspaceDb
+) -> None:
+    ctx = _owner(db)
+    instrument = _instrument(db, ctx, quote_currency="EUR")
+    _tx(db, ctx, instrument.id, day="2025-03-01", unit_price="100", fx="1")
+    _tx(
+        db,
+        ctx,
+        instrument.id,
+        day="2025-06-01",
+        type_value="dividend",
+        quantity="1",
+        unit_price="50",
+        fx="1",
+    )
+    page = performance_page(db.factory, ctx)
+    after = [point for point in page.chart if point.date >= date(2025, 6, 1)]
+    assert after
+    assert after[0].value.amount_minor == 100_000
+    assert after[0].net_invested.amount_minor == 95_000  # 1 000.00 − 50.00 net
+
+
 def test_bond_observations_show_a_coupon_reset(db: WorkspaceDb, team: WorkspaceDb) -> None:
     ctx = _owner(db)
     instrument = _instrument(db, ctx, type_value="bond_model", quote_currency="PLN")

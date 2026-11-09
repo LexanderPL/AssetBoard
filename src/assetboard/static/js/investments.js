@@ -62,6 +62,18 @@ function updateTransactionForm(form) {
   const option = select.selectedOptions[0];
   const type = option ? option.dataset.type || "" : "";
   const currency = option ? option.dataset.currency || "" : "";
+  const kindField = form.querySelector("[name=type]");
+  const kind = kindField ? kindField.value : "buy";
+  const isTrade = kind === "buy" || kind === "sell";
+  for (const field of form.querySelectorAll("[data-trade-field]")) {
+    field.classList.toggle("hidden", !isTrade);
+  }
+  for (const field of form.querySelectorAll("[data-dividend-field]")) {
+    field.classList.toggle("hidden", kind !== "dividend");
+  }
+  for (const field of form.querySelectorAll("[data-split-field]")) {
+    field.classList.toggle("hidden", kind !== "split");
+  }
   const price = form.querySelector("[data-transaction-price]");
   if (price) {
     const isCurrency = type === "currency";
@@ -69,7 +81,12 @@ function updateTransactionForm(form) {
     if (isCurrency) price.value = "1";
   }
   const fx = form.querySelector("[data-transaction-fx]");
-  if (fx) fx.classList.toggle("hidden", currency === form.dataset.baseCurrency);
+  if (fx) {
+    fx.classList.toggle(
+      "hidden",
+      kind === "split" || currency === form.dataset.baseCurrency,
+    );
+  }
 }
 
 // F6.3: the server renders each option's stored FX (manual or provider) for today. When the user
@@ -291,6 +308,10 @@ document.addEventListener("change", (event) => {
   const form = target.closest("[data-transaction-form]");
   if (!form) return;
   if (target.matches("[data-amounts-radio], [data-transaction-instrument]")) updateAmounts(form);
+  if (target.matches("[name=type]")) {
+    updateTransactionForm(form);
+    updateAmounts(form);
+  }
 });
 
 for (const eventName of ["DOMContentLoaded", "htmx:afterSwap", "htmx:oobAfterSwap"]) {

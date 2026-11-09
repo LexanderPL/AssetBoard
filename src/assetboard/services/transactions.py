@@ -56,6 +56,7 @@ from assetboard.db.repositories import (
     CategoryRepository,
     CurrentWorkspaceRepository,
     DescriptionMatch,
+    InvestmentTransactionRepository,
     NotFound,
     TransactionRepository,
 )
@@ -115,6 +116,16 @@ class UndoFutureDated(TransactionError):
     code = "undo_future_dated"
 
 
+class InvestmentIncomeLinked(TransactionError):
+    """A ledger row created by a dividend is managed only through that dividend."""
+
+    code = "investment_income_linked"
+
+    def __init__(self, investment_transaction_id: UUID) -> None:
+        super().__init__("investment income is linked to a dividend")
+        self.investment_transaction_id = investment_transaction_id
+
+
 @dataclass(frozen=True, slots=True)
 class TransactionView:
     id: UUID
@@ -127,6 +138,7 @@ class TransactionView:
     category_color: str
     category_archived: bool
     source: str
+    investment_transaction_id: UUID | None = None
 
     @property
     def month(self) -> YearMonth:
@@ -256,7 +268,19 @@ def _category(
 # Views and audit
 
 
-def _view(row: Transaction, category: Category) -> TransactionView:
+def _forbid_linked_income(session: Session, ctx: Context, row: Transaction) -> None:
+    if row.source != Source.INVESTMENT.value:
+        return
+    linked = InvestmentTransactionRepository(session, ctx).for_income_transaction(row.id)
+    if linked is not None:
+        raise InvestmentIncomeLinked(linked.id)
+
+
+def _view(
+    row: Transaction,
+    category: Category,
+    investment_transaction_id: UUID | None = None,
+) -> TransactionView:
     return TransactionView(
         id=row.id,
         direction=row.direction,
@@ -268,6 +292,7 @@ def _view(row: Transaction, category: Category) -> TransactionView:
         category_color=category.color,
         category_archived=category.archived_at is not None,
         source=row.source,
+        investment_transaction_id=investment_transaction_id,
     )
 
 
@@ -321,7 +346,8 @@ def list_month(factory: sessionmaker[Session], ctx: Context, month: YearMonth) -
     with factory() as session:
         rows = TransactionRepository(session, ctx).for_month(month)
         categories = {c.id: c for c in CategoryRepository(session, ctx).ordered()}
-        views = [_view(row, categories[row.category_id]) for row in rows]
+        links = InvestmentTransactionRepository(session, ctx).income_links([row.id for row in rows])
+        views = [_view(row, categories[row.category_id], links.get(row.id)) for row in rows]
     return MonthTransactions(
         month=month,
         expense=tuple(v for v in views if v.direction == TransactionDirection.EXPENSE),
@@ -337,7 +363,8 @@ def get_transaction(
     with factory() as session:
         row = _live_row(TransactionRepository(session, ctx), transaction_id)
         category = CategoryRepository(session, ctx).get_or_raise(row.category_id)
-        return _view(row, category)
+        linked = InvestmentTransactionRepository(session, ctx).for_income_transaction(row.id)
+        return _view(row, category, linked.id if linked is not None else None)
 
 
 def suggest_descriptions(
@@ -627,6 +654,7 @@ def update_transaction(
         lock_month_writes(session, ctx)
         repository = TransactionRepository(session, ctx)
         row = _live_row(repository, transaction_id, lock=True)
+        _forbid_linked_income(session, ctx, row)
         ensure_date_open(session, ctx, row.date)
         if YearMonth.from_date(entry.day) != YearMonth.from_date(row.date):
             ensure_date_open(session, ctx, entry.day)
@@ -774,6 +802,7 @@ def delete_transaction(
         row = repository.get_for_update(transaction_id)  # serialises writes to this row
         if row is None:
             raise NotFound
+        _forbid_linked_income(session, ctx, row)
         if row.deleted_at is None:
             ensure_date_open(session, ctx, row.date)
             occurrences.unlink_deleted_transaction(session, ctx, row.id)
@@ -812,6 +841,7 @@ def undo_delete(
         row = repository.get_for_update(transaction_id)  # serialises writes to this row
         if row is None:
             raise NotFound
+        _forbid_linked_income(session, ctx, row)
         category = CategoryRepository(session, ctx).get_or_raise(row.category_id)
         if row.deleted_at is None:
             return _view(row, category)

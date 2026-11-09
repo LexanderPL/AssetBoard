@@ -315,6 +315,7 @@ class InvestmentTransactionRepository(ScopedRepository[InvestmentTransaction]):
         settlement_fee_minor: int | None = None,
         import_batch_id: UUID | None = None,
         import_key: str | None = None,
+        income_transaction_id: UUID | None = None,
         created_at: datetime | None = None,
     ) -> InvestmentTransaction:
         row = InvestmentTransaction(
@@ -332,6 +333,7 @@ class InvestmentTransactionRepository(ScopedRepository[InvestmentTransaction]):
             settlement_fee_minor=settlement_fee_minor,
             import_batch_id=import_batch_id,
             import_key=import_key,
+            income_transaction_id=income_transaction_id,
         )
         if created_at is not None:
             # Bulk add orders same-day rows by line; the timestamp listener keeps a set value.
@@ -431,6 +433,29 @@ class InvestmentTransactionRepository(ScopedRepository[InvestmentTransaction]):
             .with_for_update()
         )
         return self._session.scalars(statement).one_or_none()
+
+    def for_income_transaction(
+        self, transaction_id: UUID, *, for_update: bool = False
+    ) -> InvestmentTransaction | None:
+        statement = self._scoped_select().where(
+            InvestmentTransaction.income_transaction_id == transaction_id
+        )
+        if for_update:
+            statement = statement.with_for_update()
+        return self._session.scalars(statement).one_or_none()
+
+    def income_links(self, transaction_ids: Collection[UUID]) -> dict[UUID, UUID]:
+        ids = tuple(dict.fromkeys(transaction_ids))
+        if not ids:
+            return {}
+        statement = self._scoped_select().where(
+            InvestmentTransaction.income_transaction_id.in_(ids)
+        )
+        return {
+            row.income_transaction_id: row.id
+            for row in self._session.scalars(statement)
+            if row.income_transaction_id is not None
+        }
 
     def for_import_batch(
         self, batch_id: UUID, *, lock: bool = False

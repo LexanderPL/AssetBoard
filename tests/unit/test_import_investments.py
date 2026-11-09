@@ -537,3 +537,222 @@ def test_rollback_keeps_rows_edited_after_the_import(db: WorkspaceDb, data_dir: 
         )
         assert instrument is not None and instrument.archived_at is None
         assert AssetClassRepository(session, _ctx(db)).get(other) is not None
+
+
+def _stored(
+    db: WorkspaceDb,
+    instrument_id: UUID,
+    *,
+    day: str,
+    type_value: str,
+    quantity: str,
+    unit_price: str,
+) -> None:
+    with db.factory.begin() as session:
+        InvestmentTransactionRepository(session, _ctx(db)).create(
+            instrument_id=instrument_id,
+            date=date.fromisoformat(day),
+            type=type_value,
+            quantity=Decimal(quantity),
+            unit_price=Decimal(unit_price),
+            quote_currency="EUR",
+            fee_minor=0,
+            fx_to_base=Decimal("1"),
+        )
+
+
+def test_dividend_and_split_rows_are_validated_and_imported(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    class_id = _class(db, "Stocks")
+    instrument_id = _instrument(db, class_id)
+    content = (
+        HEADER
+        + _row(
+            instrument_id=instrument_id,
+            instrument="World ETF",
+            date="2026-01-01",
+            type="buy",
+            quantity="10",
+            unit_price="100",
+            quote_currency="EUR",
+            fee="0",
+            fx_to_base="1",
+        )
+        + _row(
+            instrument_id=instrument_id,
+            instrument="World ETF",
+            date="2026-02-01",
+            type="split",
+            quantity="2",
+            unit_price="1",
+            quote_currency="EUR",
+            fee="0",
+        )
+        + _row(
+            instrument_id=instrument_id,
+            instrument="World ETF",
+            date="2026-03-01",
+            type="dividend",
+            quantity="1",
+            unit_price="5",
+            quote_currency="EUR",
+            fee="0.50",
+            fx_to_base="1",
+        )
+    )
+    batch_id = _upload(db, data_dir, content)
+    report = _plan(db, data_dir, batch_id)
+    assert report["counts"]["to_create"] == 3, report
+    assert report["counts"]["invalid"] == 0
+    assert _apply(db, data_dir, batch_id)["counts"]["investment_transactions_created"] == 3
+
+    with db.factory() as session:
+        rows = {row.type: row for row in InvestmentTransactionRepository(session, _ctx(db)).list()}
+    assert rows["split"].quantity == Decimal("2")
+    assert rows["split"].unit_price == Decimal("1")
+    assert rows["split"].fee_minor == 0
+    assert rows["split"].fx_to_base == Decimal("1")
+    assert rows["dividend"].quantity == Decimal("1")
+    assert rows["dividend"].unit_price == Decimal("5")
+    assert rows["dividend"].fee_minor == 50
+
+
+def test_invalid_dividend_and_split_rows_are_reported(db: WorkspaceDb, data_dir: Path) -> None:
+    class_id = _class(db, "Stocks")
+    instrument_id = _instrument(db, class_id)
+    common = {
+        "instrument_id": instrument_id,
+        "instrument": "World ETF",
+        "quote_currency": "EUR",
+    }
+    content = (
+        HEADER
+        + _row(**common, date="2026-01-01", type="dividend", quantity="2", unit_price="5", fee="0")
+        + _row(
+            **common, date="2026-01-02", type="dividend", quantity="1", unit_price="1.234", fee="0"
+        )
+        + _row(**common, date="2026-01-03", type="dividend", quantity="1", unit_price="1", fee="2")
+        + _row(**common, type="dividend", quantity="1", unit_price="5", fee="0")
+        + _row(**common, date="2026-01-04", type="split", quantity="2", unit_price="2", fee="0")
+        + _row(**common, date="2026-01-05", type="split", quantity="2", unit_price="1", fee="1")
+        + _row(
+            **common,
+            date="2026-01-06",
+            type="split",
+            quantity="2",
+            unit_price="1",
+            fx_to_base="1",
+        )
+        + _row(
+            **common,
+            date="2026-01-07",
+            type="split",
+            quantity="2",
+            unit_price="1",
+            settlement_currency="EUR",
+            settlement_unit_price="1",
+            settlement_fee="0",
+        )
+    )
+    batch_id = _upload(db, data_dir, content)
+    report = _plan(db, data_dir, batch_id)
+    codes = {entry["code"] for entry in report["errors"]}
+    assert {
+        "invalid_quantity",
+        "too_many_decimals",
+        "withholding_exceeds_gross",
+        "invalid_date",
+        "invalid_split",
+        "invalid_fee",
+        "invalid_settlement",
+    } <= codes
+    assert report["counts"]["to_create"] == 0
+
+
+def test_a_dividend_in_another_currency_needs_its_fx_rate(db: WorkspaceDb, data_dir: Path) -> None:
+    class_id = _class(db, "Stocks")
+    _instrument(db, class_id, quote_currency="USD")
+    base = {
+        "instrument": "World ETF",
+        "date": "2026-02-01",
+        "type": "dividend",
+        "quantity": "1",
+        "unit_price": "5",
+        "quote_currency": "USD",
+        "fee": "0",
+    }
+    batch_id = _upload(db, data_dir, HEADER + _row(**base))
+    report = _plan(db, data_dir, batch_id)
+    assert any(entry["code"] == "fx_needed" for entry in report["errors"])
+
+    batch_id = _upload(db, data_dir, HEADER + _row(**base, fx_to_base="1.1"))
+    report = _plan(db, data_dir, batch_id)
+    assert report["counts"]["invalid"] == 0
+    assert report["counts"]["to_create"] == 1
+
+
+def test_splits_are_refused_for_currency_instruments(db: WorkspaceDb, data_dir: Path) -> None:
+    class_id = _class(db, "Stocks")
+    _instrument(db, class_id, name="Euro", type_value="currency", quote_currency="EUR")
+    content = HEADER + _row(
+        instrument="Euro",
+        date="2026-02-01",
+        type="split",
+        quantity="2",
+        unit_price="1",
+        quote_currency="EUR",
+        fee="0",
+    )
+    batch_id = _upload(db, data_dir, content)
+    report = _plan(db, data_dir, batch_id)
+    assert any(entry["code"] == "split_not_allowed" for entry in report["errors"])
+
+
+def test_existing_splits_take_part_in_the_oversell_check(db: WorkspaceDb, data_dir: Path) -> None:
+    class_id = _class(db, "Stocks")
+    instrument_id = _instrument(db, class_id)
+    _stored(db, instrument_id, day="2026-01-01", type_value="buy", quantity="10", unit_price="100")
+    _stored(db, instrument_id, day="2026-02-01", type_value="split", quantity="2", unit_price="1")
+    content = HEADER + _row(
+        instrument_id=instrument_id,
+        instrument="World ETF",
+        date="2026-03-01",
+        type="sell",
+        quantity="20",
+        unit_price="60",
+        quote_currency="EUR",
+        fee="0",
+        fx_to_base="1",
+    )
+    batch_id = _upload(db, data_dir, content)
+    report = _plan(db, data_dir, batch_id)
+    assert report["counts"]["mapping_invalid"] == 0, report
+    assert report["counts"]["to_create"] == 1
+
+
+def test_rollback_refuses_a_history_left_oversold_without_an_imported_split(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    class_id = _class(db, "Stocks")
+    instrument_id = _instrument(db, class_id)
+    _stored(db, instrument_id, day="2026-01-01", type_value="buy", quantity="10", unit_price="100")
+    content = HEADER + _row(
+        instrument_id=instrument_id,
+        instrument="World ETF",
+        date="2026-02-01",
+        type="split",
+        quantity="2",
+        unit_price="1",
+        quote_currency="EUR",
+        fee="0",
+    )
+    batch_id = _upload(db, data_dir, content)
+    _plan(db, data_dir, batch_id)
+    _apply(db, data_dir, batch_id)
+    _stored(db, instrument_id, day="2026-02-02", type_value="sell", quantity="20", unit_price="60")
+
+    preview = preview_rollback_import(db.factory, _ctx(db), batch_id)
+    assert preview.oversells == (("World ETF", date(2026, 2, 2)),)
+    with pytest.raises(ImportRollbackOversell):
+        rollback_import(db.factory, _ctx(db), batch_id)

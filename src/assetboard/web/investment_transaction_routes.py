@@ -45,6 +45,10 @@ from assetboard.services.investment_bulk import (
     create_bulk,
     preview_bulk,
 )
+from assetboard.services.investment_income import (
+    default_income_category_id,
+    income_category_options,
+)
 from assetboard.services.investment_transactions import (
     MAX_YEAR,
     MIN_YEAR,
@@ -92,7 +96,20 @@ def _(message: str) -> str:
 
 
 ERRORS = {
-    "invalid_type": _("Choose buy or sell."),
+    "invalid_type": _("Choose buy, sell, dividend/interest or split."),
+    "invalid_split": _(
+        "A split needs different positive new and old units, and is not available for "
+        "currency or bond-model instruments."
+    ),
+    "invalid_amount_precision": _("Enter an amount with at most the currency's decimal places."),
+    "income_category_required": _(
+        "Choose an income category when recording the dividend as income."
+    ),
+    "income_category_invalid": _("Choose an active income category."),
+    "income_zero": _(
+        "The net dividend is zero; reduce the withholding or untick “Record as income”."
+    ),
+    "invalid_income": _("Only a dividend can be recorded as income."),
     "invalid_date": _("Enter a valid date."),
     "future_date": _("Investment transactions cannot be dated in the future."),
     "invalid_quantity": _("Enter a quantity greater than zero."),
@@ -194,6 +211,34 @@ def _parse_uuid(value: str) -> UUID:
         return UUID(value)
     except ValueError:
         raise NotFound from None
+
+
+def _income_category(value: str) -> UUID | None:
+    if not value:
+        return None
+    try:
+        return UUID(value)
+    except ValueError:
+        raise InvalidInvestmentTransaction("income_category", "income_category_invalid") from None
+
+
+def _type_inputs(
+    type_value: str,
+    *,
+    quantity: str,
+    unit_price: str,
+    fee: str,
+    fx_to_base: str,
+    dividend_gross: str,
+    dividend_withholding: str,
+    split_new: str,
+    split_old: str,
+) -> tuple[str, str, str, str]:
+    if type_value == "dividend":
+        return "1", dividend_gross, dividend_withholding, fx_to_base
+    if type_value == "split":
+        return split_new, split_old, "0", ""
+    return quantity, unit_price, fee, fx_to_base
 
 
 def _int(value: str, default: int = 1) -> int:
@@ -301,7 +346,20 @@ def _default_values(
         "fee": "0",
         "fx_to_base": fx_to_base,
         "note": "",
+        "dividend_gross": "",
+        "dividend_withholding": "0",
+        "record_income": "",
+        "income_category_id": "",
+        "split_new": "",
+        "split_old": "",
     }
+
+
+def _income_options(factory: Any, ctx: Context) -> tuple[list[tuple[str, str]], str]:
+    with factory() as session:
+        categories = income_category_options(session, ctx)
+        default = default_income_category_id(session, ctx)
+    return [(str(category.id), category.name) for category in categories], str(default or "")
 
 
 def _list_notice(request: Request, notice: str | None) -> str | None:
@@ -371,6 +429,8 @@ def _edit_values(
         )
         base_unit_price = format_quantity_input(price, locale)
         base_fee = format_amount_input(Money(fee_minor, base_currency), locale)
+    is_dividend = view.type == "dividend"
+    is_split = view.type == "split"
     return {
         "date": view.date.isoformat() if view.date is not None else "",
         "type": view.type,
@@ -387,6 +447,16 @@ def _edit_values(
         "amounts": view.amounts,
         "base_unit_price": base_unit_price,
         "base_fee": base_fee,
+        "dividend_gross": (
+            format_amount_input(Money.from_decimal(view.unit_price, view.quote_currency), locale)
+            if is_dividend
+            else ""
+        ),
+        "dividend_withholding": format_amount_input(view.fee, locale) if is_dividend else "0",
+        "record_income": "true" if view.income_transaction_id is not None else "",
+        "income_category_id": str(view.income_category_id or ""),
+        "split_new": format_quantity_input(view.quantity, locale) if is_split else "",
+        "split_old": format_quantity_input(view.unit_price, locale) if is_split else "",
     }
 
 
@@ -453,6 +523,7 @@ def _list_page(
     locale = request.state.locale
     today = ctx.clock.today(ctx.workspace.timezone)
     active_instruments, instruments = _instruments(factory, ctx, locale)
+    income_categories, default_income_category = _income_options(factory, ctx)
     fx_day = _form_day(create_values, today)
     fx_defaults = _fx_defaults(request, ctx, active_instruments, fx_day)
     filters = _filter_values(request)
@@ -503,6 +574,8 @@ def _list_page(
         "can_manage_providers": has_role(ctx, Role.OWNER),
         "coingecko_enabled": provider_enabled(request.app.state.session_factory, ctx, "coingecko"),
         "today": today,
+        "income_categories": income_categories,
+        "default_income_category_id": default_income_category,
         "bulk_text": bulk_text,
         "bulk_preview": bulk_preview,
         "bulk_error": _t(request, BULK_INPUT_ERRORS[bulk_error])
@@ -552,6 +625,9 @@ def _history_page(
 ) -> Response:
     locale = request.state.locale
     today = ctx.clock.today(ctx.workspace.timezone)
+    income_categories, default_income_category = _income_options(
+        request.app.state.session_factory, ctx
+    )
     prices = instrument_prices(
         request.app.state.session_factory,
         ctx,
@@ -641,6 +717,8 @@ def _history_page(
         "can_manage_providers": has_role(ctx, Role.OWNER),
         "coingecko_enabled": provider_enabled(request.app.state.session_factory, ctx, "coingecko"),
         "today": today,
+        "income_categories": income_categories,
+        "default_income_category_id": default_income_category,
         "toast_undo": toast_undo,
         "toast_seconds": toast_seconds,
         "toast_message": _t(request, NOTICES["deleted"]) if toast_undo else None,
@@ -802,6 +880,12 @@ async def transaction_create(
     amounts: FormStr = "quote",
     base_unit_price: FormStr = "",
     base_fee: FormStr = "0",
+    dividend_gross: FormStr = "",
+    dividend_withholding: FormStr = "0",
+    record_income: FormStr = "",
+    income_category_id: FormStr = "",
+    split_new: FormStr = "",
+    split_old: FormStr = "",
 ) -> Response:
     values = {
         "date": date,
@@ -815,6 +899,12 @@ async def transaction_create(
         "amounts": amounts,
         "base_unit_price": base_unit_price,
         "base_fee": base_fee,
+        "dividend_gross": dividend_gross,
+        "dividend_withholding": dividend_withholding,
+        "record_income": record_income,
+        "income_category_id": income_category_id,
+        "split_new": split_new,
+        "split_old": split_old,
     }
     form = await request.form()
     try:
@@ -829,6 +919,18 @@ async def transaction_create(
                 create_errors=_form_errors(request, failure),
             )
         )
+    quantity_value, unit_price_value, fee_value, fx_value = _type_inputs(
+        type,
+        quantity=quantity,
+        unit_price=unit_price,
+        fee=fee,
+        fx_to_base=fx_to_base,
+        dividend_gross=dividend_gross,
+        dividend_withholding=dividend_withholding,
+        split_new=split_new,
+        split_old=split_old,
+    )
+    wants_income = record_income.lower() in {"1", "true", "on", "yes"}
     try:
         await run_in_threadpool(
             lambda: create_transaction(
@@ -837,15 +939,17 @@ async def transaction_create(
                 instrument_id=item,
                 type_value=type,
                 date_value=date,
-                quantity_value=quantity,
-                unit_price_value=unit_price,
-                fee_value=fee,
-                fx_value=fx_to_base,
+                quantity_value=quantity_value,
+                unit_price_value=unit_price_value,
+                fee_value=fee_value,
+                fx_value=fx_value,
                 note_value=note,
                 locale=request.state.locale,
                 amounts_value=amounts,
                 base_unit_price_value=base_unit_price,
                 base_fee_value=base_fee,
+                record_income=wants_income,
+                income_category_id=(_income_category(income_category_id) if wants_income else None),
             )
         )
     except InvestmentTransactionError as exc:
@@ -1016,6 +1120,12 @@ async def transaction_update(
     amounts: FormStr = "quote",
     base_unit_price: FormStr = "",
     base_fee: FormStr = "0",
+    dividend_gross: FormStr = "",
+    dividend_withholding: FormStr = "0",
+    record_income: FormStr = "",
+    income_category_id: FormStr = "",
+    split_new: FormStr = "",
+    split_old: FormStr = "",
 ) -> Response:
     item_id = _parse_uuid(transaction_id)
     values = {
@@ -1030,7 +1140,25 @@ async def transaction_update(
         "amounts": amounts,
         "base_unit_price": base_unit_price,
         "base_fee": base_fee,
+        "dividend_gross": dividend_gross,
+        "dividend_withholding": dividend_withholding,
+        "record_income": record_income,
+        "income_category_id": income_category_id,
+        "split_new": split_new,
+        "split_old": split_old,
     }
+    quantity_value, unit_price_value, fee_value, fx_value = _type_inputs(
+        type,
+        quantity=quantity,
+        unit_price=unit_price,
+        fee=fee,
+        fx_to_base=fx_to_base,
+        dividend_gross=dividend_gross,
+        dividend_withholding=dividend_withholding,
+        split_new=split_new,
+        split_old=split_old,
+    )
+    wants_income = record_income.lower() in {"1", "true", "on", "yes"}
     try:
         view = await run_in_threadpool(
             lambda: update_transaction(
@@ -1039,15 +1167,17 @@ async def transaction_update(
                 item_id,
                 type_value=type,
                 date_value=date,
-                quantity_value=quantity,
-                unit_price_value=unit_price,
-                fee_value=fee,
-                fx_value=fx_to_base,
+                quantity_value=quantity_value,
+                unit_price_value=unit_price_value,
+                fee_value=fee_value,
+                fx_value=fx_value,
                 note_value=note,
                 locale=request.state.locale,
                 amounts_value=amounts,
                 base_unit_price_value=base_unit_price,
                 base_fee_value=base_fee,
+                record_income=wants_income,
+                income_category_id=(_income_category(income_category_id) if wants_income else None),
             )
         )
     except InvestmentTransactionError as exc:

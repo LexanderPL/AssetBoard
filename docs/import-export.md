@@ -163,6 +163,18 @@ a row with no stored rate is listed as `fx_needed` and can be skipped like other
 Settlement rows are the exception: they must carry their own `fx_to_base`. An exported
 `investment_transactions.csv` from a 1.4 archive reads directly.
 
+The file uses the existing quantity, unit price and fee columns for the extra types:
+
+- **Dividend / interest:** `quantity=1`, `unit_price` is the gross amount in the quote currency,
+  `fee` is the withholding, and `fx_to_base` is required when the quote currency is not the base
+  (otherwise `1`). There are no settlement fields.
+- **Split:** `quantity` is the new units and `unit_price` the old units. A 2-for-1 split is
+  `2,1`; a 1-for-10 reverse split is `1,10`. Both are positive and different, `fee` is `0`, and
+  there is no FX or settlement. Splits are not available for currency or bond-model instruments.
+
+The archive also carries an optional `income_transaction_id` linking a dividend to its ledger
+income row. A missing target restores the dividend unlinked and is listed in the restore report.
+
 ### Upload options
 
 - **CSV delimiter:** Detect (default), Comma or Semicolon. Detect chooses the separator that

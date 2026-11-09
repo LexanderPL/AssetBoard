@@ -284,7 +284,7 @@ and staleness flags, manual price entry UI. Tests: carry-forward, staleness flag
 - Provider settings are per workspace and owner-only; editors may assign an enabled price provider and use test lookup. NBP publishes PLN-based FX and gold (gold is PLN/g and converted to the instrument unit); ECB publishes EUR-based FX. Rates are converted into the workspace base currency when the provider publishes that base, and skipped with a visible `base_not_published` warning otherwise. The conversion runs in an 80-digit `localcontext`; a direct conversion and the same conversion through the provider's base must agree to Decimal precision.
 - NBP and ECB run daily at 18:10 and 18:20 UTC; CoinGecko at 00:10 UTC and EODHD at 22:40 UTC in the follow-up. The daily job refreshes latest values and backfills history from the first transaction date; enabling a provider also queues a one-off backfill. "Refresh now" is latest-only and never waits behind a long rate limit in a web request; scheduled/background work may wait. Cache TTLs: NBP latest 6 h/history 24 h, ECB 1 h (one full history XML serves both latest and history), CoinGecko latest 5 min/history 24 h, EODHD latest 15 min/history 24 h.
 - Failed provider calls keep the last known price, are recorded in `provider_errors` (explicitly pruned after 90 days) and surface on the instrument. Provider upserts are short `run_immediate` transactions under the workspace lock; a unique clash on `(instrument, date, source)` is retried as an update. A workspace with no provider enabled makes no outbound calls.
-- EODHD has a per-workspace daily call budget (default 20) counted per UTC day; latest prices are fetched first, then history uses the remainder, and the rest is skipped with `quota_exhausted` while last-known prices remain. CoinGecko history is requested as far back as the public/demo API allows (the current Basic plan is limited to the past two years per its documentation); when it cannot cover the first transaction date, the instrument records `history_limited` and the one-off backfill marker prevents daily retries. EODHD prices use adjusted closes; GPW/XETRA/LSE coverage stays marked unverified until checked with a real key.
+- EODHD has a per-workspace daily call budget (default 20) counted per UTC day; latest prices are fetched first, then history uses the remainder, and the rest is skipped with `quota_exhausted` while last-known prices remain. CoinGecko history is requested as far back as the public/demo API allows (the current Basic plan is limited to the past two years per its documentation); when it cannot cover the first transaction date, the instrument records `history_limited` and the one-off backfill marker prevents daily retries. EODHD prices use the raw `close`, falling back to `adjusted_close` only when `close` is missing (F6.10: adjusted closes are expressed in today's units and include dividend adjustments, so they cannot be carried across splits); history backfilled before F6.10 may already hold adjusted closes and a re-backfill is a follow-up. GPW/XETRA/LSE coverage stays marked unverified until checked with a real key.
 - Scheduled job (daily, after market close, per provider) refreshes latest prices and FX for instruments held (quantity > 0); "Refresh now" button; first-time **history backfill** from the first transaction date.
 - Failures keep the last known price, are logged in a `provider_error` table/log, and surface as a badge on the instrument ("last updated 9 days ago — provider error").
 - Instruments choose provider + provider symbol in the instrument form; a "test lookup" button shows the fetched price before saving.
@@ -360,7 +360,8 @@ Property tests: class totals sum exactly to the portfolio total; allocation weig
 ## F6.7 Performance over time and XIRR
 
 **Acceptance**
-- `portfolio_series(transactions, prices, fx, start, end, step[day|week|month]) -> list[Point(date, value, net_invested)]`: quantity at each date from transactions ≤ date; price = latest ≤ date (carry forward); FX likewise. `net_invested` = cumulative buys + fees − sell proceeds in base currency. Undated legacy lots are excluded from the series and counted in a page note. A point with a held instrument missing a price or FX rate is marked incomplete and leaves both that instrument's value and net invested out.
+- `portfolio_series(transactions, prices, fx, start, end, step[day|week|month]) -> list[Point(date, value, net_invested)]`: quantity at each date from transactions ≤ date; price = latest ≤ date (carry forward); FX likewise. `net_invested` = cumulative buys + fees − sell proceeds − net dividends in base currency. Undated legacy lots are excluded from the series and counted in a page note. A point with a held instrument missing a price or FX rate is marked incomplete and leaves both that instrument's value and net invested out.
+- F6.10 extends the series: a split scales the quantity from its date (`new/old`), dividends do not change quantity, and a raw price observed at `p` is multiplied by `old/new` for every split in `(p, date]`. Dividends are positive XIRR cash flows equal to their net base amount; splits are not cash flows. Splits and dividends are never transaction-price observations.
 - Chart: value line + invested-capital line (area between = gain), range selector (YTD/1y/3y/5y/all; default 1y), per-class filter (default whole portfolio, look-through weights applied to value and net invested). Ranges up to 90 days step daily; longer ranges step weekly, and all-time spans over five years step monthly. Bond-model instruments are priced with `bond_value` for the lots held at each point.
 - Table of period changes (1M, 3M, YTD, 1Y, all-time): absolute and % change of value, net flows, **Δ value − net flows**, and the contribution-adjusted return via XIRR. The start value is a negative cashflow at the end of the start date (after that day's trades), later buys are negative and sells positive, and the end value is positive. All-time starts at zero on the day before the first dated transaction. Periods under 365 days show the period money-weighted return `(1 + r)^(days/365) − 1`; periods of 365 days or more (1 year, or an all-time history at least that long) show the annualised XIRR. An incomplete start or end makes the XIRR undefined.
 - Pure `xirr(cashflows)` (Newton with bracketing/bisection fallback; actual/365 day count). Tests: 1 000 invested on 2020-01-01 and 1 100 received on 2021-01-01 gives ≈ 9.97% (366-day year); additional vectors cross-checked against `scipy.optimize.brentq` as a **dev-only** oracle; no-solution cases return a clear "undefined" result.
@@ -492,11 +493,79 @@ property tests, the policy editor and the "Risk balance" section on the portfoli
 
 ## F6.10 (stretch) Dividends, interest and splits
 
-**Acceptance:** `dividend` transactions (amount, optional withholding), optionally creating a linked income `Transaction` in the ledger; `split` transactions adjust quantity and unit price history without changing cost basis; income-from-investments report per year.
+**Acceptance**
+- Storage reuses `quantity`, `unit_price` and `fee_minor`; no new amount or ratio columns.
+  - **Dividend / interest:** `quantity = 1`, `unit_price` is the gross amount in the quote
+    currency, `fee_minor` is the withholding. Gross must be positive and fit the currency's
+    minor unit; `0 ≤ withholding ≤ gross`; the date is required; there are no settlement
+    fields; `fx_to_base` is required when the quote currency is not the base and is `1`
+    otherwise.
+  - **Split:** `quantity` is the number of new units and `unit_price` the number of old units
+    (a 2-for-1 split is `2` and `1`; a 1-for-10 reverse split is `1` and `10`). Both are
+    positive and different, `fee_minor = 0`, and there is no FX or settlement. The date is
+    required. Splits are refused for `currency` and `bond_model` instruments. A split with no
+    holding is accepted as a no-op.
+  - The same validation applies in the transaction form, the F6.9 standalone CSV import and
+    archive restore, and is documented in `docs/archive-format.md` and
+    `docs/import-export.md`.
+- **Linked ledger income** (the "Record as income" option on a dividend):
+  - `gross_base = round_half_up(gross × fx)` and
+    `withholding_base = round_half_up(withholding × fx)`, each rounded once per row; the net
+    is `gross_base − withholding_base`, so the ledger row equals the report's net exactly.
+  - Recording income requires an active income category. The form preselects the category of
+    the most recent linked dividend, otherwise the seeded "Interest" category matched through
+    its seed `name_key` in en/pl (never a literal), otherwise no choice.
+  - The ledger row uses `source = 'investment'` and is managed only through its dividend.
+    Editing or deleting it from the month page is refused with a link to the dividend, and the
+    row shows a "from investment income" badge. The new source value is added to the
+    `transactions.source` CHECK with a SQLite-safe batch migration.
+  - Creating, editing, deleting or undoing a linked dividend takes `lock_month_writes` and
+    raises `MonthClosed` when the old or the new ledger month is closed. Unlinked dividends and
+    splits do not touch the ledger and are unaffected.
+  - Undo restores the dividend and its linked income together. Changing the dividend's date,
+    amount, fee or category updates the linked row in the same locked write. Unticking
+    "Record as income" soft-deletes the linked row; editing a dividend into another type does
+    the same.
+- **Split arithmetic:**
+  - Scale each FIFO lot (and the average-method quantity) by `new/old` inside an 80-digit
+    context; quantize the resulting holding quantity once to the DecimalType scale (18 decimal
+    places, `ROUND_HALF_UP`). Cost basis and realized P&L are unchanged. Undated legacy lots
+    come before every dated row, so splits apply to them.
+  - Oversell validation covers the whole sequence including splits in form edits, the F6.9
+    import and the F6.9 rollback. Editing or deleting a split can make a later sell oversell
+    and is refused with the existing `OversellRejected` error.
+  - Cash-in-lieu for fractional shares is a normal sell the user records; it is not modelled.
+- **Price carry-forward across splits:** every stored price observation (manual, provider or
+  transaction-derived) is a raw price per unit as of its date. When an observation dated `p`
+  values a holding on `d > p`, multiply it by `old/new` for each split in `(p, d]` through the
+  pure `split_factor(splits, from_date, to_date)` helper. Use it in the F6.6 current
+  valuation, the F6.7 series, the F6.8 net-worth history and the F6.3 transaction-price
+  fallback. Quantities at `d` are historical: splits `≤ d` are applied. EODHD therefore stores
+  the raw `close`, falling back to `adjusted_close` only when `close` is missing (see F6.4);
+  history backfilled before F6.10 may already be adjusted and a re-backfill is a follow-up.
+- **Performance (F6.7):** the net dividend in base is a positive XIRR cash flow on its date
+  and counts in the net flows, reducing `net_invested`; splits are not cash flows. Dividends
+  and splits are never transaction-price observations.
+- **Income report:** a new **Income** tab under Investments, readable by viewers, grouping
+  dividends by calendar year (newest first) with gross, withholding, net and a payment count.
+  Linked ledger rows are not counted a second time. Plain fee rows stay unsupported and out of
+  scope. Undated dividends are excluded from the years and noted.
+- **Archive:** keep format 1.4 (it has not been released); add an optional
+  `income_transaction_id` column to `investment_transactions.csv`. Restore resolves it to the
+  restored ledger row and marks that row `source = 'investment'`. A missing target restores the
+  dividend unlinked and adds an `income_target_missing` report line. The merge flow stays
+  restore-only for investment files. If a release ships before this merges, bump to 1.5.
+- **Tests:** golden splits (1-for-3 exact, 3-for-2 FIFO), the split/inverse property within
+  1e-18 with an identical cost basis, split-adjusted carry-forward without a jump in
+  F6.6/F6.7/F6.8, EODHD raw close, linked-income rounding edge, closed-month refusal on
+  create/edit/delete/undo, the ledger edit/delete guard, the CHECK migration upgrade and
+  downgrade, an XIRR dividend vector, F6.9 dividend/split import and rollback with splits, the
+  archive round trip with a linked dividend and the missing-link fallback, and the Income tab.
 
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
 Implement F6.10 (stretch) from docs/specs/M6-investments.md: dividend and split transaction types in compute_holdings and the series,
-optional ledger income creation, yearly investment-income report. Update the golden tests; keep existing behaviour unchanged.
+the optional linked ledger income with its closed-month and source guard, split-aware price carry-forward,
+and the yearly investment-income report. Keep existing behaviour unchanged apart from the F6.7 dividend flows.
 ```

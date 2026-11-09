@@ -12,7 +12,7 @@ from __future__ import annotations
 from collections.abc import Collection, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import date
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from uuid import UUID
 
 from sqlalchemy.orm import Session
@@ -28,7 +28,12 @@ from assetboard.db.repositories import (
     InvestmentTransactionRepository,
     PricePointRepository,
 )
-from assetboard.domain.holdings import HoldingTransaction, InvestmentTransactionType
+from assetboard.domain.holdings import (
+    HoldingTransaction,
+    InvestmentTransactionType,
+    quantize_quantity,
+    split_factor,
+)
 from assetboard.domain.money import Money
 from assetboard.domain.performance import (
     Observations,
@@ -147,6 +152,10 @@ def historical_values(data: HistoricalPortfolio, dates: Collection[date]) -> His
         data.transactions,
         key=lambda row: (row.date or date.min, row.created_at, str(row.id)),
     )
+    splits_by_instrument: dict[UUID, list[HoldingTransaction]] = {}
+    for row in data.transactions:
+        if InvestmentTransactionType(row.type) is InvestmentTransactionType.SPLIT:
+            splits_by_instrument.setdefault(row.instrument_id, []).append(row)
     quantities: dict[UUID, Decimal] = {}
     pointer = 0
     class_ids = {
@@ -169,6 +178,13 @@ def historical_values(data: HistoricalPortfolio, dates: Collection[date]) -> His
                 quantities[row.instrument_id] = (
                     quantities.get(row.instrument_id, Decimal(0)) - row.quantity
                 )
+            elif kind is InvestmentTransactionType.SPLIT:
+                with localcontext() as context:
+                    context.prec = max(context.prec, 80)
+                    ratio = row.quantity / row.unit_price
+                    quantities[row.instrument_id] = quantize_quantity(
+                        quantities.get(row.instrument_id, Decimal(0)) * ratio
+                    )
 
         held = [
             instrument
@@ -184,13 +200,15 @@ def historical_values(data: HistoricalPortfolio, dates: Collection[date]) -> His
             )
             for instrument in held
         ]
-        price_map = [
-            PortfolioPrice(
-                instrument.id,
-                data.prices[instrument.id].latest(day) if instrument.id in data.prices else None,
-            )
-            for instrument in held
-        ]
+        price_map: list[PortfolioPrice] = []
+        for instrument in held:
+            series = data.prices.get(instrument.id)
+            observation = series.latest_with_date(day) if series is not None else None
+            if observation is None:
+                price_map.append(PortfolioPrice(instrument.id, None))
+                continue
+            factor = split_factor(splits_by_instrument.get(instrument.id, ()), observation[0], day)
+            price_map.append(PortfolioPrice(instrument.id, observation[1] * factor))
         rates: dict[str, Decimal] = {}
         for instrument in held:
             if instrument.quote_currency == data.currency:

@@ -229,6 +229,98 @@ def test_series_converts_fx_and_uses_settlement_totals() -> None:
     assert settled_point.net_invested == Money(4_100, "EUR")
 
 
+def test_series_adjusts_a_pre_split_price_and_has_no_jump() -> None:
+    instrument_id = uuid4()
+    transactions = (
+        _tx(instrument_id=instrument_id, day=DAY, quantity="10", unit_price="100"),
+        _tx(
+            instrument_id=instrument_id,
+            day=date(2020, 1, 2),
+            type="split",
+            quantity="2",
+            unit_price="1",
+        ),
+    )
+    points = portfolio_series(
+        transactions,
+        {instrument_id: _price((DAY, "100"))},
+        {},
+        DAY,
+        date(2020, 1, 3),
+        Step.DAY,
+        base_currency="EUR",
+    )
+    assert [point.value for point in points] == [Money(100_000, "EUR")] * 3
+
+
+def test_a_dividend_is_a_positive_cash_flow_and_a_split_is_not() -> None:
+    instrument_id = uuid4()
+    transactions = (
+        _tx(instrument_id=instrument_id, quantity="10", unit_price="100"),
+        _tx(
+            instrument_id=instrument_id,
+            day=date(2020, 7, 1),
+            type="dividend",
+            quantity="1",
+            unit_price="50",
+        ),
+        _tx(
+            instrument_id=instrument_id,
+            day=date(2020, 8, 1),
+            type="split",
+            quantity="2",
+            unit_price="1",
+        ),
+    )
+    flows = cashflows_for_period(
+        transactions,
+        DAY,
+        date(2021, 1, 1),
+        start_value=Money(100_000, "EUR"),
+        end_value=Money(100_000, "EUR"),
+        base_currency="EUR",
+    )
+    assert [flow for flow in flows if flow.date == date(2020, 7, 1)] == [
+        CashFlow(date(2020, 7, 1), Money(5_000, "EUR"))
+    ]
+    assert all(flow.date != date(2020, 8, 1) for flow in flows)
+
+
+def test_xirr_counts_a_dividend_as_an_inflow() -> None:
+    instrument_id = uuid4()
+    transactions = (
+        _tx(instrument_id=instrument_id, quantity="10", unit_price="100"),
+        _tx(
+            instrument_id=instrument_id,
+            day=date(2020, 7, 1),
+            type="dividend",
+            quantity="1",
+            unit_price="50",
+            quote_currency="EUR",
+        ),
+    )
+    flows = cashflows_for_period(
+        transactions,
+        DAY,
+        date(2021, 1, 1),
+        start_value=Money(100_000, "EUR"),
+        end_value=Money(100_000, "EUR"),
+        base_currency="EUR",
+    )
+    result = xirr(flows)
+    assert result.defined and result.rate is not None
+    assert result.rate > 0
+
+    def equation(rate: float) -> float:
+        return sum(
+            float(flow.amount.amount_minor) / (1 + rate) ** ((flow.date - DAY).days / 365)
+            for flow in flows
+        )
+
+    oracle = float(brentq(equation, -0.999, 10))  # type: ignore[arg-type]
+    assert abs(float(result.rate) - oracle) < 1e-9
+
+
 def test_series_excludes_undated_and_marks_missing_data() -> None:
     instrument_id = uuid4()
     undated = _tx(instrument_id=instrument_id, day=None)

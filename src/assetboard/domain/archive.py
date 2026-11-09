@@ -141,6 +141,7 @@ CSV_COLUMNS = {
         "settlement_unit_price",
         "settlement_fee",
         "deleted_at",
+        "income_transaction_id",
     ),
     "bond_terms.csv": (
         "id",
@@ -372,6 +373,7 @@ class InvestmentTransactionRow:
     settlement_unit_price: str
     settlement_fee: str
     deleted_at: str | None
+    income_transaction_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1004,6 +1006,7 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         "link_id",
         "instrument_id",
         "asset_class_id",
+        "income_transaction_id",
     ):
         return str(UUID(value)) if value else ""
     if column in ("kind", "direction"):
@@ -1548,6 +1551,66 @@ def _read_rows(
                 errors.append(
                     ArchiveError("investment_transactions.csv", str(exc), column="settlement_fee")
                 )
+        if row["type"] == "dividend":
+            if Decimal(row["quantity"]) != 1:
+                errors.append(
+                    ArchiveError(
+                        "investment_transactions.csv",
+                        "invalid dividend encoding",
+                        column="quantity",
+                    )
+                )
+            try:
+                gross_minor = _money_minor(
+                    row["unit_price"], row["quote_currency"], allow_zero=False
+                )
+                fee_minor = _money_minor(row["fee"], row["quote_currency"], allow_zero=True)
+                if fee_minor > gross_minor:
+                    raise ValueError("withholding exceeds the gross amount")
+            except ValueError as exc:
+                errors.append(
+                    ArchiveError("investment_transactions.csv", str(exc), column="unit_price")
+                )
+            if (
+                not row["fx_to_base"]
+                or Decimal(row["fx_to_base"]) <= 0
+                or row["quote_currency"] == currency
+                and row["fx_to_base"] != "1"
+            ):
+                errors.append(
+                    ArchiveError(
+                        "investment_transactions.csv", "invalid dividend FX", column="fx_to_base"
+                    )
+                )
+            if any(settlement):
+                errors.append(
+                    ArchiveError("investment_transactions.csv", "dividend has settlement fields")
+                )
+        elif row["type"] == "split":
+            if instrument is not None and instrument["type"] in {"currency", "bond_model"}:
+                errors.append(
+                    ArchiveError(
+                        "investment_transactions.csv", "split is not allowed for this instrument"
+                    )
+                )
+            if (
+                row["quantity"] == row["unit_price"]
+                or Decimal(row["quantity"]) <= 0
+                or Decimal(row["unit_price"]) <= 0
+            ):
+                errors.append(ArchiveError("investment_transactions.csv", "invalid split encoding"))
+            if row["fee"] not in {"", "0", "0.00", "0.0"}:
+                errors.append(ArchiveError("investment_transactions.csv", "split fee must be zero"))
+            if row["fx_to_base"]:
+                errors.append(ArchiveError("investment_transactions.csv", "split must not have FX"))
+            if any(settlement):
+                errors.append(
+                    ArchiveError("investment_transactions.csv", "split has settlement fields")
+                )
+        elif row["income_transaction_id"]:
+            errors.append(
+                ArchiveError("investment_transactions.csv", "income link is only for dividends")
+            )
 
     bonds = tables["bond_terms.csv"]
     bond_ids: set[str] = set()
@@ -1790,6 +1853,7 @@ def _read_rows(
                 row["settlement_unit_price"],
                 row["settlement_fee"],
                 row["deleted_at"] or None,
+                row["income_transaction_id"] or None,
             )
             for row in transactions
         ),

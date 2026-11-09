@@ -140,9 +140,9 @@ def _rows(body: bytes) -> list[tuple[date, Decimal]]:
             day = date.fromisoformat(raw_date)
         except ValueError:
             raise ProviderPayloadError() from None
-        raw_price = row.get("adjusted_close")
+        raw_price = row.get("close")
         if raw_price is None:
-            raw_price = row.get("close")
+            raw_price = row.get("adjusted_close")
         if not isinstance(raw_price, (int, Decimal)):
             raise ProviderPayloadError()
         try:
