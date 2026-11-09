@@ -200,6 +200,7 @@ def _post_in_session(
     *,
     amount_minor: int,
     day: date,
+    today: date,
     source: Source,
     actor_user_id: UUID | None,
 ) -> UUID:
@@ -214,6 +215,8 @@ def _post_in_session(
     if not 0 < amount_minor <= MAX_AMOUNT_MINOR:
         raise OccurrenceError("invalid_amount")
     _valid_day(day)
+    if day > today:
+        raise OccurrenceError("future_date")
     _ensure_open(session, scope, occurrence.due_date)
     _ensure_open(session, scope, day)
     item = (
@@ -291,6 +294,7 @@ def post_occurrence(
             occurrence_id,
             amount_minor=amount_minor,
             day=day,
+            today=ctx.clock.today(ctx.workspace.timezone),
             source=Source.RECURRING,
             actor_user_id=ctx.user.id,
         )
@@ -599,6 +603,7 @@ def auto_post_workspace(factory: sessionmaker[Session], scope: WorkspaceScope, c
                         occurrence.id,
                         amount_minor=occurrence.expected_minor,
                         day=occurrence.due_date,
+                        today=today,
                         source=Source.RECURRING_AUTO,
                         actor_user_id=None,
                     )

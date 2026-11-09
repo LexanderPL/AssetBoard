@@ -199,6 +199,27 @@ def test_auto_post_uses_workspace_clock_and_closed_month_guard(team):
     assert all(row.status == "pending" for row in occurrence_rows(team, later_item))
 
 
+def test_posting_a_future_payment_date_is_refused(team):
+    ctx = team.ctx("owner", "owner")
+    item_id = create_item(team)
+    occurrence = occurrence_rows(team, item_id)[0]
+
+    with pytest.raises(occurrences.OccurrenceError) as caught:
+        occurrences.post_occurrence(
+            team.factory,
+            ctx,
+            occurrence.id,
+            amount_minor=10000,
+            day=date(2026, 3, 2),
+        )
+
+    assert caught.value.code == "future_date"
+    stored = occurrence_rows(team, item_id)[0]
+    assert stored.status == "pending" and stored.transaction_id is None
+    with team.factory() as session:
+        assert session.scalars(select(Transaction)).all() == []
+
+
 def test_occurrence_actions_require_a_current_editor(team):
     team.add_member("viewer", "viewer")
     item_id = create_item(team)
@@ -251,7 +272,7 @@ def test_posted_occurrence_is_immune_to_rule_edits(team):
     item_id = scheduled.save_item(team.factory, ctx, values, Settings(_env_file=None))
     occurrence = occurrence_rows(team, item_id)[0]
     transaction_id = occurrences.post_occurrence(
-        team.factory, ctx, occurrence.id, amount_minor=9900, day=date(2026, 3, 2)
+        team.factory, ctx, occurrence.id, amount_minor=9900, day=date(2026, 3, 1)
     )
 
     scheduled.save_item(
@@ -276,7 +297,7 @@ def test_posted_occurrence_is_immune_to_rule_edits(team):
     with team.factory() as session:
         transaction = session.get(Transaction, transaction_id)
         assert transaction is not None and transaction.deleted_at is None
-        assert (transaction.amount_minor, transaction.date) == (9900, date(2026, 3, 2))
+        assert (transaction.amount_minor, transaction.date) == (9900, date(2026, 3, 1))
 
 
 def test_rescheduled_overdue_occurrence_survives_generation(team):
@@ -343,6 +364,10 @@ def test_ledger_delete_returns_occurrence_to_pending_and_it_can_be_posted_again(
     occurrence = occurrence_rows(team, item_id)[0]
     occurrences.reschedule_occurrence(team.factory, ctx, occurrence.id, date(2026, 3, 5))
     occurrences.edit_occurrence_amount(team.factory, ctx, occurrence.id, 25000)
+    clock = FixedClock("2026-03-05T12:00:00+00:00")
+    team.clock = clock
+    team.factory.configure(info={"clock": clock})
+    ctx = replace(ctx, clock=clock)
     first = occurrences.post_occurrence(
         team.factory, ctx, occurrence.id, amount_minor=25000, day=date(2026, 3, 5)
     )
@@ -423,7 +448,7 @@ def test_ledger_delete_is_blocked_while_the_occurrence_month_is_closed(team):
     item_id = create_item(team)
     occurrence = occurrence_rows(team, item_id)[0]
     transaction_id = occurrences.post_occurrence(
-        team.factory, ctx, occurrence.id, amount_minor=100, day=date(2026, 4, 2)
+        team.factory, ctx, occurrence.id, amount_minor=100, day=date(2026, 3, 1)
     )
     close_month(team.factory, ctx, YearMonth(2026, 3))
     with pytest.raises(MonthClosed):

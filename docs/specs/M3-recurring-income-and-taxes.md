@@ -175,7 +175,10 @@ interval/end_date/max_count, determinism. Services use the injected Clock only.
 - **Plan/actual boundary (issue #164, owner decision of 2026-11-04).** Editing a one-time
   payment whose stored date is still in the future to today or an earlier date records it as a
   manual transaction and removes the plan (the reverse of the ledger's edit-to-future); an
-  overdue one-time payment edited stays a plan. A transaction posted from a recurring
+  overdue one-time payment edited stays a plan. The same boundary applies to **Mark paid or
+  received**: a payment date after today in the workspace time zone is refused with
+  `future_date`, the occurrence stays pending and no transaction or tax line is created. The
+  user records it when it happens or edits the recurring rule. A transaction posted from a recurring
   occurrence cannot be moved to a future date at all (skip the occurrence or edit the rule);
   the whole rule is in F3.1's "a plan becomes an actual" notes and F2.2's acceptance.
 - Posting into a closed month is blocked with a clear message (the user must reopen or reschedule).

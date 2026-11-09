@@ -11,6 +11,7 @@ from uuid import UUID
 import pytest
 from sqlalchemy import select
 
+from assetboard.clock import FixedClock
 from assetboard.db.models.identity import AuditEvent
 from assetboard.db.models.ledger import Transaction
 from assetboard.domain.money import Money
@@ -28,6 +29,9 @@ AUGUST = date(2026, 8, 1)  # paid on 10 September (lag 1)
 @pytest.fixture
 def team(tmp_path):
     for db in workspace_db(tmp_path):
+        clock = FixedClock("2026-09-10T12:00:00+00:00")
+        db.clock = clock
+        db.factory.configure(info={"clock": clock})
         db.add_member("owner", "owner")
         db.add_member("editor", "editor")
         db.add_member("viewer", "viewer")
@@ -130,7 +134,7 @@ def test_received_calendar_month_is_refused_without_override(team: WorkspaceDb) 
 
 
 def test_closed_month_refuses_changes_even_with_override(team: WorkspaceDb) -> None:
-    january = date(2026, 1, 1)  # received on 10 February; the test clock is in March
+    january = date(2026, 1, 1)  # received on 10 February; the test clock is in September
     ctx, source_id, transaction_id = _received(team, calendar=True, month=january)
     close_month(team.factory, ctx, YearMonth(2026, 2))
     calls = (

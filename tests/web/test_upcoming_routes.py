@@ -38,8 +38,8 @@ def create_recurring(owner, **changes):
     )
 
 
-def fixed_clock(owner):
-    clock = FixedClock("2026-03-01T12:00:00+00:00")
+def fixed_clock(owner, at: str = "2026-03-01T12:00:00+00:00"):
+    clock = FixedClock(at)
     owner.app.state.clock = clock
     owner.app.state.session_factory.configure(info={"clock": clock})
 
@@ -76,6 +76,32 @@ def test_upcoming_post_undo_and_filtering(owner):
         assert occurrence is not None
         assert transaction.deleted_at is not None
         assert occurrence.status == "pending" and occurrence.transaction_id is None
+
+
+def test_a_future_payment_date_is_refused(owner):
+    fixed_clock(owner)
+    assert create_recurring(owner, include_past="1").status_code == 303
+    with owner.db() as session:
+        occurrence = session.scalars(
+            select(ScheduledOccurrence).where(ScheduledOccurrence.status == "pending")
+        ).first()
+        assert occurrence is not None
+        occurrence_id = occurrence.id
+
+    response = owner.post(
+        f"/upcoming/{occurrence_id}/post",
+        {"day": "2026-03-02", "amount": "100"},
+        token_from="/upcoming",
+    )
+
+    assert response.status_code == 303
+    assert "error=future_date" in response.headers["location"]
+    page = owner.client.get(response.headers["location"])
+    assert "A payment cannot be recorded in the future" in page.text
+    with owner.db() as session:
+        stored = session.get(ScheduledOccurrence, occurrence_id)
+        assert stored is not None and stored.status == "pending"
+        assert session.scalars(select(Transaction)).all() == []
 
 
 def test_occurrence_actions_preserve_rule_and_closed_month_blocks_post(owner):
@@ -131,6 +157,7 @@ def test_occurrence_actions_preserve_rule_and_closed_month_blocks_post(owner):
                 closed_at=FixedClock("2026-03-01T12:00:00+00:00").now(),
             )
         )
+    fixed_clock(owner, "2026-04-01T12:00:00+00:00")
     blocked = owner.post(
         f"/upcoming/{other_id}/post",
         {"day": "2026-03-01", "amount": "100"},

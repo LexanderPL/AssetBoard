@@ -41,6 +41,10 @@ ACTION_ERRORS = {
     "undo_expired": _("The 10-second undo window has expired."),
     "category_unavailable": _("The occurrence category is unavailable; edit the recurring rule."),
     "invalid_input": _("Check the amount and date, then try again."),
+    "future_date": _(
+        "A payment cannot be recorded in the future. Choose today or an earlier date, "
+        "or edit the recurring rule."
+    ),
     "not_planned": _("Only a one-time planned entry can be deleted here."),
     "not_skipped": _("This occurrence is not skipped."),
     "archived_item": _("This recurring item is archived, so its skipped date cannot come back."),
