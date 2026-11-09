@@ -3604,6 +3604,9 @@ msgstr ""
 msgid "The import could not be completed. Review the report and try again."
 msgstr ""
 
+msgid "No past imported months needed closing."
+msgstr ""
+
 msgid "There is no import handler available for this file yet."
 msgstr ""
 
@@ -3655,6 +3658,12 @@ msgstr ""
 
 msgid "Risk targets"
 msgstr ""
+
+#, fuzzy, python-format
+msgid "Closed %(num)d imported month."
+msgid_plural "Closed %(num)d imported months."
+msgstr[0] ""
+msgstr[1] ""
 
 msgid "Workspace settings saved."
 msgstr ""
@@ -7589,6 +7598,19 @@ msgstr ""
 msgid "Closed months in the archive (not applied in merge mode):"
 msgstr ""
 
+msgid "Close imported months"
+msgstr ""
+
+msgid ""
+"Close every past month that received rows from this import and is still "
+"open. Months already closed stay as they are; the current and future "
+"months are never closed. Rolling back this import then needs those months"
+" reopened first."
+msgstr ""
+
+msgid "Close past imported months"
+msgstr ""
+
 msgid "The file was checked, but there is no importer for this kind of file yet."
 msgstr ""
 
@@ -7599,6 +7621,27 @@ msgid ""
 "Map each category in the file to one of yours, create a new category, or "
 "ignore its rows. The defaults are already applied; change them and update"
 " the preview to check the totals before applying."
+msgstr ""
+
+msgid "Categories in the file"
+msgstr ""
+
+msgid "Mapped"
+msgstr ""
+
+msgid "Ignored"
+msgstr ""
+
+msgid "Unresolved"
+msgstr ""
+
+msgid "Rows"
+msgstr ""
+
+msgid "Filter categories"
+msgstr ""
+
+msgid "Type a category name or kind"
 msgstr ""
 
 #, python-format

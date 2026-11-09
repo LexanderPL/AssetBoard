@@ -136,6 +136,10 @@ def test_owner_can_restore_and_roll_back_over_the_suggested_set(owner: OwnerApp)
         assert "workspace.restored" in actions
         assert "import.applied" not in actions
 
+    report = owner.client.get(f"/workspace/data?batch={batch_id}").text
+    assert "data-close-imported-months" not in report
+    assert "Close past imported months" not in report
+
     preview = owner.client.get(f"/workspace/data/import/{batch_id}/rollback")
     assert preview.status_code == 200
     assert "Settings to restore" in preview.text

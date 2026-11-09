@@ -173,6 +173,23 @@ def _audit(session: Session, ctx: Context, action: str, state_id: UUID, month: Y
     )
 
 
+def close_month_state(session: Session, ctx: Context, month: YearMonth) -> bool:
+    """Close ``month`` inside the caller's write transaction; False when already closed.
+
+    The caller has already checked the role with ``require_role_now`` and taken the exclusive
+    workspace lock (``close_month`` does both). A caller that writes a month's data first also
+    calls ``lock_month_writes`` before reading it. The ``month.closed`` audit event is recorded
+    here, so every close is audited once.
+    """
+    repository = MonthStateRepository(session, ctx)
+    state = repository.for_month(month) or repository.create(month)
+    if state.closed_at is not None:
+        return False
+    repository.update(state.id, closed_at=ctx.clock.now(), closed_by_user_id=ctx.user.id)
+    _audit(session, ctx, "month.closed", state.id, month)
+    return True
+
+
 def close_month(factory: sessionmaker[Session], ctx: Context, month: YearMonth) -> bool:
     """Close ``month`` (editors and owners). False when it was already closed."""
     require_role(ctx, Role.EDITOR)
@@ -182,13 +199,7 @@ def close_month(factory: sessionmaker[Session], ctx: Context, month: YearMonth) 
     def write(session: Session) -> bool:
         require_role_now(session, ctx, Role.EDITOR)
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        repository = MonthStateRepository(session, ctx)
-        state = repository.for_month(month) or repository.create(month)
-        if state.closed_at is not None:
-            return False
-        repository.update(state.id, closed_at=ctx.clock.now(), closed_by_user_id=ctx.user.id)
-        _audit(session, ctx, "month.closed", state.id, month)
-        return True
+        return close_month_state(session, ctx, month)
 
     return run_immediate(factory, write)
 
