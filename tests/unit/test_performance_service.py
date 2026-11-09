@@ -26,7 +26,7 @@ from assetboard.services.investment_transactions import create_transaction
 from assetboard.services.investments import create_asset_class, create_instrument
 from assetboard.services.performance import (
     DEFAULT_RANGE,
-    _bond_observations,
+    bond_observations,
     performance_page,
 )
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
@@ -309,9 +309,7 @@ def test_bond_observations_show_a_coupon_reset(db: WorkspaceDb, team: WorkspaceD
         terms = BondTermsRepository(session, ctx).for_instrument(instrument.id)
         assert terms is not None
         rows = InvestmentTransactionRepository(session, ctx).for_instrument(instrument.id)
-        observations = _bond_observations(
-            model, terms, rows, {date(2025, 12, 31), date(2026, 1, 1)}
-        )
+        observations = bond_observations(model, terms, rows, {date(2025, 12, 31), date(2026, 1, 1)})
     values = {observation.date: observation.price for observation in observations}
     assert values[date(2025, 12, 31)] > Decimal("100")
     assert values[date(2026, 1, 1)] == Decimal("100")

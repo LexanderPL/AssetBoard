@@ -56,6 +56,7 @@ from assetboard.services.networth import (
 )
 from assetboard.services.networth_links import LinkOption
 from assetboard.services.networth_summary import networth_summary
+from assetboard.services.portfolio_links import create_networth_items_from_asset_classes
 from assetboard.services.workspace_options import currency_codes
 from assetboard.web.context import CurrentContext
 from assetboard.web.errors import is_htmx_fragment_request
@@ -122,6 +123,8 @@ NOTICES = {
     "item_unlinked_no_value": _("Item unlinked; no value was available, so it now has none."),
     "valuation_added": _("Value added."),
     "bulk_created": _("Items added."),
+    "portfolio_links_created": _("Net-worth items created from asset classes."),
+    "portfolio_links_none": _("No asset classes with a value need linking."),
 }
 BULK_ERRORS = {
     "wrong_format": _("Use name; value; category on each line."),
@@ -415,6 +418,17 @@ async def networth_page(
             edit_category=category_view,
         )
     )
+
+
+@router.post("/net-worth/link-asset-classes", name="networth_create_portfolio_links")
+async def networth_create_portfolio_links(request: Request, ctx: CurrentContext) -> Response:
+    result = await run_in_threadpool(
+        create_networth_items_from_asset_classes,
+        request.app.state.session_factory,
+        ctx,
+    )
+    notice = "portfolio_links_created" if result.created else "portfolio_links_none"
+    return await run_in_threadpool(lambda: _done(request, ctx, notice, Side.ASSET))
 
 
 @router.get("/net-worth/summary", name="networth_summary")

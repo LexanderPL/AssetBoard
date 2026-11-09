@@ -61,6 +61,7 @@ from assetboard.services.months import MonthClosed
 from assetboard.services.notify import Notifier
 from assetboard.services.oidc import OidcClient, UrllibTransport
 from assetboard.services.oidc_flow import ConsumedStates
+from assetboard.services.portfolio_links import register_portfolio_resolvers
 from assetboard.services.providers.registry import build_provider_runtime
 from assetboard.services.proxy_auth import RecentKeys
 from assetboard.services.update_check import GitHubReleaseSource
@@ -137,6 +138,7 @@ def create_app(
     import_adapters: Mapping[str, ImportAdapter] | None = None,
 ) -> FastAPI:
     settings = settings or Settings()
+    register_portfolio_resolvers()
     logger = configure_logging(settings.log_level, settings.log_format)
     settings.ensure_data_dir_writable()
     if settings.allow_registration is False:

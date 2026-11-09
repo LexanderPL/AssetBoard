@@ -77,6 +77,12 @@ from assetboard.services.networth_links import (
     LinkTarget,
     registry,
 )
+from assetboard.services.portfolio_links import (
+    LinkedNetWorthItem,
+    PortfolioLinkWarning,
+    portfolio_warnings,
+    real_estate_category_ids,
+)
 
 __all__ = [
     "BulkLineView",
@@ -245,6 +251,7 @@ class SideView:
 class NetWorthPage:
     asset: SideView
     liability: SideView
+    portfolio_warnings: tuple[PortfolioLinkWarning, ...] = ()
 
     def side_view(self, side: Side) -> SideView:
         return self.asset if side is Side.ASSET else self.liability
@@ -607,6 +614,29 @@ def list_networth(factory: sessionmaker[Session], ctx: Context) -> NetWorthPage:
             include_history=True,
             categories=categories,
         )
+        linked_items = tuple(
+            LinkedNetWorthItem(item.link_type, item.link_id)
+            for item in items
+            if item.valuation_mode == "linked"
+            and item.link_type is not None
+            and item.link_id is not None
+            and not item.archived
+        )
+        property_ids = real_estate_category_ids(session, ctx)
+        property_names = tuple(
+            item.name
+            for item in items
+            if not item.archived
+            and item.category_id in property_ids
+            and item.current is not None
+            and item.current.amount_minor > 0
+        )
+        warnings = portfolio_warnings(
+            session,
+            ctx,
+            linked_items=linked_items,
+            property_item_names=property_names,
+        )
     return NetWorthPage(
         asset=_side_view(
             Side.ASSET,
@@ -620,6 +650,7 @@ def list_networth(factory: sessionmaker[Session], ctx: Context) -> NetWorthPage:
             items,
             base_currency=base_currency,
         ),
+        portfolio_warnings=warnings,
     )
 
 

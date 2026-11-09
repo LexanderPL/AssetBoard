@@ -333,7 +333,8 @@ def test_one_price_and_one_fx_lookup_for_all_holdings(
         )
         _trade(db, instrument, "buy", "2026-02-27", "1", "10", fx="0.9")
     calls = {"prices": 0, "fx": 0}
-    real_prices, real_fx = portfolio_service.latest_prices, portfolio_service.latest_fx_rates
+    real_prices = portfolio_service.latest_prices_in_session
+    real_fx = portfolio_service.latest_fx_rates_in_session
 
     def prices(*args, **kwargs):
         calls["prices"] += 1
@@ -343,8 +344,8 @@ def test_one_price_and_one_fx_lookup_for_all_holdings(
         calls["fx"] += 1
         return real_fx(*args, **kwargs)
 
-    monkeypatch.setattr(portfolio_service, "latest_prices", prices)
-    monkeypatch.setattr(portfolio_service, "latest_fx_rates", fx)
+    monkeypatch.setattr(portfolio_service, "latest_prices_in_session", prices)
+    monkeypatch.setattr(portfolio_service, "latest_fx_rates_in_session", fx)
 
     page = portfolio_page(db.factory, _owner(db))
 

@@ -61,7 +61,9 @@ __all__ = [
     "fx_rate",
     "instrument_prices",
     "latest_fx_rates",
+    "latest_fx_rates_in_session",
     "latest_prices",
+    "latest_prices_in_session",
     "price_at",
     "save_manual_price",
 ]
@@ -358,6 +360,16 @@ def _latest_prices_in_session(
     return result
 
 
+def latest_prices_in_session(
+    session: Session,
+    ctx: Context,
+    instrument_ids: Collection[UUID],
+    on: date,
+) -> dict[UUID, PriceAt]:
+    """Batch prices in an existing session; the shared F6.6 current path uses this."""
+    return _latest_prices_in_session(session, ctx, instrument_ids, on)
+
+
 def latest_prices(
     factory: sessionmaker[Session],
     ctx: Context,
@@ -366,7 +378,7 @@ def latest_prices(
 ) -> dict[UUID, PriceAt]:
     require_role(ctx, Role.VIEWER)
     with factory() as session:
-        return _latest_prices_in_session(session, ctx, instrument_ids, on)
+        return latest_prices_in_session(session, ctx, instrument_ids, on)
 
 
 def price_at(
@@ -410,6 +422,17 @@ def _latest_fx_in_session(
     return {currency: _fx_at(_best(candidates[currency]), on) for currency in wanted}
 
 
+def latest_fx_rates_in_session(
+    session: Session,
+    ctx: Context,
+    currencies: Collection[str],
+    on: date,
+) -> dict[str, FxAt]:
+    """Batch FX rates in an existing session; the shared F6.6 current path uses this."""
+    base = CurrentWorkspaceRepository(session, ctx).get().base_currency
+    return _latest_fx_in_session(session, ctx, base, currencies, on)
+
+
 def latest_fx_rates(
     factory: sessionmaker[Session],
     ctx: Context,
@@ -424,7 +447,7 @@ def latest_fx_rates(
     requested = {currency.upper() for currency in currencies}
     with factory() as session:
         base = CurrentWorkspaceRepository(session, ctx).get().base_currency
-        result = _latest_fx_in_session(session, ctx, base, requested, on)
+        result = latest_fx_rates_in_session(session, ctx, requested, on)
         if base in requested:
             result[base] = FxAt(Decimal(1), on, None, False)
         return result

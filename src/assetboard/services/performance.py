@@ -133,18 +133,19 @@ def _step_for(code: str, start: date, today: date) -> Step:
     return Step.WEEK
 
 
-def _source_candidate(source: str, created_at: object, row_id: object) -> tuple[object, ...]:
+def source_candidate(source: str, created_at: object, row_id: object) -> tuple[object, ...]:
     return (-source_rank(source), created_at, str(row_id))
 
 
-def _effective_price_observations(
+def price_observations(
     price_rows: Sequence[PricePoint],
     transaction_rows: Sequence[InvestmentTransaction],
 ) -> dict[UUID, list[PriceObservation]]:
+    """The best price per instrument and date, sorted by date; shared with F6.8."""
     best: dict[tuple[UUID, date], tuple[tuple[object, ...], Decimal]] = {}
     for row in price_rows:
         key = (row.instrument_id, row.date)
-        candidate = _source_candidate(row.source, row.created_at, row.id)
+        candidate = source_candidate(row.source, row.created_at, row.id)
         previous = best.get(key)
         if previous is None or candidate > previous[0]:
             best[key] = (candidate, row.price)
@@ -152,7 +153,7 @@ def _effective_price_observations(
         if row.date is None:
             continue
         key = (row.instrument_id, row.date)
-        candidate = _source_candidate("transaction", row.created_at, row.id)
+        candidate = source_candidate("transaction", row.created_at, row.id)
         previous = best.get(key)
         if previous is None or candidate > previous[0]:
             best[key] = (candidate, row.unit_price)
@@ -164,15 +165,16 @@ def _effective_price_observations(
     return result
 
 
-def _effective_fx_observations(
+def fx_observations(
     fx_rows: Sequence[FxRate],
     transaction_rows: Sequence[InvestmentTransaction],
     base_currency: str,
 ) -> dict[str, list[RateObservation]]:
+    """The best rate per currency and date, sorted by date; shared with F6.8."""
     best: dict[tuple[str, date], tuple[tuple[object, ...], Decimal]] = {}
     for row in fx_rows:
         key = (row.quote_currency, row.date)
-        candidate = _source_candidate(row.source, row.created_at, row.id)
+        candidate = source_candidate(row.source, row.created_at, row.id)
         previous = best.get(key)
         if previous is None or candidate > previous[0]:
             best[key] = (candidate, row.rate)
@@ -183,7 +185,7 @@ def _effective_fx_observations(
         if rate <= 0:
             continue
         key = (row.quote_currency, row.date)
-        candidate = _source_candidate("transaction", row.created_at, row.id)
+        candidate = source_candidate("transaction", row.created_at, row.id)
         previous = best.get(key)
         if previous is None or candidate > previous[0]:
             best[key] = (candidate, rate)
@@ -195,12 +197,13 @@ def _effective_fx_observations(
     return result
 
 
-def _bond_observations(
+def bond_observations(
     instrument: Instrument,
     terms: BondTerms,
     transaction_rows: Sequence[InvestmentTransaction],
     dates: Collection[date],
 ) -> list[PriceObservation]:
+    """The model price per observation date; shared with F6.8."""
     term_value = terms_from_row(terms, instrument)
     rows = [
         row
@@ -259,8 +262,8 @@ def performance_page(
     chart_dates = set(step_dates(range_start, today, step))
     observation_dates = chart_dates | period_starts | {today}
 
-    prices = _effective_price_observations(price_rows, dated_rows)
-    fx = _effective_fx_observations(fx_rows, dated_rows, base)
+    prices = price_observations(price_rows, dated_rows)
+    fx = fx_observations(fx_rows, dated_rows, base)
     class_order = {row.id: row.sort_order for row in classes}
     allocations: dict[UUID, list[PortfolioAllocation]] = {}
     for row in allocation_rows:
@@ -279,7 +282,7 @@ def performance_page(
             continue
         terms = bond_rows.get(instrument.id)
         if terms is not None:
-            prices[instrument.id] = _bond_observations(
+            prices[instrument.id] = bond_observations(
                 instrument, terms, dated_rows, observation_dates
             )
 

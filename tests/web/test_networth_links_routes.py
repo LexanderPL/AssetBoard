@@ -11,6 +11,8 @@ from sqlalchemy import select
 from assetboard.clock import FixedClock
 from assetboard.db.models.networth import NetWorthCategory, NetWorthItem
 from assetboard.domain.networth import Side
+from assetboard.services.networth_links import registry as link_registry
+from assetboard.services.portfolio_links import register_portfolio_resolvers
 from tests.conftest import OwnerApp
 from tests.fake_links import FakeLinks, FakeTarget
 
@@ -83,10 +85,18 @@ def _post_linked(
     )
 
 
-def test_no_link_picker_without_a_registered_resolver(owner: OwnerApp) -> None:
-    page = owner.client.get("/net-worth").text
-    assert "Link to…" not in page
-    assert "data-linked-readonly" not in page
+def test_app_registers_portfolio_link_types_idempotently(owner: OwnerApp) -> None:
+    labels = link_registry.labels()
+    assert labels["portfolio_asset_class"] == "Asset class"
+    assert labels["portfolio_holding"] == "Holding"
+    register_portfolio_resolvers()
+    register_portfolio_resolvers()
+    assert link_registry.labels() == labels
+    asset = owner.client.get("/net-worth?side=asset").text
+    liability = owner.client.get("/net-worth?side=liability").text
+    assert "Link to…" in asset
+    assert "data-linked-readonly" not in asset
+    assert "Link to…" not in liability
 
 
 def test_link_picker_is_only_on_the_resolvers_side(owner: OwnerApp, fake_links: FakeLinks) -> None:
