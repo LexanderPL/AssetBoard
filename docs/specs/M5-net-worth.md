@@ -66,9 +66,9 @@ Money is Money only. Tests: valuation append semantics, back-dated valuations, c
 **Acceptance**
 - Pure domain function `summarize_net_worth(items_with_values) -> NetWorthSummary`: total assets, total liabilities, net worth, per-category totals and shares; items with `include_in_net_worth=false` excluded.
 - Items under an **archived category** still count while the item itself is not archived (F5.1 rule).
-- Summary page: big net-worth figure, assets-vs-liabilities bar, one combined donut of the gross
-  composition (assets and liabilities slices), table of categories with totals and % of assets;
-  liabilities likewise.
+- Summary page: big net-worth figure, one combined assets-vs-liabilities bar, and a category
+  table for each side (assets, then liabilities) with totals and shares of that side's own total.
+  The page loads no chart script.
 - "Debt-to-assets ratio" and "liquid vs illiquid" are **not** required (do not implement).
 - Currency conversion for non-base-currency items uses the FX service if M6 exists; before that, non-base items are shown separately with a warning and excluded from totals (documented limitation).
 
@@ -83,24 +83,25 @@ Money is Money only. Tests: valuation append semantics, back-dated valuations, c
 - Counting order: archived item → excluded → no value → non-base → counted. Items under an
   archived category still count.
 - Category-table shares are of each side's own total, in once-rounded tenths of a percent, using
-  the existing share helper. A side total of zero gives `None` and a displayed dash. The combined
-  donut's two slices are shares of the gross total (assets + liabilities), not of net worth and
-  not of their own side.
+  the existing share helper. A side total of zero gives `None` and a displayed dash.
 - Categories with no counted item are left out. Zero-valued counted items remain in the table
   but have no share.
-- The assets-vs-liabilities bar is server-rendered SVG with integer widths. The combined donut
-  reuses the shared donut macro and ECharts `charts.js` with fixed palette colours (blue for
-  assets, danger red for liabilities); its table is the accessible fallback. A short line under
-  it explains that it shows the gross composition, while net worth is assets minus liabilities.
-  A zero side has no slice; with neither side positive the donut shows its empty text and no
-  chart script is loaded.
+- The summary bar is server-rendered SVG with integer widths on a 0..1000 scale. It scales to
+  `max(assets, liabilities)`: assets are green from the left, liabilities red from the right.
+  When `assets >= liabilities` the bar ends at assets and the red part covers the rightmost
+  `liabilities/assets` share; the uncovered green remainder is net worth. When liabilities exceed
+  assets the bar extends to liabilities, solid red covers the assets end, the excess beyond it is
+  hatched red and a vertical marker line marks the assets end. Equal sides give a full red bar and
+  zero net worth; no liabilities gives a full green bar; assets of zero with liabilities gives a
+  fully hatched red bar; both zero gives an empty track and the **No assets or liabilities yet.**
+  caption. The page loads no chart script.
 - Excluded items are a neutral note; non-base and no-value items use warning tones. No FX, no
   base-currency lock, no writes/audit, no migration.
 
 **Agent prompt**
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
-Implement F5.2 from docs/specs/M5-net-worth.md: pure summarize_net_worth domain function, summary page with totals, bar, donut (ECharts) and category tables.
+Implement F5.2 from docs/specs/M5-net-worth.md: pure summarize_net_worth domain function, summary page with totals, one combined assets-vs-liabilities bar and category tables.
 Property tests: net = assets - liabilities; category totals sum to side totals; excluded items never counted.
 ```
 

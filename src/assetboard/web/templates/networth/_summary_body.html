@@ -1,6 +1,5 @@
 {% from "networth/_tabs.html" import tabs with context %}
 {% from "networth/_summary_macros.html" import bar, category_table, warning_list with context %}
-{% from "macros/charts.html" import donut with context %}
 <div class="space-y-6" data-networth-summary>
   {{ tabs("summary") }}
 
@@ -31,13 +30,6 @@
   {% endif %}
   {% if view.excluded_items %}
   {{ warning_list(ngettext("%(num)d item is not counted because you excluded it.", "%(num)d items are not counted because you excluded them.", view.excluded_items|length), view.excluded_items, tone="excluded") }}
-  {% endif %}
-
-  {% if view.combined_donut %}
-  <div class="space-y-2">
-    {{ donut(view.combined_donut, label=_("Side")) }}
-    <p class="max-w-3xl text-sm text-muted" data-donut-note>{{ _("The chart shows assets and liabilities as parts of the gross total; net worth is assets minus liabilities.") }}</p>
-  </div>
   {% endif %}
 
   <div class="grid gap-6 lg:grid-cols-2">

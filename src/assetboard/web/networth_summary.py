@@ -1,4 +1,4 @@
-"""View models for the net-worth summary (F5.2): big figure, bar, tables and one combined donut."""
+"""View models for the net-worth summary (F5.2): big figure, combined bar and category tables."""
 
 from __future__ import annotations
 
@@ -13,9 +13,9 @@ from assetboard.i18n import gettext
 from assetboard.i18n.numbers import format_money, format_rate_tenths
 from assetboard.services.networth import ItemView
 from assetboard.services.networth_summary import NetWorthSummaryData, SummaryCategory
-from assetboard.web.charts import DonutSlice, DonutView, NetWorthDonutKey
 
 NetWorthTone = Literal["favourable", "unfavourable", "neutral"]
+NetWorthSideKey = Literal["assets", "liabilities"]
 
 
 def _(message: str) -> str:
@@ -25,10 +25,6 @@ def _(message: str) -> str:
 
 ASSET_HEADING = _("Assets by category")
 LIABILITY_HEADING = _("Liabilities by category")
-COMBINED_HEADING = _("Assets and liabilities")
-COMBINED_EMPTY = _("No assets or liabilities yet")
-ASSET_SLICE_COLOR = "#0277bd"  # the palette's primary blue
-LIABILITY_SLICE_COLOR = "#c62828"  # the palette's danger red
 BAR_SCALE = 1000
 
 
@@ -43,7 +39,7 @@ class CategoryRow:
 
 @dataclass(frozen=True, slots=True)
 class SummarySide:
-    key: NetWorthDonutKey
+    key: NetWorthSideKey
     heading: str
     total: str
     total_share: str | None
@@ -54,11 +50,24 @@ class SummarySide:
 class SummaryBar:
     assets_width: int
     liabilities_width: int
+    caption: str
     scale: int = BAR_SCALE
 
     @property
     def empty(self) -> bool:
         return self.assets_width == 0 and self.liabilities_width == 0
+
+    @property
+    def liabilities_start(self) -> int:
+        return max(0, self.assets_width - self.liabilities_width)
+
+    @property
+    def covered_width(self) -> int:
+        return min(self.assets_width, self.liabilities_width)
+
+    @property
+    def deficit_width(self) -> int:
+        return max(0, self.liabilities_width - self.assets_width)
 
 
 @dataclass(frozen=True, slots=True)
@@ -77,7 +86,6 @@ class NetWorthSummaryView:
     net: str
     net_tone: NetWorthTone
     bar: SummaryBar
-    combined_donut: DonutView | None
     asset_side: SummarySide
     liability_side: SummarySide
     non_base_items: tuple[WarningItem, ...]
@@ -85,28 +93,39 @@ class NetWorthSummaryView:
     excluded_items: tuple[WarningItem, ...]
     unavailable_items: tuple[WarningItem, ...]
 
-    @property
-    def has_donut(self) -> bool:
-        return bool(self.combined_donut and self.combined_donut.slices)
 
-
-def _bar(summary: NetWorthSummary) -> SummaryBar:
-    whole = max(summary.assets.amount_minor, summary.liabilities.amount_minor)
+def _bar(summary: NetWorthSummary, locale: str) -> SummaryBar:
+    """One bar on the larger side's scale: green assets, red liabilities, hatched deficit."""
+    assets = summary.assets.amount_minor
+    liabilities = summary.liabilities.amount_minor
+    whole = max(assets, liabilities)
     if whole <= 0:
-        return SummaryBar(0, 0)
-    assets_width = (
-        max(1, summary.assets.amount_minor * BAR_SCALE // whole)
-        if summary.assets.amount_minor > 0
-        else 0
-    )
-    liabilities_width = (
-        max(1, summary.liabilities.amount_minor * BAR_SCALE // whole)
-        if summary.liabilities.amount_minor > 0
-        else 0
-    )
+        return SummaryBar(0, 0, gettext(_("No assets or liabilities yet."), locale))
+    assets_width = max(1, assets * BAR_SCALE // whole) if assets > 0 else 0
+    liabilities_width = max(1, liabilities * BAR_SCALE // whole) if liabilities > 0 else 0
+    if liabilities == 0:
+        caption = gettext(_("No liabilities; the whole bar is net worth."), locale)
+    elif assets == 0:
+        caption = gettext(_("Liabilities exceed assets by %(amount)s."), locale) % {
+            "amount": format_money(Money(liabilities - assets, summary.currency), locale)
+        }
+    elif assets == liabilities:
+        caption = gettext(_("Liabilities equal assets; net worth is zero."), locale)
+    elif liabilities < assets:
+        caption = gettext(
+            _("Liabilities are %(rate)s of assets; the green part is net worth."), locale
+        ) % {"rate": format_rate_tenths(share_tenths(liabilities, assets), locale)}
+    else:
+        caption = gettext(
+            _("Liabilities are %(rate)s of assets; they exceed assets by %(amount)s."), locale
+        ) % {
+            "rate": format_rate_tenths(share_tenths(liabilities, assets), locale),
+            "amount": format_money(Money(liabilities - assets, summary.currency), locale),
+        }
     return SummaryBar(
         assets_width=assets_width,
         liabilities_width=liabilities_width,
+        caption=caption,
     )
 
 
@@ -124,36 +143,9 @@ def _row(total: CategoryTotal, category: SummaryCategory, locale: str) -> Catego
     )
 
 
-def _combined_donut(summary: NetWorthSummary, locale: str) -> DonutView:
-    """Assets and liabilities as slices of the gross total, not of net worth."""
-    gross = summary.assets.amount_minor + summary.liabilities.amount_minor
-    slices = tuple(
-        DonutSlice(
-            name=gettext(name, locale),
-            color=color,
-            amount_minor=amount.amount_minor,
-            amount=format_money(amount, locale),
-            share=format_rate_tenths(share_tenths(amount.amount_minor, gross), locale),
-        )
-        for name, amount, color in (
-            (_("Assets"), summary.assets, ASSET_SLICE_COLOR),
-            (_("Liabilities"), summary.liabilities, LIABILITY_SLICE_COLOR),
-        )
-        if amount.amount_minor > 0
-    )
-    return DonutView(
-        key="combined",
-        heading=gettext(COMBINED_HEADING, locale),
-        empty=gettext(COMBINED_EMPTY, locale),
-        currency=summary.currency,
-        total=format_money(Money(gross, summary.currency), locale),
-        slices=slices,
-    )
-
-
 def _side(
     *,
-    key: NetWorthDonutKey,
+    key: NetWorthSideKey,
     heading: str,
     categories: tuple[CategoryTotal, ...],
     metadata: dict[UUID, SummaryCategory],
@@ -194,8 +186,7 @@ def build_summary_view(data: NetWorthSummaryData, locale: str) -> NetWorthSummar
         liabilities=format_money(summary.liabilities, locale),
         net=format_money(summary.net, locale),
         net_tone=net_tone,
-        bar=_bar(summary),
-        combined_donut=_combined_donut(summary, locale),
+        bar=_bar(summary, locale),
         asset_side=_side(
             key="assets",
             heading=ASSET_HEADING,

@@ -3202,10 +3202,25 @@ msgstr ""
 msgid "Liabilities by category"
 msgstr ""
 
-msgid "Assets and liabilities"
+msgid "No assets or liabilities yet."
 msgstr ""
 
-msgid "No assets or liabilities yet"
+msgid "No liabilities; the whole bar is net worth."
+msgstr ""
+
+#, python-format
+msgid "Liabilities exceed assets by %(amount)s."
+msgstr ""
+
+msgid "Liabilities equal assets; net worth is zero."
+msgstr ""
+
+#, python-format
+msgid "Liabilities are %(rate)s of assets; the green part is net worth."
+msgstr ""
+
+#, python-format
+msgid "Liabilities are %(rate)s of assets; they exceed assets by %(amount)s."
 msgstr ""
 
 msgid "Enter a name of up to 100 characters."
@@ -7023,11 +7038,6 @@ msgid_plural "%(num)d items are not counted because you excluded them."
 msgstr[0] ""
 msgstr[1] ""
 
-msgid ""
-"The chart shows assets and liabilities as parts of the gross total; net "
-"worth is assets minus liabilities."
-msgstr ""
-
 #, python-format
 msgid "Assets %(assets)s; liabilities %(liabilities)s."
 msgstr ""
@@ -9121,5 +9131,14 @@ msgstr ""
 #~ "Adds the suggested categories this side"
 #~ " does not have yet. Existing and "
 #~ "archived ones stay as they are."
+#~ msgstr ""
+
+#~ msgid "No assets or liabilities yet"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The chart shows assets and liabilities"
+#~ " as parts of the gross total; "
+#~ "net worth is assets minus liabilities."
 #~ msgstr ""
 
