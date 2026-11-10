@@ -213,7 +213,7 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             page.goto(f"{base}/", wait_until="networkidle")
 
             body_background = "() => getComputedStyle(document.body).backgroundColor"
-            assert page.evaluate(body_background) == "rgb(250, 250, 250)"
+            assert page.evaluate(body_background) == "rgb(241, 243, 244)"
             page.get_by_role("button", name="Toggle dark mode").click()
             assert page.locator("html").evaluate("element => element.classList.contains('dark')")
             assert page.evaluate("localStorage.getItem('theme')") == "dark"
