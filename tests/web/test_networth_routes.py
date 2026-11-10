@@ -353,19 +353,21 @@ def test_htmx_edit_and_plain_post_fallback(owner: OwnerApp) -> None:
 
 
 def test_writes_need_csrf(owner: OwnerApp) -> None:
+    # A marker with spaces cannot appear inside a base64url CSRF token by accident.
+    marker = "CSRF probe item"
     response = owner.client.post(
         "/net-worth/items",
         data={
             "side": "asset",
             "category_id": str(_category_id(owner, "asset", "Vehicles")),
-            "name": "Car",
+            "name": marker,
             "value": "1",
             "currency": "EUR",
         },
         follow_redirects=False,
     )
     assert response.status_code == 403
-    assert "Car" not in owner.client.get("/net-worth").text
+    assert marker not in owner.client.get("/net-worth").text
 
 
 def test_viewers_see_no_controls_and_cannot_write(owner: OwnerApp) -> None:
