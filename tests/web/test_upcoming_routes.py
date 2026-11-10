@@ -235,6 +235,11 @@ def test_upcoming_page_shows_a_monthly_item_due_in_twenty_days(owner):
     page = owner.client.get("/upcoming").text
     assert 'datetime="2026-03-21"' in page
     assert "the next 30 days" in page
+    # The week heading sits outside the panel; the occurrences form one list inside it.
+    week_start = page.index('<section class="mb-8" aria-labelledby="week-')
+    heading = page.index('class="mb-3 text-base font-semibold"', week_start)
+    panel = page.index('class="panel divide-y divide-line"', week_start)
+    assert week_start < heading < panel
     # Home uses the same window (it was a hard-coded week).
     home = owner.client.get("/").text
     assert re.search(r'<li [^>]*data-occurrence="[0-9a-f-]+"', home)
