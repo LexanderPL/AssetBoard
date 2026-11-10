@@ -2,7 +2,7 @@
 {% from "categories/_macros.html" import swatch with context %}
 
 {% macro htmx_form(action, swap="outerHTML", keep_visible="") -%}
-method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-body" hx-swap="{{ swap }}"{% if keep_visible %} data-keep-visible="#item-{{ keep_visible }}"{% endif %}
+method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-body" hx-swap="{{ swap }}"{% if keep_visible %} data-keep-visible="{{ keep_visible if keep_visible.startswith('#') else '#item-' ~ keep_visible }}"{% endif %}
 {%- endmacro %}
 
 {% macro small_button(label, attrs="") -%}
@@ -191,7 +191,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
 {% if edit_category and edit_category.id == category.id %}
 {% set values = edit_category_values %}
 <li id="category-{{ row_id }}" class="py-3" data-category="{{ row_id }}" data-editing>
-  <form {{ htmx_form(scoped_url(request, 'networth_category_update', category_id=row_id)) }} class="grid gap-3 sm:grid-cols-[minmax(0,2fr)_auto_auto] sm:items-start" novalidate>
+  <form {{ htmx_form(scoped_url(request, 'networth_category_update', category_id=row_id), keep_visible="#category-" ~ row_id) }} class="grid gap-3 sm:grid-cols-[minmax(0,2fr)_auto_auto] sm:items-start" novalidate>
     {{ csrf_input() }}
     <input type="hidden" name="side" value="{{ side_value }}">
     <div class="space-y-1">
@@ -206,7 +206,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
     </div>
     <div class="flex flex-wrap items-center gap-2">
       <button type="submit" class="btn-primary px-3 py-2 text-sm">{{ _("Save") }}</button>
-      <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}" hx-get="{{ scoped_url(request, 'networth_category_row', category_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" class="btn">{{ _("Cancel") }}</a>
+      <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&categories=open" hx-get="{{ scoped_url(request, 'networth_category_row', category_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" data-keep-visible="#category-{{ row_id }}" class="btn">{{ _("Cancel") }}</a>
     </div>
   </form>
 </li>
@@ -227,7 +227,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
       <button type="submit" data-move-up {% if first %}disabled{% endif %} aria-label="{{ _('Move %(name)s up', name=category.name) }}" class="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-subtle disabled:opacity-30"><span aria-hidden="true">↑</span></button></form>
     <form {{ htmx_form(scoped_url(request, 'networth_category_move', category_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}"><input type="hidden" name="direction" value="down">
       <button type="submit" data-move-down {% if last %}disabled{% endif %} aria-label="{{ _('Move %(name)s down', name=category.name) }}" class="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-subtle disabled:opacity-30"><span aria-hidden="true">↓</span></button></form>
-    <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&edit_category={{ row_id }}" hx-get="{{ scoped_url(request, 'networth_category_edit', category_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink" data-edit>{{ _("Edit") }}</a>
+    <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&edit_category={{ row_id }}&categories=open" hx-get="{{ scoped_url(request, 'networth_category_edit', category_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" data-keep-visible="#category-{{ row_id }}" class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink" data-edit>{{ _("Edit") }}</a>
     <form {{ htmx_form(scoped_url(request, 'networth_category_archive', category_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Archive"), "data-archive") }}</form>
     {% endif %}
     {% if not category.in_use %}

@@ -1,4 +1,4 @@
-"""View models for the net-worth summary (F5.2): big figure, bar, tables and donuts."""
+"""View models for the net-worth summary (F5.2): big figure, bar, tables and one combined donut."""
 
 from __future__ import annotations
 
@@ -6,11 +6,7 @@ from dataclasses import dataclass
 from typing import Literal
 from uuid import UUID
 
-from assetboard.domain.charts import (
-    DEFAULT_MAX_SLICES,
-    CategoryAmount,
-    category_slices,
-)
+from assetboard.domain.charts import share_tenths
 from assetboard.domain.money import Money
 from assetboard.domain.networth_summary import CategoryTotal, NetWorthSummary
 from assetboard.i18n import gettext
@@ -29,9 +25,10 @@ def _(message: str) -> str:
 
 ASSET_HEADING = _("Assets by category")
 LIABILITY_HEADING = _("Liabilities by category")
-ASSET_EMPTY = _("No assets with a value yet")
-LIABILITY_EMPTY = _("No liabilities with a value yet")
-OTHER_CATEGORIES = _("Other categories")
+COMBINED_HEADING = _("Assets and liabilities")
+COMBINED_EMPTY = _("No assets or liabilities yet")
+ASSET_SLICE_COLOR = "#0277bd"  # the palette's primary blue
+LIABILITY_SLICE_COLOR = "#c62828"  # the palette's danger red
 BAR_SCALE = 1000
 
 
@@ -51,7 +48,6 @@ class SummarySide:
     total: str
     total_share: str | None
     rows: tuple[CategoryRow, ...]
-    donut: DonutView | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -81,6 +77,7 @@ class NetWorthSummaryView:
     net: str
     net_tone: NetWorthTone
     bar: SummaryBar
+    combined_donut: DonutView | None
     asset_side: SummarySide
     liability_side: SummarySide
     non_base_items: tuple[WarningItem, ...]
@@ -90,7 +87,7 @@ class NetWorthSummaryView:
 
     @property
     def has_donut(self) -> bool:
-        return self.asset_side.donut is not None or self.liability_side.donut is not None
+        return bool(self.combined_donut and self.combined_donut.slices)
 
 
 def _bar(summary: NetWorthSummary) -> SummaryBar:
@@ -127,44 +124,30 @@ def _row(total: CategoryTotal, category: SummaryCategory, locale: str) -> Catego
     )
 
 
-def _donut(
-    *,
-    key: NetWorthDonutKey,
-    heading: str,
-    empty: str,
-    categories: tuple[CategoryTotal, ...],
-    metadata: dict[UUID, SummaryCategory],
-    currency: str,
-    total: str,
-    locale: str,
-) -> DonutView | None:
-    slices = category_slices(
-        (CategoryAmount(category.category_id, category.total) for category in categories),
-        currency=currency,
-        max_slices=DEFAULT_MAX_SLICES,
+def _combined_donut(summary: NetWorthSummary, locale: str) -> DonutView:
+    """Assets and liabilities as slices of the gross total, not of net worth."""
+    gross = summary.assets.amount_minor + summary.liabilities.amount_minor
+    slices = tuple(
+        DonutSlice(
+            name=gettext(name, locale),
+            color=color,
+            amount_minor=amount.amount_minor,
+            amount=format_money(amount, locale),
+            share=format_rate_tenths(share_tenths(amount.amount_minor, gross), locale),
+        )
+        for name, amount, color in (
+            (_("Assets"), summary.assets, ASSET_SLICE_COLOR),
+            (_("Liabilities"), summary.liabilities, LIABILITY_SLICE_COLOR),
+        )
+        if amount.amount_minor > 0
     )
-    if not slices:
-        return None
     return DonutView(
-        key=key,
-        heading=gettext(heading, locale),
-        empty=gettext(empty, locale),
-        currency=currency,
-        total=total,
-        slices=tuple(
-            DonutSlice(
-                name=(
-                    gettext(OTHER_CATEGORIES, locale)
-                    if item.category_id is None
-                    else metadata[item.category_id].name
-                ),
-                color=(None if item.category_id is None else metadata[item.category_id].color),
-                amount_minor=item.amount.amount_minor,
-                amount=format_money(item.amount, locale),
-                share=format_rate_tenths(item.share_tenths, locale),
-            )
-            for item in slices
-        ),
+        key="combined",
+        heading=gettext(COMBINED_HEADING, locale),
+        empty=gettext(COMBINED_EMPTY, locale),
+        currency=summary.currency,
+        total=format_money(Money(gross, summary.currency), locale),
+        slices=slices,
     )
 
 
@@ -172,31 +155,18 @@ def _side(
     *,
     key: NetWorthDonutKey,
     heading: str,
-    empty: str,
     categories: tuple[CategoryTotal, ...],
     metadata: dict[UUID, SummaryCategory],
     total: Money,
-    currency: str,
     locale: str,
 ) -> SummarySide:
     rows = tuple(_row(category, metadata[category.category_id], locale) for category in categories)
-    total_text = format_money(total, locale)
     return SummarySide(
         key=key,
         heading=gettext(heading, locale),
-        total=total_text,
+        total=format_money(total, locale),
         total_share=(format_rate_tenths(1000, locale) if total.amount_minor > 0 else None),
         rows=rows,
-        donut=_donut(
-            key=key,
-            heading=heading,
-            empty=empty,
-            categories=categories,
-            metadata=metadata,
-            currency=currency,
-            total=total_text,
-            locale=locale,
-        ),
     )
 
 
@@ -225,24 +195,21 @@ def build_summary_view(data: NetWorthSummaryData, locale: str) -> NetWorthSummar
         net=format_money(summary.net, locale),
         net_tone=net_tone,
         bar=_bar(summary),
+        combined_donut=_combined_donut(summary, locale),
         asset_side=_side(
             key="assets",
             heading=ASSET_HEADING,
-            empty=ASSET_EMPTY,
             categories=summary.asset_categories,
             metadata=data.categories,
             total=summary.assets,
-            currency=summary.currency,
             locale=locale,
         ),
         liability_side=_side(
             key="liabilities",
             heading=LIABILITY_HEADING,
-            empty=LIABILITY_EMPTY,
             categories=summary.liability_categories,
             metadata=data.categories,
             total=summary.liabilities,
-            currency=summary.currency,
             locale=locale,
         ),
         non_base_items=tuple(_warning(item, locale) for item in data.non_base_items),

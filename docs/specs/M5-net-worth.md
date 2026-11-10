@@ -47,7 +47,8 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
   all-or-nothing.
 - Inline edit and add-value swaps keep the item at the same viewport position (`data-keep-visible`
   in `app.js`); they do not force the row to the top, so saving from the middle of a long list
-  does not jump the page.
+  does not jump the page. The category edit form behaves the same way and leaves the Categories
+  panel open after edit, save, cancel, reorder, archive, restore and delete responses.
 - F5.1 creates manual valuations only. The link columns are reserved for F5.4.
 
 **Agent prompt**
@@ -65,7 +66,9 @@ Money is Money only. Tests: valuation append semantics, back-dated valuations, c
 **Acceptance**
 - Pure domain function `summarize_net_worth(items_with_values) -> NetWorthSummary`: total assets, total liabilities, net worth, per-category totals and shares; items with `include_in_net_worth=false` excluded.
 - Items under an **archived category** still count while the item itself is not archived (F5.1 rule).
-- Summary page: big net-worth figure, assets-vs-liabilities bar, donut of assets by category, table of categories with totals and % of assets; liabilities likewise.
+- Summary page: big net-worth figure, assets-vs-liabilities bar, one combined donut of the gross
+  composition (assets and liabilities slices), table of categories with totals and % of assets;
+  liabilities likewise.
 - "Debt-to-assets ratio" and "liquid vs illiquid" are **not** required (do not implement).
 - Currency conversion for non-base-currency items uses the FX service if M6 exists; before that, non-base items are shown separately with a warning and excluded from totals (documented limitation).
 
@@ -79,13 +82,18 @@ Money is Money only. Tests: valuation append semantics, back-dated valuations, c
   added in the web layer.
 - Counting order: archived item → excluded → no value → non-base → counted. Items under an
   archived category still count.
-- Shares are of each side's own total, in once-rounded tenths of a percent, using the existing
-  share helper. A side total of zero gives `None` and a displayed dash.
+- Category-table shares are of each side's own total, in once-rounded tenths of a percent, using
+  the existing share helper. A side total of zero gives `None` and a displayed dash. The combined
+  donut's two slices are shares of the gross total (assets + liabilities), not of net worth and
+  not of their own side.
 - Categories with no counted item are left out. Zero-valued counted items remain in the table
   but have no share.
-- The assets-vs-liabilities bar is server-rendered SVG with integer widths. Donuts reuse the
-  shared top-N plus “Other categories” slicer and ECharts `charts.js`; the grouped slice is
-  labelled “Other categories” because “Other” is a real seed category.
+- The assets-vs-liabilities bar is server-rendered SVG with integer widths. The combined donut
+  reuses the shared donut macro and ECharts `charts.js` with fixed palette colours (blue for
+  assets, danger red for liabilities); its table is the accessible fallback. A short line under
+  it explains that it shows the gross composition, while net worth is assets minus liabilities.
+  A zero side has no slice; with neither side positive the donut shows its empty text and no
+  chart script is loaded.
 - Excluded items are a neutral note; non-base and no-value items use warning tones. No FX, no
   base-currency lock, no writes/audit, no migration.
 
@@ -395,14 +403,12 @@ model), and F7.6 links a loan to a net-worth item.
 **Acceptance**
 - The asset seed gains **Real estate** (pl "Nieruchomości"), first in the asset order. New
   workspaces get it in the workspace-creation transaction with the rest of the set.
-- **"Add missing suggested categories"** action per side (editors and owners): it creates each
-  suggested category whose name key (in either supported language) has no category on that side
-  (an archived one counts as present), appended in seed order, in one `run_immediate` write with the workspace lock and a role
-  re-check. It never renames, restores or reorders existing categories, and it is idempotent
-  (a second run adds nothing). Audited as `networth_category.seeded` with the created names, like
-  the empty-side action. It replaces the empty-side-only action: on an empty side it adds the
-  whole set, as before.
-- Existing workspaces are not migrated; the action is how they get Real estate.
+- The initial seed stays the only bulk offer: **Add suggested categories** appears only while a
+  side has no categories at all (active or archived) and adds the whole set through
+  `seed_into(..., sides=[side])`. A seed request for a side that already has any category is
+  refused with `already_seeded`; there is no partial or add-missing action.
+- Existing workspaces are not migrated. A side that already has categories gets Real estate by
+  creating the category by hand with **Add category**.
 - Property items use the existing F5.1 item fields and valuation history, F5.4 links and F5.6
   estimates; nothing about items changes. `investable` defaults to off for new Real estate items
   (a home is not FIRE money), as for every new asset item.
@@ -418,22 +424,20 @@ model), and F7.6 links a loan to a net-worth item.
 - Real estate takes a palette colour the other suggested categories don't use; the others keep
   their colours, so every shipped set (`ASSET_SEED_V1`, `ASSET_SEED_V2`, `ASSET_SEED`) still
   compares exactly in the restore check.
-- The audit event lists the created names as one comma-separated `names` string (audit data
-  holds scalars). A run that creates nothing writes no event, so a no-op click never turns an
-  untouched seed into user data for restore.
-- The empty-side offer keeps its "Add suggested categories" wording; a non-empty side shows
-  "Add missing suggested categories" only while a suggested category is missing.
+- The empty-side offer keeps its "Add suggested categories" wording and writes the usual
+  `networth_category.seeded` event (`count`, `side`). A side with any category, active or
+  archived, shows no offer and a stale request is refused with `already_seeded`; a refused
+  request writes no event and changes nothing.
+- The category edit form stays expanded inside **Categories on this side** and the edited row
+  keeps its viewport position after save and cancel, using `data-keep-visible="#category-<id>"`.
 - The asset-class seed keeps the pre-F5.7 set as `ASSET_CLASS_SEED_V1` (in
   `ASSET_CLASS_SEEDS`) for the F6.9 restore check; asset classes are not in the archive yet.
 
 **Tests:**
 - Seed sets in en and pl, with Real estate first.
-- The add-missing action on:
-  - an empty side (the whole set);
-  - a partial side (only the missing ones);
-  - a side where a suggested category was renamed (the original name is added) or archived.
-    An archived category counts as present and is not re-created; the user restores it.
-- Idempotence, role, CSRF and the audit event.
+- The empty-side action adds the whole set, once; a side with a custom, renamed or archived
+  category refuses with `already_seeded` and adds nothing.
+- Role, CSRF and the audit event.
 - Restore treats the old and new untouched seed sets as empty.
 - The M6 seed has neither property class, and Other is investable.
 - The portfolio badge shows on a non-investable class, and every class still counts in the
@@ -444,6 +448,6 @@ model), and F7.6 links a loan to a net-worth item.
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
 Implement F5.7 from docs/specs/M5-net-worth.md together with its M6 seed changes: the Real estate net-worth seed (en/pl),
-the "Add missing suggested categories" action, the new M6 asset-class seed (no Real estate / Primary residence, Other investable),
+the empty-side-only suggested-category seed, the new M6 asset-class seed (no Real estate / Primary residence, Other investable),
 the "not counted in FIRE" badge on the portfolio class table, and restore emptiness accepting old and new seed sets.
 ```

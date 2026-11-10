@@ -114,7 +114,6 @@ NOTICES = {
     "category_restored": _("Category restored."),
     "category_deleted": _("Category deleted."),
     "categories_seeded": _("Suggested categories added."),
-    "categories_complete": _("Every suggested category is already on this side."),
     "item_created": _("Item added."),
     "item_saved": _("Item saved."),
     "item_archived": _("Item archived."),
@@ -267,6 +266,7 @@ def _body_context(
     bulk_text: str = "",
     bulk_preview: BulkPreview | None = None,
     link_options: tuple[LinkOption, ...] = (),
+    categories_open: bool = False,
 ) -> dict[str, object]:
     locale = request.state.locale
     today = ctx.clock.today(ctx.workspace.timezone).isoformat()
@@ -308,6 +308,7 @@ def _body_context(
         "edit_category_errors": {
             field: _t(request, message) for field, message in (edit_category_errors or {}).items()
         },
+        "categories_open": categories_open or edit_category is not None,
         "bulk_text": bulk_text,
         "bulk_preview": bulk_preview,
         "bulk_error_labels": {code: _t(request, label) for code, label in BULK_ERRORS.items()},
@@ -346,11 +347,19 @@ def _render(
     return response
 
 
-def _done(request: Request, ctx: Context, notice: str, side: Side) -> Response:
+def _done(
+    request: Request,
+    ctx: Context,
+    notice: str,
+    side: Side,
+    *,
+    categories_open: bool = False,
+) -> Response:
     if is_htmx_fragment_request(request):
-        return _render(request, ctx, side=side, notice=notice)
+        return _render(request, ctx, side=side, notice=notice, categories_open=categories_open)
+    suffix = "&categories=open" if categories_open else ""
     return RedirectResponse(
-        request.url_for("networth").path + f"?side={side.value}&notice={notice}",
+        request.url_for("networth").path + f"?side={side.value}&notice={notice}{suffix}",
         status_code=303,
     )
 
@@ -383,6 +392,7 @@ async def networth_page(
     side: str = "asset",
     edit_item: str = "",
     edit_category: str = "",
+    categories: str = "",
 ) -> Response:
     selected = _selected_side(side)
     item_view: ItemView | None = None
@@ -416,6 +426,7 @@ async def networth_page(
             error=error_message,
             edit_item=item_view,
             edit_category=category_view,
+            categories_open=categories == "open",
         )
     )
 
@@ -478,7 +489,7 @@ async def networth_categories_seed(
     selected = _selected_side(side)
     locale = request.state.locale
     try:
-        created = await run_in_threadpool(
+        await run_in_threadpool(
             lambda: seed_categories(
                 request.app.state.session_factory, ctx, side=side, locale=locale
             )
@@ -486,8 +497,7 @@ async def networth_categories_seed(
     except NetWorthError as exc:
         code = exc.code
         return await run_in_threadpool(lambda: _failed(request, ctx, selected, code))
-    notice = "categories_seeded" if created else "categories_complete"
-    return await run_in_threadpool(lambda: _done(request, ctx, notice, selected))
+    return await run_in_threadpool(lambda: _done(request, ctx, "categories_seeded", selected))
 
 
 @router.post("/net-worth/categories/{category_id}", name="networth_category_update")
@@ -521,7 +531,7 @@ async def networth_category_update(
             )
         )
     return await run_in_threadpool(
-        lambda: _done(request, ctx, "category_saved", Side(category.side))
+        lambda: _done(request, ctx, "category_saved", Side(category.side), categories_open=True)
     )
 
 
@@ -545,9 +555,12 @@ async def networth_category_move(
             lambda: _failed(request, ctx, selected, code, status_code=status_code)
         )
     if is_htmx_fragment_request(request):
-        return await run_in_threadpool(lambda: _render(request, ctx, side=selected))
+        return await run_in_threadpool(
+            lambda: _render(request, ctx, side=selected, categories_open=True)
+        )
     return RedirectResponse(
-        request.url_for("networth").path + f"?side={selected.value}", status_code=303
+        request.url_for("networth").path + f"?side={selected.value}&categories=open",
+        status_code=303,
     )
 
 
@@ -558,7 +571,9 @@ async def networth_category_archive(
     target = _parse_uuid(category_id)
     selected = _selected_side(side)
     await run_in_threadpool(archive_category, request.app.state.session_factory, ctx, target)
-    return await run_in_threadpool(lambda: _done(request, ctx, "category_archived", selected))
+    return await run_in_threadpool(
+        lambda: _done(request, ctx, "category_archived", selected, categories_open=True)
+    )
 
 
 @router.post("/net-worth/categories/{category_id}/restore", name="networth_category_restore")
@@ -572,7 +587,9 @@ async def networth_category_restore(
     except NetWorthError as exc:
         code = exc.code
         return await run_in_threadpool(lambda: _failed(request, ctx, selected, code))
-    return await run_in_threadpool(lambda: _done(request, ctx, "category_restored", selected))
+    return await run_in_threadpool(
+        lambda: _done(request, ctx, "category_restored", selected, categories_open=True)
+    )
 
 
 @router.post("/net-worth/categories/{category_id}/delete", name="networth_category_delete")
@@ -585,7 +602,9 @@ async def networth_category_delete(
         lambda: delete_category(request.app.state.session_factory, ctx, target)
     )
     notice = "category_deleted" if outcome == "deleted" else "category_archived_in_use"
-    return await run_in_threadpool(lambda: _done(request, ctx, notice, selected))
+    return await run_in_threadpool(
+        lambda: _done(request, ctx, notice, selected, categories_open=True)
+    )
 
 
 @router.get("/net-worth/categories/{category_id}/edit", name="networth_category_edit")
@@ -619,10 +638,12 @@ async def networth_category_row(
     selected = Side(category.side)
     if not is_htmx_fragment_request(request):
         return RedirectResponse(
-            request.url_for("networth").path + f"?side={selected.value}",
+            request.url_for("networth").path + f"?side={selected.value}&categories=open",
             status_code=303,
         )
-    return await run_in_threadpool(lambda: _render(request, ctx, side=selected))
+    return await run_in_threadpool(
+        lambda: _render(request, ctx, side=selected, categories_open=True)
+    )
 
 
 # Items

@@ -198,7 +198,7 @@
   {% endif %}
 
   {% if view.categories or view.archived_categories or can_edit %}
-  <details class="panel p-6 sm:p-7" data-categories {% if view.can_seed %}open{% endif %}>
+  <details class="panel p-6 sm:p-7" data-categories {% if view.can_seed or categories_open %}open{% endif %}>
     <summary class="cursor-pointer text-base font-semibold">{{ _("Categories on this side") }} <span class="text-sm font-normal text-muted">({{ view.categories|length }})</span></summary>
     {% if can_edit %}
     <form {{ htmx_form(scoped_url(request, 'networth_categories_create')) }} class="mt-4 grid gap-3 sm:grid-cols-[minmax(0,2fr)_auto_auto] sm:items-start" novalidate>
@@ -215,14 +215,6 @@
         {% if create_category_errors.get("color") %}<p class="text-xs text-danger">{{ create_category_errors.get("color") }}</p>{% endif %}
       </div>
       <button type="submit" class="btn-primary">{{ _("Add category") }}</button>
-    </form>
-    {% endif %}
-    {% if can_edit and view.can_add_suggested %}
-    <form {{ htmx_form(scoped_url(request, 'networth_categories_seed')) }} class="mt-4 flex flex-wrap items-center gap-3" data-add-missing-suggested>
-      {{ csrf_input() }}
-      <input type="hidden" name="side" value="{{ side_value }}">
-      <button type="submit" class="btn">{{ _("Add missing suggested categories") }}</button>
-      <p class="text-xs text-muted">{{ _("Adds the suggested categories this side does not have yet. Existing and archived ones stay as they are.") }}</p>
     </form>
     {% endif %}
     {% if view.categories %}

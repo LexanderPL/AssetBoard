@@ -18,7 +18,7 @@ from assetboard.i18n import gettext
 from assetboard.i18n.numbers import format_money, format_rate_tenths
 from assetboard.services.summary import SummaryData
 
-NetWorthDonutKey = Literal["assets", "liabilities"]
+NetWorthDonutKey = Literal["assets", "liabilities", "combined"]
 PortfolioDonutKey = Literal["portfolio", "portfolio-classes"]
 DonutKey = ChartBlock | NetWorthDonutKey | PortfolioDonutKey
 
