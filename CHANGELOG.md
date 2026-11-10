@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0](https://github.com/LexanderPL/AssetBoard/compare/v0.5.7...v0.6.0) (2026-11-10)
+
+
+### Features
+
+* **networth:** replace the summary donut with one assets-vs-liabilities bar ([#273](https://github.com/LexanderPL/AssetBoard/issues/273)) ([9d4844f](https://github.com/LexanderPL/AssetBoard/commit/9d4844f948ec2cb2e65ee3426cbda43d3c2c4177))
+
+
+### Tests
+
+* **auth:** freeze clocks for exact Retry-After assertions ([#276](https://github.com/LexanderPL/AssetBoard/issues/276)) ([a3f3526](https://github.com/LexanderPL/AssetBoard/commit/a3f35263f7107f0a7c07f176ad430fe6dc7f646a))
+
 ## [0.5.7](https://github.com/LexanderPL/AssetBoard/compare/v0.5.6...v0.5.7) (2026-11-10)
 
 
