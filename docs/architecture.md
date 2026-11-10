@@ -21,8 +21,10 @@ once for the light theme (`:root`) and once for the dark theme (`:root.dark`) in
 `static/css/input.css`; `tailwind.config.js` maps each name to its variable. Templates use only
 token classes and no `dark:` colour variants, so changing a colour is a one-place edit followed
 by `make css`. `tests/unit/test_theme_tokens.py` checks WCAG AA contrast for every text and
-background pair in both themes and that templates use no other colours. Form controls use the
-shared `form-control` and `form-select` classes.
+background pair in both themes and that templates use no other colours. The light theme uses a
+soft gray page (`canvas`) with white cards (`surface`) and stronger neutral lines, so panels read
+as raised without shadows; the dark theme keeps its existing values. Form controls use the shared
+`form-control` and `form-select` classes.
 
 The main content looks like a spreadsheet: boxes (`panel`) and form fields have square corners,
 a thin `line` border and no shadow; buttons, chips, the sidebar and the header keep their
