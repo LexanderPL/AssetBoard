@@ -35,7 +35,7 @@
 
   {% if view.combined_donut %}
   <div class="space-y-2">
-    {{ donut(view.combined_donut) }}
+    {{ donut(view.combined_donut, label=_("Side")) }}
     <p class="max-w-3xl text-sm text-muted" data-donut-note>{{ _("The chart shows assets and liabilities as parts of the gross total; net worth is assets minus liabilities.") }}</p>
   </div>
   {% endif %}

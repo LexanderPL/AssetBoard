@@ -122,6 +122,7 @@ def test_summary_shows_totals_bar_combined_donut_and_tables(owner: OwnerApp) -> 
     assert [slice_["share"] for slice_ in data["slices"]] == ["73.7%", "26.3%"]
     assert page.count("data-chart-legend-item") == 2
     assert page.count("data-chart-row") == 2
+    assert ">Side</th>" in page
     assert "data-chart-row" in page and "Assets and liabilities" in page
     assert (
         "The chart shows assets and liabilities as parts of the gross total; "
