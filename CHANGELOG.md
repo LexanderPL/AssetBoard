@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.5.6](https://github.com/LexanderPL/AssetBoard/compare/v0.5.5...v0.5.6) (2026-11-10)
+
+
+### Features
+
+* bridge performance gaps and auto-link portfolio net worth ([#259](https://github.com/LexanderPL/AssetBoard/issues/259)) ([1d632a1](https://github.com/LexanderPL/AssetBoard/commit/1d632a1d82d0a03fe68309e0d2fe0cdf623caa3e))
+* **demo:** add deterministic demo workspace builder (F9.11a) ([#262](https://github.com/LexanderPL/AssetBoard/issues/262)) ([dc002a9](https://github.com/LexanderPL/AssetBoard/commit/dc002a9605bcd1126c717cc0ae4dab591a60483e))
+* **demo:** add public demo mode with daily reset and restrictions (F9.11b) ([#263](https://github.com/LexanderPL/AssetBoard/issues/263)) ([fc4e57c](https://github.com/LexanderPL/AssetBoard/commit/fc4e57c306fe38ae02d20544944512d68cfe5f61))
+* **import:** polish CSV mapping and close imported months ([#258](https://github.com/LexanderPL/AssetBoard/issues/258)) ([da92f0a](https://github.com/LexanderPL/AssetBoard/commit/da92f0af71b704338aead203c5dd0a472775b7e3))
+* **investments:** polish transaction, portfolio and risk UI ([#260](https://github.com/LexanderPL/AssetBoard/issues/260)) ([4a99797](https://github.com/LexanderPL/AssetBoard/commit/4a997972ee1e55e66e8b6fa2a2f737768ff8d0e6))
+* **ui:** polish history, net-worth and settings pages ([#255](https://github.com/LexanderPL/AssetBoard/issues/255)) ([34ffa7b](https://github.com/LexanderPL/AssetBoard/commit/34ffa7b212ad8fba452485589c7fa71addd2e044))
+
+
+### Bug Fixes
+
+* **auth:** keep email links strictly ordered so the oldest is dropped ([#261](https://github.com/LexanderPL/AssetBoard/issues/261)) ([4fa9fd2](https://github.com/LexanderPL/AssetBoard/commit/4fa9fd2f2c91b2b66a24f90f7d40422e28981c1c))
+
+
+### Documentation
+
+* **spec:** F9.11 demo data builder and demo mode before M7 ([#256](https://github.com/LexanderPL/AssetBoard/issues/256)) ([86817d4](https://github.com/LexanderPL/AssetBoard/commit/86817d4935cf8f6fbc0d518756755325303a87aa))
+
 ## [0.5.5](https://github.com/LexanderPL/AssetBoard/compare/v0.5.4...v0.5.5) (2026-11-09)
 
 
