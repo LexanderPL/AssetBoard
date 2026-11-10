@@ -356,8 +356,17 @@ def test_demo_notification_and_provider_controls_are_absent(web: WebHarness) -> 
             workspace_id = session.scalars(
                 select(Workspace.id).where(Workspace.is_demo.is_(True))
             ).one()
+            # A bond-model instrument shows its terms panel instead of the price form, so pick a
+            # manually priceable one, in a fixed order (an unordered LIMIT 1 made this flaky).
             instrument_id = session.scalars(
-                select(Instrument.id).where(Instrument.workspace_id == workspace_id).limit(1)
+                select(Instrument.id)
+                .where(
+                    Instrument.workspace_id == workspace_id,
+                    Instrument.type.not_in(("bond_model", "currency")),
+                    Instrument.archived_at.is_(None),
+                )
+                .order_by(Instrument.name, Instrument.id)
+                .limit(1)
             ).one()
         instrument = client.get(f"/investments/instruments/{instrument_id}")
         assert instrument.status_code == 200
