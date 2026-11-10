@@ -68,6 +68,9 @@
     </div>
   </div>
 
+  {% if demo_session %}
+  <p class="text-sm text-muted" data-demo-read-only>{{ _("Not available in the demo workspace.") }}</p>
+  {% else %}
   <fieldset class="space-y-3" data-provider-fields>
     <legend class="text-sm font-medium">{{ _("Price source") }}</legend>
     <div class="grid gap-4 sm:grid-cols-2">
@@ -95,6 +98,7 @@
       <div data-provider-lookup></div>
     </div>
   </fieldset>
+  {% endif %}
 
   <fieldset class="space-y-2">
     <legend class="text-sm font-medium">{{ _("Allocation") }}</legend>

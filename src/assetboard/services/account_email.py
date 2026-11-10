@@ -256,6 +256,9 @@ def resolve_mail_request(
         now = clock.now()
         prune_email_tokens(session, now)
         user = session.scalar(select(User).where(User.email == request.email))
+        # The public demo account never sends or receives mail and never gets a link (F9.11b).
+        if user is not None and user.is_demo:
+            return None
         if request.purpose == "register":
             return _registration_mail(session, settings, request, user, now)
         return _reset_mail(session, settings, clock, request, user, now, log_key)
@@ -266,6 +269,8 @@ def resolve_mail_request(
 def _registration_mail(
     session: Session, settings: Settings, request: MailRequest, user: User | None, now: datetime
 ) -> MailJob | None:
+    if user is not None and user.is_demo:
+        return None
     if user is None:
         token = _issue_token(
             session,
@@ -294,7 +299,7 @@ def _reset_mail(
     now: datetime,
     log_key: bytes,
 ) -> MailJob | None:
-    if user is None or not user.is_active:
+    if user is None or not user.is_active or user.is_demo:
         return None
     if not is_deliverable(user.email):
         # An address stored before the stricter rule that would not reach exactly itself.
@@ -458,6 +463,7 @@ def reset_target(factory: sessionmaker[Session], token: str, clock: Clock) -> Re
             or user is None
             or row.email != user.email
             or not user.is_active
+            or user.is_demo
             or user.password_hash is None
         ):
             return None
@@ -525,6 +531,7 @@ def reset_password(
             user is None
             or row.email != user.email
             or not user.is_active
+            or user.is_demo
             or user.password_hash is None
         ):
             return ResetOutcome("link_invalid")

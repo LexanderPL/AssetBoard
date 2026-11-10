@@ -3,6 +3,7 @@
 {% block title %}{{ _("Members") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Members") }}{% endblock %}
 {% block content %}
+{% if demo_session %}<p class="mb-5 text-sm text-muted" data-demo-read-only>{{ _("Not available in the demo workspace.") }}</p>{% endif %}
 <section class="panel p-6 sm:p-7" aria-labelledby="members-heading">
   <h2 id="members-heading" class="text-base font-semibold">{{ _("People in this workspace") }}</h2>
   {% if error %}
@@ -16,6 +17,7 @@
         <p class="truncate text-xs text-muted">{{ member.email }}</p>
       </div>
       <div class="flex flex-wrap items-center gap-2">
+        {% if not demo_session %}
         <form method="post" action="{{ scoped_url(request, 'workspace_member_role', membership_id=member.membership_id|string) }}" class="flex items-center gap-2">
           {{ csrf_input() }}
           <label for="role-{{ member.membership_id }}" class="sr-only">{{ _("Role") }}</label>
@@ -26,7 +28,8 @@
           </select>
           <button type="submit" class="rounded-xl border border-line px-3 py-2 text-sm font-medium hover:bg-subtle">{{ _("Change role") }}</button>
         </form>
-        {% if member.user_id != current_user_id %}
+        {% endif %}
+        {% if member.user_id != current_user_id and not demo_session %}
         <form method="post" action="{{ scoped_url(request, 'workspace_member_remove', membership_id=member.membership_id|string) }}" data-confirm="{{ _('Remove %(name)s from this workspace?', name=member.display_name) }}">
           {{ csrf_input() }}
           <button type="submit" data-remove-member class="rounded-xl px-3 py-2 text-sm font-medium text-danger hover:bg-danger-soft">{{ _("Remove") }}</button>
@@ -50,6 +53,7 @@
     </div>
   </div>
   {% endif %}
+  {% if not demo_session %}
   <form method="post" action="{{ scoped_url(request, 'workspace_invitations') }}" class="mt-5 grid gap-4 sm:grid-cols-3" novalidate>
     {{ csrf_input() }}
     {{ select("role", _("Role"), roles, selected=invite_values.role, error=invite_errors.get("role")) }}
@@ -66,6 +70,7 @@
     <p class="text-xs text-muted sm:col-span-3">{{ _("Only an account with this email address can accept the invitation.") }} {{ _("The email is not verified, so share the link only with the person you mean to invite.") }}</p>
     <div class="sm:col-span-3"><button type="submit" class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Create invitation link") }}</button></div>
   </form>
+  {% endif %}
   <h3 class="mt-7 text-sm font-semibold">{{ _("Pending invitations") }} <span class="text-xs font-normal text-muted">({{ invitations|length }}/{{ max_pending }})</span></h3>
   {% if invitations %}
   <ul class="mt-3 divide-y divide-line">
@@ -76,10 +81,12 @@
         {% if not invitation.email %}<p class="text-xs text-muted" data-unlocked-explanation>{{ _("Created before invitations required an email; anyone with the link can use it until it expires.") }}</p>{% endif %}
         <p class="text-xs text-muted">{{ _("Expires %(date)s", date=invitation.expires_at.strftime("%Y-%m-%d %H:%M UTC")) }}</p>
       </div>
+      {% if not demo_session %}
       <form method="post" action="{{ scoped_url(request, 'workspace_invitation_revoke', invitation_id=invitation.id|string) }}" data-confirm="{{ _('Revoke this invitation link?') }}">
         {{ csrf_input() }}
         <button type="submit" data-revoke-invitation class="rounded-xl px-3 py-2 text-sm font-medium text-danger hover:bg-danger-soft">{{ _("Revoke") }}</button>
       </form>
+      {% endif %}
     </li>
     {% endfor %}
   </ul>

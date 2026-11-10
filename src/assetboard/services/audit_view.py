@@ -71,6 +71,8 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     "auth.proxy_unlinked": ("via", "confirmed"),
     "auth.instance_admin_granted": ("source",),
     "auth.instance_admin_revoked": ("source",),
+    "demo.reset": ("reason", "status", "version"),
+    "demo.deleted": (),
     **AUDIT_DATA_KEYS,
     "scheduled.created": (),
     "scheduled.updated": (),
@@ -298,6 +300,8 @@ ACTION_LABELS: dict[str, str] = {
     "auth.proxy_unlinked": _("Proxy sign-in unlinked"),
     "auth.instance_admin_granted": _("Administrator role granted"),
     "auth.instance_admin_revoked": _("Administrator role removed"),
+    "demo.reset": _("Demo workspace reset"),
+    "demo.deleted": _("Demo data deleted"),
     "admin.user_created": _("Account created by an administrator"),
     "admin.user_activated": _("Account activated"),
     "admin.user_deactivated": _("Account deactivated"),
@@ -388,6 +392,8 @@ KEY_LABELS: dict[str, str] = {
     "revoked_count": _("Sessions ended"),
     "sessions_revoked": _("Sessions ended"),
     "other_sessions_revoked": _("Other sessions ended"),
+    "status": _("Status"),
+    "version": _("Dataset version"),
     "via": _("Through"),
     "purpose": _("For"),
     "confirmed": _("Confirmed with"),
@@ -509,11 +515,19 @@ REASON_LABELS: dict[str, str] = {
     "headers_invalid": _("the proxy sent an invalid identity header"),
     "failed_email_attempts": _("too many attempts with another email address"),
     "owner": _("by an owner"),
+    "startup": _("at startup"),
+    "scheduled": _("on the daily schedule"),
+    "manual": _("by an administrator"),
+}
+STATUS_LABELS: dict[str, str] = {
+    "ok": _("succeeded"),
+    "failed": _("failed"),
 }
 METHOD_LABELS: dict[str, str] = {
     "password": _("password"),
     "oidc": _("identity provider"),
     "proxy": _("proxy"),
+    "demo": _("the demo"),
     "profile": _("the profile"),
     "invitation": _("an invitation"),
     "email": _("a confirmed email address"),
@@ -629,6 +643,7 @@ VALUE_TABLES: dict[str, dict[str, str]] = {
     "side": SIDE_LABELS,
     "treatment": TREATMENT_LABELS,
     "previous_treatment": TREATMENT_LABELS,
+    "status": STATUS_LABELS,
 }
 
 
@@ -748,8 +763,9 @@ GROUPS: dict[Scope, dict[str, tuple[str, ...]]] = {
             "auth.instance_admin_revoked",
             *AUDIT_DATA_KEYS,
         ),
-        "instance_settings": ("instance.settings_updated",),
+        "instance_settings": ("instance.settings_updated", "demo.reset", "demo.deleted"),
         "workspaces": ("workspace.delete",),
+        "demo": ("demo.reset", "demo.deleted"),
     },
 }
 GROUP_LABELS: dict[str, str] = {
@@ -770,6 +786,7 @@ GROUP_LABELS: dict[str, str] = {
     "accounts": _("Account administration"),
     "instance_settings": _("Instance settings"),
     "workspaces": _("Deleted workspaces"),
+    "demo": _("Demo mode"),
 }
 
 

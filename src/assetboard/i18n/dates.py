@@ -6,7 +6,7 @@ names and grammar (Polish uses the nominative "październik 2026" for a month on
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, time
 
 from babel import Locale
 from babel.core import UnknownLocaleError
@@ -16,6 +16,9 @@ from babel.dates import (
     get_date_format,
     get_day_names,
     get_month_names,
+)
+from babel.dates import (
+    format_time as babel_format_time,
 )
 from babel.lists import format_list
 
@@ -53,6 +56,14 @@ def format_month_after_from(month: YearMonth, locale: str) -> str:
 def format_day(day: date, locale: str) -> str:
     """A date in the locale's medium format: "Oct 14, 2026", "14 paź 2026"."""
     return format_date(day, format="medium", locale=_locale(locale))
+
+
+def format_time(value: str, locale: str) -> str:
+    """A ``HH:MM`` time as CLDR writes it: "3:00 AM", "03:00"."""
+    hour, minute = value.split(":", maxsplit=1)
+    text = babel_format_time(time(int(hour), int(minute)), format="short", locale=_locale(locale))
+    # CLDR separates "AM"/"PM" with a narrow no-break space; the UI uses a plain one.
+    return text.replace("\u202f", " ").replace("\u00a0", " ")
 
 
 def format_day_month(day: date, locale: str) -> str:

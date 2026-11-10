@@ -61,6 +61,7 @@ from assetboard.domain.identity import (
     normalize_new_email,
 )
 from assetboard.services import categories, investments, invitations, networth
+from assetboard.services.context import DemoRestricted
 from assetboard.services.hash_gate import HashGate, HashGateBusy
 from assetboard.services.workspace_options import WorkspaceOptions, validate_workspace_options
 
@@ -71,9 +72,17 @@ ActorType = Literal["user", "cli", "system"]
 # ``mail_ip``: password reset requests per client address (pre-release B, ADR-0017).
 # ``notify_test``: reminder channel test messages per member (F3.6, ADR-0021).
 ThrottleScope = Literal[
-    "account", "confirm", "ip", "setup", "register", "mail_email", "mail_ip", "notify_test"
+    "account",
+    "confirm",
+    "ip",
+    "setup",
+    "register",
+    "mail_email",
+    "mail_ip",
+    "notify_test",
+    "demo",
 ]
-AuthMethod = Literal["password", "oidc", "proxy"]
+AuthMethod = Literal["password", "oidc", "proxy", "demo"]
 
 MIN_PASSWORD_LENGTH = 8
 MAX_PASSWORD_LENGTH = 1024
@@ -389,6 +398,7 @@ def _ticket_user(session: Session, pending: LoginTicket, settings: Settings) -> 
     if (
         user is None
         or not user.is_active
+        or user.is_demo
         or user.password_hash is None
         or not hmac.compare_digest(
             password_fingerprint(settings, user.password_hash), pending.password_fingerprint
@@ -1038,6 +1048,7 @@ def _login_flow(
             verified
             and user is not None
             and user.is_active
+            and not user.is_demo
             and user.password_hash is not None
             and user.password_hash == candidate.password_hash
             and not not_admin
@@ -1462,6 +1473,8 @@ def _change_password_flow(
         user = session.get(User, user_id)
         if user is None:
             raise UnknownUser
+        if user.is_demo:
+            raise DemoRestricted
         slot = _confirm_slot(user_id, settings)
         now = clock.now()
         reserved = reserve_attempts(session, (slot,), now, settings)
@@ -1473,6 +1486,8 @@ def _change_password_flow(
         user = session.get(User, user_id)
         if user is None:
             raise UnknownUser
+        if user.is_demo:
+            raise DemoRestricted
         if user.password_hash is None:
             return None
         slot = _confirm_slot(user_id, settings)
@@ -1526,7 +1541,7 @@ def _change_password_flow(
     def apply(session: Session) -> PasswordChangeOutcome:
         _reset_confirm(session, user_id, clock.now())
         user = session.get(User, user_id)
-        if user is None or user.password_hash != candidate.password_hash:
+        if user is None or user.is_demo or user.password_hash != candidate.password_hash:
             # Changed concurrently (another device or the CLI); do not overwrite it.
             return PasswordChangeOutcome(status="invalid_current")
         user.password_hash = new_hash
@@ -1567,6 +1582,8 @@ def change_password(
 
     Wrong current passwords count against the user's ``confirm`` throttle (not sign-in's).
     """
+    if user.is_demo:
+        raise DemoRestricted
     return _change_password_flow(
         SameSession(session),
         user_id=user.id,
@@ -2757,6 +2774,7 @@ class WebSession:
     tax_warning_dismissed: bool = False
     must_change_password: bool = False
     second_factor_verified: bool = False
+    is_demo: bool = False
 
 
 def read_web_session(
@@ -2788,6 +2806,7 @@ def read_web_session(
         tax_warning_dismissed=user.tax_warning_dismissed,
         must_change_password=user.must_change_password,
         second_factor_verified=row.second_factor_verified,
+        is_demo=user.is_demo,
     )
 
 

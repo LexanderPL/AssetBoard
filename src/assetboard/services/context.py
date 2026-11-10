@@ -41,6 +41,7 @@ class UserRef:
     display_name: str
     locale: str | None  # None: follows the browser (F1.5)
     is_instance_admin: bool
+    is_demo: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -56,6 +57,9 @@ class WorkspaceRef:
     taxes_enabled: bool = False
     # Upcoming window in days; None: the instance setting applies (occurrences.window_days).
     upcoming_days: int | None = None
+    # The public demo workspace (F9.11b); every write that changes the instance or calls out
+    # is refused with ``DemoRestricted``.
+    is_demo: bool = False
 
 
 @dataclass(frozen=True, slots=True)
@@ -83,6 +87,10 @@ class TwoFactorRequired(Exception):
     pass
 
 
+class DemoRestricted(Exception):
+    """A demo session tried an action the shared demo workspace does not allow (F9.11b)."""
+
+
 class NoWorkspace(Exception):
     """The signed-in user is not a member of any workspace."""
 
@@ -106,6 +114,16 @@ def require_role(ctx: Context, minimum: Role | str) -> None:
     required = Role(minimum)
     if not has_role(ctx, required):
         raise PermissionDenied(required, ctx.role)
+
+
+def require_not_demo(ctx: Context) -> None:
+    """Raise ``DemoRestricted`` for the public demo user or workspace (F9.11b).
+
+    Services that change the account, the workspace or its members, configure outside calls or
+    would send email call this before doing any work; the UI also hides their controls.
+    """
+    if ctx.user.is_demo or ctx.workspace.is_demo:
+        raise DemoRestricted
 
 
 def require_role_now(session: Session, ctx: Context, minimum: Role | str) -> None:
@@ -153,6 +171,7 @@ def build_context(session: Session, web_session: WebSession, *, clock: Clock) ->
             display_name=web_session.display_name,
             locale=web_session.locale,
             is_instance_admin=web_session.is_instance_admin,
+            is_demo=web_session.is_demo,
         ),
         workspace=WorkspaceRef(
             id=membership.workspace_id,
@@ -164,6 +183,7 @@ def build_context(session: Session, web_session: WebSession, *, clock: Clock) ->
             require_two_factor=membership.require_two_factor,
             taxes_enabled=membership.taxes_enabled,
             upcoming_days=membership.upcoming_days,
+            is_demo=membership.is_demo,
         ),
         role=Role(membership.role),
         clock=clock,

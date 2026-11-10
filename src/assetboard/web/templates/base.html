@@ -79,6 +79,11 @@
     <main id="main-content" class="min-w-0 px-4 py-6 sm:px-7 lg:ml-64 lg:px-10 lg:py-9">
       <div class="mx-auto max-w-6xl">
         {% set menu_item = "block w-full rounded-lg px-3 py-2 text-left text-sm hover:bg-subtle focus-visible:bg-subtle" %}
+        {% if demo_banner %}
+        <section class="mb-6 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" role="status" data-demo-banner>
+          {{ _("Demo workspace: shared with other visitors and reset every day at %(time)s (%(timezone)s). Don't enter real data.", time=demo_banner.time, timezone=demo_banner.timezone) }}
+        </section>
+        {% endif %}
         <div class="mb-8 flex items-start gap-4">
           <header class="flex min-w-0 flex-1 flex-wrap items-end justify-between gap-4">
             <div class="min-w-0">
@@ -119,7 +124,7 @@
                     {% endfor %}
                   </div>
                   {% endif %}
-                  {% if workspace_nav.can_create_workspace %}
+                  {% if workspace_nav.can_create_workspace and not demo_session %}
                   <a href="{{ scoped_url(request, 'workspace_new') }}" data-new-workspace-link{% if request.url.path == scoped_url(request, 'workspace_new') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("New workspace") }}</a>
                   {% endif %}
                 </div>

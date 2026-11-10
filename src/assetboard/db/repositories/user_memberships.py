@@ -30,6 +30,7 @@ class MembershipView:
     require_two_factor: bool = False
     taxes_enabled: bool = False
     upcoming_days: int | None = None
+    is_demo: bool = False
 
 
 class UserMembershipReader:
@@ -77,4 +78,5 @@ def _view(membership: Membership, workspace: Workspace) -> MembershipView:
         require_two_factor=workspace.require_two_factor,
         taxes_enabled=workspace.taxes_enabled,
         upcoming_days=workspace.upcoming_days,
+        is_demo=workspace.is_demo,
     )

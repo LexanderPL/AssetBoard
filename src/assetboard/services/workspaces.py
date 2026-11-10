@@ -56,7 +56,9 @@ from assetboard.services.auth import record_auth_event
 from assetboard.services.budget import workspace_has_budget_lines
 from assetboard.services.context import (
     Context,
+    DemoRestricted,
     Role,
+    require_not_demo,
     require_role,
     require_role_now,
     select_workspace,
@@ -254,6 +256,7 @@ def update_settings(
     no longer be computed); other workspaces keep any listed country.
     """
     require_role(ctx, Role.OWNER)
+    require_not_demo(ctx)
     clean_name = name.strip()
     if not clean_name or len(clean_name) > MAX_WORKSPACE_NAME_LENGTH:
         raise InvalidWorkspaceSettings("name", "invalid_workspace_name")
@@ -350,6 +353,7 @@ def change_role(
 ) -> None:
     """Set a member's role. The last owner cannot be demoted, not even by themselves."""
     require_role(ctx, Role.OWNER)
+    require_not_demo(ctx)
     new_role = Role(role)
 
     def write(session: Session) -> None:
@@ -382,6 +386,7 @@ def change_role(
 def remove_member(factory: sessionmaker[Session], ctx: Context, *, membership_id: UUID) -> None:
     """Remove a member. Owners cannot remove themselves, and the last owner stays."""
     require_role(ctx, Role.OWNER)
+    require_not_demo(ctx)
 
     def write(session: Session) -> None:
         _require_owner_now(session, ctx)
@@ -442,6 +447,7 @@ def create_invitation(
     are registered.
     """
     require_role(ctx, Role.OWNER)
+    require_not_demo(ctx)
     invited_role = Role(role)
     if expires_in_days not in INVITATION_EXPIRY_DAYS:
         raise InvalidInvitation("expires_in_days", "invalid_expiry")
@@ -489,6 +495,7 @@ def create_invitation(
 
 def revoke_invitation(factory: sessionmaker[Session], ctx: Context, *, invitation_id: UUID) -> None:
     require_role(ctx, Role.OWNER)
+    require_not_demo(ctx)
 
     def write(session: Session) -> None:
         _require_owner_now(session, ctx)
@@ -520,6 +527,7 @@ class DeletionPreview:
 
 def deletion_preview(factory: sessionmaker[Session], ctx: Context) -> DeletionPreview:
     require_role(ctx, Role.OWNER)
+    require_not_demo(ctx)
     with factory() as session:
         workspace = CurrentWorkspaceRepository(session, ctx).get()
         members = MembershipRepository(session, ctx).members()
@@ -546,6 +554,7 @@ def delete_workspace(
     instance-level ``workspace.delete`` event with the name; no amounts.
     """
     require_role(ctx, Role.OWNER)
+    require_not_demo(ctx)
     if expected_workspace_id != ctx.workspace.id:
         raise WorkspaceChanged
 
@@ -622,6 +631,8 @@ def create_own_workspace(
         user = session.get(User, user_id)
         if user is None or not user.is_active:
             raise WorkspaceCreationDisabled
+        if user.is_demo:
+            raise DemoRestricted
         allowed = read_settings(session, lock=True).allow_workspace_creation
         if not (allowed or user.is_instance_admin):
             raise WorkspaceCreationDisabled

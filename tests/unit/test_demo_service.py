@@ -360,6 +360,59 @@ def _canonical_files(
     return files, workspace, rows
 
 
+def _canonical_without_ids(
+    content: bytes,
+) -> tuple[dict[str, bytes], dict[str, object], dict[str, object]]:
+    """Compare two independent builds: ids are random, so replace them and sort the rows."""
+    parsed, errors = parse_archive(content)
+    assert not errors and parsed is not None
+    files: dict[str, bytes] = {}
+    for name in sorted(parsed.files):
+        if name in {"manifest.json", "workspace.json"}:
+            continue
+        lines = _UUID.sub(b"ID", parsed.files[name]).splitlines()
+        files[name] = b"\r\n".join([lines[0], *sorted(lines[1:])]) + b"\r\n"
+    workspace = json.loads(parsed.files["workspace.json"])
+    manifest_rows = cast("list[dict[str, object]]", parsed.manifest["files"])
+    rows: dict[str, object] = {}
+    for entry in manifest_rows:
+        path = entry["path"]
+        if path != "manifest.json":
+            rows[str(path)] = entry["rows"]
+    return files, workspace, rows
+
+
+def test_two_builds_of_the_same_reference_are_archive_identical(
+    built: BuiltWorkspace,
+) -> None:
+    target = built.db.add_workspace("Home")
+    built.db.add_member("owner", "owner", workspace_id=target)
+    with built.db.factory.begin() as session:
+        workspace = session.get(Workspace, target)
+        assert workspace is not None
+        workspace.base_currency = built.ctx.workspace.base_currency
+        workspace.locale = built.ctx.workspace.locale
+    target_ctx = replace(built.ctx, workspace=replace(built.ctx.workspace, id=target))
+    plan = plan_for_workspace(target_ctx, REFERENCE)
+    build_demo_workspace(
+        built.db.factory,
+        target_ctx,
+        plan,
+        data_dir=built.data_dir / "second",
+    )
+
+    first = export_workspace(built.db.factory, built.ctx).content
+    second = export_workspace(built.db.factory, target_ctx).content
+    first_files, first_workspace, first_rows = _canonical_without_ids(first)
+    second_files, second_workspace, second_rows = _canonical_without_ids(second)
+
+    assert first_workspace == second_workspace
+    assert first_rows == second_rows
+    assert set(first_files) == set(second_files)
+    for name in first_files:
+        assert first_files[name] == second_files[name], name
+
+
 def test_archive_export_restores_into_an_empty_workspace(built: BuiltWorkspace) -> None:
     first = export_workspace(built.db.factory, built.ctx).content
     target = built.db.add_workspace("Restored")

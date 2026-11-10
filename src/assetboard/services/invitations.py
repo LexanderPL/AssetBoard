@@ -24,7 +24,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.clock import Clock
 from assetboard.db.engine import run_immediate
-from assetboard.db.models.identity import Workspace
+from assetboard.db.models.identity import User, Workspace
 from assetboard.db.repositories import (
     AuditEventRepository,
     CurrentWorkspaceRepository,
@@ -32,6 +32,7 @@ from assetboard.db.repositories import (
     InvitationTokenReader,
     MembershipRepository,
 )
+from assetboard.services.context import DemoRestricted
 
 TOKEN_BYTES = 32
 # ``secrets.token_urlsafe(32)``: 43 characters of the URL-safe base64 alphabet.
@@ -187,7 +188,14 @@ def accept_invitation(
     now = clock.now()
 
     def write(session: Session) -> UUID | EmailMismatch:
+        user = session.get(User, user_id)
+        if user is not None and user.is_demo:
+            raise DemoRestricted
         found = _find_pending(session, token, now)
+        workspace = session.get(Workspace, found.scope.workspace.id)
+        if workspace is not None and workspace.is_demo:
+            # A real account must never join the shared demo workspace (F9.11b).
+            raise DemoRestricted
         _checkpoint("accept")
         if MembershipRepository(session, found.scope).for_user(user_id) is not None:
             raise AlreadyMember
@@ -234,7 +242,13 @@ def consume_for_new_user(
     session: Session, token: str, *, user_id: UUID, email: str, now: datetime
 ) -> UUID:
     """Inside the sign-up transaction: re-check the invitation, then join and mark it used."""
+    user = session.get(User, user_id)
+    if user is not None and user.is_demo:
+        raise DemoRestricted
     found = _find_pending(session, token, now)
+    workspace = session.get(Workspace, found.scope.workspace.id)
+    if workspace is not None and workspace.is_demo:
+        raise DemoRestricted
     _checkpoint("sign_up")
     if found.email is not None and found.email != email:
         raise InvitationInvalid  # the pre-check counted it; the lock changed meanwhile

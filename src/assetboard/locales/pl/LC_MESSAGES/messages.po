@@ -37,6 +37,12 @@ msgstr ""
 "Twoje konto nie należy do żadnego obszaru roboczego. Poproś właściciela "
 "obszaru roboczego o zaproszenie."
 
+msgid "Demo workspace"
+msgstr "Obszar demonstracyjny"
+
+msgid "This action is not available in the demo workspace."
+msgstr "Tej czynności nie można wykonać w obszarze demonstracyjnym."
+
 msgid "Access denied"
 msgstr "Brak dostępu"
 
@@ -590,6 +596,12 @@ msgstr "Nadano uprawnienia administratora"
 msgid "Administrator role removed"
 msgstr "Odebrano uprawnienia administratora"
 
+msgid "Demo workspace reset"
+msgstr "Zresetowano obszar demonstracyjny"
+
+msgid "Demo data deleted"
+msgstr "Usunięto dane demonstracyjne"
+
 msgid "Account created by an administrator"
 msgstr "Konto utworzone przez administratora"
 
@@ -838,6 +850,12 @@ msgstr "Zakończone sesje"
 
 msgid "Other sessions ended"
 msgstr "Zakończone inne sesje"
+
+msgid "Status"
+msgstr "Stan"
+
+msgid "Dataset version"
+msgstr "Wersja zbioru danych"
 
 msgid "Through"
 msgstr "Przez"
@@ -1172,6 +1190,21 @@ msgstr "zbyt wiele prób z innym adresem e-mail"
 msgid "by an owner"
 msgstr "przez właściciela"
 
+msgid "at startup"
+msgstr "przy uruchomieniu"
+
+msgid "on the daily schedule"
+msgstr "według harmonogramu dziennego"
+
+msgid "by an administrator"
+msgstr "przez administratora"
+
+msgid "succeeded"
+msgstr "powodzenie"
+
+msgid "failed"
+msgstr "niepowodzenie"
+
 msgid "password"
 msgstr "hasło"
 
@@ -1180,6 +1213,9 @@ msgstr "dostawca tożsamości"
 
 msgid "proxy"
 msgstr "serwer proxy"
+
+msgid "the demo"
+msgstr "wersja demonstracyjna"
 
 msgid "the profile"
 msgstr "profil"
@@ -1381,6 +1417,12 @@ msgstr "Ustawienia instancji"
 
 msgid "Deleted workspaces"
 msgstr "Usunięte obszary robocze"
+
+msgid "Demo mode"
+msgstr "Tryb demonstracyjny"
+
+msgid "Demo"
+msgstr "Demo"
 
 msgid "Invalid UTF-8 encoding."
 msgstr "Nieprawidłowe kodowanie UTF-8."
@@ -2202,6 +2244,20 @@ msgstr ""
 
 msgid "Choose a value for each setting."
 msgstr "Wybierz wartość każdego ustawienia."
+
+msgid "The demo workspace was rebuilt."
+msgstr "Obszar demonstracyjny został odtworzony."
+
+msgid "The demo workspace could not be reset. The previous data was kept."
+msgstr ""
+"Nie udało się zresetować obszaru demonstracyjnego. Poprzednie dane "
+"zostały zachowane."
+
+msgid "The demo workspace and its account were deleted."
+msgstr "Obszar demonstracyjny i jego konto zostały usunięte."
+
+msgid "There is no demo workspace to delete."
+msgstr "Nie ma obszaru demonstracyjnego do usunięcia."
 
 msgid "Enter a valid email address."
 msgstr "Podaj prawidłowy adres e-mail."
@@ -4193,6 +4249,14 @@ msgstr "Dostępna aktualizacja: %(version)s"
 msgid "Toggle dark mode"
 msgstr "Przełącz tryb ciemny"
 
+#, python-format
+msgid ""
+"Demo workspace: shared with other visitors and reset every day at "
+"%(time)s (%(timezone)s). Don't enter real data."
+msgstr ""
+"Obszar demonstracyjny: współdzielony z innymi odwiedzającymi i resetowany"
+" codziennie o %(time)s (%(timezone)s). Nie wprowadzaj prawdziwych danych."
+
 msgid "Your overview"
 msgstr "Podsumowanie"
 
@@ -4275,6 +4339,9 @@ msgstr "Przejdź do dostawcy %(provider)s"
 
 msgid "Your details"
 msgstr "Twoje dane"
+
+msgid "Not available in the demo workspace."
+msgstr "Niedostępne w obszarze demonstracyjnym."
 
 msgid "Display name"
 msgstr "Wyświetlana nazwa"
@@ -4385,6 +4452,9 @@ msgstr ""
 "Właściciel obszaru roboczego może tego wymagać. Przy logowaniu przez "
 "dostawcę tożsamości lub proxy obowiązują zabezpieczenia tego dostawcy."
 
+msgid "Two-factor authentication is enabled."
+msgstr "Uwierzytelnianie dwuskładnikowe jest włączone."
+
 msgid "Save your recovery codes"
 msgstr "Zapisz kody odzyskiwania"
 
@@ -4394,9 +4464,6 @@ msgid ""
 msgstr ""
 "Te dziesięć kodów jest wyświetlanych tylko raz. Przechowuj je "
 "bezpiecznie. Każdy zastępuje kod z aplikacji podczas jednego logowania."
-
-msgid "Two-factor authentication is enabled."
-msgstr "Uwierzytelnianie dwuskładnikowe jest włączone."
 
 msgid ""
 "Replace all recovery codes if they are lost or exposed. Your current "
@@ -4513,6 +4580,52 @@ msgstr ""
 msgid "Save settings"
 msgstr "Zapisz ustawienia"
 
+msgid "On: anyone who can reach this instance can try the shared demo workspace."
+msgstr ""
+"Włączone: każdy, kto ma dostęp do tej instancji, może wypróbować "
+"współdzielony obszar demonstracyjny."
+
+msgid "Last reset"
+msgstr "Ostatni reset"
+
+msgid "Never"
+msgstr "Nigdy"
+
+msgid "Result"
+msgstr "Wynik"
+
+#, python-format
+msgid "Failed: %(error)s"
+msgstr "Niepowodzenie: %(error)s"
+
+msgid "Succeeded"
+msgstr "Powodzenie"
+
+msgid "None yet"
+msgstr "Jeszcze brak"
+
+msgid "Next reset"
+msgstr "Następny reset"
+
+msgid "Not scheduled"
+msgstr "Nie zaplanowano"
+
+msgid ""
+"The demo workspace is not ready. Check the log and restart the "
+"application."
+msgstr ""
+"Obszar demonstracyjny nie jest gotowy. Sprawdź dziennik i uruchom "
+"aplikację ponownie."
+
+msgid "Reset now"
+msgstr "Zresetuj teraz"
+
+msgid "Off. The demo workspace stays until you delete it."
+msgstr "Wyłączone. Obszar demonstracyjny pozostanie, dopóki go nie usuniesz."
+
+msgid "Delete demo data"
+msgstr "Usuń dane demonstracyjne"
+
 msgid "Account created"
 msgstr "Konto utworzone"
 
@@ -4546,9 +4659,6 @@ msgstr "Utwórz konto"
 msgid "Account"
 msgstr "Konto"
 
-msgid "Status"
-msgstr "Stan"
-
 msgid "Last sign-in"
 msgstr "Ostatnie logowanie"
 
@@ -4578,9 +4688,6 @@ msgstr "Nie jest administratorem"
 
 msgid "(from the identity provider)"
 msgstr "(od dostawcy tożsamości)"
-
-msgid "Never"
-msgstr "Nigdy"
 
 msgid "Deactivate"
 msgstr "Dezaktywuj"
@@ -4704,6 +4811,13 @@ msgstr "Kontynuuj przez %(provider)s"
 
 msgid "or sign in with your password"
 msgstr "lub zaloguj się hasłem"
+
+msgid "Try the demo"
+msgstr "Wypróbuj demo"
+
+#, python-format
+msgid "Shared sample workspace, resets daily at %(time)s"
+msgstr "Współdzielony przykładowy obszar roboczy, resetowany codziennie o %(time)s"
 
 msgid "No account yet?"
 msgstr "Nie masz jeszcze konta?"

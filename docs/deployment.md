@@ -29,6 +29,10 @@ Compose inputs only and are not application settings.
 | `ASSETBOARD_RECURRENCE_HORIZON_MONTHS` | `13` | App | Calendar months ahead for generating scheduled occurrences; must be positive. |
 | `ASSETBOARD_UPCOMING_DAYS` | `30` | App | Days ahead shown on Upcoming payments and the Home page, in addition to all overdue occurrences; 1 to 365. A workspace owner can override it in Workspace settings. |
 | `ASSETBOARD_SCHEDULER_ENABLED` | `true` | App | Enable in-process recurring generation and auto-post jobs. Disable for tests or when running jobs separately. |
+| `ASSETBOARD_DEMO_ENABLED` | `false` | App | Public demo mode: anyone who can reach the instance can sign in to the shared demo workspace without a password. Only the operator can turn it on; there is no in-app switch. See [Demo mode](demo-mode.md). |
+| `ASSETBOARD_DEMO_RESET_TIME` | `03:00` | App | Daily demo reset time in `HH:MM` (24-hour). |
+| `ASSETBOARD_DEMO_TIMEZONE` | `UTC` | App | IANA time zone of the demo reset and of the demo workspace (for example `Europe/Warsaw`). |
+| `ASSETBOARD_DEMO_IP_LIMIT` | `20` | App | Successful demo sign-ins allowed per client address in an hour; further attempts get the usual throttle message. Must be at least 1. |
 | `ASSETBOARD_SETUP_TOKEN` | unset | App | First-run setup token (at least 22 characters; use a random value). If unset, a 256-bit token is generated at each process start and logged once at `WARNING` while no user exists. A configured token is never logged. |
 | `ASSETBOARD_ALLOW_REGISTRATION` | unset | App | **Removed** (pre-release B). Open registration is turned on in **Instance settings** and needs SMTP. `true` refuses to start with a message; `false` is ignored with a warning. Remove the variable. |
 | `ASSETBOARD_SESSION_IDLE_TIMEOUT_DAYS` | `14` | App | Sessions expire after this many days without activity. Must not exceed the absolute timeout. |

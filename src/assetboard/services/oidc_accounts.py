@@ -55,6 +55,7 @@ from assetboard.services.auth import (
     revoke_all_sessions,
     session_id_hash,
 )
+from assetboard.services.context import DemoRestricted
 from assetboard.services.external_identity import PROXY_PROVIDER, SignInIdentity
 from assetboard.services.hash_gate import HashGate
 from assetboard.services.oidc_flow import PendingLink
@@ -333,6 +334,7 @@ class _Known:
     identity_user_id: UUID | None
     email_user_id: UUID | None
     email_user_has_password: bool
+    email_user_is_demo: bool
 
 
 def sign_in_external(
@@ -391,6 +393,7 @@ def sign_in_external(
             linked.user_id if linked else None,
             by_email.id if by_email else None,
             bool(by_email and by_email.password_hash is not None),
+            bool(by_email and by_email.is_demo),
         )
 
     with factory() as session:
@@ -402,6 +405,8 @@ def sign_in_external(
 
         def sign_in(session: Session) -> SignInOutcome:
             user = session.get(User, user_id)
+            if user is not None and user.is_demo:
+                raise DemoRestricted
             if user is None or not user.is_active:
                 if audited("inactive"):
                     _audit_failure(
@@ -422,6 +427,8 @@ def sign_in_external(
 
     # 3. The email belongs to an existing account.
     if known.email_user_id is not None:
+        if known.email_user_is_demo:
+            raise DemoRestricted
         if policy.link_by_email and known.email_user_has_password:
             return SignInOutcome(
                 status="confirm_link",
@@ -550,12 +557,18 @@ def link_identity(
     On success every other session of that account is revoked: whoever created or used the
     account before (pre-hijacking) is signed out. Then the visitor is signed in.
     """
+    with factory() as session:
+        user = session.get(User, pending.user_id)
+        if user is not None and user.is_demo:
+            raise DemoRestricted
     policy = policy_for(pending.issuer, settings)
     if policy is None or not policy.link_by_email:
         return LinkOutcome(status="disabled")
     request = _Request(settings, policy, clock, host, user_agent, existing_session_id)
 
     def link(session: Session, user: User) -> LinkOutcome:
+        if user.is_demo:
+            raise DemoRestricted
         if user.email != pending.email:
             return LinkOutcome(status="failed")
         existing = _find_identity(session, pending.issuer, pending.subject)

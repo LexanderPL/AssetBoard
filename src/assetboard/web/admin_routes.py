@@ -15,8 +15,10 @@ by the acting administrator through ``web.confirm.run_confirmed``, the one confi
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Annotated, Any
 from uuid import UUID
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
 from sqlalchemy import select
@@ -33,6 +35,7 @@ from assetboard.domain.identity import (
     normalize_email,
 )
 from assetboard.i18n import gettext
+from assetboard.i18n.dates import format_day, format_time
 from assetboard.services.admin_users import (
     ADMIN_ACTIONS,
     AdminAction,
@@ -45,6 +48,13 @@ from assetboard.services.admin_users import (
     record_user_created,
 )
 from assetboard.services.auth import WebSession, argon2_hash, create_user_with_temporary_password
+from assetboard.services.demo_mode import (
+    DemoStatus,
+    delete_demo_instance,
+    next_reset_at,
+    read_demo_status,
+    reset_demo_instance,
+)
 from assetboard.services.instance_settings import (
     get_settings,
     registration_blocker,
@@ -113,6 +123,10 @@ SETTINGS_RESULTS: dict[str, str] = {
     ),
 }
 SETTINGS_INVALID = _("Choose a value for each setting.")
+DEMO_RESET_DONE = _("The demo workspace was rebuilt.")
+DEMO_RESET_FAILED = _("The demo workspace could not be reset. The previous data was kept.")
+DEMO_DELETED = _("The demo workspace and its account were deleted.")
+DEMO_NOTHING_TO_DELETE = _("There is no demo workspace to delete.")
 CREATE_ERRORS = {
     "email": _("Enter a valid email address."),
     "email_taken": _("An account with this email address already exists."),
@@ -419,6 +433,35 @@ async def new_user_submit(
 # Instance settings (pre-release A)
 
 
+def _demo_time_text(moment: datetime, *, zone: str, locale: str) -> str:
+    local = moment.astimezone(ZoneInfo(zone))
+    return f"{format_day(local.date(), locale)} {format_time(local.strftime('%H:%M'), locale)}"
+
+
+def _demo_panel_context(
+    request: Request, status: DemoStatus | None, settings: Any, now: datetime
+) -> dict[str, object]:
+    locale = request.state.locale
+    zone = settings.demo_timezone
+    last_reset = (
+        _demo_time_text(status.last_reset_at, zone=zone, locale=locale)
+        if status is not None and status.last_reset_at is not None
+        else None
+    )
+    next_reset = (
+        _demo_time_text(next_reset_at(settings, now), zone=zone, locale=locale)
+        if settings.demo_enabled
+        else None
+    )
+    return {
+        "demo_configured": settings.demo_enabled,
+        "demo_status": status,
+        "demo_last_reset_at": last_reset,
+        "demo_next_reset_at": next_reset,
+        "demo_workspace_exists": status is not None and status.workspace_id is not None,
+    }
+
+
 async def _settings_page(
     request: Request,
     current: WebSession,
@@ -430,6 +473,9 @@ async def _settings_page(
 ) -> Response:
     state = _state(request)
     stored = await run_in_threadpool(get_settings, state.session_factory)
+    demo_status = await run_in_threadpool(
+        lambda: read_demo_status(state.session_factory, clock=state.clock)
+    )
     allow_workspace_creation, allow_registration, check_for_updates = wanted or (
         stored.allow_workspace_creation,
         stored.allow_registration,
@@ -449,6 +495,7 @@ async def _settings_page(
             "confirm": await confirm_view(request, current),
             "notice": notice,
             "error": error,
+            **_demo_panel_context(request, demo_status, state.settings, state.clock.now()),
         },
         status_code=status_code,
     )
@@ -529,3 +576,47 @@ async def settings_submit(
     return await _settings_page(
         request, current, notice=_t(request, SETTINGS_RESULTS[outcome.value])
     )
+
+
+# Demo mode panel (F9.11b)
+
+
+@router.post("/admin/settings/demo/reset", name="admin_demo_reset")
+async def demo_reset_now(request: Request) -> Response:
+    current = _require_admin(request)
+    state = _state(request)
+    if not state.settings.demo_enabled:
+        raise HTTPException(status_code=404)
+    result = await run_in_threadpool(
+        reset_demo_instance,
+        state.session_factory,
+        state.settings,
+        state.clock,
+        state.settings.data_dir,
+        reason="manual",
+    )
+    if result.ok:
+        return await _settings_page(request, current, notice=_t(request, DEMO_RESET_DONE))
+    return await _settings_page(
+        request, current, error=_t(request, DEMO_RESET_FAILED), status_code=409
+    )
+
+
+@router.post("/admin/settings/demo/delete", name="admin_demo_delete")
+async def demo_delete(request: Request) -> Response:
+    current = _require_admin(request)
+    state = _state(request)
+    if state.settings.demo_enabled:
+        # Delete is only offered while demo mode is off; reset is the on-mode action.
+        raise HTTPException(status_code=404)
+    deleted = await run_in_threadpool(
+        delete_demo_instance,
+        state.session_factory,
+        state.clock,
+        actor_id=current.user_id,
+        host=client_host(request),
+        user_agent=request.headers.get("user-agent"),
+    )
+    if deleted:
+        return await _settings_page(request, current, notice=_t(request, DEMO_DELETED))
+    return await _settings_page(request, current, notice=_t(request, DEMO_NOTHING_TO_DELETE))

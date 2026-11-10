@@ -9,6 +9,7 @@ from ipaddress import IPv4Network, IPv6Network, ip_network
 from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.parse import urlsplit
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
@@ -49,6 +50,7 @@ _RESERVED_PROXY_AUTH_HEADERS = frozenset(
     }
 )
 _RESERVED_PROXY_AUTH_PREFIXES = ("hx-", "sec-")
+_DEMO_RESET_TIME = re.compile(r"([01][0-9]|2[0-3]):([0-5][0-9])")
 
 
 # Apprise URL schemes members may use by default (ADR-0021): services with a fixed protocol.
@@ -129,6 +131,11 @@ class Settings(BaseSettings):
     recurrence_horizon_months: int = Field(default=DEFAULT_RECURRENCE_HORIZON_MONTHS, ge=1)
     upcoming_days: int = Field(default=30, ge=MIN_UPCOMING_DAYS, le=MAX_UPCOMING_DAYS)
     scheduler_enabled: bool = True
+    # Public demo mode (F9.11b): only the operator can turn it on, through the environment.
+    demo_enabled: bool = False
+    demo_reset_time: str = "03:00"
+    demo_timezone: str = "UTC"
+    demo_ip_limit: int = Field(default=20, ge=1)
     session_idle_timeout_days: int = Field(default=14, ge=1, le=365)
     session_absolute_timeout_days: int = Field(default=60, ge=1, le=365)
     auth_account_free_failures: int = Field(default=5, ge=1)
@@ -260,6 +267,25 @@ class Settings(BaseSettings):
         if len(normalized) != 3 or not normalized.isalpha():
             raise ValueError("DEFAULT_CURRENCY must be a three-letter ISO currency code")
         return normalized
+
+    @field_validator("demo_reset_time")
+    @classmethod
+    def validate_demo_reset_time(cls, value: str) -> str:
+        if not _DEMO_RESET_TIME.fullmatch(value):
+            raise ValueError("DEMO_RESET_TIME must be a time in HH:MM format")
+        return value
+
+    @field_validator("demo_timezone")
+    @classmethod
+    def validate_demo_timezone(cls, value: str) -> str:
+        cleaned = value.strip()
+        try:
+            ZoneInfo(cleaned)
+        except (ValueError, ZoneInfoNotFoundError):
+            raise ValueError(
+                "DEMO_TIMEZONE must be an IANA time zone such as Europe/Warsaw"
+            ) from None
+        return cleaned
 
     @field_validator("trusted_proxies", mode="before")
     @classmethod
@@ -433,6 +459,11 @@ class Settings(BaseSettings):
                     "(punycode for internationalized names)"
                 )
         return domains
+
+    @property
+    def demo_reset_hour_minute(self) -> tuple[int, int]:
+        hour, minute = self.demo_reset_time.split(":", maxsplit=1)
+        return int(hour), int(minute)
 
     @property
     def oidc_enabled(self) -> bool:

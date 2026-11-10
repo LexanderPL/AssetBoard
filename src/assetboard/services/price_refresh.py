@@ -56,7 +56,9 @@ from assetboard.domain.providers import (
 )
 from assetboard.services.context import (
     Context,
+    DemoRestricted,
     Role,
+    require_not_demo,
     require_role,
     require_role_now,
 )
@@ -157,6 +159,9 @@ def refresh_provider(
     mode: str = "latest",
     wait: bool = True,
 ) -> RefreshStats:
+    with factory() as session:
+        if RecurringWorkspaceReader(session).is_demo(scope.workspace.id):
+            raise DemoRestricted
     definition = provider_definition(provider_key)
     if definition is None:
         return RefreshStats(provider_key=provider_key, status="unknown_provider")
@@ -277,6 +282,7 @@ def refresh_now(
 ) -> RefreshStats:
     """Owner-triggered latest refresh; never waits behind a long rate limit."""
     require_role(ctx, Role.OWNER)
+    require_not_demo(ctx)
     stats = refresh_provider(factory, ctx, provider_key, runtime, mode="latest", wait=False)
 
     def audit(session: Session) -> None:
@@ -348,6 +354,7 @@ def lookup_provider(
 ) -> LookupResult:
     """Fetch one latest quote without saving it (editor-facing test lookup)."""
     require_role(ctx, Role.EDITOR)
+    require_not_demo(ctx)
     definition = provider_definition(provider_key)
     if definition is None or definition.kind == "fx":
         return LookupResult("unsupported", code="unsupported_provider")

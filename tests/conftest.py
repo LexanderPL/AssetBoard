@@ -161,6 +161,10 @@ def isolate_application_data_dir(
         "MAIL_EMAIL_LIMIT",
         "MAIL_IP_LIMIT",
         "MAIL_WINDOW_MINUTES",
+        "DEMO_ENABLED",
+        "DEMO_RESET_TIME",
+        "DEMO_TIMEZONE",
+        "DEMO_IP_LIMIT",
     ):
         monkeypatch.delenv(f"{ENV_PREFIX}_{name}", raising=False)
 

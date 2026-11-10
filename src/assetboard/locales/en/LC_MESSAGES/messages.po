@@ -34,6 +34,12 @@ msgid ""
 "invite you."
 msgstr ""
 
+msgid "Demo workspace"
+msgstr ""
+
+msgid "This action is not available in the demo workspace."
+msgstr ""
+
 msgid "Access denied"
 msgstr ""
 
@@ -581,6 +587,12 @@ msgstr ""
 msgid "Administrator role removed"
 msgstr ""
 
+msgid "Demo workspace reset"
+msgstr ""
+
+msgid "Demo data deleted"
+msgstr ""
+
 msgid "Account created by an administrator"
 msgstr ""
 
@@ -828,6 +840,12 @@ msgid "Sessions ended"
 msgstr ""
 
 msgid "Other sessions ended"
+msgstr ""
+
+msgid "Status"
+msgstr ""
+
+msgid "Dataset version"
 msgstr ""
 
 msgid "Through"
@@ -1163,6 +1181,21 @@ msgstr ""
 msgid "by an owner"
 msgstr ""
 
+msgid "at startup"
+msgstr ""
+
+msgid "on the daily schedule"
+msgstr ""
+
+msgid "by an administrator"
+msgstr ""
+
+msgid "succeeded"
+msgstr ""
+
+msgid "failed"
+msgstr ""
+
 msgid "password"
 msgstr ""
 
@@ -1170,6 +1203,9 @@ msgid "identity provider"
 msgstr ""
 
 msgid "proxy"
+msgstr ""
+
+msgid "the demo"
 msgstr ""
 
 msgid "the profile"
@@ -1371,6 +1407,12 @@ msgid "Instance settings"
 msgstr ""
 
 msgid "Deleted workspaces"
+msgstr ""
+
+msgid "Demo mode"
+msgstr ""
+
+msgid "Demo"
 msgstr ""
 
 msgid "Invalid UTF-8 encoding."
@@ -2118,6 +2160,18 @@ msgid ""
 msgstr ""
 
 msgid "Choose a value for each setting."
+msgstr ""
+
+msgid "The demo workspace was rebuilt."
+msgstr ""
+
+msgid "The demo workspace could not be reset. The previous data was kept."
+msgstr ""
+
+msgid "The demo workspace and its account were deleted."
+msgstr ""
+
+msgid "There is no demo workspace to delete."
 msgstr ""
 
 msgid "Enter a valid email address."
@@ -3934,6 +3988,12 @@ msgstr ""
 msgid "Toggle dark mode"
 msgstr ""
 
+#, python-format
+msgid ""
+"Demo workspace: shared with other visitors and reset every day at "
+"%(time)s (%(timezone)s). Don't enter real data."
+msgstr ""
+
 msgid "Your overview"
 msgstr ""
 
@@ -4013,6 +4073,9 @@ msgid "Continue to %(provider)s"
 msgstr ""
 
 msgid "Your details"
+msgstr ""
+
+msgid "Not available in the demo workspace."
 msgstr ""
 
 msgid "Display name"
@@ -4113,15 +4176,15 @@ msgid ""
 "their provider's security instead."
 msgstr ""
 
+msgid "Two-factor authentication is enabled."
+msgstr ""
+
 msgid "Save your recovery codes"
 msgstr ""
 
 msgid ""
 "These ten codes are shown only once. Store them safely. Each replaces an "
 "authenticator code for one sign-in."
-msgstr ""
-
-msgid "Two-factor authentication is enabled."
 msgstr ""
 
 msgid ""
@@ -4220,6 +4283,48 @@ msgstr ""
 msgid "Save settings"
 msgstr ""
 
+msgid "On: anyone who can reach this instance can try the shared demo workspace."
+msgstr ""
+
+msgid "Last reset"
+msgstr ""
+
+msgid "Never"
+msgstr ""
+
+msgid "Result"
+msgstr ""
+
+#, python-format
+msgid "Failed: %(error)s"
+msgstr ""
+
+msgid "Succeeded"
+msgstr ""
+
+msgid "None yet"
+msgstr ""
+
+msgid "Next reset"
+msgstr ""
+
+msgid "Not scheduled"
+msgstr ""
+
+msgid ""
+"The demo workspace is not ready. Check the log and restart the "
+"application."
+msgstr ""
+
+msgid "Reset now"
+msgstr ""
+
+msgid "Off. The demo workspace stays until you delete it."
+msgstr ""
+
+msgid "Delete demo data"
+msgstr ""
+
 msgid "Account created"
 msgstr ""
 
@@ -4245,9 +4350,6 @@ msgid "Create account"
 msgstr ""
 
 msgid "Account"
-msgstr ""
-
-msgid "Status"
 msgstr ""
 
 msgid "Last sign-in"
@@ -4278,9 +4380,6 @@ msgid "Not an administrator"
 msgstr ""
 
 msgid "(from the identity provider)"
-msgstr ""
-
-msgid "Never"
 msgstr ""
 
 msgid "Deactivate"
@@ -4402,6 +4501,13 @@ msgid "Continue with %(provider)s"
 msgstr ""
 
 msgid "or sign in with your password"
+msgstr ""
+
+msgid "Try the demo"
+msgstr ""
+
+#, python-format
+msgid "Shared sample workspace, resets daily at %(time)s"
 msgstr ""
 
 msgid "No account yet?"

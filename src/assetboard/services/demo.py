@@ -120,6 +120,7 @@ __all__ = [
     "DemoPlanMismatch",
     "DemoWorkspaceNotEmpty",
     "build_demo_workspace",
+    "build_demo_workspace_in_session",
     "plan_for_workspace",
     "workspace_owner",
 ]
@@ -850,30 +851,31 @@ def _counts(session: Session, ctx: Context) -> dict[str, int]:
     return {name: len(repository(session, ctx).list()) for name, repository in _COUNT_REPOSITORIES}
 
 
-def build_demo_workspace(
-    factory: sessionmaker[Session],
+def build_demo_workspace_in_session(
+    session: Session,
     ctx: Context,
     plan: DemoPlan,
     *,
     data_dir: Path,
     horizon_months: int = DEMO_RECURRENCE_HORIZON_MONTHS,
-) -> DemoBuildResult:
-    """Fill an empty workspace with ``plan`` in one write; returns counts only."""
-    require_role(ctx, Role.OWNER)
+) -> tuple[DemoBuildResult, Path | None]:
+    """Fill an empty workspace with ``plan`` in the caller's transaction.
+
+    Returns the counts and the uploaded CSV's path, which the caller owns: the public wrapper
+    deletes it after commit, while the reset (F9.11b) keeps it for the next reset. On failure
+    the new upload is removed here; an existing workspace's files are untouched.
+    """
+    require_role_now(session, ctx, Role.OWNER)
     if plan.locale != ctx.workspace.locale or plan.base_currency != ctx.workspace.base_currency:
         raise DemoPlanMismatch("the plan was built for another locale or base currency")
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+    if not archive.workspace_is_empty(session, ctx):
+        raise DemoWorkspaceNotEmpty("the workspace is not empty")
+    tctx = _ctx_at(ctx, plan.reference_date)
+    _use(session, tctx)
 
     upload_path: Path | None = None
-
-    def write(session: Session) -> DemoBuildResult:
-        nonlocal upload_path
-        require_role_now(session, ctx, Role.OWNER)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        if not archive.workspace_is_empty(session, ctx):
-            raise DemoWorkspaceNotEmpty("the workspace is not empty")
-        tctx = _ctx_at(ctx, plan.reference_date)
-        _use(session, tctx)
-
+    try:
         _seed_suggested_sets(session, tctx, plan)
         lookup = _lookup(session, tctx)
 
@@ -889,18 +891,43 @@ def build_demo_workspace(
         # Closed months refuse ledger writes (linked dividend income included), so M-3 is the
         # very last thing the builder does.
         months.close_month_state(session, tctx, YearMonth.from_date(plan.closed_month))
-        return DemoBuildResult(
-            reference_date=plan.reference_date,
-            version=plan.version,
-            counts=_counts(session, tctx),
+        return (
+            DemoBuildResult(
+                reference_date=plan.reference_date,
+                version=plan.version,
+                counts=_counts(session, tctx),
+            ),
+            upload_path,
         )
-
-    try:
-        result = run_immediate(factory, write)
     except BaseException:
         if upload_path is not None:
             imports._delete_upload(upload_path)
         raise
+
+
+def build_demo_workspace(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    plan: DemoPlan,
+    *,
+    data_dir: Path,
+    horizon_months: int = DEMO_RECURRENCE_HORIZON_MONTHS,
+) -> DemoBuildResult:
+    """Fill an empty workspace with ``plan`` in one write; returns counts only."""
+    require_role(ctx, Role.OWNER)
+    if plan.locale != ctx.workspace.locale or plan.base_currency != ctx.workspace.base_currency:
+        raise DemoPlanMismatch("the plan was built for another locale or base currency")
+
+    def write(session: Session) -> tuple[DemoBuildResult, Path | None]:
+        return build_demo_workspace_in_session(
+            session,
+            ctx,
+            plan,
+            data_dir=data_dir,
+            horizon_months=horizon_months,
+        )
+
+    result, upload_path = run_immediate(factory, write)
     if upload_path is not None:
         imports._delete_upload(upload_path)
     return result

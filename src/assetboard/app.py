@@ -47,10 +47,17 @@ from assetboard.services.auth import (
     setup_token_at_startup,
 )
 from assetboard.services.context import (
+    DemoRestricted,
     NoWorkspace,
     PermissionDenied,
     TwoFactorRequired,
     WorkspaceNotAvailable,
+)
+from assetboard.services.demo_mode import (
+    disable_demo_instance,
+    ensure_demo_instance,
+    record_demo_error,
+    reset_demo_instance,
 )
 from assetboard.services.hash_gate import HashGate, HashGateBusy
 from assetboard.services.import_csv import default_import_adapters
@@ -204,6 +211,13 @@ def create_app(
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+        if settings.demo_enabled:
+            logger.warning(
+                "DEMO_ENABLED is on: anyone who can reach this instance can sign in to the "
+                "shared %s demo workspace without a password; turn it off before exposing "
+                "real data",
+                APP_NAME,
+            )
         provider_runtime = build_provider_runtime(
             settings,
             app.state.clock,
@@ -243,6 +257,42 @@ def create_app(
                     settings, setup_open=setup_open, logger=logger
                 )
                 await run_in_threadpool(prune_email_tokens_with_factory, session_factory, clock)
+                if settings.demo_enabled:
+                    try:
+                        status = await run_in_threadpool(
+                            ensure_demo_instance,
+                            session_factory,
+                            settings,
+                            app.state.clock,
+                            settings.data_dir,
+                        )
+                        if status.reset_due:
+                            reset = await run_in_threadpool(
+                                reset_demo_instance,
+                                session_factory,
+                                settings,
+                                app.state.clock,
+                                settings.data_dir,
+                                reason="startup",
+                            )
+                            app.state.demo_ready = reset.ok
+                        else:
+                            app.state.demo_ready = True
+                    except Exception as exc:  # noqa: BLE001 - demo mode never blocks startup
+                        logger.error(
+                            "demo_bootstrap_failed exception_type=%s",
+                            type(exc).__name__,
+                        )
+                        await run_in_threadpool(record_demo_error, session_factory, exc)
+                        app.state.demo_ready = False
+                else:
+                    try:
+                        await run_in_threadpool(disable_demo_instance, session_factory)
+                    except Exception as exc:  # noqa: BLE001 - only a stale demo state
+                        logger.warning(
+                            "demo_disable_failed exception_type=%s",
+                            type(exc).__name__,
+                        )
             elif state == "behind":
                 logger.warning(
                     "database schema is behind this version and AUTO_MIGRATE is off; "
@@ -284,6 +334,7 @@ def create_app(
     app.state.session_factory = session_factory
     app.state.touch_factory = touch_factory
     app.state.schema_state = None  # decided in the lifespan
+    app.state.demo_ready = False  # set by the lifespan after the demo bootstrap
     app.state.csrf_key = derive_subkey(secret_key, "csrf")
     app.state.hash_gate = HashGate(settings.auth_max_concurrent_hashes)
     # OIDC (ADR-0014): None when not configured; tests replace the transport with a fake.
@@ -387,7 +438,7 @@ def create_app(
         signed_in = web_session(request)
 
         def allowed() -> bool:
-            if signed_in is None:
+            if signed_in is None or signed_in.is_demo:
                 return False
             with app.state.session_factory() as session:
                 return workspace_creation_allowed(
@@ -415,6 +466,16 @@ def create_app(
         if _is_htmx_fragment_request(request):
             return Response(status_code=204, headers={"HX-Redirect": target})
         return Response(status_code=303, headers={"Location": target})
+
+    @app.exception_handler(DemoRestricted)
+    async def handle_demo_restricted(request: Request, _exc: DemoRestricted) -> Response:
+        locale = request.state.locale
+        return error_response(
+            request,
+            403,
+            gettext("Demo workspace", locale),
+            gettext("This action is not available in the demo workspace.", locale),
+        )
 
     @app.exception_handler(PermissionDenied)
     @app.exception_handler(NotInstanceAdmin)

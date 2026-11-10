@@ -29,7 +29,13 @@ from assetboard.i18n import gettext, ngettext
 from assetboard.i18n.dates import format_day
 from assetboard.services import taxes
 from assetboard.services.archive import export_workspace, restore_available
-from assetboard.services.context import Role, WorkspaceNotAvailable, require_role, select_workspace
+from assetboard.services.context import (
+    DemoRestricted,
+    Role,
+    WorkspaceNotAvailable,
+    require_role,
+    select_workspace,
+)
 from assetboard.services.import_csv import mapping_category_options, mapping_instrument_options
 from assetboard.services.imports import (
     ImportClosedMonths,
@@ -1070,6 +1076,9 @@ async def _creation_allowed(request: Request) -> bool:
     signed_in = web_session(request)
     if signed_in is None:  # the gate redirects first; this guards direct use
         return False
+    if signed_in.is_demo:
+        # The demo account cannot create a workspace (F9.11b); the service refuses too.
+        return False
     factory = request.app.state.session_factory
 
     def check() -> bool:
@@ -1102,9 +1111,11 @@ def _new_workspace_page(
 
 @router.get("/workspaces/new", name="workspace_new")
 async def new_workspace_form(request: Request) -> Response:
+    signed_in = web_session(request)
+    if signed_in is not None and signed_in.is_demo:
+        raise DemoRestricted
     if not await _creation_allowed(request):
         raise HTTPException(status_code=404)
-    signed_in = web_session(request)
     settings = request.app.state.settings
     values = {
         "workspace_name": signed_in.display_name if signed_in else "",
@@ -1126,6 +1137,8 @@ async def new_workspace_submit(
     workspace_locale: FormStr = "",
 ) -> Response:
     signed_in = web_session(request)
+    if signed_in is not None and signed_in.is_demo:
+        raise DemoRestricted
     if signed_in is None or not await _creation_allowed(request):
         raise HTTPException(status_code=404)
     values = {
