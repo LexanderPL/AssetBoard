@@ -850,6 +850,8 @@ def _investment_plan(
     DemoBondTerms,
 ]:
     cash_currency = "GBP" if currency == "USD" else "USD"
+    # The US stock must be foreign to the base so the F6.2a base-settled buy is valid.
+    us_currency = "USD" if currency != "USD" else "EUR"
     instruments = (
         DemoInstrument(
             name=translate(_("Global ETF")),
@@ -874,7 +876,7 @@ def _investment_plan(
             name=translate(_("US stock")),
             symbol="USST",
             type="equity",
-            quote_currency="USD",
+            quote_currency=us_currency,
             unit_label=translate(_("share")),
             allocations=(DemoAllocation(translate(_("Stocks")), 10000),),
         ),
@@ -996,9 +998,7 @@ def _investment_plan(
             price_points.append(DemoPricePoint(instrument=instrument, day=point_day, price=price))
     price_points.sort(key=lambda row: (row.instrument, row.day))
 
-    fx_currencies = {cash_currency}
-    if currency != "USD":
-        fx_currencies.add("USD")
+    fx_currencies = {cash_currency, us_currency}
     fx_points: list[DemoFxPoint] = []
     for quote in sorted(fx_currencies):
         if quote == currency:
@@ -1015,15 +1015,15 @@ def _investment_plan(
         for point_day, rate in zip(dates, path, strict=True):
             fx_points.append(DemoFxPoint(quote_currency=quote, day=point_day, rate=rate))
     fx_points.sort(key=lambda row: (row.quote_currency, row.day))
-    fx_by_day = {row.day: row.rate for row in fx_points if row.quote_currency == "USD"}
+    us_fx_by_day = {row.day: row.rate for row in fx_points if row.quote_currency == us_currency}
 
     def us_fx(day: date) -> Decimal | None:
-        if currency == "USD":
+        if currency == us_currency:
             return Decimal(1)
         candidates = [
-            row.rate for row in fx_points if row.quote_currency == "USD" and row.day <= day
+            row.rate for row in fx_points if row.quote_currency == us_currency and row.day <= day
         ]
-        return candidates[-1] if candidates else fx_by_day.get(day)
+        return candidates[-1] if candidates else us_fx_by_day.get(day)
 
     cash_rate = (
         Decimal(1)
@@ -1097,7 +1097,7 @@ def _investment_plan(
             day,
             Decimal("6"),
             _price_at(price_series[us_stock], day),
-            fee=Money(200, "USD"),
+            fee=Money(200, us_currency),
             fx=us_fx(day),
         )
     txns.append(
@@ -1107,7 +1107,7 @@ def _investment_plan(
             day=split_day,
             quantity=Decimal(2),
             unit_price=Decimal(1),
-            fee=Money(0, "USD"),
+            fee=Money(0, us_currency),
             fx_to_base=Decimal(1),
             note=translate(_("2-for-1 split")),
         )
@@ -1118,7 +1118,7 @@ def _investment_plan(
         base_buy_day,
         Decimal("4"),
         Decimal("90"),
-        fee=Money(0, "USD"),
+        fee=Money(0, us_currency),
         fx=us_fx(base_buy_day),
         amounts="base",
         base_unit_price=Decimal("200"),
@@ -1133,7 +1133,7 @@ def _investment_plan(
             day=sell_day,
             quantity=Decimal("10"),
             unit_price=_price_at(price_series[us_stock], sell_day),
-            fee=Money(250, "USD"),
+            fee=Money(250, us_currency),
             fx_to_base=us_fx(sell_day),
             note=translate(_("Rebalancing sale")),
         )
@@ -1147,7 +1147,7 @@ def _investment_plan(
                 day=day,
                 quantity=Decimal(1),
                 unit_price=Decimal("12.00"),
-                fee=Money(180, "USD"),  # 15% withholding
+                fee=Money(180, us_currency),  # 15% withholding
                 fx_to_base=us_fx(day),
                 note=translate(_("Quarterly dividend")),
                 record_income=True,

@@ -862,8 +862,8 @@ def build_demo_workspace_in_session(
     """Fill an empty workspace with ``plan`` in the caller's transaction.
 
     Returns the counts and the uploaded CSV's path, which the caller owns: the public wrapper
-    deletes it after commit, and the reset (F9.11b) deletes it once its own transaction commits.
-    On any failure the new upload is removed here; an existing workspace's files are untouched.
+    deletes it after commit, while the reset (F9.11b) keeps it for the next reset. On failure
+    the new upload is removed here; an existing workspace's files are untouched.
     """
     require_role_now(session, ctx, Role.OWNER)
     if plan.locale != ctx.workspace.locale or plan.base_currency != ctx.workspace.base_currency:

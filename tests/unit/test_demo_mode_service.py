@@ -158,14 +158,25 @@ def test_ensure_aligns_the_workspace_with_changed_instance_defaults(
     )
     status = ensure_demo_instance(db.factory, changed, db.clock, changed.data_dir)
 
+    # The old rows stay in their original currency until the reset wipes them; changing the
+    # workspace's base currency in place would silently reinterpret every amount.
     with db.factory() as session:
         workspace = session.get(Workspace, workspace_id)
         assert workspace is not None
         assert workspace.name == "Demo"
+        assert workspace.base_currency == "EUR"
+        assert workspace.locale == "en"
+        assert workspace.timezone == "Europe/Warsaw"
+    assert status.reset_due is True  # the next startup rebuilds in the new defaults
+
+    reset = reset_demo_instance(db.factory, changed, db.clock, changed.data_dir, reason="manual")
+    assert reset.ok is True
+    with db.factory() as session:
+        workspace = session.get(Workspace, workspace_id)
+        assert workspace is not None
         assert workspace.base_currency == "USD"
         assert workspace.locale == "pl"
         assert workspace.timezone == "UTC"
-    assert status.reset_due is True  # the next startup rebuilds in the new defaults
 
 
 def test_a_real_account_with_the_demo_email_is_never_taken_over(

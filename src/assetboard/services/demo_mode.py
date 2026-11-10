@@ -333,16 +333,19 @@ def ensure_demo_instance(
             )
             created = True
         else:
+            workspace.is_demo = True
             data_changed = (
                 workspace.base_currency != settings.default_currency
                 or workspace.locale != settings.default_locale
                 or workspace.timezone != settings.demo_timezone
             )
-            workspace.is_demo = True
             workspace.name = workspace_name
-            workspace.base_currency = settings.default_currency
-            workspace.locale = settings.default_locale
-            workspace.timezone = settings.demo_timezone
+            if archive.workspace_is_empty(session, _context(user, workspace, clock)):
+                # No data to preserve: align the current defaults before the initial build.
+                workspace.base_currency = settings.default_currency
+                workspace.locale = settings.default_locale
+                workspace.timezone = settings.demo_timezone
+                data_changed = False
             session.flush()
 
         _ensure_membership(session, workspace, user)
@@ -477,6 +480,13 @@ def reset_demo_instance(
             raise DemoInstanceMissing("there is no demo user")
         old_paths.extend(_reset_import_files(session, workspace.id, data_dir))
         _wipe_workspace_data(session, workspace.id)
+        # The rows are gone, so the workspace can safely move to the current instance defaults;
+        # changing the base currency with live rows would be wrong.
+        workspace.name = gettext("Demo", settings.default_locale)
+        workspace.base_currency = settings.default_currency
+        workspace.locale = settings.default_locale
+        workspace.timezone = settings.demo_timezone
+        session.flush()
         _ensure_membership(session, workspace, user)
         ctx = _context(user, workspace, clock)
         today = clock.today(settings.demo_timezone)
