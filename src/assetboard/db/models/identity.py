@@ -15,6 +15,7 @@ from sqlalchemy import (
     UniqueConstraint,
     Uuid,
     false,
+    text,
     true,
 )
 from sqlalchemy.orm import Mapped, mapped_column, validates
@@ -41,6 +42,14 @@ class User(IdMixin, TimestampMixin, Base):
             name="birth_year_valid",
         ),
         CheckConstraint("life_expectancy BETWEEN 50 AND 120", name="life_expectancy_valid"),
+        # Only the public demo account may carry the flag (F9.11b).
+        Index(
+            "uq_users_is_demo",
+            "is_demo",
+            unique=True,
+            sqlite_where=text("is_demo = 1"),
+            postgresql_where=text("is_demo"),
+        ),
     )
 
     email: Mapped[str] = mapped_column(String(320), nullable=False)
@@ -70,6 +79,10 @@ class User(IdMixin, TimestampMixin, Base):
         Integer(), nullable=False, default=90, server_default="90"
     )
     last_login_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    # The public demo account (F9.11b): never an instance administrator, no password.
+    is_demo: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
 
     @validates("email")
     def _normalize_email(self, _key: str, value: str) -> str:
@@ -104,6 +117,14 @@ class Workspace(IdMixin, TimestampMixin, Base):
             "investment_cost_basis IN ('average', 'fifo')",
             name="investment_cost_basis_valid",
         ),
+        # Only the public demo workspace may carry the flag (F9.11b).
+        Index(
+            "uq_workspaces_is_demo",
+            "is_demo",
+            unique=True,
+            sqlite_where=text("is_demo = 1"),
+            postgresql_where=text("is_demo"),
+        ),
     )
 
     name: Mapped[str] = mapped_column(String(120), nullable=False)
@@ -132,6 +153,10 @@ class Workspace(IdMixin, TimestampMixin, Base):
     # F6.8: keep one linked net-worth item per active asset class with a value (off for
     # workspaces created before this setting; new workspaces turn it on explicitly).
     auto_link_portfolio: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=false()
+    )
+    # The public demo workspace (F9.11b); never listed to real users.
+    is_demo: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default=false()
     )
 
@@ -185,7 +210,9 @@ class UserSession(Base):
     __table_args__ = (
         Index("ix_user_sessions_user_expires", "user_id", "expires_at"),
         CheckConstraint("length(id_hash) = 64", name="id_hash_sha256_length"),
-        CheckConstraint("auth_method IN ('password', 'oidc', 'proxy')", name="auth_method_valid"),
+        CheckConstraint(
+            "auth_method IN ('password', 'oidc', 'proxy', 'demo')", name="auth_method_valid"
+        ),
     )
 
     id_hash: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -326,6 +353,11 @@ class InstanceSettings(Base):
     )
     latest_release_tag: Mapped[str | None] = mapped_column(String(32), nullable=True)
     update_checked_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    # Public demo mode (F9.11b): the last successful dataset rebuild, the failing exception
+    # class after a failed one, and the builder version that produced the rows.
+    demo_last_reset_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    demo_last_reset_error: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    demo_dataset_version: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     updated_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
     updated_by_user_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"), nullable=True

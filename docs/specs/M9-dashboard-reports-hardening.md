@@ -409,17 +409,23 @@ workspace restores into an empty one; CLI refuses a non-empty workspace.
     upload limits.
 - **Daily reset:** an APScheduler job at the reset time (demo timezone), and at startup when the
   last reset is older than 24 hours or the builder's `DEMO_DATASET_VERSION` changed. The reset
-  takes the workspace lock, deletes all workspace-owned rows of the demo workspace in FK-safe
-  order (driven by the tenant-coverage registry, not a hand-kept list) and its stored import
-  files, then runs the F9.11a builder with `T` = today in the demo timezone, all in one
-  transaction; on failure it rolls back, logs the error class and keeps the old data. Demo
-  sessions stay valid (the workspace id does not change). It records `last_reset_at`,
-  `last_reset_error?` and the dataset version in instance settings and an instance-level audit
-  event `demo.reset`.
+  takes the instance lock and the workspace lock, deletes all workspace-owned rows of the demo
+  workspace in FK-safe order (driven by the tenant-coverage registry, not a hand-kept list) and
+  its stored import files, then runs the F9.11a builder with `T` = today in the demo timezone, all
+  in one transaction; on failure it rolls back, logs the error class and keeps the old data. The
+  workspace row, its membership and demo sessions stay untouched (the workspace id does not
+  change). Stored upload files are removed only after the transaction commits. It records
+  `last_reset_at`, `last_reset_error?` and the dataset version in instance settings and an
+  instance-level audit event `demo.reset` with the reason (`startup`, `scheduled` or `manual`),
+  status and version.
 - **Instance admin page:** a "Demo mode" panel (only while on): status, last reset and its
   result, next reset, and a CSRF-protected **Reset now** button (instance admin only).
 - **Turning it off:** the button and route disappear, demo sessions are revoked at startup, and
   the demo workspace and user stay (deactivated) until an instance admin deletes the workspace.
+  While demo mode is off and a demo workspace still exists, the panel stays visible and offers a
+  CSRF-protected **Delete demo data** button (instance admin only) that revokes demo sessions,
+  removes the demo workspace with all its rows and the demo user, and records the instance-level
+  audit event `demo.deleted`.
 - Docs: a "Demo mode" section in the install/config docs (what it exposes, the warning, how to
   reset); en/pl strings, pl without fuzzy entries.
 

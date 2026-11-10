@@ -170,10 +170,12 @@ def create_owned_workspace(
     timezone: str,
     locale: str,
     owner_user_id: UUID,
+    is_demo: bool = False,
 ) -> tuple[Workspace, NewWorkspaceScope]:
     """Create a workspace and make ``owner_user_id`` its owner, in the caller's transaction.
 
-    The values are validated by the caller (``services.workspace_options``).
+    The values are validated by the caller (``services.workspace_options``). ``is_demo`` is set
+    only by ``services.demo_mode`` for the public demo workspace (F9.11b).
 
     New workspaces keep portfolio asset classes linked in net worth automatically; the column
     default stays off so workspaces created before the setting keep their manual links.
@@ -185,6 +187,7 @@ def create_owned_workspace(
         timezone=timezone,
         locale=locale,
         auto_link_portfolio=True,
+        is_demo=is_demo,
     )
     session.add(workspace)
     session.flush()

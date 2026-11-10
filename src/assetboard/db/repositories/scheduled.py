@@ -214,8 +214,14 @@ class RecurringWorkspaceReader:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def workspaces(self) -> list[tuple[UUID, str]]:
-        return [
-            (row.id, row.timezone)
-            for row in self.session.execute(select(Workspace.id, Workspace.timezone))
-        ]
+    def workspaces(self, *, include_demo: bool = False) -> list[tuple[UUID, str]]:
+        """Every workspace's id and time zone; the demo workspace is excluded by default."""
+        statement = select(Workspace.id, Workspace.timezone)
+        if not include_demo:
+            statement = statement.where(Workspace.is_demo.is_(False))
+        return [(row.id, row.timezone) for row in self.session.execute(statement)]
+
+    def is_demo(self, workspace_id: UUID) -> bool:
+        return bool(
+            self.session.scalar(select(Workspace.is_demo).where(Workspace.id == workspace_id))
+        )

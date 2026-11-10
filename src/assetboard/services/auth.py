@@ -71,9 +71,17 @@ ActorType = Literal["user", "cli", "system"]
 # ``mail_ip``: password reset requests per client address (pre-release B, ADR-0017).
 # ``notify_test``: reminder channel test messages per member (F3.6, ADR-0021).
 ThrottleScope = Literal[
-    "account", "confirm", "ip", "setup", "register", "mail_email", "mail_ip", "notify_test"
+    "account",
+    "confirm",
+    "ip",
+    "setup",
+    "register",
+    "mail_email",
+    "mail_ip",
+    "notify_test",
+    "demo",
 ]
-AuthMethod = Literal["password", "oidc", "proxy"]
+AuthMethod = Literal["password", "oidc", "proxy", "demo"]
 
 MIN_PASSWORD_LENGTH = 8
 MAX_PASSWORD_LENGTH = 1024
@@ -2757,6 +2765,7 @@ class WebSession:
     tax_warning_dismissed: bool = False
     must_change_password: bool = False
     second_factor_verified: bool = False
+    is_demo: bool = False
 
 
 def read_web_session(
@@ -2788,6 +2797,7 @@ def read_web_session(
         tax_warning_dismissed=user.tax_warning_dismissed,
         must_change_password=user.must_change_password,
         second_factor_verified=row.second_factor_verified,
+        is_demo=user.is_demo,
     )
 
 

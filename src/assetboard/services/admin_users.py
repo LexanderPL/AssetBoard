@@ -141,7 +141,10 @@ def _row(user: User, *, providers: set[str], has_two_factor: bool) -> UserRow:
 def list_users(factory: sessionmaker[Session], *, actor_id: UUID) -> list[UserRow]:
     with factory() as session:
         require_instance_admin(session, actor_id)
-        users = session.scalars(select(User).order_by(User.email)).all()
+        # The public demo account is shown in the demo panel, never in the account list.
+        users = session.scalars(
+            select(User).where(User.is_demo.is_(False)).order_by(User.email)
+        ).all()
         two_factor = _two_factor_users(session)
         providers = _providers_by_user(session)
         return [
@@ -158,7 +161,7 @@ def get_user(factory: sessionmaker[Session], *, actor_id: UUID, user_id: UUID) -
     with factory() as session:
         require_instance_admin(session, actor_id)
         user = session.get(User, user_id)
-        if user is None:
+        if user is None or user.is_demo:
             return None
         return _row(
             user,
@@ -172,7 +175,12 @@ def _other_active_admins(session: Session, user_id: UUID) -> int:
         session.scalar(
             select(func.count())
             .select_from(User)
-            .where(User.is_instance_admin.is_(True), User.is_active.is_(True), User.id != user_id)
+            .where(
+                User.is_instance_admin.is_(True),
+                User.is_active.is_(True),
+                User.is_demo.is_(False),
+                User.id != user_id,
+            )
         )
         or 0
     )

@@ -41,4 +41,35 @@
     </div>
   </form>
 </section>
+
+{% if demo_configured or demo_workspace_exists %}
+<section class="panel mt-6 max-w-xl p-6 sm:p-7" aria-labelledby="demo-mode-heading" data-demo-panel data-demo-on="{{ 'true' if demo_configured else 'false' }}">
+  <h2 id="demo-mode-heading" class="text-base font-semibold">{{ _("Demo mode") }}</h2>
+  {% if demo_configured %}
+  <p class="mt-3 text-sm text-muted" data-demo-state>{{ _("On: anyone who can reach this instance can try the shared demo workspace.") }}</p>
+  {% if demo_status %}
+  <dl class="mt-4 space-y-2 text-sm">
+    <div class="flex flex-wrap justify-between gap-2"><dt class="text-muted">{{ _("Last reset") }}</dt><dd data-demo-last-reset>{{ demo_last_reset_at or _("Never") }}</dd></div>
+    <div class="flex flex-wrap justify-between gap-2"><dt class="text-muted">{{ _("Result") }}</dt><dd data-demo-last-result>{% if demo_status.last_reset_error %}{{ _("Failed: %(error)s", error=demo_status.last_reset_error) }}{% else %}{{ _("Succeeded") }}{% endif %}</dd></div>
+    <div class="flex flex-wrap justify-between gap-2"><dt class="text-muted">{{ _("Dataset version") }}</dt><dd data-demo-version>{{ demo_status.dataset_version if demo_status.dataset_version is not none else _("None yet") }}</dd></div>
+    <div class="flex flex-wrap justify-between gap-2"><dt class="text-muted">{{ _("Next reset") }}</dt><dd data-demo-next-reset>{{ demo_next_reset_at or _("Not scheduled") }}</dd></div>
+  </dl>
+  {% else %}
+  <p class="mt-3 text-sm text-danger" role="alert" data-demo-not-ready>{{ _("The demo workspace is not ready. Check the log and restart the application.") }}</p>
+  {% endif %}
+  <form method="post" action="{{ scoped_url(request, 'admin_demo_reset') }}" class="mt-5">
+    {{ csrf_input() }}
+    <button type="submit" data-demo-reset class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Reset now") }}</button>
+  </form>
+  {% else %}
+  <p class="mt-3 text-sm text-muted" data-demo-state>{{ _("Off. The demo workspace stays until you delete it.") }}</p>
+  {% if demo_workspace_exists %}
+  <form method="post" action="{{ scoped_url(request, 'admin_demo_delete') }}" class="mt-5">
+    {{ csrf_input() }}
+    <button type="submit" data-demo-delete class="rounded-xl border border-danger-line bg-danger-soft px-4 py-2.5 text-sm font-semibold text-danger-strong hover:bg-danger-line/20">{{ _("Delete demo data") }}</button>
+  </form>
+  {% endif %}
+  {% endif %}
+</section>
+{% endif %}
 {% endblock %}

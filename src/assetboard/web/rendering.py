@@ -12,6 +12,7 @@ from starlette.responses import HTMLResponse
 from assetboard.domain.money import Money
 from assetboard.domain.months import InvalidMonth, YearMonth
 from assetboard.i18n import translations_for
+from assetboard.i18n.dates import format_time
 from assetboard.i18n.numbers import format_money
 from assetboard.web.security import apply_new_csrf_cookie, csrf_token, web_session
 
@@ -83,11 +84,19 @@ def render_template(
 ) -> HTMLResponse:
     locale = request.state.locale
     settings = request.app.state.settings
+    current_session = web_session(request)
     template_context: dict[str, object] = {
         "locale": locale,
         "app_name": request.app.state.app_name,
         "default_currency": settings.default_currency,
-        "web_session": web_session(request),
+        "web_session": current_session,
+        # Every page of a demo session shows the non-dismissable banner (F9.11b).
+        "demo_banner": {
+            "time": format_time(settings.demo_reset_time, locale),
+            "timezone": settings.demo_timezone,
+        }
+        if current_session is not None and current_session.is_demo
+        else None,
         # Set for every signed-in page with a workspace; see load_workspace_nav in web/context.py.
         "workspace_nav": getattr(request.state, "workspace_nav", None),
         # The running version (sidebar footer), and for administrators a newer release.

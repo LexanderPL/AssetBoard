@@ -53,6 +53,14 @@ def test_a_month_after_from_uses_the_inflected_form() -> None:
     assert format_month_after_from(september, "en") == "September 2026"
 
 
+def test_times_are_formatted_from_the_locale() -> None:
+    from assetboard.i18n.dates import format_time
+
+    assert format_time("03:00", "en") == "3:00 AM"
+    assert format_time("03:00", "pl") == "03:00"
+    assert format_time("23:59", "en") == "11:59 PM"
+
+
 def test_calendar_weekday_names_and_long_dates_come_from_cldr() -> None:
     from assetboard.i18n.dates import format_day_long, weekday_names
 

@@ -45,6 +45,7 @@ ALWAYS_OPEN = frozenset({"/healthz", "/readyz"})
 SIGNED_OUT_PATHS = frozenset(
     {
         "/login",
+        "/login/demo",
         "/login/verify",
         "/register",
         "/setup",

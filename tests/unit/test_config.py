@@ -49,6 +49,53 @@ def test_settings_are_side_effect_free_and_use_spec_defaults(
     assert not data_dir.exists()
 
 
+def test_demo_mode_defaults_and_validation(tmp_path: Path) -> None:
+    settings = Settings(_env_file=None, data_dir=tmp_path)
+    assert settings.demo_enabled is False
+    assert settings.demo_reset_time == "03:00"
+    assert settings.demo_timezone == "UTC"
+    assert settings.demo_ip_limit == 20
+    assert settings.demo_reset_hour_minute == (3, 0)
+
+    configured = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        demo_enabled=True,
+        demo_reset_time="23:59",
+        demo_timezone="Europe/Warsaw",
+        demo_ip_limit=1,
+    )
+    assert configured.demo_enabled is True
+    assert configured.demo_reset_hour_minute == (23, 59)
+    assert configured.demo_timezone == "Europe/Warsaw"
+    assert configured.demo_ip_limit == 1
+
+    for value in ("3:00", "24:00", "03:60", "03:0", "0300", " 03:00"):
+        with pytest.raises(ValueError, match="DEMO_RESET_TIME"):
+            Settings(_env_file=None, data_dir=tmp_path, demo_reset_time=value)
+
+    with pytest.raises(ValueError, match="DEMO_TIMEZONE"):
+        Settings(_env_file=None, data_dir=tmp_path, demo_timezone="Mars/Olympus")
+    with pytest.raises(ValueError, match="demo_ip_limit"):
+        Settings(_env_file=None, data_dir=tmp_path, demo_ip_limit=0)
+
+
+def test_demo_mode_settings_from_the_environment(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(f"{ENV_PREFIX}_DEMO_ENABLED", "true")
+    monkeypatch.setenv(f"{ENV_PREFIX}_DEMO_RESET_TIME", "04:15")
+    monkeypatch.setenv(f"{ENV_PREFIX}_DEMO_TIMEZONE", "America/New_York")
+    monkeypatch.setenv(f"{ENV_PREFIX}_DEMO_IP_LIMIT", "7")
+
+    settings = Settings(_env_file=None, data_dir=tmp_path)
+
+    assert settings.demo_enabled is True
+    assert settings.demo_reset_time == "04:15"
+    assert settings.demo_timezone == "America/New_York"
+    assert settings.demo_ip_limit == 7
+
+
 def test_ensure_secret_key_creates_private_persistent_file(tmp_path: Path) -> None:
     data_dir = tmp_path / "secret-data"
     settings = Settings(_env_file=None, data_dir=data_dir)

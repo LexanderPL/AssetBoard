@@ -16,6 +16,7 @@ from assetboard.clock import Clock
 from assetboard.config import Settings
 from assetboard.db.repositories import NotFound
 from assetboard.db.repositories.scheduled import RecurringWorkspaceReader
+from assetboard.services.demo_mode import reset_demo_instance
 from assetboard.services.imports import cleanup_expired_imports
 from assetboard.services.income import resync_pending_income
 from assetboard.services.networth_snapshots import take_auto_snapshot
@@ -70,7 +71,32 @@ class RecurringJobs:
         self._reconciling = threading.Lock()
         self.caught_up = threading.Event()  # set when the startup catch-up has finished
 
+    def _is_demo(self, workspace_id: UUID) -> bool:
+        """Whether this workspace is the public demo one (F9.11b)."""
+        try:
+            with self.factory() as session:
+                return RecurringWorkspaceReader(session).is_demo(workspace_id)
+        except Exception as exc:  # noqa: BLE001 - a missing workspace has nothing to skip
+            self.logger.debug(
+                "demo_check_skipped workspace=%s exception_type=%s",
+                workspace_id,
+                type(exc).__name__,
+            )
+            return False
+
+    def _skip_demo(self, job: str, workspace_id: UUID) -> bool:
+        if not self._is_demo(workspace_id):
+            return False
+        self.logger.debug(
+            "recurring_job_skipped workspace=%s job=%s reason=demo",
+            workspace_id,
+            job,
+        )
+        return True
+
     def run(self, workspace_id: UUID) -> None:
+        if self._skip_demo("generation", workspace_id):
+            return
         try:
             generate_workspace(
                 self.factory, _Scope(_Workspace(workspace_id)), self.clock(), self.settings
@@ -91,6 +117,8 @@ class RecurringJobs:
 
     def resync_income(self, workspace_id: UUID) -> None:
         """Recalculate pending income from the current tax model (after an upgrade, ADR-0022)."""
+        if self._skip_demo("income_resync", workspace_id):
+            return
         try:
             resync_pending_income(self.factory, _Scope(_Workspace(workspace_id)), self.clock())
         except NotFound:
@@ -104,6 +132,8 @@ class RecurringJobs:
             )
 
     def auto_post(self, workspace_id: UUID) -> None:
+        if self._skip_demo("auto_post", workspace_id):
+            return
         try:
             auto_post_workspace(self.factory, _Scope(_Workspace(workspace_id)), self.clock())
         except Exception as exc:
@@ -116,6 +146,8 @@ class RecurringJobs:
 
     def networth_snapshot(self, workspace_id: UUID, timezone: str) -> None:
         """Store the previous month-end (F5.3); only this month, never older gaps."""
+        if self._skip_demo("networth_snapshot", workspace_id):
+            return
         try:
             take_auto_snapshot(
                 self.factory,
@@ -159,6 +191,8 @@ class RecurringJobs:
         """One-off first history backfill, queued when a provider is enabled or assigned."""
         if self.provider_runtime is None:
             return
+        if self._skip_demo("price_backfill", workspace_id):
+            return
         try:
             refresh_provider(
                 self.factory,
@@ -192,7 +226,11 @@ class RecurringJobs:
         """Hourly (F4.2): expire stored import uploads older than 24 hours, per workspace."""
         try:
             with self.factory() as session:
-                workspace_ids = [row[0] for row in RecurringWorkspaceReader(session).workspaces()]
+                # Removing orphaned uploads is global housekeeping; the demo gets it too.
+                workspace_ids = [
+                    row[0]
+                    for row in RecurringWorkspaceReader(session).workspaces(include_demo=True)
+                ]
         except Exception as exc:
             self.logger.error(
                 "import_upload_cleanup_failed exception_type=%s; next run will retry",
@@ -217,6 +255,21 @@ class RecurringJobs:
                     exc_info=True,
                 )
 
+    def demo_reset(self) -> None:
+        """Rebuild the public demo dataset; a failure never stops the scheduler (F9.11b)."""
+        try:
+            reset_demo_instance(
+                self.factory,
+                self.settings,
+                self.clock(),
+                self.settings.data_dir,
+                reason="scheduled",
+            )
+        except Exception as exc:  # noqa: BLE001 - the service also records its own failures
+            self.logger.error(
+                "demo_reset_failed reason=scheduled exception_type=%s", type(exc).__name__
+            )
+
     def notify(self) -> None:
         """One reminder tick (F3.6): run the due channels of every workspace.
 
@@ -239,6 +292,8 @@ class RecurringJobs:
         for workspace_id in workspace_ids[start:] + workspace_ids[:start]:
             if out_of_time():
                 break
+            if self._skip_demo("notifications", workspace_id):
+                continue
             try:
                 run_notifications(
                     self.factory,
@@ -385,6 +440,17 @@ class RecurringJobs:
             coalesce=True,
             max_instances=1,
         )
+        if self.settings.demo_enabled:
+            hour, minute = self.settings.demo_reset_hour_minute
+            self.scheduler.add_job(
+                self.demo_reset,
+                CronTrigger(hour=hour, minute=minute, timezone=self.settings.demo_timezone),
+                id="demo-reset",
+                replace_existing=True,
+                coalesce=True,
+                max_instances=1,
+                misfire_grace_time=None,
+            )
         if self.provider_runtime is not None:
             for provider_key, hour, minute in (
                 ("nbp", 18, 10),

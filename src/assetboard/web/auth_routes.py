@@ -19,6 +19,7 @@ from assetboard.db.engine import is_database_locked, run_immediate
 from assetboard.db.models.identity import User
 from assetboard.domain.identity import MAX_EMAIL_LENGTH, InvalidEmail
 from assetboard.i18n import gettext
+from assetboard.i18n.dates import format_time
 from assetboard.services import totp
 from assetboard.services.account_email import password_reset_available
 from assetboard.services.auth import (
@@ -40,6 +41,7 @@ from assetboard.services.auth import (
     user_has_password,
     verify_setup_token,
 )
+from assetboard.services.demo_mode import demo_login
 from assetboard.services.instance_settings import registration_open
 from assetboard.services.profile import ConfirmMethod
 from assetboard.web.confirm import confirm_view, refusal, run_confirmed
@@ -356,10 +358,17 @@ async def _login_page(
     break_glass: bool = False,
     second_factor_step: bool = False,
     ticket_ended: bool = False,
+    error_override: str | None = None,
 ) -> Response:
     state = _state(request)
     settings = state.settings
     password_login = break_glass or not settings.oidc_only
+    demo_enabled = (
+        settings.demo_enabled
+        and getattr(state, "demo_ready", False)
+        and not break_glass
+        and not second_factor_step
+    )
 
     def open_registration() -> bool:
         with state.session_factory() as session:
@@ -376,7 +385,9 @@ async def _login_page(
         context={
             "email": email,
             "next_path": safe_next(next_path, default=""),
-            "error": _login_error(
+            "error": error_override
+            if error_override is not None
+            else _login_error(
                 request,
                 error=error,
                 throttled_until=throttled_until,
@@ -397,6 +408,8 @@ async def _login_page(
             "proxy_start_url": proxy_start_url(safe_next(next_path, default=""))
             if proxy_user
             else None,
+            "demo_enabled": demo_enabled,
+            "demo_reset_time": format_time(settings.demo_reset_time, request.state.locale),
         },
         status_code=status,
     )
@@ -482,6 +495,39 @@ async def login_submit(
     if _state(request).settings.oidc_only:
         raise HTTPException(status_code=404)
     return await _password_sign_in(request, email, password, next, break_glass=False)
+
+
+# Public demo sign-in (F9.11b): no password, no second factor, CSRF and per-address throttle.
+@router.post("/login/demo", name="login_demo")
+async def login_demo(request: Request) -> Response:
+    state = _state(request)
+    if not state.settings.demo_enabled or not getattr(state, "demo_ready", False):
+        raise HTTPException(status_code=404)
+    outcome = await run_in_threadpool(
+        demo_login,
+        state.session_factory,
+        state.settings,
+        state.clock,
+        host=client_host(request),
+        user_agent=_user_agent(request),
+    )
+    if outcome is None:
+        raise HTTPException(status_code=404)
+    if outcome.throttled or outcome.session_id is None:
+        return await _login_page(
+            request,
+            error=False,
+            status=401,
+            error_override=throttled_message(None, state.clock.now(), request.state.locale),
+        )
+    expires_at = outcome.expires_at
+    if expires_at is None:
+        expires_at = await run_in_threadpool(
+            session_expiry, state.session_factory, outcome.session_id
+        )
+    if expires_at is None:
+        raise RuntimeError("Demo session disappeared right after login")
+    return signed_in_redirect(request, "/", outcome.session_id, expires_at)
 
 
 # Break-glass password sign-in for instance administrators under OIDC_ONLY (ADR-0014). Not
