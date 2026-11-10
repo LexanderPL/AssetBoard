@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.5.7](https://github.com/LexanderPL/AssetBoard/compare/v0.5.6...v0.5.7) (2026-11-10)
+
+
+### Features
+
+* **networth:** one combined summary donut and in-place category editing ([#269](https://github.com/LexanderPL/AssetBoard/issues/269)) ([7d8a1bf](https://github.com/LexanderPL/AssetBoard/commit/7d8a1bfc38ee52c55298e363de3454889a4ce3f7))
+* **ui:** open form entry points in dialogs and close menus on history ([#270](https://github.com/LexanderPL/AssetBoard/issues/270)) ([c461efb](https://github.com/LexanderPL/AssetBoard/commit/c461efba0386d66733082d189dafab8e6b0b7504))
+
+
+### Bug Fixes
+
+* **demo:** keep the first build's import upload too ([#265](https://github.com/LexanderPL/AssetBoard/issues/265)) ([5274ec4](https://github.com/LexanderPL/AssetBoard/commit/5274ec453378a34dd7b5cf493e196969ee3995bc))
+* **performance:** stop missing chart points from dipping to zero ([#267](https://github.com/LexanderPL/AssetBoard/issues/267)) ([4d457f8](https://github.com/LexanderPL/AssetBoard/commit/4d457f8f5540f91353a2b8a65daa6bc2d91c91ce))
+
 ## [0.5.6](https://github.com/LexanderPL/AssetBoard/compare/v0.5.5...v0.5.6) (2026-11-10)
 
 
