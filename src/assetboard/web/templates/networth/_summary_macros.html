@@ -2,27 +2,39 @@
 
 {% macro bar(view) -%}
 <p class="sr-only" data-summary-bar-text>{{ _("Assets %(assets)s; liabilities %(liabilities)s.", assets=view.assets, liabilities=view.liabilities) }}</p>
-<div class="mt-4 space-y-3" data-summary-bar data-bar-empty="{{ 'true' if view.bar.empty else 'false' }}">
-  <div data-summary-bar-side="assets">
+<div class="mt-4">
+  <div class="space-y-3" data-summary-bar data-bar-empty="{{ 'true' if view.bar.empty else 'false' }}" aria-hidden="true">
     <div class="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-      <span class="font-medium">{{ _("Assets") }}</span>
-      <span class="tabular-nums" data-bar-amount>{{ view.assets }}</span>
+      <div class="flex items-baseline gap-2" data-summary-bar-side="assets">
+        <span class="font-medium">{{ _("Assets") }}</span>
+        <span class="tabular-nums" data-bar-amount>{{ view.assets }}</span>
+      </div>
+      <div class="flex items-baseline gap-2" data-summary-bar-side="liabilities">
+        <span class="font-medium">{{ _("Liabilities") }}</span>
+        <span class="tabular-nums" data-bar-amount>{{ view.liabilities }}</span>
+      </div>
     </div>
-    <svg class="mt-1.5 h-4 w-full overflow-visible" viewBox="0 0 {{ view.bar.scale }} 16" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-      <rect x="0" y="3" width="{{ view.bar.scale }}" height="10" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke"></rect>
-      <rect x="0" y="3" width="{{ view.bar.assets_width }}" height="10" class="fill-success" data-bar-width="{{ view.bar.assets_width }}"></rect>
+    <svg class="h-4 w-full overflow-visible" viewBox="0 0 {{ view.bar.scale }} 16" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+      <rect x="0" y="3" width="{{ view.bar.scale }}" height="10" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke" data-bar-track></rect>
+      {% if not view.bar.empty %}
+      <rect x="0" y="3" width="{{ view.bar.assets_width }}" height="10" class="fill-success" data-bar-assets data-bar-assets-width="{{ view.bar.assets_width }}"></rect>
+      {% endif %}
+      {% if view.bar.liabilities_width > 0 %}
+      <rect x="{{ view.bar.liabilities_start }}" y="3" width="{{ view.bar.covered_width }}" height="10" class="fill-danger" data-bar-liabilities data-bar-liabilities-width="{{ view.bar.liabilities_width }}" data-bar-liabilities-start="{{ view.bar.liabilities_start }}"></rect>
+      {% endif %}
+      {% if view.bar.deficit_width > 0 %}
+      <defs>
+        <pattern id="networth-deficit-hatch" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+          <rect x="0" y="0" width="8" height="8" class="fill-danger-tint"></rect>
+          <rect x="0" y="0" width="4" height="8" class="fill-danger"></rect>
+        </pattern>
+      </defs>
+      <rect x="{{ view.bar.assets_width }}" y="3" width="{{ view.bar.deficit_width }}" height="10" fill="url(#networth-deficit-hatch)" class="stroke-surface" data-bar-deficit data-bar-deficit-width="{{ view.bar.deficit_width }}"></rect>
+      <line x1="{{ view.bar.assets_width }}" x2="{{ view.bar.assets_width }}" y1="-2" y2="18" class="stroke-ink" stroke-width="2" vector-effect="non-scaling-stroke" data-bar-assets-end></line>
+      {% endif %}
     </svg>
   </div>
-  <div data-summary-bar-side="liabilities">
-    <div class="flex flex-wrap items-baseline justify-between gap-2 text-sm">
-      <span class="font-medium">{{ _("Liabilities") }}</span>
-      <span class="tabular-nums" data-bar-amount>{{ view.liabilities }}</span>
-    </div>
-    <svg class="mt-1.5 h-4 w-full overflow-visible" viewBox="0 0 {{ view.bar.scale }} 16" preserveAspectRatio="none" aria-hidden="true" focusable="false">
-      <rect x="0" y="3" width="{{ view.bar.scale }}" height="10" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke"></rect>
-      <rect x="0" y="3" width="{{ view.bar.liabilities_width }}" height="10" class="fill-danger" data-bar-width="{{ view.bar.liabilities_width }}"></rect>
-    </svg>
-  </div>
+  <p class="mt-1.5 text-sm text-muted" data-bar-caption>{{ view.bar.caption }}</p>
 </div>
 {%- endmacro %}
 

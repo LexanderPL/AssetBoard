@@ -13,12 +13,20 @@ totals subtract the liabilities from the assets.
 
 ## Summary
 
-The summary shows the big net-worth figure, total assets and liabilities, an assets-vs-liabilities
-bar, one **Assets and liabilities** donut, and a category table for each side. The donut has two
-slices — assets in blue and liabilities in red — as parts of the gross total (assets plus
-liabilities), not of net worth. A line under it says so. Category-table shares are percentages of
-that side's own total; they are rounded to one decimal place and need not add up to exactly
-100.0%.
+The summary shows the big net-worth figure, total assets and liabilities, one combined
+assets-vs-liabilities bar, and a category table for each side. Category-table shares are
+percentages of that side's own total; they are rounded to one decimal place and need not add up to
+exactly 100.0%.
+
+The bar scales to the larger of assets and liabilities. Assets are green from the left and
+liabilities red from the right, so the uncovered green part is net worth. When assets are larger,
+the bar ends at the assets total and the red liabilities cover its rightmost share; the caption
+gives liabilities as a percentage of assets. When liabilities exceed assets, the bar extends to the
+liabilities total: solid red covers the assets end, the excess beyond it is hatched red, and a
+vertical marker line shows where the assets end. The caption gives the percentage and the amount by
+which liabilities exceed assets. Equal sides give a full red bar and zero net worth; with no
+liabilities the whole bar is green. Assets of zero with liabilities show a fully hatched red bar,
+and with neither side positive the bar is an empty track with **No assets or liabilities yet.**
 
 The same rules as the lists apply: archived items, items with **Include in net worth** off and
 items with no effective value are not counted. Items under an archived category still count until
@@ -26,10 +34,8 @@ the item itself is archived. Items in another currency are shown separately in a
 not converted or counted before an exchange-rate service exists. Items excluded by your own
 **Include in net worth** switch are shown as a muted note, not a warning.
 
-A side with no counted value has no slice in the combined donut and a dash instead of a share in
-its table. A workspace with only liabilities therefore shows a negative net worth and a single
-liability slice. With neither side positive the donut shows **No assets or liabilities yet** and
-no chart is loaded.
+A side with no counted value has a dash instead of a share in its table. A workspace with only
+liabilities therefore shows a negative net worth and a dash in the assets table.
 
 ## History and snapshots
 

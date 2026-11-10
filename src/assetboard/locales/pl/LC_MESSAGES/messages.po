@@ -3374,11 +3374,26 @@ msgstr "Aktywa według kategorii"
 msgid "Liabilities by category"
 msgstr "Zobowiązania według kategorii"
 
-msgid "Assets and liabilities"
-msgstr "Aktywa i zobowiązania"
+msgid "No assets or liabilities yet."
+msgstr "Brak aktywów i zobowiązań."
 
-msgid "No assets or liabilities yet"
-msgstr "Brak aktywów i zobowiązań"
+msgid "No liabilities; the whole bar is net worth."
+msgstr "Brak zobowiązań; cały pasek to majątek netto."
+
+#, python-format
+msgid "Liabilities exceed assets by %(amount)s."
+msgstr "Zobowiązania przekraczają aktywa o %(amount)s."
+
+msgid "Liabilities equal assets; net worth is zero."
+msgstr "Zobowiązania są równe aktywom; majątek netto wynosi zero."
+
+#, python-format
+msgid "Liabilities are %(rate)s of assets; the green part is net worth."
+msgstr "Zobowiązania stanowią %(rate)s aktywów; zielona część to majątek netto."
+
+#, python-format
+msgid "Liabilities are %(rate)s of assets; they exceed assets by %(amount)s."
+msgstr "Zobowiązania stanowią %(rate)s aktywów; przekraczają aktywa o %(amount)s."
 
 msgid "Enter a name of up to 100 characters."
 msgstr "Podaj nazwę o długości do 100 znaków."
@@ -7612,13 +7627,6 @@ msgstr[2] ""
 "%(num)d pozycji nie jest liczonych, ponieważ zostały przez Ciebie "
 "wyłączone."
 
-msgid ""
-"The chart shows assets and liabilities as parts of the gross total; net "
-"worth is assets minus liabilities."
-msgstr ""
-"Wykres pokazuje aktywa i zobowiązania jako części sumy brutto; majątek "
-"netto to aktywa minus zobowiązania."
-
 #, python-format
 msgid "Assets %(assets)s; liabilities %(liabilities)s."
 msgstr "Aktywa: %(assets)s; zobowiązania: %(liabilities)s."
@@ -9665,4 +9673,13 @@ msgstr "Usuń obszar roboczy…"
 #~ "Dodaje proponowane kategorie, których ta "
 #~ "strona jeszcze nie ma. Istniejące i "
 #~ "zarchiwizowane pozostają bez zmian."
+
+#~ msgid ""
+#~ "The chart shows assets and liabilities"
+#~ " as parts of the gross total; "
+#~ "net worth is assets minus liabilities."
+#~ msgstr ""
+#~ "Wykres pokazuje aktywa i zobowiązania "
+#~ "jako części sumy brutto; majątek netto"
+#~ " to aktywa minus zobowiązania."
 
