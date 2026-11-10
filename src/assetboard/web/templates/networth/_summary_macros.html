@@ -1,7 +1,7 @@
 {% from "categories/_macros.html" import swatch with context %}
 
 {% macro bar(view) -%}
-<p class="sr-only" data-summary-bar-text>{{ _("Assets %(assets)s; liabilities %(liabilities)s.", assets=view.assets, liabilities=view.liabilities) }} {{ view.bar.caption }}</p>
+<p class="sr-only" data-summary-bar-text>{{ _("Assets %(assets)s; liabilities %(liabilities)s.", assets=view.assets, liabilities=view.liabilities) }}</p>
 <div class="mt-4">
   <div class="space-y-3" data-summary-bar data-bar-empty="{{ 'true' if view.bar.empty else 'false' }}" aria-hidden="true">
     <div class="flex flex-wrap items-baseline justify-between gap-2 text-sm">
