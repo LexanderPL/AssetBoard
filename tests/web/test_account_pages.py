@@ -5,13 +5,14 @@ from __future__ import annotations
 import io
 import logging
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
+from assetboard.clock import FixedClock
 from assetboard.db.models.identity import Membership, User
 from assetboard.domain.categories import SEED
 from assetboard.i18n import gettext
@@ -116,6 +117,9 @@ def test_change_password_page_flow(web: WebHarness) -> None:
 
 
 def test_change_password_is_throttled(signed_in: TestClient, web: WebHarness) -> None:
+    app = cast(FastAPI, signed_in.app)
+    # Freeze the app clock so Retry-After is exactly 60, not 59 after a slow run.
+    app.state.clock = FixedClock(app.state.clock.now().isoformat())
     for _ in range(6):
         _change(signed_in, web, "wrong current", NEW_PASSWORD)
     throttled = _change(signed_in, web, web.admin_password, NEW_PASSWORD)
@@ -132,6 +136,10 @@ def test_change_password_is_throttled(signed_in: TestClient, web: WebHarness) ->
 def test_a_throttled_logout_others_shows_the_wait_in_the_page_language(
     signed_in: TestClient, web: WebHarness
 ) -> None:
+    app = cast(FastAPI, signed_in.app)
+    # Freeze the app clock so Retry-After is exactly 60, not 59 after a slow run.
+    app.state.clock = FixedClock(app.state.clock.now().isoformat())
+
     def post(password: str):
         return signed_in.post(
             "/account/logout-others",

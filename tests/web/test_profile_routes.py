@@ -465,6 +465,8 @@ def test_every_sensitive_post_needs_confirmation(h: Harness, action: str, passwo
 def test_a_throttled_confirmation_says_how_long_to_wait(h: Harness, htmx: bool) -> None:
     client = admin(h)
     headers = {"HX-Request": "true"} if htmx else {}
+    # Freeze the app clock so Retry-After is exactly 60, not 59 after a slow run.
+    h.app.state.clock = FixedClock(h.app.state.clock.now().isoformat())
 
     def post(password: str) -> Response:
         return client.post(

@@ -20,6 +20,7 @@ from httpx import Response
 from sqlalchemy import select
 from sqlalchemy.exc import OperationalError
 
+from assetboard.clock import FixedClock
 from assetboard.db.models.identity import (
     AuditEvent,
     AuthThrottle,
@@ -579,6 +580,8 @@ def test_linking_after_the_flag_was_turned_off_fails_generically(web: WebHarness
 
 def test_a_throttled_link_says_how_long_to_wait(web: WebHarness) -> None:
     with start_link(web) as o:
+        # Freeze the app clock so Retry-After is exactly 60, not 59 after a slow run.
+        o.app.state.clock = FixedClock(o.app.state.clock.now().isoformat())
         page = o.client.get("/login/link")
         token = o.web.csrf(page.text)
         responses = [
@@ -596,6 +599,8 @@ def test_a_throttled_link_says_how_long_to_wait(web: WebHarness) -> None:
 
 def test_break_glass_login_reports_throttling_like_login(web: WebHarness) -> None:
     with oidc_app(web, oidc_only=True, allow_local_admin_login=True) as o:
+        # Freeze the app clock so Retry-After is exactly 60, not 59 after a slow run.
+        o.app.state.clock = FixedClock(o.app.state.clock.now().isoformat())
         responses = []
         for _ in range(o.app.state.settings.auth_account_free_failures + 2):
             token = o.web.csrf(o.client.get("/login/local").text)
