@@ -137,6 +137,13 @@ def test_f26_search_export_and_bulk_change_in_a_browser(tmp_path: Path) -> None:
             page.locator("[data-history-link]").first.click()
             page.wait_for_url(f"{base}/history")
             expect(page.locator("[data-result-count]")).to_have_text("1–50 of 56 entries")
+            # The table sits on the card surface, not the page canvas.
+            assert (
+                page.locator("[data-results] table").evaluate(
+                    "el => getComputedStyle(el).backgroundColor"
+                )
+                == "rgb(255, 255, 255)"
+            )
             expect(page.locator("[data-page-number]")).to_have_text("Page 1 of 2")
             page.locator("[data-next]").click()
             expect(page.locator("[data-result-count]")).to_have_text("51–56 of 56 entries")
