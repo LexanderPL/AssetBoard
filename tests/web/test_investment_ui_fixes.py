@@ -87,7 +87,7 @@ def _row(page: str, instrument: UUID) -> str:
 # 1, 2, 3: adding an instrument
 
 
-def test_a_successful_add_shows_only_the_notice_and_scrolls_to_it(owner: OwnerApp) -> None:
+def test_a_successful_add_shows_only_the_notice(owner: OwnerApp) -> None:
     response = _htmx_post(
         owner, INSTRUMENTS, _instrument_form("World ETF", _stocks(owner)), INSTRUMENTS
     )
@@ -99,18 +99,27 @@ def test_a_successful_add_shows_only_the_notice_and_scrolls_to_it(owner: OwnerAp
     assert "data-error" not in body and "data-field-error" not in body
     # The client-side warning starts hidden; the script shows it only once a weight is typed.
     assert re.search(r'class="hidden [^"]*" data-allocation-warning', body)
-    # The add form closes again and the swap shows the top of the section, where the notice is.
-    assert re.search(r"<details data-add-instrument>", body)
-    assert 'hx-swap="outerHTML show:#investments-body:top"' in body
+    # The add dialog closes again; the page does not scroll anywhere.
+    assert re.search(r"<a [^>]*data-add-instrument", body)
+    assert re.search(r'<dialog id="instrument-dialog"[^>]*data-dialog-modal', body)
+    opening = re.search(r'<dialog id="instrument-dialog"[^>]*>', body)
+    assert opening is not None and " open" not in opening.group(0)
+    assert 'hx-swap="outerHTML"' in body
+    assert "show:#investments-body:top" not in body
     assert body.index("data-notice") < body.index("data-add-instrument")
 
 
 def test_the_add_form_sits_behind_a_button_and_reopens_on_errors(owner: OwnerApp) -> None:
     page = owner.client.get(INSTRUMENTS).text
     assert re.search(
-        r"<details data-add-instrument>\s*<summary[^>]*>Add instrument</summary>", page
+        r'<a href="[^"]+" data-dialog-open="instrument-dialog"[^>]*data-add-instrument>'
+        r"Add instrument</a>",
+        page,
     )
-    assert 'id="new-instrument-name"' in page
+    dialog = re.search(r'<dialog id="instrument-dialog".*?</dialog>', page, re.S)
+    assert dialog is not None and 'id="new-instrument-name"' in dialog.group(0)
+    opening = re.search(r'<dialog id="instrument-dialog"[^>]*>', page)
+    assert opening is not None and " open" not in opening.group(0)
 
     refused = owner.post(
         INSTRUMENTS,
@@ -119,7 +128,8 @@ def test_the_add_form_sits_behind_a_button_and_reopens_on_errors(owner: OwnerApp
     )
 
     assert refused.status_code == 400
-    assert "<details data-add-instrument open>" in refused.text
+    reopened = re.search(r'<dialog id="instrument-dialog"[^>]*>', refused.text)
+    assert reopened is not None and " open" in reopened.group(0)
     assert 'value="KEEP.ME"' in refused.text and 'value="unit"' in refused.text
     assert "Enter a name of 1 to 200 characters" in refused.text
 

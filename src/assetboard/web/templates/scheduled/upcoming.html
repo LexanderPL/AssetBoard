@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros/components.html" import csrf_input, summary_button_primary with context %}
+{% from "macros/components.html" import csrf_input with context %}
 {% set input_class = "form-control w-full px-2.5 py-1.5" %}
 {% set button_class = "btn" %}
 {% block title %}{{ _("Upcoming payments") }} · {{ app_name }}{% endblock %}
@@ -45,20 +45,27 @@
 </div>
 {%- endmacro %}
 {% if can_edit %}
-<details class="mb-6" data-add-one-time{% if open_form == "one-time" %} open{% endif %}>
-  <summary class="{{ summary_button_primary }}">{{ _("Add one-time payment") }}</summary>
-  <section class="panel mt-3 max-w-2xl p-4 sm:p-5" aria-label="{{ _('Add one-time payment') }}">
-    <form method="post" action="{{ scoped_url(request, 'upcoming_one_time_create') }}" class="grid gap-4 sm:grid-cols-2" data-one-time-form>
-      {{ csrf_input() }}
-      {{ one_time_fields("one-time", one_time_values, one_time_errors) }}
-      <p class="text-xs text-muted sm:col-span-2">{{ _("A one-time payment is planned once, on its date. It is listed here, not on the Recurring page.") }}</p>
-      <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
-        <button type="submit" class="btn-primary">{{ _("Add payment") }}</button>
-        <button type="button" data-details-close class="{{ button_class }}">{{ _("Cancel") }}</button>
-      </div>
-    </form>
-  </section>
-</details>
+<div class="mb-6">
+  {# Without JavaScript the link opens the page with the dialog rendered open in the page flow. #}
+  <a href="{{ scoped_url(request, 'scheduled_upcoming') }}?form=one-time#one-time-dialog" data-dialog-open="one-time-dialog" aria-haspopup="dialog" class="btn-primary" data-add-one-time>{{ _("Add one-time payment") }}</a>
+</div>
+<dialog id="one-time-dialog" aria-labelledby="one-time-heading" data-dialog-modal class="popup w-[min(92vw,44rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if open_form == "one-time" %} open{% endif %}>
+ <div class="p-4 sm:p-6">
+  <div class="flex items-start justify-between gap-4">
+    <h2 id="one-time-heading" class="text-base font-semibold">{{ _("Add one-time payment") }}</h2>
+    <a href="{{ scoped_url(request, 'scheduled_upcoming') }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" title="{{ _('Close') }}"><span aria-hidden="true">×</span><span class="sr-only">{{ _("Close") }}</span></a>
+  </div>
+  <p class="mt-1 text-sm text-muted">{{ _("A one-time payment is planned once, on its date. It is listed here, not on the Recurring page.") }}</p>
+  <form method="post" action="{{ scoped_url(request, 'upcoming_one_time_create') }}" class="mt-4 grid gap-4 sm:grid-cols-2" data-one-time-form>
+    {{ csrf_input() }}
+    {{ one_time_fields("one-time", one_time_values, one_time_errors) }}
+    <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+      <button type="submit" class="btn-primary">{{ _("Add payment") }}</button>
+      <a href="{{ scoped_url(request, 'scheduled_upcoming') }}" data-dialog-close class="{{ button_class }}">{{ _("Cancel") }}</a>
+    </div>
+  </form>
+ </div>
+</dialog>
 {% endif %}
 <section class="panel mb-6 p-4 sm:p-6" aria-labelledby="upcoming-filters">
   <h2 id="upcoming-filters" class="font-semibold">{{ _("Filters") }}</h2>

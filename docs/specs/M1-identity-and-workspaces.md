@@ -273,6 +273,9 @@ Add a prominent warning section to docs/auth/proxy-auth.md.
   offered under `OIDC_ONLY`.
   Instance settings page (pre-release A): who can create workspaces (see the F1.2 decisions).
 - Audit log page (owner/instance admin): filterable list of `AuditEvent`s; auth and membership events appear.
+- The top-right user menu is a `<details data-popover>`; it closes on a press outside, Escape,
+  any menu link (including **Workspace settings**) and when the browser restores the page with
+  Back/Forward (`pageshow`/`popstate`). The workspace switch stays a plain POST form.
   Two scopes: the owner sees the current workspace's events; an instance administrator sees
   instance-level events (`workspace_id IS NULL`) only, never another workspace's. Keyset
   pages; data rendered only through per-action key allowlists; IP prefixes and the affected

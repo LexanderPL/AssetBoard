@@ -222,13 +222,19 @@ def test_bulk_add_previews_then_creates_all_rows(owner: OwnerApp) -> None:
     page = owner.client.get(TX).text
     assert "data-bulk" in page and "Bulk add" in page
     assert 'id="investment-bulk-panel"' in page
-    assert 'hx-swap="outerHTML show:#investment-bulk-panel:top"' in page
+    assert 'data-dialog-open="investment-bulk-panel"' in page and "data-bulk-open" in page
+    opening = re.search(r'<dialog id="investment-bulk-panel"[^>]*>', page)
+    assert opening is not None and " open" not in opening.group(0)
+    assert 'hx-swap="outerHTML"' in page
+    assert "show:#investment-bulk-panel:top" not in page
     text = "2026-01-05; World ETF; buy; 10; 100\n2026-01-06; world etf; sell; 4; 110\n"
     preview = owner.post(BULK_PREVIEW, {"text": text}, token_from=TX)
     assert preview.status_code == 200
     assert preview.text.count("data-bulk-line=") == 2
     assert "Create 2 transactions" in preview.text
-    assert preview.text.count('hx-swap="outerHTML show:#investment-bulk-panel:top"') == 2
+    opened = re.search(r'<dialog id="investment-bulk-panel"[^>]*>', preview.text)
+    assert opened is not None and " open" in opened.group(0)
+    assert "show:#investment-bulk-panel:top" not in preview.text
     assert _rows(owner) == []
     created = owner.post(BULK, {"text": text}, token_from=TX)
     assert (created.status_code, created.headers["location"]) == (

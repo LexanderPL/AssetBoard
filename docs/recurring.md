@@ -50,7 +50,7 @@ non-leap year.
 
 For a single payment or income on one date, such as a gift or an annual fee you pay just once,
 use a **one-time payment** instead: on the **Upcoming payments** page choose **Add one-time
-payment** (also reachable as `/upcoming?form=one-time`) and
+payment** (it opens a form in a window; also reachable as `/upcoming?form=one-time`) and
 enter a description, the amount, expense or income, a category of that kind and the date. It
 gets one occurrence on that date, even when the date is farther ahead than the regular
 generation horizon (see below); a date already passed gives an overdue occurrence. One-time

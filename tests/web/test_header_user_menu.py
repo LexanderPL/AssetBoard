@@ -100,6 +100,8 @@ def test_the_user_menu_is_at_the_top_right_with_the_display_name(owner: OwnerApp
     menu = _menu(page)
     assert "<details" in menu and "data-popover" in menu
     assert re.search(r"data-user-name>[^<]+</span>", menu)
+    # Menu links close the popover before they navigate.
+    assert menu.count("data-details-close") >= 10
 
 
 def test_owner_and_instance_admin_menu_items_in_groups(owner: OwnerApp) -> None:

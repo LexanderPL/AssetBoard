@@ -140,7 +140,7 @@ restoring an entry recolours its table.
 50 per page. Old links to `/transactions?...` with filters, and to the CSV export, lead here.
 Type in the **Search…** box above the list to search by description as you type; the list
 updates while you type (without JavaScript, press Enter). **Filters** at the top opens the filter
-form:
+form in a window; click outside it (or press Esc) to close it without changing anything:
 
 - **From** and **To**: dates, both included (`2026-10-07` or `07.10.2026`);
 - **Smallest amount** and **Largest amount**: typed as on the Transactions page (`12,5`, `1 234,56`),
@@ -156,7 +156,8 @@ closed months are marked "closed". Deleted entries are never listed.
 
 ## Exporting as CSV
 
-**Export CSV** at the top of the page opens the export options; **Download CSV** there saves
+**Export CSV** at the top of the page opens the export options in a window (a click outside or
+Esc closes it); **Download CSV** there saves
 every entry that matches the filters (not only the current page), oldest
 first. The file has the columns of `transactions.csv` in the workspace archive:
 `date,direction,amount,currency,category,description,category_id,id`. Dates are `YYYY-MM-DD`,
@@ -186,7 +187,8 @@ included, can export. Exports are not recorded in the audit log.
 
 Editors and owners can move entries to another category in one step:
 
-1. Filter the list, then open **Change category** above the list. Tick the entries to change, or
+1. Filter the list, then open **Change category** above the list. It opens in a window (a click
+   outside or Esc closes it). Tick the entries to change, or
    use **Change all N matching entries** for every entry that matches the filters (all pages).
 2. Choose the **New category** and press the button. A confirmation page shows how many entries
    move, from which categories and in which months. Nothing changes until you confirm.

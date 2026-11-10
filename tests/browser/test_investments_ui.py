@@ -1,8 +1,9 @@
-"""Investments forms in Chromium: the add form opens from its button with no allocation warning,
-a successful add shows the notice in view (and a fresh form still has no warning), editing opens
-in the instrument's row and cancels back to it, and a pre-filled stored FX rate follows the
-transaction date (re-filled with the new date's stored rate, cleared when none is stored) while a
-typed rate is kept. No CSP violations."""
+"""Investments forms in Chromium: the add form opens from its button in a dialog with no
+allocation warning, a successful add shows the notice in view (and a fresh form still has no
+warning), editing opens in the instrument's row and cancels back to it; the Transactions tab's
+add and bulk forms are dialogs and a refused preview reopens the bulk dialog; and a pre-filled
+stored FX rate follows the transaction date (re-filled with the new date's stored rate, cleared
+when none is stored) while a typed rate is kept. No CSP violations."""
 
 from __future__ import annotations
 
@@ -86,10 +87,12 @@ def test_instrument_add_and_inline_edit_in_a_browser(tmp_path: Path) -> None:
 
             page.goto(f"{base}/investments/instruments", wait_until="networkidle")
             add = page.locator("[data-add-instrument]")
-            create_form = add.locator("[data-instrument-form]")
+            dialog = page.locator("#instrument-dialog")
+            create_form = dialog.locator("[data-instrument-form]")
             warning = create_form.locator("[data-allocation-warning]")
-            expect(create_form).to_be_hidden()
-            add.locator("summary").click()
+            expect(dialog).to_be_hidden()
+            add.click()
+            expect(dialog).to_be_visible()
             expect(create_form).to_be_visible()
             # A fresh form is not an error: no warning until a weight is typed.
             expect(warning).to_be_hidden()
@@ -105,10 +108,12 @@ def test_instrument_add_and_inline_edit_in_a_browser(tmp_path: Path) -> None:
             expect(notice).to_have_text("Instrument added.")
             expect(notice).to_be_in_viewport()
             expect(page.locator("[data-instrument-name='World ETF']")).to_be_visible()
-            expect(add.locator("[data-instrument-form]")).to_be_hidden()  # closed again
-            add.locator("summary").click()
-            expect(add.locator("[data-allocation-warning]")).to_be_hidden()
-            add.get_by_role("button", name="Cancel").click()
+            expect(dialog).to_be_hidden()  # closed again
+            add.click()
+            expect(dialog).to_be_visible()
+            expect(dialog.locator("[data-allocation-warning]")).to_be_hidden()
+            dialog.get_by_role("link", name="Cancel").click()
+            expect(dialog).to_be_hidden()
 
             row = page.locator("[data-instrument-name='World ETF']")
             row.locator("[data-edit]").click()
@@ -124,8 +129,9 @@ def test_instrument_add_and_inline_edit_in_a_browser(tmp_path: Path) -> None:
             # A foreign-quoted instrument and an old stored rate: the new transaction's FX field
             # starts with it, a date change re-fills it untouched with that date's stored rate (or
             # clears it when none is stored), and a typed rate survives.
-            add.locator("summary").click()
-            create_form = add.locator("[data-instrument-form]")
+            add.click()
+            expect(dialog).to_be_visible()
+            create_form = dialog.locator("[data-instrument-form]")
             create_form.get_by_label("Name", exact=True).fill("US fund")
             create_form.get_by_label("Quote currency").select_option("USD")
             create_form.get_by_label("Weight for Stocks").fill("100")
@@ -165,6 +171,27 @@ def test_instrument_add_and_inline_edit_in_a_browser(tmp_path: Path) -> None:
             expect(hint).to_be_hidden()
             page.locator("#transaction-date").fill("2001-02-05")
             expect(fx).to_have_value("0.95")
+
+            # The Transactions tab keeps both forms behind dialogs; a refused preview reopens
+            # the bulk dialog as a modal.
+            page.goto(f"{base}/investments/transactions", wait_until="networkidle")
+            transaction_dialog = page.locator("#transaction-dialog")
+            expect(transaction_dialog).to_be_hidden()
+            page.locator("[data-add-transaction]").click()
+            expect(transaction_dialog).to_be_visible()
+            page.mouse.click(5, 5)
+            expect(transaction_dialog).to_be_hidden()
+            bulk = page.locator("#investment-bulk-panel")
+            expect(bulk).to_be_hidden()
+            page.locator("[data-bulk-open]").click()
+            expect(bulk).to_be_visible()
+            bulk.locator("[data-bulk-text]").fill("2026-01-05; Missing; buy; 1; 1")
+            bulk.locator("[data-bulk-preview-button]").click()
+            page.wait_for_load_state("networkidle")
+            expect(page.locator("#investment-bulk-panel")).to_be_visible()
+            expect(page.locator("[data-bulk-blocked]")).to_be_visible()
+            page.locator("#investment-bulk-panel [data-dialog-close]").first.click()
+            expect(page.locator("#investment-bulk-panel")).to_be_hidden()
 
             assert page.evaluate("window.__cspViolations") == []
             browser.close()

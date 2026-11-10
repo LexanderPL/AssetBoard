@@ -15,8 +15,20 @@
   {{ tabs("transactions") }}
 
   {% if can_edit %}
-  <section class="panel p-6 sm:p-7" aria-labelledby="transaction-form-heading" data-transaction-create>
-    <h2 id="transaction-form-heading" class="text-base font-semibold">{{ _("Add a transaction") }}</h2>
+  <div class="flex flex-wrap items-center gap-2" data-transaction-actions>
+    {# Without JavaScript the links open the page with the dialog rendered open in the page flow. #}
+    <a href="{{ scoped_url(request, 'investments_transactions') }}?form=transaction#transaction-dialog" data-dialog-open="transaction-dialog" aria-haspopup="dialog" class="btn-primary" data-add-transaction>{{ _("Add a transaction") }}</a>
+    {% if active_instruments %}
+    <a href="{{ scoped_url(request, 'investments_transactions') }}?form=bulk#investment-bulk-panel" data-dialog-open="investment-bulk-panel" aria-haspopup="dialog" class="btn" data-bulk-open>{{ _("Bulk add") }}</a>
+    {% endif %}
+  </div>
+
+  <dialog id="transaction-dialog" aria-labelledby="transaction-form-heading" data-dialog-modal data-transaction-create class="popup w-[min(92vw,48rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if create_errors or request.query_params.get("form") == "transaction" %} open{% endif %}>
+   <div class="p-4 sm:p-6">
+    <div class="flex items-start justify-between gap-4">
+      <h2 id="transaction-form-heading" class="text-base font-semibold">{{ _("Add a transaction") }}</h2>
+      <a href="{{ scoped_url(request, 'investments_transactions') }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" title="{{ _('Close') }}"><span aria-hidden="true">×</span><span class="sr-only">{{ _("Close") }}</span></a>
+    </div>
     {% if active_instruments %}
     <div class="mt-4">
       {{ transaction_form(scoped_url(request, 'investment_transaction_create'), create_values, create_errors, target, base_currency, instruments=active_instruments, submit_label=_("Add transaction"), prefill_date=fx_prefill_date) }}
@@ -24,16 +36,21 @@
     {% else %}
     <p class="mt-2 text-sm text-muted">{{ _("Add an active instrument first.") }} <a href="{{ scoped_url(request, 'investments_instruments') }}" class="text-primary-ink underline">{{ _("Instruments") }}</a></p>
     {% endif %}
-  </section>
-  {% endif %}
+   </div>
+  </dialog>
 
-  {% if can_edit and active_instruments %}
-  {# F6.2a part B: the confirm step re-posts the same text; the server checks it all again. #}
-  <details id="investment-bulk-panel" class="panel p-6 sm:p-7" data-bulk{% if bulk_text or bulk_preview or bulk_error %} open{% endif %}>
-    <summary class="cursor-pointer text-base font-semibold">{{ _("Bulk add") }}</summary>
+  {% if active_instruments %}
+  {# F6.2a part B: the confirm step re-posts the same text; the server checks it all again.
+     The dialog opens again when the server has text to show (a preview or an error). #}
+  <dialog id="investment-bulk-panel" aria-labelledby="investment-bulk-heading" data-bulk data-dialog-modal class="popup w-[min(92vw,52rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if bulk_text or bulk_preview or bulk_error or request.query_params.get("form") == "bulk" %} open{% endif %}>
+   <div class="p-4 sm:p-6">
+    <div class="flex items-start justify-between gap-4">
+      <h2 id="investment-bulk-heading" class="text-base font-semibold">{{ _("Bulk add") }}</h2>
+      <a href="{{ scoped_url(request, 'investments_transactions') }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" title="{{ _('Close') }}"><span aria-hidden="true">×</span><span class="sr-only">{{ _("Close") }}</span></a>
+    </div>
     <p class="mt-2 text-sm text-muted">{{ _("Paste one transaction per line: date; instrument; type; quantity; unit price; fee; FX; amounts currency. Empty trailing fields can be left out and lines starting with # are ignored. Numbers use the interface number format. The amounts currency is blank or the quote currency for quote amounts, or %(currency)s for amounts in %(currency)s. A blank FX rate is taken from stored FX for the date. Nothing is created unless every line is valid.", currency=base_currency) }}</p>
     <p class="mt-1 text-xs text-muted">{{ _("Example:") }} <code>2026-01-15; VWCE; buy; 4; 1600,00; 5; ; {{ base_currency }}</code></p>
-    <form method="post" action="{{ scoped_url(request, 'investment_transaction_bulk_preview') }}" hx-post="{{ scoped_url(request, 'investment_transaction_bulk_preview') }}" hx-target="#{{ target }}" hx-swap="outerHTML show:#investment-bulk-panel:top" class="mt-3 space-y-2">
+    <form method="post" action="{{ scoped_url(request, 'investment_transaction_bulk_preview') }}" hx-post="{{ scoped_url(request, 'investment_transaction_bulk_preview') }}" hx-target="#{{ target }}" hx-swap="outerHTML" class="mt-3 space-y-2">
       {{ csrf_input() }}
       <label for="bulk-transactions-text" class="sr-only">{{ _("Transactions to add") }}</label>
       <textarea id="bulk-transactions-text" name="text" rows="6" maxlength="65536" class="form-control w-full font-mono text-xs" data-bulk-text>{{ bulk_text }}</textarea>
@@ -79,7 +96,7 @@
       </div>
       {% endif %}
       {% if bulk_preview.can_create %}
-      <form method="post" action="{{ scoped_url(request, 'investment_transaction_bulk_create') }}" hx-post="{{ scoped_url(request, 'investment_transaction_bulk_create') }}" hx-target="#{{ target }}" hx-swap="outerHTML show:#investment-bulk-panel:top">
+      <form method="post" action="{{ scoped_url(request, 'investment_transaction_bulk_create') }}" hx-post="{{ scoped_url(request, 'investment_transaction_bulk_create') }}" hx-target="#{{ target }}" hx-swap="outerHTML">
         {{ csrf_input() }}
         <input type="hidden" name="text" value="{{ bulk_preview.text }}">
         <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover" data-bulk-create>{{ ngettext("Create %(num)d transaction", "Create %(num)d transactions", bulk_preview.lines|length) }}</button>
@@ -89,7 +106,9 @@
       {% endif %}
     </div>
     {% endif %}
-  </details>
+   </div>
+  </dialog>
+  {% endif %}
   {% endif %}
 
   <section class="panel p-6 sm:p-7" aria-labelledby="transaction-history-heading" data-transaction-history>

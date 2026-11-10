@@ -125,7 +125,7 @@
                   </div>
                   {% endif %}
                   {% if workspace_nav.can_create_workspace and not demo_session %}
-                  <a href="{{ scoped_url(request, 'workspace_new') }}" data-new-workspace-link{% if request.url.path == scoped_url(request, 'workspace_new') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("New workspace") }}</a>
+                  <a href="{{ scoped_url(request, 'workspace_new') }}" data-new-workspace-link{% if request.url.path == scoped_url(request, 'workspace_new') %} aria-current="page"{% endif %} class="{{ menu_item }}" data-details-close>{{ _("New workspace") }}</a>
                   {% endif %}
                 </div>
                 {% endif %}
@@ -133,27 +133,27 @@
                 <div class="p-1" data-user-menu-workspace>
                   {# Categories are edited rarely, so they live here rather than in the main
                      navigation: every member reads them, editors and owners change them. #}
-                  <a href="{{ scoped_url(request, 'categories') }}" data-categories-link{% if request.url.path.endswith('/categories') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Categories") }}</a>
+                  <a href="{{ scoped_url(request, 'categories') }}" data-categories-link{% if request.url.path.endswith('/categories') %} aria-current="page"{% endif %} class="{{ menu_item }}" data-details-close>{{ _("Categories") }}</a>
                   {% if workspace_nav.role == "owner" %}
-                  <a href="{{ scoped_url(request, 'workspace_settings') }}" data-owner-link{% if request.url.path == scoped_url(request, 'workspace_settings') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Workspace settings") }}</a>
-                  <a href="{{ scoped_url(request, 'workspace_members') }}" data-owner-link{% if request.url.path == scoped_url(request, 'workspace_members') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Members") }}</a>
-                  <a href="{{ scoped_url(request, 'audit') }}?scope=workspace" data-audit-workspace-link class="{{ menu_item }}">{{ _("Audit log: workspace") }}</a>
+                  <a href="{{ scoped_url(request, 'workspace_settings') }}" data-owner-link{% if request.url.path == scoped_url(request, 'workspace_settings') %} aria-current="page"{% endif %} class="{{ menu_item }}" data-details-close>{{ _("Workspace settings") }}</a>
+                  <a href="{{ scoped_url(request, 'workspace_members') }}" data-owner-link{% if request.url.path == scoped_url(request, 'workspace_members') %} aria-current="page"{% endif %} class="{{ menu_item }}" data-details-close>{{ _("Members") }}</a>
+                  <a href="{{ scoped_url(request, 'audit') }}?scope=workspace" data-audit-workspace-link class="{{ menu_item }}" data-details-close>{{ _("Audit log: workspace") }}</a>
                   {% endif %}
                   {% if workspace_nav.role in ("owner", "editor") %}
-                  <a href="{{ scoped_url(request, 'workspace_data') }}" data-workspace-data-link{% if request.url.path == scoped_url(request, 'workspace_data') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Export and import") }}</a>
+                  <a href="{{ scoped_url(request, 'workspace_data') }}" data-workspace-data-link{% if request.url.path == scoped_url(request, 'workspace_data') %} aria-current="page"{% endif %} class="{{ menu_item }}" data-details-close>{{ _("Export and import") }}</a>
                   {% endif %}
                 </div>
                 {% endif %}
                 {% if web_session.is_instance_admin %}
                 <div class="p-1" data-user-menu-admin>
-                  <a href="{{ scoped_url(request, 'admin_users') }}" data-admin-link{% if request.url.path == scoped_url(request, 'admin_users') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Users") }}</a>
-                  <a href="{{ scoped_url(request, 'admin_settings') }}" data-admin-settings-link{% if request.url.path == scoped_url(request, 'admin_settings') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Instance settings") }}</a>
-                  <a href="{{ scoped_url(request, 'audit') }}?scope=instance" data-audit-instance-link class="{{ menu_item }}">{{ _("Audit log: instance") }}</a>
+                  <a href="{{ scoped_url(request, 'admin_users') }}" data-admin-link{% if request.url.path == scoped_url(request, 'admin_users') %} aria-current="page"{% endif %} class="{{ menu_item }}" data-details-close>{{ _("Users") }}</a>
+                  <a href="{{ scoped_url(request, 'admin_settings') }}" data-admin-settings-link{% if request.url.path == scoped_url(request, 'admin_settings') %} aria-current="page"{% endif %} class="{{ menu_item }}" data-details-close>{{ _("Instance settings") }}</a>
+                  <a href="{{ scoped_url(request, 'audit') }}?scope=instance" data-audit-instance-link class="{{ menu_item }}" data-details-close>{{ _("Audit log: instance") }}</a>
                 </div>
                 {% endif %}
                 <div class="p-1" data-user-menu-account>
-                  <a href="{{ scoped_url(request, 'account') }}" data-profile-link{% if request.url.path == scoped_url(request, 'account') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Profile") }}</a>
-                  <a href="{{ scoped_url(request, 'account_password') }}" data-account-security-link{% if request.url.path == scoped_url(request, 'account_password') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("Account security") }}</a>
+                  <a href="{{ scoped_url(request, 'account') }}" data-profile-link{% if request.url.path == scoped_url(request, 'account') %} aria-current="page"{% endif %} class="{{ menu_item }}" data-details-close>{{ _("Profile") }}</a>
+                  <a href="{{ scoped_url(request, 'account_password') }}" data-account-security-link{% if request.url.path == scoped_url(request, 'account_password') %} aria-current="page"{% endif %} class="{{ menu_item }}" data-details-close>{{ _("Account security") }}</a>
                   <form method="post" action="{{ scoped_url(request, 'logout') }}">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
                     <button type="submit" data-sign-out class="{{ menu_item }}">{{ _("Sign out") }}</button>

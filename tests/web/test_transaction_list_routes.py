@@ -137,6 +137,9 @@ def test_the_search_is_live_and_filters_and_bulk_actions_are_dialogs(
     assert "data-search-form" in html and "data-filters-open" in html
     assert 'data-dialog-open="filters-dialog"' in html
     assert 'data-dialog-open="bulk-dialog"' in html and "data-bulk-open" in html
+    # Dialogs close on a backdrop click by default; only the confirm dialog opts out.
+    assert "data-backdrop-close" not in html
+    assert 'id="confirm-dialog"' in html and "data-backdrop-static" in html
     # Without JavaScript the buttons link to a page that renders the dialog open.
     assert re.search(r'<dialog id="filters-dialog"[^>]* open', _page(ledger, "?filters=1"))
     assert re.search(r'<dialog id="bulk-dialog"[^>]* open', _page(ledger, "?bulk=1"))

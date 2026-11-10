@@ -86,8 +86,10 @@ Implementation order: F3.1 → F3.2 → F3.3 → F3.4 → F3.5 → F3.6 → (F3.
   "One time" for a new item (an existing one-time item opened at `/recurring/<id>/edit` keeps
   the choice, so that form still works). The page linked to the new form on Upcoming; the
   redesign below removed that link.
-- Upcoming payments has **Add one-time payment** (a collapsed `<details>`, reopened with
-  `?form=one-time` and after an error): description, amount, expense/income, category, date.
+- Upcoming payments has **Add one-time payment** (a modal dialog opened by the page's button,
+  reopened with `?form=one-time` and after an error): description, amount, expense/income,
+  category, date. The form is in the page flow when the page is loaded without JavaScript or
+  with a refused submission, so it still works.
   `services.scheduled.create_one_time` wraps `save_item` (frequency `once`, no weekend
   adjustment, `include_past=True` so a past date gives an overdue occurrence, the date's month
   must be open, the category must be of the chosen kind). After saving, Upcoming says when a

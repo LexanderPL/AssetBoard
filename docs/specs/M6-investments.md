@@ -30,6 +30,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 - Archive **asset classes and instruments** with their history instead of deleting; names are unique per workspace among active rows (case-insensitive), and asset classes can be reordered like F5.1 categories.
 - Instrument allocations: at least one class per instrument, weights in basis points totalling exactly 10 000; the service enforces the cross-row rule and the page mirrors the total. Archived classes may stay on an instrument that already used them, but cannot be added to a new allocation.
 - Editors/owners only for writes. New workspaces get the suggested asset classes; an older workspace with no active class gets an explicit "Add suggested asset classes" action (no automatic migration).
+- The add form sits behind an **Add instrument** button and opens in a modal dialog (without JavaScript the button is a link to `?form=instrument`, which renders the dialog open in the page flow). A refused save reopens the dialog with the values; a successful save closes it. The form's swap only replaces `#investments-body` (no forced scroll).
 
 **Agent prompt**
 ```
@@ -46,7 +47,7 @@ Tests: allocation validation, archive rules, tenant isolation test passes.
 **Story:** I record each purchase (and sale) and always know what I hold and what it cost.
 
 **Acceptance**
-- Transaction form (buy/sell): date, instrument, quantity, unit price (instrument currency), fee, optional FX-to-base override, note. The form is usable on the global history page and on an instrument's page. Inline editing in a per-instrument history table and a global history page with filters.
+- Transaction form (buy/sell): date, instrument, quantity, unit price (instrument currency), fee, optional FX-to-base override, note. The form is usable on the global history page and on an instrument's page. Inline editing in a per-instrument history table and a global history page with filters. On the global Transactions tab the add form and the bulk add sit behind buttons that open modal dialogs; a refused form reopens its dialog, and a successful save closes it. Neither opener forces a scroll.
 - A currency instrument's unit price is always **1**; the service ignores a submitted value. Its value in base comes from FX, as recorded in F6.1.
 - **FX before F6.3:** when the instrument's `quote_currency` equals the workspace base currency, `fx_to_base` is stored as `1` and the field is not shown. Otherwise the rate is required and must be `> 0`; F6.3 will pre-fill it from stored FX, at which point the spec's “defaults to stored FX” applies. The resolved rate is stored so historical FX is frozen. (Implemented: a new transaction's FX field starts with the latest stored manual or provider rate on or before the form's date, today on a fresh form; transaction-derived rates are not used, a refused form keeps the submitted value, changing the date clears an untouched pre-fill, and the user can change it.)
 - **Pure domain function** `compute_holdings(transactions, method, as_of) -> list[Holding]` with one `Holding(instrument_id, quantity, cost_basis_base, avg_cost, realized_pnl)` per instrument, grouped by instrument. Cost basis methods: `average` and `fifo` (workspace setting; default `average`). `avg_cost` is base currency per unit. Sells reduce quantity and realize P&L; selling more than held is rejected.
@@ -170,8 +171,11 @@ Notes:
 
 ### Part B — bulk add of transactions
 
-- An **"Bulk add"** button on the Transactions tab (global history) reveals a textarea, in the
-  same style as F5.1's bulk add. Editors and owners only.
+- An **"Bulk add"** button on the Transactions tab (global history) opens a modal dialog with a
+  textarea, in the same style as F5.1's bulk add. Editors and owners only. A preview or an error
+  re-renders the dialog open (as a modal after HTMX swaps it in); creating or leaving the page
+  closes it. Without JavaScript the button is a link to `?form=bulk`, which renders the dialog
+  open in the page flow.
 - **Limits:** at most 500 non-blank lines and 64 KiB. Lines starting with `#` are ignored.
 - **Line format.** Fields are separated by `;`. Surrounding whitespace is trimmed, and empty
   trailing fields may be left out:

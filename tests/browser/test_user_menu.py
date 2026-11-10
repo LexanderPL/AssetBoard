@@ -1,7 +1,8 @@
 """The top-right user menu in Chromium: it opens from the header, switches the workspace with a
-POST form, closes on a press outside and on Escape, and works by keyboard. The header shows the
-workspace name; the sidebar footer shows the version. A phone-width page wraps without
-horizontal scrolling. No CSP violations."""
+POST form, closes on a press outside and on Escape, and works by keyboard. Menu links close it,
+and Back from Workspace settings does not restore it open. The header shows the workspace name;
+the sidebar footer shows the version. A phone-width page wraps without horizontal scrolling. No
+CSP violations."""
 
 from __future__ import annotations
 
@@ -135,6 +136,18 @@ def test_the_user_menu_in_a_browser(tmp_path: Path) -> None:
             expect(menu).not_to_have_attribute("open", "")
             expect(summary).to_be_focused()
             assert page.evaluate("window.__cspViolations") == []
+
+            # Workspace settings closes the menu; Back leaves it closed even though the browser
+            # restores the page from its back/forward cache.
+            summary.click()
+            expect(menu).to_have_attribute("open", "")
+            menu.get_by_role("link", name="Workspace settings").click()
+            page.wait_for_url(f"{base}/workspace/settings")
+            page.go_back()
+            menu = page.locator("[data-user-menu] details[data-popover]")
+            expect(menu).to_have_count(1)
+            expect(menu).not_to_have_attribute("open", "")
+            expect(menu.locator("summary")).to_be_visible()
 
             # Phone width: the sidebar is a block above the content, the header wraps, the menu
             # stays reachable and fits the screen, nothing scrolls sideways.
