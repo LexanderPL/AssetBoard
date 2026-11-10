@@ -460,10 +460,10 @@ def reset_demo_instance(
 
     The wipe, the builder, the instance settings and the ``demo.reset`` audit event commit
     together. Old upload files are deleted only after that commit; on failure the transaction
-    rolls back, the old data and files stay, and only the new build's upload is cleaned up.
+    rolls back and nothing is deleted. The batch created by the new build is never part of the
+    old-file cleanup: it becomes "old" on the next reset.
     """
     old_paths: list[Path] = []
-    new_paths: list[Path] = []
 
     def reset(session: Session) -> DemoResetResult:
         row = _instance_row(session, lock=True)
@@ -482,15 +482,14 @@ def reset_demo_instance(
         today = clock.today(settings.demo_timezone)
         plan = demo_service.plan_for_workspace(ctx, today)
         session.info["clock"] = clock
-        result, upload_path = demo_service.build_demo_workspace_in_session(
+        # Keep the new build's upload file: it belongs to the new batch, not to the old ones.
+        result, _upload_path = demo_service.build_demo_workspace_in_session(
             session,
             ctx,
             plan,
             data_dir=data_dir,
             horizon_months=settings.recurrence_horizon_months,
         )
-        if upload_path is not None:
-            new_paths.append(upload_path)
         session.info["clock"] = clock
         _record_reset(
             session,
@@ -505,7 +504,6 @@ def reset_demo_instance(
     try:
         result = run_immediate(factory, reset)
     except Exception as error:  # noqa: BLE001 - a failed reset must not stop startup/jobs
-        _discard_uploads(new_paths)
         logger.error(
             "demo_reset_failed reason=%s exception_type=%s",
             reason,
@@ -532,7 +530,7 @@ def reset_demo_instance(
             logger.error("demo_reset_error_record_failed exception_type=%s", type(error).__name__)
         return DemoResetResult(ok=False, error=name)
 
-    _discard_uploads([*old_paths, *new_paths])
+    _discard_uploads(old_paths)
     return result
 
 
