@@ -328,36 +328,54 @@ def create_rule(
     )
 
     def write(session: Session) -> UUID:
-        require_role_now(session, ctx, Role.EDITOR)
-        workspace = CurrentWorkspaceRepository(session, ctx)
-        workspace.lock(exclusive=True)
-        version_values = _version_fields(value, workspace.get().base_currency)
-        _check_category(session, ctx, fields.payment_category_id)
-        rule = TaxRuleRepository(session, ctx).create(
-            name=fields.name,
-            kind=fields.kind.value,
-            base=fields.base.value,
-            notes=fields.notes,
-            payment_day=fields.payment_day,
-            payment_timing=fields.payment_timing.value,
-            payment_category_id=fields.payment_category_id,
+        return _create_rule_in_session(
+            session, ctx, fields=fields, value=value, effective_from=effective_from
         )
-        TaxRuleVersionRepository(session, ctx).create(
-            tax_rule_id=rule.id,
-            effective_from=effective_from,
-            **version_values,
-        )
-        AuditEventRepository(session, ctx).record(
-            actor_user_id=ctx.user.id,
-            action="tax_rule.created",
-            entity_type="tax_rule",
-            entity_id=str(rule.id),
-            ts=ctx.clock.now(),
-            data={"name": fields.name, "kind": fields.kind.value, "base": fields.base.value},
-        )
-        return rule.id
 
     return run_immediate(factory, write)
+
+
+def _create_rule_in_session(
+    session: Session,
+    ctx: Context,
+    *,
+    fields: _RuleFields,
+    value: PercentOrFixed,
+    effective_from: date,
+) -> UUID:
+    """``create_rule`` inside the caller's write transaction.
+
+    Name, kind, base and schedule already passed ``_validated_rule``; role, lock, category
+    check, version validation and audit are the public write's.
+    """
+    require_role_now(session, ctx, Role.EDITOR)
+    workspace = CurrentWorkspaceRepository(session, ctx)
+    workspace.lock(exclusive=True)
+    version_values = _version_fields(value, workspace.get().base_currency)
+    _check_category(session, ctx, fields.payment_category_id)
+    rule = TaxRuleRepository(session, ctx).create(
+        name=fields.name,
+        kind=fields.kind.value,
+        base=fields.base.value,
+        notes=fields.notes,
+        payment_day=fields.payment_day,
+        payment_timing=fields.payment_timing.value,
+        payment_category_id=fields.payment_category_id,
+    )
+    TaxRuleVersionRepository(session, ctx).create(
+        tax_rule_id=rule.id,
+        effective_from=effective_from,
+        **version_values,
+    )
+    AuditEventRepository(session, ctx).record(
+        actor_user_id=ctx.user.id,
+        action="tax_rule.created",
+        entity_type="tax_rule",
+        entity_id=str(rule.id),
+        ts=ctx.clock.now(),
+        data={"name": fields.name, "kind": fields.kind.value, "base": fields.base.value},
+    )
+    return rule.id
 
 
 def update_rule(

@@ -511,26 +511,44 @@ def _create_transaction(
     category_id: UUID,
 ) -> TransactionView:
     def write(session: Session) -> TransactionView:
-        require_role_now(session, ctx, Role.EDITOR)
-        ensure_date_open(session, ctx, entry.day)  # takes the month-write lock first
-        currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
-        minor = _minor(entry.amount, currency)
-        category = _category(session, ctx, category_id, wanted.value)
-        row = TransactionRepository(session, ctx).create(
-            direction=wanted.value,
-            day=entry.day,
-            amount_minor=minor,
-            currency=currency,
-            category_id=category.id,
-            description=entry.description,
-            description_key=entry.key,
-            source=Source.MANUAL.value,
-            created_by_user_id=ctx.user.id,
+        return _create_transaction_in_session(
+            session, ctx, entry=entry, wanted=wanted, category_id=category_id
         )
-        _audit(session, ctx, "transaction.created", row, category)
-        return _view(row, category)
 
     return run_immediate(factory, write)
+
+
+def _create_transaction_in_session(
+    session: Session,
+    ctx: Context,
+    *,
+    entry: _Entry,
+    wanted: TransactionDirection,
+    category_id: UUID,
+) -> TransactionView:
+    """``_create_transaction`` inside the caller's write transaction.
+
+    Parse-level validation already happened in ``_entry``; the role, month guard, category
+    check and audit are this function's, exactly as the public write runs them.
+    """
+    require_role_now(session, ctx, Role.EDITOR)
+    ensure_date_open(session, ctx, entry.day)  # takes the month-write lock first
+    currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
+    minor = _minor(entry.amount, currency)
+    category = _category(session, ctx, category_id, wanted.value)
+    row = TransactionRepository(session, ctx).create(
+        direction=wanted.value,
+        day=entry.day,
+        amount_minor=minor,
+        currency=currency,
+        category_id=category.id,
+        description=entry.description,
+        description_key=entry.key,
+        source=Source.MANUAL.value,
+        created_by_user_id=ctx.user.id,
+    )
+    _audit(session, ctx, "transaction.created", row, category)
+    return _view(row, category)
 
 
 def _plan_entry(

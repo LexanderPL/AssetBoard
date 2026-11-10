@@ -902,67 +902,107 @@ def create_instrument(
     )
 
     def write(session: Session) -> InstrumentView:
-        require_role_now(session, ctx, Role.EDITOR)
-        _lock(session, ctx, exclusive=False)
-        instrument_repository = InstrumentRepository(session, ctx)
-        _ensure_unique_instrument(instrument_repository, key=key)
-        if provider_key_value is not None:
-            config = PriceSourceConfigRepository(session, ctx).for_provider(provider_key_value)
-            if config is None or not config.enabled:
-                raise InvalidInvestment("provider_key", "provider_disabled")
-        classes = {row.id: row for row in AssetClassRepository(session, ctx).ordered()}
-        rows = _allocation_rows(allocations, classes, existing=set())
-        row = instrument_repository.create(
+        return _create_instrument_in_session(
+            session,
+            ctx,
             name=clean,
-            name_key=key,
+            key=key,
             symbol=symbol_value,
-            type=instrument_type.value,
-            quote_currency=currency,
-            unit_label=unit,
-            valuation_source=source.value,
+            instrument_type=instrument_type,
+            currency=currency,
+            unit=unit,
+            source=source,
             provider_key=provider_key_value,
             provider_symbol=provider_symbol_value,
+            allocations=allocations,
+            locale=locale,
             risk_tier_override=wanted_risk_override,
-        )
-        allocation_repository = InstrumentAllocationRepository(session, ctx)
-        for class_id, weight_bp in rows:
-            allocation_repository.create(
-                instrument_id=row.id,
-                asset_class_id=class_id,
-                weight_bp=weight_bp,
-            )
-        _audit(
-            session,
-            ctx,
-            "instrument.created",
-            "instrument",
-            row.id,
-            {
-                "name": clean,
-                "type": instrument_type.value,
-                "currency": currency,
-                "risk_tier_override": wanted_risk_override or "",
-            },
-        )
-        _audit(
-            session,
-            ctx,
-            "instrument_allocation.updated",
-            "instrument",
-            row.id,
-            {"count": len(rows)},
-        )
-        from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
-
-        ensure_networth_items_for_asset_classes(session, ctx)
-        return _instrument_view(
-            row,
-            classes,
-            allocation_repository.for_instrument(row.id),
-            locale,
         )
 
     return _write(factory, write, duplicate=DuplicateInstrumentName())
+
+
+def _create_instrument_in_session(
+    session: Session,
+    ctx: Context,
+    *,
+    name: str,
+    key: str,
+    symbol: str | None,
+    instrument_type: InstrumentType,
+    currency: str,
+    unit: str,
+    source: ValuationSource,
+    provider_key: str | None,
+    provider_symbol: str | None,
+    allocations: Sequence[tuple[UUID, int]],
+    locale: str,
+    risk_tier_override: str | None = None,
+) -> InstrumentView:
+    """``create_instrument`` inside the caller's write transaction.
+
+    ``_instrument_values`` already validated the raw fields; role, lock, uniqueness, provider
+    check, allocation validation, audit and the view are the public write's.
+    """
+    require_role_now(session, ctx, Role.EDITOR)
+    _lock(session, ctx, exclusive=False)
+    instrument_repository = InstrumentRepository(session, ctx)
+    _ensure_unique_instrument(instrument_repository, key=key)
+    if provider_key is not None:
+        config = PriceSourceConfigRepository(session, ctx).for_provider(provider_key)
+        if config is None or not config.enabled:
+            raise InvalidInvestment("provider_key", "provider_disabled")
+    classes = {row.id: row for row in AssetClassRepository(session, ctx).ordered()}
+    rows = _allocation_rows(allocations, classes, existing=set())
+    row = instrument_repository.create(
+        name=name,
+        name_key=key,
+        symbol=symbol,
+        type=instrument_type.value,
+        quote_currency=currency,
+        unit_label=unit,
+        valuation_source=source.value,
+        provider_key=provider_key,
+        provider_symbol=provider_symbol,
+        risk_tier_override=risk_tier_override,
+    )
+    allocation_repository = InstrumentAllocationRepository(session, ctx)
+    for class_id, weight_bp in rows:
+        allocation_repository.create(
+            instrument_id=row.id,
+            asset_class_id=class_id,
+            weight_bp=weight_bp,
+        )
+    _audit(
+        session,
+        ctx,
+        "instrument.created",
+        "instrument",
+        row.id,
+        {
+            "name": name,
+            "type": instrument_type.value,
+            "currency": currency,
+            "risk_tier_override": risk_tier_override or "",
+        },
+    )
+    _audit(
+        session,
+        ctx,
+        "instrument_allocation.updated",
+        "instrument",
+        row.id,
+        {"count": len(rows)},
+    )
+    from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
+    ensure_networth_items_for_asset_classes(session, ctx)
+    return _instrument_view(
+        row,
+        classes,
+        allocation_repository.for_instrument(row.id),
+        locale,
+    )
 
 
 def update_instrument(

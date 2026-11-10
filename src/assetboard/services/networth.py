@@ -1222,93 +1222,89 @@ def create_item(
         wanted_currency = _currency(currency) if currency.strip() else None
 
     def write(session: Session) -> ItemView:
-        require_role_now(session, ctx, Role.EDITOR)
-        _lock(session, ctx, exclusive=False)
-        workspace = CurrentWorkspaceRepository(session, ctx).get()
-        category = _category_for_item(session, ctx, category_id, side=wanted_side.value)
-        today = ctx.clock.today(ctx.workspace.timezone)
-        if wanted_link_type is not None:
-            assert link_id is not None
-            resolver = registry.resolver_for(session, ctx, wanted_link_type)
-            if resolver is None:
-                raise InvalidNetWorth("link", "invalid_link")
-            if resolver.side is not wanted_side:
-                raise InvalidNetWorth("link", "link_wrong_side")
-            target = resolver.describe(link_id)
-            if not isinstance(target, LinkTarget) or not target.label:
-                raise InvalidNetWorth("link", "invalid_link")
-            try:
-                item_currency = _currency(target.currency)
-            except InvalidNetWorth:
-                raise InvalidNetWorth("link", "invalid_link") from None
-            item = NetWorthItemRepository(session, ctx).create(
-                side=wanted_side.value,
-                category_id=category.id,
-                name=clean,
-                currency=item_currency,
-                notes=clean_notes_value,
-                acquired_on=wanted_acquired,
-                valuation_mode="linked",
-                link_type=wanted_link_type,
-                link_id=link_id,
-                include_in_net_worth=include_in_net_worth,
-                investable=investable,
-                estimate_between=wanted_side is Side.ASSET,
-            )
-            _audit(
-                session,
-                ctx,
-                "networth_item.created",
-                "networth_item",
-                item.id,
-                {
-                    "name": clean,
-                    "side": wanted_side.value,
-                    "category": category.name,
-                    "currency": item_currency,
-                    "link_type": wanted_link_type,
-                },
-            )
-            _audit(
-                session,
-                ctx,
-                "networth_item.linked",
-                "networth_item",
-                item.id,
-                {"link_type": wanted_link_type, "target": target.label},
-            )
-            return _view_after_write(
-                session,
-                ctx,
-                item.id,
-                base_currency=workspace.base_currency,
-                today=today,
-            )
-
-        assert parsed is not None
-        item_currency = wanted_currency or workspace.base_currency
-        money = _money(parsed, item_currency)
-        effective_as_of = wanted_as_of or today
-        item = NetWorthItemRepository(session, ctx).create(
-            side=wanted_side.value,
-            category_id=category.id,
+        return _create_item_in_session(
+            session,
+            ctx,
+            side=wanted_side,
+            category_id=category_id,
             name=clean,
-            currency=item_currency,
             notes=clean_notes_value,
             acquired_on=wanted_acquired,
-            valuation_mode="manual",
-            link_type=None,
-            link_id=None,
+            link_type=wanted_link_type,
+            link_id=link_id,
+            parsed=parsed,
+            requested_currency=wanted_currency,
+            as_of=wanted_as_of,
+            valuation_note=clean_note,
             include_in_net_worth=include_in_net_worth,
             investable=investable,
             estimate_between=wanted_estimate,
         )
-        ItemValuationRepository(session, ctx).create(
-            item_id=item.id,
-            as_of=effective_as_of,
-            value_minor=money.amount_minor,
+
+    try:
+        return run_immediate(factory, write)
+    except IntegrityError as exc:
+        if _link_unique_error(exc):
+            raise InvalidNetWorth("link", "already_linked") from exc
+        raise
+
+
+def _create_item_in_session(
+    session: Session,
+    ctx: Context,
+    *,
+    side: Side,
+    category_id: UUID,
+    name: str,
+    notes: str,
+    acquired_on: date | None,
+    link_type: str | None,
+    link_id: UUID | None,
+    parsed: Decimal | None,
+    requested_currency: str | None,
+    as_of: date | None,
+    valuation_note: str,
+    include_in_net_worth: bool,
+    investable: bool,
+    estimate_between: bool,
+) -> ItemView:
+    """``create_item`` inside the caller's write transaction.
+
+    The public path already cleaned the name, notes, currency and date and parsed the amount;
+    role, lock, category/link checks, audit and the view are this function's.
+    """
+    require_role_now(session, ctx, Role.EDITOR)
+    _lock(session, ctx, exclusive=False)
+    workspace = CurrentWorkspaceRepository(session, ctx).get()
+    category = _category_for_item(session, ctx, category_id, side=side.value)
+    today = ctx.clock.today(ctx.workspace.timezone)
+    if link_type is not None:
+        assert link_id is not None
+        resolver = registry.resolver_for(session, ctx, link_type)
+        if resolver is None:
+            raise InvalidNetWorth("link", "invalid_link")
+        if resolver.side is not side:
+            raise InvalidNetWorth("link", "link_wrong_side")
+        target = resolver.describe(link_id)
+        if not isinstance(target, LinkTarget) or not target.label:
+            raise InvalidNetWorth("link", "invalid_link")
+        try:
+            item_currency = _currency(target.currency)
+        except InvalidNetWorth:
+            raise InvalidNetWorth("link", "invalid_link") from None
+        item = NetWorthItemRepository(session, ctx).create(
+            side=side.value,
+            category_id=category.id,
+            name=name,
             currency=item_currency,
-            note=clean_note,
+            notes=notes,
+            acquired_on=acquired_on,
+            valuation_mode="linked",
+            link_type=link_type,
+            link_id=link_id,
+            include_in_net_worth=include_in_net_worth,
+            investable=investable,
+            estimate_between=side is Side.ASSET,
         )
         _audit(
             session,
@@ -1317,13 +1313,20 @@ def create_item(
             "networth_item",
             item.id,
             {
-                "name": clean,
-                "side": wanted_side.value,
+                "name": name,
+                "side": side.value,
                 "category": category.name,
                 "currency": item_currency,
-                "amount": _amount_text(money),
-                "as_of": effective_as_of.isoformat(),
+                "link_type": link_type,
             },
+        )
+        _audit(
+            session,
+            ctx,
+            "networth_item.linked",
+            "networth_item",
+            item.id,
+            {"link_type": link_type, "target": target.label},
         )
         return _view_after_write(
             session,
@@ -1333,12 +1336,53 @@ def create_item(
             today=today,
         )
 
-    try:
-        return run_immediate(factory, write)
-    except IntegrityError as exc:
-        if _link_unique_error(exc):
-            raise InvalidNetWorth("link", "already_linked") from exc
-        raise
+    assert parsed is not None
+    item_currency = requested_currency or workspace.base_currency
+    money = _money(parsed, item_currency)
+    effective_as_of = as_of or today
+    item = NetWorthItemRepository(session, ctx).create(
+        side=side.value,
+        category_id=category.id,
+        name=name,
+        currency=item_currency,
+        notes=notes,
+        acquired_on=acquired_on,
+        valuation_mode="manual",
+        link_type=None,
+        link_id=None,
+        include_in_net_worth=include_in_net_worth,
+        investable=investable,
+        estimate_between=estimate_between,
+    )
+    ItemValuationRepository(session, ctx).create(
+        item_id=item.id,
+        as_of=effective_as_of,
+        value_minor=money.amount_minor,
+        currency=item_currency,
+        note=valuation_note,
+    )
+    _audit(
+        session,
+        ctx,
+        "networth_item.created",
+        "networth_item",
+        item.id,
+        {
+            "name": name,
+            "side": side.value,
+            "category": category.name,
+            "currency": item_currency,
+            "amount": _amount_text(money),
+            "as_of": effective_as_of.isoformat(),
+        },
+    )
+    return _view_after_write(
+        session,
+        ctx,
+        item.id,
+        base_currency=workspace.base_currency,
+        today=today,
+    )
 
 
 def update_item(
@@ -1556,45 +1600,64 @@ def add_valuation(
     wanted_as_of = _date(as_of, "as_of")
 
     def write(session: Session) -> ItemView:
-        require_role_now(session, ctx, Role.EDITOR)
-        _lock(session, ctx, exclusive=False)
-        workspace = CurrentWorkspaceRepository(session, ctx).get()
-        item = NetWorthItemRepository(session, ctx).get_or_raise(item_id)
-        if item.archived_at is not None:
-            raise ItemArchived
-        if item.valuation_mode != "manual":
-            raise InvalidNetWorth("valuation_mode", "linked_value_readonly")
-        money = _money(parsed, item.currency)
-        today = ctx.clock.today(ctx.workspace.timezone)
-        effective_as_of = wanted_as_of or today
-        ItemValuationRepository(session, ctx).create(
-            item_id=item.id,
-            as_of=effective_as_of,
-            value_minor=money.amount_minor,
-            currency=item.currency,
-            note=clean_note,
-        )
-        _audit(
-            session,
-            ctx,
-            "networth_item.valuation_added",
-            "networth_item",
-            item.id,
-            {
-                "as_of": effective_as_of.isoformat(),
-                "amount": _amount_text(money),
-                "currency": item.currency,
-            },
-        )
-        return _view_after_write(
-            session,
-            ctx,
-            item.id,
-            base_currency=workspace.base_currency,
-            today=today,
+        return _add_valuation_in_session(
+            session, ctx, item_id, value=parsed, as_of=wanted_as_of, note=clean_note
         )
 
     return run_immediate(factory, write)
+
+
+def _add_valuation_in_session(
+    session: Session,
+    ctx: Context,
+    item_id: UUID,
+    *,
+    value: Decimal,
+    as_of: date | None = None,
+    note: str = "",
+) -> ItemView:
+    """``add_valuation`` inside the caller's write transaction.
+
+    The public path parsed the amount and cleaned the note; role, lock, item checks, audit and
+    the view are this function's.
+    """
+    require_role_now(session, ctx, Role.EDITOR)
+    _lock(session, ctx, exclusive=False)
+    workspace = CurrentWorkspaceRepository(session, ctx).get()
+    item = NetWorthItemRepository(session, ctx).get_or_raise(item_id)
+    if item.archived_at is not None:
+        raise ItemArchived
+    if item.valuation_mode != "manual":
+        raise InvalidNetWorth("valuation_mode", "linked_value_readonly")
+    money = _money(value, item.currency)
+    today = ctx.clock.today(ctx.workspace.timezone)
+    effective_as_of = as_of or today
+    ItemValuationRepository(session, ctx).create(
+        item_id=item.id,
+        as_of=effective_as_of,
+        value_minor=money.amount_minor,
+        currency=item.currency,
+        note=note,
+    )
+    _audit(
+        session,
+        ctx,
+        "networth_item.valuation_added",
+        "networth_item",
+        item.id,
+        {
+            "as_of": effective_as_of.isoformat(),
+            "amount": _amount_text(money),
+            "currency": item.currency,
+        },
+    )
+    return _view_after_write(
+        session,
+        ctx,
+        item.id,
+        base_currency=workspace.base_currency,
+        today=today,
+    )
 
 
 def _amount_text(money: Money) -> str:

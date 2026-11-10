@@ -118,16 +118,256 @@ msgstr ""
 msgid "Savings withdrawal"
 msgstr ""
 
+msgid "Bakery"
+msgstr ""
+
+msgid "Supermarket"
+msgstr ""
+
+msgid "Farmers market"
+msgstr ""
+
+msgid "Corner shop"
+msgstr ""
+
+msgid "Groceries"
+msgstr ""
+
+msgid "Pizza night"
+msgstr ""
+
+msgid "Coffee"
+msgstr ""
+
+msgid "Lunch"
+msgstr ""
+
+msgid "Sushi"
+msgstr ""
+
+msgid "Brunch"
+msgstr ""
+
+msgid "Fuel"
+msgstr ""
+
+msgid "Train ticket"
+msgstr ""
+
+msgid "Bus pass"
+msgstr ""
+
+msgid "Parking"
+msgstr ""
+
+msgid "Bike repair"
+msgstr ""
+
+msgid "Hardware store"
+msgstr ""
+
+msgid "Furniture"
+msgstr ""
+
+msgid "Water bill"
+msgstr ""
+
+msgid "Pharmacy"
+msgstr ""
+
+msgid "Dentist"
+msgstr ""
+
+msgid "Haircut"
+msgstr ""
+
+msgid "Drugstore"
+msgstr ""
+
+msgid "Bookshop"
+msgstr ""
+
+msgid "Board game"
+msgstr ""
+
+msgid "Train trip"
+msgstr ""
+
+msgid "Hotel"
+msgstr ""
+
+msgid "Cinema"
+msgstr ""
+
+msgid "Concert"
+msgstr ""
+
+msgid "Language course"
+msgstr ""
+
+msgid "Online course"
+msgstr ""
+
+msgid "Birthday gift"
+msgstr ""
+
+msgid "Charity"
+msgstr ""
+
+msgid "T-shirt"
+msgstr ""
+
+msgid "Shoes"
+msgstr ""
+
+msgid "Stationery"
+msgstr ""
+
+msgid "Household items"
+msgstr ""
+
+msgid "Monthly savings"
+msgstr ""
+
+msgid "Broker transfer"
+msgstr ""
+
+msgid "Savings interest"
+msgstr ""
+
+msgid "Sold an old chair"
+msgstr ""
+
+msgid "Rent"
+msgstr ""
+
+msgid "Electricity and gas"
+msgstr ""
+
+msgid "Streaming subscription"
+msgstr ""
+
+msgid "Music subscription"
+msgstr ""
+
+msgid "Internet"
+msgstr ""
+
+msgid "Phone in 12 installments"
+msgstr ""
+
+msgid "Saturday market"
+msgstr ""
+
+msgid "Home insurance"
+msgstr ""
+
+msgid "Bike service"
+msgstr ""
+
+msgid "Hourly consulting"
+msgstr ""
+
+msgid "hour"
+msgstr ""
+
+msgid "Income tax"
+msgstr ""
+
+msgid "Current account"
+msgstr ""
+
+msgid "Savings account"
+msgstr ""
+
+msgid "Emergency fund"
+msgstr ""
+
+msgid "Car"
+msgstr ""
+
+msgid "Vehicles"
+msgstr ""
+
+msgid "Apartment"
+msgstr ""
+
+msgid "Real estate"
+msgstr ""
+
+msgid "Mortgage"
+msgstr ""
+
+msgid "Credit card"
+msgstr ""
+
+msgid "Global ETF"
+msgstr ""
+
 msgid "share"
 msgstr ""
 
-msgid "bond"
+msgid "Stocks"
+msgstr ""
+
+msgid "Balanced 80/20 fund"
+msgstr ""
+
+msgid "Bonds"
+msgstr ""
+
+msgid "US stock"
+msgstr ""
+
+msgid "Gold"
 msgstr ""
 
 msgid "oz"
 msgstr ""
 
+msgid "Metals"
+msgstr ""
+
+msgid "Bitcoin"
+msgstr ""
+
 msgid "coin"
+msgstr ""
+
+msgid "Crypto"
+msgstr ""
+
+msgid "Government bond"
+msgstr ""
+
+msgid "bond"
+msgstr ""
+
+msgid "Currency cash"
+msgstr ""
+
+msgid "Currencies"
+msgstr ""
+
+msgid "2-for-1 split"
+msgstr ""
+
+msgid "Settled in the base currency"
+msgstr ""
+
+msgid "Rebalancing sale"
+msgstr ""
+
+msgid "Quarterly dividend"
+msgstr ""
+
+msgid "Imported bookshop"
+msgstr ""
+
+msgid "Imported market"
+msgstr ""
+
+msgid "Imported refund"
 msgstr ""
 
 msgid "property"
@@ -151,13 +391,7 @@ msgstr ""
 msgid "Metal"
 msgstr ""
 
-msgid "Crypto"
-msgstr ""
-
 msgid "Currency"
-msgstr ""
-
-msgid "Real estate"
 msgstr ""
 
 msgid "Price provider"
@@ -181,22 +415,7 @@ msgstr ""
 msgid "Play money"
 msgstr ""
 
-msgid "Stocks"
-msgstr ""
-
-msgid "Bonds"
-msgstr ""
-
-msgid "Metals"
-msgstr ""
-
-msgid "Currencies"
-msgstr ""
-
 msgid "Primary residence"
-msgstr ""
-
-msgid "Vehicles"
 msgstr ""
 
 msgid "Electronics"
@@ -217,9 +436,6 @@ msgstr ""
 msgid "Photography"
 msgstr ""
 
-msgid "Furniture"
-msgstr ""
-
 msgid "Art & collectibles"
 msgstr ""
 
@@ -227,9 +443,6 @@ msgid "Tools"
 msgstr ""
 
 msgid "Installments"
-msgstr ""
-
-msgid "Mortgage"
 msgstr ""
 
 msgid ""
@@ -4819,9 +5032,6 @@ msgid "Per"
 msgstr ""
 
 msgid "day"
-msgstr ""
-
-msgid "hour"
 msgstr ""
 
 msgid "something else"

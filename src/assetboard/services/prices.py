@@ -633,41 +633,90 @@ def save_manual_price(
         raise PriceError("date", "future_date")
 
     def write(session: Session) -> PricePointView:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=False)
-        instrument = InstrumentRepository(session, ctx).get_or_raise(instrument_id)
-        if instrument.archived_at is not None:
-            raise PriceError("instrument", "instrument_archived")
-        if instrument.type == "bond_model":
-            raise PriceError("instrument", "bond_model_priced")
-        repository = PricePointRepository(session, ctx)
-        existing = repository.manual_on(instrument_id, day)
-        if price_id is not None:
-            row = repository.get_or_raise(price_id)
-            if row.instrument_id != instrument_id or row.source != "manual":
-                raise PriceError("price", "invalid_price")
-            if existing is not None and existing.id != row.id:
-                raise PriceError("date", "duplicate_date")
-            row.date = day
-            row.price = price
-            session.flush()
-            _audit(session, ctx, "price_point.manual_updated", instrument, row)
-            return _view(row)
-        if existing is not None:
-            existing.price = price
-            session.flush()
-            _audit(session, ctx, "price_point.manual_updated", instrument, existing)
-            return _view(existing)
-        row = repository.create(
-            instrument_id=instrument_id,
-            date=day,
-            price=price,
-            source="manual",
+        return _save_manual_price_in_session(
+            session, ctx, instrument_id, price_id=price_id, day=day, price=price
         )
-        _audit(session, ctx, "price_point.manual_created", instrument, row)
-        return _view(row)
 
     return run_immediate(factory, write)
+
+
+def _save_manual_price_in_session(
+    session: Session,
+    ctx: Context,
+    instrument_id: UUID,
+    *,
+    price_id: UUID | None = None,
+    day: date,
+    price: Decimal,
+) -> PricePointView:
+    """``save_manual_price`` inside the caller's write transaction.
+
+    The public path parsed the date and price before the write; role, lock, instrument checks,
+    duplicate-date handling and audit are this function's. The demo builder passes dates at or
+    before its fixed clock.
+    """
+    require_role_now(session, ctx, Role.EDITOR)
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=False)
+    instrument = InstrumentRepository(session, ctx).get_or_raise(instrument_id)
+    if instrument.archived_at is not None:
+        raise PriceError("instrument", "instrument_archived")
+    if instrument.type == "bond_model":
+        raise PriceError("instrument", "bond_model_priced")
+    repository = PricePointRepository(session, ctx)
+    existing = repository.manual_on(instrument_id, day)
+    if price_id is not None:
+        row = repository.get_or_raise(price_id)
+        if row.instrument_id != instrument_id or row.source != "manual":
+            raise PriceError("price", "invalid_price")
+        if existing is not None and existing.id != row.id:
+            raise PriceError("date", "duplicate_date")
+        row.date = day
+        row.price = price
+        session.flush()
+        _audit(session, ctx, "price_point.manual_updated", instrument, row)
+        return _view(row)
+    if existing is not None:
+        existing.price = price
+        session.flush()
+        _audit(session, ctx, "price_point.manual_updated", instrument, existing)
+        return _view(existing)
+    row = repository.create(
+        instrument_id=instrument_id,
+        date=day,
+        price=price,
+        source="manual",
+    )
+    _audit(session, ctx, "price_point.manual_created", instrument, row)
+    return _view(row)
+
+
+def _save_fx_rate_in_session(  # pyright: ignore[reportUnusedFunction]
+    session: Session,
+    ctx: Context,
+    *,
+    quote_currency: str,
+    day: date,
+    rate: Decimal,
+) -> None:
+    """Store a manual FX observation inside the caller's write transaction.
+
+    There is no manual FX service yet; this validates the two invariants the column and the
+    ``DecimalType`` need (a finite positive rate and a quote currency other than the base) and
+    goes through ``FxRateRepository`` like the import path does.
+    """
+    workspace = CurrentWorkspaceRepository(session, ctx).get()
+    quote = quote_currency.strip().upper()
+    if quote == workspace.base_currency:
+        raise PriceError("quote_currency", "same_currency")
+    if not rate.is_finite() or rate <= 0:
+        raise PriceError("rate", "invalid_rate")
+    FxRateRepository(session, ctx).create(
+        base_currency=workspace.base_currency,
+        quote_currency=quote,
+        date=day,
+        rate=rate,
+        source="manual",
+    )
 
 
 def delete_manual_price(

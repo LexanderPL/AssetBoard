@@ -196,36 +196,45 @@ def save_risk_policy(
     )
 
     def write(session: Session) -> RiskPolicy:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        if policy.mode is not RiskPolicyMode.FIXED:
-            user = session.get(User, ctx.user.id)
-            if user is None or user.birth_year is None:
-                raise InvalidRiskPolicy("mode", "birth_year_required")
-        repository = RiskTargetPolicyRepository(session, ctx)
-        row = _upsert_policy(
-            repository,
-            repository.for_workspace(for_update=True),
-            policy,
-        )
-        AuditEventRepository(session, ctx).record(
-            actor_user_id=ctx.user.id,
-            action="risk_policy.saved",
-            entity_type="risk_target_policy",
-            entity_id=str(row.id),
-            ts=ctx.clock.now(),
-            data={
-                "mode": policy.mode.value,
-                "safe_bp": policy.safe_bp,
-                "growth_bp": policy.growth_bp,
-                "speculative_bp": policy.speculative_bp,
-                "tolerance_bp": policy.tolerance_bp,
-            },
-        )
-        # Local import: portfolio_links reads the portfolio, which imports this module.
-        from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
-
-        ensure_networth_items_for_asset_classes(session, ctx)
-        return policy
+        return _save_risk_policy_in_session(session, ctx, policy)
 
     return run_immediate(factory, write)
+
+
+def _save_risk_policy_in_session(session: Session, ctx: Context, policy: RiskPolicy) -> RiskPolicy:
+    """``save_risk_policy`` inside the caller's write transaction.
+
+    The public path parsed and validated the percentages and mode; role, lock, profile check,
+    upsert and audit are this function's.
+    """
+    require_role_now(session, ctx, Role.EDITOR)
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+    if policy.mode is not RiskPolicyMode.FIXED:
+        user = session.get(User, ctx.user.id)
+        if user is None or user.birth_year is None:
+            raise InvalidRiskPolicy("mode", "birth_year_required")
+    repository = RiskTargetPolicyRepository(session, ctx)
+    row = _upsert_policy(
+        repository,
+        repository.for_workspace(for_update=True),
+        policy,
+    )
+    AuditEventRepository(session, ctx).record(
+        actor_user_id=ctx.user.id,
+        action="risk_policy.saved",
+        entity_type="risk_target_policy",
+        entity_id=str(row.id),
+        ts=ctx.clock.now(),
+        data={
+            "mode": policy.mode.value,
+            "safe_bp": policy.safe_bp,
+            "growth_bp": policy.growth_bp,
+            "speculative_bp": policy.speculative_bp,
+            "tolerance_bp": policy.tolerance_bp,
+        },
+    )
+    # Local import: portfolio_links reads the portfolio, which imports this module.
+    from assetboard.services.portfolio_links import ensure_networth_items_for_asset_classes
+
+    ensure_networth_items_for_asset_classes(session, ctx)
+    return policy

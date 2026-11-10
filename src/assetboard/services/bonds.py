@@ -159,50 +159,67 @@ def save_bond_terms(
     require_role(ctx, Role.EDITOR)
 
     def write(session: Session) -> BondTermsView:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=False)
-        instrument = InstrumentRepository(session, ctx).get_or_raise(instrument_id)
-        if instrument.type != "bond_model":
-            raise BondTermsError("instrument", "not_bond_model")
-        if instrument.archived_at is not None:
-            raise BondTermsError("instrument", "instrument_archived")
-        parsed = _parse(values, locale, instrument.quote_currency)
-        repository = BondTermsRepository(session, ctx)
-        row = repository.for_instrument(instrument_id, for_update=True)
-        data: dict[str, Any] = {
-            "instrument_id": instrument_id,
-            "series_code": parsed.series_code,
-            "face_value_minor": parsed.face_value_minor,
-            "maturity_date": parsed.maturity_date,
-            "interest_mode": parsed.interest_mode.value,
-            "rate_schedule": parsed.rate_schedule,
-            "tax_rate_bp": parsed.tax_rate_bp,
-            "early_redemption_fee_mode": parsed.fee_mode,
-            "early_redemption_fee_rate_bp": parsed.fee_rate_bp,
-            "early_redemption_fee_minor": parsed.fee_minor,
-        }
-        fields = {field: value for field, value in data.items() if field != "instrument_id"}
-        changed: list[str]
-        if row is None:
-            row = repository.create(**data)
-            changed = sorted(fields)
-        else:
-            changed = [field for field, value in fields.items() if getattr(row, field) != value]
-            row = repository.update(row.id, **fields)
-        AuditEventRepository(session, ctx).record(
-            actor_user_id=ctx.user.id,
-            action="bond_terms.saved",
-            entity_type="instrument",
-            entity_id=str(instrument.id),
-            ts=ctx.clock.now(),
-            data={
-                "instrument_id": str(instrument.id),
-                "fields": ",".join(sorted(changed)),
-            },
+        return _save_bond_terms_in_session(
+            session, ctx, instrument_id, values=values, locale=locale
         )
-        return _view(row, instrument)
 
     return run_immediate(factory, write)
+
+
+def _save_bond_terms_in_session(
+    session: Session,
+    ctx: Context,
+    instrument_id: UUID,
+    *,
+    values: BondTermsInput,
+    locale: str,
+) -> BondTermsView:
+    """``save_bond_terms`` inside the caller's write transaction.
+
+    Role, lock, instrument checks, parsing, audit and the view are the public write's.
+    """
+    require_role_now(session, ctx, Role.EDITOR)
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=False)
+    instrument = InstrumentRepository(session, ctx).get_or_raise(instrument_id)
+    if instrument.type != "bond_model":
+        raise BondTermsError("instrument", "not_bond_model")
+    if instrument.archived_at is not None:
+        raise BondTermsError("instrument", "instrument_archived")
+    parsed = _parse(values, locale, instrument.quote_currency)
+    repository = BondTermsRepository(session, ctx)
+    row = repository.for_instrument(instrument_id, for_update=True)
+    data: dict[str, Any] = {
+        "instrument_id": instrument_id,
+        "series_code": parsed.series_code,
+        "face_value_minor": parsed.face_value_minor,
+        "maturity_date": parsed.maturity_date,
+        "interest_mode": parsed.interest_mode.value,
+        "rate_schedule": parsed.rate_schedule,
+        "tax_rate_bp": parsed.tax_rate_bp,
+        "early_redemption_fee_mode": parsed.fee_mode,
+        "early_redemption_fee_rate_bp": parsed.fee_rate_bp,
+        "early_redemption_fee_minor": parsed.fee_minor,
+    }
+    fields = {field: value for field, value in data.items() if field != "instrument_id"}
+    changed: list[str]
+    if row is None:
+        row = repository.create(**data)
+        changed = sorted(fields)
+    else:
+        changed = [field for field, value in fields.items() if getattr(row, field) != value]
+        row = repository.update(row.id, **fields)
+    AuditEventRepository(session, ctx).record(
+        actor_user_id=ctx.user.id,
+        action="bond_terms.saved",
+        entity_type="instrument",
+        entity_id=str(instrument.id),
+        ts=ctx.clock.now(),
+        data={
+            "instrument_id": str(instrument.id),
+            "fields": ",".join(sorted(changed)),
+        },
+    )
+    return _view(row, instrument)
 
 
 @dataclass(slots=True)

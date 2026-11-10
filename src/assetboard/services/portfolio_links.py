@@ -402,11 +402,20 @@ def create_networth_items_from_asset_classes(
     require_role(ctx, Role.EDITOR)
 
     def write(session: Session) -> CreatedLinks:
-        require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
-        return _create_missing_links(session, ctx, include_archived=False)
+        return _create_missing_links_in_session(session, ctx)
 
     return run_immediate(factory, write)
+
+
+def _create_missing_links_in_session(session: Session, ctx: Context) -> CreatedLinks:
+    """``create_networth_items_from_asset_classes`` inside the caller's write transaction.
+
+    Role, lock and the shared ``_create_missing_links`` body are the public helper's; the
+    manual action uses active links only, so it can recreate a link the user archived.
+    """
+    require_role_now(session, ctx, Role.EDITOR)
+    CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+    return _create_missing_links(session, ctx, include_archived=False)
 
 
 def portfolio_warnings(
