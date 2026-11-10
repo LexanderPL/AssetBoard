@@ -18,7 +18,7 @@ NON_TEXT = 3.0  # WCAG 1.4.11: borders that identify a form control
 # Text set in a component class (input.css), where no template class attribute shows it.
 CSS_TEXT_PAIRS = {
     ("ink", "canvas"),  # body
-    ("muted", "surface"),  # .nav-link in the sidebar
+    ("sidebar-ink", "surface"),  # .nav-link in the sidebar
     ("ink", "subtle"),  # .nav-link:hover
     ("primary-ink", "primary-soft"),  # .nav-link[aria-current]
     ("ink", "field"),  # .form-control, .form-select
@@ -123,6 +123,8 @@ def test_palette_matches_the_approved_values() -> None:
     assert light["ink"] == (0x20, 0x21, 0x24) and dark["ink"] == (0xE1, 0xE1, 0xE1)
     assert light["muted"] == (0x5F, 0x63, 0x68)
     assert light["line"] == (0xDA, 0xDC, 0xE0)
+    assert light["sidebar-ink"] == (0x3C, 0x40, 0x43)
+    assert dark["sidebar-ink"] == dark["muted"]
     assert light["primary"] == dark["primary"] == (0x02, 0x77, 0xBD)
     assert light["accent"] == dark["accent"] == (0xFF, 0x98, 0x00)
 

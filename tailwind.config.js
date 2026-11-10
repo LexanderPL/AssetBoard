@@ -19,6 +19,7 @@ module.exports = {
         },
         ink: token("ink"),
         muted: token("muted"),
+        "sidebar-ink": token("sidebar-ink"),
         primary: {
           DEFAULT: token("primary"),
           hover: token("primary-hover"),

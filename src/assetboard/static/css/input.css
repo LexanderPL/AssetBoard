@@ -16,6 +16,7 @@
     --color-line-strong: 128 134 139; /* #80868b form-control borders (3:1) */
     --color-ink: 32 33 36; /* #202124 */
     --color-muted: 95 99 104; /* #5f6368 */
+    --color-sidebar-ink: 60 64 67; /* #3c4043 sidebar navigation and footer text */
     --color-primary: 2 119 189; /* #0277bd button backgrounds */
     --color-primary-hover: 1 87 155; /* #01579b */
     --color-primary-ink: 2 106 167; /* #026aa7 links, active navigation */
@@ -60,6 +61,7 @@
     --color-line-strong: 107 107 107; /* #6b6b6b */
     --color-ink: 225 225 225; /* #e1e1e1 */
     --color-muted: 158 158 158; /* #9e9e9e */
+    --color-sidebar-ink: 158 158 158; /* #9e9e9e same as muted, dark mode unchanged */
     --color-primary: 2 119 189; /* #0277bd */
     --color-primary-hover: 1 87 155; /* #01579b */
     --color-primary-ink: 3 169 244; /* #03a9f4 */
@@ -124,7 +126,7 @@
   }
 
   .nav-link {
-    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted transition hover:bg-subtle hover:text-ink;
+    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-sidebar-ink transition hover:bg-subtle hover:text-ink;
   }
 
   .nav-link[aria-current="page"] {
