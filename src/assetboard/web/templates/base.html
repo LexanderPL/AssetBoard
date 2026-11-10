@@ -124,7 +124,7 @@
                     {% endfor %}
                   </div>
                   {% endif %}
-                  {% if workspace_nav.can_create_workspace %}
+                  {% if workspace_nav.can_create_workspace and not demo_session %}
                   <a href="{{ scoped_url(request, 'workspace_new') }}" data-new-workspace-link{% if request.url.path == scoped_url(request, 'workspace_new') %} aria-current="page"{% endif %} class="{{ menu_item }}">{{ _("New workspace") }}</a>
                   {% endif %}
                 </div>

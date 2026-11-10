@@ -4075,6 +4075,9 @@ msgstr ""
 msgid "Your details"
 msgstr ""
 
+msgid "Not available in the demo workspace."
+msgstr ""
+
 msgid "Display name"
 msgstr ""
 
@@ -4173,15 +4176,15 @@ msgid ""
 "their provider's security instead."
 msgstr ""
 
+msgid "Two-factor authentication is enabled."
+msgstr ""
+
 msgid "Save your recovery codes"
 msgstr ""
 
 msgid ""
 "These ten codes are shown only once. Store them safely. Each replaces an "
 "authenticator code for one sign-in."
-msgstr ""
-
-msgid "Two-factor authentication is enabled."
 msgstr ""
 
 msgid ""

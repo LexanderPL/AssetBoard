@@ -40,6 +40,7 @@ from assetboard.db.repositories import (
     WorkLogRepository,
 )
 from assetboard.db.repositories.base import WorkspaceScope
+from assetboard.db.repositories.scheduled import RecurringWorkspaceReader
 from assetboard.domain.money import Money
 from assetboard.domain.notifications import (
     DEFAULT_DIGEST_TIME,
@@ -59,7 +60,13 @@ from assetboard.domain.notifications import (
 from assetboard.domain.transactions import clean_description
 from assetboard.i18n.locale import normalize_locale
 from assetboard.services.auth import count_limited_attempt
-from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.context import (
+    Context,
+    Role,
+    require_not_demo,
+    require_role,
+    require_role_now,
+)
 from assetboard.services.notification_messages import reminder_message, test_message
 from assetboard.services.notify import UNCERTAIN_ERRORS, InvalidNotificationUrl, Notifier
 from assetboard.services.secret_box import (
@@ -295,6 +302,7 @@ def create_channel(
     values: ChannelInput,
 ) -> UUID:
     require_role(ctx, Role.VIEWER)
+    require_not_demo(ctx)
     fields = _clean(values)
     url = values.url.strip()
     scheme, service_name = validate_url(url, settings, notifier)
@@ -328,6 +336,7 @@ def update_channel(
     values: ChannelInput,
 ) -> None:
     require_role(ctx, Role.VIEWER)
+    require_not_demo(ctx)
     fields = _clean(values)
     url = values.url.strip()
     new_url = validate_url(url, settings, notifier) if url else None
@@ -361,6 +370,7 @@ def update_channel(
 
 def delete_channel(factory: sessionmaker[Session], ctx: Context, channel_id: UUID) -> None:
     require_role(ctx, Role.VIEWER)
+    require_not_demo(ctx)
 
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.VIEWER)
@@ -388,6 +398,7 @@ def send_test(
 ) -> TestOutcome:
     """Send a test message to one of the member's own channels (throttled per member)."""
     require_role(ctx, Role.VIEWER)
+    require_not_demo(ctx)
     if not settings.notifications_enabled:
         return TestOutcome(False, "disabled")
 
@@ -687,6 +698,9 @@ def run_workspace(
     true, the remaining due channels are left for the next tick (they have not run today).
     """
     stats = RunStats()
+    with factory() as session:
+        if RecurringWorkspaceReader(session).is_demo(scope.workspace.id):
+            return stats
     if not settings.notifications_enabled:
         return stats
     with factory() as session:

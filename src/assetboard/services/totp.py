@@ -30,11 +30,19 @@ from assetboard.services.auth import (
     record_auth_event,
     reserve_attempts,
 )
-from assetboard.services.context import Role, WorkspaceChoice
+from assetboard.services.context import DemoRestricted, Role, WorkspaceChoice
 from assetboard.services.profile import ConfirmMethod, ConfirmOutcome, confirm_sensitive
 
 ENROLLMENT_LIFETIME = timedelta(minutes=10)
 logger = logging.getLogger(f"{APP_NAME.lower()}.totp")
+
+
+def _require_not_demo_user(factory: sessionmaker[Session], user_id: UUID) -> None:
+    """The public demo account never enrolls, changes or disables a factor (F9.11b)."""
+    with factory() as session:
+        user = session.get(User, user_id)
+        if user is not None and user.is_demo:
+            raise DemoRestricted
 
 
 @dataclass(frozen=True, slots=True)
@@ -123,6 +131,8 @@ def begin_enrollment(
     settings: Settings,
     clock: Clock,
 ) -> bool:
+    if user.is_demo:
+        raise DemoRestricted
     repository = TotpRepository(session, user.id)
     factor = repository.factor(lock=True)
     if user.password_hash is None or not repository.owns_session(session_hash):
@@ -149,6 +159,8 @@ def complete_enrollment(
     settings: Settings,
     clock: Clock,
 ) -> list[str] | Throttled | None:
+    _require_not_demo_user(factory, user_id)
+
     def complete(session: Session) -> list[str] | Throttled | None:
         repository = TotpRepository(session, user_id)
         factor = repository.factor(lock=True)
@@ -215,6 +227,7 @@ def regenerate_recovery_codes(
     The second factor (an authenticator code or an unused recovery code) is checked with the
     password, so a wrong one counts as a failed confirmation.
     """
+    _require_not_demo_user(factory, user_id)
 
     def action(session: Session, user: User, method: ConfirmMethod) -> list[str] | None:
         if method != "password":
@@ -244,6 +257,8 @@ def _regenerate_recovery_codes(
     session_hash: str,
     clock: Clock,
 ) -> list[str] | None:
+    if user.is_demo:
+        raise DemoRestricted
     repository = TotpRepository(session, user.id)
     factor = repository.factor(lock=True)
     if (
@@ -305,6 +320,7 @@ def disable(
 
     As for regenerating recovery codes, a wrong second factor is a failed confirmation.
     """
+    _require_not_demo_user(factory, user_id)
 
     def action(session: Session, user: User, method: ConfirmMethod) -> bool:
         return method == "password" and _disable(
@@ -334,6 +350,8 @@ def _disable(
     session_hash: str,
     clock: Clock,
 ) -> bool:
+    if user.is_demo:
+        raise DemoRestricted
     repository = TotpRepository(session, user.id)
     if user.password_hash is None or not repository.owns_session(session_hash):
         return False

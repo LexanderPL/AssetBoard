@@ -14,6 +14,7 @@ from assetboard.db.models.identity import (
     Workspace,
 )
 from assetboard.db.models.import_batch import ImportBatch
+from assetboard.db.models.investments import Instrument
 from assetboard.db.models.ledger import Category
 from assetboard.domain.demo import DEMO_DATASET_VERSION
 from assetboard.services.demo_mode import DEMO_EMAIL
@@ -260,3 +261,146 @@ def test_turning_demo_off_revokes_sessions_and_offers_delete(
                 session.scalars(select(Workspace).where(Workspace.is_demo.is_(True))).first()
                 is None
             )
+
+
+def _sign_in_demo(web: WebHarness, app, client: TestClient) -> None:
+    web.complete_setup(app)
+    token = web.csrf(client.get("/login").text)
+    response = client.post("/login/demo", data={"csrf_token": token}, follow_redirects=False)
+    assert response.status_code == 303
+
+
+def test_demo_account_pages_are_read_only(web: WebHarness) -> None:
+    app = _demo_app(web)
+    with TestClient(app) as client:
+        _sign_in_demo(web, app, client)
+        account = client.get("/account")
+        assert account.status_code == 200
+        assert "data-profile-form" not in account.text
+        assert "data-notifications-link" not in account.text
+        assert "data-link-oidc" not in account.text
+        assert "data-link-proxy" not in account.text
+        assert "data-unlink-form" not in account.text
+        assert "Not available in the demo workspace." in account.text
+
+        password = client.get("/account/password")
+        assert password.status_code == 200
+        assert 'name="current_password"' not in password.text
+        assert "data-account-totp" in password.text
+        assert "data-manage-two-factor" not in password.text
+        assert "Not available in the demo workspace." in password.text
+
+        totp_page = client.get("/account/totp")
+        assert totp_page.status_code == 200
+        assert "data-totp-secret" not in totp_page.text
+        assert "totp_start" not in totp_page.text
+        assert "data-recovery-codes" not in totp_page.text
+        assert "Not available in the demo workspace." in totp_page.text
+
+
+def test_demo_workspace_pages_hide_member_and_settings_controls(
+    web: WebHarness,
+) -> None:
+    app = _demo_app(web)
+    with TestClient(app) as client:
+        _sign_in_demo(web, app, client)
+        assert "data-new-workspace-link" not in client.get("/").text
+
+        settings = client.get("/workspace/settings")
+        assert settings.status_code == 200
+        assert "data-taxes-switch" not in settings.text
+        assert "data-delete-workspace-link" not in settings.text
+        assert 'name="name"' not in settings.text
+        assert "Not available in the demo workspace." in settings.text
+
+        members = client.get("/workspace/members")
+        assert members.status_code == 200
+        assert "/workspace/invitations" not in members.text
+        assert "data-revoke-invitation" not in members.text
+        assert "data-remove-member" not in members.text
+        assert "Not available in the demo workspace." in members.text
+
+        assert client.get("/workspaces/new").status_code == 403
+        assert client.get("/workspace/delete").status_code == 403
+
+        data = client.get("/workspace/data")
+        assert data.status_code == 200
+        assert "/workspace/data/import" in data.text
+
+
+def test_demo_notification_and_provider_controls_are_absent(web: WebHarness) -> None:
+    app = _demo_app(web)
+    with TestClient(app) as client:
+        _sign_in_demo(web, app, client)
+
+        channels = client.get("/notifications")
+        assert channels.status_code == 200
+        assert "data-new-channel" not in channels.text
+        assert "data-send-test" not in channels.text
+        assert "data-channel" not in channels.text
+        assert "Not available in the demo workspace." in channels.text
+
+        providers = client.get("/investments/providers")
+        assert providers.status_code == 200
+        assert "data-provider-refresh" not in providers.text
+        assert "/investments/providers/nbp" not in providers.text
+        assert "Not available in the demo workspace." in providers.text
+
+        instruments = client.get("/investments/instruments")
+        assert instruments.status_code == 200
+        assert "data-instrument-form" in instruments.text
+        assert "data-provider-fields" not in instruments.text
+        assert "data-provider-lookup-button" not in instruments.text
+
+        with app.state.session_factory() as session:
+            workspace_id = session.scalars(
+                select(Workspace.id).where(Workspace.is_demo.is_(True))
+            ).one()
+            instrument_id = session.scalars(
+                select(Instrument.id).where(Instrument.workspace_id == workspace_id).limit(1)
+            ).one()
+        instrument = client.get(f"/investments/instruments/{instrument_id}")
+        assert instrument.status_code == 200
+        assert "data-price-form" in instrument.text
+
+
+def test_demo_route_posts_refuse_before_the_service_writes(web: WebHarness) -> None:
+    app = _demo_app(web)
+    with TestClient(app) as client:
+        _sign_in_demo(web, app, client)
+        token = web.csrf(client.get("/account").text)
+        response = client.post(
+            "/account/profile",
+            data={
+                "csrf_token": token,
+                "display_name": "Changed",
+                "locale": "pl",
+                "theme": "dark",
+            },
+            follow_redirects=False,
+        )
+        assert response.status_code == 403
+        assert "not available in the demo workspace" in response.text.lower()
+        with app.state.session_factory() as session:
+            demo = session.scalars(select(User).where(User.is_demo.is_(True))).one()
+            assert demo.display_name == "Demo"
+            assert demo.locale is None
+
+        token = web.csrf(client.get("/workspace/settings").text)
+        response = client.post(
+            "/workspace/settings",
+            data={
+                "csrf_token": token,
+                "name": "Renamed",
+                "base_currency": "EUR",
+                "timezone": "UTC",
+                "locale": "en",
+            },
+            follow_redirects=False,
+        )
+        assert response.status_code == 403
+        with app.state.session_factory() as session:
+            demo_workspace = session.scalars(
+                select(Workspace).where(Workspace.is_demo.is_(True))
+            ).one()
+            assert demo_workspace.name == "Demo"

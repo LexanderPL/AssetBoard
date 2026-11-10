@@ -97,6 +97,8 @@ def render_template(
         }
         if current_session is not None and current_session.is_demo
         else None,
+        # Templates hide account, workspace and provider controls for the public demo.
+        "demo_session": current_session is not None and current_session.is_demo,
         # Set for every signed-in page with a workspace; see load_workspace_nav in web/context.py.
         "workspace_nav": getattr(request.state, "workspace_nav", None),
         # The running version (sidebar footer), and for administrators a newer release.

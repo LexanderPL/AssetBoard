@@ -25,7 +25,13 @@ from assetboard.db.repositories import (
     PriceSourceConfigRepository,
 )
 from assetboard.domain.providers import PROVIDERS, ProviderDefinition
-from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.context import (
+    Context,
+    Role,
+    require_not_demo,
+    require_role,
+    require_role_now,
+)
 from assetboard.services.secret_box import decrypt_secret, encrypt_secret
 
 SECRET_PURPOSE = "price-source-settings"
@@ -93,6 +99,7 @@ def save_provider_config(
 ) -> ProviderSaveResult:
     """Save one provider's opt-in state and report a disabled-to-enabled transition."""
     require_role(ctx, Role.OWNER)
+    require_not_demo(ctx)
     definition = PROVIDERS.get(provider_key)
     if definition is None:
         raise UnknownProvider(provider_key)

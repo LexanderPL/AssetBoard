@@ -16,6 +16,9 @@
     {{ _("Export what you want to keep first.") }}
     <a class="font-semibold underline underline-offset-2" href="{{ scoped_url(request, 'history') }}#export-heading" data-export-link>{{ _("Export transactions as CSV") }}</a>
   </p>
+  {% if demo_session %}
+  <p class="mt-4 text-sm text-muted" data-demo-read-only>{{ _("Not available in the demo workspace.") }}</p>
+  {% else %}
   <form method="post" action="{{ scoped_url(request, 'workspace_delete') }}" class="mt-6 space-y-4" novalidate>
     {{ csrf_input() }}
     <input type="hidden" name="workspace_id" value="{{ workspace_id }}">
@@ -25,5 +28,6 @@
       <a href="{{ scoped_url(request, 'workspace_settings') }}" class="rounded-xl border border-line px-4 py-2 text-sm font-medium text-ink hover:bg-subtle" data-cancel>{{ _("Cancel") }}</a>
     </div>
   </form>
+  {% endif %}
 </section>
 {% endblock %}

@@ -221,7 +221,8 @@ def apply_admin_action(
     if not actor.is_active or not actor.is_instance_admin:
         raise NotInstanceAdmin
     target = session.get(User, target_id)
-    if target is None:
+    if target is None or target.is_demo:
+        # The public demo account is managed by the demo panel, never by account actions.
         return "not_found"
     _checkpoint("admin_action")
     refusal = _protection(session, actor, target, action)

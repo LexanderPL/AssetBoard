@@ -4340,6 +4340,9 @@ msgstr "Przejdź do dostawcy %(provider)s"
 msgid "Your details"
 msgstr "Twoje dane"
 
+msgid "Not available in the demo workspace."
+msgstr "Niedostępne w obszarze demonstracyjnym."
+
 msgid "Display name"
 msgstr "Wyświetlana nazwa"
 
@@ -4449,6 +4452,9 @@ msgstr ""
 "Właściciel obszaru roboczego może tego wymagać. Przy logowaniu przez "
 "dostawcę tożsamości lub proxy obowiązują zabezpieczenia tego dostawcy."
 
+msgid "Two-factor authentication is enabled."
+msgstr "Uwierzytelnianie dwuskładnikowe jest włączone."
+
 msgid "Save your recovery codes"
 msgstr "Zapisz kody odzyskiwania"
 
@@ -4458,9 +4464,6 @@ msgid ""
 msgstr ""
 "Te dziesięć kodów jest wyświetlanych tylko raz. Przechowuj je "
 "bezpiecznie. Każdy zastępuje kod z aplikacji podczas jednego logowania."
-
-msgid "Two-factor authentication is enabled."
-msgstr "Uwierzytelnianie dwuskładnikowe jest włączone."
 
 msgid ""
 "Replace all recovery codes if they are lost or exposed. Your current "

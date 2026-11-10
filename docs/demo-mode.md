@@ -51,9 +51,10 @@ empty, stale (older than 24 hours) or built by an older `DEMO_DATASET_VERSION`.
   create, rename, delete or leave workspaces, invite anyone or change members and roles.
   Notification channels and test sends, price-provider configuration and refresh, and any email
   to the demo user are refused at the service layer with a `DemoRestricted` error (a translated
-  403 page); the UI hides those controls. The scheduler skips every workspace job for the demo
-  workspace except its reset. These guards are implemented by the F9.11b restriction work and
-  use the same `Context` flags as the login and banner.
+  403 page); the UI hides those controls. The account, workspace settings, members,
+  notifications and provider pages stay visible read-only with a short note. The scheduler skips
+  every workspace job for the demo workspace except its reset. These guards are implemented by
+  the F9.11b restriction work and use the same `Context` flags as the login and banner.
 
 ## Reset
 

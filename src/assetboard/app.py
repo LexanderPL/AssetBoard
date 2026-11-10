@@ -438,7 +438,7 @@ def create_app(
         signed_in = web_session(request)
 
         def allowed() -> bool:
-            if signed_in is None:
+            if signed_in is None or signed_in.is_demo:
                 return False
             with app.state.session_factory() as session:
                 return workspace_creation_allowed(

@@ -38,6 +38,7 @@ from assetboard.services.auth import (
     confirm_password_with_factory,
     record_auth_event,
 )
+from assetboard.services.context import DemoRestricted
 from assetboard.services.external_identity import PROXY_PROVIDER
 
 FRESH_SESSION = timedelta(minutes=10)
@@ -172,6 +173,10 @@ def update_profile(
     the browser's ``Accept-Language`` applies). ``birth_year`` is optional; age-based risk
     targets and the later FIRE planner use it. ``life_expectancy`` defaults to 90.
     """
+    # The public demo account is read-only (F9.11b): refuse before validating or writing.
+    with factory() as session:
+        if session.scalar(select(User.is_demo).where(User.id == user_id)):
+            raise DemoRestricted
     try:
         # The same rule as setup, registration and invitation sign-up.
         name = normalize_display_name(display_name)
@@ -301,6 +306,8 @@ def link_identity_to_user(
     An identity linked to someone else is ``refused``, the same answer as any other refusal, so
     the result says nothing about other accounts.
     """
+    if user.is_demo:
+        raise DemoRestricted
     owner = session.scalar(
         select(ExternalIdentity.user_id).where(
             ExternalIdentity.provider == provider, ExternalIdentity.subject == subject
@@ -361,6 +368,8 @@ def unlink_identity(
     other. Usable afterwards: a password allowed by today's settings, or another identity of a
     method that is on (the configured OIDC issuer, or the proxy). A refusal writes nothing.
     """
+    if user.is_demo:
+        raise DemoRestricted
     identity = session.get(ExternalIdentity, identity_id)
     if identity is None or identity.user_id != user.id:
         return "not_found"

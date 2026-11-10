@@ -34,7 +34,13 @@ from assetboard.domain.taxes import (
     tax_payment_date,
 )
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR, clean_description
-from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.context import (
+    Context,
+    Role,
+    require_not_demo,
+    require_role,
+    require_role_now,
+)
 from assetboard.services.income import resync_sources_with_rule
 
 # The first rate version of a tax is valid "from the start" (the app's earliest date).
@@ -594,6 +600,7 @@ def set_taxes_enabled(factory: sessionmaker[Session], ctx: Context, enabled: boo
     Turning it off is refused while a non-archived income source has a tax attached.
     """
     require_role(ctx, Role.OWNER)
+    require_not_demo(ctx)
 
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.OWNER)

@@ -4,8 +4,10 @@
 {% block heading %}{{ _("Workspace settings") }}{% endblock %}
 {% block content %}
 <div class="max-w-3xl space-y-6">
+{% if demo_session %}<p class="text-sm text-muted" data-demo-read-only>{{ _("Not available in the demo workspace.") }}</p>{% endif %}
 <section class="panel p-6 sm:p-7" aria-labelledby="workspace-settings-heading">
   <h2 id="workspace-settings-heading" class="text-base font-semibold">{{ _("General") }}</h2>
+  {% if not demo_session %}
   {% if notice %}
   <p class="mt-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status">{{ notice }}</p>
   {% endif %}
@@ -63,10 +65,12 @@
     <p class="text-xs text-muted sm:col-span-2">{{ _("The formatting default is used for numbers and dates where no personal preference applies. Your interface language follows your account and browser.") }}</p>
     <div class="sm:col-span-2">{{ primary_button(_("Save settings")) }}</div>
   </form>
+  {% endif %}
 </section>
 <section class="panel p-6 sm:p-7" aria-labelledby="workspace-menu-heading" data-settings-menu>
   <h2 id="workspace-menu-heading" class="text-base font-semibold">{{ _("Menu") }}</h2>
   <p class="mt-1 text-sm text-muted">{{ _("Hide parts of the app you don't use. Nothing is deleted; turn them back on any time.") }}</p>
+  {% if not demo_session %}
   <form method="post" action="{{ scoped_url(request, 'workspace_menu') }}" class="mt-4 flex items-center justify-between gap-4 border-t border-line pt-4">
     {{ csrf_input() }}
     <input type="hidden" name="taxes_enabled" value="{{ '0' if values.taxes_enabled else '1' }}">
@@ -84,11 +88,14 @@
     <ul class="mt-1 list-disc pl-5">{% for name in taxes_in_use %}<li>{{ name }}</li>{% endfor %}</ul>
   </div>
   {% endif %}
+  {% endif %}
 </section>
+{% if not demo_session %}
 <section class="panel border-danger-line p-6 sm:p-7" aria-labelledby="danger-zone-heading" data-danger-zone>
   <h2 id="danger-zone-heading" class="text-base font-semibold text-danger-strong">{{ _("Delete workspace") }}</h2>
   <p class="mt-2 text-sm text-muted">{{ _("Permanently removes this workspace and all its data, for every member. You confirm on the next page by typing the workspace name.") }}</p>
   <a href="{{ scoped_url(request, 'workspace_delete') }}" class="mt-4 inline-flex rounded-xl border border-danger-line bg-danger-soft px-4 py-2 text-sm font-semibold text-danger-strong hover:bg-danger-line" data-delete-workspace-link>{{ _("Delete workspace…") }}</a>
 </section>
+{% endif %}
 </div>
 {% endblock %}
