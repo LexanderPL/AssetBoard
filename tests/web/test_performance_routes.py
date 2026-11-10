@@ -6,6 +6,7 @@ import json
 import re
 from datetime import date
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 from uuid import UUID
 
@@ -223,3 +224,17 @@ def test_the_chart_does_not_start_with_a_zero_prefix(owner: OwnerApp) -> None:
     assert data["labels"][0] == "Jan 7, 2024"
     assert data["value"][0] and data["invested"][0]
     assert all(value is not None for value in data["value"])
+
+
+def test_the_performance_chart_plots_value_and_invested_independently() -> None:
+    """A stacked gain series turns a null point into a zero dip; keep them independent."""
+    source = (
+        Path(__file__).resolve().parents[2] / "src/assetboard/static/js/charts.js"
+    ).read_text()
+    start = source.index("function performanceOptions")
+    block = source[start : source.index("function lineOptions", start)]
+
+    assert "data.value" in block
+    assert "data.invested" in block
+    assert "stack:" not in block
+    assert 'type: "custom"' in block

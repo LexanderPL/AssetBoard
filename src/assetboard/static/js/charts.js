@@ -97,6 +97,7 @@
     const investedColor = token("muted");
     const valueColor = token("primary-ink");
     const gainColor = token("success");
+    const gainSegments = data.labels.map((_label, index) => index);
     return {
       animation: false,
       aria: { enabled: false }, // the plotted-data table is the accessible version
@@ -135,26 +136,64 @@
       },
       series: [
         {
+          // The two lines are independent: a null point is a gap, never a zero drop. The gain
+          // band is drawn separately so stacking cannot turn a missing point into 0.
           name: data.legend.invested,
           type: "line",
-          stack: "performance",
           data: data.invested,
           connectNulls: false,
           showSymbol: false,
+          z: 3,
           lineStyle: { width: 2, color: investedColor },
           itemStyle: { color: investedColor },
         },
         {
-          // The visible line is at invested + gain = value; the data is the gain band.
           name: data.legend.value,
           type: "line",
-          stack: "performance",
-          data: data.gain,
+          data: data.value,
           connectNulls: false,
           showSymbol: false,
+          z: 4,
           lineStyle: { width: 2, color: valueColor },
           itemStyle: { color: valueColor },
-          areaStyle: { color: gainColor, opacity: 0.2 },
+        },
+        {
+          // The area between value and invested is the gain. A segment touching a missing
+          // point is skipped, so the band gaps with the lines.
+          type: "custom",
+          name: "gain",
+          data: gainSegments,
+          silent: true,
+          z: 1,
+          renderItem(params, api) {
+            const index = params.dataIndex;
+            const next = index + 1;
+            if (next >= data.value.length) return null;
+            const value = data.value[index];
+            const nextValue = data.value[next];
+            const invested = data.invested[index];
+            const nextInvested = data.invested[next];
+            if (
+              value == null ||
+              nextValue == null ||
+              invested == null ||
+              nextInvested == null
+            ) {
+              return null;
+            }
+            return {
+              type: "polygon",
+              shape: {
+                points: [
+                  api.coord([index, value]),
+                  api.coord([next, nextValue]),
+                  api.coord([next, nextInvested]),
+                  api.coord([index, invested]),
+                ],
+              },
+              style: { fill: gainColor, opacity: 0.2 },
+            };
+          },
         },
       ],
     };
