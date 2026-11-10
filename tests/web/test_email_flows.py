@@ -460,9 +460,15 @@ def test_live_links_are_capped_at_three_per_address(
     mail: tuple[FastAPI, TestClient], web: WebHarness
 ) -> None:
     app, client = mail
+    links: list[str] = []
     for _ in range(4):
-        _start(client, web, "many@example.com")
-    links = [mail_link(m, "/register/complete/") for m in web.sent_mail(app)]
+        response = _start(client, web, "many@example.com")
+        assert response.status_code == 200
+        # The outbox has a sender pool, so four unsent requests could resolve in any order.
+        # Wait for each job before starting the next: then the links are in creation order and
+        # the test exercises the created_at cap, not the pool's scheduling.
+        assert app.state.mail_outbox.join(timeout=5)
+        links.append(mail_link(web.sent_mail(app)[-1], "/register/complete/"))
     assert len(_tokens(app, "register")) == 3
     assert client.get(links[0]).status_code == 404  # the oldest one was dropped
     assert client.get(links[3]).status_code == 200
