@@ -73,8 +73,7 @@ data and stored import files stay, only the exception class is logged and stored
 or stops the scheduler.
 
 Stored upload files of the old import batches are removed only after the reset commits; the new
-build's own upload file is removed after commit too, and only that new file is cleaned up when a
-build fails.
+build's own upload file is kept for the next reset, and a failed reset deletes nothing.
 
 ## Turning demo mode off and deleting the data
 
