@@ -79,7 +79,7 @@
 {%- endmacro %}
 
 {% macro confirm_dialog(id, title, message, confirm_label, cancel_label) -%}
-<dialog id="{{ id }}" class="popup w-[min(92vw,28rem)]">
+<dialog id="{{ id }}" class="popup w-[min(92vw,28rem)]" data-backdrop-static>
   <div class="space-y-5 p-6">
     <div>
       <h2 class="text-lg font-semibold">{{ title }}</h2>

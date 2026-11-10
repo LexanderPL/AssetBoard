@@ -71,7 +71,7 @@ def _shots(browser: Browser, base: str, pages: dict[str, tuple[str, str]]) -> No
             if name == "income-edit":
                 target.locator("details[data-inline-edit] summary").first.click()
             if name == "upcoming-one-time":
-                page.locator("[data-add-one-time] > summary").click()
+                page.locator("[data-add-one-time]").click()
             target.screenshot(path=str(Path(folder) / f"{name}-{scheme}.png"))
         page.context.close()
 
@@ -186,16 +186,24 @@ def test_log_edit_one_time_payment_and_skip(tmp_path: Path) -> None:
             expect(form.locator("[data-log-units]")).to_have_value("7")
             expect(form.locator("[data-log-submit]")).to_have_text("Update")
 
-            # Upcoming: add a one-time payment.
+            # Upcoming: add a one-time payment from its dialog.
             page.goto(f"{base}/upcoming", wait_until="networkidle")
-            page.locator("[data-add-one-time] > summary").click()
-            one_time = page.locator("form[data-one-time-form]")
+            one_time_dialog = page.locator("#one-time-dialog")
+            expect(one_time_dialog).to_be_hidden()
+            page.locator("[data-add-one-time]").click()
+            expect(one_time_dialog).to_be_visible()
+            one_time_dialog.get_by_role("link", name="Cancel").click()
+            expect(one_time_dialog).to_be_hidden()
+            page.locator("[data-add-one-time]").click()
+            expect(one_time_dialog).to_be_visible()
+            one_time = one_time_dialog.locator("form[data-one-time-form]")
             one_time.get_by_label("Description").fill("Car insurance")
             one_time.get_by_label("Amount", exact=False).fill("450")
             one_time.get_by_label("Date").fill(f"{following[0]:04d}-{following[1]:02d}-05")
             one_time.get_by_label("Category").select_option(index=1)
             one_time.get_by_role("button", name="Add payment").click()
             page.wait_for_load_state("networkidle")
+            expect(one_time_dialog).to_be_hidden()
             expect(page.locator("[data-upcoming-notice]")).to_contain_text("One-time payment")
 
             # The income is expected next month: Skip it in that month's ledger, then Undo.

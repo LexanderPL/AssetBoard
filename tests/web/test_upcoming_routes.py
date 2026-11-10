@@ -302,9 +302,18 @@ def _categories(owner, kind: str) -> list[str]:
 def test_add_edit_and_delete_a_one_time_payment_on_upcoming(owner):
     fixed_clock(owner)
     page = owner.client.get("/upcoming").text
-    assert "data-add-one-time" in page and ">Add one-time payment</summary>" in page
-    assert "data-add-one-time open" not in page
-    assert "data-add-one-time open" in owner.client.get("/upcoming?form=one-time").text
+    assert "data-add-one-time" in page
+    assert 'data-dialog-open="one-time-dialog"' in page and ">Add one-time payment</a>" in page
+    dialog = re.search(r'<dialog id="one-time-dialog".*?</dialog>', page, re.S)
+    assert dialog is not None and "data-one-time-form" in dialog.group(0)
+    opening = re.search(r'<dialog id="one-time-dialog"[^>]*>', page)
+    assert opening is not None and " open" not in opening.group(0)
+    opened = re.search(
+        r'<dialog id="one-time-dialog"[^>]*>', owner.client.get("/upcoming?form=one-time").text
+    )
+    assert opened is not None and " open" in opened.group(0)
+    assert "data-details-close" not in dialog.group(0)
+    assert "data-dialog-close" in dialog.group(0)
 
     expense, income = _categories(owner, "expense")[0], _categories(owner, "income")[0]
     created = owner.post(
@@ -383,7 +392,9 @@ def test_add_edit_and_delete_a_one_time_payment_on_upcoming(owner):
         token_from="/upcoming",
     )
     assert missing.status_code == 400
-    assert "Enter a description." in missing.text and "data-add-one-time open" in missing.text
+    reopened = re.search(r'<dialog id="one-time-dialog"[^>]*>', missing.text)
+    assert reopened is not None and " open" in reopened.group(0)
+    assert "Enter a description." in missing.text
 
     deleted = owner.post(f"/upcoming/{occurrence_id}/delete", token_from="/upcoming")
     assert deleted.headers["location"] == "/upcoming?notice=planned_deleted"

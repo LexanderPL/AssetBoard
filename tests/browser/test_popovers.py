@@ -1,8 +1,8 @@
 """Popovers and dialogs in Chromium (UI batch 3): a press outside an open popover closes it,
 Escape closes the innermost one and returns the focus to its summary, opening one closes the
-others; the History page's Export and Filters dialogs close on a backdrop click, the confirm
-dialog does not; inline forms in <details> stay open. Also the planned rows' Confirm and Delete
-buttons line up. No CSP violations."""
+others; the History page's Export, Filters and bulk dialogs close on a backdrop click and are
+centred, the confirm dialog does not close; inline forms in <details> stay open. Also the planned
+rows' Confirm and Delete buttons line up. No CSP violations."""
 
 from __future__ import annotations
 
@@ -45,10 +45,26 @@ def _add_planned(page: Page, label: str) -> None:
     expect(rows).to_have_count(count + 1)
 
 
+def _add_entry(page: Page, label: str) -> None:
+    page.locator("#entry-expense-day").fill("1")
+    page.locator("#entry-expense-amount").fill("42")
+    page.locator("#entry-expense-description").fill(label)
+    page.locator("#entry-expense-category").select_option(index=1)
+    page.locator("#entry-expense-amount").press("Enter")
+    expect(page.locator("#ledger-expense")).to_contain_text(label)
+
+
 def _box(page: Page, selector: str) -> FloatRect:
     box = page.locator(selector).first.bounding_box()
     assert box is not None, selector
     return box
+
+
+def _assert_centered(page: Page, selector: str) -> None:
+    box = _box(page, selector)
+    viewport = page.viewport_size
+    assert viewport is not None
+    assert box["y"] + box["height"] / 2 == pytest.approx(viewport["height"] / 2, abs=8)
 
 
 def test_popovers_and_dialogs_close_from_outside_and_with_escape(tmp_path: Path) -> None:
@@ -165,6 +181,7 @@ def test_popovers_and_dialogs_close_from_outside_and_with_escape(tmp_path: Path)
             page.locator("[data-pending-actions] form[data-confirm] button").first.click()
             dialog = page.locator("#confirm-dialog")
             expect(dialog).to_be_visible()
+            expect(dialog).to_have_attribute("data-backdrop-static", "")
             page.mouse.click(5, 5)
             expect(dialog).to_be_visible()
             page.keyboard.press("Escape")
@@ -182,15 +199,19 @@ def test_popovers_and_dialogs_close_from_outside_and_with_escape(tmp_path: Path)
             page.locator("h1").click()
             expect(inline).to_have_attribute("open", "")
 
-            # History: Export and Filters close on a backdrop click and with Escape.
+            # History needs a real entry for the bulk dialog, and its dialogs are centred.
+            page.goto(f"{base}/transactions/{today:%Y-%m}", wait_until="networkidle")
+            _add_entry(page, "History row")
             page.goto(f"{base}/history", wait_until="networkidle")
             for opener, dialog_id in (
                 ("[data-export-open]", "#export-dialog"),
                 ("[data-filters-open]", "#filters-dialog"),
+                ("[data-bulk-open]", "#bulk-dialog"),
             ):
                 modal = page.locator(dialog_id)
                 page.locator(opener).click()
                 expect(modal).to_be_visible()
+                _assert_centered(page, dialog_id)
                 modal.locator("h2").click()  # a press inside keeps it
                 expect(modal).to_be_visible()
                 page.mouse.click(5, 5)

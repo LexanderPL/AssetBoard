@@ -664,6 +664,14 @@ read-only enforcement in the service layer (not only the UI). Tests for enforcem
   link to `/transactions?<filters>&export=1`, which renders the dialog open in the page flow,
   so the export works without JavaScript; a refused option renders the page with the dialog
   open (a modal with JavaScript). Submitting the form closes the dialog.
+- **Dialog behaviour (owner, 2026-11):** any `dialog[data-dialog-modal]` closes when a press
+  starts and ends on its backdrop; `data-backdrop-static` opts out, and the global confirm
+  dialog carries it because it must be answered. The History page's Filters, Export and bulk
+  dialogs all behave so (the old opt-in `data-backdrop-close` is gone; the bulk dialog had no
+  opt-in and never closed). The boxes are centred: `#history-results`'s sibling spacing
+  (`space-y-6`) used to set their top margin, so Filters and the bulk dialog sat near the top
+  while Export (the first child) centred. A `dialog.popup[data-dialog-modal][open]` rule now
+  restores `margin: auto` and caps the height at `100dvh - 2rem` with an inner scroll.
 - **Export** (`/transactions/export.csv`, GET): every matching row, always in M4's entry order
   (date, `created_at`, id) whatever the screen's sort. Rows and their category names come
   from **one** SELECT (a join, fetched in batches), so every row has the name its category had

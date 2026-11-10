@@ -6807,11 +6807,11 @@ msgstr "Bez daty"
 msgid "Delete the transaction of %(date)s?"
 msgstr "Usunąć transakcję z dnia %(date)s?"
 
-msgid "Add an active instrument first."
-msgstr "Najpierw dodaj aktywny instrument."
-
 msgid "Bulk add"
 msgstr "Dodaj hurtowo"
+
+msgid "Add an active instrument first."
+msgstr "Najpierw dodaj aktywny instrument."
 
 #, python-format
 msgid ""

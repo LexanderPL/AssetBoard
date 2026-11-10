@@ -6310,10 +6310,10 @@ msgstr ""
 msgid "Delete the transaction of %(date)s?"
 msgstr ""
 
-msgid "Add an active instrument first."
+msgid "Bulk add"
 msgstr ""
 
-msgid "Bulk add"
+msgid "Add an active instrument first."
 msgstr ""
 
 #, python-format

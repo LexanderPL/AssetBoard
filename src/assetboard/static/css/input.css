@@ -286,3 +286,12 @@
 [data-hidden-when][hidden] {
   display: none !important;
 }
+
+/* A modal dialog centres itself, but a page block with sibling spacing (space-y-*) otherwise
+   sets its top margin and pins it near the top. This rule sits outside the utility layers so it
+   wins; a tall dialog scrolls inside the viewport instead of running off it. */
+dialog.popup[data-dialog-modal][open] {
+  margin: auto;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+}

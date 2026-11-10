@@ -230,18 +230,26 @@ document.addEventListener("submit", (event) => {
   });
 });
 
-// Dialogs marked data-dialog-modal (the transaction export): a link marked
-// data-dialog-open="<id>" opens one as a modal, a link marked data-dialog-close inside closes
-// it. Both are links, so without JavaScript they load a page that renders the dialog open (in
-// the page flow) or closed. A dialog the server rendered open becomes a modal here; a submitted
-// form inside one closes it (a download leaves the page as it is).
+// Dialogs marked data-dialog-modal (the History page's dialogs, the one-time payment form and
+// the investments forms): a link marked data-dialog-open="<id>" opens one as a modal, a link
+// marked data-dialog-close inside closes it. The openers are links, so without JavaScript they
+// load a page that renders the dialog open (in the page flow) or closed. A dialog the server
+// rendered open becomes a modal here, including one swapped in by htmx after a refused form; a
+// submitted form inside one closes it (a download leaves the page as it is).
 function openModalDialog(dialog) {
   if (!(dialog instanceof HTMLDialogElement) || !dialog.hasAttribute("data-dialog-modal")) {
     return false;
   }
+  if (dialog.open && dialog.matches(":modal")) return true;
   if (dialog.open) dialog.close();
   dialog.showModal();
   return true;
+}
+
+function openModalDialogs(root) {
+  const selector = "dialog[data-dialog-modal][open]";
+  if (root instanceof Element && root.matches(selector)) openModalDialog(root);
+  root.querySelectorAll(selector).forEach((dialog) => openModalDialog(dialog));
 }
 
 document.addEventListener("click", (event) => {
@@ -268,7 +276,10 @@ document.addEventListener("submit", (event) => {
   if (dialog instanceof HTMLDialogElement) window.setTimeout(() => dialog.close(), 0);
 });
 
-document.querySelectorAll("dialog[data-dialog-modal][open]").forEach(openModalDialog);
+openModalDialogs(document);
+document.addEventListener("htmx:load", (event) => {
+  if (event.target instanceof Element) openModalDialogs(event.target);
+});
 
 // Popovers: a <details data-popover> whose content floats over the page (the user menu, the
 // month picker, a planned row's Confirm form). Its summary opens it without JavaScript. A press
@@ -324,8 +335,21 @@ document.addEventListener("keydown", (event) => {
   closePopover(innermost, true);
 });
 
-// A dialog marked data-backdrop-close (the History page's Export and Filters) closes when a
-// press starts and ends on its backdrop. The confirm dialog never does: it must be answered.
+// A menu never survives a trip through history: the browser may restore the page from its
+// back/forward cache with the popover still open (for example after Workspace settings), and a
+// menu opened on the page before a pushState would hang over the restored one.
+function closeAllPopovers() {
+  document.querySelectorAll(OPEN_POPOVERS).forEach((details) => closePopover(details, false));
+}
+// pageshow also fires on the first load, where a server-rendered month picker may be open on
+// purpose (the year stepper reloads the page with it); only a restored page loses its menus.
+window.addEventListener("pageshow", (event) => {
+  if (event.persisted) closeAllPopovers();
+});
+window.addEventListener("popstate", closeAllPopovers);
+
+// A modal dialog closes when a press starts and ends on its backdrop. data-backdrop-static
+// opts out: the global confirm dialog must be answered, so a stray click cannot dismiss it.
 let backdropPress = null;
 document.addEventListener("pointerdown", (event) => {
   backdropPress = event.target instanceof HTMLDialogElement ? event.target : null;
@@ -335,7 +359,7 @@ document.addEventListener("click", (event) => {
   const pressed = backdropPress;
   backdropPress = null;
   if (!(dialog instanceof HTMLDialogElement) || dialog !== pressed || !dialog.open) return;
-  if (!dialog.hasAttribute("data-backdrop-close")) return;
+  if (!dialog.matches(":modal") || dialog.hasAttribute("data-backdrop-static")) return;
   const box = dialog.getBoundingClientRect();
   const inside =
     event.clientX >= box.left &&

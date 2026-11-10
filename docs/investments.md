@@ -48,7 +48,8 @@ ignoring case.
 ## Instruments
 
 An instrument is one thing you hold: a stock, ETF, bond, metal, currency, property or anything
-else. Its fields are:
+else. Choose **Add instrument** above the list to open the form in a window; a refused save
+reopens it with everything you entered, and a successful one closes it. Its fields are:
 
 - **Name** — unique among active instruments, ignoring case.
 - **Symbol** — optional, for example `VWCE.DE` or `BTC`.
@@ -115,7 +116,8 @@ them from the active list; restoring is refused if another active instrument has
 ## Transactions and holdings
 
 Open an instrument by clicking its name, or use the **Transactions** tab, to record a **buy** or
-**sell**:
+**sell**. On the Transactions tab **Add a transaction** opens the form in a window (a click
+outside or Esc closes it); a refused save reopens it. The fields are:
 
 - **Date** — a trade date, not a plan. A date after today is refused.
 - **Quantity** — greater than zero, with up to 18 decimal places.
@@ -181,8 +183,8 @@ overselling; that is refused, like any other oversell.
 
 ### Bulk add
 
-The **Bulk add** panel on the Transactions tab (editors and owners) takes many past trades at
-once. Paste one transaction per line, fields separated by `;`:
+The **Bulk add** button on the Transactions tab (editors and owners) opens a window that takes
+many past trades at once. Paste one transaction per line, fields separated by `;`:
 
 ```
 date; instrument; type; quantity; unit price; fee; fx; amounts currency

@@ -160,6 +160,29 @@ def test_the_transactions_tab_and_empty_page(owner: OwnerApp) -> None:
     assert 'href="/investments/transactions"' in tab
 
 
+def test_the_add_and_bulk_forms_are_dialogs(owner: OwnerApp) -> None:
+    instrument = _instrument(owner, "World ETF")
+    page = owner.client.get(TX).text
+    assert re.search(
+        r'<a href="[^"]+" data-dialog-open="transaction-dialog"[^>]*data-add-transaction>'
+        r"Add a transaction</a>",
+        page,
+    )
+    dialog = re.search(r'<dialog id="transaction-dialog".*?</dialog>', page, re.S)
+    assert dialog is not None and "data-transaction-form" in dialog.group(0)
+    opening = re.search(r'<dialog id="transaction-dialog"[^>]*>', page)
+    assert opening is not None and " open" not in opening.group(0)
+    bulk = re.search(r'<dialog id="investment-bulk-panel".*?</dialog>', page, re.S)
+    assert bulk is not None and "data-bulk-text" in bulk.group(0)
+    assert 'data-dialog-open="investment-bulk-panel"' in page and "data-bulk-open" in page
+    assert "show:#investment-bulk-panel:top" not in page
+
+    refused = _tx(owner, instrument, quantity="0")
+    assert refused.status_code == 400
+    reopened = re.search(r'<dialog id="transaction-dialog"[^>]*>', refused.text)
+    assert reopened is not None and " open" in reopened.group(0)
+
+
 def test_create_a_buy_and_see_it_in_both_histories(owner: OwnerApp) -> None:
     instrument = _instrument(owner, "World ETF")
     response = _tx(owner, instrument, quantity="10", unit_price="100", fee="2.50")

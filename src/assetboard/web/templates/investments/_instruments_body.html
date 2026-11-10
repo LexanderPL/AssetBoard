@@ -1,7 +1,7 @@
 {% from "investments/_instrument_form.html" import instrument_form with context %}
 {% from "investments/_macros.html" import htmx_form, small_button, swatch with context %}
 {% from "investments/_tabs.html" import tabs with context %}
-{% from "macros/components.html" import csrf_input, summary_button_primary with context %}
+{% from "macros/components.html" import csrf_input with context %}
 <div id="investments-body" class="space-y-6">
   {% if notice %}
   <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
@@ -29,15 +29,23 @@
   {% endif %}
 
   {% if can_edit and page.classes %}
-  <details data-add-instrument{% if create_errors %} open{% endif %}>
-    <summary class="{{ summary_button_primary }}">{{ _("Add instrument") }}</summary>
-    <section class="panel mt-3 p-6 sm:p-7" aria-labelledby="instrument-form-heading" data-instrument-create>
-      <h2 id="instrument-form-heading" class="mb-4 text-base font-semibold">{{ _("Add an instrument") }}</h2>
-      {% call instrument_form("new-instrument", scoped_url(request, 'investments_instrument_create'), "outerHTML show:#investments-body:top", create_values, create_errors, create_rows) %}
-      <button type="button" data-details-close class="rounded-xl px-3 py-2 text-sm font-medium text-muted hover:bg-subtle">{{ _("Cancel") }}</button>
+  {# Without JavaScript the link opens the page with the dialog rendered open in the page flow. #}
+  <div>
+    <a href="{{ scoped_url(request, 'investments_instruments') }}?form=instrument#instrument-dialog" data-dialog-open="instrument-dialog" aria-haspopup="dialog" class="btn-primary" data-add-instrument>{{ _("Add instrument") }}</a>
+  </div>
+  <dialog id="instrument-dialog" aria-labelledby="instrument-form-heading" data-dialog-modal class="popup w-[min(92vw,48rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if create_errors or request.query_params.get("form") == "instrument" %} open{% endif %}>
+   <div class="p-4 sm:p-6" data-instrument-create>
+    <div class="flex items-start justify-between gap-4">
+      <h2 id="instrument-form-heading" class="text-base font-semibold">{{ _("Add an instrument") }}</h2>
+      <a href="{{ scoped_url(request, 'investments_instruments') }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" title="{{ _('Close') }}"><span aria-hidden="true">×</span><span class="sr-only">{{ _("Close") }}</span></a>
+    </div>
+    <div class="mt-4">
+      {% call instrument_form("new-instrument", scoped_url(request, 'investments_instrument_create'), "outerHTML", create_values, create_errors, create_rows) %}
+      <a href="{{ scoped_url(request, 'investments_instruments') }}" data-dialog-close class="rounded-xl px-3 py-2 text-sm font-medium text-muted hover:bg-subtle">{{ _("Cancel") }}</a>
       {% endcall %}
-    </section>
-  </details>
+    </div>
+   </div>
+  </dialog>
   {% endif %}
 
   <section class="panel p-6 sm:p-7" aria-labelledby="instruments-heading" data-section="instruments">
