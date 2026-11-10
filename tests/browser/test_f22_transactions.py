@@ -121,6 +121,13 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
             expect(page.locator("li[data-category]").first).to_be_visible()
 
             page.goto(f"{base}/transactions/{MONTH}")
+            # The table sits on the card surface, not the page canvas.
+            assert (
+                page.locator("#ledger-expense table").evaluate(
+                    "el => getComputedStyle(el).backgroundColor"
+                )
+                == "rgb(255, 255, 255)"
+            )
             day = page.locator("#entry-expense-day")
             amount = page.locator("#entry-expense-amount")
             description = page.locator("#entry-expense-description")

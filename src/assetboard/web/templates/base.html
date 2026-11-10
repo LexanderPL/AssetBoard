@@ -66,11 +66,11 @@
         <span class="nav-link cursor-not-allowed opacity-50" aria-disabled="true"><span aria-hidden="true">✦</span>{{ _("FIRE projection") }}<span class="sr-only">{{ _("Unavailable") }}</span></span>
       </nav>
       <div class="mt-4 flex shrink-0 items-center justify-between gap-3 border-t border-line px-2 pt-4 lg:mt-auto" data-sidebar-footer>
-        <div class="min-w-0 text-xs text-muted">
+        <div class="min-w-0 text-xs text-sidebar-ink">
           <span data-app-version>v{{ app_version }}</span>
           {% if update_notice %}<a href="{{ update_notice.url }}" rel="noopener noreferrer" target="_blank" class="mt-0.5 block font-medium text-primary-ink hover:underline" data-update-available>{{ _("Update available: %(version)s", version=update_notice.version) }}</a>{% endif %}
         </div>
-        <button type="button" data-theme-toggle class="rounded-lg p-2 text-muted hover:bg-subtle" aria-label="{{ _('Toggle dark mode') }}" title="{{ _('Toggle dark mode') }}">
+        <button type="button" data-theme-toggle class="rounded-lg p-2 text-sidebar-ink hover:bg-subtle" aria-label="{{ _('Toggle dark mode') }}" title="{{ _('Toggle dark mode') }}">
           <span aria-hidden="true">◐</span>
         </button>
       </div>

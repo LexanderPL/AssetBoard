@@ -199,7 +199,7 @@
     {% endif %}
     {% if rows %}
     <div class="relative mt-3 overflow-x-auto">
-      <table class="sheet w-full min-w-[40rem] text-sm">
+      <table class="sheet bg-surface w-full min-w-[40rem] text-sm">
         <caption class="sr-only">{{ _("Entries matching the filters") }}{% if window and window.pages > 1 %}, {{ _("page %(number)d of %(pages)d", number=window.number, pages=window.pages) }}{% endif %}</caption>
         <thead>
           <tr class="text-left text-xs text-muted">

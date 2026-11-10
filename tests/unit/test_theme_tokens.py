@@ -18,7 +18,7 @@ NON_TEXT = 3.0  # WCAG 1.4.11: borders that identify a form control
 # Text set in a component class (input.css), where no template class attribute shows it.
 CSS_TEXT_PAIRS = {
     ("ink", "canvas"),  # body
-    ("muted", "surface"),  # .nav-link in the sidebar
+    ("sidebar-ink", "surface"),  # .nav-link in the sidebar
     ("ink", "subtle"),  # .nav-link:hover
     ("primary-ink", "primary-soft"),  # .nav-link[aria-current]
     ("ink", "field"),  # .form-control, .form-select
@@ -118,9 +118,13 @@ def test_control_borders_and_focus_meet_non_text_contrast(theme: str, fg: str, b
 
 def test_palette_matches_the_approved_values() -> None:
     light, dark = _theme(":root"), _theme(":root.dark")
-    assert light["canvas"] == (0xFA, 0xFA, 0xFA) and dark["canvas"] == (0x11, 0x11, 0x11)
+    assert light["canvas"] == (0xF1, 0xF3, 0xF4) and dark["canvas"] == (0x11, 0x11, 0x11)
     assert light["surface"] == (0xFF, 0xFF, 0xFF) and dark["surface"] == (0x1C, 0x1C, 0x1C)
-    assert light["ink"] == (0x21, 0x21, 0x21) and dark["ink"] == (0xE1, 0xE1, 0xE1)
+    assert light["ink"] == (0x20, 0x21, 0x24) and dark["ink"] == (0xE1, 0xE1, 0xE1)
+    assert light["muted"] == (0x5F, 0x63, 0x68)
+    assert light["line"] == (0xDA, 0xDC, 0xE0)
+    assert light["sidebar-ink"] == (0x3C, 0x40, 0x43)
+    assert dark["sidebar-ink"] == dark["muted"]
     assert light["primary"] == dark["primary"] == (0x02, 0x77, 0xBD)
     assert light["accent"] == dark["accent"] == (0xFF, 0x98, 0x00)
 
@@ -128,7 +132,7 @@ def test_palette_matches_the_approved_values() -> None:
 def test_built_css_contains_both_themes() -> None:
     css = APP_CSS.read_text(encoding="utf-8")
     assert ":root.dark{" in css and "--color-canvas:17 17 17" in css
-    assert "--color-canvas:250 250 250" in css
+    assert "--color-canvas:241 243 244" in css
 
 
 # Utilities that take a colour. Each must name a theme token, or be one of the non-colour
