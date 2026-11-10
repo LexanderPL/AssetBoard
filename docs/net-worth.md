@@ -14,8 +14,11 @@ totals subtract the liabilities from the assets.
 ## Summary
 
 The summary shows the big net-worth figure, total assets and liabilities, an assets-vs-liabilities
-bar, and a donut and table for each side. Category shares are percentages of that side's own
-total; they are rounded to one decimal place and need not add up to exactly 100.0%.
+bar, one **Assets and liabilities** donut, and a category table for each side. The donut has two
+slices — assets in blue and liabilities in red — as parts of the gross total (assets plus
+liabilities), not of net worth. A line under it says so. Category-table shares are percentages of
+that side's own total; they are rounded to one decimal place and need not add up to exactly
+100.0%.
 
 The same rules as the lists apply: archived items, items with **Include in net worth** off and
 items with no effective value are not counted. Items under an archived category still count until
@@ -23,8 +26,10 @@ the item itself is archived. Items in another currency are shown separately in a
 not converted or counted before an exchange-rate service exists. Items excluded by your own
 **Include in net worth** switch are shown as a muted note, not a warning.
 
-A side with no counted value shows no donut and a dash instead of a share. A workspace with only
-liabilities therefore shows a negative net worth, the liability table, and no asset donut.
+A side with no counted value has no slice in the combined donut and a dash instead of a share in
+its table. A workspace with only liabilities therefore shows a negative net worth and a single
+liability slice. With neither side positive the donut shows **No assets or liabilities yet** and
+no chart is loaded.
 
 ## History and snapshots
 
@@ -93,19 +98,19 @@ mean to sell it for that. Estimates between values and links work as for every i
 An older workspace, or one whose categories were all deleted, does not get the suggested
 categories automatically:
 
-- A side with no categories offers **Add suggested categories**, which adds the whole set.
-- A side that already has categories offers **Add missing suggested categories** (editors and
-  owners) while a suggested one is missing. It adds each suggested category that has no category
-  of that name on that side, in English or Polish, at the end of the list in the suggested order.
-  It never renames, reorders or restores anything: a renamed suggested category gets its
-  original back next to it, and an archived one counts as present (restore it instead). Running
-  it again adds nothing. This is how a workspace created before Real estate was suggested gets
-  it.
+- A side with no categories at all, active or archived, offers **Add suggested categories**,
+  which adds the whole set.
+- A side that already has any category has no bulk offer. Add a missing suggested category, such
+  as **Real estate** in a workspace created before it was suggested, with **Add category**.
 
 Archiving a category hides it from new items but keeps its items and their history. Its items
 still count towards net worth under an **Archived categories** heading until each item is
 archived. **Delete** is offered only for a category with no items; deleting a category that
 still has items archives it instead.
+
+**Edit** keeps **Categories on this side** open: saving, cancelling, reordering, archiving,
+restoring or deleting a category re-renders the section expanded, and save or cancel keeps the
+edited row at the same place on screen.
 
 ## Items
 
@@ -308,4 +313,4 @@ Restoring removes untouched suggested net-worth categories exactly as it removes
 suggested categories: only the automatic `networth_category.seeded` set, unedited, unused and
 created within five seconds of the event. Every set ever suggested counts, so a workspace
 created before Real estate was suggested is still recognised. A later manual **Add suggested
-categories** or **Add missing suggested categories** makes that set user data.
+categories** makes that set user data.

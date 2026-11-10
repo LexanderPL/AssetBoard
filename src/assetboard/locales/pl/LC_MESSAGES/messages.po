@@ -3320,9 +3320,6 @@ msgstr "Kategorie zmieniły się w międzyczasie. Odśwież stronę i spróbuj p
 msgid "Archived because it still has items."
 msgstr "Zarchiwizowano, ponieważ nadal ma pozycje."
 
-msgid "Every suggested category is already on this side."
-msgstr "Wszystkie proponowane kategorie są już po tej stronie."
-
 msgid "Item added."
 msgstr "Dodano pozycję."
 
@@ -3377,14 +3374,11 @@ msgstr "Aktywa według kategorii"
 msgid "Liabilities by category"
 msgstr "Zobowiązania według kategorii"
 
-msgid "No assets with a value yet"
-msgstr "Brak aktywów z wartością"
+msgid "Assets and liabilities"
+msgstr "Aktywa i zobowiązania"
 
-msgid "No liabilities with a value yet"
-msgstr "Brak zobowiązań z wartością"
-
-msgid "Other categories"
-msgstr "Inne kategorie"
+msgid "No assets or liabilities yet"
+msgstr "Brak aktywów i zobowiązań"
 
 msgid "Enter a name of up to 100 characters."
 msgstr "Podaj nazwę o długości do 100 znaków."
@@ -7474,16 +7468,6 @@ msgstr "Kategorie po tej stronie"
 msgid "Add category"
 msgstr "Dodaj kategorię"
 
-msgid "Add missing suggested categories"
-msgstr "Dodaj brakujące proponowane kategorie"
-
-msgid ""
-"Adds the suggested categories this side does not have yet. Existing and "
-"archived ones stay as they are."
-msgstr ""
-"Dodaje proponowane kategorie, których ta strona jeszcze nie ma. "
-"Istniejące i zarchiwizowane pozostają bez zmian."
-
 msgid "No active categories on this side."
 msgstr "Brak aktywnych kategorii po tej stronie."
 
@@ -7627,6 +7611,13 @@ msgstr[1] "%(num)d pozycje nie są liczone, ponieważ zostały przez Ciebie wył
 msgstr[2] ""
 "%(num)d pozycji nie jest liczonych, ponieważ zostały przez Ciebie "
 "wyłączone."
+
+msgid ""
+"The chart shows assets and liabilities as parts of the gross total; net "
+"worth is assets minus liabilities."
+msgstr ""
+"Wykres pokazuje aktywa i zobowiązania jako części sumy brutto; majątek "
+"netto to aktywa minus zobowiązania."
 
 #, python-format
 msgid "Assets %(assets)s; liabilities %(liabilities)s."
@@ -9650,4 +9641,28 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Choose buy or sell."
 #~ msgstr "Wybierz kupno lub sprzedaż."
+
+#~ msgid "Every suggested category is already on this side."
+#~ msgstr "Wszystkie proponowane kategorie są już po tej stronie."
+
+#~ msgid "No assets with a value yet"
+#~ msgstr "Brak aktywów z wartością"
+
+#~ msgid "No liabilities with a value yet"
+#~ msgstr "Brak zobowiązań z wartością"
+
+#~ msgid "Other categories"
+#~ msgstr "Inne kategorie"
+
+#~ msgid "Add missing suggested categories"
+#~ msgstr "Dodaj brakujące proponowane kategorie"
+
+#~ msgid ""
+#~ "Adds the suggested categories this side"
+#~ " does not have yet. Existing and "
+#~ "archived ones stay as they are."
+#~ msgstr ""
+#~ "Dodaje proponowane kategorie, których ta "
+#~ "strona jeszcze nie ma. Istniejące i "
+#~ "zarchiwizowane pozostają bez zmian."
 

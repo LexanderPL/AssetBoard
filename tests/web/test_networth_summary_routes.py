@@ -1,8 +1,10 @@
-"""The net-worth summary page (F5.2): figure, bar, donuts, tables and exclusions."""
+"""The net-worth summary page (F5.2): figure, bar, combined donut, tables and exclusions."""
 
 from __future__ import annotations
 
+import json
 import re
+from typing import Any
 from uuid import UUID
 
 from sqlalchemy import select
@@ -68,6 +70,12 @@ def _note(html: str, tone: str) -> str:
     return match.group(0)
 
 
+def _donut_data(html: str, key: str) -> Any:
+    match = re.search(rf'id="chart-{key}-data">(.*?)</script>', html, re.DOTALL)
+    assert match is not None, key
+    return json.loads(match.group(1))
+
+
 def test_the_sidebar_and_tabs_link_to_the_summary(owner: OwnerApp) -> None:
     home = owner.client.get("/").text
     assert "data-net-worth-link" in home
@@ -79,17 +87,20 @@ def test_the_sidebar_and_tabs_link_to_the_summary(owner: OwnerApp) -> None:
     assert 'data-side-tab="asset"' in page and 'data-side-tab="liability"' in page
 
 
-def test_an_empty_summary_has_no_donuts_or_chart_scripts(owner: OwnerApp) -> None:
+def test_an_empty_summary_shows_the_combined_donut_empty_state(owner: OwnerApp) -> None:
     page = owner.client.get("/net-worth/summary").text
     assert "data-networth-summary" in page
     assert _text(page, "net-worth") == "€0.00"
-    assert "data-donut=" not in page
+    assert page.count("data-donut=") == 1
+    assert 'data-donut="combined"' in page
+    assert "No assets or liabilities yet" in page
+    assert "data-chart-source" not in page
     assert "echarts.min.js" not in page
     assert "data-summary-empty" in page
     assert "—" in page
 
 
-def test_summary_shows_totals_bar_donuts_and_tables(owner: OwnerApp) -> None:
+def test_summary_shows_totals_bar_combined_donut_and_tables(owner: OwnerApp) -> None:
     _create_item(owner, name="Car", value="12000")
     _create_item(owner, name="Laptop", value="2000", category="Electronics")
     _create_item(owner, name="Mortgage", value="5000", side="liability", category="Mortgage")
@@ -100,29 +111,50 @@ def test_summary_shows_totals_bar_donuts_and_tables(owner: OwnerApp) -> None:
     assert 'data-bar-width="1000"' in page
     assert 'data-bar-width="357"' in page
     assert "data-summary-bar-text" in page and "€14,000.00" in page
-    assert 'data-donut="assets"' in page and 'data-donut="liabilities"' in page
+    assert page.count("data-donut=") == 1
+    assert 'data-donut="combined"' in page
+    assert 'data-donut="assets"' not in page and 'data-donut="liabilities"' not in page
+    assert _text(page, "chart-total") == "€19,000.00"
+    data = _donut_data(page, "combined")
+    assert data["label"] == "Assets and liabilities"
+    assert [slice_["name"] for slice_ in data["slices"]] == ["Assets", "Liabilities"]
+    assert [slice_["color"] for slice_ in data["slices"]] == ["#0277bd", "#c62828"]
+    assert [slice_["share"] for slice_ in data["slices"]] == ["73.7%", "26.3%"]
+    assert page.count("data-chart-legend-item") == 2
+    assert page.count("data-chart-row") == 2
+    assert ">Side</th>" in page
+    assert "data-chart-row" in page and "Assets and liabilities" in page
+    assert (
+        "The chart shows assets and liabilities as parts of the gross total; "
+        "net worth is assets minus liabilities." in page
+    )
     assert 'data-summary-table="assets"' in page and 'data-summary-table="liabilities"' in page
     assert "data-summary-category" in page
     assert "85.7%" in page and "14.3%" in page
     assert "echarts.min.js" in page
 
 
-def test_only_liabilities_has_negative_net_and_no_asset_donut(owner: OwnerApp) -> None:
+def test_only_liabilities_has_negative_net_and_one_liability_slice(owner: OwnerApp) -> None:
     _create_item(owner, name="Mortgage", value="5000", side="liability", category="Mortgage")
     page = owner.client.get("/net-worth/summary").text
     assert _text(page, "net-worth") == "-€5,000.00"
     assert _text(page, "assets-total") == "€0.00"
-    assert 'data-donut="liabilities"' in page
-    assert 'data-donut="assets"' not in page
+    assert page.count("data-donut=") == 1
+    assert 'data-donut="combined"' in page
+    data = _donut_data(page, "combined")
+    assert [slice_["name"] for slice_ in data["slices"]] == ["Liabilities"]
+    assert [slice_["share"] for slice_ in data["slices"]] == ["100.0%"]
     assert 'data-summary-table="assets"' in page
     assert "data-empty-share" in page
 
 
-def test_a_zero_value_asset_shows_a_dash_and_no_asset_donut(owner: OwnerApp) -> None:
+def test_a_zero_value_asset_shows_a_dash_and_an_empty_combined_donut(owner: OwnerApp) -> None:
     _create_item(owner, name="Worthless", value="0")
     page = owner.client.get("/net-worth/summary").text
     assert _text(page, "assets-total") == "€0.00"
-    assert 'data-donut="assets"' not in page
+    assert page.count("data-donut=") == 1
+    assert 'data-donut="combined"' in page
+    assert "No assets or liabilities yet" in page
     assert "data-summary-category" not in page
     assert "data-summary-empty" in page
     assert "—" in page
@@ -176,6 +208,7 @@ def test_the_summary_is_translated(owner: OwnerApp) -> None:
     assert "Aktywa" in page and "Zobowiązania" in page
     assert "Udział" in page
     assert "Aktywa według kategorii" in page
+    assert "Aktywa i zobowiązania" in page
 
 
 def test_viewers_can_read_the_summary(owner: OwnerApp) -> None:

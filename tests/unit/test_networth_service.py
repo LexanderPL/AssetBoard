@@ -22,6 +22,7 @@ from assetboard.domain.networth import Side
 from assetboard.services import networth as service
 from assetboard.services.context import Context, PermissionDenied
 from assetboard.services.networth import (
+    AlreadySeeded,
     BulkRejected,
     DuplicateCategoryName,
     InvalidNetWorth,
@@ -260,19 +261,15 @@ def test_seed_an_empty_side_adds_the_whole_set_with_the_manual_event_shape(
     ctx = team.ctx("ed", "editor")
     assert seed_categories(team.factory, ctx, side="asset", locale="en") == SUGGESTED_ASSETS
     event = _event(team, "networth_category.seeded")
-    assert event.data == {
-        "count": 9,
-        "side": "asset",
-        "names": ", ".join(SUGGESTED_ASSETS),
-    }
+    assert event.data == {"count": 9, "side": "asset"}
     assert event.actor_user_id == team.users["ed"]
     view = _side(team, ctx)
     assert _names(view) == SUGGESTED_ASSETS
     assert [category.sort_order for category in view.categories] == list(range(9))
-    assert not view.can_seed and not view.can_add_suggested
+    assert not view.can_seed
     liability_view = _side(team, ctx, Side.LIABILITY)
     assert liability_view.categories == ()
-    assert liability_view.can_seed and not liability_view.can_add_suggested
+    assert liability_view.can_seed
     assert seed_categories(team.factory, ctx, side="liability", locale="pl") == [
         "Raty",
         "Kredyt hipoteczny",
@@ -281,55 +278,43 @@ def test_seed_an_empty_side_adds_the_whole_set_with_the_manual_event_shape(
     assert _names(_side(team, ctx, Side.LIABILITY)) == ["Raty", "Kredyt hipoteczny", "Inne"]
 
 
-def test_seed_a_partial_side_appends_only_the_missing_ones_in_seed_order(
-    team: WorkspaceDb,
-) -> None:
+def test_seed_refuses_a_side_that_already_has_categories(team: WorkspaceDb) -> None:
     ctx = team.ctx("ed", "editor")
     _category(team, ctx, "Tools")
     _category(team, ctx, "My boat")
-    _category(team, ctx, "Pojazdy")  # Vehicles in Polish: present in either language
+    _category(team, ctx, "Pojazdy")  # Vehicles in Polish
     view = _side(team, ctx)
-    assert view.can_add_suggested and not view.can_seed
+    assert not view.can_seed
 
-    created = seed_categories(team.factory, ctx, side="asset", locale="en")
+    with pytest.raises(AlreadySeeded):
+        seed_categories(team.factory, ctx, side="asset", locale="en")
 
-    assert created == [
-        "Real estate",
-        "Electronics",
-        "Appliances",
-        "Furniture",
-        "Jewelry & watches",
-        "Art & collectibles",
-        "Other",
-    ]
-    view = _side(team, ctx)
-    assert _names(view) == ["Tools", "My boat", "Pojazdy", *created]
-    assert [category.sort_order for category in view.categories] == list(range(10))
-    assert not view.can_add_suggested
+    assert _names(_side(team, ctx)) == ["Tools", "My boat", "Pojazdy"]
+    assert not [e for e in _events(team) if e.action == "networth_category.seeded"]
 
 
-def test_seed_adds_the_original_of_a_renamed_category_but_not_an_archived_one(
-    team: WorkspaceDb,
-) -> None:
+def test_seed_refuses_when_only_an_archived_category_exists(team: WorkspaceDb) -> None:
     ctx = team.ctx("ed", "editor")
-    assert seed_categories(team.factory, ctx, side="asset", locale="en") == SUGGESTED_ASSETS
-    categories = {category.name: category for category in _side(team, ctx).categories}
-    update_category(team.factory, ctx, categories["Vehicles"].id, name="Cars", color="#16a34a")
-    archive_category(team.factory, ctx, categories["Real estate"].id)
-
-    assert seed_categories(team.factory, ctx, side="asset", locale="en") == ["Vehicles"]
-
+    category = _category(team, ctx, "Cars")
+    archive_category(team.factory, ctx, category.id)
     view = _side(team, ctx)
-    assert "Real estate" not in _names(view)  # archived counts as present: the user restores it
-    assert [category.name for category in view.archived_categories] == ["Real estate"]
-    assert _names(view)[0] == "Cars" and _names(view)[-1] == "Vehicles"
+    assert not view.can_seed
+    assert view.categories == ()
+
+    with pytest.raises(AlreadySeeded):
+        seed_categories(team.factory, ctx, side="asset", locale="en")
+
+    assert _names(_side(team, ctx)) == []
+    assert [category.name for category in _side(team, ctx).archived_categories] == ["Cars"]
 
 
-def test_seed_is_idempotent_and_a_no_op_writes_no_event(team: WorkspaceDb) -> None:
+def test_a_second_seed_is_refused_and_writes_no_event(team: WorkspaceDb) -> None:
     ctx = team.ctx("ed", "editor")
     seed_categories(team.factory, ctx, side="asset", locale="pl")
-    assert seed_categories(team.factory, ctx, side="asset", locale="en") == []
-    assert seed_categories(team.factory, ctx, side="asset", locale="pl") == []
+    with pytest.raises(AlreadySeeded):
+        seed_categories(team.factory, ctx, side="asset", locale="en")
+    with pytest.raises(AlreadySeeded):
+        seed_categories(team.factory, ctx, side="asset", locale="pl")
     assert len(_side(team, ctx).categories) == 9
     assert len([e for e in _events(team) if e.action == "networth_category.seeded"]) == 1
 

@@ -3148,9 +3148,6 @@ msgstr ""
 msgid "Archived because it still has items."
 msgstr ""
 
-msgid "Every suggested category is already on this side."
-msgstr ""
-
 msgid "Item added."
 msgstr ""
 
@@ -3205,13 +3202,10 @@ msgstr ""
 msgid "Liabilities by category"
 msgstr ""
 
-msgid "No assets with a value yet"
+msgid "Assets and liabilities"
 msgstr ""
 
-msgid "No liabilities with a value yet"
-msgstr ""
-
-msgid "Other categories"
+msgid "No assets or liabilities yet"
 msgstr ""
 
 msgid "Enter a name of up to 100 characters."
@@ -6901,14 +6895,6 @@ msgstr ""
 msgid "Add category"
 msgstr ""
 
-msgid "Add missing suggested categories"
-msgstr ""
-
-msgid ""
-"Adds the suggested categories this side does not have yet. Existing and "
-"archived ones stay as they are."
-msgstr ""
-
 msgid "No active categories on this side."
 msgstr ""
 
@@ -7036,6 +7022,11 @@ msgid "%(num)d item is not counted because you excluded it."
 msgid_plural "%(num)d items are not counted because you excluded them."
 msgstr[0] ""
 msgstr[1] ""
+
+msgid ""
+"The chart shows assets and liabilities as parts of the gross total; net "
+"worth is assets minus liabilities."
+msgstr ""
 
 #, python-format
 msgid "Assets %(assets)s; liabilities %(liabilities)s."
@@ -9109,5 +9100,26 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Choose buy or sell."
+#~ msgstr ""
+
+#~ msgid "Every suggested category is already on this side."
+#~ msgstr ""
+
+#~ msgid "No assets with a value yet"
+#~ msgstr ""
+
+#~ msgid "No liabilities with a value yet"
+#~ msgstr ""
+
+#~ msgid "Other categories"
+#~ msgstr ""
+
+#~ msgid "Add missing suggested categories"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Adds the suggested categories this side"
+#~ " does not have yet. Existing and "
+#~ "archived ones stay as they are."
 #~ msgstr ""
 

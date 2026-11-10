@@ -238,16 +238,57 @@ def test_category_crud_reorder_archive_restore_and_delete(owner: OwnerApp) -> No
         {"side": "asset", "name": "Outdoor", "color": "#0ea5e9"},
     )
     assert "Outdoor" in updated.text
+    assert "data-categories open" in updated.text
     archived = _htmx(owner, f"/net-worth/categories/{other}/archive", {"side": "asset"})
     assert "Category archived." in archived.text
+    assert "data-categories open" in archived.text
     restored = _htmx(owner, f"/net-worth/categories/{other}/restore", {"side": "asset"})
     assert "Category restored." in restored.text
+    assert "data-categories open" in restored.text
     deleted = owner.post(
         f"/net-worth/categories/{other}/delete",
         {"side": "asset"},
         token_from="/net-worth",
     )
-    assert deleted.headers["location"] == "/net-worth?side=asset&notice=category_deleted"
+    assert deleted.headers["location"] == (
+        "/net-worth?side=asset&notice=category_deleted&categories=open"
+    )
+
+
+def test_category_edit_stays_open_and_keeps_its_row_in_view(owner: OwnerApp) -> None:
+    category = _create_category(owner, "Garden")
+    page = owner.client.get("/net-worth").text
+    assert "data-categories open" not in page
+    marker = f'data-keep-visible="#category-{category}"'
+    assert marker in page
+
+    edit = owner.client.get(
+        f"/net-worth/categories/{category}/edit", headers={"HX-Request": "true"}
+    )
+    assert edit.status_code == 200
+    assert "data-categories open" in edit.text
+    edit_row = re.search(rf'<li id="category-{category}".*?</li>', edit.text, re.DOTALL)
+    assert edit_row is not None
+    assert edit_row.group(0).count(marker) == 2  # the form and the Cancel link
+    assert "data-editing" in edit_row.group(0)
+
+    cancel = owner.client.get(
+        f"/net-worth/categories/{category}/row", headers={"HX-Request": "true"}
+    )
+    assert "data-categories open" in cancel.text
+    assert "data-editing" not in cancel.text
+
+    page = owner.client.get(f"/net-worth?edit_category={category}").text
+    assert "data-categories open" in page
+    assert "data-editing" in page
+
+    saved = _htmx(
+        owner,
+        f"/net-worth/categories/{category}",
+        {"side": "asset", "name": "Outdoor", "color": "#0ea5e9"},
+    )
+    assert "data-categories open" in saved.text
+    assert marker in saved.text
 
 
 def test_bulk_preview_and_create(owner: OwnerApp) -> None:

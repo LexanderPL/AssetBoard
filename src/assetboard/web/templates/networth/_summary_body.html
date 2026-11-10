@@ -33,14 +33,15 @@
   {{ warning_list(ngettext("%(num)d item is not counted because you excluded it.", "%(num)d items are not counted because you excluded them.", view.excluded_items|length), view.excluded_items, tone="excluded") }}
   {% endif %}
 
+  {% if view.combined_donut %}
+  <div class="space-y-2">
+    {{ donut(view.combined_donut, label=_("Side")) }}
+    <p class="max-w-3xl text-sm text-muted" data-donut-note>{{ _("The chart shows assets and liabilities as parts of the gross total; net worth is assets minus liabilities.") }}</p>
+  </div>
+  {% endif %}
+
   <div class="grid gap-6 lg:grid-cols-2">
-    <div class="space-y-6">
-      {% if view.asset_side.donut %}{{ donut(view.asset_side.donut) }}{% endif %}
-      {{ category_table(view.asset_side) }}
-    </div>
-    <div class="space-y-6">
-      {% if view.liability_side.donut %}{{ donut(view.liability_side.donut) }}{% endif %}
-      {{ category_table(view.liability_side) }}
-    </div>
+    {{ category_table(view.asset_side) }}
+    {{ category_table(view.liability_side) }}
   </div>
 </div>

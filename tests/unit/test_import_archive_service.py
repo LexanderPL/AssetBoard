@@ -101,8 +101,8 @@ from assetboard.services.imports import (
     ImportError as ServiceImportError,
 )
 from assetboard.services.investments import seed_into as investment_seed_into
-from assetboard.services.networth import seed_categories as networth_seed_categories
 from assetboard.services.networth import seed_into as networth_seed_into
+from assetboard.services.networth import update_category as networth_update_category
 from assetboard.services.transactions import get_transaction as get_ledger_transaction
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
@@ -1123,9 +1123,9 @@ def test_workspace_seeded_with_the_old_asset_list_is_still_empty(
         assert {row.name for row in NetWorthCategoryRepository(session, ctx).list()} == {"Vehicles"}
 
 
-def test_adding_missing_suggestions_makes_the_seed_user_data(db: WorkspaceDb) -> None:
-    """An untouched pre-F5.7 workspace is empty; once the user adds Real estate with the
-    "Add missing suggested categories" action, the set is a user action and no longer empty."""
+def test_editing_a_seed_category_makes_it_user_data(db: WorkspaceDb) -> None:
+    """An untouched pre-F5.7 workspace is empty; renaming a seed category is a user change,
+    so the set is no longer an untouched suggested set."""
     target = _target(db)
     ctx = db.ctx("own", "owner", workspace_id=target)
     with db.factory.begin() as session:
@@ -1146,6 +1146,9 @@ def test_adding_missing_suggestions_makes_the_seed_user_data(db: WorkspaceDb) ->
                 color=seed.color,
                 sort_order=position,
             )
+        vehicles_id = next(
+            category.id for category in repository.ordered() if category.name == "Vehicles"
+        )
         AuditEventRepository(session, ctx).record(
             actor_user_id=db.users["own"],
             actor_type="user",
@@ -1158,7 +1161,7 @@ def test_adding_missing_suggestions_makes_the_seed_user_data(db: WorkspaceDb) ->
     with db.factory() as session:
         assert workspace_is_empty(session, ctx)
     db.clock._value += timedelta(minutes=1)
-    assert networth_seed_categories(db.factory, ctx, side="asset", locale="en") == ["Real estate"]
+    networth_update_category(db.factory, ctx, vehicles_id, name="Cars", color="#16a34a")
     with db.factory() as session:
         assert not workspace_is_empty(session, ctx)
 
