@@ -274,7 +274,6 @@ def ensure_demo_instance(
     today = clock.today(settings.demo_timezone)
     workspace_name = gettext("Demo", settings.default_locale)
     created = False
-    upload_paths: list[Path] = []
 
     def ensure(session: Session) -> DemoStatus:
         nonlocal created
@@ -353,7 +352,10 @@ def ensure_demo_instance(
         if archive.workspace_is_empty(session, ctx):
             plan = demo_service.plan_for_workspace(ctx, today)
             session.info["clock"] = clock
-            result, upload_path = demo_service.build_demo_workspace_in_session(
+            # Keep the fresh import upload, like the reset does: the next reset treats it as
+            # an old batch and removes it after its own commit. The builder already cleans up
+            # a failed build's new file.
+            result, _upload_path = demo_service.build_demo_workspace_in_session(
                 session,
                 ctx,
                 plan,
@@ -363,8 +365,6 @@ def ensure_demo_instance(
             # The builder moves ``Session.info`` to the historical clock; timestamps of the
             # instance row and the audit event must come from now again.
             session.info["clock"] = clock
-            if upload_path is not None:
-                upload_paths.append(upload_path)
             _record_reset(
                 session,
                 clock,
@@ -385,13 +385,7 @@ def ensure_demo_instance(
             created=created,
         )
 
-    try:
-        status = run_immediate(factory, ensure)
-    except BaseException:
-        _discard_uploads(upload_paths)
-        raise
-    _discard_uploads(upload_paths)
-    return status
+    return run_immediate(factory, ensure)
 
 
 def record_demo_error(factory: sessionmaker[Session], error: BaseException) -> None:

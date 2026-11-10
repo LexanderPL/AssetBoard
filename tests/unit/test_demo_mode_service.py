@@ -143,6 +143,18 @@ def test_ensure_creates_one_demo_user_and_workspace_idempotently(
     assert second.reset_due is False
 
 
+def test_the_first_build_keeps_its_import_upload(db: WorkspaceDb, tmp_path: Path) -> None:
+    settings = _settings(tmp_path)
+    ensure_demo_instance(db.factory, settings, db.clock, settings.data_dir)
+    _, workspace_id = _demo_ids(db)
+    with db.factory() as session:
+        batch_id = session.scalars(
+            select(ImportBatch.id).where(ImportBatch.workspace_id == workspace_id)
+        ).one()
+    path = imports._upload_path(settings.data_dir, workspace_id, batch_id)
+    assert path.exists()
+
+
 def test_ensure_aligns_the_workspace_with_changed_instance_defaults(
     db: WorkspaceDb, tmp_path: Path
 ) -> None:

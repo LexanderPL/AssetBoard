@@ -140,7 +140,9 @@ the contents change; F9.11b's reset job compares it.
 The builder writes everything in one `BEGIN IMMEDIATE` transaction through the normal services,
 so validation, workspace locks, month guards and audit apply. Historical rows use a `Context`
 whose fixed clock is at the row's date, and `M-3` is closed last because a closed month refuses
-ledger writes (including linked dividend income).
+ledger writes (including linked dividend income). The generated import upload stays in the data
+directory, like the reset's fresh build; the next reset removes it as an old batch after its own
+commit.
 
 ## Related
 
