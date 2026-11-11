@@ -153,13 +153,14 @@ def test_the_seed_set_is_named_in_the_users_language(owner: OwnerApp) -> None:
     assert "Akcje" in page
 
 
-def test_the_add_class_form_is_a_header_dialog(owner: OwnerApp) -> None:
+def test_the_add_class_form_is_a_tab_action_dialog(owner: OwnerApp) -> None:
     page = owner.client.get(CLASSES).text
-    header = page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
+    assert page.index("data-tab-strip") < page.index("data-page-actions")
+    actions = page.split("data-page-actions", 1)[1].split("</div>", 1)[0]
     assert re.search(
         r'<a href="[^"]+\?form=class#class-dialog" data-dialog-open="class-dialog"'
         r"[^>]*data-add-class>Add an asset class</a>",
-        header,
+        actions,
     )
     dialog = re.search(r'<dialog id="class-dialog".*?</dialog>', page, re.DOTALL)
     assert dialog is not None and "data-class-form" in dialog.group(0)

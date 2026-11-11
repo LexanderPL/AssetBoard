@@ -27,20 +27,26 @@ contributors adding a page, a form, a table or an action. The audit in
 Every signed-in page uses `base.html`:
 
 ```
-workspace name (small caps)
-H1: the destination             [primary action] [user menu]
+workspace name (small caps)                         [user menu]
+H1: the destination
+[primary action, left-aligned]
 page intro / period (optional)
 panels and tables
 ```
+
+For a page with tabs, the primary action goes below the tab strip, not above it: the action
+belongs to the tab currently shown.
 
 - **One `h1` per page.** It names the destination, not the period: `Home`, `Month`,
   `Transactions`, `History`, `Upcoming payments`, `Recurring items`, `Income`, `Taxes`,
   `Net worth`, `Investments`, `Categories`, `Notifications`, `Workspace settings`.
   Put the period in a subtitle or in the page title block (`Transactions: November 2026` is the
   exception because both destination and month matter).
-- The base template has a `header_actions` block. Use it for the page's primary action
-  (`Add income`, `New tax`, `Add instrument`, `Add transaction`). Do not invent a new
-  top-of-content action row on every page.
+- The base template has a `header_actions` block, rendered as a left-aligned row directly under
+  the `h1`. Use it for the page's primary action (`Add income`, `New tax`, `Invite someone`).
+  Pages with tabs put the action below the tab strip instead, in a `data-page-actions` row, so
+  it clearly belongs to the active tab. Do not put primary actions at the top right beside the
+  user menu.
 - Page widths:
   - dashboards and lists: `max-w-6xl` (the base default);
   - settings and forms: `max-w-3xl`;
@@ -190,8 +196,8 @@ Rules:
 
 | Action | Placement | Feedback | Undo |
 | --- | --- | --- | --- |
-| Create a primary record | header action or top of panel | dialog closes / row appears in view + toast | not needed |
-| Add a ledger entry | sticky or top entry row | new row highlighted in view + status | delete offers undo |
+| Create a primary record | action row under the title, or under the tab strip | dialog closes / row appears in view + toast | not needed |
+| Add a ledger entry | end of the chronological table | new row highlighted in view + toast/status | delete offers undo |
 | Edit in a row | row action | row updates in place, stays in view | cancel restores |
 | Delete | row/overflow | toast with Undo; row disappears | 10 s |
 | Archive | row/overflow | toast with Restore or link to archived section | restore |
@@ -224,7 +230,7 @@ Rules:
 ## 8. Pull-request checklist
 
 - [ ] One `h1`; page title matches the destination.
-- [ ] Primary action in `header_actions` or at the top of the panel.
+- [ ] Primary action in the left-aligned page action row under the title, or under the tab strip.
 - [ ] No create/edit form below a long list unless it is a deliberate wizard.
 - [ ] Every action has visible feedback in the current viewport.
 - [ ] Scroll, focus and open disclosures survive HTMX swaps.

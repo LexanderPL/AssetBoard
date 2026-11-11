@@ -5925,6 +5925,9 @@ msgstr ""
 "Ten instrument jest zarchiwizowany. Przywróć go przed zmianą warunków "
 "obligacji."
 
+msgid "Add an asset class"
+msgstr "Dodaj klasę aktywów"
+
 msgid "No asset classes yet"
 msgstr "Nie ma jeszcze klas aktywów"
 
@@ -5973,9 +5976,6 @@ msgstr "Brak aktywnych klas aktywów."
 
 msgid "Edit asset class"
 msgstr "Edytuj klasę aktywów"
-
-msgid "Add an asset class"
-msgstr "Dodaj klasę aktywów"
 
 msgid "Risk tier"
 msgstr "Poziom ryzyka"
@@ -6193,6 +6193,9 @@ msgstr "Notatka"
 
 msgid "No transactions for this instrument yet."
 msgstr "Ten instrument nie ma jeszcze transakcji."
+
+msgid "Add instrument"
+msgstr "Dodaj instrument"
 
 msgid ""
 "Add the suggested asset classes before creating instruments; every "
@@ -6839,11 +6842,11 @@ msgstr "Bez daty"
 msgid "Delete the transaction of %(date)s?"
 msgstr "Usunąć transakcję z dnia %(date)s?"
 
-msgid "Add an active instrument first."
-msgstr "Najpierw dodaj aktywny instrument."
-
 msgid "Bulk add"
 msgstr "Dodaj hurtowo"
+
+msgid "Add an active instrument first."
+msgstr "Najpierw dodaj aktywny instrument."
 
 #, python-format
 msgid ""
@@ -6925,9 +6928,6 @@ msgstr "Żadna transakcja inwestycyjna nie pasuje do tych filtrów."
 
 msgid "Investment income"
 msgstr "Przychód z inwestycji"
-
-msgid "Add instrument"
-msgstr "Dodaj instrument"
 
 msgid "Invitation"
 msgstr "Zaproszenie"
@@ -7365,6 +7365,9 @@ msgstr "Zamknięcie chroni miesiąc przed przypadkowymi zmianami."
 msgid "Future months stay open for planning."
 msgstr "Przyszłe miesiące pozostają otwarte do planowania."
 
+msgid "Add item"
+msgstr "Dodaj pozycję"
+
 msgid "Possible double counting"
 msgstr "Możliwe podwójne liczenie"
 
@@ -7432,8 +7435,8 @@ msgstr "Pozycje bez obowiązującej wartości nie są wliczane do sumy częścio
 msgid "No items yet"
 msgstr "Nie ma jeszcze pozycji"
 
-msgid "Use Add item in the header, or paste a list of items below."
-msgstr "Użyj przycisku „Dodaj pozycję” w nagłówku lub wklej listę pozycji poniżej."
+msgid "Use Add item above, or paste a list of items below."
+msgstr "Użyj przycisku „Dodaj pozycję” powyżej lub wklej listę pozycji poniżej."
 
 msgid "Add an item"
 msgstr "Dodaj pozycję"
@@ -7480,9 +7483,6 @@ msgid "Enter values as positive amounts. For a liability, enter the amount owed.
 msgstr ""
 "Podawaj wartości jako liczby dodatnie. W przypadku zobowiązania podaj "
 "kwotę zadłużenia."
-
-msgid "Add item"
-msgstr "Dodaj pozycję"
 
 msgid "Add an active category before adding items."
 msgstr "Dodaj aktywną kategorię, zanim dodasz pozycje."

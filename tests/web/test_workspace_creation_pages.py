@@ -241,7 +241,7 @@ def test_the_settings_page_is_for_instance_administrators(owner: OwnerApp) -> No
     assert page.status_code == 200
     assert 'value="on" selected' in page.text
     assert "Back to users" not in page.text
-    assert "data-admin-settings" in owner.client.get("/admin/users").text
+    assert "data-admin-settings>" not in owner.client.get("/admin/users").text
     assert "data-admin-settings-link" in owner.client.get("/").text
     _csp_safe(page.text)
     owner.add_user("bea")

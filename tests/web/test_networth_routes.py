@@ -73,9 +73,9 @@ def _htmx(owner: OwnerApp, path: str, data: dict[str, str] | None = None) -> Any
     return owner.client.post(path, data=data or {}, headers=headers, follow_redirects=False)
 
 
-def _header_actions(page: str) -> str:
-    assert "data-header-actions" in page
-    return page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
+def _page_actions(page: str) -> str:
+    assert "data-page-actions" in page
+    return page.split("data-page-actions", 1)[1].split("</div>", 1)[0]
 
 
 def _create_category(owner: OwnerApp, name: str, side: str = "asset") -> UUID:
@@ -105,8 +105,8 @@ def test_the_page_has_assets_and_liabilities_tabs(owner: OwnerApp) -> None:
     liability = owner.client.get("/net-worth?side=liability").text
     assert "Mortgage" in liability and "Vehicles" not in liability
     assert re.search(r'data-side-tab="liability" aria-current="page"', liability) is not None
-    # The header's Add item keeps the tab it was opened on.
-    assert "?side=liability&form=item#item-dialog" in _header_actions(liability)
+    # The Add item action under the tabs keeps the tab it was opened on.
+    assert "?side=liability&form=item#item-dialog" in _page_actions(liability)
 
 
 def test_the_seed_form_works_for_an_empty_side(owner: OwnerApp) -> None:
@@ -151,12 +151,13 @@ def test_create_item_shows_the_value_and_history(owner: OwnerApp) -> None:
         )
 
 
-def test_the_add_item_form_is_a_header_dialog(owner: OwnerApp) -> None:
+def test_the_add_item_form_is_a_tab_action_dialog(owner: OwnerApp) -> None:
     page = owner.client.get("/net-worth").text
+    assert page.index("data-tab-strip") < page.index("data-page-actions")
     assert re.search(
         r'<a href="[^"]+\?side=asset&form=item#item-dialog" data-dialog-open="item-dialog"'
         r"[^>]*data-add-item>Add item</a>",
-        _header_actions(page),
+        _page_actions(page),
     )
     dialog = re.search(r'<dialog id="item-dialog".*?</dialog>', page, re.DOTALL)
     assert dialog is not None

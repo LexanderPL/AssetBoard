@@ -95,7 +95,7 @@
 </dialog>
 {% endif %}
 {% set filter_count = (1 if direction else 0) + (1 if category_id else 0) %}
-<details class="panel" data-filter-disclosure open>
+<details class="panel" data-filter-disclosure>
   <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden">
     <span class="flex flex-wrap items-center gap-2 text-sm font-semibold">
       <span aria-hidden="true">▾</span>{{ _("Filters") }}
@@ -152,7 +152,7 @@
       </div>
       {% if can_edit %}
       <div class="flex flex-wrap items-start gap-2" data-occurrence-actions>
-        <a href="{{ page_url('paid-' ~ occurrence.id) }}" data-dialog-open="paid-{{ occurrence.id }}-dialog" aria-haspopup="dialog" class="btn-primary py-3">{{ _("Mark paid or received") }}<span class="sr-only"> {{ occurrence.label }}</span></a>
+        <a href="{{ page_url('paid-' ~ occurrence.id) }}" data-dialog-open="paid-{{ occurrence.id }}-dialog" aria-haspopup="dialog" class="btn-primary btn-sm h-8">{{ _("Mark paid or received") }}<span class="sr-only"> {{ occurrence.label }}</span></a>
         {% call row_menu(occurrence.label, key=occurrence.id|string) %}
           {% if occurrence.one_time %}
           {# A one-time payment is edited and deleted here; the Recurring page does not list it. #}

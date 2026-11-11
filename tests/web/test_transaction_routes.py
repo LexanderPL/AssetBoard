@@ -127,9 +127,9 @@ def test_the_month_page_has_two_tables_with_entry_rows(ledger: OwnerApp) -> None
         assert f'value="{direction}"' in section
         assert f'aria-describedby="ledger-{direction}-hint"' in section
         assert "Enter saves, Esc clears the row or cancels an edit." in section
-        # The entry row is the first row of its table: a saved entry appears right below it.
-        first_row = section.split("<tbody>", 1)[1].split("</tr>", 1)[0]
-        assert f'<tr id="entry-{direction}-row"' in first_row
+        # Entries are chronological: the new-entry row follows the rows already there.
+        tbody = section.split("<tbody>", 1)[1].split("</tbody>", 1)[0]
+        assert re.search(rf'<tr id="entry-{direction}-row".*?</tr>\s*$', tbody, re.DOTALL)
     assert "<h2" in page and ">Expenses</h2>" in page and ">Income</h2>" in page
     # F2.7: the entry page has no summary, flow bar or KPI line.
     assert 'id="month-summary"' not in page and "data-summary-kpis" not in page

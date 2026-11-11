@@ -4,7 +4,6 @@
 {% block heading %}{{ _("Users") }}{% endblock %}
 {% block header_actions %}
 {% if can_create %}<a class="btn-primary" href="{{ scoped_url(request, 'admin_user_new') }}" data-admin-create>{{ _("Create an account") }}</a>{% endif %}
-<a class="btn" href="{{ scoped_url(request, 'admin_settings') }}" data-admin-settings>{{ _("Instance settings") }}</a>
 {% endblock %}
 {% block content %}
 {% if notice %}<p class="mb-6 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-admin-notice>{{ notice }}</p>{% endif %}
