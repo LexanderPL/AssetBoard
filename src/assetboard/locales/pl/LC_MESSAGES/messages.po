@@ -5011,6 +5011,9 @@ msgstr "w użyciu"
 msgid "Restore"
 msgstr "Przywróć"
 
+msgid "Edit"
+msgstr "Edytuj"
+
 #, python-format
 msgid "Move %(name)s up"
 msgstr "Przesuń %(name)s w górę"
@@ -5018,9 +5021,6 @@ msgstr "Przesuń %(name)s w górę"
 #, python-format
 msgid "Move %(name)s down"
 msgstr "Przesuń %(name)s w dół"
-
-msgid "Edit"
-msgstr "Edytuj"
 
 msgid "Archive"
 msgstr "Archiwizuj"
