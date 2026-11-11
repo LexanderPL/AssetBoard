@@ -100,7 +100,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#categorie
     <form {{ htmx_form(scoped_url(request, 'category_archive', category_id=row_id)) }}>{{ csrf_input() }}
       <button type="submit" data-archive class="row-menu-item">{{ _("Archive") }}<span class="sr-only"> {{ c.name }}</span></button></form>
     {% if not c.in_use %}
-    <form {{ htmx_form(scoped_url(request, 'category_delete', category_id=row_id)) }} data-confirm="{{ _('Delete the category %(name)s?', name=c.name) }}">{{ csrf_input() }}
+    <form {{ htmx_form(scoped_url(request, 'category_delete', category_id=row_id)) }} data-confirm="{{ _('Delete the category %(name)s?', name=c.name) }}" data-confirm-tone="danger">{{ csrf_input() }}
       <button type="submit" data-delete class="row-menu-item row-menu-item-danger">{{ _("Delete") }}<span class="sr-only"> {{ c.name }}</span></button></form>
     {% endif %}
     {% endcall %}

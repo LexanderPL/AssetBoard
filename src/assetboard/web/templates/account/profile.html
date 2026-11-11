@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros/components.html" import field, select, csrf_input, primary_button, confirm_block with context %}
+{% from "macros/components.html" import field, select, csrf_input, confirm_block with context %}
 {% block title %}{{ _("Profile") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Profile") }}{% endblock %}
 {% block content %}
@@ -34,7 +34,7 @@
           <span id="highlight-help" class="block text-xs text-muted">{{ _("On the Transactions page, larger expenses get a stronger red background and larger income a stronger green one.") }}</span>
         </span>
       </label>
-      {{ primary_button(_("Save")) }}
+      <button type="submit" class="btn-primary">{{ _("Save") }}</button>
     </form>
     <p class="mt-4 text-xs text-muted">{{ _("The dark-mode button changes the theme on one device only.") }}
       <button type="button" data-theme-reset class="font-semibold text-primary-ink">{{ _("Use the saved theme on this device") }}</button>

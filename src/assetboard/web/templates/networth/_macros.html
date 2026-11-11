@@ -236,7 +236,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
     <form {{ htmx_form(scoped_url(request, 'networth_category_archive', category_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">
       <button type="submit" data-archive class="row-menu-item">{{ _("Archive") }}<span class="sr-only"> {{ category.name }}</span></button></form>
     {% if not category.in_use %}
-    <form {{ htmx_form(scoped_url(request, 'networth_category_delete', category_id=row_id)) }} data-confirm="{{ _('Delete the category %(name)s?', name=category.name) }}">{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">
+    <form {{ htmx_form(scoped_url(request, 'networth_category_delete', category_id=row_id)) }} data-confirm="{{ _('Delete the category %(name)s?', name=category.name) }}" data-confirm-tone="danger">{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">
       <button type="submit" data-delete class="row-menu-item row-menu-item-danger">{{ _("Delete") }}<span class="sr-only"> {{ category.name }}</span></button></form>
     {% endif %}
     {% endcall %}

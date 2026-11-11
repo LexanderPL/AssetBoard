@@ -4656,6 +4656,12 @@ msgstr ""
 "%(name)s; jest pokazywane tylko teraz i trzeba je zmienić przy pierwszym "
 "logowaniu."
 
+msgid "Copied"
+msgstr "Skopiowano"
+
+msgid "Copy"
+msgstr "Kopiuj"
+
 msgid "Create an account"
 msgstr "Utwórz konto"
 
@@ -5783,12 +5789,11 @@ msgstr "Dzień płatności"
 msgid "Save taxes"
 msgstr "Zapisz podatki"
 
-msgid ""
-"No income yet. Add your salary or contract work to see what you will "
-"receive next."
-msgstr ""
-"Nie ma jeszcze przychodów. Dodaj pensję lub pracę na zlecenie, aby "
-"zobaczyć, co otrzymasz w najbliższym czasie."
+msgid "No income yet"
+msgstr "Brak przychodów"
+
+msgid "Add your salary or contract work to see what you will receive next."
+msgstr "Dodaj pensję lub pracę na zlecenie, aby zobaczyć najbliższe wypłaty."
 
 msgid "Values are estimates from user-entered terms."
 msgstr "Wartości są szacunkami na podstawie wprowadzonych warunków."
@@ -5997,6 +6002,9 @@ msgstr "Przychody z inwestycji"
 #, python-format
 msgid "Dividends and interest by calendar year, in %(currency)s."
 msgstr "Dywidendy i odsetki według roku kalendarzowego, w %(currency)s."
+
+msgid "Income from investments by year"
+msgstr "Przychody z inwestycji według lat"
 
 msgid "Year"
 msgstr "Rok"
@@ -7752,6 +7760,11 @@ msgstr "Zapisz kanał"
 msgid "No notification channels yet."
 msgstr "Nie ma jeszcze kanałów powiadomień."
 
+msgid "Add a channel to get reminders about upcoming and overdue payments."
+msgstr ""
+"Dodaj kanał, aby otrzymywać przypomnienia o nadchodzących i zaległych "
+"płatnościach."
+
 #, python-format
 msgid "Allowed services on this server: %(schemes)s."
 msgstr "Dozwolone usługi na tym serwerze: %(schemes)s."
@@ -8326,6 +8339,9 @@ msgstr "Dodaj zmianę stawki"
 msgid "No taxes on income yet."
 msgstr "Nie ma jeszcze podatków od przychodu."
 
+msgid "Add a tax rule to plan what you keep."
+msgstr "Dodaj regułę podatku, aby zaplanować, ile ci zostaje."
+
 #, python-format
 msgid "Archived: %(names)s"
 msgstr "Zarchiwizowane: %(names)s"
@@ -8883,9 +8899,6 @@ msgstr ""
 
 msgid "Invitation link"
 msgstr "Link z zaproszeniem"
-
-msgid "Copy"
-msgstr "Kopiuj"
 
 msgid "Valid for"
 msgstr "Ważny przez"

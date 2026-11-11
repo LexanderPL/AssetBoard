@@ -219,6 +219,7 @@ def test_row_actions_share_the_compact_components_and_overflow_menu(owner: Owner
     assert 'class="btn-icon' in markup and 'aria-label="Actions: Food"' in markup
     for marker in ("data-move-up", "data-move-down", "data-archive", "data-delete"):
         assert marker in markup
+    assert 'data-confirm-tone="danger"' in markup
     assert "row-menu-item-danger" in markup
 
 

@@ -92,7 +92,7 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#work-cale
       <button type="submit" class="btn" data-calendar-fill>{{ _("Fill working days") }}</button>
     </form>
     {% if calendar.derived %}
-    <form {{ htmx_post(scoped_url(request, 'income_calendar_clear', source_id=source_id)) }} data-confirm="{{ _('Clear every day of %(month)s? The month work log made from them is removed too.', month=month_heading) }}">
+    <form {{ htmx_post(scoped_url(request, 'income_calendar_clear', source_id=source_id)) }} data-confirm="{{ _('Clear every day of %(month)s? The month work log made from them is removed too.', month=month_heading) }}" data-confirm-tone="danger">
       {{ csrf_input() }}{{ override_input() }}<input type="hidden" name="month" value="{{ month_value }}">
       <button type="submit" class="btn text-danger" data-calendar-clear>{{ _("Clear month") }}</button>
     </form>

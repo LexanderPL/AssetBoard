@@ -211,7 +211,7 @@
                 </form>
               </details>
               {% if r.occurrence.one_time %}
-              <form method="post" action="{{ scoped_url(request, 'upcoming_delete', occurrence_id=r.occurrence.id) }}" data-confirm="{{ _('Delete the planned entry %(name)s?', name=r.occurrence.label) }}">
+              <form method="post" action="{{ scoped_url(request, 'upcoming_delete', occurrence_id=r.occurrence.id) }}" data-confirm="{{ _('Delete the planned entry %(name)s?', name=r.occurrence.label) }}" data-confirm-tone="danger">
                 {{ csrf_input() }}
                 <input type="hidden" name="return_month" value="{{ ledger.month }}">
                 <button type="submit" class="{{ delete_class }}" aria-label="{{ _('Delete the entry of %(date)s, %(amount)s', date=r.full_date, amount=r.amount) }}">{{ _("Delete") }}</button>

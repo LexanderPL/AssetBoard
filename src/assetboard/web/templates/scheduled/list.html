@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros/components.html" import csrf_input with context %}
+{% from "macros/components.html" import csrf_input, empty_state with context %}
 {% from "categories/_macros.html" import swatch %}
 {% block title %}{{ _("Recurring") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Recurring items") }}{% endblock %}
@@ -7,7 +7,6 @@
 {% block header_actions %}{% if can_edit and has_items %}<a href="{{ scoped_url(request, 'scheduled_new') }}" class="btn-primary" data-new-recurring>{{ _("New recurring item") }}</a>{% endif %}{% endblock %}
 {% block content %}
 {% set chip = "ml-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" %}
-{% set new_button = "btn-primary" %}
 {% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 {% if has_items %}
@@ -42,7 +41,7 @@
               <a class="btn-sm" href="{{ scoped_url(request, 'scheduled_edit', item_id=item.id) }}" data-edit>{{ _("Edit") }}<span class="sr-only"> {{ item.values.name }}</span></a>
               {% set action = 'resume' if item.paused else 'pause' %}
               <form method="post" action="{{ scoped_url(request, 'scheduled_action', item_id=item.id, action=action) }}">{{ csrf_input() }}<button type="submit" class="btn-sm" data-{{ action }}>{{ _("Resume") if item.paused else _("Pause") }}<span class="sr-only"> {{ item.values.name }}</span></button></form>
-              <form method="post" action="{{ scoped_url(request, 'scheduled_action', item_id=item.id, action='delete') }}" data-confirm="{{ _('Delete the recurring item %(name)s? Its planned dates are removed. Payments already recorded or skipped stay in your history.', name=item.values.name) }}">{{ csrf_input() }}<button type="submit" data-delete class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ item.values.name }}</span></button></form>
+              <form method="post" action="{{ scoped_url(request, 'scheduled_action', item_id=item.id, action='delete') }}" data-confirm="{{ _('Delete the recurring item %(name)s? Its planned dates are removed. Payments already recorded or skipped stay in your history.', name=item.values.name) }}" data-confirm-tone="danger">{{ csrf_input() }}<button type="submit" data-delete class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ item.values.name }}</span></button></form>
             </div>
           </td>
           {% endif %}
@@ -58,10 +57,12 @@
 {% endfor %}
 <p class="text-sm text-muted">{{ _("Pausing removes the planned dates from today onward until you resume. Dates in closed months never change.") }}</p>
 {% else %}
-<div class="panel grid justify-items-start gap-3 p-6" data-recurring-empty>
-  <p class="font-semibold">{{ _("No recurring items yet.") }}</p>
-  <p class="max-w-xl text-sm text-muted">{{ _("Add rent, subscriptions, a salary or anything else that repeats, and its dates are planned for you.") }}</p>
-  {% if can_edit %}<a href="{{ scoped_url(request, 'scheduled_new') }}" class="{{ new_button }}" data-new-recurring>{{ _("New recurring item") }}</a>{% endif %}
+<div data-recurring-empty>
+{% if can_edit %}
+{{ empty_state(_("No recurring items yet."), _("Add rent, subscriptions, a salary or anything else that repeats, and its dates are planned for you."), _("New recurring item"), scoped_url(request, 'scheduled_new'), icon="↻", action_data={"new-recurring": ""}) }}
+{% else %}
+{{ empty_state(_("No recurring items yet."), _("Add rent, subscriptions, a salary or anything else that repeats, and its dates are planned for you."), icon="↻") }}
+{% endif %}
 </div>
 {% endif %}
 {% endblock %}

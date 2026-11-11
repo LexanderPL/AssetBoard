@@ -59,14 +59,14 @@
   {% endif %}
   <form method="post" action="{{ scoped_url(request, 'admin_demo_reset') }}" class="mt-5">
     {{ csrf_input() }}
-    <button type="submit" data-demo-reset class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Reset now") }}</button>
+    <button type="submit" data-demo-reset class="btn-primary">{{ _("Reset now") }}</button>
   </form>
   {% else %}
   <p class="mt-3 text-sm text-muted" data-demo-state>{{ _("Off. The demo workspace stays until you delete it.") }}</p>
   {% if demo_workspace_exists %}
   <form method="post" action="{{ scoped_url(request, 'admin_demo_delete') }}" class="mt-5">
     {{ csrf_input() }}
-    <button type="submit" data-demo-delete class="rounded-xl border border-danger-line bg-danger-soft px-4 py-2.5 text-sm font-semibold text-danger-strong hover:bg-danger-line/20">{{ _("Delete demo data") }}</button>
+    <button type="submit" data-demo-delete class="btn-danger">{{ _("Delete demo data") }}</button>
   </form>
   {% endif %}
   {% endif %}

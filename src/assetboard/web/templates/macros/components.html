@@ -119,8 +119,8 @@
       <p data-confirm-message class="mt-2 text-sm text-muted">{{ message }}</p>
     </div>
     <div class="flex justify-end gap-3">
-      <button type="button" data-confirm-cancel class="rounded-xl border border-line px-4 py-2 text-sm font-medium">{{ cancel_label }}</button>
-      <button type="button" data-confirm-accept class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary">{{ confirm_label }}</button>
+      <button type="button" data-confirm-cancel class="btn">{{ cancel_label }}</button>
+      <button type="button" data-confirm-accept class="btn-primary">{{ confirm_label }}</button>
     </div>
   </div>
 </dialog>
@@ -142,13 +142,13 @@
 </div>
 {%- endmacro %}
 
-{% macro empty_state(title, message, action_label=None, action_url=None) -%}
-<div class="panel flex min-h-52 flex-col items-center justify-center px-6 py-10 text-center">
-  <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-primary-ink" aria-hidden="true">+</div>
+{% macro empty_state(title, message, action_label=None, action_url=None, icon="+", action_data=None) -%}
+<div class="panel flex min-h-52 flex-col items-center justify-center px-6 py-10 text-center" data-empty-state>
+  <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary-soft text-xl font-semibold text-primary-ink" aria-hidden="true">{{ icon }}</div>
   <h2 class="text-base font-semibold">{{ title }}</h2>
   <p class="mt-2 max-w-sm text-sm leading-6 text-muted">{{ message }}</p>
   {% if action_label and action_url %}
-  <a href="{{ action_url }}" class="mt-5 rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ action_label }}</a>
+  <a href="{{ action_url }}" class="btn-primary mt-5"{% if action_data %}{% for key, value in action_data.items() %} data-{{ key }}="{{ value }}"{% endfor %}{% endif %}>{{ action_label }}</a>
   {% endif %}
 </div>
 {%- endmacro %}

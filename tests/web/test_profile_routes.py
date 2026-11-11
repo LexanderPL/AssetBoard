@@ -221,6 +221,8 @@ def test_profile_cards_share_one_column(h: Harness) -> None:
     assert '<div class="max-w-3xl space-y-6">' in page
     assert "lg:col-span-2" not in page
     assert "lg:grid-cols-2" not in page
+    assert '<button type="submit" class="btn-primary">Save</button>' in page
+    assert "w-full rounded-xl bg-primary" not in page
 
 
 def test_profile_saves_birth_year_and_life_expectancy(h: Harness) -> None:

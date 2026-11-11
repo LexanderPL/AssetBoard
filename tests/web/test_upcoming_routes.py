@@ -425,6 +425,7 @@ def test_add_edit_and_delete_a_one_time_payment_on_upcoming(owner):
     assert f'data-dialog-open="paid-{occurrence_id}-dialog"' in card.group(0)
     assert f'data-dialog-open="edit-{occurrence_id}-dialog"' in card.group(0)
     assert "data-delete" in card.group(0)
+    assert 'data-confirm-tone="danger"' in card.group(0)
     assert ">Skip<" not in card.group(0) and "Edit rule" not in card.group(0)
     assert 'value="Car insurance"' in card.group(0)
     # The Recurring page does not list it.

@@ -4352,6 +4352,12 @@ msgid ""
 "%(name)s; it is shown only now and must be changed at the first sign-in."
 msgstr ""
 
+msgid "Copied"
+msgstr ""
+
+msgid "Copy"
+msgstr ""
+
 msgid "Create an account"
 msgstr ""
 
@@ -5395,9 +5401,10 @@ msgstr ""
 msgid "Save taxes"
 msgstr ""
 
-msgid ""
-"No income yet. Add your salary or contract work to see what you will "
-"receive next."
+msgid "No income yet"
+msgstr ""
+
+msgid "Add your salary or contract work to see what you will receive next."
 msgstr ""
 
 msgid "Values are estimates from user-entered terms."
@@ -5583,6 +5590,9 @@ msgstr ""
 
 #, python-format
 msgid "Dividends and interest by calendar year, in %(currency)s."
+msgstr ""
+
+msgid "Income from investments by year"
 msgstr ""
 
 msgid "Year"
@@ -7151,6 +7161,9 @@ msgstr ""
 msgid "No notification channels yet."
 msgstr ""
 
+msgid "Add a channel to get reminders about upcoming and overdue payments."
+msgstr ""
+
 #, python-format
 msgid "Allowed services on this server: %(schemes)s."
 msgstr ""
@@ -7694,6 +7707,9 @@ msgstr ""
 msgid "No taxes on income yet."
 msgstr ""
 
+msgid "Add a tax rule to plan what you keep."
+msgstr ""
+
 #, python-format
 msgid "Archived: %(names)s"
 msgstr ""
@@ -8207,9 +8223,6 @@ msgid "Invitation link created. Copy it now: it is shown only once."
 msgstr ""
 
 msgid "Invitation link"
-msgstr ""
-
-msgid "Copy"
 msgstr ""
 
 msgid "Valid for"
@@ -9173,5 +9186,11 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Reschedule this one"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "No income yet. Add your salary or"
+#~ " contract work to see what you "
+#~ "will receive next."
 #~ msgstr ""
 

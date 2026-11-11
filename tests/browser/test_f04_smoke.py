@@ -146,6 +146,9 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             confirm = page.locator("#confirm-dialog")
             expect(confirm).to_be_visible()
             expect(confirm).to_contain_text("Remove Bea from this workspace?")
+            accept = confirm.get_by_role("button", name="Continue")
+            assert accept.evaluate("el => el.classList.contains('btn-danger')")
+            assert not accept.evaluate("el => el.classList.contains('btn-primary')")
             page.keyboard.press("Escape")
             expect(confirm).to_be_hidden()
             expect(bea_row).to_be_visible()
@@ -165,6 +168,10 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             # The link is built from BASE_URL; open its path on this test server.
             link = base + urlsplit(page.locator("#invitation-link").input_value()).path
             assert "/invite/" in link
+            copy_button = page.locator('[data-copy-target="invitation-link"]')
+            copy_button.click()
+            expect(copy_button).to_have_text("Copied")
+            expect(copy_button).to_have_text("Copy", timeout=3000)
             guest = browser.new_context(color_scheme="light")
             guest_page = guest.new_page()
             # Static files loaded by pages whose URL holds the token never carry it as Referer.
@@ -216,6 +223,21 @@ def test_f04_browser_shell_smoke(tmp_path: Path) -> None:
             page.goto(second_link, wait_until="networkidle")
             page.get_by_role("button", name="Accept invitation").click()
             expect(page.get_by_text("You are already a member of this workspace.")).to_be_visible()
+
+            # The temporary password page offers a Copy button with the same feedback.
+            page.goto(f"{base}/admin/users/new", wait_until="networkidle")
+            page.get_by_label("Email", exact=True).fill("created@example.com")
+            page.get_by_label("Display name").fill("Created User")
+            page.get_by_label("Your password").fill("Correct Horse Battery!")
+            page.get_by_role("button", name="Create account", exact=True).click()
+            expect(page.locator("[data-admin-created]")).to_be_visible()
+            password_field = page.locator("#temporary-password")
+            assert len(password_field.input_value()) >= 16
+            copy_password = page.locator('[data-copy-target="temporary-password"]')
+            copy_password.click()
+            expect(copy_password).to_have_text("Copied")
+            expect(copy_password).to_have_text("Copy", timeout=3000)
+
             page.goto(f"{base}/", wait_until="networkidle")
 
             body_background = "() => getComputedStyle(document.body).backgroundColor"
