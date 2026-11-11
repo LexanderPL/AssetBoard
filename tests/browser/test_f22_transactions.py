@@ -335,7 +335,7 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
 
             # Typing on right after Enter, while the server is slow: nothing typed is lost, the
             # first entry is saved with its own day and the second with the newly typed one.
-            slow.delay = 0.4
+            slow.delay = 1.0
             page.goto(f"{base}/transactions/2025-05")
             day.click()
             page.keyboard.type("7")
@@ -345,10 +345,23 @@ def test_f22_transactions_in_a_browser(tmp_path: Path) -> None:
             page.keyboard.type("First")
             category.select_option(label="Food")
             description.press("Enter")
+            # A slow write does not look idle: the form and its submit control are busy and the
+            # button is disabled until the answer arrives, then the fresh form is usable again.
+            add = page.locator("#entry-expense [data-entry-add]")
+            expect(page.locator("#ledger-expense form[data-entry-form]")).to_have_attribute(
+                "aria-busy", "true"
+            )
+            expect(add).to_have_attribute("aria-busy", "true")
+            expect(add).to_be_disabled()
             page.keyboard.type("15", delay=40)  # replaces the kept, selected day
             page.keyboard.press("Tab")
             page.keyboard.type("2.5", delay=40)
             expect(page.locator("#ledger-expense [data-description]")).to_have_text(["First"])
+            expect(add).to_be_enabled()
+            expect(add).not_to_have_attribute("aria-busy", "true")
+            expect(page.locator("#ledger-expense form[data-entry-form]")).not_to_have_attribute(
+                "aria-busy", "true"
+            )
             expect(day).to_have_value("15")
             expect(amount).to_have_value("2.5")
             expect(amount).to_be_focused()

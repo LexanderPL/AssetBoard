@@ -3619,6 +3619,15 @@ msgid ""
 " holiday data."
 msgstr ""
 
+msgid "Recurring item paused."
+msgstr ""
+
+msgid "Recurring item resumed."
+msgstr ""
+
+msgid "Recurring item deleted."
+msgstr ""
+
 msgid "The recurring item could not be saved. Check the form and try again."
 msgstr ""
 

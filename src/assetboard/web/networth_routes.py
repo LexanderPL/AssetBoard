@@ -249,6 +249,7 @@ def _body_context(
     *,
     side: Side,
     notice: str | None = None,
+    toast_notice: str | None = None,
     error: str | None = None,
     create_item_values: dict[str, str] | None = None,
     create_item_errors: dict[str, str] | None = None,
@@ -282,6 +283,7 @@ def _body_context(
         "currency_options": [(code, code) for code in currency_codes()],
         "today": today,
         "notice": _t(request, NOTICES[notice]) if notice in NOTICES else None,
+        "toast_notice": _t(request, NOTICES[toast_notice]) if toast_notice in NOTICES else None,
         "error": _t(request, error) if error else None,
         "create_item_values": create_item_values
         or _create_item_values(ctx.workspace.base_currency, today, side),
@@ -356,7 +358,17 @@ def _done(
     categories_open: bool = False,
 ) -> Response:
     if is_htmx_fragment_request(request):
-        return _render(request, ctx, side=side, notice=notice, categories_open=categories_open)
+        # The fragment replaces the page body from the top, so the inline notice can land above
+        # the viewport. The toast puts the result where the user is looking; the inline notice
+        # stays for the full-page redirect below.
+        return _render(
+            request,
+            ctx,
+            side=side,
+            notice=notice,
+            toast_notice=notice,
+            categories_open=categories_open,
+        )
     suffix = "&categories=open" if categories_open else ""
     return RedirectResponse(
         request.url_for("networth").path + f"?side={side.value}&notice={notice}{suffix}",

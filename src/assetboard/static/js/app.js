@@ -377,6 +377,63 @@ document.addEventListener("htmx:configRequest", (event) => {
   }
 });
 
+// A slow HTMX write must not look idle. Before a form's request goes out, mark the form and its
+// submit controls busy and disable the controls; restore their previous state when the request
+// ends (success or failure). HTMX has already collected the form's values by this point, and a
+// swap that replaces the form brings fresh, enabled controls, so the next entry works at once.
+// A counter keeps two overlapping requests on one form from re-enabling it too early.
+const pendingForms = new WeakMap(); // form -> {count, controls: [{control, disabled}]}
+
+function startFormPending(form) {
+  const pending = pendingForms.get(form);
+  if (pending) {
+    pending.count += 1;
+    return;
+  }
+  const active = document.activeElement;
+  const controls = Array.from(
+    form.querySelectorAll("button[type='submit'], input[type='submit']"),
+  ).map((control) => ({ control, disabled: control.disabled }));
+  form.setAttribute("aria-busy", "true");
+  controls.forEach(({ control }) => {
+    control.setAttribute("aria-busy", "true");
+    // Never disable the control that has the focus: disabling it drops the focus before the
+    // answer swaps in, and a keyboard user loses their place. hx-sync still prevents a second
+    // in-flight request from the same form.
+    if (control !== active) control.disabled = true;
+  });
+  pendingForms.set(form, { count: 1, controls });
+}
+
+function finishFormPending(form) {
+  const pending = pendingForms.get(form);
+  if (!pending) return;
+  pending.count -= 1;
+  if (pending.count > 0) return;
+  pendingForms.delete(form);
+  form.removeAttribute("aria-busy");
+  pending.controls.forEach(({ control, disabled }) => {
+    control.removeAttribute("aria-busy");
+    control.disabled = disabled;
+  });
+}
+
+document.addEventListener("htmx:beforeRequest", (event) => {
+  const form = event.detail?.elt;
+  if (form instanceof HTMLFormElement) startFormPending(form);
+});
+for (const eventName of [
+  "htmx:afterRequest",
+  "htmx:responseError",
+  "htmx:sendError",
+  "htmx:timeout",
+]) {
+  document.addEventListener(eventName, (event) => {
+    const form = event.detail?.elt;
+    if (form instanceof HTMLFormElement) finishFormPending(form);
+  });
+}
+
 // Fields marked data-autosubmit submit their form on change; their submit button sits in
 // <noscript>, for use without JavaScript. A month field submits only a complete month in its
 // min-max range that differs from the shown one (keyboard entry changes it segment by segment);

@@ -225,6 +225,22 @@ def test_archive_and_restore_item_keep_the_history(owner: OwnerApp) -> None:
     assert 'data-item="' + str(item) + '"' in restored.text
 
 
+def test_htmx_write_shows_a_toast_and_a_full_page_keeps_its_inline_notice(
+    owner: OwnerApp,
+) -> None:
+    item = _create_item(owner)
+    archived = _htmx(owner, f"/net-worth/items/{item}/archive", {"side": "asset"})
+    assert archived.status_code == 200
+    assert archived.text.count('hx-swap-oob="beforeend:#toast-container"') == 1
+    assert "Item archived." in archived.text
+    assert "data-toast-strict" not in archived.text
+
+    page = owner.client.get("/net-worth?side=asset&notice=item_archived").text
+    assert "data-notice" in page and "Item archived." in page
+    assert 'hx-swap-oob="beforeend:#toast-container"' not in page
+    assert "data-toast" not in page
+
+
 def test_category_crud_reorder_archive_restore_and_delete(owner: OwnerApp) -> None:
     kind = _create_category(owner, "Garden")
     other = _create_category(owner, "Hardware")

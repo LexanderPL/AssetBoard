@@ -1,10 +1,11 @@
 {% from "networth/_macros.html" import bulk_preview_panel, category_row, htmx_form, item_row with context %}
 {% from "networth/_tabs.html" import tabs with context %}
-{% from "macros/components.html" import csrf_input with context %}
+{% from "macros/components.html" import csrf_input, toast with context %}
 <div id="networth-body" class="space-y-6">
   {% if notice %}
   <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
   {% endif %}
+  {% if toast_notice %}{{ toast(toast_notice, none, none) }}{% endif %}
   {% if error %}
   <p class="border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert" data-error>{{ error }}</p>
   {% endif %}

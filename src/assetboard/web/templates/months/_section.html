@@ -1,8 +1,10 @@
-{# One transaction table after a write (F2.2 part B), with the status line and, after a
-   deletion, the undo toast out of band (F2.7: the Transactions page has no summary). After an undo the section itself comes out
-   of band and the request's target (the toast) is replaced by nothing. #}
+{# One transaction table after a write (F2.2 part B), with the status line and a toast out of
+   band (F2.7: the Transactions page has no summary). A deletion keeps the strict undo toast;
+   every other write gets the plain, auto-dismissing toast. After an undo the section itself
+   comes out of band and the request's target (the toast) is replaced by nothing. #}
 {% from "months/_ledger.html" import section with context %}
 {% from "macros/components.html" import toast with context %}
 {{ section(section_view, oob=oob_section) }}
 <p id="ledger-status" hx-swap-oob="innerHTML">{{ status }}</p>
+{% if status and not toast_undo %}{{ toast(status, none, none) }}{% endif %}
 {% if toast_undo %}{{ toast(toast_message, toast_undo, _("Undo"), toast_seconds) }}{% endif %}

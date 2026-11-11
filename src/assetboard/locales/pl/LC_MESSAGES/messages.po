@@ -3833,6 +3833,15 @@ msgstr ""
 "Ta pozycja przesuwa daty na dni robocze, a dla kraju obszaru roboczego "
 "brak danych o świętach."
 
+msgid "Recurring item paused."
+msgstr "Wstrzymano pozycję cykliczną."
+
+msgid "Recurring item resumed."
+msgstr "Wznowiono pozycję cykliczną."
+
+msgid "Recurring item deleted."
+msgstr "Usunięto pozycję cykliczną."
+
 msgid "The recurring item could not be saved. Check the form and try again."
 msgstr ""
 "Nie udało się zapisać pozycji cyklicznej. Sprawdź formularz i spróbuj "
