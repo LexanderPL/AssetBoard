@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "macros/components.html" import row_menu with context %}
 {% block title %}{{ _("Users") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Users") }}{% endblock %}
 {% block header_actions %}
@@ -8,7 +9,7 @@
 {% block content %}
 {% if notice %}<p class="mb-6 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-admin-notice>{{ notice }}</p>{% endif %}
 {% if error %}<p class="mb-6 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" role="alert">{{ error }}</p>{% endif %}
-<section class="panel overflow-x-auto p-0" aria-label="{{ _('Users') }}">
+<section class="panel overflow-x-auto p-0 lg:overflow-visible" aria-label="{{ _('Users') }}">
   <table class="sheet sheet-flush w-full text-left text-sm" data-users>
     <thead class="border-b border-line text-xs uppercase tracking-wide text-muted">
       <tr>
@@ -29,12 +30,16 @@
         </td>
         <td class="px-5 py-3 text-muted">{{ user.last_login_at.date().isoformat() if user.last_login_at else _("Never") }}</td>
         <td class="px-5 py-3 text-right whitespace-nowrap">
-          <a class="text-primary-ink" href="{{ scoped_url(request, 'audit') }}?scope=instance&amp;account={{ user.id }}" data-audit-history>{{ _("History") }}</a>
-          {% if user.id != web_session.user_id %}
-          · <a class="text-primary-ink" href="{{ scoped_url(request, 'admin_user_action', user_id=user.id, action='deactivate' if user.is_active else 'activate') }}">{% if user.is_active %}{{ _("Deactivate") }}{% else %}{{ _("Activate") }}{% endif %}</a>
-          · <a class="text-primary-ink" href="{{ scoped_url(request, 'admin_user_action', user_id=user.id, action='demote' if user.is_instance_admin else 'promote') }}">{% if user.is_instance_admin %}{{ _("Remove administrator") }}{% else %}{{ _("Make administrator") }}{% endif %}</a>
-          {% if user.has_two_factor %} · <a class="text-primary-ink" href="{{ scoped_url(request, 'admin_user_action', user_id=user.id, action='reset_totp') }}">{{ _("Reset two-factor authentication") }}</a>{% endif %}
-          {% else %}<span class="text-xs text-muted">{{ _("You") }}</span>{% endif %}
+          <div class="flex items-center justify-end gap-1.5">
+            <a class="btn-sm" href="{{ scoped_url(request, 'audit') }}?scope=instance&amp;account={{ user.id }}" data-audit-history>{{ _("History") }}<span class="sr-only"> {{ user.display_name }}</span></a>
+            {% if user.id != web_session.user_id %}
+            {% call row_menu(user.display_name, "user-" ~ user.id) %}
+            <a class="row-menu-item" href="{{ scoped_url(request, 'admin_user_action', user_id=user.id, action='deactivate' if user.is_active else 'activate') }}">{% if user.is_active %}{{ _("Deactivate") }}{% else %}{{ _("Activate") }}{% endif %}<span class="sr-only"> {{ user.display_name }}</span></a>
+            <a class="row-menu-item" href="{{ scoped_url(request, 'admin_user_action', user_id=user.id, action='demote' if user.is_instance_admin else 'promote') }}">{% if user.is_instance_admin %}{{ _("Remove administrator") }}{% else %}{{ _("Make administrator") }}{% endif %}<span class="sr-only"> {{ user.display_name }}</span></a>
+            {% if user.has_two_factor %}<a class="row-menu-item" href="{{ scoped_url(request, 'admin_user_action', user_id=user.id, action='reset_totp') }}">{{ _("Reset two-factor authentication") }}<span class="sr-only"> {{ user.display_name }}</span></a>{% endif %}
+            {% endcall %}
+            {% else %}<span class="text-xs text-muted">{{ _("You") }}</span>{% endif %}
+          </div>
         </td>
       </tr>
       {% endfor %}

@@ -2,8 +2,8 @@
 method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="{{ target }}" hx-swap="outerHTML"
 {%- endmacro %}
 
-{% macro small_button(label, attrs="") -%}
-<button type="submit" {{ attrs }} class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink">{{ label }}</button>
+{% macro small_button(label, attrs="", name="") -%}
+<button type="submit" {{ attrs }} class="btn-sm">{{ label }}{% if name %}<span class="sr-only"> {{ name }}</span>{% endif %}</button>
 {%- endmacro %}
 
 {% macro swatch(color) -%}

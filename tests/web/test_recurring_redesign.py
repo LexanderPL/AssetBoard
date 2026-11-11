@@ -106,6 +106,7 @@ def test_list_hides_archived_items_and_offers_actions_by_role(owner):
     row = _row(page, rent.id)
     for marker in ("data-edit", "data-pause", "data-delete"):
         assert marker in row
+    assert 'class="btn-sm"' in row and "btn-danger" in row
     assert "data-new-recurring" in page
     delete_form = row.split('/delete"')[1].split(">")[0]
     assert "Payments already recorded or skipped stay in your history." in delete_form

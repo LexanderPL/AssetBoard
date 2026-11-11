@@ -1,12 +1,12 @@
-{% from "macros/components.html" import csrf_input with context %}
+{% from "macros/components.html" import csrf_input, row_menu with context %}
 {% from "categories/_macros.html" import swatch with context %}
 
 {% macro htmx_form(action, swap="outerHTML", keep_visible="") -%}
 method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-body" hx-swap="{{ swap }}"{% if keep_visible %} data-keep-visible="{{ keep_visible if keep_visible.startswith('#') else '#item-' ~ keep_visible }}"{% endif %}
 {%- endmacro %}
 
-{% macro small_button(label, attrs="") -%}
-<button type="submit" {{ attrs }} class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink">{{ label }}</button>
+{% macro small_button(label, attrs="", name="") -%}
+<button type="submit" {{ attrs }} class="btn-sm">{{ label }}{% if name %}<span class="sr-only"> {{ name }}</span>{% endif %}</button>
 {%- endmacro %}
 
 {% macro item_flags(item) -%}
@@ -167,15 +167,19 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
         {% else %}<span class="text-sm text-muted" data-no-value>{{ _("No value yet") }}</span>{% endif %}
       </div>
       {% if can_edit %}
-      <div class="flex flex-wrap items-center gap-1">
+      <div class="flex flex-wrap items-center gap-1.5">
         {% if item.archived %}
-        <form {{ htmx_form(scoped_url(request, 'networth_item_restore', item_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Restore"), "data-restore") }}</form>
+        <form {{ htmx_form(scoped_url(request, 'networth_item_restore', item_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Restore"), "data-restore", item.name) }}</form>
         {% else %}
-        <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&edit_item={{ row_id }}" hx-get="{{ scoped_url(request, 'networth_item_edit', item_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" data-keep-visible="#item-{{ row_id }}" class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink" data-edit>{{ _("Edit") }}</a>
+        <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&edit_item={{ row_id }}" hx-get="{{ scoped_url(request, 'networth_item_edit', item_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" data-keep-visible="#item-{{ row_id }}" class="btn-sm" data-edit>{{ _("Edit") }}<span class="sr-only"> {{ item.name }}</span></a>
+        {% call row_menu(item.name, "item-" ~ row_id) %}
         {% if item.valuation_mode == "linked" %}
-        <form {{ htmx_form(scoped_url(request, 'networth_item_unlink', item_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Unlink"), "data-unlink") }}</form>
+        <form {{ htmx_form(scoped_url(request, 'networth_item_unlink', item_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">
+          <button type="submit" data-unlink class="row-menu-item">{{ _("Unlink") }}<span class="sr-only"> {{ item.name }}</span></button></form>
         {% endif %}
-        <form {{ htmx_form(scoped_url(request, 'networth_item_archive', item_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Archive"), "data-archive") }}</form>
+        <form {{ htmx_form(scoped_url(request, 'networth_item_archive', item_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">
+          <button type="submit" data-archive class="row-menu-item">{{ _("Archive") }}<span class="sr-only"> {{ item.name }}</span></button></form>
+        {% endcall %}
         {% endif %}
       </div>
       {% endif %}
@@ -219,20 +223,23 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
     {% if category.in_use %}<span class="text-xs text-muted" data-in-use>{{ _("in use") }}</span>{% endif %}
   </div>
   {% if can_edit %}
-  <div class="flex flex-wrap items-center gap-1">
+  <div class="flex flex-wrap items-center gap-1.5">
     {% if category.archived %}
-    <form {{ htmx_form(scoped_url(request, 'networth_category_restore', category_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Restore"), "data-restore") }}</form>
+    <form {{ htmx_form(scoped_url(request, 'networth_category_restore', category_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Restore"), "data-restore", category.name) }}</form>
     {% else %}
+    <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&edit_category={{ row_id }}&categories=open" hx-get="{{ scoped_url(request, 'networth_category_edit', category_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" data-keep-visible="#category-{{ row_id }}" class="btn-sm" data-edit>{{ _("Edit") }}<span class="sr-only"> {{ category.name }}</span></a>
+    {% call row_menu(category.name, "category-" ~ row_id) %}
     <form {{ htmx_form(scoped_url(request, 'networth_category_move', category_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}"><input type="hidden" name="direction" value="up">
-      <button type="submit" data-move-up {% if first %}disabled{% endif %} aria-label="{{ _('Move %(name)s up', name=category.name) }}" class="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-subtle disabled:opacity-30"><span aria-hidden="true">↑</span></button></form>
+      <button type="submit" data-move-up {% if first %}disabled{% endif %} aria-label="{{ _('Move %(name)s up', name=category.name) }}" class="row-menu-item disabled:opacity-30"><span aria-hidden="true">↑</span></button></form>
     <form {{ htmx_form(scoped_url(request, 'networth_category_move', category_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}"><input type="hidden" name="direction" value="down">
-      <button type="submit" data-move-down {% if last %}disabled{% endif %} aria-label="{{ _('Move %(name)s down', name=category.name) }}" class="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-subtle disabled:opacity-30"><span aria-hidden="true">↓</span></button></form>
-    <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&edit_category={{ row_id }}&categories=open" hx-get="{{ scoped_url(request, 'networth_category_edit', category_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" data-keep-visible="#category-{{ row_id }}" class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink" data-edit>{{ _("Edit") }}</a>
-    <form {{ htmx_form(scoped_url(request, 'networth_category_archive', category_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">{{ small_button(_("Archive"), "data-archive") }}</form>
-    {% endif %}
+      <button type="submit" data-move-down {% if last %}disabled{% endif %} aria-label="{{ _('Move %(name)s down', name=category.name) }}" class="row-menu-item disabled:opacity-30"><span aria-hidden="true">↓</span></button></form>
+    <form {{ htmx_form(scoped_url(request, 'networth_category_archive', category_id=row_id)) }}>{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">
+      <button type="submit" data-archive class="row-menu-item">{{ _("Archive") }}<span class="sr-only"> {{ category.name }}</span></button></form>
     {% if not category.in_use %}
     <form {{ htmx_form(scoped_url(request, 'networth_category_delete', category_id=row_id)) }} data-confirm="{{ _('Delete the category %(name)s?', name=category.name) }}">{{ csrf_input() }}<input type="hidden" name="side" value="{{ side_value }}">
-      <button type="submit" data-delete class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-danger hover:bg-danger-soft">{{ _("Delete") }}</button></form>
+      <button type="submit" data-delete class="row-menu-item row-menu-item-danger">{{ _("Delete") }}<span class="sr-only"> {{ category.name }}</span></button></form>
+    {% endif %}
+    {% endcall %}
     {% endif %}
   </div>
   {% endif %}

@@ -134,19 +134,83 @@
   }
 
   /* Buttons: one shape for every page action (the Month page's "Close month" is the model).
-     .btn is the secondary look, .btn-primary the main action of a page or form. Small in-table
-     row buttons keep their own compact size. */
+     .btn is the secondary look, .btn-primary the main action of a page or form, .btn-danger a
+     destructive action. .btn-sm is the compact row action and .btn-icon a square icon control;
+     both grow to a 44 px touch target on phones and coarse pointers. */
   .btn,
-  .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50;
+  .btn-primary,
+  .btn-danger,
+  .btn-sm,
+  .btn-icon {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl border text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-50;
+  }
+
+  .btn,
+  .btn-primary,
+  .btn-danger,
+  .btn-sm {
+    @apply px-4 py-2;
   }
 
   .btn {
-    @apply border border-line bg-surface text-ink hover:bg-subtle;
+    @apply border-line bg-surface text-ink hover:bg-subtle;
   }
 
   .btn-primary {
-    @apply border border-primary bg-primary text-on-primary hover:border-primary-hover hover:bg-primary-hover;
+    @apply border-primary bg-primary text-on-primary hover:border-primary-hover hover:bg-primary-hover;
+  }
+
+  /* Destructive text on a soft danger fill: #b71c1c on #ffebee in light, #ffcdd2 on #3b1416 in
+     dark. The border is the stronger danger token, so the control keeps a visible edge. */
+  .btn-danger {
+    @apply border-danger bg-danger-soft text-danger-strong hover:border-danger-strong hover:bg-danger-tint;
+  }
+
+  .btn-sm {
+    @apply border-line bg-surface px-3 py-2 text-xs font-medium text-ink hover:bg-subtle;
+  }
+
+  .btn-icon {
+    @apply h-8 w-8 shrink-0 border-line bg-surface p-0 text-base text-muted hover:bg-subtle hover:text-ink;
+  }
+
+  /* A row's overflow menu: a <details data-popover> panel in the shared popup skin. The items
+     are full-width controls so a long action name does not make the menu wobble. */
+  .row-menu {
+    @apply absolute right-0 z-30 mt-1 max-h-[calc(100dvh-6rem)] min-w-44 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-none border border-line bg-surface p-1 text-ink shadow-card;
+  }
+
+  .row-menu-item {
+    @apply flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-subtle;
+  }
+
+  .row-menu-item-danger {
+    @apply text-danger-strong hover:bg-danger-soft;
+  }
+
+  @media (max-width: 639.98px), (pointer: coarse) {
+    .btn-sm,
+    .btn-icon,
+    .row-menu-item {
+      min-height: 2.75rem;
+    }
+
+    .btn-icon {
+      width: 2.75rem;
+      height: 2.75rem;
+      min-width: 2.75rem;
+    }
+  }
+
+  /* A scroll container would clip an absolutely positioned menu, so inside a data sheet the
+     panel joins the flow until the sheet itself fits the viewport (admin users). */
+  @media (max-width: 1023.98px) {
+    .sheet .row-menu {
+      position: static;
+      width: 12rem;
+      max-width: calc(100vw - 2rem);
+      margin-top: 0.25rem;
+    }
   }
 
   /* A form whose HTMX request runs (app.js): the form shows a progress cursor and its submit

@@ -507,4 +507,5 @@ def test_no_dangling_separator_on_your_own_row(h: Harness) -> None:
     own = page.split(f'data-user="{h.web.admin_email}"')[1].split("</tr>")[0]
     actions = re.sub(r"<[^>]+>", " ", own.split('text-right whitespace-nowrap">')[1])
     words = actions.split()
-    assert words == ["History", "You"], words
+    # History's sr-only row name sits before the "You" marker; there is no dangling separator.
+    assert words == ["History", "Admin", "You"], words

@@ -396,6 +396,18 @@ def test_bulk_limits_show_a_form_error(owner: OwnerApp) -> None:
     assert "Paste at most 64 KiB of text." in response.text
 
 
+def test_item_row_actions_use_the_compact_components_and_overflow_menu(owner: OwnerApp) -> None:
+    item = _create_item(owner)
+    page = owner.client.get("/net-worth").text
+    row = re.search(rf'id="item-{item}".*?</li>', page, re.DOTALL)
+    assert row is not None
+    markup = row.group(0)
+    assert 'class="btn-sm"' in markup
+    assert "data-row-menu" in markup and "data-popover" in markup
+    assert 'class="btn-icon' in markup and 'aria-label="Actions: Car"' in markup
+    assert "data-archive" in markup
+
+
 def test_htmx_edit_and_plain_post_fallback(owner: OwnerApp) -> None:
     item = _create_item(owner)
     edit = owner.client.get(f"/net-worth/items/{item}/edit", headers={"HX-Request": "true"})

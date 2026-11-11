@@ -95,7 +95,31 @@ def test_f21_categories_in_a_browser(tmp_path: Path) -> None:
             expect(expense.first).to_have_text("Groceries")
             expect(page.locator("[data-notice]")).to_have_text("Category saved.")
 
-            # Reorder with the buttons.
+            # At phone width every row action is a 44 px touch target. The overflow menu (swapped
+            # in by the save above) opens, closes on an outside press, and Escape returns the
+            # focus to its summary.
+            page.set_viewport_size({"width": 390, "height": 844})
+            renamed = page.locator("li[data-category]", has_text="Groceries").first
+            edit_box = renamed.locator("[data-edit]").bounding_box()
+            assert edit_box is not None and edit_box["height"] >= 44
+            menu = renamed.locator("details[data-row-menu]")
+            summary = menu.locator("summary")
+            summary_box = summary.bounding_box()
+            assert summary_box is not None and summary_box["height"] >= 44
+            summary.click()
+            expect(menu).to_have_attribute("open", "")
+            expect(menu.get_by_role("button", name="Archive Groceries")).to_be_visible()
+            page.locator("h1").click()
+            expect(menu).not_to_have_attribute("open", "")
+            summary.click()
+            page.keyboard.press("Escape")
+            expect(menu).not_to_have_attribute("open", "")
+            expect(summary).to_be_focused()
+            page.set_viewport_size({"width": 1280, "height": 720})
+
+            # Reorder from the row's overflow menu.
+            eating_out = page.locator("li[data-category]", has_text="Eating out").first
+            eating_out.locator("details[data-row-menu] summary").click()
             page.get_by_role("button", name="Move Eating out up").click()
             expect(expense.first).to_have_text("Eating out")
 
@@ -112,7 +136,8 @@ def test_f21_categories_in_a_browser(tmp_path: Path) -> None:
 
             # Delete asks for confirmation through the CSP-safe dialog.
             gifts = page.locator("li[data-category]", has_text="Gifts")
-            gifts.get_by_role("button", name="Delete").click()
+            gifts.locator("details[data-row-menu] summary").click()
+            gifts.get_by_role("button", name="Delete Gifts").click()
             expect(page.locator("#confirm-dialog")).to_contain_text("Delete the category Gifts?")
             page.get_by_role("button", name="Continue").click()
             expect(page.locator("[data-notice]")).to_have_text("Category deleted.")

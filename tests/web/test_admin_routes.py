@@ -132,6 +132,11 @@ def test_users_list_shows_sign_in_methods_never_subjects(h: Harness) -> None:
     assert "data-admin-create" in header and "data-admin-settings" in header
     row = page.split(f'data-user="{OLA}"')[1].split("</tr>")[0]
     assert "Password" in row and "Identity provider" in row and "Proxy" in row
+    assert "data-row-menu" in row and 'class="btn-sm"' in row and "btn-icon" in row
+    # History stays visible; the account actions sit in the overflow menu, never in a run of
+    # text links separated by a middle dot.
+    assert "data-audit-history" in row
+    assert "·" not in row.split("data-audit-history")[1].split("</td>")[0]
     for secret in ("secret-subject-1234", "secret-proxy-user", "provider-only@example.net"):
         assert secret not in page
 

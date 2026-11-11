@@ -74,7 +74,7 @@ def test_editing_a_category_keeps_the_section_open_and_the_row_in_place(
             expect(details).to_be_visible()
             assert details.evaluate("element => element.open") is False
 
-            page.locator("[data-categories] summary").click()
+            page.locator("[data-categories] > summary").click()
             assert details.evaluate("element => element.open") is True
 
             row = page.locator("li[data-category]", has_text="Vehicles").first

@@ -70,6 +70,8 @@ def test_create_mask_test_send_edit_and_delete(owner):
     assert created.status_code == 303 and created.headers["location"].endswith("notice=created")
     listing = owner.client.get("/notifications")
     assert "ntfys://••••••" in listing.text
+    assert 'class="btn-sm"' in listing.text and "btn-danger" in listing.text
+    assert "data-send-test" in listing.text and "Edit channel" in listing.text
     assert "very-secret-topic" not in listing.text and "ntfy.example.com" not in listing.text
     with owner.db() as session:
         row = session.scalars(select(NotificationChannel)).one()

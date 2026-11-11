@@ -4682,15 +4682,15 @@ msgstr ""
 msgid "Restore"
 msgstr ""
 
+msgid "Edit"
+msgstr ""
+
 #, python-format
 msgid "Move %(name)s up"
 msgstr ""
 
 #, python-format
 msgid "Move %(name)s down"
-msgstr ""
-
-msgid "Edit"
 msgstr ""
 
 msgid "Archive"
