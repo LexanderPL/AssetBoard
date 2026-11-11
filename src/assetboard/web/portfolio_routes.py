@@ -97,6 +97,7 @@ class HoldingRowView:
     gain: str | None
     gain_pct: str | None
     gain_negative: bool
+    gain_positive: bool
     share: str | None
 
 
@@ -111,6 +112,7 @@ class ClassRowView:
     gain: str
     gain_pct: str | None
     gain_negative: bool
+    gain_positive: bool
 
 
 @dataclass(frozen=True, slots=True)
@@ -172,8 +174,13 @@ class PortfolioView:
     gain: str
     gain_pct: str | None
     gain_negative: bool
+    gain_positive: bool
     realized_ytd: str
     realized_all: str
+    realized_ytd_negative: bool
+    realized_ytd_positive: bool
+    realized_all_negative: bool
+    realized_all_positive: bool
     year: int
     excluded: int
     scope_options: tuple[ScopeOption, ...]
@@ -331,6 +338,7 @@ def build_view(
                 gain=format_money(row.gain, locale) if row.gain is not None else None,
                 gain_pct=_pct(row.gain_tenths, locale),
                 gain_negative=bool(row.gain and row.gain.amount_minor < 0),
+                gain_positive=bool(row.gain and row.gain.amount_minor > 0),
                 share=_pct(row.share_tenths, locale),
             )
         )
@@ -349,6 +357,7 @@ def build_view(
             gain=format_money(item.total.gain, locale),
             gain_pct=_pct(item.total.gain_tenths, locale),
             gain_negative=item.total.gain.amount_minor < 0,
+            gain_positive=item.total.gain.amount_minor > 0,
         )
         for item in page.class_rows
     )
@@ -372,8 +381,13 @@ def build_view(
         gain=format_money(valuation.gain, locale),
         gain_pct=_pct(valuation.gain_tenths, locale),
         gain_negative=valuation.gain.amount_minor < 0,
+        gain_positive=valuation.gain.amount_minor > 0,
         realized_ytd=format_money(page.realized.year_to_date, locale),
         realized_all=format_money(page.realized.all_time, locale),
+        realized_ytd_negative=page.realized.year_to_date.amount_minor < 0,
+        realized_ytd_positive=page.realized.year_to_date.amount_minor > 0,
+        realized_all_negative=page.realized.all_time.amount_minor < 0,
+        realized_all_positive=page.realized.all_time.amount_minor > 0,
         year=page.today.year,
         excluded=valuation.excluded,
         scope_options=tuple(options),

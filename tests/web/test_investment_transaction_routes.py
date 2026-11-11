@@ -275,6 +275,7 @@ def test_delete_and_undo(owner: OwnerApp) -> None:
         from assetboard.db.models.investments import InvestmentTransaction
 
         tx_id = session.scalars(select(InvestmentTransaction.id)).one()
+    assert 'data-confirm-tone="danger"' in owner.client.get(TX).text
     deleted = _htmx(owner, f"{TX}/{tx_id}/delete", {"return_to": "list"})
     assert deleted.status_code == 200
     assert "Transaction deleted." in deleted.text
@@ -404,6 +405,8 @@ def test_a_dividend_records_the_net_income_and_the_income_tab_shows_it(
 
     income = owner.client.get("/investments/income").text
     assert "Income from investments" in income
+    assert re.search(r'<table class="sheet[^"]*"', income)
+    assert "Income from investments by year" in income and 'scope="col"' in income
     assert "2026" in income
     assert "€10.00" in income and "€1.00" in income and "€9.00" in income
     assert "data-income-tab" in income

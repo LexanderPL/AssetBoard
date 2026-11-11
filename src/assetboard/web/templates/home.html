@@ -4,7 +4,7 @@
 {% from "macros/charts.html" import donut with context %}
 {# Home (F2.7): the current month's flow bar (the Month page's partial), the expense and income
    donuts and up to ten upcoming F3.2 items. No inline script or style. #}
-{% set button_class = "rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle" %}
+{% set button_class = "btn cursor-pointer list-none [&::-webkit-details-marker]:hidden" %}
 {% set input_class = "form-control w-full px-2.5 py-1.5" %}
 {% block title %}{{ _("Home") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Home") }}{% endblock %}
@@ -55,7 +55,7 @@
                 <label for="home-post-amount-{{ o.id }}" class="mb-1 block text-xs font-medium">{{ _("Amount") }}</label>
                 <input id="home-post-amount-{{ o.id }}" name="amount" type="text" inputmode="decimal" value="{{ amount_input(o.expected) }}" required class="{{ input_class }}">
               </div>
-              <button type="submit" class="{{ button_class }} sm:col-span-2">{{ _("Save transaction") }}</button>
+              <button type="submit" class="btn-primary sm:col-span-2">{{ _("Save transaction") }}</button>
             </form>
           </details>
           <form method="post" action="{{ scoped_url(request, 'upcoming_skip', occurrence_id=o.id) }}" data-home-skip>

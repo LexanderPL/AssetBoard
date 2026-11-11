@@ -187,11 +187,23 @@ for (const eventName of ["htmx:oobAfterSwap", "htmx:afterSwap"]) {
 
 const confirmedPlainForms = new WeakSet();
 
-function showConfirmation(message, onConfirm) {
+function confirmationTone(element) {
+  const marked = element.closest("[data-confirm-tone]");
+  return marked instanceof HTMLElement ? marked.dataset.confirmTone : "";
+}
+
+function showConfirmation(message, onConfirm, tone = "") {
   const dialog = document.getElementById("confirm-dialog");
   if (!(dialog instanceof HTMLDialogElement)) return;
   const messageElement = dialog.querySelector("[data-confirm-message]");
   if (messageElement) messageElement.textContent = message;
+  // A destructive action gets the danger look; every other confirmation keeps the primary one.
+  const accept = dialog.querySelector("[data-confirm-accept]");
+  if (accept instanceof HTMLElement) {
+    const danger = tone === "danger";
+    accept.classList.toggle("btn-primary", !danger);
+    accept.classList.toggle("btn-danger", danger);
+  }
   dialog.addEventListener(
     "close",
     () => {
@@ -209,7 +221,7 @@ document.addEventListener("htmx:confirm", (event) => {
   const message = trigger.getAttribute("data-confirm");
   if (message === null) return;
   event.preventDefault();
-  showConfirmation(message, () => event.detail.issueRequest(true));
+  showConfirmation(message, () => event.detail.issueRequest(true), confirmationTone(trigger));
 });
 
 document.addEventListener("submit", (event) => {
@@ -224,10 +236,14 @@ document.addEventListener("submit", (event) => {
     return;
   }
   event.preventDefault();
-  showConfirmation(form.dataset.confirm, () => {
-    confirmedPlainForms.add(form);
-    form.requestSubmit();
-  });
+  showConfirmation(
+    form.dataset.confirm,
+    () => {
+      confirmedPlainForms.add(form);
+      form.requestSubmit();
+    },
+    form.dataset.confirmTone ?? "",
+  );
 });
 
 // Dialogs marked data-dialog-modal (the History page's dialogs, the one-time payment form and
@@ -632,7 +648,26 @@ for (const eventName of ["DOMContentLoaded", "htmx:afterSwap", "htmx:oobAfterSwa
   });
 }
 
-// Buttons marked data-copy-target copy the referenced input's value (invitation links).
+// Buttons marked data-copy-target copy the referenced input's value (invitation links and
+// temporary passwords). A button with data-copied-label says "Copied" for a moment.
+const copiedLabels = new WeakMap();
+
+function showCopied(button) {
+  const copiedLabel = button.dataset.copiedLabel;
+  if (!copiedLabel) return;
+  let state = copiedLabels.get(button);
+  if (!state) {
+    state = { label: button.textContent, timeout: 0 };
+    copiedLabels.set(button, state);
+  }
+  window.clearTimeout(state.timeout);
+  button.textContent = copiedLabel;
+  state.timeout = window.setTimeout(() => {
+    button.textContent = state.label;
+    copiedLabels.delete(button);
+  }, 1500);
+}
+
 document.addEventListener("click", async (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
@@ -641,6 +676,7 @@ document.addEventListener("click", async (event) => {
   const input = document.getElementById(button.dataset.copyTarget ?? "");
   if (!(input instanceof HTMLInputElement)) return;
   input.select();
+  showCopied(button);
   try {
     await navigator.clipboard.writeText(input.value);
   } catch {

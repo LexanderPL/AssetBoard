@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros/components.html" import csrf_input, month_picker, summary_button with context %}
+{% from "macros/components.html" import csrf_input, empty_state, month_picker, summary_button with context %}
 {% from "taxes/_macros.html" import when with context %}
 {% from "income/_macros.html" import paid_phrase, per_unit, units_text, estimate_text with context %}
 {% block title %}{{ _("Income") }} · {{ app_name }}{% endblock %}
@@ -206,6 +206,6 @@
     {% endif %}
   </div>
 </section>
-{% else %}<p class="panel p-6 text-muted">{{ _("No income yet. Add your salary or contract work to see what you will receive next.") }}</p>{% endfor %}
+{% else %}{{ empty_state(_("No income yet"), _("Add your salary or contract work to see what you will receive next."), icon="+") }}{% endfor %}
 </div>
 {% endblock %}

@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros/components.html" import csrf_input with context %}
+{% from "macros/components.html" import csrf_input, empty_state with context %}
 {% set input_class = "form-control w-full px-3 py-2" %}
 {% set check_class = "h-4 w-4 rounded border-line accent-primary" %}
 {# The new-channel dialog is open when the menu link asks for it, or after a refused channel. #}
@@ -70,7 +70,7 @@
     <div class="flex flex-wrap gap-2">
       {% if not demo_session %}
       <form method="post" action="{{ scoped_url(request, 'notification_test', channel_id=channel.id) }}">{{ csrf_input() }}<button type="submit" class="btn-sm" data-send-test>{{ _("Send test") }}<span class="sr-only"> {{ channel.name }}</span></button></form>
-      <form method="post" action="{{ scoped_url(request, 'notification_delete', channel_id=channel.id) }}" data-confirm="{{ _('Delete the channel %(name)s?', name=channel.name) }}">{{ csrf_input() }}<button type="submit" class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ channel.name }}</span></button></form>
+      <form method="post" action="{{ scoped_url(request, 'notification_delete', channel_id=channel.id) }}" data-confirm="{{ _('Delete the channel %(name)s?', name=channel.name) }}" data-confirm-tone="danger">{{ csrf_input() }}<button type="submit" class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ channel.name }}</span></button></form>
       {% endif %}
     </div>
   </div>
@@ -86,7 +86,7 @@
   {% endif %}
 </section>
 {% else %}
-<p class="panel p-6 text-muted" data-no-channels>{{ _("No notification channels yet.") }}</p>
+<div data-no-channels>{{ empty_state(_("No notification channels yet."), _("Add a channel to get reminders about upcoming and overdue payments."), icon="◷") }}</div>
 {% endfor %}
 </div>
 {% if page.can_add and not demo_session %}

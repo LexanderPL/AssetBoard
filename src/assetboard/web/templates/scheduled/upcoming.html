@@ -157,7 +157,7 @@
           {% if occurrence.one_time %}
           {# A one-time payment is edited and deleted here; the Recurring page does not list it. #}
           <a class="row-menu-item" href="{{ page_url('edit-' ~ occurrence.id) }}" data-dialog-open="edit-{{ occurrence.id }}-dialog">{{ _("Edit") }}<span class="sr-only"> {{ occurrence.label }}</span></a>
-          <form method="post" action="{{ scoped_url(request, 'upcoming_delete', occurrence_id=occurrence.id) }}" data-confirm="{{ _('Delete the planned entry %(name)s?', name=occurrence.label) }}">{{ csrf_input() }}<button type="submit" data-delete class="row-menu-item row-menu-item-danger">{{ _("Delete") }}<span class="sr-only"> {{ occurrence.label }}</span></button></form>
+          <form method="post" action="{{ scoped_url(request, 'upcoming_delete', occurrence_id=occurrence.id) }}" data-confirm="{{ _('Delete the planned entry %(name)s?', name=occurrence.label) }}" data-confirm-tone="danger">{{ csrf_input() }}<button type="submit" data-delete class="row-menu-item row-menu-item-danger">{{ _("Delete") }}<span class="sr-only"> {{ occurrence.label }}</span></button></form>
           {% else %}
           <a class="row-menu-item" href="{{ page_url('reschedule-' ~ occurrence.id) }}" data-dialog-open="reschedule-{{ occurrence.id }}-dialog">{{ _("Reschedule") }}<span class="sr-only"> {{ occurrence.label }}</span></a>
           <a class="row-menu-item" href="{{ page_url('amount-' ~ occurrence.id) }}" data-dialog-open="amount-{{ occurrence.id }}-dialog">{{ _("Edit amount") }}<span class="sr-only"> {{ occurrence.label }}</span></a>

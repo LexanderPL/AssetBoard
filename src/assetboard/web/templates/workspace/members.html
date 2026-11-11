@@ -35,7 +35,7 @@
         </form>
         {% endif %}
         {% if member.user_id != current_user_id and not demo_session %}
-        <form method="post" action="{{ scoped_url(request, 'workspace_member_remove', membership_id=member.membership_id|string) }}" data-confirm="{{ _('Remove %(name)s from this workspace?', name=member.display_name) }}">
+        <form method="post" action="{{ scoped_url(request, 'workspace_member_remove', membership_id=member.membership_id|string) }}" data-confirm="{{ _('Remove %(name)s from this workspace?', name=member.display_name) }}" data-confirm-tone="danger">
           {{ csrf_input() }}
           <button type="submit" data-remove-member class="rounded-xl px-3 py-2 text-sm font-medium text-danger hover:bg-danger-soft">{{ _("Remove") }}</button>
         </form>
@@ -54,7 +54,7 @@
     <div class="mt-3 flex flex-wrap items-center gap-2">
       <label for="invitation-link" class="sr-only">{{ _("Invitation link") }}</label>
       <input id="invitation-link" type="text" readonly value="{{ created_link }}" class="form-control px-3 min-w-0 flex-1 py-2 font-mono text-xs">
-      <button type="button" data-copy-target="invitation-link" class="rounded-xl border border-line bg-surface px-3 py-2 text-sm font-medium text-ink hover:bg-subtle">{{ _("Copy") }}</button>
+      <button type="button" data-copy-target="invitation-link" data-copied-label="{{ _('Copied') }}" class="btn">{{ _("Copy") }}</button>
     </div>
   </div>
   {% endif %}
@@ -101,7 +101,7 @@
         <p class="text-xs text-muted">{{ _("Expires %(date)s", date=invitation.expires_at.strftime("%Y-%m-%d %H:%M UTC")) }}</p>
       </div>
       {% if not demo_session %}
-      <form method="post" action="{{ scoped_url(request, 'workspace_invitation_revoke', invitation_id=invitation.id|string) }}" data-confirm="{{ _('Revoke this invitation link?') }}">
+      <form method="post" action="{{ scoped_url(request, 'workspace_invitation_revoke', invitation_id=invitation.id|string) }}" data-confirm="{{ _('Revoke this invitation link?') }}" data-confirm-tone="danger">
         {{ csrf_input() }}
         <button type="submit" data-revoke-invitation class="rounded-xl px-3 py-2 text-sm font-medium text-danger hover:bg-danger-soft">{{ _("Revoke") }}</button>
       </form>

@@ -224,6 +224,7 @@ def test_revoke_invitation_and_foreign_invitations_are_404(owner: OwnerApp) -> N
     token = create_link(owner)
     with owner.db() as session:
         invitation_id = session.scalars(select(Invitation.id)).one()
+    assert 'data-confirm-tone="danger"' in owner.client.get("/workspace/members").text
     response = owner.post(
         f"/workspace/invitations/{invitation_id}/revoke", token_from="/workspace/members"
     )

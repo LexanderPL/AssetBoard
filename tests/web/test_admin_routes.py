@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import logging
+import re
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -327,7 +328,11 @@ def create(
 
 
 def temporary_password(response: Any) -> str:
-    return response.text.split("data-temporary-password>")[1].split("</p>")[0].strip()
+    field = re.search(r"<input[^>]*data-temporary-password[^>]*>", response.text)
+    assert field is not None
+    value = re.search(r'value="([^"]+)"', field.group(0))
+    assert value is not None
+    return value.group(1)
 
 
 def test_create_shows_the_temporary_password_once_and_keeps_it_nowhere(h: Harness) -> None:
@@ -337,6 +342,11 @@ def test_create_shows_the_temporary_password_once_and_keeps_it_nowhere(h: Harnes
     assert response.status_code == 200
     password = temporary_password(response)
     assert len(password) >= 16
+    assert re.search(
+        r'<button[^>]*data-copy-target="temporary-password"[^>]*data-copied-label="Copied"',
+        response.text,
+    )
+    assert 'id="temporary-password"' in response.text
     # Shown in the POST response only: no redirect, no cookie, never cached.
     assert response.headers["cache-control"] == "no-store"
     assert not response.headers.get_list("set-cookie")

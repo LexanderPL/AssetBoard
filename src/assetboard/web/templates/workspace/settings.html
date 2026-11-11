@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros/components.html" import field, select, csrf_input, primary_button with context %}
+{% from "macros/components.html" import field, select, csrf_input with context %}
 {% block title %}{{ _("Workspace settings") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Workspace settings") }}{% endblock %}
 {% block content %}
@@ -63,7 +63,7 @@
     </div>
     {% if errors.get("require_two_factor") %}<p id="require_two_factor-error" role="alert" class="text-sm text-danger sm:col-span-2">{{ errors.get("require_two_factor") }}</p>{% endif %}
     <p class="text-xs text-muted sm:col-span-2">{{ _("The formatting default is used for numbers and dates where no personal preference applies. Your interface language follows your account and browser.") }}</p>
-    <div class="sm:col-span-2">{{ primary_button(_("Save settings")) }}</div>
+    <div class="sm:col-span-2"><button type="submit" class="btn-primary">{{ _("Save settings") }}</button></div>
   </form>
   {% endif %}
 </section>

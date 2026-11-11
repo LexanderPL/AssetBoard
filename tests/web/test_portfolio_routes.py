@@ -182,6 +182,53 @@ def test_holdings_totals_classes_and_the_default_stocks_chart(owner: OwnerApp) -
     assert "100.0%" in page  # the row's share of the portfolio
 
 
+def test_gain_and_loss_colours_follow_one_convention(owner: OwnerApp) -> None:
+    fund, _classes_by_name = _fund(owner)
+    with owner.db() as session, session.begin():
+        session.add(
+            PricePoint(
+                workspace_id=owner.home_id,
+                instrument_id=fund,
+                date=date(2026, 3, 10),
+                price=Decimal("110"),
+                source="manual",
+            )
+        )
+
+    page = owner.client.get(PORTFOLIO).text
+    gain = re.search(r"<dd[^>]*data-portfolio-gain[^>]*>", page)
+    assert gain is not None and "text-success-strong" in gain.group(0)
+    row = re.search(rf'data-portfolio-row="{fund}".*?</tr>', page, re.S)
+    assert row is not None and "text-success-strong" in row.group(0)
+    for class_row in re.findall(r"data-portfolio-class>.*?</tr>", page, re.S):
+        assert "text-success-strong" in class_row and "text-danger" not in class_row
+    # A zero realized result stays neutral.
+    realized = re.search(r"<span[^>]*data-realized-ytd[^>]*>", page)
+    assert realized is not None
+    assert "text-danger" not in realized.group(0)
+    assert "text-success-strong" not in realized.group(0)
+
+    with owner.db() as session, session.begin():
+        session.add(
+            PricePoint(
+                workspace_id=owner.home_id,
+                instrument_id=fund,
+                date=date(2026, 3, 11),
+                price=Decimal("90"),
+                source="manual",
+            )
+        )
+    owner.app.state.clock = FixedClock("2026-03-11T12:00:00+00:00")
+    owner.app.state.session_factory.configure(info={"clock": owner.app.state.clock})
+    losing = owner.client.get(PORTFOLIO).text
+    gain = re.search(r"<dd[^>]*data-portfolio-gain[^>]*>", losing)
+    assert gain is not None and "text-danger" in gain.group(0)
+    row = re.search(rf'data-portfolio-row="{fund}".*?</tr>', losing, re.S)
+    assert row is not None and "text-danger" in row.group(0)
+    for class_row in re.findall(r"data-portfolio-class>.*?</tr>", losing, re.S):
+        assert "text-danger" in class_row and "text-success-strong" not in class_row
+
+
 def test_scope_selector_whole_portfolio_class_and_unknown(owner: OwnerApp) -> None:
     _fund_id, classes = _fund(owner)
     whole = owner.client.get(PORTFOLIO, params={"scope": "all"}).text
