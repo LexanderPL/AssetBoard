@@ -7417,6 +7417,12 @@ msgstr ""
 msgid "Add payment"
 msgstr ""
 
+#, python-format
+msgid "%(num)d filter"
+msgid_plural "%(num)d filters"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "All categories"
 msgstr ""
 
@@ -7437,7 +7443,19 @@ msgstr ""
 msgid "Rescheduled for this occurrence"
 msgstr ""
 
-msgid "Reschedule this one"
+msgid "Reschedule"
+msgstr ""
+
+msgid "Edit amount"
+msgstr ""
+
+msgid "Edit rule"
+msgstr ""
+
+msgid "Edit one-time payment"
+msgstr ""
+
+msgid "Reschedule this occurrence"
 msgstr ""
 
 msgid "New due date"
@@ -7446,13 +7464,7 @@ msgstr ""
 msgid "Save date"
 msgstr ""
 
-msgid "Edit amount"
-msgstr ""
-
 msgid "Save amount"
-msgstr ""
-
-msgid "Edit rule"
 msgstr ""
 
 msgid "Example"
@@ -9158,5 +9170,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Add an item below, or paste a list of items."
+#~ msgstr ""
+
+#~ msgid "Reschedule this one"
 #~ msgstr ""
 

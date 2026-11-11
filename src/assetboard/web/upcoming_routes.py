@@ -70,6 +70,7 @@ def _redirect(
     error: str | None = None,
     posted: UUID | None = None,
     notice: str | None = None,
+    skipped: UUID | None = None,
     back: str = "",
     return_month: YearMonth | None = None,
 ) -> Response:
@@ -86,6 +87,9 @@ def _redirect(
         params["posted"] = str(posted)
     if notice:
         params["notice"] = notice
+    if skipped:
+        # The Upcoming page's skip status offers Undo: the id posts to upcoming_unskip.
+        params["skipped"] = str(skipped)
     target = (
         request.url_for("transactions_month", month=str(return_month)).path
         if return_month is not None
@@ -111,6 +115,8 @@ ONE_TIME_LATER = _("It shows here when it is due within the next %(days)d days."
 NOTICES = {
     "one_time_saved": _("One-time payment saved."),
     "planned_deleted": _("Planned entry deleted."),
+    "skipped": _("Skipped. It no longer counts as pending."),
+    "skip_undone": _("Skip undone. It is pending again."),
 }
 
 
@@ -142,18 +148,29 @@ def _page_context(request: Request, ctx: Context) -> dict[str, object]:
     notice_code = request.query_params.get("notice", "")
     if notice_code in NOTICES:
         notice = gettext(NOTICES[notice_code], locale)
+    skipped_id = None
+    if notice_code == "skipped":
+        with contextlib.suppress(ValueError):
+            skipped_id = str(UUID(request.query_params.get("skipped", "")))
+    filters: dict[str, str] = {}
+    if direction:
+        filters["direction"] = direction
+    if category_id:
+        filters["category"] = str(category_id)
     return {
         "weeks": weeks,
         "today": today,
         "days": days,
         "direction": direction or "",
         "category_id": str(category_id) if category_id else "",
+        "filters_query": urlencode(filters),
         "archived_categories": categories.archived,
         "expense_categories": categories.expense,
         "income_categories": categories.income,
         "can_edit": has_role(ctx, Role.EDITOR),
         "undo": undo,
         "notice": notice,
+        "skipped_id": skipped_id,
         "open_form": request.query_params.get("form"),
         "one_time_values": {"direction": "expense", "day": today.isoformat()},
         "one_time_errors": {},
@@ -351,22 +368,23 @@ def _return_month(values: dict[str, str]) -> YearMonth | None:
 async def skip(request: Request, ctx: CurrentContext, occurrence_id: str) -> Response:
     """Skip one date; from a ledger's expected row (``return_month``) back to that month."""
     values = await _values(request)
+    target = _id(occurrence_id)
     return_month = _return_month(values)
     try:
         await run_in_threadpool(
             occurrences.skip_occurrence,
             request.app.state.session_factory,
             ctx,
-            _id(occurrence_id),
+            target,
         )
     except occurrences.OccurrenceError as exc:
         return _redirect(request, error=exc.code, return_month=return_month)
-    return _redirect(
-        request,
-        notice="skipped" if return_month is not None else None,
-        back=values.get("back", ""),
-        return_month=return_month,
-    )
+    if return_month is not None:
+        return _redirect(request, notice="skipped", return_month=return_month)
+    if values.get("back"):
+        return _redirect(request, back=values["back"])
+    # The Upcoming page's status line offers Undo of this occurrence's skip.
+    return _redirect(request, notice="skipped", skipped=target)
 
 
 @router.post("/upcoming/{occurrence_id}/unskip", name="upcoming_unskip")

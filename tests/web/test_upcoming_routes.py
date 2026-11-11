@@ -104,6 +104,78 @@ def test_a_future_payment_date_is_refused(owner):
         assert session.scalars(select(Transaction)).all() == []
 
 
+def test_mark_paid_dialog_is_a_modal_and_starts_at_today(owner):
+    fixed_clock(owner)  # 2026-03-01
+    assert create_recurring(owner, start_date="2026-03-21", month_day="21").status_code == 303
+    with owner.db() as session:
+        occurrence = session.scalars(
+            select(ScheduledOccurrence).where(ScheduledOccurrence.due_date == date(2026, 3, 21))
+        ).one()
+        occurrence_id = occurrence.id
+
+    page = owner.client.get("/upcoming").text
+    # The filters are a disclosure, rendered open as the no-JavaScript fallback.
+    assert '<details class="panel" data-filter-disclosure open>' in page
+    card = re.search(rf'<article [^>]*data-occurrence="{occurrence_id}".*?</article>', page, re.S)
+    assert card is not None
+    # One primary action and the overflow menu; the other actions are menu items.
+    assert card.group(0).count('class="btn-primary py-3"') == 1
+    assert f'data-dialog-open="paid-{occurrence_id}-dialog"' in card.group(0)
+    assert "data-row-menu" in card.group(0)
+    assert 'class="row-menu-item"' in card.group(0)
+    assert "Reschedule" in card.group(0) and "Edit amount" in card.group(0)
+    opening = re.search(rf'<dialog id="paid-{occurrence_id}-dialog"[^>]*>', page)
+    assert opening is not None and " open" not in opening.group(0)
+
+    # ?form=paid-<id> renders the dialog open for the no-JavaScript path. The due date is in the
+    # future, so the date defaults to today: a future posting date is refused.
+    opened = owner.client.get(f"/upcoming?form=paid-{occurrence_id}").text
+    opening = re.search(rf'<dialog id="paid-{occurrence_id}-dialog"[^>]*>', opened)
+    assert opening is not None and " open" in opening.group(0)
+    assert re.search(
+        rf'<input id="post-day-{occurrence_id}" name="day" type="date" value="2026-03-01"', opened
+    )
+    assert f'action="/upcoming/{occurrence_id}/post"' in opened
+
+    # The fallback link keeps the active filters.
+    filtered = owner.client.get("/upcoming?direction=expense").text
+    assert f"direction=expense&amp;form=paid-{occurrence_id}" in filtered
+    assert "1 filter" in filtered
+
+
+def test_mark_paid_dialog_keeps_an_overdue_due_date(owner):
+    fixed_clock(owner, "2026-03-15T12:00:00+00:00")
+    occurrence_id = _one_time_on_upcoming(owner, "2026-03-10")
+    page = owner.client.get(f"/upcoming?form=paid-{occurrence_id}").text
+    assert re.search(
+        rf'<input id="post-day-{occurrence_id}" name="day" type="date" value="2026-03-10"', page
+    )
+
+
+def test_skipping_from_upcoming_shows_a_notice_and_undo(owner):
+    fixed_clock(owner)
+    assert create_recurring(owner, include_past="1").status_code == 303
+    with owner.db() as session:
+        occurrence_id = session.scalars(select(ScheduledOccurrence.id)).first()
+
+    skipped = owner.post(f"/upcoming/{occurrence_id}/skip", token_from="/upcoming")
+    assert skipped.status_code == 303
+    assert skipped.headers["location"] == f"/upcoming?notice=skipped&skipped={occurrence_id}"
+    page = owner.client.get(skipped.headers["location"])
+    assert "Skipped. It no longer counts as pending." in page.text
+    assert "data-upcoming-notice" in page.text and "data-skip-undo" in page.text
+    assert f'action="/upcoming/{occurrence_id}/unskip"' in page.text
+
+    undone = owner.post(f"/upcoming/{occurrence_id}/unskip", token_from="/upcoming")
+    assert undone.status_code == 303
+    assert undone.headers["location"] == "/upcoming?notice=skip_undone"
+    page = owner.client.get(undone.headers["location"])
+    assert "Skip undone. It is pending again." in page.text
+    with owner.db() as session:
+        stored = session.get(ScheduledOccurrence, occurrence_id)
+        assert stored is not None and stored.status == "pending"
+
+
 def test_occurrence_actions_preserve_rule_and_closed_month_blocks_post(owner):
     fixed_clock(owner)
     assert create_recurring(owner).status_code == 303
@@ -346,9 +418,13 @@ def test_add_edit_and_delete_a_one_time_payment_on_upcoming(owner):
     assert "One-time payment added for" in page
     card = re.search(rf'<article [^>]*data-occurrence="{occurrence_id}".*?</article>', page, re.S)
     assert card is not None
-    # A one-time row: Mark paid, Edit and Delete; no Skip, Reschedule or "Edit rule".
+    # A one-time row: Mark paid in the row, Edit and Delete in the overflow menu; no Skip,
+    # Reschedule or "Edit rule".
     assert "Mark paid or received" in card.group(0)
-    assert "data-one-time-edit" in card.group(0) and "data-delete" in card.group(0)
+    assert "data-row-menu" in card.group(0)
+    assert f'data-dialog-open="paid-{occurrence_id}-dialog"' in card.group(0)
+    assert f'data-dialog-open="edit-{occurrence_id}-dialog"' in card.group(0)
+    assert "data-delete" in card.group(0)
     assert ">Skip<" not in card.group(0) and "Edit rule" not in card.group(0)
     assert 'value="Car insurance"' in card.group(0)
     # The Recurring page does not list it.
@@ -390,7 +466,8 @@ def test_add_edit_and_delete_a_one_time_payment_on_upcoming(owner):
     )
     assert mismatch.status_code == 400
     assert "Choose an expense category for an expense" in mismatch.text
-    assert "data-one-time-edit open" in mismatch.text
+    reopened = re.search(rf'<dialog id="edit-{occurrence_id}-dialog"[^>]*>', mismatch.text)
+    assert reopened is not None and " open" in reopened.group(0)
     missing = owner.post(
         "/upcoming/one-time",
         {"name": "", "amount": "5", "direction": "income", "category_id": income, "day": ""},

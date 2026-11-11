@@ -258,7 +258,12 @@ document.addEventListener("click", (event) => {
   const opener = target.closest("[data-dialog-open]");
   if (opener) {
     const dialog = document.getElementById(opener.getAttribute("data-dialog-open") || "");
-    if (openModalDialog(dialog)) event.preventDefault();
+    if (openModalDialog(dialog)) {
+      event.preventDefault();
+      // A row menu that starts a dialog does not linger behind it.
+      const popover = opener.closest("details[data-popover][open]");
+      if (popover instanceof HTMLDetailsElement) closePopover(popover, false);
+    }
     return;
   }
   const closer = target.closest("[data-dialog-close]");
@@ -279,6 +284,15 @@ document.addEventListener("submit", (event) => {
 openModalDialogs(document);
 document.addEventListener("htmx:load", (event) => {
   if (event.target instanceof Element) openModalDialogs(event.target);
+});
+
+// A filters panel is rendered open, so it works without JavaScript and stays open on a desktop.
+// On a phone it starts collapsed, so the page title and the first data row fit in the first
+// viewport; the user opens it with the always-visible summary. A choice made by the user is
+// never overridden later.
+const FILTER_PHONE = window.matchMedia("(max-width: 639.98px)");
+document.querySelectorAll("details[data-filter-disclosure]").forEach((details) => {
+  if (details instanceof HTMLDetailsElement && FILTER_PHONE.matches) details.open = false;
 });
 
 // Popovers: a <details data-popover> whose content floats over the page (the user menu, the

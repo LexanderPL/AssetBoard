@@ -8037,6 +8037,13 @@ msgstr ""
 msgid "Add payment"
 msgstr "Dodaj płatność"
 
+#, python-format
+msgid "%(num)d filter"
+msgid_plural "%(num)d filters"
+msgstr[0] "%(num)d filtr"
+msgstr[1] "%(num)d filtry"
+msgstr[2] "%(num)d filtrów"
+
 msgid "All categories"
 msgstr "Wszystkie kategorie"
 
@@ -8057,8 +8064,20 @@ msgstr "Automatyczne księgowanie"
 msgid "Rescheduled for this occurrence"
 msgstr "Zmieniono termin tego wystąpienia"
 
-msgid "Reschedule this one"
-msgstr "Zmień termin tylko tego wystąpienia"
+msgid "Reschedule"
+msgstr "Zmień termin"
+
+msgid "Edit amount"
+msgstr "Edytuj kwotę"
+
+msgid "Edit rule"
+msgstr "Edytuj regułę"
+
+msgid "Edit one-time payment"
+msgstr "Edytuj płatność jednorazową"
+
+msgid "Reschedule this occurrence"
+msgstr "Zmień termin tego wystąpienia"
 
 msgid "New due date"
 msgstr "Nowy termin"
@@ -8066,14 +8085,8 @@ msgstr "Nowy termin"
 msgid "Save date"
 msgstr "Zapisz datę"
 
-msgid "Edit amount"
-msgstr "Edytuj kwotę"
-
 msgid "Save amount"
 msgstr "Zapisz kwotę"
-
-msgid "Edit rule"
-msgstr "Edytuj regułę"
 
 msgid "Example"
 msgstr "Przykład"
@@ -9697,4 +9710,7 @@ msgstr "Usuń obszar roboczy…"
 #~ "Wykres pokazuje aktywa i zobowiązania "
 #~ "jako części sumy brutto; majątek netto"
 #~ " to aktywa minus zobowiązania."
+
+#~ msgid "Reschedule this one"
+#~ msgstr "Zmień termin tylko tego wystąpienia"
 

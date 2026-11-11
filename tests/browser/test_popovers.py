@@ -1,8 +1,9 @@
 """Popovers and dialogs in Chromium (UI batch 3): a press outside an open popover closes it,
 Escape closes the innermost one and returns the focus to its summary, opening one closes the
 others; the History page's Export, Filters and bulk dialogs close on a backdrop click and are
-centred, the confirm dialog does not close; inline forms in <details> stay open. Also the planned
-rows' Confirm and Delete buttons line up. No CSP violations."""
+centred, the confirm dialog does not close; a row menu action opens a dialog and closes the
+menu; a server-rendered open dialog becomes a modal. Also the planned rows' Confirm and Delete
+buttons line up. No CSP violations."""
 
 from __future__ import annotations
 
@@ -187,17 +188,32 @@ def test_popovers_and_dialogs_close_from_outside_and_with_escape(tmp_path: Path)
             page.keyboard.press("Escape")
             expect(dialog).to_be_hidden()
 
-            # An inline form in a <details> (Upcoming: Mark paid or received) stays open.
+            # Upcoming rows: one primary action and an overflow menu. A menu action opens a
+            # dialog and the menu does not linger behind it.
             page.goto(f"{base}/upcoming", wait_until="networkidle")
-            # Its summaries line up with the plain buttons.
-            summary_box = _box(page, "[data-occurrence-actions] details summary")
-            skip_box = _box(page, "[data-occurrence-actions] > form button")
-            assert summary_box["height"] == pytest.approx(skip_box["height"], abs=0.5)
-            assert summary_box["y"] == pytest.approx(skip_box["y"], abs=0.5)
-            inline = page.locator("[data-occurrence-actions] details").first
-            inline.locator("summary").click()
-            page.locator("h1").click()
-            expect(inline).to_have_attribute("open", "")
+            actions = page.locator("[data-occurrence-actions]").first
+            expect(actions.locator(":scope > a.btn-primary")).to_have_count(1)
+            menu = actions.locator(":scope > details[data-row-menu]")
+            expect(menu).to_have_count(1)
+            menu.locator("summary").click()
+            expect(menu.get_by_role("link", name="Edit").first).to_be_visible()
+            menu.get_by_role("link", name="Edit").first.click()
+            upcoming_dialog = page.locator("dialog[data-dialog-modal][open]")
+            expect(upcoming_dialog).to_be_visible()
+            expect(menu).not_to_have_attribute("open", "")
+            upcoming_dialog.get_by_role("link", name="Cancel").click()
+            expect(upcoming_dialog).to_be_hidden()
+
+            # A server-rendered open dialog (the no-JavaScript fallback) becomes a modal too.
+            occurrence_id = page.locator("article[data-occurrence]").first.get_attribute(
+                "data-occurrence"
+            )
+            assert occurrence_id
+            page.goto(f"{base}/upcoming?form=paid-{occurrence_id}", wait_until="networkidle")
+            expect(page.locator("dialog[data-dialog-modal][open]")).to_be_visible()
+            expect(page.locator("dialog[data-dialog-modal][open]")).to_have_attribute(
+                "id", f"paid-{occurrence_id}-dialog"
+            )
 
             # History needs a real entry for the bulk dialog, and its dialogs are centred.
             page.goto(f"{base}/transactions/{today:%Y-%m}", wait_until="networkidle")
