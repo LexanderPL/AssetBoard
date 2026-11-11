@@ -72,6 +72,8 @@ def test_list_has_expense_and_income_sections_with_plain_sentences(owner):
     ):  # fmt: skip
         assert owner.post("/recurring", data).status_code == 303
     page = owner.client.get("/recurring").text
+    header = page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
+    assert "data-new-recurring" in header
     expenses = page.split('data-recurring-section="expense"')[1].split("</section>")[0]
     incomes = page.split('data-recurring-section="income"')[1].split("</section>")[0]
     assert ">Expenses</h2>" in expenses and ">Income</h2>" in incomes

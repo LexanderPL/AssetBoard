@@ -128,6 +128,8 @@ def test_users_list_shows_sign_in_methods_never_subjects(h: Harness) -> None:
     client = admin(h)
     assert "data-admin-link" in client.get("/account").text
     page = client.get("/admin/users").text
+    header = page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
+    assert "data-admin-create" in header and "data-admin-settings" in header
     row = page.split(f'data-user="{OLA}"')[1].split("</tr>")[0]
     assert "Password" in row and "Identity provider" in row and "Proxy" in row
     for secret in ("secret-subject-1234", "secret-proxy-user", "provider-only@example.net"):

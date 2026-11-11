@@ -81,7 +81,11 @@ def test_notification_channels_in_a_browser(tmp_path: Path) -> None:
 
             page.goto(f"{base}/notifications", wait_until="networkidle")
             expect(page.locator("[data-no-channels]")).to_be_visible()
-            form = page.locator("[data-new-channel]")
+            dialog = page.locator("#channel-dialog")
+            expect(dialog).to_be_hidden()
+            page.locator("[data-new-channel-open]").click()
+            expect(dialog).to_be_visible()
+            form = dialog.locator("[data-new-channel]")
             form.get_by_label("Name").fill("Phone")
             form.get_by_label("Apprise URL").fill(URL)
             form.get_by_label("Daily at").fill("07:15")

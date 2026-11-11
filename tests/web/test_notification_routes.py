@@ -39,6 +39,24 @@ def channel_id(owner):
         return session.scalars(select(NotificationChannel.id)).one()
 
 
+def _dialog_opening(page: str) -> str:
+    return page.split('id="channel-dialog"', 1)[1].split(">", 1)[0]
+
+
+def _header_actions(page: str) -> str:
+    return page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
+
+
+def test_the_new_channel_form_is_a_header_dialog(owner):
+    page = owner.client.get("/notifications").text
+    header = _header_actions(page)
+    assert "data-new-channel-open" in header and 'data-dialog-open="channel-dialog"' in header
+    assert 'id="channel-dialog"' in page and "data-new-channel" in page
+    assert " open" not in _dialog_opening(page)
+    opened = owner.client.get("/notifications?form=channel").text
+    assert " open" in _dialog_opening(opened)
+
+
 def test_create_mask_test_send_edit_and_delete(owner):
     notifier = fake(owner)
     page = owner.client.get("/notifications")
@@ -94,12 +112,16 @@ def test_create_mask_test_send_edit_and_delete(owner):
 def test_rejected_urls_are_not_echoed_and_forms_need_csrf(owner):
     fake(owner)
     refused = owner.post("/notifications", channel_form(url="json://10.0.0.1/hook?token=abc"))
-    assert refused.headers["location"].endswith("error=scheme_not_allowed")
+    assert refused.headers["location"] == "/notifications?error=scheme_not_allowed&form=channel"
     assert "token=abc" not in refused.headers["location"]
     page = owner.client.get(refused.headers["location"])
     assert "not allowed on this server" in page.text and "token=abc" not in page.text
+    assert "data-new-channel" in page.text
+    # The message is inside the dialog, where the modal shows it, not behind it.
+    assert page.text.index("not allowed on this server") > page.text.index('id="channel-dialog"')
     bad_time = owner.post("/notifications", channel_form(digest_time="25:00"))
-    assert bad_time.headers["location"].endswith("error=invalid_time")
+    assert bad_time.headers["location"] == "/notifications?error=invalid_time&form=channel"
+    assert 'id="channel-dialog"' in owner.client.get(bad_time.headers["location"]).text
     assert owner.client.post("/notifications", data=channel_form()).status_code == 403
     assert owner.post(f"/notifications/{uuid4()}/delete").status_code == 404
     assert owner.post("/notifications/not-a-uuid/test").status_code == 404

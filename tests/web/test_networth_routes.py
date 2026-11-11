@@ -73,6 +73,11 @@ def _htmx(owner: OwnerApp, path: str, data: dict[str, str] | None = None) -> Any
     return owner.client.post(path, data=data or {}, headers=headers, follow_redirects=False)
 
 
+def _header_actions(page: str) -> str:
+    assert "data-header-actions" in page
+    return page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
+
+
 def _create_category(owner: OwnerApp, name: str, side: str = "asset") -> UUID:
     response = owner.post(
         "/net-worth/categories",
@@ -97,6 +102,8 @@ def test_the_page_has_assets_and_liabilities_tabs(owner: OwnerApp) -> None:
     liability = owner.client.get("/net-worth?side=liability").text
     assert "Mortgage" in liability and "Vehicles" not in liability
     assert re.search(r'aria-selected="true"[^>]*data-side-tab="liability"', liability) is not None
+    # The header's Add item keeps the tab it was opened on.
+    assert "?side=liability&form=item#item-dialog" in _header_actions(liability)
 
 
 def test_the_seed_form_works_for_an_empty_side(owner: OwnerApp) -> None:
@@ -139,6 +146,38 @@ def test_create_item_shows_the_value_and_history(owner: OwnerApp) -> None:
             len(session.scalars(select(ItemValuation).where(ItemValuation.item_id == item)).all())
             == 1
         )
+
+
+def test_the_add_item_form_is_a_header_dialog(owner: OwnerApp) -> None:
+    page = owner.client.get("/net-worth").text
+    assert re.search(
+        r'<a href="[^"]+\?side=asset&form=item#item-dialog" data-dialog-open="item-dialog"'
+        r"[^>]*data-add-item>Add item</a>",
+        _header_actions(page),
+    )
+    dialog = re.search(r'<dialog id="item-dialog".*?</dialog>', page, re.DOTALL)
+    assert dialog is not None
+    assert "grid gap-3 sm:grid-cols-2 lg:grid-cols-4" in dialog.group(0)
+    assert "data-create-item" in page
+    opening = re.search(r'<dialog id="item-dialog"[^>]*>', page)
+    assert opening is not None and " open" not in opening.group(0)
+    opened = owner.client.get("/net-worth?side=asset&form=item").text
+    opening = re.search(r'<dialog id="item-dialog"[^>]*>', opened)
+    assert opening is not None and " open" in opening.group(0)
+    refused = owner.post(
+        "/net-worth/items",
+        {
+            "side": "asset",
+            "category_id": str(_category_id(owner, "asset", "Vehicles")),
+            "name": "Car",
+            "value": "12.345",
+            "currency": "EUR",
+        },
+        token_from="/net-worth",
+    )
+    assert refused.status_code == 400
+    opening = re.search(r'<dialog id="item-dialog"[^>]*>', refused.text)
+    assert opening is not None and " open" in opening.group(0)
 
 
 def test_too_many_decimals_are_shown_on_the_item_form(owner: OwnerApp) -> None:

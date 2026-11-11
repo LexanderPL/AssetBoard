@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block title %}{{ _("Net worth") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Net worth") }}{% endblock %}
+{% block header_actions %}
+{% if can_edit and view.categories %}
+<a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&form=item#item-dialog" data-dialog-open="item-dialog" aria-haspopup="dialog" class="btn-primary" data-add-item>{{ _("Add item") }}</a>
+{% endif %}
+{% endblock %}
 {% block content %}
 {% include "networth/_body.html" %}
 {% endblock %}

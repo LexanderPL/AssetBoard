@@ -210,7 +210,8 @@ def test_cards_without_taxes_and_with_taxes_switched_off(owner):
     page = owner.client.get("/income").text
     assert "<h1" in page and ">Income<" in page
     assert "Where your money comes from and what you will receive next." in page
-    assert "Add income" in page
+    header = page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
+    assert "data-add-income" in header and "Add income" in header
     salary = _card(page, "Salary")
     assert "Fixed · €8,500.00 on the 10th · Income category:" in salary
     assert ">Work month</th>" not in salary and ">Net</th>" not in salary

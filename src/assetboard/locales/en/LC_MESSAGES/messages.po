@@ -4638,16 +4638,19 @@ msgstr ""
 msgid "Add a category"
 msgstr ""
 
-msgid "Colour"
+msgid "Close"
 msgstr ""
 
-msgid "Add"
+msgid "Colour"
 msgstr ""
 
 msgid ""
 "Savings: money put aside or invested (expense), or taken out of savings "
 "(income); it is not counted as spending or earnings. Transfer: money "
 "moved between your own accounts; it is left out of the totals."
+msgstr ""
+
+msgid "Add"
 msgstr ""
 
 msgid "Archived categories"
@@ -4698,6 +4701,9 @@ msgid "Delete the category %(name)s?"
 msgstr ""
 
 msgid "Delete"
+msgstr ""
+
+msgid "Add category"
 msgstr ""
 
 msgid "Hello,"
@@ -4787,9 +4793,6 @@ msgid "Search…"
 msgstr ""
 
 msgid "Export as CSV"
-msgstr ""
-
-msgid "Close"
 msgstr ""
 
 msgid ""
@@ -5753,9 +5756,6 @@ msgid ""
 "instrument's value is split across them."
 msgstr ""
 
-msgid "Add instrument"
-msgstr ""
-
 msgid "Add an instrument"
 msgstr ""
 
@@ -6334,10 +6334,10 @@ msgstr ""
 msgid "Delete the transaction of %(date)s?"
 msgstr ""
 
-msgid "Bulk add"
+msgid "Add an active instrument first."
 msgstr ""
 
-msgid "Add an active instrument first."
+msgid "Bulk add"
 msgstr ""
 
 #, python-format
@@ -6405,6 +6405,9 @@ msgid "Page %(page)d of %(pages)d"
 msgstr ""
 
 msgid "No investment transactions match these filters."
+msgstr ""
+
+msgid "Add instrument"
 msgstr ""
 
 msgid "Invitation"
@@ -6849,7 +6852,7 @@ msgstr ""
 msgid "No items yet"
 msgstr ""
 
-msgid "Add an item below, or paste a list of items."
+msgid "Use Add item in the header, or paste a list of items below."
 msgstr ""
 
 msgid "Add an item"
@@ -6914,9 +6917,6 @@ msgid "Their items still count towards net worth until each item is archived."
 msgstr ""
 
 msgid "Categories on this side"
-msgstr ""
-
-msgid "Add category"
 msgstr ""
 
 msgid "No active categories on this side."
@@ -7057,6 +7057,9 @@ msgstr ""
 msgid "Show items"
 msgstr ""
 
+msgid "New channel"
+msgstr ""
+
 msgid "Apprise URL"
 msgstr ""
 
@@ -7137,9 +7140,6 @@ msgid "Save channel"
 msgstr ""
 
 msgid "No notification channels yet."
-msgstr ""
-
-msgid "New channel"
 msgstr ""
 
 #, python-format
@@ -7616,6 +7616,9 @@ msgstr ""
 msgid "Archive tax"
 msgstr ""
 
+msgid "New tax"
+msgstr ""
+
 msgid "every year"
 msgstr ""
 
@@ -7631,9 +7634,6 @@ msgstr ""
 msgid ""
 "Only if you want taxes planned. You enter the rates; this is not tax "
 "advice. You can hide this page in Workspace settings."
-msgstr ""
-
-msgid "New tax"
 msgstr ""
 
 msgid "Taxes on income"
@@ -8170,6 +8170,9 @@ msgid "The remaining history for %(instrument)s would oversell on %(date)s."
 msgstr ""
 
 msgid "Confirm rollback"
+msgstr ""
+
+msgid "Invite someone"
 msgstr ""
 
 msgid "People in this workspace"
@@ -9149,5 +9152,8 @@ msgstr ""
 #~ "The chart shows assets and liabilities"
 #~ " as parts of the gross total; "
 #~ "net worth is assets minus liabilities."
+#~ msgstr ""
+
+#~ msgid "Add an item below, or paste a list of items."
 #~ msgstr ""
 

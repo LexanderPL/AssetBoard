@@ -174,7 +174,9 @@ def test_the_add_and_bulk_forms_are_dialogs(owner: OwnerApp) -> None:
     assert opening is not None and " open" not in opening.group(0)
     bulk = re.search(r'<dialog id="investment-bulk-panel".*?</dialog>', page, re.S)
     assert bulk is not None and "data-bulk-text" in bulk.group(0)
-    assert 'data-dialog-open="investment-bulk-panel"' in page and "data-bulk-open" in page
+    header = page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
+    assert "data-bulk-open" in header and "data-add-transaction" in header
+    assert "data-transaction-actions" not in page
     assert "show:#investment-bulk-panel:top" not in page
 
     refused = _tx(owner, instrument, quantity="0")
