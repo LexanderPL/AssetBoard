@@ -14,7 +14,7 @@
   {{ tabs("providers") }}
 
   <section class="panel p-6 sm:p-7" aria-labelledby="providers-heading">
-    <h1 id="providers-heading" class="text-lg font-semibold">{{ _("Price providers") }}</h1>
+    <h2 id="providers-heading" class="text-base font-semibold">{{ _("Price providers") }}</h2>
     <p class="mt-1 text-sm text-muted">{{ _("Providers are opt-in per workspace. Manual prices always remain available; a provider failure keeps the last known price.") }}</p>
     <p class="mt-2 text-sm text-muted">{{ _("Your base currency is %(currency)s. Rates are converted into it when the provider publishes that currency.", currency=base_currency) }}</p>
     {% if demo_session %}<p class="mt-2 text-sm text-muted" data-demo-read-only>{{ _("Not available in the demo workspace.") }}</p>{% endif %}

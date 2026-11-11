@@ -64,7 +64,8 @@ def _recurring(app: OwnerApp, category: UUID, name: str = "Rent") -> None:
 
 def test_home_without_data_renders_empty_states(nav: OwnerApp) -> None:
     html = nav.client.get("/").text
-    assert "<h1" in html and "March 2026" in html
+    assert ">Home</h1>" in html
+    assert '<p class="text-sm font-medium text-primary-ink" data-home-month>March 2026</p>' in html
     assert "data-open-month" not in html and "Open month" not in html
     assert "data-summary-kpis" in html and 'data-flow-segment="empty"' in html
     assert "No expenses yet this month" in html and "No income yet this month" in html
@@ -272,12 +273,24 @@ def test_the_sidebar_order_and_current_page(nav: OwnerApp) -> None:
     html = nav.client.get("/").text
     sidebar = re.search(r"<nav [^>]*aria-label=\"Main navigation\".*?</nav>", html, re.DOTALL)
     assert sidebar is not None
-    order = re.findall(
-        r"data-(home|month|transactions|history|recurring|upcoming)-link", sidebar.group(0)
-    )
+    nav_html = sidebar.group(0)
+    order = re.findall(r"data-(home|month|transactions|history|recurring|upcoming)-link", nav_html)
     assert order == ["home", "month", "transactions", "history", "upcoming", "recurring"]
     for path, current in (("/", "home"), (MONTH, "month"), (PAGE, "transactions"),
                           ("/history", "history")):  # fmt: skip
         page = nav.client.get(path).text
         marked = re.findall(r'data-(\w+)-link aria-current="page"', page)
         assert marked == [current], path
+    # Loans and FIRE are not implemented: both are disabled items, never dead links.
+    assert 'href="#loans"' not in nav_html
+    for label in ("Loans", "FIRE projection"):
+        item = re.search(
+            rf'<span class="nav-link cursor-not-allowed opacity-50" aria-disabled="true">'
+            rf'<span aria-hidden="true">[^<]+</span>{label}'
+            rf'<span class="sr-only">Unavailable</span></span>',
+            nav_html,
+        )
+        assert item is not None, label
+    # Month and Upcoming use different glyphs while keeping their accessible labels.
+    assert '<span aria-hidden="true">◷</span>Month' in nav_html
+    assert '<span aria-hidden="true">◔</span>Upcoming' in nav_html

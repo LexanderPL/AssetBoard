@@ -7,10 +7,11 @@
 {% set button_class = "rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle" %}
 {% set input_class = "form-control w-full px-2.5 py-1.5" %}
 {% block title %}{{ _("Home") }} · {{ app_name }}{% endblock %}
-{% block heading %}{{ month_heading }}{% endblock %}
+{% block heading %}{{ _("Home") }}{% endblock %}
 {% block scripts %}{% include "macros/chart_scripts.html" %}{% endblock %}
 {% block content %}
 <div class="space-y-6" data-home data-month="{{ view.month }}">
+  <p class="text-sm font-medium text-primary-ink" data-home-month>{{ month_heading }}</p>
   <section class="panel p-4 sm:p-6" aria-labelledby="home-flow-heading" data-home-flow>
     <h2 id="home-flow-heading" class="text-base font-semibold">{{ _("This month") }}</h2>
     {{ kpis() }}

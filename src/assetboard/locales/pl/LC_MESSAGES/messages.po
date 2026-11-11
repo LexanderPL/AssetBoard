@@ -4254,11 +4254,11 @@ msgstr "Cykliczne"
 msgid "Loans"
 msgstr "Kredyty"
 
-msgid "FIRE projection"
-msgstr "Prognoza FIRE"
-
 msgid "Unavailable"
 msgstr "Niedostępne"
+
+msgid "FIRE projection"
+msgstr "Prognoza FIRE"
 
 #, python-format
 msgid "Update available: %(version)s"
@@ -6914,6 +6914,9 @@ msgstr "Strona %(page)d z %(pages)d"
 
 msgid "No investment transactions match these filters."
 msgstr "Żadna transakcja inwestycyjna nie pasuje do tych filtrów."
+
+msgid "Investment income"
+msgstr "Przychód z inwestycji"
 
 msgid "Add instrument"
 msgstr "Dodaj instrument"
