@@ -250,6 +250,10 @@ def test_htmx_add_returns_the_section_with_a_new_entry_row_keeping_the_day(
     assert '<option value="" selected>' not in entry.group(0)  # no category chosen
     assert "selected>Food" not in entry.group(0)
     assert '<p id="ledger-status" hx-swap-oob="innerHTML">Entry added.</p>' in html
+    # The write also shows a plain toast in the viewport; it is not the strict undo toast.
+    assert html.count('hx-swap-oob="beforeend:#toast-container"') == 1
+    toast = html.split('hx-swap-oob="beforeend:#toast-container"', 1)[1]
+    assert "Entry added." in toast and "data-toast-strict" not in toast
     # F2.7: the Transactions page has no summary, so none comes out of band.
     assert 'id="month-summary"' not in html and 'id="plan-' not in html
     assert "HX-Request" in response.headers["Vary"]
@@ -664,6 +668,8 @@ def test_delete_returns_the_section_and_an_undo_toast(ledger: OwnerApp) -> None:
     html = response.text
     assert response.status_code == 200 and _descriptions(html, "expense") == []
     assert 'hx-swap-oob="beforeend:#toast-container"' in html and "data-toast-strict" in html
+    # One toast only: the deletion keeps its undo toast, not an extra plain one.
+    assert html.count('hx-swap-oob="beforeend:#toast-container"') == 1
     assert f'hx-post="{MONTH}/transactions/{row_id}/undo"' in html
     assert 'hx-target="closest [data-toast]"' in html and "Entry deleted." in html
     assert re.search(r'id="entry-expense-day"[^>]*data-autofocus', html)
@@ -673,6 +679,8 @@ def test_delete_returns_the_section_and_an_undo_toast(ledger: OwnerApp) -> None:
     assert '<section id="ledger-expense"' in undo.text and 'hx-swap-oob="outerHTML"' in undo.text
     assert _descriptions(undo.text, "expense") == ["Groceries"]
     assert "Entry restored." in undo.text and 'id="month-summary"' not in undo.text
+    assert 'hx-swap-oob="beforeend:#toast-container"' in undo.text
+    assert "data-toast-strict" not in undo.text
     assert _rows(ledger)[0].deleted_at is None
 
 

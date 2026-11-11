@@ -154,6 +154,11 @@ ACTION_ERRORS = {
         "This item adjusts dates to working days, and the workspace country has no holiday data."
     ),
 }
+ACTION_NOTICES = {
+    "pause": _("Recurring item paused."),
+    "resume": _("Recurring item resumed."),
+    "delete": _("Recurring item deleted."),
+}
 GENERIC_ERROR = _("The recurring item could not be saved. Check the form and try again.")
 # Service error codes that belong to a form field.
 SERVICE_FIELDS = {
@@ -303,6 +308,7 @@ async def _form(
 async def items(request: Request, ctx: CurrentContext) -> Response:
     rows = await run_in_threadpool(scheduled.list_items, request.app.state.session_factory, ctx)
     error = request.query_params.get("error")
+    notice = request.query_params.get("notice")
     locale = request.state.locale
     today = ctx.clock.today(ctx.workspace.timezone)
     # One-time items live on the Upcoming page; archived items are history only (their
@@ -326,6 +332,9 @@ async def items(request: Request, ctx: CurrentContext) -> Response:
             "has_items": bool(shown),
             "format_day": format_day,
             "can_edit": has_role(ctx, Role.EDITOR),
+            "notice": (
+                gettext(ACTION_NOTICES[notice], locale) if notice in ACTION_NOTICES else None
+            ),
             "error": gettext(ACTION_ERRORS.get(error, GENERIC_ERROR), locale) if error else None,
         },
     )
@@ -469,4 +478,7 @@ async def action(request: Request, ctx: CurrentContext, item_id: str, action: st
         code = str(exc) if str(exc) in ACTION_ERRORS else "failed"
         target = request.url_for("scheduled_items").path + "?" + urlencode({"error": code})
         return RedirectResponse(target, status_code=303)
-    return RedirectResponse(request.url_for("scheduled_items").path, status_code=303)
+    path = request.url_for("scheduled_items").path
+    if operation.value in ACTION_NOTICES:
+        path += "?" + urlencode({"notice": operation.value})
+    return RedirectResponse(path, status_code=303)

@@ -165,6 +165,30 @@ def test_list_navigation_delete_confirmation_and_action_feedback(owner):
     assert "data-action-error" in shown and "is archived and cannot change" in shown
 
 
+def test_actions_redirect_with_a_success_notice(owner):
+    assert owner.post("/recurring", form(owner)).status_code == 303
+    with owner.db() as session:
+        from sqlalchemy import select
+
+        item_id = session.scalars(select(ScheduledItem.id)).one()
+    paused = owner.post(f"/recurring/{item_id}/pause")
+    assert paused.headers["location"] == "/recurring?notice=pause"
+    paused_page = owner.client.get(paused.headers["location"]).text
+    assert "data-action-notice" in paused_page and "Recurring item paused." in paused_page
+    resumed = owner.post(f"/recurring/{item_id}/resume")
+    assert resumed.headers["location"] == "/recurring?notice=resume"
+    resumed_page = owner.client.get(resumed.headers["location"]).text
+    assert "data-action-notice" in resumed_page and "Recurring item resumed." in resumed_page
+    deleted = owner.post(f"/recurring/{item_id}/delete")
+    assert deleted.headers["location"] == "/recurring?notice=delete"
+    deleted_page = owner.client.get(deleted.headers["location"]).text
+    assert "data-action-notice" in deleted_page and "Recurring item deleted." in deleted_page
+    assert "Car insurance" not in deleted_page
+    owner.client.headers["Accept-Language"] = "pl"
+    translated = owner.client.get("/recurring?notice=pause").text
+    assert "Wstrzymano pozycję cykliczną." in translated
+
+
 def test_edit_form_keeps_an_archived_category_visible(owner):
     data = form(owner)
     assert owner.post("/recurring", data).status_code == 303

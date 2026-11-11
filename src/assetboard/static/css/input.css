@@ -149,6 +149,19 @@
     @apply border border-primary bg-primary text-on-primary hover:border-primary-hover hover:bg-primary-hover;
   }
 
+  /* A form whose HTMX request runs (app.js): the form shows a progress cursor and its submit
+     controls fade a little. The button keeps its size, so the row does not jump. */
+  form[aria-busy="true"] {
+    cursor: progress;
+  }
+
+  form[aria-busy="true"] button[type="submit"],
+  form[aria-busy="true"] input[type="submit"],
+  button[aria-busy="true"] {
+    cursor: progress;
+    opacity: 0.6;
+  }
+
   /* Phones and tablets: the sidebar's Menu button folds the navigation away. The button and the
      folding need JavaScript (theme.js marks <html> with "js"), so without it the navigation
      stays open and the button stays hidden. */
