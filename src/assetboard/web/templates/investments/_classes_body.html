@@ -11,6 +11,12 @@
 
   {{ tabs("classes") }}
 
+  {% if can_edit %}
+  <div class="flex flex-wrap items-center gap-2" data-page-actions>
+    <a href="{{ scoped_url(request, 'investments_classes') }}?form=class#class-dialog" data-dialog-open="class-dialog" aria-haspopup="dialog" class="btn-primary" data-add-class>{{ _("Add an asset class") }}</a>
+  </div>
+  {% endif %}
+
   {% if page.can_seed %}
   <section class="panel p-6 sm:p-7" aria-labelledby="seed-classes-heading" data-seed-offer>
     <h2 id="seed-classes-heading" class="text-base font-semibold">{{ _("No asset classes yet") }}</h2>

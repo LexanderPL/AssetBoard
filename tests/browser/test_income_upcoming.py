@@ -122,6 +122,12 @@ def test_log_edit_one_time_payment_and_skip(tmp_path: Path) -> None:
 
             # A per-day income paid on the 10th of the next month.
             page.goto(f"{base}/income", wait_until="networkidle")
+            # Page actions sit on the left under the title, not beside the user menu.
+            title_box = page.locator("h1").bounding_box()
+            action_box = page.locator("[data-add-income]").bounding_box()
+            assert title_box is not None and action_box is not None
+            assert action_box["y"] >= title_box["y"] + title_box["height"] - 1
+            assert abs(action_box["x"] - title_box["x"]) <= 2
             page.locator("[data-add-income]").click()
             page.wait_for_load_state("networkidle")
             page.get_by_label("Name").fill("Consulting")
@@ -224,8 +230,20 @@ def test_log_edit_one_time_payment_and_skip(tmp_path: Path) -> None:
             assert article_box["y"] >= 0 and article_box["y"] < 844, article_box
             assert article_box["y"] + min(article_box["height"], 120) <= 844, article_box
             actions = article.locator("[data-occurrence-actions]")
-            expect(actions.locator(":scope > a.btn-primary")).to_have_count(1)
+            primary = actions.locator(":scope > a.btn-primary")
+            menu_summary = actions.locator(":scope > details[data-row-menu] summary")
+            expect(primary).to_have_count(1)
             expect(actions.locator(":scope > details[data-row-menu]")).to_have_count(1)
+            primary_box = primary.bounding_box()
+            menu_box = menu_summary.bounding_box()
+            assert primary_box is not None and menu_box is not None
+            assert abs(primary_box["height"] - menu_box["height"]) <= 1, (
+                primary_box,
+                menu_box,
+            )
+            assert (
+                primary.evaluate("el => getComputedStyle(el).backgroundColor") == "rgb(2, 119, 189)"
+            )
             expect(
                 actions.locator(
                     ":scope > a:visible, :scope > button:visible, :scope > form:visible"

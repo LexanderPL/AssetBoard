@@ -12,6 +12,12 @@
 
   {{ tabs("instruments") }}
 
+  {% if can_edit and page.classes %}
+  <div class="flex flex-wrap items-center gap-2" data-page-actions>
+    <a href="{{ scoped_url(request, 'investments_instruments') }}?form=instrument#instrument-dialog" data-dialog-open="instrument-dialog" aria-haspopup="dialog" class="btn-primary" data-add-instrument>{{ _("Add instrument") }}</a>
+  </div>
+  {% endif %}
+
   {% if page.can_seed %}
   <section class="panel p-6 sm:p-7" aria-labelledby="seed-classes-heading" data-seed-offer>
     <h2 id="seed-classes-heading" class="text-base font-semibold">{{ _("No asset classes yet") }}</h2>
@@ -29,8 +35,8 @@
   {% endif %}
 
   {% if can_edit and page.classes %}
-  {# The opener is the header's "Add instrument" action. Without JavaScript it opens the page
-     with the dialog rendered open in the page flow. #}
+  {# The opener sits under the tabs. Without JavaScript it opens the page with the dialog
+     rendered open in the page flow. #}
   <dialog id="instrument-dialog" aria-labelledby="instrument-form-heading" data-dialog-modal class="popup w-[min(92vw,48rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if create_errors or request.query_params.get("form") == "instrument" %} open{% endif %}>
    <div class="p-4 sm:p-6" data-instrument-create>
     <div class="flex items-start justify-between gap-4">

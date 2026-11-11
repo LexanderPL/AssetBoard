@@ -114,12 +114,13 @@ def test_mark_paid_dialog_is_a_modal_and_starts_at_today(owner):
         occurrence_id = occurrence.id
 
     page = owner.client.get("/upcoming").text
-    # The filters are a disclosure, rendered open as the no-JavaScript fallback.
-    assert '<details class="panel" data-filter-disclosure open>' in page
+    # The filters are a disclosure, collapsed by default; the summary is the no-JS opener.
+    assert '<details class="panel" data-filter-disclosure>' in page
+    assert '<details class="panel" data-filter-disclosure open>' not in page
     card = re.search(rf'<article [^>]*data-occurrence="{occurrence_id}".*?</article>', page, re.S)
     assert card is not None
     # One primary action and the overflow menu; the other actions are menu items.
-    assert card.group(0).count('class="btn-primary py-3"') == 1
+    assert card.group(0).count('class="btn-primary btn-sm h-8"') == 1
     assert f'data-dialog-open="paid-{occurrence_id}-dialog"' in card.group(0)
     assert "data-row-menu" in card.group(0)
     assert 'class="row-menu-item"' in card.group(0)

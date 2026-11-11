@@ -1,11 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{{ _("Investments") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Investments") }}{% endblock %}
-{% block header_actions %}
-{% if can_edit %}
-<a href="{{ scoped_url(request, 'investments_classes') }}?form=class#class-dialog" data-dialog-open="class-dialog" aria-haspopup="dialog" class="btn-primary" data-add-class>{{ _("Add an asset class") }}</a>
-{% endif %}
-{% endblock %}
 {% block content %}
 {% include "investments/_classes_body.html" %}
 {% endblock %}

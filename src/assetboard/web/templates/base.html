@@ -85,7 +85,7 @@
         </section>
         {% endif %}
         <div class="mb-8 flex items-start gap-4">
-          <header class="flex min-w-0 flex-1 flex-wrap items-end justify-between gap-4">
+          <header class="flex min-w-0 flex-1 flex-col gap-4">
             <div class="min-w-0">
               {% if workspace_nav %}<p class="truncate text-xs font-semibold uppercase tracking-[0.18em] text-primary-ink" data-current-workspace>{{ workspace_nav.current.name }}</p>{% endif %}
               <h1 class="{% if workspace_nav %}mt-2 {% endif %}text-2xl font-semibold tracking-tight sm:text-3xl">{% block heading %}{{ _("Your overview") }}{% endblock %}</h1>

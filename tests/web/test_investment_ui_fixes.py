@@ -112,9 +112,9 @@ def test_a_successful_add_shows_only_the_notice(owner: OwnerApp) -> None:
     assert "data-error" not in body and "data-field-error" not in body
     # The client-side warning starts hidden; the script shows it only once a weight is typed.
     assert re.search(r'class="hidden [^"]*" data-allocation-warning', body)
-    # The add dialog closes again; its opener stays in the page header, outside the swapped
-    # body, and the page does not scroll anywhere.
-    assert "data-add-instrument" not in body
+    # The add dialog closes again; its opener stays under the tabs in the swapped body, so the
+    # page does not scroll anywhere.
+    assert "data-add-instrument" in body
     assert re.search(r'<dialog id="instrument-dialog"[^>]*data-dialog-modal', body)
     opening = re.search(r'<dialog id="instrument-dialog"[^>]*>', body)
     assert opening is not None and " open" not in opening.group(0)
@@ -125,11 +125,12 @@ def test_a_successful_add_shows_only_the_notice(owner: OwnerApp) -> None:
 
 def test_the_add_form_sits_behind_a_button_and_reopens_on_errors(owner: OwnerApp) -> None:
     page = owner.client.get(INSTRUMENTS).text
-    header = page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
+    assert page.index("data-tab-strip") < page.index("data-page-actions")
+    actions = page.split("data-page-actions", 1)[1].split("</div>", 1)[0]
     assert re.search(
         r'<a href="[^"]+" data-dialog-open="instrument-dialog"[^>]*data-add-instrument>'
         r"Add instrument</a>",
-        header,
+        actions,
     )
     dialog = re.search(r'<dialog id="instrument-dialog".*?</dialog>', page, re.S)
     assert dialog is not None and 'id="new-instrument-name"' in dialog.group(0)

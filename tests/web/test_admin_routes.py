@@ -130,7 +130,9 @@ def test_users_list_shows_sign_in_methods_never_subjects(h: Harness) -> None:
     assert "data-admin-link" in client.get("/account").text
     page = client.get("/admin/users").text
     header = page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
-    assert "data-admin-create" in header and "data-admin-settings" in header
+    assert "data-admin-create" in header
+    # Instance settings live in the user menu only; the Users page keeps one primary action.
+    assert "data-admin-settings" not in header
     row = page.split(f'data-user="{OLA}"')[1].split("</tr>")[0]
     assert "Password" in row and "Identity provider" in row and "Proxy" in row
     assert "data-row-menu" in row and 'class="btn-sm"' in row and "btn-icon" in row

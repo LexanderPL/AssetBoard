@@ -183,10 +183,6 @@
         </tr>
       </thead>
       <tbody>
-        {# The entry row comes first: a saved entry appears right below it, in view, instead of
-           far down the month. Without an entry row (a viewer, a closed month, no category of
-           this kind) it renders the "no categories" hint or nothing. #}
-        {% if ledger.can_write %}{{ entry_row(s) }}{% endif %}
         {% for r in s.rows %}{{ row(s, r) }}{% endfor %}
         {% for r in s.pending_rows %}
         <tr class="bg-primary-soft/40" data-pending-occurrence="{{ r.occurrence.id }}">
@@ -249,10 +245,12 @@
           {% endif %}
         </tr>
         {% endfor %}
-        {# An empty state only where no entry row exists (viewers, a closed month, no category
-           of this kind): the entry row itself says where to add one (owner, 2026-11-01). #}
-        {% set has_entry_row = ledger.can_write and s.categories %}
-        {% if not has_entry_row and not s.rows and not s.pending_rows and not s.skipped_rows %}<tr data-ledger-empty><td colspan="{{ 5 if ledger.can_write else 4 }}" class="py-3 {{ muted_class }}">{% if ledger.filter %}{{ _("No entries in this category this month.") }}{% else %}{{ s.empty }}{% endif %}</td></tr>{% endif %}
+        {# An empty state only for viewers (no entry row): an editor gets the entry row, and
+           without a category of this kind that row already links to the Categories page. #}
+        {% if not ledger.can_write and not s.rows and not s.pending_rows and not s.skipped_rows %}<tr data-ledger-empty><td colspan="4" class="py-3 {{ muted_class }}">{% if ledger.filter %}{{ _("No entries in this category this month.") }}{% else %}{{ s.empty }}{% endif %}</td></tr>{% endif %}
+        {# Transactions are chronological: the new-entry row follows the rows that already
+           happened, because a new entry is normally the most recent one. #}
+        {% if ledger.can_write %}{{ entry_row(s) }}{% endif %}
       </tbody>
     </table>
   </div>

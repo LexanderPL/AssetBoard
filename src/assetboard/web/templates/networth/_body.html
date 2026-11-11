@@ -12,6 +12,12 @@
 
   {{ tabs(side_value) }}
 
+  {% if can_edit and view.categories %}
+  <div class="flex flex-wrap items-center gap-2" data-page-actions>
+    <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&form=item#item-dialog" data-dialog-open="item-dialog" aria-haspopup="dialog" class="btn-primary" data-add-item>{{ _("Add item") }}</a>
+  </div>
+  {% endif %}
+
   {% if side_value == "asset" and page.portfolio_warnings %}
   <section class="panel border border-warning-line bg-warning-soft p-4 sm:p-6" aria-labelledby="portfolio-warnings-heading" data-portfolio-warnings>
     <h2 id="portfolio-warnings-heading" class="text-base font-semibold text-warning-strong">{{ _("Possible double counting") }}</h2>
@@ -76,8 +82,8 @@
   </section>
   {% endfor %}
 
-  {% if not view.groups and not view.archived_groups and not view.archived_items %}
-  <div data-empty-side>{{ empty_state(_("No items yet"), _("Use Add item in the header, or paste a list of items below."), icon="+") }}</div>
+  {% if view.categories and not view.groups and not view.archived_groups and not view.archived_items %}
+  <div data-empty-side>{{ empty_state(_("No items yet"), _("Use Add item above, or paste a list of items below."), icon="+") }}</div>
   {% endif %}
 
   {% if can_edit and view.categories %}

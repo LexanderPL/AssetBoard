@@ -190,6 +190,16 @@
     @apply border-line bg-surface px-3 py-2 text-xs font-medium text-ink hover:bg-subtle;
   }
 
+  /* A compact row action can still be the primary or a destructive one. The two-class
+     selectors outrank .btn-sm's quiet surface without changing the standalone .btn-sm look. */
+  .btn-primary.btn-sm {
+    @apply border-primary bg-primary text-on-primary hover:border-primary-hover hover:bg-primary-hover;
+  }
+
+  .btn-danger.btn-sm {
+    @apply border-danger bg-danger-soft text-danger-strong hover:border-danger-strong hover:bg-danger-tint;
+  }
+
   .btn-icon {
     @apply h-8 w-8 shrink-0 border-line bg-surface p-0 text-base text-muted hover:bg-subtle hover:text-ink;
   }

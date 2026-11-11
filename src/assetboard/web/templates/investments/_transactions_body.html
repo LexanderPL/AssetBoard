@@ -15,7 +15,11 @@
   {{ tabs("transactions") }}
 
   {% if can_edit %}
-  {# The openers are in the header. Without JavaScript they open the page with the dialog
+  <div class="flex flex-wrap items-center gap-2" data-page-actions>
+    <a href="{{ scoped_url(request, 'investments_transactions') }}?form=transaction#transaction-dialog" data-dialog-open="transaction-dialog" aria-haspopup="dialog" class="btn-primary" data-add-transaction>{{ _("Add a transaction") }}</a>
+    {% if active_instruments %}<a href="{{ scoped_url(request, 'investments_transactions') }}?form=bulk#investment-bulk-panel" data-dialog-open="investment-bulk-panel" aria-haspopup="dialog" class="btn" data-bulk-open>{{ _("Bulk add") }}</a>{% endif %}
+  </div>
+  {# The openers sit under the tabs. Without JavaScript they open the page with the dialog
      rendered open in the page flow. #}
   <dialog id="transaction-dialog" aria-labelledby="transaction-form-heading" data-dialog-modal data-transaction-create class="popup w-[min(92vw,48rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if create_errors or request.query_params.get("form") == "transaction" %} open{% endif %}>
    <div class="p-4 sm:p-6">

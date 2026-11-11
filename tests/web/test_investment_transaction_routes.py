@@ -176,6 +176,7 @@ def test_the_filters_are_a_disclosure_above_the_history(owner: OwnerApp) -> None
 def test_the_add_and_bulk_forms_are_dialogs(owner: OwnerApp) -> None:
     instrument = _instrument(owner, "World ETF")
     page = owner.client.get(TX).text
+    assert page.index("data-tab-strip") < page.index("data-page-actions")
     assert re.search(
         r'<a href="[^"]+" data-dialog-open="transaction-dialog"[^>]*data-add-transaction>'
         r"Add a transaction</a>",
@@ -187,8 +188,8 @@ def test_the_add_and_bulk_forms_are_dialogs(owner: OwnerApp) -> None:
     assert opening is not None and " open" not in opening.group(0)
     bulk = re.search(r'<dialog id="investment-bulk-panel".*?</dialog>', page, re.S)
     assert bulk is not None and "data-bulk-text" in bulk.group(0)
-    header = page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
-    assert "data-bulk-open" in header and "data-add-transaction" in header
+    actions = page.split("data-page-actions", 1)[1].split("</div>", 1)[0]
+    assert "data-bulk-open" in actions and "data-add-transaction" in actions
     assert "data-transaction-actions" not in page
     assert "show:#investment-bulk-panel:top" not in page
 
