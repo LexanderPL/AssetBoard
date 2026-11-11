@@ -1,24 +1,11 @@
 {% macro tabs(active) -%}
-<div class="flex flex-wrap items-center gap-2" role="tablist" aria-label="{{ _('Net worth') }}">
-  {% if active == "summary" %}
-  <a href="{{ scoped_url(request, 'networth_summary') }}" role="tab" aria-selected="true" data-summary-tab class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("Summary") }}</a>
-  {% else %}
-  <a href="{{ scoped_url(request, 'networth_summary') }}" role="tab" aria-selected="false" data-summary-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Summary") }}</a>
-  {% endif %}
-  {% if active == "asset" %}
-  <a href="{{ scoped_url(request, 'networth') }}?side=asset" role="tab" aria-selected="true" data-side-tab="asset" class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("Assets") }}</a>
-  {% else %}
-  <a href="{{ scoped_url(request, 'networth') }}?side=asset" role="tab" aria-selected="false" data-side-tab="asset" class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Assets") }}</a>
-  {% endif %}
-  {% if active == "liability" %}
-  <a href="{{ scoped_url(request, 'networth') }}?side=liability" role="tab" aria-selected="true" data-side-tab="liability" class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("Liabilities") }}</a>
-  {% else %}
-  <a href="{{ scoped_url(request, 'networth') }}?side=liability" role="tab" aria-selected="false" data-side-tab="liability" class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Liabilities") }}</a>
-  {% endif %}
-  {% if active == "history" %}
-  <a href="{{ scoped_url(request, 'networth_history') }}" role="tab" aria-selected="true" data-history-tab class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("History") }}</a>
-  {% else %}
-  <a href="{{ scoped_url(request, 'networth_history') }}" role="tab" aria-selected="false" data-history-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("History") }}</a>
-  {% endif %}
-</div>
+{# Page tabs are navigation, not an ARIA tab widget: plain links, a single row, and
+   aria-current="page" on the page shown. The strip scrolls sideways on a phone (app.js starts
+   with the current tab in view); Tailwind styles it as the segmented row on a desktop. #}
+<nav class="tab-strip" aria-label="{{ _('Net worth') }}" data-tab-strip>
+  <a href="{{ scoped_url(request, 'networth_summary') }}" data-summary-tab{% if active == "summary" %} aria-current="page"{% endif %}>{{ _("Summary") }}</a>
+  <a href="{{ scoped_url(request, 'networth') }}?side=asset" data-side-tab="asset"{% if active == "asset" %} aria-current="page"{% endif %}>{{ _("Assets") }}</a>
+  <a href="{{ scoped_url(request, 'networth') }}?side=liability" data-side-tab="liability"{% if active == "liability" %} aria-current="page"{% endif %}>{{ _("Liabilities") }}</a>
+  <a href="{{ scoped_url(request, 'networth_history') }}" data-history-tab{% if active == "history" %} aria-current="page"{% endif %}>{{ _("History") }}</a>
+</nav>
 {%- endmacro %}

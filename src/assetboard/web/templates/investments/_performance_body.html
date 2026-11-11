@@ -1,4 +1,5 @@
 {% from "investments/_tabs.html" import tabs with context %}
+{% from "macros/components.html" import filter_panel with context %}
 <div id="performance-body" class="space-y-6">
   {{ tabs("performance") }}
 
@@ -19,8 +20,11 @@
         {% endif %}
       {% endfor %}
     </nav>
+  </section>
 
-    <form method="get" action="{{ scoped_url(request, 'investments_performance') }}" class="mt-4 flex flex-wrap items-end gap-3" data-performance-class>
+  {% set filter_count = 1 if view.class_options and not view.class_options[0].selected else 0 %}
+  {% call filter_panel(filter_count) %}
+    <form method="get" action="{{ scoped_url(request, 'investments_performance') }}" class="flex flex-wrap items-end gap-3" data-performance-class>
       <input type="hidden" name="range" value="{{ view.range_code }}">
       <div class="space-y-1.5">
         <label for="performance-class" class="block text-sm font-medium">{{ _("Class filter") }}</label>
@@ -32,7 +36,7 @@
       </div>
       <button type="submit" class="rounded-xl border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink hover:bg-subtle">{{ _("Show") }}</button>
     </form>
-  </section>
+  {% endcall %}
 
   {% if view.undated_count %}
   <p class="border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-performance-undated>

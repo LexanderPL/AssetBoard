@@ -145,6 +145,15 @@ def test_signed_out_visitors_are_sent_to_sign_in(h: Harness) -> None:
     assert response.headers["location"].startswith("/login")
 
 
+def test_the_filters_are_a_disclosure_with_an_active_count(h: Harness) -> None:
+    page = admin(h).get("/audit?scope=workspace&group=members").text
+    assert '<details class="panel mb-6" data-filter-disclosure open>' in page
+    summary = page.split("data-filter-disclosure", 1)[1].split("</summary>", 1)[0]
+    assert "Filters" in summary and "1 filter" in summary
+    assert "data-audit-filters" in page
+    assert page.index("data-audit-filters") < page.index('aria-label="Audit log"')
+
+
 # Tenant isolation
 
 

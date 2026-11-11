@@ -1,8 +1,11 @@
 {% extends "base.html" %}
+{% from "macros/components.html" import filter_panel with context %}
 {% block title %}{{ _("Audit log") }} · {{ app_name }}{% endblock %}
 {% block heading %}{% if scope == "instance" %}{{ _("Audit log: instance") }}{% else %}{{ _("Audit log: workspace") }}{% endif %}{% endblock %}
 {% block content %}
-<form method="get" action="{{ scoped_url(request, 'audit') }}" class="panel mb-6 flex flex-wrap items-end gap-4 p-5" data-audit-filters>
+{% set filter_count = (1 if filters.get("group") else 0) + (1 if filters.get("from") else 0) + (1 if filters.get("to") else 0) + (1 if filters.get("account") else 0) %}
+{% call filter_panel(filter_count, "panel mb-6") %}
+<form method="get" action="{{ scoped_url(request, 'audit') }}" class="flex flex-wrap items-end gap-4" data-audit-filters>
   <input type="hidden" name="scope" value="{{ scope }}">
   <div class="space-y-1.5">
     <label for="audit-group" class="block text-sm font-medium">{{ _("Events") }}</label>
@@ -25,6 +28,7 @@
   {% endif %}
   <button type="submit" class="rounded-xl border border-line px-4 py-2 text-sm font-semibold hover:bg-subtle">{{ _("Filter") }}</button>
 </form>
+{% endcall %}
 <section class="panel overflow-x-auto p-0" aria-label="{{ _('Audit log') }}">
   {% if rows %}
   <table class="sheet sheet-flush w-full text-left text-sm" data-audit-rows>

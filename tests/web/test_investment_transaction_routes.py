@@ -155,9 +155,22 @@ def test_the_transactions_tab_and_empty_page(owner: OwnerApp) -> None:
     page = owner.client.get(TX).text
     assert "Transaction history" in page
     assert "data-investment-transactions-tab" in page
+    assert re.search(r'<nav class="tab-strip" aria-label="Investments"', page)
+    assert 'role="tablist"' not in page and 'role="tab"' not in page
     assert "No investment transactions match these filters." in page
     tab = owner.client.get(INSTRUMENTS).text
     assert 'href="/investments/transactions"' in tab
+
+
+def test_the_filters_are_a_disclosure_above_the_history(owner: OwnerApp) -> None:
+    page = owner.client.get(f"{TX}?type=buy&from=2026-03-01").text
+    assert '<details class="panel" data-filter-disclosure open>' in page
+    summary = page.split("data-filter-disclosure", 1)[1].split("</summary>", 1)[0]
+    assert "Filters" in summary and "2 filters" in summary
+    assert "data-transaction-filters" in page
+    # The form is a sibling of the history panel, so a collapsed disclosure cannot hide the
+    # heading, and the table is directly below the always-visible summary.
+    assert page.index("data-transaction-filters") < page.index("data-transaction-history")
 
 
 def test_the_add_and_bulk_forms_are_dialogs(owner: OwnerApp) -> None:

@@ -114,11 +114,15 @@ def _fund(owner: OwnerApp) -> tuple[UUID, dict[str, UUID]]:
 def test_the_tab_and_empty_state(owner: OwnerApp) -> None:
     page = owner.client.get(PERFORMANCE)
     assert page.status_code == 200
-    assert re.search(r'aria-selected="true" data-performance-tab', page.text)
+    assert re.search(r'data-performance-tab aria-current="page"', page.text)
+    assert 'role="tablist"' not in page.text and 'role="tab"' not in page.text
     assert "data-performance-empty" in page.text
     assert "echarts.min.js" not in page.text and "data-chart=" not in page.text
+    assert '<details class="panel" data-filter-disclosure open>' in page.text
+    assert "data-performance-class" in page.text
+    assert page.text.index("data-performance-range") < page.text.index("data-filter-disclosure")
     instruments = owner.client.get(INSTRUMENTS).text
-    assert re.search(r'aria-selected="false" data-performance-tab', instruments)
+    assert re.search(r"data-performance-tab(?! aria-current)", instruments)
 
 
 def test_chart_periods_and_default_one_year_range(owner: OwnerApp) -> None:

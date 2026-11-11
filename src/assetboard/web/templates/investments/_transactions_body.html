@@ -1,7 +1,7 @@
 {% from "investments/_tabs.html" import tabs with context %}
 {% from "investments/_transaction_form.html" import transaction_form with context %}
 {% from "investments/_transaction_row.html" import edit_row, row with context %}
-{% from "macros/components.html" import csrf_input, toast with context %}
+{% from "macros/components.html" import csrf_input, filter_panel, toast with context %}
 {% set target = "investment-transactions-body" %}
 <div id="investment-transactions-body" class="space-y-6">
   {% if notice %}
@@ -105,9 +105,9 @@
   {% endif %}
   {% endif %}
 
-  <section class="panel p-6 sm:p-7" aria-labelledby="transaction-history-heading" data-transaction-history>
-    <h2 id="transaction-history-heading" class="text-base font-semibold">{{ _("Transaction history") }}</h2>
-    <form method="get" action="{{ scoped_url(request, 'investments_transactions') }}" class="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-transaction-filters>
+  {% set filter_count = (1 if filters.instrument else 0) + (1 if filters.type else 0) + (1 if filters.from else 0) + (1 if filters.to else 0) %}
+  {% call filter_panel(filter_count) %}
+    <form method="get" action="{{ scoped_url(request, 'investments_transactions') }}" class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4" data-transaction-filters>
       <div class="space-y-1">
         <label for="filter-instrument" class="block text-xs font-medium text-muted">{{ _("Instrument") }}</label>
         <select id="filter-instrument" name="instrument" class="form-select w-full py-2">
@@ -138,6 +138,10 @@
         <a href="{{ scoped_url(request, 'investments_transactions') }}" class="rounded-xl border border-line px-4 py-2 text-sm font-medium hover:bg-subtle">{{ _("Clear") }}</a>
       </div>
     </form>
+  {% endcall %}
+
+  <section class="panel p-6 sm:p-7" aria-labelledby="transaction-history-heading" data-transaction-history>
+    <h2 id="transaction-history-heading" class="text-base font-semibold">{{ _("Transaction history") }}</h2>
 
     {% if result.rows %}
     <div class="mt-4 overflow-x-auto">

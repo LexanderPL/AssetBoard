@@ -97,11 +97,13 @@ def test_the_sidebar_links_to_the_page(owner: OwnerApp) -> None:
 def test_the_page_has_assets_and_liabilities_tabs(owner: OwnerApp) -> None:
     page = owner.client.get("/net-worth").text
     assert 'data-side-tab="asset"' in page and 'data-side-tab="liability"' in page
-    assert 'aria-selected="true"' in page
+    assert 'role="tablist"' not in page and 'role="tab"' not in page
+    assert re.search(r'data-side-tab="asset" aria-current="page"', page) is not None
+    assert "aria-selected" not in page
     assert "Vehicles" in page and "Mortgage" not in page
     liability = owner.client.get("/net-worth?side=liability").text
     assert "Mortgage" in liability and "Vehicles" not in liability
-    assert re.search(r'aria-selected="true"[^>]*data-side-tab="liability"', liability) is not None
+    assert re.search(r'data-side-tab="liability" aria-current="page"', liability) is not None
     # The header's Add item keeps the tab it was opened on.
     assert "?side=liability&form=item#item-dialog" in _header_actions(liability)
 

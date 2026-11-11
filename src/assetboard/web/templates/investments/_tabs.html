@@ -1,44 +1,19 @@
 {% macro tabs(active) -%}
-<div class="flex flex-wrap items-center gap-2" role="tablist" aria-label="{{ _('Investments') }}">
-  {% if active == "portfolio" %}
-  <a href="{{ scoped_url(request, 'investments_portfolio') }}" role="tab" aria-selected="true" data-portfolio-tab class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("Portfolio") }}</a>
-  {% else %}
-  <a href="{{ scoped_url(request, 'investments_portfolio') }}" role="tab" aria-selected="false" data-portfolio-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Portfolio") }}</a>
-  {% endif %}
-  {% if active == "instruments" %}
-  <a href="{{ scoped_url(request, 'investments_instruments') }}" role="tab" aria-selected="true" data-instruments-tab class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("Instruments") }}</a>
-  {% else %}
-  <a href="{{ scoped_url(request, 'investments_instruments') }}" role="tab" aria-selected="false" data-instruments-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Instruments") }}</a>
-  {% endif %}
-  {% if active == "performance" %}
-  <a href="{{ scoped_url(request, 'investments_performance') }}" role="tab" aria-selected="true" data-performance-tab class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("Performance") }}</a>
-  {% else %}
-  <a href="{{ scoped_url(request, 'investments_performance') }}" role="tab" aria-selected="false" data-performance-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Performance") }}</a>
-  {% endif %}
-  {% if active == "income" %}
-  <a href="{{ scoped_url(request, 'investments_income') }}" role="tab" aria-selected="true" data-income-tab class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("Income") }}</a>
-  {% else %}
-  <a href="{{ scoped_url(request, 'investments_income') }}" role="tab" aria-selected="false" data-income-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Income") }}</a>
-  {% endif %}
-  {% if active == "classes" %}
-  <a href="{{ scoped_url(request, 'investments_classes') }}" role="tab" aria-selected="true" data-classes-tab class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("Asset classes") }}</a>
-  {% else %}
-  <a href="{{ scoped_url(request, 'investments_classes') }}" role="tab" aria-selected="false" data-classes-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Asset classes") }}</a>
-  {% endif %}
-  {% if active == "transactions" %}
-  <a href="{{ scoped_url(request, 'investments_transactions') }}" role="tab" aria-selected="true" data-investment-transactions-tab class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("Transactions") }}</a>
-  {% else %}
-  <a href="{{ scoped_url(request, 'investments_transactions') }}" role="tab" aria-selected="false" data-investment-transactions-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Transactions") }}</a>
-  {% endif %}
+{# Page tabs are navigation, not an ARIA tab widget: plain links, a single row, and
+   aria-current="page" on the page shown. The strip scrolls sideways on a phone (app.js starts
+   with the current tab in view); Tailwind styles it as the segmented row on a desktop. #}
+<nav class="tab-strip" aria-label="{{ _('Investments') }}" data-tab-strip>
+  <a href="{{ scoped_url(request, 'investments_portfolio') }}" data-portfolio-tab{% if active == "portfolio" %} aria-current="page"{% endif %}>{{ _("Portfolio") }}</a>
+  <a href="{{ scoped_url(request, 'investments_instruments') }}" data-instruments-tab{% if active == "instruments" %} aria-current="page"{% endif %}>{{ _("Instruments") }}</a>
+  <a href="{{ scoped_url(request, 'investments_performance') }}" data-performance-tab{% if active == "performance" %} aria-current="page"{% endif %}>{{ _("Performance") }}</a>
+  <a href="{{ scoped_url(request, 'investments_income') }}" data-income-tab{% if active == "income" %} aria-current="page"{% endif %}>{{ _("Income") }}</a>
+  <a href="{{ scoped_url(request, 'investments_classes') }}" data-classes-tab{% if active == "classes" %} aria-current="page"{% endif %}>{{ _("Asset classes") }}</a>
+  <a href="{{ scoped_url(request, 'investments_transactions') }}" data-investment-transactions-tab{% if active == "transactions" %} aria-current="page"{% endif %}>{{ _("Transactions") }}</a>
   {% if can_manage_providers %}
-  {% if active == "providers" %}
-  <a href="{{ scoped_url(request, 'investments_providers') }}" role="tab" aria-selected="true" data-providers-tab class="rounded-xl bg-primary-soft px-4 py-2 text-sm font-semibold text-primary-ink">{{ _("Providers") }}</a>
-  {% else %}
-  <a href="{{ scoped_url(request, 'investments_providers') }}" role="tab" aria-selected="false" data-providers-tab class="rounded-xl px-4 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink">{{ _("Providers") }}</a>
-  {% endif %}
+  <a href="{{ scoped_url(request, 'investments_providers') }}" data-providers-tab{% if active == "providers" %} aria-current="page"{% endif %}>{{ _("Providers") }}</a>
   {% endif %}
   {% if coingecko_enabled %}
   <span class="rounded-full bg-primary-soft px-2.5 py-1 text-xs font-medium text-primary-ink" data-coingecko-badge>{{ _("Powered by CoinGecko") }}</span>
   {% endif %}
-</div>
+</nav>
 {%- endmacro %}
