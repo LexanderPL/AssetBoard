@@ -170,7 +170,10 @@ interval/end_date/max_count, determinism. Services use the injected Clock only.
 
 **Acceptance**
 - "Upcoming" page (headed "Upcoming payments", pl "Nadchodzące płatności"; the sidebar item stays "Upcoming"): overdue (highlighted), next 30 days (setting), grouped by week; filters by direction/category.
-- Actions per occurrence: **Mark paid/received** (dialog prefilled with expected amount and due date; editable) creates a `Transaction` (`source=recurring`) linked to the occurrence and sets `status=posted`; **Skip**; **Reschedule this one** (changes only this occurrence's date); **Edit amount** (this occurrence only); **Edit rule**.
+- Actions per occurrence: **Mark paid/received** (dialog prefilled with the expected amount and a date — today for a future occurrence, the due date when it is overdue — editable) creates a `Transaction` (`source=recurring`) linked to the occurrence and sets `status=posted`; **Skip**; **Reschedule this one** (changes only this occurrence's date); **Edit amount** (this occurrence only); **Edit rule**.
+  As built (UI batch 4): each occurrence shows one primary **Mark paid/received** action and a
+  compact overflow menu for reschedule, amount, skip, edit rule and one-time delete; the filters
+  start collapsed on phones; **Skip** shows a status with **Undo**.
   As built (UI batch 3): a recurring expected row on the month's Transactions page also has **Skip** (`upcoming_skip` with `return_month`); the skipped occurrence stays in that month's table, greyed out and labelled "Skipped", with **Undo** (`upcoming_unskip` → `services.occurrences.unskip_occurrence`: editor role, open month, not for an archived item, audited as `scheduled_occurrence.unskipped`; an income occurrence is recalculated so its tax payments return). Skipped occurrences are never pending, so the Month summary does not count them.
 - Undo of "mark paid" within 10 seconds deletes the created transaction and restores `pending`.
 - `auto_post=true` items post automatically on the due date (job runs shortly after midnight workspace time) with `source=recurring_auto`; the transaction is clearly marked and editable.

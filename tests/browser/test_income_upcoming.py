@@ -1,8 +1,9 @@
 """Income log editing, one-time payments and Skip in Chromium (UI batch 3): a payment row's
 inline Edit opens focused, Escape cancels and restores the logged units, Save changes them; the
 Log form prefills a month that has a log and says "Update"; Upcoming adds a one-time payment;
-a recurring expected row in the month ledger is skipped (greyed out, with Undo) and comes back,
-its Skip button lined up with Confirm. No CSP violations.
+at 390 px its filters start collapsed and its first row has one primary action and a dialog
+whose date starts at today; a recurring expected row in the month ledger is skipped (greyed out,
+with Undo) and comes back, its Skip button lined up with Confirm. No CSP violations.
 
 With ``ASSETBOARD_SHOTS_DIR`` set, screenshots of the three places are saved in light and
 dark."""
@@ -83,6 +84,9 @@ def test_log_edit_one_time_payment_and_skip(tmp_path: Path) -> None:
             data_dir=tmp_path,
             database_url=f"sqlite:///{tmp_path / 'browser.db'}",
             secret_key="browser-test-key",
+            # The following month's day-5 payment must fall inside the Upcoming window on any
+            # date.
+            upcoming_days=90,
         )
     )
     listener = socket.socket()
@@ -205,6 +209,49 @@ def test_log_edit_one_time_payment_and_skip(tmp_path: Path) -> None:
             page.wait_for_load_state("networkidle")
             expect(one_time_dialog).to_be_hidden()
             expect(page.locator("[data-upcoming-notice]")).to_contain_text("One-time payment")
+
+            # At 390 px the filters start collapsed, so the first occurrence is visible in the
+            # first viewport. A row has one primary action and the overflow menu only; Mark paid
+            # opens a modal whose date defaults to today for a future occurrence.
+            page.set_viewport_size({"width": 390, "height": 844})
+            page.goto(f"{base}/upcoming", wait_until="networkidle")
+            page.evaluate("window.scrollTo(0, 0)")
+            filters = page.locator("details[data-filter-disclosure]")
+            expect(filters).not_to_have_attribute("open", "")
+            article = page.locator("article[data-occurrence]").first
+            article_box = article.bounding_box()
+            assert article_box is not None
+            assert article_box["y"] >= 0 and article_box["y"] < 844, article_box
+            assert article_box["y"] + min(article_box["height"], 120) <= 844, article_box
+            actions = article.locator("[data-occurrence-actions]")
+            expect(actions.locator(":scope > a.btn-primary")).to_have_count(1)
+            expect(actions.locator(":scope > details[data-row-menu]")).to_have_count(1)
+            expect(
+                actions.locator(
+                    ":scope > a:visible, :scope > button:visible, :scope > form:visible"
+                )
+            ).to_have_count(1)
+            expect(actions.locator("button:visible")).to_have_count(0)
+            occurrence_id = article.get_attribute("data-occurrence")
+            assert occurrence_id
+            actions.locator(":scope > a.btn-primary").click()
+            paid_dialog = page.locator("dialog[data-dialog-modal][open]")
+            expect(paid_dialog).to_be_visible()
+            expect(paid_dialog.locator(f"#post-day-{occurrence_id}")).to_have_value(
+                today.isoformat()
+            )
+            expect(paid_dialog.locator(f"#post-amount-{occurrence_id}")).to_be_visible()
+            page.keyboard.press("Escape")
+            expect(paid_dialog).to_be_hidden()
+            actions.locator(":scope > a.btn-primary").click()
+            expect(paid_dialog).to_be_visible()
+            page.mouse.click(2, 2)
+            expect(paid_dialog).to_be_hidden()
+            actions.locator(":scope > a.btn-primary").click()
+            expect(paid_dialog).to_be_visible()
+            paid_dialog.get_by_role("link", name="Cancel").click()
+            expect(paid_dialog).to_be_hidden()
+            page.set_viewport_size({"width": 1280, "height": 900})
 
             # The income is expected next month: Skip it in that month's ledger, then Undo.
             month_path = f"/transactions/{following[0]:04d}-{following[1]:02d}"

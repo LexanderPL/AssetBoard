@@ -1,9 +1,29 @@
 {% extends "base.html" %}
-{% from "macros/components.html" import csrf_input with context %}
+{% from "macros/components.html" import csrf_input, row_menu with context %}
 {% set input_class = "form-control w-full px-2.5 py-1.5" %}
 {% set button_class = "btn" %}
 {% block title %}{{ _("Upcoming payments") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Upcoming payments") }}{% endblock %}
+{# A link to this page, keeping the filters. With a form code it also asks the server to render
+   that dialog open, for use without JavaScript. #}
+{% macro page_url(form_code=None) -%}
+{{ scoped_url(request, 'scheduled_upcoming') }}{% if filters_query %}?{{ filters_query }}{% endif %}{% if form_code %}{{ '&' if filters_query else '?' }}form={{ form_code }}#{{ form_code }}-dialog{% endif %}
+{%- endmacro %}
+{# The modal shell shared by the occurrence actions: a title, the payment's name and a close
+   link, then the caller's form. The server renders it open for its ?form= code, which is the
+   no-JavaScript path; app.js turns an open one into a modal. #}
+{% macro dialog_shell(form_code, title, name, force_open=false) -%}
+<dialog id="{{ form_code }}-dialog" aria-labelledby="{{ form_code }}-heading" data-dialog-modal class="popup w-[min(92vw,28rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if open_form == form_code or force_open %} open{% endif %}>
+ <div class="p-4 sm:p-6">
+  <div class="flex items-start justify-between gap-4">
+    <h2 id="{{ form_code }}-heading" class="text-base font-semibold">{{ title }}</h2>
+    <a href="{{ page_url() }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" title="{{ _('Close') }}"><span aria-hidden="true">×</span><span class="sr-only">{{ _("Close") }}</span></a>
+  </div>
+  <p class="mt-1 text-sm text-muted">{{ name }}</p>
+  {{ caller() }}
+ </div>
+</dialog>
+{%- endmacro %}
 {% block content %}
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 {% if undo and can_edit %}
@@ -12,48 +32,55 @@
   <form method="post" action="{{ scoped_url(request, 'upcoming_undo', occurrence_id=undo.occurrence_id) }}">{{ csrf_input() }}<button type="submit" class="font-semibold underline">{{ _("Undo") }}</button></form>
 </div>
 {% endif %}
-{% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-upcoming-notice>{{ notice }}</p>{% endif %}
+{% if notice %}
+<div role="status" class="mb-4 flex flex-wrap items-center gap-3 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-upcoming-notice>
+  <span>{{ notice }}</span>
+  {% if skipped_id and can_edit %}
+  <form method="post" action="{{ scoped_url(request, 'upcoming_unskip', occurrence_id=skipped_id) }}" data-skip-undo>{{ csrf_input() }}<button type="submit" class="font-semibold underline">{{ _("Undo") }}</button></form>
+  {% endif %}
+</div>
+{% endif %}
 {% from "categories/_macros.html" import category_options as grouped_options %}
 {% macro category_options(selected) -%}
 {{ grouped_options([(_("Expense categories"), expense_categories), (_("Income categories"), income_categories)], selected, _("Choose a category")) }}
 {%- endmacro %}
-{# The fields of a one-time payment: the "Add one-time payment" form and a row's Edit form. #}
+{# The fields of a one-time payment: the "Add one-time payment" form and a row's Edit dialog. #}
 {% macro one_time_fields(prefix, values, errors) -%}
 {% set field = errors.get("field") %}
 {% if errors %}<p role="alert" id="{{ prefix }}-error" class="text-sm text-danger sm:col-span-2" data-one-time-error>{{ errors.form }}</p>{% endif %}
 <div class="sm:col-span-2">
-  <label for="{{ prefix }}-name" class="mb-1 block text-xs font-medium">{{ _("Description") }}</label>
+  <label for="{{ prefix }}-name" class="mb-1 block text-sm font-medium">{{ _("Description") }}</label>
   <input id="{{ prefix }}-name" name="name" maxlength="200" required value="{{ values.get('name', '') }}" class="{{ input_class }}"{% if field == "name" %} aria-invalid="true" aria-describedby="{{ prefix }}-error"{% endif %}>
 </div>
 <div>
-  <label for="{{ prefix }}-amount" class="mb-1 block text-xs font-medium">{{ _("Amount (%(currency)s)", currency=workspace_nav.current.base_currency) }}</label>
+  <label for="{{ prefix }}-amount" class="mb-1 block text-sm font-medium">{{ _("Amount (%(currency)s)", currency=workspace_nav.current.base_currency) }}</label>
   <input id="{{ prefix }}-amount" name="amount" type="text" inputmode="decimal" required value="{{ values.get('amount', '') }}" class="{{ input_class }}"{% if field == "amount" %} aria-invalid="true" aria-describedby="{{ prefix }}-error"{% endif %}>
 </div>
 <div>
-  <label for="{{ prefix }}-day" class="mb-1 block text-xs font-medium">{{ _("Date") }}</label>
+  <label for="{{ prefix }}-day" class="mb-1 block text-sm font-medium">{{ _("Date") }}</label>
   <input id="{{ prefix }}-day" name="day" type="date" required value="{{ values.get('day', '') }}" class="{{ input_class }}"{% if field in ("day", "month_closed") %} aria-invalid="true" aria-describedby="{{ prefix }}-error"{% endif %}>
 </div>
 <fieldset class="sm:col-span-2">
-  <legend class="mb-1 text-xs font-medium">{{ _("Type") }}</legend>
+  <legend class="mb-1 text-sm font-medium">{{ _("Type") }}</legend>
   <div class="flex flex-wrap gap-4 text-sm">
     {% for value, label in (("expense", _("Expense")), ("income", _("Income"))) %}<label class="inline-flex items-center gap-2"><input type="radio" name="direction" value="{{ value }}"{% if values.get('direction', 'expense') == value %} checked{% endif %} class="h-4 w-4 accent-primary"> {{ label }}</label>{% endfor %}
   </div>
 </fieldset>
 <div class="sm:col-span-2">
-  <label for="{{ prefix }}-category" class="mb-1 block text-xs font-medium">{{ _("Category") }}</label>
+  <label for="{{ prefix }}-category" class="mb-1 block text-sm font-medium">{{ _("Category") }}</label>
   <select id="{{ prefix }}-category" name="category_id" required class="form-select w-full py-1.5 pl-2.5"{% if field in ("category", "category_kind_mismatch") %} aria-invalid="true" aria-describedby="{{ prefix }}-error"{% endif %}>{{ category_options(values.get('category_id', '')) }}</select>
 </div>
 {%- endmacro %}
 {% if can_edit %}
 <div class="mb-6">
   {# Without JavaScript the link opens the page with the dialog rendered open in the page flow. #}
-  <a href="{{ scoped_url(request, 'scheduled_upcoming') }}?form=one-time#one-time-dialog" data-dialog-open="one-time-dialog" aria-haspopup="dialog" class="btn-primary" data-add-one-time>{{ _("Add one-time payment") }}</a>
+  <a href="{{ page_url('one-time') }}" data-dialog-open="one-time-dialog" aria-haspopup="dialog" class="btn-primary" data-add-one-time>{{ _("Add one-time payment") }}</a>
 </div>
 <dialog id="one-time-dialog" aria-labelledby="one-time-heading" data-dialog-modal class="popup w-[min(92vw,44rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if open_form == "one-time" %} open{% endif %}>
  <div class="p-4 sm:p-6">
   <div class="flex items-start justify-between gap-4">
     <h2 id="one-time-heading" class="text-base font-semibold">{{ _("Add one-time payment") }}</h2>
-    <a href="{{ scoped_url(request, 'scheduled_upcoming') }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" title="{{ _('Close') }}"><span aria-hidden="true">×</span><span class="sr-only">{{ _("Close") }}</span></a>
+    <a href="{{ page_url() }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" title="{{ _('Close') }}"><span aria-hidden="true">×</span><span class="sr-only">{{ _("Close") }}</span></a>
   </div>
   <p class="mt-1 text-sm text-muted">{{ _("A one-time payment is planned once, on its date. It is listed here, not on the Recurring page.") }}</p>
   <form method="post" action="{{ scoped_url(request, 'upcoming_one_time_create') }}" class="mt-4 grid gap-4 sm:grid-cols-2" data-one-time-form>
@@ -61,42 +88,53 @@
     {{ one_time_fields("one-time", one_time_values, one_time_errors) }}
     <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
       <button type="submit" class="btn-primary">{{ _("Add payment") }}</button>
-      <a href="{{ scoped_url(request, 'scheduled_upcoming') }}" data-dialog-close class="{{ button_class }}">{{ _("Cancel") }}</a>
+      <a href="{{ page_url() }}" data-dialog-close class="{{ button_class }}">{{ _("Cancel") }}</a>
     </div>
   </form>
  </div>
 </dialog>
 {% endif %}
-<section class="panel mb-6 p-4 sm:p-6" aria-labelledby="upcoming-filters">
-  <h2 id="upcoming-filters" class="font-semibold">{{ _("Filters") }}</h2>
-  <form method="get" action="{{ scoped_url(request, 'scheduled_upcoming') }}" class="mt-4 grid gap-4 sm:grid-cols-3">
-    <div>
-      <label for="upcoming-direction" class="mb-1 block text-sm font-medium">{{ _("Direction") }}</label>
-      <select id="upcoming-direction" name="direction" class="form-select w-full py-1.5 pl-2.5">
-        <option value="">{{ _("Expenses and income") }}</option>
-        <option value="expense"{% if direction == "expense" %} selected{% endif %}>{{ _("Expenses") }}</option>
-        <option value="income"{% if direction == "income" %} selected{% endif %}>{{ _("Income") }}</option>
-      </select>
-    </div>
-    <div>
-      <label for="upcoming-category" class="mb-1 block text-sm font-medium">{{ _("Category") }}</label>
-      <select id="upcoming-category" name="category" class="form-select w-full py-1.5 pl-2.5">
-        {# Kinds and archived categories are dividers (optgroup), not options. #}
-        {{ grouped_options([(_("Expense categories"), expense_categories), (_("Income categories"), income_categories), (_("Archived categories"), archived_categories)], category_id or "", _("All categories")) }}
-      </select>
-    </div>
-    <div class="flex items-end gap-3">
-      <button type="submit" class="btn-primary">{{ _("Apply filters") }}</button>
-      <a href="{{ scoped_url(request, 'scheduled_upcoming') }}" class="btn" data-clear-filters>{{ _("Clear") }}</a>
-    </div>
-  </form>
-  <p class="mt-3 text-sm text-muted">{{ _("Showing overdue items and the next %(days)d days.", days=days) }}</p>
-</section>
+{% set filter_count = (1 if direction else 0) + (1 if category_id else 0) %}
+<details class="panel" data-filter-disclosure open>
+  <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden">
+    <span class="flex flex-wrap items-center gap-2 text-sm font-semibold">
+      <span aria-hidden="true">▾</span>{{ _("Filters") }}
+      {% if filter_count %}<span class="rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary-ink">{{ ngettext("%(num)d filter", "%(num)d filters", filter_count, num=filter_count) }}</span>{% endif %}
+    </span>
+  </summary>
+  <div class="border-t border-line p-4 sm:p-6">
+    <form method="get" action="{{ scoped_url(request, 'scheduled_upcoming') }}" class="grid gap-4 sm:grid-cols-3">
+      <div>
+        <label for="upcoming-direction" class="mb-1 block text-sm font-medium">{{ _("Direction") }}</label>
+        <select id="upcoming-direction" name="direction" class="form-select w-full py-1.5 pl-2.5">
+          <option value="">{{ _("Expenses and income") }}</option>
+          <option value="expense"{% if direction == "expense" %} selected{% endif %}>{{ _("Expenses") }}</option>
+          <option value="income"{% if direction == "income" %} selected{% endif %}>{{ _("Income") }}</option>
+        </select>
+      </div>
+      <div>
+        <label for="upcoming-category" class="mb-1 block text-sm font-medium">{{ _("Category") }}</label>
+        <select id="upcoming-category" name="category" class="form-select w-full py-1.5 pl-2.5">
+          {# Kinds and archived categories are dividers (optgroup), not options. #}
+          {{ grouped_options([(_("Expense categories"), expense_categories), (_("Income categories"), income_categories), (_("Archived categories"), archived_categories)], category_id or "", _("All categories")) }}
+        </select>
+      </div>
+      <div class="flex items-end gap-3">
+        <button type="submit" class="btn-primary">{{ _("Apply filters") }}</button>
+        <a href="{{ scoped_url(request, 'scheduled_upcoming') }}" class="btn" data-clear-filters>{{ _("Clear") }}</a>
+      </div>
+    </form>
+  </div>
+</details>
+<p class="mb-6 mt-3 text-sm text-muted">{{ _("Showing overdue items and the next %(days)d days.", days=days) }}</p>
 {% for week in weeks %}
 <section class="mb-8" aria-labelledby="week-{{ week.monday.isoformat() }}">
   <h2 id="week-{{ week.monday.isoformat() }}" class="mb-3 text-base font-semibold">{{ _("Week of %(date)s", date=format_day(week.monday, locale)) }}</h2>
   <div class="panel divide-y divide-line">
   {% for occurrence in week.occurrences %}
+  {# A future payment is recorded when it happens, not on its future due date: the dialog starts
+     at today unless the occurrence is already due. #}
+  {% set post_day = today if occurrence.due_date > today else occurrence.due_date %}
   <article class="p-4 sm:p-5 {% if occurrence.due_date < today %}bg-danger-soft{% endif %}" data-occurrence="{{ occurrence.id }}">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div class="min-w-0">
@@ -114,62 +152,82 @@
       </div>
       {% if can_edit %}
       <div class="flex flex-wrap items-start gap-2" data-occurrence-actions>
-        <details>
-          <summary class="{{ button_class }} cursor-pointer">{{ _("Mark paid or received") }}</summary>
-          <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=occurrence.id) }}" class="mt-3 grid gap-3 border border-line p-3 sm:grid-cols-2">
-            {{ csrf_input() }}
-            <div>
-              <label for="post-day-{{ occurrence.id }}" class="mb-1 block text-xs font-medium">{{ _("Date") }}</label>
-              <input id="post-day-{{ occurrence.id }}" name="day" type="date" value="{{ occurrence.due_date.isoformat() }}" required class="{{ input_class }}">
-            </div>
-            <div>
-              <label for="post-amount-{{ occurrence.id }}" class="mb-1 block text-xs font-medium">{{ _("Amount") }}</label>
-              <input id="post-amount-{{ occurrence.id }}" name="amount" type="text" inputmode="decimal" value="{{ amount_input(occurrence.expected) }}" required class="{{ input_class }}">
-            </div>
-            <button type="submit" class="btn-primary sm:col-span-2">{{ _("Save transaction") }}</button>
-          </form>
-        </details>
-        {% if occurrence.one_time %}
-        {# A one-time payment is edited and deleted here; the Recurring page does not list it. #}
-        {% set editing_this = editing == occurrence.id %}
-        {% set values = edit_values if editing_this else {"name": occurrence.label, "amount": amount_input(occurrence.expected), "day": occurrence.due_date.isoformat(), "direction": occurrence.direction, "category_id": occurrence.category_id|string} %}
-        <details data-one-time-edit{% if editing_this %} open{% endif %}>
-          <summary class="{{ button_class }} cursor-pointer">{{ _("Edit") }}<span class="sr-only"> {{ occurrence.label }}</span></summary>
-          <form method="post" action="{{ scoped_url(request, 'upcoming_one_time_update', occurrence_id=occurrence.id) }}" class="mt-3 grid gap-3 border border-line p-3 sm:grid-cols-2">
-            {{ csrf_input() }}
-            {{ one_time_fields("edit-" ~ occurrence.id, values, edit_errors if editing_this else {}) }}
-            <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
-              <button type="submit" class="{{ button_class }}">{{ _("Save") }}</button>
-              <button type="button" data-details-close class="{{ button_class }}">{{ _("Cancel") }}</button>
-            </div>
-          </form>
-        </details>
-        <form method="post" action="{{ scoped_url(request, 'upcoming_delete', occurrence_id=occurrence.id) }}" data-confirm="{{ _('Delete the planned entry %(name)s?', name=occurrence.label) }}">{{ csrf_input() }}<button type="submit" data-delete class="{{ button_class }} text-danger">{{ _("Delete") }}<span class="sr-only"> {{ occurrence.label }}</span></button></form>
-        {% else %}
-        <details>
-          <summary class="{{ button_class }} cursor-pointer">{{ _("Reschedule this one") }}</summary>
-          <form method="post" action="{{ scoped_url(request, 'upcoming_reschedule', occurrence_id=occurrence.id) }}" class="mt-3 flex flex-wrap gap-2 border border-line p-3">
-            {{ csrf_input() }}
-            <label for="reschedule-{{ occurrence.id }}" class="sr-only">{{ _("New due date") }}</label>
-            <input id="reschedule-{{ occurrence.id }}" name="day" type="date" value="{{ occurrence.due_date.isoformat() }}" required class="{{ input_class }}">
-            <button type="submit" class="{{ button_class }}">{{ _("Save date") }}</button>
-          </form>
-        </details>
-        <details>
-          <summary class="{{ button_class }} cursor-pointer">{{ _("Edit amount") }}</summary>
-          <form method="post" action="{{ scoped_url(request, 'upcoming_amount', occurrence_id=occurrence.id) }}" class="mt-3 flex flex-wrap gap-2 border border-line p-3">
-            {{ csrf_input() }}
-            <label for="amount-{{ occurrence.id }}" class="sr-only">{{ _("Amount") }}</label>
-            <input id="amount-{{ occurrence.id }}" name="amount" type="text" inputmode="decimal" value="{{ amount_input(occurrence.expected) }}" required class="{{ input_class }}">
-            <button type="submit" class="{{ button_class }}">{{ _("Save amount") }}</button>
-          </form>
-        </details>
-        <form method="post" action="{{ scoped_url(request, 'upcoming_skip', occurrence_id=occurrence.id) }}">{{ csrf_input() }}<button type="submit" class="{{ button_class }}">{{ _("Skip") }}</button></form>
-        {% if occurrence.scheduled_item_id %}<a href="{{ scoped_url(request, 'scheduled_edit', item_id=occurrence.scheduled_item_id) }}" class="{{ button_class }}">{{ _("Edit rule") }}</a>{% elif occurrence.income_source_id %}<a href="{{ scoped_url(request, 'income_sources') }}#income-source-{{ occurrence.income_source_id }}" class="{{ button_class }}">{{ _("Edit income") }}</a>{% endif %}
-        {% endif %}
+        <a href="{{ page_url('paid-' ~ occurrence.id) }}" data-dialog-open="paid-{{ occurrence.id }}-dialog" aria-haspopup="dialog" class="btn-primary py-3">{{ _("Mark paid or received") }}<span class="sr-only"> {{ occurrence.label }}</span></a>
+        {% call row_menu(occurrence.label, key=occurrence.id|string) %}
+          {% if occurrence.one_time %}
+          {# A one-time payment is edited and deleted here; the Recurring page does not list it. #}
+          <a class="row-menu-item" href="{{ page_url('edit-' ~ occurrence.id) }}" data-dialog-open="edit-{{ occurrence.id }}-dialog">{{ _("Edit") }}<span class="sr-only"> {{ occurrence.label }}</span></a>
+          <form method="post" action="{{ scoped_url(request, 'upcoming_delete', occurrence_id=occurrence.id) }}" data-confirm="{{ _('Delete the planned entry %(name)s?', name=occurrence.label) }}">{{ csrf_input() }}<button type="submit" data-delete class="row-menu-item row-menu-item-danger">{{ _("Delete") }}<span class="sr-only"> {{ occurrence.label }}</span></button></form>
+          {% else %}
+          <a class="row-menu-item" href="{{ page_url('reschedule-' ~ occurrence.id) }}" data-dialog-open="reschedule-{{ occurrence.id }}-dialog">{{ _("Reschedule") }}<span class="sr-only"> {{ occurrence.label }}</span></a>
+          <a class="row-menu-item" href="{{ page_url('amount-' ~ occurrence.id) }}" data-dialog-open="amount-{{ occurrence.id }}-dialog">{{ _("Edit amount") }}<span class="sr-only"> {{ occurrence.label }}</span></a>
+          <form method="post" action="{{ scoped_url(request, 'upcoming_skip', occurrence_id=occurrence.id) }}">{{ csrf_input() }}<button type="submit" class="row-menu-item">{{ _("Skip") }}<span class="sr-only"> {{ occurrence.label }}</span></button></form>
+          {% if occurrence.scheduled_item_id %}<a class="row-menu-item" href="{{ scoped_url(request, 'scheduled_edit', item_id=occurrence.scheduled_item_id) }}">{{ _("Edit rule") }}<span class="sr-only"> {{ occurrence.label }}</span></a>{% elif occurrence.income_source_id %}<a class="row-menu-item" href="{{ scoped_url(request, 'income_sources') }}#income-source-{{ occurrence.income_source_id }}">{{ _("Edit income") }}<span class="sr-only"> {{ occurrence.label }}</span></a>{% endif %}
+          {% endif %}
+        {% endcall %}
       </div>
       {% endif %}
     </div>
+    {% if can_edit %}
+    {% call dialog_shell('paid-' ~ occurrence.id, _('Mark paid or received'), occurrence.label) %}
+    <form method="post" action="{{ scoped_url(request, 'upcoming_post', occurrence_id=occurrence.id) }}" class="mt-4 grid gap-4 sm:grid-cols-2">
+      {{ csrf_input() }}
+      <div>
+        <label for="post-day-{{ occurrence.id }}" class="mb-1 block text-sm font-medium">{{ _("Date") }}</label>
+        <input id="post-day-{{ occurrence.id }}" name="day" type="date" value="{{ post_day.isoformat() }}" required class="{{ input_class }}">
+      </div>
+      <div>
+        <label for="post-amount-{{ occurrence.id }}" class="mb-1 block text-sm font-medium">{{ _("Amount") }}</label>
+        <input id="post-amount-{{ occurrence.id }}" name="amount" type="text" inputmode="decimal" value="{{ amount_input(occurrence.expected) }}" required class="{{ input_class }}">
+      </div>
+      <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+        <button type="submit" class="btn-primary">{{ _("Save transaction") }}</button>
+        <a href="{{ page_url() }}" data-dialog-close class="{{ button_class }}">{{ _("Cancel") }}</a>
+      </div>
+    </form>
+    {% endcall %}
+    {% if occurrence.one_time %}
+    {% set editing_this = editing == occurrence.id %}
+    {% set values = edit_values if editing_this else {"name": occurrence.label, "amount": amount_input(occurrence.expected), "day": occurrence.due_date.isoformat(), "direction": occurrence.direction, "category_id": occurrence.category_id|string} %}
+    {% call dialog_shell('edit-' ~ occurrence.id, _('Edit one-time payment'), occurrence.label, force_open=editing_this) %}
+    <form method="post" action="{{ scoped_url(request, 'upcoming_one_time_update', occurrence_id=occurrence.id) }}" class="mt-4 grid gap-4 sm:grid-cols-2" data-one-time-form>
+      {{ csrf_input() }}
+      {{ one_time_fields("edit-" ~ occurrence.id, values, edit_errors if editing_this else {}) }}
+      <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+        <button type="submit" class="btn-primary">{{ _("Save") }}</button>
+        <a href="{{ page_url() }}" data-dialog-close class="{{ button_class }}">{{ _("Cancel") }}</a>
+      </div>
+    </form>
+    {% endcall %}
+    {% else %}
+    {% call dialog_shell('reschedule-' ~ occurrence.id, _('Reschedule this occurrence'), occurrence.label) %}
+    <form method="post" action="{{ scoped_url(request, 'upcoming_reschedule', occurrence_id=occurrence.id) }}" class="mt-4 space-y-4">
+      {{ csrf_input() }}
+      <div>
+        <label for="reschedule-{{ occurrence.id }}" class="mb-1 block text-sm font-medium">{{ _("New due date") }}</label>
+        <input id="reschedule-{{ occurrence.id }}" name="day" type="date" value="{{ occurrence.due_date.isoformat() }}" required class="{{ input_class }}">
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="submit" class="btn-primary">{{ _("Save date") }}</button>
+        <a href="{{ page_url() }}" data-dialog-close class="{{ button_class }}">{{ _("Cancel") }}</a>
+      </div>
+    </form>
+    {% endcall %}
+    {% call dialog_shell('amount-' ~ occurrence.id, _('Edit amount'), occurrence.label) %}
+    <form method="post" action="{{ scoped_url(request, 'upcoming_amount', occurrence_id=occurrence.id) }}" class="mt-4 space-y-4">
+      {{ csrf_input() }}
+      <div>
+        <label for="amount-{{ occurrence.id }}" class="mb-1 block text-sm font-medium">{{ _("Amount") }}</label>
+        <input id="amount-{{ occurrence.id }}" name="amount" type="text" inputmode="decimal" value="{{ amount_input(occurrence.expected) }}" required class="{{ input_class }}">
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="submit" class="btn-primary">{{ _("Save amount") }}</button>
+        <a href="{{ page_url() }}" data-dialog-close class="{{ button_class }}">{{ _("Cancel") }}</a>
+      </div>
+    </form>
+    {% endcall %}
+    {% endif %}
+    {% endif %}
   </article>
   {% endfor %}
   </div>
