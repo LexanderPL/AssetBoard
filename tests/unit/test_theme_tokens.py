@@ -24,6 +24,9 @@ CSS_TEXT_PAIRS = {
     ("ink", "field"),  # .form-control, .form-select
     ("muted", "field"),  # placeholders, disabled controls
     ("muted", "subtle"),  # disabled controls
+    ("danger-strong", "danger-soft"),  # .btn-danger
+    ("danger-strong", "danger-tint"),  # .btn-danger:hover
+    ("danger-strong", "surface"),  # .row-menu-item-danger
     ("inverse-link", "inverse"),  # the toast's undo button sits on the toast's background
     # A month summary row above plan is tinted (months/_plan.html, plan_row); its texts are
     # in other class attributes than the tint.

@@ -7,7 +7,6 @@
 {% block header_actions %}{% if can_edit and has_items %}<a href="{{ scoped_url(request, 'scheduled_new') }}" class="btn-primary" data-new-recurring>{{ _("New recurring item") }}</a>{% endif %}{% endblock %}
 {% block content %}
 {% set chip = "ml-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" %}
-{% set small_button = "rounded-lg border border-line px-2.5 py-1 text-xs font-medium hover:bg-subtle" %}
 {% set new_button = "btn-primary" %}
 {% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
@@ -39,11 +38,11 @@
           <td class="sm:px-4 sm:py-3" data-category><span class="flex items-center justify-end gap-2 sm:justify-start">{% if item.category_color %}{{ swatch(item.category_color) }}{% endif %}<span>{{ item.category_name }}</span></span></td>
           {% if can_edit %}
           <td class="col-span-2 pt-1 sm:px-4 sm:py-3">
-            <div class="flex flex-wrap items-center gap-1.5 sm:justify-end">
-              <a class="{{ small_button }}" href="{{ scoped_url(request, 'scheduled_edit', item_id=item.id) }}" data-edit>{{ _("Edit") }}<span class="sr-only"> {{ item.values.name }}</span></a>
+            <div class="flex flex-wrap items-center gap-2 sm:justify-end">
+              <a class="btn-sm" href="{{ scoped_url(request, 'scheduled_edit', item_id=item.id) }}" data-edit>{{ _("Edit") }}<span class="sr-only"> {{ item.values.name }}</span></a>
               {% set action = 'resume' if item.paused else 'pause' %}
-              <form method="post" action="{{ scoped_url(request, 'scheduled_action', item_id=item.id, action=action) }}">{{ csrf_input() }}<button type="submit" class="{{ small_button }}" data-{{ action }}>{{ _("Resume") if item.paused else _("Pause") }}<span class="sr-only"> {{ item.values.name }}</span></button></form>
-              <form method="post" action="{{ scoped_url(request, 'scheduled_action', item_id=item.id, action='delete') }}" data-confirm="{{ _('Delete the recurring item %(name)s? Its planned dates are removed. Payments already recorded or skipped stay in your history.', name=item.values.name) }}">{{ csrf_input() }}<button type="submit" data-delete class="{{ small_button }} text-danger">{{ _("Delete") }}<span class="sr-only"> {{ item.values.name }}</span></button></form>
+              <form method="post" action="{{ scoped_url(request, 'scheduled_action', item_id=item.id, action=action) }}">{{ csrf_input() }}<button type="submit" class="btn-sm" data-{{ action }}>{{ _("Resume") if item.paused else _("Pause") }}<span class="sr-only"> {{ item.values.name }}</span></button></form>
+              <form method="post" action="{{ scoped_url(request, 'scheduled_action', item_id=item.id, action='delete') }}" data-confirm="{{ _('Delete the recurring item %(name)s? Its planned dates are removed. Payments already recorded or skipped stay in your history.', name=item.values.name) }}">{{ csrf_input() }}<button type="submit" data-delete class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ item.values.name }}</span></button></form>
             </div>
           </td>
           {% endif %}

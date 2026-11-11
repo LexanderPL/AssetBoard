@@ -41,6 +41,22 @@
 {% set summary_button_primary = "btn-primary cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden" %}
 {% set summary_button = "btn cursor-pointer list-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden" %}
 
+{# The overflow menu of a row with more than one or two actions: a <details data-popover> so
+   app.js closes it on an outside press or Escape and returns the focus to the summary. The
+   summary is an icon button; its accessible name carries the row name. Put the actions in a
+   {% call row_menu(name) %} block. #}
+{% macro row_menu(name, key="") -%}
+<details class="relative inline-block text-left" data-popover{% if key %} data-row-menu="{{ key }}"{% endif %}>
+  <summary class="btn-icon cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+    <span aria-hidden="true">⋯</span>
+    <span class="sr-only">{{ _("Actions") }}: {{ name }}</span>
+  </summary>
+  <div class="row-menu" role="group" aria-label="{{ _('Actions') }}: {{ name }}">
+    {{ caller() }}
+  </div>
+</details>
+{%- endmacro %}
+
 {# One month as a month select and a year select (``<name>_month``, ``<name>_year``):
    ``type=month`` is missing in desktop Firefox and Safari. ``value`` is a date or None; its
    year is offered even when it is outside ``years``. #}

@@ -1,7 +1,7 @@
 {% from "investments/_instrument_form.html" import instrument_form with context %}
 {% from "investments/_macros.html" import htmx_form, small_button, swatch with context %}
 {% from "investments/_tabs.html" import tabs with context %}
-{% from "macros/components.html" import csrf_input with context %}
+{% from "macros/components.html" import csrf_input, row_menu with context %}
 <div id="investments-body" class="space-y-6">
   {% if notice %}
   <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
@@ -84,9 +84,12 @@
           {% endif %}
         </div>
         {% if can_edit %}
-        <div class="flex flex-wrap items-center gap-1">
-          <a href="{{ scoped_url(request, 'investments_instruments') }}?edit={{ row_id }}#instrument-{{ row_id }}" hx-get="{{ scoped_url(request, 'investments_instrument_edit', instrument_id=row_id) }}" hx-target="#investments-body" hx-swap="outerHTML show:#instrument-{{ row_id }}:top" data-edit class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink">{{ _("Edit") }}</a>
-          <form {{ htmx_form(scoped_url(request, 'investments_instrument_archive', instrument_id=i.id|string), '#investments-body') }}>{{ csrf_input() }}{{ small_button(_("Archive"), "data-archive") }}</form>
+        <div class="flex flex-wrap items-center gap-1.5">
+          <a href="{{ scoped_url(request, 'investments_instruments') }}?edit={{ row_id }}#instrument-{{ row_id }}" hx-get="{{ scoped_url(request, 'investments_instrument_edit', instrument_id=row_id) }}" hx-target="#investments-body" hx-swap="outerHTML show:#instrument-{{ row_id }}:top" data-edit class="btn-sm">{{ _("Edit") }}<span class="sr-only"> {{ i.name }}</span></a>
+          {% call row_menu(i.name, "instrument-" ~ row_id) %}
+          <form {{ htmx_form(scoped_url(request, 'investments_instrument_archive', instrument_id=i.id|string), '#investments-body') }}>{{ csrf_input() }}
+            <button type="submit" data-archive class="row-menu-item">{{ _("Archive") }}<span class="sr-only"> {{ i.name }}</span></button></form>
+          {% endcall %}
         </div>
         {% endif %}
       </li>
@@ -115,7 +118,7 @@
           </div>
         </div>
         {% if can_edit %}
-        <form {{ htmx_form(scoped_url(request, 'investments_instrument_restore', instrument_id=i.id|string), '#investments-body') }}>{{ csrf_input() }}{{ small_button(_("Restore"), "data-restore") }}</form>
+        <form {{ htmx_form(scoped_url(request, 'investments_instrument_restore', instrument_id=i.id|string), '#investments-body') }}>{{ csrf_input() }}{{ small_button(_("Restore"), "data-restore", i.name) }}</form>
         {% endif %}
       </li>
       {% endfor %}

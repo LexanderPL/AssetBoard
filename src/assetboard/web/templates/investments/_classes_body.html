@@ -1,6 +1,6 @@
 {% from "investments/_macros.html" import error as field_error, htmx_form, small_button, swatch with context %}
 {% from "investments/_tabs.html" import tabs with context %}
-{% from "macros/components.html" import csrf_input with context %}
+{% from "macros/components.html" import csrf_input, row_menu with context %}
 <div id="investments-classes-body" class="space-y-6">
   {% if notice %}
   <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
@@ -55,13 +55,16 @@
           {% if c.risk_tier %}<span class="rounded-full bg-primary-soft px-2 py-0.5 text-xs text-primary-ink" data-risk-tier="{{ c.risk_tier }}">{{ risk_tier_labels[c.risk_tier] }}</span>{% endif %}
         </div>
         {% if can_edit %}
-        <div class="flex flex-wrap items-center gap-1">
+        <div class="flex flex-wrap items-center gap-1.5">
+          <a href="{{ scoped_url(request, 'investments_classes') }}?edit={{ c.id }}#class-dialog" data-edit class="btn-sm">{{ _("Edit") }}<span class="sr-only"> {{ c.name }}</span></a>
+          {% call row_menu(c.name, "class-" ~ c.id) %}
           <form {{ htmx_form(scoped_url(request, 'investments_class_move', class_id=c.id|string), '#investments-classes-body') }}>{{ csrf_input() }}<input type="hidden" name="direction" value="up">
-            <button type="submit" data-move-up {% if loop.first %}disabled{% endif %} aria-label="{{ _('Move %(name)s up', name=c.name) }}" class="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-subtle disabled:opacity-30"><span aria-hidden="true">↑</span></button></form>
+            <button type="submit" data-move-up {% if loop.first %}disabled{% endif %} aria-label="{{ _('Move %(name)s up', name=c.name) }}" class="row-menu-item disabled:opacity-30"><span aria-hidden="true">↑</span></button></form>
           <form {{ htmx_form(scoped_url(request, 'investments_class_move', class_id=c.id|string), '#investments-classes-body') }}>{{ csrf_input() }}<input type="hidden" name="direction" value="down">
-            <button type="submit" data-move-down {% if loop.last %}disabled{% endif %} aria-label="{{ _('Move %(name)s down', name=c.name) }}" class="rounded-lg px-2 py-1.5 text-xs text-muted hover:bg-subtle disabled:opacity-30"><span aria-hidden="true">↓</span></button></form>
-          <a href="{{ scoped_url(request, 'investments_classes') }}?edit={{ c.id }}#class-dialog" data-edit class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink">{{ _("Edit") }}</a>
-          <form {{ htmx_form(scoped_url(request, 'investments_class_archive', class_id=c.id|string), '#investments-classes-body') }}>{{ csrf_input() }}{{ small_button(_("Archive"), "data-archive") }}</form>
+            <button type="submit" data-move-down {% if loop.last %}disabled{% endif %} aria-label="{{ _('Move %(name)s down', name=c.name) }}" class="row-menu-item disabled:opacity-30"><span aria-hidden="true">↓</span></button></form>
+          <form {{ htmx_form(scoped_url(request, 'investments_class_archive', class_id=c.id|string), '#investments-classes-body') }}>{{ csrf_input() }}
+            <button type="submit" data-archive class="row-menu-item">{{ _("Archive") }}<span class="sr-only"> {{ c.name }}</span></button></form>
+          {% endcall %}
         </div>
         {% endif %}
       </li>
@@ -132,7 +135,7 @@
           {% if c.risk_tier %}<span class="rounded-full bg-subtle px-2 py-0.5 text-xs text-muted" data-risk-tier="{{ c.risk_tier }}">{{ risk_tier_labels[c.risk_tier] }}</span>{% endif %}
         </div>
         {% if can_edit %}
-        <form {{ htmx_form(scoped_url(request, 'investments_class_restore', class_id=c.id|string), '#investments-classes-body') }}>{{ csrf_input() }}{{ small_button(_("Restore"), "data-restore") }}</form>
+        <form {{ htmx_form(scoped_url(request, 'investments_class_restore', class_id=c.id|string), '#investments-classes-body') }}>{{ csrf_input() }}{{ small_button(_("Restore"), "data-restore", c.name) }}</form>
         {% endif %}
       </li>
       {% endfor %}

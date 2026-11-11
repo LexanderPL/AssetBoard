@@ -71,6 +71,19 @@ def _htmx_post(owner: OwnerApp, path: str, data: dict[str, str], token_from: str
     return owner.client.post(path, data=form, headers=HTMX)
 
 
+def test_instrument_row_actions_use_the_compact_components_and_overflow_menu(
+    owner: OwnerApp,
+) -> None:
+    instrument = _create(owner, "World ETF")
+    page = owner.client.get(INSTRUMENTS).text
+    row = page.split(f'id="instrument-{instrument}"')[1].split("</li>")[0]
+    assert 'class="btn-sm"' in row
+    assert "data-row-menu" in row and "data-popover" in row
+    assert 'class="btn-icon' in row and 'aria-label="Actions: World ETF"' in row
+    assert "data-archive" in row
+    assert "data-edit" in row
+
+
 def _base_to_pln(owner: OwnerApp) -> None:
     with owner.db() as session, session.begin():
         workspace = session.get(Workspace, owner.home_id)

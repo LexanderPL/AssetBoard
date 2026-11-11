@@ -208,6 +208,20 @@ def test_move_reorders_and_returns_the_fragment(owner: OwnerApp) -> None:
     assert _names(owner.client.get("/categories").text, "expense") == ["A", "B"]
 
 
+def test_row_actions_share_the_compact_components_and_overflow_menu(owner: OwnerApp) -> None:
+    food = _create(owner, "Food")
+    page = owner.client.get("/categories").text
+    row = re.search(rf'id="category-{food}".*?</li>', page, re.DOTALL)
+    assert row is not None
+    markup = row.group(0)
+    assert 'class="btn-sm"' in markup  # Edit stays visible in the row
+    assert "data-row-menu" in markup and "data-popover" in markup
+    assert 'class="btn-icon' in markup and 'aria-label="Actions: Food"' in markup
+    for marker in ("data-move-up", "data-move-down", "data-archive", "data-delete"):
+        assert marker in markup
+    assert "row-menu-item-danger" in markup
+
+
 def test_archive_restore_and_delete(owner: OwnerApp) -> None:
     food = _create(owner, "Food")
     archived = _htmx(owner, f"/categories/{food}/archive")
