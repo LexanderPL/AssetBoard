@@ -140,7 +140,8 @@ async def create(request: Request, ctx: CurrentContext) -> Response:
             values,
         )
     except NotificationError as exc:
-        return _redirect(request, error=exc.code)
+        # ``form`` reopens the new-channel dialog with the error above it.
+        return _redirect(request, error=exc.code, form="channel")
     return _redirect(request, notice="created")
 
 

@@ -63,6 +63,13 @@ def test_editing_a_category_keeps_the_section_open_and_the_row_in_place(
             page.wait_for_url(f"{base}/")
 
             page.goto(f"{base}/net-worth", wait_until="networkidle")
+            # Adding an item is a header action that opens a dialog, not a form at the bottom.
+            item_dialog = page.locator("#item-dialog")
+            expect(item_dialog).to_be_hidden()
+            page.locator("[data-add-item]").click()
+            expect(item_dialog).to_be_visible()
+            item_dialog.get_by_role("link", name="Cancel").click()
+            expect(item_dialog).to_be_hidden()
             details = page.locator("[data-categories]")
             expect(details).to_be_visible()
             assert details.evaluate("element => element.open") is False

@@ -1,6 +1,11 @@
 {% extends "base.html" %}
 {% block title %}{{ _("Categories") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Categories") }}{% endblock %}
+{% block header_actions %}
+{% if can_edit %}
+<a href="{{ scoped_url(request, 'categories') }}?form=category#category-dialog" data-dialog-open="category-dialog" aria-haspopup="dialog" class="btn-primary" data-add-category>{{ _("Add category") }}</a>
+{% endif %}
+{% endblock %}
 {% block content %}
 {% include "categories/_body.html" %}
 {% endblock %}

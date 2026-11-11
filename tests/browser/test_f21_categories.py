@@ -99,6 +99,17 @@ def test_f21_categories_in_a_browser(tmp_path: Path) -> None:
             page.get_by_role("button", name="Move Eating out up").click()
             expect(expense.first).to_have_text("Eating out")
 
+            # Creation lives in the header and opens a dialog, not a form below both lists.
+            category_dialog = page.locator("#category-dialog")
+            expect(category_dialog).to_be_hidden()
+            page.locator("[data-add-category]").click()
+            expect(category_dialog).to_be_visible()
+            category_dialog.get_by_label("Name").fill("Pets")
+            category_dialog.get_by_role("button", name="Add", exact=True).click()
+            expect(page.locator("[data-notice]")).to_have_text("Category added.")
+            expect(category_dialog).to_be_hidden()
+            expect(page.locator("li[data-category]", has_text="Pets")).to_have_count(1)
+
             # Delete asks for confirmation through the CSP-safe dialog.
             gifts = page.locator("li[data-category]", has_text="Gifts")
             gifts.get_by_role("button", name="Delete").click()

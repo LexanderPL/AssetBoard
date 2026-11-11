@@ -41,6 +41,11 @@ def _names(html: str, kind: str) -> list[str]:
     return re.findall(r"data-category-name>([^<]+)<", match.group(0))
 
 
+def _header_actions(page: str) -> str:
+    assert "data-header-actions" in page
+    return page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
+
+
 @pytest.fixture(autouse=True)
 def _empty_home(owner: OwnerApp) -> None:
     """These tests start from a workspace without categories: setup now seeds "Home", so its
@@ -94,6 +99,30 @@ def test_create_shows_the_category_in_order(owner: OwnerApp) -> None:
     page = owner.client.get("/categories").text
     assert _names(page, "expense") == ["Rent", "Food"]
     assert _names(page, "income") == ["Salary"]
+
+
+def test_the_add_form_is_a_header_dialog(owner: OwnerApp) -> None:
+    page = owner.client.get("/categories").text
+    header = _header_actions(page)
+    assert re.search(
+        r'<a href="[^"]+\?form=category#category-dialog" data-dialog-open="category-dialog"'
+        r"[^>]*data-add-category>Add category</a>",
+        header,
+    )
+    dialog = re.search(r'<dialog id="category-dialog".*?</dialog>', page, re.DOTALL)
+    assert dialog is not None and "data-create" in dialog.group(0)
+    opening = re.search(r'<dialog id="category-dialog"[^>]*>', page)
+    assert opening is not None and " open" not in opening.group(0)
+    # Without JavaScript the link renders the page with the dialog open in the page flow.
+    opened = owner.client.get("/categories?form=category").text
+    opening = re.search(r'<dialog id="category-dialog"[^>]*>', opened)
+    assert opening is not None and " open" in opening.group(0)
+    # A refused form reopens it, with the message on the field.
+    refused = owner.post("/categories", FORM | {"name": " "}, token_from="/categories")
+    assert refused.status_code == 400
+    opening = re.search(r'<dialog id="category-dialog"[^>]*>', refused.text)
+    assert opening is not None and " open" in opening.group(0)
+    assert "Enter a name of 1 to 80 characters" in refused.text
 
 
 def test_invalid_and_duplicate_names_re_render_with_an_error(owner: OwnerApp) -> None:

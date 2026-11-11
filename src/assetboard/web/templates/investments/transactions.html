@@ -1,6 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ _("Investments") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Investments") }}{% endblock %}
+{% block header_actions %}
+{% if can_edit %}
+<a href="{{ scoped_url(request, 'investments_transactions') }}?form=transaction#transaction-dialog" data-dialog-open="transaction-dialog" aria-haspopup="dialog" class="btn-primary" data-add-transaction>{{ _("Add a transaction") }}</a>
+{% if active_instruments %}<a href="{{ scoped_url(request, 'investments_transactions') }}?form=bulk#investment-bulk-panel" data-dialog-open="investment-bulk-panel" aria-haspopup="dialog" class="btn" data-bulk-open>{{ _("Bulk add") }}</a>{% endif %}
+{% endif %}
+{% endblock %}
 {% block content %}
 {% include "investments/_transactions_body.html" %}
 {% endblock %}

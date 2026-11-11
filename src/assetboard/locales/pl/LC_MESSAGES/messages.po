@@ -4959,11 +4959,11 @@ msgstr "Brak aktywnych kategorii tego rodzaju."
 msgid "Add a category"
 msgstr "Dodaj kategorię"
 
+msgid "Close"
+msgstr "Zamknij"
+
 msgid "Colour"
 msgstr "Kolor"
-
-msgid "Add"
-msgstr "Dodaj"
 
 msgid ""
 "Savings: money put aside or invested (expense), or taken out of savings "
@@ -4974,6 +4974,9 @@ msgstr ""
 "wypłacone z oszczędności (przychód); nie liczą się jako wydatki ani "
 "zarobki. Przelew własny: pieniądze przeniesione między własnymi kontami; "
 "nie są wliczane do sum."
+
+msgid "Add"
+msgstr "Dodaj"
 
 msgid "Archived categories"
 msgstr "Zarchiwizowane kategorie"
@@ -5028,6 +5031,9 @@ msgstr "Usunąć kategorię %(name)s?"
 
 msgid "Delete"
 msgstr "Usuń"
+
+msgid "Add category"
+msgstr "Dodaj kategorię"
 
 msgid "Hello,"
 msgstr "Dzień dobry,"
@@ -5130,9 +5136,6 @@ msgstr "Szukaj…"
 
 msgid "Export as CSV"
 msgstr "Eksport do CSV"
-
-msgid "Close"
-msgstr "Zamknij"
 
 msgid ""
 "Downloads every entry that matches the filters, oldest first, in the "
@@ -6190,9 +6193,6 @@ msgstr ""
 "Dodaj sugerowane klasy aktywów przed utworzeniem instrumentów; wartość "
 "każdego instrumentu jest między nie dzielona."
 
-msgid "Add instrument"
-msgstr "Dodaj instrument"
-
 msgid "Add an instrument"
 msgstr "Dodaj instrument"
 
@@ -6831,11 +6831,11 @@ msgstr "Bez daty"
 msgid "Delete the transaction of %(date)s?"
 msgstr "Usunąć transakcję z dnia %(date)s?"
 
-msgid "Bulk add"
-msgstr "Dodaj hurtowo"
-
 msgid "Add an active instrument first."
 msgstr "Najpierw dodaj aktywny instrument."
+
+msgid "Bulk add"
+msgstr "Dodaj hurtowo"
 
 #, python-format
 msgid ""
@@ -6914,6 +6914,9 @@ msgstr "Strona %(page)d z %(pages)d"
 
 msgid "No investment transactions match these filters."
 msgstr "Żadna transakcja inwestycyjna nie pasuje do tych filtrów."
+
+msgid "Add instrument"
+msgstr "Dodaj instrument"
 
 msgid "Invitation"
 msgstr "Zaproszenie"
@@ -7411,8 +7414,8 @@ msgstr "Pozycje bez obowiązującej wartości nie są wliczane do sumy częścio
 msgid "No items yet"
 msgstr "Nie ma jeszcze pozycji"
 
-msgid "Add an item below, or paste a list of items."
-msgstr "Dodaj pozycję poniżej lub wklej listę pozycji."
+msgid "Use Add item in the header, or paste a list of items below."
+msgstr "Użyj przycisku „Dodaj pozycję” w nagłówku lub wklej listę pozycji poniżej."
 
 msgid "Add an item"
 msgstr "Dodaj pozycję"
@@ -7488,9 +7491,6 @@ msgstr ""
 
 msgid "Categories on this side"
 msgstr "Kategorie po tej stronie"
-
-msgid "Add category"
-msgstr "Dodaj kategorię"
 
 msgid "No active categories on this side."
 msgstr "Brak aktywnych kategorii po tej stronie."
@@ -7646,6 +7646,9 @@ msgstr "Brak liczonych kategorii"
 msgid "Show items"
 msgstr "Pokaż pozycje"
 
+msgid "New channel"
+msgstr "Nowy kanał"
+
 msgid "Apprise URL"
 msgstr "Adres URL Apprise"
 
@@ -7738,9 +7741,6 @@ msgstr "Zapisz kanał"
 
 msgid "No notification channels yet."
 msgstr "Nie ma jeszcze kanałów powiadomień."
-
-msgid "New channel"
-msgstr "Nowy kanał"
 
 #, python-format
 msgid "Allowed services on this server: %(schemes)s."
@@ -8242,6 +8242,9 @@ msgstr "Zarchiwizować podatek %(name)s?"
 msgid "Archive tax"
 msgstr "Archiwizuj podatek"
 
+msgid "New tax"
+msgstr "Nowy podatek"
+
 msgid "every year"
 msgstr "co roku"
 
@@ -8261,9 +8264,6 @@ msgstr ""
 "Tylko jeśli chcesz planować podatki. Stawki wpisujesz sam; to nie jest "
 "porada podatkowa. Tę stronę możesz ukryć w ustawieniach przestrzeni "
 "roboczej."
-
-msgid "New tax"
-msgstr "Nowy podatek"
 
 msgid "Taxes on income"
 msgstr "Podatki od przychodu"
@@ -8843,6 +8843,9 @@ msgstr ""
 
 msgid "Confirm rollback"
 msgstr "Potwierdź cofnięcie"
+
+msgid "Invite someone"
+msgstr "Zaproś kogoś"
 
 msgid "People in this workspace"
 msgstr "Osoby w tym obszarze roboczym"

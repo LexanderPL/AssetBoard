@@ -3,6 +3,8 @@
 {% from "categories/_macros.html" import swatch %}
 {% block title %}{{ _("Recurring") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Recurring items") }}{% endblock %}
+{# The empty state below carries the one create button while the list is empty. #}
+{% block header_actions %}{% if can_edit and has_items %}<a href="{{ scoped_url(request, 'scheduled_new') }}" class="btn-primary" data-new-recurring>{{ _("New recurring item") }}</a>{% endif %}{% endblock %}
 {% block content %}
 {% set chip = "ml-1 inline-flex rounded-full px-2 py-0.5 text-xs font-semibold" %}
 {% set small_button = "rounded-lg border border-line px-2.5 py-1 text-xs font-medium hover:bg-subtle" %}
@@ -10,10 +12,7 @@
 {% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 {% if has_items %}
-<div class="mb-6 flex flex-wrap items-start justify-between gap-3">
-  <p class="max-w-2xl text-sm text-muted">{{ _("Bills and income that repeat. Each one plans its next dates for you.") }}</p>
-  {% if can_edit %}<a href="{{ scoped_url(request, 'scheduled_new') }}" class="{{ new_button }}" data-new-recurring>{{ _("New recurring item") }}</a>{% endif %}
-</div>
+<p class="mb-6 max-w-2xl text-sm text-muted">{{ _("Bills and income that repeat. Each one plans its next dates for you.") }}</p>
 {% for direction, rows in sections %}
 <section class="mb-8" aria-labelledby="recurring-{{ direction }}-heading" data-recurring-section="{{ direction }}">
   <h2 id="recurring-{{ direction }}-heading" class="mb-3 text-base font-semibold">{{ _("Expenses") if direction == "expense" else _("Income") }}</h2>

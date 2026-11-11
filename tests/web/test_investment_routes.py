@@ -153,6 +153,27 @@ def test_the_seed_set_is_named_in_the_users_language(owner: OwnerApp) -> None:
     assert "Akcje" in page
 
 
+def test_the_add_class_form_is_a_header_dialog(owner: OwnerApp) -> None:
+    page = owner.client.get(CLASSES).text
+    header = page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
+    assert re.search(
+        r'<a href="[^"]+\?form=class#class-dialog" data-dialog-open="class-dialog"'
+        r"[^>]*data-add-class>Add an asset class</a>",
+        header,
+    )
+    dialog = re.search(r'<dialog id="class-dialog".*?</dialog>', page, re.DOTALL)
+    assert dialog is not None and "data-class-form" in dialog.group(0)
+    opening = re.search(r'<dialog id="class-dialog"[^>]*>', page)
+    assert opening is not None and " open" not in opening.group(0)
+    opened = owner.client.get(f"{CLASSES}?form=class").text
+    opening = re.search(r'<dialog id="class-dialog"[^>]*>', opened)
+    assert opening is not None and " open" in opening.group(0)
+    refused = owner.post(CLASSES, {"name": "", "color": "#2563eb"}, token_from=CLASSES)
+    assert refused.status_code == 400
+    opening = re.search(r'<dialog id="class-dialog"[^>]*>', refused.text)
+    assert opening is not None and " open" in opening.group(0)
+
+
 def test_create_a_class_and_an_instrument(owner: OwnerApp) -> None:
     stocks = _class(owner, "Stocks")
     _instrument(owner, "World ETF", stocks, weight="100")

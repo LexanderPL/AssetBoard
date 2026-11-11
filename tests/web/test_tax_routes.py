@@ -83,6 +83,8 @@ def test_new_tax_list_card_and_edit(owner):
         assert (version.effective_from.year, version.rate_bp) == (1900, 2300)
         rule_id = rule.id
     page = owner.client.get("/taxes").text
+    header = page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
+    assert "data-new-tax" in header and "New tax" in header
     assert "23%" in page and "Added on top of what you charge" in page
     assert "Paid on the 25th of the month after you are paid" in page
     assert "Used by: not used yet" in page and "Rate changes" in page

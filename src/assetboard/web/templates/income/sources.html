@@ -4,14 +4,12 @@
 {% from "income/_macros.html" import paid_phrase, per_unit, units_text, estimate_text with context %}
 {% block title %}{{ _("Income") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Income") }}{% endblock %}
+{% block header_actions %}{% if can_edit %}<a href="{{ scoped_url(request, 'income_new') }}" class="btn-primary" data-add-income>{{ _("Add income") }}</a>{% endif %}{% endblock %}
 {% block content %}
 {% set chip = "inline-flex rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary-ink" %}
 {% set muted_chip = "ml-1 inline-flex rounded-full border border-line px-2 py-0.5 text-xs text-muted" %}
 {% set compact = "inline-flex cursor-pointer list-none items-center rounded-lg px-2.5 py-1.5 text-xs font-medium leading-4 text-muted hover:bg-subtle hover:text-ink focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden" %}
-<div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-  <p class="text-sm text-muted">{{ _("Where your money comes from and what you will receive next.") }}</p>
-  {% if can_edit %}<a href="{{ scoped_url(request, 'income_new') }}" class="btn-primary" data-add-income>{{ _("Add income") }}</a>{% endif %}
-</div>
+<p class="mb-6 text-sm text-muted">{{ _("Where your money comes from and what you will receive next.") }}</p>
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-income-error>{{ error }}{% if error_href %} <a href="{{ error_href }}" class="font-semibold underline" data-locked-transaction>{{ _("Open the transaction") }}</a>{% endif %}{% if edit_anyway_href and can_edit %} <a href="{{ edit_anyway_href }}" class="font-semibold underline" data-edit-anyway>{{ _("Edit anyway") }}</a>{% endif %}{% if closed_href %} <a href="{{ closed_href }}" class="font-semibold underline" data-reopen-link>{{ _("Open the month page") }}</a>{% endif %}</p>{% endif %}
 {% if notice == "transaction_updated" %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-transaction-updated>{{ _("The transaction now matches the logged days.") }}</p>{% endif %}
 {% if posted_change %}

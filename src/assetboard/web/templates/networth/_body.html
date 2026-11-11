@@ -79,13 +79,19 @@
   {% if not view.groups and not view.archived_groups and not view.archived_items %}
   <div class="panel px-6 py-10 text-center" data-empty-side>
     <h2 class="text-base font-semibold">{{ _("No items yet") }}</h2>
-    <p class="mt-2 text-sm text-muted">{{ _("Add an item below, or paste a list of items.") }}</p>
+    <p class="mt-2 text-sm text-muted">{{ _("Use Add item in the header, or paste a list of items below.") }}</p>
   </div>
   {% endif %}
 
   {% if can_edit and view.categories %}
-  <section class="panel p-6 sm:p-7" aria-labelledby="new-item-heading" data-create-item>
-    <h2 id="new-item-heading" class="text-base font-semibold">{{ _("Add an item") }}</h2>
+  {# The add form sits behind the header's "Add item" action. Without JavaScript that link opens
+     the page with the dialog rendered open in the page flow; a refused form renders it open too. #}
+  <dialog id="item-dialog" aria-labelledby="new-item-heading" data-dialog-modal class="popup w-[min(92vw,56rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if create_item_errors or request.query_params.get("form") == "item" %} open{% endif %}>
+   <div class="p-4 sm:p-6" data-create-item>
+    <div class="flex items-start justify-between gap-4">
+      <h2 id="new-item-heading" class="text-base font-semibold">{{ _("Add an item") }}</h2>
+      <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" title="{{ _('Close') }}"><span aria-hidden="true">×</span><span class="sr-only">{{ _("Close") }}</span></a>
+    </div>
     <form {{ htmx_form(scoped_url(request, 'networth_items_create')) }} class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4" novalidate>
       {{ csrf_input() }}
       <input type="hidden" name="side" value="{{ side_value }}">
@@ -153,11 +159,13 @@
       </div>
       <p class="text-xs text-muted sm:col-span-2 lg:col-span-4">{{ _("Backfill draws a straight line between recorded values. Re-run Backfill from history after changing this.") }}</p>
       <p class="text-xs text-muted sm:col-span-2 lg:col-span-4">{{ _("Enter values as positive amounts. For a liability, enter the amount owed.") }}</p>
-      <div class="sm:col-span-2 lg:col-span-4">
-        <button type="submit" class="btn-primary" data-add-item>{{ _("Add item") }}</button>
+      <div class="flex flex-wrap items-center gap-2 sm:col-span-2 lg:col-span-4">
+        <button type="submit" class="btn-primary" data-item-create-submit>{{ _("Add item") }}</button>
+        <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}" data-dialog-close class="btn">{{ _("Cancel") }}</a>
       </div>
     </form>
-  </section>
+   </div>
+  </dialog>
   {% elif can_edit and not view.categories %}
   <p class="text-sm text-muted" data-no-active-categories>{{ _("Add an active category before adding items.") }}</p>
   {% endif %}

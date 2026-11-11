@@ -4,13 +4,11 @@
 {% from "categories/_macros.html" import category_options %}
 {% block title %}{{ _("Taxes") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Taxes") }}{% endblock %}
+{% block header_actions %}{% if can_edit %}<a href="{{ scoped_url(request, 'tax_rule_new') }}" class="btn-primary" data-new-tax>{{ _("New tax") }}</a>{% endif %}{% endblock %}
 {% block content %}
 {% set input_class = "form-control px-3 py-2" %}
 {% set frequency_names = {"yearly": _("every year"), "quarterly": _("every quarter"), "monthly": _("every month"), "once": _("once")} %}
-<div class="mb-6 flex flex-wrap items-start justify-between gap-3">
-  <p class="max-w-2xl text-sm text-muted" data-tax-intro>{{ _("Only if you want taxes planned. You enter the rates; this is not tax advice. You can hide this page in Workspace settings.") }}</p>
-  {% if can_edit %}<a href="{{ scoped_url(request, 'tax_rule_new') }}" class="btn-primary" data-new-tax>{{ _("New tax") }}</a>{% endif %}
-</div>
+<p class="mb-6 max-w-2xl text-sm text-muted" data-tax-intro>{{ _("Only if you want taxes planned. You enter the rates; this is not tax advice. You can hide this page in Workspace settings.") }}</p>
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 
 <h2 class="mb-3 text-base font-semibold">{{ _("Taxes on income") }}</h2>

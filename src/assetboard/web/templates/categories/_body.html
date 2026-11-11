@@ -38,9 +38,14 @@
   {% endfor %}
 
   {% if can_edit %}
-  <section class="panel p-6 sm:p-7" aria-labelledby="new-category-heading">
-    <h2 id="new-category-heading" class="text-base font-semibold">{{ _("Add a category") }}</h2>
-    <form {{ htmx_form(scoped_url(request, 'categories_create')) }} class="mt-4 grid gap-4 sm:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-start" novalidate data-create>
+  {# Without JavaScript the link opens the page with the dialog rendered open in the page flow. #}
+  <dialog id="category-dialog" aria-labelledby="new-category-heading" data-dialog-modal class="popup w-[min(92vw,44rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if create_errors or request.query_params.get("form") == "category" %} open{% endif %}>
+   <div class="p-4 sm:p-6">
+    <div class="flex items-start justify-between gap-4">
+      <h2 id="new-category-heading" class="text-base font-semibold">{{ _("Add a category") }}</h2>
+      <a href="{{ scoped_url(request, 'categories') }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" title="{{ _('Close') }}"><span aria-hidden="true">×</span><span class="sr-only">{{ _("Close") }}</span></a>
+    </div>
+    <form {{ htmx_form(scoped_url(request, 'categories_create')) }} class="mt-4 grid gap-4 sm:grid-cols-2" novalidate data-create>
       {{ csrf_input() }}
       <div class="space-y-1.5">
         <label for="new-name" class="block text-sm font-medium">{{ _("Name") }}</label>
@@ -61,15 +66,17 @@
       </div>
       <div class="space-y-1.5">
         <label for="new-color" class="block text-sm font-medium">{{ _("Colour") }}</label>
-        <div class="flex items-center gap-2">
-          <input id="new-color" name="color" type="color" value="{{ create_values.color }}" class="h-9 w-10 rounded-lg border border-line-strong bg-field p-1">
-          <button type="submit" class="rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-on-primary hover:bg-primary-hover">{{ _("Add") }}</button>
-        </div>
+        <input id="new-color" name="color" type="color" value="{{ create_values.color }}" class="h-9 w-10 rounded-lg border border-line-strong bg-field p-1">
         {% if create_errors.get("color") %}<p class="text-sm text-danger">{{ create_errors.get("color") }}</p>{% endif %}
       </div>
-      <p id="treatment-help" class="text-xs text-muted sm:col-span-4">{{ _("Savings: money put aside or invested (expense), or taken out of savings (income); it is not counted as spending or earnings. Transfer: money moved between your own accounts; it is left out of the totals.") }}</p>
+      <p id="treatment-help" class="text-xs text-muted sm:col-span-2">{{ _("Savings: money put aside or invested (expense), or taken out of savings (income); it is not counted as spending or earnings. Transfer: money moved between your own accounts; it is left out of the totals.") }}</p>
+      <div class="flex flex-wrap items-center gap-2 sm:col-span-2">
+        <button type="submit" class="btn-primary">{{ _("Add") }}</button>
+        <a href="{{ scoped_url(request, 'categories') }}" data-dialog-close class="btn">{{ _("Cancel") }}</a>
+      </div>
     </form>
-  </section>
+   </div>
+  </dialog>
   {% endif %}
 
   {% if categories.archived %}

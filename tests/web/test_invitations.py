@@ -32,6 +32,10 @@ INVALID = "This invitation link is not valid."
 MISMATCH = "This invitation was sent to a different email address."
 
 
+def _dialog_opening(page: str) -> str:
+    return page.split('id="invite-dialog"', 1)[1].split(">", 1)[0]
+
+
 def create_link(owner: OwnerApp, **form: str) -> str:
     data = {"role": "editor", "email": "newbie@example.com", "expires_in_days": "7"} | form
     response = owner.post("/workspace/invitations", data, token_from="/workspace/members")
@@ -73,6 +77,28 @@ def test_create_invitation_shows_link_once_and_stores_only_the_hash(owner: Owner
     with owner.db() as session:
         invitation = session.scalars(select(Invitation)).one()
         assert invitation.token_hash == hash_token(token)
+
+
+def test_the_invite_form_is_a_header_dialog(owner: OwnerApp) -> None:
+    page = owner.client.get("/workspace/members").text
+    header = page.split("data-header-actions", 1)[1].split("</header>", 1)[0]
+    assert re.search(
+        r'<a href="[^"]+\?form=invite#invite-dialog" data-dialog-open="invite-dialog"'
+        r"[^>]*data-invite-open>Invite someone</a>",
+        header,
+    )
+    assert 'id="invite-dialog"' in page
+    assert " open" not in _dialog_opening(page)
+    opened = owner.client.get("/workspace/members?form=invite").text
+    assert " open" in _dialog_opening(opened)
+    refused = owner.post(
+        "/workspace/invitations",
+        {"role": "editor", "email": "", "expires_in_days": "7"},
+        token_from="/workspace/members",
+    )
+    assert refused.status_code == 400
+    assert " open" in _dialog_opening(refused.text)
+    assert "Enter the email address of the person you invite." in refused.text
 
 
 @pytest.mark.parametrize("role", ["owner", "editor", "viewer"])
