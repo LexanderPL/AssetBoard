@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.1](https://github.com/LexanderPL/AssetBoard/compare/v0.6.0...v0.6.1) (2026-11-11)
+
+
+### Features
+
+* **ui:** finish the component sweep and document the design system ([#285](https://github.com/LexanderPL/AssetBoard/issues/285)) ([c3d7d50](https://github.com/LexanderPL/AssetBoard/commit/c3d7d5004cd716c44586d655f32c531718c89059))
+* **ui:** give pages one clear title and fix navigation labels ([#281](https://github.com/LexanderPL/AssetBoard/issues/281)) ([6b1ea34](https://github.com/LexanderPL/AssetBoard/commit/6b1ea34062b5e441fab754f8e7428e94c2308573))
+* **ui:** make tabs and filters work on phones ([#283](https://github.com/LexanderPL/AssetBoard/issues/283)) ([d4a1f39](https://github.com/LexanderPL/AssetBoard/commit/d4a1f39b9d9e7f25296aa80e3c117e0304ca54fb))
+* **ui:** put primary create actions at the top ([#278](https://github.com/LexanderPL/AssetBoard/issues/278)) ([0afaf06](https://github.com/LexanderPL/AssetBoard/commit/0afaf0684c125cbfdda23029573b57c49f88a8aa))
+* **ui:** show visible results for writes and add busy states ([#277](https://github.com/LexanderPL/AssetBoard/issues/277)) ([c52229e](https://github.com/LexanderPL/AssetBoard/commit/c52229e8a034088d03e56e028bc162d52ad9b167))
+* **ui:** simplify upcoming actions and phone filters ([#282](https://github.com/LexanderPL/AssetBoard/issues/282)) ([62c56c5](https://github.com/LexanderPL/AssetBoard/commit/62c56c5f0cec118e840d55d7060f51297cefe164))
+* **ui:** standardise row actions and touch targets ([#280](https://github.com/LexanderPL/AssetBoard/issues/280)) ([3abca10](https://github.com/LexanderPL/AssetBoard/commit/3abca10ae4fc229d0b8325219fa27ecc75da70eb))
+
 ## [0.6.0](https://github.com/LexanderPL/AssetBoard/compare/v0.5.7...v0.6.0) (2026-11-10)
 
 
