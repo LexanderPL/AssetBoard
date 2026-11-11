@@ -6440,6 +6440,12 @@ msgstr ""
 msgid "No year"
 msgstr ""
 
+#, python-format
+msgid "%(num)d filter"
+msgid_plural "%(num)d filters"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Your password"
 msgstr ""
 
@@ -7416,12 +7422,6 @@ msgstr ""
 
 msgid "Add payment"
 msgstr ""
-
-#, python-format
-msgid "%(num)d filter"
-msgid_plural "%(num)d filters"
-msgstr[0] ""
-msgstr[1] ""
 
 msgid "All categories"
 msgstr ""

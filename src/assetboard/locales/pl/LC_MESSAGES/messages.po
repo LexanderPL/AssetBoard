@@ -6950,6 +6950,13 @@ msgstr "Bez miesiąca"
 msgid "No year"
 msgstr "Bez roku"
 
+#, python-format
+msgid "%(num)d filter"
+msgid_plural "%(num)d filters"
+msgstr[0] "%(num)d filtr"
+msgstr[1] "%(num)d filtry"
+msgstr[2] "%(num)d filtrów"
+
 msgid "Your password"
 msgstr "Twoje hasło"
 
@@ -8036,13 +8043,6 @@ msgstr ""
 
 msgid "Add payment"
 msgstr "Dodaj płatność"
-
-#, python-format
-msgid "%(num)d filter"
-msgid_plural "%(num)d filters"
-msgstr[0] "%(num)d filtr"
-msgstr[1] "%(num)d filtry"
-msgstr[2] "%(num)d filtrów"
 
 msgid "All categories"
 msgstr "Wszystkie kategorie"
