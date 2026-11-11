@@ -111,6 +111,8 @@ def test_home_upcoming_items_for_editors_and_viewers(nav: OwnerApp) -> None:
     assert items and len(items) <= 10
     assert any("data-overdue" in attrs for _, attrs in items)  # January to March, overdue
     assert "data-home-post" in html and "data-home-skip" in html
+    assert 'class="btn-primary sm:col-span-2"' in html
+    assert 'class="btn cursor-pointer list-none' in html
     assert 'href="/upcoming"' in html
     occurrence = UUID(items[0][0])
     skipped = nav.post(f"/upcoming/{occurrence}/skip", {"back": "home"}, token_from="/")

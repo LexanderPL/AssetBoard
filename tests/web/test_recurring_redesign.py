@@ -110,6 +110,7 @@ def test_list_hides_archived_items_and_offers_actions_by_role(owner):
     assert "data-new-recurring" in page
     delete_form = row.split('/delete"')[1].split(">")[0]
     assert "Payments already recorded or skipped stay in your history." in delete_form
+    assert 'data-confirm-tone="danger"' in delete_form
     owner.set_admin_role("viewer")
     page = owner.client.get("/recurring").text
     row = _row(page, rent.id)
@@ -120,6 +121,7 @@ def test_list_hides_archived_items_and_offers_actions_by_role(owner):
 def test_empty_state_has_a_single_new_button(owner):
     page = owner.client.get("/recurring").text
     assert "data-recurring-empty" in page and page.count("data-new-recurring") == 1
+    assert "data-empty-state" in page
     assert "data-recurring-section" not in page
 
 

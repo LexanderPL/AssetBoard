@@ -97,6 +97,7 @@ def test_the_sidebar_links_to_the_page(owner: OwnerApp) -> None:
 def test_the_page_has_assets_and_liabilities_tabs(owner: OwnerApp) -> None:
     page = owner.client.get("/net-worth").text
     assert 'data-side-tab="asset"' in page and 'data-side-tab="liability"' in page
+    assert "data-empty-side" in page and "data-empty-state" in page
     assert 'role="tablist"' not in page and 'role="tab"' not in page
     assert re.search(r'data-side-tab="asset" aria-current="page"', page) is not None
     assert "aria-selected" not in page
@@ -287,6 +288,7 @@ def test_category_crud_reorder_archive_restore_and_delete(owner: OwnerApp) -> No
     other = _create_category(owner, "Hardware")
     page = owner.client.get("/net-worth").text
     assert "Garden" in page and "Hardware" in page
+    assert 'data-confirm-tone="danger"' in page
     moved = _htmx(owner, f"/net-worth/categories/{kind}/move", {"side": "asset", "direction": "up"})
     assert moved.status_code == 200
     updated = _htmx(

@@ -65,6 +65,7 @@ def test_tax_pages_are_hidden_until_taxes_are_switched_on(owner):
     page = owner.client.get("/taxes")
     assert page.status_code == 200
     assert "Only if you want taxes planned" in page.text and "data-tax-warning" not in page.text
+    assert "data-no-taxes" in page.text and "data-empty-state" in page.text
     # The old calculator URL redirects to the Taxes page.
     old = owner.client.get("/taxes/calculator", follow_redirects=False)
     assert old.status_code == 303 and old.headers["location"].endswith("/taxes")

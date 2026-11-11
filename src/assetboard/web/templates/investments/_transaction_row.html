@@ -36,7 +36,7 @@
   <td class="cell-tight px-3 py-2">
     <div class="flex flex-wrap items-center justify-end gap-1">
       <a href="{{ edit_href }}?edit={{ t.id }}" hx-get="{{ scoped_url(request, 'investment_transaction_edit', transaction_id=t.id|string) }}?show_instrument={{ 1 if show_instrument else 0 }}&target={{ target }}" hx-target="#transaction-{{ t.id }}" hx-swap="outerHTML" class="rounded-lg px-2.5 py-1.5 text-xs font-medium text-muted hover:bg-subtle hover:text-ink">{{ _("Edit") }}</a>
-      <form method="post" action="{{ scoped_url(request, 'investment_transaction_delete', transaction_id=t.id|string) }}" hx-post="{{ scoped_url(request, 'investment_transaction_delete', transaction_id=t.id|string) }}" hx-target="#{{ target }}" hx-swap="outerHTML" data-confirm="{{ _('Delete the transaction of %(date)s?', date=format_day(t.date, locale) if t.date else _('Undated')) }}">
+      <form method="post" action="{{ scoped_url(request, 'investment_transaction_delete', transaction_id=t.id|string) }}" hx-post="{{ scoped_url(request, 'investment_transaction_delete', transaction_id=t.id|string) }}" hx-target="#{{ target }}" hx-swap="outerHTML" data-confirm="{{ _('Delete the transaction of %(date)s?', date=format_day(t.date, locale) if t.date else _('Undated')) }}" data-confirm-tone="danger">
         {{ csrf_input() }}
         <input type="hidden" name="return_to" value="{{ return_to }}">
         {% if instrument_id %}<input type="hidden" name="instrument_id" value="{{ instrument_id }}">{% endif %}

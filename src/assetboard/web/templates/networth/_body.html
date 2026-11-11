@@ -1,6 +1,6 @@
 {% from "networth/_macros.html" import bulk_preview_panel, category_row, htmx_form, item_row with context %}
 {% from "networth/_tabs.html" import tabs with context %}
-{% from "macros/components.html" import csrf_input, toast with context %}
+{% from "macros/components.html" import csrf_input, empty_state, toast with context %}
 <div id="networth-body" class="space-y-6">
   {% if notice %}
   <p class="border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" role="status" data-notice>{{ notice }}</p>
@@ -77,10 +77,7 @@
   {% endfor %}
 
   {% if not view.groups and not view.archived_groups and not view.archived_items %}
-  <div class="panel px-6 py-10 text-center" data-empty-side>
-    <h2 class="text-base font-semibold">{{ _("No items yet") }}</h2>
-    <p class="mt-2 text-sm text-muted">{{ _("Use Add item in the header, or paste a list of items below.") }}</p>
-  </div>
+  <div data-empty-side>{{ empty_state(_("No items yet"), _("Use Add item in the header, or paste a list of items below."), icon="+") }}</div>
   {% endif %}
 
   {% if can_edit and view.categories %}

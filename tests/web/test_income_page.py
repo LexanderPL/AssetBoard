@@ -92,6 +92,12 @@ def _card(page: str, name: str) -> str:
     return page[start : end if end != -1 else len(page)]
 
 
+def test_empty_page_uses_the_shared_empty_state(owner):
+    page = owner.client.get("/income")
+    assert page.status_code == 200
+    assert "data-empty-state" in page.text and "No income yet" in page.text
+
+
 def test_wizard_steps_keep_values_and_save_without_taxes(owner):
     first = owner.client.get("/income/new")
     assert first.status_code == 200

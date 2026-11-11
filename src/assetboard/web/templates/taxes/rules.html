@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "macros/components.html" import csrf_input, summary_button with context %}
+{% from "macros/components.html" import csrf_input, empty_state, summary_button with context %}
 {% from "taxes/_macros.html" import how, when with context %}
 {% from "categories/_macros.html" import category_options %}
 {% block title %}{{ _("Taxes") }} · {{ app_name }}{% endblock %}
@@ -59,7 +59,7 @@
   </details>
 </section>
 {% else %}
-<p class="panel p-6 text-sm text-muted" data-no-taxes>{{ _("No taxes on income yet.") }}</p>
+<div data-no-taxes>{{ empty_state(_("No taxes on income yet."), _("Add a tax rule to plan what you keep."), icon="%") }}</div>
 {% endfor %}
 </div>
 {% if archived_rules %}

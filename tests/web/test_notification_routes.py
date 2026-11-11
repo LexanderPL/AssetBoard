@@ -62,6 +62,7 @@ def test_create_mask_test_send_edit_and_delete(owner):
     page = owner.client.get("/notifications")
     assert page.status_code == 200
     assert "No notification channels yet." in page.text
+    assert "data-no-channels" in page.text and "data-empty-state" in page.text
     assert "Include amounts" in page.text and "pass through the service you choose" in page.text
     # Not in the account menu any more: in Workspace settings (owners) and on the Profile page.
     assert "data-notifications-link" not in page.text
@@ -71,6 +72,7 @@ def test_create_mask_test_send_edit_and_delete(owner):
     listing = owner.client.get("/notifications")
     assert "ntfys://••••••" in listing.text
     assert 'class="btn-sm"' in listing.text and "btn-danger" in listing.text
+    assert 'data-confirm-tone="danger"' in listing.text
     assert "data-send-test" in listing.text and "Edit channel" in listing.text
     assert "very-secret-topic" not in listing.text and "ntfy.example.com" not in listing.text
     with owner.db() as session:

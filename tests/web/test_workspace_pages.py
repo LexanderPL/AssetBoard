@@ -135,6 +135,8 @@ def test_settings_cards_share_one_column(owner: OwnerApp) -> None:
     page = owner.client.get("/workspace/settings").text
     assert page.count('<div class="max-w-3xl space-y-6">') == 1
     assert "panel max-w-2xl" not in page
+    assert '<button type="submit" class="btn-primary">Save settings</button>' in page
+    assert "w-full rounded-xl bg-primary" not in page
 
 
 def test_owner_updates_workspace_settings(owner: OwnerApp) -> None:
@@ -359,6 +361,7 @@ def test_members_page_lists_members(owner: OwnerApp) -> None:
     assert "stranger@example.com" not in page.text
     # No remove button for yourself.
     assert page.text.count("data-remove-member") == 1
+    assert 'data-confirm-tone="danger"' in page.text
 
 
 def test_owner_changes_a_role_and_removes_a_member(owner: OwnerApp) -> None:

@@ -7,14 +7,15 @@
     <p class="mt-1 text-sm text-muted">{{ _("Dividends and interest by calendar year, in %(currency)s.", currency=page.currency) }}</p>
     {% if page.years %}
     <div class="mt-5 overflow-x-auto">
-      <table class="w-full text-left text-sm">
-        <thead>
+      <table class="sheet w-full text-left text-sm">
+        <caption class="sr-only">{{ _("Income from investments by year") }}</caption>
+        <thead class="text-xs text-muted">
           <tr>
-            <th class="py-2 pr-4">{{ _("Year") }}</th>
-            <th class="py-2 pr-4 text-right">{{ _("Gross") }}</th>
-            <th class="py-2 pr-4 text-right">{{ _("Withholding") }}</th>
-            <th class="py-2 pr-4 text-right">{{ _("Net") }}</th>
-            <th class="py-2 text-right">{{ _("Payments") }}</th>
+            <th scope="col" class="py-2 pr-4">{{ _("Year") }}</th>
+            <th scope="col" class="py-2 pr-4 text-right">{{ _("Gross") }}</th>
+            <th scope="col" class="py-2 pr-4 text-right">{{ _("Withholding") }}</th>
+            <th scope="col" class="py-2 pr-4 text-right">{{ _("Net") }}</th>
+            <th scope="col" class="py-2 text-right">{{ _("Payments") }}</th>
           </tr>
         </thead>
         <tbody>

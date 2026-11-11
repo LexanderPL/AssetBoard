@@ -11,7 +11,7 @@
   <p class="mt-2 text-sm text-muted">{{ _("Recurring items, income sources, work logs, tax rules, and notifications are not included in this archive version.") }}</p>
   <form method="post" action="{{ scoped_url(request, 'workspace_data_export') }}" class="mt-5">
     <input type="hidden" name="csrf_token" value="{{ csrf_token(request) }}">
-    <button type="submit" class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary">{{ _("Download archive") }}</button>
+    <button type="submit" class="btn-primary">{{ _("Download archive") }}</button>
   </form>
 </section>
 <section class="panel mt-6 max-w-2xl p-6">
@@ -50,7 +50,7 @@
         </select>
       </label>
     </div>
-    <button type="submit" class="rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-on-primary">{{ _("Validate upload") }}</button>
+    <button type="submit" class="btn-primary">{{ _("Validate upload") }}</button>
   </form>
   <p class="mt-4 text-sm text-muted">{{ _("Templates:") }}
     <a class="underline" href="{{ scoped_url(request, 'workspace_data_import_template', filename='transactions.csv') }}">transactions.csv</a>
