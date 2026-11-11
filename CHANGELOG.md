@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.2](https://github.com/LexanderPL/AssetBoard/compare/v0.6.1...v0.6.2) (2026-11-11)
+
+
+### Bug Fixes
+
+* **ui:** refine page actions, filters and entry-row order ([#286](https://github.com/LexanderPL/AssetBoard/issues/286)) ([4f02d35](https://github.com/LexanderPL/AssetBoard/commit/4f02d353b4b145290086cf7a82dffc1af976302a))
+
 ## [0.6.1](https://github.com/LexanderPL/AssetBoard/compare/v0.6.0...v0.6.1) (2026-11-11)
 
 

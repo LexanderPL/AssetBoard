@@ -139,7 +139,7 @@ wheels = [
 
 [[package]]
 name = "assetboard"
-version = "0.6.1"
+version = "0.6.2"
 source = { editable = "." }
 default-groups = ["dev", "test"]
 dependencies = [
