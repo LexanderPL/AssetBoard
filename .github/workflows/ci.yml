@@ -77,8 +77,11 @@ jobs:
           uv pip install --python /tmp/assetboard-wheel-check/bin/python --no-deps dist/assetboard-*.whl
           PYTHONPATH= /tmp/assetboard-wheel-check/bin/python scripts/verify_installed_wheel.py
 
+      # Do not use --with-deps here: it pulls font packages from the Ubuntu security mirror,
+      # which has been unreachable from GitHub-hosted runners. The runner image already has the
+      # browser's system libraries, and the tests do not depend on the extra font packages.
       - name: Install Playwright browser
-        run: uv run --locked playwright install --with-deps chromium
+        run: uv run --locked playwright install chromium
 
       - name: Run project checks
         run: uv run --locked make check
