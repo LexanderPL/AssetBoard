@@ -84,6 +84,23 @@
 <a href="{{ href }}" rel="noreferrer" class="flex w-full justify-center rounded-xl border border-line bg-surface px-4 py-2.5 text-sm font-semibold text-ink shadow-sm hover:border-primary focus:outline-none focus:ring-2 focus:ring-primary/40">{{ label }}</a>
 {%- endmacro %}
 
+{# A filters panel: a <details> whose summary is always visible. It is rendered open, so it
+   works without JavaScript and stays open on a desktop; app.js collapses it on a phone. The
+   count is the number of active filters and is left out at zero. #}
+{% macro filter_panel(count=0, class_name="panel") -%}
+<details class="{{ class_name }}" data-filter-disclosure open>
+  <summary class="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 [&::-webkit-details-marker]:hidden">
+    <span class="flex flex-wrap items-center gap-2">
+      <span aria-hidden="true">▾</span>{{ _("Filters") }}
+      {% if count %}<span class="rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary-ink">{{ ngettext("%(num)d filter", "%(num)d filters", count, num=count) }}</span>{% endif %}
+    </span>
+  </summary>
+  <div class="border-t border-line p-4 sm:p-6">
+    {{ caller() }}
+  </div>
+</details>
+{%- endmacro %}
+
 {% macro flashes(messages=[]) -%}
 {% if messages %}
 <div class="space-y-2" role="status" aria-live="polite">

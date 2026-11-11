@@ -81,8 +81,10 @@ def test_the_sidebar_and_tabs_link_to_the_summary(owner: OwnerApp) -> None:
     list_page = owner.client.get("/net-worth").text
     assert "data-summary-tab" in list_page
     page = owner.client.get("/net-worth/summary").text
-    assert re.search(r'aria-selected="true"[^>]*data-summary-tab', page) is not None
+    assert re.search(r'data-summary-tab aria-current="page"', page) is not None
+    assert re.search(r'<nav class="tab-strip" aria-label="Net worth"', page)
     assert 'data-side-tab="asset"' in page and 'data-side-tab="liability"' in page
+    assert 'role="tablist"' not in page and "aria-selected" not in page
 
 
 def test_an_empty_summary_shows_the_empty_bar_state(owner: OwnerApp) -> None:

@@ -119,12 +119,15 @@ def _fund(owner: OwnerApp) -> tuple[UUID, dict[str, UUID]]:
 def test_the_tab_and_the_empty_state(owner: OwnerApp) -> None:
     page = owner.client.get(PORTFOLIO)
     assert page.status_code == 200
-    assert re.search(r'aria-selected="true" data-portfolio-tab', page.text)
+    assert re.search(r'data-portfolio-tab aria-current="page"', page.text)
+    assert re.search(r'<nav class="tab-strip" aria-label="Investments"', page.text)
+    assert 'role="tablist"' not in page.text and 'role="tab"' not in page.text
     assert "data-portfolio-empty" in page.text
     assert "Go to transactions" in page.text
     assert "echarts.min.js" not in page.text and "data-chart=" not in page.text
     instruments = owner.client.get(INSTRUMENTS).text
-    assert re.search(r'aria-selected="false" data-portfolio-tab', instruments)
+    assert re.search(r"data-portfolio-tab(?! aria-current)", instruments)
+    assert 'aria-selected="true"' not in instruments
     assert (
         owner.client.get("/investments", follow_redirects=False)
         .headers["location"]

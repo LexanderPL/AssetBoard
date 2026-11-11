@@ -133,6 +133,26 @@
     @apply bg-primary-soft text-primary-ink;
   }
 
+  /* Page tabs: navigation links in one strip. The strip never wraps; on a phone it scrolls
+     sideways and app.js keeps the current tab in view. On a desktop it reads as the segmented
+     row it replaced. The padding leaves room for the focus ring inside the scroll container. */
+  .tab-strip {
+    @apply flex flex-nowrap items-center gap-1 overflow-x-auto py-1 sm:gap-2;
+    scrollbar-width: thin;
+  }
+
+  .tab-strip > a {
+    @apply shrink-0 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold text-muted hover:bg-subtle hover:text-ink sm:px-4;
+  }
+
+  .tab-strip > a[aria-current="page"] {
+    @apply bg-primary-soft text-primary-ink;
+  }
+
+  .tab-strip > span {
+    @apply shrink-0;
+  }
+
   /* Buttons: one shape for every page action (the Month page's "Close month" is the model).
      .btn is the secondary look, .btn-primary the main action of a page or form, .btn-danger a
      destructive action. .btn-sm is the compact row action and .btn-icon a square icon control;

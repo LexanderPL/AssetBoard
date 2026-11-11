@@ -107,7 +107,8 @@ def test_the_history_tab_is_on_every_net_worth_page(owner: OwnerApp) -> None:
     assert "data-history-tab" in owner.client.get("/net-worth").text
     assert "data-history-tab" in owner.client.get("/net-worth/summary").text
     page = owner.client.get("/net-worth/history").text
-    assert re.search(r'aria-selected="true"[^>]*data-history-tab', page) is not None
+    assert re.search(r'data-history-tab aria-current="page"', page) is not None
+    assert 'role="tablist"' not in page and "aria-selected" not in page
 
 
 def test_an_empty_history_page_has_editor_actions_and_no_chart_script(

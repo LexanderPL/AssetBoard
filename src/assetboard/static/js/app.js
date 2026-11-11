@@ -286,6 +286,33 @@ document.addEventListener("htmx:load", (event) => {
   if (event.target instanceof Element) openModalDialogs(event.target);
 });
 
+// The page-tab strip fits one row on a desktop; on a phone it scrolls sideways. Start with the
+// current tab in view (a later tab is otherwise off-screen), moving only the strip and never the
+// page. htmx fragments carry a fresh strip, so reveal it again after a swap.
+function revealCurrentTabs(root) {
+  const strips =
+    root instanceof Element && root.matches("[data-tab-strip]")
+      ? [root]
+      : root.querySelectorAll("[data-tab-strip]");
+  strips.forEach((strip) => {
+    if (!(strip instanceof HTMLElement)) return;
+    const active = strip.querySelector(":scope > a[aria-current='page']");
+    if (!(active instanceof HTMLElement)) return;
+    const stripBox = strip.getBoundingClientRect();
+    const activeBox = active.getBoundingClientRect();
+    if (activeBox.left < stripBox.left) {
+      strip.scrollLeft -= stripBox.left - activeBox.left;
+    } else if (activeBox.right > stripBox.right) {
+      strip.scrollLeft += activeBox.right - stripBox.right;
+    }
+  });
+}
+
+revealCurrentTabs(document);
+document.addEventListener("htmx:load", (event) => {
+  if (event.target instanceof Element) revealCurrentTabs(event.target);
+});
+
 // A filters panel is rendered open, so it works without JavaScript and stays open on a desktop.
 // On a phone it starts collapsed, so the page title and the first data row fit in the first
 // viewport; the user opens it with the always-visible summary. A choice made by the user is
