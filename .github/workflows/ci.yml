@@ -15,7 +15,9 @@ concurrency:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    # ubuntu-latest migrated to 26.04; its security mirror intermittently fails to resolve the
+    # Playwright font packages. Pin to the 24.04 LTS image until the 26.04 runners are stable.
+    runs-on: ubuntu-24.04
     env:
       # The runner image already has the Python tool cache; do not download a standalone build.
       UV_PYTHON_PREFERENCE: only-system
