@@ -12,7 +12,7 @@
 
   <section class="panel p-6 sm:p-7" aria-labelledby="portfolio-heading" data-portfolio-totals>
     <div class="flex flex-wrap items-baseline justify-between gap-2">
-      <h1 id="portfolio-heading" class="text-lg font-semibold">{{ _("Portfolio") }}</h1>
+      <h2 id="portfolio-heading" class="text-base font-semibold">{{ _("Portfolio") }}</h2>
       <p class="text-sm text-muted">{{ _("Valued on %(date)s in %(currency)s", date=view.as_of, currency=view.currency) }}</p>
     </div>
     <div class="mt-5 grid gap-4{% if view.class_donut.slices %} lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:items-start{% endif %}">

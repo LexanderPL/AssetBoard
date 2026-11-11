@@ -3993,10 +3993,10 @@ msgstr ""
 msgid "Loans"
 msgstr ""
 
-msgid "FIRE projection"
+msgid "Unavailable"
 msgstr ""
 
-msgid "Unavailable"
+msgid "FIRE projection"
 msgstr ""
 
 #, python-format
@@ -6405,6 +6405,9 @@ msgid "Page %(page)d of %(pages)d"
 msgstr ""
 
 msgid "No investment transactions match these filters."
+msgstr ""
+
+msgid "Investment income"
 msgstr ""
 
 msgid "Add instrument"

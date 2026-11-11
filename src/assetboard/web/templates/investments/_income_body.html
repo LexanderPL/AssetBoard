@@ -3,7 +3,7 @@
   {{ tabs("income") }}
 
   <section class="panel p-6 sm:p-7" aria-labelledby="income-heading" data-investment-income>
-    <h1 id="income-heading" class="text-lg font-semibold">{{ _("Income from investments") }}</h1>
+    <h2 id="income-heading" class="text-base font-semibold">{{ _("Income from investments") }}</h2>
     <p class="mt-1 text-sm text-muted">{{ _("Dividends and interest by calendar year, in %(currency)s.", currency=page.currency) }}</p>
     {% if page.years %}
     <div class="mt-5 overflow-x-auto">
