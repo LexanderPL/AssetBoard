@@ -1,0 +1,54 @@
+{% if charts and charts.balance %}
+<section class="panel mb-6 p-4 sm:p-6" id="charts" data-loan-charts aria-labelledby="charts-heading">
+  <h2 id="charts-heading" class="text-base font-semibold">{{ _("Charts") }}</h2>
+  <p class="mt-1 text-sm text-muted">{{ _("Dashed lines mark rate changes.") }}</p>
+
+  <section class="mt-5" aria-labelledby="balance-chart-heading" data-loan-balance-chart>
+    <h3 id="balance-chart-heading" class="text-sm font-semibold">{{ _("Balance over time") }}</h3>
+    <p class="mt-1 text-xs text-muted">{{ _("The configured plan and the same loan without overpayments.") }}</p>
+    <div class="mt-3" data-chart="line" data-chart-source="loan-balance-data">
+      <script type="application/json" id="loan-balance-data">{{ charts.balance|tojson }}</script>
+      <div class="h-80 w-full" hidden aria-hidden="true" data-chart-canvas></div>
+    </div>
+    <details class="mt-3" data-loan-balance-points>
+      <summary class="cursor-pointer text-sm font-medium text-muted">{{ _("Plotted data") }}</summary>
+      <div class="mt-3 overflow-x-auto">
+        <table class="sheet w-full text-sm">
+          <caption class="sr-only">{{ _("Plotted balance data") }}</caption>
+          <thead><tr class="text-left text-xs text-muted"><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Date") }}</th><th scope="col" class="py-1.5 pr-3 text-right font-medium">{{ _("Configured plan") }}</th>{% if charts.has_baseline %}<th scope="col" class="py-1.5 text-right font-medium">{{ _("Without overpayments") }}</th>{% endif %}</tr></thead>
+          <tbody>
+            {% for point in charts.balance_points %}
+            <tr><th scope="row" class="py-1.5 pr-3 text-left font-normal">{{ point.date }}</th><td class="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{{ point.plan }}</td>{% if charts.has_baseline %}<td class="whitespace-nowrap py-1.5 text-right tabular-nums">{{ point.baseline }}</td>{% endif %}</tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
+  {% if charts.payments %}
+  <section class="mt-8" aria-labelledby="payments-chart-heading" data-loan-payments-chart>
+    <h3 id="payments-chart-heading" class="text-sm font-semibold">{{ _("Monthly payments") }}</h3>
+    <p class="mt-1 text-xs text-muted">{{ _("Principal, interest, costs and overpayments in each month.") }}</p>
+    <div class="mt-3" data-chart="loan-payments" data-chart-source="loan-payments-data">
+      <script type="application/json" id="loan-payments-data">{{ charts.payments|tojson }}</script>
+      <div class="h-80 w-full" hidden aria-hidden="true" data-chart-canvas></div>
+    </div>
+    <details class="mt-3" data-loan-payment-points>
+      <summary class="cursor-pointer text-sm font-medium text-muted">{{ _("Plotted data") }}</summary>
+      <div class="mt-3 overflow-x-auto">
+        <table class="sheet w-full text-sm">
+          <caption class="sr-only">{{ _("Plotted payment data") }}</caption>
+          <thead><tr class="text-left text-xs text-muted"><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Date") }}</th><th scope="col" class="py-1.5 pr-3 text-right font-medium">{{ _("Principal") }}</th><th scope="col" class="py-1.5 pr-3 text-right font-medium">{{ _("Interest") }}</th><th scope="col" class="py-1.5 pr-3 text-right font-medium">{{ _("Costs") }}</th>{% if charts.has_overpayments %}<th scope="col" class="py-1.5 pr-3 text-right font-medium">{{ _("Overpayment") }}</th>{% endif %}<th scope="col" class="py-1.5 text-right font-medium">{{ _("Total") }}</th></tr></thead>
+          <tbody>
+            {% for point in charts.payment_points %}
+            <tr><th scope="row" class="py-1.5 pr-3 text-left font-normal">{{ point.date }}</th><td class="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{{ point.principal }}</td><td class="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{{ point.interest }}</td><td class="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{{ point.costs }}</td>{% if charts.has_overpayments %}<td class="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{{ point.overpayment }}</td>{% endif %}<td class="whitespace-nowrap py-1.5 text-right tabular-nums">{{ point.total }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+  {% endif %}
+</section>
+{% endif %}

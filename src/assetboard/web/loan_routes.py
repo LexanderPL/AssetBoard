@@ -9,7 +9,7 @@ from typing import cast
 from urllib.parse import urlencode
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
@@ -35,10 +35,13 @@ from assetboard.i18n.numbers import (
     format_rate_short,
     parse_amount,
 )
+from assetboard.services import loan_schedule as loan_schedule_service
 from assetboard.services import loans
 from assetboard.services.context import Context, Role, has_role, require_role
 from assetboard.web.context import CurrentContext
 from assetboard.web.forms import InvalidPercentOrFixed, percent_to_bp
+from assetboard.web.loan_charts import build_loan_charts
+from assetboard.web.loan_page import schedule_csv, schedule_page
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
 
@@ -91,6 +94,14 @@ ERRORS = {
     "archived": _("Archived loans cannot be changed. Restore the loan first."),
     "invalid_entry_path": _("Choose how you want to enter the loan."),
     "invalid_currency": _("Enter the amount in the workspace currency."),
+    "invalid_day_count": _("Choose a valid interest calculation."),
+    "no_anchor": _("The loan has no starting balance to build a schedule from."),
+    "duplicate_rate": _("Two rate changes start on the same date."),
+    "negative_amortization": _(
+        "The installment is too low to cover the interest. Raise the installment override."
+    ),
+    "invalid_payment_date": _("The payment dates are invalid. Check the first payment date."),
+    "negative_closing": _("The schedule produced a negative balance. Check the loan terms."),
     "failed": _("The loan could not be saved. Check the form and try again."),
 }
 
@@ -393,6 +404,7 @@ def _loan_values_from_view(view: loans.LoanView, locale: str) -> dict[str, str]:
         "first_payment_date": view.first_payment_date.isoformat(),
         "term_months": str(view.term_months),
         "payment_day": str(view.payment_day),
+        "day_count": view.day_count.value,
         "installment_override": amount(view.installment_override),
     }
 
@@ -563,18 +575,25 @@ def _detail_context(
     open_form: str | None = None,
     edit_id: str | None = None,
 ) -> dict[str, object]:
-    view = loans.get_loan(request.app.state.session_factory, ctx, loan_id)
-    rates = loans.list_reference_rates(request.app.state.session_factory, ctx).rates
+    data = loan_schedule_service.loan_schedule(request.app.state.session_factory, ctx, loan_id)
+    today = ctx.clock.today(ctx.workspace.timezone)
+    page = schedule_page(data.schedule, today, request.query_params.get("schedule_page"))
+    charts = build_loan_charts(data.schedule, data.baseline, request.state.locale)
     return {
-        "loan": view,
-        "reference_rates": rates,
+        "loan": data.view,
+        "schedule_data": data,
+        "schedule": data.schedule,
+        "summary": data.summary,
+        "schedule_page": page,
+        "charts": charts,
+        "schedule_error": _error(request, data.error_code) if data.error_code else None,
         "can_edit": has_role(ctx, Role.EDITOR),
         "error": error,
         "notice": notice,
         "form_values": form_values or {},
         "open_form": open_form,
         "edit_id": edit_id,
-        "today": ctx.clock.today(ctx.workspace.timezone),
+        "today": today,
         "format_money": format_money,
         "format_day": format_day,
         "format_amount_input": format_amount_input,
@@ -882,6 +901,32 @@ async def reference_rate_value_delete(
     )
 
 
+@router.get("/loans/{loan_id}/schedule.csv", name="loan_schedule_csv")
+async def loan_schedule_csv(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    data = await run_in_threadpool(
+        loan_schedule_service.loan_schedule,
+        request.app.state.session_factory,
+        ctx,
+        loan_id,
+    )
+    if data.schedule is None:
+        raise HTTPException(
+            status_code=409,
+            detail=_error(request, data.error_code),
+        )
+    content = await run_in_threadpool(schedule_csv, data.schedule)
+    filename = f"loan-schedule-{loan_id}.csv"
+    return Response(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.get("/loans/{loan_id}", name="loan_detail")
 async def loan_detail(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
     context = await run_in_threadpool(
@@ -948,6 +993,7 @@ async def loan_update(request: Request, ctx: CurrentContext, loan_id: UUID) -> R
             reference_rate_id=_optional_id(values.get("reference_rate_id", "")),
             margin_bp=_percent(values, "margin_percent", request.state.locale),
             high_rate_confirmed=values.get("high_rate_confirmed") == "1",
+            day_count=values.get("day_count") or None,
         )
     except (loans.LoanError, LoanValidationError) as exc:
         rates = await run_in_threadpool(
