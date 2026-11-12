@@ -2020,6 +2020,9 @@ msgstr "%(tax)s: %(source)s"
 msgid "Investment income: %(instrument)s"
 msgstr "Przychód z inwestycji: %(instrument)s"
 
+msgid "Loan"
+msgstr "Kredyt"
+
 msgid "Baseline"
 msgstr "Scenariusz bazowy"
 
@@ -3382,6 +3385,42 @@ msgstr ""
 msgid "The loan schedule is unavailable."
 msgstr "Harmonogram kredytu jest niedostępny."
 
+msgid "The property item is archived."
+msgstr "Pozycja nieruchomości jest zarchiwizowana."
+
+msgid "Choose an asset item for the property."
+msgstr "Wybierz pozycję majątku dla nieruchomości."
+
+msgid "Choose an item in a real-estate category."
+msgstr "Wybierz pozycję w kategorii nieruchomości."
+
+msgid "The property and the loan must use the same currency."
+msgstr "Nieruchomość i kredyt muszą używać tej samej waluty."
+
+msgid "No property is linked to this loan."
+msgstr "Z tym kredytem nie jest powiązana żadna nieruchomość."
+
+msgid "The linked property item no longer exists."
+msgstr "Powiązana pozycja nieruchomości już nie istnieje."
+
+msgid "The property has no value on that date."
+msgstr "Nieruchomość nie ma wartości w tym dniu."
+
+msgid "The property value is zero, so LTV is unavailable."
+msgstr "Wartość nieruchomości wynosi zero, więc LTV jest niedostępne."
+
+msgid "The loan balance is unavailable on that date."
+msgstr "Saldo kredytu jest niedostępne w tym dniu."
+
+msgid "Choose an active expense category."
+msgstr "Wybierz aktywną kategorię wydatków."
+
+msgid "The loan has no future scheduled payments."
+msgstr "Kredyt nie ma przyszłych zaplanowanych płatności."
+
+msgid "The loan is no longer available."
+msgstr "Kredyt nie jest już dostępny."
+
 msgid "The loan could not be saved. Check the form and try again."
 msgstr "Nie udało się zapisać kredytu. Sprawdź formularz i spróbuj ponownie."
 
@@ -3451,6 +3490,24 @@ msgstr "Zapisano punkt kontrolny salda."
 
 msgid "Balance checkpoint deleted."
 msgstr "Usunięto punkt kontrolny salda."
+
+msgid "Linked net-worth item created."
+msgstr "Utworzono powiązaną pozycję majątku netto."
+
+msgid "Property linked."
+msgstr "Powiązano nieruchomość."
+
+msgid "Property link removed."
+msgstr "Usunięto powiązanie nieruchomości."
+
+msgid "Automatic payment recording saved."
+msgstr "Zapisano automatyczne rejestrowanie płatności."
+
+msgid "Recurring installments generated or refreshed."
+msgstr "Wygenerowano lub odświeżono raty cykliczne."
+
+msgid "Recurring installment generation disabled."
+msgstr "Wyłączono generowanie rat cyklicznych."
 
 msgid "The loan"
 msgstr "Kredyt"
@@ -7328,6 +7385,144 @@ msgstr "Kapitał, odsetki, koszty i nadpłaty w każdym miesiącu."
 msgid "Plotted payment data"
 msgstr "Dane wykresu płatności"
 
+msgid "Net worth & property"
+msgstr "Majątek netto i nieruchomość"
+
+msgid ""
+"Link this loan to a net-worth liability and a property, and let Upcoming "
+"derive the installment amounts from the schedule."
+msgstr ""
+"Powiąż kredyt z zobowiązaniem w majątku netto i nieruchomością, a "
+"Nadchodzące będą wyliczać kwoty rat z harmonogramu."
+
+msgid "Open Net worth"
+msgstr "Otwórz majątek netto"
+
+msgid "Net-worth liability"
+msgstr "Zobowiązanie w majątku netto"
+
+#, python-format
+msgid "Linked item: %(name)s"
+msgstr "Powiązana pozycja: %(name)s"
+
+msgid "Open the linked item"
+msgstr "Otwórz powiązaną pozycję"
+
+msgid "No linked liability item yet."
+msgstr "Brak powiązanej pozycji zobowiązania."
+
+msgid "Create net-worth item"
+msgstr "Utwórz pozycję majątku netto"
+
+msgid "Property and LTV"
+msgstr "Nieruchomość i LTV"
+
+#, python-format
+msgid "Value on %(date)s"
+msgstr "Wartość na %(date)s"
+
+msgid "Remaining principal"
+msgstr "Pozostały kapitał"
+
+msgid "LTV"
+msgstr "LTV"
+
+msgid "Equity"
+msgstr "Kapitał własny"
+
+msgid "Show at date"
+msgstr "Pokaż na dzień"
+
+msgid "Property item"
+msgstr "Pozycja nieruchomości"
+
+msgid "Choose a property"
+msgstr "Wybierz nieruchomość"
+
+msgid "Save property"
+msgstr "Zapisz nieruchomość"
+
+msgid "Clear property"
+msgstr "Usuń powiązanie nieruchomości"
+
+#, python-format
+msgid ""
+"Use an active real-estate asset item in %(currency)s. Add one on Net "
+"worth if the list is empty."
+msgstr ""
+"Użyj aktywnej pozycji majątku w kategorii nieruchomości w %(currency)s. "
+"Dodaj ją w Majątku netto, jeśli lista jest pusta."
+
+msgid "Add an active real-estate asset item on Net worth first."
+msgstr ""
+"Najpierw dodaj aktywną pozycję majątku w kategorii nieruchomości w "
+"Majątku netto."
+
+msgid "Recurring installments"
+msgstr "Raty cykliczne"
+
+msgid ""
+"Generate monthly expense occurrences from the projected installment. "
+"Refreshing updates pending future amounts; posted and skipped rows stay "
+"unchanged."
+msgstr ""
+"Generuj miesięczne wystąpienia wydatków z prognozowanej raty. Odświeżenie"
+" aktualizuje przyszłe oczekujące kwoty; zaksięgowane i pominięte wiersze "
+"pozostają bez zmian."
+
+msgid "Open Upcoming"
+msgstr "Otwórz Nadchodzące"
+
+msgid "Next due"
+msgstr "Następny termin"
+
+msgid "Ends"
+msgstr "Koniec"
+
+msgid "Expense category"
+msgstr "Kategoria wydatków"
+
+msgid "Refresh occurrences"
+msgstr "Odśwież wystąpienia"
+
+msgid ""
+"Disable recurring installment generation? Pending future occurrences will"
+" be removed."
+msgstr ""
+"Wyłączyć generowanie rat cyklicznych? Oczekujące przyszłe wystąpienia "
+"zostaną usunięte."
+
+msgid "Disable generation"
+msgstr "Wyłącz generowanie"
+
+msgid "Generation is not active for this loan."
+msgstr "Generowanie nie jest aktywne dla tego kredytu."
+
+msgid "Generate occurrences"
+msgstr "Generuj wystąpienia"
+
+msgid "Automatic payment recording"
+msgstr "Automatyczne rejestrowanie płatności"
+
+msgid ""
+"When an upcoming installment linked to this loan is posted, also record "
+"it as an actual loan payment."
+msgstr ""
+"Gdy powiązane z tym kredytem wystąpienie zostanie zaksięgowane, zapisz je"
+" również jako rzeczywistą płatność kredytu."
+
+msgid "Record posted installments automatically"
+msgstr "Automatycznie rejestruj zaksięgowane raty"
+
+msgid "Save setting"
+msgstr "Zapisz ustawienie"
+
+msgid "On"
+msgstr "Włączone"
+
+msgid "Off"
+msgstr "Wyłączone"
+
 msgid "per month"
 msgstr "miesięcznie"
 
@@ -7355,9 +7550,6 @@ msgstr ""
 
 msgid "Overview"
 msgstr "Przegląd"
-
-msgid "Remaining principal"
-msgstr "Pozostały kapitał"
 
 msgid "Current rate"
 msgstr "Bieżąca stopa"
@@ -9158,9 +9350,6 @@ msgstr "Kiedy"
 msgid "Starts on"
 msgstr "Początek"
 
-msgid "Ends"
-msgstr "Koniec"
-
 msgid "On a date"
 msgstr "W dniu"
 
@@ -9231,6 +9420,9 @@ msgstr "Najbliższy termin"
 
 msgid "paused"
 msgstr "wstrzymana"
+
+msgid "From loan"
+msgstr "Z kredytu"
 
 msgid "Next:"
 msgstr "Najbliższy:"
@@ -9615,9 +9807,6 @@ msgstr "Jednorazowo"
 
 msgid "Next due date"
 msgstr "Najbliższy termin"
-
-msgid "Expense category"
-msgstr "Kategoria wydatków"
 
 msgid "Create an expense category first."
 msgstr "Najpierw dodaj kategorię wydatków."

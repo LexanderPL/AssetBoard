@@ -317,6 +317,48 @@ and generation of installment occurrences with amount_mode=from_loan (extend the
 Tests: resolver values for past/future dates, occurrence amounts follow rate changes, posted occurrences untouched.
 ```
 
+### As built (M7.F7.6)
+
+- `loans.property_item_id` (composite FK to a workspace net-worth item) and
+  `loans.auto_record_payments` (default off) were added by `0055_f76_loan_integrations`.
+  `scheduled_items.loan_id` links an item to its loan, the amount-mode check now includes
+  `from_loan`, zero amounts are allowed only for that mode, and other modes must have no loan.
+- `services.loan_links` registers the `loan_balance` resolver (`Side.LIABILITY`). The resolver
+  resolves active loans in its picker, describes archived loans for existing links, and returns
+  `Unavailable` for unknown ids or a loan without a usable anchor.
+- `loan_balance_at()` takes the latest checkpoint at/before the date, otherwise origination;
+  it projects with `loan_schedule.schedule_from_anchor()`, which derives the remaining term from
+  the root schedule. Actual installment payments replace the projected principal and
+  overpayment of their matched row; overpayment-only payments reduce the balance after the
+  anchor. A payment on the anchor date is already part of the checkpoint and is not applied
+  again. The result is clamped to zero.
+- `create_loan_liability_item()` creates/reuses one active liability item in the translated
+  **Mortgage** category, with `valuation_mode=linked`, `link_type=loan_balance` and
+  `estimate_between=False`. Item and category creation are audited without amounts.
+- Property choices are active asset items in active real-estate categories in the loan
+  currency. Linking validates the same rules and audits `loan.property_linked` /
+  `loan.property_unlinked`. The view calculates LTV in basis points with half-up rounding and
+  equity = value − remaining principal. Unavailable reasons are no property, missing/archived
+  item, currency mismatch, no value, value zero (LTV only), or balance unavailable. A linked
+  property item may itself be linked; `current_values()` resolves its effective/history value.
+- `services.loan_scheduled` creates one active scheduled item per loan, monthly on the payment
+  day, starting at the first projected due date after today and ending at the payoff date. The
+  generator updates pending non-overridden rows to the projected installment total and marks
+  them estimated; a missing schedule keeps the expected amount at zero. Disabling archives the
+  item and removes only open-month pending occurrences due today or later.
+- Loan writes (terms, regular/one-off overpayments, fixed-rate changes, reference values, costs,
+  checkpoints) call a deferred `refresh_loan_occurrences()` so pending future rows follow the
+  schedule; posted, skipped and amount-overridden rows are untouched.
+- Posting a loan-linked occurrence with `auto_record_payments` on creates one `LoanPayment`
+  with `source='upcoming'`, the occurrence due date, the paid amount, its split against the
+  projected row and the created transaction id, in the same transaction. A repeated post of an
+  already-posted occurrence creates no second payment. Scheduler auto-posting has no user
+  context and therefore does not create loan payments; manual Upcoming posting does.
+- The loan page has a **Net worth & property** section with the liability link, property date
+  and LTV/equity, property select/clear, scheduled generation controls, Upcoming link and the
+  auto-record checkbox. All forms use CSRF and gettext; the page adds no inline scripts or
+  styles.
+
 ---
 
 ## F7.7 Installment plans (simple fixed installments)
