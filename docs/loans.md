@@ -90,6 +90,35 @@ The loan page turns the terms into an overview and a monthly schedule:
 If the stored terms cannot produce a schedule (for example a missing rate), the page explains
 the problem and hides the schedule, charts and CSV until the terms are corrected.
 
+## Actual payments and balance checkpoints
+
+The loan page keeps the terms and the projected schedule; **Payments** records what actually
+happened.
+
+- **Recording a payment**: choose installment or overpayment and enter the date and total. An
+  installment total is split against the projected row on that date (or the first row after it):
+  an equal total keeps the row's interest/costs/principal/overpayment, a larger total puts the
+  excess into overpayment, and a smaller total fills interest, costs, principal and overpayment
+  in that order. An overpayment payment goes entirely to the overpayment component. Open **Enter
+  an explicit breakdown instead** to enter principal, interest, costs and overpayment yourself;
+  they must add up to the total.
+- **Ledger link**: optionally link a recent expense in the loan currency. It must not be deleted,
+  must be an expense, and its amount must equal the payment total.
+- **Actual rows**: on the loan schedule, a date with a recorded installment shows the actual
+  components and an **Actual** badge. Dates before today without a payment stay **Projected**;
+  future rows are unmarked. The closing column remains the projection from the terms.
+- **Editing and deleting**: past payments can be edited or deleted. Changing the total (or the
+  kind) without an explicit breakdown re-splits the payment against the projected row. An
+  overpayment-only payment appears in the payment list, not as an invented monthly row.
+
+**Balance checkpoints** are bank-statement balances. Add a date (not in the future, and not
+before the loan starts) and the remaining principal. A checkpoint re-anchors the schedule from
+that date. The list shows the projected balance from the previous checkpoint (or the loan's
+origination) and the signed variance: a positive variance means the real balance is higher than
+projected, a negative one means it is lower. The starting checkpoint of a loan entered from its
+current balance has no earlier anchor, so it shows no variance and cannot be deleted. A
+checkpoint that cannot be projected shows the reason instead of a value.
+
 ## What-if scenarios
 
 **Scenarios** on the loan page compares the same loan under several plans without changing the
