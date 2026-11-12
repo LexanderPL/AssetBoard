@@ -1,17 +1,23 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 from uuid import UUID, uuid4
 
 import pytest
 
+from assetboard.db.models.loans import LoanPayment
 from assetboard.db.repositories import CategoryRepository, LoanRepository, TransactionRepository
 from assetboard.domain.loans import (
+    DayCount,
     LoanPaymentKind,
     LoanScheduleSummary,
     LoanValidationError,
     Money,
+    OverpaymentStrategy,
+    ScheduleAnchor,
     ScheduleRow,
+    build_schedule,
     summarize_schedule,
 )
 from assetboard.services import loan_payments, loan_schedule, loans
@@ -58,6 +64,21 @@ def _create(team: WorkspaceDb, **overrides) -> UUID:
     }
     values.update(overrides)
     return loans.create_loan(team.factory, team.ctx("owner", "owner"), **values)
+
+
+def _create_current(team: WorkspaceDb, **overrides) -> UUID:
+    values = {
+        "entry_path": "current",
+        "name": "Car loan",
+        "principal_original": _money(20_000_000),
+        "current_balance": _money(15_000_000),
+        "balance_date": date(2026, 2, 1),
+        "origination_date": None,
+        "first_payment_date": date(2026, 3, 1),
+        "term_months": 60,
+    }
+    values.update(overrides)
+    return _create(team, **values)
 
 
 def _first_row(team: WorkspaceDb, loan_id: UUID) -> tuple[LoanView, ScheduleRow]:
@@ -394,6 +415,42 @@ def test_checkpoint_variance_from_origination_and_previous_checkpoint(team: Work
     assert data.schedule.anchor_date == date(2026, 3, 1)
 
 
+def test_checkpoint_variance_uses_the_remaining_term_after_a_checkpoint(
+    team: WorkspaceDb,
+) -> None:
+    loan_id = _create(team, term_months=12)
+    ctx = team.ctx("owner", "owner")
+    loan_payments.create_loan_checkpoint(
+        team.factory,
+        ctx,
+        loan_id,
+        as_of=date(2026, 2, 1),
+        remaining_principal=_money(29_800_000),
+    )
+    loan_payments.create_loan_checkpoint(
+        team.factory,
+        ctx,
+        loan_id,
+        as_of=date(2026, 3, 1),
+        remaining_principal=_money(29_500_000),
+    )
+    inputs = loan_schedule.load_loan_schedule_inputs(team.factory, ctx, loan_id)
+    terms = replace(inputs.terms, term_months=11)
+    expected = build_schedule(
+        terms,
+        inputs.rate_timeline,
+        inputs.costs,
+        inputs.overpayments,
+        ScheduleAnchor(date(2026, 2, 1), _money(29_800_000)),
+        date(2026, 3, 1),
+        OverpaymentStrategy.REDUCE_TERM,
+        DayCount.MONTHLY,
+    )
+    expected_projected = next(row.closing for row in expected.rows if row.date == date(2026, 3, 1))
+    rows = loan_payments.list_loan_checkpoints(team.factory, ctx, loan_id)
+    assert rows[1].projected == expected_projected
+
+
 def test_checkpoint_variance_signs(team: WorkspaceDb) -> None:
     loan_id = _create(team)
     ctx = team.ctx("owner", "owner")
@@ -438,6 +495,35 @@ def test_checkpoint_variance_signs(team: WorkspaceDb) -> None:
     assert negative.variance is not None and negative.variance.amount_minor == -10_000
 
 
+def test_a_past_payment_splits_against_the_schedule_before_a_checkpoint(
+    team: WorkspaceDb,
+) -> None:
+    loan_id = _create(team, term_months=12)
+    _, expected = _first_row(team, loan_id)
+    ctx = team.ctx("owner", "owner")
+    loan_payments.create_loan_checkpoint(
+        team.factory,
+        ctx,
+        loan_id,
+        as_of=date(2026, 3, 1),
+        remaining_principal=_money(29_000_000),
+    )
+    payment_id = loan_payments.create_loan_payment(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=expected.date,
+        kind="installment",
+        total=expected.installment_total,
+    )
+    with team.factory() as session:
+        payment = session.get(LoanPayment, payment_id)
+        assert payment is not None
+        assert payment.principal_minor == expected.principal.amount_minor
+        assert payment.interest_minor == expected.interest.amount_minor
+        assert payment.costs_minor == expected.costs.amount_minor
+
+
 def test_a_payment_after_the_schedule_has_no_row(team: WorkspaceDb) -> None:
     loan_id = _create(team)
     with pytest.raises(loans.LoanError) as raised:
@@ -450,6 +536,22 @@ def test_a_payment_after_the_schedule_has_no_row(team: WorkspaceDb) -> None:
             total=_money(10_000),
         )
     assert raised.value.code == "no_scheduled_payment"
+
+
+def test_a_current_path_checkpoint_cannot_start_before_the_starting_balance(
+    team: WorkspaceDb,
+) -> None:
+    loan_id = _create_current(team)
+    ctx = team.ctx("owner", "owner")
+    with pytest.raises(loans.LoanError) as raised:
+        loan_payments.create_loan_checkpoint(
+            team.factory,
+            ctx,
+            loan_id,
+            as_of=date(2026, 1, 1),
+            remaining_principal=_money(16_000_000),
+        )
+    assert raised.value.code == "checkpoint_before_start"
 
 
 def test_checkpoint_projection_failure_marks_the_row(team: WorkspaceDb) -> None:

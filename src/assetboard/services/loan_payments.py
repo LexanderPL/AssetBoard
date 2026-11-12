@@ -10,7 +10,7 @@ amounts.
 from __future__ import annotations
 
 from collections.abc import Callable
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import date
 from uuid import UUID
 
@@ -163,12 +163,9 @@ def list_loan_payments(
     view = loans.get_loan(factory, ctx, loan_id)
     with factory() as session:
         rows = LoanPaymentRepository(session, ctx).for_loan(loan_id)
-        transactions = TransactionRepository(session, ctx)
-        by_id: dict[UUID, Transaction] = {}
-        for transaction_id in {row.transaction_id for row in rows if row.transaction_id}:
-            transaction = transactions.get(transaction_id)
-            if transaction is not None:
-                by_id[transaction_id] = transaction
+        repository = TransactionRepository(session, ctx)
+        transaction_ids = {row.transaction_id for row in rows if row.transaction_id}
+        by_id = {transaction.id: transaction for transaction in repository.by_ids(transaction_ids)}
         return tuple(
             _payment_view(
                 row,
@@ -195,17 +192,8 @@ def list_payment_transactions(
     require_role(ctx, Role.VIEWER)
     view = loans.get_loan(factory, ctx, loan_id)
     with factory() as session:
-        rows = TransactionRepository(session, ctx).recent_expenses(limit=50)
-        return tuple(_transaction_option(row) for row in rows if row.currency == view.currency)
-
-
-def _current_schedule(
-    factory: sessionmaker[Session], ctx: Context, loan_id: UUID
-) -> loan_schedule.LoanScheduleData:
-    data = loan_schedule.loan_schedule(factory, ctx, loan_id)
-    if data.schedule is None:
-        raise loans.LoanError("loan", data.error_code or "schedule_unavailable")
-    return data
+        rows = TransactionRepository(session, ctx).recent_expenses(limit=50, currency=view.currency)
+        return tuple(_transaction_option(row) for row in rows)
 
 
 def _split_from_schedule(
@@ -218,11 +206,15 @@ def _split_from_schedule(
 ) -> LoanPaymentSplit:
     if kind is LoanPaymentKind.OVERPAYMENT:
         return split_loan_payment(total, kind, None)
-    data = _current_schedule(factory, ctx, loan_id)
-    assert data.schedule is not None
-    row = next((item for item in data.schedule.rows if item.date == day), None)
+    try:
+        inputs = loan_schedule.load_loan_schedule_inputs(factory, ctx, loan_id)
+        anchor = loan_schedule.anchor_for_date(inputs, day)
+        schedule = loan_schedule.schedule_from_anchor(inputs, anchor, day)
+    except (ScheduleError, LoanValidationError) as exc:
+        raise loans.LoanError("date", exc.code) from None
+    row = next((item for item in schedule.rows if item.date == day), None)
     if row is None:
-        row = next((item for item in data.schedule.rows if item.date >= day), None)
+        row = next((item for item in schedule.rows if item.date >= day), None)
     if row is None:
         raise loans.LoanError("date", "no_scheduled_payment")
     return split_loan_payment(total, kind, row)
@@ -300,17 +292,19 @@ def create_loan_payment(
     valid_date(date_value, "date")
     wanted_kind = _kind(kind)
     wanted_total = _total(total, view.currency)
-    if wanted_kind is LoanPaymentKind.OVERPAYMENT:
-        split = split_loan_payment(wanted_total, wanted_kind, None)
-    elif any(value is not None for value in (principal, interest, costs, overpayment)):
-        split = _explicit_split(wanted_total, principal, interest, costs, overpayment)
-    else:
-        split = _split_from_schedule(factory, ctx, loan_id, date_value, wanted_kind, wanted_total)
 
     def write(session: Session) -> UUID:
         require_role_now(session, ctx, Role.EDITOR)
         _locked_currency(session, ctx)
         loan = _active_loan(session, ctx, loan_id)
+        if wanted_kind is LoanPaymentKind.OVERPAYMENT:
+            split = split_loan_payment(wanted_total, wanted_kind, None)
+        elif any(value is not None for value in (principal, interest, costs, overpayment)):
+            split = _explicit_split(wanted_total, principal, interest, costs, overpayment)
+        else:
+            split = _split_from_schedule(
+                factory, ctx, loan_id, date_value, wanted_kind, wanted_total
+            )
         _validate_transaction(session, ctx, loan, wanted_total, transaction_id)
         payment = LoanPaymentRepository(session, ctx).create(
             loan_id=loan.id,
@@ -377,25 +371,9 @@ def update_loan_payment(
     """Edit a payment; re-split when the total or kind changes without an explicit breakdown."""
     require_role(ctx, Role.EDITOR)
     view = loans.get_loan(factory, ctx, loan_id)
-    existing = get_loan_payment(factory, ctx, loan_id, payment_id)
     valid_date(date_value, "date")
     wanted_kind = _kind(kind)
     wanted_total = _total(total, view.currency)
-    if wanted_kind is LoanPaymentKind.OVERPAYMENT:
-        split = split_loan_payment(wanted_total, wanted_kind, None)
-    elif any(value is not None for value in (principal, interest, costs, overpayment)):
-        split = _explicit_split(wanted_total, principal, interest, costs, overpayment)
-    elif (
-        wanted_total.amount_minor != existing.total.amount_minor or wanted_kind is not existing.kind
-    ):
-        split = _split_from_schedule(factory, ctx, loan_id, date_value, wanted_kind, wanted_total)
-    else:
-        split = LoanPaymentSplit(
-            principal=existing.principal,
-            interest=existing.interest,
-            costs=existing.costs,
-            overpayment=existing.overpayment,
-        )
 
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.EDITOR)
@@ -405,6 +383,21 @@ def update_loan_payment(
         row = repository.get_for_loan(loan.id, payment_id)
         if row is None:
             raise NotFound
+        if wanted_kind is LoanPaymentKind.OVERPAYMENT:
+            split = split_loan_payment(wanted_total, wanted_kind, None)
+        elif any(value is not None for value in (principal, interest, costs, overpayment)):
+            split = _explicit_split(wanted_total, principal, interest, costs, overpayment)
+        elif wanted_total.amount_minor != row.total_minor or wanted_kind.value != row.kind:
+            split = _split_from_schedule(
+                factory, ctx, loan_id, date_value, wanted_kind, wanted_total
+            )
+        else:
+            split = LoanPaymentSplit(
+                principal=Money(row.principal_minor, loan.currency),
+                interest=Money(row.interest_minor, loan.currency),
+                costs=Money(row.costs_minor, loan.currency),
+                overpayment=Money(row.overpayment_minor, loan.currency),
+            )
         _validate_transaction(session, ctx, loan, wanted_total, transaction_id)
         repository.update(
             row.id,
@@ -497,7 +490,7 @@ def _checkpoint_detail(
             error_code=load_error or "schedule_unavailable",
         )
     try:
-        schedule = loan_schedule.build_inputs_schedule(replace(inputs, anchor=anchor))
+        schedule = loan_schedule.schedule_from_anchor(inputs, anchor, row.as_of)
     except (ScheduleError, LoanValidationError) as exc:
         return CheckpointDetailView(
             id=row.id,
@@ -541,12 +534,25 @@ def list_loan_checkpoints(
     return tuple(_checkpoint_detail(row, rows, view, inputs, load_error) for row in rows)
 
 
-def _validate_checkpoint(view: loans.LoanView, day: date, balance: Money, today: date) -> int:
+def _validate_checkpoint(
+    view: loans.LoanView,
+    day: date,
+    balance: Money,
+    today: date,
+    *,
+    exclude_id: UUID | None = None,
+) -> int:
     valid_date(day, "as_of")
     if day > today:
         raise loans.LoanError("as_of", "checkpoint_future")
     if view.origination_date is not None and day < view.origination_date:
         raise loans.LoanError("as_of", "checkpoint_before_start")
+    if view.entry_path == "current":
+        earlier = [
+            checkpoint.as_of for checkpoint in view.checkpoints if checkpoint.id != exclude_id
+        ]
+        if earlier and day < min(earlier):
+            raise loans.LoanError("as_of", "checkpoint_before_start")
     amount = _require_money(balance, view.currency, "remaining_principal")
     if amount < 0 or amount > MAX_AMOUNT_MINOR:
         raise loans.LoanError("remaining_principal", "invalid_balance")
@@ -605,7 +611,7 @@ def update_loan_checkpoint(
     require_role(ctx, Role.EDITOR)
     view = loans.get_loan(factory, ctx, loan_id)
     today = ctx.clock.today(ctx.workspace.timezone)
-    amount = _validate_checkpoint(view, as_of, remaining_principal, today)
+    amount = _validate_checkpoint(view, as_of, remaining_principal, today, exclude_id=checkpoint_id)
 
     def write(session: Session) -> None:
         require_role_now(session, ctx, Role.EDITOR)

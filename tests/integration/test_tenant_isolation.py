@@ -1319,6 +1319,8 @@ def test_transaction_queries_stay_in_their_workspace(
     assert in_b.description_details(direction="expense", keys=["lidl"]) == []
     assert [r.id for r in in_a.recent_expenses()] == [a_row.id]
     assert in_b.recent_expenses() == []
+    assert [r.id for r in in_a.by_ids([a_row.id])] == [a_row.id]
+    assert in_b.by_ids([a_row.id]) == []
     b_row = make(in_b, food_b.id, "Lidl")
     assert b_row.workspace_id == ctx_b.workspace.id
     assert [r.id for r in in_b.for_month(october)] == [b_row.id]

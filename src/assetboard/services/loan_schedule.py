@@ -168,6 +168,48 @@ def load_loan_schedule_inputs(
     )
 
 
+def anchor_for_date(inputs: LoanScheduleInputs, day: date) -> ScheduleAnchor:
+    """The latest checkpoint at or before ``day``, otherwise the loan's origination."""
+    return select_anchor(inputs.terms, _checkpoints(inputs.view), day)
+
+
+def _base_anchor(inputs: LoanScheduleInputs) -> ScheduleAnchor:
+    if inputs.view.origination_date is not None and inputs.view.principal_original is not None:
+        return ScheduleAnchor(
+            date=inputs.view.origination_date,
+            balance=inputs.view.principal_original,
+        )
+    checkpoints = _checkpoints(inputs.view)
+    if not checkpoints:
+        raise ScheduleError("no_anchor")
+    earliest = min(
+        checkpoints, key=lambda item: (item.as_of, item.remaining_principal.amount_minor)
+    )
+    return ScheduleAnchor(date=earliest.as_of, balance=earliest.remaining_principal)
+
+
+def schedule_from_anchor(
+    inputs: LoanScheduleInputs, anchor: ScheduleAnchor, as_of: date
+) -> Schedule:
+    """Build from ``anchor`` with the remaining term adjusted for rows already projected.
+
+    The F7.2 engine takes the number of payments from its anchor. A checkpoint after the loan's
+    base anchor needs the original term minus the rows the base schedule already put before it.
+    """
+    base = _base_anchor(inputs)
+    remaining = inputs.terms.term_months
+    if anchor.date > base.date:
+        base_schedule = build_inputs_schedule(replace(inputs, anchor=base, as_of=as_of))
+        elapsed = sum(1 for row in base_schedule.rows if row.date <= anchor.date)
+        remaining = max(1, inputs.terms.term_months - elapsed)
+    terms = (
+        inputs.terms
+        if remaining == inputs.terms.term_months
+        else replace(inputs.terms, term_months=remaining)
+    )
+    return build_inputs_schedule(replace(inputs, anchor=anchor, terms=terms, as_of=as_of))
+
+
 def build_inputs_schedule(
     inputs: LoanScheduleInputs,
     *,
@@ -307,7 +349,9 @@ __all__ = [
     "LoanScheduleInputs",
     "ScheduleActual",
     "SchedulePaymentActual",
+    "anchor_for_date",
     "build_inputs_schedule",
     "load_loan_schedule_inputs",
     "loan_schedule",
+    "schedule_from_anchor",
 ]

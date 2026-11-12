@@ -823,7 +823,7 @@ def _payment_form_values(
             "overpayment": format_amount_input(payment.overpayment, locale),
             "note": payment.note,
             "transaction_id": str(payment.transaction_id) if payment.transaction_id else "",
-            "use_breakdown": "0",
+            "use_breakdown": "1",
         }
     if submitted:
         values.update(submitted)
