@@ -125,6 +125,44 @@ def test_update_recalculates_plan_and_occurrences(team: WorkspaceDb) -> None:
     assert all(row.expected_minor == 150_000 for row in rows)
 
 
+def test_editing_a_closed_plan_back_to_a_positive_count_reopens_it(
+    team: WorkspaceDb,
+) -> None:
+    loan_id = _create(team)
+    ctx = team.ctx("owner", "owner")
+    category_id = _category(team, name="Office")
+    installment_plans.update_installment_plan(
+        team.factory,
+        ctx,
+        loan_id,
+        name="Laptop",
+        installment=_money(100_000),
+        remaining_count=0,
+        payment_day=5,
+        category_id=category_id,
+    )
+    assert installment_plans.get_installment_plan(team.factory, ctx, loan_id).closed
+
+    installment_plans.update_installment_plan(
+        team.factory,
+        ctx,
+        loan_id,
+        name="Laptop",
+        installment=_money(100_000),
+        remaining_count=2,
+        payment_day=5,
+        category_id=category_id,
+    )
+    view = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    assert not view.closed
+    assert view.remaining_count == 2
+    assert view.total_remaining == _money(200_000)
+    with team.factory() as session:
+        loan = LoanRepository(session, ctx).get_or_raise(loan_id)
+        assert loan.archived_at is None
+        assert loan.term_months == 2
+
+
 def test_validation(team: WorkspaceDb) -> None:
     with pytest.raises(loans.LoanError):
         _create(team, installment=_money(0))

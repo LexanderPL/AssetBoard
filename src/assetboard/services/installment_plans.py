@@ -312,6 +312,7 @@ def update_installment_plan(
             term_months=count,
             payment_day=payment_day,
             principal_original_minor=amount.amount_minor * count if count else None,
+            archived_at=None if count else ctx.clock.now(),
         )
         InstallmentPlanRepository(session, ctx).update(
             plan.id,
