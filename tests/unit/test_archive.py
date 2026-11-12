@@ -23,16 +23,26 @@ from assetboard.domain.archive import (
     BudgetLineRow,
     CategoryRow,
     FxRateRow,
+    InstallmentPlanRow,
     InstrumentAllocationRow,
     InstrumentRow,
     InvestmentTransactionRow,
     ItemValuationRow,
+    LoanBalanceCheckpointRow,
+    LoanCostComponentRow,
+    LoanOverpaymentRow,
+    LoanPaymentRow,
+    LoanRateChangeRow,
+    LoanRow,
+    LoanScenarioRow,
     MonthRow,
     NetWorthCategoryRow,
     NetWorthItemRow,
     NetWorthSnapshotRow,
     PricePointRow,
     PriceSourceConfigRow,
+    ReferenceRateRow,
+    ReferenceRateValueRow,
     RiskTargetPolicyRow,
     TransactionRow,
     decimal_text,
@@ -42,7 +52,8 @@ from assetboard.domain.archive import (
 from assetboard.services.archive import ARCHIVE_EXCLUDED_MODELS, ARCHIVE_INCLUDED_MODELS
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
-GOLDEN = FIXTURES / "workspace-archive-v1.4.zip"
+GOLDEN = FIXTURES / "workspace-archive-v1.5.zip"
+GOLDEN_V1_4 = FIXTURES / "workspace-archive-v1.4.zip"
 GOLDEN_V1_3 = FIXTURES / "workspace-archive-v1.3.zip"
 GOLDEN_V1_2 = FIXTURES / "workspace-archive-v1.2.zip"
 GOLDEN_V1_1 = FIXTURES / "workspace-archive-v1.1.zip"
@@ -70,6 +81,18 @@ def _rows() -> ArchiveRows:
     price_point_id = "8293a4b5-c6d7-42e3-84f5-708192a3b4c5"
     fx_rate_id = "93a4b5c6-d7e8-43f4-a506-8192a3b4c5d6"
     provider_config_id = "a4b5c6d7-e8f9-44a5-b617-92a3b4c5d6e7"
+    reference_rate_id = "b5c6d7e8-f9a0-45b6-8c28-a3b4c5d6e7f8"
+    reference_value_id = "c6d7e8f9-a0b1-46c7-9d39-b4c5d6e7f809"
+    loan_id = "d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a"
+    fixed_loan_id = "e8f9a0b1-c2d3-48e9-bf5b-d6e7f8091a2b"
+    plan_loan_id = "f9a0b1c2-d3e4-49fa-806c-e7f8091a2b3c"
+    rate_change_id = "a0b1c2d3-e4f5-4a0b-917d-f8091a2b3c4d"
+    cost_component_id = "b1c2d3e4-f5a6-4b1c-828e-091a2b3c4d5e"
+    loan_overpayment_id = "c2d3e4f5-a6b7-4c2d-939f-1a2b3c4d5e6f"
+    loan_payment_id = "d3e4f5a6-b7c8-4d3e-84a0-2b3c4d5e6f70"
+    checkpoint_id = "e4f5a6b7-c8d9-4e4f-95b1-3c4d5e6f7081"
+    scenario_id = "f5a6b7c8-d9e0-4f50-86c2-4d5e6f708192"
+    installment_plan_id = "a6b7c8d9-e0f1-4a61-97d3-5e6f708192a3"
     breakdown = (
         '{"categories":[{"category_id":"'
         + networth_category_id
@@ -281,6 +304,172 @@ def _rows() -> ArchiveRows:
             PriceSourceConfigRow(provider_config_id, "nbp", "true", 20, '{"USD":"2026-09-01"}'),
         ),
         risk_target_policy=RiskTargetPolicyRow("fixed", 6000, 3000, 1000, 500),
+        reference_rates=(ReferenceRateRow(reference_rate_id, "WIBOR", "3M fixing"),),
+        reference_rate_values=(
+            ReferenceRateValueRow(
+                reference_value_id,
+                reference_rate_id,
+                "WIBOR",
+                "2026-01-01",
+                575,
+            ),
+        ),
+        loans=(
+            LoanRow(
+                loan_id,
+                "Home mortgage",
+                "annuity",
+                "EUR",
+                "300000.00",
+                "2026-01-01",
+                "2026-02-01",
+                360,
+                1,
+                "variable",
+                "monthly",
+                150,
+                reference_rate_id,
+                "WIBOR",
+                networth_item_id,
+                "Car",
+                "true",
+                "",
+                "fixed_extra",
+                "100.00",
+                "reduce_term",
+                None,
+            ),
+            LoanRow(
+                fixed_loan_id,
+                "Car loan",
+                "annuity",
+                "EUR",
+                "50000.00",
+                "2026-01-15",
+                "2026-02-15",
+                24,
+                15,
+                "fixed",
+                "monthly",
+                None,
+                None,
+                "",
+                None,
+                "",
+                "false",
+                "",
+                "none",
+                "",
+                "reduce_term",
+                None,
+            ),
+            LoanRow(
+                plan_loan_id,
+                "Phone",
+                "installment_plan",
+                "EUR",
+                "3000.00",
+                None,
+                "2026-04-05",
+                3,
+                5,
+                "fixed",
+                "monthly",
+                None,
+                None,
+                "",
+                None,
+                "",
+                "false",
+                "",
+                "none",
+                "",
+                "reduce_term",
+                None,
+            ),
+        ),
+        loan_rate_changes=(
+            LoanRateChangeRow(rate_change_id, fixed_loan_id, "Car loan", "2026-01-15", 650),
+        ),
+        loan_cost_components=(
+            LoanCostComponentRow(
+                cost_component_id,
+                loan_id,
+                "Home mortgage",
+                "Account fee",
+                "percent",
+                20,
+                "",
+                "opening_balance",
+                "2026-01-01",
+                None,
+            ),
+        ),
+        loan_overpayments=(
+            LoanOverpaymentRow(
+                loan_overpayment_id,
+                loan_id,
+                "Home mortgage",
+                "2026-06-01",
+                "5000.00",
+                "Bonus",
+            ),
+        ),
+        loan_payments=(
+            LoanPaymentRow(
+                loan_payment_id,
+                loan_id,
+                "Home mortgage",
+                "2026-03-01",
+                "installment",
+                "2000.00",
+                "1000.00",
+                "900.00",
+                "0.00",
+                "100.00",
+                "",
+                "manual",
+                transaction_id,
+            ),
+        ),
+        loan_balance_checkpoints=(
+            LoanBalanceCheckpointRow(
+                checkpoint_id,
+                loan_id,
+                "Home mortgage",
+                "2026-07-01",
+                "280000.00",
+                "Bank statement",
+            ),
+        ),
+        loan_scenarios=(
+            LoanScenarioRow(
+                scenario_id,
+                loan_id,
+                "Home mortgage",
+                "Faster",
+                "fixed_extra",
+                "300.00",
+                "reduce_term",
+                None,
+                None,
+                None,
+                "",
+            ),
+        ),
+        installment_plans=(
+            InstallmentPlanRow(
+                installment_plan_id,
+                plan_loan_id,
+                "Phone",
+                category_id,
+                "Food",
+                "1000.00",
+                3,
+                "2026-06-05",
+                None,
+            ),
+        ),
     )
 
 
@@ -378,7 +567,7 @@ def test_v1_3_workspace_carries_the_net_worth_files_and_estimate_switch() -> Non
 
 
 def test_v1_4_workspace_carries_investments_and_risk_targets() -> None:
-    parsed, errors = parse_archive(GOLDEN.read_bytes())
+    parsed, errors = parse_archive(GOLDEN_V1_4.read_bytes())
     assert errors == ()
     assert parsed is not None and parsed.warnings == ()
     assert parsed.manifest["format_version"] == "1.4"
@@ -394,6 +583,61 @@ def test_v1_4_workspace_carries_investments_and_risk_targets() -> None:
     assert parsed.rows.price_source_configs[0].enabled == "true"
     assert parsed.rows.risk_target_policy == RiskTargetPolicyRow("fixed", 6000, 3000, 1000, 500)
     assert parsed.rows.workspace["investment_cost_basis"] == "fifo"
+    assert parsed.rows.reference_rates == ()
+    assert parsed.rows.loans == ()
+    assert parsed.rows.installment_plans == ()
+
+
+def test_v1_5_workspace_carries_loans_and_reference_rates() -> None:
+    parsed, errors = parse_archive(GOLDEN.read_bytes())
+    assert errors == ()
+    assert parsed is not None and parsed.warnings == ()
+    assert parsed.manifest["format_version"] == "1.5"
+    assert [row.name for row in parsed.rows.reference_rates] == ["WIBOR"]
+    assert parsed.rows.reference_rate_values[0].value_bp == 575
+    assert [row.name for row in parsed.rows.loans] == ["Home mortgage", "Car loan", "Phone"]
+    assert parsed.rows.loans[0].property_item == "Car"
+    assert parsed.rows.loans[0].auto_record_payments == "true"
+    assert parsed.rows.loans[0].day_count == "monthly"
+    assert parsed.rows.loan_rate_changes[0].rate_bp == 650
+    assert parsed.rows.loan_cost_components[0].rate_bp == 20
+    assert parsed.rows.loan_overpayments[0].amount == "5000.00"
+    assert parsed.rows.loan_payments[0].transaction_id == ("5c7d8e9f-0a1b-4c2d-9e3f-4a5b6c7d8e02")
+    assert parsed.rows.loan_balance_checkpoints[0].remaining_principal == "280000.00"
+    assert parsed.rows.loan_scenarios[0].overpayment_amount == "300.00"
+    assert parsed.rows.installment_plans[0].remaining_count == 3
+
+
+def test_loan_files_are_optional_before_1_5_and_required_in_1_5() -> None:
+    from assetboard.domain.archive import required_files
+
+    assert "loans.csv" not in required_files("1.4")
+    assert "installment_plans.csv" not in required_files("1.4")
+    for name in (
+        "loans.csv",
+        "loan_rate_changes.csv",
+        "reference_rates.csv",
+        "reference_rate_values.csv",
+        "loan_cost_components.csv",
+        "loan_overpayments.csv",
+        "loan_payments.csv",
+        "loan_balance_checkpoints.csv",
+        "loan_scenarios.csv",
+        "installment_plans.csv",
+    ):
+        assert name in required_files("1.5")
+
+
+def test_v1_5_requires_every_loan_file() -> None:
+    with ZipFile(io.BytesIO(_archive())) as source:
+        files = {name: source.read(name) for name in source.namelist() if name != "loans.csv"}
+    output = io.BytesIO()
+    with ZipFile(output, "w", ZIP_DEFLATED) as archive:
+        for name, content in files.items():
+            archive.writestr(name, content)
+    parsed, errors = parse_archive(output.getvalue())
+    assert parsed is None
+    assert errors == (ArchiveError("archive", "missing required members"),)
 
 
 @pytest.mark.parametrize(
@@ -442,7 +686,7 @@ def test_reader_checks_checksums() -> None:
     assert any(error.message == "checksum mismatch" for error in errors)
 
 
-def test_investment_models_are_archived_in_1_4() -> None:
+def test_investment_and_loan_models_are_archived_in_1_5() -> None:
     for model in (
         "AssetClass",
         "RiskTargetPolicy",
@@ -453,6 +697,16 @@ def test_investment_models_are_archived_in_1_4() -> None:
         "PricePoint",
         "FxRate",
         "PriceSourceConfig",
+        "ReferenceRate",
+        "ReferenceRateValue",
+        "Loan",
+        "LoanRateChange",
+        "LoanCostComponent",
+        "LoanOverpayment",
+        "LoanPayment",
+        "LoanBalanceCheckpoint",
+        "LoanScenario",
+        "InstallmentPlan",
     ):
         assert model in ARCHIVE_INCLUDED_MODELS
     assert "ProviderError" in ARCHIVE_EXCLUDED_MODELS
@@ -914,6 +1168,160 @@ def test_reader_rejects_invalid_investment_rows(
     assert any(error.message == message and error.file == file for error in errors), errors
 
 
+@pytest.mark.parametrize(
+    ("change", "message", "file"),
+    [
+        (
+            lambda rows: replace(rows, loans=(rows.loans[0], rows.loans[0], *rows.loans[1:])),
+            "duplicate loan id",
+            "loans.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                loans=(
+                    replace(
+                        rows.loans[0],
+                        reference_rate_id=None,
+                        reference_rate="",
+                    ),
+                    *rows.loans[1:],
+                ),
+            ),
+            "invalid loan rate configuration",
+            "loans.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                loans=(
+                    replace(rows.loans[0], property_item="Other"),
+                    *rows.loans[1:],
+                ),
+            ),
+            "loan property item mismatch",
+            "loans.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                loans=(
+                    rows.loans[0],
+                    replace(rows.loans[1], term_months=0),
+                    rows.loans[2],
+                ),
+            ),
+            "invalid loan term",
+            "loans.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                reference_rates=(
+                    *rows.reference_rates,
+                    replace(rows.reference_rates[0], id=str(uuid4())),
+                ),
+            ),
+            "duplicate reference rate name",
+            "reference_rates.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                reference_rate_values=(
+                    *rows.reference_rate_values,
+                    replace(rows.reference_rate_values[0], id=str(uuid4())),
+                ),
+            ),
+            "duplicate reference rate value",
+            "reference_rate_values.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                reference_rate_values=(
+                    replace(rows.reference_rate_values[0], reference_rate="EURIBOR"),
+                ),
+            ),
+            "reference rate value reference mismatch",
+            "reference_rate_values.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                loan_rate_changes=(
+                    *rows.loan_rate_changes,
+                    replace(rows.loan_rate_changes[0], id=str(uuid4())),
+                ),
+            ),
+            "duplicate loan rate change",
+            "loan_rate_changes.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                loan_cost_components=(
+                    replace(
+                        rows.loan_cost_components[0],
+                        rate_bp=None,
+                        fixed_amount="",
+                    ),
+                ),
+            ),
+            "invalid cost component",
+            "loan_cost_components.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                loan_payments=(replace(rows.loan_payments[0], total="2000.01"),),
+            ),
+            "loan payment components differ",
+            "loan_payments.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                loan_payments=(replace(rows.loan_payments[0], transaction_id=str(uuid4())),),
+            ),
+            "loan payment transaction missing",
+            "loan_payments.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                installment_plans=(
+                    *rows.installment_plans,
+                    replace(rows.installment_plans[0], id=str(uuid4())),
+                ),
+            ),
+            "duplicate installment plan loan",
+            "installment_plans.csv",
+        ),
+        (
+            lambda rows: replace(
+                rows,
+                installment_plans=(
+                    replace(
+                        rows.installment_plans[0],
+                        loan_id=rows.loans[1].id,
+                        loan=rows.loans[1].name,
+                    ),
+                ),
+            ),
+            "installment plan must reference an installment-plan loan",
+            "installment_plans.csv",
+        ),
+    ],
+)
+def test_reader_rejects_invalid_loan_rows(
+    change: Callable[[ArchiveRows], ArchiveRows], message: str, file: str
+) -> None:
+    parsed, errors = parse_archive(_archive(change(_rows())))
+    assert parsed is None
+    assert any(error.message == message and error.file == file for error in errors), errors
+
+
 def test_reader_accepts_dividends_splits_and_an_income_link() -> None:
     rows = _rows()
     template = rows.investment_transactions[0]
@@ -1159,7 +1567,7 @@ def test_reader_caps_errors(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_reader_caps_data_rows(monkeypatch: pytest.MonkeyPatch) -> None:
     import assetboard.domain.archive as archive
 
-    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 21)
+    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 33)
     assert parse_archive(_archive())[1] == ()
-    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 20)
+    monkeypatch.setattr(archive, "MAX_DATA_ROWS", 32)
     assert parse_archive(_archive())[1] == (ArchiveError("archive", "too many data rows"),)

@@ -1917,6 +1917,36 @@ def test_0055_loan_integrations_migration_is_reversible(tmp_path: Path) -> None:
         engine.dispose()
 
 
+def test_0057_loan_import_sources_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'loan_import_sources.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        checks = {
+            check.get("sqltext") or ""
+            for check in inspect(engine).get_check_constraints("import_batches")
+        }
+        source_check = next(sql for sql in checks if "source IN" in sql)
+        assert "reference_rate_values_csv" in source_check
+        assert "installment_plans_csv" in source_check
+        command.downgrade(alembic_config(settings), "0056_f77_installment_plans")
+        checks = {
+            check.get("sqltext") or ""
+            for check in inspect(engine).get_check_constraints("import_batches")
+        }
+        source_check = next(sql for sql in checks if "source IN" in sql)
+        assert "reference_rate_values_csv" not in source_check
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
 def test_0056_installment_plans_migration_is_reversible(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None,
