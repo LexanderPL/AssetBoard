@@ -90,6 +90,31 @@ The loan page turns the terms into an overview and a monthly schedule:
 If the stored terms cannot produce a schedule (for example a missing rate), the page explains
 the problem and hides the schedule, charts and CSV until the terms are corrected.
 
+## Installment plans
+
+**Loans → Installments** tracks simple fixed installments such as a 0% purchase, with no
+interest calculation. Create a plan with a name, monthly installment, remaining count, payment
+day and expense category. The plan computes the next due date on or after today (clamping the
+payment day to the end of a shorter month) and the end date after the remaining payments.
+
+- The list shows active plans with monthly installment, remaining count, total remaining
+  (installment × remaining count), next due, end date and category. Closed plans stay in a
+  separate section.
+- The plan detail shows the same totals plus its net-worth liability and generated Upcoming
+  occurrences. **Create net-worth item** links one liability item in the **Installments**
+  category; it resolves to installment × remaining count.
+- **Generate occurrences** creates or refreshes one monthly expense scheduled item linked to
+  the plan. The expected amount is the fixed installment. Posting an occurrence from Upcoming
+  reduces the remaining count by one; posted occurrences are never counted twice. At zero the
+  plan closes, its loan is archived and pending future occurrences are removed, while posted and
+  past rows remain.
+- **Archive plan** closes a plan manually and removes pending future occurrences; **Restore
+  plan** reopens it (unless the remaining count is zero). Editing the installment, remaining
+  count, payment day or category updates the plan, its end date and generated occurrences.
+- Installment plans appear in the Loans installments tab, not in the ordinary Loans list. They
+  do not create `LoanPayment` rows, because this is a liability countdown rather than an
+  interest-bearing loan payment.
+
 ## Actual payments and balance checkpoints
 
 The loan page keeps the terms and the projected schedule; **Payments** records what actually

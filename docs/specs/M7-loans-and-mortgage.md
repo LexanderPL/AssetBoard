@@ -378,6 +378,34 @@ Implement F7.7 from docs/specs/M7-loans-and-mortgage.md: InstallmentPlan model +
 decrement-on-post behaviour, linked liability and overview table. Tests for countdown, closing at zero, and idempotent generation.
 ```
 
+### As built (M7.F7.7)
+
+- `loans.kind` gained `installment_plan`; the same migration (`0056_f77_installment_plans`)
+  creates `installment_plans` with a unique `(workspace_id, loan_id)`, an expense-category
+  foreign key, a positive fixed installment, a non-negative remaining count, an end date and a
+  closed timestamp. A plan's Loan row carries the common name/currency/payment day, with
+  `origination_date=null`, no rate changes, synthetic `principal_original_minor`, and a
+  `term_months` equal to the remaining count. The loan term check allows zero only for plans.
+- `services.installment_plans.create_installment_plan()` computes the next due date on or after
+  today (month-end clamped), the end date after the remaining count, creates the Loan and plan in
+  one write and immediately creates the linked `from_loan` scheduled item. A generation failure
+  rolls the whole plan back.
+- Posting a plan occurrence calls `apply_posted_occurrence()` in the occurrence write: it
+  decrements the remaining count once, updates the Loan term/principal/first due date and the
+  plan end date, audits without amounts, and either refreshes generated occurrences or closes the
+  plan. Closing sets the plan `closed_at`, archives the Loan, removes pending future occurrences
+  and keeps posted/past history. No `LoanPayment` is created for a plan.
+- Active plans and closed plans are listed separately. The plan detail screen links the
+  net-worth liability and Upcoming generation controls; the property/LTV section is intentionally
+  omitted. Archive and restore use the same close/disable machinery. Ordinary `loans` list
+  queries exclude plan rows, and `/loans/{id}` redirects a plan to its installment detail page.
+- `loan_links.loan_balance_at()` special-cases plans as `installment × remaining_count`, zero
+  when closed/archived. The linked liability helper creates a translated **Installments**
+  category for plans instead of **Mortgage**; the resolver choices/describe and idempotent link
+  behavior are shared with ordinary loans.
+- Plan scheduled items use the plan dates and a fixed `from_loan` amount; ordinary loan
+  generation and auto-record behavior are unchanged.
+
 ---
 
 ## F7.8 Archive extension: loans

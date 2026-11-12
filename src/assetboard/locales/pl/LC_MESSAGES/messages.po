@@ -3421,6 +3421,9 @@ msgstr "Kredyt nie ma przyszłych zaplanowanych płatności."
 msgid "The loan is no longer available."
 msgstr "Kredyt nie jest już dostępny."
 
+msgid "A closed installment plan cannot be restored."
+msgstr "Nie można przywrócić zamkniętego planu ratalnego."
+
 msgid "The loan could not be saved. Check the form and try again."
 msgstr "Nie udało się zapisać kredytu. Sprawdź formularz i spróbuj ponownie."
 
@@ -3508,6 +3511,18 @@ msgstr "Wygenerowano lub odświeżono raty cykliczne."
 
 msgid "Recurring installment generation disabled."
 msgstr "Wyłączono generowanie rat cyklicznych."
+
+msgid "Installment plan created."
+msgstr "Utworzono plan ratalny."
+
+msgid "Installment plan updated."
+msgstr "Zaktualizowano plan ratalny."
+
+msgid "Installment plan archived."
+msgstr "Zarchiwizowano plan ratalny."
+
+msgid "Installment plan restored."
+msgstr "Przywrócono plan ratalny."
 
 msgid "The loan"
 msgstr "Kredyt"
@@ -7532,6 +7547,9 @@ msgstr "Annuitetowy"
 msgid "Equal principal"
 msgstr "Równy kapitał"
 
+msgid "Installment plan"
+msgstr "Plan ratalny"
+
 msgid "shorten the term"
 msgstr "skraca okres"
 
@@ -8415,6 +8433,94 @@ msgstr "Porównaj warianty"
 
 msgid "Clear rows"
 msgstr "Wyczyść wiersze"
+
+msgid "No generated occurrences yet."
+msgstr "Nie wygenerowano jeszcze żadnych wystąpień."
+
+msgid "Back to Installments"
+msgstr "Wróć do planów ratalnych"
+
+msgid "Edit plan"
+msgstr "Edytuj plan"
+
+msgid "Restore plan"
+msgstr "Plan przywracania"
+
+#, python-format
+msgid ""
+"Archive the installment plan %(name)s? Pending future occurrences will be"
+" removed."
+msgstr ""
+"Zarchiwizować plan ratalny %(name)s? Oczekujące przyszłe wystąpienia "
+"zostaną usunięte."
+
+msgid "Archive plan"
+msgstr "Zarchiwizuj plan"
+
+msgid "Monthly installment"
+msgstr "Rata miesięczna"
+
+msgid "Remaining"
+msgstr "Pozostało"
+
+msgid "Total remaining"
+msgstr "Pozostało łącznie"
+
+msgid "End date"
+msgstr "Data końcowa"
+
+msgid ""
+"Each posted installment reduces the remaining count by one. At zero the "
+"plan closes; no interest or loan payment is calculated."
+msgstr ""
+"Każde zaksięgowane wystąpienie zmniejsza pozostałą liczbę o jeden. Po "
+"osiągnięciu zera plan się zamyka; odsetki ani płatność kredytu nie są "
+"naliczane."
+
+msgid "Edit installment plan"
+msgstr "Edytuj plan ratalny"
+
+msgid "Add installment plan"
+msgstr "Dodaj plan ratalny"
+
+msgid ""
+"A fixed monthly amount and a remaining count. No interest is calculated; "
+"each posted occurrence reduces the count by one."
+msgstr ""
+"Stała kwota miesięczna i pozostała liczba rat. Odsetki nie są naliczane; "
+"każde zaksięgowane wystąpienie zmniejsza liczbę o jeden."
+
+#, python-format
+msgid "Monthly installment (%(currency)s)"
+msgstr "Rata miesięczna (%(currency)s)"
+
+msgid "Remaining count"
+msgstr "Pozostała liczba rat"
+
+msgid "Set to 0 to close the plan."
+msgstr "Ustaw 0, aby zamknąć plan."
+
+msgid "Later months use the last day of a shorter month."
+msgstr "W krótszych miesiącach płatność przypada na ostatni dzień miesiąca."
+
+msgid "Save plan"
+msgstr "Zapisz plan"
+
+msgid "Installment plans"
+msgstr "Plany ratalne"
+
+msgid "No installment plans yet."
+msgstr "Nie ma jeszcze planów ratalnych."
+
+msgid ""
+"Track a zero-interest purchase or another fixed installment plan by its "
+"monthly amount and remaining count."
+msgstr ""
+"Śledź zakup bez odsetek lub inny stały plan ratalny według kwoty "
+"miesięcznej i pozostałej liczby rat."
+
+msgid "Closed installment plans"
+msgstr "Zamknięte plany ratalne"
 
 msgid "No month"
 msgstr "Bez miesiąca"
@@ -9353,9 +9459,6 @@ msgstr "Początek"
 msgid "On a date"
 msgstr "W dniu"
 
-msgid "End date"
-msgstr "Data końcowa"
-
 msgid "After a number of times"
 msgstr "Po określonej liczbie razy"
 
@@ -9951,9 +10054,6 @@ msgstr "Nieprawidłowe wiersze"
 
 msgid "Unresolved category mappings"
 msgstr "Nierozwiązane mapowania kategorii"
-
-msgid "Restore plan"
-msgstr "Plan przywracania"
 
 msgid "Deleted transactions restored"
 msgstr "Przywrócone usunięte transakcje"
