@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+from urllib.parse import urlsplit
 
 import pytest
 from playwright.sync_api import Page, expect, sync_playwright
@@ -106,6 +107,23 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             _no_page_overflow(page)
             _actions_under_the_tabs(page)
             expect(page.locator("[data-edit-terms]")).to_be_visible()
+            expect(page.locator("[data-loan-overview]")).to_be_visible()
+            expect(page.locator("[data-loan-schedule]")).to_be_visible()
+            expect(page.locator('[data-chart="line"]')).to_have_attribute(
+                "data-chart-ready", "true"
+            )
+            expect(page.locator('[data-chart="loan-payments"]')).to_have_attribute(
+                "data-chart-ready", "true"
+            )
+            loan_id = urlsplit(page.url).path.rstrip("/").split("/")[-1]
+            csv = page.request.get(f"{base}/loans/{loan_id}/schedule.csv")
+            assert csv.status == 200
+            assert "text/csv" in csv.headers["content-type"]
+            assert "attachment" in csv.headers["content-disposition"]
+            assert csv.text().startswith(
+                "n,date,rate,opening,interest,principal,overpayment,costs,total,closing,currency\r\n"
+            )
+            assert "\r\n" in csv.text()
 
             page.get_by_role("link", name="Add rate change").click()
             dialog = page.locator("#rate-dialog")
@@ -130,6 +148,18 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             _actions_under_the_tabs(page)
             expect(page.get_by_role("link", name="Back to Loans")).to_be_visible()
             expect(page.get_by_role("link", name="Edit terms")).to_be_visible()
+            expect(page.locator("[data-loan-schedule]")).to_be_visible()
+            scroll = page.locator("[data-schedule-scroll]").evaluate(
+                "el => ({scrollWidth: el.scrollWidth, clientWidth: el.clientWidth})"
+            )
+            assert scroll["scrollWidth"] > scroll["clientWidth"]
+            expect(page.locator('[data-chart="line"]')).to_have_attribute(
+                "data-chart-ready", "true"
+            )
+            expect(page.locator('[data-chart="loan-payments"]')).to_have_attribute(
+                "data-chart-ready", "true"
+            )
+            _no_page_overflow(page)
 
             page.get_by_role("link", name="Add cost").click()
             cost_dialog = page.locator("#cost-dialog")

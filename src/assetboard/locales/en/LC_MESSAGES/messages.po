@@ -2960,6 +2960,28 @@ msgstr ""
 msgid "%(name)s (archived)"
 msgstr ""
 
+#, python-format
+msgid "Rate change: %(rate)s"
+msgstr ""
+
+msgid "Configured plan"
+msgstr ""
+
+msgid "Without overpayments"
+msgstr ""
+
+msgid "Principal"
+msgstr ""
+
+msgid "Costs"
+msgstr ""
+
+msgid "Overpayment"
+msgstr ""
+
+msgid "Total"
+msgstr ""
+
 msgid "Enter a shorter note."
 msgstr ""
 
@@ -3058,6 +3080,26 @@ msgid "Choose how you want to enter the loan."
 msgstr ""
 
 msgid "Enter the amount in the workspace currency."
+msgstr ""
+
+msgid "Choose a valid interest calculation."
+msgstr ""
+
+msgid "The loan has no starting balance to build a schedule from."
+msgstr ""
+
+msgid "Two rate changes start on the same date."
+msgstr ""
+
+msgid ""
+"The installment is too low to cover the interest. Raise the installment "
+"override."
+msgstr ""
+
+msgid "The payment dates are invalid. Check the first payment date."
+msgstr ""
+
+msgid "The schedule produced a negative balance. Check the loan terms."
 msgstr ""
 
 msgid "The loan could not be saved. Check the form and try again."
@@ -5878,9 +5920,6 @@ msgstr ""
 msgid "Weight for %(name)s"
 msgstr ""
 
-msgid "Total"
-msgstr ""
-
 #, python-format
 msgid "Weights must total exactly 100%%."
 msgstr ""
@@ -6613,6 +6652,30 @@ msgstr ""
 msgid "Create account and join"
 msgstr ""
 
+msgid "Charts"
+msgstr ""
+
+msgid "Dashed lines mark rate changes."
+msgstr ""
+
+msgid "Balance over time"
+msgstr ""
+
+msgid "The configured plan and the same loan without overpayments."
+msgstr ""
+
+msgid "Plotted balance data"
+msgstr ""
+
+msgid "Monthly payments"
+msgstr ""
+
+msgid "Principal, interest, costs and overpayments in each month."
+msgstr ""
+
+msgid "Plotted payment data"
+msgstr ""
+
 msgid "per month"
 msgstr ""
 
@@ -6636,6 +6699,107 @@ msgstr ""
 msgid "lower the installment"
 msgstr ""
 
+msgid "Schedule unavailable"
+msgstr ""
+
+msgid ""
+"The loan's schedule and charts are hidden until its terms allow a "
+"schedule to be built."
+msgstr ""
+
+msgid "Overview"
+msgstr ""
+
+msgid "Remaining principal"
+msgstr ""
+
+msgid "Current rate"
+msgstr ""
+
+msgid "No reference rate"
+msgstr ""
+
+#, python-format
+msgid "margin %(margin)s"
+msgstr ""
+
+#, python-format
+msgid "%% repaid"
+msgstr ""
+
+#, python-format
+msgid "% repaid"
+msgstr ""
+
+msgid "Payoff date"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d payment left"
+msgid_plural "%(num)d payments left"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Next payment"
+msgstr ""
+
+#, python-format
+msgid "Total %(amount)s"
+msgstr ""
+
+msgid "No payments left."
+msgstr ""
+
+msgid "Interest remaining"
+msgstr ""
+
+msgid "Costs remaining"
+msgstr ""
+
+msgid "Interest lifetime"
+msgstr ""
+
+msgid "Costs lifetime"
+msgstr ""
+
+msgid "Schedule"
+msgstr ""
+
+msgid ""
+"Monthly rows from the current starting balance. Past rows are projected "
+"until actual payments are recorded."
+msgstr ""
+
+msgid "Scroll sideways to see every column."
+msgstr ""
+
+msgid "Loan schedule"
+msgstr ""
+
+msgid "#"
+msgstr ""
+
+msgid "Due date"
+msgstr ""
+
+msgid "Rate"
+msgstr ""
+
+msgid "Opening"
+msgstr ""
+
+msgid "Closing"
+msgstr ""
+
+msgid "Today"
+msgstr ""
+
+msgid "Projected"
+msgstr ""
+
+msgid "No payments remain on this schedule."
+msgstr ""
+
 msgid "Reference rates"
 msgstr ""
 
@@ -6649,9 +6813,6 @@ msgid "entered from the original terms"
 msgstr ""
 
 msgid "entered from the current balance"
-msgstr ""
-
-msgid "Current rate"
 msgstr ""
 
 msgid "Original principal"
@@ -6674,9 +6835,6 @@ msgstr[0] ""
 msgstr[1] ""
 
 msgid "First payment"
-msgstr ""
-
-msgid "Next payment"
 msgstr ""
 
 #, python-format
@@ -6726,10 +6884,6 @@ msgid "Reference rate: %(name)s"
 msgstr ""
 
 msgid "not set"
-msgstr ""
-
-#, python-format
-msgid "margin %(margin)s"
 msgstr ""
 
 msgid ""
@@ -6812,9 +6966,6 @@ msgid "No one-off overpayments yet."
 msgstr ""
 
 msgid "Starting balance"
-msgstr ""
-
-msgid "Remaining principal"
 msgstr ""
 
 msgid ""
@@ -6912,6 +7063,20 @@ msgstr ""
 msgid "Loan type"
 msgstr ""
 
+msgid "Interest calculation"
+msgstr ""
+
+msgid "Monthly (12 equal periods)"
+msgstr ""
+
+msgid "Actual/365"
+msgstr ""
+
+msgid ""
+"Monthly uses one twelfth of the annual rate each month. Actual/365 uses "
+"the real days in each period."
+msgstr ""
+
 #, python-format
 msgid "Current balance (%(currency)s)"
 msgstr ""
@@ -6968,9 +7133,6 @@ msgid "Save terms"
 msgstr ""
 
 msgid "Add loan"
-msgstr ""
-
-msgid "Rate"
 msgstr ""
 
 msgid "Payment date"
@@ -7230,9 +7392,6 @@ msgstr ""
 
 #, python-format
 msgid "Next month: %(month)s"
-msgstr ""
-
-msgid "Today"
 msgstr ""
 
 msgid "Choose a month"
@@ -8038,9 +8197,6 @@ msgid "Recurring items"
 msgstr ""
 
 msgid "Bills and income that repeat. Each one plans its next dates for you."
-msgstr ""
-
-msgid "Schedule"
 msgstr ""
 
 msgid "Next date"
