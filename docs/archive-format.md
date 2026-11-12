@@ -1,4 +1,4 @@
-# Workspace archive format (v1.4)
+# Workspace archive format (v1.5)
 
 This is the reference for the files that **Export and import** writes and reads: the workspace
 archive (a ZIP) and the hand-made CSV files you can import on their own. It is normative: the
@@ -30,7 +30,17 @@ assetboard-home-20261018-143000Z.zip
 ├── bond_terms.csv
 ├── price_points.csv
 ├── fx_rates.csv
-└── price_source_configs.csv
+├── price_source_configs.csv
+├── reference_rates.csv
+├── reference_rate_values.csv
+├── loans.csv
+├── loan_rate_changes.csv
+├── loan_cost_components.csv
+├── loan_overpayments.csv
+├── loan_payments.csv
+├── loan_balance_checkpoints.csv
+├── loan_scenarios.csv
+└── installment_plans.csv
 ```
 
 All members sit at the root of the ZIP (no folders). Every file is required in an archive, even
@@ -74,14 +84,17 @@ liabilities off). 1.4 (additive): adds the eight investment files below,
 `workspace.json` gains the optional `investment_cost_basis` and `risk_target_policy` keys, and
 `asset_classes.csv` carries the F6.11 risk tiers. A 1.3 archive reads with no investment rows
 and the default average cost basis; a 1.4 archive requires every new file (header only when
-empty). Golden archives of all five versions are in `tests/fixtures/`.
+empty). 1.5 (additive): adds the ten loan files below; a 1.4 archive reads with no loan
+rows, and a 1.5 archive requires every new file (header only when empty). Schedules are not
+archived and are recomputed from the restored terms. Golden archives of all six versions are in
+`tests/fixtures/`.
 
 ## `manifest.json`
 
 ```json
 {
   "format": "workspace-archive",
-  "format_version": "1.4",
+  "format_version": "1.5",
   "app": {"name": "AssetBoard", "version": "0.4.0"},
   "exported_at": "2026-10-18T14:30:00Z",
   "base_currency": "EUR",
@@ -286,10 +299,10 @@ id,side,name,color,sort_order,archived_at
 | `estimate_between` | in 1.3; absent in 1.2 | `true` \| `false`: straight-line estimates in a backfill |
 | `archived_at` | no | timestamp; set = archived |
 
-A linked item keeps its `link_type` and `link_id` on export. Restore clears both and writes a
-manual item without a value, because the target's module has not yet contributed its archive
-files; the item is listed with `link_target_missing`. The M6/M7 archive extensions will resolve
-link target lineage ids. A missing `estimate_between` in a 1.2 archive restores the side default:
+A linked item keeps its `link_type` and `link_id` on export. Restore resolves a portfolio link
+against the archive's instruments and asset classes, and a `loan_balance` link against its
+loans; a link whose target is missing becomes a manual item without a value and is listed with
+`link_target_missing`. A missing `estimate_between` in a 1.2 archive restores the side default:
 on for assets, off for liabilities.
 
 ```csv
@@ -581,7 +594,230 @@ id,provider_key,enabled,daily_call_budget,fx_backfilled
 a4b5c6d7-e8f9-44a5-b617-92a3b4c5d6e7,nbp,true,20,"{""USD"":""2026-09-01""}"
 ```
 
+## `reference_rates.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id; also the loan files' reference id) |
+| `name` | yes | 1–200 characters; case-folded names are unique per workspace |
+| `notes` | no | at most 200 characters |
+
+Export order: name, id. A variable-rate loan references the series by `reference_rate_id`; the
+`reference_rate` name is the human-readable companion.
+
+```csv
+id,name,notes
+b5c6d7e8-f9a0-45b6-8c28-a3b4c5d6e7f8,WIBOR,3M fixing
+```
+
+## `reference_rate_values.csv`
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | in an archive; optional alone | UUID (lineage id) |
+| `reference_rate_id` | in an archive; optional alone | UUID from `reference_rates.csv` |
+| `reference_rate` | yes | the series name; a lone import matches it case-insensitively and creates it when absent |
+| `effective_from` | yes | `YYYY-MM-DD` |
+| `value_bp` | yes | integer 0–10 000 (annual basis points) |
+
+Export order: reference-rate order, effective date, id. One value per series and date.
+
+This is the only loan file that can be imported alone in merge mode. An identical stored value
+for the series and date is a duplicate (`already_imported`); a different value is a conflict
+(`reference_rate_value_differs`) and the stored value is kept. A series named by the file but
+absent from the workspace is created.
+
+```csv
+id,reference_rate_id,reference_rate,effective_from,value_bp
+c6d7e8f9-a0b1-46c7-9d39-b4c5d6e7f809,b5c6d7e8-f9a0-45b6-8c28-a3b4c5d6e7f8,WIBOR,2026-01-01,575
+```
+
+## `loans.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `name` | yes | 1–200 characters |
+| `kind` | yes | `annuity` \| `equal_principal` \| `installment_plan` |
+| `currency` | yes | must equal the workspace base currency |
+| `principal_original` | no | decimal > 0 |
+| `origination_date` | no | `YYYY-MM-DD`; must be before the first payment |
+| `first_payment_date` | yes | `YYYY-MM-DD` |
+| `term_months` | yes | integer 0–600; 0 only for an installment plan (a plan's term follows its remaining count) |
+| `payment_day` | yes | integer 1–31; shorter months use their last day |
+| `rate_mode` | yes | `fixed` \| `variable` |
+| `day_count` | yes | `monthly` \| `actual_365` |
+| `margin_bp` | variable only | integer 0–10 000 |
+| `reference_rate_id` | variable only | UUID from `reference_rates.csv` |
+| `reference_rate` | variable only | the series name (must match `reference_rate_id`) |
+| `property_item_id` | no | net-worth item lineage id |
+| `property_item` | no | the item name (must match `property_item_id`) |
+| `auto_record_payments` | no (default `false`) | `true` \| `false` |
+| `installment_override` | no | decimal > 0; `annuity` only |
+| `overpayment_mode` | yes | `none` \| `fixed_extra` \| `target_total` |
+| `overpayment_amount` | when the mode is not `none` | decimal > 0 |
+| `overpayment_strategy` | yes | `reduce_term` \| `reduce_installment` |
+| `archived_at` | no | timestamp; set = archived |
+
+Export order: name, kind, active before archived, id. A fixed loan has no reference rate or
+margin; a variable loan requires both. Actual payments, checkpoints and planned overpayments
+are separate files. Schedules are never stored: they are rebuilt from these terms.
+
+```csv
+id,name,kind,currency,principal_original,origination_date,first_payment_date,term_months,payment_day,rate_mode,day_count,margin_bp,reference_rate_id,reference_rate,property_item_id,property_item,auto_record_payments,installment_override,overpayment_mode,overpayment_amount,overpayment_strategy,archived_at
+d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a,Home mortgage,annuity,EUR,300000.00,2026-01-01,2026-02-01,360,1,fixed,monthly,,,,c4d5e6f7-a8b9-4c0d-9e1f-2a3b4c5d6e7f,Car,true,,fixed_extra,100.00,reduce_term,
+e8f9a0b1-c2d3-48e9-bf5b-d6e7f8091a2b,Car loan,annuity,EUR,50000.00,2026-01-15,2026-02-15,24,15,variable,actual_365,150,b5c6d7e8-f9a0-45b6-8c28-a3b4c5d6e7f8,WIBOR,,,false,,none,,reduce_term,
+f9a0b1c2-d3e4-49fa-806c-e7f8091a2b3c,Phone,installment_plan,EUR,3000.00,,2026-04-05,3,5,fixed,monthly,,,,,,false,,none,,reduce_term,
+```
+
+## `loan_rate_changes.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `loan_id` | yes | UUID from `loans.csv` |
+| `loan` | yes | the loan name (must match `loan_id`) |
+| `effective_from` | yes | `YYYY-MM-DD`; one row per loan and date |
+| `rate_bp` | yes | integer 0–10 000 (annual basis points) |
+
+Export order: loan order, effective date, id.
+
+```csv
+id,loan_id,loan,effective_from,rate_bp
+a0b1c2d3-e4f5-4a0b-917d-f8091a2b3c4d,d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a,Home mortgage,2026-01-01,575
+```
+
+## `loan_cost_components.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `loan_id` | yes | UUID from `loans.csv` |
+| `loan` | yes | the loan name (must match `loan_id`) |
+| `name` | yes | 1–200 characters |
+| `mode` | yes | `percent` \| `fixed` |
+| `rate_bp` | percent only | integer 0–10 000 (annual basis points) |
+| `fixed_amount` | fixed only | decimal > 0 |
+| `basis` | yes | `opening_balance` |
+| `effective_from` | yes | `YYYY-MM-DD` |
+| `effective_to` | no | `YYYY-MM-DD`, on or after `effective_from` |
+
+Export order: loan order, effective date, name, id.
+
+```csv
+id,loan_id,loan,name,mode,rate_bp,fixed_amount,basis,effective_from,effective_to
+b1c2d3e4-f5a6-4b1c-828e-091a2b3c4d5e,d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a,Home mortgage,Account fee,percent,20,,opening_balance,2026-01-01,
+```
+
+## `loan_overpayments.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `loan_id` | yes | UUID from `loans.csv` |
+| `loan` | yes | the loan name (must match `loan_id`) |
+| `date` | yes | `YYYY-MM-DD` |
+| `amount` | yes | decimal > 0 |
+| `note` | no | at most 200 characters |
+
+Export order: loan order, date, id. These are planned one-off overpayments, not actual payments.
+
+```csv
+id,loan_id,loan,date,amount,note
+c2d3e4f5-a6b7-4c2d-939f-1a2b3c4d5e6f,d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a,Home mortgage,2026-06-01,5000.00,Bonus
+```
+
+## `loan_payments.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `loan_id` | yes | UUID from `loans.csv` |
+| `loan` | yes | the loan name (must match `loan_id`) |
+| `date` | yes | `YYYY-MM-DD` |
+| `kind` | yes | `installment` \| `overpayment` |
+| `total` | yes | decimal > 0 |
+| `principal` | yes | decimal ≥ 0 |
+| `interest` | yes | decimal ≥ 0 |
+| `costs` | yes | decimal ≥ 0 |
+| `overpayment` | yes | decimal ≥ 0; `total` must equal their sum |
+| `note` | no | at most 200 characters |
+| `source` | yes | `manual` \| `upcoming` |
+| `transaction_id` | no | transaction lineage id from `transactions.csv` |
+
+Export order: loan order, date, entry order, id. The transaction id is mapped to the restored
+ledger row; an archive that names a missing transaction is refused.
+
+```csv
+id,loan_id,loan,date,kind,total,principal,interest,costs,overpayment,note,source,transaction_id
+d3e4f5a6-b7c8-4d3e-84a0-2b3c4d5e6f70,d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a,Home mortgage,2026-03-01,installment,2000.00,1000.00,900.00,0.00,100.00,,manual,5c7d8e9f-0a1b-4c2d-9e3f-4a5b6c7d8e02
+```
+
+## `loan_balance_checkpoints.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `loan_id` | yes | UUID from `loans.csv` |
+| `loan` | yes | the loan name (must match `loan_id`) |
+| `as_of` | yes | `YYYY-MM-DD`; one checkpoint per loan and date |
+| `remaining_principal` | yes | decimal ≥ 0 |
+| `note` | no | at most 200 characters |
+
+Export order: loan order, date, id.
+
+```csv
+id,loan_id,loan,as_of,remaining_principal,note
+e4f5a6b7-c8d9-4e4f-95b1-3c4d5e6f7081,d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a,Home mortgage,2026-07-01,280000.00,Bank statement
+```
+
+## `loan_scenarios.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `loan_id` | yes | UUID from `loans.csv` |
+| `loan` | yes | the loan name (must match `loan_id`) |
+| `name` | yes | 1–200 characters; unique per loan, case-folded |
+| `overpayment_mode` | no | `none` \| `fixed_extra` \| `target_total`; all three overpayment fields are together |
+| `overpayment_amount` | with a non-`none` mode | decimal > 0 |
+| `overpayment_strategy` | no | `reduce_term` \| `reduce_installment` |
+| `rate_shift_bp` | no | integer −10 000 to 10 000, not 0; requires `rate_shift_from` |
+| `rate_shift_from` | no | `YYYY-MM-DD` |
+| `one_off_date` | no | `YYYY-MM-DD`; requires `one_off_amount` |
+| `one_off_amount` | no | decimal > 0 |
+
+Export order: loan order, name, id.
+
+```csv
+id,loan_id,loan,name,overpayment_mode,overpayment_amount,overpayment_strategy,rate_shift_bp,rate_shift_from,one_off_date,one_off_amount
+f5a6b7c8-d9e0-4f50-86c2-4d5e6f708192,d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a,Home mortgage,Faster,fixed_extra,300.00,reduce_term,,,,
+```
+
+## `installment_plans.csv` (restore only)
+
+| Column | Required | Values |
+|---|---|---|
+| `id` | yes | UUID (lineage id) |
+| `loan_id` | yes | UUID of an `installment_plan` row in `loans.csv`; one plan per loan |
+| `loan` | yes | the loan name (must match `loan_id`) |
+| `category_id` | yes | UUID from `categories.csv` |
+| `category` | yes | the category name (must match `category_id`) |
+| `installment` | yes | decimal > 0, the fixed monthly installment |
+| `remaining_count` | yes | integer 0–600; 0 means closed |
+| `end_date` | yes | `YYYY-MM-DD` |
+| `closed_at` | no | timestamp; set = closed |
+
+Export order: loan order, id. A plan has no interest schedule; its net-worth liability is
+`installment × remaining_count`.
+
+```csv
+id,loan_id,loan,category_id,category,installment,remaining_count,end_date,closed_at
+a6b7c8d9-e0f1-4a61-97d3-5e6f708192a3,f9a0b1c2-d3e4-49fa-806c-e7f8091a2b3c,Phone,2b0e8c1e-5f7a-4c6e-9a51-3f1d2c7b9e01,Food,1000.00,3,2026-06-05,
+```
+
 ## Reader limits
+
 
 An uploaded archive is never extracted to disk. It is refused when it has members in folders or
 with unsafe names, symlinks, encrypted members, compression methods other than stored and
@@ -589,7 +825,7 @@ deflate, duplicate names, more than 64 members, a member over 100 MiB or a total
 uncompressed, or a member (1 MiB or larger) compressed more than 200:1. Unknown member names are
 listed as warnings and ignored. A file may hold at most 1 000 000 data rows and 64 columns.
 
-## Not in the archive (format 1.4)
+## Not in the archive (format 1.5)
 
 Members, invitations, users and their sessions, the audit log, import batches and saved
 mappings, and who created or closed what. Recurring items, income sources, work logs and
@@ -602,7 +838,9 @@ The profile's `birth_year` and `life_expectancy` are user data, not workspace da
 not archived. `investment_cost_basis` and `risk_target_policy` are workspace settings and live
 in `workspace.json`.
 
-Net-worth and investment files are restore-only in a full archive merge: they are ignored and
-listed once as a warning (`networth_restore_only` and `investment_restore_only`). A lone
-`item_valuations.csv` and, from F6.9's standalone importer, a lone
-`investment_transactions.csv` can be merged.
+Net-worth, investment and loan files are restore-only in a full archive merge: they are ignored
+and listed once as a warning (`networth_restore_only`, `investment_restore_only` and
+`loan_restore_only`). A lone `item_valuations.csv`, a lone `investment_transactions.csv` and a
+lone `reference_rate_values.csv` can be merged. The other loan files are refused as standalone
+uploads (`loans.csv` alone has no importer), because their rows reference loans and planned
+values that a merge does not carry.

@@ -433,3 +433,28 @@ Implement F7.8 from docs/specs/M7-loans-and-mortgage.md as an extension of the M
 ADR-0016): the new files with lineage ids, export, restore order, standalone reference_rate_values.csv import,
 emptiness checks, extended round-trip test incl. identical schedules after restore.
 ```
+
+### As built (M7.F7.8)
+
+- Archive format 1.5 adds the ten loan files. A 1.4 archive restores with empty loan data; a
+  1.5 archive requires every loan file (header only when empty). Schedules are never written.
+- Loan tables have no `import_key`: the archive `id` is the stored UUID. Restore preserves it
+  when the database does not already use that primary key (a second workspace in the same
+  instance may); when it does, a fresh id is assigned and every internal reference is mapped.
+  References to net-worth items, transactions, categories and loans are always remapped, never
+  left pointing at a source row.
+- Restore writes reference rates and values first, then net-worth items and transactions, then
+  loans and their children (`loan_rate_changes`, `loan_cost_components`, `loan_overpayments`,
+  `loan_payments`, `loan_balance_checkpoints`, `loan_scenarios`, `installment_plans`). A
+  net-worth `loan_balance` link is resolved against the restored loan ids. The archive id map is
+  stored on the import batch so restore rollback removes the restored loan rows and detects
+  edits or additions.
+- A full archive merge ignores loan files with a `loan_restore_only` warning. Only a lone
+  `reference_rate_values.csv` has a merge adapter: it matches the series by case-folded name,
+  creates it when absent, skips an identical value and reports a different value as
+  `reference_rate_value_differs`. Lone uploads of the other loan files keep their recognised
+  source and are refused by the existing no-importer path.
+- The migration `0057_f78_loan_import_sources` extends the import-batch source check for the
+  reference-rate-values adapter and the recognised restore-only files.
+- An archive round-trip test restores every table and compares the rebuilt schedule rows and
+  `summarize_schedule()` output with the source, not database ids.
