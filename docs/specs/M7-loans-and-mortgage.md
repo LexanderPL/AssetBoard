@@ -105,6 +105,51 @@ Money is integer minor units, half-up rounding per component. Golden tests: nump
 plus the property tests listed. No UI in this feature.
 ```
 
+### As built (M7.F7.2)
+
+The pure schedule engine lives in `src/assetboard/domain/loans.py`:
+
+- `select_anchor(terms, checkpoints, as_of) -> ScheduleAnchor` takes the latest checkpoint at
+  or before `as_of`; otherwise it uses the origination date and original principal. A loan with
+  neither raises `ScheduleError("no_anchor")`.
+- `build_schedule(terms, rate_timeline, costs, overpayments, anchor, as_of, strategy,
+  day_count) -> Schedule` builds monthly rows. `terms.term_months` is the number of payments from
+  the chosen anchor: F7.3/F7.5 must pass the remaining months when re-anchoring at a checkpoint.
+- Rows start at `first_payment_date` when it is after the anchor; after a mid-term checkpoint the
+  first row is the next nominal payment day (clamped to month end). Later rows continue from that
+  first date and the nominal payment day. The first ACTUAL_365 interest period runs from the
+  anchor date to the first row; later periods run from the previous row date.
+- Rate periods are sorted; duplicate effective dates raise `ScheduleError("duplicate_rate")` and
+  a row with no effective rate raises `ScheduleError("missing_rate")`. The latest rate at or
+  before the row date applies.
+- The annuity principal is the rounded difference between the unrounded payment computed for
+  the current opening balance and remaining contractual months, and the unrounded interest. This
+  is the same component `numpy_financial.ppmt` reports. The payment is recomputed at a rate
+  change and, for `reduce_installment`, after an overpayment. With `reduce_term` the payment is
+  held, so the term shortens. `installment_override` replaces the calculated payment.
+- Equal principal uses `half_up(anchor.balance / term_months)` as the regular principal; the
+  final contractual row clears the residual. `reduce_installment` has no effect; overpayments
+  shorten the term.
+- Costs are inclusive on both dates; every active component is summed. A percent cost is a
+  monthly percent of the opening balance, rounded half up per component; fixed costs add as-is.
+- `fixed_extra` adds the configured amount. `target_total` uses
+  `max(0, target - principal - interest - costs)` and is capped so the closing balance cannot go
+  negative. One-off overpayments apply at the first due date on or after their date, only when
+  their date is strictly after the anchor, and are ignored after payoff.
+- The final contractual row clears any remaining balance; rows stop as soon as the closing
+  balance is zero. `installment_total = interest + principal + overpayment + costs`.
+- `summarize_schedule(schedule, as_of)`: a payment on `as_of` is treated as made. Remaining
+  principal is the last closing at or before `as_of` (or the anchor balance); next payment is
+  the first row after `as_of`; remaining interest/costs are the sums of future rows; payoff is
+  the last row date; months remaining is the number of future rows; percent repaid is
+  `(original - remaining) / original` in basis points clamped to 0..10000, using the anchor
+  balance when the original principal is absent. Total fields are lifetime totals and include
+  overpayments.
+- A zero anchor balance returns an empty schedule and a zero summary. Invalid input uses
+  `LoanValidationError`; schedule-only problems use `ScheduleError` with a `code`.
+- `numpy-financial` is a test-only dependency (BSD-3-Clause) used as the independent annuity
+  oracle.
+
 ---
 
 ## F7.3 Loan page: overview, schedule and charts
