@@ -24,6 +24,16 @@ CATEGORIES = "categories_csv"
 ITEM_VALUATIONS = "item_valuations_csv"
 INVESTMENT_TRANSACTIONS = "investment_transactions_csv"
 MONTHS = "months_csv"
+REFERENCE_RATE_VALUES = "reference_rate_values_csv"
+LOANS = "loans_csv"
+LOAN_RATE_CHANGES = "loan_rate_changes_csv"
+REFERENCE_RATES = "reference_rates_csv"
+LOAN_COST_COMPONENTS = "loan_cost_components_csv"
+LOAN_OVERPAYMENTS = "loan_overpayments_csv"
+LOAN_PAYMENTS = "loan_payments_csv"
+LOAN_BALANCE_CHECKPOINTS = "loan_balance_checkpoints_csv"
+LOAN_SCENARIOS = "loan_scenarios_csv"
+INSTALLMENT_PLANS = "installment_plans_csv"
 
 KNOWN_COLUMNS: dict[str, frozenset[str]] = {
     TRANSACTIONS: frozenset(
@@ -66,6 +76,100 @@ KNOWN_COLUMNS: dict[str, frozenset[str]] = {
         }
     ),
     MONTHS: frozenset({"month", "closed_at", "plan_started_at"}),
+    REFERENCE_RATE_VALUES: frozenset(
+        {"id", "reference_rate_id", "reference_rate", "effective_from", "value_bp"}
+    ),
+    REFERENCE_RATES: frozenset({"id", "name", "notes"}),
+    LOANS: frozenset(
+        {
+            "id",
+            "name",
+            "kind",
+            "currency",
+            "principal_original",
+            "origination_date",
+            "first_payment_date",
+            "term_months",
+            "payment_day",
+            "rate_mode",
+            "day_count",
+            "margin_bp",
+            "reference_rate_id",
+            "reference_rate",
+            "property_item_id",
+            "property_item",
+            "auto_record_payments",
+            "installment_override",
+            "overpayment_mode",
+            "overpayment_amount",
+            "overpayment_strategy",
+            "archived_at",
+        }
+    ),
+    LOAN_RATE_CHANGES: frozenset({"id", "loan_id", "loan", "effective_from", "rate_bp"}),
+    LOAN_COST_COMPONENTS: frozenset(
+        {
+            "id",
+            "loan_id",
+            "loan",
+            "name",
+            "mode",
+            "rate_bp",
+            "fixed_amount",
+            "basis",
+            "effective_from",
+            "effective_to",
+        }
+    ),
+    LOAN_OVERPAYMENTS: frozenset({"id", "loan_id", "loan", "date", "amount", "note"}),
+    LOAN_PAYMENTS: frozenset(
+        {
+            "id",
+            "loan_id",
+            "loan",
+            "date",
+            "kind",
+            "total",
+            "principal",
+            "interest",
+            "costs",
+            "overpayment",
+            "note",
+            "source",
+            "transaction_id",
+        }
+    ),
+    LOAN_BALANCE_CHECKPOINTS: frozenset(
+        {"id", "loan_id", "loan", "as_of", "remaining_principal", "note"}
+    ),
+    LOAN_SCENARIOS: frozenset(
+        {
+            "id",
+            "loan_id",
+            "loan",
+            "name",
+            "overpayment_mode",
+            "overpayment_amount",
+            "overpayment_strategy",
+            "rate_shift_bp",
+            "rate_shift_from",
+            "one_off_date",
+            "one_off_amount",
+        }
+    ),
+    INSTALLMENT_PLANS: frozenset(
+        {
+            "id",
+            "loan_id",
+            "loan",
+            "category_id",
+            "category",
+            "installment",
+            "remaining_count",
+            "end_date",
+            "closed_at",
+        }
+    ),
 }
 
 REQUIRED_COLUMNS: dict[str, frozenset[str]] = {
@@ -75,6 +179,20 @@ REQUIRED_COLUMNS: dict[str, frozenset[str]] = {
     ITEM_VALUATIONS: frozenset({"item", "as_of", "value"}),
     INVESTMENT_TRANSACTIONS: frozenset({"instrument", "date", "type", "quantity", "unit_price"}),
     MONTHS: frozenset({"month"}),
+    REFERENCE_RATE_VALUES: frozenset({"reference_rate", "effective_from", "value_bp"}),
+    REFERENCE_RATES: frozenset({"id", "name"}),
+    LOANS: frozenset({"id", "name", "kind", "currency", "first_payment_date"}),
+    LOAN_RATE_CHANGES: frozenset({"id", "loan_id", "effective_from", "rate_bp"}),
+    LOAN_COST_COMPONENTS: frozenset({"id", "loan_id", "name", "mode", "effective_from"}),
+    LOAN_OVERPAYMENTS: frozenset({"id", "loan_id", "date", "amount"}),
+    LOAN_PAYMENTS: frozenset(
+        {"id", "loan_id", "date", "kind", "total", "principal", "interest", "costs"}
+    ),
+    LOAN_BALANCE_CHECKPOINTS: frozenset({"id", "loan_id", "as_of", "remaining_principal"}),
+    LOAN_SCENARIOS: frozenset({"id", "loan_id", "name"}),
+    INSTALLMENT_PLANS: frozenset(
+        {"id", "loan_id", "category_id", "installment", "remaining_count"}
+    ),
 }
 
 MAX_AMOUNT_TEXT_LENGTH = 64
@@ -150,6 +268,16 @@ def classify_header(cells: tuple[str, ...] | list[str]) -> HeaderClassification:
         CATEGORIES,
         ITEM_VALUATIONS,
         INVESTMENT_TRANSACTIONS,
+        REFERENCE_RATE_VALUES,
+        REFERENCE_RATES,
+        LOANS,
+        LOAN_RATE_CHANGES,
+        LOAN_COST_COMPONENTS,
+        LOAN_OVERPAYMENTS,
+        LOAN_PAYMENTS,
+        LOAN_BALANCE_CHECKPOINTS,
+        LOAN_SCENARIOS,
+        INSTALLMENT_PLANS,
         MONTHS,
     )
     source = max(order, key=lambda item: (scores[item], -order.index(item)))

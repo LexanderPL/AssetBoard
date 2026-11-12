@@ -20,8 +20,9 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any, cast
-from uuid import UUID
+from uuid import UUID, uuid4
 
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from assetboard.db.models.identity import Workspace
@@ -38,21 +39,32 @@ from assetboard.db.repositories import (
     CurrentWorkspaceRepository,
     FxRateRepository,
     ImportCategoryMappingRepository,
+    InstallmentPlanRepository,
     InstrumentAllocationRepository,
     InstrumentRepository,
     InvestmentTransactionRepository,
     ItemValuationRepository,
+    LoanBalanceCheckpointRepository,
+    LoanCostComponentRepository,
+    LoanOverpaymentRepository,
+    LoanPaymentRepository,
+    LoanRateChangeRepository,
+    LoanRepository,
+    LoanScenarioRepository,
     MonthStateRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
     NetWorthSnapshotRepository,
     PricePointRepository,
     PriceSourceConfigRepository,
+    ReferenceRateRepository,
+    ReferenceRateValueRepository,
     RiskTargetPolicyRepository,
     TransactionRepository,
 )
 from assetboard.domain.archive import (
     INVESTMENT_CSV_FILES,
+    LOAN_CSV_FILES,
     NETWORTH_CSV_FILES,
     ArchiveRows,
     BudgetLineRow,
@@ -153,6 +165,16 @@ def _restore_counts(**values: int) -> dict[str, int]:
         "price_source_configs_created": 0,
         "risk_policy_restored": 0,
         "suggested_asset_classes_removed": 0,
+        "reference_rates_created": 0,
+        "reference_rate_values_created": 0,
+        "loans_created": 0,
+        "loan_rate_changes_created": 0,
+        "loan_cost_components_created": 0,
+        "loan_overpayments_created": 0,
+        "loan_payments_created": 0,
+        "loan_balance_checkpoints_created": 0,
+        "loan_scenarios_created": 0,
+        "installment_plans_created": 0,
         **values,
     }
 
@@ -332,6 +354,16 @@ def _restore_counts_for(
             + len(rows.price_points)
             + len(rows.fx_rates)
             + len(rows.price_source_configs)
+            + len(rows.reference_rates)
+            + len(rows.reference_rate_values)
+            + len(rows.loans)
+            + len(rows.loan_rate_changes)
+            + len(rows.loan_cost_components)
+            + len(rows.loan_overpayments)
+            + len(rows.loan_payments)
+            + len(rows.loan_balance_checkpoints)
+            + len(rows.loan_scenarios)
+            + len(rows.installment_plans)
             + (1 if rows.risk_target_policy is not None else 0)
         ),
         categories_created=len(rows.categories),
@@ -356,6 +388,16 @@ def _restore_counts_for(
         price_source_configs_created=len(rows.price_source_configs),
         risk_policy_restored=1 if rows.risk_target_policy is not None else 0,
         suggested_asset_classes_removed=removed_assets,
+        reference_rates_created=len(rows.reference_rates),
+        reference_rate_values_created=len(rows.reference_rate_values),
+        loans_created=len(rows.loans),
+        loan_rate_changes_created=len(rows.loan_rate_changes),
+        loan_cost_components_created=len(rows.loan_cost_components),
+        loan_overpayments_created=len(rows.loan_overpayments),
+        loan_payments_created=len(rows.loan_payments),
+        loan_balance_checkpoints_created=len(rows.loan_balance_checkpoints),
+        loan_scenarios_created=len(rows.loan_scenarios),
+        installment_plans_created=len(rows.installment_plans),
     )
 
 
@@ -1389,6 +1431,8 @@ def _merge(
         warnings.append(_entry("networth_restore_only", file="archive"))
     if any(name in archive.files for name in INVESTMENT_CSV_FILES):
         warnings.append(_entry("investment_restore_only", file="archive"))
+    if any(name in archive.files for name in LOAN_CSV_FILES):
+        warnings.append(_entry("loan_restore_only", file="archive"))
     report = _empty_report(
         counts=counts,
         months=months_report,
@@ -1533,6 +1577,16 @@ def _plan_restore(
         archive.rows.price_points,
         archive.rows.fx_rates,
         archive.rows.price_source_configs,
+        archive.rows.reference_rates,
+        archive.rows.reference_rate_values,
+        archive.rows.loans,
+        archive.rows.loan_rate_changes,
+        archive.rows.loan_cost_components,
+        archive.rows.loan_overpayments,
+        archive.rows.loan_payments,
+        archive.rows.loan_balance_checkpoints,
+        archive.rows.loan_scenarios,
+        archive.rows.installment_plans,
     ):
         for number, _row in enumerate(rows, start=1):
             if number % DEADLINE_CHECK_ROWS == 0 and out_of_time():
@@ -1602,8 +1656,9 @@ def _resolve_networth_links(
     item_ids: Mapping[UUID, UUID],
     asset_class_ids: Mapping[UUID, UUID],
     instrument_ids: Mapping[UUID, UUID],
+    loan_ids: Mapping[UUID, UUID],
 ) -> int:
-    """Point restored net-worth items at the portfolio rows; count missing targets."""
+    """Point restored net-worth items at their portfolio or loan rows; count missing targets."""
     repository = NetWorthItemRepository(session, ctx)
     missing = 0
     for row in archive.rows.networth_items:
@@ -1614,6 +1669,8 @@ def _resolve_networth_links(
             target = asset_class_ids.get(UUID(row.link_id))
         elif row.link_type == "portfolio_holding" and row.link_id:
             target = instrument_ids.get(UUID(row.link_id))
+        elif row.link_type == "loan_balance" and row.link_id:
+            target = loan_ids.get(UUID(row.link_id))
         if target is None:
             missing += 1
             continue
@@ -1711,6 +1768,325 @@ def _restore_networth(
             import_key=f"id:{row.id}",
         )
     return item_ids
+
+
+def _create_preserving_id(session: Session, repository: Any, raw: str, **values: object) -> UUID:
+    """Create through the scoped repository, preserving the archive id when it is free.
+
+    Another workspace in the same instance may already own the primary key. The insert then
+    fails inside a savepoint; the row is created with a fresh id and every reference is mapped.
+    A row already in this workspace is a clean refusal instead.
+    """
+    source_id = UUID(raw)
+    if repository.get(source_id) is not None:
+        raise ImportServiceError("the archive conflicts with a row already in this workspace")
+    try:
+        with session.begin_nested():
+            created = repository.create(id=source_id, **values)
+        return cast("UUID", created.id)
+    except IntegrityError:
+        created = repository.create(id=uuid4(), **values)
+        return cast("UUID", created.id)
+
+
+def _mapped_id(mapping: Mapping[UUID, UUID], raw: str, *, label: str) -> UUID:
+    try:
+        return mapping[UUID(raw)]
+    except (KeyError, ValueError):
+        raise ImportServiceError(f"the archive references a missing {label}") from None
+
+
+def _restore_loans(
+    session: Session,
+    ctx: Context,
+    archive: ParsedArchive,
+    *,
+    restore_now: datetime,
+    category_ids: Mapping[UUID, UUID],
+    transaction_ids: Mapping[UUID, UUID],
+    item_ids: Mapping[UUID, UUID],
+) -> tuple[dict[str, int], dict[str, list[str]], dict[UUID, UUID]]:
+    """Recreate loan configuration after net-worth items and transactions.
+
+    Loan tables have no ``import_key``, so the archive id is the stored UUID. Ids are preserved
+    when the database does not already use them (another workspace in the same instance may);
+    references are always mapped, never left pointing at a source row.
+    """
+    restored: dict[str, list[str]] = {}
+    rate_ids: dict[UUID, UUID] = {}
+    rates = ReferenceRateRepository(session, ctx)
+    rate_values: list[str] = []
+    for index, row in enumerate(archive.rows.reference_rates):
+        rate_id = _create_preserving_id(
+            session,
+            rates,
+            row.id,
+            name=row.name,
+            name_key=name_key(row.name),
+            notes=row.notes,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        rate_ids[UUID(row.id)] = rate_id
+        rate_values.append(str(rate_id))
+    restored["reference_rates"] = rate_values
+
+    values = ReferenceRateValueRepository(session, ctx)
+    value_ids: list[str] = []
+    for index, row in enumerate(archive.rows.reference_rate_values):
+        value_id = _create_preserving_id(
+            session,
+            values,
+            row.id,
+            reference_rate_id=_mapped_id(rate_ids, row.reference_rate_id, label="reference rate"),
+            effective_from=parse_date(row.effective_from),
+            value_bp=row.value_bp,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        value_ids.append(str(value_id))
+    restored["reference_rate_values"] = value_ids
+
+    loans = LoanRepository(session, ctx)
+    loan_ids: dict[UUID, UUID] = {}
+    loan_values: list[str] = []
+    for index, row in enumerate(archive.rows.loans):
+        reference_rate_id = (
+            _mapped_id(rate_ids, row.reference_rate_id, label="reference rate")
+            if row.reference_rate_id
+            else None
+        )
+        property_item_id = (
+            _mapped_id(item_ids, row.property_item_id, label="net-worth item")
+            if row.property_item_id
+            else None
+        )
+        loan_id = _create_preserving_id(
+            session,
+            loans,
+            row.id,
+            name=row.name,
+            kind=row.kind,
+            currency=row.currency,
+            principal_original_minor=(
+                _money_minor(row.principal_original, row.currency, allow_zero=False)
+                if row.principal_original
+                else None
+            ),
+            origination_date=parse_date(row.origination_date) if row.origination_date else None,
+            first_payment_date=parse_date(row.first_payment_date),
+            term_months=row.term_months,
+            payment_day=row.payment_day,
+            rate_mode=row.rate_mode,
+            day_count=row.day_count,
+            margin_bp=row.margin_bp,
+            reference_rate_id=reference_rate_id,
+            property_item_id=property_item_id,
+            auto_record_payments=row.auto_record_payments == "true",
+            installment_override_minor=(
+                _money_minor(row.installment_override, row.currency, allow_zero=False)
+                if row.installment_override
+                else None
+            ),
+            overpayment_mode=row.overpayment_mode,
+            overpayment_amount_minor=(
+                _money_minor(row.overpayment_amount, row.currency, allow_zero=False)
+                if row.overpayment_amount
+                else None
+            ),
+            overpayment_strategy=row.overpayment_strategy,
+            archived_at=parse_timestamp(row.archived_at) if row.archived_at else None,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        loan_ids[UUID(row.id)] = loan_id
+        loan_values.append(str(loan_id))
+    restored["loans"] = loan_values
+
+    changes = LoanRateChangeRepository(session, ctx)
+    change_ids: list[str] = []
+    for index, row in enumerate(archive.rows.loan_rate_changes):
+        change_id = _create_preserving_id(
+            session,
+            changes,
+            row.id,
+            loan_id=_mapped_id(loan_ids, row.loan_id, label="loan"),
+            effective_from=parse_date(row.effective_from),
+            rate_bp=row.rate_bp,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        change_ids.append(str(change_id))
+    restored["loan_rate_changes"] = change_ids
+
+    costs = LoanCostComponentRepository(session, ctx)
+    cost_ids: list[str] = []
+    for index, row in enumerate(archive.rows.loan_cost_components):
+        loan_id = _mapped_id(loan_ids, row.loan_id, label="loan")
+        currency = loans.get_or_raise(loan_id).currency
+        cost_id = _create_preserving_id(
+            session,
+            costs,
+            row.id,
+            loan_id=loan_id,
+            name=row.name,
+            mode=row.mode,
+            rate_bp=row.rate_bp,
+            fixed_minor=(
+                _money_minor(row.fixed_amount, currency, allow_zero=False)
+                if row.fixed_amount
+                else None
+            ),
+            basis=row.basis,
+            effective_from=parse_date(row.effective_from),
+            effective_to=parse_date(row.effective_to) if row.effective_to else None,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        cost_ids.append(str(cost_id))
+    restored["loan_cost_components"] = cost_ids
+
+    overpayments = LoanOverpaymentRepository(session, ctx)
+    overpayment_ids: list[str] = []
+    for index, row in enumerate(archive.rows.loan_overpayments):
+        loan_id = _mapped_id(loan_ids, row.loan_id, label="loan")
+        currency = loans.get_or_raise(loan_id).currency
+        overpayment_id = _create_preserving_id(
+            session,
+            overpayments,
+            row.id,
+            loan_id=loan_id,
+            date=parse_date(row.date),
+            amount_minor=_money_minor(row.amount, currency, allow_zero=False),
+            note=row.note,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        overpayment_ids.append(str(overpayment_id))
+    restored["loan_overpayments"] = overpayment_ids
+
+    payments = LoanPaymentRepository(session, ctx)
+    payment_ids: list[str] = []
+    for index, row in enumerate(archive.rows.loan_payments):
+        loan_id = _mapped_id(loan_ids, row.loan_id, label="loan")
+        currency = loans.get_or_raise(loan_id).currency
+        transaction_id = (
+            _mapped_id(transaction_ids, row.transaction_id, label="transaction")
+            if row.transaction_id
+            else None
+        )
+        payment_id = _create_preserving_id(
+            session,
+            payments,
+            row.id,
+            loan_id=loan_id,
+            date=parse_date(row.date),
+            kind=row.kind,
+            total_minor=_money_minor(row.total, currency, allow_zero=False),
+            principal_minor=_money_minor(row.principal, currency, allow_zero=True),
+            interest_minor=_money_minor(row.interest, currency, allow_zero=True),
+            costs_minor=_money_minor(row.costs, currency, allow_zero=True),
+            overpayment_minor=_money_minor(row.overpayment, currency, allow_zero=True),
+            note=row.note,
+            source=row.source,
+            transaction_id=transaction_id,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        payment_ids.append(str(payment_id))
+    restored["loan_payments"] = payment_ids
+
+    checkpoints = LoanBalanceCheckpointRepository(session, ctx)
+    checkpoint_ids: list[str] = []
+    for index, row in enumerate(archive.rows.loan_balance_checkpoints):
+        loan_id = _mapped_id(loan_ids, row.loan_id, label="loan")
+        currency = loans.get_or_raise(loan_id).currency
+        checkpoint_id = _create_preserving_id(
+            session,
+            checkpoints,
+            row.id,
+            loan_id=loan_id,
+            as_of=parse_date(row.as_of),
+            remaining_principal_minor=_money_minor(
+                row.remaining_principal, currency, allow_zero=True
+            ),
+            note=row.note,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        checkpoint_ids.append(str(checkpoint_id))
+    restored["loan_balance_checkpoints"] = checkpoint_ids
+
+    scenarios = LoanScenarioRepository(session, ctx)
+    scenario_ids: list[str] = []
+    for index, row in enumerate(archive.rows.loan_scenarios):
+        loan_id = _mapped_id(loan_ids, row.loan_id, label="loan")
+        currency = loans.get_or_raise(loan_id).currency
+        scenario_id = _create_preserving_id(
+            session,
+            scenarios,
+            row.id,
+            loan_id=loan_id,
+            name=row.name,
+            name_key=name_key(row.name),
+            overpayment_mode=row.overpayment_mode or None,
+            overpayment_amount_minor=(
+                _money_minor(row.overpayment_amount, currency, allow_zero=False)
+                if row.overpayment_amount
+                else None
+            ),
+            overpayment_strategy=row.overpayment_strategy or None,
+            rate_shift_bp=row.rate_shift_bp,
+            rate_shift_from=(parse_date(row.rate_shift_from) if row.rate_shift_from else None),
+            one_off_date=parse_date(row.one_off_date) if row.one_off_date else None,
+            one_off_amount_minor=(
+                _money_minor(row.one_off_amount, currency, allow_zero=False)
+                if row.one_off_amount
+                else None
+            ),
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        scenario_ids.append(str(scenario_id))
+    restored["loan_scenarios"] = scenario_ids
+
+    plans = InstallmentPlanRepository(session, ctx)
+    plan_ids: list[str] = []
+    for index, row in enumerate(archive.rows.installment_plans):
+        loan_id = _mapped_id(loan_ids, row.loan_id, label="loan")
+        currency = loans.get_or_raise(loan_id).currency
+        plan_id = _create_preserving_id(
+            session,
+            plans,
+            row.id,
+            loan_id=loan_id,
+            category_id=_mapped_id(category_ids, row.category_id, label="category"),
+            installment_minor=_money_minor(row.installment, currency, allow_zero=False),
+            remaining_count=row.remaining_count,
+            end_date=parse_date(row.end_date),
+            closed_at=parse_timestamp(row.closed_at) if row.closed_at else None,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        plan_ids.append(str(plan_id))
+    restored["installment_plans"] = plan_ids
+
+    return (
+        {
+            "reference_rates_created": len(archive.rows.reference_rates),
+            "reference_rate_values_created": len(archive.rows.reference_rate_values),
+            "loans_created": len(archive.rows.loans),
+            "loan_rate_changes_created": len(archive.rows.loan_rate_changes),
+            "loan_cost_components_created": len(archive.rows.loan_cost_components),
+            "loan_overpayments_created": len(archive.rows.loan_overpayments),
+            "loan_payments_created": len(archive.rows.loan_payments),
+            "loan_balance_checkpoints_created": len(archive.rows.loan_balance_checkpoints),
+            "loan_scenarios_created": len(archive.rows.loan_scenarios),
+            "installment_plans_created": len(archive.rows.installment_plans),
+        },
+        restored,
+        loan_ids,
+    )
 
 
 def _money_minor(value: str, currency: str, *, allow_zero: bool) -> int:
@@ -2067,6 +2443,16 @@ def _apply_restore(
         restore_now=restore_now,
         removed=removed_networth,
     )
+    loan_counts, restored_loan_ids, loan_ids = _restore_loans(
+        session,
+        ctx,
+        archive,
+        restore_now=restore_now,
+        category_ids=category_ids,
+        transaction_ids=transaction_ids,
+        item_ids=networth_item_ids,
+    )
+    batch.report = {**(batch.report or {}), "restored_loan_ids": restored_loan_ids}
     investment_counts, asset_class_ids, instrument_ids = _restore_investments(
         session,
         ctx,
@@ -2086,6 +2472,7 @@ def _apply_restore(
         networth_item_ids,
         asset_class_ids,
         instrument_ids,
+        loan_ids,
     )
     session.flush()
     AuditEventRepository(session, ctx).record(
@@ -2113,6 +2500,16 @@ def _apply_restore(
             "price_points": len(archive.rows.price_points),
             "fx_rates": len(archive.rows.fx_rates),
             "price_source_configs": len(archive.rows.price_source_configs),
+            "reference_rates": len(archive.rows.reference_rates),
+            "reference_rate_values": len(archive.rows.reference_rate_values),
+            "loans": len(archive.rows.loans),
+            "loan_rate_changes": len(archive.rows.loan_rate_changes),
+            "loan_cost_components": len(archive.rows.loan_cost_components),
+            "loan_overpayments": len(archive.rows.loan_overpayments),
+            "loan_payments": len(archive.rows.loan_payments),
+            "loan_balance_checkpoints": len(archive.rows.loan_balance_checkpoints),
+            "loan_scenarios": len(archive.rows.loan_scenarios),
+            "installment_plans": len(archive.rows.installment_plans),
             "risk_policy": archive.rows.risk_target_policy is not None,
             "settings_fields": ",".join(settings_diff),
             "suggested_categories_removed": len(removed),
@@ -2138,6 +2535,7 @@ def _apply_restore(
         "item_valuations_created": len(archive.rows.item_valuations),
         "networth_snapshots_created": len(archive.rows.networth_snapshots),
         "linked_items_unlinked": linked_items,
+        **loan_counts,
         **investment_counts,
     }
 

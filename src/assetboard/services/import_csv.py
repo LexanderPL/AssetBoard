@@ -66,6 +66,7 @@ from assetboard.services.import_dedupe import (
     match_transactions,
 )
 from assetboard.services.import_investments import InvestmentTransactionsCsvAdapter
+from assetboard.services.import_loans import ReferenceRateValuesCsvAdapter
 from assetboard.services.import_networth import ItemValuationsCsvAdapter
 from assetboard.services.imports import ImportAdapter
 from assetboard.services.imports import ImportError as ImportServiceError
@@ -1396,6 +1397,7 @@ def default_import_adapters() -> dict[str, ImportAdapter]:
         "categories_csv": CategoriesCsvAdapter(),
         "item_valuations_csv": ItemValuationsCsvAdapter(),
         "investment_transactions_csv": InvestmentTransactionsCsvAdapter(),
+        "reference_rate_values_csv": ReferenceRateValuesCsvAdapter(),
         "archive": ArchiveImportAdapter(),
     }
 
