@@ -205,10 +205,11 @@ only editors and owners can save or delete them.
 
 ## Costs and overpayments
 
-**Cost components** are charged every month while active: a percentage of the opening balance
-or a fixed amount. Their dates are inclusive on both ends, and several active components may
+**Cost components** can be added in the last step of the loan wizard (up to three) or later on
+the loan page. They are charged every month while active: a percentage of the opening balance or
+a fixed amount. Their dates are inclusive on both ends, and several active components may
 overlap; all of them are added to the installment, and the Upcoming amounts derived from the
-schedule follow the change.
+schedule follow the change. A wizard row with an empty **Applies from** starts with the loan.
 
 Costs are configuration, not versioned history: editing a component changes every projected row
 in its date range. To keep an old premium visible and change it from a date, set the old
