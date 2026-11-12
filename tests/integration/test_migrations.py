@@ -1761,3 +1761,30 @@ def test_0051_loans_migration_is_reversible(tmp_path: Path) -> None:
         check_database_migrations(settings)
     finally:
         engine.dispose()
+
+
+def test_0052_loan_day_count_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'loan_day_count.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        columns = {column["name"]: column for column in inspector.get_columns("loans")}
+        assert columns["day_count"]["nullable"] is False
+        assert any(
+            "day_count" in (check.get("sqltext") or "")
+            for check in inspector.get_check_constraints("loans")
+        )
+        command.downgrade(alembic_config(settings), "0051_f71_loans")
+        columns = {column["name"] for column in inspect(engine).get_columns("loans")}
+        assert "day_count" not in columns
+        upgrade_database(settings)
+        columns = {column["name"] for column in inspect(engine).get_columns("loans")}
+        assert "day_count" in columns
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
