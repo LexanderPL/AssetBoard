@@ -82,6 +82,12 @@ def test_a_shift_outside_the_valid_rate_range_is_refused(shift: int) -> None:
     assert raised.value.code == "invalid_rate_shift"
 
 
+def test_a_shift_larger_than_the_rate_range_is_refused_even_if_a_rate_would_stay_valid() -> None:
+    with pytest.raises(LoanValidationError) as raised:
+        shift_rate_timeline([RatePeriod(date(2026, 1, 1), 9000)], -15000, date(2026, 2, 1))
+    assert raised.value.code == "invalid_rate_shift"
+
+
 def test_a_missing_timeline_is_an_error() -> None:
     with pytest.raises(ScheduleError) as raised:
         shift_rate_timeline([], 100, date(2026, 7, 1))

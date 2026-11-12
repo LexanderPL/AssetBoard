@@ -481,6 +481,8 @@ def shift_rate_timeline(
     ordered = _validate_rate_timeline(rate_timeline)
     if not ordered:
         raise ScheduleError("missing_rate")
+    if not -MAX_LOAN_RATE_BP <= shift_bp <= MAX_LOAN_RATE_BP:
+        raise LoanValidationError("rate_shift_bp", "invalid_rate_shift")
     if shift_bp == 0:
         return ordered
 
