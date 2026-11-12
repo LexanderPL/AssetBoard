@@ -8,16 +8,19 @@ math here: every row and total comes from ``domain.loans.build_schedule`` and
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from collections.abc import Mapping
+from dataclasses import dataclass, field, replace
 from datetime import date
 from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from assetboard.db.repositories import LoanPaymentRepository
 from assetboard.domain.loans import (
     BalanceCheckpoint,
     CostPeriod,
     DayCount,
+    LoanPaymentKind,
     LoanScheduleSummary,
     LoanTerms,
     LoanValidationError,
@@ -32,8 +35,32 @@ from assetboard.domain.loans import (
     select_anchor,
     summarize_schedule,
 )
+from assetboard.domain.money import Money
 from assetboard.services import loans
 from assetboard.services.context import Context, Role, require_role
+
+
+@dataclass(frozen=True, slots=True)
+class SchedulePaymentActual:
+    id: UUID
+    date: date
+    kind: LoanPaymentKind
+    total: Money
+    principal: Money
+    interest: Money
+    costs: Money
+    overpayment: Money
+    note: str
+
+
+@dataclass(frozen=True, slots=True)
+class ScheduleActual:
+    principal: Money
+    interest: Money
+    costs: Money
+    overpayment: Money
+    total: Money
+    count: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +71,10 @@ class LoanScheduleData:
     summary: LoanScheduleSummary | None
     has_overpayments: bool
     error_code: str | None
+    actual_payments: tuple[SchedulePaymentActual, ...] = ()
+    actual_by_date: Mapping[date, ScheduleActual] = field(
+        default_factory=dict[date, ScheduleActual]
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -158,6 +189,71 @@ def build_inputs_schedule(
     )
 
 
+def _actual_payments(
+    factory: sessionmaker[Session], ctx: Context, loan_id: UUID, currency: str
+) -> tuple[SchedulePaymentActual, ...]:
+    with factory() as session:
+        rows = LoanPaymentRepository(session, ctx).for_loan(loan_id)
+    return tuple(
+        SchedulePaymentActual(
+            id=row.id,
+            date=row.date,
+            kind=LoanPaymentKind(row.kind),
+            total=Money(row.total_minor, currency),
+            principal=Money(row.principal_minor, currency),
+            interest=Money(row.interest_minor, currency),
+            costs=Money(row.costs_minor, currency),
+            overpayment=Money(row.overpayment_minor, currency),
+            note=row.note,
+        )
+        for row in rows
+    )
+
+
+def _actual_by_date(
+    actuals: tuple[SchedulePaymentActual, ...],
+) -> dict[date, ScheduleActual]:
+    sums: dict[date, ScheduleActual] = {}
+    for payment in actuals:
+        if payment.kind is not LoanPaymentKind.INSTALLMENT:
+            continue
+        previous = sums.get(payment.date)
+        if previous is None:
+            sums[payment.date] = ScheduleActual(
+                principal=payment.principal,
+                interest=payment.interest,
+                costs=payment.costs,
+                overpayment=payment.overpayment,
+                total=payment.total,
+                count=1,
+            )
+        else:
+            sums[payment.date] = ScheduleActual(
+                principal=Money(
+                    previous.principal.amount_minor + payment.principal.amount_minor,
+                    payment.total.currency,
+                ),
+                interest=Money(
+                    previous.interest.amount_minor + payment.interest.amount_minor,
+                    payment.total.currency,
+                ),
+                costs=Money(
+                    previous.costs.amount_minor + payment.costs.amount_minor,
+                    payment.total.currency,
+                ),
+                overpayment=Money(
+                    previous.overpayment.amount_minor + payment.overpayment.amount_minor,
+                    payment.total.currency,
+                ),
+                total=Money(
+                    previous.total.amount_minor + payment.total.amount_minor,
+                    payment.total.currency,
+                ),
+                count=previous.count + 1,
+            )
+    return sums
+
+
 def loan_schedule(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -> LoanScheduleData:
     """The configured schedule, its no-overpayment baseline and the summary for one loan."""
     require_role(ctx, Role.VIEWER)
@@ -180,6 +276,8 @@ def loan_schedule(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -
         else:
             baseline = schedule
         summary = summarize_schedule(schedule, inputs.as_of)
+        actual_payments = _actual_payments(factory, ctx, loan_id, inputs.view.currency)
+        actual_by_date = _actual_by_date(actual_payments)
     except (ScheduleError, LoanValidationError) as exc:
         view = loans.get_loan(factory, ctx, loan_id)
         return LoanScheduleData(
@@ -199,12 +297,16 @@ def loan_schedule(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -
         summary=summary,
         has_overpayments=has_overpayments,
         error_code=None,
+        actual_payments=actual_payments,
+        actual_by_date=actual_by_date,
     )
 
 
 __all__ = [
     "LoanScheduleData",
     "LoanScheduleInputs",
+    "ScheduleActual",
+    "SchedulePaymentActual",
     "build_inputs_schedule",
     "load_loan_schedule_inputs",
     "loan_schedule",
