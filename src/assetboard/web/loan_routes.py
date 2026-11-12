@@ -1976,6 +1976,7 @@ async def loan_edit(request: Request, ctx: CurrentContext, loan_id: UUID) -> Res
             "reference_rates": rates.rates,
             "values": _loan_values_from_view(view, request.state.locale),
             "error": None,
+            "target_error": False,
             "can_edit": has_role(ctx, Role.EDITOR),
             "format_money": format_money,
             "format_day": format_day,
@@ -2015,6 +2016,7 @@ async def loan_update(request: Request, ctx: CurrentContext, loan_id: UUID) -> R
             day_count=values.get("day_count") or None,
         )
     except (loans.LoanError, LoanValidationError) as exc:
+        code = getattr(exc, "code", "failed")
         rates = await run_in_threadpool(
             loans.list_reference_rates, request.app.state.session_factory, ctx
         )
@@ -2026,7 +2028,8 @@ async def loan_update(request: Request, ctx: CurrentContext, loan_id: UUID) -> R
                 "loan": view,
                 "reference_rates": rates.rates,
                 "values": {**_loan_values_from_view(view, request.state.locale), **values},
-                "error": _error(request, getattr(exc, "code", "failed")),
+                "error": _error(request, code),
+                "target_error": code == "target_below_installment",
                 "can_edit": True,
                 "format_money": format_money,
                 "format_day": format_day,

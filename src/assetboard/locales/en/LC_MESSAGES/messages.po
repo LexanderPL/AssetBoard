@@ -7396,6 +7396,19 @@ msgid ""
 "archive the loan and add a new one for that."
 msgstr ""
 
+#, python-format
+msgid "Regular overpayment: %(summary)s."
+msgstr ""
+
+msgid "Change the regular overpayment"
+msgstr ""
+
+msgid ""
+"A target total must be at least the monthly installment. Raise it or "
+"clear the overpayment before increasing the principal or shortening the "
+"term."
+msgstr ""
+
 msgid "Loan type"
 msgstr ""
 

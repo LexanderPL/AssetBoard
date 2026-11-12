@@ -7942,6 +7942,22 @@ msgstr ""
 "Zmień warunki kredytu. Rodzaju stopy nie można zmienić po utworzeniu; "
 "zarchiwizuj kredyt i dodaj nowy."
 
+#, python-format
+msgid "Regular overpayment: %(summary)s."
+msgstr "Regularna nadpłata: %(summary)s."
+
+msgid "Change the regular overpayment"
+msgstr "Zmień regularną nadpłatę"
+
+msgid ""
+"A target total must be at least the monthly installment. Raise it or "
+"clear the overpayment before increasing the principal or shortening the "
+"term."
+msgstr ""
+"Docelowa kwota miesięczna nie może być niższa niż rata miesięczna. "
+"Zwiększ ją lub usuń nadpłatę przed podniesieniem kapitału lub skróceniem "
+"okresu."
+
 msgid "Loan type"
 msgstr "Rodzaj kredytu"
 

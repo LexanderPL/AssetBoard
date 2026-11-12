@@ -165,6 +165,44 @@ def test_a_rate_change_cannot_push_a_target_below_the_installment(owner):
         assert len(session.scalars(select(LoanRateChange)).all()) == 1
 
 
+def test_edit_shows_the_regular_overpayment_and_links_to_its_settings(owner):
+    loan_id = _create_original(
+        owner,
+        principal_original="900.00",
+        overpayment_mode="target_total",
+        overpayment_amount="900.00",
+    )
+    edit = owner.client.get(f"/loans/{loan_id}/edit")
+    assert edit.status_code == 200
+    assert "data-edit-overpayment-note" in edit.text
+    assert "Target total" in edit.text
+    assert "#overpayments" in edit.text
+
+    response = owner.post(
+        f"/loans/{loan_id}/edit",
+        {
+            "name": "Mortgage",
+            "kind": "annuity",
+            "principal_original": "900,000.00",
+            "origination_date": "2026-01-01",
+            "first_payment_date": "2026-02-01",
+            "term_months": "360",
+            "payment_day": "1",
+            "installment_override": "7,260.30",
+        },
+    )
+    assert response.status_code == 400
+    assert "target total cannot be below" in response.text
+    assert "data-target-error-link" in response.text
+    assert "#overpayments" in response.text
+    assert "data-form-error" in response.text
+    with owner.db() as session:
+        loan = session.get(Loan, UUID(loan_id))
+        assert loan is not None
+        assert loan.principal_original_minor == 90_000
+        assert loan.installment_override_minor is None
+
+
 def test_current_balance_wizard_creates_one_checkpoint(owner):
     data = _wizard_data(
         entry_path="current",
