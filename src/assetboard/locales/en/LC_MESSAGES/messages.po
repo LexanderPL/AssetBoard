@@ -6892,7 +6892,7 @@ msgstr ""
 msgid "No linked liability item yet."
 msgstr ""
 
-#, fuzzy, python-format
+#, fuzzy
 msgid "Create net-worth item"
 msgstr ""
 
@@ -6957,7 +6957,7 @@ msgstr ""
 msgid "Expense category"
 msgstr ""
 
-#, fuzzy, python-format
+#, fuzzy
 msgid "Refresh occurrences"
 msgstr ""
 
@@ -6972,7 +6972,7 @@ msgstr ""
 msgid "Generation is not active for this loan."
 msgstr ""
 
-#, fuzzy, python-format
+#, fuzzy
 msgid "Generate occurrences"
 msgstr ""
 
