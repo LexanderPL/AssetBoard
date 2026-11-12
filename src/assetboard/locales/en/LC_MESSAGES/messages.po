@@ -7038,25 +7038,23 @@ msgstr ""
 msgid "lower the installment"
 msgstr ""
 
-msgid "Schedule unavailable"
+msgid "entered from the original terms"
 msgstr ""
 
-msgid ""
-"The loan's schedule and charts are hidden until its terms allow a "
-"schedule to be built."
-msgstr ""
-
-msgid "Overview"
+msgid "entered from the current balance"
 msgstr ""
 
 msgid "Current rate"
 msgstr ""
 
-msgid "No reference rate"
+msgid "Fixed"
 msgstr ""
 
-#, python-format
-msgid "margin %(margin)s"
+msgid "Variable"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "Balance %(amount)s on %(date)s"
 msgstr ""
 
 #, python-format
@@ -7075,11 +7073,46 @@ msgstr[1] ""
 msgid "Next payment"
 msgstr ""
 
-#, python-format
-msgid "Total %(amount)s"
+msgid "No payments left."
 msgstr ""
 
-msgid "No payments left."
+msgid "Next payment breakdown"
+msgstr ""
+
+msgid "Schedule unavailable"
+msgstr ""
+
+msgid ""
+"The loan's schedule and charts are hidden until its terms allow a "
+"schedule to be built."
+msgstr ""
+
+msgid "Original principal"
+msgstr ""
+
+msgid "Term"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d month"
+msgid_plural "%(num)d months"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "First payment"
+msgstr ""
+
+#, python-format
+msgid "day %(day)s"
+msgstr ""
+
+msgid "First installment"
+msgstr ""
+
+msgid "override"
+msgstr ""
+
+msgid "Regular overpayment"
 msgstr ""
 
 msgid "Interest remaining"
@@ -7145,56 +7178,6 @@ msgstr ""
 msgid "Edit terms"
 msgstr ""
 
-msgid "entered from the original terms"
-msgstr ""
-
-msgid "entered from the current balance"
-msgstr ""
-
-msgid "Original principal"
-msgstr ""
-
-msgid "Current balance"
-msgstr ""
-
-#, python-format
-msgid "as of %(date)s"
-msgstr ""
-
-msgid "Term"
-msgstr ""
-
-#, fuzzy, python-format
-msgid "%(num)d month"
-msgid_plural "%(num)d months"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "First payment"
-msgstr ""
-
-#, python-format
-msgid "day %(day)s"
-msgstr ""
-
-msgid "Rate type"
-msgstr ""
-
-msgid "Fixed"
-msgstr ""
-
-msgid "Variable"
-msgstr ""
-
-msgid "First installment"
-msgstr ""
-
-msgid "Installment override"
-msgstr ""
-
-msgid "Regular overpayment"
-msgstr ""
-
 msgid "Rate changes"
 msgstr ""
 
@@ -7220,6 +7203,10 @@ msgid "Reference rate: %(name)s"
 msgstr ""
 
 msgid "not set"
+msgstr ""
+
+#, python-format
+msgid "margin %(margin)s"
 msgstr ""
 
 msgid ""
@@ -8522,6 +8509,10 @@ msgstr ""
 
 #, python-format
 msgid "Acquired %(date)s"
+msgstr ""
+
+#, python-format
+msgid "as of %(date)s"
 msgstr ""
 
 msgid "No value yet"
@@ -10679,5 +10670,20 @@ msgstr ""
 #~ "After saving you can add rate "
 #~ "changes, cost components and one-off "
 #~ "overpayments on the loan page."
+#~ msgstr ""
+
+#~ msgid "No reference rate"
+#~ msgstr ""
+
+#~ msgid "Total %(amount)s"
+#~ msgstr ""
+
+#~ msgid "Current balance"
+#~ msgstr ""
+
+#~ msgid "Rate type"
+#~ msgstr ""
+
+#~ msgid "Installment override"
 #~ msgstr ""
 

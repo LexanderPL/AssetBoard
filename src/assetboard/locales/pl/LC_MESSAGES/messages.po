@@ -7567,28 +7567,24 @@ msgstr "skraca okres"
 msgid "lower the installment"
 msgstr "obniża ratę"
 
-msgid "Schedule unavailable"
-msgstr "Harmonogram niedostępny"
+msgid "entered from the original terms"
+msgstr "wprowadzony na podstawie pierwotnych warunków"
 
-msgid ""
-"The loan's schedule and charts are hidden until its terms allow a "
-"schedule to be built."
-msgstr ""
-"Harmonogram i wykresy kredytu są ukryte, dopóki warunki nie pozwolą "
-"zbudować harmonogramu."
-
-msgid "Overview"
-msgstr "Przegląd"
+msgid "entered from the current balance"
+msgstr "wprowadzony na podstawie bieżącego salda"
 
 msgid "Current rate"
 msgstr "Bieżąca stopa"
 
-msgid "No reference rate"
-msgstr "Brak stopy referencyjnej"
+msgid "Fixed"
+msgstr "Stała"
+
+msgid "Variable"
+msgstr "Zmienna"
 
 #, python-format
-msgid "margin %(margin)s"
-msgstr "marża %(margin)s"
+msgid "Balance %(amount)s on %(date)s"
+msgstr "Saldo %(amount)s na dzień %(date)s"
 
 #, python-format
 msgid "%% repaid"
@@ -7607,12 +7603,50 @@ msgstr[2] "%(num)d miesięcy"
 msgid "Next payment"
 msgstr "Następna płatność"
 
-#, python-format
-msgid "Total %(amount)s"
-msgstr "Razem %(amount)s"
-
 msgid "No payments left."
 msgstr "Brak pozostałych płatności."
+
+msgid "Next payment breakdown"
+msgstr "Składniki następnej płatności"
+
+msgid "Schedule unavailable"
+msgstr "Harmonogram niedostępny"
+
+msgid ""
+"The loan's schedule and charts are hidden until its terms allow a "
+"schedule to be built."
+msgstr ""
+"Harmonogram i wykresy kredytu są ukryte, dopóki warunki nie pozwolą "
+"zbudować harmonogramu."
+
+msgid "Original principal"
+msgstr "Pierwotny kapitał"
+
+msgid "Term"
+msgstr "Okres"
+
+#, python-format
+msgid "%(num)d month"
+msgid_plural "%(num)d months"
+msgstr[0] "%(num)d miesiąc"
+msgstr[1] "%(num)d miesiące"
+msgstr[2] "%(num)d miesięcy"
+
+msgid "First payment"
+msgstr "Pierwsza płatność"
+
+#, python-format
+msgid "day %(day)s"
+msgstr "dzień %(day)s"
+
+msgid "First installment"
+msgstr "Pierwsza rata"
+
+msgid "override"
+msgstr "nadpisana"
+
+msgid "Regular overpayment"
+msgstr "Regularna nadpłata"
 
 msgid "Interest remaining"
 msgstr "Pozostałe odsetki"
@@ -7680,57 +7714,6 @@ msgstr "Scenariusze"
 msgid "Edit terms"
 msgstr "Edytuj warunki"
 
-msgid "entered from the original terms"
-msgstr "wprowadzony na podstawie pierwotnych warunków"
-
-msgid "entered from the current balance"
-msgstr "wprowadzony na podstawie bieżącego salda"
-
-msgid "Original principal"
-msgstr "Pierwotny kapitał"
-
-msgid "Current balance"
-msgstr "Bieżące saldo"
-
-#, python-format
-msgid "as of %(date)s"
-msgstr "na dzień %(date)s"
-
-msgid "Term"
-msgstr "Okres"
-
-#, python-format
-msgid "%(num)d month"
-msgid_plural "%(num)d months"
-msgstr[0] "%(num)d miesiąc"
-msgstr[1] "%(num)d miesiące"
-msgstr[2] "%(num)d miesięcy"
-
-msgid "First payment"
-msgstr "Pierwsza płatność"
-
-#, python-format
-msgid "day %(day)s"
-msgstr "dzień %(day)s"
-
-msgid "Rate type"
-msgstr "Rodzaj stopy"
-
-msgid "Fixed"
-msgstr "Stała"
-
-msgid "Variable"
-msgstr "Zmienna"
-
-msgid "First installment"
-msgstr "Pierwsza rata"
-
-msgid "Installment override"
-msgstr "Nadpisanie raty"
-
-msgid "Regular overpayment"
-msgstr "Regularna nadpłata"
-
 msgid "Rate changes"
 msgstr "Zmiany stawki"
 
@@ -7757,6 +7740,10 @@ msgstr "Stopa referencyjna: %(name)s"
 
 msgid "not set"
 msgstr "nie ustawiono"
+
+#, python-format
+msgid "margin %(margin)s"
+msgstr "marża %(margin)s"
 
 msgid ""
 "Change the reference rate or margin in Edit terms. Add values on the "
@@ -9200,6 +9187,10 @@ msgstr "Waluta jest ustalona po dodaniu wartości do pozycji."
 #, python-format
 msgid "Acquired %(date)s"
 msgstr "Nabyto %(date)s"
+
+#, python-format
+msgid "as of %(date)s"
+msgstr "na dzień %(date)s"
 
 msgid "No value yet"
 msgstr "Brak wartości"
@@ -10691,7 +10682,7 @@ msgstr "Usuń obszar roboczy…"
 #~ msgstr "Niedostępne: brak zarobków"
 
 #~ msgid "Overview"
-#~ msgstr "Podsumowanie"
+#~ msgstr "Przegląd"
 
 #~ msgid "Planned and actual amounts will appear here."
 #~ msgstr "Zaplanowane i rzeczywiste kwoty pojawią się tutaj."
@@ -11301,4 +11292,19 @@ msgstr "Usuń obszar roboczy…"
 #~ "początkowego. Wiersze z przeszłości są "
 #~ "prognozowane, dopóki nie zostaną zapisane "
 #~ "rzeczywiste płatności."
+
+#~ msgid "No reference rate"
+#~ msgstr "Brak stopy referencyjnej"
+
+#~ msgid "Total %(amount)s"
+#~ msgstr "Razem %(amount)s"
+
+#~ msgid "Current balance"
+#~ msgstr "Bieżące saldo"
+
+#~ msgid "Rate type"
+#~ msgstr "Rodzaj stopy"
+
+#~ msgid "Installment override"
+#~ msgstr "Nadpisanie raty"
 
