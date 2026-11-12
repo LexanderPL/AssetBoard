@@ -16,7 +16,9 @@ locked once a loan exists.
 
 The **payment day** is the nominal monthly day. The first/next payment date is the first actual
 due date; it must fall on the payment day, or on the last day when the month is shorter. Later
-months use the payment day (31 January → 28 February, then 31 March).
+months use the payment day (31 January → 28 February, then 31 March). In the add wizard, leaving
+the payment day empty uses the first payment date's day; enter 31 explicitly for month-end
+semantics.
 
 The **loan type** is annuity (roughly equal installments) or equal principal (the principal part
 is equal and the installment falls over time). You can change the type later. The **rate type**

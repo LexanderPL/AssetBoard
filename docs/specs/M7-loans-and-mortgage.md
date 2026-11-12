@@ -52,7 +52,8 @@ No schedule computation yet. Tests for validation rules and workspace scoping.
 The eight product-owner decisions implemented in F7.1:
 
 1. `first_payment_date` is the first actual due date and `payment_day` the nominal day for later
-   months. Both are required on the original path; the first date must equal
+   months. Both are required on the original path; leaving the wizard's payment-day field empty
+   uses the first payment date's day. The first date must equal
    `min(payment_day, last_day_of_month(first_payment_date))`.
 2. The current-balance path collects the balance, balance date, remaining months, next payment
    date, payment day and optional original principal. It creates one checkpoint. A fixed initial

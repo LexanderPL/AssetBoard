@@ -59,7 +59,7 @@
       <label class="grid gap-1 text-sm font-medium">{{ _("Balance date") }}<input name="balance_date" type="date" value="{{ values.get('balance_date', '') }}" required class="{{ input_class }} font-normal"></label>
       <label class="grid gap-1 text-sm font-medium">{{ _("Remaining months") }}<input name="term_months" type="number" min="1" max="600" value="{{ values.get('term_months', '') }}" required class="{{ input_class }} font-normal"></label>
       <label class="grid gap-1 text-sm font-medium">{{ _("Next payment date") }}<input name="first_payment_date" type="date" value="{{ values.get('first_payment_date', '') }}" required class="{{ input_class }} font-normal"></label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Payment day") }}<input name="payment_day" type="number" min="1" max="31" value="{{ values.get('payment_day', '1') }}" required class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("The nominal day for later months. A shorter month uses its last day.") }}</span></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Payment day") }}<input name="payment_day" type="number" min="1" max="31" value="{{ values.get('payment_day', '') }}" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Leave empty to use the first payment date's day. A shorter month uses its last day.") }}</span></label>
       <label class="grid gap-1 text-sm font-medium">{{ _("Original principal (optional)") }}<input name="principal_original" value="{{ values.get('principal_original', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Only needed to show how much you have repaid.") }}</span></label>
     </div>
 
@@ -69,7 +69,7 @@
       <label class="grid gap-1 text-sm font-medium">{{ _("Origination date") }}<input name="origination_date" type="date" value="{{ values.get('origination_date', '') }}" required class="{{ input_class }} font-normal"></label>
       <label class="grid gap-1 text-sm font-medium">{{ _("Term in months") }}<input name="term_months" type="number" min="1" max="600" value="{{ values.get('term_months', '') }}" required class="{{ input_class }} font-normal"></label>
       <label class="grid gap-1 text-sm font-medium">{{ _("First payment date") }}<input name="first_payment_date" type="date" value="{{ values.get('first_payment_date', '') }}" required class="{{ input_class }} font-normal"></label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Payment day") }}<input name="payment_day" type="number" min="1" max="31" value="{{ values.get('payment_day', '1') }}" required class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("The nominal day for later months. A shorter month uses its last day.") }}</span></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Payment day") }}<input name="payment_day" type="number" min="1" max="31" value="{{ values.get('payment_day', '') }}" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Leave empty to use the first payment date's day. A shorter month uses its last day.") }}</span></label>
     </div>
 
     {% elif step == 3 %}

@@ -6673,6 +6673,9 @@ msgid_plural "%(num)d months"
 msgstr[0] ""
 msgstr[1] ""
 
+msgid "First payment"
+msgstr ""
+
 msgid "Next payment"
 msgstr ""
 
@@ -6970,6 +6973,9 @@ msgstr ""
 msgid "Rate"
 msgstr ""
 
+msgid "Payment date"
+msgstr ""
+
 msgid "Open"
 msgstr ""
 
@@ -7014,7 +7020,9 @@ msgstr ""
 msgid "All amounts are in %(currency)s, the workspace currency."
 msgstr ""
 
-msgid "The nominal day for later months. A shorter month uses its last day."
+msgid ""
+"Leave empty to use the first payment date's day. A shorter month uses its"
+" last day."
 msgstr ""
 
 msgid "Only needed to show how much you have repaid."
@@ -9848,5 +9856,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Use Add item in the header, or paste a list of items below."
+#~ msgstr ""
+
+#~ msgid "The nominal day for later months. A shorter month uses its last day."
 #~ msgstr ""
 

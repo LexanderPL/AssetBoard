@@ -182,6 +182,35 @@ def test_target_total_must_not_be_below_the_first_installment(team: WorkspaceDb)
     assert view.overpayment_amount == _money(200_000)
 
 
+def test_a_reference_rate_change_cannot_push_a_target_below_the_installment(
+    team: WorkspaceDb,
+) -> None:
+    rate_id = _reference_rate(team)
+    _original_loan(
+        team,
+        name="Variable mortgage",
+        rate_mode="variable",
+        fixed_rate_bp=None,
+        reference_rate_id=rate_id,
+        margin_bp=100,
+        overpayment_mode="target_total",
+        overpayment_amount=_money(200_000),
+    )
+    with pytest.raises(loans.LoanError) as error:
+        loans.add_reference_rate_value(
+            team.factory,
+            team.ctx("owner", "owner"),
+            rate_id,
+            effective_from=date(2026, 1, 15),
+            value_bp=3_000,
+            high_rate_confirmed=True,
+        )
+    assert error.value.code == "target_below_installment"
+    with team.factory() as session:
+        values = ReferenceRateValueRepository(session, team.ctx("owner", "owner")).for_rate(rate_id)
+        assert [value.effective_from for value in values] == [date(2026, 1, 1)]
+
+
 def test_validation_rules(team: WorkspaceDb) -> None:
     with pytest.raises(LoanValidationError):
         _original_loan(team, term_months=0)

@@ -4,13 +4,13 @@
 {% from "loans/_macros.html" import rate, cost_value, kind_label, overpayment_label with context %}
 {% block title %}{{ loan.name }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Loans") }}{% endblock %}
-{% block header_actions %}
-<a href="{{ scoped_url(request, 'loans') }}" class="btn">{{ _("Back to Loans") }}</a>
-{% if can_edit and not loan.archived %}<a href="{{ scoped_url(request, 'loan_edit', loan_id=loan.id) }}" class="btn-primary" data-edit-terms>{{ _("Edit terms") }}</a>{% endif %}
-{% endblock %}
 {% block content %}
 {% set input_class = "form-control px-3 py-2" %}
 {{ tabs("loans") }}
+<div class="mt-4 flex flex-wrap items-center gap-2" data-page-actions>
+  <a href="{{ scoped_url(request, 'loans') }}" class="btn">{{ _("Back to Loans") }}</a>
+  {% if can_edit and not loan.archived %}<a href="{{ scoped_url(request, 'loan_edit', loan_id=loan.id) }}" class="btn-primary" data-edit-terms>{{ _("Edit terms") }}</a>{% endif %}
+</div>
 {% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 
@@ -29,7 +29,7 @@
     <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Original principal") }}</dt><dd class="mt-1 tabular-nums">{% if loan.principal_original %}{{ format_money(loan.principal_original, locale) }}{% else %}—{% endif %}</dd></div>
     <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Current balance") }}</dt><dd class="mt-1 tabular-nums">{% if loan.current_balance %}{{ format_money(loan.current_balance, locale) }}{% else %}—{% endif %}{% if loan.balance_date %}<span class="block text-xs text-muted">{{ _("as of %(date)s", date=format_day(loan.balance_date, locale)) }}</span>{% endif %}</dd></div>
     <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Term") }}</dt><dd class="mt-1">{{ ngettext("%(num)d month", "%(num)d months", loan.term_months, num=loan.term_months) }}</dd></div>
-    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Next payment") }}</dt><dd class="mt-1">{{ format_day(loan.first_payment_date, locale) }} · {{ _("day %(day)s", day=loan.payment_day) }}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("First payment") if loan.entry_path == "original" else _("Next payment") }}</dt><dd class="mt-1">{{ format_day(loan.first_payment_date, locale) }} · {{ _("day %(day)s", day=loan.payment_day) }}</dd></div>
     <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Rate type") }}</dt><dd class="mt-1">{{ _("Fixed") if loan.rate_mode.value == "fixed" else _("Variable") }}{% if loan.reference_rate_name %} · {{ loan.reference_rate_name }}{% if loan.margin_bp is not none %} + {{ format_rate_short(loan.margin_bp, locale) }}{% endif %}{% endif %}</dd></div>
     <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("First installment") }}</dt><dd class="mt-1 tabular-nums">{% if loan.first_installment %}{{ format_money(loan.first_installment, locale) }}{% else %}—{% endif %}</dd></div>
     <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Installment override") }}</dt><dd class="mt-1 tabular-nums">{% if loan.installment_override %}{{ format_money(loan.installment_override, locale) }}{% else %}—{% endif %}</dd></div>

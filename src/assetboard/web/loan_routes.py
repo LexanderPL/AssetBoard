@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 from datetime import date
 from decimal import Decimal
 from typing import cast
@@ -198,7 +199,10 @@ def _error(request: Request, code: str | None) -> str | None:
 def _notice(request: Request, code: str | None) -> str | None:
     if not code:
         return None
-    return gettext(NOTICES.get(code, NOTICES["failed"]), request.state.locale)
+    message = NOTICES.get(code)
+    if message is None:
+        return None
+    return gettext(message, request.state.locale)
 
 
 def _date(value: str, field: str) -> date:
@@ -265,9 +269,14 @@ def _wizard_values(raw: dict[str, str]) -> dict[str, str]:
         "rate_mode": "fixed",
         "overpayment_mode": "none",
         "overpayment_strategy": "reduce_term",
-        "payment_day": "1",
     }
-    return {key: raw.get(key, defaults.get(key, "")) for key in WIZARD_FIELDS}
+    values = {key: raw.get(key, defaults.get(key, "")) for key in WIZARD_FIELDS}
+    # The payment day is usually the first payment date's day. Leaving the field empty takes
+    # that day; entering 31 keeps month-end semantics for the following months.
+    if not values["payment_day"] and values["first_payment_date"]:
+        with contextlib.suppress(ValueError):
+            values["payment_day"] = str(date.fromisoformat(values["first_payment_date"]).day)
+    return values
 
 
 def _wizard_start(values: dict[str, str]) -> date | None:
@@ -618,6 +627,7 @@ async def reference_rates_page(request: Request, ctx: CurrentContext) -> Respons
             "form_values": {},
             "open_form": request.query_params.get("form"),
             "edit_id": request.query_params.get("edit"),
+            "value_edit_id": request.query_params.get("value"),
             "today": ctx.clock.today(ctx.workspace.timezone),
             "format_day": format_day,
             "format_rate_short": format_rate_short,
@@ -654,6 +664,7 @@ async def reference_rate_create(request: Request, ctx: CurrentContext) -> Respon
                 "form_values": values,
                 "open_form": "rate",
                 "edit_id": None,
+                "value_edit_id": None,
                 "today": ctx.clock.today(ctx.workspace.timezone),
                 "format_day": format_day,
                 "format_rate_short": format_rate_short,
@@ -697,6 +708,7 @@ async def reference_rate_update(request: Request, ctx: CurrentContext, rate_id: 
                 "form_values": values,
                 "open_form": "rate",
                 "edit_id": str(rate_id),
+                "value_edit_id": None,
                 "today": ctx.clock.today(ctx.workspace.timezone),
                 "format_day": format_day,
                 "format_rate_short": format_rate_short,
@@ -770,6 +782,7 @@ async def reference_rate_value_create(
                 "form_values": values,
                 "open_form": "value",
                 "edit_id": str(rate_id),
+                "value_edit_id": None,
                 "today": ctx.clock.today(ctx.workspace.timezone),
                 "format_day": format_day,
                 "format_rate_short": format_rate_short,
@@ -823,6 +836,7 @@ async def reference_rate_value_update(
                 "form_values": values,
                 "open_form": "value",
                 "edit_id": str(rate_id),
+                "value_edit_id": str(value_id),
                 "today": ctx.clock.today(ctx.workspace.timezone),
                 "format_day": format_day,
                 "format_rate_short": format_rate_short,
@@ -1020,13 +1034,16 @@ async def loan_restore(request: Request, ctx: CurrentContext, loan_id: UUID) -> 
 async def loan_rate_change_create(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
     values = await _form_values(request)
     try:
+        rate_bp = _percent(values, "rate_percent", request.state.locale)
+        if rate_bp is None:
+            raise loans.LoanError("rate_percent", "invalid_rate")
         await run_in_threadpool(
             loans.add_rate_change,
             request.app.state.session_factory,
             ctx,
             loan_id,
             effective_from=_date(values.get("effective_from", ""), "effective_from"),
-            rate_bp=_percent(values, "rate_percent", request.state.locale) or 0,
+            rate_bp=rate_bp,
             high_rate_confirmed=values.get("high_rate_confirmed") == "1",
         )
     except (loans.LoanError, LoanValidationError) as exc:
@@ -1056,6 +1073,9 @@ async def loan_rate_change_update(
 ) -> Response:
     values = await _form_values(request)
     try:
+        rate_bp = _percent(values, "rate_percent", request.state.locale)
+        if rate_bp is None:
+            raise loans.LoanError("rate_percent", "invalid_rate")
         await run_in_threadpool(
             loans.update_rate_change,
             request.app.state.session_factory,
@@ -1063,7 +1083,7 @@ async def loan_rate_change_update(
             loan_id,
             change_id,
             effective_from=_date(values.get("effective_from", ""), "effective_from"),
-            rate_bp=_percent(values, "rate_percent", request.state.locale) or 0,
+            rate_bp=rate_bp,
             high_rate_confirmed=values.get("high_rate_confirmed") == "1",
         )
     except (loans.LoanError, LoanValidationError) as exc:

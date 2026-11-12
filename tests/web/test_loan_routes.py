@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from uuid import UUID
 
 from sqlalchemy import select
 
@@ -115,6 +116,53 @@ def test_original_path_wizard_keeps_values_and_saves(owner):
             ).all()
             == []
         )
+
+
+def test_loan_detail_renders_a_notice_and_ignores_unknown_codes(owner):
+    loan_id = _create_original(owner)
+    notice = owner.client.get(f"/loans/{loan_id}?notice=loan_created")
+    assert notice.status_code == 200
+    assert "Loan saved." in notice.text
+    unknown = owner.client.get(f"/loans/{loan_id}?notice=unknown")
+    assert unknown.status_code == 200
+
+
+def test_payment_day_defaults_to_the_first_payment_date(owner):
+    loan_id = _create_original(owner, first_payment_date="2026-02-15", payment_day="")
+    with owner.db() as session:
+        loan = session.get(Loan, UUID(loan_id))
+        assert loan is not None
+        assert loan.payment_day == 15
+
+
+def test_rate_change_requires_an_explicit_rate(owner):
+    loan_id = _create_original(owner)
+    response = owner.post(
+        f"/loans/{loan_id}/rate-changes",
+        {"effective_from": "2027-01-01", "rate_percent": "", "high_rate_confirmed": ""},
+    )
+    assert response.status_code == 400
+    assert "Enter a rate" in response.text
+
+
+def test_a_rate_change_cannot_push_a_target_below_the_installment(owner):
+    loan_id = _create_original(
+        owner,
+        overpayment_mode="target_total",
+        overpayment_amount="2,000.00",
+    )
+    response = owner.post(
+        f"/loans/{loan_id}/rate-changes",
+        {
+            "effective_from": "2026-01-15",
+            "rate_percent": "30",
+            "high_rate_confirmed": "1",
+        },
+    )
+    assert response.status_code == 400
+    assert "target total cannot be below" in response.text
+    with owner.db() as session:
+        assert len(session.scalars(select(LoanRateChange)).all()) == 1
 
 
 def test_current_balance_wizard_creates_one_checkpoint(owner):

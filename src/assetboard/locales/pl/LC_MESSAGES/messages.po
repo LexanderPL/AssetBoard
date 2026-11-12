@@ -7190,6 +7190,9 @@ msgstr[0] "%(num)d miesiąc"
 msgstr[1] "%(num)d miesiące"
 msgstr[2] "%(num)d miesięcy"
 
+msgid "First payment"
+msgstr "Pierwsza płatność"
+
 msgid "Next payment"
 msgstr "Następna płatność"
 
@@ -7499,6 +7502,9 @@ msgstr "Dodaj kredyt"
 msgid "Rate"
 msgstr "Stopa"
 
+msgid "Payment date"
+msgstr "Data płatności"
+
 msgid "Open"
 msgstr "Otwórz"
 
@@ -7547,10 +7553,12 @@ msgstr "Część kapitałowa jest równa każdego miesiąca, więc rata maleje w
 msgid "All amounts are in %(currency)s, the workspace currency."
 msgstr "Wszystkie kwoty są w %(currency)s, walucie obszaru roboczego."
 
-msgid "The nominal day for later months. A shorter month uses its last day."
+msgid ""
+"Leave empty to use the first payment date's day. A shorter month uses its"
+" last day."
 msgstr ""
-"Nominalny dzień dla kolejnych miesięcy. Krótszy miesiąc używa ostatniego "
-"dnia."
+"Pozostaw puste, aby użyć dnia pierwszej płatności. Krótszy miesiąc używa "
+"ostatniego dnia."
 
 msgid "Only needed to show how much you have repaid."
 msgstr "Potrzebne tylko do pokazania, ile już spłacono."

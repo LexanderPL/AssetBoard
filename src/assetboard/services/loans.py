@@ -302,6 +302,33 @@ def _validate_high_rate(rate_bp: int, confirmed: bool) -> None:
         raise LoanError("rate_bp", "high_rate_confirmation_required")
 
 
+def _validate_current_target(session: Session, ctx: Context, loan: Loan) -> None:
+    """A rate change must not make a target-total overpayment below the first installment."""
+    if (
+        loan.overpayment_mode != OverpaymentMode.TARGET_TOTAL.value
+        or loan.overpayment_amount_minor is None
+    ):
+        return
+    changes = LoanRateChangeRepository(session, ctx).for_loan(loan.id)
+    checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
+    reference_values = (
+        ReferenceRateValueRepository(session, ctx).for_rate(loan.reference_rate_id)
+        if loan.reference_rate_id is not None
+        else []
+    )
+    _validate_target(
+        Money(loan.overpayment_amount_minor, loan.currency),
+        _target_installment(loan, changes, reference_values, checkpoints),
+    )
+
+
+def _validate_reference_targets(session: Session, ctx: Context, rate_id: UUID) -> None:
+    """Re-check target-total loans that use a changed reference-rate series."""
+    for loan in LoanRepository(session, ctx).ordered():
+        if loan.reference_rate_id == rate_id:
+            _validate_current_target(session, ctx, loan)
+
+
 def _view(
     loan: Loan,
     changes: list[LoanRateChange],
@@ -940,6 +967,7 @@ def add_rate_change(
             raise LoanError("effective_from", "rate_change_exists")
         repository.create(loan_id=loan.id, effective_from=effective_from, rate_bp=rate_bp)
         _validate_rate_timeline(loan, repository.for_loan(loan.id), _loan_start(loan, checkpoints))
+        _validate_current_target(session, ctx, loan)
         _audit(
             session,
             ctx,
@@ -985,6 +1013,7 @@ def update_rate_change(
             raise LoanError("effective_from", "rate_change_exists")
         repository.update(change.id, effective_from=effective_from, rate_bp=rate_bp)
         _validate_rate_timeline(loan, repository.for_loan(loan.id), start)
+        _validate_current_target(session, ctx, loan)
         _audit(
             session,
             ctx,
@@ -1014,6 +1043,7 @@ def delete_rate_change(
         remaining = [row for row in repository.for_loan(loan.id) if row.id != change.id]
         _validate_rate_timeline(loan, remaining, _loan_start(loan, checkpoints))
         repository.delete(change)
+        _validate_current_target(session, ctx, loan)
         _audit(
             session,
             ctx,
@@ -1449,6 +1479,7 @@ def add_reference_rate_value(
             effective_from=effective_from,
             value_bp=value_bp,
         )
+        _validate_reference_targets(session, ctx, rate.id)
         _audit(
             session,
             ctx,
@@ -1503,6 +1534,7 @@ def update_reference_rate_value(
         if repository.exists_on(rate.id, effective_from, exclude_id=value.id):
             raise LoanError("effective_from", "value_exists")
         repository.update(value.id, effective_from=effective_from, value_bp=value_bp)
+        _validate_reference_targets(session, ctx, rate.id)
         _audit(
             session,
             ctx,
@@ -1527,6 +1559,7 @@ def delete_reference_rate_value(
         today = ctx.clock.today(ctx.workspace.timezone)
         value = _future_reference_value(session, ctx, rate.id, value_id, today)
         ReferenceRateValueRepository(session, ctx).delete(value)
+        _validate_reference_targets(session, ctx, rate.id)
         _audit(
             session,
             ctx,
