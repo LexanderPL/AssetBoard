@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% block title %}{{ _("Add loan") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Add loan") }}{% endblock %}
+{% block content %}
+{% set input_class = "form-control px-3 py-2" %}
+{% set option_class = "flex cursor-pointer items-start gap-3 border border-line bg-surface p-3 hover:bg-subtle has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40" %}
+<a href="{{ scoped_url(request, 'loans') }}" class="mb-4 inline-flex rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Back to Loans") }}</a>
+<ol class="mb-4 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label="{{ _('Steps') }}" data-wizard-steps>
+  {% for label in steps %}
+  <li class="flex items-center gap-2 {% if loop.index == step %}font-semibold text-ink {% else %}text-muted {% endif %}"{% if loop.index == step %} aria-current="step"{% endif %}>
+    <span class="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold {% if loop.index == step %}bg-primary text-on-primary {% elif loop.index < step %}bg-primary-soft text-primary-ink {% else %}border border-line {% endif %}" aria-hidden="true">{{ loop.index }}</span>{{ label }}
+  </li>
+  {% endfor %}
+</ol>
+<section class="panel max-w-3xl p-5 sm:p-6" aria-labelledby="wizard-step-heading">
+  <h2 id="wizard-step-heading" class="sr-only">{{ _("Step %(step)s of %(total)s: %(label)s", step=step, total=last_step, label=steps[step - 1]) }}</h2>
+  {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ error }}</p>{% endif %}
+  <form id="loan-wizard" method="post" action="{{ scoped_url(request, 'loan_new_step') }}" class="grid gap-6" data-loan-wizard="{{ step }}">
+    {{ csrf_input() }}
+    <input type="hidden" name="step" value="{{ step }}">
+    {% for name in hidden_fields %}<input type="hidden" name="{{ name }}" value="{{ values.get(name, '') }}">{% endfor %}
+
+    {% if step == 1 %}
+    <fieldset class="grid gap-2">
+      <legend class="mb-2 text-sm font-medium">{{ _("How much do you know about the loan?") }}</legend>
+      <div class="grid gap-2 sm:grid-cols-2">
+        {% for value, title, description in (
+          ("original", _("I know the original terms"), _("Principal, origination date, term and first payment date.")),
+          ("current", _("I only know my current balance"), _("The balance today, the remaining months and the next payment date.")),
+        ) %}
+        <label class="{{ option_class }}" data-entry-path-option="{{ value }}">
+          <input type="radio" name="entry_path" value="{{ value }}" class="mt-1 h-4 w-4 accent-primary"{% if values.get('entry_path', 'original') == value %} checked{% endif %}>
+          <span class="grid gap-0.5"><span class="text-sm font-semibold">{{ title }}</span><span class="text-sm text-muted">{{ description }}</span></span>
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <label class="grid gap-1 text-sm font-medium">{{ _("Name") }}<input name="name" value="{{ values.get('name', '') }}" maxlength="200" required class="{{ input_class }} font-normal"></label>
+    <fieldset class="grid gap-2">
+      <legend class="mb-2 text-sm font-medium">{{ _("Loan type") }}</legend>
+      <div class="grid gap-2 sm:grid-cols-2">
+        {% for value, title, description in (
+          ("annuity", _("Annuity"), _("The installment stays roughly the same; more interest is paid first.")),
+          ("equal_principal", _("Equal principal"), _("The principal part is equal each month, so the installment falls over time.")),
+        ) %}
+        <label class="{{ option_class }}" data-kind-option="{{ value }}">
+          <input type="radio" name="kind" value="{{ value }}" class="mt-1 h-4 w-4 accent-primary"{% if values.get('kind', 'annuity') == value %} checked{% endif %}>
+          <span class="grid gap-0.5"><span class="text-sm font-semibold">{{ title }}</span><span class="text-sm text-muted">{{ description }}</span></span>
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <p class="text-xs text-muted">{{ _("All amounts are in %(currency)s, the workspace currency.", currency=workspace_nav.current.base_currency) }}</p>
+
+    {% elif step == 2 and values.get('entry_path', 'original') == 'current' %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="grid gap-1 text-sm font-medium">{{ _("Current balance (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="current_balance" value="{{ values.get('current_balance', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Balance date") }}<input name="balance_date" type="date" value="{{ values.get('balance_date', '') }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Remaining months") }}<input name="term_months" type="number" min="1" max="600" value="{{ values.get('term_months', '') }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Next payment date") }}<input name="first_payment_date" type="date" value="{{ values.get('first_payment_date', '') }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Payment day") }}<input name="payment_day" type="number" min="1" max="31" value="{{ values.get('payment_day', '') }}" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Leave empty to use the first payment date's day. A shorter month uses its last day.") }}</span></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Original principal (optional)") }}<input name="principal_original" value="{{ values.get('principal_original', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Only needed to show how much you have repaid.") }}</span></label>
+    </div>
+
+    {% elif step == 2 %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="grid gap-1 text-sm font-medium">{{ _("Original principal (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="principal_original" value="{{ values.get('principal_original', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Origination date") }}<input name="origination_date" type="date" value="{{ values.get('origination_date', '') }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Term in months") }}<input name="term_months" type="number" min="1" max="600" value="{{ values.get('term_months', '') }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("First payment date") }}<input name="first_payment_date" type="date" value="{{ values.get('first_payment_date', '') }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Payment day") }}<input name="payment_day" type="number" min="1" max="31" value="{{ values.get('payment_day', '') }}" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Leave empty to use the first payment date's day. A shorter month uses its last day.") }}</span></label>
+    </div>
+
+    {% elif step == 3 %}
+    <fieldset class="grid gap-2">
+      <legend class="mb-2 text-sm font-medium">{{ _("Interest") }}</legend>
+      <div class="grid gap-2 sm:grid-cols-2">
+        {% for value, title, description in (
+          ("fixed", _("Fixed rate"), _("I enter the rate and any later changes.")),
+          ("variable", _("Variable rate"), _("A reference rate plus a margin; I add the reference values.")),
+        ) %}
+        <label class="{{ option_class }}" data-rate-mode-option="{{ value }}">
+          <input type="radio" name="rate_mode" value="{{ value }}" class="mt-1 h-4 w-4 accent-primary"{% if values.get('rate_mode', 'fixed') == value %} checked{% endif %}>
+          <span class="grid gap-0.5"><span class="text-sm font-semibold">{{ title }}</span><span class="text-sm text-muted">{{ description }}</span></span>
+        </label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <div class="grid gap-4 sm:grid-cols-2" data-hidden-when="rate_mode=variable">
+      <label class="grid gap-1 text-sm font-medium">{{ _("Annual interest rate") }}<input name="fixed_rate_percent" value="{{ values.get('fixed_rate_percent', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("For example 5.5 for 5.5%%. Add later changes on the loan page.") }}</span></label>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2" data-hidden-when="rate_mode=fixed">
+      <label class="grid gap-1 text-sm font-medium">{{ _("Reference rate") }}<select name="reference_rate_id" class="form-select py-2 font-normal">
+        <option value="">{{ _("Choose a reference rate") }}</option>
+        {% for rate in reference_rates %}<option value="{{ rate.id }}"{% if values.get('reference_rate_id') == rate.id|string %} selected{% endif %}>{{ rate.name }}{% if rate.current_value_bp is not none %} · {{ format_rate_short(rate.current_value_bp, locale) }}{% endif %}</option>{% endfor %}
+      </select>{% if not reference_rates %}<span class="text-xs text-muted">{{ _("No reference rates yet. Create one on the Reference rates page first.") }}</span>{% endif %}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Margin") }}<input name="margin_percent" value="{{ values.get('margin_percent', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Added to the reference rate. For example 1.5 for 1.5%%.") }}</span></label>
+    </div>
+    {% if high_rate or values.get('high_rate_confirmed') == '1' %}
+    <label class="flex items-start gap-2 border border-warning-line bg-warning-soft p-3 text-sm"><input type="checkbox" name="high_rate_confirmed" value="1" class="mt-0.5 h-4 w-4 accent-primary"{% if values.get('high_rate_confirmed') == '1' %} checked{% endif %}> <span>{{ _("I understand this rate is above 25%%.") }}</span></label>
+    {% endif %}
+
+    {% else %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="grid gap-1 text-sm font-medium" data-hidden-when="kind=equal_principal">{{ _("Installment override (%(currency)s, optional)", currency=workspace_nav.current.base_currency) }}<input name="installment_override" value="{{ values.get('installment_override', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Leave empty to use the calculated installment. Enter the bank's amount if it differs.") }}</span></label>
+    </div>
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="grid gap-1 text-sm font-medium">{{ _("Regular overpayment") }}<select name="overpayment_mode" class="form-select py-2 font-normal">
+        {% for value, label in (("none", _("None")), ("fixed_extra", _("A fixed extra each month")), ("target_total", _("A target total each month"))) %}<option value="{{ value }}"{% if values.get('overpayment_mode', 'none') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select></label>
+      <label class="grid gap-1 text-sm font-medium" data-hidden-when="overpayment_mode=none">{{ _("Amount (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="overpayment_amount" value="{{ values.get('overpayment_amount', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("For a target, this includes principal, interest and costs.") }}</span></label>
+      <label class="grid gap-1 text-sm font-medium" data-hidden-when="overpayment_mode=none">{{ _("What happens with the extra money?") }}<select name="overpayment_strategy" class="form-select py-2 font-normal"><option value="reduce_term"{% if values.get('overpayment_strategy', 'reduce_term') == 'reduce_term' %} selected{% endif %}>{{ _("Shorten the term") }}</option><option value="reduce_installment"{% if values.get('overpayment_strategy', 'reduce_term') == 'reduce_installment' %} selected{% endif %}>{{ _("Lower the monthly installment") }}</option></select></label>
+    </div>
+    <p class="text-sm text-muted">{{ _("After saving you can add rate changes, cost components and one-off overpayments on the loan page.") }}</p>
+    {% endif %}
+
+    <div class="flex flex-wrap items-center gap-2 border-t border-line pt-4">
+      <button type="submit" name="go" value="next" class="btn-primary" data-wizard-next>{{ _("Save loan") if step == last_step else _("Next") }}</button>
+      {% if step == 1 %}
+      <a href="{{ scoped_url(request, 'loans') }}" class="order-first rounded-lg border border-line px-4 py-2 text-sm font-medium hover:bg-subtle">{{ _("Cancel") }}</a>
+      {% else %}
+      <button type="submit" name="go" value="back" formnovalidate class="order-first rounded-lg border border-line px-4 py-2 text-sm font-medium hover:bg-subtle" data-wizard-back>{{ _("Back") }}</button>
+      {% endif %}
+    </div>
+  </form>
+</section>
+{% endblock %}

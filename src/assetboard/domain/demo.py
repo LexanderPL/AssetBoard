@@ -27,7 +27,7 @@ from typing import Literal
 
 from assetboard.domain.money import Money
 
-DEMO_DATASET_VERSION: int = 1
+DEMO_DATASET_VERSION: int = 2
 
 CURRENCY_FACTORS: MappingProxyType[str, Decimal] = MappingProxyType(
     {
@@ -215,6 +215,48 @@ class DemoBondTerms:
 
 
 @dataclass(frozen=True, slots=True)
+class DemoReferenceRate:
+    name: str
+    notes: str
+    values: tuple[tuple[date, int], ...]  # (effective_from, annual_rate_bp)
+
+
+@dataclass(frozen=True, slots=True)
+class DemoLoanCost:
+    name: str
+    mode: str
+    rate_bp: int | None
+    fixed: Money | None
+    effective_from: date
+    effective_to: date | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class DemoLoan:
+    name: str
+    kind: str
+    entry_path: str
+    principal_original: Money | None
+    current_balance: Money | None
+    balance_date: date | None
+    origination_date: date | None
+    first_payment_date: date
+    term_months: int
+    payment_day: int
+    rate_mode: str
+    fixed_rate_bp: int | None
+    reference_rate_name: str | None
+    margin_bp: int | None
+    installment_override: Money | None
+    overpayment_mode: str
+    overpayment_amount: Money | None
+    overpayment_strategy: str
+    rate_changes: tuple[tuple[date, int], ...]
+    costs: tuple[DemoLoanCost, ...]
+    overpayments: tuple[tuple[date, Money, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class DemoRiskPolicy:
     safe_bp: int
     growth_bp: int
@@ -253,6 +295,8 @@ class DemoPlan:
     bond_terms: DemoBondTerms
     risk_policy: DemoRiskPolicy
     csv_rows: tuple[DemoCsvRow, ...]
+    reference_rates: tuple[DemoReferenceRate, ...]
+    loans: tuple[DemoLoan, ...]
 
 
 # ---------------------------------------------------------------------------
@@ -552,6 +596,7 @@ def build_plan(
     )
 
     csv_rows = _csv_rows(reference_date, currency, translate)
+    reference_rates, demo_loans = _loan_plan(reference_date, currency, translate)
 
     return DemoPlan(
         version=DEMO_DATASET_VERSION,
@@ -576,7 +621,102 @@ def build_plan(
             safe_bp=5000, growth_bp=4000, speculative_bp=1000, tolerance_bp=500
         ),
         csv_rows=csv_rows,
+        reference_rates=reference_rates,
+        loans=demo_loans,
     )
+
+
+def _loan_plan(
+    reference: date, currency: str, translate: Translate
+) -> tuple[tuple[DemoReferenceRate, ...], tuple[DemoLoan, ...]]:
+    """One fixed mortgage entered from its original terms and one variable car loan."""
+    start = _month_start(reference, -36)
+    mid = _month_start(reference, -12)
+    reference_name = translate(_("Sample reference rate"))
+    reference_rates = (
+        DemoReferenceRate(
+            name=reference_name,
+            notes=translate(_("Synthetic reference-rate series for the demo")),
+            values=((start, 400), (mid, 450)),
+        ),
+    )
+    mortgage_principal = convert_amount(Decimal("300000"), currency, whole=True)
+    mortgage = DemoLoan(
+        name=translate(_("Mortgage")),
+        kind="annuity",
+        entry_path="original",
+        principal_original=mortgage_principal,
+        current_balance=None,
+        balance_date=None,
+        origination_date=start,
+        first_payment_date=_month_start(reference, -35),
+        term_months=300,
+        payment_day=1,
+        rate_mode="fixed",
+        fixed_rate_bp=550,
+        reference_rate_name=None,
+        margin_bp=None,
+        installment_override=None,
+        overpayment_mode="fixed_extra",
+        overpayment_amount=convert_amount(Decimal("100"), currency, whole=True),
+        overpayment_strategy="reduce_term",
+        rate_changes=((start, 550), (mid, 600)),
+        costs=(
+            DemoLoanCost(
+                name=translate(_("Life insurance")),
+                mode="percent",
+                rate_bp=10,
+                fixed=None,
+                effective_from=start,
+            ),
+            DemoLoanCost(
+                name=translate(_("Bank fee")),
+                mode="fixed",
+                rate_bp=None,
+                fixed=convert_amount(Decimal("25"), currency, whole=True),
+                effective_from=start,
+            ),
+        ),
+        overpayments=(
+            (
+                _month_start(reference, -2),
+                convert_amount(Decimal("1000"), currency, whole=True),
+                translate(_("Annual bonus")),
+            ),
+        ),
+    )
+    car = DemoLoan(
+        name=translate(_("Car loan")),
+        kind="equal_principal",
+        entry_path="current",
+        principal_original=convert_amount(Decimal("20000"), currency, whole=True),
+        current_balance=convert_amount(Decimal("15000"), currency, whole=True),
+        balance_date=_month_start(reference, -1),
+        origination_date=None,
+        first_payment_date=_month_start(reference, 0),
+        term_months=36,
+        payment_day=1,
+        rate_mode="variable",
+        fixed_rate_bp=None,
+        reference_rate_name=reference_name,
+        margin_bp=150,
+        installment_override=None,
+        overpayment_mode="none",
+        overpayment_amount=None,
+        overpayment_strategy="reduce_term",
+        rate_changes=(),
+        costs=(
+            DemoLoanCost(
+                name=translate(_("Bank fee")),
+                mode="fixed",
+                rate_bp=None,
+                fixed=convert_amount(Decimal("10"), currency, whole=True),
+                effective_from=_month_start(reference, -1),
+            ),
+        ),
+        overpayments=(),
+    )
+    return reference_rates, (mortgage, car)
 
 
 def _recurring_plan(reference: date, currency: str, translate: Translate) -> list[DemoRecurring]:

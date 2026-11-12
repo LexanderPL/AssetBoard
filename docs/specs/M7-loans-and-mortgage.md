@@ -47,6 +47,37 @@ LoanBalanceCheckpoint models + migration (reuse the PercentOrFixed value object 
 No schedule computation yet. Tests for validation rules and workspace scoping.
 ```
 
+### As built (M7.F7.1)
+
+The eight product-owner decisions implemented in F7.1:
+
+1. `first_payment_date` is the first actual due date and `payment_day` the nominal day for later
+   months. Both are required on the original path; leaving the wizard's payment-day field empty
+   uses the first payment date's day. The first date must equal
+   `min(payment_day, last_day_of_month(first_payment_date))`.
+2. The current-balance path collects the balance, balance date, remaining months, next payment
+   date, payment day and optional original principal. It creates one checkpoint. A fixed initial
+   rate is effective from the balance date; `origination_date` stays empty.
+3. `kind` is editable after creation. `rate_mode` is fixed at creation: switching fixed↔variable
+   requires archiving the loan and creating a new one.
+4. A cost component's `effective_to` is inclusive. Multiple active components may overlap and are
+   all summed.
+5. Rates above 25.00% require explicit confirmation (25.00% itself does not). The absolute
+   maximum is 100%; a margin must be non-negative.
+6. The wizard collects the core terms, the initial/current rate and regular overpayment settings.
+   Rate changes, cost components and one-off overpayments are added on the loan detail page.
+7. All loan amounts use the workspace base currency and a loan locks that currency. One-off
+   overpayments are planned rows. Reference rates are workspace-scoped: viewers read, editors and
+   owners write. Loans archive/restore and are never hard-deleted. F7.7 owns installment plans.
+   Target-total validation uses the pure `first_installment` helper, which F7.2 reuses.
+8. No schedule computation beyond that validation helper.
+
+Implementation notes: the new loan tables also join the M4 archive emptiness checks so a restore
+cannot target a workspace that already has loans; F7.8 adds their archive files. The demo builder
+creates one fixed mortgage entered from original terms and one variable car loan entered from its
+current balance. `day_count`, the property link and the scheduled-item link remain out of F7.1;
+F7.6 uses a net-worth property item rather than the earlier `property_instrument_id` sketch.
+
 ---
 
 ## F7.2 Schedule engine (pure domain)

@@ -51,7 +51,7 @@ from assetboard.db.repositories import (
     create_owned_workspace,
 )
 from assetboard.domain.identity import InvalidEmail, normalize_email
-from assetboard.services import categories, investment_transactions, investments, networth
+from assetboard.services import categories, investment_transactions, investments, loans, networth
 from assetboard.services.auth import record_auth_event
 from assetboard.services.budget import workspace_has_budget_lines
 from assetboard.services.context import (
@@ -93,6 +93,7 @@ BASE_CURRENCY_LOCKS: list[Callable[[Session, Context], bool]] = [
     workspace_has_income_amounts,
     workspace_has_fixed_tax_amounts,
     investment_transactions.workspace_has_investment_transactions,
+    loans.workspace_has_loans,
 ]
 
 

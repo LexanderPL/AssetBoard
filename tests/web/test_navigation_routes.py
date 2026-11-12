@@ -283,16 +283,16 @@ def test_the_sidebar_order_and_current_page(nav: OwnerApp) -> None:
         page = nav.client.get(path).text
         marked = re.findall(r'data-(\w+)-link aria-current="page"', page)
         assert marked == [current], path
-    # Loans and FIRE are not implemented: both are disabled items, never dead links.
+    # Loans is implemented; FIRE is still a disabled item, never a dead link.
+    assert re.search(r'<a class="nav-link" href="/loans"[^>]*data-loans-link', nav_html)
     assert 'href="#loans"' not in nav_html
-    for label in ("Loans", "FIRE projection"):
-        item = re.search(
-            rf'<span class="nav-link cursor-not-allowed opacity-50" aria-disabled="true">'
-            rf'<span aria-hidden="true">[^<]+</span>{label}'
-            rf'<span class="sr-only">Unavailable</span></span>',
-            nav_html,
-        )
-        assert item is not None, label
+    item = re.search(
+        r'<span class="nav-link cursor-not-allowed opacity-50" aria-disabled="true">'
+        r'<span aria-hidden="true">[^<]+</span>FIRE projection'
+        r'<span class="sr-only">Unavailable</span></span>',
+        nav_html,
+    )
+    assert item is not None, "FIRE projection"
     # Month and Upcoming use different glyphs while keeping their accessible labels.
     assert '<span aria-hidden="true">◷</span>Month' in nav_html
     assert '<span aria-hidden="true">◔</span>Upcoming' in nav_html

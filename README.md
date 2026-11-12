@@ -62,6 +62,7 @@ make check
 - [Transactions](docs/transactions.md): entering, editing and deleting expenses and income; searching, CSV export and changing the category of many entries.
 - [Net worth](docs/net-worth.md): assets and liabilities, categories, values and value history.
 - [Investments](docs/investments.md): asset classes, instruments and allocation weights.
+- [Loans](docs/loans.md): mortgage and loan terms, rates, costs, overpayments and reference rates.
 - [Workspace settings](docs/workspace-settings.md): name, base currency, time zone and formats.
 
 ## Roadmap

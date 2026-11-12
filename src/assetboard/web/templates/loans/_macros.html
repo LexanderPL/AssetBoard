@@ -1,0 +1,21 @@
+{% macro rate(value_bp, locale) -%}
+{%- if value_bp is not none %}{{ format_rate_short(value_bp, locale) }}{% else %}<span class="text-muted">—</span>{% endif -%}
+{%- endmacro %}
+
+{% macro cost_value(value, locale) -%}
+{%- if value.mode == "percent" and value.rate_bp is not none %}{{ format_rate_short(value.rate_bp, locale) }} {{ _("per month") }}
+{%- elif value.fixed is not none %}{{ format_money(value.fixed, locale) }} {{ _("per month") }}
+{%- else %}<span class="text-muted">—</span>{% endif -%}
+{%- endmacro %}
+
+{% macro kind_label(kind) -%}
+{{ _("Annuity") if kind.value == "annuity" else _("Equal principal") }}
+{%- endmacro %}
+
+{% macro overpayment_label(mode, amount, strategy, locale) -%}
+{%- if mode.value == "none" %}{{ _("None") }}
+{%- elif mode.value == "fixed_extra" %}{{ _("Extra %(amount)s each month", amount=format_money(amount, locale)) }}
+{%- else %}{{ _("Target total %(amount)s each month", amount=format_money(amount, locale)) }}
+{%- endif %}
+{%- if mode.value != "none" %} · {{ _("shorten the term") if strategy.value == "reduce_term" else _("lower the installment") }}{% endif -%}
+{%- endmacro %}

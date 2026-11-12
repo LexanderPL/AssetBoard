@@ -30,6 +30,15 @@ from assetboard.db.models.investments import (
     RiskTargetPolicy,
 )
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
+from assetboard.db.models.loans import (
+    Loan,
+    LoanBalanceCheckpoint,
+    LoanCostComponent,
+    LoanOverpayment,
+    LoanRateChange,
+    ReferenceRate,
+    ReferenceRateValue,
+)
 from assetboard.db.models.networth import (
     ItemValuation,
     NetWorthCategory,
@@ -504,6 +513,105 @@ def make_networth_category(session: Session, workspace_id: UUID) -> NetWorthCate
     )
 
 
+def make_reference_rate(session: Session, workspace_id: UUID) -> ReferenceRate:
+    name = f"Reference rate {uuid4().hex[:8]}"
+    return ReferenceRate(
+        workspace_id=workspace_id,
+        name=name,
+        name_key=name.casefold(),
+        notes="",
+    )
+
+
+def make_reference_rate_value(session: Session, workspace_id: UUID) -> ReferenceRateValue:
+    rate = make_reference_rate(session, workspace_id)
+    session.add(rate)
+    session.flush()
+    return ReferenceRateValue(
+        workspace_id=workspace_id,
+        reference_rate_id=rate.id,
+        effective_from=date(2026, 1, 1),
+        value_bp=500,
+    )
+
+
+def make_loan(session: Session, workspace_id: UUID) -> Loan:
+    return Loan(
+        workspace_id=workspace_id,
+        name=f"Loan {uuid4().hex[:8]}",
+        kind="annuity",
+        currency="EUR",
+        principal_original_minor=None,
+        origination_date=None,
+        first_payment_date=date(2026, 1, 1),
+        term_months=12,
+        payment_day=1,
+        rate_mode="fixed",
+        margin_bp=None,
+        reference_rate_id=None,
+        installment_override_minor=None,
+        overpayment_mode="none",
+        overpayment_amount_minor=None,
+        overpayment_strategy="reduce_term",
+        archived_at=None,
+    )
+
+
+def make_loan_rate_change(session: Session, workspace_id: UUID) -> LoanRateChange:
+    loan = make_loan(session, workspace_id)
+    session.add(loan)
+    session.flush()
+    return LoanRateChange(
+        workspace_id=workspace_id,
+        loan_id=loan.id,
+        effective_from=date(2026, 1, 1),
+        rate_bp=500,
+    )
+
+
+def make_loan_cost_component(session: Session, workspace_id: UUID) -> LoanCostComponent:
+    loan = make_loan(session, workspace_id)
+    session.add(loan)
+    session.flush()
+    return LoanCostComponent(
+        workspace_id=workspace_id,
+        loan_id=loan.id,
+        name="Insurance",
+        mode="fixed",
+        rate_bp=None,
+        fixed_minor=1_000,
+        basis="opening_balance",
+        effective_from=date(2026, 1, 1),
+        effective_to=None,
+    )
+
+
+def make_loan_overpayment(session: Session, workspace_id: UUID) -> LoanOverpayment:
+    loan = make_loan(session, workspace_id)
+    session.add(loan)
+    session.flush()
+    return LoanOverpayment(
+        workspace_id=workspace_id,
+        loan_id=loan.id,
+        date=date(2026, 1, 15),
+        amount_minor=10_000,
+        note="",
+    )
+
+
+def make_loan_balance_checkpoint(session: Session, workspace_id: UUID) -> LoanBalanceCheckpoint:
+    loan = make_loan(session, workspace_id)
+    session.add(loan)
+    session.flush()
+    return LoanBalanceCheckpoint(
+        workspace_id=workspace_id,
+        loan_id=loan.id,
+        as_of=date(2026, 1, 1),
+        remaining_principal_minor=100_000,
+        note="",
+    )
+
+
 def make_networth_item(session: Session, workspace_id: UUID) -> NetWorthItem:
     category = make_networth_category(session, workspace_id)
     session.add(category)
@@ -621,5 +729,15 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     ImportCategoryMapping: TenantCase(
         make_import_category_mapping,
         update_values={"source_name_key": "renamed"},
+    ),
+    ReferenceRate: TenantCase(make_reference_rate, update_values={"notes": "Updated"}),
+    ReferenceRateValue: TenantCase(make_reference_rate_value, update_values={"value_bp": 600}),
+    Loan: TenantCase(make_loan, update_values={"name": "Updated loan"}),
+    LoanRateChange: TenantCase(make_loan_rate_change, update_values={"rate_bp": 600}),
+    LoanCostComponent: TenantCase(make_loan_cost_component, update_values={"name": "Updated cost"}),
+    LoanOverpayment: TenantCase(make_loan_overpayment, update_values={"amount_minor": 20_000}),
+    LoanBalanceCheckpoint: TenantCase(
+        make_loan_balance_checkpoint,
+        update_values={"remaining_principal_minor": 90_000},
     ),
 }

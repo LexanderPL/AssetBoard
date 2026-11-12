@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import empty_state with context %}
+{% from "loans/_tabs.html" import tabs with context %}
+{% from "loans/_macros.html" import rate, kind_label with context %}
+{% block title %}{{ _("Loans") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Loans") }}{% endblock %}
+{% block content %}
+{{ tabs("loans") }}
+{% if can_edit and (page.active or page.archived) %}
+<div class="mb-6 flex flex-wrap items-center gap-2" data-page-actions>
+  <a href="{{ scoped_url(request, 'loan_new') }}" class="btn-primary" data-new-loan>{{ _("Add loan") }}</a>
+</div>
+{% endif %}
+{% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
+{% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
+
+{% if page.active %}
+<div class="panel overflow-hidden">
+  <table class="sheet-sm sheet-flush w-full text-sm">
+    <caption class="sr-only">{{ _("Loans") }}</caption>
+    <thead class="hidden border-b border-line bg-subtle text-left text-xs uppercase tracking-wide text-muted sm:table-header-group">
+      <tr>
+        <th scope="col" class="px-4 py-2 font-semibold">{{ _("Name") }}</th>
+        <th scope="col" class="px-4 py-2 font-semibold">{{ _("Type") }}</th>
+        <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Amount") }}</th>
+        <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Rate") }}</th>
+        <th scope="col" class="px-4 py-2 font-semibold">{{ _("Term") }}</th>
+        <th scope="col" class="px-4 py-2 font-semibold">{{ _("Payment date") }}</th>
+        <th scope="col" class="px-4 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-line sm:divide-y-0">
+      {% for loan in page.active %}
+      <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 align-top sm:table-row sm:p-0" data-loan="{{ loan.id }}">
+        <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3">{{ loan.name }}</td>
+        <td class="text-right text-muted sm:px-4 sm:py-3 sm:text-left" data-kind>{{ kind_label(loan.kind) }}</td>
+        <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3" data-amount>
+          {% if loan.current_balance %}{{ format_money(loan.current_balance, locale) }}{% elif loan.principal_original %}{{ format_money(loan.principal_original, locale) }}{% else %}—{% endif %}
+        </td>
+        <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3" data-rate>{{ rate(loan.current_rate_bp, locale) }}</td>
+        <td class="text-muted sm:px-4 sm:py-3" data-term>{{ ngettext("%(num)d month", "%(num)d months", loan.term_months, num=loan.term_months) }}</td>
+        <td class="text-muted sm:px-4 sm:py-3" data-next-payment><time datetime="{{ loan.first_payment_date.isoformat() }}">{{ format_day(loan.first_payment_date, locale) }}</time></td>
+        <td class="col-span-2 pt-1 sm:px-4 sm:py-3">
+          <div class="flex justify-end">
+            <a class="btn-sm" href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}" data-open-loan>{{ _("Open") }}<span class="sr-only"> {{ loan.name }}</span></a>
+          </div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+{% if can_edit %}
+{{ empty_state(_("No loans yet."), _("Add a mortgage or another loan once, from its original terms or from the balance you owe today."), _("Add loan"), scoped_url(request, 'loan_new'), icon="⌂", action_data={"new-loan": ""}) }}
+{% else %}
+{{ empty_state(_("No loans yet."), _("Loans added by an editor or owner will appear here."), icon="⌂") }}
+{% endif %}
+{% endif %}
+
+{% if page.archived %}
+<details class="mt-8" data-archived-loans>
+  <summary class="cursor-pointer text-sm font-semibold text-primary-ink">{{ _("Archived loans") }} ({{ page.archived|length }})</summary>
+  <div class="panel mt-3 overflow-hidden">
+    <table class="sheet-sm sheet-flush w-full text-sm">
+      <caption class="sr-only">{{ _("Archived loans") }}</caption>
+      <thead class="hidden border-b border-line bg-subtle text-left text-xs uppercase tracking-wide text-muted sm:table-header-group">
+        <tr>
+          <th scope="col" class="px-4 py-2 font-semibold">{{ _("Name") }}</th>
+          <th scope="col" class="px-4 py-2 font-semibold">{{ _("Type") }}</th>
+          <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Amount") }}</th>
+          <th scope="col" class="px-4 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-line sm:divide-y-0">
+        {% for loan in page.archived %}
+        <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 align-top text-muted sm:table-row sm:p-0" data-archived-loan="{{ loan.id }}">
+          <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3">{{ loan.name }}</td>
+          <td class="text-right sm:px-4 sm:py-3 sm:text-left">{{ kind_label(loan.kind) }}</td>
+          <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3">{% if loan.current_balance %}{{ format_money(loan.current_balance, locale) }}{% elif loan.principal_original %}{{ format_money(loan.principal_original, locale) }}{% else %}—{% endif %}</td>
+          <td class="col-span-2 pt-1 sm:px-4 sm:py-3"><div class="flex justify-end"><a class="btn-sm" href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}">{{ _("Open") }}<span class="sr-only"> {{ loan.name }}</span></a></div></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</details>
+{% endif %}
+{% endblock %}

@@ -1304,6 +1304,13 @@ WORKSPACE_TABLES = {
     "price_source_configs",
     "provider_errors",
     "risk_target_policies",
+    "loans",
+    "loan_rate_changes",
+    "reference_rates",
+    "reference_rate_values",
+    "loan_cost_components",
+    "loan_overpayments",
+    "loan_balance_checkpoints",
 }
 
 
