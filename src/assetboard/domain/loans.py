@@ -33,6 +33,7 @@ MAX_COST_RATE_BP = 10_000
 class LoanKind(StrEnum):
     ANNUITY = "annuity"
     EQUAL_PRINCIPAL = "equal_principal"
+    INSTALLMENT_PLAN = "installment_plan"
 
 
 class RateMode(StrEnum):

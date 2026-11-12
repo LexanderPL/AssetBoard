@@ -114,7 +114,10 @@ class Loan(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         ),
         CheckConstraint("length(name) > 0", name="name_not_empty"),
         CheckConstraint("length(currency) = 3", name="currency_length"),
-        CheckConstraint("kind IN ('annuity', 'equal_principal')", name="kind_valid"),
+        CheckConstraint(
+            "kind IN ('annuity', 'equal_principal', 'installment_plan')",
+            name="kind_valid",
+        ),
         CheckConstraint("rate_mode IN ('fixed', 'variable')", name="rate_mode_valid"),
         CheckConstraint("day_count IN ('monthly', 'actual_365')", name="day_count_valid"),
         CheckConstraint(
@@ -127,7 +130,9 @@ class Loan(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         ),
         CheckConstraint("payment_day BETWEEN 1 AND 31", name="payment_day_valid"),
         CheckConstraint(
-            f"term_months BETWEEN 1 AND {MAX_TERM_MONTHS}",
+            "(kind = 'installment_plan' AND term_months BETWEEN 0 AND "
+            f"{MAX_TERM_MONTHS}) OR (kind != 'installment_plan' AND "
+            f"term_months BETWEEN 1 AND {MAX_TERM_MONTHS})",
             name="term_valid",
         ),
         CheckConstraint(
@@ -459,3 +464,44 @@ class LoanPayment(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         String(16), nullable=False, default="manual", server_default="manual"
     )
     transaction_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
+
+
+class InstallmentPlan(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
+    """A simple fixed-installment plan (F7.7); the linked Loan supplies the common header."""
+
+    __tablename__ = "installment_plans"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "id", name="uq_installment_plans_workspace_id_id"),
+        UniqueConstraint(
+            "workspace_id",
+            "loan_id",
+            name="uq_installment_plans_workspace_loan",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "loan_id"],
+            ["loans.workspace_id", "loans.id"],
+            name="fk_installment_plans_workspace_loan",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "category_id"],
+            ["categories.workspace_id", "categories.id"],
+            name="fk_installment_plans_workspace_category",
+        ),
+        CheckConstraint(
+            f"installment_minor > 0 AND installment_minor <= {MAX_AMOUNT_MINOR}",
+            name="installment_valid",
+        ),
+        CheckConstraint(
+            f"remaining_count >= 0 AND remaining_count <= {MAX_TERM_MONTHS}",
+            name="remaining_count_valid",
+        ),
+        _date_range("end_date"),
+        Index("ix_installment_plans_workspace_loan", "workspace_id", "loan_id"),
+    )
+
+    loan_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
+    category_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
+    installment_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+    remaining_count: Mapped[int] = mapped_column(Integer(), nullable=False)
+    end_date: Mapped[date] = mapped_column(Date(), nullable=False)
+    closed_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)

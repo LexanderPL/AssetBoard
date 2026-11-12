@@ -6,6 +6,7 @@ from uuid import UUID
 from sqlalchemy import exists, select
 
 from assetboard.db.models.loans import (
+    InstallmentPlan,
     Loan,
     LoanBalanceCheckpoint,
     LoanCostComponent,
@@ -287,3 +288,28 @@ class LoanPaymentRepository(ScopedRepository[LoanPayment]):
             LoanPayment.date == day,
         )
         return list(self._session.scalars(statement.order_by(LoanPayment.created_at)))
+
+
+class InstallmentPlanRepository(ScopedRepository[InstallmentPlan]):
+    model = InstallmentPlan
+
+    def create(self, **values: object) -> InstallmentPlan:
+        return self.add(InstallmentPlan(**values))
+
+    def for_loan(self, loan_id: UUID) -> InstallmentPlan | None:
+        statement = self._scoped_select().where(InstallmentPlan.loan_id == loan_id)
+        return self._session.scalars(statement).one_or_none()
+
+    def get_for_loan(self, loan_id: UUID, plan_id: UUID) -> InstallmentPlan | None:
+        statement = self._scoped_select().where(
+            InstallmentPlan.loan_id == loan_id,
+            InstallmentPlan.id == plan_id,
+        )
+        return self._session.scalars(statement).one_or_none()
+
+    def ordered(self) -> list[InstallmentPlan]:
+        return list(
+            self._session.scalars(
+                self._scoped_select().order_by(InstallmentPlan.created_at, InstallmentPlan.id)
+            )
+        )
