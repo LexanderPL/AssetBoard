@@ -1,14 +1,15 @@
-"""Loan schedule mapping (F7.3).
+"""Loan schedule mapping (F7.3/F7.4).
 
 The service maps the stored loan configuration to the pure F7.2 engine types, builds the
 configured schedule and a no-overpayment baseline, and returns the summary. There is no finance
 math here: every row and total comes from ``domain.loans.build_schedule`` and
-``summarize_schedule``.
+``summarize_schedule``. F7.4 reuses the loaded inputs for what-if scenarios.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -16,13 +17,16 @@ from sqlalchemy.orm import Session, sessionmaker
 from assetboard.domain.loans import (
     BalanceCheckpoint,
     CostPeriod,
+    DayCount,
     LoanScheduleSummary,
     LoanTerms,
     LoanValidationError,
     OneOffOverpayment,
     OverpaymentMode,
+    OverpaymentStrategy,
     RatePeriod,
     Schedule,
+    ScheduleAnchor,
     ScheduleError,
     build_schedule,
     select_anchor,
@@ -40,6 +44,21 @@ class LoanScheduleData:
     summary: LoanScheduleSummary | None
     has_overpayments: bool
     error_code: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class LoanScheduleInputs:
+    """Everything the pure engine needs for one loan, loaded once."""
+
+    view: loans.LoanView
+    terms: LoanTerms
+    rate_timeline: list[RatePeriod]
+    costs: list[CostPeriod]
+    overpayments: list[OneOffOverpayment]
+    anchor: ScheduleAnchor
+    as_of: date
+    day_count: DayCount
+    strategy: OverpaymentStrategy
 
 
 def _terms(view: loans.LoanView) -> LoanTerms:
@@ -96,54 +115,85 @@ def _checkpoints(view: loans.LoanView) -> list[BalanceCheckpoint]:
     ]
 
 
-def loan_schedule(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -> LoanScheduleData:
-    """The configured schedule, its no-overpayment baseline and the summary for one loan."""
+def load_loan_schedule_inputs(
+    factory: sessionmaker[Session], ctx: Context, loan_id: UUID
+) -> LoanScheduleInputs:
+    """Load and map one loan for the engine; domain errors propagate with their code."""
     require_role(ctx, Role.VIEWER)
     view = loans.get_loan(factory, ctx, loan_id)
     today = ctx.clock.today(ctx.workspace.timezone)
     terms = _terms(view)
-    has_overpayments = view.overpayment_mode is not OverpaymentMode.NONE or bool(view.overpayments)
+    anchor = select_anchor(terms, _checkpoints(view), today)
+    return LoanScheduleInputs(
+        view=view,
+        terms=terms,
+        rate_timeline=_rate_timeline(view),
+        costs=_costs(view),
+        overpayments=_overpayments(view),
+        anchor=anchor,
+        as_of=today,
+        day_count=view.day_count,
+        strategy=view.overpayment_strategy,
+    )
+
+
+def build_inputs_schedule(
+    inputs: LoanScheduleInputs,
+    *,
+    terms: LoanTerms | None = None,
+    rates: list[RatePeriod] | None = None,
+    overpayments: list[OneOffOverpayment] | None = None,
+    strategy: OverpaymentStrategy | str | None = None,
+) -> Schedule:
+    """Build a schedule from loaded inputs, replacing only what a scenario changes."""
+    return build_schedule(
+        terms if terms is not None else inputs.terms,
+        rates if rates is not None else inputs.rate_timeline,
+        inputs.costs,
+        overpayments if overpayments is not None else inputs.overpayments,
+        inputs.anchor,
+        inputs.as_of,
+        strategy if strategy is not None else inputs.strategy,
+        inputs.day_count,
+    )
+
+
+def loan_schedule(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -> LoanScheduleData:
+    """The configured schedule, its no-overpayment baseline and the summary for one loan."""
+    require_role(ctx, Role.VIEWER)
     try:
-        anchor = select_anchor(terms, _checkpoints(view), today)
-        schedule = build_schedule(
-            terms,
-            _rate_timeline(view),
-            _costs(view),
-            _overpayments(view),
-            anchor,
-            today,
-            view.overpayment_strategy,
-            view.day_count,
+        inputs = load_loan_schedule_inputs(factory, ctx, loan_id)
+        has_overpayments = inputs.view.overpayment_mode is not OverpaymentMode.NONE or bool(
+            inputs.view.overpayments
         )
+        schedule = build_inputs_schedule(inputs)
         if has_overpayments:
-            baseline = build_schedule(
-                replace(
-                    terms,
+            baseline = build_inputs_schedule(
+                inputs,
+                terms=replace(
+                    inputs.terms,
                     overpayment_mode=OverpaymentMode.NONE,
                     overpayment_amount=None,
                 ),
-                _rate_timeline(view),
-                _costs(view),
-                [],
-                anchor,
-                today,
-                view.overpayment_strategy,
-                view.day_count,
+                overpayments=[],
             )
         else:
             baseline = schedule
-        summary = summarize_schedule(schedule, today)
+        summary = summarize_schedule(schedule, inputs.as_of)
     except (ScheduleError, LoanValidationError) as exc:
+        view = loans.get_loan(factory, ctx, loan_id)
         return LoanScheduleData(
             view=view,
             schedule=None,
             baseline=None,
             summary=None,
-            has_overpayments=has_overpayments,
+            has_overpayments=(
+                view.overpayment_mode is not OverpaymentMode.NONE or bool(view.overpayments)
+            ),
             error_code=exc.code,
         )
     return LoanScheduleData(
-        view=view,
+        view=inputs.view,
         schedule=schedule,
         baseline=baseline,
         summary=summary,
@@ -152,4 +202,10 @@ def loan_schedule(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -
     )
 
 
-__all__ = ["LoanScheduleData", "loan_schedule"]
+__all__ = [
+    "LoanScheduleData",
+    "LoanScheduleInputs",
+    "build_inputs_schedule",
+    "load_loan_schedule_inputs",
+    "loan_schedule",
+]

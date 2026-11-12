@@ -466,6 +466,44 @@ def _rate_on(rate_timeline: list[RatePeriod], day: date) -> int:
     return chosen
 
 
+def shift_rate_timeline(
+    rate_timeline: list[RatePeriod], shift_bp: int, effective_from: date
+) -> list[RatePeriod]:
+    """Shift the annual rate by ``shift_bp`` from ``effective_from`` onwards.
+
+    Periods before the date keep their rate. When no period starts on the date, a period is
+    inserted with the rate then in force, shifted; a date after the last period appends one.
+    A date before the first period shifts every period. The result is ordered and validated.
+    """
+    valid_date(effective_from, "rate_shift_from")
+    if type(shift_bp) is not int:
+        raise LoanValidationError("rate_shift_bp", "invalid_rate_shift")
+    ordered = _validate_rate_timeline(rate_timeline)
+    if not ordered:
+        raise ScheduleError("missing_rate")
+    if shift_bp == 0:
+        return ordered
+
+    shifted: list[RatePeriod] = []
+    current: int | None = None
+    for period in ordered:
+        if period.effective_from < effective_from:
+            current = period.annual_rate_bp
+            shifted.append(period)
+            continue
+        if current is None:
+            current = period.annual_rate_bp
+        elif period.effective_from > effective_from and shifted[-1].effective_from < effective_from:
+            shifted.append(RatePeriod(effective_from, current + shift_bp))
+        shifted.append(RatePeriod(period.effective_from, period.annual_rate_bp + shift_bp))
+    if ordered[-1].effective_from < effective_from:
+        shifted.append(RatePeriod(effective_from, ordered[-1].annual_rate_bp + shift_bp))
+    for period in shifted:
+        if not 0 <= period.annual_rate_bp <= MAX_LOAN_RATE_BP:
+            raise LoanValidationError("rate_shift_bp", "invalid_rate_shift")
+    return shifted
+
+
 def _validate_costs(costs: list[CostPeriod], currency: str) -> None:
     for cost in costs:
         valid_date(cost.effective_from, "effective_from")
