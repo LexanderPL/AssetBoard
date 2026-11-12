@@ -506,6 +506,8 @@ def delete_loan_scenario(
         require_role_now(session, ctx, Role.EDITOR)
         CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
         loan = LoanRepository(session, ctx).get_or_raise(loan_id)
+        if loan.archived_at is not None:
+            raise loans.LoanError("loan", "archived")
         repository = LoanScenarioRepository(session, ctx)
         scenario = repository.get_for_loan(loan.id, scenario_id)
         if scenario is None:

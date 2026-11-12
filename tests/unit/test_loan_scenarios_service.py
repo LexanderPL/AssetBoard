@@ -293,6 +293,23 @@ def test_viewers_read_but_cannot_write(team: WorkspaceDb) -> None:
         loan_scenarios.delete_loan_scenario(team.factory, viewer, loan_id, scenario_id)
 
 
+def test_an_archived_loan_refuses_scenario_writes(team: WorkspaceDb) -> None:
+    loan_id = _create(team)
+    editor = team.ctx("editor", "editor")
+    scenario_id = loan_scenarios.create_or_update_loan_scenario(
+        team.factory, editor, loan_id, _params(name="Before archive")
+    )
+    loans.archive_loan(team.factory, team.ctx("owner", "owner"), loan_id)
+    with pytest.raises(loans.LoanError) as raised:
+        loan_scenarios.create_or_update_loan_scenario(
+            team.factory, editor, loan_id, _params(name="After archive")
+        )
+    assert raised.value.code == "archived"
+    with pytest.raises(loans.LoanError) as deleted:
+        loan_scenarios.delete_loan_scenario(team.factory, editor, loan_id, scenario_id)
+    assert deleted.value.code == "archived"
+
+
 def test_too_many_ephemeral_scenarios_are_refused(team: WorkspaceDb) -> None:
     loan_id = _create(team)
     with pytest.raises(loans.LoanError) as raised:
