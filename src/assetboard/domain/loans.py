@@ -1,8 +1,9 @@
-"""Loan configuration rules (F7.1). Pure: no I/O, no database, no clock.
+"""Loan configuration and schedule rules (F7.1-F7.2). Pure: no I/O, no database, no clock.
 
-F7.1 stores terms only. The schedule engine arrives in F7.2; the one finance helper here,
-``first_installment``, exists solely so the target-total validation can compare the configured
-monthly target with the first installment. F7.2 reuses it.
+F7.1 stores terms and validates them. F7.2 builds the monthly schedule from an anchor
+(origination or a balance checkpoint), the rate timeline, costs and planned overpayments, and
+summarizes it at an ``as_of`` date. All amounts stay in integer minor units; the only Decimal
+work is the annuity payment formula, rounded once per component.
 """
 
 from __future__ import annotations
@@ -394,6 +395,8 @@ def _validate_terms(terms: LoanTerms) -> LoanKind:
     if terms.origination_date is not None:
         valid_date(terms.origination_date, "origination_date")
     _require_currency(terms.principal_original, terms.currency, "principal_original")
+    if terms.principal_original is not None and terms.principal_original.amount_minor <= 0:
+        raise LoanValidationError("principal_original", "invalid_principal")
     _require_currency(terms.installment_override, terms.currency, "installment_override")
     if terms.installment_override is not None and terms.installment_override.amount_minor <= 0:
         raise LoanValidationError("installment_override", "invalid_override")

@@ -612,6 +612,8 @@ def test_input_validation() -> None:
     with pytest.raises(LoanValidationError):
         _build(_terms(term_months=0))
     with pytest.raises(LoanValidationError):
+        _build(_terms(principal_original=_money(-1)))
+    with pytest.raises(LoanValidationError):
         _build(terms, rates=[RatePeriod(date(2026, 1, 1), 10_001)])
     with pytest.raises(LoanValidationError):
         build_schedule(
