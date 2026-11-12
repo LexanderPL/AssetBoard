@@ -56,6 +56,11 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "investment_transactions",
         "invitations",
         "item_valuations",
+        "loan_balance_checkpoints",
+        "loan_cost_components",
+        "loan_overpayments",
+        "loan_rate_changes",
+        "loans",
         "login_tickets",
         "memberships",
         "month_states",
@@ -68,6 +73,8 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "fx_rates",
         "price_source_configs",
         "provider_errors",
+        "reference_rate_values",
+        "reference_rates",
         "risk_target_policies",
         "setup_state",
         "transactions",
@@ -1711,6 +1718,46 @@ def test_0049_auto_link_portfolio_migration_is_reversible(tmp_path: Path) -> Non
         upgrade_database(settings)
         columns = {column["name"] for column in inspect(engine).get_columns("workspaces")}
         assert "auto_link_portfolio" in columns
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0051_loans_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'loans.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        tables = set(inspect(engine).get_table_names())
+        assert {
+            "loans",
+            "loan_rate_changes",
+            "reference_rates",
+            "reference_rate_values",
+            "loan_cost_components",
+            "loan_overpayments",
+            "loan_balance_checkpoints",
+        } <= tables
+        command.downgrade(alembic_config(settings), "0050_demo_mode")
+        tables = set(inspect(engine).get_table_names())
+        assert (
+            not {
+                "loans",
+                "loan_rate_changes",
+                "reference_rates",
+                "reference_rate_values",
+                "loan_cost_components",
+                "loan_overpayments",
+                "loan_balance_checkpoints",
+            }
+            & tables
+        )
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
         check_database_migrations(settings)
     finally:
         engine.dispose()

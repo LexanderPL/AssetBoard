@@ -340,6 +340,40 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         )
         for method in ("create", "for_kind", "get_for_source", "upsert", "delete_for_categories")
     },
+    **{
+        ("LoanRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in ("create", "ordered")
+    },
+    **{
+        ("LoanRateChangeRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in ("create", "for_loan", "get_for_loan", "latest_on_or_before", "exists_on")
+    },
+    **{
+        ("ReferenceRateRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in ("create", "ordered", "by_name_key", "used_by_loan")
+    },
+    **{
+        ("ReferenceRateValueRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in (
+            "create",
+            "for_rate",
+            "get_for_rate",
+            "latest_on_or_before",
+            "exists_on",
+        )
+    },
+    **{
+        ("LoanCostComponentRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in ("create", "for_loan", "get_for_loan")
+    },
+    **{
+        ("LoanOverpaymentRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in ("create", "for_loan", "get_for_loan")
+    },
+    **{
+        ("LoanBalanceCheckpointRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in ("create", "for_loan", "latest_on_or_before", "get_for_loan")
+    },
 }
 
 READER_METHOD_COVERAGE: dict[str, str] = {

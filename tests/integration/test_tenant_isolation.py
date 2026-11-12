@@ -2355,3 +2355,135 @@ def test_tax_rule_queries_stay_in_their_workspace(
             rate_bp=100,
             fixed_minor=None,
         )
+
+
+def test_loan_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    from assetboard.db.repositories import (
+        LoanBalanceCheckpointRepository,
+        LoanCostComponentRepository,
+        LoanOverpaymentRepository,
+        LoanRateChangeRepository,
+        LoanRepository,
+        ReferenceRateRepository,
+        ReferenceRateValueRepository,
+    )
+
+    ctx_a, ctx_b = two_workspaces
+    loans_a, loans_b = LoanRepository(db_session, ctx_a), LoanRepository(db_session, ctx_b)
+    changes_a = LoanRateChangeRepository(db_session, ctx_a)
+    changes_b = LoanRateChangeRepository(db_session, ctx_b)
+    rates_a, rates_b = (
+        ReferenceRateRepository(db_session, ctx_a),
+        ReferenceRateRepository(db_session, ctx_b),
+    )
+    values_a = ReferenceRateValueRepository(db_session, ctx_a)
+    values_b = ReferenceRateValueRepository(db_session, ctx_b)
+    costs_a = LoanCostComponentRepository(db_session, ctx_a)
+    costs_b = LoanCostComponentRepository(db_session, ctx_b)
+    overpayments_a = LoanOverpaymentRepository(db_session, ctx_a)
+    overpayments_b = LoanOverpaymentRepository(db_session, ctx_b)
+    checkpoints_a = LoanBalanceCheckpointRepository(db_session, ctx_a)
+    checkpoints_b = LoanBalanceCheckpointRepository(db_session, ctx_b)
+
+    loan_values = {
+        "kind": "annuity",
+        "currency": "EUR",
+        "principal_original_minor": 100_000,
+        "origination_date": date(2025, 1, 1),
+        "first_payment_date": date(2025, 2, 1),
+        "term_months": 12,
+        "payment_day": 1,
+        "rate_mode": "fixed",
+        "margin_bp": None,
+        "reference_rate_id": None,
+        "installment_override_minor": None,
+        "overpayment_mode": "none",
+        "overpayment_amount_minor": None,
+        "overpayment_strategy": "reduce_term",
+        "archived_at": None,
+    }
+    loan_a = loans_a.create(name="Mortgage A", **loan_values)
+    loan_b = loans_b.create(name="Mortgage B", **loan_values)
+    change_a = changes_a.create(loan_id=loan_a.id, effective_from=date(2025, 1, 1), rate_bp=500)
+    changes_b.create(loan_id=loan_b.id, effective_from=date(2025, 1, 1), rate_bp=600)
+    rate_a = rates_a.create(name="WIBOR A", name_key="wibor a", notes="")
+    rate_b = rates_b.create(name="WIBOR B", name_key="wibor b", notes="")
+    value_a = values_a.create(
+        reference_rate_id=rate_a.id, effective_from=date(2025, 1, 1), value_bp=500
+    )
+    values_b.create(reference_rate_id=rate_b.id, effective_from=date(2025, 1, 1), value_bp=600)
+    cost_a = costs_a.create(
+        loan_id=loan_a.id,
+        name="Insurance",
+        mode="fixed",
+        rate_bp=None,
+        fixed_minor=1_000,
+        basis="opening_balance",
+        effective_from=date(2025, 1, 1),
+        effective_to=None,
+    )
+    costs_b.create(
+        loan_id=loan_b.id,
+        name="Insurance",
+        mode="fixed",
+        rate_bp=None,
+        fixed_minor=1_000,
+        basis="opening_balance",
+        effective_from=date(2025, 1, 1),
+        effective_to=None,
+    )
+    overpayment_a = overpayments_a.create(
+        loan_id=loan_a.id, date=date(2025, 3, 1), amount_minor=10_000, note=""
+    )
+    overpayments_b.create(loan_id=loan_b.id, date=date(2025, 3, 1), amount_minor=10_000, note="")
+    checkpoint_a = checkpoints_a.create(
+        loan_id=loan_a.id,
+        as_of=date(2025, 1, 1),
+        remaining_principal_minor=100_000,
+        note="",
+    )
+    checkpoints_b.create(
+        loan_id=loan_b.id,
+        as_of=date(2025, 1, 1),
+        remaining_principal_minor=100_000,
+        note="",
+    )
+
+    assert [row.id for row in loans_a.ordered()] == [loan_a.id]
+    assert [row.id for row in loans_b.ordered()] == [loan_b.id]
+    assert [row.id for row in changes_a.for_loan(loan_a.id)] == [change_a.id]
+    assert changes_b.for_loan(loan_a.id) == []
+    assert changes_b.get_for_loan(loan_a.id, change_a.id) is None
+    assert changes_a.latest_on_or_before(loan_a.id, date(2025, 6, 1)) == change_a
+    assert changes_b.latest_on_or_before(loan_a.id, date(2025, 6, 1)) is None
+    assert changes_a.exists_on(loan_a.id, date(2025, 1, 1))
+    assert not changes_b.exists_on(loan_a.id, date(2025, 1, 1))
+
+    assert [row.id for row in rates_a.ordered()] == [rate_a.id]
+    assert rates_b.by_name_key("wibor a") is None
+    assert rates_a.by_name_key("wibor a") == rate_a
+    assert not rates_b.used_by_loan(rate_a.id)
+
+    assert [row.id for row in values_a.for_rate(rate_a.id)] == [value_a.id]
+    assert values_b.for_rate(rate_a.id) == []
+    assert values_b.get_for_rate(rate_a.id, value_a.id) is None
+    assert values_a.latest_on_or_before(rate_a.id, date(2025, 6, 1)) == value_a
+    assert values_b.latest_on_or_before(rate_a.id, date(2025, 6, 1)) is None
+    assert values_a.exists_on(rate_a.id, date(2025, 1, 1))
+    assert not values_b.exists_on(rate_a.id, date(2025, 1, 1))
+
+    assert [row.id for row in costs_a.for_loan(loan_a.id)] == [cost_a.id]
+    assert costs_b.for_loan(loan_a.id) == []
+    assert costs_b.get_for_loan(loan_a.id, cost_a.id) is None
+    assert [row.id for row in overpayments_a.for_loan(loan_a.id)] == [overpayment_a.id]
+    assert overpayments_b.for_loan(loan_a.id) == []
+    assert overpayments_b.get_for_loan(loan_a.id, overpayment_a.id) is None
+    assert [row.id for row in checkpoints_a.for_loan(loan_a.id)] == [checkpoint_a.id]
+    assert checkpoints_b.for_loan(loan_a.id) == []
+    assert checkpoints_b.get_for_loan(loan_a.id, checkpoint_a.id) is None
+    assert checkpoints_b.latest_on_or_before(loan_a.id, date(2025, 6, 1)) is None
+
+    with pytest.raises(ForeignWorkspace):
+        loans_b.create(workspace_id=ctx_a.workspace.id, name="Cross workspace", **loan_values)

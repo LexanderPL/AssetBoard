@@ -36,6 +36,15 @@ from assetboard.db.repositories.invitation import (
     InvitationRepository,
     InvitationTokenReader,
 )
+from assetboard.db.repositories.loans import (
+    LoanBalanceCheckpointRepository,
+    LoanCostComponentRepository,
+    LoanOverpaymentRepository,
+    LoanRateChangeRepository,
+    LoanRepository,
+    ReferenceRateRepository,
+    ReferenceRateValueRepository,
+)
 from assetboard.db.repositories.membership import MembershipRepository, WorkspaceMember
 from assetboard.db.repositories.month_state import MonthStateRepository
 from assetboard.db.repositories.networth import (
@@ -89,6 +98,13 @@ __all__ = [
     "ScheduledOccurrenceRepository",
     "IncomeSourceRepository",
     "IncomeSourceTaxRuleRepository",
+    "LoanBalanceCheckpointRepository",
+    "LoanCostComponentRepository",
+    "LoanOverpaymentRepository",
+    "LoanRateChangeRepository",
+    "LoanRepository",
+    "ReferenceRateRepository",
+    "ReferenceRateValueRepository",
     "ItemValuationRepository",
     "NetWorthCategoryRepository",
     "NetWorthItemRepository",

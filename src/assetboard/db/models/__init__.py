@@ -23,6 +23,15 @@ from assetboard.db.models.investments import (
     InvestmentTransaction,
 )
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
+from assetboard.db.models.loans import (
+    Loan,
+    LoanBalanceCheckpoint,
+    LoanCostComponent,
+    LoanOverpayment,
+    LoanRateChange,
+    ReferenceRate,
+    ReferenceRateValue,
+)
 from assetboard.db.models.networth import (
     ItemValuation,
     NetWorthCategory,
@@ -58,6 +67,13 @@ __all__ = [
     "InstrumentAllocation",
     "InvestmentTransaction",
     "ItemValuation",
+    "Loan",
+    "LoanBalanceCheckpoint",
+    "LoanCostComponent",
+    "LoanOverpayment",
+    "LoanRateChange",
+    "ReferenceRate",
+    "ReferenceRateValue",
     "NetWorthCategory",
     "NetWorthItem",
     "NetWorthSnapshot",
