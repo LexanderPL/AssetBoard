@@ -192,6 +192,19 @@ WIZARD_STEPS = (
     _("Interest"),
     _("Payments"),
 )
+COST_COMPONENT_ROWS = 3
+COST_COMPONENT_FIELDS = tuple(
+    f"cost_{field}_{index}"
+    for index in range(1, COST_COMPONENT_ROWS + 1)
+    for field in (
+        "name",
+        "mode",
+        "rate_percent",
+        "fixed_amount",
+        "effective_from",
+        "effective_to",
+    )
+)
 WIZARD_FIELDS = (
     "entry_path",
     "name",
@@ -212,6 +225,7 @@ WIZARD_FIELDS = (
     "overpayment_mode",
     "overpayment_amount",
     "overpayment_strategy",
+    *COST_COMPONENT_FIELDS,
 )
 STEP_FIELDS: dict[int, tuple[str, ...]] = {
     1: ("entry_path", "name", "kind"),
@@ -236,6 +250,7 @@ STEP_FIELDS: dict[int, tuple[str, ...]] = {
         "overpayment_mode",
         "overpayment_amount",
         "overpayment_strategy",
+        *COST_COMPONENT_FIELDS,
     ),
 }
 
@@ -350,6 +365,34 @@ def _wizard_values(raw: dict[str, str]) -> dict[str, str]:
         with contextlib.suppress(ValueError):
             values["payment_day"] = str(date.fromisoformat(values["first_payment_date"]).day)
     return values
+
+
+def _wizard_costs(
+    values: dict[str, str], locale: str, currency: str
+) -> tuple[loans.CostComponentInput, ...]:
+    costs: list[loans.CostComponentInput] = []
+    for index in range(1, COST_COMPONENT_ROWS + 1):
+        name = values.get(f"cost_name_{index}", "").strip()
+        mode = values.get(f"cost_mode_{index}", "percent") or "percent"
+        rate_text = values.get(f"cost_rate_percent_{index}", "").strip()
+        fixed_text = values.get(f"cost_fixed_amount_{index}", "").strip()
+        from_text = values.get(f"cost_effective_from_{index}", "").strip()
+        to_text = values.get(f"cost_effective_to_{index}", "").strip()
+        if not any((name, rate_text, fixed_text, from_text, to_text)):
+            continue
+        if not name:
+            raise loans.LoanError(f"cost_name_{index}", "invalid_cost")
+        costs.append(
+            loans.CostComponentInput(
+                name=name,
+                mode=mode,
+                rate_bp=_percent(values, f"cost_rate_percent_{index}", locale),
+                fixed=_money(values, f"cost_fixed_amount_{index}", locale, currency),
+                effective_from=_optional_date(from_text, f"cost_effective_from_{index}"),
+                effective_to=_optional_date(to_text, f"cost_effective_to_{index}"),
+            )
+        )
+    return tuple(costs)
 
 
 def _wizard_start(values: dict[str, str]) -> date | None:
@@ -490,6 +533,7 @@ async def _wizard_context(
         "values": values,
         "hidden_fields": [name for name in WIZARD_FIELDS if name not in STEP_FIELDS[step]],
         "reference_rates": page.rates,
+        "cost_rows": COST_COMPONENT_ROWS,
         "error": error,
         "high_rate": high_rate,
         "can_edit": has_role(ctx, Role.EDITOR),
@@ -605,6 +649,7 @@ async def loan_new_step(request: Request, ctx: CurrentContext) -> Response:
                 values, "overpayment_amount", request.state.locale, ctx.workspace.base_currency
             ),
             overpayment_strategy=values["overpayment_strategy"],
+            costs=_wizard_costs(values, request.state.locale, ctx.workspace.base_currency),
         )
     except (loans.LoanError, LoanValidationError) as exc:
         code = getattr(exc, "code", "failed")
