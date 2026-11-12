@@ -34,6 +34,33 @@ is fixed at creation: to switch between fixed and variable, archive the loan and
 A rate above **25.00%** needs an explicit confirmation. Rates cannot exceed **100%**, and a
 margin cannot be negative.
 
+## How the schedule is calculated
+
+The schedule is a monthly table from the loan's start (or from the latest balance checkpoint).
+Each row has an opening balance, interest, principal, costs, overpayments and a closing balance.
+
+- **Payment dates** use the first payment date, then the nominal payment day in each later month.
+  A shorter month uses its last day, so 31 January is followed by 28 or 29 February and then
+  31 March.
+- **Interest** is the opening balance times the annual rate. The default monthly method divides
+  by 12. The actual/365 method uses the real number of days since the previous row. Each
+  component is rounded half up to the currency's minor unit.
+- **Rate changes** apply from their effective date. An annuity payment is recalculated when the
+  rate changes. Equal-principal loans keep the same regular principal each month.
+- **Costs** are charged while their dates are active, including both the first and last date.
+  Several active costs are added together. A percentage cost is a monthly percentage of the
+  opening balance.
+- **Regular overpayments** are none, a fixed extra each month, or a target total monthly outflow.
+  With the default "shorten the term" strategy the regular payment stays the same and the loan
+  ends sooner; "lower the installment" recalculates the payment after an overpayment. Equal
+  principal always shortens the term. One-off overpayments are applied at the next payment date.
+- **The final payment** clears the remaining balance exactly, including a small rounding
+  residual. The schedule stops at zero and never shows a negative balance.
+
+A balance checkpoint starts the schedule from the balance you owe on that date; earlier rows are
+not invented. When a checkpoint is used, the remaining months must be entered as the loan's term
+or the schedule will be too long.
+
 ## Costs and overpayments
 
 **Cost components** are charged every month while active: a percentage of the opening balance

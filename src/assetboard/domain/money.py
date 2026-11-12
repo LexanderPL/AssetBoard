@@ -3,6 +3,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal, localcontext
+from functools import lru_cache
 
 _CURRENCY_PATTERN = re.compile(r"[A-Z]{3}\Z")
 
@@ -35,14 +36,19 @@ def _require_currency_string(currency: object) -> str:
     return currency
 
 
-def minor_unit_for(currency: object) -> int:
-    normalized = _require_currency_string(currency).upper()
+@lru_cache(maxsize=256)
+def _minor_unit_for_cached(currency: str) -> int:
+    normalized = currency.upper()
     if not normalized.isascii() or _CURRENCY_PATTERN.fullmatch(normalized) is None:
         raise ValueError("currency must be a three-letter ISO currency code")
     try:
         return CURRENCY_MINOR_UNITS[normalized]
     except KeyError:
         raise ValueError(f"unsupported currency: {normalized}") from None
+
+
+def minor_unit_for(currency: object) -> int:
+    return _minor_unit_for_cached(_require_currency_string(currency))
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,9 +59,19 @@ class Money:
     def __post_init__(self) -> None:
         if type(self.amount_minor) is not int:
             raise TypeError("amount_minor must be an integer")
-        currency = _require_currency_string(self.currency).upper()
-        minor_unit_for(currency)
+        currency = _require_currency_string(self.currency)
+        if currency not in CURRENCY_MINOR_UNITS:
+            minor_unit_for(currency)
+            currency = currency.upper()
         object.__setattr__(self, "currency", currency)
+
+    @classmethod
+    def from_minor_unchecked(cls, amount_minor: int, currency: str) -> Money:
+        """Internal fast path for callers that already validated the integer and currency."""
+        value = object.__new__(cls)
+        object.__setattr__(value, "amount_minor", amount_minor)
+        object.__setattr__(value, "currency", currency)
+        return value
 
     @classmethod
     def from_decimal(
