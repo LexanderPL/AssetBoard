@@ -108,6 +108,7 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             _actions_under_the_tabs(page)
             expect(page.locator("[data-edit-terms]")).to_be_visible()
             expect(page.locator("[data-loan-overview]")).to_be_visible()
+            expect(page.locator("[data-loan-progress-bar]")).to_be_visible()
             expect(page.locator("[data-loan-schedule]")).to_be_visible()
             expect(page.locator('[data-chart="line"]')).to_have_attribute(
                 "data-chart-ready", "true"

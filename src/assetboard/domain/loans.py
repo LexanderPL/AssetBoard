@@ -443,6 +443,8 @@ def validate_payment_breakdown(
 @dataclass(frozen=True, slots=True)
 class LoanScheduleSummary:
     as_of: date
+    original_principal: Money
+    paid_principal: Money
     remaining_principal: Money
     next_payment_date: date | None
     next_installment: Money | None
@@ -909,6 +911,8 @@ def summarize_schedule(schedule: Schedule, as_of: date) -> LoanScheduleSummary:
     next_row = future[0] if future else None
     return LoanScheduleSummary(
         as_of=as_of,
+        original_principal=original,
+        paid_principal=_money(max(0, original.amount_minor - remaining.amount_minor), currency),
         remaining_principal=remaining,
         next_payment_date=next_row.date if next_row is not None else None,
         next_installment=next_row.installment_total if next_row is not None else None,

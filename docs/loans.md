@@ -69,10 +69,12 @@ or the schedule will be too long.
 
 The loan page turns the terms into an overview and a monthly schedule:
 
-- **Overview**: remaining principal today, the current rate (with the reference rate and margin
-  for a variable loan), the next payment and its principal/interest/costs/overpayment breakdown,
-  the percentage repaid, the payoff date, the payments left, and remaining/lifetime interest and
-  costs. The percentage is a native progress bar with the same value in text.
+- **Overview**: one header panel with a large repaid-vs-remaining principal bar (paid amount,
+  percentage, original principal and payoff date), the current rate (with the reference rate and
+  margin for a variable loan), the next payment and its principal/interest/costs/overpayment
+  breakdown, the percentage repaid, the payoff date, the payments left, and remaining/lifetime
+  interest and costs. The bar is inline SVG; its text labels carry the same information so colour
+  is not the only cue.
 - **Schedule**: 24 monthly rows per page, starting on the page with today's or the next due
   payment. The row for today is marked **Today**; when today is not a payment date, the next one
   is marked **Next**. Rows before today are marked **Projected** until actual payments are

@@ -7582,6 +7582,28 @@ msgstr "Stała"
 msgid "Variable"
 msgstr "Zmienna"
 
+msgid "Repaid principal"
+msgstr "Spłacony kapitał"
+
+msgid "Remaining"
+msgstr "Pozostało"
+
+#, python-format
+msgid "Original principal %(amount)s"
+msgstr "Pierwotny kapitał %(amount)s"
+
+#, python-format
+msgid "Starting balance %(amount)s"
+msgstr "Saldo początkowe %(amount)s"
+
+#, python-format
+msgid "Payoff %(date)s"
+msgstr "Data spłaty %(date)s"
+
+#, python-format
+msgid "Repaid %(paid)s of %(original)s (%(percent)s); %(remaining)s remains."
+msgstr "Spłacono %(paid)s z %(original)s (%(percent)s); pozostało %(remaining)s."
+
 #, python-format
 msgid "Balance %(amount)s on %(date)s"
 msgstr "Saldo %(amount)s na dzień %(date)s"
@@ -8485,9 +8507,6 @@ msgstr "Zarchiwizuj plan"
 
 msgid "Monthly installment"
 msgstr "Rata miesięczna"
-
-msgid "Remaining"
-msgstr "Pozostało"
 
 msgid "Total remaining"
 msgstr "Pozostało łącznie"

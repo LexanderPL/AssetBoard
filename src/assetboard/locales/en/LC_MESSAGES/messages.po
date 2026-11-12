@@ -7053,6 +7053,28 @@ msgstr ""
 msgid "Variable"
 msgstr ""
 
+msgid "Repaid principal"
+msgstr ""
+
+msgid "Remaining"
+msgstr ""
+
+#, python-format
+msgid "Original principal %(amount)s"
+msgstr ""
+
+#, python-format
+msgid "Starting balance %(amount)s"
+msgstr ""
+
+#, python-format
+msgid "Payoff %(date)s"
+msgstr ""
+
+#, python-format
+msgid "Repaid %(paid)s of %(original)s (%(percent)s); %(remaining)s remains."
+msgstr ""
+
 #, fuzzy, python-format
 msgid "Balance %(amount)s on %(date)s"
 msgstr ""
@@ -7887,9 +7909,6 @@ msgid "Archive plan"
 msgstr ""
 
 msgid "Monthly installment"
-msgstr ""
-
-msgid "Remaining"
 msgstr ""
 
 msgid "Total remaining"

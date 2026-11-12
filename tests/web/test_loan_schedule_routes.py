@@ -70,7 +70,10 @@ def test_overview_schedule_and_charts_render(owner):
     assert "data-loan-overview" in page.text
     assert "Remaining principal" in page.text
     assert "Next payment" in page.text
-    assert 'max="10000"' in page.text and "<progress" in page.text
+    assert "data-loan-progress" in page.text
+    assert "data-loan-progress-bar" in page.text
+    assert "Repaid principal" in page.text
+    assert "Original principal" in page.text
     assert "data-loan-schedule" in page.text
     assert page.text.count("data-schedule-row=") == 24
     assert "data-schedule-pages" in page.text and "Page 1 of" in page.text
