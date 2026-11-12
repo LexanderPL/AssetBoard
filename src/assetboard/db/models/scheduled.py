@@ -34,10 +34,28 @@ class ScheduledItem(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             ["categories.workspace_id", "categories.id"],
             name="fk_scheduled_items_workspace_category",
         ),
+        ForeignKeyConstraint(
+            ["workspace_id", "loan_id"],
+            ["loans.workspace_id", "loans.id"],
+            name="fk_scheduled_items_workspace_loan",
+        ),
         CheckConstraint("direction IN ('expense', 'income')", name="direction_valid"),
-        CheckConstraint("amount_mode IN ('fixed', 'estimate')", name="amount_mode_valid"),
         CheckConstraint(
-            f"amount_minor > 0 AND amount_minor <= {MAX_AMOUNT_MINOR}", name="amount_valid"
+            "amount_mode IN ('fixed', 'estimate', 'from_loan')", name="amount_mode_valid"
+        ),
+        CheckConstraint(
+            f"amount_minor = 0 OR (amount_minor > 0 AND amount_minor <= {MAX_AMOUNT_MINOR})",
+            name="amount_valid",
+        ),
+        CheckConstraint(
+            "(amount_mode = 'from_loan' AND loan_id IS NOT NULL) OR "
+            "(amount_mode != 'from_loan' AND loan_id IS NULL)",
+            name="loan_reference_valid",
+        ),
+        CheckConstraint(
+            "(amount_mode = 'from_loan' AND amount_minor = 0) OR "
+            "(amount_mode != 'from_loan' AND amount_minor > 0)",
+            name="amount_mode_value_valid",
         ),
         CheckConstraint("freq IN ('once', 'weekly', 'monthly', 'yearly')", name="freq_valid"),
         CheckConstraint("interval >= 1", name="interval_valid"),
@@ -52,11 +70,13 @@ class ScheduledItem(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             name="weekend_policy_valid",
         ),
         Index("ix_scheduled_items_workspace_category", "workspace_id", "category_id"),
+        Index("ix_scheduled_items_workspace_loan", "workspace_id", "loan_id"),
     )
 
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     direction: Mapped[str] = mapped_column(String(16), nullable=False)
     category_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
+    loan_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
     amount_mode: Mapped[str] = mapped_column(String(16), nullable=False)
     amount_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False)

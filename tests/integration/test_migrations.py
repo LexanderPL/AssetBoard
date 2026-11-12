@@ -1880,3 +1880,37 @@ def test_0054_loan_payments_migration_is_reversible(tmp_path: Path) -> None:
         check_database_migrations(settings)
     finally:
         engine.dispose()
+
+
+def test_0055_loan_integrations_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'loan_integrations.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        loan_columns = {column["name"] for column in inspector.get_columns("loans")}
+        assert {"property_item_id", "auto_record_payments"} <= loan_columns
+        scheduled = {column["name"]: column for column in inspector.get_columns("scheduled_items")}
+        assert "loan_id" in scheduled
+        checks = {
+            check.get("sqltext") or ""
+            for check in inspector.get_check_constraints("scheduled_items")
+        }
+        assert any("from_loan" in sql for sql in checks)
+        assert any("loan_id" in sql for sql in checks)
+        command.downgrade(alembic_config(settings), "0054_f75_loan_payments")
+        assert "property_item_id" not in {
+            column["name"] for column in inspect(engine).get_columns("loans")
+        }
+        assert "loan_id" not in {
+            column["name"] for column in inspect(engine).get_columns("scheduled_items")
+        }
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
