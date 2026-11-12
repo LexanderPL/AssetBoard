@@ -2020,6 +2020,16 @@ msgstr "%(tax)s: %(source)s"
 msgid "Investment income: %(instrument)s"
 msgstr "Przychód z inwestycji: %(instrument)s"
 
+msgid "Baseline"
+msgstr "Scenariusz bazowy"
+
+msgid "Current plan"
+msgstr "Bieżący plan"
+
+#, python-format
+msgid "What-if %(number)d"
+msgstr "Wariant %(number)d"
+
 #, python-format
 msgid "Confirm your email address for %(app)s"
 msgstr "Potwierdź adres e-mail w %(app)s"
@@ -3123,7 +3133,7 @@ msgid "Rate change: %(rate)s"
 msgstr "Zmiana stopy: %(rate)s"
 
 msgid "Configured plan"
-msgstr "Plan bieżący"
+msgstr "Plan skonfigurowany"
 
 msgid "Without overpayments"
 msgstr "Bez nadpłat"
@@ -3139,6 +3149,42 @@ msgstr "Nadpłata"
 
 msgid "Total"
 msgstr "Razem"
+
+#, python-format
+msgid "+%(points)s pp"
+msgstr "+%(points)s p.p."
+
+#, python-format
+msgid "-%(points)s pp"
+msgstr "-%(points)s p.p."
+
+msgid "Same as the loan"
+msgstr "Tak jak w kredycie"
+
+msgid "No regular overpayment"
+msgstr "Bez regularnej nadpłaty"
+
+#, python-format
+msgid "Extra %(amount)s each month"
+msgstr "Dodatkowe %(amount)s każdego miesiąca"
+
+#, python-format
+msgid "Target total %(amount)s each month"
+msgstr "Docelowa łączna kwota %(amount)s każdego miesiąca"
+
+msgid "Shorten the term"
+msgstr "Skróć okres"
+
+msgid "Lower the installment"
+msgstr "Obniż ratę"
+
+#, python-format
+msgid "Rate %(shift)s from %(date)s"
+msgstr "Stopa %(shift)s od %(date)s"
+
+#, python-format
+msgid "One-off %(amount)s on %(date)s"
+msgstr "Jednorazowo %(amount)s dnia %(date)s"
 
 msgid "Enter a shorter note."
 msgstr "Podaj krótszą notatkę."
@@ -3266,6 +3312,24 @@ msgstr "Daty płatności są nieprawidłowe. Sprawdź datę pierwszej płatnośc
 msgid "The schedule produced a negative balance. Check the loan terms."
 msgstr "Harmonogram dał ujemne saldo. Sprawdź warunki kredytu."
 
+msgid "Choose a valid overpayment type."
+msgstr "Wybierz prawidłowy typ nadpłaty."
+
+msgid "Choose a valid overpayment strategy."
+msgstr "Wybierz prawidłową strategię nadpłaty."
+
+msgid "Enter both the rate shift and the date it starts, or neither."
+msgstr "Podaj zarówno zmianę stopy, jak i datę jej rozpoczęcia, albo żadne z nich."
+
+msgid "Enter both the one-off amount and its date, or neither."
+msgstr "Podaj zarówno kwotę jednorazową, jak i jej datę, albo żadne z nich."
+
+msgid "The rate shift must leave every rate between 0% and 100%."
+msgstr "Po zmianie każda stopa musi mieścić się między 0% a 100%."
+
+msgid "Compare at most three what-if rows at a time."
+msgstr "Porównuj najwyżej trzy warianty jednocześnie."
+
 msgid "The loan could not be saved. Check the form and try again."
 msgstr "Nie udało się zapisać kredytu. Sprawdź formularz i spróbuj ponownie."
 
@@ -3315,6 +3379,14 @@ msgstr "Wartość stopy referencyjnej zapisana."
 
 msgid "Reference rate value deleted."
 msgstr "Wartość stopy referencyjnej usunięta."
+
+msgid "Saved scenarios updated. Their comparison is below."
+msgstr ""
+"Zapisane scenariusze zostały zaktualizowane. Porównanie znajduje się "
+"poniżej."
+
+msgid "Scenario deleted."
+msgstr "Scenariusz został usunięty."
 
 msgid "The loan"
 msgstr "Kredyt"
@@ -7201,14 +7273,6 @@ msgstr "Annuitetowy"
 msgid "Equal principal"
 msgstr "Równy kapitał"
 
-#, python-format
-msgid "Extra %(amount)s each month"
-msgstr "Dodatkowe %(amount)s każdego miesiąca"
-
-#, python-format
-msgid "Target total %(amount)s each month"
-msgstr "Docelowa łączna kwota %(amount)s każdego miesiąca"
-
 msgid "shorten the term"
 msgstr "skraca okres"
 
@@ -7322,6 +7386,9 @@ msgstr "Stopy referencyjne"
 
 msgid "Back to Loans"
 msgstr "Wróć do kredytów"
+
+msgid "Scenarios"
+msgstr "Scenariusze"
 
 msgid "Edit terms"
 msgstr "Edytuj warunki"
@@ -7463,9 +7530,6 @@ msgstr "Kwota (%(currency)s)"
 
 msgid "Strategy"
 msgstr "Strategia"
-
-msgid "Shorten the term"
-msgstr "Skróć okres"
 
 msgid "Lower the monthly installment"
 msgstr "Obniż miesięczną ratę"
@@ -7847,6 +7911,130 @@ msgstr "Notatki (opcjonalnie)"
 
 msgid "Save reference rate"
 msgstr "Zapisz stopę referencyjną"
+
+msgid "What-if comparison"
+msgstr "Porównanie wariantów"
+
+msgid ""
+"Compare the loan without overpayments, your current plan and every saved "
+"or temporary what-if. Negative values mean the variation is slower or "
+"more expensive than the baseline."
+msgstr ""
+"Porównaj kredyt bez nadpłat, bieżący plan oraz każdy zapisany lub "
+"tymczasowy wariant. Wartości ujemne oznaczają, że wariant jest wolniejszy"
+" lub droższy niż scenariusz bazowy."
+
+msgid ""
+"The comparison and chart are hidden until the loan's terms allow a "
+"schedule to be built."
+msgstr ""
+"Porównanie i wykres są ukryte, dopóki warunki kredytu nie pozwolą "
+"zbudować harmonogramu."
+
+msgid "Scenario comparison"
+msgstr "Porównanie scenariuszy"
+
+msgid "Scenario"
+msgstr "Scenariusz"
+
+msgid "Months saved vs baseline"
+msgstr "Zaoszczędzone miesiące wzgl. bazy"
+
+msgid "Total interest"
+msgstr "Odsetki łącznie"
+
+msgid "Interest saved vs baseline"
+msgstr "Zaoszczędzone odsetki wzgl. bazy"
+
+msgid "Total paid"
+msgstr "Zapłacono łącznie"
+
+msgid "Changes"
+msgstr "Zmiany"
+
+msgid "Cannot calculate"
+msgstr "Nie można obliczyć"
+
+msgid "No overpayments"
+msgstr "Bez nadpłat"
+
+msgid ""
+"Interest saved is the baseline's lifetime interest minus the variation's "
+"lifetime interest. Months saved compares the number of payments with the "
+"baseline."
+msgstr ""
+"Zaoszczędzone odsetki to odsetki w całym okresie bazowym minus odsetki w "
+"danym wariancie. Zaoszczędzone miesiące porównują liczbę płatności ze "
+"scenariuszem bazowym."
+
+msgid "Balance over time by scenario"
+msgstr "Saldo w czasie według scenariuszy"
+
+msgid "Closing balance after every payment. Dashed lines mark rate changes."
+msgstr ""
+"Saldo końcowe po każdej płatności. Linie przerywane oznaczają zmiany "
+"stopy."
+
+msgid "Plotted scenario balances"
+msgstr "Dane wykresu sald scenariuszy"
+
+msgid "Saved scenarios"
+msgstr "Zapisane scenariusze"
+
+#, python-format
+msgid "Delete the scenario %(name)s?"
+msgstr "Usunąć scenariusz %(name)s?"
+
+msgid "No saved scenarios yet. Give a what-if a name and compare it to save it."
+msgstr ""
+"Nie ma jeszcze zapisanych scenariuszy. Nadaj wariantowi nazwę i porównaj "
+"go, aby zapisać."
+
+msgid "What-if rows"
+msgstr "Warianty"
+
+msgid ""
+"Up to three temporary variations. A name saves the row (or updates the "
+"scenario with that name); leave the name empty to compare without saving."
+msgstr ""
+"Do trzech tymczasowych wariantów. Nazwa zapisuje wiersz (lub aktualizuje "
+"scenariusz o tej nazwie); pozostaw nazwę pustą, aby porównać bez "
+"zapisywania."
+
+msgid "Scenario name (optional)"
+msgstr "Nazwa scenariusza (opcjonalnie)"
+
+msgid "Fixed extra each month"
+msgstr "Stała dodatkowa kwota miesięcznie"
+
+msgid "Target total each month"
+msgstr "Docelowa łączna kwota miesięcznie"
+
+#, python-format
+msgid "Overpayment amount (%(currency)s)"
+msgstr "Kwota nadpłaty (%(currency)s)"
+
+msgid "Rate shift in percentage points"
+msgstr "Zmiana stopy w punktach procentowych"
+
+msgid "Rate shift from"
+msgstr "Zmiana stopy od"
+
+#, python-format
+msgid "One-off lump sum (%(currency)s)"
+msgstr "Jednorazowa nadpłata (%(currency)s)"
+
+msgid "One-off date"
+msgstr "Data nadpłaty jednorazowej"
+
+msgid "Compare and save named scenarios"
+msgstr "Porównaj i zapisz nazwane scenariusze"
+
+msgid "Compare what-ifs"
+msgstr "Porównaj warianty"
+
+msgid "Clear rows"
+msgstr "Wyczyść wiersze"
 
 msgid "No month"
 msgstr "Bez miesiąca"
@@ -10584,4 +10772,7 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Reschedule this one"
 #~ msgstr "Zmień termin tylko tego wystąpienia"
+
+#~ msgid "% repaid"
+#~ msgstr "%% spłacone"
 

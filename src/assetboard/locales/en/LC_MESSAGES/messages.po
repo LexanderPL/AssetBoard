@@ -1971,6 +1971,16 @@ msgstr ""
 msgid "Investment income: %(instrument)s"
 msgstr ""
 
+msgid "Baseline"
+msgstr ""
+
+msgid "Current plan"
+msgstr ""
+
+#, python-format
+msgid "What-if %(number)d"
+msgstr ""
+
 #, python-format
 msgid "Confirm your email address for %(app)s"
 msgstr ""
@@ -2982,6 +2992,42 @@ msgstr ""
 msgid "Total"
 msgstr ""
 
+#, python-format
+msgid "+%(points)s pp"
+msgstr ""
+
+#, python-format
+msgid "-%(points)s pp"
+msgstr ""
+
+msgid "Same as the loan"
+msgstr ""
+
+msgid "No regular overpayment"
+msgstr ""
+
+#, python-format
+msgid "Extra %(amount)s each month"
+msgstr ""
+
+#, python-format
+msgid "Target total %(amount)s each month"
+msgstr ""
+
+msgid "Shorten the term"
+msgstr ""
+
+msgid "Lower the installment"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "Rate %(shift)s from %(date)s"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "One-off %(amount)s on %(date)s"
+msgstr ""
+
 msgid "Enter a shorter note."
 msgstr ""
 
@@ -3102,6 +3148,24 @@ msgstr ""
 msgid "The schedule produced a negative balance. Check the loan terms."
 msgstr ""
 
+msgid "Choose a valid overpayment type."
+msgstr ""
+
+msgid "Choose a valid overpayment strategy."
+msgstr ""
+
+msgid "Enter both the rate shift and the date it starts, or neither."
+msgstr ""
+
+msgid "Enter both the one-off amount and its date, or neither."
+msgstr ""
+
+msgid "The rate shift must leave every rate between 0% and 100%."
+msgstr ""
+
+msgid "Compare at most three what-if rows at a time."
+msgstr ""
+
 msgid "The loan could not be saved. Check the form and try again."
 msgstr ""
 
@@ -3148,6 +3212,12 @@ msgid "Reference rate value saved."
 msgstr ""
 
 msgid "Reference rate value deleted."
+msgstr ""
+
+msgid "Saved scenarios updated. Their comparison is below."
+msgstr ""
+
+msgid "Scenario deleted."
 msgstr ""
 
 msgid "The loan"
@@ -6685,14 +6755,6 @@ msgstr ""
 msgid "Equal principal"
 msgstr ""
 
-#, python-format
-msgid "Extra %(amount)s each month"
-msgstr ""
-
-#, python-format
-msgid "Target total %(amount)s each month"
-msgstr ""
-
 msgid "shorten the term"
 msgstr ""
 
@@ -6800,6 +6862,9 @@ msgid "Reference rates"
 msgstr ""
 
 msgid "Back to Loans"
+msgstr ""
+
+msgid "Scenarios"
 msgstr ""
 
 msgid "Edit terms"
@@ -6936,9 +7001,6 @@ msgid "Amount (%(currency)s)"
 msgstr ""
 
 msgid "Strategy"
-msgstr ""
-
-msgid "Shorten the term"
 msgstr ""
 
 msgid "Lower the monthly installment"
@@ -7293,6 +7355,115 @@ msgid "Notes (optional)"
 msgstr ""
 
 msgid "Save reference rate"
+msgstr ""
+
+msgid "What-if comparison"
+msgstr ""
+
+msgid ""
+"Compare the loan without overpayments, your current plan and every saved "
+"or temporary what-if. Negative values mean the variation is slower or "
+"more expensive than the baseline."
+msgstr ""
+
+msgid ""
+"The comparison and chart are hidden until the loan's terms allow a "
+"schedule to be built."
+msgstr ""
+
+msgid "Scenario comparison"
+msgstr ""
+
+msgid "Scenario"
+msgstr ""
+
+msgid "Months saved vs baseline"
+msgstr ""
+
+msgid "Total interest"
+msgstr ""
+
+msgid "Interest saved vs baseline"
+msgstr ""
+
+msgid "Total paid"
+msgstr ""
+
+msgid "Changes"
+msgstr ""
+
+msgid "Cannot calculate"
+msgstr ""
+
+msgid "No overpayments"
+msgstr ""
+
+msgid ""
+"Interest saved is the baseline's lifetime interest minus the variation's "
+"lifetime interest. Months saved compares the number of payments with the "
+"baseline."
+msgstr ""
+
+msgid "Balance over time by scenario"
+msgstr ""
+
+msgid "Closing balance after every payment. Dashed lines mark rate changes."
+msgstr ""
+
+msgid "Plotted scenario balances"
+msgstr ""
+
+msgid "Saved scenarios"
+msgstr ""
+
+#, python-format
+msgid "Delete the scenario %(name)s?"
+msgstr ""
+
+msgid "No saved scenarios yet. Give a what-if a name and compare it to save it."
+msgstr ""
+
+msgid "What-if rows"
+msgstr ""
+
+msgid ""
+"Up to three temporary variations. A name saves the row (or updates the "
+"scenario with that name); leave the name empty to compare without saving."
+msgstr ""
+
+msgid "Scenario name (optional)"
+msgstr ""
+
+msgid "Fixed extra each month"
+msgstr ""
+
+msgid "Target total each month"
+msgstr ""
+
+#, python-format
+msgid "Overpayment amount (%(currency)s)"
+msgstr ""
+
+msgid "Rate shift in percentage points"
+msgstr ""
+
+msgid "Rate shift from"
+msgstr ""
+
+#, python-format
+msgid "One-off lump sum (%(currency)s)"
+msgstr ""
+
+msgid "One-off date"
+msgstr ""
+
+msgid "Compare and save named scenarios"
+msgstr ""
+
+msgid "Compare what-ifs"
+msgstr ""
+
+msgid "Clear rows"
 msgstr ""
 
 msgid "No month"
