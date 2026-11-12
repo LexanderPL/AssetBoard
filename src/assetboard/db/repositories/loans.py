@@ -11,6 +11,7 @@ from assetboard.db.models.loans import (
     LoanCostComponent,
     LoanOverpayment,
     LoanRateChange,
+    LoanScenario,
     ReferenceRate,
     ReferenceRateValue,
 )
@@ -219,5 +220,30 @@ class LoanBalanceCheckpointRepository(ScopedRepository[LoanBalanceCheckpoint]):
         statement = self._scoped_select().where(
             LoanBalanceCheckpoint.loan_id == loan_id,
             LoanBalanceCheckpoint.id == checkpoint_id,
+        )
+        return self._session.scalars(statement).one_or_none()
+
+
+class LoanScenarioRepository(ScopedRepository[LoanScenario]):
+    model = LoanScenario
+
+    def create(self, **values: object) -> LoanScenario:
+        return self.add(LoanScenario(**values))
+
+    def for_loan(self, loan_id: UUID) -> list[LoanScenario]:
+        statement = self._scoped_select().where(LoanScenario.loan_id == loan_id)
+        return list(self._session.scalars(statement.order_by(LoanScenario.name, LoanScenario.id)))
+
+    def get_for_loan(self, loan_id: UUID, scenario_id: UUID) -> LoanScenario | None:
+        statement = self._scoped_select().where(
+            LoanScenario.loan_id == loan_id,
+            LoanScenario.id == scenario_id,
+        )
+        return self._session.scalars(statement).one_or_none()
+
+    def by_name_key(self, loan_id: UUID, name_key: str) -> LoanScenario | None:
+        statement = self._scoped_select().where(
+            LoanScenario.loan_id == loan_id,
+            LoanScenario.name_key == name_key,
         )
         return self._session.scalars(statement).one_or_none()

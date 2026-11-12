@@ -2366,6 +2366,7 @@ def test_loan_queries_stay_in_their_workspace(
         LoanOverpaymentRepository,
         LoanRateChangeRepository,
         LoanRepository,
+        LoanScenarioRepository,
         ReferenceRateRepository,
         ReferenceRateValueRepository,
     )
@@ -2386,6 +2387,8 @@ def test_loan_queries_stay_in_their_workspace(
     overpayments_b = LoanOverpaymentRepository(db_session, ctx_b)
     checkpoints_a = LoanBalanceCheckpointRepository(db_session, ctx_a)
     checkpoints_b = LoanBalanceCheckpointRepository(db_session, ctx_b)
+    scenarios_a = LoanScenarioRepository(db_session, ctx_a)
+    scenarios_b = LoanScenarioRepository(db_session, ctx_b)
 
     loan_values = {
         "kind": "annuity",
@@ -2450,6 +2453,30 @@ def test_loan_queries_stay_in_their_workspace(
         remaining_principal_minor=100_000,
         note="",
     )
+    scenario_a = scenarios_a.create(
+        loan_id=loan_a.id,
+        name="Overpay 500",
+        name_key="overpay 500",
+        overpayment_mode="fixed_extra",
+        overpayment_amount_minor=50_000,
+        overpayment_strategy=None,
+        rate_shift_bp=None,
+        rate_shift_from=None,
+        one_off_date=None,
+        one_off_amount_minor=None,
+    )
+    scenarios_b.create(
+        loan_id=loan_b.id,
+        name="Overpay 500",
+        name_key="overpay 500",
+        overpayment_mode="fixed_extra",
+        overpayment_amount_minor=50_000,
+        overpayment_strategy=None,
+        rate_shift_bp=None,
+        rate_shift_from=None,
+        one_off_date=None,
+        one_off_amount_minor=None,
+    )
 
     assert [row.id for row in loans_a.ordered()] == [loan_a.id]
     assert [row.id for row in loans_b.ordered()] == [loan_b.id]
@@ -2484,6 +2511,11 @@ def test_loan_queries_stay_in_their_workspace(
     assert checkpoints_b.for_loan(loan_a.id) == []
     assert checkpoints_b.get_for_loan(loan_a.id, checkpoint_a.id) is None
     assert checkpoints_b.latest_on_or_before(loan_a.id, date(2025, 6, 1)) is None
+    assert [row.id for row in scenarios_a.for_loan(loan_a.id)] == [scenario_a.id]
+    assert scenarios_b.for_loan(loan_a.id) == []
+    assert scenarios_b.get_for_loan(loan_a.id, scenario_a.id) is None
+    assert scenarios_a.by_name_key(loan_a.id, "overpay 500") == scenario_a
+    assert scenarios_b.by_name_key(loan_a.id, "overpay 500") is None
 
     with pytest.raises(ForeignWorkspace):
         loans_b.create(workspace_id=ctx_a.workspace.id, name="Cross workspace", **loan_values)

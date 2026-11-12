@@ -29,6 +29,15 @@ def percent_to_bp(text: str, locale: str) -> int:
     return int(basis_points)
 
 
+def signed_percent_to_bp(text: str, locale: str) -> int:
+    """A locale-aware signed percentage with at most two decimals as basis points."""
+    percent = parse_amount(text, locale)
+    basis_points = percent.scaleb(2)
+    if basis_points != basis_points.to_integral_value():
+        raise InvalidPercentOrFixed("invalid_rate")
+    return int(basis_points)
+
+
 def fixed_to_minor(text: str, locale: str, currency: str) -> int:
     amount = parse_amount(text, locale)
     if amount < 0:

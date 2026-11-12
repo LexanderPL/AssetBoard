@@ -29,6 +29,7 @@ from assetboard.db.models.loans import (
     LoanCostComponent,
     LoanOverpayment,
     LoanRateChange,
+    LoanScenario,
     ReferenceRate,
     ReferenceRateValue,
 )
@@ -72,6 +73,7 @@ __all__ = [
     "LoanCostComponent",
     "LoanOverpayment",
     "LoanRateChange",
+    "LoanScenario",
     "ReferenceRate",
     "ReferenceRateValue",
     "NetWorthCategory",

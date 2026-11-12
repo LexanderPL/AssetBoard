@@ -14,6 +14,7 @@ from assetboard.domain.money import Money
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day
 from assetboard.i18n.numbers import format_money, format_rate_short
+from assetboard.services.loan_scenarios import LoanScenarioComparison
 
 
 @dataclass(frozen=True, slots=True)
@@ -277,9 +278,123 @@ def build_loan_charts(
     )
 
 
+@dataclass(frozen=True, slots=True)
+class ScenarioChartSeries:
+    name: str
+    color: str
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioChartPoint:
+    date: str
+    values: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioChart:
+    data: dict[str, object] | None
+    series: tuple[ScenarioChartSeries, ...]
+    points: tuple[ScenarioChartPoint, ...]
+
+
+SCENARIO_COLORS = ("success", "warning-strong", "accent", "line-strong", "ink")
+
+
+def build_scenario_chart(comparison: LoanScenarioComparison, locale: str) -> ScenarioChart:
+    """Overlay the baseline, current plan and every scenario's closing balance."""
+    entries = [
+        (row.label, row.is_baseline, row.is_current, row.schedule)
+        for row in comparison.rows
+        if row.schedule is not None and row.schedule.rows
+    ]
+    if not entries:
+        return ScenarioChart(None, (), ())
+    source = max((entry[3] for entry in entries), key=lambda schedule: len(schedule.rows))
+    assert source is not None
+    max_rows = len(source.rows)
+    labels = [format_day(source.anchor_date, locale)] + [
+        format_day(row.date, locale) for row in source.rows
+    ]
+    series: list[dict[str, object]] = []
+    series_meta: list[ScenarioChartSeries] = []
+    scenario_index = 0
+    points_by_index: list[list[str]] = [[] for _ in labels]
+    all_values: list[int] = []
+    for label, is_baseline, is_current, schedule in entries:
+        assert schedule is not None
+        if is_baseline:
+            color = "muted"
+        elif is_current:
+            color = "primary-ink"
+        else:
+            color = SCENARIO_COLORS[scenario_index % len(SCENARIO_COLORS)]
+            scenario_index += 1
+        values: list[int | None] = [schedule.starting_balance.amount_minor]
+        values.extend(row.closing.amount_minor for row in schedule.rows)
+        values.extend([None] * (max_rows - len(schedule.rows)))
+        all_values.extend(value for value in values if value is not None)
+        amounts = [_amount(value, schedule.currency, locale) for value in values]
+        for index, amount in enumerate(amounts):
+            points_by_index[index].append(amount)
+        series.append(
+            {
+                "name": label,
+                "values": values,
+                "amounts": amounts,
+                "color": color,
+            }
+        )
+        series_meta.append(ScenarioChartSeries(name=label, color=color))
+    low, high, step, axis_labels = _axis(all_values, source.currency, locale)
+
+    marker_entries: list[tuple[int, str, str]] = []
+    seen: set[tuple[int, int]] = set()
+    marker_lines: dict[int, list[str]] = {}
+    for _label, _baseline, _current, schedule in entries:
+        assert schedule is not None
+        previous: int | None = None
+        for index, row in enumerate(schedule.rows):
+            if previous is not None and row.annual_rate_bp != previous:
+                key = (index + 1, row.annual_rate_bp)
+                if key not in seen:
+                    seen.add(key)
+                    rate = format_rate_short(row.annual_rate_bp, locale)
+                    text = gettext("Rate change: %(rate)s", locale) % {"rate": rate}
+                    marker_entries.append((index + 1, rate, text))
+                    marker_lines.setdefault(index + 1, []).append(text)
+            previous = row.annual_rate_bp
+    marker_entries.sort(key=lambda marker: marker[0])
+    markers = [
+        {"index": index, "label": rate, "text": text} for index, rate, text in marker_entries
+    ]
+    tooltips = [marker_lines.get(index, []) for index in range(len(labels))]
+    data: dict[str, object] = {
+        "labels": labels,
+        "series": series,
+        "y_min": low,
+        "y_max": high,
+        "y_interval": step,
+        "y_labels": axis_labels,
+        "tooltips": tooltips,
+        "markers": markers,
+    }
+    points = tuple(
+        ScenarioChartPoint(
+            date=labels[index],
+            values=tuple(points_by_index[index]),
+        )
+        for index in range(len(labels))
+    )
+    return ScenarioChart(data, tuple(series_meta), points)
+
+
 __all__ = [
     "BalancePoint",
     "LoanCharts",
     "PaymentPoint",
+    "ScenarioChart",
+    "ScenarioChartPoint",
+    "ScenarioChartSeries",
     "build_loan_charts",
+    "build_scenario_chart",
 ]

@@ -214,6 +214,39 @@ comparison table + overlay chart, optional LoanScenario persistence (model + mig
 identical parameters give identical results.
 ```
 
+### As built (M7.F7.4)
+
+- `LoanScenario` was added by `0053_f74_loan_scenarios`: workspace-scoped with a composite
+  `(workspace_id, loan_id)` foreign key. `name`/`name_key` identify a scenario within the loan;
+  a null overpayment mode, strategy, rate shift or one-off pair means "same as the loan". The
+  rate shift is signed basis points (`0` is stored as null), and the one-off amount is positive.
+  Checks cover each parameter combination and the date range. Unique
+  `(workspace_id, loan_id, name_key)`; index `(workspace_id, loan_id, name)`.
+- `domain.loans.shift_rate_timeline()` shifts the rate in force from a date and all later
+  periods, inserts an effective period when the date falls between two changes, appends one
+  after the last and shifts everything when the date precedes the first. Duplicate dates,
+  missing rates and a result outside 0..10000 bp raise `duplicate_rate`, `missing_rate` or
+  `invalid_rate_shift`.
+- `services.loan_schedule` exposes `LoanScheduleInputs`,
+  `load_loan_schedule_inputs()` and `build_inputs_schedule()`; the F7.3 `loan_schedule()`
+  behaviour is unchanged. `services.loan_scenarios` compares the baseline, current plan, saved
+  scenarios and up to three ephemeral rows with the same engine, anchor, costs and day count.
+  A scenario row replaces the overpayment mode/amount, strategy, rate timeline or one-off list
+  only when set. A calculation error marks that row; a broken loan is a page-level error.
+- `months_saved` is the baseline row count minus the scenario row count (positive = sooner).
+  `interest_saved` is the baseline's lifetime interest minus the scenario's lifetime interest.
+  Identical parameters produce identical schedules and totals.
+- The page is `GET/POST /loans/{loan_id}/scenarios` (`loan_scenarios`). It shows the comparison
+  table, the overlay balance chart with a plotted-data table, the saved list with delete
+  confirmation and three what-if forms. A non-empty name saves/upserts by
+  `(loan_id, name_key)`; an empty name is ephemeral. Named rows are validated before any save.
+- Viewers may load the page, compare ephemeral rows and see saved scenarios; editors/owners
+  save and delete. Audit events record `loan_scenario.created`, `.updated` and `.deleted`
+  without amounts. A scenario of another workspace or another loan is `NotFound`.
+- `LoanScenario` is excluded from the archive until F7.8 but included in the workspace
+  emptiness check. The demo excludes it with the reason "scenarios are user what-ifs, not
+  sample data".
+
 ---
 
 ## F7.5 Actual payments and checkpoints

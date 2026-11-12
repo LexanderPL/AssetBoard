@@ -1,0 +1,166 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% from "loans/_tabs.html" import tabs with context %}
+{% block title %}{{ loan.name }} · {{ _("Scenarios") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Loans") }}{% endblock %}
+{% block content %}
+{% set input_class = "form-control px-3 py-2" %}
+{{ tabs("loans") }}
+<div class="mt-4 flex flex-wrap items-center gap-2" data-page-actions>
+  <a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}" class="btn" data-back-to-loan>{{ _("Back to %(name)s", name=loan.name) }}</a>
+</div>
+{% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
+{% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
+
+<section class="panel mb-6 p-4 sm:p-6" id="scenarios" aria-labelledby="scenarios-heading" data-scenario-comparison>
+  <h2 id="scenarios-heading" class="text-base font-semibold">{{ _("What-if comparison") }}</h2>
+  <p class="mt-1 text-sm text-muted">{{ _("Compare the loan without overpayments, your current plan and every saved or temporary what-if. Negative values mean the variation is slower or more expensive than the baseline.") }}</p>
+
+  {% if scenario_error %}
+  <p role="alert" class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-scenario-page-error>{{ scenario_error }}</p>
+  <p class="mt-2 text-sm text-muted">{{ _("The comparison and chart are hidden until the loan's terms allow a schedule to be built.") }}</p>
+  {% elif comparison.rows %}
+  <div class="mt-4 overflow-x-auto" tabindex="0" role="region" aria-label="{{ _('Scenario comparison') }}" data-scenario-table-scroll>
+    <table class="sheet w-full min-w-[64rem] text-sm">
+      <caption class="sr-only">{{ _("Scenario comparison") }}</caption>
+      <thead>
+        <tr class="text-left text-xs text-muted">
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Scenario") }}</th>
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Payoff date") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Months saved vs baseline") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Total interest") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Interest saved vs baseline") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Total paid") }}</th>
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Changes") }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in comparison.rows %}
+        <tr class="border-t border-line" data-scenario-row="{{ loop.index }}">
+          <th scope="row" class="px-3 py-2 text-left font-medium">
+            {{ row.label }}
+            {% if row.is_baseline %}<span class="ml-1 rounded-full bg-subtle px-2 py-0.5 text-xs font-semibold text-muted" data-scenario-baseline>{{ _("Baseline") }}</span>{% endif %}
+            {% if row.is_current %}<span class="ml-1 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary-ink" data-scenario-current>{{ _("Current plan") }}</span>{% endif %}
+            {% if row.error_code %}<span class="ml-1 rounded-full bg-danger-soft px-2 py-0.5 text-xs font-semibold text-danger-strong" data-scenario-row-error>{{ _("Cannot calculate") }}</span>{% endif %}
+          </th>
+          {% if row.error_code %}
+          <td class="whitespace-nowrap px-3 py-2 text-muted">—</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right text-muted">—</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right text-muted">—</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right text-muted">—</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right text-muted">—</td>
+          <td class="px-3 py-2 text-sm text-danger-strong">{{ scenario_row_error(row.error_code) }}</td>
+          {% else %}
+          <td class="whitespace-nowrap px-3 py-2">{% if row.payoff_date %}{{ format_day(row.payoff_date, locale) }}{% else %}—{% endif %}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{% if row.is_baseline or row.months_saved is none %}—{% else %}{{ "%+d"|format(row.months_saved) }}{% endif %}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.total_interest, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums {% if row.interest_saved and row.interest_saved.amount_minor > 0 %}text-success-strong{% elif row.interest_saved and row.interest_saved.amount_minor < 0 %}text-danger-strong{% else %}text-muted{% endif %}">
+            {% if row.is_baseline %}—{% else %}{{ format_money(row.interest_saved, locale) }}{% endif %}
+          </td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.total_paid, locale) }}</td>
+          <td class="px-3 py-2 text-sm text-muted">{% if row.is_baseline %}{{ _("No overpayments") }}{% elif row.is_current %}{{ _("Configured plan") }}{% else %}{% for part in scenario_summary(row.parameters) %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}{% endif %}</td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="mt-3 text-sm text-muted">{{ _("Interest saved is the baseline's lifetime interest minus the variation's lifetime interest. Months saved compares the number of payments with the baseline.") }}</p>
+  {% endif %}
+</section>
+
+{% if scenario_chart.data and not scenario_error %}
+<section class="panel mb-6 p-4 sm:p-6" id="scenario-chart" aria-labelledby="scenario-chart-heading" data-scenario-chart>
+  <h2 id="scenario-chart-heading" class="text-base font-semibold">{{ _("Balance over time by scenario") }}</h2>
+  <p class="mt-1 text-sm text-muted">{{ _("Closing balance after every payment. Dashed lines mark rate changes.") }}</p>
+  <div class="mt-3" data-chart="line" data-chart-source="scenario-balance-data">
+    <script type="application/json" id="scenario-balance-data">{{ scenario_chart.data|tojson }}</script>
+    <div class="h-80 w-full" hidden aria-hidden="true" data-chart-canvas></div>
+  </div>
+  <details class="mt-3" data-scenario-balance-points>
+    <summary class="cursor-pointer text-sm font-medium text-muted">{{ _("Plotted data") }}</summary>
+    <div class="mt-3 overflow-x-auto">
+      <table class="sheet w-full text-sm">
+        <caption class="sr-only">{{ _("Plotted scenario balances") }}</caption>
+        <thead>
+          <tr class="text-left text-xs text-muted">
+            <th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Date") }}</th>
+            {% for series in scenario_chart.series %}<th scope="col" class="py-1.5 pr-3 text-right font-medium">{{ series.name }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for point in scenario_chart.points %}
+          <tr>
+            <th scope="row" class="py-1.5 pr-3 text-left font-normal">{{ point.date }}</th>
+            {% for value in point.values %}<td class="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{{ value }}</td>{% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+</section>
+{% endif %}
+
+<section class="panel mb-6 p-4 sm:p-6" id="saved-scenarios" aria-labelledby="saved-scenarios-heading" data-saved-scenarios>
+  <h2 id="saved-scenarios-heading" class="text-base font-semibold">{{ _("Saved scenarios") }}</h2>
+  {% if saved %}
+  <ul class="mt-4 divide-y divide-line">
+    {% for scenario in saved %}
+    <li class="flex flex-wrap items-start justify-between gap-3 py-3" data-saved-scenario="{{ scenario.id }}">
+      <div>
+        <p class="font-medium">{{ scenario.name }}</p>
+        <p class="mt-1 text-sm text-muted">{% for part in scenario_summary(scenario.parameters) %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+      </div>
+      {% if can_edit and not loan.archived %}
+      <form method="post" action="{{ scoped_url(request, 'loan_scenario_delete', loan_id=loan.id, scenario_id=scenario.id) }}" data-confirm="{{ _('Delete the scenario %(name)s?', name=scenario.name) }}" data-confirm-tone="danger">
+        {{ csrf_input() }}
+        <button type="submit" class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ scenario.name }}</span></button>
+      </form>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p class="mt-3 text-sm text-muted" data-no-saved-scenarios>{{ _("No saved scenarios yet. Give a what-if a name and compare it to save it.") }}</p>
+  {% endif %}
+</section>
+
+<section class="panel mb-6 p-4 sm:p-6" id="what-if" aria-labelledby="what-if-heading">
+  <h2 id="what-if-heading" class="text-base font-semibold">{{ _("What-if rows") }}</h2>
+  <p class="mt-1 text-sm text-muted">{{ _("Up to three temporary variations. A name saves the row (or updates the scenario with that name); leave the name empty to compare without saving.") }}</p>
+  <form method="post" action="{{ scoped_url(request, 'loan_scenarios_compare', loan_id=loan.id) }}" class="mt-5 grid gap-5" data-scenario-form>
+    {{ csrf_input() }}
+    {% for row in scenario_rows %}
+    {% set n = loop.index %}
+    <fieldset class="rounded-xl border border-line p-4" data-scenario-form-row="{{ n }}">
+      <legend class="px-1 text-sm font-semibold">{{ _("What-if %(number)d", number=n) }}</legend>
+      <div class="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {% if can_edit and not loan.archived %}<label class="grid gap-1 text-sm font-medium">{{ _("Scenario name (optional)") }}<input name="name_{{ n }}" value="{{ row.name }}" maxlength="200" class="{{ input_class }} font-normal" data-scenario-name></label>{% endif %}
+        <label class="grid gap-1 text-sm font-medium">{{ _("Overpayment") }}<select name="overpayment_mode_{{ n }}" class="form-select py-2 font-normal">
+          <option value="same"{% if row.overpayment_mode in ("", "same") %} selected{% endif %}>{{ _("Same as the loan") }}</option>
+          <option value="none"{% if row.overpayment_mode == "none" %} selected{% endif %}>{{ _("None") }}</option>
+          <option value="fixed_extra"{% if row.overpayment_mode == "fixed_extra" %} selected{% endif %}>{{ _("Fixed extra each month") }}</option>
+          <option value="target_total"{% if row.overpayment_mode == "target_total" %} selected{% endif %}>{{ _("Target total each month") }}</option>
+        </select></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Overpayment amount (%(currency)s)", currency=loan.currency) }}<input name="overpayment_amount_{{ n }}" value="{{ row.overpayment_amount }}" inputmode="decimal" class="{{ input_class }} font-normal" data-scenario-overpayment-amount></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Strategy") }}<select name="overpayment_strategy_{{ n }}" class="form-select py-2 font-normal">
+          <option value="same"{% if row.overpayment_strategy in ("", "same") %} selected{% endif %}>{{ _("Same as the loan") }}</option>
+          <option value="reduce_term"{% if row.overpayment_strategy == "reduce_term" %} selected{% endif %}>{{ _("Shorten the term") }}</option>
+          <option value="reduce_installment"{% if row.overpayment_strategy == "reduce_installment" %} selected{% endif %}>{{ _("Lower the installment") }}</option>
+        </select></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Rate shift in percentage points") }}<input name="rate_shift_{{ n }}" value="{{ row.rate_shift }}" inputmode="decimal" placeholder="-1.5" class="{{ input_class }} font-normal" data-scenario-rate-shift></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Rate shift from") }}<input name="rate_shift_from_{{ n }}" type="date" value="{{ row.rate_shift_from }}" class="{{ input_class }} font-normal" data-scenario-rate-shift-from></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("One-off lump sum (%(currency)s)", currency=loan.currency) }}<input name="one_off_amount_{{ n }}" value="{{ row.one_off_amount }}" inputmode="decimal" class="{{ input_class }} font-normal" data-scenario-one-off-amount></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("One-off date") }}<input name="one_off_date_{{ n }}" type="date" value="{{ row.one_off_date }}" class="{{ input_class }} font-normal" data-scenario-one-off-date></label>
+      </div>
+    </fieldset>
+    {% endfor %}
+    <div class="flex flex-wrap gap-2">
+      <button type="submit" class="btn-primary">{% if can_edit and not loan.archived %}{{ _("Compare and save named scenarios") }}{% else %}{{ _("Compare what-ifs") }}{% endif %}</button>
+      <a href="{{ scoped_url(request, 'loan_scenarios', loan_id=loan.id) }}" class="btn">{{ _("Clear rows") }}</a>
+    </div>
+  </form>
+</section>
+{% endblock %}
+{% block scripts %}{% if scenario_chart.data and not scenario_error %}{% include "macros/chart_scripts.html" %}{% endif %}{% endblock %}

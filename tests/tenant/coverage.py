@@ -374,6 +374,10 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         ("LoanBalanceCheckpointRepository", method): "test_loan_queries_stay_in_their_workspace"
         for method in ("create", "for_loan", "latest_on_or_before", "get_for_loan")
     },
+    **{
+        ("LoanScenarioRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in ("create", "for_loan", "get_for_loan", "by_name_key")
+    },
 }
 
 READER_METHOD_COVERAGE: dict[str, str] = {

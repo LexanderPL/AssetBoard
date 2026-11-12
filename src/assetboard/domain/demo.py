@@ -47,6 +47,7 @@ DEMO_EXCLUDED_MODELS: MappingProxyType[str, str] = MappingProxyType(
         "NotificationLog": "the demo sends no notifications",
         "PriceSourceConfig": "no price provider is enabled in the demo",
         "ProviderError": "no provider calls are made",
+        "LoanScenario": "scenarios are user what-ifs, not sample data",
     }
 )
 

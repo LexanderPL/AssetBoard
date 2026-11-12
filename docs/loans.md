@@ -90,6 +90,39 @@ The loan page turns the terms into an overview and a monthly schedule:
 If the stored terms cannot produce a schedule (for example a missing rate), the page explains
 the problem and hides the schedule, charts and CSV until the terms are corrected.
 
+## What-if scenarios
+
+**Scenarios** on the loan page compares the same loan under several plans without changing the
+stored terms:
+
+- **Baseline** is the loan without any overpayments.
+- **Current plan** is the configured regular overpayment and one-off overpayments.
+- **Saved scenarios** are named variations that are always included.
+- **What-if rows** are up to three temporary variations for one comparison.
+
+Each variation can change the regular overpayment (same as the loan, none, a fixed extra or a
+target total), the strategy (shorten the term or lower the installment), shift the annual rate by
+a signed number of percentage points from a date, and add one one-off lump sum on a date. A rate
+shift changes every rate from that date and inserts a rate-change row when the date falls between
+two existing changes. A lump sum is added to the loan's existing one-off overpayments. Empty
+what-if rows are ignored; the rate-shift date and the lump-sum date must be entered together with
+their values.
+
+The comparison table shows the payoff date, months saved against the baseline, total interest,
+interest saved against the baseline and total paid. Positive savings are shown in green and
+negative ones in red; they are not investment advice. A variation that cannot be calculated
+(for example a shift below 0%) shows an error in its row instead of breaking the page. If the
+loan's own terms cannot produce a schedule, the page explains why and hides the comparison and
+chart.
+
+The chart overlays the closing balance of the baseline, the current plan and every saved or
+temporary variation. Dashed vertical lines mark rate changes, and the **Plotted data** table is
+available without JavaScript.
+
+Give a what-if a name to **save** it; saving the same name again updates that scenario. Saved
+scenarios can be deleted from the page. Viewers can compare scenarios and see saved ones, but
+only editors and owners can save or delete them.
+
 ## Costs and overpayments
 
 **Cost components** are charged every month while active: a percentage of the opening balance

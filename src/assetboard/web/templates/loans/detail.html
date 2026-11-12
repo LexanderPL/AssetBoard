@@ -9,6 +9,7 @@
 {{ tabs("loans") }}
 <div class="mt-4 flex flex-wrap items-center gap-2" data-page-actions>
   <a href="{{ scoped_url(request, 'loans') }}" class="btn">{{ _("Back to Loans") }}</a>
+  <a href="{{ scoped_url(request, 'loan_scenarios', loan_id=loan.id) }}" class="btn" data-loan-scenarios>{{ _("Scenarios") }}</a>
   {% if can_edit and not loan.archived %}<a href="{{ scoped_url(request, 'loan_edit', loan_id=loan.id) }}" class="btn-primary" data-edit-terms>{{ _("Edit terms") }}</a>{% endif %}
 </div>
 {% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}

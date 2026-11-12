@@ -136,6 +136,28 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             expect(page.locator("[data-action-notice]")).to_contain_text("Rate change saved.")
             _no_page_overflow(page)
 
+            page.get_by_role("link", name="Scenarios").click()
+            page.wait_for_url(f"{base}/loans/{loan_id}/scenarios")
+            expect(page.locator("[data-scenario-comparison]")).to_be_visible()
+            expect(page.locator("[data-scenario-chart]")).to_be_visible()
+            expect(page.locator('[data-chart="line"]')).to_have_attribute(
+                "data-chart-ready", "true"
+            )
+            _actions_under_the_tabs(page)
+            _no_page_overflow(page)
+            row = page.locator('[data-scenario-form-row="1"]')
+            row.locator("[data-scenario-name]").fill("Extra 200")
+            row.locator('select[name="overpayment_mode_1"]').select_option("fixed_extra")
+            row.locator("[data-scenario-overpayment-amount]").fill("200")
+            page.get_by_role("button", name="Compare and save named scenarios").click()
+            page.wait_for_load_state("networkidle")
+            expect(page.locator("[data-saved-scenario]")).to_have_count(1)
+            expect(page.locator("[data-action-notice]")).to_contain_text("Saved scenarios updated")
+            expect(page.locator('[data-chart="line"]')).to_have_attribute(
+                "data-chart-ready", "true"
+            )
+            _no_page_overflow(page)
+
             page.set_viewport_size({"width": 390, "height": 844})
             page.goto(f"{base}/loans", wait_until="networkidle")
             expect(page.locator("[data-loan]")).to_have_count(1)
@@ -168,6 +190,18 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             _no_page_overflow(page)
             cost_dialog.get_by_role("link", name="Cancel").click()
             expect(cost_dialog).to_be_hidden()
+
+            page.goto(f"{base}/loans/{loan_id}/scenarios", wait_until="networkidle")
+            expect(page.locator("[data-scenario-comparison]")).to_be_visible()
+            _no_page_overflow(page)
+            _actions_under_the_tabs(page)
+            scenario_scroll = page.locator("[data-scenario-table-scroll]").evaluate(
+                "el => ({scrollWidth: el.scrollWidth, clientWidth: el.clientWidth})"
+            )
+            assert scenario_scroll["scrollWidth"] > scenario_scroll["clientWidth"]
+            expect(page.locator('[data-chart="line"]')).to_have_attribute(
+                "data-chart-ready", "true"
+            )
 
             assert page.evaluate("window.__cspViolations") == []
             browser.close()

@@ -1311,6 +1311,7 @@ WORKSPACE_TABLES = {
     "loan_cost_components",
     "loan_overpayments",
     "loan_balance_checkpoints",
+    "loan_scenarios",
 }
 
 

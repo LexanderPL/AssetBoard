@@ -320,3 +320,69 @@ class LoanBalanceCheckpoint(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base)
     as_of: Mapped[date] = mapped_column(Date(), nullable=False)
     remaining_principal_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
     note: Mapped[str] = mapped_column(String(MAX_NOTE_LENGTH), nullable=False, default="")
+
+
+class LoanScenario(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
+    """A saved what-if for one loan: overpayment, strategy, rate shift and lump sum."""
+
+    __tablename__ = "loan_scenarios"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "id", name="uq_loan_scenarios_workspace_id_id"),
+        UniqueConstraint(
+            "workspace_id",
+            "loan_id",
+            "name_key",
+            name="uq_loan_scenarios_workspace_loan_name_key",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "loan_id"],
+            ["loans.workspace_id", "loans.id"],
+            name="fk_loan_scenarios_workspace_loan",
+        ),
+        CheckConstraint("length(name) > 0", name="name_not_empty"),
+        CheckConstraint(
+            "overpayment_mode IS NULL OR "
+            "overpayment_mode IN ('none', 'fixed_extra', 'target_total')",
+            name="overpayment_mode_valid",
+        ),
+        CheckConstraint(
+            "overpayment_strategy IS NULL OR "
+            "overpayment_strategy IN ('reduce_term', 'reduce_installment')",
+            name="overpayment_strategy_valid",
+        ),
+        CheckConstraint(
+            "(overpayment_mode IS NULL AND overpayment_amount_minor IS NULL) OR "
+            "(overpayment_mode = 'none' AND overpayment_amount_minor IS NULL) OR "
+            "(overpayment_mode IN ('fixed_extra', 'target_total') AND "
+            "overpayment_amount_minor IS NOT NULL AND overpayment_amount_minor > 0 AND "
+            f"overpayment_amount_minor <= {MAX_AMOUNT_MINOR})",
+            name="overpayment_amount_valid",
+        ),
+        CheckConstraint(
+            "(rate_shift_bp IS NULL AND rate_shift_from IS NULL) OR "
+            "(rate_shift_bp IS NOT NULL AND rate_shift_bp != 0 AND "
+            f"rate_shift_bp BETWEEN -{MAX_LOAN_RATE_BP} AND {MAX_LOAN_RATE_BP} AND "
+            "rate_shift_from IS NOT NULL)",
+            name="rate_shift_valid",
+        ),
+        CheckConstraint(
+            "(one_off_date IS NULL AND one_off_amount_minor IS NULL) OR "
+            "(one_off_date IS NOT NULL AND one_off_amount_minor IS NOT NULL AND "
+            f"one_off_amount_minor > 0 AND one_off_amount_minor <= {MAX_AMOUNT_MINOR})",
+            name="one_off_valid",
+        ),
+        _date_range("rate_shift_from"),
+        _date_range("one_off_date"),
+        Index("ix_loan_scenarios_workspace_loan_name", "workspace_id", "loan_id", "name"),
+    )
+
+    loan_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
+    name: Mapped[str] = mapped_column(String(MAX_LOAN_NAME_LENGTH), nullable=False)
+    name_key: Mapped[str] = mapped_column(String(255), nullable=False)
+    overpayment_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    overpayment_amount_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
+    overpayment_strategy: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    rate_shift_bp: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    rate_shift_from: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    one_off_date: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    one_off_amount_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
