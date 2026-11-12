@@ -16,7 +16,7 @@ from assetboard.domain.money import Money
 from assetboard.domain.percent_or_fixed import PercentOrFixed
 from assetboard.domain.recurrence import Frequency, RecurrenceRule
 from assetboard.domain.taxes import PaymentTiming, TaxBase, TaxKind
-from assetboard.domain.transactions import MAX_AMOUNT_MINOR, TransactionDirection, amount_minor
+from assetboard.domain.transactions import TransactionDirection, amount_minor
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day, format_day_of_month
 from assetboard.i18n.numbers import (
@@ -31,6 +31,7 @@ from assetboard.services import scheduled, taxes
 from assetboard.services.categories import list_categories
 from assetboard.services.context import Context, Role, has_role
 from assetboard.web.context import CurrentContext
+from assetboard.web.forms import InvalidPercentOrFixed, parse_percent_or_fixed
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
 
@@ -97,30 +98,10 @@ async def _values(request: Request) -> dict[str, str]:
 
 
 def _value(values: dict[str, str], locale: str, currency: str) -> PercentOrFixed:
-    mode = values.get("mode")
-    if mode == "percent":
-        try:
-            # A locale-aware percentage ("23", "12,5", "0.01") with at most two decimals,
-            # stored as integer basis points.
-            percent = parse_amount(values.get("rate_percent", ""), locale)
-            basis_points = percent.scaleb(2)
-            if percent < 0 or basis_points != basis_points.to_integral_value():
-                raise ValueError
-            return PercentOrFixed.percent(int(basis_points))
-        except ValueError:
-            raise taxes.TaxRuleError("invalid_rate") from None
-    if mode == "fixed":
-        try:
-            amount = parse_amount(values.get("fixed_amount", ""), locale)
-            if amount < 0:
-                raise ValueError
-            minor = 0 if amount == 0 else amount_minor(amount, currency)
-            if minor > MAX_AMOUNT_MINOR:
-                raise ValueError
-            return PercentOrFixed.fixed_amount(Money(minor, currency))
-        except ValueError:
-            raise taxes.TaxRuleError("invalid_value") from None
-    raise taxes.TaxRuleError("invalid_value")
+    try:
+        return parse_percent_or_fixed(values, locale, currency)
+    except InvalidPercentOrFixed as exc:
+        raise taxes.TaxRuleError(exc.code) from None
 
 
 def _day(value: str) -> date:
