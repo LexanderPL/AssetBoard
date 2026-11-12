@@ -8,7 +8,7 @@ is F7.2: only ``first_installment`` is used here to validate a target-total over
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import date
 from typing import Literal
@@ -92,6 +92,16 @@ class LoanCostComponentView:
     effective_from: date
     effective_to: date | None
     basis: str
+
+
+@dataclass(frozen=True, slots=True)
+class CostComponentInput:
+    name: str
+    mode: str
+    rate_bp: int | None
+    fixed: Money | None
+    effective_from: date | None
+    effective_to: date | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -706,6 +716,22 @@ def _validated_overpayment(
     return wanted_mode, amount_minor, wanted_strategy
 
 
+def _validated_cost_inputs(
+    costs: Sequence[CostComponentInput], *, start: date, currency: str
+) -> list[tuple[str, str, int | None, int | None, date, date | None]]:
+    """Validate wizard costs before the loan row exists so a bad row cannot leave a loan."""
+    validated: list[tuple[str, str, int | None, int | None, date, date | None]] = []
+    for cost in costs:
+        clean_name = clean_loan_name(cost.name)
+        effective_from = cost.effective_from or start
+        validate_cost_dates(effective_from, cost.effective_to)
+        mode, rate, fixed_minor = _cost_value(
+            mode=cost.mode, rate_bp=cost.rate_bp, fixed=cost.fixed, currency=currency
+        )
+        validated.append((clean_name, mode, rate, fixed_minor, effective_from, cost.effective_to))
+    return validated
+
+
 def create_loan(
     factory: sessionmaker[Session],
     ctx: Context,
@@ -729,6 +755,7 @@ def create_loan(
     overpayment_mode: str,
     overpayment_amount: Money | None,
     overpayment_strategy: str,
+    costs: Sequence[CostComponentInput] = (),
     day_count: str = "monthly",
 ) -> UUID:
     require_role(ctx, Role.EDITOR)
@@ -804,6 +831,7 @@ def create_loan(
             currency=currency,
             rate_bp=rate_bp,
         )
+        validated_costs = _validated_cost_inputs(costs, start=start, currency=currency)
         loan = LoanRepository(session, ctx).create(
             name=clean_name,
             kind=wanted_kind.value,
@@ -836,6 +864,25 @@ def create_loan(
                 loan_id=loan.id,
                 effective_from=start,
                 rate_bp=fixed_rate,
+            )
+        for cost_name, cost_mode, cost_rate, cost_fixed, cost_from, cost_to in validated_costs:
+            component = LoanCostComponentRepository(session, ctx).create(
+                loan_id=loan.id,
+                name=cost_name,
+                mode=cost_mode,
+                rate_bp=cost_rate,
+                fixed_minor=cost_fixed,
+                basis=CostBasis.OPENING_BALANCE.value,
+                effective_from=cost_from,
+                effective_to=cost_to,
+            )
+            _audit(
+                session,
+                ctx,
+                "loan_cost_component.created",
+                "loan",
+                loan.id,
+                {"component_id": str(component.id), "mode": cost_mode},
             )
         _audit(
             session,

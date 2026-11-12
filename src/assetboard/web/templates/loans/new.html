@@ -112,7 +112,24 @@
       <label class="grid gap-1 text-sm font-medium" data-hidden-when="overpayment_mode=none">{{ _("Amount (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="overpayment_amount" value="{{ values.get('overpayment_amount', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("For a target, this includes principal, interest and costs.") }}</span></label>
       <label class="grid gap-1 text-sm font-medium" data-hidden-when="overpayment_mode=none">{{ _("What happens with the extra money?") }}<select name="overpayment_strategy" class="form-select py-2 font-normal"><option value="reduce_term"{% if values.get('overpayment_strategy', 'reduce_term') == 'reduce_term' %} selected{% endif %}>{{ _("Shorten the term") }}</option><option value="reduce_installment"{% if values.get('overpayment_strategy', 'reduce_term') == 'reduce_installment' %} selected{% endif %}>{{ _("Lower the monthly installment") }}</option></select></label>
     </div>
-    <p class="text-sm text-muted">{{ _("After saving you can add rate changes, cost components and one-off overpayments on the loan page.") }}</p>
+    <fieldset class="grid gap-3 sm:col-span-2" data-wizard-costs>
+      <legend class="text-sm font-medium">{{ _("Cost components (optional)") }}</legend>
+      <p class="text-xs text-muted">{{ _("Charged monthly while active, for example property insurance collected with the installment. Leave a row empty to skip it; add more on the loan page later.") }}</p>
+      {% for index in range(1, cost_rows + 1) %}
+      <div class="grid gap-3 border border-line p-3 sm:grid-cols-2">
+        <label class="grid gap-1 text-sm font-medium">{{ _("Name") }}<input name="cost_name_{{ index }}" value="{{ values.get('cost_name_' ~ index, '') }}" maxlength="200" class="{{ input_class }} font-normal"></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Cost type") }}<select name="cost_mode_{{ index }}" id="cost_mode_{{ index }}" class="form-select py-2 font-normal">
+          <option value="percent"{% if values.get('cost_mode_' ~ index, 'percent') == 'percent' %} selected{% endif %}>{{ _("A percentage of the balance") }}</option>
+          <option value="fixed"{% if values.get('cost_mode_' ~ index) == 'fixed' %} selected{% endif %}>{{ _("A fixed amount") }}</option>
+        </select></label>
+        <label class="grid gap-1 text-sm font-medium" data-hidden-when="cost_mode_{{ index }}=fixed">{{ _("Percent each month") }}<input name="cost_rate_percent_{{ index }}" value="{{ values.get('cost_rate_percent_' ~ index, '') }}" inputmode="decimal" class="{{ input_class }} font-normal"></label>
+        <label class="grid gap-1 text-sm font-medium" data-hidden-when="cost_mode_{{ index }}=percent">{{ _("Amount each month (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="cost_fixed_amount_{{ index }}" value="{{ values.get('cost_fixed_amount_' ~ index, '') }}" inputmode="decimal" class="{{ input_class }} font-normal"></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Applies from") }}<input name="cost_effective_from_{{ index }}" type="date" value="{{ values.get('cost_effective_from_' ~ index, '') }}" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Leave empty to start with the loan.") }}</span></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Applies until (optional)") }}<input name="cost_effective_to_{{ index }}" type="date" value="{{ values.get('cost_effective_to_' ~ index, '') }}" class="{{ input_class }} font-normal"></label>
+      </div>
+      {% endfor %}
+    </fieldset>
+    <p class="text-sm text-muted">{{ _("After saving you can add more cost components, rate changes and one-off overpayments on the loan page.") }}</p>
     {% endif %}
 
     <div class="flex flex-wrap items-center gap-2 border-t border-line pt-4">

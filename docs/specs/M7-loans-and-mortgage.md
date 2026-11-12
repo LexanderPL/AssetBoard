@@ -64,8 +64,9 @@ The eight product-owner decisions implemented in F7.1:
    all summed.
 5. Rates above 25.00% require explicit confirmation (25.00% itself does not). The absolute
    maximum is 100%; a margin must be non-negative.
-6. The wizard collects the core terms, the initial/current rate and regular overpayment settings.
-   Rate changes, cost components and one-off overpayments are added on the loan detail page.
+6. The wizard collects the core terms, the initial/current rate, regular overpayment settings and
+   up to three cost components (a later change request). Rate changes, more cost components and
+   one-off overpayments are added on the loan detail page.
 7. All loan amounts use the workspace base currency and a loan locks that currency. One-off
    overpayments are planned rows. Reference rates are workspace-scoped: viewers read, editors and
    owners write. Loans archive/restore and are never hard-deleted. F7.7 owns installment plans.

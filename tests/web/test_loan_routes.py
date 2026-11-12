@@ -118,6 +118,54 @@ def test_original_path_wizard_keeps_values_and_saves(owner):
         )
 
 
+def test_wizard_saves_cost_components_with_effective_dates(owner):
+    data = _wizard_data(
+        cost_name_1="Property insurance",
+        cost_mode_1="fixed",
+        cost_fixed_amount_1="75.00",
+        cost_effective_from_1="2026-02-01",
+        cost_name_2="Life insurance",
+        cost_mode_2="percent",
+        cost_rate_percent_2="0.25",
+    )
+    for step in (1, 2, 3):
+        assert _step(owner, data, step).status_code == 200
+    saved = _step(owner, data, 4)
+    assert saved.status_code == 303 and "notice=loan_created" in saved.headers["location"]
+    with owner.db() as session:
+        loan = session.scalars(select(Loan).where(Loan.workspace_id == owner.home_id)).one()
+        components = {
+            row.name: row
+            for row in session.scalars(
+                select(LoanCostComponent).where(LoanCostComponent.loan_id == loan.id)
+            )
+        }
+    fixed = components["Property insurance"]
+    assert fixed.mode == "fixed"
+    assert fixed.fixed_minor == 7_500
+    assert fixed.effective_from == date(2026, 2, 1)
+    percent = components["Life insurance"]
+    assert percent.mode == "percent"
+    assert percent.rate_bp == 25
+    assert percent.effective_from == date(2026, 1, 1)
+
+
+def test_wizard_rejects_a_cost_row_without_a_name_or_amount(owner):
+    data = _wizard_data(
+        cost_name_1="Insurance",
+        cost_mode_1="fixed",
+        cost_fixed_amount_1="",
+    )
+    for step in (1, 2, 3):
+        assert _step(owner, data, step).status_code == 200
+    response = _step(owner, data, 4)
+    assert response.status_code == 400
+    assert "Enter a cost name" in response.text
+    assert 'value="Insurance"' in response.text
+    with owner.db() as session:
+        assert session.scalars(select(Loan)).all() == []
+
+
 def test_loan_detail_renders_a_notice_and_ignores_unknown_codes(owner):
     loan_id = _create_original(owner)
     notice = owner.client.get(f"/loans/{loan_id}?notice=loan_created")

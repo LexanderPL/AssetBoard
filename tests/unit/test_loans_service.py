@@ -324,6 +324,40 @@ def test_rate_changes_are_scoped_and_keep_a_rate_by_the_first_payment(team: Work
     assert missing.value.code == "rate_change_missing"
 
 
+def test_create_loan_accepts_validated_cost_components(team: WorkspaceDb) -> None:
+    loan_id = _original_loan(
+        team,
+        costs=(
+            loans.CostComponentInput(
+                name="Property insurance",
+                mode="fixed",
+                rate_bp=None,
+                fixed=_money(7_500),
+                effective_from=None,
+                effective_to=None,
+            ),
+            loans.CostComponentInput(
+                name="Life insurance",
+                mode="percent",
+                rate_bp=25,
+                fixed=None,
+                effective_from=date(2026, 2, 1),
+                effective_to=date(2026, 12, 31),
+            ),
+        ),
+    )
+    view = loans.get_loan(team.factory, team.ctx("owner", "owner"), loan_id)
+    assert [row.name for row in view.cost_components] == [
+        "Property insurance",
+        "Life insurance",
+    ]
+    fixed, percent = view.cost_components
+    assert fixed.effective_from == date(2026, 1, 1)
+    assert fixed.value.fixed == _money(7_500)
+    assert percent.effective_from == date(2026, 2, 1)
+    assert percent.value.rate_bp == 25
+
+
 def test_costs_and_one_off_overpayments_crud(team: WorkspaceDb) -> None:
     loan_id = _original_loan(team)
     ctx = team.ctx("owner", "owner")
