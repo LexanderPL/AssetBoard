@@ -194,6 +194,26 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             expect(page.locator("[data-actual-total]")).to_be_visible()
             _no_page_overflow(page)
 
+            page.goto(f"{base}/loans/installments", wait_until="networkidle")
+            expect(page.locator("[data-installments-tab]")).to_be_visible()
+            page.locator("[data-new-installment-plan]").first.click()
+            page.wait_for_load_state("networkidle")
+            page.get_by_label("Name", exact=True).fill("Phone plan")
+            page.locator('input[name="installment"]').fill("50")
+            page.locator('input[name="remaining_count"]').fill("3")
+            page.locator('input[name="payment_day"]').fill("5")
+            page.locator('select[name="category_id"]').select_option(index=1)
+            page.get_by_role("button", name="Save plan").click()
+            page.wait_for_load_state("networkidle")
+            expect(page.locator("[data-installment-plan]")).to_have_count(1)
+            page.locator("[data-open-installment-plan]").click()
+            page.wait_for_load_state("networkidle")
+            expect(page.locator("[data-installment-plan-detail]")).to_be_visible()
+            expect(page.locator("[data-plan-remaining]")).to_have_text("3")
+            _actions_under_the_tabs(page)
+            _no_page_overflow(page)
+            plan_url = page.url
+
             page.set_viewport_size({"width": 390, "height": 844})
             page.goto(f"{base}/loans", wait_until="networkidle")
             expect(page.locator("[data-loan]")).to_have_count(1)
@@ -255,6 +275,14 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
                 "el => ({scrollWidth: el.scrollWidth, clientWidth: el.clientWidth})"
             )
             assert payments_scroll["scrollWidth"] > payments_scroll["clientWidth"]
+
+            page.goto(plan_url, wait_until="networkidle")
+            expect(page.locator("[data-installment-plan-detail]")).to_be_visible()
+            _no_page_overflow(page)
+            _actions_under_the_tabs(page)
+            page.goto(f"{base}/loans/installments", wait_until="networkidle")
+            expect(page.locator("[data-installment-plan]")).to_have_count(1)
+            _no_page_overflow(page)
 
             assert page.evaluate("window.__cspViolations") == []
             browser.close()

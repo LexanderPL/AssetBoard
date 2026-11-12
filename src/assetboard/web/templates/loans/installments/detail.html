@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% from "loans/_tabs.html" import tabs with context %}
+{% block title %}{{ plan.name }} · {{ _("Installments") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Loans") }}{% endblock %}
+{% block content %}
+{{ tabs("installments") }}
+<div class="mt-4 flex flex-wrap items-center gap-2" data-page-actions>
+  <a href="{{ scoped_url(request, 'installment_plans') }}" class="btn">{{ _("Back to Installments") }}</a>
+  {% if can_edit and not plan.closed %}<a href="{{ scoped_url(request, 'installment_plan_edit', loan_id=loan.id) }}" class="btn-primary" data-edit-installment-plan>{{ _("Edit plan") }}</a>{% endif %}
+  {% if can_edit and loan.archived and plan.remaining_count > 0 %}<form method="post" action="{{ scoped_url(request, 'installment_plan_restore', loan_id=loan.id) }}">{{ csrf_input() }}<button type="submit" class="btn">{{ _("Restore plan") }}</button></form>{% endif %}
+  {% if can_edit and not loan.archived %}<form method="post" action="{{ scoped_url(request, 'installment_plan_archive', loan_id=loan.id) }}" data-confirm="{{ _('Archive the installment plan %(name)s? Pending future occurrences will be removed.', name=plan.name) }}" data-confirm-tone="danger">{{ csrf_input() }}<button type="submit" class="btn-danger">{{ _("Archive plan") }}</button></form>{% endif %}
+</div>
+{% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
+{% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
+
+<section class="panel mb-6 p-4 sm:p-6" aria-labelledby="installment-summary-heading" data-installment-plan-detail>
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h2 id="installment-summary-heading" class="text-base font-semibold">{{ plan.name }}</h2>
+      <p class="mt-1 text-sm text-muted">{{ _("Installment plan") }} · {{ plan.category_name }}{% if plan.closed %} · <span class="font-semibold text-muted">{{ _("closed") }}</span>{% endif %}</p>
+    </div>
+    <a href="{{ scoped_url(request, 'scheduled_upcoming') }}" class="btn">{{ _("Open Upcoming") }}</a>
+  </div>
+  <dl class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Monthly installment") }}</dt><dd class="mt-1 text-lg font-semibold tabular-nums" data-plan-installment>{{ format_money(plan.installment, locale) }}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Remaining") }}</dt><dd class="mt-1 text-lg font-semibold tabular-nums" data-plan-remaining>{{ plan.remaining_count }}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Total remaining") }}</dt><dd class="mt-1 text-lg font-semibold tabular-nums" data-plan-total>{{ format_money(plan.total_remaining, locale) }}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Next due") }}</dt><dd class="mt-1 text-lg font-semibold" data-plan-next-due>{% if plan.next_due %}{{ format_day(plan.next_due, locale) }}{% else %}—{% endif %}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("End date") }}</dt><dd class="mt-1" data-plan-end-date>{{ format_day(plan.end_date, locale) }}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Expense category") }}</dt><dd class="mt-1">{{ plan.category_name }}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Payment day") }}</dt><dd class="mt-1">{{ _("day %(day)s", day=loan.payment_day) }}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Currency") }}</dt><dd class="mt-1">{{ plan.currency }}</dd></div>
+  </dl>
+  <p class="mt-4 text-sm text-muted">{{ _("Each posted installment reduces the remaining count by one. At zero the plan closes; no interest or loan payment is calculated.") }}</p>
+</section>
+
+{% include "loans/installments/_integrations.html" %}
+{% endblock %}
