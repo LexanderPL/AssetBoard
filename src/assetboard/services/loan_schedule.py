@@ -146,15 +146,9 @@ def _checkpoints(view: loans.LoanView) -> list[BalanceCheckpoint]:
     ]
 
 
-def load_loan_schedule_inputs(
-    factory: sessionmaker[Session], ctx: Context, loan_id: UUID
-) -> LoanScheduleInputs:
-    """Load and map one loan for the engine; domain errors propagate with their code."""
-    require_role(ctx, Role.VIEWER)
-    view = loans.get_loan(factory, ctx, loan_id)
-    today = ctx.clock.today(ctx.workspace.timezone)
+def schedule_inputs_from_view(view: loans.LoanView, as_of: date) -> LoanScheduleInputs:
     terms = _terms(view)
-    anchor = select_anchor(terms, _checkpoints(view), today)
+    anchor = select_anchor(terms, _checkpoints(view), as_of)
     return LoanScheduleInputs(
         view=view,
         terms=terms,
@@ -162,10 +156,29 @@ def load_loan_schedule_inputs(
         costs=_costs(view),
         overpayments=_overpayments(view),
         anchor=anchor,
-        as_of=today,
+        as_of=as_of,
         day_count=view.day_count,
         strategy=view.overpayment_strategy,
     )
+
+
+def load_loan_schedule_inputs(
+    factory: sessionmaker[Session], ctx: Context, loan_id: UUID
+) -> LoanScheduleInputs:
+    """Load and map one loan for the engine; domain errors propagate with their code."""
+    require_role(ctx, Role.VIEWER)
+    view = loans.get_loan(factory, ctx, loan_id)
+    return schedule_inputs_from_view(view, ctx.clock.today(ctx.workspace.timezone))
+
+
+def load_loan_schedule_inputs_in_session(
+    session: Session, ctx: Context, loan_id: UUID, as_of: date
+) -> LoanScheduleInputs:
+    """The same mapping inside the caller's transaction, anchored at ``as_of``."""
+    require_role(ctx, Role.VIEWER)
+    today = ctx.clock.today(ctx.workspace.timezone)
+    view = loans.load_loan_view_in_session(session, ctx, loan_id, today)
+    return schedule_inputs_from_view(view, as_of)
 
 
 def anchor_for_date(inputs: LoanScheduleInputs, day: date) -> ScheduleAnchor:
@@ -352,6 +365,8 @@ __all__ = [
     "anchor_for_date",
     "build_inputs_schedule",
     "load_loan_schedule_inputs",
+    "load_loan_schedule_inputs_in_session",
     "loan_schedule",
     "schedule_from_anchor",
+    "schedule_inputs_from_view",
 ]

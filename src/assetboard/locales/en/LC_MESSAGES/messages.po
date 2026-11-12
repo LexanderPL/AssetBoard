@@ -1971,6 +1971,9 @@ msgstr ""
 msgid "Investment income: %(instrument)s"
 msgstr ""
 
+msgid "Loan"
+msgstr ""
+
 msgid "Baseline"
 msgstr ""
 
@@ -3218,6 +3221,42 @@ msgstr ""
 msgid "The loan schedule is unavailable."
 msgstr ""
 
+msgid "The property item is archived."
+msgstr ""
+
+msgid "Choose an asset item for the property."
+msgstr ""
+
+msgid "Choose an item in a real-estate category."
+msgstr ""
+
+msgid "The property and the loan must use the same currency."
+msgstr ""
+
+msgid "No property is linked to this loan."
+msgstr ""
+
+msgid "The linked property item no longer exists."
+msgstr ""
+
+msgid "The property has no value on that date."
+msgstr ""
+
+msgid "The property value is zero, so LTV is unavailable."
+msgstr ""
+
+msgid "The loan balance is unavailable on that date."
+msgstr ""
+
+msgid "Choose an active expense category."
+msgstr ""
+
+msgid "The loan has no future scheduled payments."
+msgstr ""
+
+msgid "The loan is no longer available."
+msgstr ""
+
 msgid "The loan could not be saved. Check the form and try again."
 msgstr ""
 
@@ -3283,6 +3322,24 @@ msgid "Balance checkpoint saved."
 msgstr ""
 
 msgid "Balance checkpoint deleted."
+msgstr ""
+
+msgid "Linked net-worth item created."
+msgstr ""
+
+msgid "Property linked."
+msgstr ""
+
+msgid "Property link removed."
+msgstr ""
+
+msgid "Automatic payment recording saved."
+msgstr ""
+
+msgid "Recurring installments generated or refreshed."
+msgstr ""
+
+msgid "Recurring installment generation disabled."
 msgstr ""
 
 msgid "The loan"
@@ -6811,6 +6868,134 @@ msgstr ""
 msgid "Plotted payment data"
 msgstr ""
 
+msgid "Net worth & property"
+msgstr ""
+
+msgid ""
+"Link this loan to a net-worth liability and a property, and let Upcoming "
+"derive the installment amounts from the schedule."
+msgstr ""
+
+msgid "Open Net worth"
+msgstr ""
+
+msgid "Net-worth liability"
+msgstr ""
+
+#, python-format
+msgid "Linked item: %(name)s"
+msgstr ""
+
+msgid "Open the linked item"
+msgstr ""
+
+msgid "No linked liability item yet."
+msgstr ""
+
+#, fuzzy
+msgid "Create net-worth item"
+msgstr ""
+
+msgid "Property and LTV"
+msgstr ""
+
+#, python-format
+msgid "Value on %(date)s"
+msgstr ""
+
+msgid "Remaining principal"
+msgstr ""
+
+msgid "LTV"
+msgstr ""
+
+msgid "Equity"
+msgstr ""
+
+msgid "Show at date"
+msgstr ""
+
+msgid "Property item"
+msgstr ""
+
+msgid "Choose a property"
+msgstr ""
+
+msgid "Save property"
+msgstr ""
+
+msgid "Clear property"
+msgstr ""
+
+#, python-format
+msgid ""
+"Use an active real-estate asset item in %(currency)s. Add one on Net "
+"worth if the list is empty."
+msgstr ""
+
+msgid "Add an active real-estate asset item on Net worth first."
+msgstr ""
+
+msgid "Recurring installments"
+msgstr ""
+
+msgid ""
+"Generate monthly expense occurrences from the projected installment. "
+"Refreshing updates pending future amounts; posted and skipped rows stay "
+"unchanged."
+msgstr ""
+
+msgid "Open Upcoming"
+msgstr ""
+
+msgid "Next due"
+msgstr ""
+
+msgid "Ends"
+msgstr ""
+
+msgid "Expense category"
+msgstr ""
+
+#, fuzzy
+msgid "Refresh occurrences"
+msgstr ""
+
+msgid ""
+"Disable recurring installment generation? Pending future occurrences will"
+" be removed."
+msgstr ""
+
+msgid "Disable generation"
+msgstr ""
+
+msgid "Generation is not active for this loan."
+msgstr ""
+
+#, fuzzy
+msgid "Generate occurrences"
+msgstr ""
+
+msgid "Automatic payment recording"
+msgstr ""
+
+msgid ""
+"When an upcoming installment linked to this loan is posted, also record "
+"it as an actual loan payment."
+msgstr ""
+
+msgid "Record posted installments automatically"
+msgstr ""
+
+msgid "Save setting"
+msgstr ""
+
+msgid "On"
+msgstr ""
+
+msgid "Off"
+msgstr ""
+
 msgid "per month"
 msgstr ""
 
@@ -6835,9 +7020,6 @@ msgid ""
 msgstr ""
 
 msgid "Overview"
-msgstr ""
-
-msgid "Remaining principal"
 msgstr ""
 
 msgid "Current rate"
@@ -8484,9 +8666,6 @@ msgstr ""
 msgid "Starts on"
 msgstr ""
 
-msgid "Ends"
-msgstr ""
-
 msgid "On a date"
 msgstr ""
 
@@ -8548,6 +8727,9 @@ msgid "Next date"
 msgstr ""
 
 msgid "paused"
+msgstr ""
+
+msgid "From loan"
 msgstr ""
 
 msgid "Next:"
@@ -8911,9 +9093,6 @@ msgid "Once"
 msgstr ""
 
 msgid "Next due date"
-msgstr ""
-
-msgid "Expense category"
 msgstr ""
 
 msgid "Create an expense category first."

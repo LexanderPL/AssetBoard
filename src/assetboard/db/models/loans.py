@@ -13,6 +13,7 @@ from uuid import UUID
 
 from sqlalchemy import (
     BigInteger,
+    Boolean,
     CheckConstraint,
     Date,
     ForeignKeyConstraint,
@@ -21,6 +22,7 @@ from sqlalchemy import (
     String,
     UniqueConstraint,
     Uuid,
+    false,
 )
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -105,6 +107,11 @@ class Loan(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             ["reference_rates.workspace_id", "reference_rates.id"],
             name="fk_loans_workspace_reference_rate",
         ),
+        ForeignKeyConstraint(
+            ["workspace_id", "property_item_id"],
+            ["networth_items.workspace_id", "networth_items.id"],
+            name="fk_loans_workspace_property_item",
+        ),
         CheckConstraint("length(name) > 0", name="name_not_empty"),
         CheckConstraint("length(currency) = 3", name="currency_length"),
         CheckConstraint("kind IN ('annuity', 'equal_principal')", name="kind_valid"),
@@ -163,6 +170,7 @@ class Loan(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         _date_range("first_payment_date"),
         Index("ix_loans_workspace_archived", "workspace_id", "archived_at"),
         Index("ix_loans_workspace_name", "workspace_id", "name"),
+        Index("ix_loans_workspace_property_item", "workspace_id", "property_item_id"),
     )
 
     name: Mapped[str] = mapped_column(String(MAX_LOAN_NAME_LENGTH), nullable=False)
@@ -180,6 +188,10 @@ class Loan(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     )
     margin_bp: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     reference_rate_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
+    property_item_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
+    auto_record_payments: Mapped[bool] = mapped_column(
+        Boolean(), nullable=False, default=False, server_default=false()
+    )
     installment_override_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
     overpayment_mode: Mapped[str] = mapped_column(String(16), nullable=False, default="none")
     overpayment_amount_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)

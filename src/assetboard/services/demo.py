@@ -389,6 +389,7 @@ def _write_recurring(
                 today=occurrence.due_date,
                 source=occurrences.Source.RECURRING,
                 actor_user_id=ctx.user.id,
+                context=sctx,
             )
     return items, occurrences_written
 
@@ -503,6 +504,7 @@ def _write_income(
             today=occurrence.due_date,
             source=occurrences.Source.RECURRING,
             actor_user_id=ctx.user.id,
+            context=sctx,
         )
         for child in repository.children(occurrence.id):
             occurrences_written += 1
@@ -520,6 +522,7 @@ def _write_income(
                 today=child.due_date,
                 source=occurrences.Source.RECURRING,
                 actor_user_id=ctx.user.id,
+                context=child_ctx,
             )
     return source_id, occurrences_written
 

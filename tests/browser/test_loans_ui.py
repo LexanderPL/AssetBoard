@@ -115,6 +115,22 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             expect(page.locator('[data-chart="loan-payments"]')).to_have_attribute(
                 "data-chart-ready", "true"
             )
+            expect(page.locator("[data-loan-integrations]")).to_be_visible()
+            page.get_by_role("button", name="Create net-worth item").click()
+            page.wait_for_load_state("networkidle")
+            expect(page.locator("[data-linked-item]")).to_be_visible()
+            page.locator('input[type="checkbox"][name="enabled"]').check()
+            page.get_by_role("button", name="Save setting").click()
+            page.wait_for_load_state("networkidle")
+            expect(page.locator("[data-action-notice]")).to_contain_text(
+                "Automatic payment recording saved."
+            )
+            category_select = page.locator('[data-scheduled-generation] select[name="category_id"]')
+            category_select.select_option(index=1)
+            page.get_by_role("button", name="Generate occurrences").click()
+            page.wait_for_load_state("networkidle")
+            expect(page.get_by_role("button", name="Refresh occurrences")).to_be_visible()
+            _no_page_overflow(page)
             loan_id = urlsplit(page.url).path.rstrip("/").split("/")[-1]
             csv = page.request.get(f"{base}/loans/{loan_id}/schedule.csv")
             assert csv.status == 200
@@ -191,6 +207,8 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             expect(page.get_by_role("link", name="Back to Loans")).to_be_visible()
             expect(page.get_by_role("link", name="Edit terms")).to_be_visible()
             expect(page.locator("[data-loan-schedule]")).to_be_visible()
+            expect(page.locator("[data-loan-integrations]")).to_be_visible()
+            _no_page_overflow(page)
             scroll = page.locator("[data-schedule-scroll]").evaluate(
                 "el => ({scrollWidth: el.scrollWidth, clientWidth: el.clientWidth})"
             )

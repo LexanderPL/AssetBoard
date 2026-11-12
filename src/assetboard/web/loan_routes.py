@@ -38,10 +38,13 @@ from assetboard.i18n.numbers import (
     format_rate_short,
     parse_amount,
 )
+from assetboard.services import loan_links as loan_link_service
 from assetboard.services import loan_payments as loan_payment_service
 from assetboard.services import loan_scenarios as loan_scenario_service
 from assetboard.services import loan_schedule as loan_schedule_service
+from assetboard.services import loan_scheduled as loan_scheduled_service
 from assetboard.services import loans
+from assetboard.services.categories import list_categories
 from assetboard.services.context import Context, Role, has_role, require_role
 from assetboard.web.context import CurrentContext
 from assetboard.web.forms import InvalidPercentOrFixed, percent_to_bp, signed_percent_to_bp
@@ -131,6 +134,18 @@ ERRORS = {
         "The starting balance checkpoint is required for a loan entered from its current balance."
     ),
     "schedule_unavailable": _("The loan schedule is unavailable."),
+    "property_archived": _("The property item is archived."),
+    "property_not_asset": _("Choose an asset item for the property."),
+    "property_not_real_estate": _("Choose an item in a real-estate category."),
+    "property_currency": _("The property and the loan must use the same currency."),
+    "no_property": _("No property is linked to this loan."),
+    "property_missing": _("The linked property item no longer exists."),
+    "no_value": _("The property has no value on that date."),
+    "value_zero": _("The property value is zero, so LTV is unavailable."),
+    "balance_unavailable": _("The loan balance is unavailable on that date."),
+    "invalid_category": _("Choose an active expense category."),
+    "loan_paid_off": _("The loan has no future scheduled payments."),
+    "invalid_loan": _("The loan is no longer available."),
     "failed": _("The loan could not be saved. Check the form and try again."),
 }
 
@@ -156,6 +171,12 @@ NOTICES = {
     "payment_deleted": _("Payment deleted."),
     "checkpoint_saved": _("Balance checkpoint saved."),
     "checkpoint_deleted": _("Balance checkpoint deleted."),
+    "networth_item_created": _("Linked net-worth item created."),
+    "property_saved": _("Property linked."),
+    "property_cleared": _("Property link removed."),
+    "auto_record_saved": _("Automatic payment recording saved."),
+    "schedule_generated": _("Recurring installments generated or refreshed."),
+    "schedule_disabled": _("Recurring installment generation disabled."),
 }
 
 ENTRY_PATHS = ("original", "current")
@@ -614,6 +635,12 @@ def _detail_context(
     today = ctx.clock.today(ctx.workspace.timezone)
     page = schedule_page(data.schedule, today, request.query_params.get("schedule_page"))
     charts = build_loan_charts(data.schedule, data.baseline, request.state.locale)
+    property_as_of = today
+    raw_as_of = request.query_params.get("property_as_of", "")
+    if raw_as_of:
+        with contextlib.suppress(ValueError):
+            property_as_of = date.fromisoformat(raw_as_of)
+    factory = request.app.state.session_factory
     return {
         "loan": data.view,
         "schedule_data": data,
@@ -635,6 +662,13 @@ def _detail_context(
         "format_quantity_input": format_quantity_input,
         "format_rate_short": format_rate_short,
         "rate_input": lambda bp: _rate_input(bp, request.state.locale),
+        "liability": loan_link_service.loan_liability_view(factory, ctx, loan_id),
+        "property_choices": loan_link_service.property_choices(factory, ctx, loan_id),
+        "property": loan_link_service.loan_property_view(factory, ctx, loan_id, property_as_of),
+        "property_as_of": property_as_of,
+        "property_reason": lambda code: _error(request, code),
+        "scheduled_item": loan_scheduled_service.loan_schedule_item_view(factory, ctx, loan_id),
+        "expense_categories": list_categories(factory, ctx).expense,
     }
 
 
@@ -1541,6 +1575,111 @@ async def loan_checkpoint_delete(
         )
         return render_template(request, "loans/payments.html", status_code=400, context=context)
     return _redirect_payments(request, loan_id, notice="checkpoint_deleted", anchor="checkpoints")
+
+
+@router.post("/loans/{loan_id}/networth-item", name="loan_networth_item_create")
+async def loan_networth_item_create(
+    request: Request, ctx: CurrentContext, loan_id: UUID
+) -> Response:
+    try:
+        await run_in_threadpool(
+            loan_link_service.create_loan_liability_item,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        return _redirect_detail(
+            request, loan_id, error=getattr(exc, "code", "failed"), anchor="integrations"
+        )
+    return _redirect_detail(request, loan_id, notice="networth_item_created", anchor="integrations")
+
+
+@router.post("/loans/{loan_id}/property", name="loan_property_set")
+async def loan_property_set(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    values = await _form_values(request)
+    try:
+        await run_in_threadpool(
+            loan_link_service.set_loan_property,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+            _id(values.get("property_item_id", "")),
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        return _redirect_detail(
+            request, loan_id, error=getattr(exc, "code", "failed"), anchor="integrations"
+        )
+    return _redirect_detail(request, loan_id, notice="property_saved", anchor="integrations")
+
+
+@router.post("/loans/{loan_id}/property/clear", name="loan_property_clear")
+async def loan_property_clear(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    try:
+        await run_in_threadpool(
+            loan_link_service.clear_loan_property,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        return _redirect_detail(
+            request, loan_id, error=getattr(exc, "code", "failed"), anchor="integrations"
+        )
+    return _redirect_detail(request, loan_id, notice="property_cleared", anchor="integrations")
+
+
+@router.post("/loans/{loan_id}/auto-record", name="loan_auto_record_update")
+async def loan_auto_record_update(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    values = await _form_values(request)
+    try:
+        await run_in_threadpool(
+            loan_link_service.set_auto_record_payments,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+            values.get("enabled") == "1",
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        return _redirect_detail(
+            request, loan_id, error=getattr(exc, "code", "failed"), anchor="integrations"
+        )
+    return _redirect_detail(request, loan_id, notice="auto_record_saved", anchor="integrations")
+
+
+@router.post("/loans/{loan_id}/scheduled-item", name="loan_scheduled_generate")
+async def loan_scheduled_generate(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    values = await _form_values(request)
+    try:
+        await run_in_threadpool(
+            loan_scheduled_service.create_loan_schedule_item,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+            _id(values.get("category_id", "")),
+            request.app.state.settings,
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        return _redirect_detail(
+            request, loan_id, error=getattr(exc, "code", "failed"), anchor="integrations"
+        )
+    return _redirect_detail(request, loan_id, notice="schedule_generated", anchor="integrations")
+
+
+@router.post("/loans/{loan_id}/scheduled-item/disable", name="loan_scheduled_disable")
+async def loan_scheduled_disable(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    try:
+        await run_in_threadpool(
+            loan_scheduled_service.disable_loan_schedule_item,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        return _redirect_detail(
+            request, loan_id, error=getattr(exc, "code", "failed"), anchor="integrations"
+        )
+    return _redirect_detail(request, loan_id, notice="schedule_disabled", anchor="integrations")
 
 
 @router.get("/loans/{loan_id}", name="loan_detail")

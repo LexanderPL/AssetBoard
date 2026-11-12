@@ -119,6 +119,32 @@ projected, a negative one means it is lower. The starting checkpoint of a loan e
 current balance has no earlier anchor, so it shows no variance and cannot be deleted. A
 checkpoint that cannot be projected shows the reason instead of a value.
 
+## Net worth, property and Upcoming
+
+**Net worth & property** on the loan page connects the loan to the rest of the app:
+
+- **Net-worth liability**: **Create net-worth item** adds one linked liability item in the
+  **Mortgage** category. Every net-worth date resolves the remaining principal from the loan
+  terms, checkpoints and recorded actual installment payments. Creating it again does not
+  duplicate it.
+- **Property and LTV**: choose an active real-estate asset item in the same currency. The page
+  shows the property value on the chosen date, the remaining principal, **LTV** (remaining
+  principal divided by the value) and equity (value minus remaining principal). Change the date
+  and press **Show** to recalculate. If no property is linked, the value is missing, the item is
+  archived, the currencies differ, or the balance is unavailable, the page says why instead of
+  showing a misleading number. A zero property value leaves LTV unavailable but still shows
+  equity against the remaining principal.
+- **Recurring installments**: choose an expense category and **Generate occurrences** to create
+  one monthly scheduled item linked to the loan. The expected amount of each pending occurrence
+  comes from the projected installment for its due date, so a rate, cost, term, overpayment or
+  checkpoint change refreshes pending future amounts. Posted, skipped and manually overridden
+  occurrences are left alone. **Refresh occurrences** updates the same item after changing its
+  category; **Disable generation** archives it and removes only pending future occurrences. A
+  link opens Upcoming.
+- **Automatic payment recording**: when this setting is on and a linked Upcoming occurrence is
+  posted, the app also records an actual loan payment with source **upcoming**, its transaction
+  link and the paid amount split against the projected row. The setting is off by default.
+
 ## What-if scenarios
 
 **Scenarios** on the loan page compares the same loan under several plans without changing the

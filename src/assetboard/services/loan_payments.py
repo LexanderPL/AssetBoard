@@ -119,6 +119,12 @@ def _audit(
     )
 
 
+def _refresh_loan_item(session: Session, ctx: Context, loan_id: UUID) -> None:
+    from assetboard.services.loan_scheduled import refresh_loan_occurrences
+
+    refresh_loan_occurrences(session, ctx, loan_id)
+
+
 def _active_loan(session: Session, ctx: Context, loan_id: UUID) -> Loan:
     loan = LoanRepository(session, ctx).get_or_raise(loan_id)
     if loan.archived_at is not None:
@@ -220,6 +226,30 @@ def _split_from_schedule(
     return split_loan_payment(total, kind, row)
 
 
+def _split_from_schedule_in_session(
+    session: Session,
+    ctx: Context,
+    loan_id: UUID,
+    day: date,
+    kind: LoanPaymentKind,
+    total: Money,
+) -> LoanPaymentSplit:
+    if kind is LoanPaymentKind.OVERPAYMENT:
+        return split_loan_payment(total, kind, None)
+    try:
+        inputs = loan_schedule.load_loan_schedule_inputs_in_session(session, ctx, loan_id, day)
+        anchor = loan_schedule.anchor_for_date(inputs, day)
+        schedule = loan_schedule.schedule_from_anchor(inputs, anchor, day)
+    except (ScheduleError, LoanValidationError) as exc:
+        raise loans.LoanError("date", exc.code) from None
+    row = next((item for item in schedule.rows if item.date == day), None)
+    if row is None:
+        row = next((item for item in schedule.rows if item.date >= day), None)
+    if row is None:
+        raise loans.LoanError("date", "no_scheduled_payment")
+    return split_loan_payment(total, kind, row)
+
+
 def _explicit_split(
     total: Money,
     principal: Money | None,
@@ -271,6 +301,67 @@ def _total(total: Money, currency: str) -> Money:
     return total
 
 
+def record_loan_payment_in_session(
+    session: Session,
+    ctx: Context,
+    loan_id: UUID,
+    *,
+    date_value: date,
+    kind: LoanPaymentKind | str,
+    total: Money,
+    principal: Money | None = None,
+    interest: Money | None = None,
+    costs: Money | None = None,
+    overpayment: Money | None = None,
+    note: str = "",
+    transaction_id: UUID | None = None,
+    source: LoanPaymentSource | str = LoanPaymentSource.MANUAL,
+) -> UUID:
+    """Create one payment in the caller's transaction (used by posting and the factory API)."""
+    view = loans.load_loan_view_in_session(
+        session, ctx, loan_id, ctx.clock.today(ctx.workspace.timezone)
+    )
+    loan = _active_loan(session, ctx, loan_id)
+    valid_date(date_value, "date")
+    wanted_kind = _kind(kind)
+    wanted_total = _total(total, view.currency)
+    wanted_source = LoanPaymentSource(source)
+    if wanted_kind is LoanPaymentKind.OVERPAYMENT:
+        split = split_loan_payment(wanted_total, wanted_kind, None)
+    elif any(value is not None for value in (principal, interest, costs, overpayment)):
+        split = _explicit_split(wanted_total, principal, interest, costs, overpayment)
+    else:
+        split = _split_from_schedule_in_session(
+            session, ctx, loan_id, date_value, wanted_kind, wanted_total
+        )
+    _validate_transaction(session, ctx, loan, wanted_total, transaction_id)
+    payment = LoanPaymentRepository(session, ctx).create(
+        loan_id=loan.id,
+        date=date_value,
+        kind=wanted_kind.value,
+        total_minor=wanted_total.amount_minor,
+        principal_minor=split.principal.amount_minor,
+        interest_minor=split.interest.amount_minor,
+        costs_minor=split.costs.amount_minor,
+        overpayment_minor=split.overpayment.amount_minor,
+        note=clean_note(note),
+        source=wanted_source.value,
+        transaction_id=transaction_id,
+    )
+    _audit(
+        session,
+        ctx,
+        "loan_payment.created",
+        loan.id,
+        {
+            "payment_id": str(payment.id),
+            "kind": wanted_kind.value,
+            "date": date_value.isoformat(),
+        },
+    )
+    return payment.id
+
+
 def create_loan_payment(
     factory: sessionmaker[Session],
     ctx: Context,
@@ -288,49 +379,24 @@ def create_loan_payment(
 ) -> UUID:
     """Record one actual payment; a single total is split against the projected row."""
     require_role(ctx, Role.EDITOR)
-    view = loans.get_loan(factory, ctx, loan_id)
-    valid_date(date_value, "date")
-    wanted_kind = _kind(kind)
-    wanted_total = _total(total, view.currency)
 
     def write(session: Session) -> UUID:
         require_role_now(session, ctx, Role.EDITOR)
         _locked_currency(session, ctx)
-        loan = _active_loan(session, ctx, loan_id)
-        if wanted_kind is LoanPaymentKind.OVERPAYMENT:
-            split = split_loan_payment(wanted_total, wanted_kind, None)
-        elif any(value is not None for value in (principal, interest, costs, overpayment)):
-            split = _explicit_split(wanted_total, principal, interest, costs, overpayment)
-        else:
-            split = _split_from_schedule(
-                factory, ctx, loan_id, date_value, wanted_kind, wanted_total
-            )
-        _validate_transaction(session, ctx, loan, wanted_total, transaction_id)
-        payment = LoanPaymentRepository(session, ctx).create(
-            loan_id=loan.id,
-            date=date_value,
-            kind=wanted_kind.value,
-            total_minor=wanted_total.amount_minor,
-            principal_minor=split.principal.amount_minor,
-            interest_minor=split.interest.amount_minor,
-            costs_minor=split.costs.amount_minor,
-            overpayment_minor=split.overpayment.amount_minor,
-            note=clean_note(note),
-            source=LoanPaymentSource.MANUAL.value,
-            transaction_id=transaction_id,
-        )
-        _audit(
+        return record_loan_payment_in_session(
             session,
             ctx,
-            "loan_payment.created",
-            loan.id,
-            {
-                "payment_id": str(payment.id),
-                "kind": wanted_kind.value,
-                "date": date_value.isoformat(),
-            },
+            loan_id,
+            date_value=date_value,
+            kind=kind,
+            total=total,
+            principal=principal,
+            interest=interest,
+            costs=costs,
+            overpayment=overpayment,
+            note=note,
+            transaction_id=transaction_id,
         )
-        return payment.id
 
     return _write(factory, write)
 
@@ -593,6 +659,7 @@ def create_loan_checkpoint(
             loan.id,
             {"checkpoint_id": str(checkpoint.id), "as_of": as_of.isoformat()},
         )
+        _refresh_loan_item(session, ctx, loan.id)
         return checkpoint.id
 
     return _write(factory, write)
@@ -636,6 +703,7 @@ def update_loan_checkpoint(
             loan.id,
             {"checkpoint_id": str(row.id), "as_of": as_of.isoformat()},
         )
+        _refresh_loan_item(session, ctx, loan.id)
 
     _write(factory, write)
 
@@ -665,6 +733,7 @@ def delete_loan_checkpoint(
             loan.id,
             {"checkpoint_id": str(row.id), "as_of": row.as_of.isoformat()},
         )
+        _refresh_loan_item(session, ctx, loan.id)
 
     _write(factory, write)
 
@@ -694,6 +763,7 @@ __all__ = [
     "list_loan_payments",
     "list_payment_transactions",
     "payments_page",
+    "record_loan_payment_in_session",
     "update_loan_checkpoint",
     "update_loan_payment",
 ]

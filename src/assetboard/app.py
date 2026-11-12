@@ -63,6 +63,7 @@ from assetboard.services.hash_gate import HashGate, HashGateBusy
 from assetboard.services.import_csv import default_import_adapters
 from assetboard.services.imports import ImportAdapter, ImportAdapterRegistry
 from assetboard.services.instance_settings import workspace_creation_allowed
+from assetboard.services.loan_links import register_loan_resolvers
 from assetboard.services.mail import Mailer, MailOutbox, SmtpMailer
 from assetboard.services.months import MonthClosed
 from assetboard.services.notify import Notifier
@@ -147,6 +148,7 @@ def create_app(
 ) -> FastAPI:
     settings = settings or Settings()
     register_portfolio_resolvers()
+    register_loan_resolvers()
     logger = configure_logging(settings.log_level, settings.log_format)
     settings.ensure_data_dir_writable()
     if settings.allow_registration is False:

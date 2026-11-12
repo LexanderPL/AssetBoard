@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -203,6 +204,7 @@ def _post_in_session(
     today: date,
     source: Source,
     actor_user_id: UUID | None,
+    context: Context | None = None,
 ) -> UUID:
     repository = ScheduledOccurrenceRepository(session, scope)
     occurrence = repository.get_for_update(occurrence_id)
@@ -271,6 +273,30 @@ def _post_in_session(
         ts=now,
         data={"transaction_id": str(transaction.id), "source": source.value},
     )
+    if (
+        context is not None
+        and item is not None
+        and item.loan_id is not None
+        and occurrence.direction == "expense"
+    ):
+        from assetboard.db.repositories.loans import LoanRepository
+        from assetboard.domain.loans import LoanPaymentSource, LoanValidationError
+        from assetboard.services import loan_payments
+        from assetboard.services.loans import LoanError
+
+        loan = LoanRepository(session, context).get(item.loan_id)
+        if loan is not None and loan.archived_at is None and loan.auto_record_payments:
+            with contextlib.suppress(LoanError, LoanValidationError):
+                loan_payments.record_loan_payment_in_session(
+                    session,
+                    context,
+                    loan.id,
+                    date_value=occurrence.due_date,
+                    kind="installment",
+                    total=Money(amount_minor, occurrence.currency),
+                    transaction_id=transaction.id,
+                    source=LoanPaymentSource.UPCOMING,
+                )
     return transaction.id
 
 
@@ -297,6 +323,7 @@ def post_occurrence(
             today=ctx.clock.today(ctx.workspace.timezone),
             source=Source.RECURRING,
             actor_user_id=ctx.user.id,
+            context=ctx,
         )
 
     return run_immediate(factory, write)

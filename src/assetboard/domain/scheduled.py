@@ -4,6 +4,7 @@ from enum import StrEnum
 class AmountMode(StrEnum):
     FIXED = "fixed"
     ESTIMATE = "estimate"
+    FROM_LOAN = "from_loan"
 
 
 class AmountState(StrEnum):
