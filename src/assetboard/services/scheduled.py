@@ -39,6 +39,7 @@ from assetboard.db.models.scheduled import ScheduledItem, ScheduledOccurrence
 from assetboard.db.repositories.audit import AuditEventRepository
 from assetboard.db.repositories.base import NotFound, WorkspaceScope
 from assetboard.db.repositories.category import CategoryRepository
+from assetboard.db.repositories.loans import LoanRepository
 from assetboard.db.repositories.month_state import MonthStateRepository
 from assetboard.db.repositories.scheduled import (
     ScheduledItemRepository,
@@ -46,6 +47,7 @@ from assetboard.db.repositories.scheduled import (
 )
 from assetboard.db.repositories.transaction import TransactionRepository
 from assetboard.db.repositories.workspace import CurrentWorkspaceRepository
+from assetboard.domain.loans import LoanValidationError, ScheduleError
 from assetboard.domain.money import Money
 from assetboard.domain.months import MAX_YEAR, YearMonth
 from assetboard.domain.notifications import MAX_LEAD_DAYS
@@ -89,6 +91,8 @@ class ScheduledInput:
     auto_post: bool = False
     # Days before the due date for reminders (F3.6); None: each channel's default.
     reminder_lead_days: int | None = None
+    # Only a ``from_loan`` item carries this; its amount comes from the loan schedule.
+    loan_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -131,6 +135,7 @@ def _values(item: ScheduledItem) -> ScheduledInput:
         item.notes,
         item.auto_post,
         item.reminder_lead_days,
+        item.loan_id,
     )
 
 
@@ -315,6 +320,45 @@ def _remove_pending(
     return remaining
 
 
+def _loan_amounts(
+    session: Session, scope: WorkspaceScope, loan_id: UUID, today: date
+) -> list[tuple[date, int]] | None:
+    """The current loan schedule as ``(due date, installment total)`` pairs, or unavailable."""
+    try:
+        from assetboard.services import loan_schedule, loans
+
+        view = loans.load_loan_view_in_session(session, scope, loan_id, today)
+        inputs = loan_schedule.schedule_inputs_from_view(view, today)
+        schedule = loan_schedule.build_inputs_schedule(inputs)
+    except (LoanValidationError, ScheduleError, NotFound):
+        return None
+    return [(row.date, row.installment_total.amount_minor) for row in schedule.rows]
+
+
+def _loan_amount(rows: list[tuple[date, int]] | None, due: date) -> int | None:
+    if rows is None:
+        return None
+    for day, amount in rows:
+        if day >= due:
+            return amount
+    return None
+
+
+def refresh_loan_item_in_session(
+    session: Session, ctx: Context, loan_id: UUID, *, horizon_months: int = 24
+) -> int:
+    """Reconcile the loan-linked scheduled item's pending rows with the schedule."""
+    items = [
+        item
+        for item in ScheduledItemRepository(session, ctx).ordered(active_only=True)
+        if item.loan_id == loan_id
+    ]
+    created = 0
+    for item in items:
+        created += _generate(session, ctx, ctx.clock, item, horizon_months)
+    return created
+
+
 def _generate(
     session: Session,
     scope: WorkspaceScope,
@@ -329,6 +373,12 @@ def _generate(
     today = clock.today(workspace.timezone)
     closed = MonthStateRepository(session, scope).closed_months()
     category = CategoryRepository(session, scope).get_or_raise(item.category_id)
+    from_loan = item.amount_mode == AmountMode.FROM_LOAN.value
+    loan_rows = (
+        _loan_amounts(session, scope, item.loan_id, today)
+        if from_loan and item.loan_id is not None
+        else None
+    )
     repository = ScheduledOccurrenceRepository(session, scope)
     rows = repository.for_item(item.id)
     wanted: dict[date, date] = {}
@@ -378,12 +428,17 @@ def _generate(
         row.currency = item.currency
         row.label = item.name
         if not row.amount_overridden:
-            row.expected_minor = item.amount_minor
-            row.amount_state = (
-                AmountState.CONFIRMED
-                if item.amount_mode == AmountMode.FIXED
-                else AmountState.ESTIMATED
-            )
+            if from_loan:
+                amount = _loan_amount(loan_rows, row.due_date)
+                row.expected_minor = amount or 0
+                row.amount_state = AmountState.ESTIMATED
+            else:
+                row.expected_minor = item.amount_minor
+                row.amount_state = (
+                    AmountState.CONFIRMED
+                    if item.amount_mode == AmountMode.FIXED
+                    else AmountState.ESTIMATED
+                )
         kept.add(row.nominal_date)
     missing = sorted(set(wanted) - kept)
     if item.freq == Frequency.ONCE and kept:
@@ -391,17 +446,26 @@ def _generate(
         # overdue, or in a closed month), a date edit does not add another.
         missing = []
     for nominal in missing:
+        due = wanted[nominal]
+        if from_loan:
+            expected = _loan_amount(loan_rows, due) or 0
+            amount_state = AmountState.ESTIMATED
+        else:
+            expected = item.amount_minor
+            amount_state = (
+                AmountState.CONFIRMED
+                if item.amount_mode == AmountMode.FIXED
+                else AmountState.ESTIMATED
+            )
         repository.create(
             scheduled_item_id=item.id,
             direction=item.direction,
             category_id=item.category_id,
             nominal_date=nominal,
-            due_date=wanted[nominal],
-            expected_minor=item.amount_minor,
+            due_date=due,
+            expected_minor=expected,
             currency=item.currency,
-            amount_state=AmountState.CONFIRMED
-            if item.amount_mode == AmountMode.FIXED
-            else AmountState.ESTIMATED,
+            amount_state=amount_state,
             status=OccurrenceStatus.PENDING,
             generated_by="rule",
             label=item.name,
@@ -530,7 +594,14 @@ def save_item_in_session(
     """
     name = clean_description(values.name)
     notes = clean_description(values.notes)
-    if not name or not 0 < values.amount.amount_minor <= MAX_AMOUNT_MINOR:
+    if not name:
+        raise ValueError("invalid_item")
+    if values.amount_mode is AmountMode.FROM_LOAN:
+        if values.loan_id is None or values.amount.amount_minor != 0:
+            raise ValueError("invalid_item")
+    elif not 0 < values.amount.amount_minor <= MAX_AMOUNT_MINOR:
+        raise ValueError("invalid_item")
+    if values.amount_mode is not AmountMode.FROM_LOAN and values.loan_id is not None:
         raise ValueError("invalid_item")
     if values.reminder_lead_days is not None and not (
         0 <= values.reminder_lead_days <= MAX_LEAD_DAYS
@@ -551,6 +622,16 @@ def save_item_in_session(
     # The category decides the direction: the form has no separate field, and an edit that
     # moves an item to a category of the other kind changes its direction with it.
     direction = category.kind
+    if values.amount_mode is AmountMode.FROM_LOAN:
+        if direction != "expense":
+            raise ValueError("invalid_direction")
+        loan_id = values.loan_id
+        assert loan_id is not None
+        loan = LoanRepository(session, ctx).get(loan_id)
+        if loan is None or loan.archived_at is not None:
+            raise ValueError("invalid_loan")
+        if values.amount.currency != loan.currency:
+            raise ValueError("invalid_currency")
     repository = ScheduledItemRepository(session, ctx)
     rule = normalised(values.rule)
     fields = {
@@ -561,6 +642,7 @@ def save_item_in_session(
         "amount_minor": values.amount.amount_minor,
         "currency": values.amount.currency,
         "amount_mode": values.amount_mode,
+        "loan_id": values.loan_id,
         "start_date": rule.start_date,
         "end_date": rule.end_date,
         "max_count": rule.max_count,
