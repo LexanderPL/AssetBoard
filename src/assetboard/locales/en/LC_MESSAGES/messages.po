@@ -244,6 +244,27 @@ msgstr ""
 msgid "Sold an old chair"
 msgstr ""
 
+msgid "Sample reference rate"
+msgstr ""
+
+msgid "Synthetic reference-rate series for the demo"
+msgstr ""
+
+msgid "Mortgage"
+msgstr ""
+
+msgid "Life insurance"
+msgstr ""
+
+msgid "Bank fee"
+msgstr ""
+
+msgid "Annual bonus"
+msgstr ""
+
+msgid "Car loan"
+msgstr ""
+
 msgid "Rent"
 msgstr ""
 
@@ -299,9 +320,6 @@ msgid "Apartment"
 msgstr ""
 
 msgid "Real estate"
-msgstr ""
-
-msgid "Mortgage"
 msgstr ""
 
 msgid "Credit card"
@@ -2942,6 +2960,163 @@ msgstr ""
 msgid "%(name)s (archived)"
 msgstr ""
 
+msgid "Enter a shorter note."
+msgstr ""
+
+msgid "Enter a positive original principal."
+msgstr ""
+
+msgid "Enter a positive current balance."
+msgstr ""
+
+msgid "Enter a valid amount in the workspace currency."
+msgstr ""
+
+msgid "Enter a term between 1 and 600 months."
+msgstr ""
+
+msgid "Enter a payment day between 1 and 31."
+msgstr ""
+
+msgid ""
+"The first payment date must fall on the payment day, or on the last day "
+"of a shorter month."
+msgstr ""
+
+msgid "Choose the loan type."
+msgstr ""
+
+msgid "Choose a fixed or variable rate."
+msgstr ""
+
+msgid "Enter a rate between 0% and 100% with at most two decimals."
+msgstr ""
+
+msgid "Enter a non-negative margin between 0% and 100%."
+msgstr ""
+
+msgid "This rate is above 25%. Tick the confirmation box to save it."
+msgstr ""
+
+msgid "Choose a reference rate."
+msgstr ""
+
+msgid ""
+"This reference rate has no value on or before the loan's start date. Add "
+"a value first."
+msgstr ""
+
+msgid "The rate type cannot be changed after the loan is created."
+msgstr ""
+
+msgid "A fixed loan needs a rate on or before its first payment date."
+msgstr ""
+
+msgid "A rate change cannot start before the loan starts."
+msgstr ""
+
+msgid "Another rate change already starts on that date."
+msgstr ""
+
+msgid "Enter a cost name, a percentage or a positive fixed amount."
+msgstr ""
+
+msgid "The end date must be on or after the start date."
+msgstr ""
+
+msgid "Enter a positive overpayment amount and choose a strategy."
+msgstr ""
+
+msgid "The target total cannot be below the monthly installment."
+msgstr ""
+
+msgid "Enter a positive installment override, or leave it empty."
+msgstr ""
+
+msgid "An installment override applies only to an annuity loan."
+msgstr ""
+
+msgid "The loan has no rate on its first payment date."
+msgstr ""
+
+msgid "Another reference rate already has that name."
+msgstr ""
+
+msgid "This reference rate is used by a loan and cannot be deleted."
+msgstr ""
+
+msgid "A value already exists for that date."
+msgstr ""
+
+msgid "Only a future value can be changed or deleted."
+msgstr ""
+
+msgid "Archived loans cannot be changed. Restore the loan first."
+msgstr ""
+
+msgid "Choose how you want to enter the loan."
+msgstr ""
+
+msgid "Enter the amount in the workspace currency."
+msgstr ""
+
+msgid "The loan could not be saved. Check the form and try again."
+msgstr ""
+
+msgid "Loan saved. Add rate changes, costs or one-off overpayments below."
+msgstr ""
+
+msgid "Loan terms saved."
+msgstr ""
+
+msgid "Regular overpayment settings saved."
+msgstr ""
+
+msgid "Rate change saved."
+msgstr ""
+
+msgid "Rate change deleted."
+msgstr ""
+
+msgid "Cost saved."
+msgstr ""
+
+msgid "Cost deleted."
+msgstr ""
+
+msgid "One-off overpayment saved."
+msgstr ""
+
+msgid "One-off overpayment deleted."
+msgstr ""
+
+msgid "Loan archived."
+msgstr ""
+
+msgid "Loan restored."
+msgstr ""
+
+msgid "Reference rate saved."
+msgstr ""
+
+msgid "Reference rate deleted."
+msgstr ""
+
+msgid "Reference rate value saved."
+msgstr ""
+
+msgid "Reference rate value deleted."
+msgstr ""
+
+msgid "The loan"
+msgstr ""
+
+msgid "Terms"
+msgstr ""
+
+msgid "Payments"
+msgstr ""
+
 msgid ""
 "This month is closed. Its entries and planned values cannot change until "
 "an owner reopens it."
@@ -3670,9 +3845,6 @@ msgstr ""
 msgid "Only a rate change that starts in the future can be edited."
 msgstr ""
 
-msgid "Another rate change already starts on that date."
-msgstr ""
-
 msgid "That rate change no longer exists."
 msgstr ""
 
@@ -3993,10 +4165,10 @@ msgstr ""
 msgid "Loans"
 msgstr ""
 
-msgid "Unavailable"
+msgid "FIRE projection"
 msgstr ""
 
-msgid "FIRE projection"
+msgid "Unavailable"
 msgstr ""
 
 #, python-format
@@ -5604,9 +5776,6 @@ msgstr ""
 msgid "Withholding"
 msgstr ""
 
-msgid "Payments"
-msgstr ""
-
 msgid "No dividends or interest recorded yet."
 msgstr ""
 
@@ -6444,6 +6613,522 @@ msgstr ""
 msgid "Create account and join"
 msgstr ""
 
+msgid "per month"
+msgstr ""
+
+msgid "Annuity"
+msgstr ""
+
+msgid "Equal principal"
+msgstr ""
+
+#, python-format
+msgid "Extra %(amount)s each month"
+msgstr ""
+
+#, python-format
+msgid "Target total %(amount)s each month"
+msgstr ""
+
+msgid "shorten the term"
+msgstr ""
+
+msgid "lower the installment"
+msgstr ""
+
+msgid "Reference rates"
+msgstr ""
+
+msgid "Back to Loans"
+msgstr ""
+
+msgid "Edit terms"
+msgstr ""
+
+msgid "entered from the original terms"
+msgstr ""
+
+msgid "entered from the current balance"
+msgstr ""
+
+msgid "Current rate"
+msgstr ""
+
+msgid "Original principal"
+msgstr ""
+
+msgid "Current balance"
+msgstr ""
+
+#, python-format
+msgid "as of %(date)s"
+msgstr ""
+
+msgid "Term"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d month"
+msgid_plural "%(num)d months"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Next payment"
+msgstr ""
+
+#, python-format
+msgid "day %(day)s"
+msgstr ""
+
+msgid "Rate type"
+msgstr ""
+
+msgid "Fixed"
+msgstr ""
+
+msgid "Variable"
+msgstr ""
+
+msgid "First installment"
+msgstr ""
+
+msgid "Installment override"
+msgstr ""
+
+msgid "Regular overpayment"
+msgstr ""
+
+msgid "Rate changes"
+msgstr ""
+
+msgid "Add rate change"
+msgstr ""
+
+msgid "Annual rate"
+msgstr ""
+
+#, python-format
+msgid "rate from %(date)s"
+msgstr ""
+
+#, python-format
+msgid "Delete the rate change from %(date)s?"
+msgstr ""
+
+msgid "No rate changes yet."
+msgstr ""
+
+#, python-format
+msgid "Reference rate: %(name)s"
+msgstr ""
+
+msgid "not set"
+msgstr ""
+
+#, python-format
+msgid "margin %(margin)s"
+msgstr ""
+
+msgid ""
+"Change the reference rate or margin in Edit terms. Add values on the "
+"Reference rates page."
+msgstr ""
+
+msgid "Manage reference rates"
+msgstr ""
+
+msgid "Cost components"
+msgstr ""
+
+msgid "Add cost"
+msgstr ""
+
+msgid ""
+"Charged every month while active. A percentage applies to the opening "
+"balance; several active costs are added together."
+msgstr ""
+
+msgid "Cost"
+msgstr ""
+
+#, python-format
+msgid "from %(from)s"
+msgstr ""
+
+#, python-format
+msgid "to %(to)s"
+msgstr ""
+
+#, python-format
+msgid "Delete the cost %(name)s?"
+msgstr ""
+
+msgid "No cost components yet."
+msgstr ""
+
+msgid "Overpayments"
+msgstr ""
+
+msgid "Add one-off overpayment"
+msgstr ""
+
+msgid "A fixed extra each month"
+msgstr ""
+
+msgid "A target total each month"
+msgstr ""
+
+#, python-format
+msgid "Amount (%(currency)s)"
+msgstr ""
+
+msgid "Strategy"
+msgstr ""
+
+msgid "Shorten the term"
+msgstr ""
+
+msgid "Lower the monthly installment"
+msgstr ""
+
+msgid "Save overpayment settings"
+msgstr ""
+
+msgid "One-off overpayments"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "overpayment on %(date)s"
+msgstr ""
+
+#, python-format
+msgid "Delete the overpayment on %(date)s?"
+msgstr ""
+
+msgid "No one-off overpayments yet."
+msgstr ""
+
+msgid "Starting balance"
+msgstr ""
+
+msgid "Remaining principal"
+msgstr ""
+
+msgid ""
+"This is the balance you entered. More balance checkpoints are recorded "
+"with actual payments."
+msgstr ""
+
+msgid "Loan status"
+msgstr ""
+
+msgid "This loan is archived and read-only."
+msgstr ""
+
+msgid "Restore loan"
+msgstr ""
+
+msgid ""
+"Archiving keeps the loan's settings and history but hides it from the "
+"active list."
+msgstr ""
+
+#, python-format
+msgid "Archive the loan %(name)s?"
+msgstr ""
+
+msgid "Archive loan"
+msgstr ""
+
+msgid "Edit rate change"
+msgstr ""
+
+msgid "Applies from"
+msgstr ""
+
+#, python-format
+msgid "For example 5.5 for 5.5%%."
+msgstr ""
+
+#, python-format
+msgid "I understand this rate is above 25%%."
+msgstr ""
+
+msgid "Save rate change"
+msgstr ""
+
+msgid "Edit cost"
+msgstr ""
+
+msgid "Cost type"
+msgstr ""
+
+msgid "A percentage of the balance"
+msgstr ""
+
+msgid "Percent each month"
+msgstr ""
+
+#, python-format
+msgid "Amount each month (%(currency)s)"
+msgstr ""
+
+msgid "Applies until (optional)"
+msgstr ""
+
+msgid "The end date is included. Leave empty for no end."
+msgstr ""
+
+msgid "Save cost"
+msgstr ""
+
+msgid "Edit one-off overpayment"
+msgstr ""
+
+msgid "Note (optional)"
+msgstr ""
+
+msgid "This is a planned overpayment. Actual payments are recorded separately."
+msgstr ""
+
+msgid "Save overpayment"
+msgstr ""
+
+msgid "Edit loan"
+msgstr ""
+
+#, python-format
+msgid "Back to %(name)s"
+msgstr ""
+
+msgid ""
+"Change the loan terms. The rate type cannot change after creation; "
+"archive the loan and add a new one for that."
+msgstr ""
+
+msgid "Loan type"
+msgstr ""
+
+#, python-format
+msgid "Current balance (%(currency)s)"
+msgstr ""
+
+msgid "Balance date"
+msgstr ""
+
+msgid "Remaining months"
+msgstr ""
+
+msgid "Next payment date"
+msgstr ""
+
+msgid "Original principal (optional)"
+msgstr ""
+
+#, python-format
+msgid "Original principal (%(currency)s)"
+msgstr ""
+
+msgid "Origination date"
+msgstr ""
+
+msgid "Term in months"
+msgstr ""
+
+msgid "First payment date"
+msgstr ""
+
+msgid "Reference rate"
+msgstr ""
+
+msgid "Choose a reference rate"
+msgstr ""
+
+msgid "Margin"
+msgstr ""
+
+msgid "Added to the reference rate."
+msgstr ""
+
+#, python-format
+msgid "Installment override (%(currency)s, optional)"
+msgstr ""
+
+msgid "Only for annuity loans. Leave empty to use the calculated installment."
+msgstr ""
+
+#, python-format
+msgid "Rate type: %(mode)s. It is fixed at creation."
+msgstr ""
+
+msgid "Save terms"
+msgstr ""
+
+msgid "Add loan"
+msgstr ""
+
+msgid "Rate"
+msgstr ""
+
+msgid "Open"
+msgstr ""
+
+msgid "No loans yet."
+msgstr ""
+
+msgid ""
+"Add a mortgage or another loan once, from its original terms or from the "
+"balance you owe today."
+msgstr ""
+
+msgid "Loans added by an editor or owner will appear here."
+msgstr ""
+
+msgid "Archived loans"
+msgstr ""
+
+msgid "How much do you know about the loan?"
+msgstr ""
+
+msgid "I know the original terms"
+msgstr ""
+
+msgid "Principal, origination date, term and first payment date."
+msgstr ""
+
+msgid "I only know my current balance"
+msgstr ""
+
+msgid "The balance today, the remaining months and the next payment date."
+msgstr ""
+
+msgid "The installment stays roughly the same; more interest is paid first."
+msgstr ""
+
+msgid ""
+"The principal part is equal each month, so the installment falls over "
+"time."
+msgstr ""
+
+#, python-format
+msgid "All amounts are in %(currency)s, the workspace currency."
+msgstr ""
+
+msgid "The nominal day for later months. A shorter month uses its last day."
+msgstr ""
+
+msgid "Only needed to show how much you have repaid."
+msgstr ""
+
+msgid "Fixed rate"
+msgstr ""
+
+msgid "I enter the rate and any later changes."
+msgstr ""
+
+msgid "Variable rate"
+msgstr ""
+
+msgid "A reference rate plus a margin; I add the reference values."
+msgstr ""
+
+msgid "Annual interest rate"
+msgstr ""
+
+#, python-format
+msgid "For example 5.5 for 5.5%%. Add later changes on the loan page."
+msgstr ""
+
+msgid "No reference rates yet. Create one on the Reference rates page first."
+msgstr ""
+
+#, python-format
+msgid "Added to the reference rate. For example 1.5 for 1.5%%."
+msgstr ""
+
+msgid ""
+"Leave empty to use the calculated installment. Enter the bank's amount if"
+" it differs."
+msgstr ""
+
+msgid "For a target, this includes principal, interest and costs."
+msgstr ""
+
+msgid "What happens with the extra money?"
+msgstr ""
+
+msgid ""
+"After saving you can add rate changes, cost components and one-off "
+"overpayments on the loan page."
+msgstr ""
+
+msgid "Save loan"
+msgstr ""
+
+msgid "New reference rate"
+msgstr ""
+
+msgid ""
+"A reference rate is a series you maintain, like WIBOR or EURIBOR. Add a "
+"value with the date it starts; variable-rate loans use the latest value "
+"plus their margin."
+msgstr ""
+
+msgid "Current value"
+msgstr ""
+
+msgid "no value yet"
+msgstr ""
+
+#, python-format
+msgid "Delete the reference rate %(name)s and its values?"
+msgstr ""
+
+#, python-format
+msgid "Values of %(name)s"
+msgstr ""
+
+#, python-format
+msgid "value from %(date)s"
+msgstr ""
+
+#, python-format
+msgid "Delete the value from %(date)s?"
+msgstr ""
+
+msgid "Past value"
+msgstr ""
+
+msgid "No values yet."
+msgstr ""
+
+msgid "Add value"
+msgstr ""
+
+msgid "Edit value"
+msgstr ""
+
+msgid "Save value"
+msgstr ""
+
+msgid "No reference rates yet."
+msgstr ""
+
+msgid "Add a series like WIBOR or EURIBOR to use a variable-rate loan."
+msgstr ""
+
+msgid "Reference rates added by an editor or owner will appear here."
+msgstr ""
+
+msgid "Edit reference rate"
+msgstr ""
+
+msgid "Notes (optional)"
+msgstr ""
+
+msgid "Save reference rate"
+msgstr ""
+
 msgid "No month"
 msgstr ""
 
@@ -6891,16 +7576,10 @@ msgid ""
 "fields below are ignored."
 msgstr ""
 
-msgid "Current value"
-msgstr ""
-
 msgid "Value note (optional)"
 msgstr ""
 
 msgid "Acquired on (optional)"
-msgstr ""
-
-msgid "Notes (optional)"
 msgstr ""
 
 msgid "Include in net worth"
@@ -7013,21 +7692,11 @@ msgstr ""
 msgid "Add a value"
 msgstr ""
 
-msgid "Note (optional)"
-msgstr ""
-
-msgid "Add value"
-msgstr ""
-
 msgid "The currency is fixed once the item has a value."
 msgstr ""
 
 #, python-format
 msgid "Acquired %(date)s"
-msgstr ""
-
-#, python-format
-msgid "as of %(date)s"
 msgstr ""
 
 msgid "No value yet"
@@ -7220,10 +7889,6 @@ msgid ""
 msgstr ""
 
 msgid "How much"
-msgstr ""
-
-#, python-format
-msgid "Amount (%(currency)s)"
 msgstr ""
 
 msgid "The amount varies; this is an estimate"
@@ -7674,17 +8339,11 @@ msgstr ""
 msgid "not used yet"
 msgstr ""
 
-msgid "Rate changes"
-msgstr ""
-
 msgid "From the start"
 msgstr ""
 
 #, python-format
 msgid "From %(date)s"
-msgstr ""
-
-msgid "Edit rate change"
 msgstr ""
 
 msgid "New rate from"
@@ -7693,15 +8352,9 @@ msgstr ""
 msgid "Value type"
 msgstr ""
 
-msgid "Save rate change"
-msgstr ""
-
 msgid ""
 "Past months keep the old rate. Fill in the field that matches the value "
 "type."
-msgstr ""
-
-msgid "Add rate change"
 msgstr ""
 
 msgid "No taxes on income yet."

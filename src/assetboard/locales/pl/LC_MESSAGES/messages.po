@@ -247,6 +247,27 @@ msgstr "Odsetki od oszczędności"
 msgid "Sold an old chair"
 msgstr "Sprzedane stare krzesło"
 
+msgid "Sample reference rate"
+msgstr "Przykładowa stopa referencyjna"
+
+msgid "Synthetic reference-rate series for the demo"
+msgstr "Syntetyczna seria stóp referencyjnych dla wersji demonstracyjnej"
+
+msgid "Mortgage"
+msgstr "Kredyt hipoteczny"
+
+msgid "Life insurance"
+msgstr "Ubezpieczenie na życie"
+
+msgid "Bank fee"
+msgstr "Opłata bankowa"
+
+msgid "Annual bonus"
+msgstr "Roczna premia"
+
+msgid "Car loan"
+msgstr "Kredyt samochodowy"
+
 msgid "Rent"
 msgstr "Czynsz"
 
@@ -303,9 +324,6 @@ msgstr "Mieszkanie"
 
 msgid "Real estate"
 msgstr "Nieruchomości"
-
-msgid "Mortgage"
-msgstr "Kredyt hipoteczny"
 
 msgid "Credit card"
 msgstr "Karta kredytowa"
@@ -3100,6 +3118,171 @@ msgstr "Najpierw dodaj kategorię przychodów."
 msgid "%(name)s (archived)"
 msgstr "%(name)s (zarchiwizowana)"
 
+msgid "Enter a shorter note."
+msgstr "Podaj krótszą notatkę."
+
+msgid "Enter a positive original principal."
+msgstr "Podaj dodatni pierwotny kapitał."
+
+msgid "Enter a positive current balance."
+msgstr "Podaj dodatnie bieżące saldo."
+
+msgid "Enter a valid amount in the workspace currency."
+msgstr "Podaj prawidłową kwotę w walucie obszaru roboczego."
+
+msgid "Enter a term between 1 and 600 months."
+msgstr "Podaj okres od 1 do 600 miesięcy."
+
+msgid "Enter a payment day between 1 and 31."
+msgstr "Podaj dzień płatności od 1 do 31."
+
+msgid ""
+"The first payment date must fall on the payment day, or on the last day "
+"of a shorter month."
+msgstr ""
+"Data pierwszej płatności musi przypadać na dzień płatności lub na ostatni"
+" dzień krótszego miesiąca."
+
+msgid "Choose the loan type."
+msgstr "Wybierz rodzaj kredytu."
+
+msgid "Choose a fixed or variable rate."
+msgstr "Wybierz stopę stałą lub zmienną."
+
+msgid "Enter a rate between 0% and 100% with at most two decimals."
+msgstr "Podaj stopę od 0% do 100% z co najwyżej dwoma miejscami po przecinku."
+
+msgid "Enter a non-negative margin between 0% and 100%."
+msgstr "Podaj nieujemną marżę od 0% do 100%."
+
+msgid "This rate is above 25%. Tick the confirmation box to save it."
+msgstr "Ta stopa przekracza 25%. Zaznacz pole potwierdzenia, aby ją zapisać."
+
+msgid "Choose a reference rate."
+msgstr "Wybierz stopę referencyjną."
+
+msgid ""
+"This reference rate has no value on or before the loan's start date. Add "
+"a value first."
+msgstr ""
+"Ta stopa referencyjna nie ma wartości w dniu rozpoczęcia kredytu ani "
+"wcześniej. Najpierw dodaj wartość."
+
+msgid "The rate type cannot be changed after the loan is created."
+msgstr "Rodzaju stopy nie można zmienić po utworzeniu kredytu."
+
+msgid "A fixed loan needs a rate on or before its first payment date."
+msgstr ""
+"Kredyt o stałej stopie wymaga stopy obowiązującej najpóźniej w dniu "
+"pierwszej płatności."
+
+msgid "A rate change cannot start before the loan starts."
+msgstr "Zmiana stopy nie może rozpocząć się przed rozpoczęciem kredytu."
+
+msgid "Another rate change already starts on that date."
+msgstr "Inna zmiana stawki zaczyna się już tego dnia."
+
+msgid "Enter a cost name, a percentage or a positive fixed amount."
+msgstr "Podaj nazwę kosztu, procent lub dodatnią kwotę stałą."
+
+msgid "The end date must be on or after the start date."
+msgstr "Data końcowa musi być równa lub późniejsza niż początkowa."
+
+msgid "Enter a positive overpayment amount and choose a strategy."
+msgstr "Podaj dodatnią kwotę nadpłaty i wybierz strategię."
+
+msgid "The target total cannot be below the monthly installment."
+msgstr "Docelowa łączna kwota nie może być niższa niż miesięczna rata."
+
+msgid "Enter a positive installment override, or leave it empty."
+msgstr "Podaj dodatnie nadpisanie raty albo pozostaw pole puste."
+
+msgid "An installment override applies only to an annuity loan."
+msgstr "Nadpisanie raty dotyczy tylko kredytu annuitetowego."
+
+msgid "The loan has no rate on its first payment date."
+msgstr "Kredyt nie ma stopy na dzień pierwszej płatności."
+
+msgid "Another reference rate already has that name."
+msgstr "Inna stopa referencyjna ma już tę nazwę."
+
+msgid "This reference rate is used by a loan and cannot be deleted."
+msgstr "Ta stopa referencyjna jest używana przez kredyt i nie można jej usunąć."
+
+msgid "A value already exists for that date."
+msgstr "Wartość dla tej daty już istnieje."
+
+msgid "Only a future value can be changed or deleted."
+msgstr "Zmienić lub usunąć można tylko przyszłą wartość."
+
+msgid "Archived loans cannot be changed. Restore the loan first."
+msgstr "Zarchiwizowanych kredytów nie można zmieniać. Najpierw przywróć kredyt."
+
+msgid "Choose how you want to enter the loan."
+msgstr "Wybierz, jak chcesz wprowadzić kredyt."
+
+msgid "Enter the amount in the workspace currency."
+msgstr "Podaj kwotę w walucie obszaru roboczego."
+
+msgid "The loan could not be saved. Check the form and try again."
+msgstr "Nie udało się zapisać kredytu. Sprawdź formularz i spróbuj ponownie."
+
+msgid "Loan saved. Add rate changes, costs or one-off overpayments below."
+msgstr ""
+"Kredyt zapisany. Dodaj poniżej zmiany stopy, koszty lub jednorazowe "
+"nadpłaty."
+
+msgid "Loan terms saved."
+msgstr "Warunki kredytu zapisane."
+
+msgid "Regular overpayment settings saved."
+msgstr "Ustawienia regularnej nadpłaty zapisane."
+
+msgid "Rate change saved."
+msgstr "Zmiana stopy zapisana."
+
+msgid "Rate change deleted."
+msgstr "Zmiana stopy usunięta."
+
+msgid "Cost saved."
+msgstr "Koszt zapisany."
+
+msgid "Cost deleted."
+msgstr "Koszt usunięty."
+
+msgid "One-off overpayment saved."
+msgstr "Jednorazowa nadpłata zapisana."
+
+msgid "One-off overpayment deleted."
+msgstr "Jednorazowa nadpłata usunięta."
+
+msgid "Loan archived."
+msgstr "Kredyt zarchiwizowany."
+
+msgid "Loan restored."
+msgstr "Kredyt przywrócony."
+
+msgid "Reference rate saved."
+msgstr "Stopa referencyjna zapisana."
+
+msgid "Reference rate deleted."
+msgstr "Stopa referencyjna usunięta."
+
+msgid "Reference rate value saved."
+msgstr "Wartość stopy referencyjnej zapisana."
+
+msgid "Reference rate value deleted."
+msgstr "Wartość stopy referencyjnej usunięta."
+
+msgid "The loan"
+msgstr "Kredyt"
+
+msgid "Terms"
+msgstr "Warunki"
+
+msgid "Payments"
+msgstr "Płatności"
+
 msgid ""
 "This month is closed. Its entries and planned values cannot change until "
 "an owner reopens it."
@@ -3886,9 +4069,6 @@ msgstr "Zmiana stawki musi obowiązywać od daty późniejszej niż ostatnia sta
 msgid "Only a rate change that starts in the future can be edited."
 msgstr "Można edytować tylko zmianę stawki, która zaczyna się w przyszłości."
 
-msgid "Another rate change already starts on that date."
-msgstr "Inna zmiana stawki zaczyna się już tego dnia."
-
 msgid "That rate change no longer exists."
 msgstr "Ta zmiana stawki już nie istnieje."
 
@@ -4254,11 +4434,11 @@ msgstr "Cykliczne"
 msgid "Loans"
 msgstr "Kredyty"
 
-msgid "Unavailable"
-msgstr "Niedostępne"
-
 msgid "FIRE projection"
 msgstr "Prognoza FIRE"
+
+msgid "Unavailable"
+msgstr "Niedostępne"
 
 #, python-format
 msgid "Update available: %(version)s"
@@ -6015,9 +6195,6 @@ msgstr "Brutto"
 msgid "Withholding"
 msgstr "Podatek potrącony"
 
-msgid "Payments"
-msgstr "Płatności"
-
 msgid "No dividends or interest recorded yet."
 msgstr "Nie zapisano jeszcze dywidend ani odsetek."
 
@@ -6952,6 +7129,552 @@ msgstr "Zaloguj się, aby przyjąć"
 msgid "Create account and join"
 msgstr "Utwórz konto i dołącz"
 
+msgid "per month"
+msgstr "miesięcznie"
+
+msgid "Annuity"
+msgstr "Annuitetowy"
+
+msgid "Equal principal"
+msgstr "Równy kapitał"
+
+#, python-format
+msgid "Extra %(amount)s each month"
+msgstr "Dodatkowe %(amount)s każdego miesiąca"
+
+#, python-format
+msgid "Target total %(amount)s each month"
+msgstr "Docelowa łączna kwota %(amount)s każdego miesiąca"
+
+msgid "shorten the term"
+msgstr "skraca okres"
+
+msgid "lower the installment"
+msgstr "obniża ratę"
+
+msgid "Reference rates"
+msgstr "Stopy referencyjne"
+
+msgid "Back to Loans"
+msgstr "Wróć do kredytów"
+
+msgid "Edit terms"
+msgstr "Edytuj warunki"
+
+msgid "entered from the original terms"
+msgstr "wprowadzony na podstawie pierwotnych warunków"
+
+msgid "entered from the current balance"
+msgstr "wprowadzony na podstawie bieżącego salda"
+
+msgid "Current rate"
+msgstr "Bieżąca stopa"
+
+msgid "Original principal"
+msgstr "Pierwotny kapitał"
+
+msgid "Current balance"
+msgstr "Bieżące saldo"
+
+#, python-format
+msgid "as of %(date)s"
+msgstr "na dzień %(date)s"
+
+msgid "Term"
+msgstr "Okres"
+
+#, python-format
+msgid "%(num)d month"
+msgid_plural "%(num)d months"
+msgstr[0] "%(num)d miesiąc"
+msgstr[1] "%(num)d miesiące"
+msgstr[2] "%(num)d miesięcy"
+
+msgid "Next payment"
+msgstr "Następna płatność"
+
+#, python-format
+msgid "day %(day)s"
+msgstr "dzień %(day)s"
+
+msgid "Rate type"
+msgstr "Rodzaj stopy"
+
+msgid "Fixed"
+msgstr "Stała"
+
+msgid "Variable"
+msgstr "Zmienna"
+
+msgid "First installment"
+msgstr "Pierwsza rata"
+
+msgid "Installment override"
+msgstr "Nadpisanie raty"
+
+msgid "Regular overpayment"
+msgstr "Regularna nadpłata"
+
+msgid "Rate changes"
+msgstr "Zmiany stawki"
+
+msgid "Add rate change"
+msgstr "Dodaj zmianę stawki"
+
+msgid "Annual rate"
+msgstr "Roczna stopa"
+
+#, python-format
+msgid "rate from %(date)s"
+msgstr "stopa od %(date)s"
+
+#, python-format
+msgid "Delete the rate change from %(date)s?"
+msgstr "Usunąć zmianę stopy od %(date)s?"
+
+msgid "No rate changes yet."
+msgstr "Brak zmian stopy."
+
+#, python-format
+msgid "Reference rate: %(name)s"
+msgstr "Stopa referencyjna: %(name)s"
+
+msgid "not set"
+msgstr "nie ustawiono"
+
+#, python-format
+msgid "margin %(margin)s"
+msgstr "marża %(margin)s"
+
+msgid ""
+"Change the reference rate or margin in Edit terms. Add values on the "
+"Reference rates page."
+msgstr ""
+"Zmień stopę referencyjną lub marżę w Edytuj warunki. Wartości dodaj na "
+"stronie Stopy referencyjne."
+
+msgid "Manage reference rates"
+msgstr "Zarządzaj stopami referencyjnymi"
+
+msgid "Cost components"
+msgstr "Składniki kosztów"
+
+msgid "Add cost"
+msgstr "Dodaj koszt"
+
+msgid ""
+"Charged every month while active. A percentage applies to the opening "
+"balance; several active costs are added together."
+msgstr ""
+"Naliczany co miesiąc, gdy jest aktywny. Procent dotyczy salda "
+"początkowego; kilka aktywnych kosztów jest sumowanych."
+
+msgid "Cost"
+msgstr "Koszt"
+
+#, python-format
+msgid "from %(from)s"
+msgstr "od %(from)s"
+
+#, python-format
+msgid "to %(to)s"
+msgstr "do %(to)s"
+
+#, python-format
+msgid "Delete the cost %(name)s?"
+msgstr "Usunąć koszt %(name)s?"
+
+msgid "No cost components yet."
+msgstr "Brak składników kosztów."
+
+msgid "Overpayments"
+msgstr "Nadpłaty"
+
+msgid "Add one-off overpayment"
+msgstr "Dodaj jednorazową nadpłatę"
+
+msgid "A fixed extra each month"
+msgstr "Stała dodatkowa kwota każdego miesiąca"
+
+msgid "A target total each month"
+msgstr "Docelowa łączna kwota każdego miesiąca"
+
+#, python-format
+msgid "Amount (%(currency)s)"
+msgstr "Kwota (%(currency)s)"
+
+msgid "Strategy"
+msgstr "Strategia"
+
+msgid "Shorten the term"
+msgstr "Skróć okres"
+
+msgid "Lower the monthly installment"
+msgstr "Obniż miesięczną ratę"
+
+msgid "Save overpayment settings"
+msgstr "Zapisz ustawienia nadpłaty"
+
+msgid "One-off overpayments"
+msgstr "Jednorazowe nadpłaty"
+
+#, python-format
+msgid "overpayment on %(date)s"
+msgstr "nadpłata z %(date)s"
+
+#, python-format
+msgid "Delete the overpayment on %(date)s?"
+msgstr "Usunąć nadpłatę z %(date)s?"
+
+msgid "No one-off overpayments yet."
+msgstr "Brak jednorazowych nadpłat."
+
+msgid "Starting balance"
+msgstr "Saldo początkowe"
+
+msgid "Remaining principal"
+msgstr "Pozostały kapitał"
+
+msgid ""
+"This is the balance you entered. More balance checkpoints are recorded "
+"with actual payments."
+msgstr ""
+"To saldo, które podano. Kolejne punkty kontrolne salda są zapisywane wraz"
+" z rzeczywistymi płatnościami."
+
+msgid "Loan status"
+msgstr "Status kredytu"
+
+msgid "This loan is archived and read-only."
+msgstr "Ten kredyt jest zarchiwizowany i tylko do odczytu."
+
+msgid "Restore loan"
+msgstr "Przywróć kredyt"
+
+msgid ""
+"Archiving keeps the loan's settings and history but hides it from the "
+"active list."
+msgstr ""
+"Archiwizacja zachowuje ustawienia i historię kredytu, ale ukrywa go na "
+"liście aktywnych."
+
+#, python-format
+msgid "Archive the loan %(name)s?"
+msgstr "Zarchiwizować kredyt %(name)s?"
+
+msgid "Archive loan"
+msgstr "Zarchiwizuj kredyt"
+
+msgid "Edit rate change"
+msgstr "Edytuj zmianę stawki"
+
+msgid "Applies from"
+msgstr "Obowiązuje od"
+
+#, python-format
+msgid "For example 5.5 for 5.5%%."
+msgstr "Na przykład 5,5 dla 5,5%%."
+
+#, python-format
+msgid "I understand this rate is above 25%%."
+msgstr "Rozumiem, że ta stopa przekracza 25%%."
+
+msgid "Save rate change"
+msgstr "Zapisz zmianę stawki"
+
+msgid "Edit cost"
+msgstr "Edytuj koszt"
+
+msgid "Cost type"
+msgstr "Rodzaj kosztu"
+
+msgid "A percentage of the balance"
+msgstr "Procent salda"
+
+msgid "Percent each month"
+msgstr "Procent każdego miesiąca"
+
+#, python-format
+msgid "Amount each month (%(currency)s)"
+msgstr "Kwota każdego miesiąca (%(currency)s)"
+
+msgid "Applies until (optional)"
+msgstr "Obowiązuje do (opcjonalnie)"
+
+msgid "The end date is included. Leave empty for no end."
+msgstr "Data końcowa jest wliczona. Pozostaw puste, jeśli koszt nie ma końca."
+
+msgid "Save cost"
+msgstr "Zapisz koszt"
+
+msgid "Edit one-off overpayment"
+msgstr "Edytuj jednorazową nadpłatę"
+
+msgid "Note (optional)"
+msgstr "Notatka (opcjonalnie)"
+
+msgid "This is a planned overpayment. Actual payments are recorded separately."
+msgstr "To planowana nadpłata. Rzeczywiste płatności są rejestrowane osobno."
+
+msgid "Save overpayment"
+msgstr "Zapisz nadpłatę"
+
+msgid "Edit loan"
+msgstr "Edytuj kredyt"
+
+#, python-format
+msgid "Back to %(name)s"
+msgstr "Wróć do %(name)s"
+
+msgid ""
+"Change the loan terms. The rate type cannot change after creation; "
+"archive the loan and add a new one for that."
+msgstr ""
+"Zmień warunki kredytu. Rodzaju stopy nie można zmienić po utworzeniu; "
+"zarchiwizuj kredyt i dodaj nowy."
+
+msgid "Loan type"
+msgstr "Rodzaj kredytu"
+
+#, python-format
+msgid "Current balance (%(currency)s)"
+msgstr "Bieżące saldo (%(currency)s)"
+
+msgid "Balance date"
+msgstr "Data salda"
+
+msgid "Remaining months"
+msgstr "Pozostałe miesiące"
+
+msgid "Next payment date"
+msgstr "Data następnej płatności"
+
+msgid "Original principal (optional)"
+msgstr "Pierwotny kapitał (opcjonalnie)"
+
+#, python-format
+msgid "Original principal (%(currency)s)"
+msgstr "Pierwotny kapitał (%(currency)s)"
+
+msgid "Origination date"
+msgstr "Data uruchomienia"
+
+msgid "Term in months"
+msgstr "Okres w miesiącach"
+
+msgid "First payment date"
+msgstr "Data pierwszej płatności"
+
+msgid "Reference rate"
+msgstr "Stopa referencyjna"
+
+msgid "Choose a reference rate"
+msgstr "Wybierz stopę referencyjną"
+
+msgid "Margin"
+msgstr "Marża"
+
+msgid "Added to the reference rate."
+msgstr "Dodawana do stopy referencyjnej."
+
+#, python-format
+msgid "Installment override (%(currency)s, optional)"
+msgstr "Nadpisanie raty (%(currency)s, opcjonalnie)"
+
+msgid "Only for annuity loans. Leave empty to use the calculated installment."
+msgstr ""
+"Tylko dla kredytów annuitetowych. Pozostaw puste, aby użyć obliczonej "
+"raty."
+
+#, python-format
+msgid "Rate type: %(mode)s. It is fixed at creation."
+msgstr "Rodzaj stopy: %(mode)s. Jest ustalany przy utworzeniu."
+
+msgid "Save terms"
+msgstr "Zapisz warunki"
+
+msgid "Add loan"
+msgstr "Dodaj kredyt"
+
+msgid "Rate"
+msgstr "Stopa"
+
+msgid "Open"
+msgstr "Otwórz"
+
+msgid "No loans yet."
+msgstr "Brak kredytów."
+
+msgid ""
+"Add a mortgage or another loan once, from its original terms or from the "
+"balance you owe today."
+msgstr ""
+"Dodaj hipotekę lub inny kredyt raz, na podstawie pierwotnych warunków "
+"albo salda, które dziś posiadasz."
+
+msgid "Loans added by an editor or owner will appear here."
+msgstr "Kredyty dodane przez redaktora lub właściciela pojawią się tutaj."
+
+msgid "Archived loans"
+msgstr "Zarchiwizowane kredyty"
+
+msgid "How much do you know about the loan?"
+msgstr "Ile wiesz o kredycie?"
+
+msgid "I know the original terms"
+msgstr "Znam pierwotne warunki"
+
+msgid "Principal, origination date, term and first payment date."
+msgstr "Kapitał, data uruchomienia, okres i data pierwszej płatności."
+
+msgid "I only know my current balance"
+msgstr "Znam tylko bieżące saldo"
+
+msgid "The balance today, the remaining months and the next payment date."
+msgstr "Bieżące saldo, pozostałe miesiące i data następnej płatności."
+
+msgid "The installment stays roughly the same; more interest is paid first."
+msgstr ""
+"Rata pozostaje w przybliżeniu taka sama; najpierw spłacane są większe "
+"odsetki."
+
+msgid ""
+"The principal part is equal each month, so the installment falls over "
+"time."
+msgstr "Część kapitałowa jest równa każdego miesiąca, więc rata maleje w czasie."
+
+#, python-format
+msgid "All amounts are in %(currency)s, the workspace currency."
+msgstr "Wszystkie kwoty są w %(currency)s, walucie obszaru roboczego."
+
+msgid "The nominal day for later months. A shorter month uses its last day."
+msgstr ""
+"Nominalny dzień dla kolejnych miesięcy. Krótszy miesiąc używa ostatniego "
+"dnia."
+
+msgid "Only needed to show how much you have repaid."
+msgstr "Potrzebne tylko do pokazania, ile już spłacono."
+
+msgid "Fixed rate"
+msgstr "Stopa stała"
+
+msgid "I enter the rate and any later changes."
+msgstr "Wpisuję stopę i ewentualne późniejsze zmiany."
+
+msgid "Variable rate"
+msgstr "Stopa zmienna"
+
+msgid "A reference rate plus a margin; I add the reference values."
+msgstr "Stopa referencyjna plus marża; wartości referencyjne dodaję sam."
+
+msgid "Annual interest rate"
+msgstr "Roczna stopa procentowa"
+
+#, python-format
+msgid "For example 5.5 for 5.5%%. Add later changes on the loan page."
+msgstr "Na przykład 5,5 dla 5,5%%. Późniejsze zmiany dodaj na stronie kredytu."
+
+msgid "No reference rates yet. Create one on the Reference rates page first."
+msgstr ""
+"Brak stóp referencyjnych. Najpierw utwórz jedną na stronie Stopy "
+"referencyjne."
+
+#, python-format
+msgid "Added to the reference rate. For example 1.5 for 1.5%%."
+msgstr "Dodawana do stopy referencyjnej. Na przykład 1,5 dla 1,5%%."
+
+msgid ""
+"Leave empty to use the calculated installment. Enter the bank's amount if"
+" it differs."
+msgstr ""
+"Pozostaw puste, aby użyć obliczonej raty. Wpisz kwotę banku, jeśli się "
+"różni."
+
+msgid "For a target, this includes principal, interest and costs."
+msgstr "W przypadku celu obejmuje kapitał, odsetki i koszty."
+
+msgid "What happens with the extra money?"
+msgstr "Co dzieje się z dodatkowymi pieniędzmi?"
+
+msgid ""
+"After saving you can add rate changes, cost components and one-off "
+"overpayments on the loan page."
+msgstr ""
+"Po zapisaniu możesz dodać zmiany stopy, składniki kosztów i jednorazowe "
+"nadpłaty na stronie kredytu."
+
+msgid "Save loan"
+msgstr "Zapisz kredyt"
+
+msgid "New reference rate"
+msgstr "Nowa stopa referencyjna"
+
+msgid ""
+"A reference rate is a series you maintain, like WIBOR or EURIBOR. Add a "
+"value with the date it starts; variable-rate loans use the latest value "
+"plus their margin."
+msgstr ""
+"Stopa referencyjna to seria, którą prowadzisz, np. WIBOR lub EURIBOR. "
+"Dodaj wartość z datą jej rozpoczęcia; kredyty o zmiennej stopie używają "
+"najnowszej wartości plus marży."
+
+msgid "Current value"
+msgstr "Bieżąca wartość"
+
+msgid "no value yet"
+msgstr "brak wartości"
+
+#, python-format
+msgid "Delete the reference rate %(name)s and its values?"
+msgstr "Usunąć stopę referencyjną %(name)s i jej wartości?"
+
+#, python-format
+msgid "Values of %(name)s"
+msgstr "Wartości %(name)s"
+
+#, python-format
+msgid "value from %(date)s"
+msgstr "wartość z %(date)s"
+
+#, python-format
+msgid "Delete the value from %(date)s?"
+msgstr "Usunąć wartość z %(date)s?"
+
+msgid "Past value"
+msgstr "Wartość historyczna"
+
+msgid "No values yet."
+msgstr "Brak wartości."
+
+msgid "Add value"
+msgstr "Dodaj wartość"
+
+msgid "Edit value"
+msgstr "Edytuj wartość"
+
+msgid "Save value"
+msgstr "Zapisz wartość"
+
+msgid "No reference rates yet."
+msgstr "Brak stóp referencyjnych."
+
+msgid "Add a series like WIBOR or EURIBOR to use a variable-rate loan."
+msgstr "Dodaj serię, np. WIBOR lub EURIBOR, aby użyć kredytu o zmiennej stopie."
+
+msgid "Reference rates added by an editor or owner will appear here."
+msgstr ""
+"Stopy referencyjne dodane przez redaktora lub właściciela pojawią się "
+"tutaj."
+
+msgid "Edit reference rate"
+msgstr "Edytuj stopę referencyjną"
+
+msgid "Notes (optional)"
+msgstr "Notatki (opcjonalnie)"
+
+msgid "Save reference rate"
+msgstr "Zapisz stopę referencyjną"
+
 msgid "No month"
 msgstr "Bez miesiąca"
 
@@ -7454,17 +8177,11 @@ msgstr ""
 "Powiązana pozycja pobiera wartość i walutę z celu. Pola wartości poniżej "
 "są ignorowane."
 
-msgid "Current value"
-msgstr "Bieżąca wartość"
-
 msgid "Value note (optional)"
 msgstr "Notatka do wartości (opcjonalnie)"
 
 msgid "Acquired on (optional)"
 msgstr "Data nabycia (opcjonalnie)"
-
-msgid "Notes (optional)"
-msgstr "Notatki (opcjonalnie)"
 
 msgid "Include in net worth"
 msgstr "Uwzględnij w majątku netto"
@@ -7594,22 +8311,12 @@ msgstr "przyszła"
 msgid "Add a value"
 msgstr "Dodaj wartość"
 
-msgid "Note (optional)"
-msgstr "Notatka (opcjonalnie)"
-
-msgid "Add value"
-msgstr "Dodaj wartość"
-
 msgid "The currency is fixed once the item has a value."
 msgstr "Waluta jest ustalona po dodaniu wartości do pozycji."
 
 #, python-format
 msgid "Acquired %(date)s"
 msgstr "Nabyto %(date)s"
-
-#, python-format
-msgid "as of %(date)s"
-msgstr "na dzień %(date)s"
 
 msgid "No value yet"
 msgstr "Brak wartości"
@@ -7824,10 +8531,6 @@ msgstr ""
 
 msgid "How much"
 msgstr "Ile"
-
-#, python-format
-msgid "Amount (%(currency)s)"
-msgstr "Kwota (%(currency)s)"
 
 msgid "The amount varies; this is an estimate"
 msgstr "Kwota się zmienia; to szacunek"
@@ -8304,9 +9007,6 @@ msgstr "Używany przez: %(sources)s"
 msgid "not used yet"
 msgstr "jeszcze nieużywany"
 
-msgid "Rate changes"
-msgstr "Zmiany stawki"
-
 msgid "From the start"
 msgstr "Od początku"
 
@@ -8314,17 +9014,11 @@ msgstr "Od początku"
 msgid "From %(date)s"
 msgstr "Od %(date)s"
 
-msgid "Edit rate change"
-msgstr "Edytuj zmianę stawki"
-
 msgid "New rate from"
 msgstr "Nowa stawka od"
 
 msgid "Value type"
 msgstr "Rodzaj wartości"
-
-msgid "Save rate change"
-msgstr "Zapisz zmianę stawki"
 
 msgid ""
 "Past months keep the old rate. Fill in the field that matches the value "
@@ -8332,9 +9026,6 @@ msgid ""
 msgstr ""
 "Minione miesiące zachowują dawną stawkę. Wypełnij pole pasujące do "
 "rodzaju wartości."
-
-msgid "Add rate change"
-msgstr "Dodaj zmianę stawki"
 
 msgid "No taxes on income yet."
 msgstr "Nie ma jeszcze podatków od przychodu."

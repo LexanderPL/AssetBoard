@@ -88,6 +88,7 @@ from assetboard.web.investment_transaction_routes import (
     router as investment_transaction_router,
 )
 from assetboard.web.invite_routes import router as invite_router
+from assetboard.web.loan_routes import router as loan_router
 from assetboard.web.month_routes import MONTH_CLOSED_MESSAGE, MONTH_CLOSED_TITLE
 from assetboard.web.month_routes import router as month_router
 from assetboard.web.networth_history_routes import router as networth_history_router
@@ -378,6 +379,7 @@ def create_app(
     app.include_router(upcoming_router)
     app.include_router(tax_router)
     app.include_router(income_router)
+    app.include_router(loan_router)
     app.include_router(notification_router)
     app.include_router(auth_router)
     app.include_router(email_router)

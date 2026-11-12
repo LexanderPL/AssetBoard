@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% block title %}{{ _("Edit loan") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Edit loan") }}{% endblock %}
+{% block content %}
+{% set input_class = "form-control px-3 py-2" %}
+<a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}" class="mb-4 inline-flex rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Back to %(name)s", name=loan.name) }}</a>
+<section class="panel max-w-3xl p-5 sm:p-6" aria-labelledby="loan-edit-heading">
+  <h2 id="loan-edit-heading" class="text-base font-semibold">{{ loan.name }}</h2>
+  <p class="mt-1 text-sm text-muted">{{ _("Change the loan terms. The rate type cannot change after creation; archive the loan and add a new one for that.") }}</p>
+  {% if error %}<p role="alert" class="mt-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ error }}</p>{% endif %}
+  <form method="post" action="{{ scoped_url(request, 'loan_update', loan_id=loan.id) }}" class="mt-5 grid gap-5">
+    {{ csrf_input() }}
+    <label class="grid gap-1 text-sm font-medium">{{ _("Name") }}<input name="name" value="{{ values.get('name', '') }}" maxlength="200" required class="{{ input_class }} font-normal"></label>
+    <fieldset class="grid gap-2">
+      <legend class="mb-1 text-sm font-medium">{{ _("Loan type") }}</legend>
+      <div class="flex flex-wrap gap-2">
+        {% for value, label in (("annuity", _("Annuity")), ("equal_principal", _("Equal principal"))) %}
+        <label class="inline-flex items-center gap-2 rounded-lg border border-line px-3 py-2 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary-soft"><input type="radio" name="kind" value="{{ value }}" class="h-4 w-4 accent-primary"{% if values.get('kind', 'annuity') == value %} checked{% endif %}> {{ label }}</label>
+        {% endfor %}
+      </div>
+    </fieldset>
+    {% if loan.entry_path == "current" %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="grid gap-1 text-sm font-medium">{{ _("Current balance (%(currency)s)", currency=loan.currency) }}<input name="current_balance" value="{{ values.get('current_balance', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Balance date") }}<input name="balance_date" type="date" value="{{ values.get('balance_date', '') }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Remaining months") }}<input name="term_months" type="number" min="1" max="600" value="{{ values.get('term_months', '') }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Next payment date") }}<input name="first_payment_date" type="date" value="{{ values.get('first_payment_date', '') }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Payment day") }}<input name="payment_day" type="number" min="1" max="31" value="{{ values.get('payment_day', '') }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Original principal (optional)") }}<input name="principal_original" value="{{ values.get('principal_original', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"></label>
+    </div>
+    {% else %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="grid gap-1 text-sm font-medium">{{ _("Original principal (%(currency)s)", currency=loan.currency) }}<input name="principal_original" value="{{ values.get('principal_original', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Origination date") }}<input name="origination_date" type="date" value="{{ values.get('origination_date', '') }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Term in months") }}<input name="term_months" type="number" min="1" max="600" value="{{ values.get('term_months', '') }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("First payment date") }}<input name="first_payment_date" type="date" value="{{ values.get('first_payment_date', '') }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Payment day") }}<input name="payment_day" type="number" min="1" max="31" value="{{ values.get('payment_day', '') }}" required class="{{ input_class }} font-normal"></label>
+    </div>
+    {% endif %}
+    {% if loan.rate_mode.value == "variable" %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      <label class="grid gap-1 text-sm font-medium">{{ _("Reference rate") }}<select name="reference_rate_id" class="form-select py-2 font-normal">
+        <option value="">{{ _("Choose a reference rate") }}</option>
+        {% for rate in reference_rates %}<option value="{{ rate.id }}"{% if values.get('reference_rate_id') == rate.id|string %} selected{% endif %}>{{ rate.name }}{% if rate.current_value_bp is not none %} · {{ format_rate_short(rate.current_value_bp, locale) }}{% endif %}</option>{% endfor %}
+      </select></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Margin") }}<input name="margin_percent" value="{{ values.get('margin_percent', format_rate_short(loan.margin_bp, locale) if loan.margin_bp is not none else '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Added to the reference rate.") }}</span></label>
+      <label class="flex items-start gap-2 text-sm sm:col-span-2"><input type="checkbox" name="high_rate_confirmed" value="1" class="mt-0.5 h-4 w-4 accent-primary"{% if values.get('high_rate_confirmed') == '1' %} checked{% endif %}> <span>{{ _("I understand this rate is above 25%%.") }}</span></label>
+    </div>
+    {% endif %}
+    <label class="grid gap-1 text-sm font-medium">{{ _("Installment override (%(currency)s, optional)", currency=loan.currency) }}<input name="installment_override" value="{{ values.get('installment_override', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Only for annuity loans. Leave empty to use the calculated installment.") }}</span></label>
+    <p class="text-sm text-muted">{{ _("Rate type: %(mode)s. It is fixed at creation.", mode=_("Fixed") if loan.rate_mode.value == "fixed" else _("Variable")) }}</p>
+    <div class="flex flex-wrap gap-2 border-t border-line pt-4">
+      <button type="submit" class="btn-primary">{{ _("Save terms") }}</button>
+      <a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}" class="btn">{{ _("Cancel") }}</a>
+    </div>
+  </form>
+</section>
+{% endblock %}

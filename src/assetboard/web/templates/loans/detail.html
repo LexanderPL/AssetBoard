@@ -1,0 +1,222 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% from "loans/_tabs.html" import tabs with context %}
+{% from "loans/_macros.html" import rate, cost_value, kind_label, overpayment_label with context %}
+{% block title %}{{ loan.name }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Loans") }}{% endblock %}
+{% block header_actions %}
+<a href="{{ scoped_url(request, 'loans') }}" class="btn">{{ _("Back to Loans") }}</a>
+{% if can_edit and not loan.archived %}<a href="{{ scoped_url(request, 'loan_edit', loan_id=loan.id) }}" class="btn-primary" data-edit-terms>{{ _("Edit terms") }}</a>{% endif %}
+{% endblock %}
+{% block content %}
+{% set input_class = "form-control px-3 py-2" %}
+{{ tabs("loans") }}
+{% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
+{% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
+
+<section class="panel mb-6 p-4 sm:p-6" aria-labelledby="loan-summary-heading">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="min-w-0">
+      <h2 id="loan-summary-heading" class="text-base font-semibold">{{ loan.name }}</h2>
+      <p class="mt-1 text-sm text-muted">{{ kind_label(loan.kind) }} · {{ _("entered from the original terms") if loan.entry_path == "original" else _("entered from the current balance") }}{% if loan.archived %} · <span class="font-semibold text-muted">{{ _("archived") }}</span>{% endif %}</p>
+    </div>
+    <div class="text-right">
+      <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Current rate") }}</p>
+      <p class="text-lg font-semibold tabular-nums">{{ rate(loan.current_rate_bp, locale) }}</p>
+    </div>
+  </div>
+  <dl class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Original principal") }}</dt><dd class="mt-1 tabular-nums">{% if loan.principal_original %}{{ format_money(loan.principal_original, locale) }}{% else %}—{% endif %}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Current balance") }}</dt><dd class="mt-1 tabular-nums">{% if loan.current_balance %}{{ format_money(loan.current_balance, locale) }}{% else %}—{% endif %}{% if loan.balance_date %}<span class="block text-xs text-muted">{{ _("as of %(date)s", date=format_day(loan.balance_date, locale)) }}</span>{% endif %}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Term") }}</dt><dd class="mt-1">{{ ngettext("%(num)d month", "%(num)d months", loan.term_months, num=loan.term_months) }}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Next payment") }}</dt><dd class="mt-1">{{ format_day(loan.first_payment_date, locale) }} · {{ _("day %(day)s", day=loan.payment_day) }}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Rate type") }}</dt><dd class="mt-1">{{ _("Fixed") if loan.rate_mode.value == "fixed" else _("Variable") }}{% if loan.reference_rate_name %} · {{ loan.reference_rate_name }}{% if loan.margin_bp is not none %} + {{ format_rate_short(loan.margin_bp, locale) }}{% endif %}{% endif %}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("First installment") }}</dt><dd class="mt-1 tabular-nums">{% if loan.first_installment %}{{ format_money(loan.first_installment, locale) }}{% else %}—{% endif %}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Installment override") }}</dt><dd class="mt-1 tabular-nums">{% if loan.installment_override %}{{ format_money(loan.installment_override, locale) }}{% else %}—{% endif %}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Regular overpayment") }}</dt><dd class="mt-1">{{ overpayment_label(loan.overpayment_mode, loan.overpayment_amount, loan.overpayment_strategy, locale) }}</dd></div>
+  </dl>
+</section>
+
+<section class="panel mb-6 p-4 sm:p-6" id="rates" aria-labelledby="rates-heading">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 id="rates-heading" class="text-base font-semibold">{{ _("Rate changes") }}</h2>
+    {% if can_edit and not loan.archived and loan.rate_mode.value == "fixed" %}<a href="?form=rate#rate-dialog" class="btn" data-dialog-open="rate-dialog" aria-haspopup="dialog">{{ _("Add rate change") }}</a>{% endif %}
+  </div>
+  {% if loan.rate_mode.value == "fixed" %}
+  <div class="mt-3 overflow-hidden">
+    <table class="sheet-sm w-full text-sm">
+      <caption class="sr-only">{{ _("Rate changes") }}</caption>
+      <thead class="hidden border-b border-line bg-subtle text-left text-xs uppercase tracking-wide text-muted sm:table-header-group"><tr><th scope="col" class="px-4 py-2 font-semibold">{{ _("From") }}</th><th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Annual rate") }}</th>{% if can_edit and not loan.archived %}<th scope="col" class="px-4 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>{% endif %}</tr></thead>
+      <tbody class="divide-y divide-line sm:divide-y-0">
+      {% for change in loan.rate_changes %}
+        <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 sm:table-row sm:p-0" data-rate-change="{{ change.id }}">
+          <td class="sm:px-4 sm:py-3">{{ format_day(change.effective_from, locale) }}</td>
+          <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3">{{ format_rate_short(change.rate_bp, locale) }}</td>
+          {% if can_edit and not loan.archived %}
+          <td class="col-span-2 pt-1 sm:px-4 sm:py-3"><div class="flex justify-end gap-2"><a class="btn-sm" href="?form=rate&edit={{ change.id }}#rate-dialog" data-dialog-open="rate-dialog">{{ _("Edit") }}<span class="sr-only"> {{ _("rate from %(date)s", date=format_day(change.effective_from, locale)) }}</span></a><form method="post" action="{{ scoped_url(request, 'loan_rate_change_delete', loan_id=loan.id, change_id=change.id) }}" data-confirm="{{ _('Delete the rate change from %(date)s?', date=format_day(change.effective_from, locale)) }}" data-confirm-tone="danger">{{ csrf_input() }}<button type="submit" class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ _("rate from %(date)s", date=format_day(change.effective_from, locale)) }}</span></button></form></div></td>
+          {% endif %}
+        </tr>
+      {% else %}
+        <tr><td colspan="3" class="px-4 py-3 text-sm text-muted">{{ _("No rate changes yet.") }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="mt-3 text-sm">{{ _("Reference rate: %(name)s", name=loan.reference_rate_name or _("not set")) }}{% if loan.margin_bp is not none %} · {{ _("margin %(margin)s", margin=format_rate_short(loan.margin_bp, locale)) }}{% endif %}</p>
+  <p class="mt-2 text-sm text-muted">{{ _("Change the reference rate or margin in Edit terms. Add values on the Reference rates page.") }}</p>
+  <p class="mt-2 text-sm"><a href="{{ scoped_url(request, 'reference_rates') }}" class="font-semibold text-primary-ink underline">{{ _("Manage reference rates") }}</a></p>
+  {% endif %}
+</section>
+
+<section class="panel mb-6 p-4 sm:p-6" id="costs" aria-labelledby="costs-heading">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 id="costs-heading" class="text-base font-semibold">{{ _("Cost components") }}</h2>
+    {% if can_edit and not loan.archived %}<a href="?form=cost#cost-dialog" class="btn" data-dialog-open="cost-dialog" aria-haspopup="dialog">{{ _("Add cost") }}</a>{% endif %}
+  </div>
+  <p class="mt-1 text-sm text-muted">{{ _("Charged every month while active. A percentage applies to the opening balance; several active costs are added together.") }}</p>
+  <div class="mt-3 overflow-hidden">
+    <table class="sheet-sm w-full text-sm">
+      <caption class="sr-only">{{ _("Cost components") }}</caption>
+      <thead class="hidden border-b border-line bg-subtle text-left text-xs uppercase tracking-wide text-muted sm:table-header-group"><tr><th scope="col" class="px-4 py-2 font-semibold">{{ _("Name") }}</th><th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Cost") }}</th><th scope="col" class="px-4 py-2 font-semibold">{{ _("Active") }}</th>{% if can_edit and not loan.archived %}<th scope="col" class="px-4 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>{% endif %}</tr></thead>
+      <tbody class="divide-y divide-line sm:divide-y-0">
+      {% for component in loan.cost_components %}
+        <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 sm:table-row sm:p-0" data-cost="{{ component.id }}">
+          <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3">{{ component.name }}</td>
+          <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3">{{ cost_value(component.value, locale) }}</td>
+          <td class="text-muted sm:px-4 sm:py-3">{{ _("from %(from)s", from=format_day(component.effective_from, locale)) }}{% if component.effective_to %} {{ _("to %(to)s", to=format_day(component.effective_to, locale)) }}{% endif %}</td>
+          {% if can_edit and not loan.archived %}
+          <td class="col-span-2 pt-1 sm:px-4 sm:py-3"><div class="flex justify-end gap-2"><a class="btn-sm" href="?form=cost&edit={{ component.id }}#cost-dialog" data-dialog-open="cost-dialog">{{ _("Edit") }}<span class="sr-only"> {{ component.name }}</span></a><form method="post" action="{{ scoped_url(request, 'loan_cost_delete', loan_id=loan.id, component_id=component.id) }}" data-confirm="{{ _('Delete the cost %(name)s?', name=component.name) }}" data-confirm-tone="danger">{{ csrf_input() }}<button type="submit" class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ component.name }}</span></button></form></div></td>
+          {% endif %}
+        </tr>
+      {% else %}
+        <tr><td colspan="4" class="px-4 py-3 text-sm text-muted">{{ _("No cost components yet.") }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel mb-6 p-4 sm:p-6" id="overpayments" aria-labelledby="overpayments-heading">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 id="overpayments-heading" class="text-base font-semibold">{{ _("Overpayments") }}</h2>
+    {% if can_edit and not loan.archived %}<a href="?form=overpayment#overpayment-dialog" class="btn" data-dialog-open="overpayment-dialog" aria-haspopup="dialog">{{ _("Add one-off overpayment") }}</a>{% endif %}
+  </div>
+  {% if can_edit and not loan.archived %}
+  <form method="post" action="{{ scoped_url(request, 'loan_overpayment_settings', loan_id=loan.id) }}" class="mt-4 grid gap-3 border border-line p-4 sm:grid-cols-3">
+    {{ csrf_input() }}
+    <label class="grid gap-1 text-sm font-medium">{{ _("Regular overpayment") }}<select name="overpayment_mode" class="form-select py-2 font-normal">{% for value, label in (("none", _("None")), ("fixed_extra", _("A fixed extra each month")), ("target_total", _("A target total each month"))) %}<option value="{{ value }}"{% if loan.overpayment_mode.value == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+    <label class="grid gap-1 text-sm font-medium">{{ _("Amount (%(currency)s)", currency=loan.currency) }}<input name="overpayment_amount" value="{{ format_amount_input(loan.overpayment_amount, locale) if loan.overpayment_amount else '' }}" inputmode="decimal" class="{{ input_class }} font-normal"></label>
+    <label class="grid gap-1 text-sm font-medium">{{ _("Strategy") }}<select name="overpayment_strategy" class="form-select py-2 font-normal"><option value="reduce_term"{% if loan.overpayment_strategy.value == "reduce_term" %} selected{% endif %}>{{ _("Shorten the term") }}</option><option value="reduce_installment"{% if loan.overpayment_strategy.value == "reduce_installment" %} selected{% endif %}>{{ _("Lower the monthly installment") }}</option></select></label>
+    <div class="sm:col-span-3"><button type="submit" class="btn">{{ _("Save overpayment settings") }}</button></div>
+  </form>
+  {% else %}
+  <p class="mt-1 text-sm">{{ overpayment_label(loan.overpayment_mode, loan.overpayment_amount, loan.overpayment_strategy, locale) }}</p>
+  {% endif %}
+  <div class="mt-4 overflow-hidden">
+    <table class="sheet-sm w-full text-sm">
+      <caption class="sr-only">{{ _("One-off overpayments") }}</caption>
+      <thead class="hidden border-b border-line bg-subtle text-left text-xs uppercase tracking-wide text-muted sm:table-header-group"><tr><th scope="col" class="px-4 py-2 font-semibold">{{ _("Date") }}</th><th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Amount") }}</th><th scope="col" class="px-4 py-2 font-semibold">{{ _("Note") }}</th>{% if can_edit and not loan.archived %}<th scope="col" class="px-4 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>{% endif %}</tr></thead>
+      <tbody class="divide-y divide-line sm:divide-y-0">
+      {% for item in loan.overpayments %}
+        <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 sm:table-row sm:p-0" data-loan-overpayment="{{ item.id }}">
+          <td class="sm:px-4 sm:py-3">{{ format_day(item.date, locale) }}</td>
+          <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3">{{ format_money(item.amount, locale) }}</td>
+          <td class="text-muted sm:px-4 sm:py-3">{{ item.note or "—" }}</td>
+          {% if can_edit and not loan.archived %}
+          <td class="col-span-2 pt-1 sm:px-4 sm:py-3"><div class="flex justify-end gap-2"><a class="btn-sm" href="?form=overpayment&edit={{ item.id }}#overpayment-dialog" data-dialog-open="overpayment-dialog">{{ _("Edit") }}<span class="sr-only"> {{ _("overpayment on %(date)s", date=format_day(item.date, locale)) }}</span></a><form method="post" action="{{ scoped_url(request, 'loan_overpayment_delete', loan_id=loan.id, overpayment_id=item.id) }}" data-confirm="{{ _('Delete the overpayment on %(date)s?', date=format_day(item.date, locale)) }}" data-confirm-tone="danger">{{ csrf_input() }}<button type="submit" class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ _("overpayment on %(date)s", date=format_day(item.date, locale)) }}</span></button></form></div></td>
+          {% endif %}
+        </tr>
+      {% else %}
+        <tr><td colspan="4" class="px-4 py-3 text-sm text-muted">{{ _("No one-off overpayments yet.") }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if loan.entry_path == "current" %}
+<section class="panel mb-6 p-4 sm:p-6" id="checkpoints" aria-labelledby="checkpoints-heading">
+  <h2 id="checkpoints-heading" class="text-base font-semibold">{{ _("Starting balance") }}</h2>
+  <div class="mt-3 overflow-hidden">
+    <table class="sheet-sm w-full text-sm">
+      <caption class="sr-only">{{ _("Starting balance") }}</caption>
+      <thead class="border-b border-line bg-subtle text-left text-xs uppercase tracking-wide text-muted"><tr><th scope="col" class="px-4 py-2 font-semibold">{{ _("As of") }}</th><th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Remaining principal") }}</th></tr></thead>
+      <tbody class="divide-y divide-line">
+      {% for checkpoint in loan.checkpoints %}
+        <tr><td class="px-4 py-3">{{ format_day(checkpoint.as_of, locale) }}</td><td class="px-4 py-3 text-right tabular-nums">{{ format_money(checkpoint.remaining_principal, locale) }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="mt-2 text-sm text-muted">{{ _("This is the balance you entered. More balance checkpoints are recorded with actual payments.") }}</p>
+</section>
+{% endif %}
+
+{% if can_edit %}
+<section class="panel p-4 sm:p-6" aria-labelledby="loan-lifecycle-heading">
+  <h2 id="loan-lifecycle-heading" class="text-base font-semibold">{{ _("Loan status") }}</h2>
+  {% if loan.archived %}
+  <p class="mt-2 text-sm text-muted">{{ _("This loan is archived and read-only.") }}</p>
+  <form method="post" action="{{ scoped_url(request, 'loan_restore', loan_id=loan.id) }}" class="mt-3">{{ csrf_input() }}<button type="submit" class="btn-primary">{{ _("Restore loan") }}</button></form>
+  {% else %}
+  <p class="mt-2 text-sm text-muted">{{ _("Archiving keeps the loan's settings and history but hides it from the active list.") }}</p>
+  <form method="post" action="{{ scoped_url(request, 'loan_archive', loan_id=loan.id) }}" class="mt-3" data-confirm="{{ _('Archive the loan %(name)s?', name=loan.name) }}" data-confirm-tone="danger">{{ csrf_input() }}<button type="submit" class="btn btn-danger">{{ _("Archive loan") }}</button></form>
+  {% endif %}
+</section>
+{% endif %}
+
+{# Rate change dialog. #}
+{% set rate_edit = namespace(row=none) %}
+{% for change in loan.rate_changes %}{% if edit_id == change.id|string %}{% set rate_edit.row = change %}{% endif %}{% endfor %}
+<dialog id="rate-dialog" aria-labelledby="rate-dialog-heading" data-dialog-modal class="popup w-[min(92vw,36rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if open_form == "rate" %} open{% endif %}>
+  <div class="space-y-5 p-6">
+    <div class="flex items-start justify-between gap-3"><h2 id="rate-dialog-heading" class="text-base font-semibold">{{ _("Edit rate change") if rate_edit.row else _("Add rate change") }}</h2><a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}#rates" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" aria-label="{{ _('Close') }}">×</a></div>
+    <form method="post" action="{{ scoped_url(request, 'loan_rate_change_update', loan_id=loan.id, change_id=rate_edit.row.id) if rate_edit.row else scoped_url(request, 'loan_rate_change_create', loan_id=loan.id) }}" class="grid gap-4">
+      {{ csrf_input() }}
+      <label class="grid gap-1 text-sm font-medium">{{ _("Applies from") }}<input name="effective_from" type="date" value="{{ form_values.get('effective_from', rate_edit.row.effective_from.isoformat() if rate_edit.row else today.isoformat()) }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Annual rate") }}<input name="rate_percent" value="{{ form_values.get('rate_percent', rate_input(rate_edit.row.rate_bp) if rate_edit.row else '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("For example 5.5 for 5.5%%.") }}</span></label>
+      <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="high_rate_confirmed" value="1" class="mt-0.5 h-4 w-4 accent-primary"{% if form_values.get('high_rate_confirmed') == '1' %} checked{% endif %}> <span>{{ _("I understand this rate is above 25%%.") }}</span></label>
+      <div class="flex flex-wrap gap-2"><button type="submit" class="btn-primary">{{ _("Save rate change") }}</button><a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}#rates" data-dialog-close class="btn">{{ _("Cancel") }}</a></div>
+    </form>
+  </div>
+</dialog>
+
+{# Cost dialog. #}
+{% set cost_edit = namespace(row=none) %}
+{% for component in loan.cost_components %}{% if edit_id == component.id|string %}{% set cost_edit.row = component %}{% endif %}{% endfor %}
+<dialog id="cost-dialog" aria-labelledby="cost-dialog-heading" data-dialog-modal class="popup w-[min(92vw,40rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if open_form == "cost" %} open{% endif %}>
+  <div class="space-y-5 p-6">
+    <div class="flex items-start justify-between gap-3"><h2 id="cost-dialog-heading" class="text-base font-semibold">{{ _("Edit cost") if cost_edit.row else _("Add cost") }}</h2><a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}#costs" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" aria-label="{{ _('Close') }}">×</a></div>
+    <form method="post" action="{{ scoped_url(request, 'loan_cost_update', loan_id=loan.id, component_id=cost_edit.row.id) if cost_edit.row else scoped_url(request, 'loan_cost_create', loan_id=loan.id) }}" class="grid gap-4">
+      {{ csrf_input() }}
+      <label class="grid gap-1 text-sm font-medium">{{ _("Name") }}<input name="name" value="{{ form_values.get('name', cost_edit.row.name if cost_edit.row else '') }}" maxlength="200" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Cost type") }}<select name="mode" class="form-select py-2 font-normal"><option value="percent"{% if form_values.get('mode', cost_edit.row.value.mode if cost_edit.row else 'percent') == 'percent' %} selected{% endif %}>{{ _("A percentage of the balance") }}</option><option value="fixed"{% if form_values.get('mode', cost_edit.row.value.mode if cost_edit.row else 'percent') == 'fixed' %} selected{% endif %}>{{ _("A fixed amount") }}</option></select></label>
+      <label class="grid gap-1 text-sm font-medium" data-hidden-when="mode=fixed">{{ _("Percent each month") }}<input name="rate_percent" value="{{ form_values.get('rate_percent', rate_input(cost_edit.row.value.rate_bp) if cost_edit.row and cost_edit.row.value.rate_bp is not none else '') }}" inputmode="decimal" class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium" data-hidden-when="mode=percent">{{ _("Amount each month (%(currency)s)", currency=loan.currency) }}<input name="fixed_amount" value="{{ form_values.get('fixed_amount', format_amount_input(cost_edit.row.value.fixed, locale) if cost_edit.row and cost_edit.row.value.fixed is not none else '') }}" inputmode="decimal" class="{{ input_class }} font-normal"></label>
+      <div class="grid gap-4 sm:grid-cols-2">
+        <label class="grid gap-1 text-sm font-medium">{{ _("Applies from") }}<input name="effective_from" type="date" value="{{ form_values.get('effective_from', cost_edit.row.effective_from.isoformat() if cost_edit.row else today.isoformat()) }}" required class="{{ input_class }} font-normal"></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Applies until (optional)") }}<input name="effective_to" type="date" value="{{ form_values.get('effective_to', cost_edit.row.effective_to.isoformat() if cost_edit.row and cost_edit.row.effective_to else '') }}" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("The end date is included. Leave empty for no end.") }}</span></label>
+      </div>
+      <div class="flex flex-wrap gap-2"><button type="submit" class="btn-primary">{{ _("Save cost") }}</button><a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}#costs" data-dialog-close class="btn">{{ _("Cancel") }}</a></div>
+    </form>
+  </div>
+</dialog>
+
+{# One-off overpayment dialog. #}
+{% set op_edit = namespace(row=none) %}
+{% for item in loan.overpayments %}{% if edit_id == item.id|string %}{% set op_edit.row = item %}{% endif %}{% endfor %}
+<dialog id="overpayment-dialog" aria-labelledby="overpayment-dialog-heading" data-dialog-modal class="popup w-[min(92vw,36rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if open_form == "overpayment" %} open{% endif %}>
+  <div class="space-y-5 p-6">
+    <div class="flex items-start justify-between gap-3"><h2 id="overpayment-dialog-heading" class="text-base font-semibold">{{ _("Edit one-off overpayment") if op_edit.row else _("Add one-off overpayment") }}</h2><a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}#overpayments" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" aria-label="{{ _('Close') }}">×</a></div>
+    <form method="post" action="{{ scoped_url(request, 'loan_overpayment_update', loan_id=loan.id, overpayment_id=op_edit.row.id) if op_edit.row else scoped_url(request, 'loan_overpayment_create', loan_id=loan.id) }}" class="grid gap-4">
+      {{ csrf_input() }}
+      <label class="grid gap-1 text-sm font-medium">{{ _("Date") }}<input name="date" type="date" value="{{ form_values.get('date', op_edit.row.date.isoformat() if op_edit.row else today.isoformat()) }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Amount (%(currency)s)", currency=loan.currency) }}<input name="amount" value="{{ form_values.get('amount', format_amount_input(op_edit.row.amount, locale) if op_edit.row else '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Note (optional)") }}<input name="note" value="{{ form_values.get('note', op_edit.row.note if op_edit.row else '') }}" maxlength="200" class="{{ input_class }} font-normal"></label>
+      <p class="text-xs text-muted">{{ _("This is a planned overpayment. Actual payments are recorded separately.") }}</p>
+      <div class="flex flex-wrap gap-2"><button type="submit" class="btn-primary">{{ _("Save overpayment") }}</button><a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}#overpayments" data-dialog-close class="btn">{{ _("Cancel") }}</a></div>
+    </form>
+  </div>
+</dialog>
+{% endblock %}

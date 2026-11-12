@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input, empty_state with context %}
+{% from "loans/_tabs.html" import tabs with context %}
+{% block title %}{{ _("Reference rates") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Loans") }}{% endblock %}
+{% block content %}
+{% set input_class = "form-control px-3 py-2" %}
+{{ tabs("reference-rates") }}
+{% if can_edit and page.rates %}
+<div class="mb-6 flex flex-wrap items-center gap-2" data-page-actions>
+  <a href="?form=rate#rate-dialog" class="btn-primary" data-dialog-open="rate-dialog" aria-haspopup="dialog">{{ _("New reference rate") }}</a>
+</div>
+{% endif %}
+{% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
+{% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
+<p class="mb-6 max-w-2xl text-sm text-muted">{{ _("A reference rate is a series you maintain, like WIBOR or EURIBOR. Add a value with the date it starts; variable-rate loans use the latest value plus their margin.") }}</p>
+
+{% if page.rates %}
+<div class="grid gap-4">
+{% for rate in page.rates %}
+  <section class="panel p-4 sm:p-5" aria-labelledby="reference-rate-{{ rate.id }}" data-reference-rate="{{ rate.id }}">
+    <div class="flex flex-wrap items-start justify-between gap-3">
+      <div class="min-w-0">
+        <h2 id="reference-rate-{{ rate.id }}" class="text-base font-semibold">{{ rate.name }}</h2>
+        {% if rate.notes %}<p class="mt-1 text-sm text-muted">{{ rate.notes }}</p>{% endif %}
+        <p class="mt-1 text-sm">{{ _("Current value") }}: {% if rate.current_value_bp is not none %}{{ format_rate_short(rate.current_value_bp, locale) }}{% else %}{{ _("no value yet") }}{% endif %}</p>
+      </div>
+      {% if can_edit %}
+      <div class="flex flex-wrap gap-2">
+        <a class="btn-sm" href="?form=rate&edit={{ rate.id }}#rate-dialog" data-dialog-open="rate-dialog" data-edit-reference-rate>{{ _("Edit") }}<span class="sr-only"> {{ rate.name }}</span></a>
+        <form method="post" action="{{ scoped_url(request, 'reference_rate_delete', rate_id=rate.id) }}" data-confirm="{{ _('Delete the reference rate %(name)s and its values?', name=rate.name) }}" data-confirm-tone="danger">{{ csrf_input() }}<button type="submit" class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ rate.name }}</span></button></form>
+      </div>
+      {% endif %}
+    </div>
+    <div class="mt-4 overflow-hidden">
+      <table class="sheet-sm w-full text-sm">
+        <caption class="sr-only">{{ _("Values of %(name)s", name=rate.name) }}</caption>
+        <thead class="hidden border-b border-line bg-subtle text-left text-xs uppercase tracking-wide text-muted sm:table-header-group"><tr><th scope="col" class="px-4 py-2 font-semibold">{{ _("From") }}</th><th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Annual rate") }}</th>{% if can_edit %}<th scope="col" class="px-4 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>{% endif %}</tr></thead>
+        <tbody class="divide-y divide-line sm:divide-y-0">
+        {% for value in rate.values %}
+          <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 sm:table-row sm:p-0" data-reference-value="{{ value.id }}">
+            <td class="sm:px-4 sm:py-3">{{ format_day(value.effective_from, locale) }}</td>
+            <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3">{{ format_rate_short(value.value_bp, locale) }}</td>
+            {% if can_edit %}
+            <td class="col-span-2 pt-1 sm:px-4 sm:py-3">
+              {% if value.editable %}
+              <div class="flex justify-end gap-2">
+                <a class="btn-sm" href="?form=value&edit={{ rate.id }}&value={{ value.id }}#value-dialog-{{ rate.id }}" data-dialog-open="value-dialog-{{ rate.id }}">{{ _("Edit") }}<span class="sr-only"> {{ _("value from %(date)s", date=format_day(value.effective_from, locale)) }}</span></a>
+                <form method="post" action="{{ scoped_url(request, 'reference_rate_value_delete', rate_id=rate.id, value_id=value.id) }}" data-confirm="{{ _('Delete the value from %(date)s?', date=format_day(value.effective_from, locale)) }}" data-confirm-tone="danger">{{ csrf_input() }}<button type="submit" class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ _("value from %(date)s", date=format_day(value.effective_from, locale)) }}</span></button></form>
+              </div>
+              {% else %}
+              <span class="block text-right text-xs text-muted">{{ _("Past value") }}</span>
+              {% endif %}
+            </td>
+            {% endif %}
+          </tr>
+        {% else %}
+          <tr><td colspan="3" class="px-4 py-3 text-sm text-muted">{{ _("No values yet.") }}</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if can_edit %}<div class="mt-3"><a href="?form=value&edit={{ rate.id }}#value-dialog-{{ rate.id }}" class="btn" data-dialog-open="value-dialog-{{ rate.id }}" aria-haspopup="dialog">{{ _("Add value") }}</a></div>{% endif %}
+  </section>
+
+  {% if can_edit %}
+  {% set value_edit = namespace(row=none) %}
+  {% for value in rate.values %}{% if request.query_params.get('value') == value.id|string %}{% set value_edit.row = value %}{% endif %}{% endfor %}
+  <dialog id="value-dialog-{{ rate.id }}" aria-labelledby="value-dialog-heading-{{ rate.id }}" data-dialog-modal class="popup w-[min(92vw,32rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if open_form == "value" and edit_id == rate.id|string %} open{% endif %}>
+    <div class="space-y-5 p-6">
+      <div class="flex items-start justify-between gap-3"><h2 id="value-dialog-heading-{{ rate.id }}" class="text-base font-semibold">{{ _("Edit value") if value_edit.row else _("Add value") }} · {{ rate.name }}</h2><a href="{{ scoped_url(request, 'reference_rates') }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" aria-label="{{ _('Close') }}">×</a></div>
+      <form method="post" action="{{ scoped_url(request, 'reference_rate_value_update', rate_id=rate.id, value_id=value_edit.row.id) if value_edit.row else scoped_url(request, 'reference_rate_value_create', rate_id=rate.id) }}" class="grid gap-4">
+        {{ csrf_input() }}
+        <label class="grid gap-1 text-sm font-medium">{{ _("Effective from") }}<input name="effective_from" type="date" value="{{ form_values.get('effective_from', value_edit.row.effective_from.isoformat() if value_edit.row else today.isoformat()) }}" required class="{{ input_class }} font-normal"></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Annual rate") }}<input name="value_percent" value="{{ form_values.get('value_percent', rate_input(value_edit.row.value_bp) if value_edit.row else '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("For example 5.5 for 5.5%%.") }}</span></label>
+        <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="high_rate_confirmed" value="1" class="mt-0.5 h-4 w-4 accent-primary"{% if form_values.get('high_rate_confirmed') == '1' %} checked{% endif %}> <span>{{ _("I understand this rate is above 25%%.") }}</span></label>
+        <div class="flex flex-wrap gap-2"><button type="submit" class="btn-primary">{{ _("Save value") }}</button><a href="{{ scoped_url(request, 'reference_rates') }}" data-dialog-close class="btn">{{ _("Cancel") }}</a></div>
+      </form>
+    </div>
+  </dialog>
+  {% endif %}
+{% endfor %}
+</div>
+{% else %}
+{% if can_edit %}
+{{ empty_state(_("No reference rates yet."), _("Add a series like WIBOR or EURIBOR to use a variable-rate loan."), _("New reference rate"), "?form=rate#rate-dialog", icon="%", action_data={"dialog-open": "rate-dialog"}) }}
+{% else %}
+{{ empty_state(_("No reference rates yet."), _("Reference rates added by an editor or owner will appear here."), icon="%") }}
+{% endif %}
+{% endif %}
+
+{# New/edit reference-rate dialog. #}
+{% set rate_edit = namespace(row=none) %}
+{% for rate in page.rates %}{% if edit_id == rate.id|string %}{% set rate_edit.row = rate %}{% endif %}{% endfor %}
+<dialog id="rate-dialog" aria-labelledby="reference-rate-dialog-heading" data-dialog-modal class="popup w-[min(92vw,32rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if open_form == "rate" %} open{% endif %}>
+  <div class="space-y-5 p-6">
+    <div class="flex items-start justify-between gap-3"><h2 id="reference-rate-dialog-heading" class="text-base font-semibold">{{ _("Edit reference rate") if rate_edit.row else _("New reference rate") }}</h2><a href="{{ scoped_url(request, 'reference_rates') }}" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" aria-label="{{ _('Close') }}">×</a></div>
+    <form method="post" action="{{ scoped_url(request, 'reference_rate_update', rate_id=rate_edit.row.id) if rate_edit.row else scoped_url(request, 'reference_rate_create') }}" class="grid gap-4">
+      {{ csrf_input() }}
+      <label class="grid gap-1 text-sm font-medium">{{ _("Name") }}<input name="name" value="{{ form_values.get('name', rate_edit.row.name if rate_edit.row else '') }}" maxlength="200" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Notes (optional)") }}<input name="notes" value="{{ form_values.get('notes', rate_edit.row.notes if rate_edit.row else '') }}" maxlength="200" class="{{ input_class }} font-normal"></label>
+      <div class="flex flex-wrap gap-2"><button type="submit" class="btn-primary">{{ _("Save reference rate") }}</button><a href="{{ scoped_url(request, 'reference_rates') }}" data-dialog-close class="btn">{{ _("Cancel") }}</a></div>
+    </form>
+  </div>
+</dialog>
+{% endblock %}
