@@ -3,7 +3,7 @@
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div>
       <h2 id="schedule-heading" class="text-base font-semibold">{{ _("Schedule") }}</h2>
-      <p class="mt-1 text-sm text-muted">{{ _("Monthly rows from the current starting balance. Past rows are projected until actual payments are recorded.") }}</p>
+      <p class="mt-1 text-sm text-muted">{{ _("Monthly rows from the current starting balance. A recorded actual payment replaces the components of its due date; every other row remains projected from the terms.") }}</p>
     </div>
     <a href="{{ scoped_url(request, 'loan_schedule_csv', loan_id=loan.id) }}" class="btn" data-schedule-csv download>{{ _("Download CSV") }}</a>
   </div>
@@ -28,21 +28,23 @@
       </thead>
       <tbody>
         {% for row in schedule_page.rows %}
+        {% set actual = schedule_data.actual_by_date.get(row.date) %}
         <tr class="border-t border-line {% if row.date == today or schedule_page.highlight_next_date == row.date %}bg-primary-soft{% endif %}" data-schedule-row="{{ row.n }}">
           <th scope="row" class="whitespace-nowrap px-3 py-2 text-left font-normal tabular-nums">{{ row.n }}</th>
           <td class="whitespace-nowrap px-3 py-2">
             <time datetime="{{ row.date.isoformat() }}">{{ format_day(row.date, locale) }}</time>
-            {% if row.date == today %}<span class="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-on-primary" data-schedule-today>{{ _("Today") }}</span>
+            {% if actual %}<span class="ml-2 rounded-full bg-success-soft px-2 py-0.5 text-xs font-semibold text-success-strong" data-schedule-actual>{{ _("Actual") }}</span>
+            {% elif row.date == today %}<span class="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-on-primary" data-schedule-today>{{ _("Today") }}</span>
             {% elif schedule_page.highlight_next_date == row.date %}<span class="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary-ink" data-schedule-next>{{ _("Next") }}</span>{% endif %}
-            {% if row.date < today %}<span class="ml-2 text-xs text-muted" data-schedule-projected>{{ _("Projected") }}</span>{% endif %}
+            {% if not actual and row.date < today %}<span class="ml-2 text-xs text-muted" data-schedule-projected>{{ _("Projected") }}</span>{% endif %}
           </td>
           <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_rate_short(row.annual_rate_bp, locale) }}</td>
           <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.opening, locale) }}</td>
-          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.interest, locale) }}</td>
-          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.principal, locale) }}</td>
-          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.overpayment, locale) }}</td>
-          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.costs, locale) }}</td>
-          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.installment_total, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(actual.interest if actual else row.interest, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(actual.principal if actual else row.principal, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(actual.overpayment if actual else row.overpayment, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(actual.costs if actual else row.costs, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums"{% if actual %} data-actual-total="{{ actual.total.amount_minor }}"{% endif %}>{{ format_money(actual.total if actual else row.installment_total, locale) }}</td>
           <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.closing, locale) }}</td>
         </tr>
         {% endfor %}

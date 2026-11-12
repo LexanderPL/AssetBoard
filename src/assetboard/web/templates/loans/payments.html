@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% from "loans/_tabs.html" import tabs with context %}
+{% block title %}{{ loan.name }} · {{ _("Payments") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("Loans") }}{% endblock %}
+{% block content %}
+{% set input_class = "form-control px-3 py-2" %}
+{{ tabs("loans") }}
+<div class="mt-4 flex flex-wrap items-center gap-2" data-page-actions>
+  <a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}" class="btn" data-back-to-loan>{{ _("Back to %(name)s", name=loan.name) }}</a>
+</div>
+{% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
+{% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
+
+<section class="panel mb-6 p-4 sm:p-6" id="payments" aria-labelledby="payments-heading" data-loan-payments-list>
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 id="payments-heading" class="text-base font-semibold">{{ _("Actual payments") }}</h2>
+      <p class="mt-1 text-sm text-muted">{{ _("Record what you actually paid. A single total is split against the projected installment row; an explicit breakdown overrides the split.") }}</p>
+    </div>
+    {% if can_edit and not loan.archived %}<a href="?form=payment#payment-dialog" class="btn-primary" data-dialog-open="payment-dialog" aria-haspopup="dialog">{{ _("Record payment") }}</a>{% endif %}
+  </div>
+  {% if payments %}
+  <div class="mt-4 max-w-full overflow-x-auto overflow-y-hidden [contain:paint]" tabindex="0" role="region" aria-label="{{ _('Actual payments') }}" data-payments-scroll>
+    <table class="sheet w-full min-w-[64rem] text-sm">
+      <caption class="sr-only">{{ _("Actual payments") }}</caption>
+      <thead>
+        <tr class="text-left text-xs text-muted">
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Date") }}</th>
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Kind") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Total") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Principal") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Interest") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Costs") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Overpayment") }}</th>
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Linked transaction") }}</th>
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Note") }}</th>
+          {% if can_edit and not loan.archived %}<th scope="col" class="px-3 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for payment in payments %}
+        <tr class="border-t border-line" data-payment="{{ payment.id }}">
+          <th scope="row" class="whitespace-nowrap px-3 py-2 text-left font-normal">{{ format_day(payment.date, locale) }}</th>
+          <td class="whitespace-nowrap px-3 py-2">{{ _("Installment") if payment.kind.value == "installment" else _("Overpayment") }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums">{{ format_money(payment.total, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(payment.principal, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(payment.interest, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(payment.costs, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(payment.overpayment, locale) }}</td>
+          <td class="px-3 py-2">
+            {% if payment.transaction_description %}<span class="font-medium">{{ payment.transaction_description }}</span>{% if payment.transaction_date %} · {{ format_day(payment.transaction_date, locale) }}{% endif %}{% if payment.transaction_deleted %} <span class="text-xs text-danger-strong">{{ _("deleted") }}</span>{% endif %}{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="px-3 py-2 text-muted">{{ payment.note or "—" }}</td>
+          {% if can_edit and not loan.archived %}
+          <td class="whitespace-nowrap px-3 py-2"><div class="flex justify-end gap-2"><a class="btn-sm" href="?form=payment&edit={{ payment.id }}#payment-dialog" data-dialog-open="payment-dialog">{{ _("Edit") }}<span class="sr-only"> {{ _("payment on %(date)s", date=format_day(payment.date, locale)) }}</span></a><form method="post" action="{{ scoped_url(request, 'loan_payment_delete', loan_id=loan.id, payment_id=payment.id) }}" data-confirm="{{ _('Delete the payment on %(date)s?', date=format_day(payment.date, locale)) }}" data-confirm-tone="danger">{{ csrf_input() }}<button type="submit" class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ _("payment on %(date)s", date=format_day(payment.date, locale)) }}</span></button></form></div></td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="mt-4 text-sm text-muted" data-no-payments>{{ _("No actual payments recorded yet.") }}</p>
+  {% endif %}
+</section>
+
+<section class="panel mb-6 p-4 sm:p-6" id="checkpoints" aria-labelledby="checkpoints-heading" data-loan-checkpoints-list>
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 id="checkpoints-heading" class="text-base font-semibold">{{ _("Balance checkpoints") }}</h2>
+      <p class="mt-1 text-sm text-muted">{{ _("A checkpoint re-anchors the schedule from the balance on that date. The variance compares it with the projection from the previous anchor.") }}</p>
+    </div>
+    {% if can_edit and not loan.archived %}<a href="?form=checkpoint#checkpoint-dialog" class="btn" data-dialog-open="checkpoint-dialog" aria-haspopup="dialog">{{ _("Add checkpoint") }}</a>{% endif %}
+  </div>
+  {% if checkpoints %}
+  <div class="mt-4 max-w-full overflow-x-auto overflow-y-hidden [contain:paint]" tabindex="0" role="region" aria-label="{{ _('Balance checkpoints') }}" data-checkpoints-scroll>
+    <table class="sheet w-full min-w-[56rem] text-sm">
+      <caption class="sr-only">{{ _("Balance checkpoints") }}</caption>
+      <thead>
+        <tr class="text-left text-xs text-muted">
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Date") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Balance") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Projected balance") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Variance") }}</th>
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Note") }}</th>
+          {% if can_edit and not loan.archived %}<th scope="col" class="px-3 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>{% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for checkpoint in checkpoints %}
+        <tr class="border-t border-line" data-checkpoint="{{ checkpoint.id }}">
+          <th scope="row" class="whitespace-nowrap px-3 py-2 text-left font-normal">
+            {{ format_day(checkpoint.as_of, locale) }}
+            {% if checkpoint.starting %}<span class="ml-2 rounded-full bg-subtle px-2 py-0.5 text-xs font-semibold text-muted" data-checkpoint-starting>{{ _("Starting balance") }}</span>{% endif %}
+          </th>
+          <td class="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums">{{ format_money(checkpoint.remaining_principal, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">
+            {% if checkpoint.projected %}{{ format_money(checkpoint.projected, locale) }}{% elif checkpoint.error_code %}<span class="text-muted" data-checkpoint-unavailable>{{ _("Projected balance unavailable") }}</span>{% else %}<span class="text-muted">—</span>{% endif %}
+          </td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums {% if checkpoint.variance and checkpoint.variance.amount_minor > 0 %}text-danger-strong{% elif checkpoint.variance and checkpoint.variance.amount_minor < 0 %}text-success-strong{% else %}text-muted{% endif %}">
+            {% if checkpoint.variance %}{{ format_money(checkpoint.variance, locale) }}{% elif checkpoint.error_code %}{{ row_error(checkpoint.error_code) }}{% else %}—{% endif %}
+          </td>
+          <td class="px-3 py-2 text-muted">{{ checkpoint.note or "—" }}</td>
+          {% if can_edit and not loan.archived %}
+          <td class="whitespace-nowrap px-3 py-2"><div class="flex justify-end gap-2"><a class="btn-sm" href="?form=checkpoint&edit={{ checkpoint.id }}#checkpoint-dialog" data-dialog-open="checkpoint-dialog">{{ _("Edit") }}<span class="sr-only"> {{ _("checkpoint on %(date)s", date=format_day(checkpoint.as_of, locale)) }}</span></a><form method="post" action="{{ scoped_url(request, 'loan_checkpoint_delete', loan_id=loan.id, checkpoint_id=checkpoint.id) }}" data-confirm="{{ _('Delete the checkpoint on %(date)s?', date=format_day(checkpoint.as_of, locale)) }}" data-confirm-tone="danger">{{ csrf_input() }}<button type="submit" class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ _("checkpoint on %(date)s", date=format_day(checkpoint.as_of, locale)) }}</span></button></form></div></td>
+          {% endif %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p class="mt-4 text-sm text-muted" data-no-checkpoints>{{ _("No balance checkpoints yet.") }}</p>
+  {% endif %}
+</section>
+
+{% if can_edit and not loan.archived %}
+<dialog id="payment-dialog" aria-labelledby="payment-dialog-heading" data-dialog-modal class="popup w-[min(92vw,44rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if open_form == "payment" %} open{% endif %}>
+  <div class="p-5 sm:p-6">
+    <div class="flex items-start justify-between gap-3"><h2 id="payment-dialog-heading" class="text-base font-semibold">{{ _("Edit payment") if payment_edit else _("Record payment") }}</h2><a href="{{ scoped_url(request, 'loan_payments', loan_id=loan.id) }}#payments" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" aria-label="{{ _('Close') }}">×</a></div>
+    <form method="post" action="{{ scoped_url(request, 'loan_payment_update', loan_id=loan.id, payment_id=payment_edit.id) if payment_edit else scoped_url(request, 'loan_payment_create', loan_id=loan.id) }}" class="mt-5 grid gap-4">
+      {{ csrf_input() }}
+      <div class="grid gap-4 sm:grid-cols-3">
+        <label class="grid gap-1 text-sm font-medium">{{ _("Date") }}<input name="date" type="date" value="{{ payment_form.get('date', '') }}" required class="{{ input_class }} font-normal"></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Kind") }}<select name="kind" class="form-select py-2 font-normal"><option value="installment"{% if payment_form.get('kind') != "overpayment" %} selected{% endif %}>{{ _("Installment") }}</option><option value="overpayment"{% if payment_form.get('kind') == "overpayment" %} selected{% endif %}>{{ _("Overpayment") }}</option></select></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Total (%(currency)s)", currency=loan.currency) }}<input name="total" value="{{ payment_form.get('total', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"></label>
+      </div>
+      <p class="text-xs text-muted">{{ _("With one total, an installment is split against the projected row on or after the date: interest, costs, principal, then overpayment. An overpayment goes entirely to the overpayment component.") }}</p>
+      <details class="border border-line p-3"{% if payment_form.get('use_breakdown') == '1' %} open{% endif %}>
+        <summary class="cursor-pointer text-sm font-medium">{{ _("Enter an explicit breakdown instead") }}</summary>
+        <label class="mt-3 flex items-center gap-2 text-sm"><input type="checkbox" name="use_breakdown" value="1"{% if payment_form.get('use_breakdown') == '1' %} checked{% endif %} data-use-breakdown> {{ _("Use these amounts") }}</label>
+        <div class="mt-3 grid gap-3 sm:grid-cols-2">
+          <label class="grid gap-1 text-sm font-medium">{{ _("Principal") }}<input name="principal" value="{{ payment_form.get('principal', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"></label>
+          <label class="grid gap-1 text-sm font-medium">{{ _("Interest") }}<input name="interest" value="{{ payment_form.get('interest', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"></label>
+          <label class="grid gap-1 text-sm font-medium">{{ _("Costs") }}<input name="costs" value="{{ payment_form.get('costs', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"></label>
+          <label class="grid gap-1 text-sm font-medium">{{ _("Overpayment") }}<input name="overpayment" value="{{ payment_form.get('overpayment', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"></label>
+        </div>
+        <p class="mt-2 text-xs text-muted">{{ _("The four amounts must add up to the total.") }}</p>
+      </details>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Linked transaction (optional)") }}<select name="transaction_id" class="form-select py-2 font-normal"><option value="">{{ _("No linked transaction") }}</option>{% for transaction in transactions %}<option value="{{ transaction.id }}"{% if payment_form.get('transaction_id') == transaction.id|string %} selected{% endif %}>{{ format_day(transaction.date, locale) }} · {{ format_money(transaction.amount, locale) }} · {{ transaction.description }}</option>{% endfor %}</select><span class="text-xs text-muted">{{ _("Only recent expenses in %(currency)s with the same amount can be linked.", currency=loan.currency) }}</span></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Note") }}<input name="note" value="{{ payment_form.get('note', '') }}" maxlength="200" class="{{ input_class }} font-normal"></label>
+      <div class="flex flex-wrap gap-2"><button type="submit" class="btn-primary">{{ _("Save payment") }}</button><a href="{{ scoped_url(request, 'loan_payments', loan_id=loan.id) }}#payments" data-dialog-close class="btn">{{ _("Cancel") }}</a></div>
+    </form>
+  </div>
+</dialog>
+
+<dialog id="checkpoint-dialog" aria-labelledby="checkpoint-dialog-heading" data-dialog-modal class="popup w-[min(92vw,36rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if open_form == "checkpoint" %} open{% endif %}>
+  <div class="p-5 sm:p-6">
+    <div class="flex items-start justify-between gap-3"><h2 id="checkpoint-dialog-heading" class="text-base font-semibold">{{ _("Edit checkpoint") if checkpoint_edit else _("Add checkpoint") }}</h2><a href="{{ scoped_url(request, 'loan_payments', loan_id=loan.id) }}#checkpoints" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" aria-label="{{ _('Close') }}">×</a></div>
+    <form method="post" action="{{ scoped_url(request, 'loan_checkpoint_update', loan_id=loan.id, checkpoint_id=checkpoint_edit.id) if checkpoint_edit else scoped_url(request, 'loan_checkpoint_create', loan_id=loan.id) }}" class="mt-5 grid gap-4">
+      {{ csrf_input() }}
+      <label class="grid gap-1 text-sm font-medium">{{ _("Date") }}<input name="as_of" type="date" value="{{ checkpoint_form.get('as_of', '') }}" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Remaining balance (%(currency)s)", currency=loan.currency) }}<input name="remaining_principal" value="{{ checkpoint_form.get('remaining_principal', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Note") }}<input name="note" value="{{ checkpoint_form.get('note', '') }}" maxlength="200" class="{{ input_class }} font-normal"></label>
+      <div class="flex flex-wrap gap-2"><button type="submit" class="btn-primary">{{ _("Save checkpoint") }}</button><a href="{{ scoped_url(request, 'loan_payments', loan_id=loan.id) }}#checkpoints" data-dialog-close class="btn">{{ _("Cancel") }}</a></div>
+    </form>
+  </div>
+</dialog>
+{% endif %}
+{% endblock %}
