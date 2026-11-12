@@ -7674,9 +7674,6 @@ msgstr "W tym harmonogramie nie ma pozostałych płatności."
 msgid "Reference rates"
 msgstr "Stopy referencyjne"
 
-msgid "Back to Loans"
-msgstr "Wróć do kredytów"
-
 msgid "Scenarios"
 msgstr "Scenariusze"
 
@@ -8040,9 +8037,6 @@ msgstr "Dodaj kredyt"
 msgid "Payment date"
 msgstr "Data płatności"
 
-msgid "Open"
-msgstr "Otwórz"
-
 msgid "No loans yet."
 msgstr "Brak kredytów."
 
@@ -8058,6 +8052,9 @@ msgstr "Kredyty dodane przez redaktora lub właściciela pojawią się tutaj."
 
 msgid "Archived loans"
 msgstr "Zarchiwizowane kredyty"
+
+msgid "Back to Loans"
+msgstr "Wróć do kredytów"
 
 msgid "How much do you know about the loan?"
 msgstr "Ile wiesz o kredycie?"
@@ -8535,6 +8532,9 @@ msgstr "Zapisz plan"
 
 msgid "Installment plans"
 msgstr "Plany ratalne"
+
+msgid "Open"
+msgstr "Otwórz"
 
 msgid "No installment plans yet."
 msgstr "Nie ma jeszcze planów ratalnych."
