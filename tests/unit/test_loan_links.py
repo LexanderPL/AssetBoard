@@ -173,6 +173,34 @@ def test_loan_balance_from_origination_checkpoint_and_actuals(team: WorkspaceDb)
     assert checkpoint
 
 
+def test_loan_balance_includes_an_installment_paid_before_its_due_date(
+    team: WorkspaceDb,
+) -> None:
+    loan_id = _create(team)
+    ctx = team.ctx("owner", "owner")
+    _, first = next((view, row) for view, row in [(None, None)] if False) if False else (None, None)
+    data = loan_schedule.loan_schedule(team.factory, ctx, loan_id)
+    assert data.schedule is not None
+    first = data.schedule.rows[0]
+    payment_id = loan_payments.create_loan_payment(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 1, 15),
+        kind="installment",
+        total=first.installment_total,
+    )
+    with team.factory() as session:
+        payment = LoanPaymentRepository(session, ctx).get(payment_id)
+    assert payment is not None
+    with team.factory() as session:
+        balance = loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 1, 20))
+    assert not isinstance(balance, Unavailable)
+    assert balance.amount_minor == 30_000_000 - (
+        payment.principal_minor + payment.overpayment_minor
+    )
+
+
 def test_loan_balance_overpayment_only_and_unknown(team: WorkspaceDb) -> None:
     loan_id = _create(team)
     ctx = team.ctx("owner", "owner")

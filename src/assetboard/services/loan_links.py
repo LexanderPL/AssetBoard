@@ -127,6 +127,10 @@ def loan_balance_at(
             None,
         )
         if matched is None:
+            # An installment paid before its due date still reduces today's balance, even when
+            # the projected row itself lies after ``as_of``.
+            if payment.date <= as_of and any(row.date > as_of for row in schedule.rows):
+                overpayment_only += payment.principal_minor + payment.overpayment_minor
             continue
         actual_by_row[matched.date] = actual_by_row.get(matched.date, 0) + (
             payment.principal_minor + payment.overpayment_minor
