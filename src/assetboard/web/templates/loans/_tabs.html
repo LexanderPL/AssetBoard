@@ -1,6 +1,6 @@
 {% macro tabs(active) -%}
 {# Page tabs are navigation, not an ARIA tab widget: plain links, one row, aria-current. #}
-<nav class="tab-strip" aria-label="{{ _('Loans') }}" data-tab-strip>
+<nav class="tab-strip mb-6" aria-label="{{ _('Loans') }}" data-tab-strip>
   <a href="{{ scoped_url(request, 'loans') }}" data-loans-tab{% if active == "loans" %} aria-current="page"{% endif %}>{{ _("Loans") }}</a>
   <a href="{{ scoped_url(request, 'installment_plans') }}" data-installments-tab{% if active == "installments" %} aria-current="page"{% endif %}>{{ _("Installments") }}</a>
   <a href="{{ scoped_url(request, 'reference_rates') }}" data-reference-rates-tab{% if active == "reference-rates" %} aria-current="page"{% endif %}>{{ _("Reference rates") }}</a>
