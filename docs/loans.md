@@ -207,7 +207,14 @@ only editors and owners can save or delete them.
 
 **Cost components** are charged every month while active: a percentage of the opening balance
 or a fixed amount. Their dates are inclusive on both ends, and several active components may
-overlap; all of them are added. The schedule engine in a later release uses them.
+overlap; all of them are added to the installment, and the Upcoming amounts derived from the
+schedule follow the change.
+
+Costs are configuration, not versioned history: editing a component changes every projected row
+in its date range. To keep an old premium visible and change it from a date, set the old
+component's **Applies until** to the day before the change and add a new component from the
+change date. To stop a cost, set that end date (or delete the component if no projection needs
+to keep it).
 
 **Regular overpayment** is none, a fixed extra each month, or a target total monthly outflow.
 The target must not be below the installment and may shorten the term (the default) or lower the
