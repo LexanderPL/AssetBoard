@@ -547,6 +547,7 @@ def make_loan(session: Session, workspace_id: UUID) -> Loan:
         term_months=12,
         payment_day=1,
         rate_mode="fixed",
+        day_count="monthly",
         margin_bp=None,
         reference_rate_id=None,
         installment_override_minor=None,

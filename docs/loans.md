@@ -34,6 +34,10 @@ is fixed at creation: to switch between fixed and variable, archive the loan and
 A rate above **25.00%** needs an explicit confirmation. Rates cannot exceed **100%**, and a
 margin cannot be negative.
 
+**Interest calculation** is monthly or actual/365. Monthly uses one twelfth of the annual rate
+in every period. Actual/365 uses the real number of calendar days between payment dates. The
+choice is on **Edit terms**; existing loans start with monthly.
+
 ## How the schedule is calculated
 
 The schedule is a monthly table from the loan's start (or from the latest balance checkpoint).
@@ -60,6 +64,31 @@ Each row has an opening balance, interest, principal, costs, overpayments and a 
 A balance checkpoint starts the schedule from the balance you owe on that date; earlier rows are
 not invented. When a checkpoint is used, the remaining months must be entered as the loan's term
 or the schedule will be too long.
+
+## The loan page
+
+The loan page turns the terms into an overview and a monthly schedule:
+
+- **Overview**: remaining principal today, the current rate (with the reference rate and margin
+  for a variable loan), the next payment and its principal/interest/costs/overpayment breakdown,
+  the percentage repaid, the payoff date, the payments left, and remaining/lifetime interest and
+  costs. The percentage is a native progress bar with the same value in text.
+- **Schedule**: 24 monthly rows per page, starting on the page with today's or the next due
+  payment. The row for today is marked **Today**; when today is not a payment date, the next one
+  is marked **Next**. Rows before today are marked **Projected** until actual payments are
+  recorded. On a phone the table scrolls sideways inside its own container, with a visible hint;
+  all columns stay available.
+- **CSV**: **Download CSV** exports every row as machine-readable data: ISO dates, plain decimal
+  rates and amounts, comma separated, CRLF line endings, UTF-8 without a BOM. It is available to
+  viewers too.
+- **Charts**: **Balance over time** compares your configured plan with the same loan without
+  overpayments, and **Monthly payments** stacks principal, interest, costs and overpayments.
+  Dashed vertical lines mark rate changes, including the new rate in the tooltip. Each chart has
+  a **Plotted data** table for keyboard and screen-reader users; without JavaScript the table is
+  shown instead of the chart.
+
+If the stored terms cannot produce a schedule (for example a missing rate), the page explains
+the problem and hides the schedule, charts and CSV until the terms are corrected.
 
 ## Costs and overpayments
 

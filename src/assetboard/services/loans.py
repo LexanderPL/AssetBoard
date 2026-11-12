@@ -41,6 +41,7 @@ from assetboard.db.repositories import (
 from assetboard.domain.loans import (
     MAX_LOAN_RATE_BP,
     CostBasis,
+    DayCount,
     LoanKind,
     OverpaymentMode,
     OverpaymentStrategy,
@@ -54,6 +55,7 @@ from assetboard.domain.loans import (
     valid_date,
     validate_cost_dates,
     validate_cost_rate_bp,
+    validate_day_count,
     validate_margin_bp,
     validate_payment_day,
     validate_rate_bp,
@@ -122,9 +124,11 @@ class LoanView:
     term_months: int
     payment_day: int
     rate_mode: RateMode
+    day_count: DayCount
     margin_bp: int | None
     reference_rate_id: UUID | None
     reference_rate_name: str | None
+    reference_rate_values: tuple[ReferenceRateValueView, ...]
     current_rate_bp: int | None
     installment_override: Money | None
     overpayment_mode: OverpaymentMode
@@ -362,9 +366,19 @@ def _view(
         term_months=loan.term_months,
         payment_day=loan.payment_day,
         rate_mode=RateMode(loan.rate_mode),
+        day_count=DayCount(loan.day_count),
         margin_bp=loan.margin_bp,
         reference_rate_id=loan.reference_rate_id,
         reference_rate_name=reference_rate.name if reference_rate is not None else None,
+        reference_rate_values=tuple(
+            ReferenceRateValueView(
+                id=row.id,
+                effective_from=row.effective_from,
+                value_bp=row.value_bp,
+                editable=row.effective_from > today,
+            )
+            for row in reference_values
+        ),
         current_rate_bp=current_rate,
         installment_override=_money(loan.installment_override_minor, loan.currency),
         overpayment_mode=OverpaymentMode(loan.overpayment_mode),
@@ -646,6 +660,7 @@ def create_loan(
     overpayment_mode: str,
     overpayment_amount: Money | None,
     overpayment_strategy: str,
+    day_count: str = "monthly",
 ) -> UUID:
     require_role(ctx, Role.EDITOR)
     if entry_path not in ("original", "current"):
@@ -696,6 +711,7 @@ def create_loan(
             strategy=overpayment_strategy,
             currency=currency,
         )
+        wanted_day_count = validate_day_count(day_count)
         loan = LoanRepository(session, ctx).create(
             name=clean_name,
             kind=wanted_kind.value,
@@ -706,6 +722,7 @@ def create_loan(
             term_months=term,
             payment_day=day,
             rate_mode=wanted_rate_mode.value,
+            day_count=wanted_day_count.value,
             margin_bp=margin,
             reference_rate_id=rate_id,
             installment_override_minor=override_minor,
@@ -777,6 +794,7 @@ def update_loan_terms(
     reference_rate_id: UUID | None = None,
     margin_bp: int | None = None,
     high_rate_confirmed: bool = False,
+    day_count: str | None = None,
 ) -> None:
     require_role(ctx, Role.EDITOR)
 
@@ -784,6 +802,9 @@ def update_loan_terms(
         require_role_now(session, ctx, Role.EDITOR)
         currency = _locked_workspace_currency(session, ctx)
         loan = _get_active_loan(session, ctx, loan_id)
+        wanted_day_count = validate_day_count(
+            day_count if day_count is not None else loan.day_count
+        )
         entry = _entry_path(loan)
         (
             clean_name,
@@ -849,6 +870,7 @@ def update_loan_terms(
             installment_override_minor=override_minor,
             reference_rate_id=rate_id,
             margin_bp=margin,
+            day_count=wanted_day_count.value,
         )
         if loan.overpayment_mode == OverpaymentMode.TARGET_TOTAL.value:
             updated_checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)

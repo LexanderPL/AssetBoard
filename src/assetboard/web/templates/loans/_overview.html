@@ -1,0 +1,59 @@
+{% if schedule_error %}
+<section class="panel mb-6 border-warning-line bg-warning-soft p-4 sm:p-6" id="overview" data-schedule-error aria-labelledby="overview-heading">
+  <h2 id="overview-heading" class="text-base font-semibold">{{ _("Schedule unavailable") }}</h2>
+  <p class="mt-2 text-sm text-warning-strong" role="alert">{{ schedule_error }}</p>
+  <p class="mt-2 text-sm text-muted">{{ _("The loan's schedule and charts are hidden until its terms allow a schedule to be built.") }}</p>
+</section>
+{% elif summary %}
+<section class="panel mb-6 p-4 sm:p-6" id="overview" data-loan-overview aria-labelledby="overview-heading">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <div>
+      <h2 id="overview-heading" class="text-base font-semibold">{{ _("Overview") }}</h2>
+      <p class="mt-1 text-sm text-muted">{{ _("As of %(date)s", date=format_day(today, locale)) }}</p>
+    </div>
+    {% if loan.archived %}<span class="rounded-full bg-subtle px-2 py-0.5 text-xs font-semibold text-muted">{{ _("archived") }}</span>{% endif %}
+  </div>
+  <dl class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+    <div data-overview-remaining>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Remaining principal") }}</dt>
+      <dd class="mt-1 text-lg font-semibold tabular-nums">{{ format_money(summary.remaining_principal, locale) }}</dd>
+    </div>
+    <div data-overview-rate>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Current rate") }}</dt>
+      <dd class="mt-1 text-lg font-semibold tabular-nums">{{ format_rate_short(loan.current_rate_bp, locale) if loan.current_rate_bp is not none else "—" }}</dd>
+      {% if loan.rate_mode.value == "variable" %}<dd class="mt-1 text-xs text-muted">{{ loan.reference_rate_name or _("No reference rate") }}{% if loan.margin_bp is not none %} + {{ _("margin %(margin)s", margin=format_rate_short(loan.margin_bp, locale)) }}{% endif %}</dd>{% endif %}
+    </div>
+    <div data-overview-progress>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("%% repaid") }}</dt>
+      <dd class="mt-1 text-lg font-semibold tabular-nums">{{ format_rate_short(summary.percent_repaid_bp, locale) }}</dd>
+      <progress class="mt-2 h-2 w-full" max="10000" value="{{ summary.percent_repaid_bp }}" aria-label="{{ _('%% repaid') }}">{{ format_rate_short(summary.percent_repaid_bp, locale) }}</progress>
+    </div>
+    <div data-overview-payoff>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Payoff date") }}</dt>
+      <dd class="mt-1 text-lg font-semibold">{% if summary.payoff_date %}{{ format_day(summary.payoff_date, locale) }}{% else %}—{% endif %}</dd>
+      <dd class="mt-1 text-xs text-muted">{{ ngettext("%(num)d payment left", "%(num)d payments left", summary.months_remaining, num=summary.months_remaining) }}</dd>
+    </div>
+    <div class="sm:col-span-2 lg:col-span-4" data-overview-next>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Next payment") }}</dt>
+      {% if schedule_page.next_row %}
+      <dd class="mt-1 text-sm">
+        <span class="font-semibold">{{ format_day(schedule_page.next_row.date, locale) }}</span>
+        <span class="text-muted"> · {{ _("Total %(amount)s", amount=format_money(schedule_page.next_row.installment_total, locale)) }}</span>
+      </dd>
+      <dd class="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted">
+        <span>{{ _("Principal") }} {{ format_money(schedule_page.next_row.principal, locale) }}</span>
+        <span>{{ _("Interest") }} {{ format_money(schedule_page.next_row.interest, locale) }}</span>
+        <span>{{ _("Costs") }} {{ format_money(schedule_page.next_row.costs, locale) }}</span>
+        {% if schedule_page.next_row.overpayment.amount_minor %}<span>{{ _("Overpayment") }} {{ format_money(schedule_page.next_row.overpayment, locale) }}</span>{% endif %}
+      </dd>
+      {% else %}
+      <dd class="mt-1 text-sm text-muted">{{ _("No payments left.") }}</dd>
+      {% endif %}
+    </div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Interest remaining") }}</dt><dd class="mt-1 tabular-nums">{{ format_money(summary.remaining_interest, locale) }}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Costs remaining") }}</dt><dd class="mt-1 tabular-nums">{{ format_money(summary.remaining_costs, locale) }}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Interest lifetime") }}</dt><dd class="mt-1 tabular-nums">{{ format_money(summary.total_interest, locale) }}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Costs lifetime") }}</dt><dd class="mt-1 tabular-nums">{{ format_money(summary.total_costs, locale) }}</dd></div>
+  </dl>
+</section>
+{% endif %}

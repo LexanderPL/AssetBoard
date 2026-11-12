@@ -199,10 +199,27 @@
     };
   }
 
+  function markLineData(data, ink) {
+    const line = token("line");
+    return (data.markers || []).map((marker) => ({
+      xAxis: data.labels[marker.index],
+      name: marker.text,
+      label: {
+        show: true,
+        formatter: marker.label,
+        position: "insideEndTop",
+        color: ink,
+        fontSize: 10,
+      },
+      lineStyle: { color: line, type: "dashed", width: 1 },
+    }));
+  }
+
   function lineOptions(data) {
     const ink = token("ink");
     const surface = token("surface");
     const line = token("line");
+    const markers = markLineData(data, ink);
     return {
       animation: false,
       aria: { enabled: false }, // the adjacent table is the accessible version
@@ -236,7 +253,7 @@
         axisLabel: { color: ink, formatter: (value) => data.y_labels[String(value)] || "" },
         splitLine: { lineStyle: { color: line } },
       },
-      series: data.series.map((series) => ({
+      series: data.series.map((series, index) => ({
         name: series.name,
         type: "line",
         data: series.values,
@@ -246,6 +263,65 @@
         lineStyle: { width: 2, color: token(series.color) },
         itemStyle: { color: token(series.color) },
         emphasis: { focus: "series" },
+        markLine:
+          index === 0 && markers.length
+            ? { symbol: "none", silent: true, data: markers }
+            : undefined,
+      })),
+    };
+  }
+
+  function loanPaymentsOptions(data) {
+    const ink = token("ink");
+    const surface = token("surface");
+    const line = token("line");
+    const markers = markLineData(data, ink);
+    return {
+      animation: false,
+      aria: { enabled: false }, // the plotted-data table is the accessible version
+      legend: {
+        top: 0,
+        textStyle: { color: ink },
+        data: data.series.map((series) => series.name),
+      },
+      grid: { left: 8, right: 16, top: 42, bottom: 8, containLabel: true },
+      tooltip: {
+        trigger: "axis",
+        renderMode: "richText",
+        backgroundColor: surface,
+        borderColor: line,
+        textStyle: { color: ink },
+        formatter: (params) => {
+          if (!Array.isArray(params) || params.length === 0) return "";
+          const index = params[0].dataIndex;
+          return [params[0].axisValue, ...(data.tooltips[index] || [])].join("\n");
+        },
+      },
+      xAxis: {
+        type: "category",
+        data: data.labels,
+        axisLabel: { color: ink },
+        axisLine: { lineStyle: { color: line } },
+      },
+      yAxis: {
+        type: "value",
+        min: data.y_min,
+        max: data.y_max,
+        interval: data.y_interval,
+        axisLabel: { color: ink, formatter: (value) => data.y_labels[String(value)] || "" },
+        splitLine: { lineStyle: { color: line } },
+      },
+      series: data.series.map((series, index) => ({
+        name: series.name,
+        type: "bar",
+        stack: "payments",
+        data: series.values,
+        itemStyle: { color: token(series.color) },
+        emphasis: { focus: "series" },
+        markLine:
+          index === 0 && markers.length
+            ? { symbol: "none", silent: true, data: markers }
+            : undefined,
       })),
     };
   }
@@ -266,6 +342,8 @@
       option = lineOptions(data);
     } else if (kind === "performance" && Array.isArray(data.value)) {
       option = performanceOptions(data);
+    } else if (kind === "loan-payments" && Array.isArray(data.series)) {
+      option = loanPaymentsOptions(data);
     } else {
       return;
     }
@@ -280,7 +358,7 @@
   }
 
   function drawAll() {
-    document.querySelectorAll('[data-chart="donut"], [data-chart="line"], [data-chart="performance"]').forEach(draw);
+    document.querySelectorAll('[data-chart="donut"], [data-chart="line"], [data-chart="performance"], [data-chart="loan-payments"]').forEach(draw);
   }
 
   function start() {

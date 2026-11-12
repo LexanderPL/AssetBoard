@@ -20,6 +20,10 @@
         {% endfor %}
       </div>
     </fieldset>
+    <label class="grid max-w-md gap-1 text-sm font-medium">{{ _("Interest calculation") }}<select name="day_count" class="form-select py-2 font-normal">
+      <option value="monthly"{% if values.get('day_count', 'monthly') == 'monthly' %} selected{% endif %}>{{ _("Monthly (12 equal periods)") }}</option>
+      <option value="actual_365"{% if values.get('day_count') == 'actual_365' %} selected{% endif %}>{{ _("Actual/365") }}</option>
+    </select><span class="text-xs text-muted">{{ _("Monthly uses one twelfth of the annual rate each month. Actual/365 uses the real days in each period.") }}</span></label>
     {% if loan.entry_path == "current" %}
     <div class="grid gap-4 sm:grid-cols-2">
       <label class="grid gap-1 text-sm font-medium">{{ _("Current balance (%(currency)s)", currency=loan.currency) }}<input name="current_balance" value="{{ values.get('current_balance', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"></label>

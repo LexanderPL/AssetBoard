@@ -244,6 +244,13 @@ class DayCount(StrEnum):
     ACTUAL_365 = "actual_365"
 
 
+def validate_day_count(value: DayCount | str) -> DayCount:
+    try:
+        return DayCount(value)
+    except ValueError:
+        raise LoanValidationError("day_count", "invalid_day_count") from None
+
+
 class ScheduleError(ValueError):
     """A schedule that cannot be built or has no valid answer; ``code`` names the problem."""
 

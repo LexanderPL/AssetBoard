@@ -37,6 +37,12 @@
   </dl>
 </section>
 
+{% include "loans/_overview.html" %}
+{% if not schedule_error %}
+{% include "loans/_schedule.html" %}
+{% include "loans/_charts.html" %}
+{% endif %}
+
 <section class="panel mb-6 p-4 sm:p-6" id="rates" aria-labelledby="rates-heading">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <h2 id="rates-heading" class="text-base font-semibold">{{ _("Rate changes") }}</h2>
@@ -220,3 +226,4 @@
   </div>
 </dialog>
 {% endblock %}
+{% block scripts %}{% if not schedule_error and schedule and schedule.rows %}{% include "macros/chart_scripts.html" %}{% endif %}{% endblock %}

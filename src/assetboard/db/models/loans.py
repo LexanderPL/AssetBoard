@@ -109,6 +109,7 @@ class Loan(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         CheckConstraint("length(currency) = 3", name="currency_length"),
         CheckConstraint("kind IN ('annuity', 'equal_principal')", name="kind_valid"),
         CheckConstraint("rate_mode IN ('fixed', 'variable')", name="rate_mode_valid"),
+        CheckConstraint("day_count IN ('monthly', 'actual_365')", name="day_count_valid"),
         CheckConstraint(
             "overpayment_mode IN ('none', 'fixed_extra', 'target_total')",
             name="overpayment_mode_valid",
@@ -174,6 +175,9 @@ class Loan(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     term_months: Mapped[int] = mapped_column(Integer(), nullable=False)
     payment_day: Mapped[int] = mapped_column(Integer(), nullable=False)
     rate_mode: Mapped[str] = mapped_column(String(16), nullable=False)
+    day_count: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="monthly", server_default="monthly"
+    )
     margin_bp: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     reference_rate_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
     installment_override_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)

@@ -11,7 +11,7 @@ from assetboard.db.repositories import (
     LoanRateChangeRepository,
     ReferenceRateValueRepository,
 )
-from assetboard.domain.loans import LoanValidationError
+from assetboard.domain.loans import DayCount, LoanValidationError
 from assetboard.domain.money import Money
 from assetboard.services import loans
 from assetboard.services.context import PermissionDenied
@@ -576,3 +576,28 @@ def test_update_variable_terms_changes_reference_rate_and_margin(team: Workspace
     assert view.reference_rate_name == "WIBOR 3M"
     assert view.margin_bp == 200
     assert view.current_rate_bp == 600
+
+
+def test_day_count_defaults_and_updates(team: WorkspaceDb) -> None:
+    loan_id = _original_loan(team)
+    ctx = team.ctx("owner", "owner")
+    assert loans.get_loan(team.factory, ctx, loan_id).day_count is DayCount.MONTHLY
+    update = {
+        "name": "Mortgage",
+        "kind": "annuity",
+        "principal_original": _money(30_000_000),
+        "current_balance": None,
+        "balance_date": None,
+        "origination_date": date(2026, 1, 1),
+        "first_payment_date": date(2026, 2, 1),
+        "term_months": 360,
+        "payment_day": 1,
+        "installment_override": None,
+    }
+    loans.update_loan_terms(team.factory, ctx, loan_id, **update, day_count="actual_365")
+    assert loans.get_loan(team.factory, ctx, loan_id).day_count is DayCount.ACTUAL_365
+    loans.update_loan_terms(team.factory, ctx, loan_id, **update, day_count=None)
+    assert loans.get_loan(team.factory, ctx, loan_id).day_count is DayCount.ACTUAL_365
+
+    actual = _original_loan(team, name="Actual loan", day_count="actual_365")
+    assert loans.get_loan(team.factory, ctx, actual).day_count is DayCount.ACTUAL_365

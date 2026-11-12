@@ -3118,6 +3118,28 @@ msgstr "Najpierw dodaj kategorię przychodów."
 msgid "%(name)s (archived)"
 msgstr "%(name)s (zarchiwizowana)"
 
+#, python-format
+msgid "Rate change: %(rate)s"
+msgstr "Zmiana stopy: %(rate)s"
+
+msgid "Configured plan"
+msgstr "Plan bieżący"
+
+msgid "Without overpayments"
+msgstr "Bez nadpłat"
+
+msgid "Principal"
+msgstr "Kapitał"
+
+msgid "Costs"
+msgstr "Koszty"
+
+msgid "Overpayment"
+msgstr "Nadpłata"
+
+msgid "Total"
+msgstr "Razem"
+
 msgid "Enter a shorter note."
 msgstr "Podaj krótszą notatkę."
 
@@ -3223,6 +3245,26 @@ msgstr "Wybierz, jak chcesz wprowadzić kredyt."
 
 msgid "Enter the amount in the workspace currency."
 msgstr "Podaj kwotę w walucie obszaru roboczego."
+
+msgid "Choose a valid interest calculation."
+msgstr "Wybierz prawidłowy sposób naliczania odsetek."
+
+msgid "The loan has no starting balance to build a schedule from."
+msgstr "Kredyt nie ma salda początkowego, od którego można zbudować harmonogram."
+
+msgid "Two rate changes start on the same date."
+msgstr "Dwie zmiany stopy zaczynają się tego samego dnia."
+
+msgid ""
+"The installment is too low to cover the interest. Raise the installment "
+"override."
+msgstr "Rata jest zbyt niska, aby pokryć odsetki. Zwiększ nadpisanie raty."
+
+msgid "The payment dates are invalid. Check the first payment date."
+msgstr "Daty płatności są nieprawidłowe. Sprawdź datę pierwszej płatności."
+
+msgid "The schedule produced a negative balance. Check the loan terms."
+msgstr "Harmonogram dał ujemne saldo. Sprawdź warunki kredytu."
 
 msgid "The loan could not be saved. Check the form and try again."
 msgstr "Nie udało się zapisać kredytu. Sprawdź formularz i spróbuj ponownie."
@@ -6317,9 +6359,6 @@ msgstr "Waga (%%)"
 msgid "Weight for %(name)s"
 msgstr "Waga dla %(name)s"
 
-msgid "Total"
-msgstr "Razem"
-
 #, python-format
 msgid "Weights must total exactly 100%%."
 msgstr "Wagi muszą sumować się dokładnie do 100%%."
@@ -7129,6 +7168,30 @@ msgstr "Zaloguj się, aby przyjąć"
 msgid "Create account and join"
 msgstr "Utwórz konto i dołącz"
 
+msgid "Charts"
+msgstr "Wykresy"
+
+msgid "Dashed lines mark rate changes."
+msgstr "Linie przerywane oznaczają zmiany stopy."
+
+msgid "Balance over time"
+msgstr "Saldo w czasie"
+
+msgid "The configured plan and the same loan without overpayments."
+msgstr "Plan bieżący i ten sam kredyt bez nadpłat."
+
+msgid "Plotted balance data"
+msgstr "Dane wykresu salda"
+
+msgid "Monthly payments"
+msgstr "Płatności miesięczne"
+
+msgid "Principal, interest, costs and overpayments in each month."
+msgstr "Kapitał, odsetki, koszty i nadpłaty w każdym miesiącu."
+
+msgid "Plotted payment data"
+msgstr "Dane wykresu płatności"
+
 msgid "per month"
 msgstr "miesięcznie"
 
@@ -7152,6 +7215,108 @@ msgstr "skraca okres"
 msgid "lower the installment"
 msgstr "obniża ratę"
 
+msgid "Schedule unavailable"
+msgstr "Harmonogram niedostępny"
+
+msgid ""
+"The loan's schedule and charts are hidden until its terms allow a "
+"schedule to be built."
+msgstr ""
+"Harmonogram i wykresy kredytu są ukryte, dopóki warunki nie pozwolą "
+"zbudować harmonogramu."
+
+msgid "Overview"
+msgstr "Przegląd"
+
+msgid "Remaining principal"
+msgstr "Pozostały kapitał"
+
+msgid "Current rate"
+msgstr "Bieżąca stopa"
+
+msgid "No reference rate"
+msgstr "Brak stopy referencyjnej"
+
+#, python-format
+msgid "margin %(margin)s"
+msgstr "marża %(margin)s"
+
+#, python-format
+msgid "%% repaid"
+msgstr "%% spłacone"
+
+msgid "Payoff date"
+msgstr "Data spłaty"
+
+#, python-format
+msgid "%(num)d payment left"
+msgid_plural "%(num)d payments left"
+msgstr[0] "%(num)d miesiąc"
+msgstr[1] "%(num)d miesiące"
+msgstr[2] "%(num)d miesięcy"
+
+msgid "Next payment"
+msgstr "Następna płatność"
+
+#, python-format
+msgid "Total %(amount)s"
+msgstr "Razem %(amount)s"
+
+msgid "No payments left."
+msgstr "Brak pozostałych płatności."
+
+msgid "Interest remaining"
+msgstr "Pozostałe odsetki"
+
+msgid "Costs remaining"
+msgstr "Pozostałe koszty"
+
+msgid "Interest lifetime"
+msgstr "Odsetki łącznie"
+
+msgid "Costs lifetime"
+msgstr "Koszty łącznie"
+
+msgid "Schedule"
+msgstr "Harmonogram"
+
+msgid ""
+"Monthly rows from the current starting balance. Past rows are projected "
+"until actual payments are recorded."
+msgstr ""
+"Miesięczne wiersze od bieżącego salda początkowego. Wiersze z przeszłości"
+" są prognozowane, dopóki nie zostaną zapisane rzeczywiste płatności."
+
+msgid "Scroll sideways to see every column."
+msgstr "Przewiń w bok, aby zobaczyć wszystkie kolumny."
+
+msgid "Loan schedule"
+msgstr "Harmonogram kredytu"
+
+msgid "#"
+msgstr "#"
+
+msgid "Due date"
+msgstr "Termin płatności"
+
+msgid "Rate"
+msgstr "Stopa"
+
+msgid "Opening"
+msgstr "Saldo początkowe"
+
+msgid "Closing"
+msgstr "Saldo końcowe"
+
+msgid "Today"
+msgstr "Dzisiaj"
+
+msgid "Projected"
+msgstr "Prognozowane"
+
+msgid "No payments remain on this schedule."
+msgstr "W tym harmonogramie nie ma pozostałych płatności."
+
 msgid "Reference rates"
 msgstr "Stopy referencyjne"
 
@@ -7166,9 +7331,6 @@ msgstr "wprowadzony na podstawie pierwotnych warunków"
 
 msgid "entered from the current balance"
 msgstr "wprowadzony na podstawie bieżącego salda"
-
-msgid "Current rate"
-msgstr "Bieżąca stopa"
 
 msgid "Original principal"
 msgstr "Pierwotny kapitał"
@@ -7192,9 +7354,6 @@ msgstr[2] "%(num)d miesięcy"
 
 msgid "First payment"
 msgstr "Pierwsza płatność"
-
-msgid "Next payment"
-msgstr "Następna płatność"
 
 #, python-format
 msgid "day %(day)s"
@@ -7244,10 +7403,6 @@ msgstr "Stopa referencyjna: %(name)s"
 
 msgid "not set"
 msgstr "nie ustawiono"
-
-#, python-format
-msgid "margin %(margin)s"
-msgstr "marża %(margin)s"
 
 msgid ""
 "Change the reference rate or margin in Edit terms. Add values on the "
@@ -7334,9 +7489,6 @@ msgstr "Brak jednorazowych nadpłat."
 
 msgid "Starting balance"
 msgstr "Saldo początkowe"
-
-msgid "Remaining principal"
-msgstr "Pozostały kapitał"
 
 msgid ""
 "This is the balance you entered. More balance checkpoints are recorded "
@@ -7439,6 +7591,22 @@ msgstr ""
 msgid "Loan type"
 msgstr "Rodzaj kredytu"
 
+msgid "Interest calculation"
+msgstr "Naliczanie odsetek"
+
+msgid "Monthly (12 equal periods)"
+msgstr "Miesięcznie (12 równych okresów)"
+
+msgid "Actual/365"
+msgstr "Rzeczywiste/365"
+
+msgid ""
+"Monthly uses one twelfth of the annual rate each month. Actual/365 uses "
+"the real days in each period."
+msgstr ""
+"Miesięcznie: jedna dwunasta rocznej stopy w każdym miesiącu. "
+"Rzeczywiste/365: rzeczywista liczba dni w każdym okresie."
+
 #, python-format
 msgid "Current balance (%(currency)s)"
 msgstr "Bieżące saldo (%(currency)s)"
@@ -7498,9 +7666,6 @@ msgstr "Zapisz warunki"
 
 msgid "Add loan"
 msgstr "Dodaj kredyt"
-
-msgid "Rate"
-msgstr "Stopa"
 
 msgid "Payment date"
 msgstr "Data płatności"
@@ -7785,9 +7950,6 @@ msgstr "Poprzedni miesiąc: %(month)s"
 #, python-format
 msgid "Next month: %(month)s"
 msgstr "Następny miesiąc: %(month)s"
-
-msgid "Today"
-msgstr "Dzisiaj"
 
 msgid "Choose a month"
 msgstr "Wybierz miesiąc"
@@ -8690,9 +8852,6 @@ msgid "Bills and income that repeat. Each one plans its next dates for you."
 msgstr ""
 "Powtarzające się rachunki i przychody. Każda pozycja sama planuje kolejne"
 " terminy."
-
-msgid "Schedule"
-msgstr "Harmonogram"
 
 msgid "Next date"
 msgstr "Najbliższy termin"

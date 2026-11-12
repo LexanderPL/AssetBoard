@@ -168,6 +168,32 @@ Implement F7.3 from docs/specs/M7-loans-and-mortgage.md: loan overview page, sch
 Service layer calls build_schedule(); templates only render. Tests: service returns the same summary as the domain function for a fixture loan.
 ```
 
+### As built (M7.F7.3)
+
+- `loans.day_count` was added by `0052_f73_loan_day_count` (String(16), not null, server
+  default `monthly`, check `monthly|actual_365`). Create keeps the monthly default; the edit
+  terms page exposes **Monthly (12 equal periods)** and **Actual/365**. `update_loan_terms`
+  accepts `day_count=None` to keep the stored value.
+- `LoanView` now carries `reference_rate_values` and `day_count`; the schedule service maps the
+  view to `LoanTerms`, fixed or variable `RatePeriod`s, `CostPeriod`s, one-off overpayments and
+  checkpoints. It builds the configured schedule and a no-overpayment baseline, then calls
+  `summarize_schedule`. No finance math lives in the service or UI.
+- The loan detail page shows the overview, a 24-row schedule page, a CSV download and two
+  ECharts charts. The default schedule page contains today's row or the next future row. The
+  today/next row is highlighted and past rows are marked projected. The table scrolls inside its
+  own container on phones; no critical column is hidden.
+- CSV is viewer-readable, all rows, UTF-8 without BOM, CRLF, header
+  `n,date,rate,opening,interest,principal,overpayment,costs,total,closing,currency`, plain
+  decimals via `plain_amount`, `Content-Disposition: attachment`, `Cache-Control: no-store`.
+  A schedule error returns 409.
+- Charts use server-formatted labels, amounts and tooltips; the browser receives minor units and
+  no money arithmetic. Rate changes are vertical dashed mark lines (and appear in the axis
+  tooltip). The balance chart compares the configured plan with the no-overpayment baseline and
+  ends a shorter plan series with nulls. The payments chart stacks principal, interest, costs and
+  overpayment when present. Both have **Plotted data** tables; canvases stay hidden without JS.
+- Build errors are mapped to short translated explanations; the schedule, charts and CSV are
+  omitted until the terms can produce a schedule.
+
 ---
 
 ## F7.4 Overpayment scenarios (what-if)

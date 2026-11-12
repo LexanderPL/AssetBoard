@@ -1,0 +1,61 @@
+{% if schedule %}
+<section class="panel mb-6 p-4 sm:p-6" id="schedule" data-loan-schedule aria-labelledby="schedule-heading">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <div>
+      <h2 id="schedule-heading" class="text-base font-semibold">{{ _("Schedule") }}</h2>
+      <p class="mt-1 text-sm text-muted">{{ _("Monthly rows from the current starting balance. Past rows are projected until actual payments are recorded.") }}</p>
+    </div>
+    <a href="{{ scoped_url(request, 'loan_schedule_csv', loan_id=loan.id) }}" class="btn" data-schedule-csv download>{{ _("Download CSV") }}</a>
+  </div>
+  {% if schedule_page.rows %}
+  <p class="mt-3 text-xs text-muted sm:hidden" data-scroll-hint>{{ _("Scroll sideways to see every column.") }}</p>
+  <div class="mt-3 overflow-x-auto" data-schedule-scroll tabindex="0" role="region" aria-label="{{ _('Loan schedule') }}">
+    <table class="sheet w-full min-w-[56rem] text-sm">
+      <caption class="sr-only">{{ _("Loan schedule") }}</caption>
+      <thead>
+        <tr class="text-left text-xs text-muted">
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("#") }}</th>
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Due date") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Rate") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Opening") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Interest") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Principal") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Overpayment") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Costs") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Total") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Closing") }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in schedule_page.rows %}
+        <tr class="border-t border-line {% if row.date == today or schedule_page.highlight_next_date == row.date %}bg-primary-soft{% endif %}" data-schedule-row="{{ row.n }}">
+          <th scope="row" class="whitespace-nowrap px-3 py-2 text-left font-normal tabular-nums">{{ row.n }}</th>
+          <td class="whitespace-nowrap px-3 py-2">
+            <time datetime="{{ row.date.isoformat() }}">{{ format_day(row.date, locale) }}</time>
+            {% if row.date == today %}<span class="ml-2 rounded-full bg-primary px-2 py-0.5 text-xs font-semibold text-on-primary" data-schedule-today>{{ _("Today") }}</span>
+            {% elif schedule_page.highlight_next_date == row.date %}<span class="ml-2 rounded-full bg-primary-soft px-2 py-0.5 text-xs font-semibold text-primary-ink" data-schedule-next>{{ _("Next") }}</span>{% endif %}
+            {% if row.date < today %}<span class="ml-2 text-xs text-muted" data-schedule-projected>{{ _("Projected") }}</span>{% endif %}
+          </td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_rate_short(row.annual_rate_bp, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.opening, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.interest, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.principal, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.overpayment, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.costs, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.installment_total, locale) }}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(row.closing, locale) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <nav class="mt-4 flex flex-wrap items-center gap-3 text-sm" aria-label="{{ _('Pages') }}" data-schedule-pages>
+    {% if schedule_page.page > 1 %}<a href="{{ request.url.include_query_params(schedule_page=schedule_page.page - 1) }}#schedule" rel="prev" class="btn">{{ _("Previous") }}</a>{% endif %}
+    <span class="text-muted" data-schedule-page-number>{{ _("Page %(page)d of %(pages)d", page=schedule_page.page, pages=schedule_page.pages) }}</span>
+    {% if schedule_page.page < schedule_page.pages %}<a href="{{ request.url.include_query_params(schedule_page=schedule_page.page + 1) }}#schedule" rel="next" class="btn">{{ _("Next") }}</a>{% endif %}
+  </nav>
+  {% else %}
+  <p class="mt-4 text-sm text-muted" data-schedule-empty>{{ _("No payments remain on this schedule.") }}</p>
+  {% endif %}
+</section>
+{% endif %}
