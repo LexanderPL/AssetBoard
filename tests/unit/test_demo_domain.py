@@ -102,15 +102,17 @@ def test_currency_factors_are_the_documented_table() -> None:
     }
 
 
-def test_excluded_models_are_the_five_operational_tables_with_reasons() -> None:
+def test_excluded_models_are_operational_tables_and_user_what_ifs_with_reasons() -> None:
     assert set(DEMO_EXCLUDED_MODELS) == {
         "Invitation",
         "NotificationChannel",
         "NotificationLog",
         "PriceSourceConfig",
         "ProviderError",
+        "LoanScenario",
     }
     assert all(reason.strip() for reason in DEMO_EXCLUDED_MODELS.values())
+    assert DEMO_EXCLUDED_MODELS["LoanScenario"] == "scenarios are user what-ifs, not sample data"
 
 
 def test_plan_amounts_use_the_base_currency_and_expected_shapes() -> None:

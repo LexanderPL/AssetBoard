@@ -36,6 +36,7 @@ from assetboard.db.models.loans import (
     LoanCostComponent,
     LoanOverpayment,
     LoanRateChange,
+    LoanScenario,
     ReferenceRate,
     ReferenceRateValue,
 )
@@ -613,6 +614,25 @@ def make_loan_balance_checkpoint(session: Session, workspace_id: UUID) -> LoanBa
     )
 
 
+def make_loan_scenario(session: Session, workspace_id: UUID) -> LoanScenario:
+    loan = make_loan(session, workspace_id)
+    session.add(loan)
+    session.flush()
+    return LoanScenario(
+        workspace_id=workspace_id,
+        loan_id=loan.id,
+        name=f"Scenario {uuid4().hex[:8]}",
+        name_key=f"scenario-{uuid4().hex}",
+        overpayment_mode="fixed_extra",
+        overpayment_amount_minor=50_000,
+        overpayment_strategy="reduce_term",
+        rate_shift_bp=None,
+        rate_shift_from=None,
+        one_off_date=None,
+        one_off_amount_minor=None,
+    )
+
+
 def make_networth_item(session: Session, workspace_id: UUID) -> NetWorthItem:
     category = make_networth_category(session, workspace_id)
     session.add(category)
@@ -741,4 +761,5 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
         make_loan_balance_checkpoint,
         update_values={"remaining_principal_minor": 90_000},
     ),
+    LoanScenario: TenantCase(make_loan_scenario, update_values={"name": "Updated scenario"}),
 }

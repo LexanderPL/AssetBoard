@@ -60,6 +60,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "loan_cost_components",
         "loan_overpayments",
         "loan_rate_changes",
+        "loan_scenarios",
         "loans",
         "login_tickets",
         "memberships",
@@ -1785,6 +1786,46 @@ def test_0052_loan_day_count_migration_is_reversible(tmp_path: Path) -> None:
         upgrade_database(settings)
         columns = {column["name"] for column in inspect(engine).get_columns("loans")}
         assert "day_count" in columns
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0053_loan_scenarios_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'loan_scenarios.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        columns = {column["name"]: column for column in inspector.get_columns("loan_scenarios")}
+        assert set(columns) >= {
+            "workspace_id",
+            "loan_id",
+            "name",
+            "name_key",
+            "overpayment_mode",
+            "overpayment_amount_minor",
+            "overpayment_strategy",
+            "rate_shift_bp",
+            "rate_shift_from",
+            "one_off_date",
+            "one_off_amount_minor",
+        }
+        assert columns["rate_shift_bp"]["nullable"] is True
+        checks = {
+            check.get("sqltext") or ""
+            for check in inspector.get_check_constraints("loan_scenarios")
+        }
+        assert any("rate_shift_bp" in sql and "rate_shift_from" in sql for sql in checks)
+        assert any("one_off_amount_minor" in sql for sql in checks)
+        command.downgrade(alembic_config(settings), "0052_f73_loan_day_count")
+        assert "loan_scenarios" not in set(inspect(engine).get_table_names())
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
         check_database_migrations(settings)
     finally:
         engine.dispose()
