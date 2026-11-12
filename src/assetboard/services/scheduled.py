@@ -344,19 +344,37 @@ def _loan_amount(rows: list[tuple[date, int]] | None, due: date) -> int | None:
     return None
 
 
-def refresh_loan_item_in_session(
-    session: Session, ctx: Context, loan_id: UUID, *, horizon_months: int = 24
-) -> int:
-    """Reconcile the loan-linked scheduled item's pending rows with the schedule."""
+def refresh_loan_item_in_session(session: Session, ctx: Context, loan_id: UUID) -> int:
+    """Update pending future amounts of the loan-linked item without pruning its horizon.
+
+    Automatic refreshes must not delete occurrences a caller generated with a longer recurrence
+    horizon; explicit Generate/Refresh does the full reconcile through ``save_item_in_session``.
+    """
     items = [
         item
         for item in ScheduledItemRepository(session, ctx).ordered(active_only=True)
         if item.loan_id == loan_id
     ]
-    created = 0
+    if not items:
+        return 0
+    today = ctx.clock.today(ctx.workspace.timezone)
+    amounts = _loan_amounts(session, ctx, loan_id, today)
+    occurrences = ScheduledOccurrenceRepository(session, ctx)
+    updated = 0
     for item in items:
-        created += _generate(session, ctx, ctx.clock, item, horizon_months)
-    return created
+        for row in occurrences.for_item(item.id):
+            if (
+                row.status != OccurrenceStatus.PENDING
+                or row.due_date < today
+                or row.amount_overridden
+            ):
+                continue
+            amount = _loan_amount(amounts, row.due_date)
+            if amount is None:
+                continue
+            occurrences.update(row.id, expected_minor=amount, amount_state=AmountState.ESTIMATED)
+            updated += 1
+    return updated
 
 
 def _generate(
