@@ -18,6 +18,8 @@ from assetboard.domain.loans import (
     HIGH_RATE_CONFIRMATION_BP,
     LoanKind,
     LoanValidationError,
+    OverpaymentMode,
+    OverpaymentStrategy,
     RateMode,
     clean_loan_name,
     payment_date_matches_day,
@@ -35,13 +37,14 @@ from assetboard.i18n.numbers import (
     format_rate_short,
     parse_amount,
 )
+from assetboard.services import loan_scenarios as loan_scenario_service
 from assetboard.services import loan_schedule as loan_schedule_service
 from assetboard.services import loans
 from assetboard.services.context import Context, Role, has_role, require_role
 from assetboard.web.context import CurrentContext
-from assetboard.web.forms import InvalidPercentOrFixed, percent_to_bp
-from assetboard.web.loan_charts import build_loan_charts
-from assetboard.web.loan_page import schedule_csv, schedule_page
+from assetboard.web.forms import InvalidPercentOrFixed, percent_to_bp, signed_percent_to_bp
+from assetboard.web.loan_charts import build_loan_charts, build_scenario_chart
+from assetboard.web.loan_page import scenario_summary, schedule_csv, schedule_page
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
 
@@ -102,6 +105,12 @@ ERRORS = {
     ),
     "invalid_payment_date": _("The payment dates are invalid. Check the first payment date."),
     "negative_closing": _("The schedule produced a negative balance. Check the loan terms."),
+    "invalid_overpayment_mode": _("Choose a valid overpayment type."),
+    "invalid_strategy": _("Choose a valid overpayment strategy."),
+    "rate_shift_pair_required": _("Enter both the rate shift and the date it starts, or neither."),
+    "one_off_pair_required": _("Enter both the one-off amount and its date, or neither."),
+    "invalid_rate_shift": _("The rate shift must leave every rate between 0% and 100%."),
+    "too_many_scenarios": _("Compare at most three what-if rows at a time."),
     "failed": _("The loan could not be saved. Check the form and try again."),
 }
 
@@ -121,6 +130,8 @@ NOTICES = {
     "reference_rate_deleted": _("Reference rate deleted."),
     "reference_value_saved": _("Reference rate value saved."),
     "reference_value_deleted": _("Reference rate value deleted."),
+    "scenario_saved": _("Saved scenarios updated. Their comparison is below."),
+    "scenario_deleted": _("Scenario deleted."),
 }
 
 ENTRY_PATHS = ("original", "current")
@@ -630,6 +641,120 @@ def _redirect_detail(
     return RedirectResponse(url, status_code=303)
 
 
+SCENARIO_ROW_COUNT = 3
+SCENARIO_FIELDS = (
+    "name",
+    "overpayment_mode",
+    "overpayment_amount",
+    "overpayment_strategy",
+    "rate_shift",
+    "rate_shift_from",
+    "one_off_amount",
+    "one_off_date",
+)
+_SCENARIO_DEFAULTS = {"overpayment_mode": "same", "overpayment_strategy": "same"}
+
+
+def _scenario_form_rows(values: dict[str, str] | None = None) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    for number in range(1, SCENARIO_ROW_COUNT + 1):
+        row: dict[str, str] = {}
+        for field in SCENARIO_FIELDS:
+            default = _SCENARIO_DEFAULTS.get(field, "")
+            row[field] = (values or {}).get(f"{field}_{number}", default)
+        rows.append(row)
+    return rows
+
+
+def _scenario_row_empty(row: dict[str, str]) -> bool:
+    for field, value in row.items():
+        if not value.strip():
+            continue
+        if field in _SCENARIO_DEFAULTS and value == _SCENARIO_DEFAULTS[field]:
+            continue
+        return False
+    return True
+
+
+def _scenario_mode(value: str) -> OverpaymentMode | None:
+    if value in ("", "same"):
+        return None
+    try:
+        return OverpaymentMode(value)
+    except ValueError:
+        raise loans.LoanError("overpayment_mode", "invalid_overpayment_mode") from None
+
+
+def _scenario_strategy(value: str) -> OverpaymentStrategy | None:
+    if value in ("", "same"):
+        return None
+    try:
+        return OverpaymentStrategy(value)
+    except ValueError:
+        raise loans.LoanError("overpayment_strategy", "invalid_strategy") from None
+
+
+def _signed_percent(values: dict[str, str], key: str, locale: str) -> int | None:
+    text = values.get(key, "").strip()
+    if not text:
+        return None
+    try:
+        return signed_percent_to_bp(text, locale)
+    except (ValueError, InvalidPercentOrFixed):
+        raise loans.LoanError(key, "invalid_rate_shift") from None
+
+
+def _scenario_parameters(
+    row: dict[str, str], locale: str, currency: str
+) -> loan_scenario_service.ScenarioParameters:
+    return loan_scenario_service.ScenarioParameters(
+        name=row["name"].strip() or None,
+        overpayment_mode=_scenario_mode(row["overpayment_mode"].strip()),
+        overpayment_amount=_money(row, "overpayment_amount", locale, currency),
+        strategy=_scenario_strategy(row["overpayment_strategy"].strip()),
+        rate_shift_bp=_signed_percent(row, "rate_shift", locale),
+        rate_shift_from=_optional_date(row.get("rate_shift_from", ""), "rate_shift_from"),
+        one_off_date=_optional_date(row.get("one_off_date", ""), "one_off_date"),
+        one_off_amount=_money(row, "one_off_amount", locale, currency),
+    )
+
+
+def _scenario_page(
+    request: Request,
+    ctx: Context,
+    loan_id: UUID,
+    *,
+    ephemeral: list[loan_scenario_service.ScenarioParameters],
+    form_rows: list[dict[str, str]],
+    error: str | None = None,
+    notice: str | None = None,
+) -> dict[str, object]:
+    comparison = loan_scenario_service.compare_loan_scenarios(
+        request.app.state.session_factory, ctx, loan_id, ephemeral
+    )
+    saved = loan_scenario_service.list_loan_scenarios(
+        request.app.state.session_factory, ctx, loan_id
+    )
+    locale = request.state.locale
+    return {
+        "loan": comparison.view,
+        "comparison": comparison,
+        "saved": saved,
+        "scenario_chart": build_scenario_chart(comparison, locale),
+        "scenario_rows": form_rows,
+        "scenario_error": _error(request, comparison.error_code) if comparison.error_code else None,
+        "scenario_row_error": lambda code: _error(request, code),
+        "scenario_summary": lambda parameters: scenario_summary(parameters, locale),
+        "can_edit": has_role(ctx, Role.EDITOR),
+        "error": error,
+        "notice": notice,
+        "today": ctx.clock.today(ctx.workspace.timezone),
+        "format_money": format_money,
+        "format_day": format_day,
+        "format_rate_short": format_rate_short,
+    }
+
+
 @router.get("/loans/reference-rates", name="reference_rates")
 async def reference_rates_page(request: Request, ctx: CurrentContext) -> Response:
     page = await run_in_threadpool(
@@ -925,6 +1050,94 @@ async def loan_schedule_csv(request: Request, ctx: CurrentContext, loan_id: UUID
             "X-Content-Type-Options": "nosniff",
         },
     )
+
+
+@router.get("/loans/{loan_id}/scenarios", name="loan_scenarios")
+async def loan_scenarios_page(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    context = await run_in_threadpool(
+        _scenario_page,
+        request,
+        ctx,
+        loan_id,
+        ephemeral=[],
+        form_rows=_scenario_form_rows(),
+        error=_error(request, request.query_params.get("error")),
+        notice=_notice(request, request.query_params.get("notice")),
+    )
+    return render_template(request, "loans/scenarios.html", context=context)
+
+
+@router.post("/loans/{loan_id}/scenarios", name="loan_scenarios_compare")
+async def loan_scenarios_compare(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    values = await _form_values(request)
+    form_rows = _scenario_form_rows(values)
+    try:
+        view = await run_in_threadpool(
+            loans.get_loan, request.app.state.session_factory, ctx, loan_id
+        )
+        parameters: list[loan_scenario_service.ScenarioParameters] = []
+        for row in form_rows:
+            if _scenario_row_empty(row):
+                continue
+            parameters.append(
+                loan_scenario_service.validate_scenario_parameters(
+                    _scenario_parameters(row, request.state.locale, view.currency),
+                    view.currency,
+                )
+            )
+        ephemeral: list[loan_scenario_service.ScenarioParameters] = []
+        saved_any = False
+        for parameter in parameters:
+            if parameter.name:
+                await run_in_threadpool(
+                    loan_scenario_service.create_or_update_loan_scenario,
+                    request.app.state.session_factory,
+                    ctx,
+                    loan_id,
+                    parameter,
+                )
+                saved_any = True
+            else:
+                ephemeral.append(parameter)
+        context = await run_in_threadpool(
+            _scenario_page,
+            request,
+            ctx,
+            loan_id,
+            ephemeral=ephemeral,
+            form_rows=form_rows,
+            notice=_notice(request, "scenario_saved") if saved_any else None,
+        )
+        return render_template(request, "loans/scenarios.html", context=context)
+    except (loans.LoanError, LoanValidationError) as exc:
+        context = await run_in_threadpool(
+            _scenario_page,
+            request,
+            ctx,
+            loan_id,
+            ephemeral=[],
+            form_rows=form_rows,
+            error=_error(request, getattr(exc, "code", "failed")),
+        )
+        return render_template(request, "loans/scenarios.html", status_code=400, context=context)
+
+
+@router.post(
+    "/loans/{loan_id}/scenarios/{scenario_id}/delete",
+    name="loan_scenario_delete",
+)
+async def loan_scenario_delete(
+    request: Request, ctx: CurrentContext, loan_id: UUID, scenario_id: UUID
+) -> Response:
+    await run_in_threadpool(
+        loan_scenario_service.delete_loan_scenario,
+        request.app.state.session_factory,
+        ctx,
+        loan_id,
+        scenario_id,
+    )
+    url = request.url_for("loan_scenarios", loan_id=str(loan_id)).path
+    return RedirectResponse(url + "?notice=scenario_deleted#scenarios", status_code=303)
 
 
 @router.get("/loans/{loan_id}", name="loan_detail")

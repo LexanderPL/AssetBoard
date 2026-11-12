@@ -9,7 +9,11 @@ from datetime import date
 from decimal import Decimal
 
 from assetboard.domain.ledger_csv import plain_amount
-from assetboard.domain.loans import Schedule, ScheduleRow
+from assetboard.domain.loans import OverpaymentMode, OverpaymentStrategy, Schedule, ScheduleRow
+from assetboard.i18n import gettext
+from assetboard.i18n.dates import format_day
+from assetboard.i18n.numbers import format_money, format_quantity_input
+from assetboard.services.loan_scenarios import ScenarioParameters
 
 SCHEDULE_PER_PAGE = 24
 
@@ -106,4 +110,58 @@ def schedule_csv(schedule: Schedule) -> str:
     return buffer.getvalue()
 
 
-__all__ = ["SCHEDULE_PER_PAGE", "SchedulePageView", "schedule_csv", "schedule_page"]
+def _shift_text(shift_bp: int, locale: str) -> str:
+    points = format_quantity_input(Decimal(abs(shift_bp)).scaleb(-2), locale)
+    if shift_bp > 0:
+        return gettext("+%(points)s pp", locale) % {"points": points}
+    return gettext("-%(points)s pp", locale) % {"points": points}
+
+
+def scenario_summary(parameters: ScenarioParameters | None, locale: str) -> tuple[str, ...]:
+    """A compact, translated description of the parameters that differ from the loan."""
+    if parameters is None:
+        return (gettext("Same as the loan", locale),)
+    parts: list[str] = []
+    mode = parameters.overpayment_mode
+    if mode is OverpaymentMode.NONE:
+        parts.append(gettext("No regular overpayment", locale))
+    elif mode is OverpaymentMode.FIXED_EXTRA and parameters.overpayment_amount is not None:
+        parts.append(
+            gettext("Extra %(amount)s each month", locale)
+            % {"amount": format_money(parameters.overpayment_amount, locale)}
+        )
+    elif mode is OverpaymentMode.TARGET_TOTAL and parameters.overpayment_amount is not None:
+        parts.append(
+            gettext("Target total %(amount)s each month", locale)
+            % {"amount": format_money(parameters.overpayment_amount, locale)}
+        )
+    if parameters.strategy is OverpaymentStrategy.REDUCE_TERM:
+        parts.append(gettext("Shorten the term", locale))
+    elif parameters.strategy is OverpaymentStrategy.REDUCE_INSTALLMENT:
+        parts.append(gettext("Lower the installment", locale))
+    if parameters.rate_shift_bp is not None and parameters.rate_shift_from is not None:
+        parts.append(
+            gettext("Rate %(shift)s from %(date)s", locale)
+            % {
+                "shift": _shift_text(parameters.rate_shift_bp, locale),
+                "date": format_day(parameters.rate_shift_from, locale),
+            }
+        )
+    if parameters.one_off_amount is not None and parameters.one_off_date is not None:
+        parts.append(
+            gettext("One-off %(amount)s on %(date)s", locale)
+            % {
+                "amount": format_money(parameters.one_off_amount, locale),
+                "date": format_day(parameters.one_off_date, locale),
+            }
+        )
+    return tuple(parts) or (gettext("Same as the loan", locale),)
+
+
+__all__ = [
+    "SCHEDULE_PER_PAGE",
+    "SchedulePageView",
+    "scenario_summary",
+    "schedule_csv",
+    "schedule_page",
+]
