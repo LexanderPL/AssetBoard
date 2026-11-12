@@ -26,13 +26,12 @@
         <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Rate") }}</th>
         <th scope="col" class="px-4 py-2 font-semibold">{{ _("Term") }}</th>
         <th scope="col" class="px-4 py-2 font-semibold">{{ _("Payment date") }}</th>
-        <th scope="col" class="px-4 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>
       </tr>
     </thead>
     <tbody class="divide-y divide-line sm:divide-y-0">
       {% for loan in page.active %}
       <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 align-top sm:table-row sm:p-0" data-loan="{{ loan.id }}">
-        <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3">{{ loan.name }}</td>
+        <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3"><a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}" class="text-primary-ink underline-offset-2 hover:underline" data-open-loan>{{ loan.name }}</a></td>
         <td class="text-right text-muted sm:px-4 sm:py-3 sm:text-left" data-kind>{{ kind_label(loan.kind) }}</td>
         <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3" data-amount>
           {% if loan.current_balance %}{{ format_money(loan.current_balance, locale) }}{% elif loan.principal_original %}{{ format_money(loan.principal_original, locale) }}{% else %}—{% endif %}
@@ -40,11 +39,6 @@
         <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3" data-rate>{{ rate(loan.current_rate_bp, locale) }}</td>
         <td class="text-muted sm:px-4 sm:py-3" data-term>{{ ngettext("%(num)d month", "%(num)d months", loan.term_months, num=loan.term_months) }}</td>
         <td class="text-muted sm:px-4 sm:py-3" data-next-payment><time datetime="{{ loan.first_payment_date.isoformat() }}">{{ format_day(loan.first_payment_date, locale) }}</time></td>
-        <td class="col-span-2 pt-1 sm:px-4 sm:py-3">
-          <div class="flex justify-end">
-            <a class="btn-sm" href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}" data-open-loan>{{ _("Open") }}<span class="sr-only"> {{ loan.name }}</span></a>
-          </div>
-        </td>
       </tr>
       {% endfor %}
     </tbody>
@@ -69,16 +63,14 @@
           <th scope="col" class="px-4 py-2 font-semibold">{{ _("Name") }}</th>
           <th scope="col" class="px-4 py-2 font-semibold">{{ _("Type") }}</th>
           <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Amount") }}</th>
-          <th scope="col" class="px-4 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>
         </tr>
       </thead>
       <tbody class="divide-y divide-line sm:divide-y-0">
         {% for loan in page.archived %}
         <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 align-top text-muted sm:table-row sm:p-0" data-archived-loan="{{ loan.id }}">
-          <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3">{{ loan.name }}</td>
+          <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3"><a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}" class="text-primary-ink underline-offset-2 hover:underline" data-open-archived-loan>{{ loan.name }}</a></td>
           <td class="text-right sm:px-4 sm:py-3 sm:text-left">{{ kind_label(loan.kind) }}</td>
           <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3">{% if loan.current_balance %}{{ format_money(loan.current_balance, locale) }}{% elif loan.principal_original %}{{ format_money(loan.principal_original, locale) }}{% else %}—{% endif %}</td>
-          <td class="col-span-2 pt-1 sm:px-4 sm:py-3"><div class="flex justify-end"><a class="btn-sm" href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}">{{ _("Open") }}<span class="sr-only"> {{ loan.name }}</span></a></div></td>
         </tr>
         {% endfor %}
       </tbody>

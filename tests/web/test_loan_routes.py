@@ -328,6 +328,21 @@ def test_reference_rates_page_crud(owner):
     )
 
 
+def test_loan_and_archived_titles_open_the_detail_without_an_actions_column(owner):
+    loan_id = _create_original(owner)
+    page = owner.client.get("/loans")
+    assert f'href="/loans/{loan_id}"' in page.text
+    assert "data-open-loan>Mortgage</a>" in page.text
+    assert ">Open<" not in page.text
+    assert "Actions" not in page.text
+
+    owner.post(f"/loans/{loan_id}/archive")
+    archived = owner.client.get("/loans")
+    assert "data-open-archived-loan>Mortgage</a>" in archived.text
+    assert ">Open<" not in archived.text
+    assert "Actions" not in archived.text
+
+
 def test_viewer_sees_loans_but_not_write_controls(owner):
     _create_original(owner)
     owner.set_admin_role("viewer")
