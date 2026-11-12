@@ -59,6 +59,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "loan_balance_checkpoints",
         "loan_cost_components",
         "loan_overpayments",
+        "loan_payments",
         "loan_rate_changes",
         "loan_scenarios",
         "loans",
@@ -1824,6 +1825,56 @@ def test_0053_loan_scenarios_migration_is_reversible(tmp_path: Path) -> None:
         assert any("one_off_amount_minor" in sql for sql in checks)
         command.downgrade(alembic_config(settings), "0052_f73_loan_day_count")
         assert "loan_scenarios" not in set(inspect(engine).get_table_names())
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0054_loan_payments_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'loan_payments.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        columns = {column["name"]: column for column in inspector.get_columns("loan_payments")}
+        assert set(columns) >= {
+            "workspace_id",
+            "loan_id",
+            "date",
+            "kind",
+            "total_minor",
+            "principal_minor",
+            "interest_minor",
+            "costs_minor",
+            "overpayment_minor",
+            "note",
+            "source",
+            "transaction_id",
+        }
+        checks = {
+            check.get("sqltext") or "" for check in inspector.get_check_constraints("loan_payments")
+        }
+        assert any("total_minor = principal_minor" in sql for sql in checks)
+        assert any("kind IN" in sql for sql in checks)
+        checkpoints = inspector.get_unique_constraints("loan_balance_checkpoints")
+        assert any(
+            constraint["column_names"] == ["workspace_id", "loan_id", "as_of"]
+            for constraint in checkpoints
+        )
+        command.downgrade(alembic_config(settings), "0053_f74_loan_scenarios")
+        tables = set(inspect(engine).get_table_names())
+        assert "loan_payments" not in tables
+        checkpoints = inspect(engine).get_unique_constraints("loan_balance_checkpoints")
+        assert not any(
+            constraint["column_names"] == ["workspace_id", "loan_id", "as_of"]
+            for constraint in checkpoints
+        )
         upgrade_database(settings)
         assert database_is_at_head(settings)
         check_database_migrations(settings)

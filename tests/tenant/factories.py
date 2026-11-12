@@ -35,6 +35,7 @@ from assetboard.db.models.loans import (
     LoanBalanceCheckpoint,
     LoanCostComponent,
     LoanOverpayment,
+    LoanPayment,
     LoanRateChange,
     LoanScenario,
     ReferenceRate,
@@ -614,6 +615,26 @@ def make_loan_balance_checkpoint(session: Session, workspace_id: UUID) -> LoanBa
     )
 
 
+def make_loan_payment(session: Session, workspace_id: UUID) -> LoanPayment:
+    loan = make_loan(session, workspace_id)
+    session.add(loan)
+    session.flush()
+    return LoanPayment(
+        workspace_id=workspace_id,
+        loan_id=loan.id,
+        date=date(2026, 1, 1),
+        kind="installment",
+        total_minor=10_000,
+        principal_minor=8_000,
+        interest_minor=2_000,
+        costs_minor=0,
+        overpayment_minor=0,
+        note="",
+        source="manual",
+        transaction_id=None,
+    )
+
+
 def make_loan_scenario(session: Session, workspace_id: UUID) -> LoanScenario:
     loan = make_loan(session, workspace_id)
     session.add(loan)
@@ -762,4 +783,5 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
         update_values={"remaining_principal_minor": 90_000},
     ),
     LoanScenario: TenantCase(make_loan_scenario, update_values={"name": "Updated scenario"}),
+    LoanPayment: TenantCase(make_loan_payment, update_values={"note": "Updated payment"}),
 }

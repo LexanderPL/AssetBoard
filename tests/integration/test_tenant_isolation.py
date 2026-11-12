@@ -1317,6 +1317,8 @@ def test_transaction_queries_stay_in_their_workspace(
     assert [m.description for m in in_a.description_details(
         direction="expense", keys=["lidl"])] == ["Lidl"]  # fmt: skip
     assert in_b.description_details(direction="expense", keys=["lidl"]) == []
+    assert [r.id for r in in_a.recent_expenses()] == [a_row.id]
+    assert in_b.recent_expenses() == []
     b_row = make(in_b, food_b.id, "Lidl")
     assert b_row.workspace_id == ctx_b.workspace.id
     assert [r.id for r in in_b.for_month(october)] == [b_row.id]
@@ -2364,6 +2366,7 @@ def test_loan_queries_stay_in_their_workspace(
         LoanBalanceCheckpointRepository,
         LoanCostComponentRepository,
         LoanOverpaymentRepository,
+        LoanPaymentRepository,
         LoanRateChangeRepository,
         LoanRepository,
         LoanScenarioRepository,
@@ -2389,6 +2392,8 @@ def test_loan_queries_stay_in_their_workspace(
     checkpoints_b = LoanBalanceCheckpointRepository(db_session, ctx_b)
     scenarios_a = LoanScenarioRepository(db_session, ctx_a)
     scenarios_b = LoanScenarioRepository(db_session, ctx_b)
+    payments_a = LoanPaymentRepository(db_session, ctx_a)
+    payments_b = LoanPaymentRepository(db_session, ctx_b)
 
     loan_values = {
         "kind": "annuity",
@@ -2453,6 +2458,32 @@ def test_loan_queries_stay_in_their_workspace(
         remaining_principal_minor=100_000,
         note="",
     )
+    payment_a = payments_a.create(
+        loan_id=loan_a.id,
+        date=date(2025, 4, 1),
+        kind="installment",
+        total_minor=10_000,
+        principal_minor=8_000,
+        interest_minor=2_000,
+        costs_minor=0,
+        overpayment_minor=0,
+        note="",
+        source="manual",
+        transaction_id=None,
+    )
+    payments_b.create(
+        loan_id=loan_b.id,
+        date=date(2025, 4, 1),
+        kind="installment",
+        total_minor=10_000,
+        principal_minor=8_000,
+        interest_minor=2_000,
+        costs_minor=0,
+        overpayment_minor=0,
+        note="",
+        source="manual",
+        transaction_id=None,
+    )
     scenario_a = scenarios_a.create(
         loan_id=loan_a.id,
         name="Overpay 500",
@@ -2511,6 +2542,15 @@ def test_loan_queries_stay_in_their_workspace(
     assert checkpoints_b.for_loan(loan_a.id) == []
     assert checkpoints_b.get_for_loan(loan_a.id, checkpoint_a.id) is None
     assert checkpoints_b.latest_on_or_before(loan_a.id, date(2025, 6, 1)) is None
+    assert checkpoints_a.exists_on(loan_a.id, date(2025, 1, 1))
+    assert not checkpoints_b.exists_on(loan_a.id, date(2025, 1, 1))
+    assert [row.id for row in payments_a.for_loan(loan_a.id)] == [payment_a.id]
+    assert payments_b.for_loan(loan_a.id) == []
+    assert payments_b.get_for_loan(loan_a.id, payment_a.id) is None
+    assert [row.id for row in payments_a.for_loan_on_date(loan_a.id, date(2025, 4, 1))] == [
+        payment_a.id
+    ]
+    assert payments_b.for_loan_on_date(loan_a.id, date(2025, 4, 1)) == []
     assert [row.id for row in scenarios_a.for_loan(loan_a.id)] == [scenario_a.id]
     assert scenarios_b.for_loan(loan_a.id) == []
     assert scenarios_b.get_for_loan(loan_a.id, scenario_a.id) is None

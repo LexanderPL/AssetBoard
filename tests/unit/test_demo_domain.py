@@ -110,9 +110,13 @@ def test_excluded_models_are_operational_tables_and_user_what_ifs_with_reasons()
         "PriceSourceConfig",
         "ProviderError",
         "LoanScenario",
+        "LoanPayment",
     }
     assert all(reason.strip() for reason in DEMO_EXCLUDED_MODELS.values())
     assert DEMO_EXCLUDED_MODELS["LoanScenario"] == "scenarios are user what-ifs, not sample data"
+    assert (
+        DEMO_EXCLUDED_MODELS["LoanPayment"] == "actual payments are user records, not sample data"
+    )
 
 
 def test_plan_amounts_use_the_base_currency_and_expected_shapes() -> None:

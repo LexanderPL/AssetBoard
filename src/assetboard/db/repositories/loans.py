@@ -10,6 +10,7 @@ from assetboard.db.models.loans import (
     LoanBalanceCheckpoint,
     LoanCostComponent,
     LoanOverpayment,
+    LoanPayment,
     LoanRateChange,
     LoanScenario,
     ReferenceRate,
@@ -223,6 +224,16 @@ class LoanBalanceCheckpointRepository(ScopedRepository[LoanBalanceCheckpoint]):
         )
         return self._session.scalars(statement).one_or_none()
 
+    def exists_on(self, loan_id: UUID, day: date, *, exclude_id: UUID | None = None) -> bool:
+        conditions = [
+            LoanBalanceCheckpoint.workspace_id == self._workspace_id,
+            LoanBalanceCheckpoint.loan_id == loan_id,
+            LoanBalanceCheckpoint.as_of == day,
+        ]
+        if exclude_id is not None:
+            conditions.append(LoanBalanceCheckpoint.id != exclude_id)
+        return bool(self._session.execute(select(exists().where(*conditions))).scalar_one())
+
 
 class LoanScenarioRepository(ScopedRepository[LoanScenario]):
     model = LoanScenario
@@ -247,3 +258,32 @@ class LoanScenarioRepository(ScopedRepository[LoanScenario]):
             LoanScenario.name_key == name_key,
         )
         return self._session.scalars(statement).one_or_none()
+
+
+class LoanPaymentRepository(ScopedRepository[LoanPayment]):
+    model = LoanPayment
+
+    def create(self, **values: object) -> LoanPayment:
+        return self.add(LoanPayment(**values))
+
+    def for_loan(self, loan_id: UUID) -> list[LoanPayment]:
+        statement = self._scoped_select().where(LoanPayment.loan_id == loan_id)
+        return list(
+            self._session.scalars(
+                statement.order_by(LoanPayment.date.desc(), LoanPayment.created_at.desc())
+            )
+        )
+
+    def get_for_loan(self, loan_id: UUID, payment_id: UUID) -> LoanPayment | None:
+        statement = self._scoped_select().where(
+            LoanPayment.loan_id == loan_id,
+            LoanPayment.id == payment_id,
+        )
+        return self._session.scalars(statement).one_or_none()
+
+    def for_loan_on_date(self, loan_id: UUID, day: date) -> list[LoanPayment]:
+        statement = self._scoped_select().where(
+            LoanPayment.loan_id == loan_id,
+            LoanPayment.date == day,
+        )
+        return list(self._session.scalars(statement.order_by(LoanPayment.created_at)))

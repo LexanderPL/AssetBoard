@@ -297,6 +297,12 @@ class LoanBalanceCheckpoint(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base)
 
     __tablename__ = "loan_balance_checkpoints"
     __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "loan_id",
+            "as_of",
+            name="uq_loan_balance_checkpoints_workspace_loan_as_of",
+        ),
         ForeignKeyConstraint(
             ["workspace_id", "loan_id"],
             ["loans.workspace_id", "loans.id"],
@@ -386,3 +392,58 @@ class LoanScenario(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     rate_shift_from: Mapped[date | None] = mapped_column(Date(), nullable=True)
     one_off_date: Mapped[date | None] = mapped_column(Date(), nullable=True)
     one_off_amount_minor: Mapped[int | None] = mapped_column(BigInteger(), nullable=True)
+
+
+class LoanPayment(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
+    """An actual installment or overpayment, optionally linked to a ledger transaction."""
+
+    __tablename__ = "loan_payments"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "id", name="uq_loan_payments_workspace_id_id"),
+        ForeignKeyConstraint(
+            ["workspace_id", "loan_id"],
+            ["loans.workspace_id", "loans.id"],
+            name="fk_loan_payments_workspace_loan",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "transaction_id"],
+            ["transactions.workspace_id", "transactions.id"],
+            name="fk_loan_payments_workspace_transaction",
+        ),
+        CheckConstraint("kind IN ('installment', 'overpayment')", name="kind_valid"),
+        CheckConstraint("source IN ('manual', 'upcoming')", name="source_valid"),
+        CheckConstraint(
+            f"total_minor > 0 AND total_minor <= {MAX_AMOUNT_MINOR}",
+            name="total_valid",
+        ),
+        CheckConstraint(
+            "principal_minor >= 0 AND principal_minor <= "
+            f"{MAX_AMOUNT_MINOR} AND interest_minor >= 0 AND interest_minor <= "
+            f"{MAX_AMOUNT_MINOR} AND costs_minor >= 0 AND costs_minor <= "
+            f"{MAX_AMOUNT_MINOR} AND overpayment_minor >= 0 AND overpayment_minor <= "
+            f"{MAX_AMOUNT_MINOR}",
+            name="components_valid",
+        ),
+        CheckConstraint(
+            "total_minor = principal_minor + interest_minor + costs_minor + overpayment_minor",
+            name="total_matches_components",
+        ),
+        CheckConstraint(f"length(note) <= {MAX_NOTE_LENGTH}", name="note_length"),
+        _date_range("date"),
+        Index("ix_loan_payments_workspace_loan_date", "workspace_id", "loan_id", "date"),
+        Index("ix_loan_payments_workspace_transaction", "workspace_id", "transaction_id"),
+    )
+
+    loan_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
+    date: Mapped[date] = mapped_column(Date(), nullable=False)
+    kind: Mapped[str] = mapped_column(String(16), nullable=False)
+    total_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+    principal_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+    interest_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+    costs_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+    overpayment_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+    note: Mapped[str] = mapped_column(String(MAX_NOTE_LENGTH), nullable=False, default="")
+    source: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="manual", server_default="manual"
+    )
+    transaction_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)

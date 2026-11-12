@@ -244,6 +244,19 @@ class TransactionRepository(ScopedRepository[Transaction]):
         statement = self._scoped_select().where(Transaction.id == row_id).with_for_update()
         return self._session.scalars(statement).one_or_none()
 
+    def recent_expenses(self, limit: int = 50) -> list[Transaction]:
+        """Non-deleted expense rows, newest first, for the loan-payment link select."""
+        statement = (
+            self._scoped_select()
+            .where(
+                Transaction.deleted_at.is_(None),
+                Transaction.direction == "expense",
+            )
+            .order_by(Transaction.date.desc(), Transaction.created_at.desc(), Transaction.id.desc())
+            .limit(limit)
+        )
+        return list(self._session.scalars(statement))
+
     def for_month(self, month: YearMonth, direction: str | None = None) -> list[Transaction]:
         """Non-deleted rows dated in ``month``, by date and then entry order."""
         statement = self._scoped_select().where(
