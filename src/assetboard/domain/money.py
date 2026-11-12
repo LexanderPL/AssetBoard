@@ -66,6 +66,14 @@ class Money:
         object.__setattr__(self, "currency", currency)
 
     @classmethod
+    def from_minor_unchecked(cls, amount_minor: int, currency: str) -> Money:
+        """Internal fast path for callers that already validated the integer and currency."""
+        value = object.__new__(cls)
+        object.__setattr__(value, "amount_minor", amount_minor)
+        object.__setattr__(value, "currency", currency)
+        return value
+
+    @classmethod
     def from_decimal(
         cls,
         amount: Decimal,

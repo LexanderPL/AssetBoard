@@ -170,8 +170,7 @@ def _annuity_payment_decimal(amount: Decimal, annual_rate_bp: int, term_months: 
 def _round_minor(value: Decimal, currency: str, minor_unit: int | None = None) -> int:
     if minor_unit is None:
         minor_unit = minor_unit_for(currency)
-    rounded = value.quantize(Decimal(1).scaleb(-minor_unit), rounding=ROUND_HALF_UP)
-    return int(rounded.scaleb(minor_unit))
+    return int(value.scaleb(minor_unit).to_integral_value(rounding=ROUND_HALF_UP))
 
 
 def first_installment(
@@ -236,10 +235,8 @@ def _annuity_principal_minor(
     component ``numpy_financial.ppmt`` reports. Using the rounded payment first would drift by a
     minor unit on many rows.
     """
-    with localcontext() as context:
-        context.prec = max(context.prec, 40)
-        interest = amount * monthly_rate
-        return _round_minor(payment - interest, currency, minor_unit)
+    interest = amount * monthly_rate
+    return _round_minor(payment - interest, currency, minor_unit)
 
 
 class DayCount(StrEnum):
@@ -348,8 +345,13 @@ def _half_up(value: int, multiplier: int, divisor: int) -> int:
     return (value * multiplier * 2 + divisor) // (2 * divisor)
 
 
+_DAYS_IN_MONTH = (31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31)
+
+
 def _month_last_day(year: int, month: int) -> int:
-    return calendar.monthrange(year, month)[1]
+    if month == 2 and year % 4 == 0 and (year % 100 != 0 or year % 400 == 0):
+        return 29
+    return _DAYS_IN_MONTH[month - 1]
 
 
 def _clamped_date(year: int, month: int, day: int) -> date:
@@ -390,9 +392,9 @@ def _money(value: int, currency: str) -> Money:
     if value == 0:
         zero = _ZERO_MONEY.get(currency)
         if zero is None:
-            zero = _ZERO_MONEY[currency] = Money(0, currency)
+            zero = _ZERO_MONEY[currency] = Money.from_minor_unchecked(0, currency)
         return zero
-    return Money(value, currency)
+    return Money.from_minor_unchecked(value, currency)
 
 
 def _require_currency(money: Money | None, currency: str, field: str) -> None:
@@ -505,12 +507,12 @@ def _validate_one_off_overpayments(
 
 def _regular_overpayment(
     terms: LoanTerms,
+    mode: OverpaymentMode,
     *,
     principal_minor: int,
     interest_minor: int,
     costs_minor: int,
 ) -> int:
-    mode = OverpaymentMode(terms.overpayment_mode)
     if mode is OverpaymentMode.NONE:
         return 0
     assert terms.overpayment_amount is not None
@@ -567,6 +569,7 @@ def build_schedule(
         wanted_strategy = OverpaymentStrategy(strategy)
     except ValueError:
         raise LoanValidationError("strategy", "invalid_strategy") from None
+    overpayment_mode = OverpaymentMode(terms.overpayment_mode)
     try:
         wanted_day_count = DayCount(day_count)
     except ValueError:
@@ -676,6 +679,7 @@ def build_schedule(
                 principal = min(principal, balance)
             regular = _regular_overpayment(
                 terms,
+                overpayment_mode,
                 principal_minor=principal,
                 interest_minor=interest,
                 costs_minor=costs_minor,
