@@ -6727,10 +6727,6 @@ msgstr ""
 msgid "%% repaid"
 msgstr ""
 
-#, python-format
-msgid "% repaid"
-msgstr ""
-
 msgid "Payoff date"
 msgstr ""
 
@@ -10015,5 +10011,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "The nominal day for later months. A shorter month uses its last day."
+#~ msgstr ""
+
+#~ msgid "% repaid"
 #~ msgstr ""
 

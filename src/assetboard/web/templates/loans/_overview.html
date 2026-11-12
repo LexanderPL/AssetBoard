@@ -26,7 +26,7 @@
     <div data-overview-progress>
       <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("%% repaid") }}</dt>
       <dd class="mt-1 text-lg font-semibold tabular-nums">{{ format_rate_short(summary.percent_repaid_bp, locale) }}</dd>
-      <progress class="mt-2 h-2 w-full" max="10000" value="{{ summary.percent_repaid_bp }}" aria-label="{{ _('% repaid') }}">{{ format_rate_short(summary.percent_repaid_bp, locale) }}</progress>
+      <progress class="mt-2 h-2 w-full" max="10000" value="{{ summary.percent_repaid_bp }}" aria-label="{{ _('%% repaid') }}">{{ format_rate_short(summary.percent_repaid_bp, locale) }}</progress>
     </div>
     <div data-overview-payoff>
       <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Payoff date") }}</dt>
