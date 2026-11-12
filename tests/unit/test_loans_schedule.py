@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
-from time import perf_counter
+from time import process_time
 
 import pytest
 from hypothesis import HealthCheck, given, settings
@@ -587,9 +587,11 @@ def test_a_360_month_schedule_builds_in_under_ten_ms() -> None:
     _build(terms, rates=[RatePeriod(date(2026, 1, 1), 550)], anchor=anchor)
     timings = []
     for _ in range(3):
-        started = perf_counter()
+        # CPU time keeps the assertion stable under xdist/CI contention; it measures the same
+        # computation without waiting for another worker's scheduling slot.
+        started = process_time()
         _build(terms, rates=[RatePeriod(date(2026, 1, 1), 550)], anchor=anchor)
-        timings.append(perf_counter() - started)
+        timings.append(process_time() - started)
     assert min(timings) < 0.010
 
 

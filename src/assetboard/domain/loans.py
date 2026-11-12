@@ -203,9 +203,29 @@ def first_installment(
     return Money(minor, principal.currency)
 
 
+def _annuity_denominators(annual_rate_bp: int, max_months: int) -> list[Decimal]:
+    """``1 - (1 + r)^-n`` for every n from 1 to ``max_months``.
+
+    The annuity payment uses the same expression every row; growing the power down from
+    ``max_months`` avoids a Decimal exponentiation per row on long schedules.
+    """
+    monthly_rate = _monthly_rate(annual_rate_bp)
+    if monthly_rate == 0:
+        return []
+    values = [Decimal(0)] * (max_months + 1)
+    with localcontext() as context:
+        context.prec = max(context.prec, 40)
+        growth = (Decimal(1) + monthly_rate) ** (-max_months)
+        values[max_months] = Decimal(1) - growth
+        for months in range(max_months - 1, 0, -1):
+            growth *= Decimal(1) + monthly_rate
+            values[months] = Decimal(1) - growth
+    return values
+
+
 def _annuity_principal_minor(
     amount: Decimal,
-    annual_rate_bp: int,
+    monthly_rate: Decimal,
     payment: Decimal,
     currency: str,
     minor_unit: int,
@@ -218,7 +238,7 @@ def _annuity_principal_minor(
     """
     with localcontext() as context:
         context.prec = max(context.prec, 40)
-        interest = amount * _monthly_rate(annual_rate_bp)
+        interest = amount * monthly_rate
         return _round_minor(payment - interest, currency, minor_unit)
 
 
@@ -581,6 +601,8 @@ def build_schedule(
     opening_decimal = Decimal(balance).scaleb(-minor_unit)
     base_equal_principal = _half_up(balance, 1, terms.term_months)
     annuity_payment: Decimal | None = None
+    annuity_denominators: dict[int, list[Decimal]] = {}
+    monthly_rates: dict[int, Decimal] = {}
     hold_payment = False
     previous_rate: int | None = None
     recompute_next = True
@@ -623,17 +645,31 @@ def build_schedule(
                     rate_changed = previous_rate is not None and previous_rate != rate
                     if recompute_next or rate_changed or not hold_payment:
                         remaining = max(1, terms.term_months - (index - 1))
+                        monthly_rate = monthly_rates.get(rate)
+                        if monthly_rate is None:
+                            monthly_rate = monthly_rates[rate] = _monthly_rate(rate)
                         with localcontext() as context:
                             context.prec = max(context.prec, 40)
-                            annuity_payment = _annuity_payment_decimal(
-                                opening_decimal, rate, remaining
-                            )
+                            denominators = annuity_denominators.get(rate)
+                            if denominators is None:
+                                denominators = _annuity_denominators(rate, terms.term_months)
+                                annuity_denominators[rate] = denominators
+                            if denominators:
+                                annuity_payment = (
+                                    opening_decimal * monthly_rate / denominators[remaining]
+                                )
+                            else:
+                                annuity_payment = opening_decimal / Decimal(remaining)
                         recompute_next = False
                         if rate_changed:
                             hold_payment = False
                     assert annuity_payment is not None
                     principal = _annuity_principal_minor(
-                        opening_decimal, rate, annuity_payment, currency, minor_unit
+                        opening_decimal,
+                        monthly_rates[rate],
+                        annuity_payment,
+                        currency,
+                        minor_unit,
                     )
                 if principal < 0:
                     raise ScheduleError("negative_amortization")
