@@ -3330,6 +3330,58 @@ msgstr "Po zmianie każda stopa musi mieścić się między 0% a 100%."
 msgid "Compare at most three what-if rows at a time."
 msgstr "Porównuj najwyżej trzy warianty jednocześnie."
 
+msgid "Choose installment or overpayment."
+msgstr "Wybierz ratę lub nadpłatę."
+
+msgid "Enter a positive payment total."
+msgstr "Podaj dodatnią kwotę płatności."
+
+msgid "No scheduled payment row exists on or after that date."
+msgstr "Brak zaplanowanego wiersza płatności w tej dacie lub po niej."
+
+msgid "Enter all four breakdown amounts."
+msgstr "Podaj wszystkie cztery składniki rozbicia."
+
+msgid "The breakdown must add up to the payment total."
+msgstr "Składniki rozbicia muszą sumować się do kwoty płatności."
+
+msgid "Breakdown amounts cannot be negative."
+msgstr "Składniki rozbicia nie mogą być ujemne."
+
+msgid "The linked transaction no longer exists."
+msgstr "Powiązana transakcja już nie istnieje."
+
+msgid "The linked transaction was deleted."
+msgstr "Powiązana transakcja została usunięta."
+
+msgid "Only an expense transaction can be linked."
+msgstr "Można powiązać tylko transakcję wydatku."
+
+msgid "The linked transaction uses another currency."
+msgstr "Powiązana transakcja używa innej waluty."
+
+msgid "The linked transaction amount must equal the payment total."
+msgstr "Kwota powiązanej transakcji musi być równa kwocie płatności."
+
+msgid "A checkpoint date cannot be in the future."
+msgstr "Data punktu kontrolnego nie może być w przyszłości."
+
+msgid "A checkpoint cannot start before the loan."
+msgstr "Punkt kontrolny nie może przypadać przed rozpoczęciem kredytu."
+
+msgid "A checkpoint already exists on that date."
+msgstr "Punkt kontrolny dla tej daty już istnieje."
+
+msgid ""
+"The starting balance checkpoint is required for a loan entered from its "
+"current balance."
+msgstr ""
+"Punkt kontrolny salda początkowego jest wymagany dla kredytu "
+"wprowadzonego z bieżącego salda."
+
+msgid "The loan schedule is unavailable."
+msgstr "Harmonogram kredytu jest niedostępny."
+
 msgid "The loan could not be saved. Check the form and try again."
 msgstr "Nie udało się zapisać kredytu. Sprawdź formularz i spróbuj ponownie."
 
@@ -3387,6 +3439,18 @@ msgstr ""
 
 msgid "Scenario deleted."
 msgstr "Scenariusz został usunięty."
+
+msgid "Payment saved."
+msgstr "Zapisano płatność."
+
+msgid "Payment deleted."
+msgstr "Usunięto płatność."
+
+msgid "Balance checkpoint saved."
+msgstr "Zapisano punkt kontrolny salda."
+
+msgid "Balance checkpoint deleted."
+msgstr "Usunięto punkt kontrolny salda."
 
 msgid "The loan"
 msgstr "Kredyt"
@@ -7345,11 +7409,13 @@ msgid "Schedule"
 msgstr "Harmonogram"
 
 msgid ""
-"Monthly rows from the current starting balance. Past rows are projected "
-"until actual payments are recorded."
+"Monthly rows from the current starting balance. A recorded actual payment"
+" replaces the components of its due date; every other row remains "
+"projected from the terms."
 msgstr ""
-"Miesięczne wiersze od bieżącego salda początkowego. Wiersze z przeszłości"
-" są prognozowane, dopóki nie zostaną zapisane rzeczywiste płatności."
+"Miesięczne wiersze od bieżącego salda początkowego. Zarejestrowana "
+"rzeczywista płatność zastępuje składniki swojego terminu; pozostałe "
+"wiersze nadal pochodzą z prognozy warunków."
 
 msgid "Scroll sideways to see every column."
 msgstr "Przewiń w bok, aby zobaczyć wszystkie kolumny."
@@ -7371,6 +7437,9 @@ msgstr "Saldo początkowe"
 
 msgid "Closing"
 msgstr "Saldo końcowe"
+
+msgid "Actual"
+msgstr "Wykonanie"
 
 msgid "Today"
 msgstr "Dzisiaj"
@@ -7842,6 +7911,125 @@ msgstr ""
 
 msgid "Save loan"
 msgstr "Zapisz kredyt"
+
+msgid "Actual payments"
+msgstr "Rzeczywiste płatności"
+
+msgid ""
+"Record what you actually paid. A single total is split against the "
+"projected installment row; an explicit breakdown overrides the split."
+msgstr ""
+"Zarejestruj kwoty, które faktycznie zapłacono. Pojedyncza suma jest "
+"dzielona na zaplanowany wiersz raty; jawne rozbicie zastępuje to "
+"dzielenie."
+
+msgid "Record payment"
+msgstr "Zarejestruj płatność"
+
+msgid "Linked transaction"
+msgstr "Powiązana transakcja"
+
+msgid "Installment"
+msgstr "Rata"
+
+msgid "deleted"
+msgstr "usunięta"
+
+#, python-format
+msgid "payment on %(date)s"
+msgstr "płatność z %(date)s"
+
+#, python-format
+msgid "Delete the payment on %(date)s?"
+msgstr "Usunąć płatność z %(date)s?"
+
+msgid "No actual payments recorded yet."
+msgstr "Nie zarejestrowano jeszcze żadnych płatności."
+
+msgid "Balance checkpoints"
+msgstr "Punkty kontrolne salda"
+
+msgid ""
+"A checkpoint re-anchors the schedule from the balance on that date. The "
+"variance compares it with the projection from the previous anchor."
+msgstr ""
+"Punkt kontrolny zmienia punkt zakotwiczenia harmonogramu na saldo z tej "
+"daty. Odchylenie porównuje je z prognozą od poprzedniego punktu "
+"zakotwiczenia."
+
+msgid "Add checkpoint"
+msgstr "Dodaj punkt kontrolny"
+
+msgid "Balance"
+msgstr "Saldo"
+
+msgid "Projected balance"
+msgstr "Saldo prognozowane"
+
+msgid "Variance"
+msgstr "Odchylenie"
+
+msgid "Projected balance unavailable"
+msgstr "Saldo prognozowane niedostępne"
+
+#, python-format
+msgid "checkpoint on %(date)s"
+msgstr "punkt kontrolny z %(date)s"
+
+#, python-format
+msgid "Delete the checkpoint on %(date)s?"
+msgstr "Usunąć punkt kontrolny z %(date)s?"
+
+msgid "No balance checkpoints yet."
+msgstr "Nie ma jeszcze punktów kontrolnych salda."
+
+msgid "Edit payment"
+msgstr "Edytuj płatność"
+
+#, python-format
+msgid "Total (%(currency)s)"
+msgstr "Razem (%(currency)s)"
+
+msgid ""
+"With one total, an installment is split against the projected row on or "
+"after the date: interest, costs, principal, then overpayment. An "
+"overpayment goes entirely to the overpayment component."
+msgstr ""
+"Przy jednej sumie rata jest dzielona na zaplanowany wiersz w tej dacie "
+"lub po niej: odsetki, koszty, kapitał, a następnie nadpłata. Nadpłata w "
+"całości trafia do składnika nadpłaty."
+
+msgid "Enter an explicit breakdown instead"
+msgstr "Wprowadź jawne rozbicie zamiast tego"
+
+msgid "Use these amounts"
+msgstr "Użyj tych kwot"
+
+msgid "The four amounts must add up to the total."
+msgstr "Cztery kwoty muszą sumować się do sumy."
+
+msgid "Linked transaction (optional)"
+msgstr "Powiązana transakcja (opcjonalnie)"
+
+msgid "No linked transaction"
+msgstr "Bez powiązanej transakcji"
+
+#, python-format
+msgid "Only recent expenses in %(currency)s with the same amount can be linked."
+msgstr "Można powiązać tylko ostatnie wydatki w %(currency)s o tej samej kwocie."
+
+msgid "Save payment"
+msgstr "Zapisz płatność"
+
+msgid "Edit checkpoint"
+msgstr "Edytuj punkt kontrolny"
+
+#, python-format
+msgid "Remaining balance (%(currency)s)"
+msgstr "Pozostałe saldo (%(currency)s)"
+
+msgid "Save checkpoint"
+msgstr "Zapisz punkt kontrolny"
 
 msgid "New reference rate"
 msgstr "Nowa stopa referencyjna"
@@ -8372,9 +8560,6 @@ msgstr[1] ""
 msgstr[2] ""
 "Nie skopiowano %(num)d wartości planowanych kategorii zarchiwizowanych "
 "lub przelewów własnych."
-
-msgid "Actual"
-msgstr "Wykonanie"
 
 msgid "Summary"
 msgstr "Podsumowanie"
@@ -10775,4 +10960,14 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "% repaid"
 #~ msgstr "%% spłacone"
+
+#~ msgid ""
+#~ "Monthly rows from the current starting"
+#~ " balance. Past rows are projected "
+#~ "until actual payments are recorded."
+#~ msgstr ""
+#~ "Miesięczne wiersze od bieżącego salda "
+#~ "początkowego. Wiersze z przeszłości są "
+#~ "prognozowane, dopóki nie zostaną zapisane "
+#~ "rzeczywiste płatności."
 

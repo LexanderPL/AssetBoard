@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import contextlib
+from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from typing import cast
@@ -37,6 +38,7 @@ from assetboard.i18n.numbers import (
     format_rate_short,
     parse_amount,
 )
+from assetboard.services import loan_payments as loan_payment_service
 from assetboard.services import loan_scenarios as loan_scenario_service
 from assetboard.services import loan_schedule as loan_schedule_service
 from assetboard.services import loans
@@ -111,6 +113,24 @@ ERRORS = {
     "one_off_pair_required": _("Enter both the one-off amount and its date, or neither."),
     "invalid_rate_shift": _("The rate shift must leave every rate between 0% and 100%."),
     "too_many_scenarios": _("Compare at most three what-if rows at a time."),
+    "invalid_payment_kind": _("Choose installment or overpayment."),
+    "invalid_payment_total": _("Enter a positive payment total."),
+    "no_scheduled_payment": _("No scheduled payment row exists on or after that date."),
+    "payment_breakdown_missing": _("Enter all four breakdown amounts."),
+    "payment_breakdown_mismatch": _("The breakdown must add up to the payment total."),
+    "invalid_payment_breakdown": _("Breakdown amounts cannot be negative."),
+    "transaction_not_found": _("The linked transaction no longer exists."),
+    "transaction_deleted": _("The linked transaction was deleted."),
+    "transaction_not_expense": _("Only an expense transaction can be linked."),
+    "transaction_currency": _("The linked transaction uses another currency."),
+    "transaction_amount": _("The linked transaction amount must equal the payment total."),
+    "checkpoint_future": _("A checkpoint date cannot be in the future."),
+    "checkpoint_before_start": _("A checkpoint cannot start before the loan."),
+    "checkpoint_exists": _("A checkpoint already exists on that date."),
+    "starting_checkpoint_required": _(
+        "The starting balance checkpoint is required for a loan entered from its current balance."
+    ),
+    "schedule_unavailable": _("The loan schedule is unavailable."),
     "failed": _("The loan could not be saved. Check the form and try again."),
 }
 
@@ -132,6 +152,10 @@ NOTICES = {
     "reference_value_deleted": _("Reference rate value deleted."),
     "scenario_saved": _("Saved scenarios updated. Their comparison is below."),
     "scenario_deleted": _("Scenario deleted."),
+    "payment_saved": _("Payment saved."),
+    "payment_deleted": _("Payment deleted."),
+    "checkpoint_saved": _("Balance checkpoint saved."),
+    "checkpoint_deleted": _("Balance checkpoint deleted."),
 }
 
 ENTRY_PATHS = ("original", "current")
@@ -755,6 +779,187 @@ def _scenario_page(
     }
 
 
+def _money_or_zero(values: dict[str, str], key: str, locale: str, currency: str) -> Money:
+    text = values.get(key, "").strip()
+    if not text:
+        return Money(0, currency)
+    try:
+        amount = parse_amount(text, locale)
+        if amount == 0:
+            return Money(0, currency)
+        return Money(amount_minor(amount, currency), currency)
+    except (ValueError, EntryError):
+        raise loans.LoanError(key, "invalid_amount") from None
+
+
+def _payment_form_values(
+    loan: loans.LoanView,
+    payment: loan_payment_service.LoanPaymentView | None,
+    locale: str,
+    today: date,
+    submitted: dict[str, str] | None = None,
+) -> dict[str, str]:
+    if payment is None:
+        values = {
+            "date": today.isoformat(),
+            "kind": "installment",
+            "total": "",
+            "principal": "",
+            "interest": "",
+            "costs": "",
+            "overpayment": "",
+            "note": "",
+            "transaction_id": "",
+            "use_breakdown": "0",
+        }
+    else:
+        values = {
+            "date": payment.date.isoformat(),
+            "kind": payment.kind.value,
+            "total": format_amount_input(payment.total, locale),
+            "principal": format_amount_input(payment.principal, locale),
+            "interest": format_amount_input(payment.interest, locale),
+            "costs": format_amount_input(payment.costs, locale),
+            "overpayment": format_amount_input(payment.overpayment, locale),
+            "note": payment.note,
+            "transaction_id": str(payment.transaction_id) if payment.transaction_id else "",
+            "use_breakdown": "1",
+        }
+    if submitted:
+        values.update(submitted)
+    return values
+
+
+def _checkpoint_form_values(
+    checkpoint: loan_payment_service.CheckpointDetailView | None,
+    locale: str,
+    today: date,
+    submitted: dict[str, str] | None = None,
+) -> dict[str, str]:
+    if checkpoint is None:
+        values = {"as_of": today.isoformat(), "remaining_principal": "", "note": ""}
+    else:
+        values = {
+            "as_of": checkpoint.as_of.isoformat(),
+            "remaining_principal": format_amount_input(checkpoint.remaining_principal, locale),
+            "note": checkpoint.note,
+        }
+    if submitted:
+        values.update(submitted)
+    return values
+
+
+def _payments_context(
+    request: Request,
+    ctx: Context,
+    loan_id: UUID,
+    *,
+    error: str | None = None,
+    notice: str | None = None,
+    form_values: dict[str, str] | None = None,
+    open_form: str | None = None,
+    edit_id: str | None = None,
+) -> dict[str, object]:
+    page = loan_payment_service.payments_page(request.app.state.session_factory, ctx, loan_id)
+    payment_edit = next(
+        (row for row in page.payments if str(row.id) == edit_id),
+        None,
+    )
+    checkpoint_edit = next(
+        (row for row in page.checkpoints if str(row.id) == edit_id),
+        None,
+    )
+    today = ctx.clock.today(ctx.workspace.timezone)
+    return {
+        "loan": page.loan,
+        "payments": page.payments,
+        "checkpoints": page.checkpoints,
+        "transactions": page.transactions,
+        "payment_edit": payment_edit,
+        "checkpoint_edit": checkpoint_edit,
+        "payment_form": _payment_form_values(
+            page.loan, payment_edit, request.state.locale, today, form_values
+        ),
+        "checkpoint_form": _checkpoint_form_values(
+            checkpoint_edit, request.state.locale, today, form_values
+        ),
+        "can_edit": has_role(ctx, Role.EDITOR),
+        "error": error,
+        "notice": notice,
+        "open_form": open_form,
+        "today": today,
+        "format_money": format_money,
+        "format_day": format_day,
+        "format_amount_input": format_amount_input,
+        "row_error": lambda code: _error(request, code),
+    }
+
+
+def _redirect_payments(
+    request: Request,
+    loan_id: UUID,
+    *,
+    notice: str | None = None,
+    error: str | None = None,
+    anchor: str = "payments",
+) -> RedirectResponse:
+    query: dict[str, str] = {}
+    if notice:
+        query["notice"] = notice
+    if error:
+        query["error"] = error
+    url = request.url_for("loan_payments", loan_id=str(loan_id)).path
+    if query:
+        url += "?" + urlencode(query)
+    return RedirectResponse(url + f"#{anchor}", status_code=303)
+
+
+@dataclass(frozen=True, slots=True)
+class _PaymentForm:
+    date_value: date
+    kind: str
+    total: Money
+    principal: Money | None
+    interest: Money | None
+    costs: Money | None
+    overpayment: Money | None
+    note: str
+    transaction_id: UUID | None
+
+
+def _payment_values_from_form(values: dict[str, str], locale: str, currency: str) -> _PaymentForm:
+    total = _money(values, "total", locale, currency)
+    if total is None:
+        raise loans.LoanError("total", "invalid_payment_total")
+    breakdown = values.get("use_breakdown") == "1"
+    return _PaymentForm(
+        date_value=_date(values.get("date", ""), "date"),
+        kind=values.get("kind", "installment"),
+        total=total,
+        principal=_money_or_zero(values, "principal", locale, currency) if breakdown else None,
+        interest=_money_or_zero(values, "interest", locale, currency) if breakdown else None,
+        costs=_money_or_zero(values, "costs", locale, currency) if breakdown else None,
+        overpayment=(
+            _money_or_zero(values, "overpayment", locale, currency) if breakdown else None
+        ),
+        note=values.get("note", ""),
+        transaction_id=_optional_id(values.get("transaction_id", "")),
+    )
+
+
+def _checkpoint_values_from_form(
+    values: dict[str, str], locale: str, currency: str
+) -> dict[str, object]:
+    balance = _money(values, "remaining_principal", locale, currency)
+    if balance is None:
+        raise loans.LoanError("remaining_principal", "invalid_balance")
+    return {
+        "as_of": _date(values.get("as_of", ""), "as_of"),
+        "remaining_principal": balance,
+        "note": values.get("note", ""),
+    }
+
+
 @router.get("/loans/reference-rates", name="reference_rates")
 async def reference_rates_page(request: Request, ctx: CurrentContext) -> Response:
     page = await run_in_threadpool(
@@ -1138,6 +1343,204 @@ async def loan_scenario_delete(
     )
     url = request.url_for("loan_scenarios", loan_id=str(loan_id)).path
     return RedirectResponse(url + "?notice=scenario_deleted#scenarios", status_code=303)
+
+
+@router.get("/loans/{loan_id}/payments", name="loan_payments")
+async def loan_payments_page(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    context = await run_in_threadpool(
+        _payments_context,
+        request,
+        ctx,
+        loan_id,
+        error=_error(request, request.query_params.get("error")),
+        notice=_notice(request, request.query_params.get("notice")),
+        open_form=request.query_params.get("form"),
+        edit_id=request.query_params.get("edit"),
+    )
+    return render_template(request, "loans/payments.html", context=context)
+
+
+@router.post("/loans/{loan_id}/payments", name="loan_payment_create")
+async def loan_payment_create(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    values = await _form_values(request)
+    view = await run_in_threadpool(loans.get_loan, request.app.state.session_factory, ctx, loan_id)
+    try:
+        form = _payment_values_from_form(values, request.state.locale, view.currency)
+        await run_in_threadpool(
+            loan_payment_service.create_loan_payment,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+            date_value=form.date_value,
+            kind=form.kind,
+            total=form.total,
+            principal=form.principal,
+            interest=form.interest,
+            costs=form.costs,
+            overpayment=form.overpayment,
+            note=form.note,
+            transaction_id=form.transaction_id,
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        context = await run_in_threadpool(
+            _payments_context,
+            request,
+            ctx,
+            loan_id,
+            error=_error(request, getattr(exc, "code", "failed")),
+            form_values=values,
+            open_form="payment",
+        )
+        return render_template(request, "loans/payments.html", status_code=400, context=context)
+    return _redirect_payments(request, loan_id, notice="payment_saved")
+
+
+@router.post("/loans/{loan_id}/payments/{payment_id}", name="loan_payment_update")
+async def loan_payment_update(
+    request: Request, ctx: CurrentContext, loan_id: UUID, payment_id: UUID
+) -> Response:
+    values = await _form_values(request)
+    view = await run_in_threadpool(loans.get_loan, request.app.state.session_factory, ctx, loan_id)
+    try:
+        form = _payment_values_from_form(values, request.state.locale, view.currency)
+        await run_in_threadpool(
+            loan_payment_service.update_loan_payment,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+            payment_id,
+            date_value=form.date_value,
+            kind=form.kind,
+            total=form.total,
+            principal=form.principal,
+            interest=form.interest,
+            costs=form.costs,
+            overpayment=form.overpayment,
+            note=form.note,
+            transaction_id=form.transaction_id,
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        context = await run_in_threadpool(
+            _payments_context,
+            request,
+            ctx,
+            loan_id,
+            error=_error(request, getattr(exc, "code", "failed")),
+            form_values=values,
+            open_form="payment",
+            edit_id=str(payment_id),
+        )
+        return render_template(request, "loans/payments.html", status_code=400, context=context)
+    return _redirect_payments(request, loan_id, notice="payment_saved")
+
+
+@router.post("/loans/{loan_id}/payments/{payment_id}/delete", name="loan_payment_delete")
+async def loan_payment_delete(
+    request: Request, ctx: CurrentContext, loan_id: UUID, payment_id: UUID
+) -> Response:
+    try:
+        await run_in_threadpool(
+            loan_payment_service.delete_loan_payment,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+            payment_id,
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        context = await run_in_threadpool(
+            _payments_context,
+            request,
+            ctx,
+            loan_id,
+            error=_error(request, getattr(exc, "code", "failed")),
+        )
+        return render_template(request, "loans/payments.html", status_code=400, context=context)
+    return _redirect_payments(request, loan_id, notice="payment_deleted")
+
+
+@router.post("/loans/{loan_id}/checkpoints", name="loan_checkpoint_create")
+async def loan_checkpoint_create(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    values = await _form_values(request)
+    view = await run_in_threadpool(loans.get_loan, request.app.state.session_factory, ctx, loan_id)
+    try:
+        form = _checkpoint_values_from_form(values, request.state.locale, view.currency)
+        await run_in_threadpool(
+            loan_payment_service.create_loan_checkpoint,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+            **form,  # type: ignore[arg-type]
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        context = await run_in_threadpool(
+            _payments_context,
+            request,
+            ctx,
+            loan_id,
+            error=_error(request, getattr(exc, "code", "failed")),
+            form_values=values,
+            open_form="checkpoint",
+        )
+        return render_template(request, "loans/payments.html", status_code=400, context=context)
+    return _redirect_payments(request, loan_id, notice="checkpoint_saved", anchor="checkpoints")
+
+
+@router.post("/loans/{loan_id}/checkpoints/{checkpoint_id}", name="loan_checkpoint_update")
+async def loan_checkpoint_update(
+    request: Request, ctx: CurrentContext, loan_id: UUID, checkpoint_id: UUID
+) -> Response:
+    values = await _form_values(request)
+    view = await run_in_threadpool(loans.get_loan, request.app.state.session_factory, ctx, loan_id)
+    try:
+        form = _checkpoint_values_from_form(values, request.state.locale, view.currency)
+        await run_in_threadpool(
+            loan_payment_service.update_loan_checkpoint,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+            checkpoint_id,
+            **form,  # type: ignore[arg-type]
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        context = await run_in_threadpool(
+            _payments_context,
+            request,
+            ctx,
+            loan_id,
+            error=_error(request, getattr(exc, "code", "failed")),
+            form_values=values,
+            open_form="checkpoint",
+            edit_id=str(checkpoint_id),
+        )
+        return render_template(request, "loans/payments.html", status_code=400, context=context)
+    return _redirect_payments(request, loan_id, notice="checkpoint_saved", anchor="checkpoints")
+
+
+@router.post(
+    "/loans/{loan_id}/checkpoints/{checkpoint_id}/delete",
+    name="loan_checkpoint_delete",
+)
+async def loan_checkpoint_delete(
+    request: Request, ctx: CurrentContext, loan_id: UUID, checkpoint_id: UUID
+) -> Response:
+    try:
+        await run_in_threadpool(
+            loan_payment_service.delete_loan_checkpoint,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+            checkpoint_id,
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        context = await run_in_threadpool(
+            _payments_context,
+            request,
+            ctx,
+            loan_id,
+            error=_error(request, getattr(exc, "code", "failed")),
+        )
+        return render_template(request, "loans/payments.html", status_code=400, context=context)
+    return _redirect_payments(request, loan_id, notice="checkpoint_deleted", anchor="checkpoints")
 
 
 @router.get("/loans/{loan_id}", name="loan_detail")

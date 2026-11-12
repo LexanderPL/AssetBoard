@@ -290,6 +290,8 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
             "any_exists",
             "description_keys",
             "description_details",
+            "recent_expenses",
+            "by_ids",
         )
     },
     **{
@@ -372,11 +374,21 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     },
     **{
         ("LoanBalanceCheckpointRepository", method): "test_loan_queries_stay_in_their_workspace"
-        for method in ("create", "for_loan", "latest_on_or_before", "get_for_loan")
+        for method in (
+            "create",
+            "for_loan",
+            "latest_on_or_before",
+            "get_for_loan",
+            "exists_on",
+        )
     },
     **{
         ("LoanScenarioRepository", method): "test_loan_queries_stay_in_their_workspace"
         for method in ("create", "for_loan", "get_for_loan", "by_name_key")
+    },
+    **{
+        ("LoanPaymentRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in ("create", "for_loan", "get_for_loan", "for_loan_on_date")
     },
 }
 

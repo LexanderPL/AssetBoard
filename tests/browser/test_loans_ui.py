@@ -158,6 +158,26 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             )
             _no_page_overflow(page)
 
+            page.goto(f"{base}/loans/{loan_id}/payments", wait_until="networkidle")
+            expect(page.locator("[data-loan-payments-list]")).to_be_visible()
+            expect(page.locator("[data-loan-checkpoints-list]")).to_be_visible()
+            _actions_under_the_tabs(page)
+            _no_page_overflow(page)
+            page.get_by_role("link", name="Record payment").click()
+            payment_dialog = page.locator("#payment-dialog")
+            expect(payment_dialog).to_be_visible()
+            payment_dialog.locator('input[name="date"]').fill("2026-02-15")
+            payment_dialog.locator('input[name="total"]').fill("100")
+            payment_dialog.get_by_role("button", name="Save payment").click()
+            page.wait_for_load_state("networkidle")
+            expect(page.locator("[data-action-notice]")).to_contain_text("Payment saved.")
+            expect(page.locator("[data-payment]")).to_have_count(1)
+            _no_page_overflow(page)
+            page.goto(f"{base}/loans/{loan_id}?schedule_page=1", wait_until="networkidle")
+            expect(page.locator("[data-schedule-actual]")).to_be_visible()
+            expect(page.locator("[data-actual-total]")).to_be_visible()
+            _no_page_overflow(page)
+
             page.set_viewport_size({"width": 390, "height": 844})
             page.goto(f"{base}/loans", wait_until="networkidle")
             expect(page.locator("[data-loan]")).to_have_count(1)
@@ -193,6 +213,11 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
 
             page.goto(f"{base}/loans/{loan_id}/scenarios", wait_until="networkidle")
             expect(page.locator("[data-scenario-comparison]")).to_be_visible()
+            print(
+                "SCENARIO_WIDTH",
+                page.evaluate("document.documentElement.scrollWidth"),
+                page.evaluate("document.querySelector('[data-scenario-table-scroll]').scrollWidth"),
+            )
             _no_page_overflow(page)
             _actions_under_the_tabs(page)
             scenario_scroll = page.locator("[data-scenario-table-scroll]").evaluate(
@@ -202,6 +227,16 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             expect(page.locator('[data-chart="line"]')).to_have_attribute(
                 "data-chart-ready", "true"
             )
+
+            page.goto(f"{base}/loans/{loan_id}/payments", wait_until="networkidle")
+            expect(page.locator("[data-loan-payments-list]")).to_be_visible()
+            expect(page.get_by_role("link", name="Record payment")).to_be_visible()
+            _no_page_overflow(page)
+            _actions_under_the_tabs(page)
+            payments_scroll = page.locator("[data-payments-scroll]").evaluate(
+                "el => ({scrollWidth: el.scrollWidth, clientWidth: el.clientWidth})"
+            )
+            assert payments_scroll["scrollWidth"] > payments_scroll["clientWidth"]
 
             assert page.evaluate("window.__cspViolations") == []
             browser.close()

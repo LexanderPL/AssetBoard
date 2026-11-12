@@ -3166,6 +3166,58 @@ msgstr ""
 msgid "Compare at most three what-if rows at a time."
 msgstr ""
 
+msgid "Choose installment or overpayment."
+msgstr ""
+
+msgid "Enter a positive payment total."
+msgstr ""
+
+msgid "No scheduled payment row exists on or after that date."
+msgstr ""
+
+msgid "Enter all four breakdown amounts."
+msgstr ""
+
+msgid "The breakdown must add up to the payment total."
+msgstr ""
+
+msgid "Breakdown amounts cannot be negative."
+msgstr ""
+
+msgid "The linked transaction no longer exists."
+msgstr ""
+
+#, fuzzy
+msgid "The linked transaction was deleted."
+msgstr ""
+
+msgid "Only an expense transaction can be linked."
+msgstr ""
+
+msgid "The linked transaction uses another currency."
+msgstr ""
+
+msgid "The linked transaction amount must equal the payment total."
+msgstr ""
+
+msgid "A checkpoint date cannot be in the future."
+msgstr ""
+
+msgid "A checkpoint cannot start before the loan."
+msgstr ""
+
+msgid "A checkpoint already exists on that date."
+msgstr ""
+
+msgid ""
+"The starting balance checkpoint is required for a loan entered from its "
+"current balance."
+msgstr ""
+
+#, fuzzy
+msgid "The loan schedule is unavailable."
+msgstr ""
+
 msgid "The loan could not be saved. Check the form and try again."
 msgstr ""
 
@@ -3218,6 +3270,19 @@ msgid "Saved scenarios updated. Their comparison is below."
 msgstr ""
 
 msgid "Scenario deleted."
+msgstr ""
+
+msgid "Payment saved."
+msgstr ""
+
+#, fuzzy
+msgid "Payment deleted."
+msgstr ""
+
+msgid "Balance checkpoint saved."
+msgstr ""
+
+msgid "Balance checkpoint deleted."
 msgstr ""
 
 msgid "The loan"
@@ -6824,8 +6889,9 @@ msgid "Schedule"
 msgstr ""
 
 msgid ""
-"Monthly rows from the current starting balance. Past rows are projected "
-"until actual payments are recorded."
+"Monthly rows from the current starting balance. A recorded actual payment"
+" replaces the components of its due date; every other row remains "
+"projected from the terms."
 msgstr ""
 
 msgid "Scroll sideways to see every column."
@@ -6847,6 +6913,9 @@ msgid "Opening"
 msgstr ""
 
 msgid "Closing"
+msgstr ""
+
+msgid "Actual"
 msgstr ""
 
 msgid "Today"
@@ -7291,6 +7360,118 @@ msgid ""
 msgstr ""
 
 msgid "Save loan"
+msgstr ""
+
+msgid "Actual payments"
+msgstr ""
+
+msgid ""
+"Record what you actually paid. A single total is split against the "
+"projected installment row; an explicit breakdown overrides the split."
+msgstr ""
+
+msgid "Record payment"
+msgstr ""
+
+#, fuzzy
+msgid "Linked transaction"
+msgstr ""
+
+msgid "Installment"
+msgstr ""
+
+msgid "deleted"
+msgstr ""
+
+#, python-format
+msgid "payment on %(date)s"
+msgstr ""
+
+#, python-format
+msgid "Delete the payment on %(date)s?"
+msgstr ""
+
+msgid "No actual payments recorded yet."
+msgstr ""
+
+msgid "Balance checkpoints"
+msgstr ""
+
+msgid ""
+"A checkpoint re-anchors the schedule from the balance on that date. The "
+"variance compares it with the projection from the previous anchor."
+msgstr ""
+
+msgid "Add checkpoint"
+msgstr ""
+
+msgid "Balance"
+msgstr ""
+
+msgid "Projected balance"
+msgstr ""
+
+msgid "Variance"
+msgstr ""
+
+msgid "Projected balance unavailable"
+msgstr ""
+
+#, python-format
+msgid "checkpoint on %(date)s"
+msgstr ""
+
+#, python-format
+msgid "Delete the checkpoint on %(date)s?"
+msgstr ""
+
+msgid "No balance checkpoints yet."
+msgstr ""
+
+msgid "Edit payment"
+msgstr ""
+
+#, python-format
+msgid "Total (%(currency)s)"
+msgstr ""
+
+msgid ""
+"With one total, an installment is split against the projected row on or "
+"after the date: interest, costs, principal, then overpayment. An "
+"overpayment goes entirely to the overpayment component."
+msgstr ""
+
+msgid "Enter an explicit breakdown instead"
+msgstr ""
+
+msgid "Use these amounts"
+msgstr ""
+
+msgid "The four amounts must add up to the total."
+msgstr ""
+
+msgid "Linked transaction (optional)"
+msgstr ""
+
+#, fuzzy
+msgid "No linked transaction"
+msgstr ""
+
+#, python-format
+msgid "Only recent expenses in %(currency)s with the same amount can be linked."
+msgstr ""
+
+msgid "Save payment"
+msgstr ""
+
+msgid "Edit checkpoint"
+msgstr ""
+
+#, python-format
+msgid "Remaining balance (%(currency)s)"
+msgstr ""
+
+msgid "Save checkpoint"
 msgstr ""
 
 msgid "New reference rate"
@@ -7768,9 +7949,6 @@ msgid "%(num)d planned value of an archived or transfer category was not copied.
 msgid_plural "%(num)d planned values of archived or transfer categories were not copied."
 msgstr[0] ""
 msgstr[1] ""
-
-msgid "Actual"
-msgstr ""
 
 msgid "Summary"
 msgstr ""
@@ -10185,5 +10363,11 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "% repaid"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Monthly rows from the current starting"
+#~ " balance. Past rows are projected "
+#~ "until actual payments are recorded."
 #~ msgstr ""
 

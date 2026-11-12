@@ -244,6 +244,16 @@ class DayCount(StrEnum):
     ACTUAL_365 = "actual_365"
 
 
+class LoanPaymentKind(StrEnum):
+    INSTALLMENT = "installment"
+    OVERPAYMENT = "overpayment"
+
+
+class LoanPaymentSource(StrEnum):
+    MANUAL = "manual"
+    UPCOMING = "upcoming"
+
+
 def validate_day_count(value: DayCount | str) -> DayCount:
     try:
         return DayCount(value)
@@ -326,6 +336,107 @@ class Schedule:
     as_of: date
     original_principal: Money | None
     currency: str
+
+
+@dataclass(frozen=True, slots=True)
+class LoanPaymentSplit:
+    principal: Money
+    interest: Money
+    costs: Money
+    overpayment: Money
+
+    @property
+    def total(self) -> Money:
+        return Money(
+            self.principal.amount_minor
+            + self.interest.amount_minor
+            + self.costs.amount_minor
+            + self.overpayment.amount_minor,
+            self.principal.currency,
+        )
+
+
+def split_loan_payment(
+    total: Money, kind: LoanPaymentKind | str, row: ScheduleRow | None
+) -> LoanPaymentSplit:
+    """Split an actual payment against its projected installment row.
+
+    An overpayment goes entirely to the overpayment component. For an installment, an equal
+    total keeps the row's components, a larger total adds the excess to the overpayment, and a
+    smaller total fills interest, costs, principal and overpayment in that order.
+    """
+    try:
+        wanted_kind = LoanPaymentKind(kind)
+    except ValueError:
+        raise LoanValidationError("kind", "invalid_payment_kind") from None
+    if total.amount_minor <= 0 or total.amount_minor > MAX_AMOUNT_MINOR:
+        raise LoanValidationError("total", "invalid_payment_total")
+    if wanted_kind is LoanPaymentKind.OVERPAYMENT:
+        return LoanPaymentSplit(
+            principal=Money(0, total.currency),
+            interest=Money(0, total.currency),
+            costs=Money(0, total.currency),
+            overpayment=total,
+        )
+    if row is None:
+        raise LoanValidationError("date", "no_scheduled_payment")
+    if row.opening.currency != total.currency:
+        raise LoanValidationError("total", "invalid_currency")
+    row_total = row.installment_total.amount_minor
+    if total.amount_minor == row_total:
+        return LoanPaymentSplit(
+            principal=row.principal,
+            interest=row.interest,
+            costs=row.costs,
+            overpayment=row.overpayment,
+        )
+    if total.amount_minor > row_total:
+        return LoanPaymentSplit(
+            principal=row.principal,
+            interest=row.interest,
+            costs=row.costs,
+            overpayment=Money(
+                row.overpayment.amount_minor + total.amount_minor - row_total,
+                total.currency,
+            ),
+        )
+    remaining = total.amount_minor
+    interest = min(remaining, row.interest.amount_minor)
+    remaining -= interest
+    costs = min(remaining, row.costs.amount_minor)
+    remaining -= costs
+    principal = min(remaining, row.principal.amount_minor)
+    remaining -= principal
+    overpayment = min(remaining, row.overpayment.amount_minor)
+    return LoanPaymentSplit(
+        principal=Money(principal, total.currency),
+        interest=Money(interest, total.currency),
+        costs=Money(costs, total.currency),
+        overpayment=Money(overpayment, total.currency),
+    )
+
+
+def validate_payment_breakdown(
+    total: Money,
+    principal: Money,
+    interest: Money,
+    costs: Money,
+    overpayment: Money,
+) -> LoanPaymentSplit:
+    """Check an explicit breakdown: non-negative, same currency and exactly the total."""
+    parts = (principal, interest, costs, overpayment)
+    if any(part.currency != total.currency for part in parts):
+        raise LoanValidationError("total", "invalid_currency")
+    if any(part.amount_minor < 0 or part.amount_minor > MAX_AMOUNT_MINOR for part in parts):
+        raise LoanValidationError("principal", "invalid_payment_breakdown")
+    if sum(part.amount_minor for part in parts) != total.amount_minor:
+        raise LoanValidationError("total", "payment_breakdown_mismatch")
+    return LoanPaymentSplit(
+        principal=principal,
+        interest=interest,
+        costs=costs,
+        overpayment=overpayment,
+    )
 
 
 @dataclass(frozen=True, slots=True)

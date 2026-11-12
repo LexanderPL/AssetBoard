@@ -48,6 +48,7 @@ DEMO_EXCLUDED_MODELS: MappingProxyType[str, str] = MappingProxyType(
         "PriceSourceConfig": "no price provider is enabled in the demo",
         "ProviderError": "no provider calls are made",
         "LoanScenario": "scenarios are user what-ifs, not sample data",
+        "LoanPayment": "actual payments are user records, not sample data",
     }
 )
 

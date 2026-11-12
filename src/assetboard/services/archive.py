@@ -37,6 +37,7 @@ from assetboard.db.repositories import (
     LoanBalanceCheckpointRepository,
     LoanCostComponentRepository,
     LoanOverpaymentRepository,
+    LoanPaymentRepository,
     LoanRateChangeRepository,
     LoanRepository,
     LoanScenarioRepository,
@@ -139,6 +140,7 @@ ARCHIVE_EXCLUDED_MODELS = {
     "LoanOverpayment": "loan overpayments require the F7.8 archive extension",
     "LoanBalanceCheckpoint": "loan checkpoints require the F7.8 archive extension",
     "LoanScenario": "loan scenarios require the F7.8 archive extension",
+    "LoanPayment": "actual loan payments require the F7.8 archive extension",
 }
 
 
@@ -477,6 +479,10 @@ def _has_loan_scenarios(session: Session, ctx: Context) -> bool:
     return LoanScenarioRepository(session, ctx).any_exists()
 
 
+def _has_loan_payments(session: Session, ctx: Context) -> bool:
+    return LoanPaymentRepository(session, ctx).any_exists()
+
+
 def _has_reference_rates(session: Session, ctx: Context) -> bool:
     return ReferenceRateRepository(session, ctx).any_exists()
 
@@ -518,6 +524,7 @@ EMPTINESS_CHECKS = (
     _has_loan_overpayments,
     _has_loan_balance_checkpoints,
     _has_loan_scenarios,
+    _has_loan_payments,
 )
 
 

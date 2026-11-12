@@ -264,6 +264,41 @@ Implement F7.5 from docs/specs/M7-loans-and-mortgage.md: LoanPayment model + mig
 optional ledger transaction link. Tests: re-anchoring changes the future schedule only; variance computation; actuals override projections for past rows.
 ```
 
+### As built (M7.F7.5)
+
+- `LoanPayment` was added by `0054_f75_loan_payments`: workspace-scoped with composite
+  `(workspace_id, loan_id)` and optional `(workspace_id, transaction_id)` foreign keys. `kind`
+  is `installment|overpayment`, `source` is `manual|upcoming`, the total and every component are
+  non-negative minor units, and a check enforces `total = principal + interest + costs +
+  overpayment`. The same migration adds the unique `(workspace_id, loan_id, as_of)` constraint
+  on balance checkpoints; F7.1 created at most the starting checkpoint.
+- Recording a payment accepts one total or an explicit breakdown. The pure
+  `domain.loans.split_loan_payment()` finds the projected installment row (exact date or the
+  first later row) and splits: equal keeps the row components, greater adds the excess to
+  overpayment, smaller fills interest, costs, principal and overpayment in that order.
+  `kind=overpayment` assigns the whole total to overpayment. An explicit breakdown must be
+  non-negative, in the loan currency and sum to the total. Edits re-split when the total or kind
+  changes and no breakdown is supplied; otherwise the stored components remain.
+- A payment may link one ledger transaction. The service checks that it exists, is not
+  soft-deleted, is an expense, uses the loan currency and has exactly the payment total.
+  `TransactionRepository.recent_expenses()` supplies the form select.
+- `services.loan_payments` owns payment and checkpoint CRUD, locks the workspace and re-checks
+  the editor role inside writes, and audits ids/dates/kinds without amounts. Payments are
+  viewer-readable; writes need editor or owner.
+- Checkpoints are dated today or earlier and not before origination. A duplicate date is
+  refused. The first checkpoint of a current-balance loan is the starting anchor: it has no
+  projection or variance and cannot be deleted. Every other checkpoint projects from the latest
+  earlier checkpoint, otherwise origination, with the F7.2 engine; the projected balance is the
+  last closing at/before the date (or the anchor balance). Variance is checkpoint balance minus
+  projection. A projection error marks that row instead of failing the list.
+- `services.loan_schedule` now also loads actual payments. Installment payments are aggregated
+  by date and replace the components/total in the schedule table with an **Actual** badge;
+  overpayment-only payments stay in the payment list. The closing column remains projected.
+- The detail page links to **Payments**; the page has responsive payment/checkpoint tables,
+  dialog forms, edit/delete actions, CSRF, gettext and no inline scripts or styles.
+- The archive excludes `LoanPayment` until F7.8 but includes it in the emptiness check. The demo
+  excludes actual payments as user records.
+
 ---
 
 ## F7.6 Integrations: net worth, property LTV, scheduled payments

@@ -1312,6 +1312,7 @@ WORKSPACE_TABLES = {
     "loan_overpayments",
     "loan_balance_checkpoints",
     "loan_scenarios",
+    "loan_payments",
 }
 
 

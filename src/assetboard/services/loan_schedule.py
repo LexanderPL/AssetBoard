@@ -8,16 +8,19 @@ math here: every row and total comes from ``domain.loans.build_schedule`` and
 
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from collections.abc import Mapping
+from dataclasses import dataclass, field, replace
 from datetime import date
 from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
 
+from assetboard.db.repositories import LoanPaymentRepository
 from assetboard.domain.loans import (
     BalanceCheckpoint,
     CostPeriod,
     DayCount,
+    LoanPaymentKind,
     LoanScheduleSummary,
     LoanTerms,
     LoanValidationError,
@@ -32,8 +35,32 @@ from assetboard.domain.loans import (
     select_anchor,
     summarize_schedule,
 )
+from assetboard.domain.money import Money
 from assetboard.services import loans
 from assetboard.services.context import Context, Role, require_role
+
+
+@dataclass(frozen=True, slots=True)
+class SchedulePaymentActual:
+    id: UUID
+    date: date
+    kind: LoanPaymentKind
+    total: Money
+    principal: Money
+    interest: Money
+    costs: Money
+    overpayment: Money
+    note: str
+
+
+@dataclass(frozen=True, slots=True)
+class ScheduleActual:
+    principal: Money
+    interest: Money
+    costs: Money
+    overpayment: Money
+    total: Money
+    count: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,6 +71,10 @@ class LoanScheduleData:
     summary: LoanScheduleSummary | None
     has_overpayments: bool
     error_code: str | None
+    actual_payments: tuple[SchedulePaymentActual, ...] = ()
+    actual_by_date: Mapping[date, ScheduleActual] = field(
+        default_factory=dict[date, ScheduleActual]
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -137,6 +168,48 @@ def load_loan_schedule_inputs(
     )
 
 
+def anchor_for_date(inputs: LoanScheduleInputs, day: date) -> ScheduleAnchor:
+    """The latest checkpoint at or before ``day``, otherwise the loan's origination."""
+    return select_anchor(inputs.terms, _checkpoints(inputs.view), day)
+
+
+def _base_anchor(inputs: LoanScheduleInputs) -> ScheduleAnchor:
+    if inputs.view.origination_date is not None and inputs.view.principal_original is not None:
+        return ScheduleAnchor(
+            date=inputs.view.origination_date,
+            balance=inputs.view.principal_original,
+        )
+    checkpoints = _checkpoints(inputs.view)
+    if not checkpoints:
+        raise ScheduleError("no_anchor")
+    earliest = min(
+        checkpoints, key=lambda item: (item.as_of, item.remaining_principal.amount_minor)
+    )
+    return ScheduleAnchor(date=earliest.as_of, balance=earliest.remaining_principal)
+
+
+def schedule_from_anchor(
+    inputs: LoanScheduleInputs, anchor: ScheduleAnchor, as_of: date
+) -> Schedule:
+    """Build from ``anchor`` with the remaining term adjusted for rows already projected.
+
+    The F7.2 engine takes the number of payments from its anchor. A checkpoint after the loan's
+    base anchor needs the original term minus the rows the base schedule already put before it.
+    """
+    base = _base_anchor(inputs)
+    remaining = inputs.terms.term_months
+    if anchor.date > base.date:
+        base_schedule = build_inputs_schedule(replace(inputs, anchor=base, as_of=as_of))
+        elapsed = sum(1 for row in base_schedule.rows if row.date <= anchor.date)
+        remaining = max(1, inputs.terms.term_months - elapsed)
+    terms = (
+        inputs.terms
+        if remaining == inputs.terms.term_months
+        else replace(inputs.terms, term_months=remaining)
+    )
+    return build_inputs_schedule(replace(inputs, anchor=anchor, terms=terms, as_of=as_of))
+
+
 def build_inputs_schedule(
     inputs: LoanScheduleInputs,
     *,
@@ -156,6 +229,71 @@ def build_inputs_schedule(
         strategy if strategy is not None else inputs.strategy,
         inputs.day_count,
     )
+
+
+def _actual_payments(
+    factory: sessionmaker[Session], ctx: Context, loan_id: UUID, currency: str
+) -> tuple[SchedulePaymentActual, ...]:
+    with factory() as session:
+        rows = LoanPaymentRepository(session, ctx).for_loan(loan_id)
+    return tuple(
+        SchedulePaymentActual(
+            id=row.id,
+            date=row.date,
+            kind=LoanPaymentKind(row.kind),
+            total=Money(row.total_minor, currency),
+            principal=Money(row.principal_minor, currency),
+            interest=Money(row.interest_minor, currency),
+            costs=Money(row.costs_minor, currency),
+            overpayment=Money(row.overpayment_minor, currency),
+            note=row.note,
+        )
+        for row in rows
+    )
+
+
+def _actual_by_date(
+    actuals: tuple[SchedulePaymentActual, ...],
+) -> dict[date, ScheduleActual]:
+    sums: dict[date, ScheduleActual] = {}
+    for payment in actuals:
+        if payment.kind is not LoanPaymentKind.INSTALLMENT:
+            continue
+        previous = sums.get(payment.date)
+        if previous is None:
+            sums[payment.date] = ScheduleActual(
+                principal=payment.principal,
+                interest=payment.interest,
+                costs=payment.costs,
+                overpayment=payment.overpayment,
+                total=payment.total,
+                count=1,
+            )
+        else:
+            sums[payment.date] = ScheduleActual(
+                principal=Money(
+                    previous.principal.amount_minor + payment.principal.amount_minor,
+                    payment.total.currency,
+                ),
+                interest=Money(
+                    previous.interest.amount_minor + payment.interest.amount_minor,
+                    payment.total.currency,
+                ),
+                costs=Money(
+                    previous.costs.amount_minor + payment.costs.amount_minor,
+                    payment.total.currency,
+                ),
+                overpayment=Money(
+                    previous.overpayment.amount_minor + payment.overpayment.amount_minor,
+                    payment.total.currency,
+                ),
+                total=Money(
+                    previous.total.amount_minor + payment.total.amount_minor,
+                    payment.total.currency,
+                ),
+                count=previous.count + 1,
+            )
+    return sums
 
 
 def loan_schedule(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -> LoanScheduleData:
@@ -180,6 +318,8 @@ def loan_schedule(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -
         else:
             baseline = schedule
         summary = summarize_schedule(schedule, inputs.as_of)
+        actual_payments = _actual_payments(factory, ctx, loan_id, inputs.view.currency)
+        actual_by_date = _actual_by_date(actual_payments)
     except (ScheduleError, LoanValidationError) as exc:
         view = loans.get_loan(factory, ctx, loan_id)
         return LoanScheduleData(
@@ -199,13 +339,19 @@ def loan_schedule(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -
         summary=summary,
         has_overpayments=has_overpayments,
         error_code=None,
+        actual_payments=actual_payments,
+        actual_by_date=actual_by_date,
     )
 
 
 __all__ = [
     "LoanScheduleData",
     "LoanScheduleInputs",
+    "ScheduleActual",
+    "SchedulePaymentActual",
+    "anchor_for_date",
     "build_inputs_schedule",
     "load_loan_schedule_inputs",
     "loan_schedule",
+    "schedule_from_anchor",
 ]
