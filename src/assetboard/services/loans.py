@@ -38,6 +38,7 @@ from assetboard.db.repositories import (
     ReferenceRateRepository,
     ReferenceRateValueRepository,
 )
+from assetboard.db.repositories.base import WorkspaceScope
 from assetboard.domain.loans import (
     MAX_LOAN_RATE_BP,
     CostBasis,
@@ -129,6 +130,8 @@ class LoanView:
     reference_rate_id: UUID | None
     reference_rate_name: str | None
     reference_rate_values: tuple[ReferenceRateValueView, ...]
+    property_item_id: UUID | None
+    auto_record_payments: bool
     current_rate_bp: int | None
     installment_override: Money | None
     overpayment_mode: OverpaymentMode
@@ -208,6 +211,18 @@ def _locked_workspace_currency(session: Session, ctx: Context) -> str:
     repository = CurrentWorkspaceRepository(session, ctx)
     repository.lock(exclusive=True)
     return repository.get().base_currency
+
+
+def _refresh_loan_occurrences(session: Session, ctx: Context, loan_id: UUID) -> None:
+    from assetboard.services.loan_scheduled import refresh_loan_occurrences
+
+    refresh_loan_occurrences(session, ctx, loan_id)
+
+
+def _refresh_reference_loans(session: Session, ctx: Context, rate_id: UUID) -> None:
+    for loan in LoanRepository(session, ctx).ordered():
+        if loan.reference_rate_id == rate_id:
+            _refresh_loan_occurrences(session, ctx, loan.id)
 
 
 def _loan_start(loan: Loan, checkpoints: list[LoanBalanceCheckpoint]) -> date:
@@ -370,6 +385,8 @@ def _view(
         margin_bp=loan.margin_bp,
         reference_rate_id=loan.reference_rate_id,
         reference_rate_name=reference_rate.name if reference_rate is not None else None,
+        property_item_id=loan.property_item_id,
+        auto_record_payments=loan.auto_record_payments,
         reference_rate_values=tuple(
             ReferenceRateValueView(
                 id=row.id,
@@ -426,7 +443,7 @@ def _view(
     )
 
 
-def _load_loan_view(session: Session, ctx: Context, loan: Loan, today: date) -> LoanView:
+def _load_loan_view(session: Session, ctx: WorkspaceScope, loan: Loan, today: date) -> LoanView:
     changes = LoanRateChangeRepository(session, ctx).for_loan(loan.id)
     costs = LoanCostComponentRepository(session, ctx).for_loan(loan.id)
     overpayments = LoanOverpaymentRepository(session, ctx).for_loan(loan.id)
@@ -465,8 +482,15 @@ def get_loan(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -> Loa
     require_role(ctx, Role.VIEWER)
     today = ctx.clock.today(ctx.workspace.timezone)
     with factory() as session:
-        loan = LoanRepository(session, ctx).get_or_raise(loan_id)
-        return _load_loan_view(session, ctx, loan, today)
+        return load_loan_view_in_session(session, ctx, loan_id, today)
+
+
+def load_loan_view_in_session(
+    session: Session, ctx: WorkspaceScope, loan_id: UUID, today: date
+) -> LoanView:
+    """One loan view inside the caller's transaction; archived loans remain readable."""
+    loan = LoanRepository(session, ctx).get_or_raise(loan_id)
+    return _load_loan_view(session, ctx, loan, today)
 
 
 def _validated_terms(
@@ -882,6 +906,7 @@ def update_loan_terms(
             installment = _target_installment(loan, changes, reference_values, updated_checkpoints)
             if loan.overpayment_amount_minor is not None:
                 _validate_target(Money(loan.overpayment_amount_minor, currency), installment)
+        _refresh_loan_occurrences(session, ctx, loan.id)
         _audit(session, ctx, "loan.updated", "loan", loan.id, {"kind": wanted_kind.value})
 
     _write(factory, write)
@@ -929,6 +954,7 @@ def set_overpayment_settings(
             loan.id,
             {"mode": wanted_mode.value, "strategy": wanted_strategy.value},
         )
+        _refresh_loan_occurrences(session, ctx, loan.id)
 
     _write(factory, write)
 
@@ -998,6 +1024,7 @@ def add_rate_change(
             loan.id,
             {"effective_from": effective_from.isoformat(), "rate_bp": rate_bp},
         )
+        _refresh_loan_occurrences(session, ctx, loan.id)
 
     _write(factory, write)
 
@@ -1044,6 +1071,7 @@ def update_rate_change(
             loan.id,
             {"effective_from": effective_from.isoformat(), "rate_bp": rate_bp},
         )
+        _refresh_loan_occurrences(session, ctx, loan.id)
 
     _write(factory, write)
 
@@ -1074,6 +1102,7 @@ def delete_rate_change(
             loan.id,
             {"effective_from": change.effective_from.isoformat()},
         )
+        _refresh_loan_occurrences(session, ctx, loan.id)
 
     _write(factory, write)
 
@@ -1139,6 +1168,7 @@ def add_cost_component(
             loan.id,
             {"component_id": str(component.id), "mode": wanted_mode},
         )
+        _refresh_loan_occurrences(session, ctx, loan.id)
 
     _write(factory, write)
 
@@ -1189,6 +1219,7 @@ def update_cost_component(
             loan.id,
             {"component_id": str(component.id), "mode": wanted_mode},
         )
+        _refresh_loan_occurrences(session, ctx, loan.id)
 
     _write(factory, write)
 
@@ -1215,6 +1246,7 @@ def delete_cost_component(
             loan.id,
             {"component_id": str(component.id)},
         )
+        _refresh_loan_occurrences(session, ctx, loan.id)
 
     _write(factory, write)
 
@@ -1253,6 +1285,7 @@ def add_overpayment(
             loan.id,
             {"overpayment_id": str(overpayment.id)},
         )
+        _refresh_loan_occurrences(session, ctx, loan.id)
 
     _write(factory, write)
 
@@ -1295,6 +1328,7 @@ def update_overpayment(
             loan.id,
             {"overpayment_id": str(overpayment.id)},
         )
+        _refresh_loan_occurrences(session, ctx, loan.id)
 
     _write(factory, write)
 
@@ -1321,6 +1355,7 @@ def delete_overpayment(
             loan.id,
             {"overpayment_id": str(overpayment.id)},
         )
+        _refresh_loan_occurrences(session, ctx, loan.id)
 
     _write(factory, write)
 
@@ -1510,6 +1545,7 @@ def add_reference_rate_value(
             rate.id,
             {"effective_from": effective_from.isoformat(), "value_bp": value_bp},
         )
+        _refresh_reference_loans(session, ctx, rate.id)
 
     _write(factory, write)
 
@@ -1565,6 +1601,7 @@ def update_reference_rate_value(
             rate.id,
             {"effective_from": effective_from.isoformat(), "value_bp": value_bp},
         )
+        _refresh_reference_loans(session, ctx, rate.id)
 
     _write(factory, write)
 
@@ -1590,6 +1627,7 @@ def delete_reference_rate_value(
             rate.id,
             {"effective_from": value.effective_from.isoformat()},
         )
+        _refresh_reference_loans(session, ctx, rate.id)
 
     _write(factory, write)
 
