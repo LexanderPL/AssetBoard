@@ -3187,7 +3187,7 @@ msgstr ""
 msgid "The linked transaction no longer exists."
 msgstr ""
 
-#, fuzzy, python-format
+#, fuzzy
 msgid "The linked transaction was deleted."
 msgstr ""
 
@@ -3214,7 +3214,7 @@ msgid ""
 "current balance."
 msgstr ""
 
-#, fuzzy, python-format
+#, fuzzy
 msgid "The loan schedule is unavailable."
 msgstr ""
 
@@ -3275,7 +3275,7 @@ msgstr ""
 msgid "Payment saved."
 msgstr ""
 
-#, fuzzy, python-format
+#, fuzzy
 msgid "Payment deleted."
 msgstr ""
 
@@ -7373,7 +7373,7 @@ msgstr ""
 msgid "Record payment"
 msgstr ""
 
-#, fuzzy, python-format
+#, fuzzy
 msgid "Linked transaction"
 msgstr ""
 
@@ -7453,7 +7453,7 @@ msgstr ""
 msgid "Linked transaction (optional)"
 msgstr ""
 
-#, fuzzy, python-format
+#, fuzzy
 msgid "No linked transaction"
 msgstr ""
 
