@@ -3257,6 +3257,9 @@ msgstr ""
 msgid "The loan is no longer available."
 msgstr ""
 
+msgid "A closed installment plan cannot be restored."
+msgstr ""
+
 msgid "The loan could not be saved. Check the form and try again."
 msgstr ""
 
@@ -3340,6 +3343,18 @@ msgid "Recurring installments generated or refreshed."
 msgstr ""
 
 msgid "Recurring installment generation disabled."
+msgstr ""
+
+msgid "Installment plan created."
+msgstr ""
+
+msgid "Installment plan updated."
+msgstr ""
+
+msgid "Installment plan archived."
+msgstr ""
+
+msgid "Installment plan restored."
 msgstr ""
 
 msgid "The loan"
@@ -7005,6 +7020,9 @@ msgstr ""
 msgid "Equal principal"
 msgstr ""
 
+msgid "Installment plan"
+msgstr ""
+
 msgid "shorten the term"
 msgstr ""
 
@@ -7827,6 +7845,85 @@ msgid "Compare what-ifs"
 msgstr ""
 
 msgid "Clear rows"
+msgstr ""
+
+msgid "No generated occurrences yet."
+msgstr ""
+
+msgid "Back to Installments"
+msgstr ""
+
+msgid "Edit plan"
+msgstr ""
+
+msgid "Restore plan"
+msgstr ""
+
+#, python-format
+msgid ""
+"Archive the installment plan %(name)s? Pending future occurrences will be"
+" removed."
+msgstr ""
+
+msgid "Archive plan"
+msgstr ""
+
+msgid "Monthly installment"
+msgstr ""
+
+msgid "Remaining"
+msgstr ""
+
+msgid "Total remaining"
+msgstr ""
+
+msgid "End date"
+msgstr ""
+
+msgid ""
+"Each posted installment reduces the remaining count by one. At zero the "
+"plan closes; no interest or loan payment is calculated."
+msgstr ""
+
+msgid "Edit installment plan"
+msgstr ""
+
+msgid "Add installment plan"
+msgstr ""
+
+msgid ""
+"A fixed monthly amount and a remaining count. No interest is calculated; "
+"each posted occurrence reduces the count by one."
+msgstr ""
+
+#, python-format
+msgid "Monthly installment (%(currency)s)"
+msgstr ""
+
+msgid "Remaining count"
+msgstr ""
+
+msgid "Set to 0 to close the plan."
+msgstr ""
+
+msgid "Later months use the last day of a shorter month."
+msgstr ""
+
+msgid "Save plan"
+msgstr ""
+
+msgid "Installment plans"
+msgstr ""
+
+msgid "No installment plans yet."
+msgstr ""
+
+msgid ""
+"Track a zero-interest purchase or another fixed installment plan by its "
+"monthly amount and remaining count."
+msgstr ""
+
+msgid "Closed installment plans"
 msgstr ""
 
 msgid "No month"
@@ -8669,9 +8766,6 @@ msgstr ""
 msgid "On a date"
 msgstr ""
 
-msgid "End date"
-msgstr ""
-
 msgid "After a number of times"
 msgstr ""
 
@@ -9227,9 +9321,6 @@ msgid "Invalid rows"
 msgstr ""
 
 msgid "Unresolved category mappings"
-msgstr ""
-
-msgid "Restore plan"
 msgstr ""
 
 msgid "Deleted transactions restored"

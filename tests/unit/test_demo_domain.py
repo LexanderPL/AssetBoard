@@ -111,6 +111,7 @@ def test_excluded_models_are_operational_tables_and_user_what_ifs_with_reasons()
         "ProviderError",
         "LoanScenario",
         "LoanPayment",
+        "InstallmentPlan",
     }
     assert all(reason.strip() for reason in DEMO_EXCLUDED_MODELS.values())
     assert DEMO_EXCLUDED_MODELS["LoanScenario"] == "scenarios are user what-ifs, not sample data"

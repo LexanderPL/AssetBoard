@@ -285,7 +285,11 @@ def _post_in_session(
         from assetboard.services.loans import LoanError
 
         loan = LoanRepository(session, context).get(item.loan_id)
-        if loan is not None and loan.archived_at is None and loan.auto_record_payments:
+        if loan is not None and loan.kind == "installment_plan":
+            from assetboard.services.installment_plans import apply_posted_occurrence
+
+            apply_posted_occurrence(session, context, loan, occurrence.due_date)
+        elif loan is not None and loan.archived_at is None and loan.auto_record_payments:
             with contextlib.suppress(LoanError, LoanValidationError):
                 loan_payments.record_loan_payment_in_session(
                     session,

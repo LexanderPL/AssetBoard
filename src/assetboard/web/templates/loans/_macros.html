@@ -9,7 +9,7 @@
 {%- endmacro %}
 
 {% macro kind_label(kind) -%}
-{{ _("Annuity") if kind.value == "annuity" else _("Equal principal") }}
+{%- if kind.value == "annuity" %}{{ _("Annuity") }}{% elif kind.value == "equal_principal" %}{{ _("Equal principal") }}{% else %}{{ _("Installment plan") }}{% endif %}
 {%- endmacro %}
 
 {% macro overpayment_label(mode, amount, strategy, locale) -%}

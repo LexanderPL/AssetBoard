@@ -51,6 +51,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "income_source_tax_rules",
         "income_sources",
         "instance_settings",
+        "installment_plans",
         "instrument_allocations",
         "instruments",
         "investment_transactions",
@@ -1909,6 +1910,49 @@ def test_0055_loan_integrations_migration_is_reversible(tmp_path: Path) -> None:
         assert "loan_id" not in {
             column["name"] for column in inspect(engine).get_columns("scheduled_items")
         }
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0056_installment_plans_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'installment_plans.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        columns = {column["name"]: column for column in inspector.get_columns("installment_plans")}
+        assert set(columns) >= {
+            "workspace_id",
+            "loan_id",
+            "category_id",
+            "installment_minor",
+            "remaining_count",
+            "end_date",
+            "closed_at",
+        }
+        checks = {
+            check.get("sqltext") or ""
+            for check in inspector.get_check_constraints("installment_plans")
+        }
+        assert any("installment_minor" in sql for sql in checks)
+        assert any("remaining_count" in sql for sql in checks)
+        loan_checks = {
+            check.get("sqltext") or "" for check in inspector.get_check_constraints("loans")
+        }
+        assert any("installment_plan" in sql for sql in loan_checks)
+        command.downgrade(alembic_config(settings), "0055_f76_loan_integrations")
+        assert "installment_plans" not in set(inspect(engine).get_table_names())
+        loan_checks = {
+            check.get("sqltext") or "" for check in inspect(engine).get_check_constraints("loans")
+        }
+        assert not any("installment_plan" in sql for sql in loan_checks)
         upgrade_database(settings)
         assert database_is_at_head(settings)
         check_database_migrations(settings)

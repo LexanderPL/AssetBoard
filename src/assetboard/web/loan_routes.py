@@ -38,6 +38,7 @@ from assetboard.i18n.numbers import (
     format_rate_short,
     parse_amount,
 )
+from assetboard.services import installment_plans as installment_plan_service
 from assetboard.services import loan_links as loan_link_service
 from assetboard.services import loan_payments as loan_payment_service
 from assetboard.services import loan_scenarios as loan_scenario_service
@@ -146,6 +147,7 @@ ERRORS = {
     "invalid_category": _("Choose an active expense category."),
     "loan_paid_off": _("The loan has no future scheduled payments."),
     "invalid_loan": _("The loan is no longer available."),
+    "installment_plan_closed": _("A closed installment plan cannot be restored."),
     "failed": _("The loan could not be saved. Check the form and try again."),
 }
 
@@ -177,6 +179,10 @@ NOTICES = {
     "auto_record_saved": _("Automatic payment recording saved."),
     "schedule_generated": _("Recurring installments generated or refreshed."),
     "schedule_disabled": _("Recurring installment generation disabled."),
+    "installment_plan_created": _("Installment plan created."),
+    "installment_plan_updated": _("Installment plan updated."),
+    "installment_plan_archived": _("Installment plan archived."),
+    "installment_plan_restored": _("Installment plan restored."),
 }
 
 ENTRY_PATHS = ("original", "current")
@@ -697,6 +703,104 @@ def _redirect_detail(
     if anchor:
         url += f"#{anchor}"
     return RedirectResponse(url, status_code=303)
+
+
+def _installment_form_values(
+    plan: installment_plan_service.InstallmentPlanView | None,
+    locale: str,
+    submitted: dict[str, str] | None = None,
+) -> dict[str, str]:
+    if plan is None:
+        values = {
+            "name": "",
+            "installment": "",
+            "remaining_count": "12",
+            "payment_day": "1",
+            "category_id": "",
+        }
+    else:
+        values = {
+            "name": plan.name,
+            "installment": format_amount_input(plan.installment, locale),
+            "remaining_count": str(plan.remaining_count),
+            "payment_day": str(plan.loan.payment_day),
+            "category_id": str(plan.category_id),
+        }
+    if submitted:
+        values.update(submitted)
+    return values
+
+
+def _installment_plan_form_context(
+    request: Request,
+    ctx: Context,
+    *,
+    loan_id: UUID | None = None,
+    values: dict[str, str] | None = None,
+    error: str | None = None,
+) -> dict[str, object]:
+    plan = (
+        installment_plan_service.get_installment_plan(
+            request.app.state.session_factory, ctx, loan_id
+        )
+        if loan_id is not None
+        else None
+    )
+    categories = list_categories(request.app.state.session_factory, ctx).expense
+    return {
+        "plan": plan,
+        "loan": plan.loan if plan is not None else None,
+        "categories": categories,
+        "values": _installment_form_values(plan, request.state.locale, values),
+        "currency": plan.currency if plan is not None else ctx.workspace.base_currency,
+        "error": error,
+        "can_edit": True,
+        "format_money": format_money,
+    }
+
+
+def _installment_plan_detail_context(
+    request: Request,
+    ctx: Context,
+    loan_id: UUID,
+    *,
+    error: str | None = None,
+    notice: str | None = None,
+) -> dict[str, object]:
+    plan = installment_plan_service.get_installment_plan(
+        request.app.state.session_factory, ctx, loan_id
+    )
+    factory = request.app.state.session_factory
+    return {
+        "plan": plan,
+        "loan": plan.loan,
+        "liability": loan_link_service.loan_liability_view(factory, ctx, loan_id),
+        "scheduled_item": loan_scheduled_service.loan_schedule_item_view(factory, ctx, loan_id),
+        "expense_categories": list_categories(factory, ctx).expense,
+        "can_edit": has_role(ctx, Role.EDITOR),
+        "error": error,
+        "notice": notice,
+        "format_money": format_money,
+        "format_day": format_day,
+    }
+
+
+def _installment_plans_context(
+    request: Request,
+    ctx: Context,
+    *,
+    error: str | None = None,
+    notice: str | None = None,
+) -> dict[str, object]:
+    page = installment_plan_service.list_installment_plans(request.app.state.session_factory, ctx)
+    return {
+        "page": page,
+        "can_edit": has_role(ctx, Role.EDITOR),
+        "error": error,
+        "notice": notice,
+        "format_money": format_money,
+        "format_day": format_day,
+    }
 
 
 SCENARIO_ROW_COUNT = 3
@@ -1682,8 +1786,168 @@ async def loan_scheduled_disable(request: Request, ctx: CurrentContext, loan_id:
     return _redirect_detail(request, loan_id, notice="schedule_disabled", anchor="integrations")
 
 
+@router.get("/loans/installments", name="installment_plans")
+async def installment_plans_page(request: Request, ctx: CurrentContext) -> Response:
+    context = await run_in_threadpool(
+        _installment_plans_context,
+        request,
+        ctx,
+        error=_error(request, request.query_params.get("error")),
+        notice=_notice(request, request.query_params.get("notice")),
+    )
+    return render_template(request, "loans/installments/list.html", context=context)
+
+
+@router.get("/loans/installments/new", name="installment_plan_new")
+async def installment_plan_new(request: Request, ctx: CurrentContext) -> Response:
+    require_role(ctx, Role.EDITOR)
+    context = await run_in_threadpool(_installment_plan_form_context, request, ctx)
+    return render_template(request, "loans/installments/form.html", context=context)
+
+
+@router.post("/loans/installments", name="installment_plan_create")
+async def installment_plan_create(request: Request, ctx: CurrentContext) -> Response:
+    require_role(ctx, Role.EDITOR)
+    values = await _form_values(request)
+    try:
+        await run_in_threadpool(
+            installment_plan_service.create_installment_plan,
+            request.app.state.session_factory,
+            ctx,
+            name=values.get("name", ""),
+            installment=_money(
+                values, "installment", request.state.locale, ctx.workspace.base_currency
+            ),
+            remaining_count=_integer(values.get("remaining_count", ""), "remaining_count"),
+            payment_day=_integer(values.get("payment_day", ""), "payment_day"),
+            category_id=_id(values.get("category_id", "")),
+            horizon_months=request.app.state.settings.recurrence_horizon_months,
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        context = await run_in_threadpool(
+            _installment_plan_form_context,
+            request,
+            ctx,
+            values=values,
+            error=_error(request, getattr(exc, "code", "failed")),
+        )
+        return render_template(
+            request, "loans/installments/form.html", status_code=400, context=context
+        )
+    return RedirectResponse(
+        request.url_for("installment_plans").path + "?notice=installment_plan_created",
+        status_code=303,
+    )
+
+
+@router.get("/loans/installments/{loan_id}", name="installment_plan_detail")
+async def installment_plan_detail(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    context = await run_in_threadpool(
+        _installment_plan_detail_context,
+        request,
+        ctx,
+        loan_id,
+        error=_error(request, request.query_params.get("error")),
+        notice=_notice(request, request.query_params.get("notice")),
+    )
+    return render_template(request, "loans/installments/detail.html", context=context)
+
+
+@router.get("/loans/installments/{loan_id}/edit", name="installment_plan_edit")
+async def installment_plan_edit(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    require_role(ctx, Role.EDITOR)
+    context = await run_in_threadpool(_installment_plan_form_context, request, ctx, loan_id=loan_id)
+    return render_template(request, "loans/installments/form.html", context=context)
+
+
+@router.post("/loans/installments/{loan_id}", name="installment_plan_update")
+async def installment_plan_update(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    require_role(ctx, Role.EDITOR)
+    values = await _form_values(request)
+    try:
+        await run_in_threadpool(
+            installment_plan_service.update_installment_plan,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+            name=values.get("name", ""),
+            installment=_money(
+                values, "installment", request.state.locale, ctx.workspace.base_currency
+            ),
+            remaining_count=_integer(values.get("remaining_count", ""), "remaining_count"),
+            payment_day=_integer(values.get("payment_day", ""), "payment_day"),
+            category_id=_id(values.get("category_id", "")),
+            horizon_months=request.app.state.settings.recurrence_horizon_months,
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        context = await run_in_threadpool(
+            _installment_plan_form_context,
+            request,
+            ctx,
+            loan_id=loan_id,
+            values=values,
+            error=_error(request, getattr(exc, "code", "failed")),
+        )
+        return render_template(
+            request, "loans/installments/form.html", status_code=400, context=context
+        )
+    return RedirectResponse(
+        request.url_for("installment_plan_detail", loan_id=str(loan_id)).path
+        + "?notice=installment_plan_updated",
+        status_code=303,
+    )
+
+
+@router.post("/loans/installments/{loan_id}/archive", name="installment_plan_archive")
+async def installment_plan_archive(
+    request: Request, ctx: CurrentContext, loan_id: UUID
+) -> Response:
+    await run_in_threadpool(
+        installment_plan_service.archive_installment_plan,
+        request.app.state.session_factory,
+        ctx,
+        loan_id,
+    )
+    return RedirectResponse(
+        request.url_for("installment_plan_detail", loan_id=str(loan_id)).path
+        + "?notice=installment_plan_archived",
+        status_code=303,
+    )
+
+
+@router.post("/loans/installments/{loan_id}/restore", name="installment_plan_restore")
+async def installment_plan_restore(
+    request: Request, ctx: CurrentContext, loan_id: UUID
+) -> Response:
+    try:
+        await run_in_threadpool(
+            installment_plan_service.restore_installment_plan,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        return RedirectResponse(
+            request.url_for("installment_plan_detail", loan_id=str(loan_id)).path
+            + "?"
+            + urlencode({"error": getattr(exc, "code", "failed")}),
+            status_code=303,
+        )
+    return RedirectResponse(
+        request.url_for("installment_plan_detail", loan_id=str(loan_id)).path
+        + "?notice=installment_plan_restored",
+        status_code=303,
+    )
+
+
 @router.get("/loans/{loan_id}", name="loan_detail")
 async def loan_detail(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    view = await run_in_threadpool(loans.get_loan, request.app.state.session_factory, ctx, loan_id)
+    if view.kind is LoanKind.INSTALLMENT_PLAN:
+        return RedirectResponse(
+            request.url_for("installment_plan_detail", loan_id=str(loan_id)).path,
+            status_code=303,
+        )
     context = await run_in_threadpool(
         _detail_context,
         request,

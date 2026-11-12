@@ -24,6 +24,7 @@ from assetboard.db.models.investments import (
 )
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.db.models.loans import (
+    InstallmentPlan,
     Loan,
     LoanBalanceCheckpoint,
     LoanCostComponent,
@@ -69,6 +70,7 @@ __all__ = [
     "InstrumentAllocation",
     "InvestmentTransaction",
     "ItemValuation",
+    "InstallmentPlan",
     "Loan",
     "LoanBalanceCheckpoint",
     "LoanCostComponent",

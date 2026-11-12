@@ -472,7 +472,11 @@ def list_loans(factory: sessionmaker[Session], ctx: Context) -> LoanPage:
     today = ctx.clock.today(ctx.workspace.timezone)
     with factory() as session:
         rows = LoanRepository(session, ctx).ordered()
-        views = [_load_loan_view(session, ctx, row, today) for row in rows]
+        views = [
+            _load_loan_view(session, ctx, row, today)
+            for row in rows
+            if row.kind != LoanKind.INSTALLMENT_PLAN.value
+        ]
     active = tuple(view for view in views if not view.archived)
     archived = tuple(view for view in views if view.archived)
     return LoanPage(active=active, archived=archived)

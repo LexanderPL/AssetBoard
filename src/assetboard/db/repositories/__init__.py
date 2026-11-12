@@ -37,6 +37,7 @@ from assetboard.db.repositories.invitation import (
     InvitationTokenReader,
 )
 from assetboard.db.repositories.loans import (
+    InstallmentPlanRepository,
     LoanBalanceCheckpointRepository,
     LoanCostComponentRepository,
     LoanOverpaymentRepository,
@@ -101,6 +102,7 @@ __all__ = [
     "IncomeSourceRepository",
     "IncomeSourceTaxRuleRepository",
     "LoanBalanceCheckpointRepository",
+    "InstallmentPlanRepository",
     "LoanCostComponentRepository",
     "LoanOverpaymentRepository",
     "LoanPaymentRepository",

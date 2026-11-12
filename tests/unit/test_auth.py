@@ -1313,6 +1313,7 @@ WORKSPACE_TABLES = {
     "loan_balance_checkpoints",
     "loan_scenarios",
     "loan_payments",
+    "installment_plans",
 }
 
 

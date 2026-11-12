@@ -47,7 +47,7 @@ from assetboard.db.repositories.scheduled import (
 )
 from assetboard.db.repositories.transaction import TransactionRepository
 from assetboard.db.repositories.workspace import CurrentWorkspaceRepository
-from assetboard.domain.loans import LoanValidationError, ScheduleError
+from assetboard.domain.loans import LoanKind, LoanValidationError, ScheduleError
 from assetboard.domain.money import Money
 from assetboard.domain.months import MAX_YEAR, YearMonth
 from assetboard.domain.notifications import MAX_LEAD_DAYS
@@ -322,20 +322,26 @@ def _remove_pending(
 
 def _loan_amounts(
     session: Session, scope: WorkspaceScope, loan_id: UUID, today: date
-) -> list[tuple[date, int]] | None:
-    """The current loan schedule as ``(due date, installment total)`` pairs, or unavailable."""
+) -> tuple[list[tuple[date, int]] | None, int | None]:
+    """Loan amounts as schedule rows, or one fixed amount for an installment plan."""
     try:
         from assetboard.services import loan_schedule, loans
 
         view = loans.load_loan_view_in_session(session, scope, loan_id, today)
+        if view.kind is LoanKind.INSTALLMENT_PLAN:
+            from assetboard.services.installment_plans import plan_installment_in_session
+
+            return None, plan_installment_in_session(session, scope, loan_id)
         inputs = loan_schedule.schedule_inputs_from_view(view, today)
         schedule = loan_schedule.build_inputs_schedule(inputs)
     except (LoanValidationError, ScheduleError, NotFound):
-        return None
-    return [(row.date, row.installment_total.amount_minor) for row in schedule.rows]
+        return None, None
+    return [(row.date, row.installment_total.amount_minor) for row in schedule.rows], None
 
 
-def _loan_amount(rows: list[tuple[date, int]] | None, due: date) -> int | None:
+def _loan_amount(rows: list[tuple[date, int]] | None, fixed: int | None, due: date) -> int | None:
+    if fixed is not None:
+        return fixed
     if rows is None:
         return None
     for day, amount in rows:
@@ -358,7 +364,7 @@ def refresh_loan_item_in_session(session: Session, ctx: Context, loan_id: UUID) 
     if not items:
         return 0
     today = ctx.clock.today(ctx.workspace.timezone)
-    amounts = _loan_amounts(session, ctx, loan_id, today)
+    rows, fixed = _loan_amounts(session, ctx, loan_id, today)
     occurrences = ScheduledOccurrenceRepository(session, ctx)
     updated = 0
     for item in items:
@@ -369,7 +375,7 @@ def refresh_loan_item_in_session(session: Session, ctx: Context, loan_id: UUID) 
                 or row.amount_overridden
             ):
                 continue
-            amount = _loan_amount(amounts, row.due_date)
+            amount = _loan_amount(rows, fixed, row.due_date)
             if amount is None:
                 continue
             occurrences.update(row.id, expected_minor=amount, amount_state=AmountState.ESTIMATED)
@@ -392,10 +398,10 @@ def _generate(
     closed = MonthStateRepository(session, scope).closed_months()
     category = CategoryRepository(session, scope).get_or_raise(item.category_id)
     from_loan = item.amount_mode == AmountMode.FROM_LOAN.value
-    loan_rows = (
+    loan_rows, loan_fixed = (
         _loan_amounts(session, scope, item.loan_id, today)
         if from_loan and item.loan_id is not None
-        else None
+        else (None, None)
     )
     repository = ScheduledOccurrenceRepository(session, scope)
     rows = repository.for_item(item.id)
@@ -447,7 +453,7 @@ def _generate(
         row.label = item.name
         if not row.amount_overridden:
             if from_loan:
-                amount = _loan_amount(loan_rows, row.due_date)
+                amount = _loan_amount(loan_rows, loan_fixed, row.due_date)
                 row.expected_minor = amount or 0
                 row.amount_state = AmountState.ESTIMATED
             else:
@@ -466,7 +472,7 @@ def _generate(
     for nominal in missing:
         due = wanted[nominal]
         if from_loan:
-            expected = _loan_amount(loan_rows, due) or 0
+            expected = _loan_amount(loan_rows, loan_fixed, due) or 0
             amount_state = AmountState.ESTIMATED
         else:
             expected = item.amount_minor

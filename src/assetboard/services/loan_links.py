@@ -91,6 +91,11 @@ def loan_balance_at(
         view = loans.load_loan_view_in_session(session, ctx, loan_id, _today(ctx))
     except NotFound:
         return UNAVAILABLE
+    if view.kind is loans.LoanKind.INSTALLMENT_PLAN:
+        from assetboard.services.installment_plans import plan_remaining_minor_in_session
+
+        amount = plan_remaining_minor_in_session(session, ctx, loan_id)
+        return UNAVAILABLE if amount is None else Money(amount, view.currency)
     anchor: ScheduleAnchor | None = None
     for checkpoint in view.checkpoints:
         if checkpoint.as_of <= as_of and (anchor is None or checkpoint.as_of >= anchor.date):
@@ -160,7 +165,12 @@ class _LoanBalanceResolver:
         row = LoanRepository(self.session, self.scope).get(link_id)
         if row is None:
             return None
-        return LinkTarget(row.name, row.currency, f"/loans/{row.id}")
+        href = (
+            f"/loans/installments/{row.id}"
+            if row.kind == "installment_plan"
+            else f"/loans/{row.id}"
+        )
+        return LinkTarget(row.name, row.currency, href)
 
     def resolve_many(
         self, link_ids: Collection[UUID], dates: Sequence[date]
@@ -192,17 +202,19 @@ def register_loan_resolvers() -> None:
         )
 
 
-def _mortgage_category_keys() -> frozenset[str]:
-    return frozenset(name_key(gettext("Mortgage", locale)) for locale in SUPPORTED_LOCALES)
+def _liability_category_keys(label: str) -> frozenset[str]:
+    return frozenset(name_key(gettext(label, locale)) for locale in SUPPORTED_LOCALES)
 
 
-def _mortgage_category(session: Session, ctx: Context) -> tuple[NetWorthCategory, bool]:
+def _liability_category(
+    session: Session, ctx: Context, label: str
+) -> tuple[NetWorthCategory, bool]:
     repository = NetWorthCategoryRepository(session, ctx)
-    keys = _mortgage_category_keys()
+    keys = _liability_category_keys(label)
     for row in repository.ordered(Side.LIABILITY.value):
         if row.archived_at is None and row.name_key in keys:
             return row, False
-    name = gettext("Mortgage", ctx.workspace.locale)
+    name = gettext(label, ctx.workspace.locale)
     category = repository.create(
         name=name,
         name_key=name_key(name),
@@ -251,7 +263,11 @@ def create_loan_liability_item(
         existing = items.active_linked("loan_balance", loan.id)
         if existing is not None:
             return _liability_view(existing)
-        category, _created = _mortgage_category(session, ctx)
+        category, _created = _liability_category(
+            session,
+            ctx,
+            "Installments" if loan.kind == "installment_plan" else "Mortgage",
+        )
         item = items.create(
             side=Side.LIABILITY.value,
             category_id=category.id,

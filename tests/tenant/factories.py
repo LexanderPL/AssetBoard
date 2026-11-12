@@ -31,6 +31,7 @@ from assetboard.db.models.investments import (
 )
 from assetboard.db.models.ledger import BudgetLine, Category, MonthState, Transaction
 from assetboard.db.models.loans import (
+    InstallmentPlan,
     Loan,
     LoanBalanceCheckpoint,
     LoanCostComponent,
@@ -560,6 +561,27 @@ def make_loan(session: Session, workspace_id: UUID) -> Loan:
     )
 
 
+def make_installment_plan(session: Session, workspace_id: UUID) -> InstallmentPlan:
+    loan = make_loan(session, workspace_id)
+    loan.kind = "installment_plan"
+    loan.principal_original_minor = 100_000
+    loan.term_months = 10
+    session.add(loan)
+    session.flush()
+    category = make_category(session, workspace_id)
+    session.add(category)
+    session.flush()
+    return InstallmentPlan(
+        workspace_id=workspace_id,
+        loan_id=loan.id,
+        category_id=category.id,
+        installment_minor=10_000,
+        remaining_count=10,
+        end_date=date(2026, 10, 1),
+        closed_at=None,
+    )
+
+
 def make_loan_rate_change(session: Session, workspace_id: UUID) -> LoanRateChange:
     loan = make_loan(session, workspace_id)
     session.add(loan)
@@ -784,4 +806,5 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     ),
     LoanScenario: TenantCase(make_loan_scenario, update_values={"name": "Updated scenario"}),
     LoanPayment: TenantCase(make_loan_payment, update_values={"note": "Updated payment"}),
+    InstallmentPlan: TenantCase(make_installment_plan, update_values={"remaining_count": 9}),
 }

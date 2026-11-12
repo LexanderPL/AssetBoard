@@ -2365,6 +2365,7 @@ def test_loan_queries_stay_in_their_workspace(
     db_session: Session, two_workspaces: tuple[Any, Any]
 ) -> None:
     from assetboard.db.repositories import (
+        InstallmentPlanRepository,
         LoanBalanceCheckpointRepository,
         LoanCostComponentRepository,
         LoanOverpaymentRepository,
@@ -2396,6 +2397,8 @@ def test_loan_queries_stay_in_their_workspace(
     scenarios_b = LoanScenarioRepository(db_session, ctx_b)
     payments_a = LoanPaymentRepository(db_session, ctx_a)
     payments_b = LoanPaymentRepository(db_session, ctx_b)
+    plans_a = InstallmentPlanRepository(db_session, ctx_a)
+    plans_b = InstallmentPlanRepository(db_session, ctx_b)
 
     loan_values = {
         "kind": "annuity",
@@ -2486,6 +2489,38 @@ def test_loan_queries_stay_in_their_workspace(
         source="manual",
         transaction_id=None,
     )
+    category_a = CategoryRepository(db_session, ctx_a).create(
+        name="Plan A",
+        name_key="plan a",
+        kind="expense",
+        treatment="regular",
+        color="#16a34a",
+        sort_order=0,
+    )
+    category_b = CategoryRepository(db_session, ctx_b).create(
+        name="Plan B",
+        name_key="plan b",
+        kind="expense",
+        treatment="regular",
+        color="#16a34a",
+        sort_order=0,
+    )
+    plan_a = plans_a.create(
+        loan_id=loan_a.id,
+        category_id=category_a.id,
+        installment_minor=10_000,
+        remaining_count=10,
+        end_date=date(2025, 12, 1),
+        closed_at=None,
+    )
+    plans_b.create(
+        loan_id=loan_b.id,
+        category_id=category_b.id,
+        installment_minor=10_000,
+        remaining_count=10,
+        end_date=date(2025, 12, 1),
+        closed_at=None,
+    )
     scenario_a = scenarios_a.create(
         loan_id=loan_a.id,
         name="Overpay 500",
@@ -2546,6 +2581,10 @@ def test_loan_queries_stay_in_their_workspace(
     assert checkpoints_b.latest_on_or_before(loan_a.id, date(2025, 6, 1)) is None
     assert checkpoints_a.exists_on(loan_a.id, date(2025, 1, 1))
     assert not checkpoints_b.exists_on(loan_a.id, date(2025, 1, 1))
+    assert [row.id for row in plans_a.ordered()] == [plan_a.id]
+    assert [row.id for row in plans_b.ordered()] != [plan_a.id]
+    assert plans_b.for_loan(loan_a.id) is None
+    assert plans_b.get_for_loan(loan_a.id, plan_a.id) is None
     assert [row.id for row in payments_a.for_loan(loan_a.id)] == [payment_a.id]
     assert payments_b.for_loan(loan_a.id) == []
     assert payments_b.get_for_loan(loan_a.id, payment_a.id) is None
