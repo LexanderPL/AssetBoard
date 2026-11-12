@@ -34,12 +34,19 @@ from assetboard.db.repositories import (
     InstrumentRepository,
     InvestmentTransactionRepository,
     ItemValuationRepository,
+    LoanBalanceCheckpointRepository,
+    LoanCostComponentRepository,
+    LoanOverpaymentRepository,
+    LoanRateChangeRepository,
+    LoanRepository,
     MonthStateRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
     NetWorthSnapshotRepository,
     PricePointRepository,
     PriceSourceConfigRepository,
+    ReferenceRateRepository,
+    ReferenceRateValueRepository,
     RiskTargetPolicyRepository,
     ScheduledItemRepository,
     ScheduledOccurrenceRepository,
@@ -123,6 +130,13 @@ ARCHIVE_EXCLUDED_MODELS = {
     "NotificationChannel": "notification URLs contain secrets (F3.8/F9.3)",
     "NotificationLog": "notification delivery history is not portable (F3.8)",
     "ProviderError": "provider error logs are operational and not portable",
+    "Loan": "loans require the F7.8 archive extension",
+    "LoanRateChange": "loan rates require the F7.8 archive extension",
+    "ReferenceRate": "reference rates require the F7.8 archive extension",
+    "ReferenceRateValue": "reference-rate values require the F7.8 archive extension",
+    "LoanCostComponent": "loan costs require the F7.8 archive extension",
+    "LoanOverpayment": "loan overpayments require the F7.8 archive extension",
+    "LoanBalanceCheckpoint": "loan checkpoints require the F7.8 archive extension",
 }
 
 
@@ -437,6 +451,34 @@ def _has_tax_rule_versions(session: Session, ctx: Context) -> bool:
     return TaxRuleVersionRepository(session, ctx).any_exists()
 
 
+def _has_loans(session: Session, ctx: Context) -> bool:
+    return LoanRepository(session, ctx).any_exists()
+
+
+def _has_loan_rate_changes(session: Session, ctx: Context) -> bool:
+    return LoanRateChangeRepository(session, ctx).any_exists()
+
+
+def _has_loan_cost_components(session: Session, ctx: Context) -> bool:
+    return LoanCostComponentRepository(session, ctx).any_exists()
+
+
+def _has_loan_overpayments(session: Session, ctx: Context) -> bool:
+    return LoanOverpaymentRepository(session, ctx).any_exists()
+
+
+def _has_loan_balance_checkpoints(session: Session, ctx: Context) -> bool:
+    return LoanBalanceCheckpointRepository(session, ctx).any_exists()
+
+
+def _has_reference_rates(session: Session, ctx: Context) -> bool:
+    return ReferenceRateRepository(session, ctx).any_exists()
+
+
+def _has_reference_rate_values(session: Session, ctx: Context) -> bool:
+    return ReferenceRateValueRepository(session, ctx).any_exists()
+
+
 EMPTINESS_CHECKS = (
     _has_unexpected_categories,
     _has_transactions,
@@ -462,6 +504,13 @@ EMPTINESS_CHECKS = (
     _has_price_points,
     _has_fx_rates,
     _has_price_source_configs,
+    _has_reference_rates,
+    _has_reference_rate_values,
+    _has_loans,
+    _has_loan_rate_changes,
+    _has_loan_cost_components,
+    _has_loan_overpayments,
+    _has_loan_balance_checkpoints,
 )
 
 

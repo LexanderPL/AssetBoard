@@ -380,6 +380,7 @@ def test_every_registered_lock_is_consulted(
     from assetboard.services.investment_transactions import (
         workspace_has_investment_transactions,
     )
+    from assetboard.services.loans import workspace_has_loans
     from assetboard.services.scheduled import workspace_has_scheduled_amounts
 
     assert [
@@ -389,6 +390,7 @@ def test_every_registered_lock_is_consulted(
         workspace_has_income_amounts,
         workspace_has_fixed_tax_amounts,
         workspace_has_investment_transactions,
+        workspace_has_loans,
     ] == workspaces.BASE_CURRENCY_LOCKS
     # Any check that reports stored amounts locks it.
     monkeypatch.setattr(workspaces, "BASE_CURRENCY_LOCKS", [lambda _session, _ctx: True])
@@ -411,6 +413,39 @@ def test_tax_rule_versions_lock_the_base_currency(team: WorkspaceDb) -> None:
         notes="",
         effective_from=date(2026, 1, 1),
         value=PercentOrFixed.fixed_amount(Money(1000, "EUR")),
+    )
+    assert workspace_settings(team.factory, owner).base_currency_locked
+    with pytest.raises(workspaces.BaseCurrencyLocked):
+        update_settings(team.factory, owner, **SETTINGS)
+
+
+def test_a_loan_locks_the_base_currency(team: WorkspaceDb) -> None:
+    from assetboard.domain.money import Money
+    from assetboard.services.loans import create_loan
+
+    owner = team.ctx("olga", "owner")
+    create_loan(
+        team.factory,
+        owner,
+        entry_path="original",
+        name="Mortgage",
+        kind="annuity",
+        principal_original=Money(30_000_000, "EUR"),
+        current_balance=None,
+        balance_date=None,
+        origination_date=date(2026, 1, 1),
+        first_payment_date=date(2026, 2, 1),
+        term_months=360,
+        payment_day=1,
+        rate_mode="fixed",
+        fixed_rate_bp=550,
+        reference_rate_id=None,
+        margin_bp=None,
+        high_rate_confirmed=False,
+        installment_override=None,
+        overpayment_mode="none",
+        overpayment_amount=None,
+        overpayment_strategy="reduce_term",
     )
     assert workspace_settings(team.factory, owner).base_currency_locked
     with pytest.raises(workspaces.BaseCurrencyLocked):

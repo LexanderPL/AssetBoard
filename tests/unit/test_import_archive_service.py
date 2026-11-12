@@ -2155,3 +2155,33 @@ def test_merge_refuses_currency_mismatch_and_restore_accepts_it(
     restore_report = _plan(db, data_dir, restore_batch, ctx=target_ctx)
     assert restore_report["counts"]["invalid"] == 0, restore_report
     _apply(db, data_dir, restore_batch, ctx=target_ctx)
+
+
+def test_loans_and_reference_rates_make_a_workspace_non_empty(db: WorkspaceDb) -> None:
+    from assetboard.db.repositories import LoanRepository, ReferenceRateRepository
+
+    ctx = db.ctx("own", "owner")
+    with db.factory.begin() as session:
+        assert workspace_is_empty(session, ctx)
+        ReferenceRateRepository(session, ctx).create(name="WIBOR", name_key="wibor", notes="")
+        assert not workspace_is_empty(session, ctx)
+    with db.factory.begin() as session:
+        LoanRepository(session, ctx).create(
+            name="Mortgage",
+            kind="annuity",
+            currency="EUR",
+            principal_original_minor=100_000,
+            origination_date=date(2026, 1, 1),
+            first_payment_date=date(2026, 2, 1),
+            term_months=12,
+            payment_day=1,
+            rate_mode="fixed",
+            margin_bp=None,
+            reference_rate_id=None,
+            installment_override_minor=None,
+            overpayment_mode="none",
+            overpayment_amount_minor=None,
+            overpayment_strategy="reduce_term",
+            archived_at=None,
+        )
+        assert not workspace_is_empty(session, ctx)
