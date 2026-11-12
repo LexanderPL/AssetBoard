@@ -6,7 +6,7 @@
 {% block content %}
 {% set input_class = "form-control px-3 py-2" %}
 {{ tabs("installments") }}
-<div class="mt-4 flex flex-wrap items-center gap-2" data-page-actions>
+<div class="mb-6 flex flex-wrap items-center gap-2" data-page-actions>
   <a href="{{ scoped_url(request, 'installment_plan_detail', loan_id=plan.loan.id) if plan else scoped_url(request, 'installment_plans') }}" class="btn">{{ _("Back to %(name)s", name=plan.name) if plan else _("Back to Installments") }}</a>
 </div>
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}

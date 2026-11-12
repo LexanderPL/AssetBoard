@@ -224,7 +224,7 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             expect(page.locator("#loan-summary-heading")).to_have_text("Home mortgage")
             _no_page_overflow(page)
             _actions_under_the_tabs(page)
-            expect(page.get_by_role("link", name="Back to Loans")).to_be_visible()
+            expect(page.get_by_role("link", name="Back to Loans")).to_have_count(0)
             expect(page.get_by_role("link", name="Edit terms")).to_be_visible()
             expect(page.locator("[data-loan-schedule]")).to_be_visible()
             expect(page.locator("[data-loan-integrations]")).to_be_visible()

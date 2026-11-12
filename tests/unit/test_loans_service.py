@@ -4,6 +4,7 @@ from datetime import date
 from uuid import UUID
 
 import pytest
+from sqlalchemy import select
 
 from assetboard.db.models.loans import Loan
 from assetboard.db.repositories import (
@@ -180,6 +181,54 @@ def test_target_total_must_not_be_below_the_first_installment(team: WorkspaceDb)
     view = loans.get_loan(team.factory, team.ctx("owner", "owner"), loan_id)
     assert view.overpayment_mode.value == "target_total"
     assert view.overpayment_amount == _money(200_000)
+
+
+def test_a_target_below_an_override_is_a_validation_error_not_a_database_error(
+    team: WorkspaceDb,
+) -> None:
+    with pytest.raises(loans.LoanError) as created:
+        _original_loan(
+            team,
+            installment_override=_money(200_000),
+            overpayment_mode="target_total",
+            overpayment_amount=_money(100_000),
+        )
+    assert created.value.code == "target_below_installment"
+    with team.factory() as session:
+        assert session.scalars(select(Loan)).all() == []
+
+
+def test_editing_terms_cannot_leave_a_target_below_the_new_override(
+    team: WorkspaceDb,
+) -> None:
+    loan_id = _original_loan(
+        team,
+        principal_original=_money(90_000),
+        overpayment_mode="target_total",
+        overpayment_amount=_money(90_000),
+    )
+    ctx = team.ctx("owner", "owner")
+    with pytest.raises(loans.LoanError) as error:
+        loans.update_loan_terms(
+            team.factory,
+            ctx,
+            loan_id,
+            name="Mortgage",
+            kind="annuity",
+            principal_original=_money(90_000_000),
+            current_balance=None,
+            balance_date=None,
+            origination_date=date(2026, 1, 1),
+            first_payment_date=date(2026, 2, 1),
+            term_months=360,
+            payment_day=1,
+            installment_override=_money(726_030),
+        )
+    assert error.value.code == "target_below_installment"
+    view = loans.get_loan(team.factory, ctx, loan_id)
+    assert view.principal_original == _money(90_000)
+    assert view.installment_override is None
+    assert view.overpayment_amount == _money(90_000)
 
 
 def test_a_reference_rate_change_cannot_push_a_target_below_the_installment(

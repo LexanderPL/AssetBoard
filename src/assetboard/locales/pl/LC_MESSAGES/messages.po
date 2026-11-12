@@ -7674,9 +7674,6 @@ msgstr "W tym harmonogramie nie ma pozostałych płatności."
 msgid "Reference rates"
 msgstr "Stopy referencyjne"
 
-msgid "Back to Loans"
-msgstr "Wróć do kredytów"
-
 msgid "Scenarios"
 msgstr "Scenariusze"
 
@@ -7942,6 +7939,22 @@ msgstr ""
 "Zmień warunki kredytu. Rodzaju stopy nie można zmienić po utworzeniu; "
 "zarchiwizuj kredyt i dodaj nowy."
 
+#, python-format
+msgid "Regular overpayment: %(summary)s."
+msgstr "Regularna nadpłata: %(summary)s."
+
+msgid "Change the regular overpayment"
+msgstr "Zmień regularną nadpłatę"
+
+msgid ""
+"A target total must be at least the monthly installment. Raise it or "
+"clear the overpayment before increasing the principal or shortening the "
+"term."
+msgstr ""
+"Docelowa kwota miesięczna nie może być niższa niż rata miesięczna. "
+"Zwiększ ją lub usuń nadpłatę przed podniesieniem kapitału lub skróceniem "
+"okresu."
+
 msgid "Loan type"
 msgstr "Rodzaj kredytu"
 
@@ -8024,9 +8037,6 @@ msgstr "Dodaj kredyt"
 msgid "Payment date"
 msgstr "Data płatności"
 
-msgid "Open"
-msgstr "Otwórz"
-
 msgid "No loans yet."
 msgstr "Brak kredytów."
 
@@ -8042,6 +8052,9 @@ msgstr "Kredyty dodane przez redaktora lub właściciela pojawią się tutaj."
 
 msgid "Archived loans"
 msgstr "Zarchiwizowane kredyty"
+
+msgid "Back to Loans"
+msgstr "Wróć do kredytów"
 
 msgid "How much do you know about the loan?"
 msgstr "Ile wiesz o kredycie?"
@@ -8519,6 +8532,9 @@ msgstr "Zapisz plan"
 
 msgid "Installment plans"
 msgstr "Plany ratalne"
+
+msgid "Open"
+msgstr "Otwórz"
 
 msgid "No installment plans yet."
 msgstr "Nie ma jeszcze planów ratalnych."

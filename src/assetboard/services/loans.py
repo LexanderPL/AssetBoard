@@ -251,18 +251,28 @@ def _reference_rate_at(values: list[ReferenceRateValue], day: date) -> int | Non
     )
 
 
+def _rate_bp(
+    rate_mode: str,
+    changes: list[LoanRateChange],
+    reference_values: list[ReferenceRateValue],
+    margin_bp: int | None,
+    day: date,
+) -> int | None:
+    if rate_mode == RateMode.FIXED.value:
+        return _fixed_rate_at(changes, day)
+    reference = _reference_rate_at(reference_values, day)
+    if reference is None or margin_bp is None:
+        return None
+    return reference + margin_bp
+
+
 def _loan_rate_at(
     loan: Loan,
     changes: list[LoanRateChange],
     reference_values: list[ReferenceRateValue],
     day: date,
 ) -> int | None:
-    if loan.rate_mode == RateMode.FIXED.value:
-        return _fixed_rate_at(changes, day)
-    reference = _reference_rate_at(reference_values, day)
-    if reference is None or loan.margin_bp is None:
-        return None
-    return reference + loan.margin_bp
+    return _rate_bp(loan.rate_mode, changes, reference_values, loan.margin_bp, day)
 
 
 def _validate_rate_timeline(
@@ -314,6 +324,37 @@ def _validate_target(
         raise LoanError(field, "missing_rate")
     if target.amount_minor < installment.amount_minor:
         raise LoanError(field, "target_below_installment")
+
+
+def _validate_target_terms(
+    *,
+    target_minor: int | None,
+    entry_path: str,
+    principal_minor: int | None,
+    current_balance_minor: int | None,
+    override_minor: int | None,
+    term_months: int,
+    kind: LoanKind,
+    currency: str,
+    rate_bp: int | None,
+) -> None:
+    """Reject a target total below the proposed first installment before the row is flushed.
+
+    The ``ck_loans_target_not_below_override`` check fires on the same UPDATE/INSERT as the new
+    override, so this check must run first; otherwise a user edit would surface as a 500.
+    """
+    if target_minor is None:
+        return
+    if override_minor is not None:
+        installment = Money(override_minor, currency)
+    else:
+        base_minor = principal_minor if entry_path == "original" else current_balance_minor
+        if base_minor is None:
+            raise LoanError("overpayment_amount", "missing_rate")
+        if rate_bp is None:
+            raise LoanError("overpayment_amount", "missing_rate")
+        installment = first_installment(Money(base_minor, currency), rate_bp, term_months, kind)
+    _validate_target(Money(target_minor, currency), installment)
 
 
 def _validate_high_rate(rate_bp: int, confirmed: bool) -> None:
@@ -740,6 +781,29 @@ def create_loan(
             currency=currency,
         )
         wanted_day_count = validate_day_count(day_count)
+        rate_bp: int | None
+        if wanted_rate_mode is RateMode.FIXED:
+            rate_bp = fixed_rate
+        else:
+            reference_values = (
+                ReferenceRateValueRepository(session, ctx).for_rate(rate_id)
+                if rate_id is not None
+                else []
+            )
+            rate_bp = _rate_bp(wanted_rate_mode.value, [], reference_values, margin, first_date)
+        _validate_target_terms(
+            target_minor=(
+                overpayment_minor if wanted_overpayment is OverpaymentMode.TARGET_TOTAL else None
+            ),
+            entry_path=entry_path,
+            principal_minor=principal_minor,
+            current_balance_minor=current_balance.amount_minor if current_balance else None,
+            override_minor=override_minor,
+            term_months=term,
+            kind=wanted_kind,
+            currency=currency,
+            rate_bp=rate_bp,
+        )
         loan = LoanRepository(session, ctx).create(
             name=clean_name,
             kind=wanted_kind.value,
@@ -773,17 +837,6 @@ def create_loan(
                 effective_from=start,
                 rate_bp=fixed_rate,
             )
-        if wanted_overpayment is OverpaymentMode.TARGET_TOTAL:
-            checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
-            changes = LoanRateChangeRepository(session, ctx).for_loan(loan.id)
-            reference_values = (
-                ReferenceRateValueRepository(session, ctx).for_rate(rate_id)
-                if rate_id is not None
-                else []
-            )
-            installment = _target_installment(loan, changes, reference_values, checkpoints)
-            if overpayment_minor is not None:
-                _validate_target(Money(overpayment_minor, currency), installment)
         _audit(
             session,
             ctx,
@@ -886,6 +939,26 @@ def update_loan_terms(
                 as_of=balance_date,
                 remaining_principal_minor=current_balance.amount_minor,
             )
+        reference_values = (
+            ReferenceRateValueRepository(session, ctx).for_rate(rate_id)
+            if rate_id is not None
+            else []
+        )
+        _validate_target_terms(
+            target_minor=(
+                loan.overpayment_amount_minor
+                if loan.overpayment_mode == OverpaymentMode.TARGET_TOTAL.value
+                else None
+            ),
+            entry_path=entry,
+            principal_minor=principal_minor,
+            current_balance_minor=current_balance.amount_minor if current_balance else None,
+            override_minor=override_minor,
+            term_months=term,
+            kind=wanted_kind,
+            currency=currency,
+            rate_bp=_rate_bp(loan.rate_mode, changes, reference_values, margin, first_date),
+        )
         LoanRepository(session, ctx).update(
             loan.id,
             name=clean_name,
@@ -900,16 +973,6 @@ def update_loan_terms(
             margin_bp=margin,
             day_count=wanted_day_count.value,
         )
-        if loan.overpayment_mode == OverpaymentMode.TARGET_TOTAL.value:
-            updated_checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
-            reference_values = (
-                ReferenceRateValueRepository(session, ctx).for_rate(loan.reference_rate_id)
-                if loan.reference_rate_id is not None
-                else []
-            )
-            installment = _target_installment(loan, changes, reference_values, updated_checkpoints)
-            if loan.overpayment_amount_minor is not None:
-                _validate_target(Money(loan.overpayment_amount_minor, currency), installment)
         _refresh_loan_occurrences(session, ctx, loan.id)
         _audit(session, ctx, "loan.updated", "loan", loan.id, {"kind": wanted_kind.value})
 

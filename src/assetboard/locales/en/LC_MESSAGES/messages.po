@@ -7139,9 +7139,6 @@ msgstr ""
 msgid "Reference rates"
 msgstr ""
 
-msgid "Back to Loans"
-msgstr ""
-
 msgid "Scenarios"
 msgstr ""
 
@@ -7396,6 +7393,19 @@ msgid ""
 "archive the loan and add a new one for that."
 msgstr ""
 
+#, python-format
+msgid "Regular overpayment: %(summary)s."
+msgstr ""
+
+msgid "Change the regular overpayment"
+msgstr ""
+
+msgid ""
+"A target total must be at least the monthly installment. Raise it or "
+"clear the overpayment before increasing the principal or shortening the "
+"term."
+msgstr ""
+
 msgid "Loan type"
 msgstr ""
 
@@ -7474,9 +7484,6 @@ msgstr ""
 msgid "Payment date"
 msgstr ""
 
-msgid "Open"
-msgstr ""
-
 msgid "No loans yet."
 msgstr ""
 
@@ -7489,6 +7496,9 @@ msgid "Loans added by an editor or owner will appear here."
 msgstr ""
 
 msgid "Archived loans"
+msgstr ""
+
+msgid "Back to Loans"
 msgstr ""
 
 msgid "How much do you know about the loan?"
@@ -7922,6 +7932,9 @@ msgid "Save plan"
 msgstr ""
 
 msgid "Installment plans"
+msgstr ""
+
+msgid "Open"
 msgstr ""
 
 msgid "No installment plans yet."

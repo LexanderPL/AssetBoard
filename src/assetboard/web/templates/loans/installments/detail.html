@@ -5,7 +5,7 @@
 {% block heading %}{{ _("Loans") }}{% endblock %}
 {% block content %}
 {{ tabs("installments") }}
-<div class="mt-4 flex flex-wrap items-center gap-2" data-page-actions>
+<div class="mb-6 flex flex-wrap items-center gap-2" data-page-actions>
   <a href="{{ scoped_url(request, 'installment_plans') }}" class="btn">{{ _("Back to Installments") }}</a>
   {% if can_edit and not plan.closed %}<a href="{{ scoped_url(request, 'installment_plan_edit', loan_id=loan.id) }}" class="btn-primary" data-edit-installment-plan>{{ _("Edit plan") }}</a>{% endif %}
   {% if can_edit and loan.archived and plan.remaining_count > 0 %}<form method="post" action="{{ scoped_url(request, 'installment_plan_restore', loan_id=loan.id) }}">{{ csrf_input() }}<button type="submit" class="btn">{{ _("Restore plan") }}</button></form>{% endif %}
