@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.6.3](https://github.com/LexanderPL/AssetBoard/compare/v0.6.2...v0.6.3) (2026-11-12)
+
+
+### Features
+
+* **archive:** extend the workspace archive to loans (F7.8) ([#296](https://github.com/LexanderPL/AssetBoard/issues/296)) ([3d2095c](https://github.com/LexanderPL/AssetBoard/commit/3d2095c5b5bc7e727d97b2213a4fa9fbde2a960c))
+* **loans:** add F7.1 loan terms and configuration ([#288](https://github.com/LexanderPL/AssetBoard/issues/288)) ([7f2e03e](https://github.com/LexanderPL/AssetBoard/commit/7f2e03e5a0f3e666c03c3394139e61025885fe38))
+* **loans:** add F7.5 actual payments and checkpoints ([#293](https://github.com/LexanderPL/AssetBoard/issues/293)) ([5c6f500](https://github.com/LexanderPL/AssetBoard/commit/5c6f500c45cfa4de02e5e0637cf01cb494fa86e7))
+* **loans:** add F7.6 loan integrations ([#294](https://github.com/LexanderPL/AssetBoard/issues/294)) ([89ed3aa](https://github.com/LexanderPL/AssetBoard/commit/89ed3aad9ae625ea30be1561d1eb9b1f10af0fd3))
+* **loans:** add F7.7 installment plans ([#295](https://github.com/LexanderPL/AssetBoard/issues/295)) ([30f6812](https://github.com/LexanderPL/AssetBoard/commit/30f6812376a3b30ac99a9cbd683abac0888e317a))
+* **loans:** add the F7.2 schedule engine ([#290](https://github.com/LexanderPL/AssetBoard/issues/290)) ([0557716](https://github.com/LexanderPL/AssetBoard/commit/0557716863d81eedaf58b8f876abdb065b8539ab))
+* **loans:** add the F7.3 loan page, schedule and charts ([#291](https://github.com/LexanderPL/AssetBoard/issues/291)) ([b128d53](https://github.com/LexanderPL/AssetBoard/commit/b128d53a01449d1fb00e0a48324514dd9a4134fd))
+* **loans:** add the F7.4 what-if scenarios ([#292](https://github.com/LexanderPL/AssetBoard/issues/292)) ([df16ae0](https://github.com/LexanderPL/AssetBoard/commit/df16ae0aed12fb4410571aef9a4dbdbca2b5a812))
+
 ## [0.6.2](https://github.com/LexanderPL/AssetBoard/compare/v0.6.1...v0.6.2) (2026-11-11)
 
 
