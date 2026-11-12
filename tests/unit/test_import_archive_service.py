@@ -49,10 +49,18 @@ from assetboard.domain.archive import (
     BudgetLineRow,
     CategoryRow,
     FxRateRow,
+    InstallmentPlanRow,
     InstrumentAllocationRow,
     InstrumentRow,
     InvestmentTransactionRow,
     ItemValuationRow,
+    LoanBalanceCheckpointRow,
+    LoanCostComponentRow,
+    LoanOverpaymentRow,
+    LoanPaymentRow,
+    LoanRateChangeRow,
+    LoanRow,
+    LoanScenarioRow,
     MonthRow,
     NetWorthCategoryRow,
     NetWorthItemRow,
@@ -60,6 +68,8 @@ from assetboard.domain.archive import (
     ParsedArchive,
     PricePointRow,
     PriceSourceConfigRow,
+    ReferenceRateRow,
+    ReferenceRateValueRow,
     RiskTargetPolicyRow,
     TransactionRow,
     manifest_bytes,
@@ -130,6 +140,21 @@ FX_RATE = UUID("a2a2a2a2-a2a2-4a2a-8a2a-a2a2a2a2a2a2")
 PROVIDER_CONFIG = UUID("a3a3a3a3-a3a3-4a3a-8a3a-a3a3a3a3a3a3")
 DIVIDEND_INCOME = UUID("a4a4a4a4-a4a4-4a4a-8a4a-a4a4a4a4a4a4")
 DIVIDEND_TX = UUID("a5a5a5a5-a5a5-4a5a-8a5a-a5a5a5a5a5a5")
+RATE = UUID("b0b0b0b0-b0b0-4b0b-8b0b-b0b0b0b0b0b0")
+RATE_VALUE = UUID("b1b1b1b1-b1b1-4b1b-8b1b-b1b1b1b1b1b1")
+MORTGAGE_LOAN = UUID("b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2")
+CAR_LOAN = UUID("b3b3b3b3-b3b3-4b3b-8b3b-b3b3b3b3b3b3")
+PLAN_LOAN = UUID("b4b4b4b4-b4b4-4b4b-8b4b-b4b4b4b4b4b4")
+RATE_CHANGE = UUID("b5b5b5b5-b5b5-4b5b-8b5b-b5b5b5b5b5b5")
+COST_PERCENT = UUID("b6b6b6b6-b6b6-4b6b-8b6b-b6b6b6b6b6b6")
+COST_FIXED = UUID("b7b7b7b7-b7b7-4b7b-8b7b-b7b7b7b7b7b7")
+LOAN_OVERPAYMENT = UUID("b8b8b8b8-b8b8-4b8b-8b8b-b8b8b8b8b8b8")
+LOAN_PAYMENT = UUID("b9b9b9b9-b9b9-4b9b-8b9b-b9b9b9b9b9b9")
+CHECKPOINT = UUID("c0c0c0c0-c0c0-4c0c-8c0c-c0c0c0c0c0c0")
+SCENARIO = UUID("c1c1c1c1-c1c1-4c1c-8c1c-c1c1c1c1c1c1")
+PLAN = UUID("c2c2c2c2-c2c2-4c2c-8c2c-c2c2c2c2c2c2")
+NW_LOANS = UUID("c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3")
+NW_MORTGAGE = UUID("c4c4c4c4-c4c4-4c4c-8c4c-c4c4c4c4c4c4")
 
 
 @pytest.fixture
@@ -471,6 +496,384 @@ def _rows(*, currency: str = "EUR", name: str = "Home") -> ArchiveRows:
     )
 
 
+def _loan_rows(*, currency: str = "EUR") -> ArchiveRows:
+    """The base archive plus every loan table, with loan_balance and transaction links."""
+    rows = _rows(currency=currency)
+    return replace(
+        rows,
+        networth_categories=(
+            *rows.networth_categories,
+            NetWorthCategoryRow(str(NW_LOANS), "liability", "Loans", "#a35d3b", 0, None),
+        ),
+        networth_items=(
+            *rows.networth_items,
+            NetWorthItemRow(
+                str(NW_MORTGAGE),
+                "liability",
+                "Loans",
+                str(NW_LOANS),
+                "Mortgage",
+                currency,
+                "",
+                None,
+                "linked",
+                "loan_balance",
+                str(MORTGAGE_LOAN),
+                "true",
+                "false",
+                None,
+                "false",
+            ),
+        ),
+        reference_rates=(ReferenceRateRow(str(RATE), "WIBOR", "3M fixing"),),
+        reference_rate_values=(
+            ReferenceRateValueRow(str(RATE_VALUE), str(RATE), "WIBOR", "2026-01-01", 575),
+        ),
+        loans=(
+            LoanRow(
+                str(MORTGAGE_LOAN),
+                "Home mortgage",
+                "annuity",
+                currency,
+                "300000.00",
+                "2026-01-01",
+                "2026-02-01",
+                240,
+                1,
+                "variable",
+                "actual_365",
+                150,
+                str(RATE),
+                "WIBOR",
+                str(NW_CAR),
+                "Car",
+                "true",
+                "",
+                "fixed_extra",
+                "100.00",
+                "reduce_term",
+                None,
+            ),
+            LoanRow(
+                str(CAR_LOAN),
+                "Car loan",
+                "annuity",
+                currency,
+                "50000.00",
+                "2026-01-15",
+                "2026-02-15",
+                24,
+                15,
+                "fixed",
+                "monthly",
+                None,
+                None,
+                "",
+                None,
+                "",
+                "false",
+                "",
+                "none",
+                "",
+                "reduce_term",
+                None,
+            ),
+            LoanRow(
+                str(PLAN_LOAN),
+                "Phone",
+                "installment_plan",
+                currency,
+                "3000.00",
+                None,
+                "2026-04-05",
+                3,
+                5,
+                "fixed",
+                "monthly",
+                None,
+                None,
+                "",
+                None,
+                "",
+                "false",
+                "",
+                "none",
+                "",
+                "reduce_term",
+                None,
+            ),
+        ),
+        loan_rate_changes=(
+            LoanRateChangeRow(str(RATE_CHANGE), str(CAR_LOAN), "Car loan", "2026-01-15", 650),
+        ),
+        loan_cost_components=(
+            LoanCostComponentRow(
+                str(COST_PERCENT),
+                str(MORTGAGE_LOAN),
+                "Home mortgage",
+                "Account fee",
+                "percent",
+                20,
+                "",
+                "opening_balance",
+                "2026-01-01",
+                None,
+            ),
+            LoanCostComponentRow(
+                str(COST_FIXED),
+                str(MORTGAGE_LOAN),
+                "Home mortgage",
+                "Insurance",
+                "fixed",
+                None,
+                "25.00",
+                "opening_balance",
+                "2026-01-01",
+                None,
+            ),
+        ),
+        loan_overpayments=(
+            LoanOverpaymentRow(
+                str(LOAN_OVERPAYMENT),
+                str(MORTGAGE_LOAN),
+                "Home mortgage",
+                "2026-06-01",
+                "1000.00",
+                "Bonus",
+            ),
+        ),
+        loan_payments=(
+            LoanPaymentRow(
+                str(LOAN_PAYMENT),
+                str(MORTGAGE_LOAN),
+                "Home mortgage",
+                "2026-03-01",
+                "installment",
+                "2000.00",
+                "1000.00",
+                "990.00",
+                "10.00",
+                "0.00",
+                "",
+                "manual",
+                str(SOURCE),
+            ),
+        ),
+        loan_balance_checkpoints=(
+            LoanBalanceCheckpointRow(
+                str(CHECKPOINT),
+                str(MORTGAGE_LOAN),
+                "Home mortgage",
+                "2026-07-01",
+                "280000.00",
+                "Bank statement",
+            ),
+        ),
+        loan_scenarios=(
+            LoanScenarioRow(
+                str(SCENARIO),
+                str(MORTGAGE_LOAN),
+                "Home mortgage",
+                "Faster",
+                "fixed_extra",
+                "2000.00",
+                "reduce_term",
+                None,
+                None,
+                None,
+                "",
+            ),
+        ),
+        installment_plans=(
+            InstallmentPlanRow(
+                str(PLAN),
+                str(PLAN_LOAN),
+                "Phone",
+                str(FOOD),
+                "Food",
+                "1000.00",
+                3,
+                "2026-06-05",
+                None,
+            ),
+        ),
+    )
+
+
+def _loan_source_workspace(db: WorkspaceDb) -> None:
+    from assetboard.db.repositories import (
+        InstallmentPlanRepository,
+        LoanBalanceCheckpointRepository,
+        LoanCostComponentRepository,
+        LoanOverpaymentRepository,
+        LoanPaymentRepository,
+        LoanRateChangeRepository,
+        LoanRepository,
+        LoanScenarioRepository,
+        ReferenceRateRepository,
+        ReferenceRateValueRepository,
+    )
+
+    _source_workspace(db)
+    ctx = db.ctx("own", "owner")
+    with db.factory.begin() as session:
+        car = next(
+            row for row in NetWorthItemRepository(session, ctx).ordered() if row.name == "Car"
+        )
+        rate = ReferenceRateRepository(session, ctx).create(
+            id=RATE, name="WIBOR", name_key="wibor", notes="3M fixing"
+        )
+        ReferenceRateValueRepository(session, ctx).create(
+            id=RATE_VALUE,
+            reference_rate_id=rate.id,
+            effective_from=date(2026, 1, 1),
+            value_bp=575,
+        )
+        loan = LoanRepository(session, ctx).create(
+            id=MORTGAGE_LOAN,
+            name="Home mortgage",
+            kind="annuity",
+            currency="EUR",
+            principal_original_minor=30_000_000,
+            origination_date=date(2026, 1, 1),
+            first_payment_date=date(2026, 2, 1),
+            term_months=240,
+            payment_day=1,
+            rate_mode="variable",
+            day_count="actual_365",
+            margin_bp=150,
+            reference_rate_id=rate.id,
+            property_item_id=car.id,
+            auto_record_payments=True,
+            overpayment_mode="fixed_extra",
+            overpayment_amount_minor=10_000,
+            overpayment_strategy="reduce_term",
+        )
+        LoanRepository(session, ctx).create(
+            id=CAR_LOAN,
+            name="Car loan",
+            kind="annuity",
+            currency="EUR",
+            principal_original_minor=5_000_000,
+            origination_date=date(2026, 1, 15),
+            first_payment_date=date(2026, 2, 15),
+            term_months=24,
+            payment_day=15,
+            rate_mode="fixed",
+            day_count="monthly",
+            overpayment_mode="none",
+            overpayment_strategy="reduce_term",
+        )
+        plan_loan = LoanRepository(session, ctx).create(
+            id=PLAN_LOAN,
+            name="Phone",
+            kind="installment_plan",
+            currency="EUR",
+            principal_original_minor=300_000,
+            origination_date=None,
+            first_payment_date=date(2026, 4, 5),
+            term_months=3,
+            payment_day=5,
+            rate_mode="fixed",
+            day_count="monthly",
+            overpayment_mode="none",
+            overpayment_strategy="reduce_term",
+        )
+        LoanRateChangeRepository(session, ctx).create(
+            id=RATE_CHANGE, loan_id=CAR_LOAN, effective_from=date(2026, 1, 15), rate_bp=650
+        )
+        LoanCostComponentRepository(session, ctx).create(
+            id=COST_PERCENT,
+            loan_id=loan.id,
+            name="Account fee",
+            mode="percent",
+            rate_bp=20,
+            basis="opening_balance",
+            effective_from=date(2026, 1, 1),
+        )
+        LoanCostComponentRepository(session, ctx).create(
+            id=COST_FIXED,
+            loan_id=loan.id,
+            name="Insurance",
+            mode="fixed",
+            fixed_minor=2_500,
+            basis="opening_balance",
+            effective_from=date(2026, 1, 1),
+        )
+        LoanOverpaymentRepository(session, ctx).create(
+            id=LOAN_OVERPAYMENT,
+            loan_id=loan.id,
+            date=date(2026, 6, 1),
+            amount_minor=100_000,
+            note="Bonus",
+        )
+        transaction = next(
+            row
+            for row in TransactionRepository(session, ctx).list()
+            if row.import_key == f"id:{SOURCE}"
+        )
+        LoanPaymentRepository(session, ctx).create(
+            id=LOAN_PAYMENT,
+            loan_id=loan.id,
+            date=date(2026, 3, 1),
+            kind="installment",
+            total_minor=200_000,
+            principal_minor=100_000,
+            interest_minor=99_000,
+            costs_minor=1_000,
+            overpayment_minor=0,
+            source="manual",
+            transaction_id=transaction.id,
+        )
+        LoanBalanceCheckpointRepository(session, ctx).create(
+            id=CHECKPOINT,
+            loan_id=loan.id,
+            as_of=date(2026, 7, 1),
+            remaining_principal_minor=28_000_000,
+            note="Bank statement",
+        )
+        LoanScenarioRepository(session, ctx).create(
+            id=SCENARIO,
+            loan_id=loan.id,
+            name="Faster",
+            name_key="faster",
+            overpayment_mode="fixed_extra",
+            overpayment_amount_minor=200_000,
+            overpayment_strategy="reduce_term",
+        )
+        food = next(
+            row for row in CategoryRepository(session, ctx).list() if row.import_key == f"id:{FOOD}"
+        )
+        InstallmentPlanRepository(session, ctx).create(
+            id=PLAN,
+            loan_id=plan_loan.id,
+            category_id=food.id,
+            installment_minor=100_000,
+            remaining_count=3,
+            end_date=date(2026, 6, 5),
+        )
+        categories = NetWorthCategoryRepository(session, ctx)
+        loans_category = categories.create(
+            name="Loans",
+            name_key="loans",
+            side="liability",
+            color="#a35d3b",
+            sort_order=0,
+            import_key=f"id:{NW_LOANS}",
+        )
+        NetWorthItemRepository(session, ctx).create(
+            side="liability",
+            category_id=loans_category.id,
+            name="Mortgage",
+            currency="EUR",
+            valuation_mode="linked",
+            link_type="loan_balance",
+            link_id=loan.id,
+            estimate_between=False,
+            import_key=f"id:{NW_MORTGAGE}",
+        )
+
+
 def _source_workspace(db: WorkspaceDb) -> None:
     ctx = db.ctx("own", "owner")
     with db.factory.begin() as session:
@@ -808,9 +1211,106 @@ def test_restore_round_trip_is_byte_identical(db: WorkspaceDb, data_dir: Path) -
         "price_points.csv",
         "fx_rates.csv",
         "price_source_configs.csv",
+        "reference_rates.csv",
+        "reference_rate_values.csv",
+        "loans.csv",
+        "loan_rate_changes.csv",
+        "loan_cost_components.csv",
+        "loan_overpayments.csv",
+        "loan_payments.csv",
+        "loan_balance_checkpoints.csv",
+        "loan_scenarios.csv",
+        "installment_plans.csv",
     ):
         assert first_parsed.files[name] == second_parsed.files[name]
     assert first_parsed.manifest["files"] == second_parsed.manifest["files"]
+
+
+def test_loan_restore_round_trip_maps_references_and_keeps_schedule(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    from assetboard.db.repositories import (
+        InstallmentPlanRepository,
+        LoanPaymentRepository,
+        LoanRepository,
+        ReferenceRateRepository,
+    )
+    from assetboard.domain.loans import summarize_schedule
+    from assetboard.services.loan_schedule import (
+        build_inputs_schedule,
+        load_loan_schedule_inputs,
+    )
+
+    _loan_source_workspace(db)
+    source_ctx = db.ctx("own", "owner")
+    first = export_workspace(db.factory, source_ctx).content
+    source_inputs = load_loan_schedule_inputs(db.factory, source_ctx, MORTGAGE_LOAN)
+    source_schedule = build_inputs_schedule(source_inputs)
+    source_summary = summarize_schedule(source_schedule, source_inputs.as_of)
+
+    parsed, errors = parse_archive(first)
+    assert errors == () and parsed is not None
+    assert len(parsed.rows.reference_rates) == 1
+    assert len(parsed.rows.reference_rate_values) == 1
+    assert len(parsed.rows.loans) == 3
+    assert len(parsed.rows.loan_rate_changes) == 1
+    assert len(parsed.rows.loan_cost_components) == 2
+    assert len(parsed.rows.loan_overpayments) == 1
+    assert len(parsed.rows.loan_payments) == 1
+    assert len(parsed.rows.loan_balance_checkpoints) == 1
+    assert len(parsed.rows.loan_scenarios) == 1
+    assert len(parsed.rows.installment_plans) == 1
+    assert parsed.rows.loan_payments[0].transaction_id == str(SOURCE)
+
+    target = _target(db)
+    target_ctx = db.ctx("own", "owner", workspace_id=target)
+    batch_id = _upload(db, data_dir, first, ctx=target_ctx)
+    report = _plan(db, data_dir, batch_id, ctx=target_ctx)
+    assert report["counts"]["invalid"] == 0, report
+    assert report["counts"]["loans_created"] == 3
+    _apply(db, data_dir, batch_id, ctx=target_ctx)
+
+    with db.factory() as session:
+        loans_by_name = {row.name: row for row in LoanRepository(session, target_ctx).ordered()}
+        mortgage = loans_by_name["Home mortgage"]
+        plan_loan = loans_by_name["Phone"]
+        assert mortgage.property_item_id is not None
+        property_item = NetWorthItemRepository(session, target_ctx).get(mortgage.property_item_id)
+        assert property_item is not None and property_item.name == "Car"
+        payment = LoanPaymentRepository(session, target_ctx).for_loan(mortgage.id)[0]
+        assert payment.transaction_id is not None
+        transaction = TransactionRepository(session, target_ctx).get(payment.transaction_id)
+        assert transaction is not None and transaction.import_key == f"id:{SOURCE}"
+        plan = InstallmentPlanRepository(session, target_ctx).for_loan(plan_loan.id)
+        assert plan is not None and plan.remaining_count == 3
+        plan_category = CategoryRepository(session, target_ctx).get(plan.category_id)
+        assert plan_category is not None and plan_category.import_key == f"id:{FOOD}"
+        linked_item = next(
+            row
+            for row in NetWorthItemRepository(session, target_ctx).ordered()
+            if row.name == "Mortgage"
+        )
+        assert linked_item.valuation_mode == "linked"
+        assert linked_item.link_type == "loan_balance"
+        assert linked_item.link_id == mortgage.id
+        assert [row.name for row in ReferenceRateRepository(session, target_ctx).ordered()] == [
+            "WIBOR"
+        ]
+
+    target_inputs = load_loan_schedule_inputs(db.factory, target_ctx, mortgage.id)
+    target_schedule = build_inputs_schedule(target_inputs)
+    assert target_schedule.rows == source_schedule.rows
+    assert summarize_schedule(target_schedule, target_inputs.as_of) == source_summary
+
+    second = export_workspace(db.factory, target_ctx).content
+    second_parsed, second_errors = parse_archive(second)
+    assert second_errors == () and second_parsed is not None
+    assert (
+        second_parsed.rows.loan_payments[0].transaction_id
+        == parsed.rows.loan_payments[0].transaction_id
+    )
+    assert second_parsed.rows.loan_balance_checkpoints[0].remaining_principal == ("280000.00")
+    assert second_parsed.rows.installment_plans[0].category == "Food"
 
 
 def test_restore_preserves_a_linked_dividend_and_its_source(
@@ -1481,6 +1981,24 @@ def test_restore_reads_the_v1_2_golden_archive(db: WorkspaceDb, data_dir: Path) 
         assert snapshots[0].breakdown["categories"][0]["category_id"] == str(categories[0].id)
 
 
+def test_restore_reads_the_v1_4_golden_archive_without_loan_files(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    from assetboard.db.repositories import LoanRepository, ReferenceRateRepository
+
+    content = (Path(__file__).parents[1] / "fixtures" / "workspace-archive-v1.4.zip").read_bytes()
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    batch_id = _upload(db, data_dir, content, ctx=ctx)
+    report = _plan(db, data_dir, batch_id, ctx=ctx)
+    assert report["counts"]["invalid"] == 0, report
+    assert report["counts"]["loans_created"] == 0
+    _apply(db, data_dir, batch_id, ctx=ctx)
+    with db.factory() as session:
+        assert LoanRepository(session, ctx).list() == []
+        assert ReferenceRateRepository(session, ctx).list() == []
+
+
 def test_v1_3_portfolio_link_restores_through_the_missing_target_fallback(
     db: WorkspaceDb, data_dir: Path
 ) -> None:
@@ -1886,6 +2404,7 @@ def test_merge_into_source_workspace_creates_nothing(db: WorkspaceDb, data_dir: 
     assert [warning["code"] for warning in report["warnings"]] == [
         "networth_restore_only",
         "investment_restore_only",
+        "loan_restore_only",
     ]
     _apply(db, data_dir, batch_id, ctx=db.ctx("own", "owner"))
     with db.factory() as session:
@@ -1911,6 +2430,7 @@ def test_merge_into_another_workspace_keeps_settings_and_maps_archived(
     assert [warning["code"] for warning in report["warnings"]] == [
         "networth_restore_only",
         "investment_restore_only",
+        "loan_restore_only",
     ]
     _apply(db, data_dir, batch_id, ctx=target_ctx)
     with db.factory() as session:
@@ -2155,6 +2675,181 @@ def test_merge_refuses_currency_mismatch_and_restore_accepts_it(
     restore_report = _plan(db, data_dir, restore_batch, ctx=target_ctx)
     assert restore_report["counts"]["invalid"] == 0, restore_report
     _apply(db, data_dir, restore_batch, ctx=target_ctx)
+
+
+def test_lone_reference_rate_values_merge_creates_reports_and_keeps_stored_values(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    from assetboard.db.repositories import ReferenceRateRepository, ReferenceRateValueRepository
+
+    ctx = db.ctx("own", "owner")
+    content = (
+        b"reference_rate,effective_from,value_bp\r\n"
+        b"WIBOR,2026-01-01,575\r\n"
+        b"WIBOR,2026-06-01,600\r\n"
+    )
+    batch_id = _upload(db, data_dir, content, ctx=ctx, mode="merge")
+    report = _plan(db, data_dir, batch_id, ctx=ctx)
+    assert report["source"] == "reference_rate_values_csv"
+    assert report["counts"]["to_create"] == 2
+    assert report["counts"]["reference_rates_created"] == 1
+    _apply(db, data_dir, batch_id, ctx=ctx)
+    with db.factory() as session:
+        rate = ReferenceRateRepository(session, ctx).by_name_key("wibor")
+        assert rate is not None
+        values = ReferenceRateValueRepository(session, ctx).for_rate(rate.id)
+        assert [(value.effective_from.isoformat(), value.value_bp) for value in values] == [
+            ("2026-01-01", 575),
+            ("2026-06-01", 600),
+        ]
+
+    batch_id = _upload(
+        db,
+        data_dir,
+        (
+            b"reference_rate,effective_from,value_bp\r\n"
+            b"WIBOR,2026-01-01,575\r\n"
+            b"WIBOR,2026-06-01,625\r\n"
+            b"EURIBOR,2026-01-01,300\r\n"
+        ),
+        ctx=ctx,
+        mode="merge",
+    )
+    report = _plan(db, data_dir, batch_id, ctx=ctx)
+    assert report["counts"]["to_create"] == 1
+    assert report["counts"]["duplicates_skipped"] == 1
+    assert report["counts"]["conflicts_skipped"] == 1
+    assert report["counts"]["reference_rates_created"] == 1
+    assert {entry["code"] for entry in report["skipped"]} == {
+        "already_imported",
+        "reference_rate_value_differs",
+    }
+    _apply(db, data_dir, batch_id, ctx=ctx)
+    with db.factory() as session:
+        rates = ReferenceRateRepository(session, ctx).ordered()
+        assert [rate.name for rate in rates] == ["EURIBOR", "WIBOR"]
+        wibor = next(rate for rate in rates if rate.name == "WIBOR")
+        values = {
+            value.effective_from.isoformat(): value.value_bp
+            for value in ReferenceRateValueRepository(session, ctx).for_rate(wibor.id)
+        }
+        assert values == {"2026-01-01": 575, "2026-06-01": 600}
+
+
+def test_lone_loan_archive_files_are_restore_only(db: WorkspaceDb, data_dir: Path) -> None:
+    from assetboard.domain.archive import CSV_COLUMNS
+    from assetboard.services.imports import ImportUnavailable
+
+    ctx = db.ctx("own", "owner")
+    output = StringIO()
+    writer = csv.DictWriter(
+        output,
+        fieldnames=CSV_COLUMNS["loans.csv"],
+        lineterminator="\r\n",
+        extrasaction="ignore",
+    )
+    writer.writeheader()
+    writer.writerow(
+        {
+            "id": str(MORTGAGE_LOAN),
+            "name": "Loan",
+            "kind": "annuity",
+            "currency": "EUR",
+            "first_payment_date": "2026-02-01",
+            "term_months": "12",
+            "payment_day": "1",
+            "rate_mode": "fixed",
+            "day_count": "monthly",
+            "auto_record_payments": "false",
+            "overpayment_mode": "none",
+            "overpayment_strategy": "reduce_term",
+        }
+    )
+    batch_id = _upload(db, data_dir, output.getvalue().encode(), ctx=ctx, mode="merge")
+    report = _plan(db, data_dir, batch_id, ctx=ctx)
+    assert report["source"] == "loans_csv"
+    with pytest.raises(ImportUnavailable):
+        _apply(db, data_dir, batch_id, ctx=ctx)
+
+
+def test_restore_into_a_fresh_database_preserves_loan_ids(db: WorkspaceDb, tmp_path: Path) -> None:
+    from assetboard.db.repositories import (
+        InstallmentPlanRepository,
+        LoanRepository,
+        ReferenceRateRepository,
+        ReferenceRateValueRepository,
+    )
+
+    _loan_source_workspace(db)
+    content = export_workspace(db.factory, db.ctx("own", "owner")).content
+    fresh_dir = tmp_path / "fresh"
+    fresh_dir.mkdir()
+    fresh = workspace_db(fresh_dir)
+    target_db = next(fresh)
+    try:
+        target_db.add_member("own", "owner")
+        ctx = target_db.ctx("own", "owner")
+        import_dir = tmp_path / "fresh-imports"
+        import_dir.mkdir()
+        batch_id = _upload(target_db, import_dir, content, ctx=ctx)
+        report = _plan(target_db, import_dir, batch_id, ctx=ctx)
+        assert report["counts"]["invalid"] == 0, report
+        _apply(target_db, import_dir, batch_id, ctx=ctx)
+        with target_db.factory() as session:
+            assert LoanRepository(session, ctx).get(MORTGAGE_LOAN) is not None
+            assert LoanRepository(session, ctx).get(PLAN_LOAN) is not None
+            assert ReferenceRateRepository(session, ctx).get(RATE) is not None
+            assert ReferenceRateValueRepository(session, ctx).get(RATE_VALUE) is not None
+            plan = InstallmentPlanRepository(session, ctx).get(PLAN)
+            assert plan is not None and plan.loan_id == PLAN_LOAN
+            linked_item = next(
+                row
+                for row in NetWorthItemRepository(session, ctx).ordered()
+                if row.name == "Mortgage"
+            )
+            assert linked_item.link_id == MORTGAGE_LOAN
+    finally:
+        target_db.engine.dispose()
+
+
+def test_restore_rollback_removes_the_restored_loan_rows(db: WorkspaceDb, data_dir: Path) -> None:
+    from assetboard.db.repositories import (
+        InstallmentPlanRepository,
+        LoanBalanceCheckpointRepository,
+        LoanCostComponentRepository,
+        LoanOverpaymentRepository,
+        LoanPaymentRepository,
+        LoanRateChangeRepository,
+        LoanRepository,
+        LoanScenarioRepository,
+        ReferenceRateRepository,
+        ReferenceRateValueRepository,
+    )
+
+    target = _target(db)
+    ctx = db.ctx("own", "owner", workspace_id=target)
+    batch_id = _upload(db, data_dir, _archive(_loan_rows()), ctx=ctx)
+    report = _plan(db, data_dir, batch_id, ctx=ctx)
+    assert report["counts"]["invalid"] == 0, report
+    _apply(db, data_dir, batch_id, ctx=ctx)
+    preview = preview_rollback_import(db.factory, ctx, batch_id)
+    assert preview.blocked_reasons == ()
+    rollback_import(db.factory, ctx, batch_id)
+    with db.factory() as session:
+        for repository in (
+            ReferenceRateRepository,
+            ReferenceRateValueRepository,
+            LoanRepository,
+            LoanRateChangeRepository,
+            LoanCostComponentRepository,
+            LoanOverpaymentRepository,
+            LoanPaymentRepository,
+            LoanBalanceCheckpointRepository,
+            LoanScenarioRepository,
+            InstallmentPlanRepository,
+        ):
+            assert repository(session, ctx).list() == []
+        assert workspace_is_empty(session, ctx)
 
 
 def test_loans_and_reference_rates_make_a_workspace_non_empty(db: WorkspaceDb) -> None:

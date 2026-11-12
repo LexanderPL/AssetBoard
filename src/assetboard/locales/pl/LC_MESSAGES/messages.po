@@ -1695,6 +1695,17 @@ msgstr ""
 "Pliki inwestycji służą tylko do przywracania; zostały pominięte w tym "
 "scalaniu."
 
+msgid "Loan files are restored only; they were ignored in this merge."
+msgstr ""
+"Pliki kredytów służą tylko do przywracania; zostały pominięte w tym "
+"scalaniu."
+
+msgid "A different value is already stored for this date; it is kept."
+msgstr "Dla tej daty jest już zapisana inna wartość; pozostaje bez zmian."
+
+msgid "Enter a whole rate in basis points between 0 and 10000."
+msgstr "Podaj całą stawkę w punktach bazowych od 0 do 10000."
+
 #, python-format
 msgid "Re-enter the API key and enable %(provider)s."
 msgstr "Wprowadź ponownie klucz API i włącz %(provider)s."

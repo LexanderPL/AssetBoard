@@ -34,11 +34,22 @@ from assetboard.domain.instruments import (
     RiskTier,
     ValuationSource,
 )
+from assetboard.domain.loans import (
+    MAX_LOAN_NAME_LENGTH,
+    MAX_TERM_MONTHS,
+    DayCount,
+    LoanKind,
+    LoanPaymentKind,
+    LoanPaymentSource,
+    OverpaymentMode,
+    OverpaymentStrategy,
+    RateMode,
+)
 from assetboard.domain.money import minor_unit_for
 from assetboard.domain.networth import MAX_ITEM_NAME_LENGTH, MAX_NOTES_LENGTH, Side
 
 FORMAT = "workspace-archive"
-FORMAT_VERSION = "1.4"
+FORMAT_VERSION = "1.5"
 # Bounds of the optional ``upcoming_days`` key (1.1); mirror ``config.MIN/MAX_UPCOMING_DAYS``.
 MIN_UPCOMING_DAYS = 1
 MAX_UPCOMING_DAYS = 365
@@ -181,6 +192,99 @@ CSV_COLUMNS = {
         "daily_call_budget",
         "fx_backfilled",
     ),
+    "reference_rates.csv": ("id", "name", "notes"),
+    "reference_rate_values.csv": (
+        "id",
+        "reference_rate_id",
+        "reference_rate",
+        "effective_from",
+        "value_bp",
+    ),
+    "loans.csv": (
+        "id",
+        "name",
+        "kind",
+        "currency",
+        "principal_original",
+        "origination_date",
+        "first_payment_date",
+        "term_months",
+        "payment_day",
+        "rate_mode",
+        "day_count",
+        "margin_bp",
+        "reference_rate_id",
+        "reference_rate",
+        "property_item_id",
+        "property_item",
+        "auto_record_payments",
+        "installment_override",
+        "overpayment_mode",
+        "overpayment_amount",
+        "overpayment_strategy",
+        "archived_at",
+    ),
+    "loan_rate_changes.csv": ("id", "loan_id", "loan", "effective_from", "rate_bp"),
+    "loan_cost_components.csv": (
+        "id",
+        "loan_id",
+        "loan",
+        "name",
+        "mode",
+        "rate_bp",
+        "fixed_amount",
+        "basis",
+        "effective_from",
+        "effective_to",
+    ),
+    "loan_overpayments.csv": ("id", "loan_id", "loan", "date", "amount", "note"),
+    "loan_payments.csv": (
+        "id",
+        "loan_id",
+        "loan",
+        "date",
+        "kind",
+        "total",
+        "principal",
+        "interest",
+        "costs",
+        "overpayment",
+        "note",
+        "source",
+        "transaction_id",
+    ),
+    "loan_balance_checkpoints.csv": (
+        "id",
+        "loan_id",
+        "loan",
+        "as_of",
+        "remaining_principal",
+        "note",
+    ),
+    "loan_scenarios.csv": (
+        "id",
+        "loan_id",
+        "loan",
+        "name",
+        "overpayment_mode",
+        "overpayment_amount",
+        "overpayment_strategy",
+        "rate_shift_bp",
+        "rate_shift_from",
+        "one_off_date",
+        "one_off_amount",
+    ),
+    "installment_plans.csv": (
+        "id",
+        "loan_id",
+        "loan",
+        "category_id",
+        "category",
+        "installment",
+        "remaining_count",
+        "end_date",
+        "closed_at",
+    ),
 }
 BASE_CSV_FILES = ("categories.csv", "budget_lines.csv", "transactions.csv", "months.csv")
 NETWORTH_CSV_FILES = (
@@ -198,6 +302,18 @@ INVESTMENT_CSV_FILES = (
     "price_points.csv",
     "fx_rates.csv",
     "price_source_configs.csv",
+)
+LOAN_CSV_FILES = (
+    "reference_rates.csv",
+    "reference_rate_values.csv",
+    "loans.csv",
+    "loan_rate_changes.csv",
+    "loan_cost_components.csv",
+    "loan_overpayments.csv",
+    "loan_payments.csv",
+    "loan_balance_checkpoints.csv",
+    "loan_scenarios.csv",
+    "installment_plans.csv",
 )
 FILE_ORDER = ("workspace.json", *CSV_COLUMNS)
 REQUIRED_FILES = ("manifest.json", *FILE_ORDER)
@@ -223,6 +339,8 @@ def required_files(version: str) -> tuple[str, ...]:
     csv_files = BASE_CSV_FILES + (NETWORTH_CSV_FILES if minor >= 2 else ())
     if minor >= 4:
         csv_files += INVESTMENT_CSV_FILES
+    if minor >= 5:
+        csv_files += LOAN_CSV_FILES
     return ("manifest.json", "workspace.json", *csv_files)
 
 
@@ -432,6 +550,136 @@ class RiskTargetPolicyRow:
 
 
 @dataclass(frozen=True, slots=True)
+class ReferenceRateRow:
+    id: str
+    name: str
+    notes: str
+
+
+@dataclass(frozen=True, slots=True)
+class ReferenceRateValueRow:
+    id: str
+    reference_rate_id: str
+    reference_rate: str
+    effective_from: str
+    value_bp: int
+
+
+@dataclass(frozen=True, slots=True)
+class LoanRow:
+    id: str
+    name: str
+    kind: str
+    currency: str
+    principal_original: str
+    origination_date: str | None
+    first_payment_date: str
+    term_months: int
+    payment_day: int
+    rate_mode: str
+    day_count: str
+    margin_bp: int | None
+    reference_rate_id: str | None
+    reference_rate: str
+    property_item_id: str | None
+    property_item: str
+    auto_record_payments: str
+    installment_override: str
+    overpayment_mode: str
+    overpayment_amount: str
+    overpayment_strategy: str
+    archived_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class LoanRateChangeRow:
+    id: str
+    loan_id: str
+    loan: str
+    effective_from: str
+    rate_bp: int
+
+
+@dataclass(frozen=True, slots=True)
+class LoanCostComponentRow:
+    id: str
+    loan_id: str
+    loan: str
+    name: str
+    mode: str
+    rate_bp: int | None
+    fixed_amount: str
+    basis: str
+    effective_from: str
+    effective_to: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class LoanOverpaymentRow:
+    id: str
+    loan_id: str
+    loan: str
+    date: str
+    amount: str
+    note: str
+
+
+@dataclass(frozen=True, slots=True)
+class LoanPaymentRow:
+    id: str
+    loan_id: str
+    loan: str
+    date: str
+    kind: str
+    total: str
+    principal: str
+    interest: str
+    costs: str
+    overpayment: str
+    note: str
+    source: str
+    transaction_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class LoanBalanceCheckpointRow:
+    id: str
+    loan_id: str
+    loan: str
+    as_of: str
+    remaining_principal: str
+    note: str
+
+
+@dataclass(frozen=True, slots=True)
+class LoanScenarioRow:
+    id: str
+    loan_id: str
+    loan: str
+    name: str
+    overpayment_mode: str
+    overpayment_amount: str
+    overpayment_strategy: str
+    rate_shift_bp: int | None
+    rate_shift_from: str | None
+    one_off_date: str | None
+    one_off_amount: str
+
+
+@dataclass(frozen=True, slots=True)
+class InstallmentPlanRow:
+    id: str
+    loan_id: str
+    loan: str
+    category_id: str
+    category: str
+    installment: str
+    remaining_count: int
+    end_date: str
+    closed_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
 class ArchiveRows:
     workspace: dict[str, object]
     categories: tuple[CategoryRow, ...]
@@ -451,6 +699,16 @@ class ArchiveRows:
     fx_rates: tuple[FxRateRow, ...] = ()
     price_source_configs: tuple[PriceSourceConfigRow, ...] = ()
     risk_target_policy: RiskTargetPolicyRow | None = None
+    reference_rates: tuple[ReferenceRateRow, ...] = ()
+    reference_rate_values: tuple[ReferenceRateValueRow, ...] = ()
+    loans: tuple[LoanRow, ...] = ()
+    loan_rate_changes: tuple[LoanRateChangeRow, ...] = ()
+    loan_cost_components: tuple[LoanCostComponentRow, ...] = ()
+    loan_overpayments: tuple[LoanOverpaymentRow, ...] = ()
+    loan_payments: tuple[LoanPaymentRow, ...] = ()
+    loan_balance_checkpoints: tuple[LoanBalanceCheckpointRow, ...] = ()
+    loan_scenarios: tuple[LoanScenarioRow, ...] = ()
+    installment_plans: tuple[InstallmentPlanRow, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -535,6 +793,22 @@ def build_files(rows: ArchiveRows) -> dict[str, bytes]:
         "price_source_configs.csv": csv_bytes(
             "price_source_configs.csv", rows.price_source_configs
         ),
+        "reference_rates.csv": csv_bytes("reference_rates.csv", rows.reference_rates),
+        "reference_rate_values.csv": csv_bytes(
+            "reference_rate_values.csv", rows.reference_rate_values
+        ),
+        "loans.csv": csv_bytes("loans.csv", rows.loans),
+        "loan_rate_changes.csv": csv_bytes("loan_rate_changes.csv", rows.loan_rate_changes),
+        "loan_cost_components.csv": csv_bytes(
+            "loan_cost_components.csv", rows.loan_cost_components
+        ),
+        "loan_overpayments.csv": csv_bytes("loan_overpayments.csv", rows.loan_overpayments),
+        "loan_payments.csv": csv_bytes("loan_payments.csv", rows.loan_payments),
+        "loan_balance_checkpoints.csv": csv_bytes(
+            "loan_balance_checkpoints.csv", rows.loan_balance_checkpoints
+        ),
+        "loan_scenarios.csv": csv_bytes("loan_scenarios.csv", rows.loan_scenarios),
+        "installment_plans.csv": csv_bytes("installment_plans.csv", rows.installment_plans),
     }
 
 
@@ -1007,14 +1281,32 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         "instrument_id",
         "asset_class_id",
         "income_transaction_id",
+        "reference_rate_id",
+        "loan_id",
+        "property_item_id",
+        "transaction_id",
     ):
         return str(UUID(value)) if value else ""
-    if column in ("kind", "direction"):
+    if column == "kind":
+        if file == "loans.csv":
+            return LoanKind(value).value if value else ""
+        if file == "loan_payments.csv":
+            return LoanPaymentKind(value).value if value else ""
+        return Kind(value).value if value else ""
+    if column == "direction":
         return Kind(value).value if value else ""
     if column == "side":
         return Side(value).value if value else ""
     if column == "treatment":
         return Treatment(value or "regular").value
+    if column == "rate_mode":
+        return RateMode(value).value
+    if column == "day_count":
+        return DayCount(value).value
+    if column == "overpayment_mode":
+        return OverpaymentMode(value).value if value else ""
+    if column == "overpayment_strategy":
+        return OverpaymentStrategy(value).value if value else ""
     if column == "valuation_mode":
         if value not in {"", "manual", "linked"}:
             raise ValueError("invalid valuation mode")
@@ -1023,11 +1315,18 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         if value and value not in LINK_TYPES:
             raise ValueError("invalid link type")
         return value
-    if column in ("include_in_net_worth", "investable", "enabled"):
+    if column in (
+        "include_in_net_worth",
+        "investable",
+        "enabled",
+        "auto_record_payments",
+    ):
         if column == "investable":
             default = "true" if file == "asset_classes.csv" else "false"
+        elif column == "include_in_net_worth":
+            default = "true"
         else:
-            default = "true" if column == "include_in_net_worth" else "false"
+            default = "false"
         chosen = value or default
         if chosen not in {"true", "false"}:
             raise ValueError("invalid boolean")
@@ -1045,8 +1344,28 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         "provider_backfilled_at",
     ):
         return _parse_timestamp(value) if value else ""
-    if column in ("date", "month", "as_of", "acquired_on", "maturity_date"):
-        if not value and (column == "acquired_on" or file == "investment_transactions.csv"):
+    if column in (
+        "date",
+        "month",
+        "as_of",
+        "acquired_on",
+        "maturity_date",
+        "origination_date",
+        "first_payment_date",
+        "effective_from",
+        "effective_to",
+        "rate_shift_from",
+        "one_off_date",
+        "end_date",
+    ):
+        optional_dates = {
+            "acquired_on",
+            "origination_date",
+            "effective_to",
+            "rate_shift_from",
+            "one_off_date",
+        }
+        if not value and (column in optional_dates or file == "investment_transactions.csv"):
             return ""
         pattern = r"[0-9]{4}-[0-9]{2}" + ("" if column == "month" else r"-[0-9]{2}")
         if not re.fullmatch(pattern, value):
@@ -1063,6 +1382,56 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
             currency,
             allow_zero=column in {"planned", "value", "assets", "liabilities"},
         )
+    if column in (
+        "principal_original",
+        "installment_override",
+        "overpayment_amount",
+        "fixed_amount",
+        "one_off_amount",
+    ):
+        return _decimal_text(value, currency, allow_zero=False) if value else ""
+    if column in ("total", "installment"):
+        return _decimal_text(value, currency, allow_zero=False)
+    if column in ("principal", "interest", "costs", "overpayment", "remaining_principal"):
+        return _decimal_text(value, currency, allow_zero=True)
+    if column in ("value_bp", "rate_bp", "margin_bp"):
+        if not value and column in {"rate_bp", "margin_bp"}:
+            return ""
+        if not re.fullmatch(r"[0-9]{1,5}", value):
+            raise ValueError("invalid rate")
+        number = int(value)
+        if not 0 <= number <= 10_000:
+            raise ValueError("invalid rate")
+        return str(number)
+    if column == "rate_shift_bp":
+        if not value:
+            return ""
+        if not re.fullmatch(r"-?[0-9]{1,5}", value):
+            raise ValueError("invalid rate shift")
+        number = int(value)
+        if number == 0 or not -10_000 <= number <= 10_000:
+            raise ValueError("invalid rate shift")
+        return str(number)
+    if column == "payment_day":
+        if not re.fullmatch(r"[0-9]{1,2}", value) or not 1 <= int(value) <= 31:
+            raise ValueError("invalid payment day")
+        return str(int(value))
+    if column == "term_months":
+        if not re.fullmatch(r"[0-9]{1,3}", value) or not 0 <= int(value) <= MAX_TERM_MONTHS:
+            raise ValueError("invalid term")
+        return str(int(value))
+    if column == "remaining_count":
+        if not re.fullmatch(r"[0-9]{1,3}", value) or not 0 <= int(value) <= MAX_TERM_MONTHS:
+            raise ValueError("invalid remaining count")
+        return str(int(value))
+    if column == "basis":
+        if value != "opening_balance":
+            raise ValueError("invalid cost basis")
+        return value
+    if column == "mode":
+        if value not in {"percent", "fixed"}:
+            raise ValueError("invalid cost mode")
+        return value
     if column == "currency":
         if file in {"networth_items.csv", "item_valuations.csv", "networth_snapshots.csv"}:
             return _valid_currency(value)
@@ -1137,11 +1506,19 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
     if column == "category":
         if not 1 <= len(value) <= 80:
             raise ValueError("invalid category name")
-    elif column in ("name", "instrument", "asset_class"):
+    elif column in ("reference_rate", "property_item"):
+        if not value:
+            return ""
+        maximum = MAX_LOAN_NAME_LENGTH if column == "reference_rate" else MAX_ITEM_NAME_LENGTH
+        if len(value) > maximum:
+            raise ValueError("invalid name")
+    elif column in ("name", "instrument", "asset_class", "loan"):
         if column == "instrument":
             maximum = MAX_INSTRUMENT_NAME_LENGTH
         elif column == "asset_class":
             maximum = MAX_ASSET_CLASS_NAME_LENGTH
+        elif column == "loan":
+            maximum = MAX_LOAN_NAME_LENGTH
         elif file == "networth_items.csv":
             maximum = MAX_ITEM_NAME_LENGTH
         elif file == "instruments.csv":
@@ -1192,6 +1569,9 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         elif file == "fx_rates.csv":
             if not value or len(value) > 32:
                 raise ValueError("invalid FX source")
+        elif file == "loan_payments.csv":
+            if value not in {source.value for source in LoanPaymentSource}:
+                raise ValueError("invalid payment source")
         elif value not in SNAPSHOT_SOURCES:
             raise ValueError("invalid snapshot source")
     elif column == "breakdown":
@@ -1272,6 +1652,69 @@ _REQUIRED_COLUMNS = {
         "provider_key",
         "enabled",
         "daily_call_budget",
+    },
+    "reference_rates.csv": {"id", "name"},
+    "reference_rate_values.csv": {
+        "id",
+        "reference_rate_id",
+        "reference_rate",
+        "effective_from",
+        "value_bp",
+    },
+    "loans.csv": {
+        "id",
+        "name",
+        "kind",
+        "currency",
+        "first_payment_date",
+        "term_months",
+        "payment_day",
+        "rate_mode",
+        "day_count",
+        "overpayment_mode",
+        "overpayment_strategy",
+    },
+    "loan_rate_changes.csv": {"id", "loan_id", "loan", "effective_from", "rate_bp"},
+    "loan_cost_components.csv": {
+        "id",
+        "loan_id",
+        "loan",
+        "name",
+        "mode",
+        "basis",
+        "effective_from",
+    },
+    "loan_overpayments.csv": {"id", "loan_id", "loan", "date", "amount"},
+    "loan_payments.csv": {
+        "id",
+        "loan_id",
+        "loan",
+        "date",
+        "kind",
+        "total",
+        "principal",
+        "interest",
+        "costs",
+        "overpayment",
+        "source",
+    },
+    "loan_balance_checkpoints.csv": {
+        "id",
+        "loan_id",
+        "loan",
+        "as_of",
+        "remaining_principal",
+    },
+    "loan_scenarios.csv": {"id", "loan_id", "loan", "name"},
+    "installment_plans.csv": {
+        "id",
+        "loan_id",
+        "loan",
+        "category_id",
+        "category",
+        "installment",
+        "remaining_count",
+        "end_date",
     },
 }
 
@@ -1707,6 +2150,233 @@ def _read_rows(
             errors.append(ArchiveError("price_source_configs.csv", "duplicate provider config"))
         config_providers.add(row["provider_key"])
 
+    reference_rates = tables["reference_rates.csv"]
+    reference_rates_by_id: dict[str, dict[str, str]] = {}
+    reference_rate_keys: set[str] = set()
+    for row in reference_rates:
+        if row["id"] in reference_rates_by_id:
+            errors.append(ArchiveError("reference_rates.csv", "duplicate reference rate id"))
+        reference_rates_by_id[row["id"]] = row
+        key = name_key(row["name"])
+        if key in reference_rate_keys:
+            errors.append(ArchiveError("reference_rates.csv", "duplicate reference rate name"))
+        reference_rate_keys.add(key)
+
+    reference_values = tables["reference_rate_values.csv"]
+    reference_value_ids: set[str] = set()
+    reference_value_keys: set[tuple[str, str]] = set()
+    for row in reference_values:
+        if row["id"] in reference_value_ids:
+            errors.append(
+                ArchiveError("reference_rate_values.csv", "duplicate reference rate value id")
+            )
+        reference_value_ids.add(row["id"])
+        rate = reference_rates_by_id.get(row["reference_rate_id"])
+        if rate is None or row["reference_rate"] != rate["name"]:
+            errors.append(
+                ArchiveError("reference_rate_values.csv", "reference rate value reference mismatch")
+            )
+        key = (row["reference_rate_id"], row["effective_from"])
+        if key in reference_value_keys:
+            errors.append(
+                ArchiveError("reference_rate_values.csv", "duplicate reference rate value")
+            )
+        reference_value_keys.add(key)
+
+    loans = tables["loans.csv"]
+    loans_by_id: dict[str, dict[str, str]] = {}
+    ledger_transaction_ids = {row["id"] for row in tables["transactions.csv"]}
+    for row in loans:
+        if row["id"] in loans_by_id:
+            errors.append(ArchiveError("loans.csv", "duplicate loan id"))
+        loans_by_id[row["id"]] = row
+        term = int(row["term_months"])
+        if (row["kind"] == "installment_plan" and term < 0) or (
+            row["kind"] != "installment_plan" and term < 1
+        ):
+            errors.append(ArchiveError("loans.csv", "invalid loan term", column="term_months"))
+        if row["origination_date"] and row["first_payment_date"] <= row["origination_date"]:
+            errors.append(
+                ArchiveError(
+                    "loans.csv",
+                    "first payment is not after origination",
+                    column="first_payment_date",
+                )
+            )
+        if row["rate_mode"] == "fixed":
+            if row["reference_rate_id"] or row["margin_bp"]:
+                errors.append(ArchiveError("loans.csv", "invalid loan rate configuration"))
+        else:
+            rate = reference_rates_by_id.get(row["reference_rate_id"])
+            if rate is None or row["reference_rate"] != rate["name"] or not row["margin_bp"]:
+                errors.append(ArchiveError("loans.csv", "invalid loan rate configuration"))
+        if row["reference_rate_id"] and not row["reference_rate"]:
+            errors.append(
+                ArchiveError(
+                    "loans.csv", "invalid loan rate configuration", column="reference_rate_id"
+                )
+            )
+        if row["property_item_id"]:
+            item = networth_items_by_id.get(row["property_item_id"])
+            if item is None or row["property_item"] != item["name"]:
+                errors.append(
+                    ArchiveError(
+                        "loans.csv", "loan property item mismatch", column="property_item_id"
+                    )
+                )
+        elif row["property_item"]:
+            errors.append(
+                ArchiveError("loans.csv", "loan property item mismatch", column="property_item_id")
+            )
+        if row["kind"] != "annuity" and row["installment_override"]:
+            errors.append(ArchiveError("loans.csv", "installment override is annuity only"))
+        if (row["overpayment_mode"] == "none" and row["overpayment_amount"]) or (
+            row["overpayment_mode"] != "none" and not row["overpayment_amount"]
+        ):
+            errors.append(ArchiveError("loans.csv", "invalid loan overpayment"))
+        if (
+            row["overpayment_mode"] == "target_total"
+            and row["installment_override"]
+            and row["overpayment_amount"]
+        ):
+            override = _money_minor(row["installment_override"], row["currency"], allow_zero=False)
+            target = _money_minor(row["overpayment_amount"], row["currency"], allow_zero=False)
+            if target < override:
+                errors.append(ArchiveError("loans.csv", "invalid loan overpayment"))
+
+    def _loan_reference(file: str, row: dict[str, str]) -> None:
+        loan = loans_by_id.get(row["loan_id"])
+        if loan is None or row["loan"] != loan["name"]:
+            errors.append(ArchiveError(file, "loan reference mismatch"))
+
+    rate_changes = tables["loan_rate_changes.csv"]
+    rate_change_ids: set[str] = set()
+    rate_change_keys: set[tuple[str, str]] = set()
+    for row in rate_changes:
+        _loan_reference("loan_rate_changes.csv", row)
+        if row["id"] in rate_change_ids:
+            errors.append(ArchiveError("loan_rate_changes.csv", "duplicate loan rate change id"))
+        rate_change_ids.add(row["id"])
+        key = (row["loan_id"], row["effective_from"])
+        if key in rate_change_keys:
+            errors.append(ArchiveError("loan_rate_changes.csv", "duplicate loan rate change"))
+        rate_change_keys.add(key)
+
+    cost_components = tables["loan_cost_components.csv"]
+    cost_ids: set[str] = set()
+    for row in cost_components:
+        _loan_reference("loan_cost_components.csv", row)
+        if row["id"] in cost_ids:
+            errors.append(
+                ArchiveError("loan_cost_components.csv", "duplicate loan cost component id")
+            )
+        cost_ids.add(row["id"])
+        if row["mode"] == "percent":
+            valid = bool(row["rate_bp"]) and not row["fixed_amount"]
+        else:
+            valid = not row["rate_bp"] and bool(row["fixed_amount"])
+        if not valid:
+            errors.append(ArchiveError("loan_cost_components.csv", "invalid cost component"))
+        if row["effective_to"] and row["effective_to"] < row["effective_from"]:
+            errors.append(
+                ArchiveError(
+                    "loan_cost_components.csv",
+                    "invalid cost component range",
+                    column="effective_to",
+                )
+            )
+
+    overpayments = tables["loan_overpayments.csv"]
+    overpayment_ids: set[str] = set()
+    for row in overpayments:
+        _loan_reference("loan_overpayments.csv", row)
+        if row["id"] in overpayment_ids:
+            errors.append(ArchiveError("loan_overpayments.csv", "duplicate loan overpayment id"))
+        overpayment_ids.add(row["id"])
+
+    payments = tables["loan_payments.csv"]
+    payment_ids: set[str] = set()
+    for row in payments:
+        _loan_reference("loan_payments.csv", row)
+        if row["id"] in payment_ids:
+            errors.append(ArchiveError("loan_payments.csv", "duplicate loan payment id"))
+        payment_ids.add(row["id"])
+        total = _money_minor(row["total"], currency, allow_zero=False)
+        components = sum(
+            _money_minor(row[column], currency, allow_zero=True)
+            for column in ("principal", "interest", "costs", "overpayment")
+        )
+        if total != components:
+            errors.append(ArchiveError("loan_payments.csv", "loan payment components differ"))
+        if row["transaction_id"] and row["transaction_id"] not in ledger_transaction_ids:
+            errors.append(ArchiveError("loan_payments.csv", "loan payment transaction missing"))
+
+    checkpoints = tables["loan_balance_checkpoints.csv"]
+    checkpoint_ids: set[str] = set()
+    checkpoint_keys: set[tuple[str, str]] = set()
+    for row in checkpoints:
+        _loan_reference("loan_balance_checkpoints.csv", row)
+        if row["id"] in checkpoint_ids:
+            errors.append(
+                ArchiveError("loan_balance_checkpoints.csv", "duplicate loan balance checkpoint id")
+            )
+        checkpoint_ids.add(row["id"])
+        key = (row["loan_id"], row["as_of"])
+        if key in checkpoint_keys:
+            errors.append(
+                ArchiveError("loan_balance_checkpoints.csv", "duplicate loan balance checkpoint")
+            )
+        checkpoint_keys.add(key)
+
+    scenarios = tables["loan_scenarios.csv"]
+    scenario_ids: set[str] = set()
+    scenario_keys: set[tuple[str, str]] = set()
+    for row in scenarios:
+        _loan_reference("loan_scenarios.csv", row)
+        if row["id"] in scenario_ids:
+            errors.append(ArchiveError("loan_scenarios.csv", "duplicate loan scenario id"))
+        scenario_ids.add(row["id"])
+        key = (row["loan_id"], name_key(row["name"]))
+        if key in scenario_keys:
+            errors.append(ArchiveError("loan_scenarios.csv", "duplicate loan scenario name"))
+        scenario_keys.add(key)
+        mode = row["overpayment_mode"]
+        if (
+            (mode == "" and (row["overpayment_amount"] or row["overpayment_strategy"]))
+            or (mode == "none" and (row["overpayment_amount"] or row["overpayment_strategy"]))
+            or (mode not in {"", "none"} and not row["overpayment_amount"])
+        ):
+            errors.append(ArchiveError("loan_scenarios.csv", "invalid loan scenario"))
+        if bool(row["rate_shift_bp"]) != bool(row["rate_shift_from"]):
+            errors.append(ArchiveError("loan_scenarios.csv", "invalid loan scenario"))
+        if bool(row["one_off_date"]) != bool(row["one_off_amount"]):
+            errors.append(ArchiveError("loan_scenarios.csv", "invalid loan scenario"))
+
+    plans = tables["installment_plans.csv"]
+    plan_ids: set[str] = set()
+    plan_loans: set[str] = set()
+    for row in plans:
+        _loan_reference("installment_plans.csv", row)
+        if row["id"] in plan_ids:
+            errors.append(ArchiveError("installment_plans.csv", "duplicate installment plan id"))
+        plan_ids.add(row["id"])
+        if row["loan_id"] in plan_loans:
+            errors.append(ArchiveError("installment_plans.csv", "duplicate installment plan loan"))
+        plan_loans.add(row["loan_id"])
+        loan = loans_by_id.get(row["loan_id"])
+        if loan is not None and loan["kind"] != "installment_plan":
+            errors.append(
+                ArchiveError(
+                    "installment_plans.csv",
+                    "installment plan must reference an installment-plan loan",
+                )
+            )
+        category = by_id.get(row["category_id"])
+        if category is None or row["category"] != category["name"]:
+            errors.append(
+                ArchiveError("installment_plans.csv", "installment plan category mismatch")
+            )
+
     return ArchiveRows(
         workspace=workspace,
         categories=tuple(
@@ -1910,4 +2580,139 @@ def _read_rows(
             for row in configs
         ),
         risk_target_policy=risk_policy,
+        reference_rates=tuple(
+            ReferenceRateRow(row["id"], row["name"], row["notes"]) for row in reference_rates
+        ),
+        reference_rate_values=tuple(
+            ReferenceRateValueRow(
+                row["id"],
+                row["reference_rate_id"],
+                row["reference_rate"],
+                row["effective_from"],
+                int(row["value_bp"]),
+            )
+            for row in reference_values
+        ),
+        loans=tuple(
+            LoanRow(
+                row["id"],
+                row["name"],
+                row["kind"],
+                row["currency"],
+                row["principal_original"],
+                row["origination_date"] or None,
+                row["first_payment_date"],
+                int(row["term_months"]),
+                int(row["payment_day"]),
+                row["rate_mode"],
+                row["day_count"],
+                int(row["margin_bp"]) if row["margin_bp"] else None,
+                row["reference_rate_id"] or None,
+                row["reference_rate"],
+                row["property_item_id"] or None,
+                row["property_item"],
+                row["auto_record_payments"],
+                row["installment_override"],
+                row["overpayment_mode"],
+                row["overpayment_amount"],
+                row["overpayment_strategy"],
+                row["archived_at"] or None,
+            )
+            for row in loans
+        ),
+        loan_rate_changes=tuple(
+            LoanRateChangeRow(
+                row["id"],
+                row["loan_id"],
+                row["loan"],
+                row["effective_from"],
+                int(row["rate_bp"]),
+            )
+            for row in rate_changes
+        ),
+        loan_cost_components=tuple(
+            LoanCostComponentRow(
+                row["id"],
+                row["loan_id"],
+                row["loan"],
+                row["name"],
+                row["mode"],
+                int(row["rate_bp"]) if row["rate_bp"] else None,
+                row["fixed_amount"],
+                row["basis"],
+                row["effective_from"],
+                row["effective_to"] or None,
+            )
+            for row in cost_components
+        ),
+        loan_overpayments=tuple(
+            LoanOverpaymentRow(
+                row["id"],
+                row["loan_id"],
+                row["loan"],
+                row["date"],
+                row["amount"],
+                row["note"],
+            )
+            for row in overpayments
+        ),
+        loan_payments=tuple(
+            LoanPaymentRow(
+                row["id"],
+                row["loan_id"],
+                row["loan"],
+                row["date"],
+                row["kind"],
+                row["total"],
+                row["principal"],
+                row["interest"],
+                row["costs"],
+                row["overpayment"],
+                row["note"],
+                row["source"],
+                row["transaction_id"] or None,
+            )
+            for row in payments
+        ),
+        loan_balance_checkpoints=tuple(
+            LoanBalanceCheckpointRow(
+                row["id"],
+                row["loan_id"],
+                row["loan"],
+                row["as_of"],
+                row["remaining_principal"],
+                row["note"],
+            )
+            for row in checkpoints
+        ),
+        loan_scenarios=tuple(
+            LoanScenarioRow(
+                row["id"],
+                row["loan_id"],
+                row["loan"],
+                row["name"],
+                row["overpayment_mode"],
+                row["overpayment_amount"],
+                row["overpayment_strategy"],
+                int(row["rate_shift_bp"]) if row["rate_shift_bp"] else None,
+                row["rate_shift_from"] or None,
+                row["one_off_date"] or None,
+                row["one_off_amount"],
+            )
+            for row in scenarios
+        ),
+        installment_plans=tuple(
+            InstallmentPlanRow(
+                row["id"],
+                row["loan_id"],
+                row["loan"],
+                row["category_id"],
+                row["category"],
+                row["installment"],
+                int(row["remaining_count"]),
+                row["end_date"],
+                row["closed_at"] or None,
+            )
+            for row in plans
+        ),
     )

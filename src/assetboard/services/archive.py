@@ -66,16 +66,26 @@ from assetboard.domain.archive import (
     BudgetLineRow,
     CategoryRow,
     FxRateRow,
+    InstallmentPlanRow,
     InstrumentAllocationRow,
     InstrumentRow,
     InvestmentTransactionRow,
     ItemValuationRow,
+    LoanBalanceCheckpointRow,
+    LoanCostComponentRow,
+    LoanOverpaymentRow,
+    LoanPaymentRow,
+    LoanRateChangeRow,
+    LoanRow,
+    LoanScenarioRow,
     MonthRow,
     NetWorthCategoryRow,
     NetWorthItemRow,
     NetWorthSnapshotRow,
     PricePointRow,
     PriceSourceConfigRow,
+    ReferenceRateRow,
+    ReferenceRateValueRow,
     RiskTargetPolicyRow,
     TransactionRow,
     decimal_text,
@@ -112,6 +122,16 @@ ARCHIVE_INCLUDED_MODELS = frozenset(
         "PricePoint",
         "FxRate",
         "PriceSourceConfig",
+        "ReferenceRate",
+        "ReferenceRateValue",
+        "Loan",
+        "LoanRateChange",
+        "LoanCostComponent",
+        "LoanOverpayment",
+        "LoanPayment",
+        "LoanBalanceCheckpoint",
+        "LoanScenario",
+        "InstallmentPlan",
     }
 )
 ARCHIVE_EXCLUDED_MODELS = {
@@ -133,16 +153,6 @@ ARCHIVE_EXCLUDED_MODELS = {
     "NotificationChannel": "notification URLs contain secrets (F3.8/F9.3)",
     "NotificationLog": "notification delivery history is not portable (F3.8)",
     "ProviderError": "provider error logs are operational and not portable",
-    "Loan": "loans require the F7.8 archive extension",
-    "LoanRateChange": "loan rates require the F7.8 archive extension",
-    "ReferenceRate": "reference rates require the F7.8 archive extension",
-    "ReferenceRateValue": "reference-rate values require the F7.8 archive extension",
-    "LoanCostComponent": "loan costs require the F7.8 archive extension",
-    "LoanOverpayment": "loan overpayments require the F7.8 archive extension",
-    "LoanBalanceCheckpoint": "loan checkpoints require the F7.8 archive extension",
-    "LoanScenario": "loan scenarios require the F7.8 archive extension",
-    "LoanPayment": "actual loan payments require the F7.8 archive extension",
-    "InstallmentPlan": "installment plans require the F7.8 archive extension",
 }
 
 
@@ -713,6 +723,21 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
         instruments = InstrumentRepository(session, ctx).ordered()
         instrument_rank = {row.id: index for index, row in enumerate(instruments)}
         instrument_lineage = {row.id: lineage_id(row.id, row.import_key) for row in instruments}
+        reference_rates = ReferenceRateRepository(session, ctx).ordered()
+        reference_rate_rank = {row.id: index for index, row in enumerate(reference_rates)}
+        reference_rates_by_id = {row.id: row for row in reference_rates}
+        loans = sorted(
+            LoanRepository(session, ctx).ordered(),
+            key=lambda row: (
+                row.name,
+                row.kind,
+                row.archived_at is not None,
+                str(row.id),
+            ),
+        )
+        loan_rank = {row.id: index for index, row in enumerate(loans)}
+        loans_by_id = {row.id: row for row in loans}
+        loan_lineage = {row.id: row.id for row in loans}
         networth_items_by_id = {item.id: item for item in networth_items}
         networth_item_rank = {item.id: position for position, item in enumerate(networth_items)}
         networth_item_rows = tuple(
@@ -737,7 +762,13 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
                         if item.link_id is not None
                         and item.link_type == "portfolio_holding"
                         and item.link_id in instrument_lineage
-                        else (str(item.link_id) if item.link_id else None)
+                        else (
+                            str(loan_lineage[item.link_id])
+                            if item.link_id is not None
+                            and item.link_type == "loan_balance"
+                            and item.link_id in loan_lineage
+                            else (str(item.link_id) if item.link_id else None)
+                        )
                     )
                 ),
                 include_in_net_worth="true" if item.include_in_net_worth else "false",
@@ -789,6 +820,261 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
                 source=row.source,
             )
             for row in snapshots
+        )
+        reference_rate_rows = tuple(
+            ReferenceRateRow(id=str(row.id), name=row.name, notes=row.notes)
+            for row in reference_rates
+        )
+        reference_values = sorted(
+            (
+                value
+                for rate in reference_rates
+                for value in ReferenceRateValueRepository(session, ctx).for_rate(rate.id)
+            ),
+            key=lambda row: (
+                reference_rate_rank[row.reference_rate_id],
+                row.effective_from,
+                str(row.id),
+            ),
+        )
+        reference_rate_value_rows = tuple(
+            ReferenceRateValueRow(
+                id=str(row.id),
+                reference_rate_id=str(row.reference_rate_id),
+                reference_rate=reference_rates_by_id[row.reference_rate_id].name,
+                effective_from=row.effective_from.isoformat(),
+                value_bp=row.value_bp,
+            )
+            for row in reference_values
+        )
+
+        def loan_amount(minor: int | None, currency: str) -> str:
+            return plain_amount(minor, currency) if minor is not None else ""
+
+        loan_rows = tuple(
+            LoanRow(
+                id=str(loan_lineage[row.id]),
+                name=row.name,
+                kind=row.kind,
+                currency=row.currency,
+                principal_original=loan_amount(row.principal_original_minor, row.currency),
+                origination_date=(
+                    row.origination_date.isoformat() if row.origination_date else None
+                ),
+                first_payment_date=row.first_payment_date.isoformat(),
+                term_months=row.term_months,
+                payment_day=row.payment_day,
+                rate_mode=row.rate_mode,
+                day_count=row.day_count,
+                margin_bp=row.margin_bp,
+                reference_rate_id=(str(row.reference_rate_id) if row.reference_rate_id else None),
+                reference_rate=(
+                    reference_rates_by_id[row.reference_rate_id].name
+                    if row.reference_rate_id is not None
+                    and row.reference_rate_id in reference_rates_by_id
+                    else ""
+                ),
+                property_item_id=(
+                    str(
+                        lineage_id(
+                            networth_items_by_id[row.property_item_id].id,
+                            networth_items_by_id[row.property_item_id].import_key,
+                        )
+                    )
+                    if row.property_item_id is not None
+                    and row.property_item_id in networth_items_by_id
+                    else None
+                ),
+                property_item=(
+                    networth_items_by_id[row.property_item_id].name
+                    if row.property_item_id is not None
+                    and row.property_item_id in networth_items_by_id
+                    else ""
+                ),
+                auto_record_payments="true" if row.auto_record_payments else "false",
+                installment_override=loan_amount(row.installment_override_minor, row.currency),
+                overpayment_mode=row.overpayment_mode,
+                overpayment_amount=loan_amount(row.overpayment_amount_minor, row.currency),
+                overpayment_strategy=row.overpayment_strategy,
+                archived_at=timestamp_text(row.archived_at),
+            )
+            for row in loans
+        )
+        rate_changes = sorted(
+            (
+                change
+                for loan in loans
+                for change in LoanRateChangeRepository(session, ctx).for_loan(loan.id)
+            ),
+            key=lambda row: (
+                loan_rank[row.loan_id],
+                row.effective_from,
+                str(row.id),
+            ),
+        )
+        loan_rate_change_rows = tuple(
+            LoanRateChangeRow(
+                id=str(row.id),
+                loan_id=str(loan_lineage[row.loan_id]),
+                loan=loans_by_id[row.loan_id].name,
+                effective_from=row.effective_from.isoformat(),
+                rate_bp=row.rate_bp,
+            )
+            for row in rate_changes
+        )
+        cost_components = sorted(
+            (
+                component
+                for loan in loans
+                for component in LoanCostComponentRepository(session, ctx).for_loan(loan.id)
+            ),
+            key=lambda row: (
+                loan_rank[row.loan_id],
+                row.effective_from,
+                row.name,
+                str(row.id),
+            ),
+        )
+        loan_cost_component_rows = tuple(
+            LoanCostComponentRow(
+                id=str(row.id),
+                loan_id=str(loan_lineage[row.loan_id]),
+                loan=loans_by_id[row.loan_id].name,
+                name=row.name,
+                mode=row.mode,
+                rate_bp=row.rate_bp,
+                fixed_amount=loan_amount(row.fixed_minor, loans_by_id[row.loan_id].currency),
+                basis=row.basis,
+                effective_from=row.effective_from.isoformat(),
+                effective_to=row.effective_to.isoformat() if row.effective_to else None,
+            )
+            for row in cost_components
+        )
+        planned_overpayments = sorted(
+            (
+                overpayment
+                for loan in loans
+                for overpayment in LoanOverpaymentRepository(session, ctx).for_loan(loan.id)
+            ),
+            key=lambda row: (loan_rank[row.loan_id], row.date, str(row.id)),
+        )
+        loan_overpayment_rows = tuple(
+            LoanOverpaymentRow(
+                id=str(row.id),
+                loan_id=str(loan_lineage[row.loan_id]),
+                loan=loans_by_id[row.loan_id].name,
+                date=row.date.isoformat(),
+                amount=loan_amount(row.amount_minor, loans_by_id[row.loan_id].currency),
+                note=row.note,
+            )
+            for row in planned_overpayments
+        )
+        payments = sorted(
+            (
+                payment
+                for loan in loans
+                for payment in LoanPaymentRepository(session, ctx).for_loan(loan.id)
+            ),
+            key=lambda row: (
+                loan_rank[row.loan_id],
+                row.date,
+                row.created_at,
+                str(row.id),
+            ),
+        )
+        loan_payment_rows = tuple(
+            LoanPaymentRow(
+                id=str(row.id),
+                loan_id=str(loan_lineage[row.loan_id]),
+                loan=loans_by_id[row.loan_id].name,
+                date=row.date.isoformat(),
+                kind=row.kind,
+                total=loan_amount(row.total_minor, loans_by_id[row.loan_id].currency),
+                principal=loan_amount(row.principal_minor, loans_by_id[row.loan_id].currency),
+                interest=loan_amount(row.interest_minor, loans_by_id[row.loan_id].currency),
+                costs=loan_amount(row.costs_minor, loans_by_id[row.loan_id].currency),
+                overpayment=loan_amount(row.overpayment_minor, loans_by_id[row.loan_id].currency),
+                note=row.note,
+                source=row.source,
+                transaction_id=(
+                    str(transaction_lineage.get(row.transaction_id, row.transaction_id))
+                    if row.transaction_id is not None
+                    else None
+                ),
+            )
+            for row in payments
+        )
+        checkpoints = sorted(
+            (
+                checkpoint
+                for loan in loans
+                for checkpoint in LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
+            ),
+            key=lambda row: (loan_rank[row.loan_id], row.as_of, str(row.id)),
+        )
+        loan_balance_checkpoint_rows = tuple(
+            LoanBalanceCheckpointRow(
+                id=str(row.id),
+                loan_id=str(loan_lineage[row.loan_id]),
+                loan=loans_by_id[row.loan_id].name,
+                as_of=row.as_of.isoformat(),
+                remaining_principal=loan_amount(
+                    row.remaining_principal_minor, loans_by_id[row.loan_id].currency
+                ),
+                note=row.note,
+            )
+            for row in checkpoints
+        )
+        scenarios = sorted(
+            (
+                scenario
+                for loan in loans
+                for scenario in LoanScenarioRepository(session, ctx).for_loan(loan.id)
+            ),
+            key=lambda row: (loan_rank[row.loan_id], row.name, str(row.id)),
+        )
+        loan_scenario_rows = tuple(
+            LoanScenarioRow(
+                id=str(row.id),
+                loan_id=str(loan_lineage[row.loan_id]),
+                loan=loans_by_id[row.loan_id].name,
+                name=row.name,
+                overpayment_mode=row.overpayment_mode or "",
+                overpayment_amount=loan_amount(
+                    row.overpayment_amount_minor, loans_by_id[row.loan_id].currency
+                ),
+                overpayment_strategy=row.overpayment_strategy or "",
+                rate_shift_bp=row.rate_shift_bp,
+                rate_shift_from=(row.rate_shift_from.isoformat() if row.rate_shift_from else None),
+                one_off_date=row.one_off_date.isoformat() if row.one_off_date else None,
+                one_off_amount=loan_amount(
+                    row.one_off_amount_minor, loans_by_id[row.loan_id].currency
+                ),
+            )
+            for row in scenarios
+        )
+        plans = sorted(
+            InstallmentPlanRepository(session, ctx).ordered(),
+            key=lambda row: (loan_rank.get(row.loan_id, len(loans)), str(row.id)),
+        )
+        installment_plan_rows = tuple(
+            InstallmentPlanRow(
+                id=str(row.id),
+                loan_id=str(loan_lineage[row.loan_id]),
+                loan=loans_by_id[row.loan_id].name,
+                category_id=str(
+                    lineage_id(
+                        categories_by_id[row.category_id].id,
+                        categories_by_id[row.category_id].import_key,
+                    )
+                ),
+                category=categories_by_id[row.category_id].name,
+                installment=loan_amount(row.installment_minor, loans_by_id[row.loan_id].currency),
+                remaining_count=row.remaining_count,
+                end_date=row.end_date.isoformat(),
+                closed_at=timestamp_text(row.closed_at),
+            )
+            for row in plans
         )
         asset_class_rows = tuple(
             AssetClassRow(
@@ -1037,6 +1323,16 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
                 if policy is not None
                 else None
             ),
+            reference_rates=reference_rate_rows,
+            reference_rate_values=reference_rate_value_rows,
+            loans=loan_rows,
+            loan_rate_changes=loan_rate_change_rows,
+            loan_cost_components=loan_cost_component_rows,
+            loan_overpayments=loan_overpayment_rows,
+            loan_payments=loan_payment_rows,
+            loan_balance_checkpoints=loan_balance_checkpoint_rows,
+            loan_scenarios=loan_scenario_rows,
+            installment_plans=installment_plan_rows,
         )
         counts = {
             "categories": len(category_rows),
@@ -1055,6 +1351,16 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             "price_points": len(price_point_rows),
             "fx_rates": len(fx_rate_rows),
             "price_source_configs": len(provider_config_rows),
+            "reference_rates": len(reference_rate_rows),
+            "reference_rate_values": len(reference_rate_value_rows),
+            "loans": len(loan_rows),
+            "loan_rate_changes": len(loan_rate_change_rows),
+            "loan_cost_components": len(loan_cost_component_rows),
+            "loan_overpayments": len(loan_overpayment_rows),
+            "loan_payments": len(loan_payment_rows),
+            "loan_balance_checkpoints": len(loan_balance_checkpoint_rows),
+            "loan_scenarios": len(loan_scenario_rows),
+            "installment_plans": len(installment_plan_rows),
         }
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,

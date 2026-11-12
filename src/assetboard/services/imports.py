@@ -69,16 +69,26 @@ from assetboard.db.repositories import (
     ImportCategoryMappingRepository,
     IncomeSourceRepository,
     IncomeSourceTaxRuleRepository,
+    InstallmentPlanRepository,
     InstrumentAllocationRepository,
     InstrumentRepository,
     InvestmentTransactionRepository,
     ItemValuationRepository,
+    LoanBalanceCheckpointRepository,
+    LoanCostComponentRepository,
+    LoanOverpaymentRepository,
+    LoanPaymentRepository,
+    LoanRateChangeRepository,
+    LoanRepository,
+    LoanScenarioRepository,
     MonthStateRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
     NetWorthSnapshotRepository,
     PricePointRepository,
     PriceSourceConfigRepository,
+    ReferenceRateRepository,
+    ReferenceRateValueRepository,
     RiskTargetPolicyRepository,
     ScheduledItemRepository,
     ScheduledOccurrenceRepository,
@@ -226,6 +236,11 @@ REPORT_MESSAGES: dict[str, str] = {
     "investment_restore_only": _(
         "Investment files are restored only; they were ignored in this merge."
     ),
+    "loan_restore_only": _("Loan files are restored only; they were ignored in this merge."),
+    "reference_rate_value_differs": _(
+        "A different value is already stored for this date; it is kept."
+    ),
+    "invalid_rate": _("Enter a whole rate in basis points between 0 and 10000."),
     "provider_key_required": _("Re-enter the API key and enable %(provider)s."),
     "duplicate_asset_class": _("An asset class id appears more than once."),
     "duplicate_asset_class_name": _("Two active asset classes have the same name."),
@@ -837,6 +852,9 @@ def _plan_worker(
             return status, base_report
         adapter = adapters.for_source(parsed.source)
         if adapter is None:
+            # Keep the recognised source so apply refuses it with ImportUnavailable instead of
+            # falling back to the upload's provisional "transactions_csv" adapter.
+            base_report["source"] = parsed.source
             return status, base_report
         base_currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
         report = _merge_adapter_report(
@@ -1322,6 +1340,7 @@ class _RestoreRollbackPlan:
     provider_configs: tuple[PriceSourceConfig, ...]
     risk_policies: tuple[RiskTargetPolicy, ...]
     previous_risk_policy: dict[str, object] | None
+    loan_rows: dict[str, tuple[Any, ...]]
     reasons: tuple[str, ...]
     settings: dict[str, object]
 
@@ -1344,6 +1363,7 @@ class _RestoreRollbackPlan:
             "fx_rates": len(self.fx_rates),
             "price_source_configs": len(self.provider_configs),
             "risk_policies": len(self.risk_policies),
+            **{key: len(rows) for key, rows in self.loan_rows.items()},
         }
 
 
@@ -1357,6 +1377,18 @@ _M3_REPOSITORIES = (
     TaxRuleRepository,
     TaxRuleVersionRepository,
 )
+_LOAN_RESTORE_REPOSITORIES: dict[str, Any] = {
+    "reference_rates": ReferenceRateRepository,
+    "reference_rate_values": ReferenceRateValueRepository,
+    "loans": LoanRepository,
+    "loan_rate_changes": LoanRateChangeRepository,
+    "loan_cost_components": LoanCostComponentRepository,
+    "loan_overpayments": LoanOverpaymentRepository,
+    "loan_payments": LoanPaymentRepository,
+    "loan_balance_checkpoints": LoanBalanceCheckpointRepository,
+    "loan_scenarios": LoanScenarioRepository,
+    "installment_plans": InstallmentPlanRepository,
+}
 _M3_REFERENCE_ATTRIBUTES = (
     "category_id",
     "payment_category_id",
@@ -1411,6 +1443,25 @@ def _restore_rollback_plan(
     all_provider_configs = PriceSourceConfigRepository(session, ctx).list()
     all_risk_policies = RiskTargetPolicyRepository(session, ctx).list()
     reasons: set[str] = set()
+    raw_loan_ids = (batch.report or {}).get("restored_loan_ids")
+    restored_loan_ids: Mapping[str, object] = (
+        cast("Mapping[str, object]", raw_loan_ids) if isinstance(raw_loan_ids, dict) else {}
+    )
+    loan_rows: dict[str, tuple[Any, ...]] = {}
+    for key, repository_class in _LOAN_RESTORE_REPOSITORIES.items():
+        all_rows = repository_class(session, ctx).list()
+        raw_ids = restored_loan_ids.get(key)
+        expected: set[UUID] = set()
+        if isinstance(raw_ids, list):
+            for value in cast("list[object]", raw_ids):
+                with contextlib.suppress(ValueError, AttributeError):
+                    expected.add(UUID(str(value)))
+        rows = tuple(row for row in all_rows if row.id in expected)
+        if len(all_rows) != len(expected) or len(rows) != len(expected):
+            reasons.add("restore_rows_added")
+        if any(row.updated_at > applied_at for row in rows):
+            reasons.add("restore_rows_changed")
+        loan_rows[key] = rows
     if (
         len(all_transactions) != len(transactions)
         or any(row.import_batch_id != batch.id for row in all_transactions)
@@ -1528,6 +1579,7 @@ def _restore_rollback_plan(
         provider_configs=tuple(provider_configs),
         risk_policies=tuple(risk_policies),
         previous_risk_policy=previous_policy,
+        loan_rows=loan_rows,
         reasons=tuple(sorted(reasons)),
         settings=workspace_settings,
     )
@@ -1538,6 +1590,11 @@ def _rollback_restore(
 ) -> dict[str, int]:
     if plan.reasons:
         raise ImportRestoreRollbackBlocked(plan.reasons)
+    for key in reversed(tuple(_LOAN_RESTORE_REPOSITORIES)):
+        repository = _LOAN_RESTORE_REPOSITORIES[key](session, ctx)
+        for row in plan.loan_rows.get(key, ()):
+            repository.delete(row)
+    session.flush()
     investments = InvestmentTransactionRepository(session, ctx)
     for row in plan.investment_transactions:
         investments.delete(row)
@@ -1624,6 +1681,8 @@ def _rollback_restore(
             "fx_rates_deleted": len(plan.fx_rates),
             "price_source_configs_deleted": len(plan.provider_configs),
             "risk_policies_deleted": len(plan.risk_policies),
+            "loans_deleted": len(plan.loan_rows.get("loans", ())),
+            "loan_rows_deleted": sum(len(rows) for rows in plan.loan_rows.values()),
             "settings_restored": ",".join(
                 sorted(
                     {

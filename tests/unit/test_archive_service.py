@@ -125,6 +125,16 @@ def test_export_complete_scoped_deterministic_and_lineage(team: WorkspaceDb) -> 
             "price_points": 0,
             "fx_rates": 0,
             "price_source_configs": 0,
+            "reference_rates": 0,
+            "reference_rate_values": 0,
+            "loans": 0,
+            "loan_rate_changes": 0,
+            "loan_cost_components": 0,
+            "loan_overpayments": 0,
+            "loan_payments": 0,
+            "loan_balance_checkpoints": 0,
+            "loan_scenarios": 0,
+            "installment_plans": 0,
         }
     # Uniqueness is per workspace, including deleted/archived rows; NULLs remain allowed.
     with pytest.raises(IntegrityError), team.factory.begin() as session:
@@ -290,7 +300,7 @@ def test_export_includes_the_taxes_switch_and_upcoming_days(team: WorkspaceDb) -
 
     parsed, _ = parse_archive(export_workspace(team.factory, team.ctx("editor", "editor")).content)
     assert parsed is not None
-    assert parsed.manifest["format_version"] == "1.4"
+    assert parsed.manifest["format_version"] == "1.5"
     assert parsed.rows.workspace["taxes_enabled"] is False
     assert parsed.rows.workspace["upcoming_days"] is None
 
@@ -304,6 +314,171 @@ def test_export_includes_the_taxes_switch_and_upcoming_days(team: WorkspaceDb) -
     assert errors == () and parsed is not None and parsed.warnings == ()
     assert parsed.rows.workspace["taxes_enabled"] is True
     assert parsed.rows.workspace["upcoming_days"] == 30
+
+
+def test_export_includes_loans_and_maps_their_references(team: WorkspaceDb) -> None:
+    from assetboard.db.repositories import (
+        InstallmentPlanRepository,
+        LoanBalanceCheckpointRepository,
+        LoanCostComponentRepository,
+        LoanOverpaymentRepository,
+        LoanPaymentRepository,
+        LoanRateChangeRepository,
+        LoanRepository,
+        LoanScenarioRepository,
+        NetWorthCategoryRepository,
+        NetWorthItemRepository,
+        ReferenceRateRepository,
+        ReferenceRateValueRepository,
+        TransactionRepository,
+    )
+
+    ctx = team.ctx("editor", "editor")
+    transaction_origin = uuid4()
+    with team.factory.begin() as session:
+        category = Category(
+            workspace_id=team.workspace_id,
+            name="Food",
+            name_key="food",
+            kind="expense",
+            treatment="regular",
+            color="#16a34a",
+            sort_order=0,
+        )
+        session.add(category)
+        session.flush()
+        transaction = TransactionRepository(session, ctx).create(
+            direction="expense",
+            day=date(2026, 3, 1),
+            amount_minor=200_000,
+            currency="EUR",
+            category_id=category.id,
+            description="Mortgage",
+            description_key="mortgage",
+            source="manual",
+            import_key=f"id:{transaction_origin}",
+            created_by_user_id=team.users["editor"],
+        )
+        networth_category = NetWorthCategoryRepository(session, ctx).create(
+            name="Property",
+            name_key="property",
+            side="asset",
+            color="#3b6ea8",
+            sort_order=0,
+        )
+        item = NetWorthItemRepository(session, ctx).create(
+            side="asset",
+            category_id=networth_category.id,
+            name="Flat",
+            currency="EUR",
+            estimate_between=True,
+        )
+        rate = ReferenceRateRepository(session, ctx).create(
+            name="WIBOR", name_key="wibor", notes="3M"
+        )
+        ReferenceRateValueRepository(session, ctx).create(
+            reference_rate_id=rate.id,
+            effective_from=date(2026, 1, 1),
+            value_bp=575,
+        )
+        loan = LoanRepository(session, ctx).create(
+            name="Mortgage",
+            kind="annuity",
+            currency="EUR",
+            principal_original_minor=30_000_000,
+            origination_date=date(2026, 1, 1),
+            first_payment_date=date(2026, 2, 1),
+            term_months=240,
+            payment_day=1,
+            rate_mode="variable",
+            day_count="actual_365",
+            margin_bp=150,
+            reference_rate_id=rate.id,
+            property_item_id=item.id,
+            auto_record_payments=True,
+            overpayment_mode="fixed_extra",
+            overpayment_amount_minor=10_000,
+            overpayment_strategy="reduce_term",
+        )
+        LoanRateChangeRepository(session, ctx).create(
+            loan_id=loan.id, effective_from=date(2026, 1, 1), rate_bp=575
+        )
+        LoanCostComponentRepository(session, ctx).create(
+            loan_id=loan.id,
+            name="Fee",
+            mode="fixed",
+            fixed_minor=500,
+            basis="opening_balance",
+            effective_from=date(2026, 1, 1),
+        )
+        LoanOverpaymentRepository(session, ctx).create(
+            loan_id=loan.id,
+            date=date(2026, 6, 1),
+            amount_minor=100_000,
+            note="Bonus",
+        )
+        LoanPaymentRepository(session, ctx).create(
+            loan_id=loan.id,
+            date=date(2026, 3, 1),
+            kind="installment",
+            total_minor=200_000,
+            principal_minor=100_000,
+            interest_minor=99_000,
+            costs_minor=1_000,
+            overpayment_minor=0,
+            source="manual",
+            transaction_id=transaction.id,
+        )
+        LoanBalanceCheckpointRepository(session, ctx).create(
+            loan_id=loan.id,
+            as_of=date(2026, 7, 1),
+            remaining_principal_minor=28_000_000,
+        )
+        LoanScenarioRepository(session, ctx).create(
+            loan_id=loan.id,
+            name="Faster",
+            name_key="faster",
+            overpayment_mode="fixed_extra",
+            overpayment_amount_minor=20_000,
+            overpayment_strategy="reduce_term",
+        )
+        plan_loan = LoanRepository(session, ctx).create(
+            name="Phone",
+            kind="installment_plan",
+            currency="EUR",
+            principal_original_minor=300_000,
+            first_payment_date=date(2026, 4, 5),
+            term_months=3,
+            payment_day=5,
+            rate_mode="fixed",
+            day_count="monthly",
+            overpayment_mode="none",
+            overpayment_strategy="reduce_term",
+        )
+        InstallmentPlanRepository(session, ctx).create(
+            loan_id=plan_loan.id,
+            category_id=category.id,
+            installment_minor=100_000,
+            remaining_count=3,
+            end_date=date(2026, 6, 5),
+        )
+
+    parsed, errors = parse_archive(export_workspace(team.factory, ctx).content)
+    assert errors == () and parsed is not None
+    rows = parsed.rows
+    assert [row.name for row in rows.reference_rates] == ["WIBOR"]
+    assert rows.reference_rate_values[0].value_bp == 575
+    loan_row = next(row for row in rows.loans if row.name == "Mortgage")
+    assert loan_row.id == str(loan.id)
+    assert loan_row.property_item_id == str(item.id)
+    assert loan_row.property_item == "Flat"
+    assert loan_row.reference_rate_id == str(rate.id)
+    assert loan_row.auto_record_payments == "true"
+    assert loan_row.day_count == "actual_365"
+    assert rows.loan_payments[0].transaction_id == str(transaction_origin)
+    assert rows.installment_plans[0].category == "Food"
+    assert rows.installment_plans[0].loan == "Phone"
+    assert rows.loan_rate_changes[0].loan == "Mortgage"
 
 
 def test_export_includes_risk_policy_and_never_provider_secrets(team: WorkspaceDb) -> None:

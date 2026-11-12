@@ -228,5 +228,19 @@ cannot be deleted.
 **Archive loan** hides a loan from the active list and makes it read-only. **Restore loan** brings
 it back. Loans are never hard-deleted.
 
+## Backup and restore
+
+Loans are part of the workspace archive (format 1.5): reference rates and values, terms, rate
+changes, cost components, planned overpayments, actual payments, balance checkpoints, scenarios
+and installment plans. Generated schedules are not stored in the archive; a restore rebuilds
+them from the restored terms, so the schedule is identical. Property and ledger-payment links
+are mapped to the restored net-worth items and transactions. Loan and reference-rate ids are
+preserved when the destination does not already use them, which keeps linked net-worth items
+and installment plans pointing at the same loans.
+
+A merge of a full archive does not apply loan files; only a restore does. A lone
+`reference_rate_values.csv` can be merged, matching the series by case-folded name and treating
+an existing value for the same date as a duplicate or a conflict.
+
 The app only stores and displays terms; it does not give financial advice. The installment
 figures are estimates until the bank's actual payments are recorded.

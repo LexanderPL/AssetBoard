@@ -28,9 +28,12 @@ categories (including archived categories), transactions (including deleted entr
 values, stored month states (closed months and plan-start markers), all net-worth categories,
 items, value histories and snapshots, and the whole investment history: asset classes,
 instruments, allocations, buy/sell transactions (undated lots included), bond terms, stored
-manual and provider prices, stored FX rates, and provider settings without their API keys.
-Recurring items, income sources, work logs and calendars, and tax rules are not in this archive
-version yet. Notification channels and delivery logs are never exported, because channel URLs
+manual and provider prices, stored FX rates, and provider settings without their API keys,
+and the loan configuration: reference rates and their values, loans (including installment
+plans), fixed-rate changes, cost components, planned overpayments, actual payments, balance
+checkpoints and saved scenarios. Schedules are not archived; they are recomputed from those
+terms. Recurring items, income sources, work logs and calendars, and tax rules are not in this
+archive version yet. Notification channels and delivery logs are never exported, because channel URLs
 can contain secrets; provider API keys are not exported either.
 
 The download is a copy: exporting does not change the ledger. The audit log records the export
@@ -81,7 +84,13 @@ Restore writes, all at once:
    undated legacy lots and deleted rows), bond terms, stored prices and FX rates, and provider
    settings. Investment quantities, prices and FX rates are restored from their plain decimal
    text without going through `float`;
-8. the saved risk targets and the investment cost basis.
+8. reference rates and their values, then loans, rate changes, costs, planned overpayments,
+   actual payments, balance checkpoints, scenarios and installment plans. Property and
+   transaction links are mapped to the restored net-worth items and ledger rows; a link whose
+   target is missing blocks the restore rather than being left dangling. Loan rows keep their
+   archived ids when the target database does not already use them, so linked net-worth items
+   and installment-plan references keep pointing at the right loan;
+9. the saved risk targets and the investment cost basis.
 
 A net-worth item linked to a portfolio class or holding is linked to the restored row when the
 archive carries its target (1.4 archives do). A link whose target is not in the archive —
@@ -106,9 +115,10 @@ Merge brings an archive's ledger data into a workspace you already use, for exam
 two workspaces. Owners and editors can merge; it is the default mode.
 
 A merge writes categories, transactions and planned values only. The archive's settings,
-closed months, net-worth files and investment files are listed for information but never
-applied; a 1.2+ archive lists its net-worth files once with a restore-only warning, and a 1.4
-archive lists its investment files once with the same kind of warning. The settings diff also
+closed months, net-worth files, investment files and loan files are listed for information but
+never applied; a 1.2+ archive lists its net-worth files once with a restore-only warning, a 1.4
+archive lists its investment files once with the same kind of warning, and a 1.5 archive lists
+its loan files once with `loan_restore_only`. The settings diff also
 reports the investment cost basis and risk targets when they differ. The archive's base currency
 must match the workspace's; otherwise the whole archive is refused. Existing net-worth and
 investment data is left untouched. To merge a valuation history, import its
@@ -134,6 +144,7 @@ file name:
 | Categories | `kind,name` | `id`, `treatment`, `color`, `sort_order` and `archived_at` are optional |
 | Item valuations | `item,as_of,value` | `currency`, `note` and `item_id` are optional; `id` and `created_at` are accepted for an exported file |
 | Investment transactions | `instrument,date,type,quantity,unit_price` | `quote_currency`, `fee`, `fx_to_base`, `note`, the three settlement fields and `id` are optional; `instrument_id` is ignored and the instrument is matched by name |
+| Reference-rate values | `reference_rate,effective_from,value_bp` | `id` and `reference_rate_id` are accepted for an exported file; the series is matched by case-folded name and created when absent |
 
 Download a ready-made template for transactions, planned values or item valuations from the
 links under the upload form. A `months.csv` or `workspace.json` on its own is refused: only a
@@ -147,6 +158,12 @@ date makes an identical value a duplicate and a different value a conflict, whil
 rows in one file for the same item and date are imported in file order, so a same-day
 correction becomes the latest value. Values must use the item's currency and exactly its minor
 digits; a file without `created_at` is stamped in row order from the import time.
+
+A lone reference-rate-values file creates a series named by the file when it does not exist.
+For an existing series, the same series and effective date makes an identical value a duplicate
+(`already_imported`) and a different value a conflict (`reference_rate_value_differs`); the
+stored value is kept. The other loan archive files are restore-only: `loans.csv` and its
+companions have no standalone importer.
 
 Investment transactions are matched by instrument name. A name that matches an active instrument
 is mapped automatically; an unknown name needs the **Instrument mapping** step: map it to an
