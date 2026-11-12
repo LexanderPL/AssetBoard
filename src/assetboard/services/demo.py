@@ -54,12 +54,19 @@ from assetboard.db.repositories import (
     InstrumentRepository,
     InvestmentTransactionRepository,
     ItemValuationRepository,
+    LoanBalanceCheckpointRepository,
+    LoanCostComponentRepository,
+    LoanOverpaymentRepository,
+    LoanRateChangeRepository,
+    LoanRepository,
     MembershipRepository,
     MonthStateRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
     NetWorthSnapshotRepository,
     PricePointRepository,
+    ReferenceRateRepository,
+    ReferenceRateValueRepository,
     RiskTargetPolicyRepository,
     ScheduledItemRepository,
     ScheduledOccurrenceRepository,
@@ -74,11 +81,13 @@ from assetboard.domain.categories import name_key
 from assetboard.domain.demo import (
     DemoBondTerms,
     DemoIncomeSource,
+    DemoLoan,
     DemoPlan,
     DemoRecurring,
     build_plan,
 )
 from assetboard.domain.income import IncomeKind
+from assetboard.domain.loans import CostBasis
 from assetboard.domain.months import YearMonth
 from assetboard.domain.percent_or_fixed import PercentOrFixed
 from assetboard.domain.recurrence import Frequency, RecurrenceRule, WeekendPolicy
@@ -562,6 +571,89 @@ def _write_networth(
     return items, valuations
 
 
+def _write_loans(session: Session, ctx: Context, plan: DemoPlan) -> None:
+    """Write the demo reference rates and loans through the scoped repositories.
+
+    The public loan service opens its own transaction per call, so the demo writer composes the
+    repositories directly, like the other in-session seams. The plan is synthetic and already
+    validated by its fixed values and the coverage test.
+    """
+    rate_ids: dict[str, UUID] = {}
+    for rate in plan.reference_rates:
+        _use(session, ctx)
+        row = ReferenceRateRepository(session, ctx).create(
+            name=rate.name, name_key=name_key(rate.name), notes=rate.notes
+        )
+        rate_ids[rate.name] = row.id
+        for effective_from, value_bp in rate.values:
+            ReferenceRateValueRepository(session, ctx).create(
+                reference_rate_id=row.id,
+                effective_from=effective_from,
+                value_bp=value_bp,
+            )
+    for demo in plan.loans:
+        _write_loan(session, ctx, demo, rate_ids)
+
+
+def _write_loan(session: Session, ctx: Context, demo: DemoLoan, rate_ids: dict[str, UUID]) -> None:
+    loan = LoanRepository(session, ctx).create(
+        name=demo.name,
+        kind=demo.kind,
+        currency=ctx.workspace.base_currency,
+        principal_original_minor=(
+            demo.principal_original.amount_minor if demo.principal_original else None
+        ),
+        origination_date=demo.origination_date,
+        first_payment_date=demo.first_payment_date,
+        term_months=demo.term_months,
+        payment_day=demo.payment_day,
+        rate_mode=demo.rate_mode,
+        margin_bp=demo.margin_bp,
+        reference_rate_id=(
+            rate_ids[demo.reference_rate_name] if demo.reference_rate_name else None
+        ),
+        installment_override_minor=(
+            demo.installment_override.amount_minor if demo.installment_override else None
+        ),
+        overpayment_mode=demo.overpayment_mode,
+        overpayment_amount_minor=(
+            demo.overpayment_amount.amount_minor if demo.overpayment_amount else None
+        ),
+        overpayment_strategy=demo.overpayment_strategy,
+        archived_at=None,
+    )
+    if demo.entry_path == "current" and demo.current_balance is not None:
+        assert demo.balance_date is not None
+        LoanBalanceCheckpointRepository(session, ctx).create(
+            loan_id=loan.id,
+            as_of=demo.balance_date,
+            remaining_principal_minor=demo.current_balance.amount_minor,
+            note="",
+        )
+    for effective_from, rate_bp in demo.rate_changes:
+        LoanRateChangeRepository(session, ctx).create(
+            loan_id=loan.id, effective_from=effective_from, rate_bp=rate_bp
+        )
+    for cost in demo.costs:
+        LoanCostComponentRepository(session, ctx).create(
+            loan_id=loan.id,
+            name=cost.name,
+            mode=cost.mode,
+            rate_bp=cost.rate_bp,
+            fixed_minor=cost.fixed.amount_minor if cost.fixed else None,
+            basis=CostBasis.OPENING_BALANCE.value,
+            effective_from=cost.effective_from,
+            effective_to=cost.effective_to,
+        )
+    for paid_on, amount, note in demo.overpayments:
+        LoanOverpaymentRepository(session, ctx).create(
+            loan_id=loan.id,
+            date=paid_on,
+            amount_minor=amount.amount_minor,
+            note=note,
+        )
+
+
 def _write_investments(
     session: Session, ctx: Context, plan: DemoPlan, lookup: _Lookup
 ) -> tuple[int, int, int, int, int]:
@@ -834,6 +926,13 @@ _COUNT_REPOSITORIES: tuple[tuple[str, type[ScopedRepository[Any]]], ...] = (
     ("networth_items", NetWorthItemRepository),
     ("item_valuations", ItemValuationRepository),
     ("networth_snapshots", NetWorthSnapshotRepository),
+    ("reference_rates", ReferenceRateRepository),
+    ("reference_rate_values", ReferenceRateValueRepository),
+    ("loans", LoanRepository),
+    ("loan_rate_changes", LoanRateChangeRepository),
+    ("loan_cost_components", LoanCostComponentRepository),
+    ("loan_overpayments", LoanOverpaymentRepository),
+    ("loan_balance_checkpoints", LoanBalanceCheckpointRepository),
     ("asset_classes", AssetClassRepository),
     ("instruments", InstrumentRepository),
     ("instrument_allocations", InstrumentAllocationRepository),
@@ -884,6 +983,7 @@ def build_demo_workspace_in_session(
         _write_recurring(session, tctx, plan, lookup, horizon_months=horizon_months)
         _write_income(session, tctx, plan, lookup)
         _write_networth(session, tctx, plan, lookup)
+        _write_loans(session, tctx, plan)
         _write_investments(session, tctx, plan, lookup)
         _write_snapshots(session, tctx, plan)
         _import_batches, upload_path = _write_import(session, tctx, plan, data_dir)

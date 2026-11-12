@@ -143,3 +143,15 @@ def test_nothing_is_dated_after_t_except_planned_future_rows() -> None:
     assert all(day <= reference for day in plan.snapshot_dates)
     future_items = [row for row in plan.recurring if row.start_date > reference]
     assert {row.key for row in future_items} == {"insurance", "one-time"}
+
+
+def test_the_plan_contains_both_loan_entry_paths_and_a_reference_rate() -> None:
+    plan = _plan(currency="PLN")
+    assert len(plan.reference_rates) == 1
+    assert plan.reference_rates[0].values[0][0] < plan.reference_rates[0].values[-1][0]
+    assert len(plan.loans) == 2
+    assert {row.entry_path for row in plan.loans} == {"original", "current"}
+    assert {row.rate_mode for row in plan.loans} == {"fixed", "variable"}
+    assert all(
+        row.principal_original and row.principal_original.currency == "PLN" for row in plan.loans
+    )
