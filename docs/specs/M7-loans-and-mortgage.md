@@ -483,3 +483,43 @@ emptiness checks, extended round-trip test incl. identical schedules after resto
   reference-rate-values adapter and the recognised restore-only files.
 - An archive round-trip test restores every table and compares the rebuilt schedule rows and
   `summarize_schedule()` output with the source, not database ids.
+
+### As built (P2 loan UI polish, 2026-11-13)
+
+The post-F7.8 polish keeps the same models and services, except for two read-only repository
+helpers (`ScheduledItemRepository.for_loan`, `ScheduledOccurrenceRepository.for_items`) and a
+`preview_first_installment()` service wrapper around the domain helper. No migration was needed.
+
+- **Wizard review and save-another.** Step 4 renders a read-only review of the draft: name,
+  entry path, principal or current balance, term, first payment date, rate configuration,
+  regular overpayment, cost components and the calculated first installment. The route calls
+  `preview_first_installment()`, which uses the current balance for the current-balance path and
+  returns the override when one is set. A calculation error shows the existing validation
+  message. `go=save_add` saves and redirects to a fresh `/loans/new` with a confirmation;
+  `go=next` keeps the Settings redirect. Wizard errors with a field in the current step mark the
+  input with `aria-invalid`, `aria-describedby` and a message; other errors keep the top alert.
+- **Installment progress and quick post.** `InstallmentPlanView` derives `paid_count`,
+  `original_count = remaining_count + posted plan occurrences` and a basis-point percentage
+  from the plan's scheduled items (including archived items with history). Both lists link the
+  plan name and show an Open/Closed badge and an accessible inline progress bar; the detail
+  shows the same progress with paid/remaining labels. `post_next_installment()` finds the
+  earliest pending occurrence due today or earlier and posts it through
+  `occurrences.post_occurrence()`, so the countdown, transaction and schedule refresh follow the
+  normal path. The detail shows **Post next installment** only when one is due; a repeated post
+  is refused as `no_due_installment` and cannot decrement twice.
+- **Compact reference rates.** `ReferenceRateView` adds `used_by` loan references and a
+  100×24 sparkline of the value history. The page is a compact expandable series table with
+  name, current value, sparkline, used-by count and, inside the row, the values table, loan
+  links and edit/delete controls. The add/edit dialogs and "future values editable, past values
+  read-only" rule are unchanged.
+- **Status and validation polish.** The loan overview shows the same Active/Paid off/Archived
+  badge as the list; plan lists and detail show Open/Closed. The loan overview, plan detail and
+  reference-rates page keep one primary action and group secondary actions; the installment
+  detail no longer has a redundant Back link. Settings rate/cost/overpayment/property errors
+  mark the matching input, with unexpected errors staying in the top alert. The wide settings
+  lists remain card rows below `sm`.
+- Tests cover both wizard redirects, review values for original/current/override paths, one
+  field error per wizard step and the settings forms, progress after one posted occurrence,
+  posting the next due occurrence, the no-due case and no double decrement, used-by links and
+  sparkline data, plus browser checks of the wizard review, status/progress and the compact
+  reference-rate view at 390 and 1440.

@@ -24,6 +24,17 @@ The **loan type** is annuity (roughly equal installments) or equal principal (th
 is equal and the installment falls over time). You can change the type later. The **rate type**
 is fixed at creation: to switch between fixed and variable, archive the loan and add a new one.
 
+The last step shows a read-only **Review**: the name, entry path, original principal or current
+balance, term, first payment date, rate configuration, regular overpayment, cost components and
+the **calculated first installment**. A current-balance loan calculates from today's balance. An
+installment override replaces the calculated amount and is marked **override**. If the amount
+cannot be calculated, the wizard shows the same validation message as saving would.
+
+**Save loan** stores the loan and opens its Settings page. **Save and add another** stores it
+and returns to a fresh Add loan form with a confirmation, which is useful when entering several
+loans. A validation error marks the matching input with its message; errors that do not belong
+to one field stay in the alert above the form.
+
 ## Interest
 
 - **Fixed**: enter the rate; add later changes in **Settings → Rates**. Each rate is effective from its
@@ -91,12 +102,12 @@ A loan has its own section navigation: **Overview**, **Schedule**, **Payments**,
 and **Settings**. The overview is read-only insight; changing the terms, rate, costs,
 overpayments, links or archive state happens in Settings.
 
-- **Overview**: one header panel with a large repaid-vs-remaining principal bar (paid amount,
-  percentage, original principal and payoff date), the current rate (with the reference rate and
-  margin for a variable loan), the next payment and its principal/interest/costs/overpayment
-  breakdown, the percentage repaid, the payoff date, the payments left, and remaining/lifetime
-  interest and costs. The bar is inline SVG; its text labels carry the same information so colour
-  is not the only cue.
+- **Overview**: one header panel with an **Active**, **Paid off** or **Archived** status badge,
+  a large repaid-vs-remaining principal bar (paid amount, percentage, original principal and
+  payoff date), the current rate (with the reference rate and margin for a variable loan), the
+  next payment and its principal/interest/costs/overpayment breakdown, the percentage repaid,
+  the payoff date, the payments left, and remaining/lifetime interest and costs. The bar is
+  inline SVG; its text labels carry the same information so colour is not the only cue.
 - **Plan vs actual**: the last recorded actual payment, the latest balance checkpoint and its
   variance, and a plain **Ahead**, **Behind** or **On track** line. Without actual payments or
   checkpoints the panel says that no actual payments are recorded yet.
@@ -132,7 +143,10 @@ overpayments, links or archive state happens in Settings.
 card summarises the current key terms; its **Edit terms** button opens the separate edit page,
 which returns to Settings when saved or cancelled. Viewers see every card read-only; only
 editors and owners see the edit, create, delete and archive controls. Payment and checkpoint
-dialogs stay on the Payments page.
+dialogs stay on the Payments page. An invalid rate, cost, overpayment or property choice marks
+the matching input and shows its message there; general errors stay in the alert above the
+cards. The wide rate, cost and overpayment lists become card rows on phones and do not force
+sideways page scrolling.
 
 If the stored terms cannot produce a schedule (for example a missing rate), the overview explains
 the problem and hides the schedule, charts and CSV until the terms are corrected.
@@ -144,9 +158,15 @@ interest calculation. Create a plan with a name, monthly installment, remaining 
 day and expense category. The plan computes the next due date on or after today (clamping the
 payment day to the end of a shorter month) and the end date after the remaining payments.
 
-- The list shows active plans with monthly installment, remaining count, total remaining
-  (installment × remaining count), next due, end date and category. Closed plans stay in a
-  separate section.
+- The list shows active plans with monthly installment, remaining count, progress, total
+  remaining (installment × remaining count), next due, end date and category. The plan name is
+  the link to its detail; an **Open**/**Closed** badge names the state. Closed plans stay in a
+  separate section with the same columns and progress.
+- **Progress** is the posted installments out of the original count. The original count is the
+  remaining count plus the plan occurrences already posted, so it stays correct without a
+  separate stored total. The list uses a compact bar; the detail shows paid and remaining
+  installments with the percentage and an inline bar. The text labels repeat the values, so
+  colour is not the only cue.
 - The plan detail shows the same totals plus its net-worth liability and generated Upcoming
   occurrences. **Create net-worth item** links one liability item in the **Installments**
   category; it resolves to installment × remaining count.
@@ -155,6 +175,11 @@ payment day to the end of a shorter month) and the end date after the remaining 
   reduces the remaining count by one; posted occurrences are never counted twice. At zero the
   plan closes, its loan is archived and pending future occurrences are removed, while posted and
   past rows remain.
+- **Post next installment** is available on the plan detail when the earliest pending occurrence
+  is due today or earlier. It posts that occurrence through the normal Upcoming posting service,
+  which records the expense transaction, reduces the count and refreshes the schedule. The
+  button is hidden when nothing is due. A posted occurrence is not decremented again, and the
+  next click posts the next due occurrence (or says that nothing is due).
 - **Archive plan** closes a plan manually and removes pending future occurrences; **Restore
   plan** reopens it (unless the remaining count is zero). Editing the installment, remaining
   count, payment day or category updates the plan, its end date and generated occurrences.
@@ -304,10 +329,16 @@ calculated installment.
 
 ## Reference rates
 
-Reference rates are workspace-scoped series such as WIBOR or EURIBOR. Editors and owners create
-a series and add a value with its effective date; viewers can read them. Values that start in the
+Reference rates are workspace-scoped series such as WIBOR or EURIBOR. The page is a compact
+series table: each row shows the rate name and notes, its current value, a small value-history
+sparkline, and how many loans use it. Open a row to see the individual values with their dates,
+the **Used by** loan links, and the rate and value edit/delete controls. Values that start in the
 future can be corrected or deleted; past values are historical. A reference rate used by a loan
 cannot be deleted.
+
+Editors and owners create a series and add a value with its effective date; viewers can read
+them but see no edit controls. The **New reference rate** action stays the page's primary
+action, and the add/edit dialogs are unchanged.
 
 ## Archiving
 
