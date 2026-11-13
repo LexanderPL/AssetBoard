@@ -206,12 +206,21 @@ class ReferenceRateValueView:
 
 
 @dataclass(frozen=True, slots=True)
+class ReferenceRateLoanRef:
+    id: UUID
+    name: str
+    archived: bool
+
+
+@dataclass(frozen=True, slots=True)
 class ReferenceRateView:
     id: UUID
     name: str
     notes: str
     values: tuple[ReferenceRateValueView, ...]
     current_value_bp: int | None
+    used_by: tuple[ReferenceRateLoanRef, ...] = ()
+    sparkline: tuple[tuple[int, int], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -824,6 +833,35 @@ def _validated_cost_inputs(
         )
         validated.append((clean_name, mode, rate, fixed_minor, effective_from, cost.effective_to))
     return validated
+
+
+def preview_first_installment(
+    *,
+    entry_path: EntryPath,
+    principal_original: Money | None,
+    current_balance: Money | None,
+    term_months: int,
+    kind: LoanKind,
+    rate_bp: int | None,
+    installment_override: Money | None,
+) -> Money:
+    """The first installment the wizard will save; the route never calculates finance itself.
+
+    A current-balance loan is based on the balance entered today. An installment override wins
+    over the calculated amount. Missing terms raise the same errors as the save path.
+    """
+    if entry_path not in ("original", "current"):
+        raise LoanError("entry_path", "invalid_entry_path")
+    if installment_override is not None:
+        return installment_override
+    base = principal_original if entry_path == "original" else current_balance
+    if base is None:
+        field = "principal_original" if entry_path == "original" else "current_balance"
+        code = "invalid_principal" if entry_path == "original" else "invalid_balance"
+        raise LoanError(field, code)
+    if rate_bp is None:
+        raise LoanError("rate_bp", "missing_rate")
+    return first_installment(base, rate_bp, term_months, kind)
 
 
 def create_loan(
@@ -1580,10 +1618,29 @@ def _reference_name_key(name: str) -> str:
     return key
 
 
+def _sparkline(values: list[ReferenceRateValue]) -> tuple[tuple[int, int], ...]:
+    """A 100 x 24 viewBox path for the value history; no floats, no chart dependency."""
+    if not values:
+        return ()
+    if len(values) == 1:
+        return ((0, 12), (100, 12))
+    low = min(value.value_bp for value in values)
+    high = max(value.value_bp for value in values)
+    span = high - low
+    last = len(values) - 1
+    if span == 0:
+        return tuple((index * 100 // last, 12) for index in range(len(values)))
+    return tuple(
+        (index * 100 // last, 22 - (value.value_bp - low) * 20 // span)
+        for index, value in enumerate(values)
+    )
+
+
 def _reference_view(
     rate: ReferenceRate,
     values: list[ReferenceRateValue],
     today: date,
+    loans: Sequence[Loan] = (),
 ) -> ReferenceRateView:
     return ReferenceRateView(
         id=rate.id,
@@ -1601,6 +1658,12 @@ def _reference_view(
         current_value_bp=latest_value_on_or_before(
             [(value.effective_from, value.value_bp) for value in values], today
         ),
+        used_by=tuple(
+            ReferenceRateLoanRef(id=loan.id, name=loan.name, archived=loan.archived_at is not None)
+            for loan in loans
+            if loan.reference_rate_id == rate.id
+        ),
+        sparkline=_sparkline(values),
     )
 
 
@@ -1610,8 +1673,11 @@ def list_reference_rates(factory: sessionmaker[Session], ctx: Context) -> Refere
     with factory() as session:
         rates = ReferenceRateRepository(session, ctx).ordered()
         values = ReferenceRateValueRepository(session, ctx)
+        loans = LoanRepository(session, ctx).ordered()
         return ReferenceRatesPage(
-            rates=tuple(_reference_view(rate, values.for_rate(rate.id), today) for rate in rates)
+            rates=tuple(
+                _reference_view(rate, values.for_rate(rate.id), today, loans) for rate in rates
+            )
         )
 
 
@@ -1623,7 +1689,8 @@ def get_reference_rate(
     with factory() as session:
         rate = ReferenceRateRepository(session, ctx).get_or_raise(rate_id)
         values = ReferenceRateValueRepository(session, ctx).for_rate(rate.id)
-        return _reference_view(rate, values, today)
+        loans = LoanRepository(session, ctx).ordered()
+        return _reference_view(rate, values, today, loans)
 
 
 def create_reference_rate(
@@ -1852,6 +1919,7 @@ __all__ = [
     "LoanRateChangeView",
     "LoanStatus",
     "LoanView",
+    "ReferenceRateLoanRef",
     "ReferenceRateValueView",
     "ReferenceRateView",
     "ReferenceRatesPage",
@@ -1871,6 +1939,7 @@ __all__ = [
     "get_reference_rate",
     "list_loans",
     "list_reference_rates",
+    "preview_first_installment",
     "restore_loan",
     "set_overpayment_settings",
     "update_cost_component",

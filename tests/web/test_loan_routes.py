@@ -169,6 +169,96 @@ def test_original_path_wizard_keeps_values_and_saves(owner):
         )
 
 
+def test_wizard_final_step_reviews_the_loan_and_its_first_installment(owner):
+    data = _wizard_data(
+        overpayment_mode="fixed_extra",
+        overpayment_amount="100.00",
+        cost_name_1="Property insurance",
+        cost_mode_1="fixed",
+        cost_fixed_amount_1="75.00",
+    )
+    for step in (1, 2, 3):
+        response = _step(owner, data, step)
+        assert response.status_code == 200, response.text
+    assert "data-wizard-review" in response.text
+    assert "data-review-name>Mortgage<" in response.text
+    assert "data-review-entry>Original terms<" in response.text
+    assert "data-review-base>€300,000.00<" in response.text
+    assert "data-review-term>360 months<" in response.text
+    assert "data-review-first-payment>Feb 1, 2026<" in response.text
+    assert "data-review-rate>Fixed · 5.5%<" in response.text
+    assert "data-review-overpayment>Extra €100.00 each month" in response.text
+    assert "data-review-costs" in response.text and "Property insurance" in response.text
+    assert "data-review-first-installment>€1,703.37<" in response.text
+    assert "data-wizard-save-add" in response.text
+
+
+def test_wizard_review_uses_the_current_balance_and_an_override(owner):
+    data = _wizard_data(
+        entry_path="current",
+        current_balance="200,000.00",
+        balance_date="2026-01-01",
+        principal_original="300,000.00",
+        first_payment_date="2026-02-01",
+        term_months="240",
+        installment_override="1,200.00",
+    )
+    for step in (1, 2, 3):
+        response = _step(owner, data, step)
+        assert response.status_code == 200, response.text
+    assert "data-review-base>€200,000.00<" in response.text
+    assert "data-review-entry>Current balance<" in response.text
+    assert "data-review-first-installment>€1,200.00 " in response.text
+    assert ">override</span>" in response.text
+
+
+def test_wizard_save_and_add_another_redirects_to_a_fresh_form(owner):
+    data = _wizard_data()
+    for step in (1, 2, 3):
+        assert _step(owner, data, step).status_code == 200
+    saved = _step(owner, data, 4, go="save_add")
+    assert saved.status_code == 303
+    assert saved.headers["location"] == "/loans/new?notice=loan_created_another"
+    with owner.db() as session:
+        rows = session.scalars(select(Loan).where(Loan.workspace_id == owner.home_id)).all()
+        assert len(rows) == 1
+    fresh = owner.client.get(saved.headers["location"])
+    assert fresh.status_code == 200
+    assert "Loan saved. Add the next loan below." in fresh.text
+    assert 'data-loan-wizard="1"' in fresh.text
+    assert 'name="name" value=""' in fresh.text
+
+
+def test_wizard_marks_field_errors_next_to_the_matching_input(owner):
+    name_error = _step(owner, _wizard_data(name=""), 1)
+    assert name_error.status_code == 400
+    assert 'data-field-error="name"' in name_error.text
+    assert 'aria-invalid="true"' in name_error.text
+    assert "data-form-error" not in name_error.text
+
+    term_error = _step(owner, _wizard_data(term_months="0"), 2)
+    assert term_error.status_code == 400
+    assert 'data-field-error="term_months"' in term_error.text
+    assert 'aria-describedby="wizard-term_months-error"' in term_error.text
+
+    rate_error = _step(owner, _wizard_data(fixed_rate_percent=""), 3)
+    assert rate_error.status_code == 400
+    assert 'data-field-error="fixed_rate_percent"' in rate_error.text
+    assert "data-form-error" not in rate_error.text
+
+    data = _wizard_data()
+    for step in (1, 2, 3):
+        assert _step(owner, data, step).status_code == 200
+    cost_error = _step(
+        owner,
+        data | {"cost_name_1": "", "cost_mode_1": "fixed", "cost_fixed_amount_1": "75.00"},
+        4,
+    )
+    assert cost_error.status_code == 400
+    assert 'data-field-error="cost_name_1"' in cost_error.text
+    assert 'aria-describedby="wizard-cost_name_1-error"' in cost_error.text
+
+
 def test_wizard_saves_cost_components_with_effective_dates(owner):
     data = _wizard_data(
         cost_name_1="Property insurance",
@@ -215,6 +305,30 @@ def test_wizard_rejects_a_cost_row_without_a_name_or_amount(owner):
     assert 'value="Insurance"' in response.text
     with owner.db() as session:
         assert session.scalars(select(Loan)).all() == []
+
+
+def test_loan_overview_shows_the_same_status_badge_as_the_list(owner):
+    loan_id = _create_original(owner)
+    page = owner.client.get(f"/loans/{loan_id}")
+    assert 'data-loan-status-badge="active"' in page.text
+    assert ">Active</span>" in page.text
+
+    owner.post(f"/loans/{loan_id}/archive")
+    archived = owner.client.get(f"/loans/{loan_id}")
+    assert 'data-loan-status-badge="archived"' in archived.text
+    assert ">Archived</span>" in archived.text
+
+    paid_id = _create_original(
+        owner,
+        name="Almost paid",
+        principal_original="1,000.00",
+        origination_date="2025-12-01",
+        first_payment_date="2026-01-01",
+        term_months="1",
+    )
+    paid = owner.client.get(f"/loans/{paid_id}")
+    assert 'data-loan-status-badge="paid_off"' in paid.text
+    assert ">Paid off</span>" in paid.text
 
 
 def test_loan_detail_renders_a_notice_and_ignores_unknown_codes(owner):
@@ -430,6 +544,44 @@ def test_reference_rates_page_crud(owner):
         deleted.status_code == 303
         and "notice=reference_value_deleted" in deleted.headers["location"]
     )
+
+
+def test_reference_rates_compact_view_shows_sparkline_values_and_used_by(owner):
+    owner.post("/loans/reference-rates", {"name": "EURIBOR 6M", "notes": "Euro area"})
+    with owner.db() as session:
+        rate = session.scalars(select(ReferenceRate)).one()
+        rate_id = rate.id
+    for day, value in (("2026-01-01", "4.0"), ("2027-01-01", "4.5")):
+        added = owner.post(
+            f"/loans/reference-rates/{rate_id}/values",
+            {"effective_from": day, "value_percent": value, "high_rate_confirmed": ""},
+        )
+        assert added.status_code == 303
+    loan_id = _create_original(
+        owner,
+        name="Variable mortgage",
+        rate_mode="variable",
+        fixed_rate_percent="",
+        reference_rate_id=str(rate_id),
+        margin_percent="1.5",
+    )
+    page = owner.client.get("/loans/reference-rates")
+    assert page.status_code == 200
+    assert "data-reference-rates-list" in page.text
+    assert f'data-reference-rate="{rate_id}"' in page.text
+    assert "data-reference-current" in page.text and "4%" in page.text
+    assert "data-reference-sparkline" in page.text and "<polyline points=" in page.text
+    assert "data-reference-used-by" in page.text and "1 loan" in page.text
+    assert f'href="/loans/{loan_id}"' in page.text
+    assert "data-reference-values" in page.text
+    assert "Past value" in page.text
+    assert "data-reference-value=" in page.text
+
+    owner.post("/loans/reference-rates", {"name": "WIRON", "notes": ""})
+    page = owner.client.get("/loans/reference-rates")
+    assert page.text.count("data-reference-sparkline") == 2
+    assert "No values yet." in page.text
+    assert "Not used" in page.text
 
 
 def test_loan_and_archived_titles_open_the_detail_without_an_actions_column(owner):

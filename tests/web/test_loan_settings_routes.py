@@ -242,6 +242,60 @@ def test_invalid_configuration_keeps_the_settings_dialog_open(owner) -> None:
     assert " open>" in response.text[start : start + 700]
 
 
+def test_invalid_settings_fields_are_marked_next_to_the_input(owner) -> None:
+    loan_id = _create(owner)
+    path = f"/loans/{loan_id}/settings"
+    rate = owner.post(
+        f"/loans/{loan_id}/rate-changes",
+        {"effective_from": "2027-01-01", "rate_percent": "101", "high_rate_confirmed": "1"},
+        token_from=path,
+    )
+    assert rate.status_code == 400
+    assert 'data-field-error="rate_percent"' in rate.text
+    assert 'aria-describedby="settings-rate-rate_percent-error"' in rate.text
+    assert "data-action-error" not in rate.text
+
+    cost = owner.post(
+        f"/loans/{loan_id}/costs",
+        {
+            "name": "Insurance",
+            "mode": "fixed",
+            "fixed_amount": "",
+            "effective_from": "2026-01-01",
+            "effective_to": "",
+        },
+        token_from=path,
+    )
+    assert cost.status_code == 400
+    assert 'data-field-error="fixed_amount"' in cost.text
+    assert 'aria-describedby="settings-cost-fixed_amount-error"' in cost.text
+
+    overpayment = owner.post(
+        f"/loans/{loan_id}/overpayments",
+        {"date": "2026-06-01", "amount": "", "note": ""},
+        token_from=path,
+    )
+    assert overpayment.status_code == 400
+    assert 'data-field-error="amount"' in overpayment.text
+    assert 'aria-describedby="settings-overpayment-amount-error"' in overpayment.text
+
+    settings = owner.post(
+        f"/loans/{loan_id}/overpayment-settings",
+        {
+            "overpayment_mode": "fixed_extra",
+            "overpayment_amount": "",
+            "overpayment_strategy": "reduce_term",
+        },
+        token_from=path,
+    )
+    assert settings.status_code == 303
+    assert "field=overpayment_amount" in settings.headers["location"]
+    marked = owner.client.get(settings.headers["location"])
+    assert 'data-field-error="overpayment_amount"' in marked.text
+    assert 'aria-describedby="settings-overpayment_amount-error"' in marked.text
+    assert "data-action-error" not in marked.text
+
+
 def test_terms_edit_uses_settings_for_back_cancel_and_save(owner) -> None:
     loan_id = _create(owner)
     edit = owner.client.get(f"/loans/{loan_id}/edit")

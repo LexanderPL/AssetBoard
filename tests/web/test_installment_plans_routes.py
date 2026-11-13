@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from uuid import uuid4
 
+from sqlalchemy import select, update
+
 from assetboard.db.models.ledger import Category
 from assetboard.db.models.loans import InstallmentPlan, Loan
 from assetboard.db.models.networth import NetWorthCategory
+from assetboard.db.models.scheduled import ScheduledOccurrence
 
 
 def _category(owner, name: str = "Installments") -> str:
@@ -70,6 +73,11 @@ def test_installments_tab_empty_state_and_add_plan(owner) -> None:
     assert "data-installment-plan=" in page.text
     assert "Laptop" in page.text
     assert "3,000.00" in page.text
+    assert f'href="/loans/installments/{loan_id}"' in page.text
+    assert "data-open-installment-plan" in page.text
+    assert "data-open-installment-plan>Laptop</a>" in page.text
+    assert 'data-installment-status-badge="open"' in page.text
+    assert ">Open</span>" in page.text
     detail = owner.client.get(f"/loans/installments/{loan_id}")
     assert detail.status_code == 200
     assert "data-installment-plan-detail" in detail.text
@@ -84,6 +92,45 @@ def test_ordinary_loans_list_excludes_plans_and_detail_redirects(owner) -> None:
     redirect = owner.client.get(f"/loans/{loan_id}", follow_redirects=False)
     assert redirect.status_code == 303
     assert redirect.headers["location"].endswith(f"/loans/installments/{loan_id}")
+
+
+def test_post_next_installment_uses_the_due_occurrence_once(owner) -> None:
+    loan_id = _create(owner, remaining_count="3")
+    path = f"/loans/installments/{loan_id}"
+    detail = owner.client.get(path)
+    assert "data-post-next-installment" not in detail.text
+    no_due = owner.post(f"{path}/post-next", token_from=path)
+    assert no_due.status_code == 303
+    assert "error=no_due_installment" in no_due.headers["location"]
+    assert "No installment is due yet." in owner.client.get(no_due.headers["location"]).text
+    assert "data-plan-remaining>" in owner.client.get(path).text
+
+    today = owner.app.state.clock.today("UTC")
+    with owner.db() as session, session.begin():
+        occurrence = session.scalars(
+            select(ScheduledOccurrence)
+            .where(ScheduledOccurrence.workspace_id == owner.home_id)
+            .order_by(ScheduledOccurrence.due_date)
+        ).first()
+        assert occurrence is not None
+        session.execute(
+            update(ScheduledOccurrence)
+            .where(ScheduledOccurrence.id == occurrence.id)
+            .values(due_date=today)
+        )
+    due = owner.client.get(path)
+    assert "data-post-next-installment" in due.text
+    posted = owner.post(f"{path}/post-next", token_from=path)
+    assert posted.status_code == 303
+    assert "notice=installment_plan_posted" in posted.headers["location"]
+    after = owner.client.get(posted.headers["location"])
+    assert "Next installment posted." in after.text
+    assert "data-plan-remaining>2<" in after.text
+    assert "data-installment-progress-detail" in after.text and ">1</span>" in after.text
+    again = owner.post(f"{path}/post-next", token_from=path)
+    assert again.status_code == 303
+    assert "error=no_due_installment" in again.headers["location"]
+    assert "data-plan-remaining>2<" in owner.client.get(path).text
 
 
 def test_edit_closes_and_closed_section(owner) -> None:
@@ -116,10 +163,14 @@ def test_edit_closes_and_closed_section(owner) -> None:
     )
     assert closed.status_code == 303
     detail = owner.client.get(f"/loans/installments/{loan_id}")
-    assert "closed" in detail.text
+    assert 'data-installment-status-badge="closed"' in detail.text
+    assert ">Closed</span>" in detail.text
     listing = owner.client.get("/loans/installments")
     assert "data-closed-installment-plan=" in listing.text
     assert "data-installment-plan=" not in listing.text
+    assert 'data-installment-status-badge="closed"' in listing.text
+    assert "data-open-closed-installment-plan" in listing.text
+    assert "data-open-closed-installment-plan>Laptop Pro</a>" in listing.text
 
 
 def test_archive_restore_and_networth_item(owner) -> None:
@@ -137,7 +188,7 @@ def test_archive_restore_and_networth_item(owner) -> None:
     archived = owner.post(f"/loans/installments/{loan_id}/archive")
     assert archived.status_code == 303
     detail = owner.client.get(f"/loans/installments/{loan_id}")
-    assert "closed" in detail.text
+    assert 'data-installment-status-badge="closed"' in detail.text
     restored = owner.post(f"/loans/installments/{loan_id}/restore")
     assert restored.status_code == 303
     detail = owner.client.get(f"/loans/installments/{loan_id}")

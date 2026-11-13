@@ -3269,10 +3269,22 @@ msgstr ""
 msgid "A closed installment plan cannot be restored."
 msgstr ""
 
+msgid "No installment is due yet."
+msgstr ""
+
+msgid "The month is closed. Reopen it before posting the installment."
+msgstr ""
+
+msgid "That installment is no longer pending."
+msgstr ""
+
 msgid "The loan could not be saved. Check the form and try again."
 msgstr ""
 
 msgid "Loan saved. Add rate changes, costs or one-off overpayments below."
+msgstr ""
+
+msgid "Loan saved. Add the next loan below."
 msgstr ""
 
 msgid "Loan terms saved."
@@ -3364,6 +3376,9 @@ msgid "Installment plan archived."
 msgstr ""
 
 msgid "Installment plan restored."
+msgstr ""
+
+msgid "Next installment posted."
 msgstr ""
 
 msgid "The loan"
@@ -6938,6 +6953,23 @@ msgstr ""
 msgid "Next payment"
 msgstr ""
 
+msgid "Closed"
+msgstr ""
+
+msgid "Open"
+msgstr ""
+
+#, python-format
+msgid "Paid %(paid)s of %(total)s installments"
+msgstr ""
+
+msgid "Paid installments"
+msgstr ""
+
+#, python-format
+msgid "Paid %(paid)s of %(total)s installments; %(remaining)s remain."
+msgstr ""
+
 msgid "shorten the term"
 msgstr ""
 
@@ -7540,7 +7572,36 @@ msgid ""
 "overpayments on the loan page."
 msgstr ""
 
+msgid "Review"
+msgstr ""
+
+msgid "Entry"
+msgstr ""
+
+msgid "Original terms"
+msgstr ""
+
+msgid "Current balance"
+msgstr ""
+
+msgid "Cost components"
+msgstr ""
+
+#, python-format
+msgid "from %(from)s"
+msgstr ""
+
+#, python-format
+msgid "to %(to)s"
+msgstr ""
+
+msgid "Calculated first installment"
+msgstr ""
+
 msgid "Save loan"
+msgstr ""
+
+msgid "Save and add another"
 msgstr ""
 
 msgid "Payments & balance"
@@ -7706,6 +7767,31 @@ msgid "no value yet"
 msgstr ""
 
 #, python-format
+msgid "Value history from %(from)s to %(to)s"
+msgstr ""
+
+msgid "No values yet."
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d loan"
+msgid_plural "%(num)d loans"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Not used"
+msgstr ""
+
+msgid "Values"
+msgstr ""
+
+msgid "Future values can be changed; past values are read-only."
+msgstr ""
+
+msgid "Used by"
+msgstr ""
+
+#, python-format
 msgid "Delete the reference rate %(name)s and its values?"
 msgstr ""
 
@@ -7725,9 +7811,6 @@ msgid "Delete the value from %(date)s?"
 msgstr ""
 
 msgid "Past value"
-msgstr ""
-
-msgid "No values yet."
 msgstr ""
 
 msgid "Add value"
@@ -8008,18 +8091,7 @@ msgstr ""
 msgid "Add cost"
 msgstr ""
 
-msgid "Cost components"
-msgstr ""
-
 msgid "Cost"
-msgstr ""
-
-#, python-format
-msgid "from %(from)s"
-msgstr ""
-
-#, python-format
-msgid "to %(to)s"
 msgstr ""
 
 #, python-format
@@ -8105,7 +8177,7 @@ msgstr ""
 msgid "No generated occurrences yet."
 msgstr ""
 
-msgid "Back to Installments"
+msgid "Post next installment"
 msgstr ""
 
 msgid "Edit plan"
@@ -8147,6 +8219,9 @@ msgstr ""
 msgid "Back to %(name)s"
 msgstr ""
 
+msgid "Back to Installments"
+msgstr ""
+
 msgid ""
 "A fixed monthly amount and a remaining count. No interest is calculated; "
 "each posted occurrence reduces the count by one."
@@ -8169,9 +8244,6 @@ msgid "Save plan"
 msgstr ""
 
 msgid "Installment plans"
-msgstr ""
-
-msgid "Open"
 msgstr ""
 
 msgid "No installment plans yet."
@@ -8509,9 +8581,6 @@ msgstr ""
 msgid ""
 "Enter or leaving the field saves a planned value; 0 or an empty field "
 "removes it. Esc restores the saved value."
-msgstr ""
-
-msgid "Closed"
 msgstr ""
 
 msgid "This month is closed. Its entries and planned values are read-only."

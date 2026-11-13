@@ -1899,7 +1899,9 @@ def test_scheduled_queries_stay_in_their_workspace(db_session, two_workspaces) -
         other_rows.create(workspace_id=ctx_a.workspace.id)
     assert other_items.ordered() == [] and other_items.ordered(active_only=True) == []
     assert other_items.category_counts() == {} and other_rows.category_counts() == {}
+    assert other_items.for_loan(uuid4()) == [] and items.for_loan(uuid4()) == []
     assert other_rows.for_item(item.id) == []
+    assert other_rows.for_items([item.id]) == [] and rows.for_items([item.id]) == [row]
     assert other_rows.for_income_source(uuid4()) == []
     assert other_rows.for_income_work_month(uuid4(), date(2026, 3, 1)) is None
     assert other_rows.children(row.id) == []

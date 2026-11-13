@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import date
 from uuid import UUID
 
@@ -24,6 +25,15 @@ class ScheduledItemRepository(ScopedRepository[ScheduledItem]):
             statement = statement.where(
                 ScheduledItem.paused_at.is_(None), ScheduledItem.archived_at.is_(None)
             )
+        return list(self._session.scalars(statement))
+
+    def for_loan(self, loan_id: UUID) -> list[ScheduledItem]:
+        """Every item linked to a loan, including archived items with historical occurrences."""
+        statement = (
+            self._scoped_select()
+            .where(ScheduledItem.loan_id == loan_id)
+            .order_by(ScheduledItem.created_at, ScheduledItem.id)
+        )
         return list(self._session.scalars(statement))
 
     def tax_items(self) -> list[ScheduledItem]:
@@ -63,6 +73,16 @@ class ScheduledOccurrenceRepository(ScopedRepository[ScheduledOccurrence]):
                 .order_by(ScheduledOccurrence.due_date, ScheduledOccurrence.id)
             )
         )
+
+    def for_items(self, item_ids: Sequence[UUID]) -> list[ScheduledOccurrence]:
+        if not item_ids:
+            return []
+        statement = (
+            self._scoped_select()
+            .where(ScheduledOccurrence.scheduled_item_id.in_(item_ids))
+            .order_by(ScheduledOccurrence.due_date, ScheduledOccurrence.id)
+        )
+        return list(self._session.scalars(statement))
 
     def for_income_work_month(
         self, income_source_id: UUID, work_month: date

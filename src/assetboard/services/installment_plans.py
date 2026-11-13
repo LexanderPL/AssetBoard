@@ -13,6 +13,7 @@ from assetboard.config import DEFAULT_RECURRENCE_HORIZON_MONTHS
 from assetboard.db.engine import run_immediate
 from assetboard.db.models.ledger import Category
 from assetboard.db.models.loans import InstallmentPlan, Loan
+from assetboard.db.models.scheduled import ScheduledOccurrence
 from assetboard.db.repositories import (
     AuditEventRepository,
     CategoryRepository,
@@ -20,6 +21,8 @@ from assetboard.db.repositories import (
     InstallmentPlanRepository,
     LoanRepository,
     NotFound,
+    ScheduledItemRepository,
+    ScheduledOccurrenceRepository,
 )
 from assetboard.db.repositories.base import WorkspaceScope
 from assetboard.domain.loans import (
@@ -48,6 +51,10 @@ class InstallmentPlanView:
     category_id: UUID
     category_name: str
     closed: bool
+    paid_count: int
+    original_count: int
+    percent_repaid_bp: int
+    due_occurrence: date | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -107,6 +114,21 @@ def _category(session: Session, ctx: Context, category_id: UUID) -> Category:
     return category
 
 
+def _occurrences_for_loan(
+    session: Session, ctx: Context, loan_id: UUID
+) -> list[ScheduledOccurrence]:
+    items = ScheduledItemRepository(session, ctx).for_loan(loan_id)
+    return ScheduledOccurrenceRepository(session, ctx).for_items([item.id for item in items])
+
+
+def _progress(paid_count: int, remaining_count: int) -> tuple[int, int]:
+    original = paid_count + remaining_count
+    if original <= 0:
+        return 0, 0
+    percent = (paid_count * 20_000 + original) // (2 * original)
+    return original, min(10_000, percent)
+
+
 def _plan_view(
     session: Session,
     ctx: Context,
@@ -121,6 +143,15 @@ def _plan_view(
     next_due = None
     if not closed and count > 0:
         next_due = next_due_on_or_after(today, loan.payment_day)
+    occurrences = _occurrences_for_loan(session, ctx, loan.id)
+    paid = sum(1 for row in occurrences if row.status == "posted" and row.direction == "expense")
+    original, percent = _progress(paid, count)
+    due = [
+        row.due_date
+        for row in occurrences
+        if row.status == "pending" and row.direction == "expense" and row.due_date <= today
+    ]
+    due_occurrence = min(due) if due and not closed else None
     return InstallmentPlanView(
         loan=_view(session, ctx, loan, today),
         plan_id=plan.id,
@@ -134,6 +165,10 @@ def _plan_view(
         category_id=category.id,
         category_name=category.name,
         closed=closed,
+        paid_count=paid,
+        original_count=original,
+        percent_repaid_bp=percent,
+        due_occurrence=due_occurrence,
     )
 
 
@@ -171,6 +206,36 @@ def get_installment_plan(
         if plan is None:
             raise NotFound
         return _plan_view(session, ctx, loan, plan, today)
+
+
+def post_next_installment(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -> UUID:
+    """Post the earliest pending occurrence due today or earlier, through the normal service."""
+    require_role(ctx, Role.EDITOR)
+    today = ctx.clock.today(ctx.workspace.timezone)
+    with factory() as session:
+        loan = LoanRepository(session, ctx).get_or_raise(loan_id)
+        if loan.kind != LoanKind.INSTALLMENT_PLAN.value:
+            raise NotFound
+        plan = InstallmentPlanRepository(session, ctx).for_loan(loan.id)
+        if plan is None:
+            raise NotFound
+        if plan.closed_at is not None or loan.archived_at is not None or plan.remaining_count <= 0:
+            raise loans.LoanError("loan", "loan_paid_off")
+        due = [
+            row
+            for row in _occurrences_for_loan(session, ctx, loan.id)
+            if row.status == "pending" and row.direction == "expense" and row.due_date <= today
+        ]
+        if not due:
+            raise loans.LoanError("loan", "no_due_installment")
+        target = min(due, key=lambda row: (row.due_date, row.id))
+        occurrence_id = target.id
+        amount_minor = target.expected_minor
+    from assetboard.services import occurrences as occurrence_service
+
+    return occurrence_service.post_occurrence(
+        factory, ctx, occurrence_id, amount_minor=amount_minor, day=today
+    )
 
 
 def plan_remaining_minor_in_session(
@@ -475,6 +540,7 @@ __all__ = [
     "plan_due_dates_in_session",
     "plan_installment_in_session",
     "plan_remaining_minor_in_session",
+    "post_next_installment",
     "restore_installment_plan",
     "update_installment_plan",
 ]

@@ -24,6 +24,7 @@ from assetboard.domain.loans import (
     RateMode,
     ScheduleRow,
     clean_loan_name,
+    latest_value_on_or_before,
     payment_date_matches_day,
     validate_payment_day,
     validate_term_months,
@@ -46,6 +47,7 @@ from assetboard.services import loan_scenarios as loan_scenario_service
 from assetboard.services import loan_schedule as loan_schedule_service
 from assetboard.services import loan_scheduled as loan_scheduled_service
 from assetboard.services import loans
+from assetboard.services import occurrences as occurrence_service
 from assetboard.services.categories import list_categories
 from assetboard.services.context import Context, Role, has_role, require_role
 from assetboard.web.context import CurrentContext
@@ -154,11 +156,15 @@ ERRORS = {
     "loan_paid_off": _("The loan has no future scheduled payments."),
     "invalid_loan": _("The loan is no longer available."),
     "installment_plan_closed": _("A closed installment plan cannot be restored."),
+    "no_due_installment": _("No installment is due yet."),
+    "month_closed": _("The month is closed. Reopen it before posting the installment."),
+    "not_pending": _("That installment is no longer pending."),
     "failed": _("The loan could not be saved. Check the form and try again."),
 }
 
 NOTICES = {
     "loan_created": _("Loan saved. Add rate changes, costs or one-off overpayments below."),
+    "loan_created_another": _("Loan saved. Add the next loan below."),
     "terms_saved": _("Loan terms saved."),
     "overpayment_saved": _("Regular overpayment settings saved."),
     "rate_saved": _("Rate change saved."),
@@ -189,6 +195,7 @@ NOTICES = {
     "installment_plan_updated": _("Installment plan updated."),
     "installment_plan_archived": _("Installment plan archived."),
     "installment_plan_restored": _("Installment plan restored."),
+    "installment_plan_posted": _("Next installment posted."),
 }
 
 SETTINGS_FORMS = frozenset({"rate", "cost", "overpayment"})
@@ -283,6 +290,15 @@ def _optional_id(value: str) -> UUID | None:
 
 def _rate_input(rate_bp: int, locale: str) -> str:
     return format_quantity_input(Decimal(rate_bp).scaleb(-2), locale)
+
+
+def _reference_value_error_field(exc: Exception) -> str | None:
+    field = getattr(exc, "field", None)
+    if field in ("rate_bp", "value_percent"):
+        return "value_percent"
+    if field == "effective_from":
+        return "effective_from"
+    return None
 
 
 def _error(request: Request, code: str | None) -> str | None:
@@ -502,6 +518,99 @@ def _check_step(
     return False
 
 
+def _wizard_review(
+    request: Request,
+    ctx: Context,
+    values: dict[str, str],
+    reference_rates: tuple[loans.ReferenceRateView, ...],
+) -> dict[str, object]:
+    """Validate the draft and calculate its first installment for the final review panel."""
+    locale = request.state.locale
+    currency = ctx.workspace.base_currency
+    entry = values.get("entry_path")
+    if entry not in ENTRY_PATHS:
+        raise loans.LoanError("entry_path", "invalid_entry_path")
+    kind = _loan_kind(values.get("kind", ""))
+    principal = _money(values, "principal_original", locale, currency)
+    balance = _money(values, "current_balance", locale, currency)
+    term = _integer(values.get("term_months", ""), "term_months")
+    first = _date(values.get("first_payment_date", ""), "first_payment_date")
+    start = _wizard_start(values)
+    if start is None:
+        raise loans.LoanError("rate_mode", "invalid_date")
+    mode = _rate_mode(values.get("rate_mode", ""))
+    fixed_rate: int | None = None
+    margin: int | None = None
+    reference_name: str | None = None
+    if mode is RateMode.FIXED:
+        fixed_rate = _percent(values, "fixed_rate_percent", locale)
+        rate_bp = fixed_rate
+    else:
+        rate_id = _optional_id(values.get("reference_rate_id", ""))
+        if rate_id is None:
+            raise loans.LoanError("reference_rate_id", "invalid_reference_rate")
+        margin = _percent(values, "margin_percent", locale)
+        if margin is None:
+            raise loans.LoanError("margin_percent", "invalid_margin")
+        reference = next((row for row in reference_rates if row.id == rate_id), None)
+        if reference is None:
+            raise loans.LoanError("reference_rate_id", "invalid_reference_rate")
+        reference_value = latest_value_on_or_before(
+            [(row.effective_from, row.value_bp) for row in reference.values], start
+        )
+        if reference_value is None:
+            raise loans.LoanError("reference_rate_id", "missing_reference_value")
+        reference_name = reference.name
+        rate_bp = reference_value + margin
+    override = _money(values, "installment_override", locale, currency)
+    installment = loans.preview_first_installment(
+        entry_path=cast(loans.EntryPath, entry),
+        principal_original=principal,
+        current_balance=balance,
+        term_months=term,
+        kind=kind,
+        rate_bp=rate_bp,
+        installment_override=override,
+    )
+    try:
+        overpayment_mode = OverpaymentMode(values.get("overpayment_mode", "none"))
+        overpayment_strategy = OverpaymentStrategy(
+            values.get("overpayment_strategy", "reduce_term")
+        )
+    except ValueError:
+        raise loans.LoanError("overpayment_mode", "invalid_overpayment") from None
+    costs = _wizard_costs(values, locale, currency)
+    return {
+        "name": values.get("name", ""),
+        "entry_path": entry,
+        "kind": kind,
+        "base": principal if entry == "original" else balance,
+        "first_payment_date": first,
+        "term_months": term,
+        "rate_mode": mode,
+        "fixed_rate_bp": fixed_rate,
+        "reference_rate_name": reference_name,
+        "margin_bp": margin,
+        "effective_rate_bp": rate_bp,
+        "installment_override": override,
+        "first_installment": installment,
+        "overpayment_mode": overpayment_mode,
+        "overpayment_amount": _money(values, "overpayment_amount", locale, currency),
+        "overpayment_strategy": overpayment_strategy,
+        "costs": tuple(
+            {
+                "name": cost.name,
+                "mode": cost.mode,
+                "rate_bp": cost.rate_bp,
+                "fixed": cost.fixed,
+                "effective_from": cost.effective_from or start,
+                "effective_to": cost.effective_to,
+            }
+            for cost in costs
+        ),
+    }
+
+
 def _loan_values_from_view(view: loans.LoanView, locale: str) -> dict[str, str]:
     def amount(value: Money | None) -> str:
         return format_amount_input(value, locale) if value is not None else ""
@@ -528,7 +637,10 @@ async def _wizard_context(
     values: dict[str, str],
     *,
     error: str | None = None,
+    error_field: str | None = None,
     high_rate: bool = False,
+    notice: str | None = None,
+    review: dict[str, object] | None = None,
 ) -> dict[str, object]:
     page = await run_in_threadpool(
         loans.list_reference_rates, request.app.state.session_factory, ctx
@@ -542,9 +654,14 @@ async def _wizard_context(
         "reference_rates": page.rates,
         "cost_rows": COST_COMPONENT_ROWS,
         "error": error,
+        "error_field": error_field if error_field in STEP_FIELDS[step] else None,
+        "error_is_field": error_field in STEP_FIELDS[step],
         "high_rate": high_rate,
+        "notice": notice,
+        "review": review,
         "can_edit": has_role(ctx, Role.EDITOR),
         "format_money": format_money,
+        "format_day": format_day,
         "format_amount_input": format_amount_input,
         "format_quantity_input": format_quantity_input,
         "format_rate_short": format_rate_short,
@@ -558,10 +675,23 @@ async def _render_wizard(
     values: dict[str, str],
     *,
     error: str | None = None,
+    error_field: str | None = None,
     high_rate: bool = False,
+    notice: str | None = None,
+    review: dict[str, object] | None = None,
     status_code: int = 200,
 ) -> Response:
-    context = await _wizard_context(request, ctx, step, values, error=error, high_rate=high_rate)
+    context = await _wizard_context(
+        request,
+        ctx,
+        step,
+        values,
+        error=error,
+        error_field=error_field,
+        high_rate=high_rate,
+        notice=notice,
+        review=review,
+    )
     return render_template(request, "loans/new.html", context=context, status_code=status_code)
 
 
@@ -586,7 +716,13 @@ async def loans_page(request: Request, ctx: CurrentContext) -> Response:
 @router.get("/loans/new", name="loan_new")
 async def loan_new(request: Request, ctx: CurrentContext) -> Response:
     require_role(ctx, Role.EDITOR)
-    return await _render_wizard(request, ctx, 1, _wizard_values({}))
+    return await _render_wizard(
+        request,
+        ctx,
+        1,
+        _wizard_values({}),
+        notice=_notice(request, request.query_params.get("notice")),
+    )
 
 
 @router.post("/loans/new", name="loan_new_step")
@@ -613,17 +749,47 @@ async def loan_new_step(request: Request, ctx: CurrentContext) -> Response:
             high_rate = _check_step(request, checked, values, ctx, reference_rates) or high_rate
     except (loans.LoanError, LoanValidationError) as exc:
         code = getattr(exc, "code", "failed")
+        field = getattr(exc, "field", None)
         return await _render_wizard(
             request,
             ctx,
             step,
             values,
             error=_error(request, code),
+            error_field=field,
             high_rate=high_rate or code == "high_rate_confirmation_required",
             status_code=400,
         )
     if step < 4:
-        return await _render_wizard(request, ctx, step + 1, values)
+        next_step = step + 1
+        if next_step == 4:
+            try:
+                review = _wizard_review(request, ctx, values, reference_rates)
+            except (loans.LoanError, LoanValidationError) as exc:
+                return await _render_wizard(
+                    request,
+                    ctx,
+                    4,
+                    values,
+                    error=_error(request, getattr(exc, "code", "failed")),
+                    error_field=getattr(exc, "field", None),
+                    status_code=400,
+                )
+            return await _render_wizard(request, ctx, 4, values, review=review)
+        return await _render_wizard(request, ctx, next_step, values)
+    try:
+        review = _wizard_review(request, ctx, values, reference_rates)
+    except (loans.LoanError, LoanValidationError) as exc:
+        return await _render_wizard(
+            request,
+            ctx,
+            4,
+            values,
+            error=_error(request, getattr(exc, "code", "failed")),
+            error_field=getattr(exc, "field", None),
+            status_code=400,
+        )
+    save_add = raw.get("go") == "save_add"
     try:
         loan_id = await run_in_threadpool(
             loans.create_loan,
@@ -667,8 +833,15 @@ async def loan_new_step(request: Request, ctx: CurrentContext) -> Response:
             target_step,
             values,
             error=_error(request, code),
+            error_field=getattr(exc, "field", None),
             high_rate=code == "high_rate_confirmation_required",
+            review=review,
             status_code=400,
+        )
+    if save_add:
+        return RedirectResponse(
+            request.url_for("loan_new").path + "?notice=loan_created_another",
+            status_code=303,
         )
     return _redirect_settings(request, loan_id, notice="loan_created")
 
@@ -719,8 +892,15 @@ def _detail_context(
         if can_edit and not data.view.archived and page.next_row is not None
         else None
     )
+    if data.view.archived:
+        loan_status = "archived"
+    elif data.summary is not None and data.summary.remaining_principal.amount_minor == 0:
+        loan_status = "paid_off"
+    else:
+        loan_status = "active"
     return {
         "loan": data.view,
+        "loan_status": loan_status,
         "schedule_data": data,
         "schedule": data.schedule,
         "summary": data.summary,
@@ -743,12 +923,30 @@ def _detail_context(
     }
 
 
+SETTINGS_FORM_FIELDS: dict[str, frozenset[str]] = {
+    "rate": frozenset({"effective_from", "rate_percent"}),
+    "cost": frozenset(
+        {"name", "mode", "rate_percent", "fixed_amount", "effective_from", "effective_to"}
+    ),
+    "overpayment": frozenset({"date", "amount", "note"}),
+}
+
+
+def _settings_error_field(exc: Exception, form: str) -> str | None:
+    """Map a service error to the input a settings action should highlight."""
+    field = getattr(exc, "field", None)
+    if field == "rate_bp" and form in ("rate", "cost"):
+        return "rate_percent"
+    return field if field in SETTINGS_FORM_FIELDS.get(form, frozenset()) else None
+
+
 def _settings_context(
     request: Request,
     ctx: Context,
     loan_id: UUID,
     *,
     error: str | None = None,
+    error_field: str | None = None,
     notice: str | None = None,
     form_values: dict[str, str] | None = None,
     open_form: str | None = None,
@@ -763,6 +961,7 @@ def _settings_context(
         "loan": view,
         "can_edit": has_role(ctx, Role.EDITOR),
         "error": error,
+        "error_field": error_field,
         "notice": notice,
         "form_values": form_values or {},
         "open_form": open_form if open_form in SETTINGS_FORMS else None,
@@ -789,6 +988,7 @@ def _redirect_settings(
     *,
     notice: str | None = None,
     error: str | None = None,
+    error_field: str | None = None,
     anchor: str | None = None,
 ) -> RedirectResponse:
     query: dict[str, str] = {}
@@ -796,6 +996,8 @@ def _redirect_settings(
         query["notice"] = notice
     if error:
         query["error"] = error
+    if error and error_field:
+        query["field"] = error_field
     url = request.url_for("loan_settings", loan_id=str(loan_id)).path
     if query:
         url += "?" + urlencode(query)
@@ -820,6 +1022,7 @@ async def _render_settings_error(
         ctx,
         loan_id,
         error=_error(request, getattr(exc, "code", "failed")),
+        error_field=_settings_error_field(exc, form),
         form_values=values,
         open_form=form,
         edit_id=edit_id,
@@ -904,6 +1107,7 @@ def _installment_plan_detail_context(
         "notice": notice,
         "format_money": format_money,
         "format_day": format_day,
+        "format_rate_short": format_rate_short,
     }
 
 
@@ -922,6 +1126,7 @@ def _installment_plans_context(
         "notice": notice,
         "format_money": format_money,
         "format_day": format_day,
+        "format_rate_short": format_rate_short,
     }
 
 
@@ -1265,6 +1470,7 @@ async def reference_rates_page(request: Request, ctx: CurrentContext) -> Respons
             "can_edit": has_role(ctx, Role.EDITOR),
             "notice": _notice(request, request.query_params.get("notice")),
             "error": _error(request, request.query_params.get("error")),
+            "error_field": request.query_params.get("field"),
             "form_values": {},
             "open_form": request.query_params.get("form"),
             "edit_id": request.query_params.get("edit"),
@@ -1301,6 +1507,7 @@ async def reference_rate_create(request: Request, ctx: CurrentContext) -> Respon
                 "page": page,
                 "can_edit": True,
                 "error": _error(request, getattr(exc, "code", "failed")),
+                "error_field": getattr(exc, "field", None),
                 "notice": None,
                 "form_values": values,
                 "open_form": "rate",
@@ -1345,6 +1552,7 @@ async def reference_rate_update(request: Request, ctx: CurrentContext, rate_id: 
                 "page": page,
                 "can_edit": True,
                 "error": _error(request, getattr(exc, "code", "failed")),
+                "error_field": getattr(exc, "field", None),
                 "notice": None,
                 "form_values": values,
                 "open_form": "rate",
@@ -1419,6 +1627,7 @@ async def reference_rate_value_create(
                 "page": page,
                 "can_edit": True,
                 "error": _error(request, getattr(exc, "code", "failed")),
+                "error_field": _reference_value_error_field(exc),
                 "notice": None,
                 "form_values": values,
                 "open_form": "value",
@@ -1473,6 +1682,7 @@ async def reference_rate_value_update(
                 "page": page,
                 "can_edit": True,
                 "error": _error(request, getattr(exc, "code", "failed")),
+                "error_field": _reference_value_error_field(exc),
                 "notice": None,
                 "form_values": values,
                 "open_form": "value",
@@ -1682,6 +1892,7 @@ async def loan_settings_page(request: Request, ctx: CurrentContext, loan_id: UUI
         ctx,
         loan_id,
         error=_error(request, request.query_params.get("error")),
+        error_field=request.query_params.get("field"),
         notice=_notice(request, request.query_params.get("notice")),
         open_form=requested_form,
         edit_id=request.query_params.get("edit"),
@@ -1902,8 +2113,13 @@ async def loan_property_set(request: Request, ctx: CurrentContext, loan_id: UUID
             _id(values.get("property_item_id", "")),
         )
     except (loans.LoanError, LoanValidationError) as exc:
+        field = getattr(exc, "field", None)
         return _redirect_settings(
-            request, loan_id, error=getattr(exc, "code", "failed"), anchor="property"
+            request,
+            loan_id,
+            error=getattr(exc, "code", "failed"),
+            error_field=field if field == "property_item_id" else None,
+            anchor="property",
         )
     return _redirect_settings(request, loan_id, notice="property_saved", anchor="property")
 
@@ -1955,8 +2171,13 @@ async def loan_scheduled_generate(request: Request, ctx: CurrentContext, loan_id
             request.app.state.settings,
         )
     except (loans.LoanError, LoanValidationError) as exc:
+        field = getattr(exc, "field", None)
         return _redirect_settings(
-            request, loan_id, error=getattr(exc, "code", "failed"), anchor="upcoming"
+            request,
+            loan_id,
+            error=getattr(exc, "code", "failed"),
+            error_field=field if field == "category_id" else None,
+            anchor="upcoming",
         )
     return _redirect_settings(request, loan_id, notice="schedule_generated", anchor="upcoming")
 
@@ -2042,6 +2263,31 @@ async def installment_plan_detail(request: Request, ctx: CurrentContext, loan_id
         notice=_notice(request, request.query_params.get("notice")),
     )
     return render_template(request, "loans/installments/detail.html", context=context)
+
+
+@router.post("/loans/installments/{loan_id}/post-next", name="installment_plan_post_next")
+async def installment_plan_post_next(
+    request: Request, ctx: CurrentContext, loan_id: UUID
+) -> Response:
+    try:
+        await run_in_threadpool(
+            installment_plan_service.post_next_installment,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+        )
+    except (loans.LoanError, LoanValidationError, occurrence_service.OccurrenceError) as exc:
+        return RedirectResponse(
+            request.url_for("installment_plan_detail", loan_id=str(loan_id)).path
+            + "?"
+            + urlencode({"error": getattr(exc, "code", "failed")}),
+            status_code=303,
+        )
+    return RedirectResponse(
+        request.url_for("installment_plan_detail", loan_id=str(loan_id)).path
+        + "?notice=installment_plan_posted",
+        status_code=303,
+    )
 
 
 @router.get("/loans/installments/{loan_id}/edit", name="installment_plan_edit")
@@ -2246,10 +2492,16 @@ async def loan_overpayment_settings(
             strategy=values.get("overpayment_strategy", "reduce_term"),
         )
     except (loans.LoanError, LoanValidationError) as exc:
+        field = getattr(exc, "field", None)
         return _redirect_settings(
             request,
             loan_id,
             error=getattr(exc, "code", "failed"),
+            error_field=(
+                field
+                if field in ("overpayment_mode", "overpayment_amount", "overpayment_strategy")
+                else None
+            ),
             anchor="overpayments",
         )
     return _redirect_settings(request, loan_id, notice="overpayment_saved", anchor="overpayments")

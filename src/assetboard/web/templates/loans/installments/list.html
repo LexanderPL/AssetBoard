@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% from "macros/components.html" import empty_state with context %}
 {% from "loans/_tabs.html" import tabs with context %}
+{% from "loans/_macros.html" import installment_progress, installment_status_badge with context %}
 {% block title %}{{ _("Installments") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Loans") }}{% endblock %}
 {% block content %}
@@ -22,6 +23,7 @@
         <th scope="col" class="px-4 py-2 font-semibold">{{ _("Name") }}</th>
         <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Monthly installment") }}</th>
         <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Remaining") }}</th>
+        <th scope="col" class="px-4 py-2 font-semibold">{{ _("Progress") }}</th>
         <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Total remaining") }}</th>
         <th scope="col" class="px-4 py-2 font-semibold">{{ _("Next due") }}</th>
         <th scope="col" class="px-4 py-2 font-semibold">{{ _("End date") }}</th>
@@ -32,14 +34,15 @@
     <tbody class="divide-y divide-line sm:divide-y-0">
       {% for plan in page.active %}
       <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 align-top sm:table-row sm:p-0" data-installment-plan="{{ plan.loan.id }}">
-        <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3">{{ plan.name }}</td>
+        <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3"><a class="text-primary-ink underline-offset-2 hover:underline" href="{{ scoped_url(request, 'installment_plan_detail', loan_id=plan.loan.id) }}" data-open-installment-plan>{{ plan.name }}</a> <span class="ml-1 align-middle">{{ installment_status_badge(plan.closed) }}</span></td>
         <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3" data-installment>{{ format_money(plan.installment, locale) }}</td>
         <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3" data-remaining>{{ plan.remaining_count }}</td>
+        <td class="whitespace-nowrap sm:px-4 sm:py-3" data-progress>{{ installment_progress(plan.paid_count, plan.original_count, plan.percent_repaid_bp, locale) }}</td>
         <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3" data-total>{{ format_money(plan.total_remaining, locale) }}</td>
         <td class="whitespace-nowrap text-muted sm:px-4 sm:py-3" data-next-due>{% if plan.next_due %}{{ format_day(plan.next_due, locale) }}{% else %}—{% endif %}</td>
         <td class="whitespace-nowrap text-muted sm:px-4 sm:py-3" data-end-date>{{ format_day(plan.end_date, locale) }}</td>
         <td class="text-muted sm:px-4 sm:py-3" data-category>{{ plan.category_name }}</td>
-        <td class="col-span-2 pt-1 sm:px-4 sm:py-3"><div class="flex justify-end gap-2"><a class="btn-sm" href="{{ scoped_url(request, 'installment_plan_detail', loan_id=plan.loan.id) }}" data-open-installment-plan>{{ _("Open") }}<span class="sr-only"> {{ plan.name }}</span></a>{% if can_edit %}<a class="btn-sm" href="{{ scoped_url(request, 'installment_plan_edit', loan_id=plan.loan.id) }}">{{ _("Edit") }}<span class="sr-only"> {{ plan.name }}</span></a>{% endif %}</div></td>
+        <td class="col-span-2 pt-1 sm:px-4 sm:py-3">{% if can_edit %}<div class="flex justify-end gap-2"><a class="btn-sm" href="{{ scoped_url(request, 'installment_plan_edit', loan_id=plan.loan.id) }}">{{ _("Edit") }}<span class="sr-only"> {{ plan.name }}</span></a></div>{% endif %}</td>
       </tr>
       {% endfor %}
     </tbody>
@@ -60,6 +63,7 @@
           <th scope="col" class="px-4 py-2 font-semibold">{{ _("Name") }}</th>
           <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Monthly installment") }}</th>
           <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Remaining") }}</th>
+          <th scope="col" class="px-4 py-2 font-semibold">{{ _("Progress") }}</th>
           <th scope="col" class="px-4 py-2 font-semibold">{{ _("End date") }}</th>
           <th scope="col" class="px-4 py-2 font-semibold">{{ _("Category") }}</th>
           <th scope="col" class="px-4 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>
@@ -68,12 +72,13 @@
       <tbody class="divide-y divide-line sm:divide-y-0">
         {% for plan in page.closed %}
         <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 align-top text-muted sm:table-row sm:p-0" data-closed-installment-plan="{{ plan.loan.id }}">
-          <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3">{{ plan.name }} <span class="rounded-full bg-subtle px-2 py-0.5 text-xs font-semibold">{{ _("closed") }}</span></td>
+          <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3"><a class="text-primary-ink underline-offset-2 hover:underline" href="{{ scoped_url(request, 'installment_plan_detail', loan_id=plan.loan.id) }}" data-open-closed-installment-plan>{{ plan.name }}</a> <span class="ml-1 align-middle">{{ installment_status_badge(plan.closed) }}</span></td>
           <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3">{{ format_money(plan.installment, locale) }}</td>
           <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3">{{ plan.remaining_count }}</td>
+          <td class="whitespace-nowrap sm:px-4 sm:py-3">{{ installment_progress(plan.paid_count, plan.original_count, plan.percent_repaid_bp, locale) }}</td>
           <td class="whitespace-nowrap sm:px-4 sm:py-3">{{ format_day(plan.end_date, locale) }}</td>
           <td class="sm:px-4 sm:py-3">{{ plan.category_name }}</td>
-          <td class="col-span-2 pt-1 sm:px-4 sm:py-3"><div class="flex justify-end"><a class="btn-sm" href="{{ scoped_url(request, 'installment_plan_detail', loan_id=plan.loan.id) }}">{{ _("Open") }}<span class="sr-only"> {{ plan.name }}</span></a></div></td>
+          <td class="col-span-2 pt-1 sm:px-4 sm:py-3"></td>
         </tr>
         {% endfor %}
       </tbody>
