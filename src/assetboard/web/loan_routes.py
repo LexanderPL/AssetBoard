@@ -1063,6 +1063,7 @@ def _installment_plan_form_context(
     loan_id: UUID | None = None,
     values: dict[str, str] | None = None,
     error: str | None = None,
+    error_field: str | None = None,
 ) -> dict[str, object]:
     plan = (
         installment_plan_service.get_installment_plan(
@@ -1079,6 +1080,7 @@ def _installment_plan_form_context(
         "values": _installment_form_values(plan, request.state.locale, values),
         "currency": plan.currency if plan is not None else ctx.workspace.base_currency,
         "error": error,
+        "error_field": error_field,
         "can_edit": True,
         "format_money": format_money,
     }
@@ -1165,6 +1167,21 @@ def _scenario_row_empty(row: dict[str, str]) -> bool:
     return True
 
 
+def _scenario_error_field(exc: Exception, form_rows: list[dict[str, str]]) -> str | None:
+    """The first card input that should be marked for a service field error."""
+    field = getattr(exc, "field", None)
+    if field == "rate_shift_bp":
+        field = "rate_shift"
+    if field not in SCENARIO_FIELDS:
+        return None
+    for number, row in enumerate(form_rows, start=1):
+        value = row.get(field, "").strip()
+        default = _SCENARIO_DEFAULTS.get(field, "")
+        if value and value != default:
+            return f"{field}_{number}"
+    return f"{field}_1"
+
+
 def _scenario_mode(value: str) -> OverpaymentMode | None:
     if value in ("", "same"):
         return None
@@ -1216,6 +1233,7 @@ def _scenario_page(
     ephemeral: list[loan_scenario_service.ScenarioParameters],
     form_rows: list[dict[str, str]],
     error: str | None = None,
+    error_field: str | None = None,
     notice: str | None = None,
 ) -> dict[str, object]:
     comparison = loan_scenario_service.compare_loan_scenarios(
@@ -1239,6 +1257,7 @@ def _scenario_page(
         "scenario_summary": lambda parameters: scenario_summary(parameters, locale),
         "can_edit": has_role(ctx, Role.EDITOR),
         "error": error,
+        "error_field": error_field,
         "notice": notice,
         "today": ctx.clock.today(ctx.workspace.timezone),
         "format_money": format_money,
@@ -1350,6 +1369,7 @@ def _payments_context(
     edit_id: str | None = None,
     prefill_date: str | None = None,
     prefill_total: str | None = None,
+    error_field: str | None = None,
 ) -> dict[str, object]:
     page = loan_payment_service.payments_page(request.app.state.session_factory, ctx, loan_id)
     payment_edit = next(
@@ -1382,6 +1402,7 @@ def _payments_context(
         ),
         "can_edit": has_role(ctx, Role.EDITOR),
         "error": error,
+        "error_field": error_field,
         "notice": notice,
         "open_form": open_form,
         "today": today,
@@ -1825,6 +1846,7 @@ async def loan_scenarios_compare(request: Request, ctx: CurrentContext, loan_id:
             ephemeral=[],
             form_rows=form_rows,
             error=_error(request, getattr(exc, "code", "failed")),
+            error_field=_scenario_error_field(exc, form_rows),
         )
         return render_template(request, "loans/scenarios.html", status_code=400, context=context)
 
@@ -1930,6 +1952,7 @@ async def loan_payment_create(request: Request, ctx: CurrentContext, loan_id: UU
             error=_error(request, getattr(exc, "code", "failed")),
             form_values=values,
             open_form="payment",
+            error_field=getattr(exc, "field", None),
         )
         return render_template(request, "loans/payments.html", status_code=400, context=context)
     return _redirect_payments(request, loan_id, notice="payment_saved")
@@ -1969,6 +1992,7 @@ async def loan_payment_update(
             form_values=values,
             open_form="payment",
             edit_id=str(payment_id),
+            error_field=getattr(exc, "field", None),
         )
         return render_template(request, "loans/payments.html", status_code=400, context=context)
     return _redirect_payments(request, loan_id, notice="payment_saved")
@@ -2020,6 +2044,7 @@ async def loan_checkpoint_create(request: Request, ctx: CurrentContext, loan_id:
             error=_error(request, getattr(exc, "code", "failed")),
             form_values=values,
             open_form="checkpoint",
+            error_field=getattr(exc, "field", None),
         )
         return render_template(request, "loans/payments.html", status_code=400, context=context)
     return _redirect_payments(request, loan_id, notice="checkpoint_saved", anchor="checkpoints")
@@ -2051,6 +2076,7 @@ async def loan_checkpoint_update(
             form_values=values,
             open_form="checkpoint",
             edit_id=str(checkpoint_id),
+            error_field=getattr(exc, "field", None),
         )
         return render_template(request, "loans/payments.html", status_code=400, context=context)
     return _redirect_payments(request, loan_id, notice="checkpoint_saved", anchor="checkpoints")
@@ -2242,6 +2268,7 @@ async def installment_plan_create(request: Request, ctx: CurrentContext) -> Resp
             ctx,
             values=values,
             error=_error(request, getattr(exc, "code", "failed")),
+            error_field=getattr(exc, "field", None),
         )
         return render_template(
             request, "loans/installments/form.html", status_code=400, context=context
@@ -2324,6 +2351,7 @@ async def installment_plan_update(request: Request, ctx: CurrentContext, loan_id
             loan_id=loan_id,
             values=values,
             error=_error(request, getattr(exc, "code", "failed")),
+            error_field=getattr(exc, "field", None),
         )
         return render_template(
             request, "loans/installments/form.html", status_code=400, context=context

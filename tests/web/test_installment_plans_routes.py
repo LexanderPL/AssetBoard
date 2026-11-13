@@ -195,6 +195,13 @@ def test_archive_restore_and_networth_item(owner) -> None:
     assert "data-plan-remaining" in detail.text
 
 
+def test_create_validation_marks_the_field(owner):
+    category_id = _category(owner)
+    response = owner.post("/loans/installments", _data(installment="", category_id=category_id))
+    assert response.status_code == 400
+    assert 'name="installment"' in response.text and "data-field-error" in response.text
+
+
 def test_create_validation_keeps_values(owner) -> None:
     category_id = _category(owner)
     response = owner.post(
