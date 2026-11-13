@@ -3435,6 +3435,15 @@ msgstr "Kredyt nie jest już dostępny."
 msgid "A closed installment plan cannot be restored."
 msgstr "Nie można przywrócić zamkniętego planu ratalnego."
 
+msgid "No installment is due yet."
+msgstr "Żadna rata nie jest jeszcze wymagalna."
+
+msgid "The month is closed. Reopen it before posting the installment."
+msgstr "Miesiąc jest zamknięty. Otwórz go ponownie przed zaksięgowaniem raty."
+
+msgid "That installment is no longer pending."
+msgstr "Ta rata nie oczekuje już na księgowanie."
+
 msgid "The loan could not be saved. Check the form and try again."
 msgstr "Nie udało się zapisać kredytu. Sprawdź formularz i spróbuj ponownie."
 
@@ -3442,6 +3451,9 @@ msgid "Loan saved. Add rate changes, costs or one-off overpayments below."
 msgstr ""
 "Kredyt zapisany. Dodaj poniżej zmiany stopy, koszty lub jednorazowe "
 "nadpłaty."
+
+msgid "Loan saved. Add the next loan below."
+msgstr "Kredyt zapisany. Dodaj poniżej następny kredyt."
 
 msgid "Loan terms saved."
 msgstr "Warunki kredytu zapisane."
@@ -3534,6 +3546,9 @@ msgstr "Zarchiwizowano plan ratalny."
 
 msgid "Installment plan restored."
 msgstr "Przywrócono plan ratalny."
+
+msgid "Next installment posted."
+msgstr "Zaksięgowano następną ratę."
 
 msgid "The loan"
 msgstr "Kredyt"
@@ -7457,6 +7472,23 @@ msgstr "Stopa"
 msgid "Next payment"
 msgstr "Następna płatność"
 
+msgid "Closed"
+msgstr "Zamknięty"
+
+msgid "Open"
+msgstr "Otwarty"
+
+#, python-format
+msgid "Paid %(paid)s of %(total)s installments"
+msgstr "Spłacono %(paid)s z %(total)s rat"
+
+msgid "Paid installments"
+msgstr "Spłacone raty"
+
+#, python-format
+msgid "Paid %(paid)s of %(total)s installments; %(remaining)s remain."
+msgstr "Spłacono %(paid)s z %(total)s rat; pozostało %(remaining)s."
+
 msgid "shorten the term"
 msgstr "skraca okres"
 
@@ -8113,8 +8145,37 @@ msgstr ""
 "Po zapisaniu możesz dodać więcej składników kosztów, zmian stopy i "
 "jednorazowych nadpłat na stronie kredytu."
 
+msgid "Review"
+msgstr "Podsumowanie"
+
+msgid "Entry"
+msgstr "Wprowadzenie"
+
+msgid "Original terms"
+msgstr "Pierwotne warunki"
+
+msgid "Current balance"
+msgstr "Bieżące saldo"
+
+msgid "Cost components"
+msgstr "Składniki kosztów"
+
+#, python-format
+msgid "from %(from)s"
+msgstr "od %(from)s"
+
+#, python-format
+msgid "to %(to)s"
+msgstr "do %(to)s"
+
+msgid "Calculated first installment"
+msgstr "Obliczona pierwsza rata"
+
 msgid "Save loan"
 msgstr "Zapisz kredyt"
+
+msgid "Save and add another"
+msgstr "Zapisz i dodaj kolejny"
 
 msgid "Payments & balance"
 msgstr "Płatności i saldo"
@@ -8296,6 +8357,32 @@ msgid "no value yet"
 msgstr "brak wartości"
 
 #, python-format
+msgid "Value history from %(from)s to %(to)s"
+msgstr "Historia wartości od %(from)s do %(to)s"
+
+msgid "No values yet."
+msgstr "Brak wartości."
+
+#, python-format
+msgid "%(num)d loan"
+msgid_plural "%(num)d loans"
+msgstr[0] "%(num)d kredyt"
+msgstr[1] "%(num)d kredyty"
+msgstr[2] "%(num)d kredytów"
+
+msgid "Not used"
+msgstr "Nieużywana"
+
+msgid "Values"
+msgstr "Wartości"
+
+msgid "Future values can be changed; past values are read-only."
+msgstr "Przyszłe wartości można zmieniać; przeszłe wartości są tylko do odczytu."
+
+msgid "Used by"
+msgstr "Używana przez"
+
+#, python-format
 msgid "Delete the reference rate %(name)s and its values?"
 msgstr "Usunąć stopę referencyjną %(name)s i jej wartości?"
 
@@ -8316,9 +8403,6 @@ msgstr "Usunąć wartość z %(date)s?"
 
 msgid "Past value"
 msgstr "Wartość historyczna"
-
-msgid "No values yet."
-msgstr "Brak wartości."
 
 msgid "Add value"
 msgstr "Dodaj wartość"
@@ -8629,19 +8713,8 @@ msgstr ""
 msgid "Add cost"
 msgstr "Dodaj koszt"
 
-msgid "Cost components"
-msgstr "Składniki kosztów"
-
 msgid "Cost"
 msgstr "Koszt"
-
-#, python-format
-msgid "from %(from)s"
-msgstr "od %(from)s"
-
-#, python-format
-msgid "to %(to)s"
-msgstr "do %(to)s"
 
 #, python-format
 msgid "Delete the cost %(name)s?"
@@ -8730,8 +8803,8 @@ msgstr "Zapisz nadpłatę"
 msgid "No generated occurrences yet."
 msgstr "Nie wygenerowano jeszcze żadnych wystąpień."
 
-msgid "Back to Installments"
-msgstr "Wróć do planów ratalnych"
+msgid "Post next installment"
+msgstr "Zaksięguj następną ratę"
 
 msgid "Edit plan"
 msgstr "Edytuj plan"
@@ -8777,6 +8850,9 @@ msgstr "Dodaj plan ratalny"
 msgid "Back to %(name)s"
 msgstr "Wróć do %(name)s"
 
+msgid "Back to Installments"
+msgstr "Wróć do planów ratalnych"
+
 msgid ""
 "A fixed monthly amount and a remaining count. No interest is calculated; "
 "each posted occurrence reduces the count by one."
@@ -8802,9 +8878,6 @@ msgstr "Zapisz plan"
 
 msgid "Installment plans"
 msgstr "Plany ratalne"
-
-msgid "Open"
-msgstr "Otwórz"
 
 msgid "No installment plans yet."
 msgstr "Nie ma jeszcze planów ratalnych."
@@ -9180,9 +9253,6 @@ msgid ""
 msgstr ""
 "Enter lub opuszczenie pola zapisuje wartość planowaną; 0 lub puste pole "
 "ją usuwa. Esc przywraca zapisaną wartość."
-
-msgid "Closed"
-msgstr "Zamknięty"
 
 msgid "This month is closed. Its entries and planned values are read-only."
 msgstr ""
