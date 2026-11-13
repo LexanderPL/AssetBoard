@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.6.7](https://github.com/LexanderPL/AssetBoard/compare/v0.6.6...v0.6.7) (2026-11-13)
+
+
+### Bug Fixes
+
+* **loans:** ask for high-rate confirmation only when needed ([#311](https://github.com/LexanderPL/AssetBoard/issues/311)) ([5edf128](https://github.com/LexanderPL/AssetBoard/commit/5edf1281282227fcd63bfc019b7b0366d831291b))
+
 ## [0.6.6](https://github.com/LexanderPL/AssetBoard/compare/v0.6.5...v0.6.6) (2026-11-13)
 
 
