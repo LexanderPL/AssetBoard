@@ -12,7 +12,7 @@ from assetboard.db.repositories import (
     LoanRateChangeRepository,
     ReferenceRateValueRepository,
 )
-from assetboard.domain.loans import DayCount, LoanValidationError
+from assetboard.domain.loans import DayCount, LoanKind, LoanValidationError
 from assetboard.domain.money import Money
 from assetboard.services import loans
 from assetboard.services.context import PermissionDenied
@@ -105,6 +105,52 @@ def _reference_rate(team: WorkspaceDb, name: str = "EURIBOR 6M") -> UUID:
         high_rate_confirmed=False,
     )
     return rate_id
+
+
+def test_wizard_preview_uses_the_current_balance_and_respects_an_override(
+    team: WorkspaceDb,
+) -> None:
+    original = loans.preview_first_installment(
+        entry_path="original",
+        principal_original=_money(30_000_000),
+        current_balance=None,
+        term_months=360,
+        kind=LoanKind.ANNUITY,
+        rate_bp=550,
+        installment_override=None,
+    )
+    assert original == _money(170_337)
+    current = loans.preview_first_installment(
+        entry_path="current",
+        principal_original=_money(30_000_000),
+        current_balance=_money(20_000_000),
+        term_months=240,
+        kind=LoanKind.ANNUITY,
+        rate_bp=550,
+        installment_override=None,
+    )
+    assert current == _money(137_577)
+    override = loans.preview_first_installment(
+        entry_path="current",
+        principal_original=None,
+        current_balance=_money(20_000_000),
+        term_months=240,
+        kind=LoanKind.ANNUITY,
+        rate_bp=550,
+        installment_override=_money(120_000),
+    )
+    assert override == _money(120_000)
+    with pytest.raises(loans.LoanError) as missing:
+        loans.preview_first_installment(
+            entry_path="current",
+            principal_original=None,
+            current_balance=None,
+            term_months=240,
+            kind=LoanKind.ANNUITY,
+            rate_bp=550,
+            installment_override=None,
+        )
+    assert missing.value.code == "invalid_balance"
 
 
 def test_original_path_creates_a_loan_and_an_initial_fixed_rate(team: WorkspaceDb) -> None:

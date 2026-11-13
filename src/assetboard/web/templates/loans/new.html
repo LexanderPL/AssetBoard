@@ -1,9 +1,12 @@
 {% extends "base.html" %}
 {% from "macros/components.html" import csrf_input with context %}
+{% from "loans/_macros.html" import overpayment_label with context %}
 {% block title %}{{ _("Add loan") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Add loan") }}{% endblock %}
 {% block content %}
 {% set input_class = "form-control px-3 py-2" %}
+{% macro field_attrs(name) -%}{% if error_field == name %} aria-invalid="true" aria-describedby="wizard-{{ name }}-error"{% endif %}{%- endmacro %}
+{% macro field_error(name) -%}{% if error_field == name %}<p id="wizard-{{ name }}-error" class="text-sm text-danger" data-field-error="{{ name }}">{{ error }}</p>{% endif %}{%- endmacro %}
 {% set option_class = "flex cursor-pointer items-start gap-3 border border-line bg-surface p-3 hover:bg-subtle has-[:checked]:border-primary has-[:checked]:bg-primary-soft has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40" %}
 <a href="{{ scoped_url(request, 'loans') }}" class="mb-4 inline-flex rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Back to Loans") }}</a>
 <ol class="mb-4 flex flex-wrap gap-x-5 gap-y-2 text-sm" aria-label="{{ _('Steps') }}" data-wizard-steps>
@@ -15,14 +18,15 @@
 </ol>
 <section class="panel max-w-3xl p-5 sm:p-6" aria-labelledby="wizard-step-heading">
   <h2 id="wizard-step-heading" class="sr-only">{{ _("Step %(step)s of %(total)s: %(label)s", step=step, total=last_step, label=steps[step - 1]) }}</h2>
-  {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ error }}</p>{% endif %}
+  {% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
+  {% if error and not error_is_field %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ error }}</p>{% endif %}
   <form id="loan-wizard" method="post" action="{{ scoped_url(request, 'loan_new_step') }}" class="grid gap-6" data-loan-wizard="{{ step }}">
     {{ csrf_input() }}
     <input type="hidden" name="step" value="{{ step }}">
     {% for name in hidden_fields %}<input type="hidden" name="{{ name }}" value="{{ values.get(name, '') }}">{% endfor %}
 
     {% if step == 1 %}
-    <fieldset class="grid gap-2">
+    <fieldset class="grid gap-2"{% if error_field == "entry_path" %} aria-describedby="wizard-entry_path-error"{% endif %}>
       <legend class="mb-2 text-sm font-medium">{{ _("How much do you know about the loan?") }}</legend>
       <div class="grid gap-2 sm:grid-cols-2">
         {% for value, title, description in (
@@ -35,9 +39,10 @@
         </label>
         {% endfor %}
       </div>
+      {{ field_error("entry_path") }}
     </fieldset>
-    <label class="grid gap-1 text-sm font-medium">{{ _("Name") }}<input name="name" value="{{ values.get('name', '') }}" maxlength="200" required class="{{ input_class }} font-normal"></label>
-    <fieldset class="grid gap-2">
+    <label class="grid gap-1 text-sm font-medium">{{ _("Name") }}<input name="name" value="{{ values.get('name', '') }}" maxlength="200" required{{ field_attrs("name") }} class="{{ input_class }} font-normal">{{ field_error("name") }}</label>
+    <fieldset class="grid gap-2"{% if error_field == "kind" %} aria-describedby="wizard-kind-error"{% endif %}>
       <legend class="mb-2 text-sm font-medium">{{ _("Loan type") }}</legend>
       <div class="grid gap-2 sm:grid-cols-2">
         {% for value, title, description in (
@@ -50,30 +55,31 @@
         </label>
         {% endfor %}
       </div>
+      {{ field_error("kind") }}
     </fieldset>
     <p class="text-xs text-muted">{{ _("All amounts are in %(currency)s, the workspace currency.", currency=workspace_nav.current.base_currency) }}</p>
 
     {% elif step == 2 and values.get('entry_path', 'original') == 'current' %}
     <div class="grid gap-4 sm:grid-cols-2">
-      <label class="grid gap-1 text-sm font-medium">{{ _("Current balance (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="current_balance" value="{{ values.get('current_balance', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"></label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Balance date") }}<input name="balance_date" type="date" value="{{ values.get('balance_date', '') }}" required class="{{ input_class }} font-normal"></label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Remaining months") }}<input name="term_months" type="number" min="1" max="600" value="{{ values.get('term_months', '') }}" required class="{{ input_class }} font-normal"></label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Next payment date") }}<input name="first_payment_date" type="date" value="{{ values.get('first_payment_date', '') }}" required class="{{ input_class }} font-normal"></label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Payment day") }}<input name="payment_day" type="number" min="1" max="31" value="{{ values.get('payment_day', '') }}" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Leave empty to use the first payment date's day. A shorter month uses its last day.") }}</span></label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Original principal (optional)") }}<input name="principal_original" value="{{ values.get('principal_original', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Only needed to show how much you have repaid.") }}</span></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Current balance (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="current_balance" value="{{ values.get('current_balance', '') }}" inputmode="decimal" required{{ field_attrs("current_balance") }} class="{{ input_class }} font-normal">{{ field_error("current_balance") }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Balance date") }}<input name="balance_date" type="date" value="{{ values.get('balance_date', '') }}" required{{ field_attrs("balance_date") }} class="{{ input_class }} font-normal">{{ field_error("balance_date") }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Remaining months") }}<input name="term_months" type="number" min="1" max="600" value="{{ values.get('term_months', '') }}" required{{ field_attrs("term_months") }} class="{{ input_class }} font-normal">{{ field_error("term_months") }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Next payment date") }}<input name="first_payment_date" type="date" value="{{ values.get('first_payment_date', '') }}" required{{ field_attrs("first_payment_date") }} class="{{ input_class }} font-normal">{{ field_error("first_payment_date") }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Payment day") }}<input name="payment_day" type="number" min="1" max="31" value="{{ values.get('payment_day', '') }}"{{ field_attrs("payment_day") }} class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Leave empty to use the first payment date's day. A shorter month uses its last day.") }}</span>{{ field_error("payment_day") }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Original principal (optional)") }}<input name="principal_original" value="{{ values.get('principal_original', '') }}" inputmode="decimal"{{ field_attrs("principal_original") }} class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Only needed to show how much you have repaid.") }}</span>{{ field_error("principal_original") }}</label>
     </div>
 
     {% elif step == 2 %}
     <div class="grid gap-4 sm:grid-cols-2">
-      <label class="grid gap-1 text-sm font-medium">{{ _("Original principal (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="principal_original" value="{{ values.get('principal_original', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"></label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Origination date") }}<input name="origination_date" type="date" value="{{ values.get('origination_date', '') }}" required class="{{ input_class }} font-normal"></label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Term in months") }}<input name="term_months" type="number" min="1" max="600" value="{{ values.get('term_months', '') }}" required class="{{ input_class }} font-normal"></label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("First payment date") }}<input name="first_payment_date" type="date" value="{{ values.get('first_payment_date', '') }}" required class="{{ input_class }} font-normal"></label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Payment day") }}<input name="payment_day" type="number" min="1" max="31" value="{{ values.get('payment_day', '') }}" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Leave empty to use the first payment date's day. A shorter month uses its last day.") }}</span></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Original principal (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="principal_original" value="{{ values.get('principal_original', '') }}" inputmode="decimal" required{{ field_attrs("principal_original") }} class="{{ input_class }} font-normal">{{ field_error("principal_original") }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Origination date") }}<input name="origination_date" type="date" value="{{ values.get('origination_date', '') }}" required{{ field_attrs("origination_date") }} class="{{ input_class }} font-normal">{{ field_error("origination_date") }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Term in months") }}<input name="term_months" type="number" min="1" max="600" value="{{ values.get('term_months', '') }}" required{{ field_attrs("term_months") }} class="{{ input_class }} font-normal">{{ field_error("term_months") }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("First payment date") }}<input name="first_payment_date" type="date" value="{{ values.get('first_payment_date', '') }}" required{{ field_attrs("first_payment_date") }} class="{{ input_class }} font-normal">{{ field_error("first_payment_date") }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Payment day") }}<input name="payment_day" type="number" min="1" max="31" value="{{ values.get('payment_day', '') }}"{{ field_attrs("payment_day") }} class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Leave empty to use the first payment date's day. A shorter month uses its last day.") }}</span>{{ field_error("payment_day") }}</label>
     </div>
 
     {% elif step == 3 %}
-    <fieldset class="grid gap-2">
+    <fieldset class="grid gap-2"{% if error_field == "rate_mode" %} aria-describedby="wizard-rate_mode-error"{% endif %}>
       <legend class="mb-2 text-sm font-medium">{{ _("Interest") }}</legend>
       <div class="grid gap-2 sm:grid-cols-2">
         {% for value, title, description in (
@@ -86,16 +92,17 @@
         </label>
         {% endfor %}
       </div>
+      {{ field_error("rate_mode") }}
     </fieldset>
     <div class="grid gap-4 sm:grid-cols-2" data-hidden-when="rate_mode=variable">
-      <label class="grid gap-1 text-sm font-medium">{{ _("Annual interest rate") }}<input name="fixed_rate_percent" value="{{ values.get('fixed_rate_percent', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("For example 5.5 for 5.5%%. Add later changes on the loan page.") }}</span></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Annual interest rate") }}<input name="fixed_rate_percent" value="{{ values.get('fixed_rate_percent', '') }}" inputmode="decimal"{{ field_attrs("fixed_rate_percent") }} class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("For example 5.5 for 5.5%%. Add later changes on the loan page.") }}</span>{{ field_error("fixed_rate_percent") }}</label>
     </div>
     <div class="grid gap-4 sm:grid-cols-2" data-hidden-when="rate_mode=fixed">
-      <label class="grid gap-1 text-sm font-medium">{{ _("Reference rate") }}<select name="reference_rate_id" class="form-select py-2 font-normal">
+      <label class="grid gap-1 text-sm font-medium">{{ _("Reference rate") }}<select name="reference_rate_id"{{ field_attrs("reference_rate_id") }} class="form-select py-2 font-normal">
         <option value="">{{ _("Choose a reference rate") }}</option>
         {% for rate in reference_rates %}<option value="{{ rate.id }}"{% if values.get('reference_rate_id') == rate.id|string %} selected{% endif %}>{{ rate.name }}{% if rate.current_value_bp is not none %} · {{ format_rate_short(rate.current_value_bp, locale) }}{% endif %}</option>{% endfor %}
-      </select>{% if not reference_rates %}<span class="text-xs text-muted">{{ _("No reference rates yet. Create one on the Reference rates page first.") }}</span>{% endif %}</label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Margin") }}<input name="margin_percent" value="{{ values.get('margin_percent', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Added to the reference rate. For example 1.5 for 1.5%%.") }}</span></label>
+      </select>{% if not reference_rates %}<span class="text-xs text-muted">{{ _("No reference rates yet. Create one on the Reference rates page first.") }}</span>{% endif %}{{ field_error("reference_rate_id") }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Margin") }}<input name="margin_percent" value="{{ values.get('margin_percent', '') }}" inputmode="decimal"{{ field_attrs("margin_percent") }} class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Added to the reference rate. For example 1.5 for 1.5%%.") }}</span>{{ field_error("margin_percent") }}</label>
     </div>
     {% if high_rate or values.get('high_rate_confirmed') == '1' %}
     <label class="flex items-start gap-2 border border-warning-line bg-warning-soft p-3 text-sm"><input type="checkbox" name="high_rate_confirmed" value="1" class="mt-0.5 h-4 w-4 accent-primary"{% if values.get('high_rate_confirmed') == '1' %} checked{% endif %}> <span>{{ _("I understand this rate is above 25%%.") }}</span></label>
@@ -103,37 +110,55 @@
 
     {% else %}
     <div class="grid gap-4 sm:grid-cols-2">
-      <label class="grid gap-1 text-sm font-medium" data-hidden-when="kind=equal_principal">{{ _("Installment override (%(currency)s, optional)", currency=workspace_nav.current.base_currency) }}<input name="installment_override" value="{{ values.get('installment_override', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Leave empty to use the calculated installment. Enter the bank's amount if it differs.") }}</span></label>
+      <label class="grid gap-1 text-sm font-medium" data-hidden-when="kind=equal_principal">{{ _("Installment override (%(currency)s, optional)", currency=workspace_nav.current.base_currency) }}<input name="installment_override" value="{{ values.get('installment_override', '') }}" inputmode="decimal"{{ field_attrs("installment_override") }} class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Leave empty to use the calculated installment. Enter the bank's amount if it differs.") }}</span>{{ field_error("installment_override") }}</label>
     </div>
     <div class="grid gap-4 sm:grid-cols-2">
-      <label class="grid gap-1 text-sm font-medium">{{ _("Regular overpayment") }}<select name="overpayment_mode" class="form-select py-2 font-normal">
+      <label class="grid gap-1 text-sm font-medium">{{ _("Regular overpayment") }}<select name="overpayment_mode"{{ field_attrs("overpayment_mode") }} class="form-select py-2 font-normal">
         {% for value, label in (("none", _("None")), ("fixed_extra", _("A fixed extra each month")), ("target_total", _("A target total each month"))) %}<option value="{{ value }}"{% if values.get('overpayment_mode', 'none') == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
-      </select></label>
-      <label class="grid gap-1 text-sm font-medium" data-hidden-when="overpayment_mode=none">{{ _("Amount (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="overpayment_amount" value="{{ values.get('overpayment_amount', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("For a target, this includes principal, interest and costs.") }}</span></label>
-      <label class="grid gap-1 text-sm font-medium" data-hidden-when="overpayment_mode=none">{{ _("What happens with the extra money?") }}<select name="overpayment_strategy" class="form-select py-2 font-normal"><option value="reduce_term"{% if values.get('overpayment_strategy', 'reduce_term') == 'reduce_term' %} selected{% endif %}>{{ _("Shorten the term") }}</option><option value="reduce_installment"{% if values.get('overpayment_strategy', 'reduce_term') == 'reduce_installment' %} selected{% endif %}>{{ _("Lower the monthly installment") }}</option></select></label>
+      </select>{{ field_error("overpayment_mode") }}</label>
+      <label class="grid gap-1 text-sm font-medium" data-hidden-when="overpayment_mode=none">{{ _("Amount (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="overpayment_amount" value="{{ values.get('overpayment_amount', '') }}" inputmode="decimal"{{ field_attrs("overpayment_amount") }} class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("For a target, this includes principal, interest and costs.") }}</span>{{ field_error("overpayment_amount") }}</label>
+      <label class="grid gap-1 text-sm font-medium" data-hidden-when="overpayment_mode=none">{{ _("What happens with the extra money?") }}<select name="overpayment_strategy"{{ field_attrs("overpayment_strategy") }} class="form-select py-2 font-normal"><option value="reduce_term"{% if values.get('overpayment_strategy', 'reduce_term') == 'reduce_term' %} selected{% endif %}>{{ _("Shorten the term") }}</option><option value="reduce_installment"{% if values.get('overpayment_strategy', 'reduce_term') == 'reduce_installment' %} selected{% endif %}>{{ _("Lower the monthly installment") }}</option></select>{{ field_error("overpayment_strategy") }}</label>
     </div>
     <fieldset class="grid gap-3 sm:col-span-2" data-wizard-costs>
       <legend class="text-sm font-medium">{{ _("Cost components (optional)") }}</legend>
       <p class="text-xs text-muted">{{ _("Charged monthly while active, for example property insurance collected with the installment. Leave a row empty to skip it; add more on the loan page later.") }}</p>
       {% for index in range(1, cost_rows + 1) %}
       <div class="grid gap-3 border border-line p-3 sm:grid-cols-2">
-        <label class="grid gap-1 text-sm font-medium">{{ _("Name") }}<input name="cost_name_{{ index }}" value="{{ values.get('cost_name_' ~ index, '') }}" maxlength="200" class="{{ input_class }} font-normal"></label>
-        <label class="grid gap-1 text-sm font-medium">{{ _("Cost type") }}<select name="cost_mode_{{ index }}" id="cost_mode_{{ index }}" class="form-select py-2 font-normal">
+        <label class="grid gap-1 text-sm font-medium">{{ _("Name") }}<input name="cost_name_{{ index }}" value="{{ values.get('cost_name_' ~ index, '') }}" maxlength="200"{{ field_attrs("cost_name_" ~ index) }} class="{{ input_class }} font-normal">{{ field_error("cost_name_" ~ index) }}</label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Cost type") }}<select name="cost_mode_{{ index }}" id="cost_mode_{{ index }}"{{ field_attrs("cost_mode_" ~ index) }} class="form-select py-2 font-normal">
           <option value="percent"{% if values.get('cost_mode_' ~ index, 'percent') == 'percent' %} selected{% endif %}>{{ _("A percentage of the balance") }}</option>
           <option value="fixed"{% if values.get('cost_mode_' ~ index) == 'fixed' %} selected{% endif %}>{{ _("A fixed amount") }}</option>
-        </select></label>
-        <label class="grid gap-1 text-sm font-medium" data-hidden-when="cost_mode_{{ index }}=fixed">{{ _("Percent each month") }}<input name="cost_rate_percent_{{ index }}" value="{{ values.get('cost_rate_percent_' ~ index, '') }}" inputmode="decimal" class="{{ input_class }} font-normal"></label>
-        <label class="grid gap-1 text-sm font-medium" data-hidden-when="cost_mode_{{ index }}=percent">{{ _("Amount each month (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="cost_fixed_amount_{{ index }}" value="{{ values.get('cost_fixed_amount_' ~ index, '') }}" inputmode="decimal" class="{{ input_class }} font-normal"></label>
-        <label class="grid gap-1 text-sm font-medium">{{ _("Applies from") }}<input name="cost_effective_from_{{ index }}" type="date" value="{{ values.get('cost_effective_from_' ~ index, '') }}" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Leave empty to start with the loan.") }}</span></label>
-        <label class="grid gap-1 text-sm font-medium">{{ _("Applies until (optional)") }}<input name="cost_effective_to_{{ index }}" type="date" value="{{ values.get('cost_effective_to_' ~ index, '') }}" class="{{ input_class }} font-normal"></label>
+        </select>{{ field_error("cost_mode_" ~ index) }}</label>
+        <label class="grid gap-1 text-sm font-medium" data-hidden-when="cost_mode_{{ index }}=fixed">{{ _("Percent each month") }}<input name="cost_rate_percent_{{ index }}" value="{{ values.get('cost_rate_percent_' ~ index, '') }}" inputmode="decimal"{{ field_attrs("cost_rate_percent_" ~ index) }} class="{{ input_class }} font-normal">{{ field_error("cost_rate_percent_" ~ index) }}</label>
+        <label class="grid gap-1 text-sm font-medium" data-hidden-when="cost_mode_{{ index }}=percent">{{ _("Amount each month (%(currency)s)", currency=workspace_nav.current.base_currency) }}<input name="cost_fixed_amount_{{ index }}" value="{{ values.get('cost_fixed_amount_' ~ index, '') }}" inputmode="decimal"{{ field_attrs("cost_fixed_amount_" ~ index) }} class="{{ input_class }} font-normal">{{ field_error("cost_fixed_amount_" ~ index) }}</label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Applies from") }}<input name="cost_effective_from_{{ index }}" type="date" value="{{ values.get('cost_effective_from_' ~ index, '') }}"{{ field_attrs("cost_effective_from_" ~ index) }} class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Leave empty to start with the loan.") }}</span>{{ field_error("cost_effective_from_" ~ index) }}</label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Applies until (optional)") }}<input name="cost_effective_to_{{ index }}" type="date" value="{{ values.get('cost_effective_to_' ~ index, '') }}"{{ field_attrs("cost_effective_to_" ~ index) }} class="{{ input_class }} font-normal">{{ field_error("cost_effective_to_" ~ index) }}</label>
       </div>
       {% endfor %}
     </fieldset>
     <p class="text-sm text-muted">{{ _("After saving you can add more cost components, rate changes and one-off overpayments on the loan page.") }}</p>
+
+    {% if review %}
+    <section class="border border-line bg-subtle p-4 sm:p-5" aria-labelledby="wizard-review-heading" data-wizard-review>
+      <h3 id="wizard-review-heading" class="text-sm font-semibold">{{ _("Review") }}</h3>
+      <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+        <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Name") }}</dt><dd class="mt-0.5 font-semibold" data-review-name>{{ review.name }}</dd></div>
+        <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Entry") }}</dt><dd class="mt-0.5" data-review-entry>{{ _("Original terms") if review.entry_path == "original" else _("Current balance") }}</dd></div>
+        <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{% if review.entry_path == "original" %}{{ _("Original principal") }}{% else %}{{ _("Current balance") }}{% endif %}</dt><dd class="mt-0.5 tabular-nums" data-review-base>{% if review.base %}{{ format_money(review.base, locale) }}{% else %}—{% endif %}</dd></div>
+        <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Term") }}</dt><dd class="mt-0.5" data-review-term>{{ ngettext("%(num)d month", "%(num)d months", review.term_months, num=review.term_months) }}</dd></div>
+        <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("First payment") }}</dt><dd class="mt-0.5" data-review-first-payment>{{ format_day(review.first_payment_date, locale) }}</dd></div>
+        <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Rate") }}</dt><dd class="mt-0.5" data-review-rate>{% if review.rate_mode.value == "fixed" %}{{ _("Fixed") }} · {{ format_rate_short(review.fixed_rate_bp, locale) }}{% else %}{{ _("Variable") }} · {{ review.reference_rate_name }} + {{ format_rate_short(review.margin_bp, locale) }} ({{ format_rate_short(review.effective_rate_bp, locale) }}){% endif %}</dd></div>
+        <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Regular overpayment") }}</dt><dd class="mt-0.5" data-review-overpayment>{{ overpayment_label(review.overpayment_mode, review.overpayment_amount, review.overpayment_strategy, locale) }}</dd></div>
+        <div class="sm:col-span-2"><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Cost components") }}</dt><dd class="mt-0.5" data-review-costs>{% if review.costs %}<ul class="grid gap-1">{% for cost in review.costs %}<li>{{ cost.name }} · {% if cost.mode == "percent" %}{{ format_rate_short(cost.rate_bp, locale) if cost.rate_bp is not none else "—" }} {{ _("per month") }}{% elif cost.fixed %}{{ format_money(cost.fixed, locale) }} {{ _("per month") }}{% else %}—{% endif %} · {{ _("from %(from)s", from=format_day(cost.effective_from, locale)) }}{% if cost.effective_to %} {{ _("to %(to)s", to=format_day(cost.effective_to, locale)) }}{% endif %}</li>{% endfor %}</ul>{% else %}{{ _("None") }}{% endif %}</dd></div>
+        <div class="sm:col-span-2 border-t border-line pt-3"><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Calculated first installment") }}</dt><dd class="mt-1 text-lg font-semibold tabular-nums" data-review-first-installment>{{ format_money(review.first_installment, locale) }}{% if review.installment_override %} <span class="rounded-full bg-subtle px-2 py-0.5 text-xs font-semibold text-muted">{{ _("override") }}</span>{% endif %}</dd></div>
+      </dl>
+    </section>
+    {% endif %}
     {% endif %}
 
     <div class="flex flex-wrap items-center gap-2 border-t border-line pt-4">
       <button type="submit" name="go" value="next" class="btn-primary" data-wizard-next>{{ _("Save loan") if step == last_step else _("Next") }}</button>
+      {% if step == last_step %}<button type="submit" name="go" value="save_add" class="btn" data-wizard-save-add>{{ _("Save and add another") }}</button>{% endif %}
       {% if step == 1 %}
       <a href="{{ scoped_url(request, 'loans') }}" class="order-first rounded-lg border border-line px-4 py-2 text-sm font-medium hover:bg-subtle">{{ _("Cancel") }}</a>
       {% else %}

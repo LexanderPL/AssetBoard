@@ -169,6 +169,96 @@ def test_original_path_wizard_keeps_values_and_saves(owner):
         )
 
 
+def test_wizard_final_step_reviews_the_loan_and_its_first_installment(owner):
+    data = _wizard_data(
+        overpayment_mode="fixed_extra",
+        overpayment_amount="100.00",
+        cost_name_1="Property insurance",
+        cost_mode_1="fixed",
+        cost_fixed_amount_1="75.00",
+    )
+    for step in (1, 2, 3):
+        response = _step(owner, data, step)
+        assert response.status_code == 200, response.text
+    assert "data-wizard-review" in response.text
+    assert "data-review-name>Mortgage<" in response.text
+    assert "data-review-entry>Original terms<" in response.text
+    assert "data-review-base>€300,000.00<" in response.text
+    assert "data-review-term>360 months<" in response.text
+    assert "data-review-first-payment>Feb 1, 2026<" in response.text
+    assert "data-review-rate>Fixed · 5.5%<" in response.text
+    assert "data-review-overpayment>Extra €100.00 each month" in response.text
+    assert "data-review-costs" in response.text and "Property insurance" in response.text
+    assert "data-review-first-installment>€1,703.37<" in response.text
+    assert "data-wizard-save-add" in response.text
+
+
+def test_wizard_review_uses_the_current_balance_and_an_override(owner):
+    data = _wizard_data(
+        entry_path="current",
+        current_balance="200,000.00",
+        balance_date="2026-01-01",
+        principal_original="300,000.00",
+        first_payment_date="2026-02-01",
+        term_months="240",
+        installment_override="1,200.00",
+    )
+    for step in (1, 2, 3):
+        response = _step(owner, data, step)
+        assert response.status_code == 200, response.text
+    assert "data-review-base>€200,000.00<" in response.text
+    assert "data-review-entry>Current balance<" in response.text
+    assert "data-review-first-installment>€1,200.00 " in response.text
+    assert ">override</span>" in response.text
+
+
+def test_wizard_save_and_add_another_redirects_to_a_fresh_form(owner):
+    data = _wizard_data()
+    for step in (1, 2, 3):
+        assert _step(owner, data, step).status_code == 200
+    saved = _step(owner, data, 4, go="save_add")
+    assert saved.status_code == 303
+    assert saved.headers["location"] == "/loans/new?notice=loan_created_another"
+    with owner.db() as session:
+        rows = session.scalars(select(Loan).where(Loan.workspace_id == owner.home_id)).all()
+        assert len(rows) == 1
+    fresh = owner.client.get(saved.headers["location"])
+    assert fresh.status_code == 200
+    assert "Loan saved. Add the next loan below." in fresh.text
+    assert 'data-loan-wizard="1"' in fresh.text
+    assert 'name="name" value=""' in fresh.text
+
+
+def test_wizard_marks_field_errors_next_to_the_matching_input(owner):
+    name_error = _step(owner, _wizard_data(name=""), 1)
+    assert name_error.status_code == 400
+    assert 'data-field-error="name"' in name_error.text
+    assert 'aria-invalid="true"' in name_error.text
+    assert "data-form-error" not in name_error.text
+
+    term_error = _step(owner, _wizard_data(term_months="0"), 2)
+    assert term_error.status_code == 400
+    assert 'data-field-error="term_months"' in term_error.text
+    assert 'aria-describedby="wizard-term_months-error"' in term_error.text
+
+    rate_error = _step(owner, _wizard_data(fixed_rate_percent=""), 3)
+    assert rate_error.status_code == 400
+    assert 'data-field-error="fixed_rate_percent"' in rate_error.text
+    assert "data-form-error" not in rate_error.text
+
+    data = _wizard_data()
+    for step in (1, 2, 3):
+        assert _step(owner, data, step).status_code == 200
+    cost_error = _step(
+        owner,
+        data | {"cost_name_1": "", "cost_mode_1": "fixed", "cost_fixed_amount_1": "75.00"},
+        4,
+    )
+    assert cost_error.status_code == 400
+    assert 'data-field-error="cost_name_1"' in cost_error.text
+    assert 'aria-describedby="wizard-cost_name_1-error"' in cost_error.text
+
+
 def test_wizard_saves_cost_components_with_effective_dates(owner):
     data = _wizard_data(
         cost_name_1="Property insurance",

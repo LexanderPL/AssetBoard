@@ -826,6 +826,35 @@ def _validated_cost_inputs(
     return validated
 
 
+def preview_first_installment(
+    *,
+    entry_path: EntryPath,
+    principal_original: Money | None,
+    current_balance: Money | None,
+    term_months: int,
+    kind: LoanKind,
+    rate_bp: int | None,
+    installment_override: Money | None,
+) -> Money:
+    """The first installment the wizard will save; the route never calculates finance itself.
+
+    A current-balance loan is based on the balance entered today. An installment override wins
+    over the calculated amount. Missing terms raise the same errors as the save path.
+    """
+    if entry_path not in ("original", "current"):
+        raise LoanError("entry_path", "invalid_entry_path")
+    if installment_override is not None:
+        return installment_override
+    base = principal_original if entry_path == "original" else current_balance
+    if base is None:
+        field = "principal_original" if entry_path == "original" else "current_balance"
+        code = "invalid_principal" if entry_path == "original" else "invalid_balance"
+        raise LoanError(field, code)
+    if rate_bp is None:
+        raise LoanError("rate_bp", "missing_rate")
+    return first_installment(base, rate_bp, term_months, kind)
+
+
 def create_loan(
     factory: sessionmaker[Session],
     ctx: Context,
@@ -1871,6 +1900,7 @@ __all__ = [
     "get_reference_rate",
     "list_loans",
     "list_reference_rates",
+    "preview_first_installment",
     "restore_loan",
     "set_overpayment_settings",
     "update_cost_component",
