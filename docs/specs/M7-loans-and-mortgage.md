@@ -66,7 +66,8 @@ The eight product-owner decisions implemented in F7.1:
    maximum is 100%; a margin must be non-negative.
 6. The wizard collects the core terms, the initial/current rate, regular overpayment settings and
    up to three cost components (a later change request). Rate changes, more cost components and
-   one-off overpayments are added on the loan detail page.
+   one-off overpayments are added on the loan settings page (the loan detail page was split into
+   a read-only overview and Settings after 0.6.4).
 7. All loan amounts use the workspace base currency and a loan locks that currency. One-off
    overpayments are planned rows. Reference rates are workspace-scoped: viewers read, editors and
    owners write. Loans archive/restore and are never hard-deleted. F7.7 owns installment plans.
@@ -295,8 +296,11 @@ optional ledger transaction link. Tests: re-anchoring changes the future schedul
 - `services.loan_schedule` now also loads actual payments. Installment payments are aggregated
   by date and replace the components/total in the schedule table with an **Actual** badge;
   overpayment-only payments stay in the payment list. The closing column remains projected.
-- The detail page links to **Payments**; the page has responsive payment/checkpoint tables,
-  dialog forms, edit/delete actions, CSRF, gettext and no inline scripts or styles.
+- The loan subnavigation links to **Payments**; the page has responsive payment/checkpoint
+  tables, dialog forms, edit/delete actions, CSRF, gettext and no inline scripts or styles.
+- The overview's **Plan vs actual** panel shows the last actual payment, the latest checkpoint
+  and its variance, and an ahead/behind/on-track line. **Record next payment** prefills the
+  payment dialog with the next schedule row's date and total.
 - The archive excludes `LoanPayment` until F7.8 but includes it in the emptiness check. The demo
   excludes actual payments as user records.
 
@@ -355,10 +359,11 @@ Tests: resolver values for past/future dates, occurrence amounts follow rate cha
   projected row and the created transaction id, in the same transaction. A repeated post of an
   already-posted occurrence creates no second payment. Scheduler auto-posting has no user
   context and therefore does not create loan payments; manual Upcoming posting does.
-- The loan page has a **Net worth & property** section with the liability link, property date
-  and LTV/equity, property select/clear, scheduled generation controls, Upcoming link and the
-  auto-record checkbox. All forms use CSRF and gettext; the page adds no inline scripts or
-  styles.
+- The loan settings page has separate **Property & net worth** and **Upcoming & auto-record**
+  cards with the liability link, property date and LTV/equity, property select/clear, scheduled
+  generation controls, Upcoming link and the auto-record checkbox. The overview keeps a compact
+  read-only property/LTV card with a **Manage in Settings** link. All forms use CSRF and
+  gettext; the pages add no inline scripts or styles.
 
 ---
 

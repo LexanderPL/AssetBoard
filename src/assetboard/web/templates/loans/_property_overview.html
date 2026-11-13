@@ -1,0 +1,36 @@
+<section class="panel mb-6 p-4 sm:p-6" id="property-summary" aria-labelledby="property-summary-heading" data-loan-property-summary>
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h2 id="property-summary-heading" class="text-base font-semibold">{{ _("Property & LTV") }}</h2>
+      <p class="mt-1 text-sm text-muted">{{ _("Read-only view of the linked property at the selected date.") }}</p>
+    </div>
+    <a href="{{ scoped_url(request, 'loan_settings', loan_id=loan.id) }}#property" class="btn" data-manage-property>{{ _("Manage in Settings") }}</a>
+  </div>
+  {% if property.property_name %}
+  <p class="mt-4 text-sm font-medium" data-property-name>{{ property.property_name }}</p>
+  <dl class="mt-3 grid grid-cols-2 gap-4 text-sm lg:grid-cols-4">
+    <div data-property-value>
+      <dt class="text-muted">{{ _("Value on %(date)s", date=format_day(property.as_of, locale)) }}</dt>
+      <dd class="mt-0.5 font-semibold tabular-nums">{% if property.value %}{{ format_money(property.value, locale) }}{% else %}<span class="text-muted">—</span>{% endif %}</dd>
+    </div>
+    <div data-property-remaining>
+      <dt class="text-muted">{{ _("Remaining principal") }}</dt>
+      <dd class="mt-0.5 font-semibold tabular-nums">{% if property.remaining %}{{ format_money(property.remaining, locale) }}{% else %}<span class="text-muted">—</span>{% endif %}</dd>
+    </div>
+    <div data-property-ltv>
+      <dt class="text-muted">{{ _("LTV") }}</dt>
+      <dd class="mt-0.5 font-semibold tabular-nums">{% if property.ltv_bp is not none %}{{ format_rate_short(property.ltv_bp, locale) }}{% else %}<span class="text-muted" data-property-ltv-unavailable>{{ property_reason(property.ltv_reason) }}</span>{% endif %}</dd>
+    </div>
+    <div data-property-equity>
+      <dt class="text-muted">{{ _("Equity") }}</dt>
+      <dd class="mt-0.5 font-semibold tabular-nums">{% if property.equity is not none %}{{ format_money(property.equity, locale) }}{% else %}<span class="text-muted" data-property-equity-unavailable>{{ property_reason(property.equity_reason) }}</span>{% endif %}</dd>
+    </div>
+  </dl>
+  {% else %}
+  <p class="mt-4 text-sm text-muted" data-no-property-summary>{{ property_reason(property.ltv_reason) if property.ltv_reason else _("No property is linked to this loan.") }}</p>
+  {% endif %}
+  <form method="get" action="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}#property-summary" class="mt-4 flex flex-wrap items-end gap-2">
+    <label class="grid gap-1 text-sm font-medium">{{ _("Show at date") }}<input type="date" name="property_as_of" value="{{ property_as_of.isoformat() }}" class="form-control px-3 py-2 font-normal"></label>
+    <button type="submit" class="btn">{{ _("Show") }}</button>
+  </form>
+</section>

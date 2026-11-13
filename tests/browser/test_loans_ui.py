@@ -1,7 +1,10 @@
-"""Loans in Chromium (F7.1): the original-terms wizard leaves the payment day to default from
-the first payment date, the detail page keeps its actions under the tab strip, the rate-change
-dialog saves, and the list/detail pages fit 390 and 1440 without sideways scrolling. No CSP
-violations."""
+"""Loans in Chromium: the loan subnavigation, the read-only overview and the Settings page.
+
+The wizard saves into Settings, configuration actions (rate, cost, overpayment, property,
+auto-record, generation, archive) live there, and the overview keeps the progress bar, schedule,
+charts, property LTV card, quick-record link and plan-vs-actual status. Both pages fit 390 and
+1440 without sideways scrolling and without CSP violations.
+"""
 
 from __future__ import annotations
 
@@ -50,7 +53,12 @@ def _actions_under_the_tabs(page: Page) -> None:
     assert actions["y"] >= tabs["y"] + tabs["height"] - 1
 
 
-def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> None:
+def _loan_sections(page: Page) -> None:
+    expect(page.locator("[data-loan-tabs]")).to_be_visible()
+    expect(page.locator("[data-loan-tabs] a")).to_have_count(5)
+
+
+def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path: Path) -> None:
     app = create_app(
         Settings(
             _env_file=None,
@@ -99,24 +107,13 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             page.wait_for_load_state("networkidle")
             page.get_by_role("button", name="Save loan").click()
 
-            expect(page.locator("#loan-summary-heading")).to_have_text("Home mortgage")
-            expect(page.locator("dt", has_text="First payment")).to_be_visible()
-            expect(page.locator("dt", has_text="First payment").locator("..")).to_contain_text(
-                "day 15"
-            )
+            # A new loan lands on Settings, where all configuration lives.
+            expect(page.locator("[data-loan-settings-page]")).to_be_visible()
+            _loan_sections(page)
+            expect(page.locator("[data-loan-property-settings]")).to_be_visible()
+            expect(page.locator("[data-loan-rates-settings]")).to_be_visible()
             _no_page_overflow(page)
-            _actions_under_the_tabs(page)
-            expect(page.locator("[data-edit-terms]")).to_be_visible()
-            expect(page.locator("[data-loan-overview]")).to_be_visible()
-            expect(page.locator("[data-loan-progress-bar]")).to_be_visible()
-            expect(page.locator("[data-loan-schedule]")).to_be_visible()
-            expect(page.locator('[data-chart="line"]')).to_have_attribute(
-                "data-chart-ready", "true"
-            )
-            expect(page.locator('[data-chart="loan-payments"]')).to_have_attribute(
-                "data-chart-ready", "true"
-            )
-            expect(page.locator("[data-loan-integrations]")).to_be_visible()
+
             page.get_by_role("button", name="Create net-worth item").click()
             page.wait_for_load_state("networkidle")
             expect(page.locator("[data-linked-item]")).to_be_visible()
@@ -132,15 +129,6 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             page.wait_for_load_state("networkidle")
             expect(page.get_by_role("button", name="Refresh occurrences")).to_be_visible()
             _no_page_overflow(page)
-            loan_id = urlsplit(page.url).path.rstrip("/").split("/")[-1]
-            csv = page.request.get(f"{base}/loans/{loan_id}/schedule.csv")
-            assert csv.status == 200
-            assert "text/csv" in csv.headers["content-type"]
-            assert "attachment" in csv.headers["content-disposition"]
-            assert csv.text().startswith(
-                "n,date,rate,opening,interest,principal,overpayment,costs,total,closing,currency\r\n"
-            )
-            assert "\r\n" in csv.text()
 
             page.get_by_role("link", name="Add rate change").click()
             dialog = page.locator("#rate-dialog")
@@ -153,14 +141,53 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             expect(page.locator("[data-action-notice]")).to_contain_text("Rate change saved.")
             _no_page_overflow(page)
 
-            page.get_by_role("link", name="Scenarios").click()
+            # The overview is read-only insight: no configuration forms or dialogs.
+            page.locator('[data-loan-tab="overview"]').click()
+            page.wait_for_load_state("networkidle")
+            expect(page.locator("#loan-summary-heading")).to_have_text("Home mortgage")
+            expect(page.locator("dt", has_text="First payment")).to_be_visible()
+            expect(page.locator("dt", has_text="First payment").locator("..")).to_contain_text(
+                "day 15"
+            )
+            _actions_under_the_tabs(page)
+            expect(page.locator("[data-loan-overview]")).to_be_visible()
+            expect(page.locator("[data-loan-progress-bar]")).to_be_visible()
+            expect(page.locator("[data-loan-property-summary]")).to_be_visible()
+            expect(page.locator("[data-manage-property]")).to_be_visible()
+            expect(page.locator("[data-quick-record]")).to_be_visible()
+            expect(page.locator("[data-plan-actual]")).to_be_visible()
+            expect(page.locator("[data-plan-actual]")).to_contain_text(
+                "No actual payments recorded yet."
+            )
+            expect(page.locator("[data-loan-schedule]")).to_be_visible()
+            expect(page.locator('[data-chart="line"]')).to_have_attribute(
+                "data-chart-ready", "true"
+            )
+            expect(page.locator('[data-chart="loan-payments"]')).to_have_attribute(
+                "data-chart-ready", "true"
+            )
+            expect(page.locator("#rate-dialog")).to_have_count(0)
+            expect(page.locator("#cost-dialog")).to_have_count(0)
+            expect(page.locator("#overpayment-dialog")).to_have_count(0)
+            _no_page_overflow(page)
+            loan_id = urlsplit(page.url).path.rstrip("/").split("/")[-1]
+            csv = page.request.get(f"{base}/loans/{loan_id}/schedule.csv")
+            assert csv.status == 200
+            assert "text/csv" in csv.headers["content-type"]
+            assert "attachment" in csv.headers["content-disposition"]
+            assert csv.text().startswith(
+                "n,date,rate,opening,interest,principal,overpayment,costs,total,closing,currency\r\n"
+            )
+            assert "\r\n" in csv.text()
+
+            page.locator('[data-loan-tab="scenarios"]').click()
             page.wait_for_url(f"{base}/loans/{loan_id}/scenarios")
+            _loan_sections(page)
             expect(page.locator("[data-scenario-comparison]")).to_be_visible()
             expect(page.locator("[data-scenario-chart]")).to_be_visible()
             expect(page.locator('[data-chart="line"]')).to_have_attribute(
                 "data-chart-ready", "true"
             )
-            _actions_under_the_tabs(page)
             _no_page_overflow(page)
             row = page.locator('[data-scenario-form-row="1"]')
             row.locator("[data-scenario-name]").fill("Extra 200")
@@ -175,10 +202,11 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             )
             _no_page_overflow(page)
 
-            page.goto(f"{base}/loans/{loan_id}/payments", wait_until="networkidle")
+            page.locator('[data-loan-tab="payments"]').click()
+            page.wait_for_url(f"{base}/loans/{loan_id}/payments")
+            _loan_sections(page)
             expect(page.locator("[data-loan-payments-list]")).to_be_visible()
             expect(page.locator("[data-loan-checkpoints-list]")).to_be_visible()
-            _actions_under_the_tabs(page)
             _no_page_overflow(page)
             page.get_by_role("link", name="Record payment").click()
             payment_dialog = page.locator("#payment-dialog")
@@ -190,9 +218,36 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             expect(page.locator("[data-action-notice]")).to_contain_text("Payment saved.")
             expect(page.locator("[data-payment]")).to_have_count(1)
             _no_page_overflow(page)
-            page.goto(f"{base}/loans/{loan_id}?schedule_page=1", wait_until="networkidle")
+
+            page.locator('[data-loan-tab="overview"]').click()
+            page.wait_for_load_state("networkidle")
             expect(page.locator("[data-schedule-actual]")).to_be_visible()
             expect(page.locator("[data-actual-total]")).to_be_visible()
+            _no_page_overflow(page)
+
+            page.locator('[data-loan-tab="payments"]').click()
+            page.wait_for_load_state("networkidle")
+            page.get_by_role("link", name="Add checkpoint").click()
+            checkpoint_dialog = page.locator("#checkpoint-dialog")
+            expect(checkpoint_dialog).to_be_visible()
+            checkpoint_dialog.locator('input[name="as_of"]').fill("2026-06-01")
+            checkpoint_dialog.locator('input[name="remaining_principal"]').fill("290,000")
+            checkpoint_dialog.get_by_role("button", name="Save checkpoint").click()
+            page.wait_for_load_state("networkidle")
+            expect(page.locator("[data-action-notice]")).to_contain_text(
+                "Balance checkpoint saved."
+            )
+
+            page.locator('[data-loan-tab="overview"]').click()
+            page.wait_for_load_state("networkidle")
+            expect(page.locator("[data-plan-last-payment]")).to_contain_text("100.00")
+            expect(page.locator("[data-plan-checkpoint]")).to_contain_text("290,000.00")
+            expect(page.locator("[data-plan-actual]")).to_have_attribute(
+                "data-plan-status", "ahead"
+            )
+            expect(page.locator("[data-plan-status-line]")).to_contain_text(
+                "Ahead of the projected balance"
+            )
             _no_page_overflow(page)
 
             page.goto(f"{base}/loans/installments", wait_until="networkidle")
@@ -223,12 +278,14 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             page.locator("[data-open-loan]").click()
             page.wait_for_load_state("networkidle")
             expect(page.locator("#loan-summary-heading")).to_have_text("Home mortgage")
+            _loan_sections(page)
             _no_page_overflow(page)
             _actions_under_the_tabs(page)
             expect(page.get_by_role("link", name="Back to Loans")).to_have_count(0)
-            expect(page.get_by_role("link", name="Edit terms")).to_be_visible()
+            expect(page.locator("[data-quick-record]")).to_be_visible()
+            expect(page.locator("[data-loan-property-summary]")).to_be_visible()
+            expect(page.locator("[data-plan-status-line]")).to_be_visible()
             expect(page.locator("[data-loan-schedule]")).to_be_visible()
-            expect(page.locator("[data-loan-integrations]")).to_be_visible()
             _no_page_overflow(page)
             scroll = page.locator("[data-schedule-scroll]").evaluate(
                 "el => ({scrollWidth: el.scrollWidth, clientWidth: el.clientWidth})"
@@ -242,6 +299,11 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             )
             _no_page_overflow(page)
 
+            page.locator('[data-loan-tab="settings"]').click()
+            page.wait_for_load_state("networkidle")
+            expect(page.locator("[data-loan-settings-page]")).to_be_visible()
+            _loan_sections(page)
+            _no_page_overflow(page)
             page.get_by_role("link", name="Add cost").click()
             cost_dialog = page.locator("#cost-dialog")
             expect(cost_dialog).to_be_visible()
@@ -251,14 +313,9 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             expect(cost_dialog).to_be_hidden()
 
             page.goto(f"{base}/loans/{loan_id}/scenarios", wait_until="networkidle")
+            _loan_sections(page)
             expect(page.locator("[data-scenario-comparison]")).to_be_visible()
-            print(
-                "SCENARIO_WIDTH",
-                page.evaluate("document.documentElement.scrollWidth"),
-                page.evaluate("document.querySelector('[data-scenario-table-scroll]').scrollWidth"),
-            )
             _no_page_overflow(page)
-            _actions_under_the_tabs(page)
             scenario_scroll = page.locator("[data-scenario-table-scroll]").evaluate(
                 "el => ({scrollWidth: el.scrollWidth, clientWidth: el.clientWidth})"
             )
@@ -268,10 +325,10 @@ def test_loan_wizard_and_detail_at_desktop_and_phone_widths(tmp_path: Path) -> N
             )
 
             page.goto(f"{base}/loans/{loan_id}/payments", wait_until="networkidle")
+            _loan_sections(page)
             expect(page.locator("[data-loan-payments-list]")).to_be_visible()
             expect(page.get_by_role("link", name="Record payment")).to_be_visible()
             _no_page_overflow(page)
-            _actions_under_the_tabs(page)
             payments_scroll = page.locator("[data-payments-scroll]").evaluate(
                 "el => ({scrollWidth: el.scrollWidth, clientWidth: el.clientWidth})"
             )

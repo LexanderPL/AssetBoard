@@ -702,3 +702,34 @@ def test_schedule_actuals_and_reanchoring(team: WorkspaceDb) -> None:
     assert after.summary is not None
     assert isinstance(after.summary, LoanScheduleSummary)
     assert after.summary == summarize_schedule(after.schedule, after.summary.as_of)
+
+
+def test_plan_status_summarises_the_last_payment_and_checkpoint(team: WorkspaceDb) -> None:
+    loan_id = _create(team)
+    ctx = team.ctx("owner", "owner")
+    empty = loan_payments.plan_status(team.factory, team.ctx("viewer", "viewer"), loan_id)
+    assert empty.last_payment is None
+    assert empty.latest_checkpoint is None
+    assert empty.status is None
+
+    _, row = _first_row(team, loan_id)
+    payment_id = loan_payments.create_loan_payment(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=row.date,
+        kind="installment",
+        total=row.installment_total,
+    )
+    loan_payments.create_loan_checkpoint(
+        team.factory,
+        ctx,
+        loan_id,
+        as_of=row.date,
+        remaining_principal=_money(29_000_000),
+    )
+    status = loan_payments.plan_status(team.factory, team.ctx("viewer", "viewer"), loan_id)
+    assert status.last_payment is not None and status.last_payment.id == payment_id
+    assert status.latest_checkpoint is not None
+    assert status.status == "ahead"
+    assert status.variance is not None and status.variance.amount_minor > 0

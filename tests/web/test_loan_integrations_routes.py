@@ -135,12 +135,13 @@ def _expense_category(owner, name: str = "Housing") -> str:
 
 def test_integrations_section_creates_networth_item(owner) -> None:
     loan_id = _create(owner)
-    page = owner.client.get(f"/loans/{loan_id}")
-    assert "data-loan-integrations" in page.text
+    page = owner.client.get(f"/loans/{loan_id}/settings")
+    assert "data-loan-property-settings" in page.text
     assert "Create net-worth item" in page.text
     response = owner.post(f"/loans/{loan_id}/networth-item")
     assert response.status_code == 303
-    page = owner.client.get(f"/loans/{loan_id}")
+    assert f"/loans/{loan_id}/settings" in response.headers["location"]
+    page = owner.client.get(f"/loans/{loan_id}/settings")
     assert "Linked item: Mortgage" in page.text
     assert "data-linked-item" in page.text
     with owner.db() as session:
@@ -160,10 +161,13 @@ def test_property_link_ltv_equity_and_clear(owner) -> None:
     )
     assert response.status_code == 303
     page = owner.client.get(f"/loans/{loan_id}?property_as_of=2026-01-01")
+    assert "data-loan-property-summary" in page.text
     assert "Flat" in page.text
     assert "75%" in page.text
     assert "100,000.00" in page.text
     assert "data-property-ltv-unavailable" not in page.text
+    settings = owner.client.get(f"/loans/{loan_id}/settings?property_as_of=2026-01-01")
+    assert "Flat" in settings.text and "75%" in settings.text
     cleared = owner.post(f"/loans/{loan_id}/property/clear")
     assert cleared.status_code == 303
     page = owner.client.get(f"/loans/{loan_id}")
@@ -189,7 +193,7 @@ def test_scheduled_generation_and_disable(owner) -> None:
         {"category_id": category_id},
     )
     assert response.status_code == 303
-    page = owner.client.get(f"/loans/{loan_id}")
+    page = owner.client.get(f"/loans/{loan_id}/settings")
     assert "Recurring installments" in page.text
     assert "Refresh occurrences" in page.text
     assert "data-scheduled-generation" in page.text
@@ -199,7 +203,7 @@ def test_scheduled_generation_and_disable(owner) -> None:
         assert session.query(ScheduledOccurrence).filter_by(scheduled_item_id=item.id).count() > 0
     disabled = owner.post(f"/loans/{loan_id}/scheduled-item/disable")
     assert disabled.status_code == 303
-    page = owner.client.get(f"/loans/{loan_id}")
+    page = owner.client.get(f"/loans/{loan_id}/settings")
     assert "Generation is not active for this loan." in page.text
 
 
@@ -210,9 +214,9 @@ def test_auto_record_setting_and_viewer_read_only(owner) -> None:
     with owner.db() as session:
         assert session.get(Loan, UUID(loan_id)).auto_record_payments is True
     owner.set_admin_role("viewer")
-    page = owner.client.get(f"/loans/{loan_id}")
+    page = owner.client.get(f"/loans/{loan_id}/settings")
     assert page.status_code == 200
-    assert "data-loan-integrations" in page.text
+    assert "data-loan-property-settings" in page.text
     assert "Create net-worth item" not in page.text
     assert "Generate occurrences" not in page.text
     assert "Record posted installments automatically" not in page.text

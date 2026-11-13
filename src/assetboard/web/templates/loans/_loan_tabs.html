@@ -1,0 +1,10 @@
+{% macro loan_tabs(active) -%}
+{# One loan's sections. Navigation only: plain links, one scrollable row, aria-current. #}
+<nav class="tab-strip mb-6" aria-label="{{ _('Loan sections') }}" data-tab-strip data-loan-tabs>
+  <a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}" data-loan-tab="overview"{% if active == "overview" %} aria-current="page"{% endif %}>{{ _("Overview") }}</a>
+  <a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}#schedule" data-loan-tab="schedule"{% if active == "schedule" %} aria-current="page"{% endif %}>{{ _("Schedule") }}</a>
+  <a href="{{ scoped_url(request, 'loan_payments', loan_id=loan.id) }}" data-loan-tab="payments" data-loan-payments{% if active == "payments" %} aria-current="page"{% endif %}>{{ _("Payments") }}</a>
+  <a href="{{ scoped_url(request, 'loan_scenarios', loan_id=loan.id) }}" data-loan-tab="scenarios" data-loan-scenarios{% if active == "scenarios" %} aria-current="page"{% endif %}>{{ _("Scenarios") }}</a>
+  <a href="{{ scoped_url(request, 'loan_settings', loan_id=loan.id) }}" data-loan-tab="settings" data-loan-settings-tab{% if active == "settings" %} aria-current="page"{% endif %}>{{ _("Settings") }}</a>
+</nav>
+{%- endmacro %}

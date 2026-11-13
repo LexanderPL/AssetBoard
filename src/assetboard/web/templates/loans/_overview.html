@@ -68,6 +68,56 @@
   {% endif %}
   {% endif %}
 
+  <div class="mt-5 border-t border-line pt-4" data-plan-actual data-plan-status="{{ plan_status.status or 'none' }}">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <h3 class="text-sm font-semibold">{{ _("Plan vs actual") }}</h3>
+      <a href="{{ scoped_url(request, 'loan_payments', loan_id=loan.id) }}#payments" class="text-sm font-semibold text-primary-ink underline" data-plan-payments-link>{{ _("Review payments") }}</a>
+    </div>
+    {% if plan_status.last_payment or plan_status.latest_checkpoint %}
+    <dl class="mt-3 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+      <div data-plan-last-payment>
+        <dt class="text-muted">{{ _("Last actual payment") }}</dt>
+        {% if plan_status.last_payment %}
+        <dd class="mt-0.5 font-semibold tabular-nums">{{ format_money(plan_status.last_payment.total, locale) }}</dd>
+        <dd class="text-xs text-muted">{{ format_day(plan_status.last_payment.date, locale) }}</dd>
+        {% else %}
+        <dd class="mt-0.5 text-muted">{{ _("No payment recorded yet.") }}</dd>
+        {% endif %}
+      </div>
+      <div data-plan-checkpoint>
+        <dt class="text-muted">{{ _("Latest balance checkpoint") }}</dt>
+        {% if plan_status.latest_checkpoint %}
+        <dd class="mt-0.5 font-semibold tabular-nums">{{ format_money(plan_status.latest_checkpoint.remaining_principal, locale) }}</dd>
+        <dd class="text-xs text-muted">{{ format_day(plan_status.latest_checkpoint.as_of, locale) }}</dd>
+        {% else %}
+        <dd class="mt-0.5 text-muted">{{ _("No checkpoint recorded yet.") }}</dd>
+        {% endif %}
+      </div>
+      <div data-plan-variance>
+        <dt class="text-muted">{{ _("Variance") }}</dt>
+        <dd class="mt-0.5 tabular-nums">
+          {% if plan_status.latest_checkpoint and plan_status.latest_checkpoint.variance %}
+            <span class="{% if plan_status.latest_checkpoint.variance.amount_minor > 0 %}text-danger-strong{% elif plan_status.latest_checkpoint.variance.amount_minor < 0 %}text-success-strong{% endif %}">{{ format_money(plan_status.latest_checkpoint.variance, locale) }}</span>
+          {% else %}
+            <span class="text-muted">—</span>
+          {% endif %}
+        </dd>
+      </div>
+    </dl>
+    {% if plan_status.status %}
+    <p class="mt-3 text-sm {% if plan_status.status == 'ahead' %}text-success-strong{% elif plan_status.status == 'behind' %}text-danger-strong{% else %}text-muted{% endif %}" data-plan-status-line>
+      {% if plan_status.status == "ahead" %}{{ _("Ahead of the projected balance by %(amount)s.", amount=format_money(plan_status.variance, locale)) }}
+      {% elif plan_status.status == "behind" %}{{ _("Behind the projected balance by %(amount)s.", amount=format_money(plan_status.variance, locale)) }}
+      {% else %}{{ _("On track with the projected balance.") }}{% endif %}
+    </p>
+    {% elif plan_status.latest_checkpoint %}
+    <p class="mt-3 text-sm text-muted" data-plan-status-line>{{ _("No variance yet for this checkpoint.") }}</p>
+    {% endif %}
+    {% else %}
+    <p class="mt-3 text-sm text-muted" data-plan-empty>{{ _("No actual payments recorded yet.") }}</p>
+    {% endif %}
+  </div>
+
   {% if schedule_error %}
   <div class="mt-4 border border-warning-line bg-warning-soft px-4 py-3" data-schedule-error>
     <p class="text-sm font-semibold text-warning-strong">{{ _("Schedule unavailable") }}</p>

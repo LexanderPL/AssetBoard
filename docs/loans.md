@@ -26,7 +26,7 @@ is fixed at creation: to switch between fixed and variable, archive the loan and
 
 ## Interest
 
-- **Fixed**: enter the rate; add later changes on the loan page. Each rate is effective from its
+- **Fixed**: enter the rate; add later changes in **Settings → Rates**. Each rate is effective from its
   date and the latest rate at or before a payment applies.
 - **Variable**: choose a reference rate and a margin. Values are maintained on
   **Loans → Reference rates**; the latest value at or before a payment plus the margin applies.
@@ -67,7 +67,9 @@ or the schedule will be too long.
 
 ## The loan page
 
-The loan page turns the terms into an overview and a monthly schedule:
+A loan has its own section navigation: **Overview**, **Schedule**, **Payments**, **Scenarios**
+and **Settings**. The overview is read-only insight; changing the terms, rate, costs,
+overpayments, links or archive state happens in Settings.
 
 - **Overview**: one header panel with a large repaid-vs-remaining principal bar (paid amount,
   percentage, original principal and payoff date), the current rate (with the reference rate and
@@ -75,6 +77,15 @@ The loan page turns the terms into an overview and a monthly schedule:
   breakdown, the percentage repaid, the payoff date, the payments left, and remaining/lifetime
   interest and costs. The bar is inline SVG; its text labels carry the same information so colour
   is not the only cue.
+- **Plan vs actual**: the last recorded actual payment, the latest balance checkpoint and its
+  variance, and a plain **Ahead**, **Behind** or **On track** line. Without actual payments or
+  checkpoints the panel says that no actual payments are recorded yet.
+- **Property & LTV**: a compact, read-only card with the linked property value, remaining
+  principal, LTV and equity at the chosen date. **Manage in Settings** opens the property and
+  liability controls; the real-estate-only explanation lives there.
+- **Record next payment**: the overview's primary action opens the payment dialog on the
+  Payments page with the next schedule row's due date and total filled in. The Payments page
+  keeps its own **Record payment** button.
 - **Schedule**: 24 monthly rows per page, starting on the page with today's or the next due
   payment. The row for today is marked **Today**; when today is not a payment date, the next one
   is marked **Next**. Rows before today are marked **Projected** until actual payments are
@@ -89,7 +100,14 @@ The loan page turns the terms into an overview and a monthly schedule:
   a **Plotted data** table for keyboard and screen-reader users; without JavaScript the table is
   shown instead of the chart.
 
-If the stored terms cannot produce a schedule (for example a missing rate), the page explains
+**Settings** is one card per concern, in this order: **Terms**, **Property & net worth**,
+**Rates**, **Costs**, **Overpayments**, **Upcoming & auto-record** and **Archive**. The Terms
+card summarises the current key terms; its **Edit terms** button opens the separate edit page,
+which returns to Settings when saved or cancelled. Viewers see every card read-only; only
+editors and owners see the edit, create, delete and archive controls. Payment and checkpoint
+dialogs stay on the Payments page.
+
+If the stored terms cannot produce a schedule (for example a missing rate), the overview explains
 the problem and hides the schedule, charts and CSV until the terms are corrected.
 
 ## Installment plans
@@ -119,8 +137,8 @@ payment day to the end of a shorter month) and the end date after the remaining 
 
 ## Actual payments and balance checkpoints
 
-The loan page keeps the terms and the projected schedule; **Payments** records what actually
-happened.
+The Overview and Schedule keep the terms and the projected schedule; **Payments** records what
+actually happened.
 
 - **Recording a payment**: choose installment or overpayment and enter the date and total. An
   installment total is split against the projected row on that date (or the first row after it):
@@ -148,7 +166,8 @@ checkpoint that cannot be projected shows the reason instead of a value.
 
 ## Net worth, property and Upcoming
 
-**Net worth & property** on the loan page connects the loan to the rest of the app:
+**Property & net worth** in Settings connects the loan to the rest of the app (the overview
+shows the compact read-only property card):
 
 - **Net-worth liability**: **Create net-worth item** adds one linked liability item in the
   **Mortgage** category. Every net-worth date resolves the remaining principal from the loan
@@ -174,8 +193,8 @@ checkpoint that cannot be projected shows the reason instead of a value.
 
 ## What-if scenarios
 
-**Scenarios** on the loan page compares the same loan under several plans without changing the
-stored terms:
+**Scenarios** in the loan navigation compares the same loan under several plans without changing
+the stored terms:
 
 - **Baseline** is the loan without any overpayments.
 - **Current plan** is the configured regular overpayment and one-off overpayments.
@@ -208,7 +227,7 @@ only editors and owners can save or delete them.
 ## Costs and overpayments
 
 **Cost components** can be added in the last step of the loan wizard (up to three) or later on
-the loan page. They are charged every month while active: a percentage of the opening balance or
+Settings → Costs. They are charged every month while active: a percentage of the opening balance or
 a fixed amount. Their dates are inclusive on both ends, and several active components may
 overlap; all of them are added to the installment, and the Upcoming amounts derived from the
 schedule follow the change. A wizard row with an empty **Applies from** starts with the loan.
@@ -235,8 +254,8 @@ cannot be deleted.
 
 ## Archiving
 
-**Archive loan** hides a loan from the active list and makes it read-only. **Restore loan** brings
-it back. Loans are never hard-deleted.
+**Settings → Archive** hides a loan from the active list and makes it read-only. **Restore loan**
+brings it back. Loans are never hard-deleted.
 
 ## Backup and restore
 

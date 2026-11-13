@@ -1,24 +1,28 @@
 {% extends "base.html" %}
 {% from "macros/components.html" import csrf_input with context %}
+{% from "loans/_loan_tabs.html" import loan_tabs with context %}
 {% from "loans/_macros.html" import overpayment_label with context %}
 {% block title %}{{ _("Edit loan") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Edit loan") }}{% endblock %}
 {% block content %}
 {% set input_class = "form-control px-3 py-2" %}
-<a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}" class="mb-4 inline-flex rounded-lg border border-line px-3 py-1.5 text-sm font-medium hover:bg-subtle">{{ _("Back to %(name)s", name=loan.name) }}</a>
+{{ loan_tabs("settings") }}
+<div class="mb-6 flex flex-wrap items-center gap-2" data-page-actions>
+  <a href="{{ scoped_url(request, 'loan_settings', loan_id=loan.id) }}#terms" class="btn">{{ _("Back to Settings") }}</a>
+</div>
 <section class="panel max-w-3xl p-5 sm:p-6" aria-labelledby="loan-edit-heading">
   <h2 id="loan-edit-heading" class="text-base font-semibold">{{ loan.name }}</h2>
   <p class="mt-1 text-sm text-muted">{{ _("Change the loan terms. The rate type cannot change after creation; archive the loan and add a new one for that.") }}</p>
   {% if loan.overpayment_mode.value != "none" %}
   <p class="mt-4 border border-line bg-subtle px-4 py-3 text-sm" data-edit-overpayment-note>
     {{ _("Regular overpayment: %(summary)s.", summary=overpayment_label(loan.overpayment_mode, loan.overpayment_amount, loan.overpayment_strategy, locale)) }}
-    <a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}#overpayments" class="font-semibold text-primary-ink underline" data-overpayment-link>{{ _("Change the regular overpayment") }}</a>
+    <a href="{{ scoped_url(request, 'loan_settings', loan_id=loan.id) }}#overpayments" class="font-semibold text-primary-ink underline" data-overpayment-link>{{ _("Change the regular overpayment") }}</a>
     {% if loan.overpayment_mode.value == "target_total" %}
     <span class="mt-1 block text-muted">{{ _("A target total must be at least the monthly installment. Raise it or clear the overpayment before increasing the principal or shortening the term.") }}</span>
     {% endif %}
   </p>
   {% endif %}
-  {% if error %}<p role="alert" class="mt-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ error }}{% if target_error %} <a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}#overpayments" class="font-semibold underline" data-target-error-link>{{ _("Change the regular overpayment") }}</a>{% endif %}</p>{% endif %}
+  {% if error %}<p role="alert" class="mt-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-form-error>{{ error }}{% if target_error %} <a href="{{ scoped_url(request, 'loan_settings', loan_id=loan.id) }}#overpayments" class="font-semibold underline" data-target-error-link>{{ _("Change the regular overpayment") }}</a>{% endif %}</p>{% endif %}
   <form method="post" action="{{ scoped_url(request, 'loan_update', loan_id=loan.id) }}" class="mt-5 grid gap-5">
     {{ csrf_input() }}
     <label class="grid gap-1 text-sm font-medium">{{ _("Name") }}<input name="name" value="{{ values.get('name', '') }}" maxlength="200" required class="{{ input_class }} font-normal"></label>
@@ -66,7 +70,7 @@
     <p class="text-sm text-muted">{{ _("Rate type: %(mode)s. It is fixed at creation.", mode=_("Fixed") if loan.rate_mode.value == "fixed" else _("Variable")) }}</p>
     <div class="flex flex-wrap gap-2 border-t border-line pt-4">
       <button type="submit" class="btn-primary">{{ _("Save terms") }}</button>
-      <a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}" class="btn">{{ _("Cancel") }}</a>
+      <a href="{{ scoped_url(request, 'loan_settings', loan_id=loan.id) }}#terms" class="btn">{{ _("Cancel") }}</a>
     </div>
   </form>
 </section>

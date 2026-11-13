@@ -22,6 +22,7 @@ from assetboard.domain.loans import (
     OverpaymentMode,
     OverpaymentStrategy,
     RateMode,
+    ScheduleRow,
     clean_loan_name,
     payment_date_matches_day,
     validate_payment_day,
@@ -185,6 +186,7 @@ NOTICES = {
     "installment_plan_restored": _("Installment plan restored."),
 }
 
+SETTINGS_FORMS = frozenset({"rate", "cost", "overpayment"})
 ENTRY_PATHS = ("original", "current")
 WIZARD_STEPS = (
     _("The loan"),
@@ -663,11 +665,31 @@ async def loan_new_step(request: Request, ctx: CurrentContext) -> Response:
             high_rate=code == "high_rate_confirmation_required",
             status_code=400,
         )
-    return RedirectResponse(
-        request.url_for("loan_detail", loan_id=str(loan_id)).path
+    return _redirect_settings(request, loan_id, notice="loan_created")
+
+
+def _property_as_of(request: Request, today: date) -> date:
+    raw_as_of = request.query_params.get("property_as_of", "")
+    if not raw_as_of:
+        return today
+    with contextlib.suppress(ValueError):
+        return date.fromisoformat(raw_as_of)
+    return today
+
+
+def _quick_record_url(request: Request, loan_id: UUID, row: ScheduleRow, locale: str) -> str:
+    query = urlencode(
+        {
+            "form": "payment",
+            "payment_date": row.date.isoformat(),
+            "payment_total": format_amount_input(row.installment_total, locale),
+        }
+    )
+    return (
+        request.url_for("loan_payments", loan_id=str(loan_id)).path
         + "?"
-        + urlencode({"notice": "loan_created"}),
-        status_code=303,
+        + query
+        + "#payment-dialog"
     )
 
 
@@ -678,20 +700,19 @@ def _detail_context(
     *,
     error: str | None = None,
     notice: str | None = None,
-    form_values: dict[str, str] | None = None,
-    open_form: str | None = None,
-    edit_id: str | None = None,
 ) -> dict[str, object]:
-    data = loan_schedule_service.loan_schedule(request.app.state.session_factory, ctx, loan_id)
+    factory = request.app.state.session_factory
+    data = loan_schedule_service.loan_schedule(factory, ctx, loan_id)
     today = ctx.clock.today(ctx.workspace.timezone)
     page = schedule_page(data.schedule, today, request.query_params.get("schedule_page"))
     charts = build_loan_charts(data.schedule, data.baseline, request.state.locale)
-    property_as_of = today
-    raw_as_of = request.query_params.get("property_as_of", "")
-    if raw_as_of:
-        with contextlib.suppress(ValueError):
-            property_as_of = date.fromisoformat(raw_as_of)
-    factory = request.app.state.session_factory
+    property_as_of = _property_as_of(request, today)
+    can_edit = has_role(ctx, Role.EDITOR)
+    quick_record_url = (
+        _quick_record_url(request, loan_id, page.next_row, request.state.locale)
+        if can_edit and not data.view.archived and page.next_row is not None
+        else None
+    )
     return {
         "loan": data.view,
         "schedule_data": data,
@@ -700,17 +721,49 @@ def _detail_context(
         "schedule_page": page,
         "charts": charts,
         "schedule_error": _error(request, data.error_code) if data.error_code else None,
+        "can_edit": can_edit,
+        "error": error,
+        "notice": notice,
+        "today": today,
+        "quick_record_url": quick_record_url,
+        "plan_status": loan_payment_service.plan_status(factory, ctx, loan_id),
+        "format_money": format_money,
+        "format_day": format_day,
+        "format_rate_short": format_rate_short,
+        "property": loan_link_service.loan_property_view(factory, ctx, loan_id, property_as_of),
+        "property_as_of": property_as_of,
+        "property_reason": lambda code: _error(request, code),
+    }
+
+
+def _settings_context(
+    request: Request,
+    ctx: Context,
+    loan_id: UUID,
+    *,
+    error: str | None = None,
+    notice: str | None = None,
+    form_values: dict[str, str] | None = None,
+    open_form: str | None = None,
+    edit_id: str | None = None,
+) -> dict[str, object]:
+    """Everything the settings cards and dialogs need; the schedule is not built here."""
+    factory = request.app.state.session_factory
+    view = loans.get_loan(factory, ctx, loan_id)
+    today = ctx.clock.today(ctx.workspace.timezone)
+    property_as_of = _property_as_of(request, today)
+    return {
+        "loan": view,
         "can_edit": has_role(ctx, Role.EDITOR),
         "error": error,
         "notice": notice,
         "form_values": form_values or {},
-        "open_form": open_form,
+        "open_form": open_form if open_form in SETTINGS_FORMS else None,
         "edit_id": edit_id,
         "today": today,
         "format_money": format_money,
         "format_day": format_day,
         "format_amount_input": format_amount_input,
-        "format_quantity_input": format_quantity_input,
         "format_rate_short": format_rate_short,
         "rate_input": lambda bp: _rate_input(bp, request.state.locale),
         "liability": loan_link_service.loan_liability_view(factory, ctx, loan_id),
@@ -723,31 +776,48 @@ def _detail_context(
     }
 
 
-def _redirect_detail(
+def _redirect_settings(
     request: Request,
     loan_id: UUID,
     *,
     notice: str | None = None,
     error: str | None = None,
     anchor: str | None = None,
-    form: str | None = None,
-    edit: str | None = None,
 ) -> RedirectResponse:
     query: dict[str, str] = {}
     if notice:
         query["notice"] = notice
     if error:
         query["error"] = error
-    if form:
-        query["form"] = form
-    if edit:
-        query["edit"] = edit
-    url = request.url_for("loan_detail", loan_id=str(loan_id)).path
+    url = request.url_for("loan_settings", loan_id=str(loan_id)).path
     if query:
         url += "?" + urlencode(query)
     if anchor:
         url += f"#{anchor}"
     return RedirectResponse(url, status_code=303)
+
+
+async def _render_settings_error(
+    request: Request,
+    ctx: Context,
+    loan_id: UUID,
+    exc: Exception,
+    *,
+    values: dict[str, str],
+    form: str,
+    edit_id: str | None,
+) -> Response:
+    context = await run_in_threadpool(
+        _settings_context,
+        request,
+        ctx,
+        loan_id,
+        error=_error(request, getattr(exc, "code", "failed")),
+        form_values=values,
+        open_form=form,
+        edit_id=edit_id,
+    )
+    return render_template(request, "loans/settings.html", status_code=400, context=context)
 
 
 def _installment_form_values(
@@ -975,18 +1045,39 @@ def _money_or_zero(values: dict[str, str], key: str, locale: str, currency: str)
         raise loans.LoanError(key, "invalid_amount") from None
 
 
+def _prefilled_date(text: str | None, fallback: date) -> str:
+    if not text:
+        return fallback.isoformat()
+    with contextlib.suppress(ValueError):
+        return date.fromisoformat(text).isoformat()
+    return fallback.isoformat()
+
+
+def _prefilled_total(text: str | None, locale: str, currency: str) -> str:
+    if not text:
+        return ""
+    with contextlib.suppress(ValueError, EntryError):
+        return format_amount_input(
+            Money(amount_minor(parse_amount(text, locale), currency), currency), locale
+        )
+    return ""
+
+
 def _payment_form_values(
     loan: loans.LoanView,
     payment: loan_payment_service.LoanPaymentView | None,
     locale: str,
     today: date,
     submitted: dict[str, str] | None = None,
+    *,
+    prefill_date: str | None = None,
+    prefill_total: str | None = None,
 ) -> dict[str, str]:
     if payment is None:
         values = {
-            "date": today.isoformat(),
+            "date": _prefilled_date(prefill_date, today),
             "kind": "installment",
-            "total": "",
+            "total": _prefilled_total(prefill_total, locale, loan.currency),
             "principal": "",
             "interest": "",
             "costs": "",
@@ -1042,6 +1133,8 @@ def _payments_context(
     form_values: dict[str, str] | None = None,
     open_form: str | None = None,
     edit_id: str | None = None,
+    prefill_date: str | None = None,
+    prefill_total: str | None = None,
 ) -> dict[str, object]:
     page = loan_payment_service.payments_page(request.app.state.session_factory, ctx, loan_id)
     payment_edit = next(
@@ -1061,7 +1154,13 @@ def _payments_context(
         "payment_edit": payment_edit,
         "checkpoint_edit": checkpoint_edit,
         "payment_form": _payment_form_values(
-            page.loan, payment_edit, request.state.locale, today, form_values
+            page.loan,
+            payment_edit,
+            request.state.locale,
+            today,
+            form_values,
+            prefill_date=prefill_date,
+            prefill_total=prefill_total,
         ),
         "checkpoint_form": _checkpoint_form_values(
             checkpoint_edit, request.state.locale, today, form_values
@@ -1539,8 +1638,45 @@ async def loan_payments_page(request: Request, ctx: CurrentContext, loan_id: UUI
         notice=_notice(request, request.query_params.get("notice")),
         open_form=request.query_params.get("form"),
         edit_id=request.query_params.get("edit"),
+        prefill_date=request.query_params.get("payment_date"),
+        prefill_total=request.query_params.get("payment_total"),
     )
     return render_template(request, "loans/payments.html", context=context)
+
+
+@router.get("/loans/{loan_id}/settings", name="loan_settings")
+async def loan_settings_page(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    view = await run_in_threadpool(loans.get_loan, request.app.state.session_factory, ctx, loan_id)
+    if view.kind is LoanKind.INSTALLMENT_PLAN:
+        return RedirectResponse(
+            request.url_for("installment_plan_detail", loan_id=str(loan_id)).path,
+            status_code=303,
+        )
+    requested_form = request.query_params.get("form")
+    if requested_form in ("payment", "checkpoint"):
+        preserved = ("form", "edit", "payment_date", "payment_total")
+        query = urlencode(
+            {key: request.query_params[key] for key in preserved if key in request.query_params}
+        )
+        anchor = "payment-dialog" if requested_form == "payment" else "checkpoint-dialog"
+        return RedirectResponse(
+            request.url_for("loan_payments", loan_id=str(loan_id)).path
+            + "?"
+            + query
+            + f"#{anchor}",
+            status_code=303,
+        )
+    context = await run_in_threadpool(
+        _settings_context,
+        request,
+        ctx,
+        loan_id,
+        error=_error(request, request.query_params.get("error")),
+        notice=_notice(request, request.query_params.get("notice")),
+        open_form=requested_form,
+        edit_id=request.query_params.get("edit"),
+    )
+    return render_template(request, "loans/settings.html", context=context)
 
 
 @router.post("/loans/{loan_id}/payments", name="loan_payment_create")
@@ -1738,10 +1874,10 @@ async def loan_networth_item_create(
             loan_id,
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        return _redirect_detail(
-            request, loan_id, error=getattr(exc, "code", "failed"), anchor="integrations"
+        return _redirect_settings(
+            request, loan_id, error=getattr(exc, "code", "failed"), anchor="property"
         )
-    return _redirect_detail(request, loan_id, notice="networth_item_created", anchor="integrations")
+    return _redirect_settings(request, loan_id, notice="networth_item_created", anchor="property")
 
 
 @router.post("/loans/{loan_id}/property", name="loan_property_set")
@@ -1756,10 +1892,10 @@ async def loan_property_set(request: Request, ctx: CurrentContext, loan_id: UUID
             _id(values.get("property_item_id", "")),
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        return _redirect_detail(
-            request, loan_id, error=getattr(exc, "code", "failed"), anchor="integrations"
+        return _redirect_settings(
+            request, loan_id, error=getattr(exc, "code", "failed"), anchor="property"
         )
-    return _redirect_detail(request, loan_id, notice="property_saved", anchor="integrations")
+    return _redirect_settings(request, loan_id, notice="property_saved", anchor="property")
 
 
 @router.post("/loans/{loan_id}/property/clear", name="loan_property_clear")
@@ -1772,10 +1908,10 @@ async def loan_property_clear(request: Request, ctx: CurrentContext, loan_id: UU
             loan_id,
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        return _redirect_detail(
-            request, loan_id, error=getattr(exc, "code", "failed"), anchor="integrations"
+        return _redirect_settings(
+            request, loan_id, error=getattr(exc, "code", "failed"), anchor="property"
         )
-    return _redirect_detail(request, loan_id, notice="property_cleared", anchor="integrations")
+    return _redirect_settings(request, loan_id, notice="property_cleared", anchor="property")
 
 
 @router.post("/loans/{loan_id}/auto-record", name="loan_auto_record_update")
@@ -1790,10 +1926,10 @@ async def loan_auto_record_update(request: Request, ctx: CurrentContext, loan_id
             values.get("enabled") == "1",
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        return _redirect_detail(
-            request, loan_id, error=getattr(exc, "code", "failed"), anchor="integrations"
+        return _redirect_settings(
+            request, loan_id, error=getattr(exc, "code", "failed"), anchor="upcoming"
         )
-    return _redirect_detail(request, loan_id, notice="auto_record_saved", anchor="integrations")
+    return _redirect_settings(request, loan_id, notice="auto_record_saved", anchor="upcoming")
 
 
 @router.post("/loans/{loan_id}/scheduled-item", name="loan_scheduled_generate")
@@ -1809,10 +1945,10 @@ async def loan_scheduled_generate(request: Request, ctx: CurrentContext, loan_id
             request.app.state.settings,
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        return _redirect_detail(
-            request, loan_id, error=getattr(exc, "code", "failed"), anchor="integrations"
+        return _redirect_settings(
+            request, loan_id, error=getattr(exc, "code", "failed"), anchor="upcoming"
         )
-    return _redirect_detail(request, loan_id, notice="schedule_generated", anchor="integrations")
+    return _redirect_settings(request, loan_id, notice="schedule_generated", anchor="upcoming")
 
 
 @router.post("/loans/{loan_id}/scheduled-item/disable", name="loan_scheduled_disable")
@@ -1825,10 +1961,10 @@ async def loan_scheduled_disable(request: Request, ctx: CurrentContext, loan_id:
             loan_id,
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        return _redirect_detail(
-            request, loan_id, error=getattr(exc, "code", "failed"), anchor="integrations"
+        return _redirect_settings(
+            request, loan_id, error=getattr(exc, "code", "failed"), anchor="upcoming"
         )
-    return _redirect_detail(request, loan_id, notice="schedule_disabled", anchor="integrations")
+    return _redirect_settings(request, loan_id, notice="schedule_disabled", anchor="upcoming")
 
 
 @router.get("/loans/installments", name="installment_plans")
@@ -2000,8 +2136,6 @@ async def loan_detail(request: Request, ctx: CurrentContext, loan_id: UUID) -> R
         loan_id,
         error=_error(request, request.query_params.get("error")),
         notice=_notice(request, request.query_params.get("notice")),
-        open_form=request.query_params.get("form"),
-        edit_id=request.query_params.get("edit"),
     )
     return render_template(request, "loans/detail.html", context=context)
 
@@ -2082,12 +2216,7 @@ async def loan_update(request: Request, ctx: CurrentContext, loan_id: UUID) -> R
                 "format_rate_short": format_rate_short,
             },
         )
-    return RedirectResponse(
-        request.url_for("loan_detail", loan_id=str(loan_id)).path
-        + "?"
-        + urlencode({"notice": "terms_saved"}),
-        status_code=303,
-    )
+    return _redirect_settings(request, loan_id, notice="terms_saved", anchor="terms")
 
 
 @router.post("/loans/{loan_id}/overpayment-settings", name="loan_overpayment_settings")
@@ -2107,40 +2236,25 @@ async def loan_overpayment_settings(
             strategy=values.get("overpayment_strategy", "reduce_term"),
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        return RedirectResponse(
-            request.url_for("loan_detail", loan_id=str(loan_id)).path
-            + "?"
-            + urlencode({"error": getattr(exc, "code", "failed")}),
-            status_code=303,
+        return _redirect_settings(
+            request,
+            loan_id,
+            error=getattr(exc, "code", "failed"),
+            anchor="overpayments",
         )
-    return RedirectResponse(
-        request.url_for("loan_detail", loan_id=str(loan_id)).path
-        + "?"
-        + urlencode({"notice": "overpayment_saved"}),
-        status_code=303,
-    )
+    return _redirect_settings(request, loan_id, notice="overpayment_saved", anchor="overpayments")
 
 
 @router.post("/loans/{loan_id}/archive", name="loan_archive")
 async def loan_archive(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
     await run_in_threadpool(loans.archive_loan, request.app.state.session_factory, ctx, loan_id)
-    return RedirectResponse(
-        request.url_for("loan_detail", loan_id=str(loan_id)).path
-        + "?"
-        + urlencode({"notice": "loan_archived"}),
-        status_code=303,
-    )
+    return _redirect_settings(request, loan_id, notice="loan_archived", anchor="archive")
 
 
 @router.post("/loans/{loan_id}/restore", name="loan_restore")
 async def loan_restore(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
     await run_in_threadpool(loans.restore_loan, request.app.state.session_factory, ctx, loan_id)
-    return RedirectResponse(
-        request.url_for("loan_detail", loan_id=str(loan_id)).path
-        + "?"
-        + urlencode({"notice": "loan_restored"}),
-        status_code=303,
-    )
+    return _redirect_settings(request, loan_id, notice="loan_restored", anchor="archive")
 
 
 @router.post("/loans/{loan_id}/rate-changes", name="loan_rate_change_create")
@@ -2160,24 +2274,16 @@ async def loan_rate_change_create(request: Request, ctx: CurrentContext, loan_id
             high_rate_confirmed=values.get("high_rate_confirmed") == "1",
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        context = await run_in_threadpool(
-            _detail_context,
+        return await _render_settings_error(
             request,
             ctx,
             loan_id,
-            error=_error(request, getattr(exc, "code", "failed")),
-            form_values=values,
-            open_form="rate",
+            exc,
+            values=values,
+            form="rate",
             edit_id=values.get("change_id"),
         )
-        return render_template(request, "loans/detail.html", status_code=400, context=context)
-    return RedirectResponse(
-        request.url_for("loan_detail", loan_id=str(loan_id)).path
-        + "?"
-        + urlencode({"notice": "rate_saved"})
-        + "#rates",
-        status_code=303,
-    )
+    return _redirect_settings(request, loan_id, notice="rate_saved", anchor="rates")
 
 
 @router.post("/loans/{loan_id}/rate-changes/{change_id}", name="loan_rate_change_update")
@@ -2200,24 +2306,16 @@ async def loan_rate_change_update(
             high_rate_confirmed=values.get("high_rate_confirmed") == "1",
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        context = await run_in_threadpool(
-            _detail_context,
+        return await _render_settings_error(
             request,
             ctx,
             loan_id,
-            error=_error(request, getattr(exc, "code", "failed")),
-            form_values=values,
-            open_form="rate",
+            exc,
+            values=values,
+            form="rate",
             edit_id=str(change_id),
         )
-        return render_template(request, "loans/detail.html", status_code=400, context=context)
-    return RedirectResponse(
-        request.url_for("loan_detail", loan_id=str(loan_id)).path
-        + "?"
-        + urlencode({"notice": "rate_saved"})
-        + "#rates",
-        status_code=303,
-    )
+    return _redirect_settings(request, loan_id, notice="rate_saved", anchor="rates")
 
 
 @router.post(
@@ -2236,10 +2334,10 @@ async def loan_rate_change_delete(
             change_id,
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        return _redirect_detail(
+        return _redirect_settings(
             request, loan_id, error=getattr(exc, "code", "failed"), anchor="rates"
         )
-    return _redirect_detail(request, loan_id, notice="rate_deleted", anchor="rates")
+    return _redirect_settings(request, loan_id, notice="rate_deleted", anchor="rates")
 
 
 @router.post("/loans/{loan_id}/costs", name="loan_cost_create")
@@ -2269,18 +2367,16 @@ async def loan_cost_create(request: Request, ctx: CurrentContext, loan_id: UUID)
             effective_to=_optional_date(values.get("effective_to", ""), "effective_to"),
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        context = await run_in_threadpool(
-            _detail_context,
+        return await _render_settings_error(
             request,
             ctx,
             loan_id,
-            error=_error(request, getattr(exc, "code", "failed")),
-            form_values=values,
-            open_form="cost",
+            exc,
+            values=values,
+            form="cost",
             edit_id=values.get("component_id"),
         )
-        return render_template(request, "loans/detail.html", status_code=400, context=context)
-    return _redirect_detail(request, loan_id, notice="cost_saved", anchor="costs")
+    return _redirect_settings(request, loan_id, notice="cost_saved", anchor="costs")
 
 
 @router.post("/loans/{loan_id}/costs/{component_id}", name="loan_cost_update")
@@ -2313,18 +2409,16 @@ async def loan_cost_update(
             effective_to=_optional_date(values.get("effective_to", ""), "effective_to"),
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        context = await run_in_threadpool(
-            _detail_context,
+        return await _render_settings_error(
             request,
             ctx,
             loan_id,
-            error=_error(request, getattr(exc, "code", "failed")),
-            form_values=values,
-            open_form="cost",
+            exc,
+            values=values,
+            form="cost",
             edit_id=str(component_id),
         )
-        return render_template(request, "loans/detail.html", status_code=400, context=context)
-    return _redirect_detail(request, loan_id, notice="cost_saved", anchor="costs")
+    return _redirect_settings(request, loan_id, notice="cost_saved", anchor="costs")
 
 
 @router.post("/loans/{loan_id}/costs/{component_id}/delete", name="loan_cost_delete")
@@ -2340,10 +2434,10 @@ async def loan_cost_delete(
             component_id,
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        return _redirect_detail(
+        return _redirect_settings(
             request, loan_id, error=getattr(exc, "code", "failed"), anchor="costs"
         )
-    return _redirect_detail(request, loan_id, notice="cost_deleted", anchor="costs")
+    return _redirect_settings(request, loan_id, notice="cost_deleted", anchor="costs")
 
 
 @router.post("/loans/{loan_id}/overpayments", name="loan_overpayment_create")
@@ -2364,18 +2458,16 @@ async def loan_overpayment_create(request: Request, ctx: CurrentContext, loan_id
             note=values.get("note", ""),
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        context = await run_in_threadpool(
-            _detail_context,
+        return await _render_settings_error(
             request,
             ctx,
             loan_id,
-            error=_error(request, getattr(exc, "code", "failed")),
-            form_values=values,
-            open_form="overpayment",
+            exc,
+            values=values,
+            form="overpayment",
             edit_id=values.get("overpayment_id"),
         )
-        return render_template(request, "loans/detail.html", status_code=400, context=context)
-    return _redirect_detail(
+    return _redirect_settings(
         request, loan_id, notice="overpayment_item_saved", anchor="overpayments"
     )
 
@@ -2404,18 +2496,16 @@ async def loan_overpayment_update(
             note=values.get("note", ""),
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        context = await run_in_threadpool(
-            _detail_context,
+        return await _render_settings_error(
             request,
             ctx,
             loan_id,
-            error=_error(request, getattr(exc, "code", "failed")),
-            form_values=values,
-            open_form="overpayment",
+            exc,
+            values=values,
+            form="overpayment",
             edit_id=str(overpayment_id),
         )
-        return render_template(request, "loans/detail.html", status_code=400, context=context)
-    return _redirect_detail(
+    return _redirect_settings(
         request, loan_id, notice="overpayment_item_saved", anchor="overpayments"
     )
 
@@ -2436,12 +2526,12 @@ async def loan_overpayment_delete(
             overpayment_id,
         )
     except (loans.LoanError, LoanValidationError) as exc:
-        return _redirect_detail(
+        return _redirect_settings(
             request,
             loan_id,
             error=getattr(exc, "code", "failed"),
             anchor="overpayments",
         )
-    return _redirect_detail(
+    return _redirect_settings(
         request, loan_id, notice="overpayment_item_deleted", anchor="overpayments"
     )
