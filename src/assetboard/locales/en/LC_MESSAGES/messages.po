@@ -2512,6 +2512,14 @@ msgstr ""
 msgid "Give every event a short description."
 msgstr ""
 
+msgid ""
+"This event is no longer part of the scenario. Reload the page and try "
+"again."
+msgstr ""
+
+msgid "The same event appears twice. Reload the page and try again."
+msgstr ""
+
 msgid "Enter a whole year for every row."
 msgstr ""
 
@@ -5653,6 +5661,10 @@ msgid "Make default"
 msgstr ""
 
 msgid "Duplicate"
+msgstr ""
+
+#, python-format
+msgid "Archive the scenario %(name)s?"
 msgstr ""
 
 msgid "No active scenarios yet."
