@@ -12,7 +12,7 @@ or income series. The sign is the meaning, so the model keeps it.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from enum import StrEnum
 
@@ -256,7 +256,11 @@ class ProjectionRow:
 
 @dataclass(frozen=True, slots=True)
 class Projection:
-    """A complete projection plus the metrics the scenario page and comparison show."""
+    """A complete projection plus the metrics the scenario page and comparison show.
+
+    ``inputs`` is the validated input with its currency canonicalized to uppercase, so it
+    matches the currency of every row's ``Money`` values.
+    """
 
     inputs: ProjectionInputs
     rows: tuple[ProjectionRow, ...]
@@ -485,6 +489,9 @@ def project(inputs: ProjectionInputs) -> Projection:
     """
     plan = _validate(inputs)
     currency = plan.currency
+    projection_inputs = (
+        inputs if inputs.currency == currency else replace(inputs, currency=currency)
+    )
     age = age_at_start(plan.start_year, plan.birth_year)
     last_year = plan.birth_year + plan.horizon_age
     gain_bp = plan.inflation_bp + plan.real_return_bp
@@ -560,6 +567,8 @@ def project(inputs: ProjectionInputs) -> Projection:
     first_expenses = rows[0].expenses.amount_minor
     fire_number_today: Money | None
     if first_expenses == 0:
+        # No annual expenses need no portfolio, even when the sheet's gain rate is not
+        # positive and the division would otherwise be undefined.
         fire_number_today = Money(0, currency)
     elif plan.rule is Rule.SWR:
         assert plan.swr_bp is not None
@@ -588,7 +597,7 @@ def project(inputs: ProjectionInputs) -> Projection:
     min_after_stop = min((row.net_worth.amount_minor for row in retirement_rows), default=None)
 
     return Projection(
-        inputs=inputs,
+        inputs=projection_inputs,
         rows=tuple(rows),
         fire_index=fire_index,
         fire_year=fire_year,

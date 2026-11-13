@@ -24,7 +24,8 @@ has to be fixed, documented and testable against an independent oracle.
 - Growth and deflation use the closed form once per line:
   `inflate(v, bp, t) = round_ratio(v * (10000 + bp)^t, 10000^t)` and
   `deflate(v, i, t) = round_ratio(v * 10000^t, (10000 + i)^t)`. Growing a balance iteratively and
-  rounding every year would drift; the formulas in the source spreadsheet are the closed form.
+  rounding every year would drift; the spreadsheet keeps full precision in its cells, so its
+  iterative product equals this closed form and only the displayed line is rounded.
 - The nominal gain rate is the **additive** `inflation + real return`, not the compounded
   `(1 + inflation)(1 + real return) - 1`, because that is what the source spreadsheet's formulas
   say. The gain is `round_ratio(opening * (i + r), 10000)`, where the opening is the previous
@@ -47,7 +48,8 @@ has to be fixed, documented and testable against an independent oracle.
   spreadsheet's definition and is locked by the golden test. The `swr` rule uses the inclusive
   `opening_t * swr_bp >= expenses_t * 10000`.
 - Inputs are validated to `MAX_AMOUNT_MINOR`, the hard rate bounds, the supported year range and
-  the plan windows. Invalid inputs raise `FireProjectionError(field, code)`; the engine is pure
+  the plan windows, and the currency is canonicalized to uppercase in the returned
+  `Projection.inputs`. Invalid inputs raise `FireProjectionError(field, code)`; the engine is pure
   and never reads a clock, database or environment.
 
 ## Consequences

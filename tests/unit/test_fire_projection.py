@@ -435,6 +435,20 @@ def test_same_kind_and_year_events_are_summed_before_the_single_rounding() -> No
     assert project(inputs).rows[1].expenses == _eur(3)
 
 
+def test_different_event_years_are_inflated_and_rounded_separately() -> None:
+    inputs = _edge(
+        horizon_age=44,
+        inflation_bp=5_000,
+        events=(
+            ProjectionEvent(2027, EventKind.EXPENSE_CHANGE, _eur(1)),
+            ProjectionEvent(2028, EventKind.EXPENSE_CHANGE, _eur(1)),
+        ),
+    )
+    # At t=2 each year's amount is round(1 * 1.5^2) = 2, so the total is 4. Summing the
+    # two event years first would give round(2 * 1.5^2) = 5.
+    assert project(inputs).rows[2].expenses == _eur(4)
+
+
 def test_income_changes_continue_after_the_salary_stop() -> None:
     inputs = _edge(
         horizon_age=45,
@@ -449,6 +463,16 @@ def test_income_changes_continue_after_the_salary_stop() -> None:
     assert rows[1].income_stopped
     assert rows[2].income == _eur(10_000)
     assert rows[2].income_stopped
+
+
+def test_start_year_income_is_paid_even_when_the_salary_stops_at_the_current_age() -> None:
+    inputs = _edge(horizon_age=43, stop_working_age=41, start_income=_eur(100_000))
+    rows = project(inputs).rows
+    # The spreadsheet always pays start_income in row 0; the stop applies from row 1.
+    assert rows[0].income == _eur(100_000)
+    assert not rows[0].income_stopped
+    assert rows[1].income == _eur(0)
+    assert rows[1].income_stopped
 
 
 def test_negative_overrides_and_series_are_not_clamped() -> None:
@@ -662,6 +686,12 @@ def test_half_up_rounds_negative_values_away_from_zero() -> None:
     assert project(negative_expense).rows[1].expenses == _eur(-2)
 
 
+def test_projection_returns_inputs_with_the_canonical_currency() -> None:
+    result = project(_variant(currency="eur"))
+    assert result.inputs.currency == "EUR"
+    assert result.rows[0].net_worth.currency == "EUR"
+
+
 def test_the_projection_contract_uses_integers_for_money_and_rates() -> None:
     hints = []
     for cls in (
@@ -682,10 +712,14 @@ def test_the_projection_contract_uses_integers_for_money_and_rates() -> None:
     ("changes", "field", "code"),
     [
         ({"currency": "ZZZ"}, "currency", "invalid_currency"),
+        ({"currency": None}, "currency", "invalid_currency"),
+        ({"currency": 978}, "currency", "invalid_currency"),
         ({"start_income": Money(1, "USD")}, "start_income", "invalid_currency"),
         ({"birth_year": 2027}, "birth_year", "invalid_birth_year"),
         ({"birth_year": 1899}, "birth_year", "invalid_birth_year"),
+        ({"birth_year": "1985"}, "birth_year", "invalid_birth_year"),
         ({"start_year": 2200}, "start_year", "invalid_start_year"),
+        ({"start_year": 2026.0}, "start_year", "invalid_start_year"),
         ({"horizon_age": 41}, "horizon_age", "horizon_not_after_age"),
         ({"horizon_age": 0}, "horizon_age", "invalid_horizon"),
         ({"horizon_age": 121}, "horizon_age", "invalid_horizon"),
@@ -697,13 +731,18 @@ def test_the_projection_contract_uses_integers_for_money_and_rates() -> None:
         ({"stop_working_age": 40}, "stop_working_age", "stop_before_age"),
         ({"stop_working_age": 121}, "stop_working_age", "invalid_stop_age"),
         ({"stop_working_age": -1}, "stop_working_age", "invalid_stop_age"),
+        ({"stop_working_age": 55.0}, "stop_working_age", "invalid_stop_age"),
         ({"inflation_bp": -2_001}, "inflation_bp", "invalid_rate"),
+        ({"inflation_bp": 250.0}, "inflation_bp", "invalid_rate"),
         ({"real_return_bp": 5_001}, "real_return_bp", "invalid_rate"),
+        ({"real_return_bp": True}, "real_return_bp", "invalid_rate"),
         ({"income_growth_bp": -2_001}, "income_growth_bp", "invalid_rate"),
         ({"rule": "bogus"}, "rule", "invalid_rule"),
+        ({"rule": None}, "rule", "invalid_rule"),
         ({"rule": Rule.SWR, "swr_bp": None}, "swr_bp", "invalid_swr"),
         ({"rule": Rule.SWR, "swr_bp": 49}, "swr_bp", "invalid_swr"),
         ({"rule": Rule.SWR, "swr_bp": 2_001}, "swr_bp", "invalid_swr"),
+        ({"rule": Rule.SWR, "swr_bp": 400.0}, "swr_bp", "invalid_swr"),
         ({"swr_bp": 400}, "swr_bp", "invalid_swr"),
         ({"start_income": _eur(-1)}, "start_income", "invalid_amount"),
         ({"start_expenses": _eur(MAX_AMOUNT_MINOR + 1)}, "start_expenses", "invalid_amount"),
@@ -750,6 +789,11 @@ def test_the_projection_contract_uses_integers_for_money_and_rates() -> None:
         ),
         (
             {"events": (ProjectionEvent(2026, cast(EventKind, "bogus"), _eur(1)),)},
+            "events",
+            "invalid_event_kind",
+        ),
+        (
+            {"events": (ProjectionEvent(2026, cast(EventKind, None), _eur(1)),)},
             "events",
             "invalid_event_kind",
         ),

@@ -114,8 +114,9 @@ money), the FIRE number in today's money, two progress figures, the depletion ag
 minimum net worth after income stops. The **sheet progress** compares the first year's net worth
 with the net worth at FIRE. The **today's progress** compares the starting portfolio with the
 FIRE number and is shown even when FIRE is never reached. Depletion and the minimum look at
-nominal net worth from the stop age onward. Undefined metrics are reported as not reached, not
-as zero, and a plan whose opening net worth is negative does not switch to FIRE.
+nominal net worth from the stop age onward, never at the start row. Undefined metrics are
+reported as not reached, not as zero, and a plan whose opening net worth is negative does not
+switch to FIRE.
 
 Money is rounded once per computed line, half away from zero; real values are deflated
 independently from each nominal line. The numeric and rounding rules are recorded in
@@ -126,15 +127,16 @@ independently from each nominal line. The numeric and rounding rules are recorde
 The form refuses and explains:
 
 - a missing or impossible birth year;
-- a horizon that is not older than your age at the start, or that runs past the supported year
-  range;
+- a horizon that is not older than your age at the start;
 - an income stop age before your age at the start;
 - rates outside the hard bounds, or outside the ordinary ranges without the confirmation;
 - contribution years before the year after the start or after the horizon;
 - event years before the start or after the horizon;
 - duplicate contribution years, a blank event description, or too many rows.
 
-Nothing is saved when validation fails; the rows you typed stay on the form.
+Nothing is saved when validation fails; the rows you typed stay on the form. The projection also
+refuses a plan whose last year is past the supported year range; with the start year fixed at
+creation, this is a guard for far-future plans.
 
 ## Privacy and scope
 

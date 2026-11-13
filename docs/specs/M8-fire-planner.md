@@ -131,8 +131,10 @@ Golden test: independent naive loop in the tests; plus the property tests. No UI
   The F8.1 names and behaviour are unchanged.
 - Money stays in integer minor units and rates in basis points; `net`, `net_worth`, cash and the
   result metrics use `Money`. Each computed line is rounded half away from zero once; real values
-  are one deflation step from each nominal line. The recurrence, the additive `i + r`, the
-  `t = 0` convention and the strict-`<` timing artefact are recorded in ADR-0025.
+  are one deflation step from each nominal line. The returned `Projection.inputs` is the validated
+  input with the currency canonicalized to uppercase, so it matches the rows. The recurrence, the
+  additive `i + r`, the `t = 0` convention and the strict-`<` timing artefact are recorded in
+  ADR-0025.
 - Rows run from `start_year` through `birth_year + horizon_age` (`horizon_age - age_at_start + 1`
   rows). `t = 0` reuses the net column as `start_portfolio`, earns
   `round(start_portfolio * (i + r))` and adds start-year cash after that gain. Later rows grow
@@ -140,7 +142,9 @@ Golden test: independent naive loop in the tests; plus the property tests. No UI
   `net = override` when present else `income - expenses`, and add cash after the gain. Base
   series and event adjustments stay separate: income changes inflate with `g` and expense
   changes with `i` from the start year, active from the event year; same-kind/same-year events
-  sum before one rounding. Income changes continue after the salary stop. Negative series and
+  sum before one rounding, while different event years round separately. Income changes continue
+  after the salary stop. The start-year row always pays the base income, even when
+  `stop_working_age` equals `age_at_start`; `income_stopped` is false there. Negative series and
   overrides are not clamped.
 - FIRE is the first row with a non-negative opening net worth and either `expenses < gain`
   (`returns_cover_expenses`, strict) or `opening * swr_bp >= expenses * 10_000` (`swr`,
@@ -157,7 +161,9 @@ Golden test: independent naive loop in the tests; plus the property tests. No UI
   `horizon_age > age_at_start`, the last year within `MAX_YEAR`, stop-age bounds, hard rate
   bounds, the rule/SWR pairing, non-negative start amounts up to `MAX_AMOUNT_MINOR`, contribution
   years `start_year+1..last_year` with unique years, event years `start_year..last_year`, valid
-  event kinds and signed amount limits. Errors are `FireProjectionError(field, code)`.
+  event kinds and signed amount limits. Errors are `FireProjectionError(field, code)`. The
+  last-year check is a future guard: F8.1's event window has no `MAX_YEAR` cap, but a scenario
+  created now cannot reach it with the 120-year horizon.
 - Tests: `tests/unit/test_fire_projection.py` compares every row field and metric with an
   independent `Fraction`/half-up oracle for five golden sets (parity, never-FIRE + depletion,
   first-ten-years overrides, events, SWR), plus deterministic edge and validation cases;
