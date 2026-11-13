@@ -93,6 +93,28 @@ def test_the_page_renders_the_comparison_chart_form_and_detail_link(owner) -> No
     assert f"/loans/{loan_id}/scenarios" in detail.text
 
 
+def test_scenario_field_errors_are_marked_on_the_card(owner):
+    loan_id = _create(owner)
+    page = owner.client.get(f"/loans/{loan_id}/scenarios")
+    assert page.status_code == 200
+    response = owner.post(
+        f"/loans/{loan_id}/scenarios",
+        {
+            "name_1": "",
+            "overpayment_mode_1": "fixed_extra",
+            "overpayment_amount_1": "not-a-number",
+            "overpayment_strategy_1": "same",
+            "rate_shift_1": "",
+            "rate_shift_from_1": "",
+            "one_off_amount_1": "",
+            "one_off_date_1": "",
+        },
+    )
+    assert response.status_code == 400
+    assert 'name="overpayment_amount_1"' in response.text
+    assert "data-field-error" in response.text
+
+
 def test_what_if_cards_offer_presets_and_a_clear_action(owner) -> None:
     loan_id = _create(owner)
     page = owner.client.get(f"/loans/{loan_id}/scenarios")

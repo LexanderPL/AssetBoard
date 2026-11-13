@@ -297,6 +297,19 @@ def test_viewer_can_read_but_not_change_payments_or_checkpoints(owner) -> None:
     assert "Record payment" not in page.text
 
 
+def test_payment_and_checkpoint_errors_are_marked_next_to_the_field(owner):
+    loan_id = _create(owner)
+    payment = owner.post(f"/loans/{loan_id}/payments", _payment(total=""))
+    assert payment.status_code == 400
+    assert 'name="total"' in payment.text and "data-field-error" in payment.text
+    checkpoint = owner.post(
+        f"/loans/{loan_id}/checkpoints",
+        {"as_of": "2026-03-01", "remaining_principal": "", "note": ""},
+    )
+    assert checkpoint.status_code == 400
+    assert 'name="remaining_principal"' in checkpoint.text and "data-field-error" in checkpoint.text
+
+
 def test_payment_variance_is_rendered_per_installment(owner) -> None:
     loan_id = _create(owner)
     path = f"/loans/{loan_id}/payments"
