@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from uuid import UUID, uuid4
 
@@ -126,6 +127,10 @@ def test_payments_page_and_detail_link(owner) -> None:
     assert "data-no-payments" in page.text
     assert "data-no-checkpoints" in page.text
     assert "data-dialog-modal" in page.text
+    assert "Payments & balance" in page.text
+    assert "data-payments-intro" in page.text
+    assert "Actual payments" in page.text
+    assert "Balance checkpoints" in page.text
     detail = owner.client.get(f"/loans/{loan_id}")
     assert "data-loan-payments" in detail.text
     assert f"/loans/{loan_id}/payments" in detail.text
@@ -269,6 +274,17 @@ def test_checkpoint_errors_keep_values(owner) -> None:
     assert 'value="280,000.00"' in duplicate.text
 
 
+def test_quick_record_query_prefills_the_payment_dialog(owner) -> None:
+    loan_id = _create(owner)
+    page = owner.client.get(
+        f"/loans/{loan_id}/payments?form=payment&payment_date=2026-03-01&payment_total=100.00"
+    )
+    assert page.status_code == 200
+    assert 'value="2026-03-01"' in page.text
+    assert 'value="100.00"' in page.text
+    assert 'id="payment-dialog"' in page.text
+
+
 def test_viewer_can_read_but_not_change_payments_or_checkpoints(owner) -> None:
     loan_id = _create(owner)
     path = f"/loans/{loan_id}/payments"
@@ -279,6 +295,55 @@ def test_viewer_can_read_but_not_change_payments_or_checkpoints(owner) -> None:
     assert "data-payment=" in page.text
     assert "data-dialog-modal" not in page.text
     assert "Record payment" not in page.text
+
+
+def test_payment_variance_is_rendered_per_installment(owner) -> None:
+    loan_id = _create(owner)
+    path = f"/loans/{loan_id}/payments"
+    # The projected first installment is about 1,703.37: 100.00 is less, 5,000.00 is more.
+    owner.post(path, _payment(day="2026-02-15", total="100.00"), token_from=path)
+    owner.post(
+        path,
+        _payment(
+            day="2026-02-01",
+            total="5,000.00",
+            principal="4,000.00",
+            interest="1,000.00",
+            costs="0.00",
+        ),
+        token_from=path,
+    )
+    page = owner.client.get(path)
+    assert page.status_code == 200
+    assert 'data-payment-variance="less"' in page.text
+    assert "Less than projected" in page.text
+    assert 'data-payment-variance="more"' in page.text
+    assert "More than projected" in page.text
+    assert re.search(r'data-payment-total-variance="-\d+"', page.text)
+    assert re.search(r'data-payment-total-variance="\d+"', page.text)
+    assert "data-payment-principal-variance=" in page.text
+
+
+def test_overpayment_only_payment_has_no_variance_row(owner) -> None:
+    loan_id = _create(owner)
+    path = f"/loans/{loan_id}/payments"
+    owner.post(
+        path,
+        _payment(
+            day="2026-02-01",
+            kind="overpayment",
+            total="200.00",
+            principal="0.00",
+            interest="0.00",
+            costs="0.00",
+            overpayment="200.00",
+        ),
+        token_from=path,
+    )
+    page = owner.client.get(path)
+    assert page.status_code == 200
+    assert 'data-payment-variance="unmatched"' in page.text
+    assert "No schedule row to compare" in page.text
 
 
 def test_current_path_starting_checkpoint_is_labelled_and_cannot_be_deleted(owner) -> None:

@@ -228,6 +228,15 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             page.wait_for_load_state("networkidle")
             expect(page.locator("[data-action-notice]")).to_contain_text("Payment saved.")
             expect(page.locator("[data-payment]")).to_have_count(1)
+            expect(page.locator("[data-payment-variance]")).to_be_visible()
+            expect(page.locator("[data-payment-variance-label]")).to_have_text(
+                "Less than projected"
+            )
+            expect(page.locator("[data-payment-total-variance]")).to_be_visible()
+            payment_display = page.locator("[data-payment]").first.evaluate(
+                "el => getComputedStyle(el).display"
+            )
+            assert payment_display == "table-row"
             _no_page_overflow(page)
 
             page.locator('[data-loan-tab="overview"]').click()
@@ -351,11 +360,23 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             _loan_sections(page)
             expect(page.locator("[data-loan-payments-list]")).to_be_visible()
             expect(page.get_by_role("link", name="Record payment")).to_be_visible()
+            expect(page.locator("[data-payment]")).to_have_count(1)
+            expect(page.locator("[data-payment-variance]")).to_be_visible()
+            expect(page.locator("[data-checkpoint]")).to_have_count(1)
             _no_page_overflow(page)
-            payments_scroll = page.locator("[data-payments-scroll]").evaluate(
-                "el => ({scrollWidth: el.scrollWidth, clientWidth: el.clientWidth})"
+            phone_payment_display = page.locator("[data-payment]").first.evaluate(
+                "el => getComputedStyle(el).display"
             )
-            assert payments_scroll["scrollWidth"] > payments_scroll["clientWidth"]
+            assert phone_payment_display == "grid"
+            phone_checkpoint_display = page.locator("[data-checkpoint]").first.evaluate(
+                "el => getComputedStyle(el).display"
+            )
+            assert phone_checkpoint_display == "grid"
+            for selector in ("[data-payments-scroll]", "[data-checkpoints-scroll]"):
+                scroll = page.locator(selector).evaluate(
+                    "el => ({scrollWidth: el.scrollWidth, clientWidth: el.clientWidth})"
+                )
+                assert scroll["scrollWidth"] <= scroll["clientWidth"] + 1, (selector, scroll)
 
             page.goto(plan_url, wait_until="networkidle")
             expect(page.locator("[data-installment-plan-detail]")).to_be_visible()
