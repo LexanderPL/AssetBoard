@@ -73,21 +73,26 @@ CRUD/duplicate/default UI with contribution and event editors, validation and to
   scenario; restoring into an empty active list promotes the restored one. There is no hard
   delete. Archived scenarios are read-only; restoring a name that another active scenario now
   uses renames the restored row with the same `(copy)` / `(copy N)` suffix as duplication.
+  Saving reconciles the editors instead of replacing every child row: contributions are matched
+  by year and events by a hidden row id, so unchanged rows keep their ids and timestamps (F8.6
+  archive lineage and audit rely on that). An event id that belongs to another scenario is
+  refused with `invalid_event`, and the same id twice with `duplicate_event`.
 - Validation returns `FireError(field, code)`: a required birth year (`birth_year_required`),
   `invalid_birth_year`, `horizon_not_after_age`, `stop_before_age`, `invalid_horizon`,
   `invalid_stop_age`, hard-bound rate errors, `extreme_rate_confirmation_required` for a
   **changed** rate outside the ordinary ranges, `duplicate_name`, `rows_outside_window`,
   `duplicate_contribution_year`, the 120/200 row caps, `invalid_event_kind`, `invalid_label`,
-  `duplicate_name` and `archived`. A stop age after the horizon is allowed and shown as a
-  warning. Contribution years are `start_year+1 … birth_year+horizon_age`; event years are
-  `start_year … birth_year+horizon_age`. Rows are never deleted silently: an outside row blocks
-  the save and stays on the form.
+  `invalid_event`, `duplicate_event` and `archived`. A stop age after the horizon is allowed and
+  shown as a warning. Contribution years are `start_year+1 … birth_year+horizon_age`; event
+  years are `start_year … birth_year+horizon_age`. Rows are never deleted silently: an outside
+  row blocks the save and stays on the form.
 - F8.1 stores `income_mode`, `expenses_mode` and `portfolio_mode` but accepts only `manual`;
   linked values fail with `linked_mode_unavailable` until F8.4. The starting amounts are in
   today's money in the scenario currency. Illustrative prefill (2.5% inflation, 5% real return,
   3% income growth, 4% SWR) is editable and the page says it is not advice.
-- The settings UI is `GET /fire` (`fire_scenarios`), `GET/POST /fire/new`, `GET /fire/{id}`,
-  `GET/POST /fire/{id}/edit`, and POST actions for duplicate, default, archive and restore.
+- The settings UI is `GET /fire` (`fire_scenarios`), `GET /fire/new` with `POST /fire`,
+  `GET /fire/{id}`, `GET /fire/{id}/edit` with `POST /fire/{id}`, and POST actions for
+  duplicate, default, archive and restore.
   Viewers read; editors and owners write. The form has plain-language tooltips, the
   contribution editor (add/remove rows and a paste column that accepts bare amounts with blank
   lines consuming a year, or `year, amount` / `year<TAB>amount` pairs), the events editor and

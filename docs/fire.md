@@ -6,10 +6,11 @@ later updates. Until then the page stores and validates each plan.
 
 ## Scenarios
 
-**FIRE projection → New scenario** creates a plan. Every field except the start year can be
-changed later; **Edit scenario** saves the changes. **Duplicate** copies the assumptions,
-contribution overrides and events under a free `(copy)` name. There is no hard delete:
-**Archive** makes a scenario read-only and keeps its inputs; **Restore** brings it back.
+**FIRE projection → New scenario** creates a plan. Every field can be changed later except the
+start year and currency, which are fixed when the scenario is created. **Edit scenario** saves
+the changes. **Duplicate** copies the assumptions, contribution overrides and events under a
+free `(copy)` name. There is no hard delete: **Archive** makes a scenario read-only and keeps
+its inputs; **Restore** brings it back.
 
 Active scenario names are unique ignoring case. Archiving a scenario lets its name be reused.
 Exactly one active scenario is the default while an active scenario exists: the first one
