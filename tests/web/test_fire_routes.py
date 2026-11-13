@@ -282,3 +282,22 @@ def test_viewers_read_but_see_no_write_controls_and_cannot_post(owner) -> None:
     response = owner.post("/fire", _form(), token_from="/fire")
     assert response.status_code == 403
     assert len(_scenario_ids(owner)) == 1
+
+
+def test_the_form_stores_percentages_as_basis_points(owner) -> None:
+    scenario_id = _create(
+        owner,
+        inflation="2.5",
+        real_return="5",
+        income_growth="3",
+        rule="swr",
+        swr="4",
+    )
+    with owner.db() as session:
+        row = session.get_one(FireScenario, scenario_id)
+    assert (row.inflation_bp, row.real_return_bp, row.income_growth_bp, row.swr_bp) == (
+        250,
+        500,
+        300,
+        400,
+    )
