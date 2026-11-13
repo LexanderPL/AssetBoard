@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% from "macros/components.html" import empty_state with context %}
 {% from "loans/_tabs.html" import tabs with context %}
-{% from "loans/_macros.html" import rate, kind_label with context %}
+{% from "loans/_macros.html" import rate, loan_list_row with context %}
 {% block title %}{{ _("Loans") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Loans") }}{% endblock %}
 {% block content %}
@@ -15,6 +15,31 @@
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 
 {% if page.active %}
+<section class="panel mb-6 p-4 sm:p-6" aria-labelledby="loan-portfolio-heading" data-loan-portfolio>
+  <h2 id="loan-portfolio-heading" class="text-base font-semibold">{{ _("Loan portfolio") }}</h2>
+  <dl class="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-4">
+    <div data-portfolio-remaining>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Remaining principal") }}</dt>
+      <dd class="mt-1 text-lg font-semibold tabular-nums">{{ format_money(page.summary.total_remaining, locale) }}</dd>
+    </div>
+    <div data-portfolio-monthly>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Monthly installments") }}</dt>
+      <dd class="mt-1 text-lg font-semibold tabular-nums">{{ format_money(page.summary.total_monthly, locale) }}</dd>
+    </div>
+    <div data-portfolio-due>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Due in the next 30 days") }}</dt>
+      <dd class="mt-1 text-lg font-semibold tabular-nums">{{ format_money(page.summary.due_next_30_days, locale) }}</dd>
+    </div>
+    <div data-portfolio-rate>
+      <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Average rate") }}</dt>
+      <dd class="mt-1 text-lg font-semibold tabular-nums">{{ rate(page.summary.weighted_average_rate_bp, locale) }}</dd>
+    </div>
+  </dl>
+  {% if page.summary.unavailable_count %}
+  <p class="mt-4 border-t border-line pt-3 text-sm text-warning-strong" data-portfolio-unavailable>{{ ngettext("%(num)d loan is not included because its schedule is unavailable.", "%(num)d loans are not included because their schedules are unavailable.", page.summary.unavailable_count, num=page.summary.unavailable_count) }}</p>
+  {% endif %}
+</section>
+
 <div class="panel overflow-hidden">
   <table class="sheet-sm sheet-flush w-full text-sm">
     <caption class="sr-only">{{ _("Loans") }}</caption>
@@ -22,24 +47,16 @@
       <tr>
         <th scope="col" class="px-4 py-2 font-semibold">{{ _("Name") }}</th>
         <th scope="col" class="px-4 py-2 font-semibold">{{ _("Type") }}</th>
-        <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Amount") }}</th>
+        <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Remaining") }}</th>
+        <th scope="col" class="px-4 py-2 font-semibold">{{ _("Progress") }}</th>
         <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Rate") }}</th>
-        <th scope="col" class="px-4 py-2 font-semibold">{{ _("Term") }}</th>
-        <th scope="col" class="px-4 py-2 font-semibold">{{ _("Payment date") }}</th>
+        <th scope="col" class="px-4 py-2 font-semibold">{{ _("Next payment") }}</th>
+        <th scope="col" class="px-4 py-2 font-semibold">{{ _("Status") }}</th>
       </tr>
     </thead>
     <tbody class="divide-y divide-line sm:divide-y-0">
-      {% for loan in page.active %}
-      <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 align-top sm:table-row sm:p-0" data-loan="{{ loan.id }}">
-        <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3"><a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}" class="text-primary-ink underline-offset-2 hover:underline" data-open-loan>{{ loan.name }}</a></td>
-        <td class="text-right text-muted sm:px-4 sm:py-3 sm:text-left" data-kind>{{ kind_label(loan.kind) }}</td>
-        <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3" data-amount>
-          {% if loan.current_balance %}{{ format_money(loan.current_balance, locale) }}{% elif loan.principal_original %}{{ format_money(loan.principal_original, locale) }}{% else %}—{% endif %}
-        </td>
-        <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3" data-rate>{{ rate(loan.current_rate_bp, locale) }}</td>
-        <td class="text-muted sm:px-4 sm:py-3" data-term>{{ ngettext("%(num)d month", "%(num)d months", loan.term_months, num=loan.term_months) }}</td>
-        <td class="text-muted sm:px-4 sm:py-3" data-next-payment><time datetime="{{ loan.first_payment_date.isoformat() }}">{{ format_day(loan.first_payment_date, locale) }}</time></td>
-      </tr>
+      {% for row in page.active %}
+      {{ loan_list_row(row) }}
       {% endfor %}
     </tbody>
   </table>
@@ -62,16 +79,16 @@
         <tr>
           <th scope="col" class="px-4 py-2 font-semibold">{{ _("Name") }}</th>
           <th scope="col" class="px-4 py-2 font-semibold">{{ _("Type") }}</th>
-          <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Amount") }}</th>
+          <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Remaining") }}</th>
+          <th scope="col" class="px-4 py-2 font-semibold">{{ _("Progress") }}</th>
+          <th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Rate") }}</th>
+          <th scope="col" class="px-4 py-2 font-semibold">{{ _("Next payment") }}</th>
+          <th scope="col" class="px-4 py-2 font-semibold">{{ _("Status") }}</th>
         </tr>
       </thead>
       <tbody class="divide-y divide-line sm:divide-y-0">
-        {% for loan in page.archived %}
-        <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 align-top text-muted sm:table-row sm:p-0" data-archived-loan="{{ loan.id }}">
-          <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3"><a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}" class="text-primary-ink underline-offset-2 hover:underline" data-open-archived-loan>{{ loan.name }}</a></td>
-          <td class="text-right sm:px-4 sm:py-3 sm:text-left">{{ kind_label(loan.kind) }}</td>
-          <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3">{% if loan.current_balance %}{{ format_money(loan.current_balance, locale) }}{% elif loan.principal_original %}{{ format_money(loan.principal_original, locale) }}{% else %}—{% endif %}</td>
-        </tr>
+        {% for row in page.archived %}
+        {{ loan_list_row(row, archived=true) }}
         {% endfor %}
       </tbody>
     </table>

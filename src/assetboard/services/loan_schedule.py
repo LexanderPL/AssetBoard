@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from dataclasses import dataclass, field, replace
-from datetime import date
+from datetime import date, timedelta
 from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -244,6 +244,43 @@ def build_inputs_schedule(
     )
 
 
+def list_figures(view: loans.LoanView, today: date) -> loans.LoanListFigures:
+    """The loan-list figures for one loan; a broken schedule becomes an unavailable row."""
+    try:
+        inputs = schedule_inputs_from_view(view, today)
+        schedule = build_inputs_schedule(inputs)
+        summary = summarize_schedule(schedule, today)
+    except (ScheduleError, LoanValidationError) as exc:
+        return loans.LoanListFigures(
+            currency=view.currency,
+            remaining_principal=None,
+            monthly_installment=None,
+            percent_repaid_bp=None,
+            next_payment_date=None,
+            due_next_30_days=Money(0, view.currency),
+            current_rate_bp=view.current_rate_bp,
+            paid_off=False,
+            schedule_error=exc.code,
+        )
+    window_end = today + timedelta(days=30)
+    due = sum(
+        row.installment_total.amount_minor
+        for row in schedule.rows
+        if today < row.date <= window_end
+    )
+    return loans.LoanListFigures(
+        currency=view.currency,
+        remaining_principal=summary.remaining_principal,
+        monthly_installment=summary.next_installment or Money(0, view.currency),
+        percent_repaid_bp=max(0, min(10_000, summary.percent_repaid_bp)),
+        next_payment_date=summary.next_payment_date,
+        due_next_30_days=Money(due, view.currency),
+        current_rate_bp=view.current_rate_bp,
+        paid_off=summary.remaining_principal.amount_minor == 0,
+        schedule_error=None,
+    )
+
+
 def _actual_payments(
     factory: sessionmaker[Session], ctx: Context, loan_id: UUID, currency: str
 ) -> tuple[SchedulePaymentActual, ...]:
@@ -364,6 +401,7 @@ __all__ = [
     "SchedulePaymentActual",
     "anchor_for_date",
     "build_inputs_schedule",
+    "list_figures",
     "load_loan_schedule_inputs",
     "load_loan_schedule_inputs_in_session",
     "loan_schedule",

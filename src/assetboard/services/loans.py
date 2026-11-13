@@ -156,9 +156,45 @@ class LoanView:
 
 
 @dataclass(frozen=True, slots=True)
+class LoanListFigures:
+    """The per-loan totals the list shows; every value comes from the schedule engine."""
+
+    currency: str
+    remaining_principal: Money | None
+    monthly_installment: Money | None
+    percent_repaid_bp: int | None
+    next_payment_date: date | None
+    due_next_30_days: Money
+    current_rate_bp: int | None
+    paid_off: bool
+    schedule_error: str | None
+
+
+LoanStatus = Literal["active", "paid_off", "archived"]
+
+
+@dataclass(frozen=True, slots=True)
+class LoanListRow:
+    loan: LoanView
+    figures: LoanListFigures
+    status: LoanStatus
+
+
+@dataclass(frozen=True, slots=True)
+class LoanPortfolioSummary:
+    currency: str
+    total_remaining: Money
+    total_monthly: Money
+    due_next_30_days: Money
+    weighted_average_rate_bp: int | None
+    unavailable_count: int
+
+
+@dataclass(frozen=True, slots=True)
 class LoanPage:
-    active: tuple[LoanView, ...]
-    archived: tuple[LoanView, ...]
+    active: tuple[LoanListRow, ...]
+    archived: tuple[LoanListRow, ...]
+    summary: LoanPortfolioSummary
 
 
 @dataclass(frozen=True, slots=True)
@@ -518,6 +554,53 @@ def _load_loan_view(session: Session, ctx: WorkspaceScope, loan: Loan, today: da
     )
 
 
+def _loan_status(view: LoanView, figures: LoanListFigures) -> LoanStatus:
+    if view.archived:
+        return "archived"
+    if figures.paid_off:
+        return "paid_off"
+    return "active"
+
+
+def _portfolio_summary(rows: tuple[LoanListRow, ...], currency: str) -> LoanPortfolioSummary:
+    """Totals over the non-archived loans, skipping a loan whose schedule cannot be built."""
+    total_remaining = Money(0, currency)
+    total_monthly = Money(0, currency)
+    due_next_30_days = Money(0, currency)
+    rated_balance = 0
+    weighted_rate = 0
+    unavailable = 0
+    for row in rows:
+        figures = row.figures
+        if figures.schedule_error is not None:
+            unavailable += 1
+            continue
+        if figures.remaining_principal is not None:
+            total_remaining += figures.remaining_principal
+        if figures.monthly_installment is not None:
+            total_monthly += figures.monthly_installment
+        due_next_30_days += figures.due_next_30_days
+        if (
+            figures.remaining_principal is not None
+            and figures.remaining_principal.amount_minor > 0
+            and figures.current_rate_bp is not None
+        ):
+            balance = figures.remaining_principal.amount_minor
+            rated_balance += balance
+            weighted_rate += balance * figures.current_rate_bp
+    average = (
+        (2 * weighted_rate + rated_balance) // (2 * rated_balance) if rated_balance > 0 else None
+    )
+    return LoanPortfolioSummary(
+        currency=currency,
+        total_remaining=total_remaining,
+        total_monthly=total_monthly,
+        due_next_30_days=due_next_30_days,
+        weighted_average_rate_bp=average,
+        unavailable_count=unavailable,
+    )
+
+
 def list_loans(factory: sessionmaker[Session], ctx: Context) -> LoanPage:
     require_role(ctx, Role.VIEWER)
     today = ctx.clock.today(ctx.workspace.timezone)
@@ -528,9 +611,20 @@ def list_loans(factory: sessionmaker[Session], ctx: Context) -> LoanPage:
             for row in rows
             if row.kind != LoanKind.INSTALLMENT_PLAN.value
         ]
-    active = tuple(view for view in views if not view.archived)
-    archived = tuple(view for view in views if view.archived)
-    return LoanPage(active=active, archived=archived)
+    # Import here: loan_schedule imports this module for LoanView and the schedule helpers.
+    from assetboard.services import loan_schedule as schedule_service
+
+    def listed(view: LoanView) -> LoanListRow:
+        figures = schedule_service.list_figures(view, today)
+        return LoanListRow(loan=view, figures=figures, status=_loan_status(view, figures))
+
+    active = tuple(listed(view) for view in views if not view.archived)
+    archived = tuple(listed(view) for view in views if view.archived)
+    return LoanPage(
+        active=active,
+        archived=archived,
+        summary=_portfolio_summary(active, ctx.workspace.base_currency),
+    )
 
 
 def get_loan(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -> LoanView:
@@ -1750,9 +1844,13 @@ __all__ = [
     "LoanCheckpointView",
     "LoanCostComponentView",
     "LoanError",
+    "LoanListFigures",
+    "LoanListRow",
     "LoanOverpaymentView",
     "LoanPage",
+    "LoanPortfolioSummary",
     "LoanRateChangeView",
+    "LoanStatus",
     "LoanView",
     "ReferenceRateValueView",
     "ReferenceRateView",
