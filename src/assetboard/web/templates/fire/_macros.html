@@ -1,0 +1,16 @@
+{% macro hint(text) -%}
+<span class="ml-1 inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full border border-line-strong align-middle text-xs font-semibold text-muted" tabindex="0" role="note" aria-label="{{ text }}" title="{{ text }}">?</span>
+{%- endmacro %}
+
+{% macro badge(text, tone="neutral") -%}
+{% set tone_class = {"primary": "bg-primary-soft text-primary-ink", "success": "bg-success-soft text-success-strong", "neutral": "bg-subtle text-muted"}.get(tone, "bg-subtle text-muted") %}
+<span class="ml-1 rounded-full px-2 py-0.5 text-xs font-semibold {{ tone_class }}">{{ text }}</span>
+{%- endmacro %}
+
+{% macro field_error(error_field, field, error) -%}
+{% if error_field == field %}<span id="{{ field }}-error" class="text-sm text-danger" data-field-error="{{ field }}">{{ error }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro field_attrs(error_field, field) -%}
+{% if error_field == field %} aria-invalid="true" aria-describedby="{{ field }}-error"{% endif %}
+{%- endmacro %}

@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% from "fire/_macros.html" import field_attrs, field_error, hint with context %}
+{% block title %}{{ title }} · {{ _("FIRE planner") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("FIRE planner") }}{% endblock %}
+{% block header_actions %}
+<a href="{{ scoped_url(request, 'fire_scenarios') }}" class="btn" data-fire-back>{{ _("All scenarios") }}</a>
+{% endblock %}
+
+{% set input_class = "form-control px-3 py-2" %}
+
+{% macro contribution_row(row) %}
+<tr class="border-t border-line" data-editor-row>
+  <th scope="row" class="py-2 pr-3 text-left font-normal"><label class="sr-only" for="contribution-year-{{ row.index }}">{{ _("Year") }}</label><input id="contribution-year-{{ row.index }}" name="contribution_year_{{ row.index }}" value="{{ row.year }}" inputmode="numeric" class="{{ input_class }} w-28 font-normal" data-contribution-year></th>
+  <td class="py-2 pr-3"><label class="sr-only" for="contribution-amount-{{ row.index }}">{{ _("Net saving") }}</label><input id="contribution-amount-{{ row.index }}" name="contribution_amount_{{ row.index }}" value="{{ row.amount }}" inputmode="decimal" class="{{ input_class }} w-full font-normal" data-contribution-amount></td>
+  <td class="py-2 text-right"><button type="button" class="btn-sm" data-remove-row>{{ _("Remove") }}<span class="sr-only"> {{ _("this contribution row") }}</span></button></td>
+</tr>
+{% endmacro %}
+
+{% macro event_row(row) %}
+<tr class="border-t border-line" data-editor-row>
+  <th scope="row" class="py-2 pr-3 text-left font-normal"><label class="sr-only" for="event-year-{{ row.index }}">{{ _("Year") }}</label><input id="event-year-{{ row.index }}" name="event_year_{{ row.index }}" value="{{ row.year }}" inputmode="numeric" class="{{ input_class }} w-28 font-normal" data-event-year></th>
+  <td class="py-2 pr-3"><label class="sr-only" for="event-kind-{{ row.index }}">{{ _("Type") }}</label><select id="event-kind-{{ row.index }}" name="event_kind_{{ row.index }}" class="form-select py-2 font-normal" data-event-kind>{% for code, label in event_kind_labels.items() %}<option value="{{ code }}"{% if row.kind == code %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
+  <td class="py-2 pr-3"><label class="sr-only" for="event-label-{{ row.index }}">{{ _("Description") }}</label><input id="event-label-{{ row.index }}" name="event_label_{{ row.index }}" value="{{ row.label }}" maxlength="200" class="{{ input_class }} w-full font-normal" data-event-label></td>
+  <td class="py-2 pr-3"><label class="sr-only" for="event-amount-{{ row.index }}">{{ _("Amount") }}</label><input id="event-amount-{{ row.index }}" name="event_amount_{{ row.index }}" value="{{ row.amount }}" inputmode="decimal" class="{{ input_class }} w-full font-normal" data-event-amount></td>
+  <td class="py-2 text-right"><button type="button" class="btn-sm" data-remove-row>{{ _("Remove") }}<span class="sr-only"> {{ _("this event") }}</span></button></td>
+</tr>
+{% endmacro %}
+
+{% block content %}
+{% if error %}
+<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}{% if error_code == 'birth_year_required' %} <a href="{{ profile_url }}" class="font-semibold underline underline-offset-2" data-fire-profile-link>{{ _("Open your profile") }}</a>{% endif %}</p>
+{% endif %}
+
+<p class="mb-4 border border-line bg-subtle px-4 py-3 text-sm text-muted" data-fire-disclaimer>{{ _("Projections are illustrative and not financial advice. The starting rates are examples, not recommendations.") }}</p>
+
+<form method="post" action="{{ action }}" class="space-y-6" data-fire-form data-start-year="{{ start_year }}" novalidate>
+  {{ csrf_input() }}
+
+  <section class="panel p-6 sm:p-7" aria-labelledby="plan-heading">
+    <h2 id="plan-heading" class="text-base font-semibold">{{ _("Plan") }}</h2>
+    <div class="mt-4 grid gap-4 sm:grid-cols-2">
+      <label class="grid gap-1 text-sm font-medium sm:col-span-2">{{ _("Scenario name") }}<input name="name" value="{{ values.get('name', '') }}" maxlength="200" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "name") }}>{{ field_error(error_field, "name", error) }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Start year") }} {{ hint(_("Fixed when the scenario is created, so a saved plan stays reproducible.")) }}<input value="{{ values.get('start_year', start_year) }}" readonly class="{{ input_class }} font-normal text-muted" aria-describedby="start-year-help"><span id="start-year-help" class="text-xs font-normal text-muted">{{ _("The current year when the scenario was created.") }}</span></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Currency") }}<input value="{{ values.get('currency', currency) }}" readonly class="{{ input_class }} font-normal text-muted"><span class="text-xs font-normal text-muted">{{ _("Snapshotted from the workspace base currency.") }}</span></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Birth year") }} {{ hint(_("Used to turn plan years into ages. It is stored with the scenario and prefilled from your profile.")) }}<input name="birth_year" value="{{ values.get('birth_year', '') }}" inputmode="numeric" class="{{ input_class }} font-normal"{{ field_attrs(error_field, "birth_year") }}>{{ field_error(error_field, "birth_year", error) }}<span class="text-xs font-normal text-muted">{{ _("Required. You can change it for this scenario without changing your profile.") }}</span></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Horizon age") }} {{ hint(_("The last age shown in the projection. It defaults from your profile's life expectancy.")) }}<input name="horizon_age" value="{{ values.get('horizon_age', '') }}" inputmode="numeric" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "horizon_age") }}>{{ field_error(error_field, "horizon_age", error) }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Income stops at age") }} {{ hint(_("The age at which earned income stops; from then on the plan spends from the portfolio.")) }}<input name="stop_working_age" value="{{ values.get('stop_working_age', '') }}" inputmode="numeric" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "stop_working_age") }}>{{ field_error(error_field, "stop_working_age", error) }}</label>
+    </div>
+  </section>
+
+  <section class="panel p-6 sm:p-7" aria-labelledby="assumptions-heading">
+    <h2 id="assumptions-heading" class="text-base font-semibold">{{ _("Assumptions") }}</h2>
+    <div class="mt-4 grid gap-4 sm:grid-cols-3">
+      <label class="grid gap-1 text-sm font-medium">{{ _("Inflation (%%)") }} {{ hint(_("The yearly rise in prices. It reduces what the portfolio can buy.")) }}<input name="inflation" value="{{ values.get('inflation', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "inflation") }}>{{ field_error(error_field, "inflation", error) }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Real return (%%)") }} {{ hint(_("The yearly investment return above inflation. It is not a promise of future returns.")) }}<input name="real_return" value="{{ values.get('real_return', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "real_return") }}>{{ field_error(error_field, "real_return", error) }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Income growth (%%)") }} {{ hint(_("How much your earned income grows each year until it stops.")) }}<input name="income_growth" value="{{ values.get('income_growth', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "income_growth") }}>{{ field_error(error_field, "income_growth", error) }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Independence rule") }} {{ hint(_("Returns cover expenses: independent when the portfolio's return pays the inflated expenses. Withdrawal rate: independent when the portfolio is large enough for a chosen safe withdrawal rate.")) }}<select name="rule" class="form-select py-2 font-normal"{{ field_attrs(error_field, "rule") }}>{% for code, label in rule_labels.items() %}<option value="{{ code }}"{% if values.get('rule') == code %} selected{% endif %}>{{ label }}</option>{% endfor %}</select>{{ field_error(error_field, "rule", error) }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Withdrawal rate (%%)") }} {{ hint(_("Only used with the withdrawal-rate rule. The share of the portfolio withdrawn in the first year of retirement. 4%% is a common example, not a rule.")) }}<input name="swr" value="{{ values.get('swr', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"{{ field_attrs(error_field, "swr") }}>{{ field_error(error_field, "swr", error) }}</label>
+    </div>
+    <div class="mt-5 border-t border-line pt-4">
+      <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="extreme_rates_confirmed" value="1"{% if values.get('extreme_rates_confirmed') == '1' %} checked{% endif %} class="mt-0.5 h-4 w-4 rounded border-line accent-primary"{{ field_attrs(error_field, "extreme_rates_confirmed") }}> <span>{{ _("I confirm these unusual rates are intentional") }}<span class="block text-xs text-muted">{{ _("Unusual means inflation outside 0–10%%, real return outside −2–8%%, income growth outside 0–10%%, or a withdrawal rate outside 2–6%%.") }}</span></span></label>
+      {{ field_error(error_field, "extreme_rates_confirmed", error) }}
+    </div>
+  </section>
+
+  <section class="panel p-6 sm:p-7" aria-labelledby="amounts-heading">
+    <h2 id="amounts-heading" class="text-base font-semibold">{{ _("Starting amounts") }}</h2>
+    <p class="mt-1 text-sm text-muted">{{ _("All amounts are in %(currency)s and in today's money. Enter the yearly income and expenses at the start of the plan.", currency=currency) }}</p>
+    <div class="mt-4 grid gap-4 sm:grid-cols-3">
+      <div class="grid gap-2">
+        <label class="grid gap-1 text-sm font-medium">{{ _("Annual income") }} {{ hint(_("Earned income in the start year, before tax and other deductions.")) }}<input name="income_manual" value="{{ values.get('income_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "income_manual") }}>{{ field_error(error_field, "income_manual", error) }}</label>
+        <label class="grid gap-1 text-xs text-muted">{{ _("Source") }}<select name="income_mode" class="form-select py-2 font-normal"><option value="manual" selected>{{ _("Manual") }}</option><option value="trailing_12m" disabled>{{ _("From the app's data (coming later)") }}</option></select></label>
+      </div>
+      <div class="grid gap-2">
+        <label class="grid gap-1 text-sm font-medium">{{ _("Annual expenses") }} {{ hint(_("Regular yearly spending in the start year, excluding savings and transfers.")) }}<input name="expenses_manual" value="{{ values.get('expenses_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "expenses_manual") }}>{{ field_error(error_field, "expenses_manual", error) }}</label>
+        <label class="grid gap-1 text-xs text-muted">{{ _("Source") }}<select name="expenses_mode" class="form-select py-2 font-normal"><option value="manual" selected>{{ _("Manual") }}</option><option value="trailing_12m" disabled>{{ _("From the app's data (coming later)") }}</option></select></label>
+      </div>
+      <div class="grid gap-2">
+        <label class="grid gap-1 text-sm font-medium">{{ _("Starting portfolio") }} {{ hint(_("Investable assets at the start: investments and cash savings, not your home.")) }}<input name="portfolio_manual" value="{{ values.get('portfolio_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "portfolio_manual") }}>{{ field_error(error_field, "portfolio_manual", error) }}</label>
+        <label class="grid gap-1 text-xs text-muted">{{ _("Source") }}<select name="portfolio_mode" class="form-select py-2 font-normal"><option value="manual" selected>{{ _("Manual") }}</option><option value="linked_investable" disabled>{{ _("From the app's data (coming later)") }}</option></select></label>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel p-6 sm:p-7" aria-labelledby="contributions-heading">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h2 id="contributions-heading" class="text-base font-semibold">{{ _("Contribution overrides") }} {{ hint(_("A positive amount is net saving in that year; a negative amount is net dissaving. A year without a row uses income minus expenses.")) }}</h2>
+      <p class="text-xs text-muted">{% if window_end %}{{ _("Years %(start)d to %(end)d", start=start_year + 1, end=window_end) }}{% endif %}</p>
+    </div>
+    <p class="mt-1 text-sm text-muted">{{ _("Optional explicit net savings for individual years. Paste a column from a spreadsheet or add rows one by one.") }}</p>
+    <div class="mt-4 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+      <label class="grid gap-1 text-sm font-medium">{{ _("Paste a column (amounts, or year and amount)") }}<textarea data-contribution-paste rows="4" class="{{ input_class }} font-normal" placeholder="{{ _('2029, 15000') }}"></textarea></label>
+      <div class="flex items-end"><button type="button" class="btn" data-paste-contributions data-empty-message="{{ _('Paste a column first.') }}" data-filled-message="{{ _('Rows filled from the pasted column.') }}">{{ _("Fill rows from the pasted column") }}</button></div>
+    </div>
+    <p class="mt-1 text-xs text-muted">{{ _("Bare amounts fill consecutive years from %(start)d; a blank line skips a year. Lines like 2029, 15000 or a year and an amount separated by a tab fill those years. Pasting replaces the rows below.", start=start_year + 1) }}</p>
+    <p class="mt-2 text-sm text-danger" role="status" data-paste-status aria-live="polite"></p>
+    <div class="mt-3 overflow-x-auto">
+      <table class="sheet w-full text-sm" data-contribution-table>
+        <caption class="sr-only">{{ _("Contribution overrides") }}</caption>
+        <thead><tr class="text-left text-xs text-muted"><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Year") }}</th><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Net saving (%(currency)s)", currency=currency) }}</th><th scope="col" class="py-1.5 text-right font-medium"><span class="sr-only">{{ _("Actions") }}</span></th></tr></thead>
+        <tbody data-contribution-rows data-next-index="{{ empty_contribution.index }}">
+          {% for row in contribution_rows %}{{ contribution_row(row) }}{% endfor %}
+          {{ contribution_row(empty_contribution) }}
+        </tbody>
+      </table>
+    </div>
+    <template data-contribution-template>{{ contribution_row({"index": "__index__", "year": "", "amount": "", "kind": "", "label": ""}) }}</template>
+    <div class="mt-3 flex flex-wrap gap-2">
+      <button type="button" class="btn-sm" data-add-contribution>{{ _("Add a contribution row") }}</button>
+    </div>
+    {{ field_error(error_field, "contributions", error) }}
+  </section>
+
+  <section class="panel p-6 sm:p-7" aria-labelledby="events-heading">
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h2 id="events-heading" class="text-base font-semibold">{{ _("Events") }} {{ hint(_("A one-off cash flow is added to net worth in that year. An expense or income change alters the annual series from that year onward. Negative amounts reduce, positive amounts increase.")) }}</h2>
+      <p class="text-xs text-muted">{% if window_end %}{{ _("Years %(start)d to %(end)d", start=start_year, end=window_end) }}{% endif %}</p>
+    </div>
+    <p class="mt-1 text-sm text-muted">{{ _("Optional one-off inflows or outflows, and permanent changes to the yearly expense or income series.") }}</p>
+    <div class="mt-3 overflow-x-auto">
+      <table class="sheet w-full min-w-[48rem] text-sm" data-event-table>
+        <caption class="sr-only">{{ _("Events") }}</caption>
+        <thead><tr class="text-left text-xs text-muted"><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Year") }}</th><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Type") }}</th><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Description") }}</th><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Amount (%(currency)s)", currency=currency) }}</th><th scope="col" class="py-1.5 text-right font-medium"><span class="sr-only">{{ _("Actions") }}</span></th></tr></thead>
+        <tbody data-event-rows data-next-index="{{ empty_event.index }}">
+          {% for row in event_rows %}{{ event_row(row) }}{% endfor %}
+          {{ event_row(empty_event) }}
+        </tbody>
+      </table>
+    </div>
+    <template data-event-template>{{ event_row({"index": "__index__", "year": "", "kind": "", "amount": "", "label": ""}) }}</template>
+    <div class="mt-3 flex flex-wrap gap-2">
+      <button type="button" class="btn-sm" data-add-event>{{ _("Add an event") }}</button>
+    </div>
+    {{ field_error(error_field, "events", error) }}
+    <p class="mt-3 text-xs text-muted">{{ _("Examples: a one-off 20 000 cash inflow; −1 200 per year when a loan is repaid; 500 per year of extra rental income.") }}</p>
+  </section>
+
+  <div class="flex flex-wrap items-center gap-3">
+    <button type="submit" class="btn-primary" data-fire-save>{{ _("Save scenario") }}</button>
+    <a href="{{ cancel_url }}" class="btn">{{ _("Cancel") }}</a>
+  </div>
+</form>
+{% endblock %}
+{% block scripts %}<script defer src="{{ static_url(request, 'js/fire.js') }}" referrerpolicy="no-referrer"></script>{% endblock %}
