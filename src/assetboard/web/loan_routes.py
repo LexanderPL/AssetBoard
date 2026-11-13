@@ -47,6 +47,7 @@ from assetboard.services import loan_scenarios as loan_scenario_service
 from assetboard.services import loan_schedule as loan_schedule_service
 from assetboard.services import loan_scheduled as loan_scheduled_service
 from assetboard.services import loans
+from assetboard.services import occurrences as occurrence_service
 from assetboard.services.categories import list_categories
 from assetboard.services.context import Context, Role, has_role, require_role
 from assetboard.web.context import CurrentContext
@@ -155,11 +156,15 @@ ERRORS = {
     "loan_paid_off": _("The loan has no future scheduled payments."),
     "invalid_loan": _("The loan is no longer available."),
     "installment_plan_closed": _("A closed installment plan cannot be restored."),
+    "no_due_installment": _("No installment is due yet."),
+    "month_closed": _("The month is closed. Reopen it before posting the installment."),
+    "not_pending": _("That installment is no longer pending."),
     "failed": _("The loan could not be saved. Check the form and try again."),
 }
 
 NOTICES = {
     "loan_created": _("Loan saved. Add rate changes, costs or one-off overpayments below."),
+    "loan_created_another": _("Loan saved. Add the next loan below."),
     "terms_saved": _("Loan terms saved."),
     "overpayment_saved": _("Regular overpayment settings saved."),
     "rate_saved": _("Rate change saved."),
@@ -1088,6 +1093,7 @@ def _installment_plan_detail_context(
         "notice": notice,
         "format_money": format_money,
         "format_day": format_day,
+        "format_rate_short": format_rate_short,
     }
 
 
@@ -1106,6 +1112,7 @@ def _installment_plans_context(
         "notice": notice,
         "format_money": format_money,
         "format_day": format_day,
+        "format_rate_short": format_rate_short,
     }
 
 
@@ -2226,6 +2233,31 @@ async def installment_plan_detail(request: Request, ctx: CurrentContext, loan_id
         notice=_notice(request, request.query_params.get("notice")),
     )
     return render_template(request, "loans/installments/detail.html", context=context)
+
+
+@router.post("/loans/installments/{loan_id}/post-next", name="installment_plan_post_next")
+async def installment_plan_post_next(
+    request: Request, ctx: CurrentContext, loan_id: UUID
+) -> Response:
+    try:
+        await run_in_threadpool(
+            installment_plan_service.post_next_installment,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+        )
+    except (loans.LoanError, LoanValidationError, occurrence_service.OccurrenceError) as exc:
+        return RedirectResponse(
+            request.url_for("installment_plan_detail", loan_id=str(loan_id)).path
+            + "?"
+            + urlencode({"error": getattr(exc, "code", "failed")}),
+            status_code=303,
+        )
+    return RedirectResponse(
+        request.url_for("installment_plan_detail", loan_id=str(loan_id)).path
+        + "?notice=installment_plan_posted",
+        status_code=303,
+    )
 
 
 @router.get("/loans/installments/{loan_id}/edit", name="installment_plan_edit")

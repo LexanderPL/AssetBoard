@@ -212,6 +212,53 @@ def test_posted_occurrence_decrements_once_and_closes_at_zero(team: WorkspaceDb)
     assert transaction_id
 
 
+def test_progress_derives_the_original_count_from_posted_occurrences(
+    team: WorkspaceDb,
+) -> None:
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    fresh = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    assert (fresh.paid_count, fresh.remaining_count, fresh.original_count) == (0, 3, 3)
+    assert fresh.percent_repaid_bp == 0
+    assert fresh.due_occurrence is None
+
+    with team.factory() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        first = ScheduledOccurrenceRepository(session, ctx).for_item(item.id)[0]
+    occurrences.post_occurrence(
+        team.factory,
+        ctx,
+        first.id,
+        amount_minor=100_000,
+        day=date(2026, 3, 1),
+    )
+    posted = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    assert (posted.paid_count, posted.remaining_count, posted.original_count) == (1, 2, 3)
+    assert posted.percent_repaid_bp == 3_333
+
+
+def test_post_next_installment_posts_the_earliest_due_occurrence_once(
+    team: WorkspaceDb,
+) -> None:
+    loan_id = _create(team, remaining_count=3)
+    ctx = team.ctx("owner", "owner")
+    with pytest.raises(loans.LoanError) as none_due:
+        installment_plans.post_next_installment(team.factory, ctx, loan_id)
+    assert none_due.value.code == "no_due_installment"
+
+    with team.factory.begin() as session:
+        item = ScheduledItemRepository(session, ctx).ordered()[0]
+        first = ScheduledOccurrenceRepository(session, ctx).for_item(item.id)[0]
+        ScheduledOccurrenceRepository(session, ctx).update(first.id, due_date=date(2026, 3, 1))
+    installment_plans.post_next_installment(team.factory, ctx, loan_id)
+    view = installment_plans.get_installment_plan(team.factory, ctx, loan_id)
+    assert (view.paid_count, view.remaining_count) == (1, 2)
+    with pytest.raises(loans.LoanError) as again:
+        installment_plans.post_next_installment(team.factory, ctx, loan_id)
+    assert again.value.code == "no_due_installment"
+    assert installment_plans.get_installment_plan(team.factory, ctx, loan_id).remaining_count == 2
+
+
 def test_archive_and_restore(team: WorkspaceDb) -> None:
     loan_id = _create(team)
     ctx = team.ctx("owner", "owner")

@@ -25,13 +25,21 @@ BASE_METHOD_COVERAGE: dict[str, str] = {
 EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
     **{
         ("ScheduledItemRepository", method): "test_scheduled_queries_stay_in_their_workspace"
-        for method in ("create", "ordered", "any_exists", "category_counts", "tax_items")
+        for method in (
+            "create",
+            "ordered",
+            "any_exists",
+            "category_counts",
+            "tax_items",
+            "for_loan",
+        )
     },
     **{
         ("ScheduledOccurrenceRepository", method): "test_scheduled_queries_stay_in_their_workspace"
         for method in (
             "create",
             "for_item",
+            "for_items",
             "for_income_work_month",
             "for_income_source",
             "children",
