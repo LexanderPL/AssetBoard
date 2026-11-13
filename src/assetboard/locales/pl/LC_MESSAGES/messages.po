@@ -7438,6 +7438,25 @@ msgstr "Równy kapitał"
 msgid "Installment plan"
 msgstr "Plan ratalny"
 
+msgid "Paid off"
+msgstr "Spłacony"
+
+msgid "Repaid principal"
+msgstr "Spłacony kapitał"
+
+msgid "Remaining"
+msgstr "Pozostało"
+
+#, python-format
+msgid "%% repaid"
+msgstr "%% spłacone"
+
+msgid "Rate"
+msgstr "Stopa"
+
+msgid "Next payment"
+msgstr "Następna płatność"
+
 msgid "shorten the term"
 msgstr "skraca okres"
 
@@ -7458,12 +7477,6 @@ msgstr "Stała"
 
 msgid "Variable"
 msgstr "Zmienna"
-
-msgid "Repaid principal"
-msgstr "Spłacony kapitał"
-
-msgid "Remaining"
-msgstr "Pozostało"
 
 #, python-format
 msgid "Original principal %(amount)s"
@@ -7488,10 +7501,6 @@ msgstr "Pozostały kapitał"
 msgid "Balance %(amount)s on %(date)s"
 msgstr "Saldo %(amount)s na dzień %(date)s"
 
-#, python-format
-msgid "%% repaid"
-msgstr "%% spłacone"
-
 msgid "Payoff date"
 msgstr "Data spłaty"
 
@@ -7501,9 +7510,6 @@ msgid_plural "%(num)d payments left"
 msgstr[0] "%(num)d miesiąc"
 msgstr[1] "%(num)d miesiące"
 msgstr[2] "%(num)d miesięcy"
-
-msgid "Next payment"
-msgstr "Następna płatność"
 
 msgid "No payments left."
 msgstr "Brak pozostałych płatności."
@@ -7623,6 +7629,13 @@ msgid "Show at date"
 msgstr "Pokaż na dzień"
 
 msgid ""
+"Every row shows the projected components from the loan terms, even where "
+"an actual payment is recorded."
+msgstr ""
+"Każdy wiersz pokazuje prognozowane składniki z warunków kredytu, także "
+"tam, gdzie zapisano rzeczywistą płatność."
+
+msgid ""
 "Monthly rows from the current starting balance. A recorded actual payment"
 " replaces the components of its due date; every other row remains "
 "projected from the terms."
@@ -7630,6 +7643,15 @@ msgstr ""
 "Miesięczne wiersze od bieżącego salda początkowego. Zarejestrowana "
 "rzeczywista płatność zastępuje składniki swojego terminu; pozostałe "
 "wiersze nadal pochodzą z prognozy warunków."
+
+msgid "Schedule values"
+msgstr "Wartości harmonogramu"
+
+msgid "Actual"
+msgstr "Wykonanie"
+
+msgid "Planned"
+msgstr "Zaplanowano"
 
 msgid "Scroll sideways to see every column."
 msgstr "Przewiń w bok, aby zobaczyć wszystkie kolumny."
@@ -7643,23 +7665,17 @@ msgstr "#"
 msgid "Due date"
 msgstr "Termin płatności"
 
-msgid "Rate"
-msgstr "Stopa"
-
 msgid "Opening"
 msgstr "Saldo początkowe"
 
 msgid "Closing"
 msgstr "Saldo końcowe"
 
-msgid "Actual"
-msgstr "Wykonanie"
+msgid "Projected"
+msgstr "Prognozowane"
 
 msgid "Today"
 msgstr "Dzisiaj"
-
-msgid "Projected"
-msgstr "Prognozowane"
 
 msgid "No payments remain on this schedule."
 msgstr "W tym harmonogramie nie ma pozostałych płatności."
@@ -7916,8 +7932,33 @@ msgstr "Zapisz warunki"
 msgid "Add loan"
 msgstr "Dodaj kredyt"
 
-msgid "Payment date"
-msgstr "Data płatności"
+msgid "Loan portfolio"
+msgstr "Portfel kredytów"
+
+msgid "Monthly installments"
+msgstr "Raty miesięczne"
+
+msgid "Due in the next 30 days"
+msgstr "Należne w ciągu najbliższych 30 dni"
+
+msgid "Average rate"
+msgstr "Średnia stopa"
+
+#, python-format
+msgid "%(num)d loan is not included because its schedule is unavailable."
+msgid_plural "%(num)d loans are not included because their schedules are unavailable."
+msgstr[0] ""
+"%(num)d kredyt nie jest uwzględniony, ponieważ jego harmonogram jest "
+"niedostępny."
+msgstr[1] ""
+"%(num)d kredyty nie są uwzględnione, ponieważ ich harmonogramy są "
+"niedostępne."
+msgstr[2] ""
+"%(num)d kredytów nie jest uwzględnionych, ponieważ ich harmonogramy są "
+"niedostępne."
+
+msgid "Progress"
+msgstr "Postęp"
 
 msgid "No loans yet."
 msgstr "Brak kredytów."
@@ -10131,9 +10172,6 @@ msgstr "Ostatnie importy"
 msgid "Uploaded"
 msgstr "Przesłano"
 
-msgid "Planned"
-msgstr "Zaplanowano"
-
 msgid "Cancelled"
 msgstr "Anulowano"
 
@@ -11420,4 +11458,7 @@ msgstr "Usuń obszar roboczy…"
 #~ "To saldo, które podano. Kolejne punkty"
 #~ " kontrolne salda są zapisywane wraz z"
 #~ " rzeczywistymi płatnościami."
+
+#~ msgid "Payment date"
+#~ msgstr "Data płatności"
 

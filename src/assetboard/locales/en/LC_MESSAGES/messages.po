@@ -6919,6 +6919,25 @@ msgstr ""
 msgid "Installment plan"
 msgstr ""
 
+msgid "Paid off"
+msgstr ""
+
+msgid "Repaid principal"
+msgstr ""
+
+msgid "Remaining"
+msgstr ""
+
+#, python-format
+msgid "%% repaid"
+msgstr ""
+
+msgid "Rate"
+msgstr ""
+
+msgid "Next payment"
+msgstr ""
+
 msgid "shorten the term"
 msgstr ""
 
@@ -6938,12 +6957,6 @@ msgid "Fixed"
 msgstr ""
 
 msgid "Variable"
-msgstr ""
-
-msgid "Repaid principal"
-msgstr ""
-
-msgid "Remaining"
 msgstr ""
 
 #, python-format
@@ -6969,10 +6982,6 @@ msgstr ""
 msgid "Balance %(amount)s on %(date)s"
 msgstr ""
 
-#, python-format
-msgid "%% repaid"
-msgstr ""
-
 msgid "Payoff date"
 msgstr ""
 
@@ -6981,9 +6990,6 @@ msgid "%(num)d payment left"
 msgid_plural "%(num)d payments left"
 msgstr[0] ""
 msgstr[1] ""
-
-msgid "Next payment"
-msgstr ""
 
 msgid "No payments left."
 msgstr ""
@@ -7100,9 +7106,23 @@ msgid "Show at date"
 msgstr ""
 
 msgid ""
+"Every row shows the projected components from the loan terms, even where "
+"an actual payment is recorded."
+msgstr ""
+
+msgid ""
 "Monthly rows from the current starting balance. A recorded actual payment"
 " replaces the components of its due date; every other row remains "
 "projected from the terms."
+msgstr ""
+
+msgid "Schedule values"
+msgstr ""
+
+msgid "Actual"
+msgstr ""
+
+msgid "Planned"
 msgstr ""
 
 msgid "Scroll sideways to see every column."
@@ -7117,22 +7137,16 @@ msgstr ""
 msgid "Due date"
 msgstr ""
 
-msgid "Rate"
-msgstr ""
-
 msgid "Opening"
 msgstr ""
 
 msgid "Closing"
 msgstr ""
 
-msgid "Actual"
+msgid "Projected"
 msgstr ""
 
 msgid "Today"
-msgstr ""
-
-msgid "Projected"
 msgstr ""
 
 msgid "No payments remain on this schedule."
@@ -7367,7 +7381,25 @@ msgstr ""
 msgid "Add loan"
 msgstr ""
 
-msgid "Payment date"
+msgid "Loan portfolio"
+msgstr ""
+
+msgid "Monthly installments"
+msgstr ""
+
+msgid "Due in the next 30 days"
+msgstr ""
+
+msgid "Average rate"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d loan is not included because its schedule is unavailable."
+msgid_plural "%(num)d loans are not included because their schedules are unavailable."
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Progress"
 msgstr ""
 
 msgid "No loans yet."
@@ -9383,9 +9415,6 @@ msgstr ""
 msgid "Uploaded"
 msgstr ""
 
-msgid "Planned"
-msgstr ""
-
 msgid "Cancelled"
 msgstr ""
 
@@ -10803,5 +10832,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Loan status"
+#~ msgstr ""
+
+#~ msgid "Payment date"
 #~ msgstr ""
 
