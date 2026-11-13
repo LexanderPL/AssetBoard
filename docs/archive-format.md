@@ -1,4 +1,4 @@
-# Workspace archive format (v1.5)
+# Workspace archive format (v1.6)
 
 This is the reference for the files that **Export and import** writes and reads: the workspace
 archive (a ZIP) and the hand-made CSV files you can import on their own. It is normative: the
@@ -85,16 +85,18 @@ liabilities off). 1.4 (additive): adds the eight investment files below,
 `asset_classes.csv` carries the F6.11 risk tiers. A 1.3 archive reads with no investment rows
 and the default average cost basis; a 1.4 archive requires every new file (header only when
 empty). 1.5 (additive): adds the ten loan files below; a 1.4 archive reads with no loan
-rows, and a 1.5 archive requires every new file (header only when empty). Schedules are not
-archived and are recomputed from the restored terms. Golden archives of all six versions are in
-`tests/fixtures/`.
+rows, and a 1.5 archive requires every new file (header only when empty). 1.6 (additive):
+`loan_rate_changes.csv` gains `mode`, `reference_rate_id`, `reference_rate` and `margin_bp`;
+a 1.5 archive reads its old rows as fixed. Schedules are not
+archived and are recomputed from the restored terms. Golden archives of all seven versions are
+in `tests/fixtures/`.
 
 ## `manifest.json`
 
 ```json
 {
   "format": "workspace-archive",
-  "format_version": "1.5",
+  "format_version": "1.6",
   "app": {"name": "AssetBoard", "version": "0.4.0"},
   "exported_at": "2026-10-18T14:30:00Z",
   "base_currency": "EUR",
@@ -672,19 +674,27 @@ f9a0b1c2-d3e4-49fa-806c-e7f8091a2b3c,Phone,installment_plan,EUR,3000.00,,2026-04
 
 ## `loan_rate_changes.csv` (restore only)
 
+Each row starts a rate segment: a fixed rate or a reference rate plus margin. A fixed row has
+`rate_bp`; a variable row has `reference_rate_id` and `margin_bp` instead.
+
 | Column | Required | Values |
 |---|---|---|
 | `id` | yes | UUID (lineage id) |
 | `loan_id` | yes | UUID from `loans.csv` |
 | `loan` | yes | the loan name (must match `loan_id`) |
 | `effective_from` | yes | `YYYY-MM-DD`; one row per loan and date |
-| `rate_bp` | yes | integer 0–10 000 (annual basis points) |
+| `rate_bp` | fixed only | integer 0–10 000 (annual basis points) |
+| `mode` | in 1.6 | `fixed` (default for older archives) \| `variable` |
+| `reference_rate_id` | variable only | UUID from `reference_rates.csv` |
+| `reference_rate` | variable only | the reference rate name (must match the id) |
+| `margin_bp` | variable only | integer 0–10 000 (annual basis points) |
 
 Export order: loan order, effective date, id.
 
 ```csv
-id,loan_id,loan,effective_from,rate_bp
-a0b1c2d3-e4f5-4a0b-917d-f8091a2b3c4d,d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a,Home mortgage,2026-01-01,575
+id,loan_id,loan,effective_from,rate_bp,mode,reference_rate_id,reference_rate,margin_bp
+a0b1c2d3-e4f5-4a0b-917d-f8091a2b3c4d,d7e8f9a0-b1c2-47d8-ae4a-c5d6e7f8091a,Home mortgage,2026-01-01,575,fixed,,,
+b1c2d3e4-f5a6-4b1c-928e-a8091a2b3c4d,e8f9a0b1-c2d3-48e9-bf5b-d6e7f8091a2b,Car loan,2027-01-15,,variable,b5c6d7e8-f9a0-45b6-8c28-a3b4c5d6e7f8,WIBOR,150
 ```
 
 ## `loan_cost_components.csv` (restore only)
@@ -825,7 +835,7 @@ deflate, duplicate names, more than 64 members, a member over 100 MiB or a total
 uncompressed, or a member (1 MiB or larger) compressed more than 200:1. Unknown member names are
 listed as warnings and ignored. A file may hold at most 1 000 000 data rows and 64 columns.
 
-## Not in the archive (format 1.5)
+## Not in the archive (format 1.6)
 
 Members, invitations, users and their sessions, the audit log, import batches and saved
 mappings, and who created or closed what. Recurring items, income sources, work logs and

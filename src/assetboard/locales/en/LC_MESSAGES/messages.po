@@ -3082,14 +3082,11 @@ msgid "Choose a reference rate."
 msgstr ""
 
 msgid ""
-"This reference rate has no value on or before the loan's start date. Add "
-"a value first."
+"This reference rate has no value on or before the required date. Add a "
+"value first."
 msgstr ""
 
-msgid "The rate type cannot be changed after the loan is created."
-msgstr ""
-
-msgid "A fixed loan needs a rate on or before its first payment date."
+msgid "The loan needs a rate on or before its first payment date."
 msgstr ""
 
 msgid "A rate change cannot start before the loan starts."
@@ -7412,7 +7409,9 @@ msgid "Only for annuity loans. Leave empty to use the calculated installment."
 msgstr ""
 
 #, python-format
-msgid "Rate type: %(mode)s. It is fixed at creation."
+msgid ""
+"Initial rate type: %(mode)s. Later segments can switch between fixed and "
+"variable."
 msgstr ""
 
 msgid "Save terms"
@@ -7497,20 +7496,24 @@ msgstr ""
 msgid "Fixed rate"
 msgstr ""
 
-msgid "I enter the rate and any later changes."
+msgid "I enter the starting rate; later changes can switch to a reference rate."
 msgstr ""
 
 msgid "Variable rate"
 msgstr ""
 
-msgid "A reference rate plus a margin; I add the reference values."
+msgid ""
+"A reference rate plus a margin for the initial period; later changes can "
+"switch."
 msgstr ""
 
 msgid "Annual interest rate"
 msgstr ""
 
 #, python-format
-msgid "For example 5.5 for 5.5%%. Add later changes on the loan page."
+msgid ""
+"For example 5.5 for 5.5%%. Add later changes and switches on the loan "
+"page."
 msgstr ""
 
 msgid "No reference rates yet. Create one on the Reference rates page first."
@@ -8051,11 +8054,31 @@ msgid "Rates"
 msgstr ""
 
 msgid ""
-"Fixed loans use the rate in force on each payment date. Variable loans "
-"add the margin to the reference rate."
+"Each rate change starts a new segment. A segment is either a fixed rate "
+"or a reference rate plus margin; later reference values reprice a "
+"variable segment automatically."
 msgstr ""
 
 msgid "Add rate change"
+msgstr ""
+
+#, python-format
+msgid "Initial rate: %(name)s"
+msgstr ""
+
+msgid "not set"
+msgstr ""
+
+#, python-format
+msgid "margin %(margin)s"
+msgstr ""
+
+msgid ""
+"Change the initial reference rate or margin in Edit terms. Add values on "
+"the Reference rates page."
+msgstr ""
+
+msgid "Manage reference rates"
 msgstr ""
 
 msgid "Rate changes"
@@ -8070,25 +8093,6 @@ msgid "Delete the rate change from %(date)s?"
 msgstr ""
 
 msgid "No rate changes yet."
-msgstr ""
-
-#, python-format
-msgid "Reference rate: %(name)s"
-msgstr ""
-
-msgid "not set"
-msgstr ""
-
-#, python-format
-msgid "margin %(margin)s"
-msgstr ""
-
-msgid ""
-"Change the reference rate or margin in Edit terms. Add values on the "
-"Reference rates page."
-msgstr ""
-
-msgid "Manage reference rates"
 msgstr ""
 
 msgid ""
@@ -8156,6 +8160,23 @@ msgid "Archive loan"
 msgstr ""
 
 msgid "Edit rate change"
+msgstr ""
+
+msgid "The new rate applies from the first payment on or after this date."
+msgstr ""
+
+msgid "Rate type"
+msgstr ""
+
+msgid "Reference rate + margin"
+msgstr ""
+
+msgid "Added to the reference value."
+msgstr ""
+
+msgid ""
+"The latest reference value on or before the start date applies; later "
+"values reprice the segment automatically."
 msgstr ""
 
 msgid "Save rate change"
@@ -11055,5 +11076,45 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Property and LTV"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "This reference rate has no value "
+#~ "on or before the loan's start "
+#~ "date. Add a value first."
+#~ msgstr ""
+
+#~ msgid "Rate type: %(mode)s. It is fixed at creation."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Fixed loans use the rate in force"
+#~ " on each payment date. Variable loans"
+#~ " add the margin to the reference "
+#~ "rate."
+#~ msgstr ""
+
+#~ msgid "Reference rate: %(name)s"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Change the reference rate or margin "
+#~ "in Edit terms. Add values on the"
+#~ " Reference rates page."
+#~ msgstr ""
+
+#~ msgid "I enter the rate and any later changes."
+#~ msgstr ""
+
+#~ msgid "A reference rate plus a margin; I add the reference values."
+#~ msgstr ""
+
+#~ msgid "For example 5.5 for 5.5%%. Add later changes on the loan page."
+#~ msgstr ""
+
+#~ msgid "The rate type cannot be changed after the loan is created."
+#~ msgstr ""
+
+#~ msgid "A fixed loan needs a rate on or before its first payment date."
 #~ msgstr ""
 

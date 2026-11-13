@@ -1912,7 +1912,14 @@ def _restore_loans(
             row.id,
             loan_id=_mapped_id(loan_ids, row.loan_id, label="loan"),
             effective_from=parse_date(row.effective_from),
+            mode=row.mode,
             rate_bp=row.rate_bp,
+            reference_rate_id=(
+                _mapped_id(rate_ids, row.reference_rate_id, label="reference rate")
+                if row.reference_rate_id
+                else None
+            ),
+            margin_bp=row.margin_bp,
             created_at=restore_now + timedelta(microseconds=index),
             updated_at=restore_now,
         )

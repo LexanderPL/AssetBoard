@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import html
 from datetime import date
+from uuid import UUID
 
-from assetboard.db.models.loans import Loan
+from assetboard.db.models.loans import Loan, LoanRateChange, ReferenceRate
 
 
 def _wizard_data(**extra: str) -> dict[str, str]:
@@ -151,9 +152,9 @@ def test_cost_dialog_hides_the_unused_amount_field(owner) -> None:
     loan_id = _create(owner)
     page = owner.client.get(f"/loans/{loan_id}/settings?form=cost")
     assert page.status_code == 200
-    assert 'id="mode"' in page.text
-    assert 'data-hidden-when="mode=fixed"' in page.text
-    assert 'data-hidden-when="mode=percent"' in page.text
+    assert 'id="cost_mode"' in page.text
+    assert 'data-hidden-when="cost_mode=fixed"' in page.text
+    assert 'data-hidden-when="cost_mode=percent"' in page.text
 
 
 def test_viewer_reads_settings_but_sees_no_configuration_controls(owner) -> None:
@@ -433,3 +434,171 @@ def test_payment_and_checkpoint_dialogs_stay_on_the_payments_page(owner) -> None
     settings = owner.client.get(f"/loans/{loan_id}/settings")
     assert 'id="payment-dialog"' not in settings.text
     assert 'id="checkpoint-dialog"' not in settings.text
+
+
+def _create_reference_rate(owner, name: str = "WIBOR 3M") -> str:
+    path = "/loans/reference-rates"
+    response = owner.post(path, {"name": name, "notes": ""}, token_from=path)
+    assert response.status_code == 303, response.text
+    with owner.db() as session:
+        return str(
+            session.query(ReferenceRate)
+            .filter(ReferenceRate.workspace_id == owner.home_id, ReferenceRate.name == name)
+            .one()
+            .id
+        )
+
+
+def _add_reference_value(
+    owner,
+    rate_id: str,
+    *,
+    effective_from: str = "2026-01-01",
+    value: str = "4.0",
+    confirmed: bool = False,
+) -> None:
+    path = "/loans/reference-rates"
+    response = owner.post(
+        f"/loans/reference-rates/{rate_id}/values",
+        {
+            "effective_from": effective_from,
+            "value_percent": value,
+            "high_rate_confirmed": "1" if confirmed else "",
+        },
+        token_from=path,
+    )
+    assert response.status_code == 303, response.text
+
+
+def test_a_fixed_loan_can_add_a_variable_rate_segment(owner) -> None:
+    loan_id = _create(owner)
+    rate_id = _create_reference_rate(owner)
+    _add_reference_value(owner, rate_id)
+    page = owner.client.get(f"/loans/{loan_id}/settings?form=rate")
+    assert page.status_code == 200
+    assert 'id="rate_mode"' in page.text
+    assert 'data-hidden-when="rate_mode=variable"' in page.text
+    assert f'<option value="{rate_id}"' in page.text
+    path = f"/loans/{loan_id}/settings"
+    saved = owner.post(
+        f"/loans/{loan_id}/rate-changes",
+        {
+            "effective_from": "2027-01-01",
+            "mode": "variable",
+            "rate_percent": "",
+            "reference_rate_id": rate_id,
+            "margin_percent": "2.5",
+            "high_rate_confirmed": "",
+        },
+        token_from=path,
+    )
+    assert saved.status_code == 303, saved.text
+    with owner.db() as session:
+        change = (
+            session.query(LoanRateChange)
+            .filter(
+                LoanRateChange.workspace_id == owner.home_id,
+                LoanRateChange.loan_id == UUID(loan_id),
+            )
+            .filter(LoanRateChange.effective_from == date(2027, 1, 1))
+            .one()
+        )
+        assert change.mode == "variable"
+        assert change.rate_bp is None
+        assert str(change.reference_rate_id) == rate_id
+        assert change.margin_bp == 250
+    page = owner.client.get(path)
+    assert 'data-rate-change-mode="variable"' in page.text
+    assert "WIBOR 3M" in page.text and "2.5%" in page.text
+    schedule = owner.client.get(f"/loans/{loan_id}/schedule")
+    assert "6.5%" in schedule.text
+    reference_page = owner.client.get("/loans/reference-rates")
+    assert f"/loans/{loan_id}" in reference_page.text
+    with owner.db() as session:
+        change_id = str(
+            session.query(LoanRateChange)
+            .filter(
+                LoanRateChange.workspace_id == owner.home_id,
+                LoanRateChange.loan_id == UUID(loan_id),
+            )
+            .filter(LoanRateChange.effective_from == date(2027, 1, 1))
+            .one()
+            .id
+        )
+    edit = owner.client.get(f"{path}?form=rate&edit={change_id}")
+    assert edit.status_code == 200
+    assert f'<option value="{rate_id}" selected>' in edit.text
+    converted = owner.post(
+        f"/loans/{loan_id}/rate-changes/{change_id}",
+        {
+            "effective_from": "2027-01-01",
+            "mode": "fixed",
+            "rate_percent": "6",
+            "reference_rate_id": "",
+            "margin_percent": "",
+            "high_rate_confirmed": "",
+        },
+        token_from=path,
+    )
+    assert converted.status_code == 303, converted.text
+    with owner.db() as session:
+        converted_change = (
+            session.query(LoanRateChange)
+            .filter(
+                LoanRateChange.workspace_id == owner.home_id,
+                LoanRateChange.loan_id == UUID(loan_id),
+                LoanRateChange.effective_from == date(2027, 1, 1),
+            )
+            .one()
+        )
+        assert converted_change.mode == "fixed"
+        assert converted_change.rate_bp == 600
+        assert converted_change.reference_rate_id is None
+        assert converted_change.margin_bp is None
+
+
+def test_a_variable_rate_segment_needs_a_reference_value_and_confirmation(owner) -> None:
+    loan_id = _create(owner)
+    empty_rate_id = _create_reference_rate(owner, name="Empty series")
+    path = f"/loans/{loan_id}/settings"
+    missing = owner.post(
+        f"/loans/{loan_id}/rate-changes",
+        {
+            "effective_from": "2028-01-01",
+            "mode": "variable",
+            "reference_rate_id": empty_rate_id,
+            "margin_percent": "0",
+            "high_rate_confirmed": "",
+        },
+        token_from=path,
+    )
+    assert missing.status_code == 400
+    assert "value on or before" in missing.text
+
+    high_rate_id = _create_reference_rate(owner, name="High series")
+    _add_reference_value(owner, high_rate_id, value="26.0", confirmed=True)
+    high = owner.post(
+        f"/loans/{loan_id}/rate-changes",
+        {
+            "effective_from": "2026-03-01",
+            "mode": "variable",
+            "reference_rate_id": high_rate_id,
+            "margin_percent": "0",
+            "high_rate_confirmed": "",
+        },
+        token_from=path,
+    )
+    assert high.status_code == 400
+    assert "I understand this rate is above 25%" in high.text
+    saved = owner.post(
+        f"/loans/{loan_id}/rate-changes",
+        {
+            "effective_from": "2026-03-01",
+            "mode": "variable",
+            "reference_rate_id": high_rate_id,
+            "margin_percent": "0",
+            "high_rate_confirmed": "1",
+        },
+        token_from=path,
+    )
+    assert saved.status_code == 303, saved.text

@@ -108,20 +108,7 @@ def _terms(view: loans.LoanView) -> LoanTerms:
 
 
 def _rate_timeline(view: loans.LoanView) -> list[RatePeriod]:
-    if view.rate_mode.value == "fixed":
-        return [
-            RatePeriod(effective_from=row.effective_from, annual_rate_bp=row.rate_bp)
-            for row in view.rate_changes
-        ]
-    if view.margin_bp is None:
-        return []
-    return [
-        RatePeriod(
-            effective_from=row.effective_from,
-            annual_rate_bp=row.value_bp + view.margin_bp,
-        )
-        for row in view.reference_rate_values
-    ]
+    return loans.rate_timeline(view)
 
 
 def _costs(view: loans.LoanView) -> list[CostPeriod]:

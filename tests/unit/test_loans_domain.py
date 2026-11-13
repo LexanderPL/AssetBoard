@@ -10,6 +10,9 @@ from assetboard.domain.loans import (
     MAX_TERM_MONTHS,
     LoanKind,
     LoanValidationError,
+    RateMode,
+    RateSegment,
+    build_rate_timeline,
     clean_loan_name,
     cost_active_on,
     first_installment,
@@ -83,3 +86,90 @@ def test_latest_value_and_name_cleaning() -> None:
     assert clean_loan_name("  My   mortgage ") == "My mortgage"
     with pytest.raises(LoanValidationError):
         clean_loan_name("   ")
+
+
+def test_mixed_rate_timeline_resolves_fixed_and_reference_segments() -> None:
+    start = date(2026, 1, 1)
+    timeline = build_rate_timeline(
+        [
+            RateSegment(
+                effective_from=date(2026, 1, 1),
+                mode=RateMode.FIXED,
+                rate_bp=550,
+            ),
+            RateSegment(
+                effective_from=date(2027, 1, 1),
+                mode=RateMode.VARIABLE,
+                margin_bp=150,
+                reference_values=(
+                    (date(2026, 7, 1), 450),
+                    (date(2028, 1, 1), 500),
+                ),
+            ),
+            RateSegment(
+                effective_from=date(2029, 1, 1),
+                mode=RateMode.FIXED,
+                rate_bp=700,
+            ),
+        ],
+        start,
+    )
+    assert [(row.effective_from, row.annual_rate_bp) for row in timeline] == [
+        (date(2026, 1, 1), 550),
+        (date(2027, 1, 1), 600),
+        (date(2028, 1, 1), 650),
+        (date(2029, 1, 1), 700),
+    ]
+
+
+def test_reference_values_at_or_before_a_variable_start_set_its_opening_rate() -> None:
+    timeline = build_rate_timeline(
+        [
+            RateSegment(
+                effective_from=date(2027, 1, 1),
+                mode=RateMode.VARIABLE,
+                margin_bp=100,
+                reference_values=(
+                    (date(2026, 1, 1), 400),
+                    (date(2027, 7, 1), 450),
+                ),
+            )
+        ],
+        date(2026, 1, 1),
+    )
+    assert [(row.effective_from, row.annual_rate_bp) for row in timeline] == [
+        (date(2027, 1, 1), 500),
+        (date(2027, 7, 1), 550),
+    ]
+
+
+def test_a_variable_segment_needs_a_value_on_or_before_its_start() -> None:
+    with pytest.raises(LoanValidationError) as error:
+        build_rate_timeline(
+            [
+                RateSegment(
+                    effective_from=date(2027, 1, 1),
+                    mode=RateMode.VARIABLE,
+                    margin_bp=100,
+                    reference_values=((date(2027, 2, 1), 400),),
+                )
+            ],
+            date(2026, 1, 1),
+        )
+    assert error.value.code == "missing_reference_value"
+
+
+def test_rate_segments_cannot_start_before_the_loan_or_share_a_date() -> None:
+    with pytest.raises(LoanValidationError):
+        build_rate_timeline(
+            [RateSegment(effective_from=date(2025, 12, 31), mode=RateMode.FIXED, rate_bp=500)],
+            date(2026, 1, 1),
+        )
+    with pytest.raises(LoanValidationError):
+        build_rate_timeline(
+            [
+                RateSegment(effective_from=date(2026, 1, 1), mode=RateMode.FIXED, rate_bp=500),
+                RateSegment(effective_from=date(2026, 1, 1), mode=RateMode.FIXED, rate_bp=600),
+            ],
+            date(2026, 1, 1),
+        )

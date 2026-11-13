@@ -91,10 +91,9 @@ ERRORS = {
     ),
     "invalid_reference_rate": _("Choose a reference rate."),
     "missing_reference_value": _(
-        "This reference rate has no value on or before the loan's start date. Add a value first."
+        "This reference rate has no value on or before the required date. Add a value first."
     ),
-    "rate_mode_locked": _("The rate type cannot be changed after the loan is created."),
-    "rate_change_missing": _("A fixed loan needs a rate on or before its first payment date."),
+    "rate_change_missing": _("The loan needs a rate on or before its first payment date."),
     "rate_change_before_start": _("A rate change cannot start before the loan starts."),
     "rate_change_exists": _("Another rate change already starts on that date."),
     "invalid_cost": _("Enter a cost name, a percentage or a positive fixed amount."),
@@ -924,7 +923,9 @@ def _detail_context(
 
 
 SETTINGS_FORM_FIELDS: dict[str, frozenset[str]] = {
-    "rate": frozenset({"effective_from", "rate_percent"}),
+    "rate": frozenset(
+        {"effective_from", "mode", "rate_percent", "reference_rate_id", "margin_percent"}
+    ),
     "cost": frozenset(
         {"name", "mode", "rate_percent", "fixed_amount", "effective_from", "effective_to"}
     ),
@@ -932,11 +933,17 @@ SETTINGS_FORM_FIELDS: dict[str, frozenset[str]] = {
 }
 
 
-def _settings_error_field(exc: Exception, form: str) -> str | None:
+def _settings_error_field(
+    exc: Exception, form: str, values: dict[str, str] | None = None
+) -> str | None:
     """Map a service error to the input a settings action should highlight."""
     field = getattr(exc, "field", None)
     if field == "rate_bp" and form in ("rate", "cost"):
+        if form == "rate" and (values or {}).get("mode") == "variable":
+            return "margin_percent"
         return "rate_percent"
+    if field == "margin_bp" and form == "rate":
+        return "margin_percent"
     return field if field in SETTINGS_FORM_FIELDS.get(form, frozenset()) else None
 
 
@@ -981,6 +988,7 @@ def _settings_context(
         "property_reason": lambda code: _error(request, code),
         "scheduled_item": loan_scheduled_service.loan_schedule_item_view(factory, ctx, loan_id),
         "expense_categories": list_categories(factory, ctx).expense,
+        "reference_rates": loans.list_reference_rates(factory, ctx).rates,
     }
 
 
@@ -1024,7 +1032,7 @@ async def _render_settings_error(
         ctx,
         loan_id,
         error=_error(request, getattr(exc, "code", "failed")),
-        error_field=_settings_error_field(exc, form),
+        error_field=_settings_error_field(exc, form, values),
         high_rate=getattr(exc, "code", None) == "high_rate_confirmation_required",
         form_values=values,
         open_form=form,
@@ -1240,7 +1248,11 @@ def _scenario_page(
     notice: str | None = None,
 ) -> dict[str, object]:
     comparison = loan_scenario_service.compare_loan_scenarios(
-        request.app.state.session_factory, ctx, loan_id, ephemeral
+        request.app.state.session_factory,
+        ctx,
+        loan_id,
+        ephemeral,
+        locale=request.state.locale,
     )
     saved = loan_scenario_service.list_loan_scenarios(
         request.app.state.session_factory, ctx, loan_id
@@ -2574,21 +2586,47 @@ async def loan_restore(request: Request, ctx: CurrentContext, loan_id: UUID) -> 
     return _redirect_settings(request, loan_id, notice="loan_restored", anchor="archive")
 
 
+@dataclass(frozen=True, slots=True)
+class _RateChangeInput:
+    mode: str
+    rate_bp: int | None
+    reference_rate_id: UUID | None
+    margin_bp: int | None
+
+
+def _rate_change_input(values: dict[str, str], locale: str) -> _RateChangeInput:
+    if values.get("mode") == "variable":
+        margin_bp = _percent(values, "margin_percent", locale)
+        if margin_bp is None:
+            raise loans.LoanError("margin_percent", "invalid_margin")
+        return _RateChangeInput(
+            mode="variable",
+            rate_bp=None,
+            reference_rate_id=_optional_id(values.get("reference_rate_id", "")),
+            margin_bp=margin_bp,
+        )
+    rate_bp = _percent(values, "rate_percent", locale)
+    if rate_bp is None:
+        raise loans.LoanError("rate_percent", "invalid_rate")
+    return _RateChangeInput(mode="fixed", rate_bp=rate_bp, reference_rate_id=None, margin_bp=None)
+
+
 @router.post("/loans/{loan_id}/rate-changes", name="loan_rate_change_create")
 async def loan_rate_change_create(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
     values = await _form_values(request)
     try:
-        rate_bp = _percent(values, "rate_percent", request.state.locale)
-        if rate_bp is None:
-            raise loans.LoanError("rate_percent", "invalid_rate")
+        rate_input = _rate_change_input(values, request.state.locale)
         await run_in_threadpool(
             loans.add_rate_change,
             request.app.state.session_factory,
             ctx,
             loan_id,
             effective_from=_date(values.get("effective_from", ""), "effective_from"),
-            rate_bp=rate_bp,
             high_rate_confirmed=values.get("high_rate_confirmed") == "1",
+            mode=rate_input.mode,
+            rate_bp=rate_input.rate_bp,
+            reference_rate_id=rate_input.reference_rate_id,
+            margin_bp=rate_input.margin_bp,
         )
     except (loans.LoanError, LoanValidationError) as exc:
         return await _render_settings_error(
@@ -2609,9 +2647,7 @@ async def loan_rate_change_update(
 ) -> Response:
     values = await _form_values(request)
     try:
-        rate_bp = _percent(values, "rate_percent", request.state.locale)
-        if rate_bp is None:
-            raise loans.LoanError("rate_percent", "invalid_rate")
+        rate_input = _rate_change_input(values, request.state.locale)
         await run_in_threadpool(
             loans.update_rate_change,
             request.app.state.session_factory,
@@ -2619,8 +2655,11 @@ async def loan_rate_change_update(
             loan_id,
             change_id,
             effective_from=_date(values.get("effective_from", ""), "effective_from"),
-            rate_bp=rate_bp,
             high_rate_confirmed=values.get("high_rate_confirmed") == "1",
+            mode=rate_input.mode,
+            rate_bp=rate_input.rate_bp,
+            reference_rate_id=rate_input.reference_rate_id,
+            margin_bp=rate_input.margin_bp,
         )
     except (loans.LoanError, LoanValidationError) as exc:
         return await _render_settings_error(

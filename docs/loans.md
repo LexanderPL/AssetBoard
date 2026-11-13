@@ -21,8 +21,9 @@ the payment day empty uses the first payment date's day; enter 31 explicitly for
 semantics.
 
 The **loan type** is annuity (roughly equal installments) or equal principal (the principal part
-is equal and the installment falls over time). You can change the type later. The **rate type**
-is fixed at creation: to switch between fixed and variable, archive the loan and add a new one.
+is equal and the installment falls over time). You can change the type later. The **initial rate
+type** is chosen at creation; later **rate changes** may switch between fixed and reference-rate
+segments, so a fixed period can be followed by a variable one on the same loan.
 
 The last step shows a read-only **Review**: the name, entry path, original principal or current
 balance, term, first payment date, rate configuration, regular overpayment, cost components and
@@ -41,9 +42,16 @@ to one field stay in the alert above the form.
   date and the latest rate at or before a payment applies.
 - **Variable**: choose a reference rate and a margin. Values are maintained on
   **Loans → Reference rates**; the latest value at or before a payment plus the margin applies.
+- **Mixed**: any rate change can start a fixed segment or a variable segment. On the change
+  date choose **Fixed rate** and enter the rate, or **Reference rate + margin** and pick the
+  series. A variable segment uses the latest value at or before its start, then reprices with
+  every later value until the next segment. A later change can switch back to fixed. The
+  **Rates** card lists the initial rate and every segment, and the current-rate summary shows
+  the source in force today.
 
 A rate above **25.00%** needs an explicit confirmation. Rates cannot exceed **100%**, and a
-margin cannot be negative.
+margin cannot be negative. A variable segment needs a reference value on or before its start;
+add values on the reference-rates page first.
 
 **Interest calculation** is monthly or actual/365. Monthly uses one twelfth of the annual rate
 in every period. Actual/365 uses the real number of calendar days between payment dates. The
@@ -333,9 +341,11 @@ calculated installment.
 Reference rates are workspace-scoped series such as WIBOR or EURIBOR. The page is a compact
 series table: each row shows the rate name and notes, its current value, a small value-history
 sparkline, and how many loans use it. Open a row to see the individual values with their dates,
-the **Used by** loan links, and the rate and value edit/delete controls. Values that start in the
-future can be corrected or deleted; past values are historical. A reference rate used by a loan
-cannot be deleted.
+the **Used by** loan links, and the rate and value edit/delete controls. Used-by includes loans
+that use the series in their initial rate **and** in any later variable segment. Values that
+start in the future can be corrected or deleted; past values are historical. A reference rate
+used by any segment cannot be deleted. Adding or changing a value revalidates every affected
+loan and refreshes its schedule.
 
 Editors and owners create a series and add a value with its effective date; viewers can read
 them but see no edit controls. The **New reference rate** action stays the page's primary
@@ -348,9 +358,9 @@ brings it back. Loans are never hard-deleted.
 
 ## Backup and restore
 
-Loans are part of the workspace archive (format 1.5): reference rates and values, terms, rate
-changes, cost components, planned overpayments, actual payments, balance checkpoints, scenarios
-and installment plans. Generated schedules are not stored in the archive; a restore rebuilds
+Loans are part of the workspace archive (format 1.6): reference rates and values, terms, fixed
+and variable rate segments, cost components, planned overpayments, actual payments, balance
+checkpoints, scenarios and installment plans. Generated schedules are not stored in the archive; a restore rebuilds
 them from the restored terms, so the schedule is identical. Property and ledger-payment links
 are mapped to the restored net-worth items and transactions. Loan and reference-rate ids are
 preserved when the destination does not already use them, which keeps linked net-worth items

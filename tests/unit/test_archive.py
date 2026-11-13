@@ -52,7 +52,8 @@ from assetboard.domain.archive import (
 from assetboard.services.archive import ARCHIVE_EXCLUDED_MODELS, ARCHIVE_INCLUDED_MODELS
 
 FIXTURES = Path(__file__).parents[1] / "fixtures"
-GOLDEN = FIXTURES / "workspace-archive-v1.5.zip"
+GOLDEN = FIXTURES / "workspace-archive-v1.6.zip"
+GOLDEN_V1_5 = FIXTURES / "workspace-archive-v1.5.zip"
 GOLDEN_V1_4 = FIXTURES / "workspace-archive-v1.4.zip"
 GOLDEN_V1_3 = FIXTURES / "workspace-archive-v1.3.zip"
 GOLDEN_V1_2 = FIXTURES / "workspace-archive-v1.2.zip"
@@ -589,7 +590,7 @@ def test_v1_4_workspace_carries_investments_and_risk_targets() -> None:
 
 
 def test_v1_5_workspace_carries_loans_and_reference_rates() -> None:
-    parsed, errors = parse_archive(GOLDEN.read_bytes())
+    parsed, errors = parse_archive(GOLDEN_V1_5.read_bytes())
     assert errors == ()
     assert parsed is not None and parsed.warnings == ()
     assert parsed.manifest["format_version"] == "1.5"
@@ -606,6 +607,18 @@ def test_v1_5_workspace_carries_loans_and_reference_rates() -> None:
     assert parsed.rows.loan_balance_checkpoints[0].remaining_principal == "280000.00"
     assert parsed.rows.loan_scenarios[0].overpayment_amount == "300.00"
     assert parsed.rows.installment_plans[0].remaining_count == 3
+
+
+def test_v1_6_workspace_adds_the_rate_segment_type() -> None:
+    parsed, errors = parse_archive(GOLDEN.read_bytes())
+    assert errors == ()
+    assert parsed is not None and parsed.warnings == ()
+    assert parsed.manifest["format_version"] == "1.6"
+    change = parsed.rows.loan_rate_changes[0]
+    assert change.mode == "fixed"
+    assert change.rate_bp == 650
+    assert change.reference_rate_id is None
+    assert change.margin_bp is None
 
 
 def test_loan_files_are_optional_before_1_5_and_required_in_1_5() -> None:

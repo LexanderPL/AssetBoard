@@ -30,7 +30,7 @@ items, value histories and snapshots, and the whole investment history: asset cl
 instruments, allocations, buy/sell transactions (undated lots included), bond terms, stored
 manual and provider prices, stored FX rates, and provider settings without their API keys,
 and the loan configuration: reference rates and their values, loans (including installment
-plans), fixed-rate changes, cost components, planned overpayments, actual payments, balance
+plans), fixed and variable rate segments, cost components, planned overpayments, actual payments, balance
 checkpoints and saved scenarios. Schedules are not archived; they are recomputed from those
 terms. Recurring items, income sources, work logs and calendars, and tax rules are not in this
 archive version yet. Notification channels and delivery logs are never exported, because channel URLs
@@ -117,7 +117,7 @@ two workspaces. Owners and editors can merge; it is the default mode.
 A merge writes categories, transactions and planned values only. The archive's settings,
 closed months, net-worth files, investment files and loan files are listed for information but
 never applied; a 1.2+ archive lists its net-worth files once with a restore-only warning, a 1.4
-archive lists its investment files once with the same kind of warning, and a 1.5 archive lists
+archive lists its investment files once with the same kind of warning, and a 1.5+ archive lists
 its loan files once with `loan_restore_only`. The settings diff also
 reports the investment cost basis and risk targets when they differ. The archive's base currency
 must match the workspace's; otherwise the whole archive is refused. Existing net-worth and

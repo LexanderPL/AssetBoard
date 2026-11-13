@@ -919,6 +919,15 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
                 loan=loans_by_id[row.loan_id].name,
                 effective_from=row.effective_from.isoformat(),
                 rate_bp=row.rate_bp,
+                mode=row.mode,
+                reference_rate_id=(str(row.reference_rate_id) if row.reference_rate_id else None),
+                reference_rate=(
+                    reference_rates_by_id[row.reference_rate_id].name
+                    if row.reference_rate_id is not None
+                    and row.reference_rate_id in reference_rates_by_id
+                    else ""
+                ),
+                margin_bp=row.margin_bp,
             )
             for row in rate_changes
         )

@@ -146,6 +146,7 @@ MORTGAGE_LOAN = UUID("b2b2b2b2-b2b2-4b2b-8b2b-b2b2b2b2b2b2")
 CAR_LOAN = UUID("b3b3b3b3-b3b3-4b3b-8b3b-b3b3b3b3b3b3")
 PLAN_LOAN = UUID("b4b4b4b4-b4b4-4b4b-8b4b-b4b4b4b4b4b4")
 RATE_CHANGE = UUID("b5b5b5b5-b5b5-4b5b-8b5b-b5b5b5b5b5b5")
+CAR_VARIABLE_CHANGE = UUID("c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3")
 COST_PERCENT = UUID("b6b6b6b6-b6b6-4b6b-8b6b-b6b6b6b6b6b6")
 COST_FIXED = UUID("b7b7b7b7-b7b7-4b7b-8b7b-b7b7b7b7b7b7")
 LOAN_OVERPAYMENT = UUID("b8b8b8b8-b8b8-4b8b-8b8b-b8b8b8b8b8b8")
@@ -782,6 +783,14 @@ def _loan_source_workspace(db: WorkspaceDb) -> None:
         LoanRateChangeRepository(session, ctx).create(
             id=RATE_CHANGE, loan_id=CAR_LOAN, effective_from=date(2026, 1, 15), rate_bp=650
         )
+        LoanRateChangeRepository(session, ctx).create(
+            id=CAR_VARIABLE_CHANGE,
+            loan_id=CAR_LOAN,
+            effective_from=date(2027, 6, 15),
+            mode="variable",
+            reference_rate_id=rate.id,
+            margin_bp=100,
+        )
         LoanCostComponentRepository(session, ctx).create(
             id=COST_PERCENT,
             loan_id=loan.id,
@@ -1247,13 +1256,16 @@ def test_loan_restore_round_trip_maps_references_and_keeps_schedule(
     source_inputs = load_loan_schedule_inputs(db.factory, source_ctx, MORTGAGE_LOAN)
     source_schedule = build_inputs_schedule(source_inputs)
     source_summary = summarize_schedule(source_schedule, source_inputs.as_of)
+    source_car_inputs = load_loan_schedule_inputs(db.factory, source_ctx, CAR_LOAN)
+    source_car_schedule = build_inputs_schedule(source_car_inputs)
 
     parsed, errors = parse_archive(first)
     assert errors == () and parsed is not None
     assert len(parsed.rows.reference_rates) == 1
     assert len(parsed.rows.reference_rate_values) == 1
     assert len(parsed.rows.loans) == 3
-    assert len(parsed.rows.loan_rate_changes) == 1
+    assert len(parsed.rows.loan_rate_changes) == 2
+    assert [row.mode for row in parsed.rows.loan_rate_changes] == ["fixed", "variable"]
     assert len(parsed.rows.loan_cost_components) == 2
     assert len(parsed.rows.loan_overpayments) == 1
     assert len(parsed.rows.loan_payments) == 1
@@ -1301,6 +1313,10 @@ def test_loan_restore_round_trip_maps_references_and_keeps_schedule(
     target_schedule = build_inputs_schedule(target_inputs)
     assert target_schedule.rows == source_schedule.rows
     assert summarize_schedule(target_schedule, target_inputs.as_of) == source_summary
+    target_car = loans_by_name["Car loan"]
+    target_car_inputs = load_loan_schedule_inputs(db.factory, target_ctx, target_car.id)
+    target_car_schedule = build_inputs_schedule(target_car_inputs)
+    assert target_car_schedule.rows == source_car_schedule.rows
 
     second = export_workspace(db.factory, target_ctx).content
     second_parsed, second_errors = parse_archive(second)
