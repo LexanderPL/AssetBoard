@@ -290,3 +290,30 @@ def test_every_transaction_action_has_a_label_keys_and_a_group() -> None:
     texts += [VALUE_TABLES["fields"][f] for f in ("date", "amount", "description", "category")]
     for text in texts:
         assert gettext(text, "pl") != text, f"no Polish translation for {text!r}"
+
+
+# FIRE events (F8.1)
+
+FIRE_ACTIONS = {
+    "fire_scenario.created",
+    "fire_scenario.updated",
+    "fire_scenario.duplicated",
+    "fire_scenario.archived",
+    "fire_scenario.restored",
+    "fire_scenario.default_changed",
+}
+
+
+def test_every_fire_action_has_a_label_keys_and_a_group() -> None:
+    assert {action for action in ACTION_LABELS if action.startswith("fire_scenario.")} == (
+        FIRE_ACTIONS
+    )
+    assert set(GROUPS["workspace"]["fire"]) == FIRE_ACTIONS
+    assert "fire" in GROUP_LABELS
+    keys = {key for action in FIRE_ACTIONS for key in DATA_KEYS[action]}
+    assert keys <= set(KEY_LABELS)
+    texts = [ACTION_LABELS[action] for action in FIRE_ACTIONS]
+    texts += [KEY_LABELS[key] for key in keys]
+    texts.append(GROUP_LABELS["fire"])
+    for text in texts:
+        assert gettext(text, "pl").strip()
