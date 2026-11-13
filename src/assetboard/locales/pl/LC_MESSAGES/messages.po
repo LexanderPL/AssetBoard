@@ -7954,6 +7954,10 @@ msgid "I understand this rate is above 25%%."
 msgstr "Rozumiem, że ta stopa przekracza 25%%."
 
 #, python-format
+msgid "A rate above 25%% asks for confirmation when you save it."
+msgstr "Stopa powyżej 25%% poprosi o potwierdzenie przy zapisie."
+
+#, python-format
 msgid "Installment override (%(currency)s, optional)"
 msgstr "Nadpisanie raty (%(currency)s, opcjonalnie)"
 
