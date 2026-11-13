@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.6.4](https://github.com/LexanderPL/AssetBoard/compare/v0.6.3...v0.6.4) (2026-11-12)
+
+
+### Features
+
+* **loans:** add cost components to the loan wizard ([#299](https://github.com/LexanderPL/AssetBoard/issues/299)) ([5a5aceb](https://github.com/LexanderPL/AssetBoard/commit/5a5aceb05a580586dd2038646e8fe1c81916824e))
+* **loans:** merge the overview and add a repayment progress bar ([#300](https://github.com/LexanderPL/AssetBoard/issues/300)) ([2dcbc02](https://github.com/LexanderPL/AssetBoard/commit/2dcbc02db44b61cade31006573d7a1790c62a327))
+
+
+### Bug Fixes
+
+* **loans:** tab spacing and target-total edit validation ([#297](https://github.com/LexanderPL/AssetBoard/issues/297)) ([f0496ce](https://github.com/LexanderPL/AssetBoard/commit/f0496ce70fef4e942df00d483680a507f6be9d8b))
+
 ## [0.6.3](https://github.com/LexanderPL/AssetBoard/compare/v0.6.2...v0.6.3) (2026-11-12)
 
 
