@@ -307,6 +307,30 @@ def test_wizard_rejects_a_cost_row_without_a_name_or_amount(owner):
         assert session.scalars(select(Loan)).all() == []
 
 
+def test_loan_overview_shows_the_same_status_badge_as_the_list(owner):
+    loan_id = _create_original(owner)
+    page = owner.client.get(f"/loans/{loan_id}")
+    assert 'data-loan-status-badge="active"' in page.text
+    assert ">Active</span>" in page.text
+
+    owner.post(f"/loans/{loan_id}/archive")
+    archived = owner.client.get(f"/loans/{loan_id}")
+    assert 'data-loan-status-badge="archived"' in archived.text
+    assert ">Archived</span>" in archived.text
+
+    paid_id = _create_original(
+        owner,
+        name="Almost paid",
+        principal_original="1,000.00",
+        origination_date="2025-12-01",
+        first_payment_date="2026-01-01",
+        term_months="1",
+    )
+    paid = owner.client.get(f"/loans/{paid_id}")
+    assert 'data-loan-status-badge="paid_off"' in paid.text
+    assert ">Paid off</span>" in paid.text
+
+
 def test_loan_detail_renders_a_notice_and_ignores_unknown_codes(owner):
     loan_id = _create_original(owner)
     notice = owner.client.get(f"/loans/{loan_id}?notice=loan_created")

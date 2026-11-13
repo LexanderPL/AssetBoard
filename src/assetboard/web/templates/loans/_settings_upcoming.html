@@ -21,7 +21,7 @@
     <div class="mt-3 flex flex-wrap items-end gap-2">
       <form method="post" action="{{ scoped_url(request, 'loan_scheduled_generate', loan_id=loan.id) }}" class="flex flex-wrap items-end gap-2">
         {{ csrf_input() }}
-        <label class="grid gap-1 text-sm font-medium">{{ _("Expense category") }}<select name="category_id" class="form-select py-2 font-normal" required>{% for category in expense_categories %}<option value="{{ category.id }}"{% if category.id == scheduled_item.category_id %} selected{% endif %}>{{ category.name }}</option>{% endfor %}</select></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Expense category") }}<select name="category_id" class="form-select py-2 font-normal" required{% if error_field == "category_id" %} aria-invalid="true" aria-describedby="settings-category_id-error"{% endif %}>{% for category in expense_categories %}<option value="{{ category.id }}"{% if form_values.get('category_id', scheduled_item.category_id|string) == category.id|string %} selected{% endif %}>{{ category.name }}</option>{% endfor %}</select>{% if error_field == "category_id" %}<p id="settings-category_id-error" class="text-sm text-danger" data-field-error="category_id">{{ error }}</p>{% endif %}</label>
         <button type="submit" class="btn">{{ _("Refresh occurrences") }}</button>
       </form>
       <form method="post" action="{{ scoped_url(request, 'loan_scheduled_disable', loan_id=loan.id) }}" data-confirm="{{ _('Disable recurring installment generation? Pending future occurrences will be removed.') }}" data-confirm-tone="danger">
@@ -35,7 +35,7 @@
     {% if can_edit and not loan.archived and expense_categories %}
     <form method="post" action="{{ scoped_url(request, 'loan_scheduled_generate', loan_id=loan.id) }}" class="mt-3 flex flex-wrap items-end gap-2">
       {{ csrf_input() }}
-      <label class="grid gap-1 text-sm font-medium">{{ _("Expense category") }}<select name="category_id" class="form-select py-2 font-normal" required><option value="">{{ _("Choose a category") }}</option>{% for category in expense_categories %}<option value="{{ category.id }}">{{ category.name }}</option>{% endfor %}</select></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Expense category") }}<select name="category_id" class="form-select py-2 font-normal" required{% if error_field == "category_id" %} aria-invalid="true" aria-describedby="settings-category_id-error"{% endif %}><option value="">{{ _("Choose a category") }}</option>{% for category in expense_categories %}<option value="{{ category.id }}"{% if form_values.get('category_id') == category.id|string %} selected{% endif %}>{{ category.name }}</option>{% endfor %}</select>{% if error_field == "category_id" %}<p id="settings-category_id-error" class="text-sm text-danger" data-field-error="category_id">{{ error }}</p>{% endif %}</label>
       <button type="submit" class="btn-primary">{{ _("Generate occurrences") }}</button>
     </form>
     {% endif %}

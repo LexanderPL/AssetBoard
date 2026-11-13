@@ -176,13 +176,17 @@ def test_property_link_ltv_equity_and_clear(owner) -> None:
 
 def test_property_validation_error_is_shown(owner) -> None:
     loan_id = _create(owner)
-    property_id = _property_item(owner, currency="USD")
+    _property_item(owner, name="Home")
+    property_id = _property_item(owner, name="Dollar flat", currency="USD")
     response = owner.post(f"/loans/{loan_id}/property", {"property_item_id": property_id})
     assert response.status_code == 303
+    assert "field=property_item_id" in response.headers["location"]
     page = owner.client.get(response.headers["location"])
     with owner.db() as session:
         assert session.get(Loan, UUID(loan_id)).property_item_id is None
     assert "The property and the loan must use the same currency." in page.text
+    assert 'data-field-error="property_item_id"' in page.text
+    assert 'aria-describedby="settings-property_item_id-error"' in page.text
 
 
 def test_scheduled_generation_and_disable(owner) -> None:

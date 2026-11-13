@@ -961,6 +961,7 @@ def _settings_context(
         "loan": view,
         "can_edit": has_role(ctx, Role.EDITOR),
         "error": error,
+        "error_field": error_field,
         "notice": notice,
         "form_values": form_values or {},
         "open_form": open_form if open_form in SETTINGS_FORMS else None,
@@ -987,6 +988,7 @@ def _redirect_settings(
     *,
     notice: str | None = None,
     error: str | None = None,
+    error_field: str | None = None,
     anchor: str | None = None,
 ) -> RedirectResponse:
     query: dict[str, str] = {}
@@ -994,6 +996,8 @@ def _redirect_settings(
         query["notice"] = notice
     if error:
         query["error"] = error
+    if error and error_field:
+        query["field"] = error_field
     url = request.url_for("loan_settings", loan_id=str(loan_id)).path
     if query:
         url += "?" + urlencode(query)
@@ -1018,6 +1022,7 @@ async def _render_settings_error(
         ctx,
         loan_id,
         error=_error(request, getattr(exc, "code", "failed")),
+        error_field=_settings_error_field(exc, form),
         form_values=values,
         open_form=form,
         edit_id=edit_id,
@@ -1887,6 +1892,7 @@ async def loan_settings_page(request: Request, ctx: CurrentContext, loan_id: UUI
         ctx,
         loan_id,
         error=_error(request, request.query_params.get("error")),
+        error_field=request.query_params.get("field"),
         notice=_notice(request, request.query_params.get("notice")),
         open_form=requested_form,
         edit_id=request.query_params.get("edit"),
@@ -2107,8 +2113,13 @@ async def loan_property_set(request: Request, ctx: CurrentContext, loan_id: UUID
             _id(values.get("property_item_id", "")),
         )
     except (loans.LoanError, LoanValidationError) as exc:
+        field = getattr(exc, "field", None)
         return _redirect_settings(
-            request, loan_id, error=getattr(exc, "code", "failed"), anchor="property"
+            request,
+            loan_id,
+            error=getattr(exc, "code", "failed"),
+            error_field=field if field == "property_item_id" else None,
+            anchor="property",
         )
     return _redirect_settings(request, loan_id, notice="property_saved", anchor="property")
 
@@ -2160,8 +2171,13 @@ async def loan_scheduled_generate(request: Request, ctx: CurrentContext, loan_id
             request.app.state.settings,
         )
     except (loans.LoanError, LoanValidationError) as exc:
+        field = getattr(exc, "field", None)
         return _redirect_settings(
-            request, loan_id, error=getattr(exc, "code", "failed"), anchor="upcoming"
+            request,
+            loan_id,
+            error=getattr(exc, "code", "failed"),
+            error_field=field if field == "category_id" else None,
+            anchor="upcoming",
         )
     return _redirect_settings(request, loan_id, notice="schedule_generated", anchor="upcoming")
 
@@ -2476,10 +2492,16 @@ async def loan_overpayment_settings(
             strategy=values.get("overpayment_strategy", "reduce_term"),
         )
     except (loans.LoanError, LoanValidationError) as exc:
+        field = getattr(exc, "field", None)
         return _redirect_settings(
             request,
             loan_id,
             error=getattr(exc, "code", "failed"),
+            error_field=(
+                field
+                if field in ("overpayment_mode", "overpayment_amount", "overpayment_strategy")
+                else None
+            ),
             anchor="overpayments",
         )
     return _redirect_settings(request, loan_id, notice="overpayment_saved", anchor="overpayments")
