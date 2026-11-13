@@ -81,6 +81,23 @@ class ScenarioComparisonRow:
     parameters: ScenarioParameters | None
     scenario_id: UUID | None
     error_code: str | None
+    interest_saved_vs_current: Money | None = None
+    months_saved_vs_current: int | None = None
+
+    @property
+    def interest_saved_vs_current_abs(self) -> Money | None:
+        if self.interest_saved_vs_current is None:
+            return None
+        return Money(
+            abs(self.interest_saved_vs_current.amount_minor),
+            self.interest_saved_vs_current.currency,
+        )
+
+    @property
+    def months_saved_vs_current_abs(self) -> int | None:
+        if self.months_saved_vs_current is None:
+            return None
+        return abs(self.months_saved_vs_current)
 
 
 @dataclass(frozen=True, slots=True)
@@ -212,6 +229,7 @@ def _row(
     is_current: bool = False,
     scenario_id: UUID | None = None,
     baseline: Schedule | None = None,
+    current: Schedule | None = None,
     schedule_override: Schedule | None = None,
 ) -> ScenarioComparisonRow:
     name = parameters.name if parameters is not None else None
@@ -282,6 +300,15 @@ def _row(
             - summary.total_interest.amount_minor,
             schedule.currency,
         )
+    interest_saved_vs_current = None
+    months_saved_vs_current = None
+    if current is not None:
+        months_saved_vs_current = len(current.rows) - len(schedule.rows)
+        interest_saved_vs_current = Money(
+            sum(row.interest.amount_minor for row in current.rows)
+            - summary.total_interest.amount_minor,
+            schedule.currency,
+        )
     return ScenarioComparisonRow(
         label=label,
         name=name,
@@ -296,6 +323,8 @@ def _row(
         parameters=parameters,
         scenario_id=scenario_id,
         error_code=None,
+        interest_saved_vs_current=interest_saved_vs_current,
+        months_saved_vs_current=months_saved_vs_current,
     )
 
 
@@ -399,6 +428,7 @@ def compare_loan_scenarios(
                 view.name,
                 scenario_id=view.id,
                 baseline=baseline_schedule,
+                current=current.schedule,
             )
         )
     ephemeral_rows = [

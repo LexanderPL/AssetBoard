@@ -101,19 +101,48 @@
 
 <section class="panel mb-6 p-4 sm:p-6" id="saved-scenarios" aria-labelledby="saved-scenarios-heading" data-saved-scenarios>
   <h2 id="saved-scenarios-heading" class="text-base font-semibold">{{ _("Saved scenarios") }}</h2>
-  {% if saved %}
-  <ul class="mt-4 divide-y divide-line">
-    {% for scenario in saved %}
-    <li class="flex flex-wrap items-start justify-between gap-3 py-3" data-saved-scenario="{{ scenario.id }}">
-      <div>
-        <p class="font-medium">{{ scenario.name }}</p>
-        <p class="mt-1 text-sm text-muted">{% for part in scenario_summary(scenario.parameters) %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+  <p class="mt-1 text-sm text-muted">{{ _("Each saved scenario is compared with your current plan, so the change is visible before you open the full table.") }}</p>
+  {% if saved_cards %}
+  <ul class="mt-4 grid gap-4 md:grid-cols-2" data-saved-scenarios-list>
+    {% for scenario, row in saved_cards %}
+    <li class="border border-line p-4" data-saved-scenario="{{ scenario.id }}">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="font-medium">{{ scenario.name }}</p>
+          <p class="mt-1 text-sm text-muted">{% for part in scenario_summary(scenario.parameters) %}{{ part }}{% if not loop.last %} · {% endif %}{% endfor %}</p>
+        </div>
+        {% if can_edit and not loan.archived %}
+        <form method="post" action="{{ scoped_url(request, 'loan_scenario_delete', loan_id=loan.id, scenario_id=scenario.id) }}" data-confirm="{{ _('Delete the scenario %(name)s?', name=scenario.name) }}" data-confirm-tone="danger">
+          {{ csrf_input() }}
+          <button type="submit" class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ scenario.name }}</span></button>
+        </form>
+        {% endif %}
       </div>
-      {% if can_edit and not loan.archived %}
-      <form method="post" action="{{ scoped_url(request, 'loan_scenario_delete', loan_id=loan.id, scenario_id=scenario.id) }}" data-confirm="{{ _('Delete the scenario %(name)s?', name=scenario.name) }}" data-confirm-tone="danger">
-        {{ csrf_input() }}
-        <button type="submit" class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ scenario.name }}</span></button>
-      </form>
+      {% if row and row.error_code %}
+      <p class="mt-3 text-sm text-danger-strong" data-saved-delta-error>{{ _("Cannot calculate with the current terms:") }} {{ scenario_row_error(row.error_code) }}</p>
+      {% elif row and row.interest_saved_vs_current is not none and row.months_saved_vs_current is not none %}
+      {% set interest = row.interest_saved_vs_current %}
+      {% set months = row.months_saved_vs_current %}
+      <dl class="mt-4 grid gap-3 border-t border-line pt-3 sm:grid-cols-2" data-saved-delta>
+        <div>
+          <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Interest vs the current plan") }}</dt>
+          <dd class="mt-1 text-lg font-semibold tabular-nums {% if interest.amount_minor > 0 %}text-success-strong{% elif interest.amount_minor < 0 %}text-danger-strong{% else %}text-muted{% endif %}" data-saved-interest-delta="{{ interest.amount_minor }}">
+            {% if interest.amount_minor > 0 %}{{ _("Saves %(amount)s", amount=format_money(row.interest_saved_vs_current_abs, locale)) }}
+            {% elif interest.amount_minor < 0 %}{{ _("Adds %(amount)s", amount=format_money(row.interest_saved_vs_current_abs, locale)) }}
+            {% else %}{{ _("Same interest as the current plan") }}{% endif %}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Payoff vs the current plan") }}</dt>
+          <dd class="mt-1 text-lg font-semibold tabular-nums {% if months > 0 %}text-success-strong{% elif months < 0 %}text-danger-strong{% else %}text-muted{% endif %}" data-saved-months-delta="{{ months }}">
+            {% if months > 0 %}{{ ngettext("%(num)d month sooner", "%(num)d months sooner", row.months_saved_vs_current_abs, num=row.months_saved_vs_current_abs) }}
+            {% elif months < 0 %}{{ ngettext("%(num)d month later", "%(num)d months later", row.months_saved_vs_current_abs, num=row.months_saved_vs_current_abs) }}
+            {% else %}{{ _("Same payoff date as the current plan") }}{% endif %}
+          </dd>
+        </div>
+      </dl>
+      {% else %}
+      <p class="mt-3 text-sm text-muted" data-saved-delta-unavailable>{{ _("Comparison unavailable until the loan's terms allow a schedule to be built.") }}</p>
       {% endif %}
     </li>
     {% endfor %}
@@ -124,36 +153,54 @@
 </section>
 
 <section class="panel mb-6 p-4 sm:p-6" id="what-if" aria-labelledby="what-if-heading">
-  <h2 id="what-if-heading" class="text-base font-semibold">{{ _("What-if rows") }}</h2>
-  <p class="mt-1 text-sm text-muted">{{ _("Up to three temporary variations. A name saves the row (or updates the scenario with that name); leave the name empty to compare without saving.") }}</p>
-  <form method="post" action="{{ scoped_url(request, 'loan_scenarios_compare', loan_id=loan.id) }}" class="mt-5 grid gap-5" data-scenario-form>
+  <h2 id="what-if-heading" class="text-base font-semibold">{{ _("What-if cards") }}</h2>
+  <p class="mt-1 text-sm text-muted">{{ _("Up to three temporary variations. A name saves the card (or updates the scenario with that name); leave the name empty to compare without saving.") }}</p>
+  <form method="post" action="{{ scoped_url(request, 'loan_scenarios_compare', loan_id=loan.id) }}" class="mt-5" data-scenario-form>
     {{ csrf_input() }}
+    <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
     {% for row in scenario_rows %}
     {% set n = loop.index %}
-    <fieldset class="rounded-xl border border-line p-4" data-scenario-form-row="{{ n }}">
+    <fieldset class="min-w-0 border border-line p-4" data-scenario-card="{{ n }}" data-scenario-form-row="{{ n }}">
       <legend class="px-1 text-sm font-semibold">{{ _("What-if %(number)d", number=n) }}</legend>
-      <div class="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {% if can_edit and not loan.archived %}<label class="grid gap-1 text-sm font-medium">{{ _("Scenario name (optional)") }}<input name="name_{{ n }}" value="{{ row.name }}" maxlength="200" class="{{ input_class }} font-normal" data-scenario-name></label>{% endif %}
-        <label class="grid gap-1 text-sm font-medium">{{ _("Overpayment") }}<select name="overpayment_mode_{{ n }}" class="form-select py-2 font-normal">
+      <div class="mt-3 flex flex-wrap gap-2" data-scenario-presets>
+        {% if scenario_presets.overpayment_amount %}
+        <button type="button" class="btn-sm" data-scenario-preset="overpayment" data-amount="{{ scenario_presets.overpayment_amount }}">{{ _("Add 10%% of the installment") }}<span class="sr-only"> {{ _("in what-if %(number)d", number=n) }}</span></button>
+        {% endif %}
+        <button type="button" class="btn-sm" data-scenario-preset="rate" data-shift="{{ scenario_presets.rate_shift }}" data-date="{{ today.isoformat() }}">{{ _("Raise the rate by 1 pp") }}<span class="sr-only"> {{ _("in what-if %(number)d", number=n) }}</span></button>
+        <button type="button" class="btn-sm" data-scenario-preset="one_off" data-amount="{{ scenario_presets.one_off_amount }}" data-date="{{ today.isoformat() }}">{{ _("One-off 1,000") }}<span class="sr-only"> {{ _("in what-if %(number)d", number=n) }}</span></button>
+      </div>
+      <div class="mt-4 grid gap-3">
+        {% if can_edit and not loan.archived %}<label class="grid gap-1 text-sm font-medium">{{ _("Scenario name (optional)") }}<input name="name_{{ n }}" value="{{ row.name }}" maxlength="200" class="{{ input_class }} font-normal" data-scenario-name data-scenario-clear-field data-default=""></label>{% endif %}
+        <label class="grid gap-1 text-sm font-medium">{{ _("Overpayment") }}<select name="overpayment_mode_{{ n }}" class="form-select py-2 font-normal" data-scenario-overpayment-mode data-scenario-clear-field data-default="same">
           <option value="same"{% if row.overpayment_mode in ("", "same") %} selected{% endif %}>{{ _("Same as the loan") }}</option>
           <option value="none"{% if row.overpayment_mode == "none" %} selected{% endif %}>{{ _("None") }}</option>
           <option value="fixed_extra"{% if row.overpayment_mode == "fixed_extra" %} selected{% endif %}>{{ _("Fixed extra each month") }}</option>
           <option value="target_total"{% if row.overpayment_mode == "target_total" %} selected{% endif %}>{{ _("Target total each month") }}</option>
         </select></label>
-        <label class="grid gap-1 text-sm font-medium">{{ _("Overpayment amount (%(currency)s)", currency=loan.currency) }}<input name="overpayment_amount_{{ n }}" value="{{ row.overpayment_amount }}" inputmode="decimal" class="{{ input_class }} font-normal" data-scenario-overpayment-amount></label>
-        <label class="grid gap-1 text-sm font-medium">{{ _("Strategy") }}<select name="overpayment_strategy_{{ n }}" class="form-select py-2 font-normal">
+        <label class="grid gap-1 text-sm font-medium">{{ _("Overpayment amount (%(currency)s)", currency=loan.currency) }}<input name="overpayment_amount_{{ n }}" value="{{ row.overpayment_amount }}" inputmode="decimal" class="{{ input_class }} font-normal" data-scenario-overpayment-amount data-scenario-clear-field data-default=""><span class="text-xs font-normal text-muted">{{ _("Used only with a fixed extra or a target total.") }}</span></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Strategy") }}<select name="overpayment_strategy_{{ n }}" class="form-select py-2 font-normal" data-scenario-strategy data-scenario-clear-field data-default="same">
           <option value="same"{% if row.overpayment_strategy in ("", "same") %} selected{% endif %}>{{ _("Same as the loan") }}</option>
           <option value="reduce_term"{% if row.overpayment_strategy == "reduce_term" %} selected{% endif %}>{{ _("Shorten the term") }}</option>
           <option value="reduce_installment"{% if row.overpayment_strategy == "reduce_installment" %} selected{% endif %}>{{ _("Lower the installment") }}</option>
         </select></label>
-        <label class="grid gap-1 text-sm font-medium">{{ _("Rate shift in percentage points") }}<input name="rate_shift_{{ n }}" value="{{ row.rate_shift }}" inputmode="decimal" placeholder="-1.5" class="{{ input_class }} font-normal" data-scenario-rate-shift></label>
-        <label class="grid gap-1 text-sm font-medium">{{ _("Rate shift from") }}<input name="rate_shift_from_{{ n }}" type="date" value="{{ row.rate_shift_from }}" class="{{ input_class }} font-normal" data-scenario-rate-shift-from></label>
-        <label class="grid gap-1 text-sm font-medium">{{ _("One-off lump sum (%(currency)s)", currency=loan.currency) }}<input name="one_off_amount_{{ n }}" value="{{ row.one_off_amount }}" inputmode="decimal" class="{{ input_class }} font-normal" data-scenario-one-off-amount></label>
-        <label class="grid gap-1 text-sm font-medium">{{ _("One-off date") }}<input name="one_off_date_{{ n }}" type="date" value="{{ row.one_off_date }}" class="{{ input_class }} font-normal" data-scenario-one-off-date></label>
+        <div class="grid gap-3 border-t border-line pt-3">
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Rate shift") }}</p>
+          <label class="grid gap-1 text-sm font-medium">{{ _("Rate shift in percentage points") }}<input name="rate_shift_{{ n }}" value="{{ row.rate_shift }}" inputmode="decimal" placeholder="-1.5" class="{{ input_class }} font-normal" data-scenario-rate-shift data-scenario-clear-field data-default=""></label>
+          <label class="grid gap-1 text-sm font-medium">{{ _("Rate shift from") }}<input name="rate_shift_from_{{ n }}" type="date" value="{{ row.rate_shift_from }}" class="{{ input_class }} font-normal" data-scenario-rate-shift-from data-scenario-clear-field data-default=""></label>
+        </div>
+        <div class="grid gap-3 border-t border-line pt-3">
+          <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("One-off") }}</p>
+          <label class="grid gap-1 text-sm font-medium">{{ _("One-off lump sum (%(currency)s)", currency=loan.currency) }}<input name="one_off_amount_{{ n }}" value="{{ row.one_off_amount }}" inputmode="decimal" class="{{ input_class }} font-normal" data-scenario-one-off-amount data-scenario-clear-field data-default=""></label>
+          <label class="grid gap-1 text-sm font-medium">{{ _("One-off date") }}<input name="one_off_date_{{ n }}" type="date" value="{{ row.one_off_date }}" class="{{ input_class }} font-normal" data-scenario-one-off-date data-scenario-clear-field data-default=""></label>
+        </div>
+      </div>
+      <div class="mt-3 flex justify-end">
+        <button type="button" class="btn-sm" data-scenario-clear>{{ _("Clear card") }}<span class="sr-only"> {{ _("what-if %(number)d", number=n) }}</span></button>
       </div>
     </fieldset>
     {% endfor %}
-    <div class="flex flex-wrap gap-2">
+    </div>
+    <div class="mt-5 flex flex-wrap gap-2">
       <button type="submit" class="btn-primary">{% if can_edit and not loan.archived %}{{ _("Compare and save named scenarios") }}{% else %}{{ _("Compare what-ifs") }}{% endif %}</button>
       <a href="{{ scoped_url(request, 'loan_scenarios', loan_id=loan.id) }}" class="btn">{{ _("Clear rows") }}</a>
     </div>

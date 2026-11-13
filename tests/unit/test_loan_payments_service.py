@@ -733,3 +733,145 @@ def test_plan_status_summarises_the_last_payment_and_checkpoint(team: WorkspaceD
     assert status.latest_checkpoint is not None
     assert status.status == "ahead"
     assert status.variance is not None and status.variance.amount_minor > 0
+
+
+def _payment_variance(
+    team: WorkspaceDb, loan_id: UUID, date_value: date, total: int, **kwargs
+) -> loan_payments.LoanPaymentView:
+    ctx = team.ctx("owner", "owner")
+    loan_payments.create_loan_payment(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date_value,
+        kind=kwargs.pop("kind", "installment"),
+        total=_money(total),
+        **kwargs,
+    )
+    return loan_payments.list_loan_payments(team.factory, ctx, loan_id)[0]
+
+
+def test_payment_variance_equal_total_and_principal(team: WorkspaceDb) -> None:
+    loan_id = _create(team)
+    _, row = _first_row(team, loan_id)
+    payment = _payment_variance(team, loan_id, row.date, row.installment_total.amount_minor)
+    assert payment.variance is not None
+    assert payment.variance_error is None
+    assert payment.variance.label == "equal"
+    assert payment.variance.matched_date == row.date
+    assert payment.variance.projected_total == row.installment_total
+    assert payment.variance.total_variance.amount_minor == 0
+    assert payment.variance.projected_principal == row.principal
+    assert payment.variance.principal_variance.amount_minor == 0
+
+
+def test_payment_variance_larger_total_keeps_the_projected_principal(team: WorkspaceDb) -> None:
+    loan_id = _create(team)
+    _, row = _first_row(team, loan_id)
+    excess = 50_000
+    payment = _payment_variance(
+        team, loan_id, row.date, row.installment_total.amount_minor + excess
+    )
+    assert payment.variance is not None
+    assert payment.variance.label == "more"
+    assert payment.variance.total_variance.amount_minor == excess
+    assert payment.variance.principal_variance.amount_minor == 0
+
+
+def test_payment_variance_smaller_total_reduces_the_principal(team: WorkspaceDb) -> None:
+    loan_id = _create(team)
+    _, row = _first_row(team, loan_id)
+    shortfall = 10_000
+    payment = _payment_variance(
+        team, loan_id, row.date, row.installment_total.amount_minor - shortfall
+    )
+    assert payment.variance is not None
+    assert payment.variance.label == "less"
+    assert payment.variance.total_variance.amount_minor == -shortfall
+    assert payment.variance.principal_variance.amount_minor == -shortfall
+
+
+def test_payment_variance_matches_the_first_later_row(team: WorkspaceDb) -> None:
+    loan_id = _create(team)
+    data = loan_schedule.loan_schedule(team.factory, team.ctx("owner", "owner"), loan_id)
+    assert data.schedule is not None
+    expected = data.schedule.rows[1]
+    payment = _payment_variance(
+        team, loan_id, date(2026, 2, 15), expected.installment_total.amount_minor
+    )
+    assert payment.variance is not None
+    assert payment.variance.matched_date == expected.date
+    assert payment.variance.total_variance.amount_minor == 0
+
+
+def test_payment_variance_handles_overpayment_only_and_no_row(team: WorkspaceDb) -> None:
+    loan_id = _create(team)
+    ctx = team.ctx("owner", "owner")
+    loan_payments.create_loan_payment(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 2, 1),
+        kind="overpayment",
+        total=_money(20_000),
+    )
+    payments = loan_payments.list_loan_payments(team.factory, ctx, loan_id)
+    assert payments[0].kind is LoanPaymentKind.OVERPAYMENT
+    assert payments[0].variance is None
+    assert payments[0].variance_error is None
+
+    loan_payments.create_loan_payment(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2199, 1, 1),
+        kind="installment",
+        total=_money(10_000),
+        principal=_money(10_000),
+        interest=_money(0),
+        costs=_money(0),
+        overpayment=_money(0),
+    )
+    after_payoff = loan_payments.list_loan_payments(team.factory, ctx, loan_id)[0]
+    assert after_payoff.variance is None
+    assert after_payoff.variance_error == "no_scheduled_payment"
+
+
+def test_payment_variance_handles_a_broken_schedule(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    with team.factory.begin() as session:
+        LoanRepository(session, ctx).create(
+            name="No rate loan",
+            kind="annuity",
+            currency="EUR",
+            principal_original_minor=100_000,
+            origination_date=date(2026, 1, 1),
+            first_payment_date=date(2026, 2, 1),
+            term_months=12,
+            payment_day=1,
+            rate_mode="fixed",
+            day_count="monthly",
+            margin_bp=None,
+            reference_rate_id=None,
+            installment_override_minor=None,
+            overpayment_mode="none",
+            overpayment_amount_minor=None,
+            overpayment_strategy="reduce_term",
+            archived_at=None,
+        )
+        loan_id = LoanRepository(session, ctx).ordered()[0].id
+    loan_payments.create_loan_payment(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 2, 1),
+        kind="installment",
+        total=_money(10_000),
+        principal=_money(10_000),
+        interest=_money(0),
+        costs=_money(0),
+        overpayment=_money(0),
+    )
+    payment = loan_payments.list_loan_payments(team.factory, ctx, loan_id)[0]
+    assert payment.variance is None
+    assert payment.variance_error == "missing_rate"

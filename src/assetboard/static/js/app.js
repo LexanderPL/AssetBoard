@@ -510,6 +510,73 @@ document.addEventListener("change", (event) => {
   target.form?.requestSubmit();
 });
 
+// What-if scenario cards (F7.4): a preset button fills the card it belongs to and a Clear card
+// button resets that card. The buttons are type="button", so without this script the form still
+// works; the fields simply stay as typed. A preset only writes form values, never submits.
+function setScenarioValue(card, selector, value) {
+  const field = card.querySelector(selector);
+  if (!(field instanceof HTMLInputElement || field instanceof HTMLSelectElement)) return null;
+  field.value = value;
+  field.dispatchEvent(new Event("change", { bubbles: true }));
+  return field;
+}
+
+function focusScenarioField(field) {
+  if (!(field instanceof HTMLElement)) return;
+  field.focus();
+  if (field instanceof HTMLInputElement && field.type !== "date") field.select();
+}
+
+document.addEventListener("click", (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+
+  const preset = target.closest("[data-scenario-preset]");
+  if (preset instanceof HTMLElement) {
+    const card = preset.closest("[data-scenario-card]");
+    if (!(card instanceof HTMLElement)) return;
+    event.preventDefault();
+    const kind = preset.dataset.scenarioPreset;
+    if (kind === "overpayment") {
+      setScenarioValue(card, "[data-scenario-overpayment-mode]", "fixed_extra");
+      focusScenarioField(
+        setScenarioValue(
+          card,
+          "[data-scenario-overpayment-amount]",
+          preset.dataset.amount ?? "",
+        ),
+      );
+    } else if (kind === "rate") {
+      setScenarioValue(card, "[data-scenario-rate-shift-from]", preset.dataset.date ?? "");
+      focusScenarioField(
+        setScenarioValue(card, "[data-scenario-rate-shift]", preset.dataset.shift ?? ""),
+      );
+    } else if (kind === "one_off") {
+      setScenarioValue(card, "[data-scenario-one-off-date]", preset.dataset.date ?? "");
+      focusScenarioField(
+        setScenarioValue(card, "[data-scenario-one-off-amount]", preset.dataset.amount ?? ""),
+      );
+    }
+    return;
+  }
+
+  const clear = target.closest("[data-scenario-clear]");
+  if (!(clear instanceof HTMLElement)) return;
+  const card = clear.closest("[data-scenario-card]");
+  if (!(card instanceof HTMLElement)) return;
+  event.preventDefault();
+  card.querySelectorAll("[data-scenario-clear-field]").forEach((field) => {
+    if (field instanceof HTMLInputElement || field instanceof HTMLSelectElement) {
+      field.value = field.dataset.default ?? "";
+      field.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  });
+  const first = card.querySelector(
+    "[data-scenario-name], [data-scenario-overpayment-mode]",
+  );
+  focusScenarioField(first);
+});
+
 // Progressive disclosure: an element marked data-hidden-when="<name>=<value>" is hidden while
 // the select with that id, or the checked radio button of that name, holds that value (the
 // recurring form shows the fields of the chosen "How often"; the tax form hides fields that do

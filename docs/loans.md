@@ -164,8 +164,12 @@ payment day to the end of a shorter month) and the end date after the remaining 
 
 ## Actual payments and balance checkpoints
 
-The Overview and Schedule keep the terms and the projected schedule; **Payments** records what
-actually happened.
+**Payments & balance** keeps the projected schedule and records what actually happened. It has
+two sections: **Actual payments** (what you paid) and **Balance checkpoints** (what the bank
+reported). An actual payment is split against the projected row; a checkpoint re-anchors the
+schedule from the real balance, so together they show whether the loan is ahead of or behind the
+plan. On a phone each row is a card with every amount and action; on a wider screen both lists
+are tables that scroll inside their own container if needed.
 
 - **Recording a payment**: choose installment or overpayment and enter the date and total. An
   installment total is split against the projected row on that date (or the first row after it):
@@ -179,6 +183,13 @@ actually happened.
 - **Actual rows**: on the loan schedule, a date with a recorded installment shows the actual
   components and an **Actual** badge. Dates before today without a payment stay **Projected**;
   future rows are unmarked. The closing column remains the projection from the terms.
+- **Payment variance**: every actual installment shows its total and principal variance against
+  the projected row on the same date, or the first later row (the same rule as the split). The
+  variance is actual minus projected, so a positive value means you paid more than projected; a
+  short label adds **More than projected**, **Less than projected** or **Matches projection**.
+  A payment with no matching schedule row (for example an overpayment-only payment) says so, and
+  a schedule that cannot be built shows **Variance unavailable** with the reason for screen
+  readers.
 - **Editing and deleting**: past payments can be edited or deleted. Changing the total (or the
   kind) without an explicit breakdown re-splits the payment against the projected row. An
   overpayment-only payment appears in the payment list, not as an invented monthly row.
@@ -226,15 +237,34 @@ the stored terms:
 - **Baseline** is the loan without any overpayments.
 - **Current plan** is the configured regular overpayment and one-off overpayments.
 - **Saved scenarios** are named variations that are always included.
-- **What-if rows** are up to three temporary variations for one comparison.
+- **What-if cards** are up to three temporary variations for one comparison. Each card holds the
+  name, overpayment fields, rate-shift fields and one-off fields, and has its own **Clear card**
+  action. A **Clear rows** link resets the whole form.
+
+Each card has three **presets** that fill its fields without submitting anything:
+
+- **Add 10% of the installment** puts a fixed extra equal to 10% of the loan's first installment
+  into the overpayment fields.
+- **Raise the rate by 1 pp** fills a +1 percentage-point shift from today.
+- **One-off 1,000** fills a one-off overpayment of 1,000 in the loan currency, dated today.
+
+The presets only write form values; adjust them and press **Compare** as usual. They are
+available to viewers too, who can compare temporary variations but cannot save or delete
+scenarios.
 
 Each variation can change the regular overpayment (same as the loan, none, a fixed extra or a
 target total), the strategy (shorten the term or lower the installment), shift the annual rate by
 a signed number of percentage points from a date, and add one one-off lump sum on a date. A rate
 shift changes every rate from that date and inserts a rate-change row when the date falls between
 two existing changes. A lump sum is added to the loan's existing one-off overpayments. Empty
-what-if rows are ignored; the rate-shift date and the lump-sum date must be entered together with
-their values.
+cards are ignored; the rate-shift date and the lump-sum date must be entered together with their
+values.
+
+Each **saved scenario** card shows its name and parameters plus the change against the **current
+plan**: the interest saved (or added) and how many months sooner (or later) the loan ends. A
+favourable change is green, an unfavourable one red, and the text says which it is, so colour is
+not the only cue. The full comparison table and the chart below still compare every row with the
+baseline.
 
 The comparison table shows the payoff date, months saved against the baseline, total interest,
 interest saved against the baseline and total paid. Positive savings are shown in green and

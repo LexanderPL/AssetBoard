@@ -7543,6 +7543,16 @@ msgstr ""
 msgid "Save loan"
 msgstr ""
 
+msgid "Payments & balance"
+msgstr ""
+
+msgid ""
+"Record what you actually paid and the balance your bank reports. An "
+"actual installment is split against the projected row; a balance "
+"checkpoint re-anchors the schedule from the real balance. The two "
+"together show whether the loan is ahead of or behind the plan."
+msgstr ""
+
 msgid "Actual payments"
 msgstr ""
 
@@ -7554,11 +7564,39 @@ msgstr ""
 msgid "Record payment"
 msgstr ""
 
+msgid ""
+"Variance is the actual amount minus the projected row on the same date, "
+"or the first later row. A positive value means you paid more than "
+"projected."
+msgstr ""
+
+msgid "Variance vs plan"
+msgstr ""
+
 #, fuzzy
 msgid "Linked transaction"
 msgstr ""
 
 msgid "Installment"
+msgstr ""
+
+msgid "More than projected"
+msgstr ""
+
+msgid "Less than projected"
+msgstr ""
+
+msgid "Matches projection"
+msgstr ""
+
+#, python-format
+msgid "Principal %(amount)s"
+msgstr ""
+
+msgid "Variance unavailable"
+msgstr ""
+
+msgid "No schedule row to compare"
 msgstr ""
 
 msgid "deleted"
@@ -7782,19 +7820,78 @@ msgstr ""
 msgid "Saved scenarios"
 msgstr ""
 
+msgid ""
+"Each saved scenario is compared with your current plan, so the change is "
+"visible before you open the full table."
+msgstr ""
+
 #, python-format
 msgid "Delete the scenario %(name)s?"
+msgstr ""
+
+msgid "Cannot calculate with the current terms:"
+msgstr ""
+
+msgid "Interest vs the current plan"
+msgstr ""
+
+#, python-format
+msgid "Saves %(amount)s"
+msgstr ""
+
+#, python-format
+msgid "Adds %(amount)s"
+msgstr ""
+
+msgid "Same interest as the current plan"
+msgstr ""
+
+msgid "Payoff vs the current plan"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d month sooner"
+msgid_plural "%(num)d months sooner"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy, python-format
+msgid "%(num)d month later"
+msgid_plural "%(num)d months later"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Same payoff date as the current plan"
+msgstr ""
+
+msgid ""
+"Comparison unavailable until the loan's terms allow a schedule to be "
+"built."
 msgstr ""
 
 msgid "No saved scenarios yet. Give a what-if a name and compare it to save it."
 msgstr ""
 
-msgid "What-if rows"
+msgid "What-if cards"
 msgstr ""
 
 msgid ""
-"Up to three temporary variations. A name saves the row (or updates the "
+"Up to three temporary variations. A name saves the card (or updates the "
 "scenario with that name); leave the name empty to compare without saving."
+msgstr ""
+
+#, python-format
+msgid "Add 10%% of the installment"
+msgstr ""
+
+#, python-format
+msgid "in what-if %(number)d"
+msgstr ""
+
+msgid "Raise the rate by 1 pp"
+msgstr ""
+
+msgid "One-off 1,000"
 msgstr ""
 
 msgid "Scenario name (optional)"
@@ -7810,7 +7907,13 @@ msgstr ""
 msgid "Overpayment amount (%(currency)s)"
 msgstr ""
 
+msgid "Used only with a fixed extra or a target total."
+msgstr ""
+
 msgid "Strategy"
+msgstr ""
+
+msgid "Rate shift"
 msgstr ""
 
 msgid "Rate shift in percentage points"
@@ -7819,11 +7922,21 @@ msgstr ""
 msgid "Rate shift from"
 msgstr ""
 
+msgid "One-off"
+msgstr ""
+
 #, python-format
 msgid "One-off lump sum (%(currency)s)"
 msgstr ""
 
 msgid "One-off date"
+msgstr ""
+
+msgid "Clear card"
+msgstr ""
+
+#, python-format
+msgid "what-if %(number)d"
 msgstr ""
 
 msgid "Compare and save named scenarios"
@@ -10835,5 +10948,16 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Payment date"
+#~ msgstr ""
+
+#~ msgid "What-if rows"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Up to three temporary variations. A "
+#~ "name saves the row (or updates the"
+#~ " scenario with that name); leave the"
+#~ " name empty to compare without "
+#~ "saving."
 #~ msgstr ""
 

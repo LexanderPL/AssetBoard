@@ -35,6 +35,7 @@ from assetboard.domain.loans import (
     LoanPaymentSplit,
     LoanValidationError,
     Money,
+    Schedule,
     ScheduleAnchor,
     ScheduleError,
     clean_note,
@@ -44,6 +45,30 @@ from assetboard.domain.loans import (
 )
 from assetboard.services import loan_schedule, loans
 from assetboard.services.context import Context, Role, require_role, require_role_now
+
+
+@dataclass(frozen=True, slots=True)
+class PaymentVariance:
+    """An actual installment against the projected row on or after its date.
+
+    The projection starts from the anchor in force on that date, which is the same rule the
+    payment split uses. A positive variance means the actual amount was higher than projected.
+    """
+
+    projected_total: Money
+    total_variance: Money
+    projected_principal: Money
+    principal_variance: Money
+    matched_date: date
+
+    @property
+    def label(self) -> str:
+        amount = self.total_variance.amount_minor
+        if amount > 0:
+            return "more"
+        if amount < 0:
+            return "less"
+        return "equal"
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,6 +87,8 @@ class LoanPaymentView:
     transaction_description: str | None
     transaction_date: date | None
     transaction_deleted: bool
+    variance: PaymentVariance | None = None
+    variance_error: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -149,7 +176,11 @@ def _require_money(value: Money, currency: str, field: str) -> int:
 
 
 def _payment_view(
-    row: LoanPayment, currency: str, transaction: Transaction | None
+    row: LoanPayment,
+    currency: str,
+    transaction: Transaction | None,
+    variance: PaymentVariance | None = None,
+    variance_error: str | None = None,
 ) -> LoanPaymentView:
     return LoanPaymentView(
         id=row.id,
@@ -168,7 +199,74 @@ def _payment_view(
         transaction_deleted=transaction.deleted_at is not None
         if transaction is not None
         else False,
+        variance=variance,
+        variance_error=variance_error,
     )
+
+
+def _payment_variances(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    view: loans.LoanView,
+    payments: list[LoanPayment] | tuple[LoanPayment, ...],
+) -> dict[UUID, tuple[PaymentVariance | None, str | None]]:
+    """Projection variance for every installment payment; other kinds have none.
+
+    The schedule is built from the anchor in force on the payment date (a checkpoint at or
+    before it, otherwise the loan start), matching ``split_loan_payment``. One schedule per
+    anchor is reused. A schedule problem is returned per payment, so the list still renders.
+    """
+    installments = [
+        payment for payment in payments if payment.kind == LoanPaymentKind.INSTALLMENT.value
+    ]
+    if not installments:
+        return {}
+    try:
+        inputs = loan_schedule.load_loan_schedule_inputs(factory, ctx, view.id)
+    except (ScheduleError, LoanValidationError) as exc:
+        return {payment.id: (None, exc.code) for payment in installments}
+    schedules: dict[tuple[date, int], Schedule] = {}
+    errors: dict[tuple[date, int], str] = {}
+    result: dict[UUID, tuple[PaymentVariance | None, str | None]] = {}
+    for payment in installments:
+        try:
+            anchor = loan_schedule.anchor_for_date(inputs, payment.date)
+        except (ScheduleError, LoanValidationError) as exc:
+            result[payment.id] = (None, exc.code)
+            continue
+        key = (anchor.date, anchor.balance.amount_minor)
+        if key not in schedules and key not in errors:
+            try:
+                schedules[key] = loan_schedule.schedule_from_anchor(inputs, anchor, payment.date)
+            except (ScheduleError, LoanValidationError) as exc:
+                errors[key] = exc.code
+        if key in errors:
+            result[payment.id] = (None, errors[key])
+            continue
+        schedule = schedules[key]
+        row = next((item for item in schedule.rows if item.date == payment.date), None)
+        if row is None:
+            row = next((item for item in schedule.rows if item.date >= payment.date), None)
+        if row is None:
+            result[payment.id] = (None, "no_scheduled_payment")
+            continue
+        total = Money(payment.total_minor, view.currency)
+        principal = Money(payment.principal_minor, view.currency)
+        result[payment.id] = (
+            PaymentVariance(
+                projected_total=row.installment_total,
+                total_variance=Money(
+                    total.amount_minor - row.installment_total.amount_minor, view.currency
+                ),
+                projected_principal=row.principal,
+                principal_variance=Money(
+                    principal.amount_minor - row.principal.amount_minor, view.currency
+                ),
+                matched_date=row.date,
+            ),
+            None,
+        )
+    return result
 
 
 def list_loan_payments(
@@ -182,14 +280,16 @@ def list_loan_payments(
         repository = TransactionRepository(session, ctx)
         transaction_ids = {row.transaction_id for row in rows if row.transaction_id}
         by_id = {transaction.id: transaction for transaction in repository.by_ids(transaction_ids)}
-        return tuple(
-            _payment_view(
-                row,
-                view.currency,
-                by_id.get(row.transaction_id) if row.transaction_id is not None else None,
-            )
-            for row in rows
+    variances = _payment_variances(factory, ctx, view, rows)
+    return tuple(
+        _payment_view(
+            row,
+            view.currency,
+            by_id.get(row.transaction_id) if row.transaction_id is not None else None,
+            *variances.get(row.id, (None, None)),
         )
+        for row in rows
+    )
 
 
 def _transaction_option(row: Transaction) -> TransactionOption:
@@ -425,7 +525,10 @@ def get_loan_payment(
             if row.transaction_id is not None
             else None
         )
-        return _payment_view(row, view.currency, transaction)
+    variance, variance_error = _payment_variances(factory, ctx, view, [row]).get(
+        row.id, (None, None)
+    )
+    return _payment_view(row, view.currency, transaction, variance, variance_error)
 
 
 def update_loan_payment(
@@ -795,6 +898,7 @@ __all__ = [
     "LoanPaymentView",
     "LoanPaymentsPage",
     "LoanPlanStatus",
+    "PaymentVariance",
     "TransactionOption",
     "create_loan_checkpoint",
     "create_loan_payment",

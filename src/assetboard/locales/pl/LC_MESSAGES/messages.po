@@ -8116,6 +8116,20 @@ msgstr ""
 msgid "Save loan"
 msgstr "Zapisz kredyt"
 
+msgid "Payments & balance"
+msgstr "Płatności i saldo"
+
+msgid ""
+"Record what you actually paid and the balance your bank reports. An "
+"actual installment is split against the projected row; a balance "
+"checkpoint re-anchors the schedule from the real balance. The two "
+"together show whether the loan is ahead of or behind the plan."
+msgstr ""
+"Zapisuj rzeczywiste płatności i saldo podawane przez bank. Rzeczywista "
+"rata jest dzielona względem prognozowanego wiersza, a punkt kontrolny "
+"salda zaczepia harmonogram od rzeczywistego salda. Razem pokazują, czy "
+"kredyt jest przed planem, czy za nim."
+
 msgid "Actual payments"
 msgstr "Rzeczywiste płatności"
 
@@ -8130,11 +8144,42 @@ msgstr ""
 msgid "Record payment"
 msgstr "Zarejestruj płatność"
 
+msgid ""
+"Variance is the actual amount minus the projected row on the same date, "
+"or the first later row. A positive value means you paid more than "
+"projected."
+msgstr ""
+"Odchylenie to rzeczywista kwota minus prognozowany wiersz na ten sam "
+"dzień lub pierwszy późniejszy wiersz. Wartość dodatnia oznacza, że "
+"zapłacono więcej niż prognozowano."
+
+msgid "Variance vs plan"
+msgstr "Odchylenie od planu"
+
 msgid "Linked transaction"
 msgstr "Powiązana transakcja"
 
 msgid "Installment"
 msgstr "Rata"
+
+msgid "More than projected"
+msgstr "Więcej niż prognozowano"
+
+msgid "Less than projected"
+msgstr "Mniej niż prognozowano"
+
+msgid "Matches projection"
+msgstr "Zgodne z prognozą"
+
+#, python-format
+msgid "Principal %(amount)s"
+msgstr "Kapitał %(amount)s"
+
+msgid "Variance unavailable"
+msgstr "Odchylenie niedostępne"
+
+msgid "No schedule row to compare"
+msgstr "Brak wiersza harmonogramu do porównania"
 
 msgid "deleted"
 msgstr "usunięta"
@@ -8377,25 +8422,90 @@ msgstr "Dane wykresu sald scenariuszy"
 msgid "Saved scenarios"
 msgstr "Zapisane scenariusze"
 
+msgid ""
+"Each saved scenario is compared with your current plan, so the change is "
+"visible before you open the full table."
+msgstr ""
+"Każdy zapisany scenariusz jest porównywany z bieżącym planem, więc zmianę"
+" widać przed otwarciem pełnej tabeli."
+
 #, python-format
 msgid "Delete the scenario %(name)s?"
 msgstr "Usunąć scenariusz %(name)s?"
+
+msgid "Cannot calculate with the current terms:"
+msgstr "Nie można obliczyć przy obecnych warunkach:"
+
+msgid "Interest vs the current plan"
+msgstr "Odsetki względem bieżącego planu"
+
+#, python-format
+msgid "Saves %(amount)s"
+msgstr "Oszczędza %(amount)s"
+
+#, python-format
+msgid "Adds %(amount)s"
+msgstr "Dodaje %(amount)s"
+
+msgid "Same interest as the current plan"
+msgstr "Takie same odsetki jak w bieżącym planie"
+
+msgid "Payoff vs the current plan"
+msgstr "Spłata względem bieżącego planu"
+
+#, python-format
+msgid "%(num)d month sooner"
+msgid_plural "%(num)d months sooner"
+msgstr[0] "%(num)d miesiąc wcześniej"
+msgstr[1] "%(num)d miesiące wcześniej"
+msgstr[2] "%(num)d miesięcy wcześniej"
+
+#, python-format
+msgid "%(num)d month later"
+msgid_plural "%(num)d months later"
+msgstr[0] "%(num)d miesiąc później"
+msgstr[1] "%(num)d miesiące później"
+msgstr[2] "%(num)d miesięcy później"
+
+msgid "Same payoff date as the current plan"
+msgstr "Ta sama data spłaty jak w bieżącym planie"
+
+msgid ""
+"Comparison unavailable until the loan's terms allow a schedule to be "
+"built."
+msgstr ""
+"Porównanie jest niedostępne, dopóki warunki kredytu nie pozwolą zbudować "
+"harmonogramu."
 
 msgid "No saved scenarios yet. Give a what-if a name and compare it to save it."
 msgstr ""
 "Nie ma jeszcze zapisanych scenariuszy. Nadaj wariantowi nazwę i porównaj "
 "go, aby zapisać."
 
-msgid "What-if rows"
-msgstr "Warianty"
+msgid "What-if cards"
+msgstr "Karty wariantów"
 
 msgid ""
-"Up to three temporary variations. A name saves the row (or updates the "
+"Up to three temporary variations. A name saves the card (or updates the "
 "scenario with that name); leave the name empty to compare without saving."
 msgstr ""
-"Do trzech tymczasowych wariantów. Nazwa zapisuje wiersz (lub aktualizuje "
+"Do trzech tymczasowych wariantów. Nazwa zapisuje kartę (lub aktualizuje "
 "scenariusz o tej nazwie); pozostaw nazwę pustą, aby porównać bez "
 "zapisywania."
+
+#, python-format
+msgid "Add 10%% of the installment"
+msgstr "Dodaj 10%% raty"
+
+#, python-format
+msgid "in what-if %(number)d"
+msgstr "w wariancie %(number)d"
+
+msgid "Raise the rate by 1 pp"
+msgstr "Podnieś stopę o 1 p.p."
+
+msgid "One-off 1,000"
+msgstr "Jednorazowo 1000"
 
 msgid "Scenario name (optional)"
 msgstr "Nazwa scenariusza (opcjonalnie)"
@@ -8410,8 +8520,14 @@ msgstr "Docelowa łączna kwota miesięcznie"
 msgid "Overpayment amount (%(currency)s)"
 msgstr "Kwota nadpłaty (%(currency)s)"
 
+msgid "Used only with a fixed extra or a target total."
+msgstr "Używana tylko przy stałej nadpłacie lub docelowej kwocie miesięcznej."
+
 msgid "Strategy"
 msgstr "Strategia"
+
+msgid "Rate shift"
+msgstr "Zmiana stopy"
 
 msgid "Rate shift in percentage points"
 msgstr "Zmiana stopy w punktach procentowych"
@@ -8419,12 +8535,22 @@ msgstr "Zmiana stopy w punktach procentowych"
 msgid "Rate shift from"
 msgstr "Zmiana stopy od"
 
+msgid "One-off"
+msgstr "Jednorazowo"
+
 #, python-format
 msgid "One-off lump sum (%(currency)s)"
 msgstr "Jednorazowa nadpłata (%(currency)s)"
 
 msgid "One-off date"
 msgstr "Data nadpłaty jednorazowej"
+
+msgid "Clear card"
+msgstr "Wyczyść kartę"
+
+#, python-format
+msgid "what-if %(number)d"
+msgstr "wariant %(number)d"
 
 msgid "Compare and save named scenarios"
 msgstr "Porównaj i zapisz nazwane scenariusze"

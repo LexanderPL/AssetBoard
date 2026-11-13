@@ -93,6 +93,66 @@ def test_the_page_renders_the_comparison_chart_form_and_detail_link(owner) -> No
     assert f"/loans/{loan_id}/scenarios" in detail.text
 
 
+def test_what_if_cards_offer_presets_and_a_clear_action(owner) -> None:
+    loan_id = _create(owner)
+    page = owner.client.get(f"/loans/{loan_id}/scenarios")
+    assert page.status_code == 200
+    assert page.text.count("data-scenario-card=") == 3
+    assert page.text.count("data-scenario-preset=") == 9
+    assert page.text.count("data-scenario-clear>") == 3
+    assert "Add 10% of the installment" in page.text
+    assert "Raise the rate by 1 pp" in page.text
+    assert "One-off 1,000" in page.text
+    assert re.search(r'data-scenario-preset="overpayment" data-amount="[0-9.,]+"', page.text)
+    assert re.search(
+        r'data-scenario-preset="rate" data-shift="1" data-date="\d{4}-\d{2}-\d{2}"',
+        page.text,
+    )
+    assert re.search(
+        r'data-scenario-preset="one_off" data-amount="[0-9.,]+" data-date="\d{4}-\d{2}-\d{2}"',
+        page.text,
+    )
+    assert "data-scenario-overpayment-mode" in page.text
+
+
+def test_saved_scenarios_show_their_delta_against_the_current_plan(owner) -> None:
+    loan_id = _create(owner)
+    path = f"/loans/{loan_id}/scenarios"
+    owner.post(
+        path,
+        _row(
+            1,
+            name="Extra",
+            overpayment_mode="fixed_extra",
+            overpayment_amount="100.00",
+        ),
+        token_from=path,
+    )
+    page = owner.client.get(path)
+    assert page.status_code == 200
+    assert "data-saved-delta>" in page.text
+    assert "data-saved-interest-delta=" in page.text
+    assert "data-saved-months-delta=" in page.text
+    assert "Interest vs the current plan" in page.text
+    assert "Saves" in page.text
+    assert "sooner" in page.text
+
+
+def test_an_unfavourable_saved_delta_is_marked(owner) -> None:
+    loan_id = _create(
+        owner,
+        overpayment_mode="fixed_extra",
+        overpayment_amount="100.00",
+    )
+    path = f"/loans/{loan_id}/scenarios"
+    owner.post(path, _row(1, name="No extra", overpayment_mode="none"), token_from=path)
+    page = owner.client.get(path)
+    assert page.status_code == 200
+    assert 'data-saved-interest-delta="-' in page.text
+    assert "Adds" in page.text
+    assert "later" in page.text
+
+
 def test_a_named_row_saves_and_reuses_the_name(owner) -> None:
     loan_id = _create(owner)
     path = f"/loans/{loan_id}/scenarios"
@@ -215,6 +275,7 @@ def test_a_viewer_reads_but_does_not_get_save_or_delete_controls(owner) -> None:
     assert "button" not in page.text.split("data-saved-scenarios")[1].split("</section>")[0]
     assert "data-scenario-name" not in page.text
     assert "data-scenario-form" in page.text
+    assert "data-scenario-preset" in page.text
 
 
 def test_a_broken_loan_shows_a_page_error_and_no_chart(owner) -> None:

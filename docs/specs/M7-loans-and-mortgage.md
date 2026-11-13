@@ -253,6 +253,9 @@ identical parameters give identical results.
   table, the overlay balance chart with a plotted-data table, the saved list with delete
   confirmation and three what-if forms. A non-empty name saves/upserts by
   `(loan_id, name_key)`; an empty name is ephemeral. Named rows are validated before any save.
+  The what-if forms became cards with three presets (10% of the installment, a +1 pp rate shift,
+  a one-off 1,000), each with a clear action. Saved cards show interest saved and months saved
+  against the current plan, with favourable/unfavourable tones.
 - Viewers may load the page, compare ephemeral rows and see saved scenarios; editors/owners
   save and delete. Audit events record `loan_scenario.created`, `.updated` and `.deleted`
   without amounts. A scenario of another workspace or another loan is `NotFound`.
@@ -309,6 +312,11 @@ optional ledger transaction link. Tests: re-anchoring changes the future schedul
   overpayment-only payments stay in the payment list. The closing column remains projected.
 - The loan subnavigation links to **Payments**; the page has responsive payment/checkpoint
   tables, dialog forms, edit/delete actions, CSRF, gettext and no inline scripts or styles.
+  **Payments & balance** is one page with an intro and the **Actual payments** and **Balance
+  checkpoints** sections. On phones both lists are cards; wider screens show tables. Each actual
+  installment shows the total and principal variance against the projected row on or after its
+  date (the same rule as the split), computed by the service; an overpayment-only payment and a
+  schedule build error are handled without breaking the list.
 - The overview's **Plan vs actual** panel shows the last actual payment, the latest checkpoint
   and its variance, and an ahead/behind/on-track line. **Record next payment** prefills the
   payment dialog with the next schedule row's date and total.

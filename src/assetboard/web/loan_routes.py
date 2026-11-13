@@ -51,7 +51,12 @@ from assetboard.services.context import Context, Role, has_role, require_role
 from assetboard.web.context import CurrentContext
 from assetboard.web.forms import InvalidPercentOrFixed, percent_to_bp, signed_percent_to_bp
 from assetboard.web.loan_charts import build_loan_charts, build_scenario_chart
-from assetboard.web.loan_page import scenario_summary, schedule_csv, schedule_page
+from assetboard.web.loan_page import (
+    scenario_presets,
+    scenario_summary,
+    schedule_csv,
+    schedule_page,
+)
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
 
@@ -1015,12 +1020,15 @@ def _scenario_page(
         request.app.state.session_factory, ctx, loan_id
     )
     locale = request.state.locale
+    saved_rows = {row.scenario_id: row for row in comparison.saved}
     return {
         "loan": comparison.view,
         "comparison": comparison,
         "saved": saved,
+        "saved_cards": tuple((scenario, saved_rows.get(scenario.id)) for scenario in saved),
         "scenario_chart": build_scenario_chart(comparison, locale),
         "scenario_rows": form_rows,
+        "scenario_presets": scenario_presets(comparison.view, locale),
         "scenario_error": _error(request, comparison.error_code) if comparison.error_code else None,
         "scenario_row_error": lambda code: _error(request, code),
         "scenario_summary": lambda parameters: scenario_summary(parameters, locale),
