@@ -322,6 +322,16 @@ def test_too_many_ephemeral_scenarios_are_refused(team: WorkspaceDb) -> None:
     assert raised.value.code == "too_many_scenarios"
 
 
+def test_comparison_labels_follow_the_request_locale(team: WorkspaceDb) -> None:
+    loan_id = _create(team)
+    comparison = loan_scenarios.compare_loan_scenarios(
+        team.factory, team.ctx("owner", "owner"), loan_id, [], locale="pl"
+    )
+    assert comparison.baseline is not None and comparison.current is not None
+    assert comparison.baseline.label == "Scenariusz bazowy"
+    assert comparison.current.label == "Bieżący plan"
+
+
 def test_saved_scenarios_compare_against_the_current_plan(team: WorkspaceDb) -> None:
     loan_id = _create(
         team,

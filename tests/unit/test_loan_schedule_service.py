@@ -178,3 +178,107 @@ def test_day_count_is_passed_to_the_engine(team: WorkspaceDb) -> None:
 def test_invalid_day_count_is_refused(team: WorkspaceDb) -> None:
     with pytest.raises(LoanValidationError):
         _create(team, day_count="weekly")
+
+
+def test_a_fixed_loan_can_switch_to_a_reference_rate_and_back(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    rate_id = loans.create_reference_rate(team.factory, ctx, name="WIBOR 3M")
+    loans.add_reference_rate_value(
+        team.factory,
+        ctx,
+        rate_id,
+        effective_from=date(2026, 1, 1),
+        value_bp=400,
+        high_rate_confirmed=False,
+    )
+    loans.add_reference_rate_value(
+        team.factory,
+        ctx,
+        rate_id,
+        effective_from=date(2026, 7, 1),
+        value_bp=450,
+        high_rate_confirmed=False,
+    )
+    loans.add_reference_rate_value(
+        team.factory,
+        ctx,
+        rate_id,
+        effective_from=date(2028, 1, 1),
+        value_bp=500,
+        high_rate_confirmed=False,
+    )
+    loan_id = _create(team, term_months=48)
+    loans.add_rate_change(
+        team.factory,
+        ctx,
+        loan_id,
+        effective_from=date(2027, 1, 1),
+        mode="variable",
+        reference_rate_id=rate_id,
+        margin_bp=150,
+        high_rate_confirmed=False,
+    )
+    loans.add_rate_change(
+        team.factory,
+        ctx,
+        loan_id,
+        effective_from=date(2029, 1, 1),
+        rate_bp=700,
+        high_rate_confirmed=False,
+    )
+    data = loan_schedule.loan_schedule(team.factory, ctx, loan_id)
+    assert data.error_code is None and data.schedule is not None
+    rates = {(row.date.year, row.date.month): row.annual_rate_bp for row in data.schedule.rows}
+    assert rates[(2026, 12)] == 550
+    assert rates[(2027, 1)] == 600
+    assert rates[(2028, 1)] == 650
+    assert rates[(2029, 1)] == 700
+    assert [change.mode for change in data.view.rate_changes] == [
+        RateMode.FIXED,
+        RateMode.VARIABLE,
+        RateMode.FIXED,
+    ]
+    assert data.view.rate_changes[1].effective_rate_bp == 600
+
+    used_by = loans.list_reference_rates(team.factory, ctx).rates[0].used_by
+    assert [reference.id for reference in used_by] == [loan_id]
+    with pytest.raises(loans.LoanError) as error:
+        loans.delete_reference_rate(team.factory, ctx, rate_id)
+    assert error.value.code == "reference_rate_in_use"
+
+
+def test_a_new_reference_value_reprices_its_variable_segment(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    rate_id = loans.create_reference_rate(team.factory, ctx, name="WIBOR 3M")
+    loans.add_reference_rate_value(
+        team.factory,
+        ctx,
+        rate_id,
+        effective_from=date(2026, 1, 1),
+        value_bp=400,
+        high_rate_confirmed=False,
+    )
+    loan_id = _create(team, term_months=36)
+    loans.add_rate_change(
+        team.factory,
+        ctx,
+        loan_id,
+        effective_from=date(2027, 1, 1),
+        mode="variable",
+        reference_rate_id=rate_id,
+        margin_bp=150,
+        high_rate_confirmed=False,
+    )
+    loans.add_reference_rate_value(
+        team.factory,
+        ctx,
+        rate_id,
+        effective_from=date(2027, 7, 1),
+        value_bp=500,
+        high_rate_confirmed=False,
+    )
+    data = loan_schedule.loan_schedule(team.factory, ctx, loan_id)
+    assert data.error_code is None and data.schedule is not None
+    rates = {(row.date.year, row.date.month): row.annual_rate_bp for row in data.schedule.rows}
+    assert rates[(2027, 6)] == 550
+    assert rates[(2027, 7)] == 650

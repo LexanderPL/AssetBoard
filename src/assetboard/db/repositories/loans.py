@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import exists, select
+from sqlalchemy import exists, or_, select
 
 from assetboard.db.models.loans import (
     InstallmentPlan,
@@ -97,10 +97,17 @@ class ReferenceRateRepository(ScopedRepository[ReferenceRate]):
         return self._session.scalars(statement).one_or_none()
 
     def used_by_loan(self, reference_rate_id: UUID) -> bool:
+        change_loans = select(LoanRateChange.loan_id).where(
+            LoanRateChange.workspace_id == self._workspace_id,
+            LoanRateChange.reference_rate_id == reference_rate_id,
+        )
         statement = select(
             exists().where(
                 Loan.workspace_id == self._workspace_id,
-                Loan.reference_rate_id == reference_rate_id,
+                or_(
+                    Loan.reference_rate_id == reference_rate_id,
+                    Loan.id.in_(change_loans),
+                ),
             )
         )
         return bool(self._session.execute(statement).scalar_one())

@@ -8,6 +8,7 @@ from uuid import UUID
 
 from sqlalchemy import delete
 
+from assetboard.db.models.identity import Workspace
 from assetboard.db.models.loans import Loan, LoanRateChange, LoanScenario
 
 
@@ -91,6 +92,18 @@ def test_the_page_renders_the_comparison_chart_form_and_detail_link(owner) -> No
     detail = owner.client.get(f"/loans/{loan_id}")
     assert "data-loan-scenarios" in detail.text
     assert f"/loans/{loan_id}/scenarios" in detail.text
+
+
+def test_scenario_labels_use_the_ui_locale_not_the_workspace_locale(owner) -> None:
+    loan_id = _create(owner)
+    with owner.db() as session, session.begin():
+        workspace = session.get(Workspace, owner.home_id)
+        assert workspace is not None
+        workspace.locale = "pl"
+    page = owner.client.get(f"/loans/{loan_id}/scenarios")
+    assert page.status_code == 200
+    assert "Baseline" in page.text
+    assert "Scenariusz bazowy" not in page.text
 
 
 def test_scenario_field_errors_are_marked_on_the_card(owner):

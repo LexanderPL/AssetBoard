@@ -16,7 +16,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 
 **Data model (sketch)**
 - `Loan(id, workspace_id, name, kind[annuity|equal_principal|installment_plan], principal_original Money?, origination_date?, first_payment_date, term_months, payment_day, rate_mode[fixed|variable], margin_bp?, reference_rate_id?, day_count[monthly|actual_365], installment_override Money?, overpayment_mode[none|fixed_extra|target_total], overpayment_amount Money?, overpayment_strategy[reduce_term|reduce_installment], property_instrument_id?, scheduled_item_id?, archived_at)`
-- `LoanRateChange(loan_id, effective_from, rate_bp)` — for `rate_mode=fixed` (rate changes over time).
+- `LoanRateChange(loan_id, effective_from, mode[fixed|variable], rate_bp?, reference_rate_id?, margin_bp?)` — segment starts; fixed rows carry a rate, variable rows a reference rate plus margin (F7.9).
 - `ReferenceRate(id, workspace_id, name, notes)`; `ReferenceRateValue(reference_rate_id, effective_from, value_bp)` — user-defined series (WIBOR 1M, WIRON, EURIBOR… the app hardcodes none).
 - `LoanCostComponent(loan_id, name, mode[percent|fixed], rate_bp?/fixed Money?, basis[opening_balance], effective_from, effective_to?)` — uses `PercentOrFixed`; percent is applied monthly to the opening balance.
 - `LoanOverpayment(loan_id, date, amount Money, note)` — one-off planned/actual overpayments.
@@ -58,8 +58,9 @@ The eight product-owner decisions implemented in F7.1:
 2. The current-balance path collects the balance, balance date, remaining months, next payment
    date, payment day and optional original principal. It creates one checkpoint. A fixed initial
    rate is effective from the balance date; `origination_date` stays empty.
-3. `kind` is editable after creation. `rate_mode` is fixed at creation: switching fixed↔variable
-   requires archiving the loan and creating a new one.
+3. `kind` is editable after creation. `rate_mode` is the loan's **initial** rate type; later
+   rate changes may switch between fixed and reference-rate segments (F7.9), so the wizard
+   choice no longer locks the whole life of the loan.
 4. A cost component's `effective_to` is inclusive. Multiple active components may overlap and are
    all summed.
 5. Rates above 25.00% require explicit confirmation (25.00% itself does not). The absolute
@@ -523,3 +524,50 @@ helpers (`ScheduledItemRepository.for_loan`, `ScheduledOccurrenceRepository.for_
   posting the next due occurrence, the no-due case and no double decrement, used-by links and
   sparkline data, plus browser checks of the wizard review, status/progress and the compact
   reference-rate view at 390 and 1440.
+
+---
+
+## F7.9 Mixed fixed and reference-rate timeline
+
+**Story:** my mortgage is fixed for a few years, then moves to a reference rate; when the fixed
+period ends I want to add that switch without recreating the loan.
+
+**Acceptance**
+- A rate change can start either a **fixed** segment (`rate_bp`) or a **variable** segment
+  (`reference_rate_id` + `margin_bp`). The initial loan rate is the first segment.
+- Rate changes may be added to any active loan, in either direction and more than once; the
+  fixed↔variable switch is no longer restricted by `rate_mode` after creation.
+- A variable segment uses the latest reference value on or before its start date, then every
+  later value before the next segment; changes to those values reprice the schedule
+  automatically.
+- The Add/Edit rate change dialog chooses the rate type and shows only its fields. The Rates card
+  shows the initial rate and every segment's source or rate, with a current-rate summary.
+- Reference rates show every loan using them through the initial rate or a change in **Used by**;
+  deleting one is refused while any segment uses it. Adding, editing or deleting a value
+  revalidates every affected loan and refreshes its scheduled occurrences.
+- Validation: a variable segment needs a value at or before its start; high-rate confirmation
+  applies to the resolved rate; effective dates may not precede the loan start or collide; the
+  target-total check still runs after every change.
+- Archive format 1.6 adds `mode`, `reference_rate_id`, `reference_rate` and `margin_bp` to
+  `loan_rate_changes.csv`; a 1.5 archive reads its rows as fixed. The archive round-trip
+  preserves a mixed timeline and rebuilds the same schedule.
+
+### As built (M7.F7.9)
+
+- `LoanRateChange` is now a **segment start**: `mode=fixed` stores `rate_bp`; `mode=variable`
+  stores `reference_rate_id` and `margin_bp`. Existing rows migrate as fixed. The migration is
+  `0058_loan_mixed_rate_timeline`; its downgrade removes variable segments because the previous
+  schema cannot represent them.
+- `RateSegment` and the pure `build_rate_timeline()` in `domain/loans.py` resolve a mixed
+  timeline into the flat `RatePeriod` list used by the schedule engine. The last segment at or
+  before a payment date wins; a fixed segment always wins on its own effective date.
+- `loans.rate_timeline(view)` is the single resolver used by the schedule, current-rate display,
+  first-installment and target-total validation. `LoanRateChangeView` carries its mode, source +
+  margin, reference values and the resolved rate at its start date.
+- The wizard still asks for the **initial** rate only. The settings dialog adds the rate type,
+  reference select and margin; the Rates card lists every segment. The reference-rates page
+  includes change-based usage in **Used by**, its delete guard and its revalidation/refresh path.
+- The fixed-rate tests remain valid; new tests cover fixed→variable→fixed schedules, later
+  reference values repricing a segment, missing values, high-rate confirmation, used-by/delete
+  guards, archive round-trip and the UI disclosure. The scenario labels now use the request
+  locale instead of the workspace locale, fixing a Polish chart legend in an English UI.

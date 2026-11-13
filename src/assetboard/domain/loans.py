@@ -9,6 +9,7 @@ work is the annuity payment formula, rounded once per component.
 from __future__ import annotations
 
 import calendar
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from decimal import ROUND_HALF_UP, Decimal, localcontext
@@ -274,6 +275,61 @@ class ScheduleError(ValueError):
 class RatePeriod:
     effective_from: date
     annual_rate_bp: int
+
+
+@dataclass(frozen=True, slots=True)
+class RateSegment:
+    """One part of a loan's rate life: a fixed rate or a reference rate plus margin.
+
+    Each segment starts on ``effective_from`` and lasts until the next segment starts. A variable
+    segment carries the reference values that may reprice it; the value in force on the segment's
+    first day always applies, even when it was published earlier.
+    """
+
+    effective_from: date
+    mode: RateMode
+    rate_bp: int | None = None
+    margin_bp: int | None = None
+    reference_values: tuple[tuple[date, int], ...] = ()
+
+
+def build_rate_timeline(segments: Sequence[RateSegment], start: date) -> list[RatePeriod]:
+    """Resolve mixed fixed/reference segments into the flat timeline the schedule engine uses.
+
+    Segments must start on or after the loan start and may not share a date. A variable segment
+    contributes its opening value and then every later reference value up to (but not including)
+    the next segment's start, so a fixed segment always wins on its own effective date.
+    """
+    ordered = sorted(segments, key=lambda segment: segment.effective_from)
+    previous: date | None = None
+    timeline: list[RatePeriod] = []
+    for index, segment in enumerate(ordered):
+        if segment.effective_from < start:
+            raise LoanValidationError("effective_from", "rate_change_before_start")
+        if previous == segment.effective_from:
+            raise LoanValidationError("effective_from", "rate_change_exists")
+        previous = segment.effective_from
+        end = ordered[index + 1].effective_from if index + 1 < len(ordered) else None
+        if segment.mode is RateMode.FIXED:
+            if segment.rate_bp is None:
+                raise LoanValidationError("rate_bp", "invalid_rate")
+            timeline.append(RatePeriod(segment.effective_from, validate_rate_bp(segment.rate_bp)))
+            continue
+        if segment.margin_bp is None:
+            raise LoanValidationError("margin_bp", "invalid_margin")
+        margin = validate_margin_bp(segment.margin_bp)
+        values = sorted(segment.reference_values, key=lambda value: value[0])
+        opening = latest_value_on_or_before(values, segment.effective_from)
+        if opening is None:
+            raise LoanValidationError("reference_rate_id", "missing_reference_value")
+        timeline.append(RatePeriod(segment.effective_from, validate_rate_bp(opening + margin)))
+        for effective_from, value_bp in values:
+            if effective_from <= segment.effective_from:
+                continue
+            if end is not None and effective_from >= end:
+                break
+            timeline.append(RatePeriod(effective_from, validate_rate_bp(value_bp + margin)))
+    return timeline
 
 
 @dataclass(frozen=True, slots=True)

@@ -328,10 +328,6 @@ def _row(
     )
 
 
-def _locale(ctx: Context) -> str:
-    return ctx.workspace.locale
-
-
 def _saved_views(
     session: Session, ctx: Context, loan_id: UUID, currency: str
 ) -> tuple[LoanScenarioView, ...]:
@@ -365,10 +361,13 @@ def compare_loan_scenarios(
     ctx: Context,
     loan_id: UUID,
     ephemeral: list[ScenarioParameters],
+    *,
+    locale: str | None = None,
 ) -> LoanScenarioComparison:
     """Build the baseline, current plan, saved scenarios and ephemeral variations."""
     _require_viewer(ctx)
     _validate_count(ephemeral)
+    label_locale = locale or ctx.user.locale or ctx.workspace.locale
     try:
         inputs = loan_schedule.load_loan_schedule_inputs(factory, ctx, loan_id)
     except (ScheduleError, LoanValidationError) as exc:
@@ -395,7 +394,7 @@ def compare_loan_scenarios(
         baseline = _row(
             inputs,
             None,
-            gettext("Baseline", _locale(ctx)),
+            gettext("Baseline", label_locale),
             is_baseline=True,
             baseline=baseline_schedule,
             schedule_override=baseline_schedule,
@@ -403,7 +402,7 @@ def compare_loan_scenarios(
         current = _row(
             inputs,
             None,
-            gettext("Current plan", _locale(ctx)),
+            gettext("Current plan", label_locale),
             is_current=True,
             baseline=baseline_schedule,
         )
@@ -435,7 +434,7 @@ def compare_loan_scenarios(
         _row(
             inputs,
             parameters,
-            gettext("What-if %(number)d", _locale(ctx)) % {"number": index},
+            gettext("What-if %(number)d", label_locale) % {"number": index},
             baseline=baseline_schedule,
         )
         for index, parameters in enumerate(ephemeral, start=1)

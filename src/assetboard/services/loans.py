@@ -8,8 +8,8 @@ is F7.2: only ``first_installment`` is used here to validate a target-total over
 
 from __future__ import annotations
 
-from collections.abc import Callable, Sequence
-from dataclasses import dataclass
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, replace
 from datetime import date
 from typing import Literal
 from uuid import UUID
@@ -44,9 +44,12 @@ from assetboard.domain.loans import (
     CostBasis,
     DayCount,
     LoanKind,
+    LoanValidationError,
     OverpaymentMode,
     OverpaymentStrategy,
     RateMode,
+    RatePeriod,
+    RateSegment,
     clean_loan_name,
     clean_note,
     first_installment,
@@ -61,6 +64,9 @@ from assetboard.domain.loans import (
     validate_payment_day,
     validate_rate_bp,
     validate_term_months,
+)
+from assetboard.domain.loans import (
+    build_rate_timeline as build_rate_timeline_domain,
 )
 from assetboard.domain.money import Money
 from assetboard.domain.percent_or_fixed import PercentOrFixed
@@ -81,7 +87,13 @@ class LoanError(Exception):
 class LoanRateChangeView:
     id: UUID
     effective_from: date
-    rate_bp: int
+    mode: RateMode
+    rate_bp: int | None
+    reference_rate_id: UUID | None
+    reference_rate_name: str | None
+    margin_bp: int | None
+    reference_rate_values: tuple[ReferenceRateValueView, ...]
+    effective_rate_bp: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +155,10 @@ class LoanView:
     property_item_id: UUID | None
     auto_record_payments: bool
     current_rate_bp: int | None
+    initial_rate_bp: int | None
+    current_rate_mode: RateMode
+    current_rate_reference_name: str | None
+    current_rate_margin_bp: int | None
     installment_override: Money | None
     overpayment_mode: OverpaymentMode
     overpayment_amount: Money | None
@@ -274,10 +290,54 @@ def _refresh_loan_occurrences(session: Session, ctx: Context, loan_id: UUID) -> 
     refresh_loan_occurrences(session, ctx, loan_id)
 
 
-def _refresh_reference_loans(session: Session, ctx: Context, rate_id: UUID) -> None:
+@dataclass(frozen=True, slots=True)
+class _ReferenceData:
+    rates: Mapping[UUID, ReferenceRate]
+    values: Mapping[UUID, list[ReferenceRateValue]]
+
+
+def _load_reference_data(
+    session: Session,
+    ctx: WorkspaceScope,
+    loan: Loan,
+    changes: Sequence[LoanRateChange],
+) -> _ReferenceData:
+    ids = {change.reference_rate_id for change in changes if change.reference_rate_id is not None}
+    if loan.reference_rate_id is not None:
+        ids.add(loan.reference_rate_id)
+    rates: dict[UUID, ReferenceRate] = {}
+    values: dict[UUID, list[ReferenceRateValue]] = {}
+    rate_repository = ReferenceRateRepository(session, ctx)
+    value_repository = ReferenceRateValueRepository(session, ctx)
+    for rate_id in ids:
+        rate = rate_repository.get(rate_id)
+        if rate is not None:
+            rates[rate_id] = rate
+            values[rate_id] = value_repository.for_rate(rate_id)
+    return _ReferenceData(rates=rates, values=values)
+
+
+def _reference_usage(session: Session, ctx: Context) -> dict[UUID, list[Loan]]:
+    """Loans that use each reference rate, through their initial rate or a later segment."""
+    usage: dict[UUID, list[Loan]] = {}
+    changes = LoanRateChangeRepository(session, ctx)
     for loan in LoanRepository(session, ctx).ordered():
-        if loan.reference_rate_id == rate_id:
-            _refresh_loan_occurrences(session, ctx, loan.id)
+        ids: set[UUID] = set()
+        if loan.reference_rate_id is not None:
+            ids.add(loan.reference_rate_id)
+        ids.update(
+            change.reference_rate_id
+            for change in changes.for_loan(loan.id)
+            if change.reference_rate_id is not None
+        )
+        for rate_id in ids:
+            usage.setdefault(rate_id, []).append(loan)
+    return usage
+
+
+def _refresh_reference_loans(session: Session, ctx: Context, rate_id: UUID) -> None:
+    for loan in _reference_usage(session, ctx).get(rate_id, []):
+        _refresh_loan_occurrences(session, ctx, loan.id)
 
 
 def _loan_start(loan: Loan, checkpoints: list[LoanBalanceCheckpoint]) -> date:
@@ -292,59 +352,122 @@ def _entry_path(loan: Loan) -> EntryPath:
     return "original" if loan.origination_date is not None else "current"
 
 
-def _fixed_rate_at(changes: list[LoanRateChange], day: date) -> int | None:
-    chosen: int | None = None
-    for change in changes:
-        if change.effective_from <= day:
-            chosen = change.rate_bp
-    return chosen
-
-
 def _reference_rate_at(values: list[ReferenceRateValue], day: date) -> int | None:
     return latest_value_on_or_before(
         [(value.effective_from, value.value_bp) for value in values], day
     )
 
 
-def _rate_bp(
-    rate_mode: str,
-    changes: list[LoanRateChange],
-    reference_values: list[ReferenceRateValue],
+def _segments_from_changes(
+    rate_mode: RateMode,
+    reference_rate_id: UUID | None,
     margin_bp: int | None,
-    day: date,
-) -> int | None:
-    if rate_mode == RateMode.FIXED.value:
-        return _fixed_rate_at(changes, day)
-    reference = _reference_rate_at(reference_values, day)
-    if reference is None or margin_bp is None:
-        return None
-    return reference + margin_bp
+    initial_values: Sequence[ReferenceRateValueView],
+    changes: Sequence[LoanRateChangeView],
+    start: date,
+) -> list[RateSegment]:
+    """Turn the loan's initial rate and segment starts into the domain's rate segments."""
+    segments: list[RateSegment] = []
+    first_change = min((change.effective_from for change in changes), default=None)
+    if (
+        rate_mode is RateMode.VARIABLE
+        and reference_rate_id is not None
+        and margin_bp is not None
+        and (first_change is None or first_change > start)
+    ):
+        segments.append(
+            RateSegment(
+                effective_from=start,
+                mode=RateMode.VARIABLE,
+                margin_bp=margin_bp,
+                reference_values=tuple(
+                    (value.effective_from, value.value_bp) for value in initial_values
+                ),
+            )
+        )
+    for change in changes:
+        if change.mode is RateMode.FIXED:
+            segments.append(
+                RateSegment(
+                    effective_from=change.effective_from,
+                    mode=RateMode.FIXED,
+                    rate_bp=change.rate_bp,
+                )
+            )
+        else:
+            segments.append(
+                RateSegment(
+                    effective_from=change.effective_from,
+                    mode=RateMode.VARIABLE,
+                    margin_bp=change.margin_bp,
+                    reference_values=tuple(
+                        (value.effective_from, value.value_bp)
+                        for value in change.reference_rate_values
+                    ),
+                )
+            )
+    return segments
 
 
-def _loan_rate_at(
-    loan: Loan,
-    changes: list[LoanRateChange],
-    reference_values: list[ReferenceRateValue],
-    day: date,
-) -> int | None:
-    return _rate_bp(loan.rate_mode, changes, reference_values, loan.margin_bp, day)
+def _view_segments(view: LoanView) -> list[RateSegment]:
+    if view.kind is LoanKind.INSTALLMENT_PLAN:
+        return []
+    start = view.origination_date or view.balance_date
+    if start is None:
+        raise LoanError("origination_date", "invalid_date")
+    return _segments_from_changes(
+        view.rate_mode,
+        view.reference_rate_id,
+        view.margin_bp,
+        view.reference_rate_values,
+        view.rate_changes,
+        start,
+    )
+
+
+def rate_timeline(view: LoanView) -> list[RatePeriod]:
+    """The flat rate timeline of a loan view: initial rate plus every rate segment start."""
+    if view.kind is LoanKind.INSTALLMENT_PLAN:
+        return []
+    start = view.origination_date or view.balance_date
+    if start is None:
+        raise LoanError("origination_date", "invalid_date")
+    return build_rate_timeline_domain(_view_segments(view), start)
+
+
+def _current_rate_source(view: LoanView, today: date) -> tuple[RateMode, str | None, int | None]:
+    current: RateSegment | None = None
+    for segment in sorted(_view_segments(view), key=lambda row: row.effective_from):
+        if segment.effective_from <= today:
+            current = segment
+    if current is None or current.mode is RateMode.FIXED:
+        return current.mode if current is not None else view.rate_mode, None, None
+    for change in view.rate_changes:
+        if change.effective_from == current.effective_from and change.mode is RateMode.VARIABLE:
+            return RateMode.VARIABLE, change.reference_rate_name, change.margin_bp
+    return RateMode.VARIABLE, view.reference_rate_name, view.margin_bp
+
+
+def _rate_on_or_none(timeline: Sequence[RatePeriod], day: date) -> int | None:
+    chosen: int | None = None
+    for period in timeline:
+        if period.effective_from <= day:
+            chosen = period.annual_rate_bp
+    return chosen
 
 
 def _validate_rate_timeline(
+    session: Session,
+    ctx: Context,
     loan: Loan,
-    changes: list[LoanRateChange],
-    start: date,
     *,
     first_payment_date: date | None = None,
 ) -> None:
-    if loan.rate_mode != RateMode.FIXED.value:
-        return
-    if not changes:
-        raise LoanError("rate_bp", "rate_change_missing")
-    if any(change.effective_from < start for change in changes):
-        raise LoanError("effective_from", "rate_change_before_start")
+    today = ctx.clock.today(ctx.workspace.timezone)
+    view = _load_loan_view(session, ctx, loan, today)
+    timeline = rate_timeline(view)
     first = first_payment_date or loan.first_payment_date
-    if not any(change.effective_from <= first for change in changes):
+    if not timeline or timeline[0].effective_from > first:
         raise LoanError("rate_bp", "rate_change_missing")
 
 
@@ -359,14 +482,13 @@ def _base_principal(loan: Loan, checkpoints: list[LoanBalanceCheckpoint]) -> Mon
 
 def _target_installment(
     loan: Loan,
-    changes: list[LoanRateChange],
-    reference_values: list[ReferenceRateValue],
+    timeline: Sequence[RatePeriod],
     checkpoints: list[LoanBalanceCheckpoint],
 ) -> Money | None:
     if loan.installment_override_minor is not None:
         return Money(loan.installment_override_minor, loan.currency)
     principal = _base_principal(loan, checkpoints)
-    rate = _loan_rate_at(loan, changes, reference_values, loan.first_payment_date)
+    rate = _rate_on_or_none(timeline, loan.first_payment_date)
     if principal is None or rate is None:
         return None
     return first_installment(principal, rate, loan.term_months, LoanKind(loan.kind))
@@ -424,24 +546,73 @@ def _validate_current_target(session: Session, ctx: Context, loan: Loan) -> None
         or loan.overpayment_amount_minor is None
     ):
         return
-    changes = LoanRateChangeRepository(session, ctx).for_loan(loan.id)
+    today = ctx.clock.today(ctx.workspace.timezone)
+    view = _load_loan_view(session, ctx, loan, today)
+    timeline = rate_timeline(view)
     checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
-    reference_values = (
-        ReferenceRateValueRepository(session, ctx).for_rate(loan.reference_rate_id)
-        if loan.reference_rate_id is not None
-        else []
-    )
     _validate_target(
         Money(loan.overpayment_amount_minor, loan.currency),
-        _target_installment(loan, changes, reference_values, checkpoints),
+        _target_installment(loan, timeline, checkpoints),
     )
 
 
 def _validate_reference_targets(session: Session, ctx: Context, rate_id: UUID) -> None:
-    """Re-check target-total loans that use a changed reference-rate series."""
-    for loan in LoanRepository(session, ctx).ordered():
-        if loan.reference_rate_id == rate_id:
-            _validate_current_target(session, ctx, loan)
+    """Re-check every loan that uses a changed reference-rate series."""
+    for loan in _reference_usage(session, ctx).get(rate_id, []):
+        _validate_rate_timeline(session, ctx, loan)
+        _validate_current_target(session, ctx, loan)
+
+
+def _value_views(
+    values: Sequence[ReferenceRateValue], today: date
+) -> tuple[ReferenceRateValueView, ...]:
+    return tuple(
+        ReferenceRateValueView(
+            id=row.id,
+            effective_from=row.effective_from,
+            value_bp=row.value_bp,
+            editable=row.effective_from > today,
+        )
+        for row in values
+    )
+
+
+def _change_views(
+    loan: Loan,
+    changes: Sequence[LoanRateChange],
+    reference_data: _ReferenceData,
+    today: date,
+) -> tuple[LoanRateChangeView, ...]:
+    views: list[LoanRateChangeView] = []
+    for row in changes:
+        mode = RateMode(row.mode)
+        rate_name = None
+        values: tuple[ReferenceRateValueView, ...] = ()
+        effective_rate = row.rate_bp
+        if row.reference_rate_id is not None:
+            reference = reference_data.rates.get(row.reference_rate_id)
+            rate_name = reference.name if reference is not None else None
+            raw_values = reference_data.values.get(row.reference_rate_id, [])
+            values = _value_views(raw_values, today)
+            if row.margin_bp is not None:
+                reference_value = _reference_rate_at(raw_values, row.effective_from)
+                effective_rate = (
+                    reference_value + row.margin_bp if reference_value is not None else None
+                )
+        views.append(
+            LoanRateChangeView(
+                id=row.id,
+                effective_from=row.effective_from,
+                mode=mode,
+                rate_bp=row.rate_bp,
+                reference_rate_id=row.reference_rate_id,
+                reference_rate_name=rate_name,
+                margin_bp=row.margin_bp,
+                reference_rate_values=values,
+                effective_rate_bp=effective_rate,
+            )
+        )
+    return tuple(views)
 
 
 def _view(
@@ -450,16 +621,25 @@ def _view(
     costs: list[LoanCostComponent],
     overpayments: list[LoanOverpayment],
     checkpoints: list[LoanBalanceCheckpoint],
-    reference_rate: ReferenceRate | None,
-    reference_values: list[ReferenceRateValue],
+    reference_data: _ReferenceData,
     today: date,
 ) -> LoanView:
     entry = _entry_path(loan)
     latest_checkpoint = None
     if checkpoints:
         latest_checkpoint = max(checkpoints, key=lambda row: (row.as_of, row.id))
-    current_rate = _loan_rate_at(loan, changes, reference_values, today)
-    return LoanView(
+    initial_reference = (
+        reference_data.rates.get(loan.reference_rate_id)
+        if loan.reference_rate_id is not None
+        else None
+    )
+    initial_values = (
+        reference_data.values.get(loan.reference_rate_id, [])
+        if loan.reference_rate_id is not None
+        else []
+    )
+    change_views = _change_views(loan, changes, reference_data, today)
+    view = LoanView(
         id=loan.id,
         name=loan.name,
         kind=LoanKind(loan.kind),
@@ -480,28 +660,23 @@ def _view(
         day_count=DayCount(loan.day_count),
         margin_bp=loan.margin_bp,
         reference_rate_id=loan.reference_rate_id,
-        reference_rate_name=reference_rate.name if reference_rate is not None else None,
+        reference_rate_name=initial_reference.name if initial_reference is not None else None,
         property_item_id=loan.property_item_id,
         auto_record_payments=loan.auto_record_payments,
-        reference_rate_values=tuple(
-            ReferenceRateValueView(
-                id=row.id,
-                effective_from=row.effective_from,
-                value_bp=row.value_bp,
-                editable=row.effective_from > today,
-            )
-            for row in reference_values
-        ),
-        current_rate_bp=current_rate,
+        reference_rate_values=_value_views(initial_values, today),
+        current_rate_bp=None,
+        initial_rate_bp=None,
+        current_rate_mode=RateMode(loan.rate_mode),
+        current_rate_reference_name=initial_reference.name
+        if initial_reference is not None
+        else None,
+        current_rate_margin_bp=loan.margin_bp,
         installment_override=_money(loan.installment_override_minor, loan.currency),
         overpayment_mode=OverpaymentMode(loan.overpayment_mode),
         overpayment_amount=_money(loan.overpayment_amount_minor, loan.currency),
         overpayment_strategy=OverpaymentStrategy(loan.overpayment_strategy),
         archived=loan.archived_at is not None,
-        rate_changes=tuple(
-            LoanRateChangeView(id=row.id, effective_from=row.effective_from, rate_bp=row.rate_bp)
-            for row in changes
-        ),
+        rate_changes=change_views,
         cost_components=tuple(
             LoanCostComponentView(
                 id=row.id,
@@ -535,7 +710,24 @@ def _view(
             )
             for row in checkpoints
         ),
-        first_installment=_target_installment(loan, changes, reference_values, checkpoints),
+        first_installment=None,
+    )
+    try:
+        timeline = rate_timeline(view)
+    except LoanValidationError:
+        timeline = []
+    initial_on = loan.origination_date or (
+        min(row.as_of for row in checkpoints) if checkpoints else None
+    )
+    current_mode, current_name, current_margin = _current_rate_source(view, today)
+    return replace(
+        view,
+        current_rate_bp=_rate_on_or_none(timeline, today),
+        initial_rate_bp=_rate_on_or_none(timeline, initial_on) if initial_on else None,
+        current_rate_mode=current_mode,
+        current_rate_reference_name=current_name,
+        current_rate_margin_bp=current_margin,
+        first_installment=_target_installment(loan, timeline, checkpoints),
     )
 
 
@@ -544,23 +736,8 @@ def _load_loan_view(session: Session, ctx: WorkspaceScope, loan: Loan, today: da
     costs = LoanCostComponentRepository(session, ctx).for_loan(loan.id)
     overpayments = LoanOverpaymentRepository(session, ctx).for_loan(loan.id)
     checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
-    reference = None
-    reference_values: list[ReferenceRateValue] = []
-    if loan.reference_rate_id is not None:
-        reference = ReferenceRateRepository(session, ctx).get(loan.reference_rate_id)
-        reference_values = ReferenceRateValueRepository(session, ctx).for_rate(
-            loan.reference_rate_id
-        )
-    return _view(
-        loan,
-        changes,
-        costs,
-        overpayments,
-        checkpoints,
-        reference,
-        reference_values,
-        today,
-    )
+    reference_data = _load_reference_data(session, ctx, loan, changes)
+    return _view(loan, changes, costs, overpayments, checkpoints, reference_data, today)
 
 
 def _loan_status(view: LoanView, figures: LoanListFigures) -> LoanStatus:
@@ -949,7 +1126,12 @@ def create_loan(
                 if rate_id is not None
                 else []
             )
-            rate_bp = _rate_bp(wanted_rate_mode.value, [], reference_values, margin, first_date)
+            reference_value = _reference_rate_at(reference_values, first_date)
+            rate_bp = (
+                reference_value + margin
+                if reference_value is not None and margin is not None
+                else None
+            )
         _validate_target_terms(
             target_minor=(
                 overpayment_minor if wanted_overpayment is OverpaymentMode.TARGET_TOTAL else None
@@ -997,6 +1179,7 @@ def create_loan(
                 effective_from=start,
                 rate_bp=fixed_rate,
             )
+        _validate_rate_timeline(session, ctx, loan)
         for cost_name, cost_mode, cost_rate, cost_fixed, cost_from, cost_to in validated_costs:
             component = LoanCostComponentRepository(session, ctx).create(
                 loan_id=loan.id,
@@ -1106,23 +1289,27 @@ def update_loan_terms(
             if reference_rate_id is not None or margin_bp is not None:
                 raise LoanError("rate_mode", "invalid_rate_mode")
             rate_id, margin = None, None
-        changes = LoanRateChangeRepository(session, ctx).for_loan(loan.id)
-        _validate_rate_timeline(loan, changes, start, first_payment_date=first_date)
-        if entry == "current":
-            if current_balance is None or balance_date is None:
-                raise LoanError("current_balance", "invalid_balance")
-            if len(checkpoints) != 1:
-                raise LoanError("current_balance", "invalid_balance")
-            LoanBalanceCheckpointRepository(session, ctx).update(
-                checkpoints[0].id,
-                as_of=balance_date,
-                remaining_principal_minor=current_balance.amount_minor,
-            )
+        if entry == "current" and (current_balance is None or balance_date is None):
+            raise LoanError("current_balance", "invalid_balance")
+        if entry == "current" and len(checkpoints) != 1:
+            raise LoanError("current_balance", "invalid_balance")
+        today = ctx.clock.today(ctx.workspace.timezone)
         reference_values = (
             ReferenceRateValueRepository(session, ctx).for_rate(rate_id)
             if rate_id is not None
             else []
         )
+        proposed = replace(
+            _load_loan_view(session, ctx, loan, today),
+            origination_date=wanted_origination,
+            balance_date=balance_date if entry == "current" else None,
+            first_payment_date=first_date,
+            term_months=term,
+            reference_rate_id=rate_id,
+            margin_bp=margin,
+            reference_rate_values=_value_views(reference_values, today),
+        )
+        timeline = rate_timeline(proposed)
         _validate_target_terms(
             target_minor=(
                 loan.overpayment_amount_minor
@@ -1136,8 +1323,16 @@ def update_loan_terms(
             term_months=term,
             kind=wanted_kind,
             currency=currency,
-            rate_bp=_rate_bp(loan.rate_mode, changes, reference_values, margin, first_date),
+            rate_bp=_rate_on_or_none(timeline, first_date),
         )
+        if entry == "current":
+            assert balance_date is not None
+            assert current_balance is not None
+            LoanBalanceCheckpointRepository(session, ctx).update(
+                checkpoints[0].id,
+                as_of=balance_date,
+                remaining_principal_minor=current_balance.amount_minor,
+            )
         LoanRepository(session, ctx).update(
             loan.id,
             name=clean_name,
@@ -1152,6 +1347,8 @@ def update_loan_terms(
             margin_bp=margin,
             day_count=wanted_day_count.value,
         )
+        _validate_rate_timeline(session, ctx, loan, first_payment_date=first_date)
+        _validate_current_target(session, ctx, loan)
         _refresh_loan_occurrences(session, ctx, loan.id)
         _audit(session, ctx, "loan.updated", "loan", loan.id, {"kind": wanted_kind.value})
 
@@ -1177,14 +1374,11 @@ def set_overpayment_settings(
             mode=mode, amount=amount, strategy=strategy, currency=currency
         )
         if wanted_mode is OverpaymentMode.TARGET_TOTAL and amount_minor is not None:
-            changes = LoanRateChangeRepository(session, ctx).for_loan(loan.id)
+            today = ctx.clock.today(ctx.workspace.timezone)
+            view = _load_loan_view(session, ctx, loan, today)
+            timeline = rate_timeline(view)
             checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
-            reference_values = (
-                ReferenceRateValueRepository(session, ctx).for_rate(loan.reference_rate_id)
-                if loan.reference_rate_id is not None
-                else []
-            )
-            installment = _target_installment(loan, changes, reference_values, checkpoints)
+            installment = _target_installment(loan, timeline, checkpoints)
             _validate_target(Money(amount_minor, currency), installment)
         LoanRepository(session, ctx).update(
             loan.id,
@@ -1233,14 +1427,61 @@ def restore_loan(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) ->
     _write(factory, write)
 
 
+def _rate_change_fields(
+    *,
+    mode: str,
+    rate_bp: int | None,
+    reference_rate_id: UUID | None,
+    margin_bp: int | None,
+    high_rate_confirmed: bool,
+    effective_from: date,
+    session: Session,
+    ctx: Context,
+) -> dict[str, str | int | UUID | None]:
+    try:
+        wanted_mode = RateMode(mode)
+    except ValueError:
+        raise LoanError("mode", "invalid_rate_mode") from None
+    if wanted_mode is RateMode.FIXED:
+        if rate_bp is None:
+            raise LoanError("rate_bp", "invalid_rate")
+        validate_rate_bp(rate_bp)
+        _validate_high_rate(rate_bp, high_rate_confirmed)
+        if reference_rate_id is not None or margin_bp is not None:
+            raise LoanError("mode", "invalid_rate_mode")
+        return {
+            "mode": RateMode.FIXED.value,
+            "rate_bp": rate_bp,
+            "reference_rate_id": None,
+            "margin_bp": None,
+        }
+    reference_rate_id, margin_bp = _validated_variable_config(
+        reference_rate_id=reference_rate_id,
+        margin_bp=margin_bp,
+        high_rate_confirmed=high_rate_confirmed,
+        start=effective_from,
+        session=session,
+        ctx=ctx,
+    )
+    return {
+        "mode": RateMode.VARIABLE.value,
+        "rate_bp": None,
+        "reference_rate_id": reference_rate_id,
+        "margin_bp": margin_bp,
+    }
+
+
 def add_rate_change(
     factory: sessionmaker[Session],
     ctx: Context,
     loan_id: UUID,
     *,
     effective_from: date,
-    rate_bp: int,
-    high_rate_confirmed: bool,
+    rate_bp: int | None = None,
+    high_rate_confirmed: bool = False,
+    mode: str = RateMode.FIXED.value,
+    reference_rate_id: UUID | None = None,
+    margin_bp: int | None = None,
 ) -> None:
     require_role(ctx, Role.EDITOR)
 
@@ -1248,28 +1489,40 @@ def add_rate_change(
         require_role_now(session, ctx, Role.EDITOR)
         _locked_workspace_currency(session, ctx)
         loan = _get_active_loan(session, ctx, loan_id)
-        if loan.rate_mode != RateMode.FIXED.value:
-            raise LoanError("rate_bp", "rate_mode_locked")
         valid_date(effective_from, "effective_from")
-        validate_rate_bp(rate_bp)
-        _validate_high_rate(rate_bp, high_rate_confirmed)
         checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
         if effective_from < _loan_start(loan, checkpoints):
             raise LoanError("effective_from", "rate_change_before_start")
         repository = LoanRateChangeRepository(session, ctx)
         if repository.exists_on(loan.id, effective_from):
             raise LoanError("effective_from", "rate_change_exists")
-        repository.create(loan_id=loan.id, effective_from=effective_from, rate_bp=rate_bp)
-        _validate_rate_timeline(loan, repository.for_loan(loan.id), _loan_start(loan, checkpoints))
-        _validate_current_target(session, ctx, loan)
-        _audit(
-            session,
-            ctx,
-            "loan_rate_change.created",
-            "loan",
-            loan.id,
-            {"effective_from": effective_from.isoformat(), "rate_bp": rate_bp},
+        fields = _rate_change_fields(
+            mode=mode,
+            rate_bp=rate_bp,
+            reference_rate_id=reference_rate_id,
+            margin_bp=margin_bp,
+            high_rate_confirmed=high_rate_confirmed,
+            effective_from=effective_from,
+            session=session,
+            ctx=ctx,
         )
+        repository.create(loan_id=loan.id, effective_from=effective_from, **fields)
+        _validate_rate_timeline(session, ctx, loan)
+        _validate_current_target(session, ctx, loan)
+        audit: dict[str, str | int | bool] = {
+            "effective_from": effective_from.isoformat(),
+            "mode": str(fields["mode"]),
+        }
+        fixed_rate = fields["rate_bp"]
+        if isinstance(fixed_rate, int):
+            audit["rate_bp"] = fixed_rate
+        reference_rate = fields["reference_rate_id"]
+        if isinstance(reference_rate, UUID):
+            audit["reference_rate_id"] = str(reference_rate)
+            margin = fields["margin_bp"]
+            if isinstance(margin, int):
+                audit["margin_bp"] = margin
+        _audit(session, ctx, "loan_rate_change.created", "loan", loan.id, audit)
         _refresh_loan_occurrences(session, ctx, loan.id)
 
     _write(factory, write)
@@ -1282,8 +1535,11 @@ def update_rate_change(
     change_id: UUID,
     *,
     effective_from: date,
-    rate_bp: int,
-    high_rate_confirmed: bool,
+    rate_bp: int | None = None,
+    high_rate_confirmed: bool = False,
+    mode: str = RateMode.FIXED.value,
+    reference_rate_id: UUID | None = None,
+    margin_bp: int | None = None,
 ) -> None:
     require_role(ctx, Role.EDITOR)
 
@@ -1291,32 +1547,43 @@ def update_rate_change(
         require_role_now(session, ctx, Role.EDITOR)
         _locked_workspace_currency(session, ctx)
         loan = _get_active_loan(session, ctx, loan_id)
-        if loan.rate_mode != RateMode.FIXED.value:
-            raise LoanError("rate_bp", "rate_mode_locked")
         valid_date(effective_from, "effective_from")
-        validate_rate_bp(rate_bp)
-        _validate_high_rate(rate_bp, high_rate_confirmed)
         repository = LoanRateChangeRepository(session, ctx)
         change = repository.get_for_loan(loan.id, change_id)
         if change is None:
             raise NotFound
         checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
-        start = _loan_start(loan, checkpoints)
-        if effective_from < start:
+        if effective_from < _loan_start(loan, checkpoints):
             raise LoanError("effective_from", "rate_change_before_start")
         if repository.exists_on(loan.id, effective_from, exclude_id=change.id):
             raise LoanError("effective_from", "rate_change_exists")
-        repository.update(change.id, effective_from=effective_from, rate_bp=rate_bp)
-        _validate_rate_timeline(loan, repository.for_loan(loan.id), start)
-        _validate_current_target(session, ctx, loan)
-        _audit(
-            session,
-            ctx,
-            "loan_rate_change.updated",
-            "loan",
-            loan.id,
-            {"effective_from": effective_from.isoformat(), "rate_bp": rate_bp},
+        fields = _rate_change_fields(
+            mode=mode,
+            rate_bp=rate_bp,
+            reference_rate_id=reference_rate_id,
+            margin_bp=margin_bp,
+            high_rate_confirmed=high_rate_confirmed,
+            effective_from=effective_from,
+            session=session,
+            ctx=ctx,
         )
+        repository.update(change.id, effective_from=effective_from, **fields)
+        _validate_rate_timeline(session, ctx, loan)
+        _validate_current_target(session, ctx, loan)
+        audit: dict[str, str | int | bool] = {
+            "effective_from": effective_from.isoformat(),
+            "mode": str(fields["mode"]),
+        }
+        fixed_rate = fields["rate_bp"]
+        if isinstance(fixed_rate, int):
+            audit["rate_bp"] = fixed_rate
+        reference_rate = fields["reference_rate_id"]
+        if isinstance(reference_rate, UUID):
+            audit["reference_rate_id"] = str(reference_rate)
+            margin = fields["margin_bp"]
+            if isinstance(margin, int):
+                audit["margin_bp"] = margin
+        _audit(session, ctx, "loan_rate_change.updated", "loan", loan.id, audit)
         _refresh_loan_occurrences(session, ctx, loan.id)
 
     _write(factory, write)
@@ -1335,10 +1602,9 @@ def delete_rate_change(
         change = repository.get_for_loan(loan.id, change_id)
         if change is None:
             raise NotFound
-        checkpoints = LoanBalanceCheckpointRepository(session, ctx).for_loan(loan.id)
-        remaining = [row for row in repository.for_loan(loan.id) if row.id != change.id]
-        _validate_rate_timeline(loan, remaining, _loan_start(loan, checkpoints))
+        effective_from = change.effective_from
         repository.delete(change)
+        _validate_rate_timeline(session, ctx, loan)
         _validate_current_target(session, ctx, loan)
         _audit(
             session,
@@ -1346,7 +1612,7 @@ def delete_rate_change(
             "loan_rate_change.deleted",
             "loan",
             loan.id,
-            {"effective_from": change.effective_from.isoformat()},
+            {"effective_from": effective_from.isoformat()},
         )
         _refresh_loan_occurrences(session, ctx, loan.id)
 
@@ -1661,7 +1927,6 @@ def _reference_view(
         used_by=tuple(
             ReferenceRateLoanRef(id=loan.id, name=loan.name, archived=loan.archived_at is not None)
             for loan in loans
-            if loan.reference_rate_id == rate.id
         ),
         sparkline=_sparkline(values),
     )
@@ -1673,10 +1938,11 @@ def list_reference_rates(factory: sessionmaker[Session], ctx: Context) -> Refere
     with factory() as session:
         rates = ReferenceRateRepository(session, ctx).ordered()
         values = ReferenceRateValueRepository(session, ctx)
-        loans = LoanRepository(session, ctx).ordered()
+        usage = _reference_usage(session, ctx)
         return ReferenceRatesPage(
             rates=tuple(
-                _reference_view(rate, values.for_rate(rate.id), today, loans) for rate in rates
+                _reference_view(rate, values.for_rate(rate.id), today, usage.get(rate.id, ()))
+                for rate in rates
             )
         )
 
@@ -1689,8 +1955,8 @@ def get_reference_rate(
     with factory() as session:
         rate = ReferenceRateRepository(session, ctx).get_or_raise(rate_id)
         values = ReferenceRateValueRepository(session, ctx).for_rate(rate.id)
-        loans = LoanRepository(session, ctx).ordered()
-        return _reference_view(rate, values, today, loans)
+        usage = _reference_usage(session, ctx)
+        return _reference_view(rate, values, today, usage.get(rate.id, ()))
 
 
 def create_reference_rate(
@@ -1940,6 +2206,7 @@ __all__ = [
     "list_loans",
     "list_reference_rates",
     "preview_first_installment",
+    "rate_timeline",
     "restore_loan",
     "set_overpayment_settings",
     "update_cost_component",

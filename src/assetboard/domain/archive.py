@@ -49,7 +49,7 @@ from assetboard.domain.money import minor_unit_for
 from assetboard.domain.networth import MAX_ITEM_NAME_LENGTH, MAX_NOTES_LENGTH, Side
 
 FORMAT = "workspace-archive"
-FORMAT_VERSION = "1.5"
+FORMAT_VERSION = "1.6"
 # Bounds of the optional ``upcoming_days`` key (1.1); mirror ``config.MIN/MAX_UPCOMING_DAYS``.
 MIN_UPCOMING_DAYS = 1
 MAX_UPCOMING_DAYS = 365
@@ -224,7 +224,17 @@ CSV_COLUMNS = {
         "overpayment_strategy",
         "archived_at",
     ),
-    "loan_rate_changes.csv": ("id", "loan_id", "loan", "effective_from", "rate_bp"),
+    "loan_rate_changes.csv": (
+        "id",
+        "loan_id",
+        "loan",
+        "effective_from",
+        "rate_bp",
+        "mode",
+        "reference_rate_id",
+        "reference_rate",
+        "margin_bp",
+    ),
     "loan_cost_components.csv": (
         "id",
         "loan_id",
@@ -597,7 +607,11 @@ class LoanRateChangeRow:
     loan_id: str
     loan: str
     effective_from: str
-    rate_bp: int
+    rate_bp: int | None
+    mode: str = "fixed"
+    reference_rate_id: str | None = None
+    reference_rate: str | None = None
+    margin_bp: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -1429,6 +1443,8 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
             raise ValueError("invalid cost basis")
         return value
     if column == "mode":
+        if file == "loan_rate_changes.csv":
+            return RateMode(value or "fixed").value
         if value not in {"percent", "fixed"}:
             raise ValueError("invalid cost mode")
         return value
@@ -1674,7 +1690,7 @@ _REQUIRED_COLUMNS = {
         "overpayment_mode",
         "overpayment_strategy",
     },
-    "loan_rate_changes.csv": {"id", "loan_id", "loan", "effective_from", "rate_bp"},
+    "loan_rate_changes.csv": {"id", "loan_id", "loan", "effective_from"},
     "loan_cost_components.csv": {
         "id",
         "loan_id",
@@ -1725,6 +1741,8 @@ def required_columns(version: str) -> dict[str, set[str]]:
     major, minor = (int(part) for part in version.split(".", 1))
     if major == 1 and minor >= 3:
         columns["networth_items.csv"].add("estimate_between")
+    if major == 1 and minor >= 6:
+        columns["loan_rate_changes.csv"].add("mode")
     return columns
 
 
@@ -1786,6 +1804,24 @@ def _read_rows(
                     except ValueError as exc:
                         errors.append(ArchiveError(name, str(exc), line, column))
                 if len(row) == len(columns):
+                    if name == "loan_rate_changes.csv":
+                        mode = row["mode"] or "fixed"
+                        if mode == "fixed" and not row["rate_bp"]:
+                            errors.append(
+                                ArchiveError(name, "a fixed rate change needs a rate", line)
+                            )
+                            continue
+                        if mode == "variable" and (
+                            not row["reference_rate_id"] or not row["margin_bp"]
+                        ):
+                            errors.append(
+                                ArchiveError(
+                                    name,
+                                    "a variable rate change needs a reference rate and margin",
+                                    line,
+                                )
+                            )
+                            continue
                     rows.append(row)
         except (UnicodeDecodeError, csv.Error) as exc:
             errors.append(ArchiveError(name, str(exc)))
@@ -2261,6 +2297,16 @@ def _read_rows(
         if key in rate_change_keys:
             errors.append(ArchiveError("loan_rate_changes.csv", "duplicate loan rate change"))
         rate_change_keys.add(key)
+        if row["mode"] == "variable":
+            rate = reference_rates_by_id.get(row["reference_rate_id"])
+            if rate is None or row["reference_rate"] != rate["name"]:
+                errors.append(
+                    ArchiveError("loan_rate_changes.csv", "rate change reference mismatch")
+                )
+        elif row["reference_rate_id"] or row["margin_bp"] or not row["rate_bp"]:
+            errors.append(
+                ArchiveError("loan_rate_changes.csv", "invalid rate change configuration")
+            )
 
     cost_components = tables["loan_cost_components.csv"]
     cost_ids: set[str] = set()
@@ -2622,11 +2668,15 @@ def _read_rows(
         ),
         loan_rate_changes=tuple(
             LoanRateChangeRow(
-                row["id"],
-                row["loan_id"],
-                row["loan"],
-                row["effective_from"],
-                int(row["rate_bp"]),
+                id=row["id"],
+                loan_id=row["loan_id"],
+                loan=row["loan"],
+                effective_from=row["effective_from"],
+                rate_bp=int(row["rate_bp"]) if row["rate_bp"] else None,
+                mode=row["mode"] or "fixed",
+                reference_rate_id=row["reference_rate_id"] or None,
+                reference_rate=row["reference_rate"] or None,
+                margin_bp=int(row["margin_bp"]) if row["margin_bp"] else None,
             )
             for row in rate_changes
         ),

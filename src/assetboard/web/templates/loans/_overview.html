@@ -8,7 +8,7 @@
     <div class="text-right">
       <p class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Current rate") }}</p>
       <p class="text-lg font-semibold tabular-nums" data-overview-rate>{{ rate(loan.current_rate_bp, locale) }}</p>
-      <p class="text-xs text-muted">{{ _("Fixed") if loan.rate_mode.value == "fixed" else _("Variable") }}{% if loan.reference_rate_name %} · {{ loan.reference_rate_name }}{% if loan.margin_bp is not none %} + {{ format_rate_short(loan.margin_bp, locale) }}{% endif %}{% endif %}</p>
+      <p class="text-xs text-muted">{{ _("Fixed") if loan.current_rate_mode.value == "fixed" else _("Variable") }}{% if loan.current_rate_reference_name %} · {{ loan.current_rate_reference_name }}{% if loan.current_rate_margin_bp is not none %} + {{ format_rate_short(loan.current_rate_margin_bp, locale) }}{% endif %}{% endif %}</p>
     </div>
   </div>
 

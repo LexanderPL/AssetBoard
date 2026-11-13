@@ -83,8 +83,8 @@
       <legend class="mb-2 text-sm font-medium">{{ _("Interest") }}</legend>
       <div class="grid gap-2 sm:grid-cols-2">
         {% for value, title, description in (
-          ("fixed", _("Fixed rate"), _("I enter the rate and any later changes.")),
-          ("variable", _("Variable rate"), _("A reference rate plus a margin; I add the reference values.")),
+          ("fixed", _("Fixed rate"), _("I enter the starting rate; later changes can switch to a reference rate.")),
+          ("variable", _("Variable rate"), _("A reference rate plus a margin for the initial period; later changes can switch.")),
         ) %}
         <label class="{{ option_class }}" data-rate-mode-option="{{ value }}">
           <input type="radio" name="rate_mode" value="{{ value }}" class="mt-1 h-4 w-4 accent-primary"{% if values.get('rate_mode', 'fixed') == value %} checked{% endif %}>
@@ -95,7 +95,7 @@
       {{ field_error("rate_mode") }}
     </fieldset>
     <div class="grid gap-4 sm:grid-cols-2" data-hidden-when="rate_mode=variable">
-      <label class="grid gap-1 text-sm font-medium">{{ _("Annual interest rate") }}<input name="fixed_rate_percent" value="{{ values.get('fixed_rate_percent', '') }}" inputmode="decimal"{{ field_attrs("fixed_rate_percent") }} class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("For example 5.5 for 5.5%%. Add later changes on the loan page.") }}</span>{{ field_error("fixed_rate_percent") }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Annual interest rate") }}<input name="fixed_rate_percent" value="{{ values.get('fixed_rate_percent', '') }}" inputmode="decimal"{{ field_attrs("fixed_rate_percent") }} class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("For example 5.5 for 5.5%%. Add later changes and switches on the loan page.") }}</span>{{ field_error("fixed_rate_percent") }}</label>
     </div>
     <div class="grid gap-4 sm:grid-cols-2" data-hidden-when="rate_mode=fixed">
       <label class="grid gap-1 text-sm font-medium">{{ _("Reference rate") }}<select name="reference_rate_id"{{ field_attrs("reference_rate_id") }} class="form-select py-2 font-normal">

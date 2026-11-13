@@ -106,7 +106,19 @@ KNOWN_COLUMNS: dict[str, frozenset[str]] = {
             "archived_at",
         }
     ),
-    LOAN_RATE_CHANGES: frozenset({"id", "loan_id", "loan", "effective_from", "rate_bp"}),
+    LOAN_RATE_CHANGES: frozenset(
+        {
+            "id",
+            "loan_id",
+            "loan",
+            "effective_from",
+            "rate_bp",
+            "mode",
+            "reference_rate_id",
+            "reference_rate",
+            "margin_bp",
+        }
+    ),
     LOAN_COST_COMPONENTS: frozenset(
         {
             "id",

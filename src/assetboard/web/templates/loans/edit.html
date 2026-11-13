@@ -65,7 +65,7 @@
         {% for rate in reference_rates %}<option value="{{ rate.id }}"{% if values.get('reference_rate_id') == rate.id|string %} selected{% endif %}>{{ rate.name }}{% if rate.current_value_bp is not none %} · {{ format_rate_short(rate.current_value_bp, locale) }}{% endif %}</option>{% endfor %}
       </select></label>
       <label class="grid gap-1 text-sm font-medium">{{ _("Margin") }}<input name="margin_percent" value="{{ values.get('margin_percent', format_rate_short(loan.margin_bp, locale) if loan.margin_bp is not none else '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Added to the reference rate.") }}</span></label>
-      {% if high_rate or values.get('high_rate_confirmed') == '1' or (loan.current_rate_bp is not none and loan.current_rate_bp > 2500) %}
+      {% if high_rate or values.get('high_rate_confirmed') == '1' or (loan.initial_rate_bp is not none and loan.initial_rate_bp > 2500) %}
       <label class="flex items-start gap-2 border border-warning-line bg-warning-soft p-3 text-sm sm:col-span-2"><input type="checkbox" name="high_rate_confirmed" value="1" class="mt-0.5 h-4 w-4 accent-primary"{% if values.get('high_rate_confirmed') == '1' %} checked{% endif %}> <span>{{ _("I understand this rate is above 25%%.") }}</span></label>
       {% else %}
       <p class="text-xs text-muted sm:col-span-2">{{ _("A rate above 25%% asks for confirmation when you save it.") }}</p>
@@ -73,7 +73,7 @@
     </div>
     {% endif %}
     <label class="grid gap-1 text-sm font-medium">{{ _("Installment override (%(currency)s, optional)", currency=loan.currency) }}<input name="installment_override" value="{{ values.get('installment_override', '') }}" inputmode="decimal" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Only for annuity loans. Leave empty to use the calculated installment.") }}</span></label>
-    <p class="text-sm text-muted">{{ _("Rate type: %(mode)s. It is fixed at creation.", mode=_("Fixed") if loan.rate_mode.value == "fixed" else _("Variable")) }}</p>
+    <p class="text-sm text-muted">{{ _("Initial rate type: %(mode)s. Later segments can switch between fixed and variable.", mode=_("Fixed") if loan.rate_mode.value == "fixed" else _("Variable")) }}</p>
     <div class="flex flex-wrap gap-2 border-t border-line pt-4">
       <button type="submit" class="btn-primary">{{ _("Save terms") }}</button>
       <a href="{{ scoped_url(request, 'loan_settings', loan_id=loan.id) }}#terms" class="btn">{{ _("Cancel") }}</a>

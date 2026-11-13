@@ -27,7 +27,7 @@
   </div>
   <dl class="mt-5 grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
     <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Loan type") }}</dt><dd class="mt-1">{{ kind_label(loan.kind) }}{% if loan.archived %} · <span class="font-semibold text-muted">{{ _("archived") }}</span>{% endif %}</dd></div>
-    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Current rate") }}</dt><dd class="mt-1 tabular-nums">{{ rate(loan.current_rate_bp, locale) }}</dd><dd class="text-xs text-muted">{{ _("Fixed") if loan.rate_mode.value == "fixed" else _("Variable") }}{% if loan.reference_rate_name %} · {{ loan.reference_rate_name }}{% if loan.margin_bp is not none %} + {{ format_rate_short(loan.margin_bp, locale) }}{% endif %}{% endif %}</dd></div>
+    <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Current rate") }}</dt><dd class="mt-1 tabular-nums">{{ rate(loan.current_rate_bp, locale) }}</dd><dd class="text-xs text-muted">{{ _("Fixed") if loan.current_rate_mode.value == "fixed" else _("Variable") }}{% if loan.current_rate_reference_name %} · {{ loan.current_rate_reference_name }}{% if loan.current_rate_margin_bp is not none %} + {{ format_rate_short(loan.current_rate_margin_bp, locale) }}{% endif %}{% endif %}</dd></div>
     <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{% if loan.entry_path == "original" %}{{ _("Original principal") }}{% else %}{{ _("Starting balance") }}{% endif %}</dt><dd class="mt-1 tabular-nums">{% if loan.principal_original %}{{ format_money(loan.principal_original, locale) }}{% else %}—{% endif %}</dd>{% if loan.entry_path == "current" and loan.balance_date %}<dd class="text-xs text-muted">{{ format_day(loan.balance_date, locale) }}</dd>{% endif %}</div>
     <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("Term") }}</dt><dd class="mt-1">{{ ngettext("%(num)d month", "%(num)d months", loan.term_months, num=loan.term_months) }}</dd></div>
     <div><dt class="text-xs font-semibold uppercase tracking-wide text-muted">{{ _("First payment") }}</dt><dd class="mt-1">{{ format_day(loan.first_payment_date, locale) }} · {{ _("day %(day)s", day=loan.payment_day) }}</dd></div>
@@ -43,20 +43,27 @@
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div>
       <h2 id="rates-heading" class="text-base font-semibold">{{ _("Rates") }}</h2>
-      <p class="mt-1 text-sm text-muted">{{ _("Fixed loans use the rate in force on each payment date. Variable loans add the margin to the reference rate.") }}</p>
+      <p class="mt-1 text-sm text-muted">{{ _("Each rate change starts a new segment. A segment is either a fixed rate or a reference rate plus margin; later reference values reprice a variable segment automatically.") }}</p>
     </div>
-    {% if can_edit and not loan.archived and loan.rate_mode.value == "fixed" %}<a href="?form=rate#rate-dialog" class="btn" data-dialog-open="rate-dialog" aria-haspopup="dialog">{{ _("Add rate change") }}</a>{% endif %}
+    {% if can_edit and not loan.archived %}<a href="?form=rate#rate-dialog" class="btn" data-dialog-open="rate-dialog" aria-haspopup="dialog">{{ _("Add rate change") }}</a>{% endif %}
   </div>
-  {% if loan.rate_mode.value == "fixed" %}
+  {% if loan.rate_mode.value == "variable" %}
+  <p class="mt-3 text-sm" data-initial-rate>{{ _("Initial rate: %(name)s", name=loan.reference_rate_name or _("not set")) }}{% if loan.margin_bp is not none %} · {{ _("margin %(margin)s", margin=format_rate_short(loan.margin_bp, locale)) }}{% endif %}</p>
+  <p class="mt-2 text-sm text-muted">{{ _("Change the initial reference rate or margin in Edit terms. Add values on the Reference rates page.") }}</p>
+  <p class="mt-2 text-sm"><a href="{{ scoped_url(request, 'reference_rates') }}" class="font-semibold text-primary-ink underline">{{ _("Manage reference rates") }}</a></p>
+  {% endif %}
   <div class="mt-3 overflow-hidden">
     <table class="sheet-sm w-full text-sm">
       <caption class="sr-only">{{ _("Rate changes") }}</caption>
-      <thead class="hidden border-b border-line bg-subtle text-left text-xs uppercase tracking-wide text-muted sm:table-header-group"><tr><th scope="col" class="px-4 py-2 font-semibold">{{ _("From") }}</th><th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Annual rate") }}</th>{% if can_edit and not loan.archived %}<th scope="col" class="px-4 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>{% endif %}</tr></thead>
+      <thead class="hidden border-b border-line bg-subtle text-left text-xs uppercase tracking-wide text-muted sm:table-header-group"><tr><th scope="col" class="px-4 py-2 font-semibold">{{ _("From") }}</th><th scope="col" class="px-4 py-2 text-right font-semibold">{{ _("Rate") }}</th>{% if can_edit and not loan.archived %}<th scope="col" class="px-4 py-2"><span class="sr-only">{{ _("Actions") }}</span></th>{% endif %}</tr></thead>
       <tbody class="divide-y divide-line sm:divide-y-0">
       {% for change in loan.rate_changes %}
-        <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 sm:table-row sm:p-0" data-rate-change="{{ change.id }}">
+        <tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-1 px-4 py-3 sm:table-row sm:p-0" data-rate-change="{{ change.id }}" data-rate-change-mode="{{ change.mode.value }}">
           <td class="sm:px-4 sm:py-3">{{ format_day(change.effective_from, locale) }}</td>
-          <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3">{{ format_rate_short(change.rate_bp, locale) }}</td>
+          <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3">
+            {% if change.mode.value == "fixed" %}{{ format_rate_short(change.rate_bp, locale) }}
+            {% else %}{{ change.reference_rate_name or _("not set") }} + {{ format_rate_short(change.margin_bp, locale) }}{% if change.effective_rate_bp is not none %} · {{ format_rate_short(change.effective_rate_bp, locale) }}{% endif %}{% endif %}
+          </td>
           {% if can_edit and not loan.archived %}
           <td class="col-span-2 pt-1 sm:px-4 sm:py-3"><div class="flex justify-end gap-2"><a class="btn-sm" href="?form=rate&edit={{ change.id }}#rate-dialog" data-dialog-open="rate-dialog">{{ _("Edit") }}<span class="sr-only"> {{ _("rate from %(date)s", date=format_day(change.effective_from, locale)) }}</span></a><form method="post" action="{{ scoped_url(request, 'loan_rate_change_delete', loan_id=loan.id, change_id=change.id) }}" data-confirm="{{ _('Delete the rate change from %(date)s?', date=format_day(change.effective_from, locale)) }}" data-confirm-tone="danger">{{ csrf_input() }}<button type="submit" class="btn-sm btn-danger">{{ _("Delete") }}<span class="sr-only"> {{ _("rate from %(date)s", date=format_day(change.effective_from, locale)) }}</span></button></form></div></td>
           {% endif %}
@@ -67,11 +74,6 @@
       </tbody>
     </table>
   </div>
-  {% else %}
-  <p class="mt-3 text-sm">{{ _("Reference rate: %(name)s", name=loan.reference_rate_name or _("not set")) }}{% if loan.margin_bp is not none %} · {{ _("margin %(margin)s", margin=format_rate_short(loan.margin_bp, locale)) }}{% endif %}</p>
-  <p class="mt-2 text-sm text-muted">{{ _("Change the reference rate or margin in Edit terms. Add values on the Reference rates page.") }}</p>
-  <p class="mt-2 text-sm"><a href="{{ scoped_url(request, 'reference_rates') }}" class="font-semibold text-primary-ink underline">{{ _("Manage reference rates") }}</a></p>
-  {% endif %}
 </section>
 
 <section class="panel mb-6 p-4 sm:p-6" id="costs" aria-labelledby="costs-heading" data-loan-costs-settings>
@@ -164,14 +166,24 @@
 {# Rate change dialog. #}
 {% set rate_edit = namespace(row=none) %}
 {% for change in loan.rate_changes %}{% if edit_id == change.id|string %}{% set rate_edit.row = change %}{% endif %}{% endfor %}
-<dialog id="rate-dialog" aria-labelledby="rate-dialog-heading" data-dialog-modal class="popup w-[min(92vw,36rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if open_form == "rate" %} open{% endif %}>
+<dialog id="rate-dialog" aria-labelledby="rate-dialog-heading" data-dialog-modal class="popup w-[min(92vw,40rem)] [&:not(:modal)]:static [&:not(:modal)]:w-full [&:not(:modal)]:max-w-none"{% if open_form == "rate" %} open{% endif %}>
   <div class="space-y-5 p-6">
     <div class="flex items-start justify-between gap-3"><h2 id="rate-dialog-heading" class="text-base font-semibold">{{ _("Edit rate change") if rate_edit.row else _("Add rate change") }}</h2><a href="{{ scoped_url(request, 'loan_settings', loan_id=loan.id) }}#rates" data-dialog-close class="-m-1 rounded-lg px-2 py-1 text-lg leading-none text-muted hover:bg-subtle" aria-label="{{ _('Close') }}">×</a></div>
+    {% set change_mode = form_values.get('mode', rate_edit.row.mode.value if rate_edit.row else loan.current_rate_mode.value) %}
     <form method="post" action="{{ scoped_url(request, 'loan_rate_change_update', loan_id=loan.id, change_id=rate_edit.row.id) if rate_edit.row else scoped_url(request, 'loan_rate_change_create', loan_id=loan.id) }}" class="grid gap-4">
       {{ csrf_input() }}
-      <label class="grid gap-1 text-sm font-medium">{{ _("Applies from") }}<input name="effective_from" type="date" value="{{ form_values.get('effective_from', rate_edit.row.effective_from.isoformat() if rate_edit.row else today.isoformat()) }}" required{{ dialog_attrs("rate", "effective_from") }} class="{{ input_class }} font-normal">{{ dialog_error("rate", "effective_from") }}</label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Annual rate") }}<input name="rate_percent" value="{{ form_values.get('rate_percent', rate_input(rate_edit.row.rate_bp) if rate_edit.row else '') }}" inputmode="decimal" required{{ dialog_attrs("rate", "rate_percent") }} class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("For example 5.5 for 5.5%%.") }}</span>{{ dialog_error("rate", "rate_percent") }}</label>
-      {% if high_rate or form_values.get('high_rate_confirmed') == '1' or (rate_edit.row and rate_edit.row.rate_bp > 2500) %}
+      <label class="grid gap-1 text-sm font-medium">{{ _("Applies from") }}<input name="effective_from" type="date" value="{{ form_values.get('effective_from', rate_edit.row.effective_from.isoformat() if rate_edit.row else today.isoformat()) }}" required{{ dialog_attrs("rate", "effective_from") }} class="{{ input_class }} font-normal">{{ dialog_error("rate", "effective_from") }}<span class="text-xs text-muted">{{ _("The new rate applies from the first payment on or after this date.") }}</span></label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Rate type") }}<select name="mode" id="rate_mode"{{ dialog_attrs("rate", "mode") }} class="form-select py-2 font-normal"><option value="fixed"{% if change_mode == "fixed" %} selected{% endif %}>{{ _("Fixed rate") }}</option><option value="variable"{% if change_mode == "variable" %} selected{% endif %}>{{ _("Reference rate + margin") }}</option></select>{{ dialog_error("rate", "mode") }}</label>
+      <label class="grid gap-1 text-sm font-medium" data-hidden-when="rate_mode=variable">{{ _("Annual rate") }}<input name="rate_percent" value="{{ form_values.get('rate_percent', rate_input(rate_edit.row.rate_bp) if rate_edit.row and rate_edit.row.rate_bp is not none else '') }}" inputmode="decimal"{{ dialog_attrs("rate", "rate_percent") }} class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("For example 5.5 for 5.5%%.") }}</span>{{ dialog_error("rate", "rate_percent") }}</label>
+      <div class="grid gap-4 sm:grid-cols-2" data-hidden-when="rate_mode=fixed">
+        <label class="grid gap-1 text-sm font-medium">{{ _("Reference rate") }}<select name="reference_rate_id"{{ dialog_attrs("rate", "reference_rate_id") }} class="form-select py-2 font-normal">
+          <option value="">{{ _("Choose a reference rate") }}</option>
+          {% for rate in reference_rates %}<option value="{{ rate.id }}"{% if form_values.get('reference_rate_id', rate_edit.row.reference_rate_id|string if rate_edit.row and rate_edit.row.reference_rate_id else '') == rate.id|string %} selected{% endif %}>{{ rate.name }}{% if rate.current_value_bp is not none %} · {{ format_rate_short(rate.current_value_bp, locale) }}{% endif %}</option>{% endfor %}
+        </select>{% if not reference_rates %}<span class="text-xs text-muted">{{ _("No reference rates yet. Create one on the Reference rates page first.") }}</span>{% endif %}{{ dialog_error("rate", "reference_rate_id") }}</label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Margin") }}<input name="margin_percent" value="{{ form_values.get('margin_percent', rate_input(rate_edit.row.margin_bp) if rate_edit.row and rate_edit.row.margin_bp is not none else '') }}" inputmode="decimal"{{ dialog_attrs("rate", "margin_percent") }} class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Added to the reference value.") }}</span>{{ dialog_error("rate", "margin_percent") }}</label>
+      </div>
+      <p class="text-xs text-muted" data-hidden-when="rate_mode=fixed">{{ _("The latest reference value on or before the start date applies; later values reprice the segment automatically.") }}</p>
+      {% if high_rate or form_values.get('high_rate_confirmed') == '1' or (rate_edit.row and rate_edit.row.effective_rate_bp is not none and rate_edit.row.effective_rate_bp > 2500) %}
       <label class="flex items-start gap-2 border border-warning-line bg-warning-soft p-3 text-sm"><input type="checkbox" name="high_rate_confirmed" value="1" class="mt-0.5 h-4 w-4 accent-primary"{% if form_values.get('high_rate_confirmed') == '1' %} checked{% endif %}> <span>{{ _("I understand this rate is above 25%%.") }}</span></label>
       {% else %}
       <p class="text-xs text-muted">{{ _("A rate above 25%% asks for confirmation when you save it.") }}</p>
@@ -190,9 +202,9 @@
     <form method="post" action="{{ scoped_url(request, 'loan_cost_update', loan_id=loan.id, component_id=cost_edit.row.id) if cost_edit.row else scoped_url(request, 'loan_cost_create', loan_id=loan.id) }}" class="grid gap-4">
       {{ csrf_input() }}
       <label class="grid gap-1 text-sm font-medium">{{ _("Name") }}<input name="name" value="{{ form_values.get('name', cost_edit.row.name if cost_edit.row else '') }}" maxlength="200" required{{ dialog_attrs("cost", "name") }} class="{{ input_class }} font-normal">{{ dialog_error("cost", "name") }}</label>
-      <label class="grid gap-1 text-sm font-medium">{{ _("Cost type") }}<select name="mode" id="mode"{{ dialog_attrs("cost", "mode") }} class="form-select py-2 font-normal"><option value="percent"{% if form_values.get('mode', cost_edit.row.value.mode if cost_edit.row else 'percent') == 'percent' %} selected{% endif %}>{{ _("A percentage of the balance") }}</option><option value="fixed"{% if form_values.get('mode', cost_edit.row.value.mode if cost_edit.row else 'percent') == 'fixed' %} selected{% endif %}>{{ _("A fixed amount") }}</option></select>{{ dialog_error("cost", "mode") }}</label>
-      <label class="grid gap-1 text-sm font-medium" data-hidden-when="mode=fixed">{{ _("Percent each month") }}<input name="rate_percent" value="{{ form_values.get('rate_percent', rate_input(cost_edit.row.value.rate_bp) if cost_edit.row and cost_edit.row.value.rate_bp is not none else '') }}" inputmode="decimal"{{ dialog_attrs("cost", "rate_percent") }} class="{{ input_class }} font-normal">{{ dialog_error("cost", "rate_percent") }}</label>
-      <label class="grid gap-1 text-sm font-medium" data-hidden-when="mode=percent">{{ _("Amount each month (%(currency)s)", currency=loan.currency) }}<input name="fixed_amount" value="{{ form_values.get('fixed_amount', format_amount_input(cost_edit.row.value.fixed, locale) if cost_edit.row and cost_edit.row.value.fixed is not none else '') }}" inputmode="decimal"{{ dialog_attrs("cost", "fixed_amount") }} class="{{ input_class }} font-normal">{{ dialog_error("cost", "fixed_amount") }}</label>
+      <label class="grid gap-1 text-sm font-medium">{{ _("Cost type") }}<select name="mode" id="cost_mode"{{ dialog_attrs("cost", "mode") }} class="form-select py-2 font-normal"><option value="percent"{% if form_values.get('mode', cost_edit.row.value.mode if cost_edit.row else 'percent') == 'percent' %} selected{% endif %}>{{ _("A percentage of the balance") }}</option><option value="fixed"{% if form_values.get('mode', cost_edit.row.value.mode if cost_edit.row else 'percent') == 'fixed' %} selected{% endif %}>{{ _("A fixed amount") }}</option></select>{{ dialog_error("cost", "mode") }}</label>
+      <label class="grid gap-1 text-sm font-medium" data-hidden-when="cost_mode=fixed">{{ _("Percent each month") }}<input name="rate_percent" value="{{ form_values.get('rate_percent', rate_input(cost_edit.row.value.rate_bp) if cost_edit.row and cost_edit.row.value.rate_bp is not none else '') }}" inputmode="decimal"{{ dialog_attrs("cost", "rate_percent") }} class="{{ input_class }} font-normal">{{ dialog_error("cost", "rate_percent") }}</label>
+      <label class="grid gap-1 text-sm font-medium" data-hidden-when="cost_mode=percent">{{ _("Amount each month (%(currency)s)", currency=loan.currency) }}<input name="fixed_amount" value="{{ form_values.get('fixed_amount', format_amount_input(cost_edit.row.value.fixed, locale) if cost_edit.row and cost_edit.row.value.fixed is not none else '') }}" inputmode="decimal"{{ dialog_attrs("cost", "fixed_amount") }} class="{{ input_class }} font-normal">{{ dialog_error("cost", "fixed_amount") }}</label>
       <p class="text-xs text-muted">{{ _("Only the field for the selected cost type is used.") }}</p>
       <div class="grid gap-4 sm:grid-cols-2">
         <label class="grid gap-1 text-sm font-medium">{{ _("Applies from") }}<input name="effective_from" type="date" value="{{ form_values.get('effective_from', cost_edit.row.effective_from.isoformat() if cost_edit.row else today.isoformat()) }}" required{{ dialog_attrs("cost", "effective_from") }} class="{{ input_class }} font-normal">{{ dialog_error("cost", "effective_from") }}</label>

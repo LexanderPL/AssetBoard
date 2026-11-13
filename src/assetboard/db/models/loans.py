@@ -207,7 +207,11 @@ class Loan(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
 
 
 class LoanRateChange(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
-    """The complete fixed-rate timeline of a fixed loan; the latest effective row applies."""
+    """A rate segment start: a fixed rate or a reference rate plus margin.
+
+    The latest effective row at or before a payment date decides the rate. Existing rows are
+    fixed; a variable row stores the reference rate and margin instead of a static rate.
+    """
 
     __tablename__ = "loan_rate_changes"
     __table_args__ = (
@@ -222,9 +226,19 @@ class LoanRateChange(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             ["loans.workspace_id", "loans.id"],
             name="fk_loan_rate_changes_workspace_loan",
         ),
+        ForeignKeyConstraint(
+            ["workspace_id", "reference_rate_id"],
+            ["reference_rates.workspace_id", "reference_rates.id"],
+            name="fk_loan_rate_changes_workspace_reference_rate",
+        ),
+        CheckConstraint("mode IN ('fixed', 'variable')", name="mode_valid"),
         CheckConstraint(
-            f"rate_bp BETWEEN 0 AND {MAX_LOAN_RATE_BP}",
-            name="rate_valid",
+            "(mode = 'fixed' AND rate_bp IS NOT NULL AND "
+            f"rate_bp BETWEEN 0 AND {MAX_LOAN_RATE_BP} AND "
+            "reference_rate_id IS NULL AND margin_bp IS NULL) OR "
+            "(mode = 'variable' AND rate_bp IS NULL AND reference_rate_id IS NOT NULL AND "
+            f"margin_bp IS NOT NULL AND margin_bp BETWEEN 0 AND {MAX_LOAN_RATE_BP})",
+            name="rate_configuration_valid",
         ),
         _date_range("effective_from"),
         Index(
@@ -233,11 +247,21 @@ class LoanRateChange(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             "loan_id",
             "effective_from",
         ),
+        Index(
+            "ix_loan_rate_changes_workspace_reference_rate",
+            "workspace_id",
+            "reference_rate_id",
+        ),
     )
 
     loan_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
     effective_from: Mapped[date] = mapped_column(Date(), nullable=False)
-    rate_bp: Mapped[int] = mapped_column(Integer(), nullable=False)
+    mode: Mapped[str] = mapped_column(
+        String(16), nullable=False, default="fixed", server_default="fixed"
+    )
+    rate_bp: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    reference_rate_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
+    margin_bp: Mapped[int | None] = mapped_column(Integer(), nullable=True)
 
 
 class LoanCostComponent(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
