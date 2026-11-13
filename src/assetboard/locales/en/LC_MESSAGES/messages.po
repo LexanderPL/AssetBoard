@@ -6892,132 +6892,19 @@ msgstr ""
 msgid "Plotted payment data"
 msgstr ""
 
-msgid "Net worth & property"
+msgid "Loan sections"
 msgstr ""
 
-msgid ""
-"Link this loan to a net-worth liability and a property, and let Upcoming "
-"derive the installment amounts from the schedule."
+msgid "Overview"
 msgstr ""
 
-msgid "Open Net worth"
+msgid "Schedule"
 msgstr ""
 
-msgid "Net-worth liability"
+msgid "Scenarios"
 msgstr ""
 
-#, python-format
-msgid "Linked item: %(name)s"
-msgstr ""
-
-msgid "Open the linked item"
-msgstr ""
-
-msgid "No linked liability item yet."
-msgstr ""
-
-#, fuzzy
-msgid "Create net-worth item"
-msgstr ""
-
-msgid "Property and LTV"
-msgstr ""
-
-#, python-format
-msgid "Value on %(date)s"
-msgstr ""
-
-msgid "Remaining principal"
-msgstr ""
-
-msgid "LTV"
-msgstr ""
-
-msgid "Equity"
-msgstr ""
-
-msgid "Show at date"
-msgstr ""
-
-msgid "Property item"
-msgstr ""
-
-msgid "Choose a property"
-msgstr ""
-
-msgid "Save property"
-msgstr ""
-
-msgid "Clear property"
-msgstr ""
-
-#, python-format
-msgid ""
-"Use an active real-estate asset item in %(currency)s. Add one on Net "
-"worth if the list is empty."
-msgstr ""
-
-msgid "Add an active real-estate asset item on Net worth first."
-msgstr ""
-
-msgid "Recurring installments"
-msgstr ""
-
-msgid ""
-"Generate monthly expense occurrences from the projected installment. "
-"Refreshing updates pending future amounts; posted and skipped rows stay "
-"unchanged."
-msgstr ""
-
-msgid "Open Upcoming"
-msgstr ""
-
-msgid "Next due"
-msgstr ""
-
-msgid "Ends"
-msgstr ""
-
-msgid "Expense category"
-msgstr ""
-
-#, fuzzy
-msgid "Refresh occurrences"
-msgstr ""
-
-msgid ""
-"Disable recurring installment generation? Pending future occurrences will"
-" be removed."
-msgstr ""
-
-msgid "Disable generation"
-msgstr ""
-
-msgid "Generation is not active for this loan."
-msgstr ""
-
-#, fuzzy
-msgid "Generate occurrences"
-msgstr ""
-
-msgid "Automatic payment recording"
-msgstr ""
-
-msgid ""
-"When an upcoming installment linked to this loan is posted, also record "
-"it as an actual loan payment."
-msgstr ""
-
-msgid "Record posted installments automatically"
-msgstr ""
-
-msgid "Save setting"
-msgstr ""
-
-msgid "On"
-msgstr ""
-
-msgid "Off"
+msgid "Settings"
 msgstr ""
 
 msgid "per month"
@@ -7075,6 +6962,9 @@ msgstr ""
 msgid "Repaid %(paid)s of %(original)s (%(percent)s); %(remaining)s remains."
 msgstr ""
 
+msgid "Remaining principal"
+msgstr ""
+
 #, fuzzy, python-format
 msgid "Balance %(amount)s on %(date)s"
 msgstr ""
@@ -7099,6 +6989,44 @@ msgid "No payments left."
 msgstr ""
 
 msgid "Next payment breakdown"
+msgstr ""
+
+msgid "Plan vs actual"
+msgstr ""
+
+msgid "Review payments"
+msgstr ""
+
+msgid "Last actual payment"
+msgstr ""
+
+msgid "No payment recorded yet."
+msgstr ""
+
+msgid "Latest balance checkpoint"
+msgstr ""
+
+msgid "No checkpoint recorded yet."
+msgstr ""
+
+msgid "Variance"
+msgstr ""
+
+#, python-format
+msgid "Ahead of the projected balance by %(amount)s."
+msgstr ""
+
+#, python-format
+msgid "Behind the projected balance by %(amount)s."
+msgstr ""
+
+msgid "On track with the projected balance."
+msgstr ""
+
+msgid "No variance yet for this checkpoint."
+msgstr ""
+
+msgid "No actual payments recorded yet."
 msgstr ""
 
 msgid "Schedule unavailable"
@@ -7149,7 +7077,26 @@ msgstr ""
 msgid "Costs lifetime"
 msgstr ""
 
-msgid "Schedule"
+msgid "Property & LTV"
+msgstr ""
+
+msgid "Read-only view of the linked property at the selected date."
+msgstr ""
+
+msgid "Manage in Settings"
+msgstr ""
+
+#, python-format
+msgid "Value on %(date)s"
+msgstr ""
+
+msgid "LTV"
+msgstr ""
+
+msgid "Equity"
+msgstr ""
+
+msgid "Show at date"
 msgstr ""
 
 msgid ""
@@ -7191,210 +7138,136 @@ msgstr ""
 msgid "No payments remain on this schedule."
 msgstr ""
 
+msgid "Property & net worth"
+msgstr ""
+
+#, python-format
+msgid ""
+"Link this loan to a net-worth liability and a property. Property and LTV "
+"use an active real-estate asset item in %(currency)s."
+msgstr ""
+
+msgid "Open Net worth"
+msgstr ""
+
+msgid "Net-worth liability"
+msgstr ""
+
+#, python-format
+msgid "Linked item: %(name)s"
+msgstr ""
+
+msgid "Open the linked item"
+msgstr ""
+
+msgid "No linked liability item yet."
+msgstr ""
+
+#, fuzzy
+msgid "Create net-worth item"
+msgstr ""
+
+msgid "Property and LTV"
+msgstr ""
+
+msgid "Property item"
+msgstr ""
+
+msgid "Choose a property"
+msgstr ""
+
+msgid "Save property"
+msgstr ""
+
+msgid "Clear property"
+msgstr ""
+
+msgid ""
+"Property and LTV are available for active real-estate asset items only. "
+"Add one on Net worth if the list is empty."
+msgstr ""
+
+msgid "Add an active real-estate asset item on Net worth first."
+msgstr ""
+
+msgid "Upcoming & auto-record"
+msgstr ""
+
+msgid ""
+"Let Upcoming derive the installment amounts from the schedule, and "
+"optionally record posted installments as actual loan payments."
+msgstr ""
+
+msgid "Open Upcoming"
+msgstr ""
+
+msgid "Recurring installments"
+msgstr ""
+
+msgid ""
+"Generate monthly expense occurrences from the projected installment. "
+"Refreshing updates pending future amounts; posted and skipped rows stay "
+"unchanged."
+msgstr ""
+
+msgid "Next due"
+msgstr ""
+
+msgid "Ends"
+msgstr ""
+
+msgid "Expense category"
+msgstr ""
+
+#, fuzzy
+msgid "Refresh occurrences"
+msgstr ""
+
+msgid ""
+"Disable recurring installment generation? Pending future occurrences will"
+" be removed."
+msgstr ""
+
+msgid "Disable generation"
+msgstr ""
+
+msgid "Generation is not active for this loan."
+msgstr ""
+
+#, fuzzy
+msgid "Generate occurrences"
+msgstr ""
+
+msgid "Automatic payment recording"
+msgstr ""
+
+msgid ""
+"When an upcoming installment linked to this loan is posted, also record "
+"it as an actual loan payment."
+msgstr ""
+
+msgid "Record posted installments automatically"
+msgstr ""
+
+msgid "Save setting"
+msgstr ""
+
+msgid "On"
+msgstr ""
+
+msgid "Off"
+msgstr ""
+
 msgid "Reference rates"
 msgstr ""
 
-msgid "Scenarios"
-msgstr ""
-
-msgid "Edit terms"
-msgstr ""
-
-msgid "Rate changes"
-msgstr ""
-
-msgid "Add rate change"
-msgstr ""
-
-msgid "Annual rate"
-msgstr ""
-
-#, python-format
-msgid "rate from %(date)s"
-msgstr ""
-
-#, python-format
-msgid "Delete the rate change from %(date)s?"
-msgstr ""
-
-msgid "No rate changes yet."
-msgstr ""
-
-#, python-format
-msgid "Reference rate: %(name)s"
-msgstr ""
-
-msgid "not set"
-msgstr ""
-
-#, python-format
-msgid "margin %(margin)s"
-msgstr ""
-
-msgid ""
-"Change the reference rate or margin in Edit terms. Add values on the "
-"Reference rates page."
-msgstr ""
-
-msgid "Manage reference rates"
-msgstr ""
-
-msgid "Cost components"
-msgstr ""
-
-msgid "Add cost"
-msgstr ""
-
-msgid ""
-"Charged every month while active. A percentage applies to the opening "
-"balance; several active costs are added together."
-msgstr ""
-
-msgid "Cost"
-msgstr ""
-
-#, python-format
-msgid "from %(from)s"
-msgstr ""
-
-#, python-format
-msgid "to %(to)s"
-msgstr ""
-
-#, python-format
-msgid "Delete the cost %(name)s?"
-msgstr ""
-
-msgid "No cost components yet."
-msgstr ""
-
-msgid "Overpayments"
-msgstr ""
-
-msgid "Add one-off overpayment"
-msgstr ""
-
-msgid "A fixed extra each month"
-msgstr ""
-
-msgid "A target total each month"
-msgstr ""
-
-#, python-format
-msgid "Amount (%(currency)s)"
-msgstr ""
-
-msgid "Strategy"
-msgstr ""
-
-msgid "Lower the monthly installment"
-msgstr ""
-
-msgid "Save overpayment settings"
-msgstr ""
-
-msgid "One-off overpayments"
-msgstr ""
-
-#, fuzzy, python-format
-msgid "overpayment on %(date)s"
-msgstr ""
-
-#, python-format
-msgid "Delete the overpayment on %(date)s?"
-msgstr ""
-
-msgid "No one-off overpayments yet."
-msgstr ""
-
-msgid "Starting balance"
-msgstr ""
-
-msgid ""
-"This is the balance you entered. More balance checkpoints are recorded "
-"with actual payments."
-msgstr ""
-
-msgid "Loan status"
-msgstr ""
-
-msgid "This loan is archived and read-only."
-msgstr ""
-
-msgid "Restore loan"
-msgstr ""
-
-msgid ""
-"Archiving keeps the loan's settings and history but hides it from the "
-"active list."
-msgstr ""
-
-#, python-format
-msgid "Archive the loan %(name)s?"
-msgstr ""
-
-msgid "Archive loan"
-msgstr ""
-
-msgid "Edit rate change"
-msgstr ""
-
-msgid "Applies from"
-msgstr ""
-
-#, python-format
-msgid "For example 5.5 for 5.5%%."
-msgstr ""
-
-#, python-format
-msgid "I understand this rate is above 25%%."
-msgstr ""
-
-msgid "Save rate change"
-msgstr ""
-
-msgid "Edit cost"
-msgstr ""
-
-msgid "Cost type"
-msgstr ""
-
-msgid "A percentage of the balance"
-msgstr ""
-
-msgid "Percent each month"
-msgstr ""
-
-#, python-format
-msgid "Amount each month (%(currency)s)"
-msgstr ""
-
-msgid "Applies until (optional)"
-msgstr ""
-
-msgid "The end date is included. Leave empty for no end."
-msgstr ""
-
-msgid "Save cost"
-msgstr ""
-
-msgid "Edit one-off overpayment"
-msgstr ""
-
-msgid "Note (optional)"
-msgstr ""
-
-msgid "This is a planned overpayment. Actual payments are recorded separately."
-msgstr ""
-
-msgid "Save overpayment"
+msgid "Record next payment"
 msgstr ""
 
 msgid "Edit loan"
 msgstr ""
 
-#, python-format
-msgid "Back to %(name)s"
+msgid "Back to Settings"
 msgstr ""
 
 msgid ""
@@ -7471,6 +7344,10 @@ msgid "Margin"
 msgstr ""
 
 msgid "Added to the reference rate."
+msgstr ""
+
+#, python-format
+msgid "I understand this rate is above 25%%."
 msgstr ""
 
 #, python-format
@@ -7576,10 +7453,23 @@ msgid ""
 " it differs."
 msgstr ""
 
+msgid "A fixed extra each month"
+msgstr ""
+
+msgid "A target total each month"
+msgstr ""
+
+#, python-format
+msgid "Amount (%(currency)s)"
+msgstr ""
+
 msgid "For a target, this includes principal, interest and costs."
 msgstr ""
 
 msgid "What happens with the extra money?"
+msgstr ""
+
+msgid "Lower the monthly installment"
 msgstr ""
 
 msgid "Cost components (optional)"
@@ -7591,7 +7481,26 @@ msgid ""
 "page later."
 msgstr ""
 
+msgid "Cost type"
+msgstr ""
+
+msgid "A percentage of the balance"
+msgstr ""
+
+msgid "Percent each month"
+msgstr ""
+
+#, python-format
+msgid "Amount each month (%(currency)s)"
+msgstr ""
+
+msgid "Applies from"
+msgstr ""
+
 msgid "Leave empty to start with the loan."
+msgstr ""
+
+msgid "Applies until (optional)"
 msgstr ""
 
 msgid ""
@@ -7631,9 +7540,6 @@ msgstr ""
 msgid "Delete the payment on %(date)s?"
 msgstr ""
 
-msgid "No actual payments recorded yet."
-msgstr ""
-
 msgid "Balance checkpoints"
 msgstr ""
 
@@ -7651,7 +7557,7 @@ msgstr ""
 msgid "Projected balance"
 msgstr ""
 
-msgid "Variance"
+msgid "Starting balance"
 msgstr ""
 
 msgid "Projected balance unavailable"
@@ -7737,6 +7643,9 @@ msgstr ""
 msgid "Values of %(name)s"
 msgstr ""
 
+msgid "Annual rate"
+msgstr ""
+
 #, python-format
 msgid "value from %(date)s"
 msgstr ""
@@ -7755,6 +7664,10 @@ msgid "Add value"
 msgstr ""
 
 msgid "Edit value"
+msgstr ""
+
+#, python-format
+msgid "For example 5.5 for 5.5%%."
 msgstr ""
 
 msgid "Save value"
@@ -7865,6 +7778,9 @@ msgstr ""
 msgid "Overpayment amount (%(currency)s)"
 msgstr ""
 
+msgid "Strategy"
+msgstr ""
+
 msgid "Rate shift in percentage points"
 msgstr ""
 
@@ -7885,6 +7801,160 @@ msgid "Compare what-ifs"
 msgstr ""
 
 msgid "Clear rows"
+msgstr ""
+
+msgid ""
+"The stored loan terms. Changing them recalculates the schedule and "
+"pending Upcoming amounts."
+msgstr ""
+
+msgid "Edit terms"
+msgstr ""
+
+msgid "Rates"
+msgstr ""
+
+msgid ""
+"Fixed loans use the rate in force on each payment date. Variable loans "
+"add the margin to the reference rate."
+msgstr ""
+
+msgid "Add rate change"
+msgstr ""
+
+msgid "Rate changes"
+msgstr ""
+
+#, python-format
+msgid "rate from %(date)s"
+msgstr ""
+
+#, python-format
+msgid "Delete the rate change from %(date)s?"
+msgstr ""
+
+msgid "No rate changes yet."
+msgstr ""
+
+#, python-format
+msgid "Reference rate: %(name)s"
+msgstr ""
+
+msgid "not set"
+msgstr ""
+
+#, python-format
+msgid "margin %(margin)s"
+msgstr ""
+
+msgid ""
+"Change the reference rate or margin in Edit terms. Add values on the "
+"Reference rates page."
+msgstr ""
+
+msgid "Manage reference rates"
+msgstr ""
+
+msgid ""
+"Charged every month while active. A percentage applies to the opening "
+"balance; several active costs are added together."
+msgstr ""
+
+msgid "Add cost"
+msgstr ""
+
+msgid "Cost components"
+msgstr ""
+
+msgid "Cost"
+msgstr ""
+
+#, python-format
+msgid "from %(from)s"
+msgstr ""
+
+#, python-format
+msgid "to %(to)s"
+msgstr ""
+
+#, python-format
+msgid "Delete the cost %(name)s?"
+msgstr ""
+
+msgid "No cost components yet."
+msgstr ""
+
+msgid "Overpayments"
+msgstr ""
+
+msgid ""
+"Set a regular overpayment and plan one-off amounts. Actual payments are "
+"recorded on the Payments page."
+msgstr ""
+
+msgid "Add one-off overpayment"
+msgstr ""
+
+msgid "Save overpayment settings"
+msgstr ""
+
+msgid "One-off overpayments"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "overpayment on %(date)s"
+msgstr ""
+
+#, python-format
+msgid "Delete the overpayment on %(date)s?"
+msgstr ""
+
+msgid "No one-off overpayments yet."
+msgstr ""
+
+msgid "This loan is archived and read-only."
+msgstr ""
+
+msgid "Restore loan"
+msgstr ""
+
+msgid ""
+"Archiving keeps the loan's settings and history but hides it from the "
+"active list."
+msgstr ""
+
+#, python-format
+msgid "Archive the loan %(name)s?"
+msgstr ""
+
+msgid "Archive loan"
+msgstr ""
+
+msgid "Edit rate change"
+msgstr ""
+
+msgid "Save rate change"
+msgstr ""
+
+msgid "Edit cost"
+msgstr ""
+
+msgid "The end date is included. Leave empty for no end."
+msgstr ""
+
+msgid "Save cost"
+msgstr ""
+
+msgid "Edit one-off overpayment"
+msgstr ""
+
+msgid "Note (optional)"
+msgstr ""
+
+msgid "This is a planned overpayment. Actual payments are recorded separately."
+msgstr ""
+
+msgid "Save overpayment"
 msgstr ""
 
 msgid "No generated occurrences yet."
@@ -7926,6 +7996,10 @@ msgid "Edit installment plan"
 msgstr ""
 
 msgid "Add installment plan"
+msgstr ""
+
+#, python-format
+msgid "Back to %(name)s"
 msgstr ""
 
 msgid ""
@@ -10704,5 +10778,30 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Installment override"
+#~ msgstr ""
+
+#~ msgid "Net worth & property"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Link this loan to a net-worth "
+#~ "liability and a property, and let "
+#~ "Upcoming derive the installment amounts "
+#~ "from the schedule."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Use an active real-estate asset "
+#~ "item in %(currency)s. Add one on "
+#~ "Net worth if the list is empty."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "This is the balance you entered. "
+#~ "More balance checkpoints are recorded "
+#~ "with actual payments."
+#~ msgstr ""
+
+#~ msgid "Loan status"
 #~ msgstr ""
 

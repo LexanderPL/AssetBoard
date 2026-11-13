@@ -7411,143 +7411,20 @@ msgstr "Kapitał, odsetki, koszty i nadpłaty w każdym miesiącu."
 msgid "Plotted payment data"
 msgstr "Dane wykresu płatności"
 
-msgid "Net worth & property"
-msgstr "Majątek netto i nieruchomość"
+msgid "Loan sections"
+msgstr "Sekcje kredytu"
 
-msgid ""
-"Link this loan to a net-worth liability and a property, and let Upcoming "
-"derive the installment amounts from the schedule."
-msgstr ""
-"Powiąż kredyt z zobowiązaniem w majątku netto i nieruchomością, a "
-"Nadchodzące będą wyliczać kwoty rat z harmonogramu."
+msgid "Overview"
+msgstr "Przegląd"
 
-msgid "Open Net worth"
-msgstr "Otwórz majątek netto"
+msgid "Schedule"
+msgstr "Harmonogram"
 
-msgid "Net-worth liability"
-msgstr "Zobowiązanie w majątku netto"
+msgid "Scenarios"
+msgstr "Scenariusze"
 
-#, python-format
-msgid "Linked item: %(name)s"
-msgstr "Powiązana pozycja: %(name)s"
-
-msgid "Open the linked item"
-msgstr "Otwórz powiązaną pozycję"
-
-msgid "No linked liability item yet."
-msgstr "Brak powiązanej pozycji zobowiązania."
-
-msgid "Create net-worth item"
-msgstr "Utwórz pozycję majątku netto"
-
-msgid "Property and LTV"
-msgstr "Nieruchomość i LTV"
-
-#, python-format
-msgid "Value on %(date)s"
-msgstr "Wartość na %(date)s"
-
-msgid "Remaining principal"
-msgstr "Pozostały kapitał"
-
-msgid "LTV"
-msgstr "LTV"
-
-msgid "Equity"
-msgstr "Kapitał własny"
-
-msgid "Show at date"
-msgstr "Pokaż na dzień"
-
-msgid "Property item"
-msgstr "Pozycja nieruchomości"
-
-msgid "Choose a property"
-msgstr "Wybierz nieruchomość"
-
-msgid "Save property"
-msgstr "Zapisz nieruchomość"
-
-msgid "Clear property"
-msgstr "Usuń powiązanie nieruchomości"
-
-#, python-format
-msgid ""
-"Use an active real-estate asset item in %(currency)s. Add one on Net "
-"worth if the list is empty."
-msgstr ""
-"Użyj aktywnej pozycji majątku w kategorii nieruchomości w %(currency)s. "
-"Dodaj ją w Majątku netto, jeśli lista jest pusta."
-
-msgid "Add an active real-estate asset item on Net worth first."
-msgstr ""
-"Najpierw dodaj aktywną pozycję majątku w kategorii nieruchomości w "
-"Majątku netto."
-
-msgid "Recurring installments"
-msgstr "Raty cykliczne"
-
-msgid ""
-"Generate monthly expense occurrences from the projected installment. "
-"Refreshing updates pending future amounts; posted and skipped rows stay "
-"unchanged."
-msgstr ""
-"Generuj miesięczne wystąpienia wydatków z prognozowanej raty. Odświeżenie"
-" aktualizuje przyszłe oczekujące kwoty; zaksięgowane i pominięte wiersze "
-"pozostają bez zmian."
-
-msgid "Open Upcoming"
-msgstr "Otwórz Nadchodzące"
-
-msgid "Next due"
-msgstr "Następny termin"
-
-msgid "Ends"
-msgstr "Koniec"
-
-msgid "Expense category"
-msgstr "Kategoria wydatków"
-
-msgid "Refresh occurrences"
-msgstr "Odśwież wystąpienia"
-
-msgid ""
-"Disable recurring installment generation? Pending future occurrences will"
-" be removed."
-msgstr ""
-"Wyłączyć generowanie rat cyklicznych? Oczekujące przyszłe wystąpienia "
-"zostaną usunięte."
-
-msgid "Disable generation"
-msgstr "Wyłącz generowanie"
-
-msgid "Generation is not active for this loan."
-msgstr "Generowanie nie jest aktywne dla tego kredytu."
-
-msgid "Generate occurrences"
-msgstr "Generuj wystąpienia"
-
-msgid "Automatic payment recording"
-msgstr "Automatyczne rejestrowanie płatności"
-
-msgid ""
-"When an upcoming installment linked to this loan is posted, also record "
-"it as an actual loan payment."
-msgstr ""
-"Gdy powiązane z tym kredytem wystąpienie zostanie zaksięgowane, zapisz je"
-" również jako rzeczywistą płatność kredytu."
-
-msgid "Record posted installments automatically"
-msgstr "Automatycznie rejestruj zaksięgowane raty"
-
-msgid "Save setting"
-msgstr "Zapisz ustawienie"
-
-msgid "On"
-msgstr "Włączone"
-
-msgid "Off"
-msgstr "Wyłączone"
+msgid "Settings"
+msgstr "Ustawienia"
 
 msgid "per month"
 msgstr "miesięcznie"
@@ -7604,6 +7481,9 @@ msgstr "Data spłaty %(date)s"
 msgid "Repaid %(paid)s of %(original)s (%(percent)s); %(remaining)s remains."
 msgstr "Spłacono %(paid)s z %(original)s (%(percent)s); pozostało %(remaining)s."
 
+msgid "Remaining principal"
+msgstr "Pozostały kapitał"
+
 #, python-format
 msgid "Balance %(amount)s on %(date)s"
 msgstr "Saldo %(amount)s na dzień %(date)s"
@@ -7630,6 +7510,44 @@ msgstr "Brak pozostałych płatności."
 
 msgid "Next payment breakdown"
 msgstr "Składniki następnej płatności"
+
+msgid "Plan vs actual"
+msgstr "Plan a rzeczywistość"
+
+msgid "Review payments"
+msgstr "Przejrzyj płatności"
+
+msgid "Last actual payment"
+msgstr "Ostatnia rzeczywista płatność"
+
+msgid "No payment recorded yet."
+msgstr "Nie zarejestrowano jeszcze żadnej płatności."
+
+msgid "Latest balance checkpoint"
+msgstr "Najnowszy punkt kontrolny salda"
+
+msgid "No checkpoint recorded yet."
+msgstr "Nie zarejestrowano jeszcze żadnego punktu kontrolnego salda."
+
+msgid "Variance"
+msgstr "Odchylenie"
+
+#, python-format
+msgid "Ahead of the projected balance by %(amount)s."
+msgstr "Saldo wyprzedza prognozę o %(amount)s."
+
+#, python-format
+msgid "Behind the projected balance by %(amount)s."
+msgstr "Saldo pozostaje za prognozą o %(amount)s."
+
+msgid "On track with the projected balance."
+msgstr "Saldo jest zgodne z prognozą."
+
+msgid "No variance yet for this checkpoint."
+msgstr "Ten punkt kontrolny nie ma jeszcze odchylenia."
+
+msgid "No actual payments recorded yet."
+msgstr "Nie zarejestrowano jeszcze żadnych płatności."
 
 msgid "Schedule unavailable"
 msgstr "Harmonogram niedostępny"
@@ -7682,8 +7600,27 @@ msgstr "Odsetki łącznie"
 msgid "Costs lifetime"
 msgstr "Koszty łącznie"
 
-msgid "Schedule"
-msgstr "Harmonogram"
+msgid "Property & LTV"
+msgstr "Nieruchomość i LTV"
+
+msgid "Read-only view of the linked property at the selected date."
+msgstr "Widok tylko do odczytu powiązanej nieruchomości w wybranym dniu."
+
+msgid "Manage in Settings"
+msgstr "Zarządzaj w ustawieniach"
+
+#, python-format
+msgid "Value on %(date)s"
+msgstr "Wartość na %(date)s"
+
+msgid "LTV"
+msgstr "LTV"
+
+msgid "Equity"
+msgstr "Kapitał własny"
+
+msgid "Show at date"
+msgstr "Pokaż na dzień"
 
 msgid ""
 "Monthly rows from the current starting balance. A recorded actual payment"
@@ -7727,219 +7664,138 @@ msgstr "Prognozowane"
 msgid "No payments remain on this schedule."
 msgstr "W tym harmonogramie nie ma pozostałych płatności."
 
+msgid "Property & net worth"
+msgstr "Nieruchomość i majątek netto"
+
+#, python-format
+msgid "Link this loan to a net-worth liability and a property. Property and LTV use an active real-estate asset item in %(currency)s."
+msgstr "Powiąż kredyt z zobowiązaniem w majątku netto i nieruchomością. Nieruchomość i LTV korzystają z aktywnej pozycji majątku w kategorii nieruchomości w walucie %(currency)s."
+
+msgid "Open Net worth"
+msgstr "Otwórz majątek netto"
+
+msgid "Net-worth liability"
+msgstr "Zobowiązanie w majątku netto"
+
+#, python-format
+msgid "Linked item: %(name)s"
+msgstr "Powiązana pozycja: %(name)s"
+
+msgid "Open the linked item"
+msgstr "Otwórz powiązaną pozycję"
+
+msgid "No linked liability item yet."
+msgstr "Brak powiązanej pozycji zobowiązania."
+
+msgid "Create net-worth item"
+msgstr "Utwórz pozycję majątku netto"
+
+msgid "Property and LTV"
+msgstr "Nieruchomość i LTV"
+
+msgid "Property item"
+msgstr "Pozycja nieruchomości"
+
+msgid "Choose a property"
+msgstr "Wybierz nieruchomość"
+
+msgid "Save property"
+msgstr "Zapisz nieruchomość"
+
+msgid "Clear property"
+msgstr "Usuń powiązanie nieruchomości"
+
+#, python-format
+msgid "Property and LTV are available for active real-estate asset items only. Add one on Net worth if the list is empty."
+msgstr "Nieruchomość i LTV są dostępne tylko dla aktywnych pozycji majątku w kategorii nieruchomości. Dodaj taką pozycję w Majątku netto, jeśli lista jest pusta."
+
+msgid "Add an active real-estate asset item on Net worth first."
+msgstr ""
+"Najpierw dodaj aktywną pozycję majątku w kategorii nieruchomości w "
+"Majątku netto."
+
+msgid "Upcoming & auto-record"
+msgstr "Nadchodzące i automatyczny zapis"
+
+msgid "Let Upcoming derive the installment amounts from the schedule, and optionally record posted installments as actual loan payments."
+msgstr "Pozwól, aby Nadchodzące wyliczały kwoty rat z harmonogramu, i opcjonalnie zapisuj księgowane raty jako rzeczywiste płatności kredytu."
+
+msgid "Open Upcoming"
+msgstr "Otwórz Nadchodzące"
+
+msgid "Recurring installments"
+msgstr "Raty cykliczne"
+
+msgid ""
+"Generate monthly expense occurrences from the projected installment. "
+"Refreshing updates pending future amounts; posted and skipped rows stay "
+"unchanged."
+msgstr ""
+"Generuj miesięczne wystąpienia wydatków z prognozowanej raty. Odświeżenie"
+" aktualizuje przyszłe oczekujące kwoty; zaksięgowane i pominięte wiersze "
+"pozostają bez zmian."
+
+msgid "Next due"
+msgstr "Następny termin"
+
+msgid "Ends"
+msgstr "Koniec"
+
+msgid "Expense category"
+msgstr "Kategoria wydatków"
+
+msgid "Refresh occurrences"
+msgstr "Odśwież wystąpienia"
+
+msgid ""
+"Disable recurring installment generation? Pending future occurrences will"
+" be removed."
+msgstr ""
+"Wyłączyć generowanie rat cyklicznych? Oczekujące przyszłe wystąpienia "
+"zostaną usunięte."
+
+msgid "Disable generation"
+msgstr "Wyłącz generowanie"
+
+msgid "Generation is not active for this loan."
+msgstr "Generowanie nie jest aktywne dla tego kredytu."
+
+msgid "Generate occurrences"
+msgstr "Generuj wystąpienia"
+
+msgid "Automatic payment recording"
+msgstr "Automatyczne rejestrowanie płatności"
+
+msgid ""
+"When an upcoming installment linked to this loan is posted, also record "
+"it as an actual loan payment."
+msgstr ""
+"Gdy powiązane z tym kredytem wystąpienie zostanie zaksięgowane, zapisz je"
+" również jako rzeczywistą płatność kredytu."
+
+msgid "Record posted installments automatically"
+msgstr "Automatycznie rejestruj zaksięgowane raty"
+
+msgid "Save setting"
+msgstr "Zapisz ustawienie"
+
+msgid "On"
+msgstr "Włączone"
+
+msgid "Off"
+msgstr "Wyłączone"
+
 msgid "Reference rates"
 msgstr "Stopy referencyjne"
 
-msgid "Scenarios"
-msgstr "Scenariusze"
-
-msgid "Edit terms"
-msgstr "Edytuj warunki"
-
-msgid "Rate changes"
-msgstr "Zmiany stawki"
-
-msgid "Add rate change"
-msgstr "Dodaj zmianę stawki"
-
-msgid "Annual rate"
-msgstr "Roczna stopa"
-
-#, python-format
-msgid "rate from %(date)s"
-msgstr "stopa od %(date)s"
-
-#, python-format
-msgid "Delete the rate change from %(date)s?"
-msgstr "Usunąć zmianę stopy od %(date)s?"
-
-msgid "No rate changes yet."
-msgstr "Brak zmian stopy."
-
-#, python-format
-msgid "Reference rate: %(name)s"
-msgstr "Stopa referencyjna: %(name)s"
-
-msgid "not set"
-msgstr "nie ustawiono"
-
-#, python-format
-msgid "margin %(margin)s"
-msgstr "marża %(margin)s"
-
-msgid ""
-"Change the reference rate or margin in Edit terms. Add values on the "
-"Reference rates page."
-msgstr ""
-"Zmień stopę referencyjną lub marżę w Edytuj warunki. Wartości dodaj na "
-"stronie Stopy referencyjne."
-
-msgid "Manage reference rates"
-msgstr "Zarządzaj stopami referencyjnymi"
-
-msgid "Cost components"
-msgstr "Składniki kosztów"
-
-msgid "Add cost"
-msgstr "Dodaj koszt"
-
-msgid ""
-"Charged every month while active. A percentage applies to the opening "
-"balance; several active costs are added together."
-msgstr ""
-"Naliczany co miesiąc, gdy jest aktywny. Procent dotyczy salda "
-"początkowego; kilka aktywnych kosztów jest sumowanych."
-
-msgid "Cost"
-msgstr "Koszt"
-
-#, python-format
-msgid "from %(from)s"
-msgstr "od %(from)s"
-
-#, python-format
-msgid "to %(to)s"
-msgstr "do %(to)s"
-
-#, python-format
-msgid "Delete the cost %(name)s?"
-msgstr "Usunąć koszt %(name)s?"
-
-msgid "No cost components yet."
-msgstr "Brak składników kosztów."
-
-msgid "Overpayments"
-msgstr "Nadpłaty"
-
-msgid "Add one-off overpayment"
-msgstr "Dodaj jednorazową nadpłatę"
-
-msgid "A fixed extra each month"
-msgstr "Stała dodatkowa kwota każdego miesiąca"
-
-msgid "A target total each month"
-msgstr "Docelowa łączna kwota każdego miesiąca"
-
-#, python-format
-msgid "Amount (%(currency)s)"
-msgstr "Kwota (%(currency)s)"
-
-msgid "Strategy"
-msgstr "Strategia"
-
-msgid "Lower the monthly installment"
-msgstr "Obniż miesięczną ratę"
-
-msgid "Save overpayment settings"
-msgstr "Zapisz ustawienia nadpłaty"
-
-msgid "One-off overpayments"
-msgstr "Jednorazowe nadpłaty"
-
-#, python-format
-msgid "overpayment on %(date)s"
-msgstr "nadpłata z %(date)s"
-
-#, python-format
-msgid "Delete the overpayment on %(date)s?"
-msgstr "Usunąć nadpłatę z %(date)s?"
-
-msgid "No one-off overpayments yet."
-msgstr "Brak jednorazowych nadpłat."
-
-msgid "Starting balance"
-msgstr "Saldo początkowe"
-
-msgid ""
-"This is the balance you entered. More balance checkpoints are recorded "
-"with actual payments."
-msgstr ""
-"To saldo, które podano. Kolejne punkty kontrolne salda są zapisywane wraz"
-" z rzeczywistymi płatnościami."
-
-msgid "Loan status"
-msgstr "Status kredytu"
-
-msgid "This loan is archived and read-only."
-msgstr "Ten kredyt jest zarchiwizowany i tylko do odczytu."
-
-msgid "Restore loan"
-msgstr "Przywróć kredyt"
-
-msgid ""
-"Archiving keeps the loan's settings and history but hides it from the "
-"active list."
-msgstr ""
-"Archiwizacja zachowuje ustawienia i historię kredytu, ale ukrywa go na "
-"liście aktywnych."
-
-#, python-format
-msgid "Archive the loan %(name)s?"
-msgstr "Zarchiwizować kredyt %(name)s?"
-
-msgid "Archive loan"
-msgstr "Zarchiwizuj kredyt"
-
-msgid "Edit rate change"
-msgstr "Edytuj zmianę stawki"
-
-msgid "Applies from"
-msgstr "Obowiązuje od"
-
-#, python-format
-msgid "For example 5.5 for 5.5%%."
-msgstr "Na przykład 5,5 dla 5,5%%."
-
-#, python-format
-msgid "I understand this rate is above 25%%."
-msgstr "Rozumiem, że ta stopa przekracza 25%%."
-
-msgid "Save rate change"
-msgstr "Zapisz zmianę stawki"
-
-msgid "Edit cost"
-msgstr "Edytuj koszt"
-
-msgid "Cost type"
-msgstr "Rodzaj kosztu"
-
-msgid "A percentage of the balance"
-msgstr "Procent salda"
-
-msgid "Percent each month"
-msgstr "Procent każdego miesiąca"
-
-#, python-format
-msgid "Amount each month (%(currency)s)"
-msgstr "Kwota każdego miesiąca (%(currency)s)"
-
-msgid "Applies until (optional)"
-msgstr "Obowiązuje do (opcjonalnie)"
-
-msgid "The end date is included. Leave empty for no end."
-msgstr "Data końcowa jest wliczona. Pozostaw puste, jeśli koszt nie ma końca."
-
-msgid "Save cost"
-msgstr "Zapisz koszt"
-
-msgid "Edit one-off overpayment"
-msgstr "Edytuj jednorazową nadpłatę"
-
-msgid "Note (optional)"
-msgstr "Notatka (opcjonalnie)"
-
-msgid "This is a planned overpayment. Actual payments are recorded separately."
-msgstr "To planowana nadpłata. Rzeczywiste płatności są rejestrowane osobno."
-
-msgid "Save overpayment"
-msgstr "Zapisz nadpłatę"
+msgid "Record next payment"
+msgstr "Zarejestruj następną płatność"
 
 msgid "Edit loan"
 msgstr "Edytuj kredyt"
 
-#, python-format
-msgid "Back to %(name)s"
-msgstr "Wróć do %(name)s"
+msgid "Back to Settings"
+msgstr "Wróć do ustawień"
 
 msgid ""
 "Change the loan terms. The rate type cannot change after creation; "
@@ -8023,6 +7879,10 @@ msgstr "Marża"
 
 msgid "Added to the reference rate."
 msgstr "Dodawana do stopy referencyjnej."
+
+#, python-format
+msgid "I understand this rate is above 25%%."
+msgstr "Rozumiem, że ta stopa przekracza 25%%."
 
 #, python-format
 msgid "Installment override (%(currency)s, optional)"
@@ -8139,11 +7999,24 @@ msgstr ""
 "Pozostaw puste, aby użyć obliczonej raty. Wpisz kwotę banku, jeśli się "
 "różni."
 
+msgid "A fixed extra each month"
+msgstr "Stała dodatkowa kwota każdego miesiąca"
+
+msgid "A target total each month"
+msgstr "Docelowa łączna kwota każdego miesiąca"
+
+#, python-format
+msgid "Amount (%(currency)s)"
+msgstr "Kwota (%(currency)s)"
+
 msgid "For a target, this includes principal, interest and costs."
 msgstr "W przypadku celu obejmuje kapitał, odsetki i koszty."
 
 msgid "What happens with the extra money?"
 msgstr "Co dzieje się z dodatkowymi pieniędzmi?"
+
+msgid "Lower the monthly installment"
+msgstr "Obniż miesięczną ratę"
 
 msgid "Cost components (optional)"
 msgstr "Składniki kosztów (opcjonalnie)"
@@ -8157,8 +8030,27 @@ msgstr ""
 "pobierane razem z ratą. Pozostaw wiersz pusty, aby go pominąć; więcej "
 "dodasz później na stronie kredytu."
 
+msgid "Cost type"
+msgstr "Rodzaj kosztu"
+
+msgid "A percentage of the balance"
+msgstr "Procent salda"
+
+msgid "Percent each month"
+msgstr "Procent każdego miesiąca"
+
+#, python-format
+msgid "Amount each month (%(currency)s)"
+msgstr "Kwota każdego miesiąca (%(currency)s)"
+
+msgid "Applies from"
+msgstr "Obowiązuje od"
+
 msgid "Leave empty to start with the loan."
 msgstr "Pozostaw puste, aby rozpocząć wraz z kredytem."
+
+msgid "Applies until (optional)"
+msgstr "Obowiązuje do (opcjonalnie)"
 
 msgid ""
 "After saving you can add more cost components, rate changes and one-off "
@@ -8201,9 +8093,6 @@ msgstr "płatność z %(date)s"
 msgid "Delete the payment on %(date)s?"
 msgstr "Usunąć płatność z %(date)s?"
 
-msgid "No actual payments recorded yet."
-msgstr "Nie zarejestrowano jeszcze żadnych płatności."
-
 msgid "Balance checkpoints"
 msgstr "Punkty kontrolne salda"
 
@@ -8224,8 +8113,8 @@ msgstr "Saldo"
 msgid "Projected balance"
 msgstr "Saldo prognozowane"
 
-msgid "Variance"
-msgstr "Odchylenie"
+msgid "Starting balance"
+msgstr "Saldo początkowe"
 
 msgid "Projected balance unavailable"
 msgstr "Saldo prognozowane niedostępne"
@@ -8315,6 +8204,9 @@ msgstr "Usunąć stopę referencyjną %(name)s i jej wartości?"
 msgid "Values of %(name)s"
 msgstr "Wartości %(name)s"
 
+msgid "Annual rate"
+msgstr "Roczna stopa"
+
 #, python-format
 msgid "value from %(date)s"
 msgstr "wartość z %(date)s"
@@ -8334,6 +8226,10 @@ msgstr "Dodaj wartość"
 
 msgid "Edit value"
 msgstr "Edytuj wartość"
+
+#, python-format
+msgid "For example 5.5 for 5.5%%."
+msgstr "Na przykład 5,5 dla 5,5%%."
 
 msgid "Save value"
 msgstr "Zapisz wartość"
@@ -8460,6 +8356,9 @@ msgstr "Docelowa łączna kwota miesięcznie"
 msgid "Overpayment amount (%(currency)s)"
 msgstr "Kwota nadpłaty (%(currency)s)"
 
+msgid "Strategy"
+msgstr "Strategia"
+
 msgid "Rate shift in percentage points"
 msgstr "Zmiana stopy w punktach procentowych"
 
@@ -8481,6 +8380,160 @@ msgstr "Porównaj warianty"
 
 msgid "Clear rows"
 msgstr "Wyczyść wiersze"
+
+msgid "The stored loan terms. Changing them recalculates the schedule and pending Upcoming amounts."
+msgstr "Zapisane warunki kredytu. Ich zmiana przelicza harmonogram i przyszłe kwoty w Nadchodzących."
+
+msgid "Edit terms"
+msgstr "Edytuj warunki"
+
+msgid "Rates"
+msgstr "Stopy procentowe"
+
+msgid "Fixed loans use the rate in force on each payment date. Variable loans add the margin to the reference rate."
+msgstr "Kredyty o stałej stopie używają stopy obowiązującej w dniu każdej płatności. Kredyty o zmiennej stopie dodają marżę do stopy referencyjnej."
+
+msgid "Add rate change"
+msgstr "Dodaj zmianę stawki"
+
+msgid "Rate changes"
+msgstr "Zmiany stawki"
+
+#, python-format
+msgid "rate from %(date)s"
+msgstr "stopa od %(date)s"
+
+#, python-format
+msgid "Delete the rate change from %(date)s?"
+msgstr "Usunąć zmianę stopy od %(date)s?"
+
+msgid "No rate changes yet."
+msgstr "Brak zmian stopy."
+
+#, python-format
+msgid "Reference rate: %(name)s"
+msgstr "Stopa referencyjna: %(name)s"
+
+msgid "not set"
+msgstr "nie ustawiono"
+
+#, python-format
+msgid "margin %(margin)s"
+msgstr "marża %(margin)s"
+
+msgid ""
+"Change the reference rate or margin in Edit terms. Add values on the "
+"Reference rates page."
+msgstr ""
+"Zmień stopę referencyjną lub marżę w Edytuj warunki. Wartości dodaj na "
+"stronie Stopy referencyjne."
+
+msgid "Manage reference rates"
+msgstr "Zarządzaj stopami referencyjnymi"
+
+msgid ""
+"Charged every month while active. A percentage applies to the opening "
+"balance; several active costs are added together."
+msgstr ""
+"Naliczany co miesiąc, gdy jest aktywny. Procent dotyczy salda "
+"początkowego; kilka aktywnych kosztów jest sumowanych."
+
+msgid "Add cost"
+msgstr "Dodaj koszt"
+
+msgid "Cost components"
+msgstr "Składniki kosztów"
+
+msgid "Cost"
+msgstr "Koszt"
+
+#, python-format
+msgid "from %(from)s"
+msgstr "od %(from)s"
+
+#, python-format
+msgid "to %(to)s"
+msgstr "do %(to)s"
+
+#, python-format
+msgid "Delete the cost %(name)s?"
+msgstr "Usunąć koszt %(name)s?"
+
+msgid "No cost components yet."
+msgstr "Brak składników kosztów."
+
+msgid "Overpayments"
+msgstr "Nadpłaty"
+
+msgid "Set a regular overpayment and plan one-off amounts. Actual payments are recorded on the Payments page."
+msgstr "Ustaw regularną nadpłatę i zaplanuj kwoty jednorazowe. Rzeczywiste płatności są rejestrowane na stronie Płatności."
+
+msgid "Add one-off overpayment"
+msgstr "Dodaj jednorazową nadpłatę"
+
+msgid "Save overpayment settings"
+msgstr "Zapisz ustawienia nadpłaty"
+
+msgid "One-off overpayments"
+msgstr "Jednorazowe nadpłaty"
+
+#, python-format
+msgid "overpayment on %(date)s"
+msgstr "nadpłata z %(date)s"
+
+#, python-format
+msgid "Delete the overpayment on %(date)s?"
+msgstr "Usunąć nadpłatę z %(date)s?"
+
+msgid "No one-off overpayments yet."
+msgstr "Brak jednorazowych nadpłat."
+
+msgid "This loan is archived and read-only."
+msgstr "Ten kredyt jest zarchiwizowany i tylko do odczytu."
+
+msgid "Restore loan"
+msgstr "Przywróć kredyt"
+
+msgid ""
+"Archiving keeps the loan's settings and history but hides it from the "
+"active list."
+msgstr ""
+"Archiwizacja zachowuje ustawienia i historię kredytu, ale ukrywa go na "
+"liście aktywnych."
+
+#, python-format
+msgid "Archive the loan %(name)s?"
+msgstr "Zarchiwizować kredyt %(name)s?"
+
+msgid "Archive loan"
+msgstr "Zarchiwizuj kredyt"
+
+msgid "Edit rate change"
+msgstr "Edytuj zmianę stawki"
+
+msgid "Save rate change"
+msgstr "Zapisz zmianę stawki"
+
+msgid "Edit cost"
+msgstr "Edytuj koszt"
+
+msgid "The end date is included. Leave empty for no end."
+msgstr "Data końcowa jest wliczona. Pozostaw puste, jeśli koszt nie ma końca."
+
+msgid "Save cost"
+msgstr "Zapisz koszt"
+
+msgid "Edit one-off overpayment"
+msgstr "Edytuj jednorazową nadpłatę"
+
+msgid "Note (optional)"
+msgstr "Notatka (opcjonalnie)"
+
+msgid "This is a planned overpayment. Actual payments are recorded separately."
+msgstr "To planowana nadpłata. Rzeczywiste płatności są rejestrowane osobno."
+
+msgid "Save overpayment"
+msgstr "Zapisz nadpłatę"
 
 msgid "No generated occurrences yet."
 msgstr "Nie wygenerowano jeszcze żadnych wystąpień."
@@ -8527,6 +8580,10 @@ msgstr "Edytuj plan ratalny"
 
 msgid "Add installment plan"
 msgstr "Dodaj plan ratalny"
+
+#, python-format
+msgid "Back to %(name)s"
+msgstr "Wróć do %(name)s"
 
 msgid ""
 "A fixed monthly amount and a remaining count. No interest is calculated; "
@@ -11326,4 +11383,16 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Installment override"
 #~ msgstr "Nadpisanie raty"
+
+#~ msgid "Net worth & property"
+#~ msgstr "Majątek netto i nieruchomość"
+
+#~ msgid ""
+#~ "This is the balance you entered. "
+#~ "More balance checkpoints are recorded "
+#~ "with actual payments."
+#~ msgstr ""
+#~ "To saldo, które podano. Kolejne punkty"
+#~ " kontrolne salda są zapisywane wraz z"
+#~ " rzeczywistymi płatnościami."
 
