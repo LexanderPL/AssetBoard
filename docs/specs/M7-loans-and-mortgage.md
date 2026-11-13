@@ -196,6 +196,17 @@ Service layer calls build_schedule(); templates only render. Tests: service retu
 - Build errors are mapped to short translated explanations; the schedule, charts and CSV are
   omitted until the terms can produce a schedule.
 
+**List and schedule UX (after 0.6.4).** The loans list is a small portfolio: remaining principal,
+current monthly installments, the projected amount due in the next 30 days (after today through
+30 days later) and the balance-weighted average current rate. A loan whose schedule cannot be
+built is skipped with an unavailable count, not an error. Rows show name, type, remaining
+principal, percentage repaid with a progress bar, current rate, the next payment date and its
+installment, and an Active / Paid off / Archived badge; the archived section uses the same
+columns. The schedule is grouped by calendar year with a `th scope="colgroup"` header row, has
+an Actual/Planned toggle (`view=planned`) that keeps pagination, and switches to card rows on
+phones; the row-number and due-date columns are sticky on wider screens. CSV and charts always
+show the projection and are unchanged by the toggle.
+
 ---
 
 ## F7.4 Overpayment scenarios (what-if)

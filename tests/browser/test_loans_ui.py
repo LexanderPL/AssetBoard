@@ -9,6 +9,7 @@ charts, property LTV card, quick-record link and plan-vs-actual status. Both pag
 from __future__ import annotations
 
 import os
+import re
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -166,6 +167,16 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             expect(page.locator('[data-chart="loan-payments"]')).to_have_attribute(
                 "data-chart-ready", "true"
             )
+            position = page.locator("[data-schedule-row] th").first.evaluate(
+                "el => getComputedStyle(el).position"
+            )
+            assert position == "sticky"
+            page.locator('[data-schedule-view="planned"]').click()
+            page.wait_for_load_state("networkidle")
+            expect(page).to_have_url(re.compile(r"view=planned"))
+            _no_page_overflow(page)
+            page.locator('[data-schedule-view="actual"]').click()
+            page.wait_for_load_state("networkidle")
             expect(page.locator("#rate-dialog")).to_have_count(0)
             expect(page.locator("#cost-dialog")).to_have_count(0)
             expect(page.locator("#overpayment-dialog")).to_have_count(0)
@@ -223,6 +234,15 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             page.wait_for_load_state("networkidle")
             expect(page.locator("[data-schedule-actual]")).to_be_visible()
             expect(page.locator("[data-actual-total]")).to_be_visible()
+            page.locator('[data-schedule-view="planned"]').click()
+            page.wait_for_load_state("networkidle")
+            expect(page.locator("[data-schedule-planned]")).to_be_visible()
+            expect(page.locator("[data-schedule-actual]")).to_have_count(0)
+            expect(page.locator("[data-actual-total]")).to_have_count(0)
+            _no_page_overflow(page)
+            page.locator('[data-schedule-view="actual"]').click()
+            page.wait_for_load_state("networkidle")
+            expect(page.locator("[data-schedule-actual]")).to_be_visible()
             _no_page_overflow(page)
 
             page.locator('[data-loan-tab="payments"]').click()
@@ -273,6 +293,8 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             page.set_viewport_size({"width": 390, "height": 844})
             page.goto(f"{base}/loans", wait_until="networkidle")
             expect(page.locator("[data-loan]")).to_have_count(1)
+            expect(page.locator("[data-loan-portfolio]")).to_be_visible()
+            expect(page.locator("[data-loan-row-progress]")).to_be_visible()
             _no_page_overflow(page)
 
             page.locator("[data-open-loan]").click()
@@ -286,11 +308,12 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             expect(page.locator("[data-loan-property-summary]")).to_be_visible()
             expect(page.locator("[data-plan-status-line]")).to_be_visible()
             expect(page.locator("[data-loan-schedule]")).to_be_visible()
+            expect(page.locator("[data-schedule-row]")).to_have_count(24)
             _no_page_overflow(page)
             scroll = page.locator("[data-schedule-scroll]").evaluate(
                 "el => ({scrollWidth: el.scrollWidth, clientWidth: el.clientWidth})"
             )
-            assert scroll["scrollWidth"] > scroll["clientWidth"]
+            assert scroll["scrollWidth"] <= scroll["clientWidth"] + 1
             expect(page.locator('[data-chart="line"]')).to_have_attribute(
                 "data-chart-ready", "true"
             )

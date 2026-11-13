@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 
 from assetboard.db.models.loans import (
     Loan,
@@ -60,7 +60,11 @@ def _create_original(owner, **extra: str) -> str:
     saved = _step(owner, data, 4)
     assert saved.status_code == 303, saved.text
     with owner.db() as session:
-        return str(session.scalars(select(Loan.id).where(Loan.workspace_id == owner.home_id)).one())
+        return str(
+            session.scalars(
+                select(Loan.id).where(Loan.workspace_id == owner.home_id, Loan.name == data["name"])
+            ).one()
+        )
 
 
 def test_empty_loans_page_has_tabs_and_shared_empty_state(owner):
@@ -70,6 +74,53 @@ def test_empty_loans_page_has_tabs_and_shared_empty_state(owner):
     assert "data-empty-state" in page.text
     assert "No loans yet" in page.text
     assert "data-loans-link" in owner.client.get("/").text
+
+
+def test_loan_list_shows_the_portfolio_progress_and_status(owner):
+    active_id = _create_original(owner, name="Active mortgage")
+    paid_id = _create_original(
+        owner,
+        name="Paid loan",
+        principal_original="1,000.00",
+        origination_date="2025-12-01",
+        first_payment_date="2026-01-01",
+        term_months="1",
+    )
+    archived_id = _create_original(owner, name="Archived loan")
+    owner.post(f"/loans/{archived_id}/archive")
+
+    page = owner.client.get("/loans")
+    assert page.status_code == 200
+    assert "data-loan-portfolio" in page.text
+    assert "data-portfolio-remaining" in page.text
+    assert "data-portfolio-monthly" in page.text
+    assert "data-portfolio-due" in page.text
+    assert "data-portfolio-rate" in page.text
+    assert "Remaining principal" in page.text
+    assert "Monthly installments" in page.text
+    assert "Due in the next 30 days" in page.text
+    assert "Average rate" in page.text
+
+    assert f'data-loan="{active_id}" data-loan-status="active"' in page.text
+    assert f'data-loan="{paid_id}" data-loan-status="paid_off"' in page.text
+    assert f'data-archived-loan="{archived_id}"' in page.text
+    assert f'data-loan="{archived_id}" data-loan-status="archived"' in page.text
+    assert page.text.count("data-loan-row-progress") == 3
+    assert ">Paid off</span>" in page.text
+    assert ">Archived</span>" in page.text
+    assert "data-open-archived-loan" in page.text
+
+
+def test_loan_list_skips_a_broken_schedule_with_a_note(owner):
+    _create_original(owner)
+    with owner.db() as session, session.begin():
+        session.execute(delete(LoanRateChange).where(LoanRateChange.workspace_id == owner.home_id))
+    page = owner.client.get("/loans")
+    assert page.status_code == 200
+    assert "data-portfolio-unavailable" in page.text
+    assert "1 loan is not included" in page.text
+    assert 'data-loan-status="active"' in page.text
+    assert "data-loan-row-progress" not in page.text
 
 
 def test_original_path_wizard_keeps_values_and_saves(owner):

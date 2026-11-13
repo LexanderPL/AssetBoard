@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import csv
 import io
+from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
@@ -27,6 +28,7 @@ class SchedulePageView:
     today_is_due: bool
     highlight_next_date: date | None
     next_row: ScheduleRow | None
+    year_headers: Mapping[int, int]
 
 
 def schedule_page(
@@ -34,7 +36,7 @@ def schedule_page(
 ) -> SchedulePageView:
     """The requested page, or the page containing today's/next due row by default."""
     if schedule is None or not schedule.rows:
-        return SchedulePageView((), 1, 1, 0, False, None, None)
+        return SchedulePageView((), 1, 1, 0, False, None, None, {})
     rows = schedule.rows
     pages = max(1, (len(rows) + SCHEDULE_PER_PAGE - 1) // SCHEDULE_PER_PAGE)
     default_index = next(
@@ -48,17 +50,25 @@ def schedule_page(
         wanted = default_page
     page = wanted if 1 <= wanted <= pages else default_page
     start = (page - 1) * SCHEDULE_PER_PAGE
+    page_rows = rows[start : start + SCHEDULE_PER_PAGE]
     today_is_due = any(row.date == today for row in rows)
     next_row = next((row for row in rows if row.date > today), None)
     highlight_next = next_row.date if not today_is_due and next_row is not None else None
+    year_headers: dict[int, int] = {}
+    previous_year: int | None = None
+    for row in page_rows:
+        if row.date.year != previous_year:
+            year_headers[row.n] = row.date.year
+            previous_year = row.date.year
     return SchedulePageView(
-        rows=tuple(rows[start : start + SCHEDULE_PER_PAGE]),
+        rows=tuple(page_rows),
         page=page,
         pages=pages,
         total=len(rows),
         today_is_due=today_is_due,
         highlight_next_date=highlight_next,
         next_row=next_row,
+        year_headers=year_headers,
     )
 
 

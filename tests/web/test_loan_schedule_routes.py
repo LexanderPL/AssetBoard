@@ -96,6 +96,64 @@ def test_schedule_pagination_and_default_current_page(owner):
     assert "Page 1 of 15" in fallback.text
 
 
+def test_schedule_year_headers_repeat_across_pages(owner):
+    loan_id = _create(owner)
+    second = owner.client.get(f"/loans/{loan_id}?schedule_page=2")
+    assert 'scope="colgroup"' in second.text
+    assert 'data-schedule-year="2028"' in second.text
+    assert 'data-schedule-year="2029"' in second.text
+    assert second.text.index('data-schedule-year="2028"') < second.text.index(
+        'data-schedule-year="2029"'
+    )
+    first_row = second.text.index('data-schedule-row="25"')
+    assert second.text.index('data-schedule-year="2028"') < first_row
+
+
+def test_planned_view_ignores_actuals_and_pagination_keeps_it(owner):
+    loan_id = _create(owner)
+    path = f"/loans/{loan_id}/payments"
+    recorded = owner.post(
+        path,
+        {
+            "date": "2026-02-01",
+            "kind": "installment",
+            "total": "100.00",
+            "use_breakdown": "0",
+            "principal": "",
+            "interest": "",
+            "costs": "",
+            "overpayment": "",
+            "note": "",
+            "transaction_id": "",
+        },
+        token_from=path,
+    )
+    assert recorded.status_code == 303
+
+    actual = owner.client.get(f"/loans/{loan_id}?schedule_page=1")
+    assert "data-schedule-actual" in actual.text
+    assert "data-actual-total" in actual.text
+    assert "data-schedule-planned" not in actual.text
+
+    planned = owner.client.get(f"/loans/{loan_id}?schedule_page=1&view=planned")
+    assert planned.status_code == 200
+    assert 'data-schedule-view="planned" aria-current="true"' in planned.text
+    assert "data-schedule-planned" in planned.text
+    assert "data-schedule-actual" not in planned.text
+    assert "data-actual-total" not in planned.text
+    assert "data-schedule-csv" in planned.text
+    assert re.search(r'href="[^"]*schedule_page=2[^"]*view=planned[^"]*#schedule"', planned.text)
+
+
+def test_schedule_sticky_columns_are_marked(owner):
+    loan_id = _create(owner)
+    page = owner.client.get(f"/loans/{loan_id}")
+    assert "data-schedule-scroll" in page.text
+    assert "sm:sticky sm:left-0" in page.text
+    assert "sm:sticky sm:left-12" in page.text
+    assert "sm:bg-surface" in page.text
+
+
 def test_today_and_next_highlights(owner):
     today = owner.app.state.clock.today("UTC")
     today_loan = _create(

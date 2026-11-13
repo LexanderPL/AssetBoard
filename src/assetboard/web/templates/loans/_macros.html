@@ -12,6 +12,49 @@
 {%- if kind.value == "annuity" %}{{ _("Annuity") }}{% elif kind.value == "equal_principal" %}{{ _("Equal principal") }}{% else %}{{ _("Installment plan") }}{% endif %}
 {%- endmacro %}
 
+{% macro loan_status_badge(status) -%}
+<span class="rounded-full px-2 py-0.5 text-xs font-semibold {% if status == 'paid_off' %}bg-success-soft text-success-strong {% elif status == 'archived' %}bg-subtle text-muted {% else %}bg-primary-soft text-primary-ink {% endif %}" data-loan-status-badge="{{ status }}">{% if status == "paid_off" %}{{ _("Paid off") }}{% elif status == "archived" %}{{ _("Archived") }}{% else %}{{ _("Active") }}{% endif %}</span>
+{%- endmacro %}
+
+{% macro loan_progress(percent_bp, locale) -%}
+{% if percent_bp is not none %}
+<span class="inline-flex items-center gap-2" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ percent_bp // 100 }}" aria-label="{{ _('Repaid principal') }}" data-loan-row-progress>
+  <span class="tabular-nums">{{ format_rate_short(percent_bp, locale) }}</span>
+  <svg class="h-1.5 w-16 shrink-0" viewBox="0 0 100 4" preserveAspectRatio="none" aria-hidden="true" focusable="false">
+    <rect width="100" height="4" class="fill-subtle"></rect>
+    {% if percent_bp > 0 %}<rect width="{{ percent_bp / 100 }}" height="4" class="fill-success"></rect>{% endif %}
+  </svg>
+</span>
+{% else %}<span class="text-muted">—</span>{% endif %}
+{%- endmacro %}
+
+{% macro loan_list_row(row, archived=false) -%}
+{% set loan = row.loan %}
+{% set figures = row.figures %}
+<tr class="grid grid-cols-[1fr_auto] gap-x-3 gap-y-2 px-4 py-3 align-top {% if archived %}text-muted {% endif %}sm:table-row sm:p-0" data-loan="{{ loan.id }}" data-loan-status="{{ row.status }}"{% if archived %} data-archived-loan="{{ loan.id }}"{% endif %}>
+  <td class="min-w-0 font-semibold break-words sm:px-4 sm:py-3">
+    <a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}" class="text-primary-ink underline-offset-2 hover:underline"{% if archived %} data-open-archived-loan{% else %} data-open-loan{% endif %}>{{ loan.name }}</a>
+    <span class="ml-2 align-middle sm:hidden">{{ loan_status_badge(row.status) }}</span>
+  </td>
+  <td class="text-right text-muted sm:px-4 sm:py-3 sm:text-left" data-kind>{{ kind_label(loan.kind) }}</td>
+  <td class="whitespace-nowrap tabular-nums sm:px-4 sm:py-3 sm:text-right" data-remaining>
+    <span class="mr-1 text-xs text-muted sm:hidden">{{ _("Remaining") }}</span>
+    {% if figures.remaining_principal is not none %}{{ format_money(figures.remaining_principal, locale) }}{% else %}<span class="text-muted">—</span>{% endif %}
+  </td>
+  <td class="whitespace-nowrap text-right tabular-nums sm:px-4 sm:py-3 sm:text-left" data-progress>
+    <span class="mr-1 text-xs text-muted sm:hidden">{{ _("%% repaid") }}</span>{{ loan_progress(figures.percent_repaid_bp, locale) }}
+  </td>
+  <td class="whitespace-nowrap tabular-nums sm:px-4 sm:py-3 sm:text-right" data-rate>
+    <span class="mr-1 text-xs text-muted sm:hidden">{{ _("Rate") }}</span>{{ rate(figures.current_rate_bp, locale) }}
+  </td>
+  <td class="whitespace-nowrap sm:px-4 sm:py-3" data-next-payment>
+    <span class="mr-1 text-xs text-muted sm:hidden">{{ _("Next payment") }}</span>
+    {% if figures.next_payment_date %}<time datetime="{{ figures.next_payment_date.isoformat() }}">{{ format_day(figures.next_payment_date, locale) }}</time>{% if figures.monthly_installment %}<span class="ml-2 text-xs text-muted tabular-nums sm:ml-0 sm:block">{{ format_money(figures.monthly_installment, locale) }}</span>{% endif %}{% else %}<span class="text-muted">{{ _("Paid off") if row.status == "paid_off" else "—" }}</span>{% endif %}
+  </td>
+  <td class="hidden sm:table-cell sm:px-4 sm:py-3" data-status>{{ loan_status_badge(row.status) }}</td>
+</tr>
+{%- endmacro %}
+
 {% macro overpayment_label(mode, amount, strategy, locale) -%}
 {%- if mode.value == "none" %}{{ _("None") }}
 {%- elif mode.value == "fixed_extra" %}{{ _("Extra %(amount)s each month", amount=format_money(amount, locale)) }}

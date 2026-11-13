@@ -705,6 +705,7 @@ def _detail_context(
     data = loan_schedule_service.loan_schedule(factory, ctx, loan_id)
     today = ctx.clock.today(ctx.workspace.timezone)
     page = schedule_page(data.schedule, today, request.query_params.get("schedule_page"))
+    schedule_view = "planned" if request.query_params.get("view") == "planned" else "actual"
     charts = build_loan_charts(data.schedule, data.baseline, request.state.locale)
     property_as_of = _property_as_of(request, today)
     can_edit = has_role(ctx, Role.EDITOR)
@@ -719,6 +720,7 @@ def _detail_context(
         "schedule": data.schedule,
         "summary": data.summary,
         "schedule_page": page,
+        "schedule_view": schedule_view,
         "charts": charts,
         "schedule_error": _error(request, data.error_code) if data.error_code else None,
         "can_edit": can_edit,
