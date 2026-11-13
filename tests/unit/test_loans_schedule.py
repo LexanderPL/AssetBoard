@@ -595,6 +595,24 @@ def test_a_360_month_schedule_builds_in_under_ten_ms() -> None:
     assert min(timings) < 0.010
 
 
+def test_a_360_month_schedule_with_many_rate_changes_stays_linear() -> None:
+    terms = _terms(
+        principal_original=_money(30_000_000),
+        term_months=360,
+    )
+    anchor = ScheduleAnchor(date(2026, 1, 1), _money(30_000_000))
+    rates = [RatePeriod(date(2026 + index, 1, 1), 400 + index) for index in range(30)]
+    _build(terms, rates=rates, anchor=anchor)
+    timings = []
+    for _ in range(3):
+        started = process_time()
+        _build(terms, rates=rates, anchor=anchor)
+        timings.append(process_time() - started)
+    # Before the per-rate growth cursor this took ~12 ms: one full-term Decimal table per
+    # distinct rate. The bound is the same F7.2 target, not a separate budget.
+    assert min(timings) < 0.010
+
+
 # 14. Input validation
 
 

@@ -204,26 +204,6 @@ def first_installment(
     return Money(minor, principal.currency)
 
 
-def _annuity_denominators(annual_rate_bp: int, max_months: int) -> list[Decimal]:
-    """``1 - (1 + r)^-n`` for every n from 1 to ``max_months``.
-
-    The annuity payment uses the same expression every row; growing the power down from
-    ``max_months`` avoids a Decimal exponentiation per row on long schedules.
-    """
-    monthly_rate = _monthly_rate(annual_rate_bp)
-    if monthly_rate == 0:
-        return []
-    values = [Decimal(0)] * (max_months + 1)
-    with localcontext() as context:
-        context.prec = max(context.prec, 40)
-        growth = (Decimal(1) + monthly_rate) ** (-max_months)
-        values[max_months] = Decimal(1) - growth
-        for months in range(max_months - 1, 0, -1):
-            growth *= Decimal(1) + monthly_rate
-            values[months] = Decimal(1) - growth
-    return values
-
-
 def _annuity_principal_minor(
     amount: Decimal,
     monthly_rate: Decimal,
@@ -626,16 +606,6 @@ def _validate_rate_timeline(rate_timeline: list[RatePeriod]) -> list[RatePeriod]
     return ordered
 
 
-def _rate_on(rate_timeline: list[RatePeriod], day: date) -> int:
-    chosen: int | None = None
-    for period in rate_timeline:
-        if period.effective_from <= day:
-            chosen = period.annual_rate_bp
-    if chosen is None:
-        raise ScheduleError("missing_rate")
-    return chosen
-
-
 def shift_rate_timeline(
     rate_timeline: list[RatePeriod], shift_bp: int, effective_from: date
 ) -> list[RatePeriod]:
@@ -821,10 +791,16 @@ def build_schedule(
     opening_decimal = Decimal(balance).scaleb(-minor_unit)
     base_equal_principal = _half_up(balance, 1, terms.term_months)
     annuity_payment: Decimal | None = None
-    annuity_denominators: dict[int, list[Decimal]] = {}
+    # Per rate: the ``remaining`` its cached ``(1 + r) ** -remaining`` belongs to. A fixed loan
+    # has a few rates; a variable loan may reprice every month. Growing the power down one month
+    # at a time keeps the work linear in the schedule length instead of building a full-term
+    # table for every distinct rate (which would be quadratic with frequent repricing).
+    annuity_growth: dict[int, tuple[int, Decimal]] = {}
     monthly_rates: dict[int, Decimal] = {}
     hold_payment = False
     previous_rate: int | None = None
+    next_rate_index = 0
+    current_rate: int | None = None
     recompute_next = True
     one_off_index = 0
     previous_date = anchor.date
@@ -832,7 +808,14 @@ def build_schedule(
     for index, due in enumerate(dates, start=1):
         if balance <= 0:
             break
-        rate = _rate_on(rates, due)
+        # Dates are ascending, so each rate period is consumed once; scanning the whole
+        # timeline on every row would be quadratic for a frequently repriced variable loan.
+        while next_rate_index < len(rates) and rates[next_rate_index].effective_from <= due:
+            current_rate = rates[next_rate_index].annual_rate_bp
+            next_rate_index += 1
+        if current_rate is None:
+            raise ScheduleError("missing_rate")
+        rate = current_rate
         days = (due - previous_date).days
         if days <= 0:
             raise ScheduleError("invalid_payment_date")
@@ -870,16 +853,24 @@ def build_schedule(
                             monthly_rate = monthly_rates[rate] = _monthly_rate(rate)
                         with localcontext() as context:
                             context.prec = max(context.prec, 40)
-                            denominators = annuity_denominators.get(rate)
-                            if denominators is None:
-                                denominators = _annuity_denominators(rate, terms.term_months)
-                                annuity_denominators[rate] = denominators
-                            if denominators:
-                                annuity_payment = (
-                                    opening_decimal * monthly_rate / denominators[remaining]
-                                )
-                            else:
+                            if monthly_rate == 0:
                                 annuity_payment = opening_decimal / Decimal(remaining)
+                            else:
+                                factor = Decimal(1) + monthly_rate
+                                cached = annuity_growth.get(rate)
+                                if cached is None:
+                                    growth = factor ** (-remaining)
+                                else:
+                                    cached_remaining, growth = cached
+                                    if cached_remaining > remaining:
+                                        for _ in range(cached_remaining - remaining):
+                                            growth *= factor
+                                    elif cached_remaining < remaining:
+                                        growth = factor ** (-remaining)
+                                annuity_growth[rate] = (remaining, growth)
+                                annuity_payment = (
+                                    opening_decimal * monthly_rate / (Decimal(1) - growth)
+                                )
                         recompute_next = False
                         if rate_changed:
                             hold_payment = False
