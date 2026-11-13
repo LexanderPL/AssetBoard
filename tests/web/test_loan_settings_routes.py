@@ -145,6 +145,15 @@ def test_overview_is_read_only_insight_and_keeps_the_schedule(owner) -> None:
         assert marker not in page.text
 
 
+def test_cost_dialog_hides_the_unused_amount_field(owner) -> None:
+    loan_id = _create(owner)
+    page = owner.client.get(f"/loans/{loan_id}/settings?form=cost")
+    assert page.status_code == 200
+    assert 'id="mode"' in page.text
+    assert 'data-hidden-when="mode=fixed"' in page.text
+    assert 'data-hidden-when="mode=percent"' in page.text
+
+
 def test_viewer_reads_settings_but_sees_no_configuration_controls(owner) -> None:
     loan_id = _create(owner)
     owner.set_admin_role("viewer")

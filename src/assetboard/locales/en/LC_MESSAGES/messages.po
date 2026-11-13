@@ -8156,6 +8156,9 @@ msgstr ""
 msgid "Edit cost"
 msgstr ""
 
+msgid "Only the field for the selected cost type is used."
+msgstr ""
+
 msgid "The end date is included. Leave empty for no end."
 msgstr ""
 
