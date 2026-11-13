@@ -281,18 +281,23 @@ def test_current_balance_wizard_creates_one_checkpoint(owner):
         assert checkpoints[0].remaining_principal_minor == 1_500_000
 
 
-def test_detail_supports_rate_cost_and_overpayment_dialogs(owner):
+def test_settings_supports_rate_cost_and_overpayment_dialogs(owner):
     loan_id = _create_original(owner)
     detail = owner.client.get(f"/loans/{loan_id}")
     assert detail.status_code == 200
-    assert "Rate changes" in detail.text and "Cost components" in detail.text
-    assert "Overpayments" in detail.text and "Starting balance" not in detail.text
+    assert "Rate changes" not in detail.text and "Cost components" not in detail.text
+    settings = owner.client.get(f"/loans/{loan_id}/settings")
+    assert settings.status_code == 200
+    assert "Rate changes" in settings.text and "Cost components" in settings.text
+    assert "Overpayments" in settings.text and "Starting balance" not in settings.text
 
     rate = owner.post(
         f"/loans/{loan_id}/rate-changes",
         {"effective_from": "2027-01-01", "rate_percent": "6", "high_rate_confirmed": ""},
     )
-    assert rate.status_code == 303 and "notice=rate_saved" in rate.headers["location"]
+    assert rate.status_code == 303
+    assert f"/loans/{loan_id}/settings" in rate.headers["location"]
+    assert "notice=rate_saved" in rate.headers["location"]
     cost = owner.post(
         f"/loans/{loan_id}/costs",
         {
@@ -397,9 +402,14 @@ def test_viewer_sees_loans_but_not_write_controls(owner):
     page = owner.client.get("/loans")
     assert page.status_code == 200
     assert "Add loan" not in page.text
-    detail = owner.client.get("/loans/" + page.text.split('data-loan="')[1].split('"')[0])
+    loan_id = page.text.split('data-loan="')[1].split('"')[0]
+    detail = owner.client.get("/loans/" + loan_id)
     assert detail.status_code == 200
     assert "Edit terms" not in detail.text
+    settings = owner.client.get(f"/loans/{loan_id}/settings")
+    assert settings.status_code == 200
+    assert "data-edit-terms" not in settings.text
+    assert "Save overpayment settings" not in settings.text
     post = owner.post(
         "/loans/new",
         _wizard_data() | {"step": "1", "go": "next"},
@@ -407,14 +417,14 @@ def test_viewer_sees_loans_but_not_write_controls(owner):
     assert post.status_code == 403
 
 
-def test_short_forms_open_from_query_parameters_without_javascript(owner):
+def test_settings_short_forms_open_from_query_parameters_without_javascript(owner):
     loan_id = _create_original(owner)
     for form, dialog in (
         ("cost", "cost-dialog"),
         ("overpayment", "overpayment-dialog"),
         ("rate", "rate-dialog"),
     ):
-        page = owner.client.get(f"/loans/{loan_id}?form={form}")
+        page = owner.client.get(f"/loans/{loan_id}/settings?form={form}")
         assert page.status_code == 200
         assert f'id="{dialog}"' in page.text
         start = page.text.index(f'id="{dialog}"')
