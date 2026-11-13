@@ -7638,8 +7638,8 @@ msgstr "Odsetki łącznie"
 msgid "Costs lifetime"
 msgstr "Koszty łącznie"
 
-msgid "Property & LTV"
-msgstr "Nieruchomość i LTV"
+msgid "Property and loan-to-value (LTV)"
+msgstr "Nieruchomość i wskaźnik LTV (loan-to-value)"
 
 msgid "Read-only view of the linked property at the selected date."
 msgstr "Widok tylko do odczytu powiązanej nieruchomości w wybranym dniu."
@@ -7717,12 +7717,12 @@ msgstr "Nieruchomość i majątek netto"
 
 #, python-format
 msgid ""
-"Link this loan to a net-worth liability and a property. Property and LTV "
-"use an active real-estate asset item in %(currency)s."
+"Link this loan to a net-worth liability and a property. Property and "
+"loan-to-value (LTV) use an active real-estate asset item in %(currency)s."
 msgstr ""
 "Powiąż kredyt z zobowiązaniem w majątku netto i nieruchomością. "
-"Nieruchomość i LTV korzystają z aktywnej pozycji majątku w kategorii "
-"nieruchomości w walucie %(currency)s."
+"Nieruchomość i wskaźnik LTV (loan-to-value) korzystają z aktywnej pozycji "
+"majątku w kategorii nieruchomości w walucie %(currency)s."
 
 msgid "Open Net worth"
 msgstr "Otwórz majątek netto"
@@ -7734,17 +7734,25 @@ msgstr "Zobowiązanie w majątku netto"
 msgid "Linked item: %(name)s"
 msgstr "Powiązana pozycja: %(name)s"
 
+msgid ""
+"Every net-worth date resolves the remaining principal from the loan "
+"terms, checkpoints and recorded actual payments."
+msgstr ""
+"Każda data w majątku netto wylicza pozostały kapitał z warunków kredytu, "
+"punktów kontrolnych i zapisanych rzeczywistych płatności."
+
+msgid ""
+"No linked liability item yet. Create one to show this loan as a liability"
+" in net worth."
+msgstr ""
+"Brak powiązanej pozycji zobowiązania. Utwórz ją, aby kredyt był widoczny "
+"jako zobowiązanie w majątku netto."
+
 msgid "Open the linked item"
 msgstr "Otwórz powiązaną pozycję"
 
-msgid "No linked liability item yet."
-msgstr "Brak powiązanej pozycji zobowiązania."
-
 msgid "Create net-worth item"
 msgstr "Utwórz pozycję majątku netto"
-
-msgid "Property and LTV"
-msgstr "Nieruchomość i LTV"
 
 msgid "Property item"
 msgstr "Pozycja nieruchomości"
@@ -8802,6 +8810,9 @@ msgstr "To planowana nadpłata. Rzeczywiste płatności są rejestrowane osobno.
 
 msgid "Save overpayment"
 msgstr "Zapisz nadpłatę"
+
+msgid "No linked liability item yet."
+msgstr "Brak powiązanej pozycji zobowiązania."
 
 msgid "No generated occurrences yet."
 msgstr "Nie wygenerowano jeszcze żadnych wystąpień."
@@ -11660,4 +11671,7 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Payment date"
 #~ msgstr "Data płatności"
+
+#~ msgid "Property & LTV"
+#~ msgstr "Nieruchomość i LTV"
 

@@ -128,9 +128,11 @@ def test_overview_is_read_only_insight_and_keeps_the_schedule(owner) -> None:
     assert page.status_code == 200
     assert "data-loan-overview" in page.text
     assert "data-loan-progress-bar" in page.text
-    assert "data-loan-schedule" in page.text
-    assert 'data-chart="line"' in page.text
-    assert 'data-chart="loan-payments"' in page.text
+    assert "data-loan-schedule" not in page.text
+    assert 'data-chart="line"' not in page.text
+    schedule = owner.client.get(f"/loans/{loan_id}/schedule")
+    assert "data-loan-schedule" in schedule.text
+    assert 'data-chart="line"' in schedule.text
     for marker in (
         'id="rate-dialog"',
         'id="cost-dialog"',

@@ -1,9 +1,11 @@
 {% extends "base.html" %}
+{% from "loans/_tabs.html" import tabs with context %}
 {% from "loans/_loan_tabs.html" import loan_tabs with context %}
 {% from "loans/_macros.html" import rate, kind_label, overpayment_label with context %}
 {% block title %}{{ loan.name }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Loans") }}{% endblock %}
 {% block content %}
+{{ tabs("loans") }}
 {{ loan_tabs("overview") }}
 {% if quick_record_url %}
 <div class="mb-6 flex flex-wrap items-center gap-2" data-page-actions>
@@ -15,9 +17,4 @@
 
 {% include "loans/_overview.html" %}
 {% include "loans/_property_overview.html" %}
-{% if not schedule_error %}
-{% include "loans/_schedule.html" %}
-{% include "loans/_charts.html" %}
-{% endif %}
 {% endblock %}
-{% block scripts %}{% if not schedule_error and schedule and schedule.rows %}{% include "macros/chart_scripts.html" %}{% endif %}{% endblock %}

@@ -1,7 +1,7 @@
 <section class="panel mb-6 p-4 sm:p-6" id="property-summary" aria-labelledby="property-summary-heading" data-loan-property-summary>
   <div class="flex flex-wrap items-start justify-between gap-3">
     <div>
-      <h2 id="property-summary-heading" class="text-base font-semibold">{{ _("Property & LTV") }}</h2>
+      <h2 id="property-summary-heading" class="text-base font-semibold">{{ _("Property and loan-to-value (LTV)") }}</h2>
       <p class="mt-1 text-sm text-muted">{{ _("Read-only view of the linked property at the selected date.") }}</p>
     </div>
     <a href="{{ scoped_url(request, 'loan_settings', loan_id=loan.id) }}#property" class="btn" data-manage-property>{{ _("Manage in Settings") }}</a>

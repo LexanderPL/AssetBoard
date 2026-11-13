@@ -2424,6 +2424,25 @@ async def loan_detail(request: Request, ctx: CurrentContext, loan_id: UUID) -> R
     return render_template(request, "loans/detail.html", context=context)
 
 
+@router.get("/loans/{loan_id}/schedule", name="loan_schedule")
+async def loan_schedule_page(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    view = await run_in_threadpool(loans.get_loan, request.app.state.session_factory, ctx, loan_id)
+    if view.kind is LoanKind.INSTALLMENT_PLAN:
+        return RedirectResponse(
+            request.url_for("installment_plan_detail", loan_id=str(loan_id)).path,
+            status_code=303,
+        )
+    context = await run_in_threadpool(
+        _detail_context,
+        request,
+        ctx,
+        loan_id,
+        error=_error(request, request.query_params.get("error")),
+        notice=_notice(request, request.query_params.get("notice")),
+    )
+    return render_template(request, "loans/schedule.html", context=context)
+
+
 @router.get("/loans/{loan_id}/edit", name="loan_edit")
 async def loan_edit(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
     require_role(ctx, Role.EDITOR)
