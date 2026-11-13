@@ -48,7 +48,7 @@ def _no_page_overflow(page: Page) -> None:
 
 
 def _actions_under_the_tabs(page: Page) -> None:
-    tabs = page.locator("[data-tab-strip]").bounding_box()
+    tabs = page.locator("[data-tab-strip]").last.bounding_box()
     actions = page.locator("[data-page-actions]").bounding_box()
     assert tabs is not None and actions is not None
     assert actions["y"] >= tabs["y"] + tabs["height"] - 1
@@ -266,8 +266,8 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             assert payment_display == "table-row"
             _no_page_overflow(page)
 
-            page.locator('[data-loan-tab="overview"]').click()
-            page.wait_for_load_state("networkidle")
+            page.locator('[data-loan-tab="schedule"]').click()
+            page.wait_for_url(f"{base}/loans/{loan_id}/schedule")
             expect(page.locator("[data-schedule-actual]")).to_be_visible()
             expect(page.locator("[data-actual-total]")).to_be_visible()
             page.locator('[data-schedule-view="planned"]').click()
