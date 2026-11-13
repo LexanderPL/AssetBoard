@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.6.5](https://github.com/LexanderPL/AssetBoard/compare/v0.6.4...v0.6.5) (2026-11-13)
+
+
+### Features
+
+* **loans:** payment variance and scenario cards ([#305](https://github.com/LexanderPL/AssetBoard/issues/305)) ([18c0b44](https://github.com/LexanderPL/AssetBoard/commit/18c0b4483e8b55e81f24eaaa2ea95e71d48ffb7d))
+* **loans:** portfolio list and schedule controls ([#304](https://github.com/LexanderPL/AssetBoard/issues/304)) ([80c76a6](https://github.com/LexanderPL/AssetBoard/commit/80c76a6dba23c9a717048827f5ea6ae17a9e11d6))
+* **loans:** split the loan overview and settings ([#302](https://github.com/LexanderPL/AssetBoard/issues/302)) ([6ee6d82](https://github.com/LexanderPL/AssetBoard/commit/6ee6d82b3843502c0c2997205f0a765402d65ee3))
+* **loans:** wizard review, installment progress and reference-rate polish ([#306](https://github.com/LexanderPL/AssetBoard/issues/306)) ([c8b945b](https://github.com/LexanderPL/AssetBoard/commit/c8b945b533417870d01107e141506ea711c87ff6))
+
+
+### Bug Fixes
+
+* **income:** open the taxes settings in a new window ([#301](https://github.com/LexanderPL/AssetBoard/issues/301)) ([ac296be](https://github.com/LexanderPL/AssetBoard/commit/ac296be282cfae9a9bfa28352ec4514d3ee5bb91))
+* **loans:** mark field errors on the remaining loan forms ([#307](https://github.com/LexanderPL/AssetBoard/issues/307)) ([029cbb6](https://github.com/LexanderPL/AssetBoard/commit/029cbb615b0c0c9bfc5afca6721404b2e2fa1705))
+
 ## [0.6.4](https://github.com/LexanderPL/AssetBoard/compare/v0.6.3...v0.6.4) (2026-11-12)
 
 
