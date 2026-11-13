@@ -45,6 +45,9 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "budget_lines",
         "categories",
         "email_tokens",
+        "fire_contributions",
+        "fire_events",
+        "fire_scenarios",
         "import_batches",
         "import_category_mappings",
         "external_identities",
@@ -1983,6 +1986,86 @@ def test_0056_installment_plans_migration_is_reversible(tmp_path: Path) -> None:
             check.get("sqltext") or "" for check in inspect(engine).get_check_constraints("loans")
         }
         assert not any("installment_plan" in sql for sql in loan_checks)
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0059_fire_scenarios_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'fire_scenarios.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        scenario_columns = {column["name"] for column in inspector.get_columns("fire_scenarios")}
+        assert set(scenario_columns) >= {
+            "workspace_id",
+            "name",
+            "name_key",
+            "currency",
+            "birth_year",
+            "start_year",
+            "inflation_bp",
+            "real_return_bp",
+            "income_growth_bp",
+            "stop_working_age",
+            "horizon_age",
+            "rule",
+            "swr_bp",
+            "income_mode",
+            "income_manual_minor",
+            "expenses_mode",
+            "expenses_manual_minor",
+            "portfolio_mode",
+            "portfolio_manual_minor",
+            "is_default",
+            "archived_at",
+        }
+        checks = {
+            check.get("sqltext") or ""
+            for check in inspector.get_check_constraints("fire_scenarios")
+        }
+        assert any("horizon_age > start_year - birth_year" in sql for sql in checks)
+        assert any("swr_bp" in sql and "returns_cover_expenses" in sql for sql in checks)
+        assert any("NOT (is_default AND archived_at IS NOT NULL)" in sql for sql in checks)
+        is_default_column = next(
+            column
+            for column in inspector.get_columns("fire_scenarios")
+            if column["name"] == "is_default"
+        )
+        assert is_default_column["default"] is not None
+        indexes = {index["name"] for index in inspector.get_indexes("fire_scenarios")}
+        assert {
+            "uq_fire_scenarios_active_name_key",
+            "uq_fire_scenarios_active_default",
+        } <= indexes
+
+        contribution_columns = {
+            column["name"] for column in inspector.get_columns("fire_contributions")
+        }
+        assert {"scenario_id", "year", "net_amount_minor"} <= contribution_columns
+        contribution_checks = {
+            check.get("sqltext") or ""
+            for check in inspector.get_check_constraints("fire_contributions")
+        }
+        assert any("net_amount_minor BETWEEN -" in sql for sql in contribution_checks)
+
+        event_columns = {column["name"] for column in inspector.get_columns("fire_events")}
+        assert {"scenario_id", "year", "kind", "amount_minor", "label"} <= event_columns
+        event_checks = {
+            check.get("sqltext") or "" for check in inspector.get_check_constraints("fire_events")
+        }
+        assert any("expense_change" in sql for sql in event_checks)
+
+        command.downgrade(alembic_config(settings), "0058_loan_mixed_rate_timeline")
+        tables = set(inspect(engine).get_table_names())
+        assert not {"fire_scenarios", "fire_contributions", "fire_events"} & tables
         upgrade_database(settings)
         assert database_is_at_head(settings)
         check_database_migrations(settings)

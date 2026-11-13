@@ -18,6 +18,7 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
+from assetboard.db.models.fire import FireContribution, FireEvent, FireScenario
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
 from assetboard.db.models.import_batch import ImportBatch, ImportCategoryMapping
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
@@ -676,6 +677,59 @@ def make_loan_scenario(session: Session, workspace_id: UUID) -> LoanScenario:
     )
 
 
+def make_fire_scenario(session: Session, workspace_id: UUID) -> FireScenario:
+    name = f"FIRE plan {uuid4().hex[:8]}"
+    return FireScenario(
+        workspace_id=workspace_id,
+        name=name,
+        name_key=name.casefold(),
+        currency="EUR",
+        birth_year=1985,
+        start_year=2026,
+        inflation_bp=250,
+        real_return_bp=500,
+        income_growth_bp=300,
+        stop_working_age=55,
+        horizon_age=90,
+        rule="returns_cover_expenses",
+        swr_bp=None,
+        income_mode="manual",
+        income_manual_minor=500_000,
+        expenses_mode="manual",
+        expenses_manual_minor=300_000,
+        portfolio_mode="manual",
+        portfolio_manual_minor=10_000_000,
+        is_default=False,
+        archived_at=None,
+    )
+
+
+def make_fire_contribution(session: Session, workspace_id: UUID) -> FireContribution:
+    scenario = make_fire_scenario(session, workspace_id)
+    session.add(scenario)
+    session.flush()
+    return FireContribution(
+        workspace_id=workspace_id,
+        scenario_id=scenario.id,
+        year=2027,
+        net_amount_minor=120_000,
+    )
+
+
+def make_fire_event(session: Session, workspace_id: UUID) -> FireEvent:
+    scenario = make_fire_scenario(session, workspace_id)
+    session.add(scenario)
+    session.flush()
+    return FireEvent(
+        workspace_id=workspace_id,
+        scenario_id=scenario.id,
+        year=2028,
+        kind="expense_change",
+        amount_minor=-50_000,
+        label="Mortgage repaid",
+    )
+
+
 def make_networth_item(session: Session, workspace_id: UUID) -> NetWorthItem:
     category = make_networth_category(session, workspace_id)
     session.add(category)
@@ -807,4 +861,7 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     LoanScenario: TenantCase(make_loan_scenario, update_values={"name": "Updated scenario"}),
     LoanPayment: TenantCase(make_loan_payment, update_values={"note": "Updated payment"}),
     InstallmentPlan: TenantCase(make_installment_plan, update_values={"remaining_count": 9}),
+    FireScenario: TenantCase(make_fire_scenario, update_values={"name": "Updated FIRE plan"}),
+    FireContribution: TenantCase(make_fire_contribution, update_values={"net_amount_minor": 1}),
+    FireEvent: TenantCase(make_fire_event, update_values={"label": "Updated event"}),
 }

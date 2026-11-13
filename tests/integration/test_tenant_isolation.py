@@ -2602,3 +2602,134 @@ def test_loan_queries_stay_in_their_workspace(
 
     with pytest.raises(ForeignWorkspace):
         loans_b.create(workspace_id=ctx_a.workspace.id, name="Cross workspace", **loan_values)
+
+
+def test_fire_queries_stay_in_their_workspace(
+    db_session: Session, two_workspaces: tuple[Any, Any]
+) -> None:
+    from datetime import UTC, datetime
+
+    from assetboard.db.repositories import (
+        FireContributionRepository,
+        FireEventRepository,
+        FireScenarioRepository,
+    )
+
+    ctx_a, ctx_b = two_workspaces
+    scenarios_a = FireScenarioRepository(db_session, ctx_a)
+    scenarios_b = FireScenarioRepository(db_session, ctx_b)
+    contributions_a = FireContributionRepository(db_session, ctx_a)
+    contributions_b = FireContributionRepository(db_session, ctx_b)
+    events_a = FireEventRepository(db_session, ctx_a)
+    events_b = FireEventRepository(db_session, ctx_b)
+
+    scenario_values = {
+        "currency": "EUR",
+        "birth_year": 1985,
+        "start_year": 2026,
+        "inflation_bp": 250,
+        "real_return_bp": 500,
+        "income_growth_bp": 300,
+        "stop_working_age": 55,
+        "horizon_age": 90,
+        "rule": "returns_cover_expenses",
+        "swr_bp": None,
+        "income_mode": "manual",
+        "income_manual_minor": 500_000,
+        "expenses_mode": "manual",
+        "expenses_manual_minor": 300_000,
+        "portfolio_mode": "manual",
+        "portfolio_manual_minor": 10_000_000,
+    }
+    active_a = scenarios_a.create(
+        name="Retire at 55",
+        name_key="retire at 55",
+        is_default=True,
+        archived_at=None,
+        **scenario_values,
+    )
+    old_a = scenarios_a.create(
+        name="Old plan",
+        name_key="old plan",
+        is_default=False,
+        archived_at=datetime(2026, 1, 1, tzinfo=UTC),
+        **scenario_values,
+    )
+    active_b = scenarios_b.create(
+        name="Retire at 60",
+        name_key="retire at 60",
+        is_default=True,
+        archived_at=None,
+        **scenario_values,
+    )
+    scenarios_b.create(
+        name="Old plan",
+        name_key="old plan",
+        is_default=False,
+        archived_at=datetime(2026, 1, 1, tzinfo=UTC),
+        **scenario_values,
+    )
+    contribution_a = contributions_a.create(
+        scenario_id=active_a.id, year=2027, net_amount_minor=120_000
+    )
+    contributions_b.create(scenario_id=active_b.id, year=2027, net_amount_minor=90_000)
+    event_a = events_a.create(
+        scenario_id=active_a.id,
+        year=2028,
+        kind="expense_change",
+        amount_minor=-50_000,
+        label="Mortgage repaid",
+    )
+    events_b.create(
+        scenario_id=active_b.id,
+        year=2028,
+        kind="cash",
+        amount_minor=200_000,
+        label="Bonus",
+    )
+
+    assert [row.id for row in scenarios_a.active()] == [active_a.id]
+    assert [row.id for row in scenarios_a.archived()] == [old_a.id]
+    assert scenarios_b.active_by_name_key("retire at 55") is None
+    assert scenarios_a.active_by_name_key("retire at 55") == active_a
+    assert scenarios_b.active_default() is active_b
+    assert scenarios_a.active_default() == active_a
+    assert scenarios_b.first_active().id == active_b.id  # type: ignore[union-attr]
+    assert scenarios_a.first_active(exclude_id=active_a.id) is None
+    assert scenarios_a.first_active() == active_a
+    assert scenarios_a.active_name_keys() == {"retire at 55"}
+    assert scenarios_b.active_name_keys() == {"retire at 60"}
+    assert [row.id for row in contributions_a.for_scenario(active_a.id)] == [contribution_a.id]
+    assert contributions_b.for_scenario(active_a.id) == []
+    assert contributions_a.counts_by_scenario() == {active_a.id: 1}
+    assert contributions_b.counts_by_scenario() == {active_b.id: 1}
+    assert [row.id for row in events_a.for_scenario(active_a.id)] == [event_a.id]
+    assert events_b.for_scenario(active_a.id) == []
+    assert events_a.counts_by_scenario() == {active_a.id: 1}
+    assert events_b.counts_by_scenario() == {active_b.id: 1}
+
+    with pytest.raises(ForeignWorkspace):
+        scenarios_b.create(
+            workspace_id=ctx_a.workspace.id,
+            name="Cross workspace",
+            name_key="cross workspace",
+            is_default=False,
+            archived_at=None,
+            **scenario_values,
+        )
+    with pytest.raises(ForeignWorkspace):
+        contributions_b.create(
+            workspace_id=ctx_a.workspace.id,
+            scenario_id=active_a.id,
+            year=2030,
+            net_amount_minor=1,
+        )
+    with pytest.raises(ForeignWorkspace):
+        events_b.create(
+            workspace_id=ctx_a.workspace.id,
+            scenario_id=active_a.id,
+            year=2030,
+            kind="cash",
+            amount_minor=1,
+            label="Cross workspace",
+        )

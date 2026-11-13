@@ -27,6 +27,9 @@ from assetboard.db.repositories import (
     BudgetLineRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
+    FireContributionRepository,
+    FireEventRepository,
+    FireScenarioRepository,
     FxRateRepository,
     IncomeSourceRepository,
     IncomeSourceTaxRuleRepository,
@@ -138,6 +141,9 @@ ARCHIVE_EXCLUDED_MODELS = {
     "Membership": "workspace membership is instance access control",
     "Invitation": "invitations are not financial workspace data",
     "AuditEvent": "audit history is intentionally not portable",
+    "FireContribution": "FIRE scenarios require the F8.6 archive extension",
+    "FireEvent": "FIRE scenarios require the F8.6 archive extension",
+    "FireScenario": "FIRE scenarios require the F8.6 archive extension",
     "ImportBatch": "temporary import state and user reports are not portable",
     "ImportCategoryMapping": (
         "remembered import choices are workspace import preferences, not ledger data"
@@ -499,6 +505,18 @@ def _has_installment_plans(session: Session, ctx: Context) -> bool:
     return InstallmentPlanRepository(session, ctx).any_exists()
 
 
+def _has_fire_scenarios(session: Session, ctx: Context) -> bool:
+    return FireScenarioRepository(session, ctx).any_exists()
+
+
+def _has_fire_contributions(session: Session, ctx: Context) -> bool:
+    return FireContributionRepository(session, ctx).any_exists()
+
+
+def _has_fire_events(session: Session, ctx: Context) -> bool:
+    return FireEventRepository(session, ctx).any_exists()
+
+
 def _has_reference_rates(session: Session, ctx: Context) -> bool:
     return ReferenceRateRepository(session, ctx).any_exists()
 
@@ -542,6 +560,9 @@ EMPTINESS_CHECKS = (
     _has_loan_scenarios,
     _has_loan_payments,
     _has_installment_plans,
+    _has_fire_scenarios,
+    _has_fire_contributions,
+    _has_fire_events,
 )
 
 

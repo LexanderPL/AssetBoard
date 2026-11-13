@@ -402,6 +402,26 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         ("LoanPaymentRepository", method): "test_loan_queries_stay_in_their_workspace"
         for method in ("create", "for_loan", "get_for_loan", "for_loan_on_date")
     },
+    **{
+        ("FireScenarioRepository", method): "test_fire_queries_stay_in_their_workspace"
+        for method in (
+            "create",
+            "active",
+            "archived",
+            "active_by_name_key",
+            "active_default",
+            "first_active",
+            "active_name_keys",
+        )
+    },
+    **{
+        ("FireContributionRepository", method): "test_fire_queries_stay_in_their_workspace"
+        for method in ("create", "for_scenario", "counts_by_scenario")
+    },
+    **{
+        ("FireEventRepository", method): "test_fire_queries_stay_in_their_workspace"
+        for method in ("create", "for_scenario", "counts_by_scenario")
+    },
 }
 
 READER_METHOD_COVERAGE: dict[str, str] = {

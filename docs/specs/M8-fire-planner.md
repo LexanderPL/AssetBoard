@@ -29,6 +29,12 @@ Computed outputs: **FIRE age/year** = first row where `expenses_t < gain_t` (ret
 - `FireContribution(scenario_id, year, net_amount Money)` — explicit yearly net-savings overrides.
 - `FireEvent(scenario_id, year, kind[cash|expense_change|income_change], amount Money, label)` — `cash`: one-off added to net worth in that year; `expense_change` / `income_change`: annual change from that year onward, entered in today's money and inflated/grown like the base series.
 
+`start_year` is fixed when the scenario is created (the workspace's current year) and is not
+editable, so a saved plan stays reproducible; `age_at_start = start_year - birth_year` is the
+"current age" used by validation. Contribution and event amounts are signed minor units (an
+explicit exception to overview §3.2): positive saves/adds/increases, negative
+dissaves/withdraws/reduces.
+
 ---
 
 ## F8.1 Scenario model and settings
@@ -46,6 +52,55 @@ Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait 
 Implement F8.1 from docs/specs/M8-fire-planner.md: FireScenario, FireContribution, FireEvent models + migration, optional profile birth_year,
 CRUD/duplicate/default UI with contribution and event editors, validation and tooltips (translatable). No projection logic yet.
 ```
+
+### As built (M8.F8.1)
+
+- `0059_f81_fire_scenarios` creates `fire_scenarios`, `fire_contributions` and `fire_events`.
+  The scenario carries a `currency` snapshotted from the workspace base currency and a
+  `start_year` fixed from the injected `Clock` at creation. Active names are unique ignoring
+  case through a partial unique index on `(workspace_id, name_key) WHERE archived_at IS NULL`;
+  archived names may be reused. A second partial unique index keeps at most one active default.
+  Checks cover the year range, `birth_year <= start_year`, the horizon/stop ages against
+  `start_year - birth_year`, the rate hard bounds, the rule/SWR pairing, the three mode enums,
+  manual amounts (0..MAX, linked amounts null) and "default not archived". Child rows use
+  composite `(workspace_id, scenario_id)` foreign keys with `ON DELETE CASCADE`; contribution
+  years are unique per scenario. Both child amount columns are signed minor units.
+- `services.fire_scenarios` is the only writer: role checks in the service (plus
+  `require_role_now` under the write lock), `CurrentWorkspaceRepository.lock(exclusive=True)`,
+  audit events without amounts (`fire_scenario.created`, `.updated`, `.duplicated`,
+  `.archived`, `.restored`, `.default_changed`) and the injected clock for `archived_at`.
+  The first active scenario becomes the default; archiving the default promotes the next active
+  scenario; restoring into an empty active list promotes the restored one. There is no hard
+  delete. Archived scenarios are read-only; restoring a name that another active scenario now
+  uses renames the restored row with the same `(copy)` / `(copy N)` suffix as duplication.
+  Saving reconciles the editors instead of replacing every child row: contributions are matched
+  by year and events by a hidden row id, so unchanged rows keep their ids and timestamps (F8.6
+  archive lineage and audit rely on that). An event id that belongs to another scenario is
+  refused with `invalid_event`, and the same id twice with `duplicate_event`.
+- Validation returns `FireError(field, code)`: a required birth year (`birth_year_required`),
+  `invalid_birth_year`, `horizon_not_after_age`, `stop_before_age`, `invalid_horizon`,
+  `invalid_stop_age`, hard-bound rate errors, `extreme_rate_confirmation_required` for a
+  **changed** rate outside the ordinary ranges, `duplicate_name`, `rows_outside_window`,
+  `duplicate_contribution_year`, the 120/200 row caps, `invalid_event_kind`, `invalid_label`,
+  `invalid_event`, `duplicate_event` and `archived`. A stop age after the horizon is allowed and
+  shown as a warning. Contribution years are `start_year+1 … birth_year+horizon_age`; event
+  years are `start_year … birth_year+horizon_age`. Rows are never deleted silently: an outside
+  row blocks the save and stays on the form.
+- F8.1 stores `income_mode`, `expenses_mode` and `portfolio_mode` but accepts only `manual`;
+  linked values fail with `linked_mode_unavailable` until F8.4. The starting amounts are in
+  today's money in the scenario currency. Illustrative prefill (2.5% inflation, 5% real return,
+  3% income growth, 4% SWR) is editable and the page says it is not advice.
+- The settings UI is `GET /fire` (`fire_scenarios`), `GET /fire/new` with `POST /fire`,
+  `GET /fire/{id}`, `GET /fire/{id}/edit` with `POST /fire/{id}`, and POST actions for
+  duplicate, default, archive and restore.
+  Viewers read; editors and owners write. The form has plain-language tooltips, the
+  contribution editor (add/remove rows and a paste column that accepts bare amounts with blank
+  lines consuming a year, or `year, amount` / `year<TAB>amount` pairs), the events editor and
+  the disclaimer. The sidebar's disabled FIRE item is now a link.
+- The three models are in `EMPTINESS_CHECKS` but excluded from the archive format until F8.6
+  (`FIRE scenarios require the F8.6 archive extension`), and excluded from the demo with
+  reasoned entries. Audit events are shown in a new **FIRE planner** group. Polish translations
+  are complete; the user guide is `docs/fire.md`.
 
 ---
 

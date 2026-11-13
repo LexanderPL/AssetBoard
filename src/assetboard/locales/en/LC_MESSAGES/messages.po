@@ -788,6 +788,24 @@ msgstr ""
 msgid "Risk targets saved"
 msgstr ""
 
+msgid "FIRE scenario added"
+msgstr ""
+
+msgid "FIRE scenario changed"
+msgstr ""
+
+msgid "FIRE scenario duplicated"
+msgstr ""
+
+msgid "FIRE scenario archived"
+msgstr ""
+
+msgid "FIRE scenario restored"
+msgstr ""
+
+msgid "FIRE default scenario changed"
+msgstr ""
+
 msgid "Investment transaction added"
 msgstr ""
 
@@ -1404,6 +1422,9 @@ msgid "Import and export"
 msgstr ""
 
 msgid "Net worth"
+msgstr ""
+
+msgid "FIRE planner"
 msgstr ""
 
 msgid "Closing months"
@@ -2421,6 +2442,130 @@ msgid "Too many registration attempts from your network. Try again later."
 msgstr ""
 
 msgid "Too many requests from your network. Try again later."
+msgstr ""
+
+msgid "Enter a name of 1 to 200 characters."
+msgstr ""
+
+msgid "Enter your birth year, or add it to your profile first."
+msgstr ""
+
+msgid "Enter a birth year between 1900 and the plan's start year."
+msgstr ""
+
+msgid "Enter a horizon between 1 and 120 years of age."
+msgstr ""
+
+msgid "The horizon age must be older than your age at the start of the plan."
+msgstr ""
+
+msgid "Enter the age at which income stops, between 0 and 120."
+msgstr ""
+
+msgid "Income cannot stop before your age at the start of the plan."
+msgstr ""
+
+msgid "Enter a percentage between -20% and 50% with at most two decimals."
+msgstr ""
+
+msgid "Enter a withdrawal rate between 0.5% and 20% with at most two decimals."
+msgstr ""
+
+msgid "Choose how the plan decides that you are financially independent."
+msgstr ""
+
+msgid "Choose how starting income is entered."
+msgstr ""
+
+msgid "Choose how starting expenses are entered."
+msgstr ""
+
+msgid "Choose how the starting portfolio is entered."
+msgstr ""
+
+msgid ""
+"Reading this input from the app's data arrives in a later update. Enter "
+"it manually."
+msgstr ""
+
+msgid "Enter a valid non-negative amount in the plan currency."
+msgstr ""
+
+msgid "Another active scenario already has this name."
+msgstr ""
+
+msgid "Every contribution and event year must fall inside the plan's window."
+msgstr ""
+
+msgid "Each contribution year can appear only once."
+msgstr ""
+
+msgid "A scenario can have at most 120 contribution rows."
+msgstr ""
+
+msgid "A scenario can have at most 200 events."
+msgstr ""
+
+msgid "Choose a valid event type."
+msgstr ""
+
+msgid "Give every event a short description."
+msgstr ""
+
+msgid ""
+"This event is no longer part of the scenario. Reload the page and try "
+"again."
+msgstr ""
+
+msgid "The same event appears twice. Reload the page and try again."
+msgstr ""
+
+msgid "Enter a whole year for every row."
+msgstr ""
+
+msgid "Archived scenarios are read-only. Restore the scenario first."
+msgstr ""
+
+msgid "A rate is outside the usual range. Tick the confirmation box to save it."
+msgstr ""
+
+msgid "Tick the confirmation box only when you mean the unusual rates."
+msgstr ""
+
+msgid "The scenario could not be saved. Reload the page and try again."
+msgstr ""
+
+msgid "Scenario created."
+msgstr ""
+
+msgid "Scenario saved."
+msgstr ""
+
+msgid "Scenario duplicated."
+msgstr ""
+
+msgid "Scenario archived."
+msgstr ""
+
+msgid "Scenario restored."
+msgstr ""
+
+msgid "Default scenario changed."
+msgstr ""
+
+msgid "Returns cover expenses"
+msgstr ""
+
+msgid "Withdrawal rate"
+msgstr ""
+
+msgid "One-off cash flow"
+msgstr ""
+
+msgid "Annual expense change"
+msgstr ""
+
+msgid "Annual income change"
 msgstr ""
 
 msgid "This request came from another site and was blocked."
@@ -4438,9 +4583,6 @@ msgstr ""
 msgid "FIRE projection"
 msgstr ""
 
-msgid "Unavailable"
-msgstr ""
-
 #, python-format
 msgid "Update available: %(version)s"
 msgstr ""
@@ -5225,6 +5367,372 @@ msgstr ""
 msgid "Return to overview"
 msgstr ""
 
+msgid "All scenarios"
+msgstr ""
+
+msgid "Year"
+msgstr ""
+
+msgid "Net saving"
+msgstr ""
+
+msgid "this contribution row"
+msgstr ""
+
+msgid "Description"
+msgstr ""
+
+msgid "this event"
+msgstr ""
+
+msgid "Open your profile"
+msgstr ""
+
+msgid ""
+"Projections are illustrative and not financial advice. The starting rates"
+" are examples, not recommendations."
+msgstr ""
+
+msgid "Plan"
+msgstr ""
+
+msgid "Scenario name"
+msgstr ""
+
+msgid "Start year"
+msgstr ""
+
+msgid "Fixed when the scenario is created, so a saved plan stays reproducible."
+msgstr ""
+
+msgid "The current year when the scenario was created."
+msgstr ""
+
+msgid "Snapshotted from the workspace base currency."
+msgstr ""
+
+msgid "Birth year"
+msgstr ""
+
+msgid ""
+"Used to turn plan years into ages. It is stored with the scenario and "
+"prefilled from your profile."
+msgstr ""
+
+msgid ""
+"Required. You can change it for this scenario without changing your "
+"profile."
+msgstr ""
+
+msgid "Horizon age"
+msgstr ""
+
+msgid ""
+"The last age shown in the projection. It defaults from your profile's "
+"life expectancy."
+msgstr ""
+
+msgid "Income stops at age"
+msgstr ""
+
+msgid ""
+"The age at which earned income stops; from then on the plan spends from "
+"the portfolio."
+msgstr ""
+
+msgid "Assumptions"
+msgstr ""
+
+#, python-format
+msgid "Inflation (%%)"
+msgstr ""
+
+msgid "The yearly rise in prices. It reduces what the portfolio can buy."
+msgstr ""
+
+#, python-format
+msgid "Real return (%%)"
+msgstr ""
+
+msgid ""
+"The yearly investment return above inflation. It is not a promise of "
+"future returns."
+msgstr ""
+
+#, python-format
+msgid "Income growth (%%)"
+msgstr ""
+
+msgid "How much your earned income grows each year until it stops."
+msgstr ""
+
+msgid "Independence rule"
+msgstr ""
+
+msgid ""
+"Returns cover expenses: independent when the portfolio's return pays the "
+"inflated expenses. Withdrawal rate: independent when the portfolio is "
+"large enough for a chosen safe withdrawal rate."
+msgstr ""
+
+#, python-format
+msgid "Withdrawal rate (%%)"
+msgstr ""
+
+#, python-format
+msgid ""
+"Only used with the withdrawal-rate rule. The share of the portfolio "
+"withdrawn in the first year of retirement. 4%% is a common example, not a"
+" rule."
+msgstr ""
+
+msgid "I confirm these unusual rates are intentional"
+msgstr ""
+
+#, python-format
+msgid ""
+"Unusual means inflation outside 0–10%%, real return outside −2–8%%, "
+"income growth outside 0–10%%, or a withdrawal rate outside 2–6%%."
+msgstr ""
+
+msgid "Starting amounts"
+msgstr ""
+
+#, python-format
+msgid ""
+"All amounts are in %(currency)s and in today's money. Enter the yearly "
+"income and expenses at the start of the plan."
+msgstr ""
+
+msgid "Annual income"
+msgstr ""
+
+msgid "Earned income in the start year, before tax and other deductions."
+msgstr ""
+
+msgid "From the app's data (coming later)"
+msgstr ""
+
+msgid "Annual expenses"
+msgstr ""
+
+msgid ""
+"Regular yearly spending in the start year, excluding savings and "
+"transfers."
+msgstr ""
+
+msgid "Starting portfolio"
+msgstr ""
+
+msgid ""
+"Investable assets at the start: investments and cash savings, not your "
+"home."
+msgstr ""
+
+msgid "Contribution overrides"
+msgstr ""
+
+msgid ""
+"A positive amount is net saving in that year; a negative amount is net "
+"dissaving. A year without a row uses income minus expenses."
+msgstr ""
+
+#, python-format
+msgid "Years %(start)d to %(end)d"
+msgstr ""
+
+msgid ""
+"Optional explicit net savings for individual years. Paste a column from a"
+" spreadsheet or add rows one by one."
+msgstr ""
+
+msgid "Paste a column (amounts, or year and amount)"
+msgstr ""
+
+msgid "2029, 15000"
+msgstr ""
+
+msgid "Paste a column first."
+msgstr ""
+
+msgid "Rows filled from the pasted column."
+msgstr ""
+
+msgid "Fill rows from the pasted column"
+msgstr ""
+
+#, python-format
+msgid ""
+"Bare amounts fill consecutive years from %(start)d; a blank line skips a "
+"year. Lines like 2029, 15000 or a year and an amount separated by a tab "
+"fill those years. Pasting replaces the rows below."
+msgstr ""
+
+#, python-format
+msgid "Net saving (%(currency)s)"
+msgstr ""
+
+msgid "Add a contribution row"
+msgstr ""
+
+msgid ""
+"A one-off cash flow is added to net worth in that year. An expense or "
+"income change alters the annual series from that year onward. Negative "
+"amounts reduce, positive amounts increase."
+msgstr ""
+
+msgid ""
+"Optional one-off inflows or outflows, and permanent changes to the yearly"
+" expense or income series."
+msgstr ""
+
+#, python-format
+msgid "Amount (%(currency)s)"
+msgstr ""
+
+msgid "Add an event"
+msgstr ""
+
+msgid ""
+"Examples: a one-off 20 000 cash inflow; −1 200 per year when a loan is "
+"repaid; 500 per year of extra rental income."
+msgstr ""
+
+msgid "Save scenario"
+msgstr ""
+
+msgid "New scenario"
+msgstr ""
+
+msgid "Plan your financial independence"
+msgstr ""
+
+msgid ""
+"A scenario keeps the assumptions of one plan: your age, the rates, the "
+"starting amounts and any yearly overrides or one-off events. Results and "
+"projections arrive in a later update; for now the scenario stores and "
+"validates the plan."
+msgstr ""
+
+msgid "Active scenarios"
+msgstr ""
+
+#, python-format
+msgid "%(num)d active scenario"
+msgid_plural "%(num)d active scenarios"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Default"
+msgstr ""
+
+#, python-format
+msgid "Age %(age)d in %(year)d"
+msgstr ""
+
+msgid "Income stops"
+msgstr ""
+
+msgid "Horizon"
+msgstr ""
+
+msgid "Real return"
+msgstr ""
+
+msgid "Inflation"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d contribution override"
+msgid_plural "%(num)d contribution overrides"
+msgstr[0] ""
+msgstr[1] ""
+
+#, fuzzy, python-format
+msgid "%(num)d event"
+msgid_plural "%(num)d events"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "Open"
+msgstr ""
+
+msgid "Make default"
+msgstr ""
+
+msgid "Duplicate"
+msgstr ""
+
+#, python-format
+msgid "Archive the scenario %(name)s?"
+msgstr ""
+
+msgid "No active scenarios yet."
+msgstr ""
+
+msgid ""
+"Create a scenario to store your assumptions. The first one becomes the "
+"default."
+msgstr ""
+
+msgid "An editor or owner of this workspace can add scenarios."
+msgstr ""
+
+msgid "Archived scenarios"
+msgstr ""
+
+msgid ""
+"Archived scenarios are read-only and keep their inputs. Restore one to "
+"edit it again."
+msgstr ""
+
+#, python-format
+msgid "archived %(date)s"
+msgstr ""
+
+msgid "Archived"
+msgstr ""
+
+#, python-format
+msgid "Start year %(year)d · age %(age)d at the start · currency %(currency)s"
+msgstr ""
+
+msgid "Edit scenario"
+msgstr ""
+
+msgid "This scenario is archived and read-only. Restore it to change its inputs."
+msgstr ""
+
+#, python-format
+msgid ""
+"Income stops after the plan's horizon. The plan is saved, but the "
+"projection will have no working years beyond age %(horizon)d."
+msgstr ""
+
+msgid "Income growth"
+msgstr ""
+
+#, python-format
+msgid "Entered manually in today's money, in %(currency)s."
+msgstr ""
+
+#, python-format
+msgid "%(num)d row"
+msgid_plural "%(num)d rows"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "No overrides. Every year uses income minus expenses."
+msgstr ""
+
+msgid "No events."
+msgstr ""
+
+msgid ""
+"Projections are illustrative and not financial advice. The projection "
+"engine and linked inputs arrive in later updates."
+msgstr ""
+
 msgid "Filters"
 msgstr ""
 
@@ -5333,9 +5841,6 @@ msgid "page %(number)d of %(pages)d"
 msgstr ""
 
 msgid "Select"
-msgstr ""
-
-msgid "Description"
 msgstr ""
 
 #, python-format
@@ -5722,9 +6227,6 @@ msgstr ""
 msgid "Fixed · %(amount)s on the %(day)s · Income category: %(category)s"
 msgstr ""
 
-msgid "Archived"
-msgstr ""
-
 msgid "Taxes on this income:"
 msgstr ""
 
@@ -6035,9 +6537,6 @@ msgid "Dividends and interest by calendar year, in %(currency)s."
 msgstr ""
 
 msgid "Income from investments by year"
-msgstr ""
-
-msgid "Year"
 msgstr ""
 
 msgid "Gross"
@@ -6953,9 +7452,6 @@ msgstr ""
 msgid "Closed"
 msgstr ""
 
-msgid "Open"
-msgstr ""
-
 #, python-format
 msgid "Paid %(paid)s of %(total)s installments"
 msgstr ""
@@ -7532,10 +8028,6 @@ msgid "A fixed extra each month"
 msgstr ""
 
 msgid "A target total each month"
-msgstr ""
-
-#, python-format
-msgid "Amount (%(currency)s)"
 msgstr ""
 
 msgid "For a target, this includes principal, interest and costs."
@@ -8330,9 +8822,6 @@ msgid "Day"
 msgstr ""
 
 msgid "Earlier descriptions"
-msgstr ""
-
-msgid "Plan"
 msgstr ""
 
 msgid "from investment income"
@@ -9801,12 +10290,6 @@ msgstr ""
 msgid "Type a category name or kind"
 msgstr ""
 
-#, python-format
-msgid "%(num)d row"
-msgid_plural "%(num)d rows"
-msgstr[0] ""
-msgstr[1] ""
-
 msgid "Action"
 msgstr ""
 
@@ -11116,5 +11599,8 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "A fixed loan needs a rate on or before its first payment date."
+#~ msgstr ""
+
+#~ msgid "Unavailable"
 #~ msgstr ""
 

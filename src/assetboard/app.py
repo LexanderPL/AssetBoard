@@ -82,6 +82,7 @@ from assetboard.web.context import load_workspace_nav
 from assetboard.web.email_routes import router as email_router
 from assetboard.web.errors import BUSY_RETRY_AFTER, add_error_response_headers, error_response
 from assetboard.web.errors import is_htmx_fragment_request as _is_htmx_fragment_request
+from assetboard.web.fire_routes import router as fire_router
 from assetboard.web.gate import AccessGateMiddleware, OriginCheckMiddleware
 from assetboard.web.income_routes import router as income_router
 from assetboard.web.investment_routes import router as investment_router
@@ -382,6 +383,7 @@ def create_app(
     app.include_router(tax_router)
     app.include_router(income_router)
     app.include_router(loan_router)
+    app.include_router(fire_router)
     app.include_router(notification_router)
     app.include_router(auth_router)
     app.include_router(email_router)
