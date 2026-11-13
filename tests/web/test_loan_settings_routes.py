@@ -253,6 +253,27 @@ def test_invalid_configuration_keeps_the_settings_dialog_open(owner) -> None:
     assert " open>" in response.text[start : start + 700]
 
 
+def test_high_rate_confirmation_only_appears_when_needed(owner) -> None:
+    loan_id = _create(owner)
+    page = owner.client.get(f"/loans/{loan_id}/settings?form=rate")
+    assert page.status_code == 200
+    assert "I understand this rate is above 25%" not in page.text
+    path = f"/loans/{loan_id}/settings"
+    response = owner.post(
+        f"/loans/{loan_id}/rate-changes",
+        {"effective_from": "2027-01-01", "rate_percent": "26", "high_rate_confirmed": ""},
+        token_from=path,
+    )
+    assert response.status_code == 400
+    assert "I understand this rate is above 25%" in response.text
+    saved = owner.post(
+        f"/loans/{loan_id}/rate-changes",
+        {"effective_from": "2027-01-01", "rate_percent": "26", "high_rate_confirmed": "1"},
+        token_from=path,
+    )
+    assert saved.status_code == 303
+
+
 def test_invalid_settings_fields_are_marked_next_to_the_input(owner) -> None:
     loan_id = _create(owner)
     path = f"/loans/{loan_id}/settings"

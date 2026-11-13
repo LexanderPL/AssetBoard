@@ -171,7 +171,11 @@
       {{ csrf_input() }}
       <label class="grid gap-1 text-sm font-medium">{{ _("Applies from") }}<input name="effective_from" type="date" value="{{ form_values.get('effective_from', rate_edit.row.effective_from.isoformat() if rate_edit.row else today.isoformat()) }}" required{{ dialog_attrs("rate", "effective_from") }} class="{{ input_class }} font-normal">{{ dialog_error("rate", "effective_from") }}</label>
       <label class="grid gap-1 text-sm font-medium">{{ _("Annual rate") }}<input name="rate_percent" value="{{ form_values.get('rate_percent', rate_input(rate_edit.row.rate_bp) if rate_edit.row else '') }}" inputmode="decimal" required{{ dialog_attrs("rate", "rate_percent") }} class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("For example 5.5 for 5.5%%.") }}</span>{{ dialog_error("rate", "rate_percent") }}</label>
-      <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="high_rate_confirmed" value="1" class="mt-0.5 h-4 w-4 accent-primary"{% if form_values.get('high_rate_confirmed') == '1' %} checked{% endif %}> <span>{{ _("I understand this rate is above 25%%.") }}</span></label>
+      {% if high_rate or form_values.get('high_rate_confirmed') == '1' or (rate_edit.row and rate_edit.row.rate_bp > 2500) %}
+      <label class="flex items-start gap-2 border border-warning-line bg-warning-soft p-3 text-sm"><input type="checkbox" name="high_rate_confirmed" value="1" class="mt-0.5 h-4 w-4 accent-primary"{% if form_values.get('high_rate_confirmed') == '1' %} checked{% endif %}> <span>{{ _("I understand this rate is above 25%%.") }}</span></label>
+      {% else %}
+      <p class="text-xs text-muted">{{ _("A rate above 25%% asks for confirmation when you save it.") }}</p>
+      {% endif %}
       <div class="flex flex-wrap gap-2"><button type="submit" class="btn-primary">{{ _("Save rate change") }}</button><a href="{{ scoped_url(request, 'loan_settings', loan_id=loan.id) }}#rates" data-dialog-close class="btn">{{ _("Cancel") }}</a></div>
     </form>
   </div>

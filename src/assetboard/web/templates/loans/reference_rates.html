@@ -98,7 +98,11 @@
         {{ csrf_input() }}
         <label class="grid gap-1 text-sm font-medium">{{ _("Effective from") }}<input name="effective_from" type="date" value="{{ form_values.get('effective_from', value_edit.row.effective_from.isoformat() if value_edit.row else today.isoformat()) }}" required{% if error_field == "effective_from" and edit_id == rate.id|string %} aria-invalid="true" aria-describedby="value-effective_from-error"{% endif %} class="{{ input_class }} font-normal">{% if error_field == "effective_from" and edit_id == rate.id|string %}<span id="value-effective_from-error" class="text-sm text-danger" data-field-error="effective_from">{{ error }}</span>{% endif %}</label>
         <label class="grid gap-1 text-sm font-medium">{{ _("Annual rate") }}<input name="value_percent" value="{{ form_values.get('value_percent', rate_input(value_edit.row.value_bp) if value_edit.row else '') }}" inputmode="decimal" required{% if error_field == "value_percent" and edit_id == rate.id|string %} aria-invalid="true" aria-describedby="value-value_percent-error"{% endif %} class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("For example 5.5 for 5.5%%.") }}</span>{% if error_field == "value_percent" and edit_id == rate.id|string %}<span id="value-value_percent-error" class="text-sm text-danger" data-field-error="value_percent">{{ error }}</span>{% endif %}</label>
-        <label class="flex items-start gap-2 text-sm"><input type="checkbox" name="high_rate_confirmed" value="1" class="mt-0.5 h-4 w-4 accent-primary"{% if form_values.get('high_rate_confirmed') == '1' %} checked{% endif %}> <span>{{ _("I understand this rate is above 25%%.") }}</span></label>
+        {% if high_rate or form_values.get('high_rate_confirmed') == '1' or (value_edit.row and value_edit.row.value_bp > 2500) %}
+        <label class="flex items-start gap-2 border border-warning-line bg-warning-soft p-3 text-sm"><input type="checkbox" name="high_rate_confirmed" value="1" class="mt-0.5 h-4 w-4 accent-primary"{% if form_values.get('high_rate_confirmed') == '1' %} checked{% endif %}> <span>{{ _("I understand this rate is above 25%%.") }}</span></label>
+        {% else %}
+        <p class="text-xs text-muted">{{ _("A rate above 25%% asks for confirmation when you save it.") }}</p>
+        {% endif %}
         <div class="flex flex-wrap gap-2"><button type="submit" class="btn-primary">{{ _("Save value") }}</button><a href="{{ scoped_url(request, 'reference_rates') }}" data-dialog-close class="btn">{{ _("Cancel") }}</a></div>
       </form>
     </div>

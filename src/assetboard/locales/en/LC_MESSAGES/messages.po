@@ -7401,6 +7401,10 @@ msgid "I understand this rate is above 25%%."
 msgstr ""
 
 #, python-format
+msgid "A rate above 25%% asks for confirmation when you save it."
+msgstr ""
+
+#, python-format
 msgid "Installment override (%(currency)s, optional)"
 msgstr ""
 
