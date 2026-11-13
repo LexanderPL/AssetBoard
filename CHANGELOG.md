@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.0](https://github.com/LexanderPL/AssetBoard/compare/v0.6.7...v0.7.0) (2026-11-13)
+
+
+### Features
+
+* **loans:** mix fixed and reference-rate timelines ([#313](https://github.com/LexanderPL/AssetBoard/issues/313)) ([94a8362](https://github.com/LexanderPL/AssetBoard/commit/94a8362e2a06078e73ddb1ff7a1b188c5c4e4e58))
+
+
+### Performance Improvements
+
+* **loans:** keep mixed-rate schedules linear ([#315](https://github.com/LexanderPL/AssetBoard/issues/315)) ([50f9705](https://github.com/LexanderPL/AssetBoard/commit/50f9705f42ba0e07608b745210aa5c5c2ab2e910))
+
 ## [0.6.7](https://github.com/LexanderPL/AssetBoard/compare/v0.6.6...v0.6.7) (2026-11-13)
 
 
