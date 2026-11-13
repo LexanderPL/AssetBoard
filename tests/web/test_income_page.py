@@ -250,6 +250,7 @@ def test_why_no_tax_payment_messages(owner):
             select(IncomeSource.id).where(IncomeSource.name == "Flat rental")
         ).one()
     assert f"?form=taxes-{rental_id}#taxes-{rental_id}" in rental
+    assert 'target="_blank"' in rental and 'rel="noopener"' in rental
     opened = owner.client.get(f"/income?form=taxes-{rental_id}").text
     assert f'id="taxes-{rental_id}" class="open:w-full" open' in opened
     salary = _card(page, "Salary")
