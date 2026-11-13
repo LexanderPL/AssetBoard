@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.6.6](https://github.com/LexanderPL/AssetBoard/compare/v0.6.5...v0.6.6) (2026-11-13)
+
+
+### Bug Fixes
+
+* **loans:** hide the unused cost amount field and align the dates ([#308](https://github.com/LexanderPL/AssetBoard/issues/308)) ([e58d6fc](https://github.com/LexanderPL/AssetBoard/commit/e58d6fca208ffaf71061d8b7eeb0c1d2bf2ee8b6))
+* **loans:** separate the schedule page and restore the global tabs ([#310](https://github.com/LexanderPL/AssetBoard/issues/310)) ([e702fc5](https://github.com/LexanderPL/AssetBoard/commit/e702fc5a3320a8122f70fb6512d3b529d3fb9c3e))
+
 ## [0.6.5](https://github.com/LexanderPL/AssetBoard/compare/v0.6.4...v0.6.5) (2026-11-13)
 
 
