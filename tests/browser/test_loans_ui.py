@@ -369,6 +369,16 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             cost_dialog = page.locator("#cost-dialog")
             expect(cost_dialog).to_be_visible()
             expect(cost_dialog.get_by_label("Name", exact=True)).to_be_visible()
+            cost_dialog.locator('select[name="mode"]').select_option("fixed")
+            expect(cost_dialog.locator('input[name="rate_percent"]')).to_be_hidden()
+            expect(cost_dialog.locator('input[name="fixed_amount"]')).to_be_visible()
+            cost_dialog.locator('select[name="mode"]').select_option("percent")
+            expect(cost_dialog.locator('input[name="fixed_amount"]')).to_be_hidden()
+            expect(cost_dialog.locator('input[name="rate_percent"]')).to_be_visible()
+            from_box = cost_dialog.locator('input[name="effective_from"]').bounding_box()
+            until_box = cost_dialog.locator('input[name="effective_to"]').bounding_box()
+            assert from_box is not None and until_box is not None
+            assert abs(from_box["height"] - until_box["height"]) <= 1
             _no_page_overflow(page)
             cost_dialog.get_by_role("link", name="Cancel").click()
             expect(cost_dialog).to_be_hidden()

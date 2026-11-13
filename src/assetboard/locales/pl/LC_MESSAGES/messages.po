@@ -8782,6 +8782,9 @@ msgstr "Zapisz zmianę stawki"
 msgid "Edit cost"
 msgstr "Edytuj koszt"
 
+msgid "Only the field for the selected cost type is used."
+msgstr "Używane jest tylko pole wybranego rodzaju kosztu."
+
 msgid "The end date is included. Leave empty for no end."
 msgstr "Data końcowa jest wliczona. Pozostaw puste, jeśli koszt nie ma końca."
 
