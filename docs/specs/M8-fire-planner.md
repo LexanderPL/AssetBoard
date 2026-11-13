@@ -55,7 +55,7 @@ CRUD/duplicate/default UI with contribution and event editors, validation and to
 
 ### As built (M8.F8.1)
 
-- `0058_f81_fire_scenarios` creates `fire_scenarios`, `fire_contributions` and `fire_events`.
+- `0059_f81_fire_scenarios` creates `fire_scenarios`, `fire_contributions` and `fire_events`.
   The scenario carries a `currency` snapshotted from the workspace base currency and a
   `start_year` fixed from the injected `Clock` at creation. Active names are unique ignoring
   case through a partial unique index on `(workspace_id, name_key) WHERE archived_at IS NULL`;

@@ -1,7 +1,7 @@
 """FIRE scenarios, contribution overrides and one-off events
 
-Revision ID: 0058_f81_fire_scenarios
-Revises: 0057_f78_loan_import_sources
+Revision ID: 0059_f81_fire_scenarios
+Revises: 0058_loan_mixed_rate_timeline
 Create Date: 2026-11-13
 
 F8.1. A scenario snapshots its currency and start year at creation. Active names are unique
@@ -27,8 +27,8 @@ from assetboard.domain.fire import (
 )
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR
 
-revision = "0058_f81_fire_scenarios"
-down_revision = "0057_f78_loan_import_sources"
+revision = "0059_f81_fire_scenarios"
+down_revision = "0058_loan_mixed_rate_timeline"
 branch_labels = None
 depends_on = None
 

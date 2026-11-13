@@ -1993,7 +1993,7 @@ def test_0056_installment_plans_migration_is_reversible(tmp_path: Path) -> None:
         engine.dispose()
 
 
-def test_0058_fire_scenarios_migration_is_reversible(tmp_path: Path) -> None:
+def test_0059_fire_scenarios_migration_is_reversible(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None,
         data_dir=tmp_path,
@@ -2057,7 +2057,7 @@ def test_0058_fire_scenarios_migration_is_reversible(tmp_path: Path) -> None:
         }
         assert any("expense_change" in sql for sql in event_checks)
 
-        command.downgrade(alembic_config(settings), "0057_f78_loan_import_sources")
+        command.downgrade(alembic_config(settings), "0058_loan_mixed_rate_timeline")
         tables = set(inspect(engine).get_table_names())
         assert not {"fire_scenarios", "fire_contributions", "fire_events"} & tables
         upgrade_database(settings)
