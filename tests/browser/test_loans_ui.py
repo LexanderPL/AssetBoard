@@ -106,6 +106,10 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             page.get_by_label("Annual interest rate", exact=False).fill("5.5")
             page.get_by_role("button", name="Next").click()
             page.wait_for_load_state("networkidle")
+            expect(page.locator("[data-wizard-review]")).to_be_visible()
+            expect(page.locator("[data-review-first-installment]")).to_contain_text("1,703.37")
+            expect(page.get_by_role("button", name="Save and add another")).to_be_visible()
+            _no_page_overflow(page)
             page.get_by_role("button", name="Save loan").click()
 
             # A new loan lands on Settings, where all configuration lives.
@@ -145,13 +149,14 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             # The overview is read-only insight: no configuration forms or dialogs.
             page.locator('[data-loan-tab="overview"]').click()
             page.wait_for_load_state("networkidle")
-            expect(page.locator("#loan-summary-heading")).to_have_text("Home mortgage")
+            expect(page.locator("#loan-summary-heading")).to_contain_text("Home mortgage")
             expect(page.locator("dt", has_text="First payment")).to_be_visible()
             expect(page.locator("dt", has_text="First payment").locator("..")).to_contain_text(
                 "day 15"
             )
             _actions_under_the_tabs(page)
             expect(page.locator("[data-loan-overview]")).to_be_visible()
+            expect(page.locator('[data-loan-status-badge="active"]')).to_be_visible()
             expect(page.locator("[data-loan-progress-bar]")).to_be_visible()
             expect(page.locator("[data-loan-property-summary]")).to_be_visible()
             expect(page.locator("[data-manage-property]")).to_be_visible()
@@ -309,10 +314,16 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             page.get_by_role("button", name="Save plan").click()
             page.wait_for_load_state("networkidle")
             expect(page.locator("[data-installment-plan]")).to_have_count(1)
+            expect(page.locator("[data-installment-progress]")).to_be_visible()
+            expect(page.locator('[data-installment-status-badge="open"]')).to_be_visible()
+            expect(page.get_by_role("link", name="Back to Installments")).to_have_count(0)
             page.locator("[data-open-installment-plan]").click()
             page.wait_for_load_state("networkidle")
             expect(page.locator("[data-installment-plan-detail]")).to_be_visible()
             expect(page.locator("[data-plan-remaining]")).to_have_text("3")
+            expect(page.locator("[data-installment-progress-detail]")).to_be_visible()
+            expect(page.get_by_role("button", name="Post next installment")).to_have_count(0)
+            expect(page.get_by_role("link", name="Back to Installments")).to_have_count(0)
             _actions_under_the_tabs(page)
             _no_page_overflow(page)
             plan_url = page.url
@@ -326,7 +337,7 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
 
             page.locator("[data-open-loan]").click()
             page.wait_for_load_state("networkidle")
-            expect(page.locator("#loan-summary-heading")).to_have_text("Home mortgage")
+            expect(page.locator("#loan-summary-heading")).to_contain_text("Home mortgage")
             _loan_sections(page)
             _no_page_overflow(page)
             _actions_under_the_tabs(page)
@@ -410,6 +421,41 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             _actions_under_the_tabs(page)
             page.goto(f"{base}/loans/installments", wait_until="networkidle")
             expect(page.locator("[data-installment-plan]")).to_have_count(1)
+            _no_page_overflow(page)
+
+            page.goto(f"{base}/loans/reference-rates", wait_until="networkidle")
+            page.locator('[data-dialog-open="rate-dialog"]').first.click()
+            rate_dialog = page.locator("#rate-dialog")
+            expect(rate_dialog).to_be_visible()
+            rate_dialog.get_by_label("Name", exact=True).fill("EURIBOR 6M")
+            rate_dialog.get_by_role("button", name="Save reference rate").click()
+            page.wait_for_load_state("networkidle")
+            rate = page.locator("[data-reference-rate]").first
+            expect(rate).to_be_visible()
+            rate.locator("summary").click()
+            rate.get_by_role("link", name="Add value").click()
+            value_dialog = page.locator('[id^="value-dialog-"]').first
+            expect(value_dialog).to_be_visible()
+            value_dialog.get_by_label("Effective from").fill("2025-10-01")
+            value_dialog.locator('input[name="value_percent"]').fill("4")
+            value_dialog.get_by_role("button", name="Save value").click()
+            page.wait_for_load_state("networkidle")
+            rate = page.locator("[data-reference-rate]").first
+            rate.locator("summary").click()
+            rate.get_by_role("link", name="Add value").click()
+            value_dialog = page.locator('[id^="value-dialog-"]').first
+            value_dialog.get_by_label("Effective from").fill("2026-01-01")
+            value_dialog.locator('input[name="value_percent"]').fill("4.5")
+            value_dialog.get_by_role("button", name="Save value").click()
+            page.wait_for_load_state("networkidle")
+            rate = page.locator("[data-reference-rate]").first
+            rate.locator("summary").click()
+            expect(rate.locator("[data-reference-sparkline] svg")).to_be_visible()
+            expect(rate.locator("[data-reference-current]")).to_contain_text("4.5%")
+            expect(rate.locator("[data-reference-values]")).to_be_visible()
+            expect(rate.locator("[data-reference-value]")).to_have_count(2)
+            _no_page_overflow(page)
+            page.set_viewport_size({"width": 1440, "height": 900})
             _no_page_overflow(page)
 
             assert page.evaluate("window.__cspViolations") == []
