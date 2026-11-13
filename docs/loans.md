@@ -99,8 +99,9 @@ or the schedule will be too long.
 ## The loan page
 
 A loan has its own section navigation: **Overview**, **Schedule**, **Payments**, **Scenarios**
-and **Settings**. The overview is read-only insight; changing the terms, rate, costs,
-overpayments, links or archive state happens in Settings.
+and **Settings**. The global **Loans / Installments / Reference rates** tabs stay visible above
+it. The overview is read-only insight; changing the terms, rate, costs, overpayments, links or
+archive state happens in Settings. The schedule and charts live on their own Schedule page.
 
 - **Overview**: one header panel with an **Active**, **Paid off** or **Archived** status badge,
   a large repaid-vs-remaining principal bar (paid amount, percentage, original principal and
@@ -111,13 +112,13 @@ overpayments, links or archive state happens in Settings.
 - **Plan vs actual**: the last recorded actual payment, the latest balance checkpoint and its
   variance, and a plain **Ahead**, **Behind** or **On track** line. Without actual payments or
   checkpoints the panel says that no actual payments are recorded yet.
-- **Property & LTV**: a compact, read-only card with the linked property value, remaining
+- **Property and loan-to-value (LTV)**: a compact, read-only card with the linked property value, remaining
   principal, LTV and equity at the chosen date. **Manage in Settings** opens the property and
   liability controls; the real-estate-only explanation lives there.
 - **Record next payment**: the overview's primary action opens the payment dialog on the
   Payments page with the next schedule row's due date and total filled in. The Payments page
   keeps its own **Record payment** button.
-- **Schedule**: 24 monthly rows per page, starting on the page with today's or the next due
+- **Schedule page**: 24 monthly rows per page, starting on the page with today's or the next due
   payment. Rows are grouped by calendar year: a year header row appears before the first row of
   each year, including when a page starts in the middle of a year. The **Actual** / **Planned**
   toggle changes the component columns: **Actual** shows a recorded payment's components on its

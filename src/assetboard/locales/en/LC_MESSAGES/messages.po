@@ -7115,7 +7115,7 @@ msgstr ""
 msgid "Costs lifetime"
 msgstr ""
 
-msgid "Property & LTV"
+msgid "Property and loan-to-value (LTV)"
 msgstr ""
 
 msgid "Read-only view of the linked property at the selected date."
@@ -7189,8 +7189,8 @@ msgstr ""
 
 #, python-format
 msgid ""
-"Link this loan to a net-worth liability and a property. Property and LTV "
-"use an active real-estate asset item in %(currency)s."
+"Link this loan to a net-worth liability and a property. Property and "
+"loan-to-value (LTV) use an active real-estate asset item in %(currency)s."
 msgstr ""
 
 msgid "Open Net worth"
@@ -7203,17 +7203,21 @@ msgstr ""
 msgid "Linked item: %(name)s"
 msgstr ""
 
-msgid "Open the linked item"
+msgid ""
+"Every net-worth date resolves the remaining principal from the loan "
+"terms, checkpoints and recorded actual payments."
 msgstr ""
 
-msgid "No linked liability item yet."
+msgid ""
+"No linked liability item yet. Create one to show this loan as a liability"
+" in net worth."
+msgstr ""
+
+msgid "Open the linked item"
 msgstr ""
 
 #, fuzzy
 msgid "Create net-worth item"
-msgstr ""
-
-msgid "Property and LTV"
 msgstr ""
 
 msgid "Property item"
@@ -8175,6 +8179,9 @@ msgid "This is a planned overpayment. Actual payments are recorded separately."
 msgstr ""
 
 msgid "Save overpayment"
+msgstr ""
+
+msgid "No linked liability item yet."
 msgstr ""
 
 msgid "No generated occurrences yet."
@@ -11031,5 +11038,18 @@ msgstr ""
 #~ " scenario with that name); leave the"
 #~ " name empty to compare without "
 #~ "saving."
+#~ msgstr ""
+
+#~ msgid "Property & LTV"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Link this loan to a net-worth "
+#~ "liability and a property. Property and"
+#~ " LTV use an active real-estate "
+#~ "asset item in %(currency)s."
+#~ msgstr ""
+
+#~ msgid "Property and LTV"
 #~ msgstr ""
 

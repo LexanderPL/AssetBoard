@@ -63,7 +63,7 @@ def _create(owner, **extra: str) -> str:
         )
 
 
-def test_overview_schedule_and_charts_render(owner):
+def test_overview_and_schedule_page_render(owner):
     loan_id = _create(owner)
     page = owner.client.get(f"/loans/{loan_id}")
     assert page.status_code == 200
@@ -74,31 +74,36 @@ def test_overview_schedule_and_charts_render(owner):
     assert "data-loan-progress-bar" in page.text
     assert "Repaid principal" in page.text
     assert "Original principal" in page.text
-    assert "data-loan-schedule" in page.text
-    assert page.text.count("data-schedule-row=") == 24
-    assert "data-schedule-pages" in page.text and "Page 1 of" in page.text
-    assert "data-schedule-csv" in page.text
-    assert 'data-chart="line"' in page.text
-    assert 'data-chart="loan-payments"' in page.text
-    assert "data-loan-balance-points" in page.text
-    assert "data-loan-payment-points" in page.text
-    assert "data-chart-ready" not in page.text  # drawn by JavaScript
+    assert "data-loan-schedule" not in page.text
+    assert 'data-chart="line"' not in page.text
+
+    schedule = owner.client.get(f"/loans/{loan_id}/schedule")
+    assert schedule.status_code == 200
+    assert "data-loan-schedule" in schedule.text
+    assert schedule.text.count("data-schedule-row=") == 24
+    assert "data-schedule-pages" in schedule.text and "Page 1 of" in schedule.text
+    assert "data-schedule-csv" in schedule.text
+    assert 'data-chart="line"' in schedule.text
+    assert 'data-chart="loan-payments"' in schedule.text
+    assert "data-loan-balance-points" in schedule.text
+    assert "data-loan-payment-points" in schedule.text
+    assert "data-chart-ready" not in schedule.text  # drawn by JavaScript
 
 
 def test_schedule_pagination_and_default_current_page(owner):
     loan_id = _create(owner)
-    second = owner.client.get(f"/loans/{loan_id}?schedule_page=2")
+    second = owner.client.get(f"/loans/{loan_id}/schedule?schedule_page=2")
     assert second.status_code == 200
     assert "Page 2 of 15" in second.text
     rows = re.findall(r'data-schedule-row="(\d+)"', second.text)
     assert rows[0] == "25" and len(rows) == 24
-    fallback = owner.client.get(f"/loans/{loan_id}?schedule_page=999")
+    fallback = owner.client.get(f"/loans/{loan_id}/schedule?schedule_page=999")
     assert "Page 1 of 15" in fallback.text
 
 
 def test_schedule_year_headers_repeat_across_pages(owner):
     loan_id = _create(owner)
-    second = owner.client.get(f"/loans/{loan_id}?schedule_page=2")
+    second = owner.client.get(f"/loans/{loan_id}/schedule?schedule_page=2")
     assert 'scope="colgroup"' in second.text
     assert 'data-schedule-year="2028"' in second.text
     assert 'data-schedule-year="2029"' in second.text
@@ -130,12 +135,12 @@ def test_planned_view_ignores_actuals_and_pagination_keeps_it(owner):
     )
     assert recorded.status_code == 303
 
-    actual = owner.client.get(f"/loans/{loan_id}?schedule_page=1")
+    actual = owner.client.get(f"/loans/{loan_id}/schedule?schedule_page=1")
     assert "data-schedule-actual" in actual.text
     assert "data-actual-total" in actual.text
     assert "data-schedule-planned" not in actual.text
 
-    planned = owner.client.get(f"/loans/{loan_id}?schedule_page=1&view=planned")
+    planned = owner.client.get(f"/loans/{loan_id}/schedule?schedule_page=1&view=planned")
     assert planned.status_code == 200
     assert 'data-schedule-view="planned" aria-current="true"' in planned.text
     assert "data-schedule-planned" in planned.text
@@ -147,7 +152,7 @@ def test_planned_view_ignores_actuals_and_pagination_keeps_it(owner):
 
 def test_schedule_sticky_columns_are_marked(owner):
     loan_id = _create(owner)
-    page = owner.client.get(f"/loans/{loan_id}")
+    page = owner.client.get(f"/loans/{loan_id}/schedule")
     assert "data-schedule-scroll" in page.text
     assert "sm:sticky sm:left-0" in page.text
     assert "sm:sticky sm:left-12" in page.text
@@ -164,7 +169,7 @@ def test_today_and_next_highlights(owner):
         payment_day=str(today.day),
         term_months="12",
     )
-    today_page = owner.client.get(f"/loans/{today_loan}")
+    today_page = owner.client.get(f"/loans/{today_loan}/schedule")
     assert "data-schedule-today" in today_page.text
     assert today.isoformat() in today_page.text
 
@@ -177,7 +182,7 @@ def test_today_and_next_highlights(owner):
         payment_day=str(next_date.day),
         term_months="12",
     )
-    next_page = owner.client.get(f"/loans/{next_loan}")
+    next_page = owner.client.get(f"/loans/{next_loan}/schedule")
     assert "data-schedule-next" in next_page.text
 
 
@@ -204,7 +209,7 @@ def test_chart_json_has_series_baseline_and_rate_markers(owner):
         f"/loans/{loan_id}/rate-changes",
         {"effective_from": "2027-01-01", "rate_percent": "6", "high_rate_confirmed": ""},
     )
-    page = owner.client.get(f"/loans/{loan_id}")
+    page = owner.client.get(f"/loans/{loan_id}/schedule")
     balance = re.search(
         r'<script type="application/json" id="loan-balance-data">(.*?)</script>',
         page.text,
@@ -227,13 +232,13 @@ def test_chart_json_has_series_baseline_and_rate_markers(owner):
 def test_viewer_sees_the_schedule_and_archived_loan_keeps_it(owner):
     loan_id = _create(owner)
     owner.set_admin_role("viewer")
-    viewer_page = owner.client.get(f"/loans/{loan_id}")
+    viewer_page = owner.client.get(f"/loans/{loan_id}/schedule")
     assert viewer_page.status_code == 200
     assert "data-loan-schedule" in viewer_page.text
     assert "Edit terms" not in viewer_page.text
     owner.set_admin_role("owner")
     owner.post(f"/loans/{loan_id}/archive")
-    archived = owner.client.get(f"/loans/{loan_id}")
+    archived = owner.client.get(f"/loans/{loan_id}/schedule")
     assert "data-loan-schedule" in archived.text
     assert "archived" in archived.text
 
@@ -242,7 +247,7 @@ def test_schedule_error_warning_and_csv_conflict(owner):
     loan_id = _create(owner)
     with owner.db() as session, session.begin():
         session.execute(delete(LoanRateChange).where(LoanRateChange.loan_id == UUID(loan_id)))
-    page = owner.client.get(f"/loans/{loan_id}")
+    page = owner.client.get(f"/loans/{loan_id}/schedule")
     assert page.status_code == 200
     assert "data-schedule-error" in page.text
     assert "Schedule unavailable" in page.text
@@ -282,7 +287,7 @@ def test_chart_json_includes_the_baseline_and_overpayment_series(owner):
         overpayment_amount="100.00",
         overpayment_strategy="reduce_term",
     )
-    page = owner.client.get(f"/loans/{loan_id}")
+    page = owner.client.get(f"/loans/{loan_id}/schedule")
     balance = re.search(
         r'<script type="application/json" id="loan-balance-data">(.*?)</script>',
         page.text,

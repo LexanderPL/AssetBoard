@@ -157,7 +157,7 @@ def test_record_payment_and_show_actuals_on_the_schedule(owner) -> None:
         assert payment.costs_minor == 500
         assert payment.overpayment_minor == 0
 
-    detail = owner.client.get(f"/loans/{loan_id}?schedule_page=1")
+    detail = owner.client.get(f"/loans/{loan_id}/schedule?schedule_page=1")
     assert "data-schedule-actual" in detail.text
     assert 'data-actual-total="10000"' in detail.text
 

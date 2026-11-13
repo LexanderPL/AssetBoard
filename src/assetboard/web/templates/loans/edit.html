@@ -1,11 +1,13 @@
 {% extends "base.html" %}
 {% from "macros/components.html" import csrf_input with context %}
+{% from "loans/_tabs.html" import tabs with context %}
 {% from "loans/_loan_tabs.html" import loan_tabs with context %}
 {% from "loans/_macros.html" import overpayment_label with context %}
 {% block title %}{{ _("Edit loan") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Edit loan") }}{% endblock %}
 {% block content %}
 {% set input_class = "form-control px-3 py-2" %}
+{{ tabs("loans") }}
 {{ loan_tabs("settings") }}
 <div class="mb-6 flex flex-wrap items-center gap-2" data-page-actions>
   <a href="{{ scoped_url(request, 'loan_settings', loan_id=loan.id) }}#terms" class="btn">{{ _("Back to Settings") }}</a>
