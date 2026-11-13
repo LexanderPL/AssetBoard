@@ -1,14 +1,11 @@
 {% extends "base.html" %}
 {% from "macros/components.html" import csrf_input with context %}
-{% from "loans/_tabs.html" import tabs with context %}
+{% from "loans/_loan_tabs.html" import loan_tabs with context %}
 {% block title %}{{ loan.name }} · {{ _("Payments") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("Loans") }}{% endblock %}
 {% block content %}
 {% set input_class = "form-control px-3 py-2" %}
-{{ tabs("loans") }}
-<div class="mb-6 flex flex-wrap items-center gap-2" data-page-actions>
-  <a href="{{ scoped_url(request, 'loan_detail', loan_id=loan.id) }}" class="btn" data-back-to-loan>{{ _("Back to %(name)s", name=loan.name) }}</a>
-</div>
+{{ loan_tabs("payments") }}
 {% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
 {% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}</p>{% endif %}
 

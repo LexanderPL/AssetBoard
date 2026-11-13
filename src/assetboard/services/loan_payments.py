@@ -92,6 +92,16 @@ class LoanPaymentsPage:
     transactions: tuple[TransactionOption, ...]
 
 
+@dataclass(frozen=True, slots=True)
+class LoanPlanStatus:
+    """The last recorded payment and the latest checkpoint, summarised for the overview."""
+
+    last_payment: LoanPaymentView | None
+    latest_checkpoint: CheckpointDetailView | None
+    status: str | None
+    variance: Money | None
+
+
 def _write[T](factory: sessionmaker[Session], operation: Callable[[Session], T]) -> T:
     return run_immediate(factory, operation)
 
@@ -749,10 +759,42 @@ def payments_page(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -
     )
 
 
+def plan_status(factory: sessionmaker[Session], ctx: Context, loan_id: UUID) -> LoanPlanStatus:
+    """Last actual payment, latest checkpoint and whether the loan is ahead or behind.
+
+    A positive checkpoint variance means the real balance is higher than projected, so the loan
+    is behind; a negative variance means it is ahead. The status needs a checkpoint with a
+    variance, so a starting checkpoint alone leaves it undecided.
+    """
+    require_role(ctx, Role.VIEWER)
+    payments = list_loan_payments(factory, ctx, loan_id)
+    checkpoints = list_loan_checkpoints(factory, ctx, loan_id)
+    last_payment = payments[0] if payments else None
+    latest_checkpoint = max(checkpoints, key=lambda row: (row.as_of, str(row.id)), default=None)
+    status: str | None = None
+    variance: Money | None = None
+    if latest_checkpoint is not None and latest_checkpoint.variance is not None:
+        amount = latest_checkpoint.variance.amount_minor
+        if amount < 0:
+            status = "ahead"
+        elif amount > 0:
+            status = "behind"
+        else:
+            status = "on_track"
+        variance = Money(abs(amount), latest_checkpoint.variance.currency)
+    return LoanPlanStatus(
+        last_payment=last_payment,
+        latest_checkpoint=latest_checkpoint,
+        status=status,
+        variance=variance,
+    )
+
+
 __all__ = [
     "CheckpointDetailView",
     "LoanPaymentView",
     "LoanPaymentsPage",
+    "LoanPlanStatus",
     "TransactionOption",
     "create_loan_checkpoint",
     "create_loan_payment",
@@ -763,6 +805,7 @@ __all__ = [
     "list_loan_payments",
     "list_payment_transactions",
     "payments_page",
+    "plan_status",
     "record_loan_payment_in_session",
     "update_loan_checkpoint",
     "update_loan_payment",
