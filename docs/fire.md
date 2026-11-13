@@ -1,8 +1,8 @@
 # FIRE planner
 
 The FIRE planner stores plans for financial independence and early retirement. F8.1 covers the
-scenarios and their settings; the year-by-year projection, charts and linked inputs arrive in
-later updates. Until then the page stores and validates each plan.
+scenarios and their settings; the results page with charts and linked inputs arrives in later
+updates. The projection engine behind those results is implemented and documented below.
 
 ## Scenarios
 
@@ -85,12 +85,49 @@ An event is a one-off change in a plan year:
 Event amounts are signed in the same way as contribution overrides. Events may start in the
 start year and run through the horizon year. A scenario can hold at most 200 events.
 
+## Projection
+
+The planner projects a plan year by year from the start year through the horizon age. Each year
+shows annual income, expenses, net saving, investment gain and net worth, both in that year's
+money (nominal) and in today's money (real). The first year uses the starting portfolio as its
+net saving; its gain is earned on that portfolio. Later gains are earned on the previous year's
+net worth. The nominal gain rate is inflation **plus** real return, as in the original
+spreadsheet: 2.5% inflation and 5% real return mean a 7.5% nominal gain, not 7.625%.
+
+Base income grows with income growth while your age is below the stop age, then stops. Base
+expenses grow with inflation. Contribution overrides replace the net saving of their year; a
+one-off cash flow is added after that year's gain, so it earns from the following year. Annual
+income and expense changes are separate from the base series and stay active from their event
+year onward, including after income stops. The projection continues to the horizon after FIRE
+and after income stops.
+
+Two FIRE rules are available:
+
+- **Returns cover expenses** — FIRE in the first year whose investment gain is strictly greater
+  than that year's expenses. Because the gain is earned on the previous year's balance, the row
+  is marked one year after the theoretical moment the return first covers the year's expenses.
+- **Withdrawal rate** — FIRE in the first year whose opening portfolio times the withdrawal rate
+  is at least that year's expenses.
+
+The results include the FIRE year and age, years to FIRE, net worth at FIRE (nominal and today's
+money), the FIRE number in today's money, two progress figures, the depletion age and the
+minimum net worth after income stops. The **sheet progress** compares the first year's net worth
+with the net worth at FIRE. The **today's progress** compares the starting portfolio with the
+FIRE number and is shown even when FIRE is never reached. Depletion and the minimum look at
+nominal net worth from the stop age onward. Undefined metrics are reported as not reached, not
+as zero, and a plan whose opening net worth is negative does not switch to FIRE.
+
+Money is rounded once per computed line, half away from zero; real values are deflated
+independently from each nominal line. The numeric and rounding rules are recorded in
+[ADR-0025](adr/0025-fire-projection-rounding.md). Projections are illustrative, not advice.
+
 ## Validation
 
 The form refuses and explains:
 
 - a missing or impossible birth year;
-- a horizon that is not older than your age at the start;
+- a horizon that is not older than your age at the start, or that runs past the supported year
+  range;
 - an income stop age before your age at the start;
 - rates outside the hard bounds, or outside the ordinary ranges without the confirmation;
 - contribution years before the year after the start or after the horizon;
