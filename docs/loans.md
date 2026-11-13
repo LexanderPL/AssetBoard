@@ -65,6 +65,26 @@ A balance checkpoint starts the schedule from the balance you owe on that date; 
 not invented. When a checkpoint is used, the remaining months must be entered as the loan's term
 or the schedule will be too long.
 
+## The loan list
+
+**Loans** is a small portfolio view of the loans that are not archived.
+
+- The portfolio panel above the table totals the remaining principal, the current monthly
+  installments, the amount due in the next 30 days and the balance-weighted average current
+  rate. "Due in the next 30 days" counts projected installments after today up to and including
+  the same day 30 days later. Archived loans are not in the totals.
+- A loan whose stored terms cannot produce a schedule (for example a missing rate) is left out
+  of the totals instead of breaking the page. The panel says how many loans were skipped and the
+  loan's figures show a dash.
+- The table has one set of columns: **Name**, **Type**, **Remaining**, **Progress**, **Rate**,
+  **Next payment** and **Status**. The name opens the loan. **Remaining** is the projected
+  principal today, **Progress** is the percentage repaid with a small progress bar, **Rate** is
+  the current annual rate, and **Next payment** shows the next due date and its projected
+  installment. A paid-off loan has no next payment and a 0.00 monthly installment.
+- **Status** is **Active**, **Paid off** (the projected remaining principal is zero) or
+  **Archived**. Archived loans stay in the separate **Archived loans** section with the same
+  columns and status badge.
+
 ## The loan page
 
 A loan has its own section navigation: **Overview**, **Schedule**, **Payments**, **Scenarios**
@@ -87,10 +107,17 @@ overpayments, links or archive state happens in Settings.
   Payments page with the next schedule row's due date and total filled in. The Payments page
   keeps its own **Record payment** button.
 - **Schedule**: 24 monthly rows per page, starting on the page with today's or the next due
-  payment. The row for today is marked **Today**; when today is not a payment date, the next one
-  is marked **Next**. Rows before today are marked **Projected** until actual payments are
-  recorded. On a phone the table scrolls sideways inside its own container, with a visible hint;
-  all columns stay available.
+  payment. Rows are grouped by calendar year: a year header row appears before the first row of
+  each year, including when a page starts in the middle of a year. The **Actual** / **Planned**
+  toggle changes the component columns: **Actual** shows a recorded payment's components on its
+  due date (the default), while **Planned** shows the projected components for every row. The
+  toggle is kept when you move between pages. The row for today is marked **Today**; when today
+  is not a payment date, the next one is marked **Next**. Rows before today without a payment
+  are marked **Projected**; a row with a recorded payment is marked **Actual** (or **Planned**
+  in the planned view). On a phone each row is a card with the date, total, principal, interest,
+  costs, overpayment and closing balance, with no sideways page scrolling. On a wider screen the
+  table scrolls inside its own container and the row number and due date columns stay pinned
+  while the other columns scroll.
 - **CSV**: **Download CSV** exports every row as machine-readable data: ISO dates, plain decimal
   rates and amounts, comma separated, CRLF line endings, UTF-8 without a BOM. It is available to
   viewers too.
