@@ -292,6 +292,15 @@ def _rate_input(rate_bp: int, locale: str) -> str:
     return format_quantity_input(Decimal(rate_bp).scaleb(-2), locale)
 
 
+def _reference_value_error_field(exc: Exception) -> str | None:
+    field = getattr(exc, "field", None)
+    if field in ("rate_bp", "value_percent"):
+        return "value_percent"
+    if field == "effective_from":
+        return "effective_from"
+    return None
+
+
 def _error(request: Request, code: str | None) -> str | None:
     if not code:
         return None
@@ -1456,6 +1465,7 @@ async def reference_rates_page(request: Request, ctx: CurrentContext) -> Respons
             "can_edit": has_role(ctx, Role.EDITOR),
             "notice": _notice(request, request.query_params.get("notice")),
             "error": _error(request, request.query_params.get("error")),
+            "error_field": request.query_params.get("field"),
             "form_values": {},
             "open_form": request.query_params.get("form"),
             "edit_id": request.query_params.get("edit"),
@@ -1492,6 +1502,7 @@ async def reference_rate_create(request: Request, ctx: CurrentContext) -> Respon
                 "page": page,
                 "can_edit": True,
                 "error": _error(request, getattr(exc, "code", "failed")),
+                "error_field": getattr(exc, "field", None),
                 "notice": None,
                 "form_values": values,
                 "open_form": "rate",
@@ -1536,6 +1547,7 @@ async def reference_rate_update(request: Request, ctx: CurrentContext, rate_id: 
                 "page": page,
                 "can_edit": True,
                 "error": _error(request, getattr(exc, "code", "failed")),
+                "error_field": getattr(exc, "field", None),
                 "notice": None,
                 "form_values": values,
                 "open_form": "rate",
@@ -1610,6 +1622,7 @@ async def reference_rate_value_create(
                 "page": page,
                 "can_edit": True,
                 "error": _error(request, getattr(exc, "code", "failed")),
+                "error_field": _reference_value_error_field(exc),
                 "notice": None,
                 "form_values": values,
                 "open_form": "value",
@@ -1664,6 +1677,7 @@ async def reference_rate_value_update(
                 "page": page,
                 "can_edit": True,
                 "error": _error(request, getattr(exc, "code", "failed")),
+                "error_field": _reference_value_error_field(exc),
                 "notice": None,
                 "form_values": values,
                 "open_form": "value",

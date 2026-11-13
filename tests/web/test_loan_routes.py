@@ -522,6 +522,44 @@ def test_reference_rates_page_crud(owner):
     )
 
 
+def test_reference_rates_compact_view_shows_sparkline_values_and_used_by(owner):
+    owner.post("/loans/reference-rates", {"name": "EURIBOR 6M", "notes": "Euro area"})
+    with owner.db() as session:
+        rate = session.scalars(select(ReferenceRate)).one()
+        rate_id = rate.id
+    for day, value in (("2026-01-01", "4.0"), ("2027-01-01", "4.5")):
+        added = owner.post(
+            f"/loans/reference-rates/{rate_id}/values",
+            {"effective_from": day, "value_percent": value, "high_rate_confirmed": ""},
+        )
+        assert added.status_code == 303
+    loan_id = _create_original(
+        owner,
+        name="Variable mortgage",
+        rate_mode="variable",
+        fixed_rate_percent="",
+        reference_rate_id=str(rate_id),
+        margin_percent="1.5",
+    )
+    page = owner.client.get("/loans/reference-rates")
+    assert page.status_code == 200
+    assert "data-reference-rates-list" in page.text
+    assert f'data-reference-rate="{rate_id}"' in page.text
+    assert "data-reference-current" in page.text and "4%" in page.text
+    assert "data-reference-sparkline" in page.text and "<polyline points=" in page.text
+    assert "data-reference-used-by" in page.text and "1 loan" in page.text
+    assert f'href="/loans/{loan_id}"' in page.text
+    assert "data-reference-values" in page.text
+    assert "Past value" in page.text
+    assert "data-reference-value=" in page.text
+
+    owner.post("/loans/reference-rates", {"name": "WIRON", "notes": ""})
+    page = owner.client.get("/loans/reference-rates")
+    assert page.text.count("data-reference-sparkline") == 2
+    assert "No values yet." in page.text
+    assert "Not used" in page.text
+
+
 def test_loan_and_archived_titles_open_the_detail_without_an_actions_column(owner):
     loan_id = _create_original(owner)
     page = owner.client.get("/loans")

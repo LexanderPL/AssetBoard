@@ -206,12 +206,21 @@ class ReferenceRateValueView:
 
 
 @dataclass(frozen=True, slots=True)
+class ReferenceRateLoanRef:
+    id: UUID
+    name: str
+    archived: bool
+
+
+@dataclass(frozen=True, slots=True)
 class ReferenceRateView:
     id: UUID
     name: str
     notes: str
     values: tuple[ReferenceRateValueView, ...]
     current_value_bp: int | None
+    used_by: tuple[ReferenceRateLoanRef, ...] = ()
+    sparkline: tuple[tuple[int, int], ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -1609,10 +1618,29 @@ def _reference_name_key(name: str) -> str:
     return key
 
 
+def _sparkline(values: list[ReferenceRateValue]) -> tuple[tuple[int, int], ...]:
+    """A 100 x 24 viewBox path for the value history; no floats, no chart dependency."""
+    if not values:
+        return ()
+    if len(values) == 1:
+        return ((0, 12), (100, 12))
+    low = min(value.value_bp for value in values)
+    high = max(value.value_bp for value in values)
+    span = high - low
+    last = len(values) - 1
+    if span == 0:
+        return tuple((index * 100 // last, 12) for index in range(len(values)))
+    return tuple(
+        (index * 100 // last, 22 - (value.value_bp - low) * 20 // span)
+        for index, value in enumerate(values)
+    )
+
+
 def _reference_view(
     rate: ReferenceRate,
     values: list[ReferenceRateValue],
     today: date,
+    loans: Sequence[Loan] = (),
 ) -> ReferenceRateView:
     return ReferenceRateView(
         id=rate.id,
@@ -1630,6 +1658,12 @@ def _reference_view(
         current_value_bp=latest_value_on_or_before(
             [(value.effective_from, value.value_bp) for value in values], today
         ),
+        used_by=tuple(
+            ReferenceRateLoanRef(id=loan.id, name=loan.name, archived=loan.archived_at is not None)
+            for loan in loans
+            if loan.reference_rate_id == rate.id
+        ),
+        sparkline=_sparkline(values),
     )
 
 
@@ -1639,8 +1673,11 @@ def list_reference_rates(factory: sessionmaker[Session], ctx: Context) -> Refere
     with factory() as session:
         rates = ReferenceRateRepository(session, ctx).ordered()
         values = ReferenceRateValueRepository(session, ctx)
+        loans = LoanRepository(session, ctx).ordered()
         return ReferenceRatesPage(
-            rates=tuple(_reference_view(rate, values.for_rate(rate.id), today) for rate in rates)
+            rates=tuple(
+                _reference_view(rate, values.for_rate(rate.id), today, loans) for rate in rates
+            )
         )
 
 
@@ -1652,7 +1689,8 @@ def get_reference_rate(
     with factory() as session:
         rate = ReferenceRateRepository(session, ctx).get_or_raise(rate_id)
         values = ReferenceRateValueRepository(session, ctx).for_rate(rate.id)
-        return _reference_view(rate, values, today)
+        loans = LoanRepository(session, ctx).ordered()
+        return _reference_view(rate, values, today, loans)
 
 
 def create_reference_rate(
@@ -1881,6 +1919,7 @@ __all__ = [
     "LoanRateChangeView",
     "LoanStatus",
     "LoanView",
+    "ReferenceRateLoanRef",
     "ReferenceRateValueView",
     "ReferenceRateView",
     "ReferenceRatesPage",

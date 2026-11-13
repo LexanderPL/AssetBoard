@@ -528,6 +528,59 @@ def test_reference_rates_are_workspace_scoped_and_future_values_are_editable(
         ]
 
 
+def test_reference_rate_view_lists_used_by_loans_and_a_sparkline(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    rate_id = _reference_rate(team)
+    first = _original_loan(
+        team,
+        name="Variable mortgage",
+        rate_mode="variable",
+        fixed_rate_bp=None,
+        reference_rate_id=rate_id,
+        margin_bp=100,
+    )
+    second = _original_loan(
+        team,
+        name="Variable car loan",
+        rate_mode="variable",
+        fixed_rate_bp=None,
+        reference_rate_id=rate_id,
+        margin_bp=150,
+    )
+    loans.archive_loan(team.factory, ctx, second)
+    loans.add_reference_rate_value(
+        team.factory,
+        ctx,
+        rate_id,
+        effective_from=date(2026, 4, 1),
+        value_bp=450,
+        high_rate_confirmed=False,
+    )
+    loans.add_reference_rate_value(
+        team.factory,
+        ctx,
+        rate_id,
+        effective_from=date(2026, 7, 1),
+        value_bp=425,
+        high_rate_confirmed=False,
+    )
+    page = loans.list_reference_rates(team.factory, team.ctx("viewer", "viewer"))
+    rate = next(row for row in page.rates if row.id == rate_id)
+    assert [row.name for row in rate.used_by] == ["Variable car loan", "Variable mortgage"]
+    assert {row.id for row in rate.used_by} == {first, second}
+    assert [row.archived for row in rate.used_by] == [True, False]
+    assert rate.sparkline[0][0] == 0 and rate.sparkline[-1][0] == 100
+    assert all(0 <= y <= 24 for _, y in rate.sparkline)
+    assert len(rate.sparkline) == 3
+    fetched = loans.get_reference_rate(team.factory, team.ctx("viewer", "viewer"), rate_id)
+    assert fetched.used_by == rate.used_by
+    assert fetched.sparkline == rate.sparkline
+    other = loans.create_reference_rate(team.factory, ctx, name="WIRON")
+    empty = loans.get_reference_rate(team.factory, ctx, other)
+    assert empty.used_by == ()
+    assert empty.sparkline == ()
+
+
 def test_reference_rate_delete_is_refused_while_used(team: WorkspaceDb) -> None:
     rate_id = _reference_rate(team)
     _original_loan(
