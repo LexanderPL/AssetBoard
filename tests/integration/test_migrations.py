@@ -2034,6 +2034,12 @@ def test_0059_fire_scenarios_migration_is_reversible(tmp_path: Path) -> None:
         assert any("horizon_age > start_year - birth_year" in sql for sql in checks)
         assert any("swr_bp" in sql and "returns_cover_expenses" in sql for sql in checks)
         assert any("NOT (is_default AND archived_at IS NOT NULL)" in sql for sql in checks)
+        is_default_column = next(
+            column
+            for column in inspector.get_columns("fire_scenarios")
+            if column["name"] == "is_default"
+        )
+        assert is_default_column["default"] is not None
         indexes = {index["name"] for index in inspector.get_indexes("fire_scenarios")}
         assert {
             "uq_fire_scenarios_active_name_key",

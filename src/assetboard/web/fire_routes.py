@@ -79,6 +79,10 @@ ERRORS = {
     "too_many_events": _("A scenario can have at most 200 events."),
     "invalid_event_kind": _("Choose a valid event type."),
     "invalid_label": _("Give every event a short description."),
+    "invalid_event": _(
+        "This event is no longer part of the scenario. Reload the page and try again."
+    ),
+    "duplicate_event": _("The same event appears twice. Reload the page and try again."),
     "invalid_year": _("Enter a whole year for every row."),
     "archived": _("Archived scenarios are read-only. Restore the scenario first."),
     "extreme_rate_confirmation_required": _(
@@ -109,9 +113,9 @@ EVENT_KIND_LABELS = {
 }
 
 _CONTRIBUTION_KEY = re.compile(r"^contribution_(year|amount)_([0-9]+)$")
-_EVENT_KEY = re.compile(r"^event_(year|kind|amount|label)_([0-9]+)$")
+_EVENT_KEY = re.compile(r"^event_(id|year|kind|amount|label)_([0-9]+)$")
 _CONTRIBUTION_FIELDS = ("year", "amount")
-_EVENT_FIELDS = ("year", "kind", "amount", "label")
+_EVENT_FIELDS = ("id", "year", "kind", "amount", "label")
 
 
 def _t(request: Request, message: str) -> str:
@@ -236,6 +240,16 @@ def _optional_int(values: dict[str, str], key: str, code: str) -> int | None:
         raise fire_service.FireError(key, code) from None
 
 
+def _optional_uuid(values: dict[str, str], key: str, field: str) -> UUID | None:
+    text = values.get(key, "").strip()
+    if not text:
+        return None
+    try:
+        return UUID(text)
+    except ValueError:
+        raise fire_service.FireError(field, "invalid_event") from None
+
+
 def _contribution_inputs(
     values: dict[str, str], locale: str, currency: str
 ) -> tuple[fire_service.ContributionInput, ...]:
@@ -269,6 +283,7 @@ def _event_inputs(
                 kind=row["kind"].strip(),
                 amount_minor=amount.amount_minor,
                 label=row["label"].strip(),
+                id=_optional_uuid(row, "id", "events"),
             )
         )
     return tuple(rows)
@@ -402,6 +417,7 @@ def _event_rows(detail: fire_service.FireScenarioDetail, locale: str) -> list[di
     return [
         {
             "index": str(index),
+            "id": str(row.id),
             "year": str(row.year),
             "kind": row.kind,
             "amount": format_amount_input(row.amount, locale),
@@ -730,12 +746,17 @@ async def fire_scenario_update(request: Request, ctx: CurrentContext, scenario_i
 async def fire_scenario_duplicate(
     request: Request, ctx: CurrentContext, scenario_id: str
 ) -> Response:
-    new_id = await run_in_threadpool(
-        fire_service.duplicate_fire_scenario,
-        request.app.state.session_factory,
-        ctx,
-        _uuid(scenario_id),
-    )
+    try:
+        new_id = await run_in_threadpool(
+            fire_service.duplicate_fire_scenario,
+            request.app.state.session_factory,
+            ctx,
+            _uuid(scenario_id),
+        )
+    except fire_service.FireError as exc:
+        return _redirect(
+            request, "fire_scenario", error=exc.code, scenario_id=str(_uuid(scenario_id))
+        )
     return _redirect(request, "fire_scenario", notice="duplicated", scenario_id=str(new_id))
 
 
@@ -743,12 +764,17 @@ async def fire_scenario_duplicate(
 async def fire_scenario_default(
     request: Request, ctx: CurrentContext, scenario_id: str
 ) -> Response:
-    await run_in_threadpool(
-        fire_service.set_default_fire_scenario,
-        request.app.state.session_factory,
-        ctx,
-        _uuid(scenario_id),
-    )
+    try:
+        await run_in_threadpool(
+            fire_service.set_default_fire_scenario,
+            request.app.state.session_factory,
+            ctx,
+            _uuid(scenario_id),
+        )
+    except fire_service.FireError as exc:
+        return _redirect(
+            request, "fire_scenario", error=exc.code, scenario_id=str(_uuid(scenario_id))
+        )
     return _redirect(request, "fire_scenarios", notice="default_changed")
 
 
@@ -756,12 +782,15 @@ async def fire_scenario_default(
 async def fire_scenario_archive(
     request: Request, ctx: CurrentContext, scenario_id: str
 ) -> Response:
-    await run_in_threadpool(
-        fire_service.archive_fire_scenario,
-        request.app.state.session_factory,
-        ctx,
-        _uuid(scenario_id),
-    )
+    try:
+        await run_in_threadpool(
+            fire_service.archive_fire_scenario,
+            request.app.state.session_factory,
+            ctx,
+            _uuid(scenario_id),
+        )
+    except fire_service.FireError as exc:
+        return _redirect(request, "fire_scenarios", error=exc.code)
     return _redirect(request, "fire_scenarios", notice="archived")
 
 
@@ -769,12 +798,15 @@ async def fire_scenario_archive(
 async def fire_scenario_restore(
     request: Request, ctx: CurrentContext, scenario_id: str
 ) -> Response:
-    await run_in_threadpool(
-        fire_service.restore_fire_scenario,
-        request.app.state.session_factory,
-        ctx,
-        _uuid(scenario_id),
-    )
+    try:
+        await run_in_threadpool(
+            fire_service.restore_fire_scenario,
+            request.app.state.session_factory,
+            ctx,
+            _uuid(scenario_id),
+        )
+    except fire_service.FireError as exc:
+        return _redirect(request, "fire_scenarios", error=exc.code)
     return _redirect(request, "fire_scenarios", notice="restored")
 
 

@@ -29,6 +29,7 @@ def _form(**overrides: str) -> dict[str, str]:
         "portfolio_manual": "1000000",
         "contribution_year_1": "",
         "contribution_amount_1": "",
+        "event_id_1": "",
         "event_year_1": "",
         "event_kind_1": "cash",
         "event_amount_1": "",
@@ -199,6 +200,89 @@ def test_contribution_and_event_rows_are_parsed_with_sparse_indices(owner) -> No
         (2030, "cash", 2_500_000, "Inheritance"),
         (2031, "income_change", -30_000, "Rent ends"),
     ]
+
+
+def test_archive_buttons_ask_for_confirmation(owner) -> None:
+    scenario_id = _create(owner)
+    confirmation = "Archive the scenario Retire at 55?"
+    assert confirmation in owner.client.get("/fire").text
+    assert confirmation in owner.client.get(f"/fire/{scenario_id}").text
+    assert 'data-confirm-tone="danger"' in owner.client.get(f"/fire/{scenario_id}").text
+
+
+def test_make_default_on_an_archived_scenario_is_refused_without_a_server_error(owner) -> None:
+    scenario_id = _create(owner)
+    archived = owner.post(
+        f"/fire/{scenario_id}/archive",
+        token_from=f"/fire/{scenario_id}",
+    )
+    assert archived.status_code == 303
+    response = owner.post(
+        f"/fire/{scenario_id}/default",
+        token_from=f"/fire/{scenario_id}",
+    )
+    assert response.status_code == 303
+    assert "error=archived" in response.headers["location"]
+    page = owner.client.get(response.headers["location"])
+    assert "Archived scenarios are read-only" in page.text
+
+
+def test_editing_an_event_keeps_its_identity_and_another_scenario_id_is_refused(owner) -> None:
+    scenario_id = _create(
+        owner,
+        event_year_1="2028",
+        event_kind_1="cash",
+        event_amount_1="100",
+        event_label_1="Bonus",
+    )
+    with owner.db() as session:
+        event = session.scalars(select(FireEvent).where(FireEvent.scenario_id == scenario_id)).one()
+    edit_page = owner.client.get(f"/fire/{scenario_id}/edit").text
+    assert f'name="event_id_1" value="{event.id}"' in edit_page
+
+    renamed = owner.post(
+        f"/fire/{scenario_id}",
+        _form(
+            event_id_1=str(event.id),
+            event_year_1="2028",
+            event_kind_1="cash",
+            event_amount_1="100",
+            event_label_1="Renamed",
+        ),
+        token_from=f"/fire/{scenario_id}/edit",
+    )
+    assert renamed.status_code == 303, renamed.text
+    with owner.db() as session:
+        saved = session.get_one(FireEvent, event.id)
+        assert (saved.scenario_id, saved.label) == (scenario_id, "Renamed")
+
+    other = _create(
+        owner,
+        name="Other plan",
+        event_year_1="2028",
+        event_kind_1="cash",
+        event_amount_1="100",
+        event_label_1="Other event",
+    )
+    with owner.db() as session:
+        other_event = session.scalars(select(FireEvent).where(FireEvent.scenario_id == other)).one()
+    refused = owner.post(
+        f"/fire/{scenario_id}",
+        _form(
+            event_id_1=str(other_event.id),
+            event_year_1="2028",
+            event_kind_1="cash",
+            event_amount_1="100",
+            event_label_1="Hijacked",
+        ),
+        token_from=f"/fire/{scenario_id}/edit",
+    )
+    assert refused.status_code == 400
+    assert "no longer part of the scenario" in refused.text
+    with owner.db() as session:
+        saved = session.get_one(FireEvent, event.id)
+        assert saved.label == "Renamed"
+        assert session.get(FireEvent, other_event.id) is not None
 
 
 def test_rows_outside_the_window_are_refused_and_kept_on_the_form(owner) -> None:

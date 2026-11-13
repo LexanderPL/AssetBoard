@@ -110,21 +110,28 @@ def in_range(value: int, bounds: tuple[int, int]) -> bool:
     return low <= value <= high
 
 
-def extreme_rates(
+def extreme_rate_change(
     *,
     inflation_bp: int,
     real_return_bp: int,
     income_growth_bp: int,
     swr_bp: int | None,
+    previous: tuple[int, int, int, int | None] | None,
 ) -> bool:
-    """Whether any rate falls outside its ordinary range and needs a confirmation."""
-    if not in_range(inflation_bp, INFLATION_SANE_BP):
-        return True
-    if not in_range(real_return_bp, REAL_RETURN_SANE_BP):
-        return True
-    if not in_range(income_growth_bp, INCOME_GROWTH_SANE_BP):
-        return True
-    return swr_bp is not None and not in_range(swr_bp, SWR_SANE_BP)
+    """Whether a **changed** rate falls outside its ordinary range.
+
+    ``previous`` is the saved ``(inflation, real return, income growth, withdrawal)`` tuple, or
+    ``None`` for a new scenario. Only a field whose value changed asks for confirmation again,
+    so editing another field of a plan with an unusual rate does not nag on every save.
+    """
+    current = (inflation_bp, real_return_bp, income_growth_bp, swr_bp)
+    bounds = (INFLATION_SANE_BP, REAL_RETURN_SANE_BP, INCOME_GROWTH_SANE_BP, SWR_SANE_BP)
+    for value, sane, saved in zip(
+        current, bounds, previous or (None, None, None, None), strict=True
+    ):
+        if value is not None and not in_range(value, sane) and (saved is None or value != saved):
+            return True
+    return False
 
 
 def clean_scenario_name(value: str) -> str:

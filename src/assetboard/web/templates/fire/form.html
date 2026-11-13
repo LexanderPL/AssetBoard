@@ -19,7 +19,7 @@
 
 {% macro event_row(row) %}
 <tr class="border-t border-line" data-editor-row>
-  <th scope="row" class="py-2 pr-3 text-left font-normal"><label class="sr-only" for="event-year-{{ row.index }}">{{ _("Year") }}</label><input id="event-year-{{ row.index }}" name="event_year_{{ row.index }}" value="{{ row.year }}" inputmode="numeric" class="{{ input_class }} w-28 font-normal" data-event-year></th>
+  <th scope="row" class="py-2 pr-3 text-left font-normal"><input type="hidden" name="event_id_{{ row.index }}" value="{{ row.id }}"><label class="sr-only" for="event-year-{{ row.index }}">{{ _("Year") }}</label><input id="event-year-{{ row.index }}" name="event_year_{{ row.index }}" value="{{ row.year }}" inputmode="numeric" class="{{ input_class }} w-28 font-normal" data-event-year></th>
   <td class="py-2 pr-3"><label class="sr-only" for="event-kind-{{ row.index }}">{{ _("Type") }}</label><select id="event-kind-{{ row.index }}" name="event_kind_{{ row.index }}" class="form-select py-2 font-normal" data-event-kind>{% for code, label in event_kind_labels.items() %}<option value="{{ code }}"{% if row.kind == code %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></td>
   <td class="py-2 pr-3"><label class="sr-only" for="event-label-{{ row.index }}">{{ _("Description") }}</label><input id="event-label-{{ row.index }}" name="event_label_{{ row.index }}" value="{{ row.label }}" maxlength="200" class="{{ input_class }} w-full font-normal" data-event-label></td>
   <td class="py-2 pr-3"><label class="sr-only" for="event-amount-{{ row.index }}">{{ _("Amount") }}</label><input id="event-amount-{{ row.index }}" name="event_amount_{{ row.index }}" value="{{ row.amount }}" inputmode="decimal" class="{{ input_class }} w-full font-normal" data-event-amount></td>
@@ -128,7 +128,7 @@
         </tbody>
       </table>
     </div>
-    <template data-event-template>{{ event_row({"index": "__index__", "year": "", "kind": "", "amount": "", "label": ""}) }}</template>
+    <template data-event-template>{{ event_row({"index": "__index__", "id": "", "year": "", "kind": "", "amount": "", "label": ""}) }}</template>
     <div class="mt-3 flex flex-wrap gap-2">
       <button type="button" class="btn-sm" data-add-event>{{ _("Add an event") }}</button>
     </div>

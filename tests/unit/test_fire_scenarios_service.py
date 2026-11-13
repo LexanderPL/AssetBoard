@@ -5,10 +5,10 @@ from typing import Any
 from uuid import UUID
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from assetboard.db.models.fire import FireContribution, FireEvent, FireScenario
-from assetboard.db.models.identity import AuditEvent, User
+from assetboard.db.models.identity import AuditEvent, User, Workspace
 from assetboard.domain.fire import (
     MAX_CONTRIBUTION_ROWS,
     MAX_EVENT_ROWS,
@@ -350,7 +350,156 @@ def test_contribution_and_event_windows_and_row_caps(team: WorkspaceDb) -> None:
     assert _codes(exc) == ("events", "invalid_event_kind")
 
 
-def test_update_replaces_the_contribution_and_event_rows(team: WorkspaceDb) -> None:
+def test_update_reconciles_rows_and_keeps_unchanged_identities(team: WorkspaceDb) -> None:
+    scenario_id = _create(
+        team,
+        contributions=(
+            ContributionInput(year=2027, amount_minor=1),
+            ContributionInput(year=2028, amount_minor=2),
+            ContributionInput(year=2029, amount_minor=3),
+        ),
+        events=(
+            EventInput(year=2028, kind="cash", amount_minor=100, label="Bonus"),
+            EventInput(year=2029, kind="expense_change", amount_minor=-50, label="Rent ends"),
+            EventInput(year=2030, kind="income_change", amount_minor=25, label="Side job"),
+        ),
+    )
+    before = fire_scenarios.get_fire_scenario(team.factory, team.ctx("owner", "owner"), scenario_id)
+    contribution_ids = {row.year: row.id for row in before.contributions}
+    event_ids = {row.label: row.id for row in before.events}
+    old = datetime(2020, 1, 1, tzinfo=UTC)
+    with team.factory.begin() as session:
+        session.execute(
+            update(FireContribution)
+            .where(FireContribution.scenario_id == scenario_id)
+            .values(created_at=old, updated_at=old)
+        )
+        session.execute(
+            update(FireEvent)
+            .where(FireEvent.scenario_id == scenario_id)
+            .values(created_at=old, updated_at=old)
+        )
+
+    fire_scenarios.update_fire_scenario(
+        team.factory,
+        team.ctx("owner", "owner"),
+        scenario_id,
+        _input(
+            contributions=(
+                ContributionInput(year=2027, amount_minor=1),
+                ContributionInput(year=2028, amount_minor=20),
+                ContributionInput(year=2031, amount_minor=4),
+            ),
+            events=(
+                EventInput(
+                    year=2028,
+                    kind="cash",
+                    amount_minor=100,
+                    label="Bonus",
+                    id=event_ids["Bonus"],
+                ),
+                EventInput(
+                    year=2029,
+                    kind="expense_change",
+                    amount_minor=-500,
+                    label="Rent ends",
+                    id=event_ids["Rent ends"],
+                ),
+                EventInput(year=2032, kind="income_change", amount_minor=30, label="New job"),
+            ),
+        ),
+    )
+
+    after = fire_scenarios.get_fire_scenario(team.factory, team.ctx("owner", "owner"), scenario_id)
+    after_contributions = {row.year: row for row in after.contributions}
+    after_events = {row.label: row for row in after.events}
+    assert set(after_contributions) == {2027, 2028, 2031}
+    assert after_contributions[2027].id == contribution_ids[2027]
+    assert after_contributions[2028].id == contribution_ids[2028]
+    assert after_contributions[2028].amount.amount_minor == 20
+    assert 2029 not in after_contributions
+    assert after_contributions[2031].id not in contribution_ids.values()
+    assert set(after_events) == {"Bonus", "Rent ends", "New job"}
+    assert after_events["Bonus"].id == event_ids["Bonus"]
+    assert after_events["Rent ends"].id == event_ids["Rent ends"]
+    assert after_events["Rent ends"].amount.amount_minor == -500
+    assert after_events["New job"].id not in event_ids.values()
+
+    clock_now = datetime(2026, 3, 1, 12, tzinfo=UTC)
+    with team.factory() as session:
+        stored_contributions = {
+            row.year: row
+            for row in session.scalars(
+                select(FireContribution).where(FireContribution.scenario_id == scenario_id)
+            )
+        }
+        stored_events = {
+            row.label: row
+            for row in session.scalars(
+                select(FireEvent).where(FireEvent.scenario_id == scenario_id)
+            )
+        }
+    assert stored_contributions[2027].updated_at == old
+    assert stored_contributions[2028].updated_at == clock_now
+    assert stored_contributions[2031].updated_at == clock_now
+    assert stored_events["Bonus"].updated_at == old
+    assert stored_events["Rent ends"].updated_at == clock_now
+    assert stored_events["New job"].updated_at == clock_now
+
+
+def test_an_event_id_from_another_scenario_is_rejected_without_writing(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    first = _create(team, name="First")
+    second = _create(
+        team,
+        name="Second",
+        events=(EventInput(year=2028, kind="cash", amount_minor=1, label="Other"),),
+    )
+    other_event = fire_scenarios.get_fire_scenario(team.factory, ctx, second).events[0]
+    before = fire_scenarios.get_fire_scenario(team.factory, ctx, first)
+
+    with pytest.raises(FireError) as exc:
+        fire_scenarios.update_fire_scenario(
+            team.factory,
+            ctx,
+            first,
+            _input(
+                name="Changed name",
+                events=(
+                    EventInput(
+                        year=2028,
+                        kind="cash",
+                        amount_minor=1,
+                        label="Other",
+                        id=other_event.id,
+                    ),
+                ),
+            ),
+        )
+    assert _codes(exc) == ("events", "invalid_event")
+    after = fire_scenarios.get_fire_scenario(team.factory, ctx, first)
+    assert after.scenario.name == "First"
+    assert after.events == before.events
+
+
+def test_the_same_hidden_event_id_cannot_appear_twice(team: WorkspaceDb) -> None:
+    event = EventInput(year=2028, kind="cash", amount_minor=1, label="Bonus")
+    scenario_id = _create(team, events=(event,))
+    saved = fire_scenarios.get_fire_scenario(
+        team.factory, team.ctx("owner", "owner"), scenario_id
+    ).events[0]
+    duplicate = EventInput(year=2028, kind="cash", amount_minor=1, label="Bonus", id=saved.id)
+    with pytest.raises(FireError) as exc:
+        fire_scenarios.update_fire_scenario(
+            team.factory,
+            team.ctx("owner", "owner"),
+            scenario_id,
+            _input(events=(duplicate, duplicate)),
+        )
+    assert _codes(exc) == ("events", "duplicate_event")
+
+
+def test_update_can_replace_every_contribution_and_event_row(team: WorkspaceDb) -> None:
     scenario_id = _create(
         team,
         contributions=(
@@ -397,6 +546,62 @@ def test_defaults_come_from_the_profile_and_the_clock(team: WorkspaceDb) -> None
     assert defaults.real_return_bp == 500
     assert defaults.income_growth_bp == 300
     assert defaults.swr_bp == 400
+
+
+def test_defaults_and_create_use_the_current_workspace_currency_not_the_stale_context(
+    team: WorkspaceDb,
+) -> None:
+    with team.factory.begin() as session:
+        session.get_one(Workspace, team.workspace_id).base_currency = "PLN"
+    ctx = team.ctx("owner", "owner")  # still carries the old EUR value
+    defaults = fire_scenarios.scenario_defaults(team.factory, ctx)
+    assert defaults.currency == "PLN"
+
+    scenario_id = fire_scenarios.create_fire_scenario(
+        team.factory,
+        ctx,
+        _input(
+            income_manual=_money(5_000_000, "PLN"),
+            expenses_manual=_money(3_000_000, "PLN"),
+            portfolio_manual=_money(100_000_000, "PLN"),
+        ),
+    )
+    detail = fire_scenarios.get_fire_scenario(team.factory, ctx, scenario_id)
+    assert detail.scenario.currency == "PLN"
+
+
+def test_create_without_a_horizon_uses_the_profile_life_expectancy(team: WorkspaceDb) -> None:
+    with team.factory.begin() as session:
+        session.get_one(User, team.users["editor"]).life_expectancy = 95
+    scenario_id = fire_scenarios.create_fire_scenario(
+        team.factory, team.ctx("editor", "editor"), _input(horizon_age=None)
+    )
+    detail = fire_scenarios.get_fire_scenario(
+        team.factory, team.ctx("editor", "editor"), scenario_id
+    )
+    assert detail.scenario.horizon_age == 95
+
+
+def test_create_without_a_horizon_or_profile_value_uses_ninety(team: WorkspaceDb) -> None:
+    scenario_id = fire_scenarios.create_fire_scenario(
+        team.factory, team.ctx("editor", "editor"), _input(horizon_age=None)
+    )
+    detail = fire_scenarios.get_fire_scenario(
+        team.factory, team.ctx("editor", "editor"), scenario_id
+    )
+    assert detail.scenario.horizon_age == 90
+
+
+def test_update_without_a_horizon_keeps_the_saved_one(team: WorkspaceDb) -> None:
+    scenario_id = _create(team, horizon_age=95)
+    fire_scenarios.update_fire_scenario(
+        team.factory,
+        team.ctx("owner", "owner"),
+        scenario_id,
+        _input(horizon_age=None, stop_working_age=56),
+    )
+    detail = fire_scenarios.get_fire_scenario(team.factory, team.ctx("owner", "owner"), scenario_id)
+    assert detail.scenario.horizon_age == 95
 
 
 def test_fire_rows_make_the_workspace_non_empty(team: WorkspaceDb) -> None:

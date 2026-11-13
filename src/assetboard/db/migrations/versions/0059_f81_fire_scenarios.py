@@ -54,7 +54,7 @@ def upgrade() -> None:
         sa.Column("expenses_manual_minor", sa.BigInteger(), nullable=True),
         sa.Column("portfolio_mode", sa.String(length=16), nullable=False),
         sa.Column("portfolio_manual_minor", sa.BigInteger(), nullable=True),
-        sa.Column("is_default", sa.Boolean(), nullable=False),
+        sa.Column("is_default", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("archived_at", UtcDateTime(), nullable=True),
         sa.Column("id", sa.Uuid(), nullable=False),
         sa.Column("created_at", UtcDateTime(), nullable=False),

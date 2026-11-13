@@ -34,8 +34,6 @@ from assetboard.domain.fire import (
     ILLUSTRATIVE_INFLATION_BP,
     ILLUSTRATIVE_REAL_RETURN_BP,
     ILLUSTRATIVE_SWR_BP,
-    INCOME_GROWTH_SANE_BP,
-    INFLATION_SANE_BP,
     MAX_CONTRIBUTION_ROWS,
     MAX_EVENT_ROWS,
     MAX_HORIZON_AGE,
@@ -46,10 +44,8 @@ from assetboard.domain.fire import (
     MIN_YEAR,
     RATE_HARD_MAX_BP,
     RATE_HARD_MIN_BP,
-    REAL_RETURN_SANE_BP,
     SWR_HARD_MAX_BP,
     SWR_HARD_MIN_BP,
-    SWR_SANE_BP,
     EventKind,
     ExpensesMode,
     IncomeMode,
@@ -61,7 +57,7 @@ from assetboard.domain.fire import (
     contribution_years,
     default_horizon_age,
     event_years,
-    in_range,
+    extreme_rate_change,
     year_in_window,
 )
 from assetboard.domain.money import Money
@@ -91,6 +87,9 @@ class EventInput:
     kind: str
     amount_minor: int
     label: str
+    # The saved row this editor row came from; ``None`` creates a new event. A saving keeps the
+    # identity (and timestamps) of unchanged events, which F8.6 archive lineage relies on.
+    id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -101,7 +100,9 @@ class FireScenarioInput:
     real_return_bp: int = ILLUSTRATIVE_REAL_RETURN_BP
     income_growth_bp: int = ILLUSTRATIVE_INCOME_GROWTH_BP
     stop_working_age: int = 0
-    horizon_age: int = DEFAULT_LIFE_EXPECTANCY
+    # None takes the profile's life expectancy on create (90 without one), or the saved horizon
+    # on update; the web form always posts an explicit value.
+    horizon_age: int | None = None
     rule: str = Rule.RETURNS_COVER_EXPENSES.value
     swr_bp: int | None = None
     income_mode: str = IncomeMode.MANUAL.value
@@ -256,15 +257,12 @@ def _manual_minor(
     return amount.amount_minor
 
 
-def _changed(current: int | None, previous: int | None) -> bool:
-    return previous is None or current != previous
-
-
 def _validate(
     scenario: FireScenarioInput,
     *,
     start_year: int,
     currency: str,
+    default_horizon: int,
     previous: FireScenario | None,
 ) -> _ValidatedScenario:
     try:
@@ -281,7 +279,11 @@ def _validate(
         raise FireError("birth_year", "invalid_birth_year")
     age = age_at_start(start_year, birth_year)
 
-    horizon_age = _integer(scenario.horizon_age, "horizon_age", "invalid_horizon")
+    horizon_age = _integer(
+        scenario.horizon_age if scenario.horizon_age is not None else default_horizon,
+        "horizon_age",
+        "invalid_horizon",
+    )
     if not MIN_HORIZON_AGE <= horizon_age <= MAX_HORIZON_AGE:
         raise FireError("horizon_age", "invalid_horizon")
     if horizon_age <= age:
@@ -324,25 +326,20 @@ def _validate(
         "portfolio_manual", portfolio_mode, scenario.portfolio_manual, currency
     )
 
-    needs_confirmation = (
-        (
-            not in_range(inflation_bp, INFLATION_SANE_BP)
-            and (_changed(inflation_bp, previous.inflation_bp if previous else None))
-        )
-        or (
-            not in_range(real_return_bp, REAL_RETURN_SANE_BP)
-            and (_changed(real_return_bp, previous.real_return_bp if previous else None))
-        )
-        or (
-            not in_range(income_growth_bp, INCOME_GROWTH_SANE_BP)
-            and (_changed(income_growth_bp, previous.income_growth_bp if previous else None))
-        )
+    needs_confirmation = extreme_rate_change(
+        inflation_bp=inflation_bp,
+        real_return_bp=real_return_bp,
+        income_growth_bp=income_growth_bp,
+        swr_bp=swr_bp,
+        previous=None
+        if previous is None
+        else (
+            previous.inflation_bp,
+            previous.real_return_bp,
+            previous.income_growth_bp,
+            previous.swr_bp,
+        ),
     )
-    if swr_bp is not None and not in_range(swr_bp, SWR_SANE_BP):
-        changed_swr = previous is None or (
-            previous.rule != Rule.SWR.value or swr_bp != previous.swr_bp
-        )
-        needs_confirmation = needs_confirmation or changed_swr
     if needs_confirmation and not scenario.extreme_rates_confirmed:
         raise FireError("extreme_rates_confirmed", "extreme_rate_confirmation_required")
 
@@ -365,9 +362,14 @@ def _validate(
         raise FireError("events", "too_many_events")
     event_window = event_years(start_year, birth_year, horizon_age)
     events: list[EventInput] = []
+    seen_event_ids: set[UUID] = set()
     for row in scenario.events:
         if not year_in_window(row.year, event_window):
             raise FireError("events", "rows_outside_window")
+        if row.id is not None:
+            if row.id in seen_event_ids:
+                raise FireError("events", "duplicate_event")
+            seen_event_ids.add(row.id)
         try:
             kind = EventKind(row.kind)
         except ValueError:
@@ -378,7 +380,15 @@ def _validate(
             label = clean_event_label(row.label)
         except ValueError:
             raise FireError("events", "invalid_label") from None
-        events.append(EventInput(row.year, kind.value, row.amount_minor, label))
+        events.append(
+            EventInput(
+                year=row.year,
+                kind=kind.value,
+                amount_minor=row.amount_minor,
+                label=label,
+                id=row.id,
+            )
+        )
 
     return _ValidatedScenario(
         name=name,
@@ -480,31 +490,65 @@ def _audit(session: Session, ctx: Context, action: str, row: FireScenario) -> No
     )
 
 
-def _replace_rows(
+def _reconcile_rows(
     session: Session,
     ctx: Context,
     scenario_id: UUID,
     validated: _ValidatedScenario,
 ) -> None:
+    """Make the saved child rows match the editor, keeping the identity of unchanged rows.
+
+    Contributions are matched by year (unique per scenario). Events carry a hidden row id, so
+    two events in the same year can be edited independently. A row omitted from the editor is
+    deleted, a new row is created and a changed row is updated; an event id that does not belong
+    to this scenario is refused instead of silently creating a second row. Stable child ids and
+    timestamps matter for the F8.6 archive lineage and for an honest audit trail.
+    """
     contributions = FireContributionRepository(session, ctx)
-    for row in contributions.for_scenario(scenario_id):
-        contributions.delete(row)
+    existing_contributions = {row.year: row for row in contributions.for_scenario(scenario_id)}
+    wanted_years = {row.year for row in validated.contributions}
     for row in validated.contributions:
-        contributions.create(
-            scenario_id=scenario_id, year=row.year, net_amount_minor=row.amount_minor
-        )
+        current = existing_contributions.get(row.year)
+        if current is None:
+            contributions.create(
+                scenario_id=scenario_id, year=row.year, net_amount_minor=row.amount_minor
+            )
+        elif current.net_amount_minor != row.amount_minor:
+            contributions.update(current.id, net_amount_minor=row.amount_minor)
+    for year, current in existing_contributions.items():
+        if year not in wanted_years:
+            contributions.delete(current)
 
     events = FireEventRepository(session, ctx)
-    for row in events.for_scenario(scenario_id):
-        events.delete(row)
+    existing_events = {row.id: row for row in events.for_scenario(scenario_id)}
     for row in validated.events:
-        events.create(
-            scenario_id=scenario_id,
-            year=row.year,
-            kind=row.kind,
-            amount_minor=row.amount_minor,
-            label=row.label,
-        )
+        if row.id is None:
+            events.create(
+                scenario_id=scenario_id,
+                year=row.year,
+                kind=row.kind,
+                amount_minor=row.amount_minor,
+                label=row.label,
+            )
+            continue
+        current = existing_events.pop(row.id, None)
+        if current is None:
+            raise FireError("events", "invalid_event")
+        if (
+            current.year,
+            current.kind,
+            current.amount_minor,
+            current.label,
+        ) != (row.year, row.kind, row.amount_minor, row.label):
+            events.update(
+                current.id,
+                year=row.year,
+                kind=row.kind,
+                amount_minor=row.amount_minor,
+                label=row.label,
+            )
+    for current in existing_events.values():
+        events.delete(current)
 
 
 def _copy_rows(session: Session, ctx: Context, source: UUID, target: UUID) -> None:
@@ -547,10 +591,12 @@ def scenario_defaults(factory: sessionmaker[Session], ctx: Context) -> FireScena
     _require_viewer(ctx)
     with factory() as session:
         birth_year, life_expectancy = _profile(session, ctx)
+        # The Context is a request-time snapshot; read the current row for the form's currency.
+        currency = CurrentWorkspaceRepository(session, ctx).get().base_currency
     today = ctx.clock.today(ctx.workspace.timezone)
     return FireScenarioDefaults(
         start_year=today.year,
-        currency=ctx.workspace.base_currency,
+        currency=currency,
         birth_year=birth_year,
         life_expectancy=life_expectancy,
         inflation_bp=ILLUSTRATIVE_INFLATION_BP,
@@ -630,12 +676,17 @@ def create_fire_scenario(
 
     def write(session: Session) -> UUID:
         require_role_now(session, ctx, Role.EDITOR)
-        CurrentWorkspaceRepository(session, ctx).lock(exclusive=True)
+        workspace = CurrentWorkspaceRepository(session, ctx)
+        workspace.lock(exclusive=True)
+        # The Context is a request-time snapshot; the locked row is the current base currency.
+        currency = workspace.get().base_currency
         start_year = ctx.clock.today(ctx.workspace.timezone).year
+        _, profile_horizon = _profile(session, ctx)
         validated = _validate(
             scenario,
             start_year=start_year,
-            currency=ctx.workspace.base_currency,
+            currency=currency,
+            default_horizon=profile_horizon,
             previous=None,
         )
         repository = FireScenarioRepository(session, ctx)
@@ -644,12 +695,12 @@ def create_fire_scenario(
         row = repository.create(
             **{
                 **_scenario_values(validated),
-                "currency": ctx.workspace.base_currency,
+                "currency": currency,
                 "start_year": start_year,
                 "is_default": repository.active_default() is None,
             }
         )
-        _replace_rows(session, ctx, row.id, validated)
+        _reconcile_rows(session, ctx, row.id, validated)
         _audit(session, ctx, "fire_scenario.created", row)
         return row.id
 
@@ -673,13 +724,14 @@ def update_fire_scenario(
             scenario,
             start_year=row.start_year,
             currency=row.currency,
+            default_horizon=row.horizon_age,
             previous=row,
         )
         existing = repository.active_by_name_key(validated.name_key)
         if existing is not None and existing.id != row.id:
             raise FireError("name", "duplicate_name")
         repository.update(row.id, **_scenario_values(validated))
-        _replace_rows(session, ctx, row.id, validated)
+        _reconcile_rows(session, ctx, row.id, validated)
         _audit(session, ctx, "fire_scenario.updated", row)
         return row.id
 

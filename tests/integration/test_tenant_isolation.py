@@ -2717,3 +2717,19 @@ def test_fire_queries_stay_in_their_workspace(
             archived_at=None,
             **scenario_values,
         )
+    with pytest.raises(ForeignWorkspace):
+        contributions_b.create(
+            workspace_id=ctx_a.workspace.id,
+            scenario_id=active_a.id,
+            year=2030,
+            net_amount_minor=1,
+        )
+    with pytest.raises(ForeignWorkspace):
+        events_b.create(
+            workspace_id=ctx_a.workspace.id,
+            scenario_id=active_a.id,
+            year=2030,
+            kind="cash",
+            amount_minor=1,
+            label="Cross workspace",
+        )

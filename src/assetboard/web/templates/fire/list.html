@@ -55,7 +55,7 @@
           {{ csrf_input() }}
           <button type="submit" class="btn-sm" data-fire-duplicate>{{ _("Duplicate") }}</button>
         </form>
-        <form method="post" action="{{ scoped_url(request, 'fire_scenario_archive', scenario_id=s.id) }}">
+        <form method="post" action="{{ scoped_url(request, 'fire_scenario_archive', scenario_id=s.id) }}" data-confirm="{{ _('Archive the scenario %(name)s?', name=s.name) }}" data-confirm-tone="danger">
           {{ csrf_input() }}
           <button type="submit" class="btn-sm btn-danger" data-fire-archive>{{ _("Archive") }}</button>
         </form>

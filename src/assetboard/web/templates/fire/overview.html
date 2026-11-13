@@ -27,7 +27,7 @@
         <button type="submit" class="btn" data-fire-set-default>{{ _("Make default") }}</button>
       </form>
       {% endif %}
-      <form method="post" action="{{ scoped_url(request, 'fire_scenario_archive', scenario_id=s.id) }}">
+      <form method="post" action="{{ scoped_url(request, 'fire_scenario_archive', scenario_id=s.id) }}" data-confirm="{{ _('Archive the scenario %(name)s?', name=s.name) }}" data-confirm-tone="danger">
         {{ csrf_input() }}
         <button type="submit" class="btn btn-danger" data-fire-archive>{{ _("Archive") }}</button>
       </form>

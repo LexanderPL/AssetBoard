@@ -16,7 +16,7 @@ from assetboard.domain.fire import (
     contribution_years,
     default_horizon_age,
     event_years,
-    extreme_rates,
+    extreme_rate_change,
     in_range,
     signed_amount_minor,
     year_in_window,
@@ -37,43 +37,64 @@ def test_age_and_windows_follow_the_start_year_and_horizon() -> None:
     assert not year_in_window(2076, events)
 
 
-def test_extreme_rates_table() -> None:
+def test_extreme_rate_change_table() -> None:
     assert in_range(INFLATION_SANE_BP[0], INFLATION_SANE_BP)
-    assert not extreme_rates(
+    assert not extreme_rate_change(
         inflation_bp=250,
         real_return_bp=500,
         income_growth_bp=300,
         swr_bp=400,
+        previous=None,
     )
-    assert extreme_rates(
+    assert extreme_rate_change(
         inflation_bp=INFLATION_SANE_BP[1] + 1,
         real_return_bp=500,
         income_growth_bp=300,
         swr_bp=None,
+        previous=None,
     )
-    assert extreme_rates(
+    assert extreme_rate_change(
         inflation_bp=250,
         real_return_bp=REAL_RETURN_SANE_BP[0] - 1,
         income_growth_bp=300,
         swr_bp=None,
+        previous=None,
     )
-    assert extreme_rates(
+    assert extreme_rate_change(
         inflation_bp=250,
         real_return_bp=500,
         income_growth_bp=INCOME_GROWTH_SANE_BP[1] + 1,
         swr_bp=None,
+        previous=None,
     )
-    assert extreme_rates(
+    assert extreme_rate_change(
         inflation_bp=250,
         real_return_bp=500,
         income_growth_bp=300,
         swr_bp=SWR_SANE_BP[0] - 1,
+        previous=None,
     )
-    assert not extreme_rates(
+    assert not extreme_rate_change(
         inflation_bp=ILLUSTRATIVE_INFLATION_BP,
         real_return_bp=500,
         income_growth_bp=300,
         swr_bp=SWR_SANE_BP[1],
+        previous=None,
+    )
+    # An unchanged unusual rate does not ask again; a changed one does.
+    assert not extreme_rate_change(
+        inflation_bp=INFLATION_SANE_BP[1] + 1,
+        real_return_bp=500,
+        income_growth_bp=300,
+        swr_bp=None,
+        previous=(INFLATION_SANE_BP[1] + 1, 500, 300, None),
+    )
+    assert extreme_rate_change(
+        inflation_bp=INFLATION_SANE_BP[1] + 2,
+        real_return_bp=500,
+        income_growth_bp=300,
+        swr_bp=None,
+        previous=(INFLATION_SANE_BP[1] + 1, 500, 300, None),
     )
 
 
