@@ -11,12 +11,26 @@ from decimal import Decimal
 
 from assetboard.domain.ledger_csv import plain_amount
 from assetboard.domain.loans import OverpaymentMode, OverpaymentStrategy, Schedule, ScheduleRow
+from assetboard.domain.money import Money
 from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day
-from assetboard.i18n.numbers import format_money, format_quantity_input
+from assetboard.i18n.numbers import format_amount_input, format_money, format_quantity_input
 from assetboard.services.loan_scenarios import ScenarioParameters
+from assetboard.services.loans import LoanView
 
 SCHEDULE_PER_PAGE = 24
+SCENARIO_OVERPAYMENT_SHARE = Decimal("0.10")
+SCENARIO_RATE_SHIFT_BP = 100
+SCENARIO_ONE_OFF_AMOUNT = Decimal("1000")
+
+
+@dataclass(frozen=True, slots=True)
+class ScenarioPresets:
+    """Form values the what-if preset buttons fill in (no finance logic in the template)."""
+
+    overpayment_amount: str
+    rate_shift: str
+    one_off_amount: str
 
 
 @dataclass(frozen=True, slots=True)
@@ -168,9 +182,30 @@ def scenario_summary(parameters: ScenarioParameters | None, locale: str) -> tupl
     return tuple(parts) or (gettext("Same as the loan", locale),)
 
 
+def scenario_presets(loan: LoanView, locale: str) -> ScenarioPresets:
+    """The common what-ifs as input-ready values (10% of the installment, +1 pp, 1,000)."""
+    overpayment = ""
+    if loan.first_installment is not None:
+        extra = Money.from_decimal(
+            loan.first_installment.to_decimal() * SCENARIO_OVERPAYMENT_SHARE,
+            loan.currency,
+        )
+        if extra.amount_minor > 0:
+            overpayment = format_amount_input(extra, locale)
+    return ScenarioPresets(
+        overpayment_amount=overpayment,
+        rate_shift=format_quantity_input(Decimal(SCENARIO_RATE_SHIFT_BP).scaleb(-2), locale),
+        one_off_amount=format_amount_input(
+            Money.from_decimal(SCENARIO_ONE_OFF_AMOUNT, loan.currency), locale
+        ),
+    )
+
+
 __all__ = [
     "SCHEDULE_PER_PAGE",
+    "ScenarioPresets",
     "SchedulePageView",
+    "scenario_presets",
     "scenario_summary",
     "schedule_csv",
     "schedule_page",

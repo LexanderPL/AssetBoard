@@ -322,6 +322,50 @@ def test_too_many_ephemeral_scenarios_are_refused(team: WorkspaceDb) -> None:
     assert raised.value.code == "too_many_scenarios"
 
 
+def test_saved_scenarios_compare_against_the_current_plan(team: WorkspaceDb) -> None:
+    loan_id = _create(
+        team,
+        overpayment_mode="fixed_extra",
+        overpayment_amount=_money(100_000),
+        overpayment_strategy="reduce_term",
+    )
+    editor = team.ctx("editor", "editor")
+    loan_scenarios.create_or_update_loan_scenario(
+        team.factory,
+        editor,
+        loan_id,
+        _params(
+            name="More",
+            overpayment_mode=OverpaymentMode.FIXED_EXTRA,
+            overpayment_amount=_money(200_000),
+        ),
+    )
+    loan_scenarios.create_or_update_loan_scenario(
+        team.factory,
+        editor,
+        loan_id,
+        _params(name="None", overpayment_mode=OverpaymentMode.NONE),
+    )
+    comparison = loan_scenarios.compare_loan_scenarios(team.factory, editor, loan_id, [])
+    assert comparison.current is not None
+    assert comparison.current.total_interest is not None
+    saved = {row.name: row for row in comparison.saved}
+    more = saved["More"]
+    assert more.interest_saved_vs_current is not None
+    assert more.interest_saved_vs_current.amount_minor > 0
+    assert more.months_saved_vs_current is not None and more.months_saved_vs_current > 0
+    assert more.interest_saved_vs_current_abs == more.interest_saved_vs_current
+    assert more.months_saved_vs_current_abs == more.months_saved_vs_current
+    none = saved["None"]
+    assert none.interest_saved_vs_current is not None
+    assert none.interest_saved_vs_current.amount_minor < 0
+    assert none.months_saved_vs_current is not None and none.months_saved_vs_current < 0
+    assert none.interest_saved_vs_current_abs is not None
+    assert none.interest_saved_vs_current_abs.amount_minor > 0
+    assert none.months_saved_vs_current_abs is not None
+    assert none.months_saved_vs_current_abs > 0
+
+
 def test_a_scenario_from_another_workspace_is_not_visible(team: WorkspaceDb) -> None:
     other_workspace = team.add_workspace("Other")
     team.add_member("other", "owner", other_workspace)

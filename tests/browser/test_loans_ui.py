@@ -208,9 +208,27 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             page.wait_for_load_state("networkidle")
             expect(page.locator("[data-saved-scenario]")).to_have_count(1)
             expect(page.locator("[data-action-notice]")).to_contain_text("Saved scenarios updated")
+            expect(page.locator("[data-saved-delta]")).to_be_visible()
+            expect(page.locator("[data-saved-interest-delta]")).to_be_visible()
+            expect(page.locator("[data-saved-months-delta]")).to_be_visible()
+            expect(page.locator("[data-saved-interest-delta]")).to_contain_text("Saves")
+            expect(page.locator("[data-saved-months-delta]")).to_contain_text("sooner")
             expect(page.locator('[data-chart="line"]')).to_have_attribute(
                 "data-chart-ready", "true"
             )
+            _no_page_overflow(page)
+
+            third = page.locator('[data-scenario-form-row="3"]')
+            rate_preset = third.locator('[data-scenario-preset="rate"]')
+            rate_preset.focus()
+            page.keyboard.press("Enter")
+            expect(third.locator("[data-scenario-rate-shift]")).to_have_value("1")
+            expect(third.locator("[data-scenario-rate-shift-from]")).not_to_have_value("")
+            expect(third.locator("[data-scenario-rate-shift]")).to_be_focused()
+            third.locator("[data-scenario-clear]").click()
+            expect(third.locator("[data-scenario-rate-shift]")).to_have_value("")
+            expect(third.locator("[data-scenario-rate-shift-from]")).to_have_value("")
+            expect(third.locator("[data-scenario-name]")).to_be_focused()
             _no_page_overflow(page)
 
             page.locator('[data-loan-tab="payments"]').click()
@@ -347,7 +365,15 @@ def test_loan_wizard_settings_and_overview_at_desktop_and_phone_widths(tmp_path:
             page.goto(f"{base}/loans/{loan_id}/scenarios", wait_until="networkidle")
             _loan_sections(page)
             expect(page.locator("[data-scenario-comparison]")).to_be_visible()
+            expect(page.locator("[data-scenario-card]")).to_have_count(3)
+            expect(page.locator("[data-scenario-presets]").first).to_be_visible()
+            expect(page.locator("[data-saved-delta]")).to_be_visible()
             _no_page_overflow(page)
+            for index in range(3):
+                box = page.locator("[data-scenario-card]").nth(index).bounding_box()
+                assert box is not None
+                assert box["x"] >= -1
+                assert box["x"] + box["width"] <= 390 + 1
             scenario_scroll = page.locator("[data-scenario-table-scroll]").evaluate(
                 "el => ({scrollWidth: el.scrollWidth, clientWidth: el.clientWidth})"
             )
