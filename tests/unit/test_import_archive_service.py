@@ -2443,6 +2443,7 @@ def test_merge_into_source_workspace_creates_nothing(db: WorkspaceDb, data_dir: 
         "networth_restore_only",
         "investment_restore_only",
         "loan_restore_only",
+        "fire_restore_only",
     ]
     _apply(db, data_dir, batch_id, ctx=db.ctx("own", "owner"))
     with db.factory() as session:
@@ -2469,6 +2470,7 @@ def test_merge_into_another_workspace_keeps_settings_and_maps_archived(
         "networth_restore_only",
         "investment_restore_only",
         "loan_restore_only",
+        "fire_restore_only",
     ]
     _apply(db, data_dir, batch_id, ctx=target_ctx)
     with db.factory() as session:
