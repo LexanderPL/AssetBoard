@@ -1,3 +1,4 @@
+{% from "categories/_macros.html" import swatch with context %}
 {% from "fire/_macros.html" import badge with context %}
 {% set linked = results.linked %}
 {% if linked %}
@@ -53,14 +54,14 @@
             <th scope="row" class="py-2 pr-3 text-left font-normal">
               {% if row.source_kind == "portfolio_class" %}
               <a class="inline-flex min-w-0 items-center gap-2 text-primary-ink underline underline-offset-2" href="{{ scoped_url(request, 'investments_portfolio') }}?scope={{ row.source_id }}" data-fire-source-link>
-                <span class="h-3 w-3 shrink-0 rounded-full border border-line" style="background-color: {{ row.color or '#94a3b8' }}" aria-hidden="true"></span>
+                {{ swatch(row.color or "#94a3b8") }}
                 <span class="min-w-0 break-words">{{ row.name }}</span>
               </a>
               {% elif row.source_kind == "portfolio_unallocated" %}
               <a class="text-primary-ink underline underline-offset-2" href="{{ scoped_url(request, 'investments_portfolio') }}" data-fire-source-link>{{ _("Unallocated") }}</a>
               {% else %}
               <a class="inline-flex min-w-0 items-center gap-2 text-primary-ink underline underline-offset-2" href="{{ scoped_url(request, 'networth') }}?side=asset&amp;edit_item={{ row.source_id }}" data-fire-source-link>
-                <span class="h-3 w-3 shrink-0 rounded-full border border-line" style="background-color: {{ row.color or '#94a3b8' }}" aria-hidden="true"></span>
+                {{ swatch(row.color or "#94a3b8") }}
                 <span class="min-w-0 break-words">{{ row.name }}</span>
               </a>
               {% endif %}
@@ -90,7 +91,7 @@
         <tbody>
           {% for row in series.categories %}
           <tr class="border-t border-line">
-            <th scope="row" class="py-2 pr-3 text-left font-normal"><span class="inline-flex min-w-0 items-center gap-2"><span class="h-3 w-3 shrink-0 rounded-full border border-line" style="background-color: {{ row.color }}" aria-hidden="true"></span><span class="min-w-0 break-words">{{ row.name }}</span>{% if row.archived %}{{ badge(_("Archived")) }}{% endif %}</span></th>
+            <th scope="row" class="py-2 pr-3 text-left font-normal"><span class="inline-flex min-w-0 items-center gap-2">{{ swatch(row.color) }}<span class="min-w-0 break-words">{{ row.name }}</span>{% if row.archived %}{{ badge(_("Archived")) }}{% endif %}</span></th>
             <td class="py-2">{{ format_money(row.amount, locale) }}</td>
           </tr>
           {% endfor %}
@@ -104,7 +105,7 @@
       <ul class="mt-2 space-y-1 text-sm">
         {% for row in series.excluded_categories %}
         <li class="flex flex-wrap items-baseline justify-between gap-2" data-fire-excluded-category="{{ row.category_id }}">
-          <span class="inline-flex min-w-0 items-center gap-2"><span class="h-3 w-3 shrink-0 rounded-full border border-line" style="background-color: {{ row.color }}" aria-hidden="true"></span><span class="min-w-0 break-words">{{ row.name }}</span>{% if row.archived %}{{ badge(_("Archived")) }}{% endif %}</span>
+          <span class="inline-flex min-w-0 items-center gap-2">{{ swatch(row.color) }}<span class="min-w-0 break-words">{{ row.name }}</span>{% if row.archived %}{{ badge(_("Archived")) }}{% endif %}</span>
           <span>{{ format_money(row.amount, locale) }}</span>
         </li>
         {% endfor %}

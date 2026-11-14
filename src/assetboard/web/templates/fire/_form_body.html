@@ -1,3 +1,4 @@
+{% from "categories/_macros.html" import swatch with context %}
 {% from "fire/_macros.html" import badge, field_attrs, field_error, hint with context %}
 {% set input_class = "form-control px-3 py-2" %}
 
@@ -75,7 +76,7 @@
       <li>
         <label class="flex items-start gap-2 text-sm">
           <input type="checkbox" name="expense_exclusion" value="{{ option.category_id }}"{% if option.selected %} checked{% endif %} class="mt-0.5 h-4 w-4 rounded border-line accent-primary" data-fire-exclusion="{{ option.category_id }}">
-          <span class="inline-flex min-w-0 items-center gap-2"><span class="h-3 w-3 shrink-0 rounded-full border border-line" style="background-color: {{ option.color }}" aria-hidden="true"></span><span class="min-w-0 break-words">{{ option.name }}</span>{% if option.archived %}{{ badge(_("Archived")) }}{% endif %}</span>
+          <span class="inline-flex min-w-0 items-center gap-2">{{ swatch(option.color) }}<span class="min-w-0 break-words">{{ option.name }}</span>{% if option.archived %}{{ badge(_("Archived")) }}{% endif %}</span>
         </label>
       </li>
       {% endfor %}
