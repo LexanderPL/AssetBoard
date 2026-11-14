@@ -1,0 +1,28 @@
+{% from "macros/components.html" import csrf_input with context %}
+{% from "fire/_macros.html" import hint with context %}
+{% set editable = can_edit and not detail.scenario.archived %}
+<section class="mt-6" aria-labelledby="inputs-heading">
+  <details id="inputs" class="panel p-6 sm:p-7"{% if inputs_open %} open{% endif %}>
+    <summary class="cursor-pointer list-none">
+      <span id="inputs-heading" class="text-base font-semibold">{{ _("Plan inputs") }}</span>
+      <span class="ml-1 text-sm font-normal text-muted">{{ _("Change an input to preview the results, then save when you are happy.") if editable else _("Read-only inputs.") }}</span>
+      {% if editable %}{{ hint(_("Changes preview automatically and are not saved until you press Save changes.")) }}{% endif %}
+    </summary>
+    {% if editable %}
+    <form id="fire-form" method="post" action="{{ action }}" class="mt-5 space-y-6" data-fire-form data-start-year="{{ start_year }}" novalidate>
+      {{ csrf_input() }}
+      <input type="hidden" name="basis" value="{{ basis }}">
+      {% include "fire/_form_body.html" %}
+      <div class="flex flex-wrap items-center gap-3">
+        <button type="submit" class="btn-primary" data-fire-save>{{ _("Save changes") }}</button>
+        <a href="{{ cancel_url }}" class="btn" data-fire-discard>{{ _("Discard changes") }}</a>
+      </div>
+    </form>
+    {% else %}
+    <fieldset disabled class="mt-5 space-y-6">
+      {% include "fire/_form_body.html" %}
+    </fieldset>
+    <p class="mt-4 text-sm text-muted" data-fire-readonly>{{ _("This scenario is archived and read-only. Restore it to change its inputs.") if detail.scenario.archived else _("Your role can read this plan but not change it.") }}</p>
+    {% endif %}
+  </details>
+</section>

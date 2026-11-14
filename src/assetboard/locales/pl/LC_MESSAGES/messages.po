@@ -2547,6 +2547,45 @@ msgstr "Zbyt wiele prób rejestracji z Twojej sieci. Spróbuj ponownie później
 msgid "Too many requests from your network. Try again later."
 msgstr "Zbyt wiele żądań z Twojej sieci. Spróbuj ponownie później."
 
+msgid "FIRE"
+msgstr "FIRE"
+
+#, python-format
+msgid "FIRE at age %(age)d (%(year)d)"
+msgstr "FIRE w wieku %(age)d (%(year)d)"
+
+msgid "Income stops"
+msgstr "Dochody kończą się"
+
+#, python-format
+msgid "Income stops at age %(age)d"
+msgstr "Dochody kończą się w wieku %(age)d"
+
+msgid "Depleted"
+msgstr "Wyczerpany"
+
+#, python-format
+msgid "Portfolio depleted at age %(age)d"
+msgstr "Portfel wyczerpuje się w wieku %(age)d"
+
+msgid "FIRE year"
+msgstr "Rok FIRE"
+
+msgid "Income stopped"
+msgstr "Dochody się skończyły"
+
+msgid "Portfolio depleted"
+msgstr "Portfel wyczerpany"
+
+msgid "Net worth in today's money"
+msgstr "Wartość netto w dzisiejszych pieniądzach"
+
+msgid "Expenses"
+msgstr "Wydatki"
+
+msgid "Investment gain"
+msgstr "Zysk z inwestycji"
+
 msgid "Enter a name of 1 to 200 characters."
 msgstr "Podaj nazwę o długości od 1 do 200 znaków."
 
@@ -2647,6 +2686,12 @@ msgstr ""
 "Zaznacz pole potwierdzenia tylko wtedy, gdy naprawdę chcesz użyć "
 "nietypowych stóp."
 
+msgid "The plan is missing a starting value."
+msgstr "W planie brakuje wartości początkowej."
+
+msgid "The saved plan cannot be projected."
+msgstr "Nie można wykonać prognozy zapisanego planu."
+
 msgid "The scenario could not be saved. Reload the page and try again."
 msgstr "Nie udało się zapisać scenariusza. Odśwież stronę i spróbuj ponownie."
 
@@ -2682,6 +2727,15 @@ msgstr "Zmiana rocznych wydatków"
 
 msgid "Annual income change"
 msgstr "Zmiana rocznych dochodów"
+
+msgid "annual income"
+msgstr "roczne dochody"
+
+msgid "annual expenses"
+msgstr "roczne wydatki"
+
+msgid "starting portfolio"
+msgstr "portfel początkowy"
 
 msgid "This request came from another site and was blocked."
 msgstr "To żądanie pochodziło z innej witryny i zostało zablokowane."
@@ -3279,9 +3333,6 @@ msgstr "Miesiąc %(month)s jest zamknięty. Wybierz datę w otwartym miesiącu."
 
 msgid "The entry was not saved. Check the marked fields."
 msgstr "Wpis nie został zapisany. Sprawdź oznaczone pola."
-
-msgid "Expenses"
-msgstr "Wydatki"
 
 msgid "No expenses in this month."
 msgstr "Brak wydatków w tym miesiącu."
@@ -5731,11 +5782,49 @@ msgstr "Utwórz obszar roboczy"
 msgid "Return to overview"
 msgstr "Powrót do podsumowania"
 
-msgid "All scenarios"
-msgstr "Wszystkie scenariusze"
+msgid "Charts"
+msgstr "Wykresy"
+
+msgid ""
+"Dashed lines mark FIRE, the income stop and depletion. The FIRE point is "
+"pinned."
+msgstr ""
+"Linie przerywane oznaczają FIRE, koniec dochodów i wyczerpanie portfela. "
+"Punkt FIRE jest przypięty."
+
+msgid "Net worth over time"
+msgstr "Wartość netto w czasie"
+
+msgid "In today's money."
+msgstr "W dzisiejszych pieniądzach."
+
+msgid "In each year's money."
+msgstr "W pieniądzach danego roku."
+
+msgid "Plotted data"
+msgstr "Dane wykresu"
+
+msgid "Plotted net worth data"
+msgstr "Dane wykresu wartości netto"
 
 msgid "Year"
 msgstr "Rok"
+
+msgid "Age"
+msgstr "Wiek"
+
+msgid "Expenses versus investment gain"
+msgstr "Wydatki a zysk z inwestycji"
+
+msgid ""
+"Both lines are in each year's money, because the independence rule "
+"compares nominal values."
+msgstr ""
+"Obie linie są w pieniądzach danego roku, ponieważ reguła niezależności "
+"porównuje wartości nominalne."
+
+msgid "Plotted expenses and gain data"
+msgstr "Dane wykresu wydatków i zysku"
 
 msgid "Net saving"
 msgstr "Oszczędności netto"
@@ -5748,16 +5837,6 @@ msgstr "Opis"
 
 msgid "this event"
 msgstr "to zdarzenie"
-
-msgid "Open your profile"
-msgstr "Otwórz swój profil"
-
-msgid ""
-"Projections are illustrative and not financial advice. The starting rates"
-" are examples, not recommendations."
-msgstr ""
-"Prognozy mają charakter poglądowy i nie stanowią porady finansowej. "
-"Początkowe stopy są przykładami, a nie rekomendacjami."
 
 msgid "Plan"
 msgstr "Plan"
@@ -6002,6 +6081,231 @@ msgstr ""
 "Przykłady: jednorazowy wpływ 20 000 gotówki; −1 200 rocznie po spłacie "
 "kredytu; 500 rocznie dodatkowego dochodu z najmu."
 
+msgid "Plan inputs"
+msgstr "Dane planu"
+
+msgid "Change an input to preview the results, then save when you are happy."
+msgstr ""
+"Zmień dane, aby zobaczyć podgląd wyników, a następnie zapisz, gdy będą "
+"odpowiednie."
+
+msgid "Read-only inputs."
+msgstr "Dane tylko do odczytu."
+
+msgid ""
+"Changes preview automatically and are not saved until you press Save "
+"changes."
+msgstr ""
+"Zmiany są automatycznie podglądane i nie zostaną zapisane, dopóki nie "
+"naciśniesz Zapisuj zmiany."
+
+msgid "Save changes"
+msgstr "Zapisz zmiany"
+
+msgid "Discard changes"
+msgstr "Odrzuć zmiany"
+
+msgid "This scenario is archived and read-only. Restore it to change its inputs."
+msgstr ""
+"Ten scenariusz jest zarchiwizowany i tylko do odczytu. Przywróć go, aby "
+"zmienić dane."
+
+msgid "Your role can read this plan but not change it."
+msgstr "Twoja rola pozwala czytać ten plan, ale nie zmieniać go."
+
+#, python-format
+msgid "Bar capped at 100%%, exact value %(value)s"
+msgstr "Pasek ograniczony do 100%%, dokładna wartość %(value)s"
+
+msgid "Key metrics"
+msgstr "Najważniejsze wskaźniki"
+
+msgid "FIRE age"
+msgstr "Wiek FIRE"
+
+msgid ""
+"The age at which the plan first meets its independence rule. The year is "
+"shown beside it."
+msgstr ""
+"Wiek, w którym plan po raz pierwszy spełnia regułę niezależności. Rok "
+"jest pokazany obok."
+
+msgid "Years to FIRE"
+msgstr "Lata do FIRE"
+
+msgid ""
+"The number of plan years from the start year to the FIRE row. The start "
+"year counts as 0."
+msgstr ""
+"Liczba lat planu od roku początkowego do wiersza FIRE. Rok początkowy "
+"liczy się jako 0."
+
+msgid "FIRE number (today's money)"
+msgstr "Kwota FIRE (w dzisiejszych pieniądzach)"
+
+msgid ""
+"The portfolio needed today for the plan's rule to cover its first year's "
+"expenses. It is expressed in today's money."
+msgstr ""
+"Portfel potrzebny dziś, aby reguła planu pokryła wydatki pierwszego roku."
+" Jest wyrażony w dzisiejszych pieniądzach."
+
+msgid "Not defined with these rates."
+msgstr "Nieokreślona przy tych stopach."
+
+msgid "Sustainability"
+msgstr "Trwałość"
+
+#, python-format
+msgid "The portfolio runs out at age %(age)d."
+msgstr "Portfel wyczerpuje się w wieku %(age)d."
+
+#, python-format
+msgid "Lowest net worth after income stops: %(amount)s"
+msgstr "Najniższa wartość netto po zakończeniu dochodów: %(amount)s"
+
+msgid "The portfolio lasts to the horizon."
+msgstr "Portfel wystarcza do końca horyzontu."
+
+msgid "Not checked: no years after income stops fall inside the horizon."
+msgstr "Nie sprawdzono: w horyzoncie nie ma lat po zakończeniu dochodów."
+
+msgid "Sheet progress"
+msgstr "Postęp arkusza"
+
+msgid ""
+"Start net worth divided by net worth at FIRE, as in the original "
+"spreadsheet."
+msgstr ""
+"Początkowa wartość netto podzielona przez wartość netto w roku FIRE, jak "
+"w oryginalnym arkuszu."
+
+msgid "Today's-money progress"
+msgstr "Postęp w dzisiejszych pieniądzach"
+
+msgid "Start portfolio divided by the FIRE number, both in today's money."
+msgstr ""
+"Portfel początkowy podzielony przez kwotę FIRE, oba w dzisiejszych "
+"pieniądzach."
+
+#, python-format
+msgid ""
+"With these inputs, the portfolio never reaches the withdrawal-rate target"
+" before age %(age)d."
+msgstr ""
+"Przy tych danych portfel nigdy nie osiąga celu stopy wypłat przed wiekiem"
+" %(age)d."
+
+#, python-format
+msgid "With these inputs, returns never cover expenses before age %(age)d."
+msgstr "Przy tych danych zyski nigdy nie pokrywają wydatków przed wiekiem %(age)d."
+
+msgid "Preview of unsaved changes."
+msgstr "Podgląd niezapisanych zmian."
+
+msgid ""
+"A changed rate is outside the usual range. Tick the confirmation box in "
+"Plan inputs before saving."
+msgstr ""
+"Zmieniona stopa wykracza poza zwykły zakres. Przed zapisaniem zaznacz "
+"pole potwierdzenia w danych planu."
+
+msgid "Money basis"
+msgstr "Podstawa pieniężna"
+
+msgid "Each year's money"
+msgstr "Pieniądze każdego roku"
+
+msgid "Today's money"
+msgstr "Dzisiejsze pieniądze"
+
+msgid "A view preference; it is not saved with the scenario."
+msgstr "Preferencja widoku; nie jest zapisywana ze scenariuszem."
+
+msgid "The projection is unavailable"
+msgstr "Prognoza jest niedostępna"
+
+#, python-format
+msgid ""
+"The plan is missing a resolved starting value for %(field)s. Linked "
+"inputs arrive in a later update; enter the value manually in Plan inputs."
+msgstr ""
+"W planie brakuje ustalonej wartości początkowej dla: %(field)s. Dane "
+"powiązane pojawią się w późniejszej aktualizacji; wpisz wartość ręcznie w"
+" danych planu."
+
+msgid ""
+"The saved plan cannot be projected. Check the starting values and rates "
+"in Plan inputs, then preview the result."
+msgstr ""
+"Nie można wykonać prognozy zapisanego planu. Sprawdź wartości początkowe "
+"i stopy w danych planu, a następnie wyświetl podgląd wyniku."
+
+msgid ""
+"Projections are illustrative and not financial advice. The projection "
+"assumes constant rates and no taxes; real life will differ."
+msgstr ""
+"Prognozy mają charakter poglądowy i nie stanowią porady finansowej. "
+"Prognoza zakłada stałe stopy i brak podatków; rzeczywistość będzie inna."
+
+msgid "Year by year"
+msgstr "Rok po roku"
+
+msgid "Every amount is in today's money."
+msgstr "Każda kwota jest w dzisiejszych pieniądzach."
+
+msgid "Every amount is in that year's money."
+msgstr "Każda kwota jest w pieniądzach danego roku."
+
+msgid "Download CSV"
+msgstr "Pobierz CSV"
+
+msgid "Year-by-year projection"
+msgstr "Prognoza rok po roku"
+
+#, python-format
+msgid "Year-by-year projection, %(basis)s"
+msgstr "Prognoza rok po roku, %(basis)s"
+
+msgid "today's money"
+msgstr "w dzisiejszych pieniądzach"
+
+msgid "each year's money"
+msgstr "w pieniądzach każdego roku"
+
+msgid "Cash"
+msgstr "Gotówka"
+
+msgid "No income"
+msgstr "Brak dochodów"
+
+msgid ""
+"In the start year, net saving shows the starting portfolio, as in the "
+"original spreadsheet. Its gain is earned on that portfolio."
+msgstr ""
+"W roku początkowym oszczędności netto pokazują portfel początkowy, jak w "
+"oryginalnym arkuszu. Zysk jest naliczany od tego portfela."
+
+msgid ""
+"FIRE rows are highlighted. Rows after income stops are muted; a depleted "
+"row is marked in red."
+msgstr ""
+"Wiersze FIRE są wyróżnione. Wiersze po zakończeniu dochodów są wyciszone;"
+" wyczerpany wiersz jest oznaczony na czerwono."
+
+msgid "All scenarios"
+msgstr "Wszystkie scenariusze"
+
+msgid "Open your profile"
+msgstr "Otwórz swój profil"
+
+msgid ""
+"Projections are illustrative and not financial advice. The starting rates"
+" are examples, not recommendations."
+msgstr ""
+"Prognozy mają charakter poglądowy i nie stanowią porady finansowej. "
+"Początkowe stopy są przykładami, a nie rekomendacjami."
+
 msgid "Save scenario"
 msgstr "Zapisz scenariusz"
 
@@ -6038,9 +6342,6 @@ msgstr "Domyślny"
 #, python-format
 msgid "Age %(age)d in %(year)d"
 msgstr "Wiek %(age)d w %(year)d"
-
-msgid "Income stops"
-msgstr "Dochody kończą się"
 
 msgid "Horizon"
 msgstr "Horyzont"
@@ -6112,11 +6413,6 @@ msgstr "Rok rozpoczęcia %(year)d · wiek %(age)d na początku · waluta %(curre
 
 msgid "Edit scenario"
 msgstr "Edytuj scenariusz"
-
-msgid "This scenario is archived and read-only. Restore it to change its inputs."
-msgstr ""
-"Ten scenariusz jest zarchiwizowany i tylko do odczytu. Przywróć go, aby "
-"zmienić dane."
 
 #, python-format
 msgid ""
@@ -6224,9 +6520,6 @@ msgstr ""
 "przecinku lub średniku w ich treści, aby arkusz kalkulacyjny nie wykonał "
 "ich jako formuł. Takie wartości różnią się wtedy od zapisanych, a "
 "chroniony opis może być za długi do ponownego importu."
-
-msgid "Download CSV"
-msgstr "Pobierz CSV"
 
 msgid "Smallest amount"
 msgstr "Najmniejsza kwota"
@@ -7293,9 +7586,6 @@ msgstr[2] ""
 msgid "Value and invested capital"
 msgstr "Wartość i zainwestowany kapitał"
 
-msgid "Plotted data"
-msgstr "Dane wykresu"
-
 msgid "Plotted performance data"
 msgstr "Dane wykresu wyników"
 
@@ -7965,9 +8255,6 @@ msgstr "Zaloguj się, aby przyjąć"
 
 msgid "Create account and join"
 msgstr "Utwórz konto i dołącz"
-
-msgid "Charts"
-msgstr "Wykresy"
 
 msgid "Dashed lines mark rate changes."
 msgstr "Linie przerywane oznaczają zmiany stopy."

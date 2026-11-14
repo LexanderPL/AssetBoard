@@ -2444,6 +2444,45 @@ msgstr ""
 msgid "Too many requests from your network. Try again later."
 msgstr ""
 
+msgid "FIRE"
+msgstr ""
+
+#, python-format
+msgid "FIRE at age %(age)d (%(year)d)"
+msgstr ""
+
+msgid "Income stops"
+msgstr ""
+
+#, python-format
+msgid "Income stops at age %(age)d"
+msgstr ""
+
+msgid "Depleted"
+msgstr ""
+
+#, python-format
+msgid "Portfolio depleted at age %(age)d"
+msgstr ""
+
+msgid "FIRE year"
+msgstr ""
+
+msgid "Income stopped"
+msgstr ""
+
+msgid "Portfolio depleted"
+msgstr ""
+
+msgid "Net worth in today's money"
+msgstr ""
+
+msgid "Expenses"
+msgstr ""
+
+msgid "Investment gain"
+msgstr ""
+
 msgid "Enter a name of 1 to 200 characters."
 msgstr ""
 
@@ -2532,6 +2571,12 @@ msgstr ""
 msgid "Tick the confirmation box only when you mean the unusual rates."
 msgstr ""
 
+msgid "The plan is missing a starting value."
+msgstr ""
+
+msgid "The saved plan cannot be projected."
+msgstr ""
+
 msgid "The scenario could not be saved. Reload the page and try again."
 msgstr ""
 
@@ -2566,6 +2611,15 @@ msgid "Annual expense change"
 msgstr ""
 
 msgid "Annual income change"
+msgstr ""
+
+msgid "annual income"
+msgstr ""
+
+msgid "annual expenses"
+msgstr ""
+
+msgid "starting portfolio"
 msgstr ""
 
 msgid "This request came from another site and was blocked."
@@ -3106,9 +3160,6 @@ msgid "%(month)s is closed. Choose a date in an open month."
 msgstr ""
 
 msgid "The entry was not saved. Check the marked fields."
-msgstr ""
-
-msgid "Expenses"
 msgstr ""
 
 msgid "No expenses in this month."
@@ -5367,10 +5418,44 @@ msgstr ""
 msgid "Return to overview"
 msgstr ""
 
-msgid "All scenarios"
+msgid "Charts"
+msgstr ""
+
+msgid ""
+"Dashed lines mark FIRE, the income stop and depletion. The FIRE point is "
+"pinned."
+msgstr ""
+
+msgid "Net worth over time"
+msgstr ""
+
+msgid "In today's money."
+msgstr ""
+
+msgid "In each year's money."
+msgstr ""
+
+msgid "Plotted data"
+msgstr ""
+
+msgid "Plotted net worth data"
 msgstr ""
 
 msgid "Year"
+msgstr ""
+
+msgid "Age"
+msgstr ""
+
+msgid "Expenses versus investment gain"
+msgstr ""
+
+msgid ""
+"Both lines are in each year's money, because the independence rule "
+"compares nominal values."
+msgstr ""
+
+msgid "Plotted expenses and gain data"
 msgstr ""
 
 msgid "Net saving"
@@ -5383,14 +5468,6 @@ msgid "Description"
 msgstr ""
 
 msgid "this event"
-msgstr ""
-
-msgid "Open your profile"
-msgstr ""
-
-msgid ""
-"Projections are illustrative and not financial advice. The starting rates"
-" are examples, not recommendations."
 msgstr ""
 
 msgid "Plan"
@@ -5598,6 +5675,198 @@ msgid ""
 "repaid; 500 per year of extra rental income."
 msgstr ""
 
+msgid "Plan inputs"
+msgstr ""
+
+msgid "Change an input to preview the results, then save when you are happy."
+msgstr ""
+
+msgid "Read-only inputs."
+msgstr ""
+
+msgid ""
+"Changes preview automatically and are not saved until you press Save "
+"changes."
+msgstr ""
+
+msgid "Save changes"
+msgstr ""
+
+msgid "Discard changes"
+msgstr ""
+
+msgid "This scenario is archived and read-only. Restore it to change its inputs."
+msgstr ""
+
+msgid "Your role can read this plan but not change it."
+msgstr ""
+
+#, python-format
+msgid "Bar capped at 100%%, exact value %(value)s"
+msgstr ""
+
+msgid "Key metrics"
+msgstr ""
+
+msgid "FIRE age"
+msgstr ""
+
+msgid ""
+"The age at which the plan first meets its independence rule. The year is "
+"shown beside it."
+msgstr ""
+
+msgid "Years to FIRE"
+msgstr ""
+
+msgid ""
+"The number of plan years from the start year to the FIRE row. The start "
+"year counts as 0."
+msgstr ""
+
+msgid "FIRE number (today's money)"
+msgstr ""
+
+msgid ""
+"The portfolio needed today for the plan's rule to cover its first year's "
+"expenses. It is expressed in today's money."
+msgstr ""
+
+msgid "Not defined with these rates."
+msgstr ""
+
+msgid "Sustainability"
+msgstr ""
+
+#, python-format
+msgid "The portfolio runs out at age %(age)d."
+msgstr ""
+
+#, python-format
+msgid "Lowest net worth after income stops: %(amount)s"
+msgstr ""
+
+msgid "The portfolio lasts to the horizon."
+msgstr ""
+
+msgid "Not checked: no years after income stops fall inside the horizon."
+msgstr ""
+
+msgid "Sheet progress"
+msgstr ""
+
+msgid ""
+"Start net worth divided by net worth at FIRE, as in the original "
+"spreadsheet."
+msgstr ""
+
+msgid "Today's-money progress"
+msgstr ""
+
+msgid "Start portfolio divided by the FIRE number, both in today's money."
+msgstr ""
+
+#, python-format
+msgid ""
+"With these inputs, the portfolio never reaches the withdrawal-rate target"
+" before age %(age)d."
+msgstr ""
+
+#, python-format
+msgid "With these inputs, returns never cover expenses before age %(age)d."
+msgstr ""
+
+msgid "Preview of unsaved changes."
+msgstr ""
+
+msgid ""
+"A changed rate is outside the usual range. Tick the confirmation box in "
+"Plan inputs before saving."
+msgstr ""
+
+msgid "Money basis"
+msgstr ""
+
+msgid "Each year's money"
+msgstr ""
+
+msgid "Today's money"
+msgstr ""
+
+msgid "A view preference; it is not saved with the scenario."
+msgstr ""
+
+msgid "The projection is unavailable"
+msgstr ""
+
+#, python-format
+msgid ""
+"The plan is missing a resolved starting value for %(field)s. Linked "
+"inputs arrive in a later update; enter the value manually in Plan inputs."
+msgstr ""
+
+msgid ""
+"The saved plan cannot be projected. Check the starting values and rates "
+"in Plan inputs, then preview the result."
+msgstr ""
+
+msgid ""
+"Projections are illustrative and not financial advice. The projection "
+"assumes constant rates and no taxes; real life will differ."
+msgstr ""
+
+msgid "Year by year"
+msgstr ""
+
+msgid "Every amount is in today's money."
+msgstr ""
+
+msgid "Every amount is in that year's money."
+msgstr ""
+
+msgid "Download CSV"
+msgstr ""
+
+msgid "Year-by-year projection"
+msgstr ""
+
+#, python-format
+msgid "Year-by-year projection, %(basis)s"
+msgstr ""
+
+msgid "today's money"
+msgstr ""
+
+msgid "each year's money"
+msgstr ""
+
+msgid "Cash"
+msgstr ""
+
+msgid "No income"
+msgstr ""
+
+msgid ""
+"In the start year, net saving shows the starting portfolio, as in the "
+"original spreadsheet. Its gain is earned on that portfolio."
+msgstr ""
+
+msgid ""
+"FIRE rows are highlighted. Rows after income stops are muted; a depleted "
+"row is marked in red."
+msgstr ""
+
+msgid "All scenarios"
+msgstr ""
+
+msgid "Open your profile"
+msgstr ""
+
+msgid ""
+"Projections are illustrative and not financial advice. The starting rates"
+" are examples, not recommendations."
+msgstr ""
+
 msgid "Save scenario"
 msgstr ""
 
@@ -5628,9 +5897,6 @@ msgstr ""
 
 #, python-format
 msgid "Age %(age)d in %(year)d"
-msgstr ""
-
-msgid "Income stops"
 msgstr ""
 
 msgid "Horizon"
@@ -5698,9 +5964,6 @@ msgid "Start year %(year)d · age %(age)d at the start · currency %(currency)s"
 msgstr ""
 
 msgid "Edit scenario"
-msgstr ""
-
-msgid "This scenario is archived and read-only. Restore it to change its inputs."
 msgstr ""
 
 #, python-format
@@ -5792,9 +6055,6 @@ msgid ""
 "a comma or semicolon inside it, so that a spreadsheet does not run them "
 "as formulas. Such values then differ from the stored ones, and a "
 "protected description may be too long to import again."
-msgstr ""
-
-msgid "Download CSV"
 msgstr ""
 
 msgid "Smallest amount"
@@ -6765,9 +7025,6 @@ msgstr[1] ""
 msgid "Value and invested capital"
 msgstr ""
 
-msgid "Plotted data"
-msgstr ""
-
 msgid "Plotted performance data"
 msgstr ""
 
@@ -7377,9 +7634,6 @@ msgid "Sign in to accept"
 msgstr ""
 
 msgid "Create account and join"
-msgstr ""
-
-msgid "Charts"
 msgstr ""
 
 msgid "Dashed lines mark rate changes."

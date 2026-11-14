@@ -20,6 +20,16 @@
   }
 
   function readData(element) {
+    // HTMX swaps strip <script> tags, so a chart rendered into an HTMX fragment carries its JSON
+    // in an attribute. Pages with a script source keep working exactly as before.
+    const inline = element.getAttribute("data-chart-json");
+    if (inline !== null) {
+      try {
+        return JSON.parse(inline);
+      } catch {
+        return null;
+      }
+    }
     const source = document.getElementById(element.getAttribute("data-chart-source") || "");
     if (!source) return null;
     try {
@@ -267,6 +277,26 @@
           index === 0 && markers.length
             ? { symbol: "none", silent: true, data: markers }
             : undefined,
+        markPoint:
+          index === 0 && Array.isArray(data.mark_points) && data.mark_points.length
+            ? {
+                symbol: "pin",
+                symbolSize: 42,
+                itemStyle: { color: token("primary-ink") },
+                label: {
+                  show: true,
+                  color: token("on-primary"),
+                  fontSize: 10,
+                  fontWeight: "bold",
+                  formatter: (params) => params.data.labelText || "",
+                },
+                data: data.mark_points.map((point) => ({
+                  name: point.text,
+                  labelText: point.label,
+                  coord: [data.labels[point.index], point.value],
+                })),
+              }
+            : undefined,
       })),
     };
   }
@@ -357,7 +387,19 @@
     element.setAttribute("data-chart-ready", "true");
   }
 
+  function disposeDetached() {
+    // A swap replaces the chart's container; the old ECharts instance would otherwise keep its
+    // canvas, listeners and data alive for the rest of the page.
+    charts.forEach((chart, element) => {
+      if (!element.isConnected || !element.querySelector("[data-chart-canvas]")) {
+        charts.delete(element);
+        chart.dispose();
+      }
+    });
+  }
+
   function drawAll() {
+    disposeDetached();
     document.querySelectorAll('[data-chart="donut"], [data-chart="line"], [data-chart="performance"], [data-chart="loan-payments"]').forEach(draw);
   }
 
@@ -368,6 +410,11 @@
       attributes: true,
       attributeFilter: ["class", "data-theme"],
     });
+    // HTMX swaps can replace a whole chart or a fragment that contains one (the FIRE live
+    // preview). Redraw after the DOM is in place; disposeDetached drops the replaced instances.
+    for (const eventName of ["htmx:afterSwap", "htmx:oobAfterSwap", "htmx:load"]) {
+      document.addEventListener(eventName, drawAll);
+    }
     let pending = 0;
     window.addEventListener("resize", () => {
       window.cancelAnimationFrame(pending);

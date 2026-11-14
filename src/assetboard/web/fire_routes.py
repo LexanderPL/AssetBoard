@@ -11,7 +11,7 @@ import re
 from decimal import Decimal
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.concurrency import run_in_threadpool
 from starlette.responses import RedirectResponse, Response
 
@@ -35,9 +35,12 @@ from assetboard.i18n.numbers import (
     format_rate_short,
     parse_amount,
 )
+from assetboard.services import fire_projection as fire_projection_service
 from assetboard.services import fire_scenarios as fire_service
 from assetboard.services.context import Context, Role, has_role, require_role
 from assetboard.web.context import CurrentContext
+from assetboard.web.fire_charts import build_fire_charts
+from assetboard.web.fire_csv import fire_scenario_csv as render_fire_csv
 from assetboard.web.forms import InvalidPercentOrFixed, signed_percent_to_bp
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
@@ -89,6 +92,8 @@ ERRORS = {
         "A rate is outside the usual range. Tick the confirmation box to save it."
     ),
     "invalid_extreme_rates": _("Tick the confirmation box only when you mean the unusual rates."),
+    "missing_starting_value": _("The plan is missing a starting value."),
+    "invalid_projection": _("The saved plan cannot be projected."),
 }
 
 FALLBACK_ERROR = _("The scenario could not be saved. Reload the page and try again.")
@@ -110,6 +115,11 @@ EVENT_KIND_LABELS = {
     EventKind.CASH.value: _("One-off cash flow"),
     EventKind.EXPENSE_CHANGE.value: _("Annual expense change"),
     EventKind.INCOME_CHANGE.value: _("Annual income change"),
+}
+STARTING_FIELD_LABELS = {
+    "income_manual": _("annual income"),
+    "expenses_manual": _("annual expenses"),
+    "portfolio_manual": _("starting portfolio"),
 }
 
 _CONTRIBUTION_KEY = re.compile(r"^contribution_(year|amount)_([0-9]+)$")
@@ -140,6 +150,11 @@ def _uuid(value: str) -> UUID:
         return UUID(value)
     except ValueError:
         raise NotFound from None
+
+
+def _basis(value: str | None) -> str:
+    """The page's money basis; anything but ``real`` is the default nominal view."""
+    return "real" if value == "real" else "nominal"
 
 
 def _rate_input(rate_bp: int, locale: str) -> str:
@@ -541,27 +556,86 @@ def _list_context(
     }
 
 
-def _detail_context(
+def _results_context(
     request: Request,
     ctx: Context,
-    detail: fire_service.FireScenarioDetail,
+    results: fire_projection_service.FireScenarioResults,
     *,
-    notice: str | None = None,
-    error: str | None = None,
+    basis: str,
+    inputs_open: bool,
+    preview_error: str | None = None,
+    preview_error_field: str | None = None,
 ) -> dict[str, object]:
+    projection = results.projection
     return {
-        "detail": detail,
-        "notice": notice,
-        "error": error,
-        "can_edit": has_role(ctx, Role.EDITOR),
+        "results": results,
+        "detail": results.detail,
+        "projection": projection,
+        "basis": basis,
+        "inputs_open": inputs_open,
+        "charts": (
+            build_fire_charts(projection, basis, request.state.locale)
+            if projection is not None
+            else None
+        ),
+        "preview_error": preview_error,
+        "preview_error_field": preview_error_field,
+        "can_preview": has_role(ctx, Role.EDITOR) and not results.detail.scenario.archived,
+        "field_labels": {
+            field: _t(request, label) for field, label in STARTING_FIELD_LABELS.items()
+        },
         "format_money": format_money,
         "format_rate_short": format_rate_short,
-        "format_day": format_day,
         "rule_labels": {code: _t(request, label) for code, label in RULE_LABELS.items()},
         "event_kind_labels": {
             code: _t(request, label) for code, label in EVENT_KIND_LABELS.items()
         },
     }
+
+
+def _combined_context(
+    request: Request,
+    ctx: Context,
+    results: fire_projection_service.FireScenarioResults,
+    *,
+    basis: str,
+    inputs_open: bool,
+    notice: str | None = None,
+    error: str | None = None,
+    error_code: str | None = None,
+    error_field: str | None = None,
+    values: dict[str, str] | None = None,
+    contribution_rows: list[dict[str, str]] | None = None,
+    event_rows: list[dict[str, str]] | None = None,
+) -> dict[str, object]:
+    detail = results.detail
+    context = _form_context(
+        request,
+        ctx,
+        detail=detail,
+        defaults=None,
+        values=values,
+        contribution_rows=contribution_rows,
+        event_rows=event_rows,
+        error=error,
+        error_code=error_code,
+        error_field=error_field,
+    )
+    context.update(
+        _results_context(
+            request,
+            ctx,
+            results,
+            basis=basis,
+            inputs_open=inputs_open,
+        )
+    )
+    context["notice"] = notice
+    results_url = request.url_for("fire_scenario", scenario_id=str(detail.scenario.id)).path
+    if basis == "real":
+        results_url = f"{results_url}?basis=real"
+    context["cancel_url"] = results_url
+    return context
 
 
 async def _form_values(request: Request) -> dict[str, str]:
@@ -575,6 +649,8 @@ def _redirect(
     *,
     notice: str | None = None,
     error: str | None = None,
+    basis: str | None = None,
+    anchor: str | None = None,
     **params: str,
 ) -> RedirectResponse:
     url = request.url_for(route, **params).path
@@ -583,8 +659,12 @@ def _redirect(
         query.append(f"notice={notice}")
     if error is not None:
         query.append(f"error={error}")
+    if basis == "real":
+        query.append("basis=real")
     if query:
         url = f"{url}?{'&'.join(query)}"
+    if anchor is not None:
+        url = f"{url}#{anchor}"
     return RedirectResponse(url, status_code=303)
 
 
@@ -656,21 +736,27 @@ async def fire_scenario_create(request: Request, ctx: CurrentContext) -> Respons
 
 @router.get("/fire/{scenario_id}", name="fire_scenario")
 async def fire_scenario_page(request: Request, ctx: CurrentContext, scenario_id: str) -> Response:
-    detail = await run_in_threadpool(
-        fire_service.get_fire_scenario,
+    results = await run_in_threadpool(
+        fire_projection_service.scenario_results,
         request.app.state.session_factory,
         ctx,
         _uuid(scenario_id),
     )
+    error_code = request.query_params.get("error")
+    error = _error(request, error_code)
+    inputs_open = request.query_params.get("edit") == "1" or error is not None
     context = await run_in_threadpool(
-        _detail_context,
+        _combined_context,
         request,
         ctx,
-        detail,
+        results,
+        basis=_basis(request.query_params.get("basis")),
+        inputs_open=inputs_open,
         notice=_notice(request, request.query_params.get("notice")),
-        error=_error(request, request.query_params.get("error")),
+        error=error,
+        error_code=error_code,
     )
-    return render_template(request, "fire/overview.html", context=context)
+    return render_template(request, "fire/results.html", context=context)
 
 
 @router.get("/fire/{scenario_id}/edit", name="fire_scenario_edit")
@@ -689,18 +775,80 @@ async def fire_scenario_edit(request: Request, ctx: CurrentContext, scenario_id:
             error="archived",
             scenario_id=str(detail.scenario.id),
         )
+    url = request.url_for("fire_scenario", scenario_id=str(detail.scenario.id)).path
+    return RedirectResponse(f"{url}?edit=1#inputs", status_code=303)
+
+
+@router.post("/fire/{scenario_id}/preview", name="fire_scenario_preview")
+async def fire_scenario_preview(
+    request: Request, ctx: CurrentContext, scenario_id: str
+) -> Response:
+    """Return only the results fragment for the posted inputs; never write anything."""
+    require_role(ctx, Role.EDITOR)
+    values = await _form_values(request)
+    detail = await run_in_threadpool(
+        fire_service.get_fire_scenario,
+        request.app.state.session_factory,
+        ctx,
+        _uuid(scenario_id),
+    )
+    basis = _basis(values.get("basis"))
+    try:
+        scenario = _scenario_input(values, request.state.locale, detail.scenario.currency)
+        results = await run_in_threadpool(
+            fire_projection_service.preview_scenario_results,
+            ctx,
+            detail,
+            scenario,
+        )
+    except fire_service.FireError as exc:
+        # The preview never replaces the saved result with a broken one: show what is saved and
+        # explain the field the user needs to fix.
+        saved = fire_projection_service.results_from_detail(detail)
+        context = await run_in_threadpool(
+            _results_context,
+            request,
+            ctx,
+            saved,
+            basis=basis,
+            inputs_open=True,
+            preview_error=_error(request, exc.code),
+            preview_error_field=exc.field,
+        )
+        return render_template(request, "fire/_results.html", context=context)
     context = await run_in_threadpool(
-        _form_context,
+        _results_context,
         request,
         ctx,
-        detail=detail,
-        defaults=None,
-        values=None,
-        contribution_rows=None,
-        event_rows=None,
-        error=_error(request, request.query_params.get("error")),
+        results,
+        basis=basis,
+        inputs_open=True,
     )
-    return render_template(request, "fire/form.html", context=context)
+    return render_template(request, "fire/_results.html", context=context)
+
+
+@router.get("/fire/{scenario_id}/results.csv", name="fire_scenario_csv")
+async def fire_scenario_csv(request: Request, ctx: CurrentContext, scenario_id: str) -> Response:
+    results = await run_in_threadpool(
+        fire_projection_service.scenario_results,
+        request.app.state.session_factory,
+        ctx,
+        _uuid(scenario_id),
+    )
+    if results.projection is None:
+        code = results.blocked.code if results.blocked is not None else "invalid_projection"
+        raise HTTPException(status_code=409, detail=_error(request, code))
+    content = await run_in_threadpool(render_fire_csv, results.projection)
+    filename = f"fire-scenario-{results.detail.scenario.id}.csv"
+    return Response(
+        content,
+        media_type="text/csv; charset=utf-8",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Cache-Control": "no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.post("/fire/{scenario_id}", name="fire_scenario_update")
@@ -725,21 +873,29 @@ async def fire_scenario_update(request: Request, ctx: CurrentContext, scenario_i
             scenario,
         )
     except fire_service.FireError as exc:
+        saved = await run_in_threadpool(fire_projection_service.results_from_detail, detail)
         context = await run_in_threadpool(
-            _form_context,
+            _combined_context,
             request,
             ctx,
-            detail=detail,
-            defaults=None,
-            values=values,
-            contribution_rows=rows,
-            event_rows=event_rows,
+            saved,
+            basis=_basis(values.get("basis")),
+            inputs_open=True,
             error=_error(request, exc.code),
             error_code=exc.code,
             error_field=exc.field,
+            values=values,
+            contribution_rows=rows,
+            event_rows=event_rows,
         )
-        return render_template(request, "fire/form.html", status_code=400, context=context)
-    return _redirect(request, "fire_scenario", notice="saved", scenario_id=str(saved_id))
+        return render_template(request, "fire/results.html", status_code=400, context=context)
+    return _redirect(
+        request,
+        "fire_scenario",
+        notice="saved",
+        basis=_basis(values.get("basis")),
+        scenario_id=str(saved_id),
+    )
 
 
 @router.post("/fire/{scenario_id}/duplicate", name="fire_scenario_duplicate")

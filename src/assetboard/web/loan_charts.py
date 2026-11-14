@@ -15,6 +15,7 @@ from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day
 from assetboard.i18n.numbers import format_money, format_rate_short
 from assetboard.services.loan_scenarios import LoanScenarioComparison
+from assetboard.web.chart_axis import money_axis
 
 
 @dataclass(frozen=True, slots=True)
@@ -42,33 +43,6 @@ class LoanCharts:
     payment_points: tuple[PaymentPoint, ...]
     has_baseline: bool
     has_overpayments: bool
-
-
-def _nice_step(span: int) -> int:
-    raw = max(1, span // 5)
-    magnitude = 10 ** (len(str(raw)) - 1)
-    for factor in (1, 2, 5, 10):
-        step = factor * magnitude
-        if step >= raw:
-            return step
-    return 10 * magnitude
-
-
-def _axis(values: list[int], currency: str, locale: str) -> tuple[int, int, int, dict[str, str]]:
-    low_value = min((0, *values))
-    high_value = max((0, *values))
-    if high_value == low_value:
-        high_value = low_value + 1
-    step = _nice_step(high_value - low_value)
-    low = (low_value // step) * step
-    high = -((-high_value) // step) * step
-    if high == low:
-        high = low + step
-    labels = {
-        str(tick): format_money(Money(tick, currency), locale)
-        for tick in range(low, high + 1, step)
-    }
-    return low, high, step, labels
 
 
 def _amount(value: int | None, currency: str, locale: str) -> str:
@@ -115,7 +89,7 @@ def _balance_data(
             baseline.rows[index].closing.amount_minor if index < len(baseline.rows) else None
         )
     complete = [value for value in (*plan_values, *baseline_values) if value is not None]
-    low, high, step, axis_labels = _axis(complete, schedule.currency, locale)
+    low, high, step, axis_labels = money_axis(complete, schedule.currency, locale)
     tooltips: list[list[str]] = [[]]
     for row in schedule.rows:
         extra: list[str] = []
@@ -210,7 +184,7 @@ def _payments_data(
         principal[i] + interest[i] + costs[i] + (overpayment[i] if show_overpayment else 0)
         for i in range(len(rows))
     ]
-    low, high, step, axis_labels = _axis(totals, schedule.currency, locale)
+    low, high, step, axis_labels = money_axis(totals, schedule.currency, locale)
     tooltips = []
     for row in rows:
         lines = [
@@ -345,7 +319,7 @@ def build_scenario_chart(comparison: LoanScenarioComparison, locale: str) -> Sce
             }
         )
         series_meta.append(ScenarioChartSeries(name=label, color=color))
-    low, high, step, axis_labels = _axis(all_values, source.currency, locale)
+    low, high, step, axis_labels = money_axis(all_values, source.currency, locale)
 
     marker_entries: list[tuple[int, str, str]] = []
     seen: set[tuple[int, int]] = set()
