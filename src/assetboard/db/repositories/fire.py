@@ -4,7 +4,12 @@ from uuid import UUID
 
 from sqlalchemy import func, select
 
-from assetboard.db.models.fire import FireContribution, FireEvent, FireScenario
+from assetboard.db.models.fire import (
+    FireContribution,
+    FireEvent,
+    FireExpenseExclusion,
+    FireScenario,
+)
 from assetboard.db.repositories.base import ScopedRepository
 
 
@@ -78,6 +83,32 @@ class FireContributionRepository(ScopedRepository[FireContribution]):
             select(FireContribution.scenario_id, func.count())
             .where(FireContribution.workspace_id == self._workspace_id)
             .group_by(FireContribution.scenario_id)
+        )
+        return dict(self._session.execute(statement).all())
+
+
+class FireExpenseExclusionRepository(ScopedRepository[FireExpenseExclusion]):
+    """Excluded expense categories of one scenario; reconciled by category id."""
+
+    model = FireExpenseExclusion
+    unsupported = frozenset({"update"})
+
+    def create(self, *, scenario_id: UUID, category_id: UUID) -> FireExpenseExclusion:
+        return self.add(FireExpenseExclusion(scenario_id=scenario_id, category_id=category_id))
+
+    def for_scenario(self, scenario_id: UUID) -> list[FireExpenseExclusion]:
+        statement = (
+            self._scoped_select()
+            .where(FireExpenseExclusion.scenario_id == scenario_id)
+            .order_by(FireExpenseExclusion.category_id)
+        )
+        return list(self._session.scalars(statement))
+
+    def counts_by_category(self) -> dict[UUID, int]:
+        statement = (
+            select(FireExpenseExclusion.category_id, func.count())
+            .where(FireExpenseExclusion.workspace_id == self._workspace_id)
+            .group_by(FireExpenseExclusion.category_id)
         )
         return dict(self._session.execute(statement).all())
 

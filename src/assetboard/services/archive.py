@@ -29,6 +29,7 @@ from assetboard.db.repositories import (
     CurrentWorkspaceRepository,
     FireContributionRepository,
     FireEventRepository,
+    FireExpenseExclusionRepository,
     FireScenarioRepository,
     FxRateRepository,
     IncomeSourceRepository,
@@ -143,6 +144,7 @@ ARCHIVE_EXCLUDED_MODELS = {
     "AuditEvent": "audit history is intentionally not portable",
     "FireContribution": "FIRE scenarios require the F8.6 archive extension",
     "FireEvent": "FIRE scenarios require the F8.6 archive extension",
+    "FireExpenseExclusion": "FIRE scenarios require the F8.6 archive extension",
     "FireScenario": "FIRE scenarios require the F8.6 archive extension",
     "ImportBatch": "temporary import state and user reports are not portable",
     "ImportCategoryMapping": (
@@ -517,6 +519,10 @@ def _has_fire_events(session: Session, ctx: Context) -> bool:
     return FireEventRepository(session, ctx).any_exists()
 
 
+def _has_fire_expense_exclusions(session: Session, ctx: Context) -> bool:
+    return FireExpenseExclusionRepository(session, ctx).any_exists()
+
+
 def _has_reference_rates(session: Session, ctx: Context) -> bool:
     return ReferenceRateRepository(session, ctx).any_exists()
 
@@ -563,6 +569,7 @@ EMPTINESS_CHECKS = (
     _has_fire_scenarios,
     _has_fire_contributions,
     _has_fire_events,
+    _has_fire_expense_exclusions,
 )
 
 

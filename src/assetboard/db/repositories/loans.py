@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Collection
 from datetime import date
 from uuid import UUID
 
@@ -42,6 +43,17 @@ class LoanRateChangeRepository(ScopedRepository[LoanRateChange]):
     def for_loan(self, loan_id: UUID) -> list[LoanRateChange]:
         statement = self._scoped_select().where(LoanRateChange.loan_id == loan_id)
         return list(self._session.scalars(statement.order_by(LoanRateChange.effective_from)))
+
+    def for_loans(self, loan_ids: Collection[UUID]) -> list[LoanRateChange]:
+        ids = list(loan_ids)
+        if not ids:
+            return []
+        statement = (
+            self._scoped_select()
+            .where(LoanRateChange.loan_id.in_(ids))
+            .order_by(LoanRateChange.loan_id, LoanRateChange.effective_from)
+        )
+        return list(self._session.scalars(statement))
 
     def get_for_loan(self, loan_id: UUID, change_id: UUID) -> LoanRateChange | None:
         statement = self._scoped_select().where(
@@ -92,6 +104,13 @@ class ReferenceRateRepository(ScopedRepository[ReferenceRate]):
         statement = self._scoped_select().order_by(ReferenceRate.name, ReferenceRate.id)
         return list(self._session.scalars(statement))
 
+    def by_ids(self, rate_ids: Collection[UUID]) -> list[ReferenceRate]:
+        ids = list(rate_ids)
+        if not ids:
+            return []
+        statement = self._scoped_select().where(ReferenceRate.id.in_(ids))
+        return list(self._session.scalars(statement))
+
     def by_name_key(self, name_key: str) -> ReferenceRate | None:
         statement = self._scoped_select().where(ReferenceRate.name_key == name_key)
         return self._session.scalars(statement).one_or_none()
@@ -124,6 +143,17 @@ class ReferenceRateValueRepository(ScopedRepository[ReferenceRateValue]):
             ReferenceRateValue.reference_rate_id == reference_rate_id
         )
         return list(self._session.scalars(statement.order_by(ReferenceRateValue.effective_from)))
+
+    def for_rates(self, reference_rate_ids: Collection[UUID]) -> list[ReferenceRateValue]:
+        ids = list(reference_rate_ids)
+        if not ids:
+            return []
+        statement = (
+            self._scoped_select()
+            .where(ReferenceRateValue.reference_rate_id.in_(ids))
+            .order_by(ReferenceRateValue.reference_rate_id, ReferenceRateValue.effective_from)
+        )
+        return list(self._session.scalars(statement))
 
     def get_for_rate(self, reference_rate_id: UUID, value_id: UUID) -> ReferenceRateValue | None:
         statement = self._scoped_select().where(
@@ -171,6 +201,21 @@ class LoanCostComponentRepository(ScopedRepository[LoanCostComponent]):
             )
         )
 
+    def for_loans(self, loan_ids: Collection[UUID]) -> list[LoanCostComponent]:
+        ids = list(loan_ids)
+        if not ids:
+            return []
+        statement = (
+            self._scoped_select()
+            .where(LoanCostComponent.loan_id.in_(ids))
+            .order_by(
+                LoanCostComponent.loan_id,
+                LoanCostComponent.effective_from,
+                LoanCostComponent.name,
+            )
+        )
+        return list(self._session.scalars(statement))
+
     def get_for_loan(self, loan_id: UUID, component_id: UUID) -> LoanCostComponent | None:
         statement = self._scoped_select().where(
             LoanCostComponent.loan_id == loan_id,
@@ -190,6 +235,17 @@ class LoanOverpaymentRepository(ScopedRepository[LoanOverpayment]):
         return list(
             self._session.scalars(statement.order_by(LoanOverpayment.date, LoanOverpayment.id))
         )
+
+    def for_loans(self, loan_ids: Collection[UUID]) -> list[LoanOverpayment]:
+        ids = list(loan_ids)
+        if not ids:
+            return []
+        statement = (
+            self._scoped_select()
+            .where(LoanOverpayment.loan_id.in_(ids))
+            .order_by(LoanOverpayment.loan_id, LoanOverpayment.date, LoanOverpayment.id)
+        )
+        return list(self._session.scalars(statement))
 
     def get_for_loan(self, loan_id: UUID, overpayment_id: UUID) -> LoanOverpayment | None:
         statement = self._scoped_select().where(
@@ -212,6 +268,21 @@ class LoanBalanceCheckpointRepository(ScopedRepository[LoanBalanceCheckpoint]):
                 statement.order_by(LoanBalanceCheckpoint.as_of, LoanBalanceCheckpoint.id)
             )
         )
+
+    def for_loans(self, loan_ids: Collection[UUID]) -> list[LoanBalanceCheckpoint]:
+        ids = list(loan_ids)
+        if not ids:
+            return []
+        statement = (
+            self._scoped_select()
+            .where(LoanBalanceCheckpoint.loan_id.in_(ids))
+            .order_by(
+                LoanBalanceCheckpoint.loan_id,
+                LoanBalanceCheckpoint.as_of,
+                LoanBalanceCheckpoint.id,
+            )
+        )
+        return list(self._session.scalars(statement))
 
     def latest_on_or_before(self, loan_id: UUID, day: date) -> LoanBalanceCheckpoint | None:
         statement = (

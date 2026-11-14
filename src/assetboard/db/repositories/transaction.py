@@ -67,6 +67,16 @@ class CategoryCounts:
 
 
 @dataclass(frozen=True, slots=True)
+class RegularWindowTotal:
+    """A direction's regular-transaction total for one category and calendar month."""
+
+    category_id: UUID
+    month: YearMonth
+    currency: str
+    amount_minor: int
+
+
+@dataclass(frozen=True, slots=True)
 class DescriptionMatch:
     """One (description, category) pair among non-deleted rows, with its use count."""
 
@@ -306,6 +316,53 @@ class TransactionRepository(ScopedRepository[Transaction]):
         for category_id, y, m in self._session.execute(statement):
             months.setdefault(category_id, set()).add(YearMonth(int(y), int(m)))
         return {category_id: frozenset(found) for category_id, found in months.items()}
+
+    def regular_window_totals(
+        self, *, direction: str, start: date, end: date
+    ) -> list[RegularWindowTotal]:
+        """Non-deleted, regular-category totals by category, month and currency.
+
+        Only categories with ``treatment='regular'`` count, so savings and transfers are
+        excluded. ``amount_minor`` is a BIGINT and may be summed in SQL; decimals are not.
+        """
+        year = cast(extract("year", Transaction.date), Integer)
+        month = cast(extract("month", Transaction.date), Integer)
+        statement = (
+            select(
+                Transaction.category_id,
+                year,
+                month,
+                Transaction.currency,
+                func.sum(Transaction.amount_minor),
+            )
+            .join(
+                Category,
+                and_(
+                    Category.workspace_id == Transaction.workspace_id,
+                    Category.id == Transaction.category_id,
+                ),
+            )
+            .where(
+                Transaction.workspace_id == self._workspace_id,
+                Transaction.deleted_at.is_(None),
+                Transaction.direction == direction,
+                Transaction.date >= start,
+                Transaction.date <= end,
+                Category.treatment == "regular",
+            )
+            .group_by(Transaction.category_id, year, month, Transaction.currency)
+        )
+        return [
+            RegularWindowTotal(
+                category_id=category_id,
+                month=YearMonth(int(row_year), int(row_month)),
+                currency=currency,
+                amount_minor=int(total),
+            )
+            for category_id, row_year, row_month, currency, total in self._session.execute(
+                statement
+            )
+        ]
 
     def any_exists(self) -> bool:
         """Whether the workspace has any transaction, soft-deleted ones included."""

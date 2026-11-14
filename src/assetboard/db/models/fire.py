@@ -11,6 +11,9 @@ is the meaning: positive saves/adds/increases, negative dissaves/withdraws/reduc
 
 Scenarios are archived, never hard-deleted. A partial unique index keeps active names unique
 ignoring case; another keeps at most one active default per workspace.
+
+F8.4 adds ``fire_expense_exclusions``: regular expense categories left out of a scenario's
+linked trailing expenses. The category must stay a regular expense category while referenced.
 """
 
 from __future__ import annotations
@@ -208,6 +211,45 @@ class FireContribution(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     scenario_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
     year: Mapped[int] = mapped_column(Integer(), nullable=False)
     net_amount_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+
+
+class FireExpenseExclusion(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
+    """One expense category excluded from a scenario's linked trailing expenses (F8.4).
+
+    The category must be a regular expense category when it is saved; the category usage seam
+    keeps it regular (and an expense) while the exclusion exists. Archived categories remain
+    valid so an old exclusion keeps meaning the same thing.
+    """
+
+    __tablename__ = "fire_expense_exclusions"
+    __table_args__ = (
+        UniqueConstraint(
+            "workspace_id",
+            "scenario_id",
+            "category_id",
+            name="uq_fire_expense_exclusions_workspace_scenario_category",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "scenario_id"],
+            ["fire_scenarios.workspace_id", "fire_scenarios.id"],
+            name="fk_fire_expense_exclusions_workspace_scenario",
+            ondelete="CASCADE",
+        ),
+        ForeignKeyConstraint(
+            ["workspace_id", "category_id"],
+            ["categories.workspace_id", "categories.id"],
+            name="fk_fire_expense_exclusions_workspace_category",
+            ondelete="CASCADE",
+        ),
+        Index(
+            "ix_fire_expense_exclusions_workspace_scenario",
+            "workspace_id",
+            "scenario_id",
+        ),
+    )
+
+    scenario_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
+    category_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
 
 
 class FireEvent(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):

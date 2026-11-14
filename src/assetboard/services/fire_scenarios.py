@@ -6,8 +6,9 @@ route: roles, the required birth year, rate bounds and the confirmation for unus
 age horizon and the contribution/event year windows. Archived scenarios are read-only; there is
 no hard delete. Exactly one active scenario is the default whenever an active one exists.
 
-F8.1 stores the linked input modes but accepts only ``manual``; a linked value is refused with
-``linked_mode_unavailable`` until F8.4 resolves it from the app's own data.
+F8.4 resolves the linked input modes from the app's own data at read/projection time, so a
+linked mode stores no manual amount. Expense-category exclusions are validated against the
+workspace and reconciled by category id.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ from assetboard.db.repositories import (
     CurrentWorkspaceRepository,
     FireContributionRepository,
     FireEventRepository,
+    FireExpenseExclusionRepository,
     FireScenarioRepository,
 )
 from assetboard.domain.fire import (
@@ -64,6 +66,10 @@ from assetboard.domain.money import Money
 from assetboard.domain.text import text_key
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR
 from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.fire_linked import (
+    ExpenseExclusionError,
+    validate_expense_exclusions_in_session,
+)
 
 
 class FireError(Exception):
@@ -111,6 +117,7 @@ class FireScenarioInput:
     expenses_manual: Money | None = None
     portfolio_mode: str = PortfolioMode.MANUAL.value
     portfolio_manual: Money | None = None
+    expense_exclusion_ids: tuple[UUID, ...] = ()
     extreme_rates_confirmed: bool = False
     contributions: tuple[ContributionInput, ...] = ()
     events: tuple[EventInput, ...] = ()
@@ -185,6 +192,7 @@ class FireScenarioDetail:
     scenario: FireScenarioView
     contributions: tuple[ContributionView, ...]
     events: tuple[EventView, ...]
+    expense_exclusion_ids: tuple[UUID, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -208,11 +216,12 @@ class ValidatedScenario:
     rule: Rule
     swr_bp: int | None
     income_mode: IncomeMode
-    income_manual_minor: int
+    income_manual_minor: int | None
     expenses_mode: ExpensesMode
-    expenses_manual_minor: int
+    expenses_manual_minor: int | None
     portfolio_mode: PortfolioMode
-    portfolio_manual_minor: int
+    portfolio_manual_minor: int | None
+    expense_exclusion_ids: tuple[UUID, ...]
     contributions: tuple[ContributionInput, ...]
     events: tuple[EventInput, ...]
     # True when a changed rate is outside its ordinary range and the form should say so. A preview
@@ -251,10 +260,10 @@ def _manual_minor(
     mode: IncomeMode | ExpensesMode | PortfolioMode,
     amount: Money | None,
     currency: str,
-) -> int:
-    # F8.1 accepts manual inputs only; F8.4 removes this branch and resolves linked values.
+) -> int | None:
+    """A manual starting amount, or ``None`` for a mode resolved from the app's data."""
     if mode.value != "manual":
-        raise FireError(field, "linked_mode_unavailable")
+        return None
     if amount is None or amount.currency != currency:
         raise FireError(field, "invalid_amount")
     if not 0 <= amount.amount_minor <= MAX_AMOUNT_MINOR:
@@ -342,6 +351,14 @@ def validate_scenario_input(
     portfolio_manual = _manual_minor(
         "portfolio_manual", portfolio_mode, scenario.portfolio_manual, currency
     )
+    exclusion_ids: list[UUID] = []
+    seen_exclusions: set[UUID] = set()
+    for exclusion_id in scenario.expense_exclusion_ids:
+        if type(exclusion_id) is not UUID:
+            raise FireError("expense_exclusions", "invalid_expense_exclusion")
+        if exclusion_id not in seen_exclusions:
+            seen_exclusions.add(exclusion_id)
+            exclusion_ids.append(exclusion_id)
 
     needs_confirmation = extreme_rate_change(
         inflation_bp=inflation_bp,
@@ -417,6 +434,7 @@ def validate_scenario_input(
         expenses_manual_minor=expenses_manual,
         portfolio_mode=portfolio_mode,
         portfolio_manual_minor=portfolio_manual,
+        expense_exclusion_ids=tuple(exclusion_ids),
         contributions=tuple(contributions),
         events=tuple(events),
         needs_extreme_confirmation=needs_confirmation,
@@ -501,6 +519,13 @@ def _audit(session: Session, ctx: Context, action: str, row: FireScenario) -> No
     )
 
 
+def _check_expense_exclusions(session: Session, ctx: Context, validated: ValidatedScenario) -> None:
+    try:
+        validate_expense_exclusions_in_session(session, ctx, validated.expense_exclusion_ids)
+    except ExpenseExclusionError:
+        raise FireError("expense_exclusions", "invalid_expense_exclusion") from None
+
+
 def _reconcile_rows(
     session: Session,
     ctx: Context,
@@ -561,6 +586,16 @@ def _reconcile_rows(
     for current in existing_events.values():
         events.delete(current)
 
+    exclusions = FireExpenseExclusionRepository(session, ctx)
+    existing_exclusions = {row.category_id: row for row in exclusions.for_scenario(scenario_id)}
+    wanted_exclusions = set(validated.expense_exclusion_ids)
+    for category_id in validated.expense_exclusion_ids:
+        if category_id not in existing_exclusions:
+            exclusions.create(scenario_id=scenario_id, category_id=category_id)
+    for category_id, current in existing_exclusions.items():
+        if category_id not in wanted_exclusions:
+            exclusions.delete(current)
+
 
 def _copy_rows(session: Session, ctx: Context, source: UUID, target: UUID) -> None:
     contributions = FireContributionRepository(session, ctx)
@@ -577,6 +612,9 @@ def _copy_rows(session: Session, ctx: Context, source: UUID, target: UUID) -> No
             amount_minor=row.amount_minor,
             label=row.label,
         )
+    exclusions = FireExpenseExclusionRepository(session, ctx)
+    for row in exclusions.for_scenario(source):
+        exclusions.create(scenario_id=target, category_id=row.category_id)
 
 
 def _promote_default(
@@ -655,6 +693,7 @@ def get_fire_scenario(
         row = FireScenarioRepository(session, ctx).get_or_raise(scenario_id)
         contributions = FireContributionRepository(session, ctx).for_scenario(row.id)
         events = FireEventRepository(session, ctx).for_scenario(row.id)
+        exclusions = FireExpenseExclusionRepository(session, ctx).for_scenario(row.id)
         view = _view(row, contribution_count=len(contributions), event_count=len(events))
         return FireScenarioDetail(
             scenario=view,
@@ -676,6 +715,7 @@ def get_fire_scenario(
                 )
                 for item in events
             ),
+            expense_exclusion_ids=tuple(item.category_id for item in exclusions),
         )
 
 
@@ -699,6 +739,7 @@ def create_fire_scenario(
             currency=currency,
             default_horizon=profile_horizon,
         )
+        _check_expense_exclusions(session, ctx, validated)
         repository = FireScenarioRepository(session, ctx)
         if repository.active_by_name_key(validated.name_key) is not None:
             raise FireError("name", "duplicate_name")
@@ -742,6 +783,7 @@ def update_fire_scenario(
                 row.swr_bp,
             ),
         )
+        _check_expense_exclusions(session, ctx, validated)
         existing = repository.active_by_name_key(validated.name_key)
         if existing is not None and existing.id != row.id:
             raise FireError("name", "duplicate_name")

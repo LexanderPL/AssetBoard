@@ -23,12 +23,17 @@ class CategoryUsage:
     active_transactions: int = 0  # non-deleted transactions (shown when the treatment changes)
     # Months whose totals depend on the category's treatment (non-deleted rows only).
     active_months: frozenset[YearMonth] = field(default_factory=frozenset[YearMonth])
+    # A FIRE exclusion only makes sense while the category stays a regular expense category.
+    requires_regular_expense: bool = False
 
     def __add__(self, other: CategoryUsage) -> CategoryUsage:
         return CategoryUsage(
             references=self.references + other.references,
             active_transactions=self.active_transactions + other.active_transactions,
             active_months=self.active_months | other.active_months,
+            requires_regular_expense=(
+                self.requires_regular_expense or other.requires_regular_expense
+            ),
         )
 
 

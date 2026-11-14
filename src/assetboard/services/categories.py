@@ -63,6 +63,7 @@ from assetboard.i18n import gettext
 from assetboard.services.budget import category_usage as budget_line_usage
 from assetboard.services.category_usage import CategoryUsage, UsageSource
 from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.fire_usage import category_usage as fire_usage
 from assetboard.services.income import category_usage as income_usage
 from assetboard.services.scheduled import category_usage as scheduled_usage
 from assetboard.services.transactions import category_usage as transaction_usage
@@ -75,6 +76,7 @@ USAGE_SOURCES: list[UsageSource] = [
     budget_line_usage,
     scheduled_usage,
     income_usage,
+    fire_usage,
 ]
 
 
@@ -102,6 +104,13 @@ class KindChangeBlocked(CategoryError):
 
     code = "kind_in_use"
     field = "kind"
+
+
+class TreatmentChangeBlocked(CategoryError):
+    """A FIRE exclusion depends on the category staying a regular expense category."""
+
+    code = "treatment_in_use"
+    field = "treatment"
 
 
 class CategoryArchived(CategoryError):
@@ -369,6 +378,8 @@ def update_category(
         kind_changes = category.kind != wanted_kind.value
         if kind_changes and used.references > 0:
             raise KindChangeBlocked
+        if used.requires_regular_expense and wanted_treatment is not Treatment.REGULAR:
+            raise TreatmentChangeBlocked
         if kind_changes or category.name_key != key:
             _ensure_unique(repository, kind=wanted_kind, key=key, own_id=category.id)
         changes: dict[str, object] = {

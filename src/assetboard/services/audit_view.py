@@ -214,6 +214,7 @@ DATA_KEYS: dict[str, tuple[str, ...]] = {
     "fire_scenario.archived": ("name",),
     "fire_scenario.restored": ("name",),
     "fire_scenario.default_changed": ("name",),
+    "fire_scenario.loan_payoff_event": ("loan", "year"),
     "investment_transaction.created": (
         "instrument",
         "transaction_type",
@@ -375,6 +376,7 @@ ACTION_LABELS: dict[str, str] = {
     "fire_scenario.archived": _("FIRE scenario archived"),
     "fire_scenario.restored": _("FIRE scenario restored"),
     "fire_scenario.default_changed": _("FIRE default scenario changed"),
+    "fire_scenario.loan_payoff_event": _("FIRE loan payoff added"),
     "investment_transaction.created": _("Investment transaction added"),
     "investment_transaction.updated": _("Investment transaction changed"),
     "investment_transaction.deleted": _("Investment transaction deleted"),
@@ -432,6 +434,8 @@ KEY_LABELS: dict[str, str] = {
     "rows_skipped": _("Rows skipped"),
     "transactions": _("Transactions"),
     "name": _("Name"),
+    "loan": _("Loan"),
+    "year": _("Year"),
     "kind": _("Kind"),
     "type": _("Type"),
     "investable": _("Investable"),
@@ -743,6 +747,7 @@ GROUPS: dict[Scope, dict[str, tuple[str, ...]]] = {
             "fire_scenario.archived",
             "fire_scenario.restored",
             "fire_scenario.default_changed",
+            "fire_scenario.loan_payoff_event",
         ),
         "transactions": (
             "transaction.created",
