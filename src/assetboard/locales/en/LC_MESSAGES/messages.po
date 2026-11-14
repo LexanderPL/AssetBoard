@@ -5972,30 +5972,6 @@ msgid ""
 "projection will have no working years beyond age %(horizon)d."
 msgstr ""
 
-msgid "Income growth"
-msgstr ""
-
-#, python-format
-msgid "Entered manually in today's money, in %(currency)s."
-msgstr ""
-
-#, python-format
-msgid "%(num)d row"
-msgid_plural "%(num)d rows"
-msgstr[0] ""
-msgstr[1] ""
-
-msgid "No overrides. Every year uses income minus expenses."
-msgstr ""
-
-msgid "No events."
-msgstr ""
-
-msgid ""
-"Projections are illustrative and not financial advice. The projection "
-"engine and linked inputs arrive in later updates."
-msgstr ""
-
 msgid "Filters"
 msgstr ""
 
@@ -10544,6 +10520,12 @@ msgstr ""
 msgid "Type a category name or kind"
 msgstr ""
 
+#, python-format
+msgid "%(num)d row"
+msgid_plural "%(num)d rows"
+msgstr[0] ""
+msgstr[1] ""
+
 msgid "Action"
 msgstr ""
 
@@ -11856,5 +11838,24 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Unavailable"
+#~ msgstr ""
+
+#~ msgid "Income growth"
+#~ msgstr ""
+
+#~ msgid "Entered manually in today's money, in %(currency)s."
+#~ msgstr ""
+
+#~ msgid "No overrides. Every year uses income minus expenses."
+#~ msgstr ""
+
+#~ msgid "No events."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Projections are illustrative and not "
+#~ "financial advice. The projection engine "
+#~ "and linked inputs arrive in later "
+#~ "updates."
 #~ msgstr ""
 

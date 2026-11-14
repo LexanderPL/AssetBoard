@@ -6422,34 +6422,6 @@ msgstr ""
 "Dochody kończą się po horyzoncie planu. Plan zostanie zapisany, ale "
 "prognoza nie będzie miała lat pracy po osiągnięciu wieku %(horizon)d."
 
-msgid "Income growth"
-msgstr "Wzrost dochodów"
-
-#, python-format
-msgid "Entered manually in today's money, in %(currency)s."
-msgstr "Wprowadzone ręcznie w dzisiejszej wartości pieniądza, w %(currency)s."
-
-#, python-format
-msgid "%(num)d row"
-msgid_plural "%(num)d rows"
-msgstr[0] "%(num)d wiersz"
-msgstr[1] "%(num)d wiersze"
-msgstr[2] "%(num)d wierszy"
-
-msgid "No overrides. Every year uses income minus expenses."
-msgstr "Brak nadpisań. Każdy rok używa dochodów minus wydatki."
-
-msgid "No events."
-msgstr "Brak zdarzeń."
-
-msgid ""
-"Projections are illustrative and not financial advice. The projection "
-"engine and linked inputs arrive in later updates."
-msgstr ""
-"Prognozy mają charakter poglądowy i nie stanowią porady finansowej. "
-"Silnik prognoz i dane powiązane pojawią się w późniejszych "
-"aktualizacjach."
-
 msgid "Filters"
 msgstr "Filtry"
 
@@ -11444,6 +11416,13 @@ msgstr "Filtruj kategorie"
 msgid "Type a category name or kind"
 msgstr "Wpisz nazwę kategorii lub rodzaj"
 
+#, python-format
+msgid "%(num)d row"
+msgid_plural "%(num)d rows"
+msgstr[0] "%(num)d wiersz"
+msgstr[1] "%(num)d wiersze"
+msgstr[2] "%(num)d wierszy"
+
 msgid "Action"
 msgstr "Działanie"
 
@@ -12576,4 +12555,27 @@ msgstr "Usuń obszar roboczy…"
 
 #~ msgid "Unavailable"
 #~ msgstr "Niedostępne"
+
+#~ msgid "Income growth"
+#~ msgstr "Wzrost dochodów"
+
+#~ msgid "Entered manually in today's money, in %(currency)s."
+#~ msgstr "Wprowadzone ręcznie w dzisiejszej wartości pieniądza, w %(currency)s."
+
+#~ msgid "No overrides. Every year uses income minus expenses."
+#~ msgstr "Brak nadpisań. Każdy rok używa dochodów minus wydatki."
+
+#~ msgid "No events."
+#~ msgstr "Brak zdarzeń."
+
+#~ msgid ""
+#~ "Projections are illustrative and not "
+#~ "financial advice. The projection engine "
+#~ "and linked inputs arrive in later "
+#~ "updates."
+#~ msgstr ""
+#~ "Prognozy mają charakter poglądowy i nie"
+#~ " stanowią porady finansowej. Silnik prognoz"
+#~ " i dane powiązane pojawią się w "
+#~ "późniejszych aktualizacjach."
 
