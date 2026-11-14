@@ -107,6 +107,8 @@ def test_the_combined_page_shows_results_first_then_the_collapsible_inputs(owner
     assert "data-fire-form" in page.text
     assert 'name="basis" value="nominal"' in page.text
     assert "Mortgage repaid" in page.text and "12,000" in page.text
+    # No cash event in this plan, so the table has no cash column.
+    assert not re.search(r">Cash</th>", page.text)
 
     charts = _chart_data(page.text)
     assert charts[0]["labels"] == [str(year) for year in range(2026, 2076)]
@@ -164,6 +166,8 @@ def test_csv_has_both_bases_and_never_writes(owner) -> None:
         event_amount_1="25000",
         event_label_1="Inheritance",
     )
+    page = owner.client.get(f"/fire/{scenario_id}")
+    assert re.search(r">Cash</th>", page.text)
     before = _scenario_snapshot(owner, scenario_id)
     response = owner.client.get(f"/fire/{scenario_id}/results.csv")
     assert response.status_code == 200

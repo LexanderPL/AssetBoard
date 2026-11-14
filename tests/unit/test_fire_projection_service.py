@@ -107,6 +107,27 @@ def test_results_map_the_scenario_children_and_metrics(team: WorkspaceDb) -> Non
     assert results.show_cash is False
 
 
+def test_results_show_cash_only_when_a_cash_event_exists(team: WorkspaceDb) -> None:
+    scenario_id = _create(
+        team,
+        events=(EventInput(year=2028, kind="cash", amount_minor=250_000, label="Bonus"),),
+    )
+    results = fire_projection.scenario_results(
+        team.factory, team.ctx("viewer", "viewer"), scenario_id
+    )
+    assert results.show_cash is True
+
+
+def test_a_preview_ignores_another_scenarios_name(team: WorkspaceDb) -> None:
+    first = _create(team, name="First")
+    _create(team, name="Second")
+    detail = fire_scenarios.get_fire_scenario(team.factory, team.ctx("editor", "editor"), first)
+    preview = fire_projection.preview_scenario_results(
+        team.ctx("editor", "editor"), detail, _input(name="Second")
+    )
+    assert preview.projection is not None
+
+
 def test_a_preview_with_unchanged_inputs_equals_the_saved_projection(team: WorkspaceDb) -> None:
     scenario_id = _create(
         team,
