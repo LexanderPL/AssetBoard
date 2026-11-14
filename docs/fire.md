@@ -143,6 +143,8 @@ start year, net saving shows the starting portfolio and earns that year's gain. 
 is highlighted, rows after income stops are muted and marked **No income**, and a depleted row
 is marked in red. **Each year's money** shows nominal values; **Today's money** deflates every
 amount by the plan's inflation. This is a view preference and is not saved with the scenario.
+Editors switch it with a radio control that previews in place, so unsaved input changes are not
+lost; viewers and archived plans use plain links.
 
 The net-worth chart follows the same nominal/real choice. It marks the FIRE row with a line and
 a pinned point, the income stop and any depletion. The expenses-versus-gain chart is always

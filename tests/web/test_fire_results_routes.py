@@ -8,8 +8,10 @@ from datetime import datetime
 from typing import Any
 from uuid import UUID
 
+from sqlalchemy import func, select
+
 from assetboard.db.models.fire import FireContribution, FireEvent, FireScenario
-from assetboard.db.models.identity import Workspace
+from assetboard.db.models.identity import AuditEvent, Workspace
 
 
 def _form(**overrides: str) -> dict[str, str]:
@@ -59,20 +61,25 @@ def _chart_data(html: str) -> list[dict[str, Any]]:
     return [json.loads(value) for value in values]
 
 
-def _scenario_snapshot(owner, scenario_id: UUID) -> tuple[datetime, int, int]:
+def _scenario_snapshot(
+    owner, scenario_id: UUID
+) -> tuple[datetime, tuple[UUID, ...], tuple[UUID, ...], int]:
+    """The saved row, child identities and audit count a preview must leave untouched."""
     with owner.db() as session:
         row = session.get_one(FireScenario, scenario_id)
-        contributions = len(
-            list(
-                session.query(FireContribution)
-                .filter(FireContribution.scenario_id == scenario_id)
-                .all()
-            )
-        )
-        events = len(
-            list(session.query(FireEvent).filter(FireEvent.scenario_id == scenario_id).all())
-        )
-        return row.updated_at, contributions, events
+        contributions = session.scalars(
+            select(FireContribution.id)
+            .where(FireContribution.scenario_id == scenario_id)
+            .order_by(FireContribution.year)
+        ).all()
+        events = session.scalars(
+            select(FireEvent.id)
+            .where(FireEvent.scenario_id == scenario_id)
+            .order_by(FireEvent.year, FireEvent.id)
+        ).all()
+        audits = session.scalar(select(func.count()).select_from(AuditEvent))
+        assert audits is not None
+        return row.updated_at, tuple(contributions), tuple(events), audits
 
 
 def test_the_combined_page_shows_results_first_then_the_collapsible_inputs(owner) -> None:
@@ -124,7 +131,11 @@ def test_the_basis_toggle_switches_the_table_and_chart_to_real_values(owner) -> 
     page = owner.client.get(f"/fire/{scenario_id}?basis=real")
     assert page.status_code == 200
     assert 'data-fire-basis="real"' in page.text
-    assert re.search(r'aria-current="true"[^>]*data-fire-basis="real"', page.text)
+    assert re.search(
+        r'<input[^>]*name="basis" value="real"[^>]*checked[^>]*data-fire-basis="real"',
+        page.text,
+    )
+    assert 'href="?basis=' not in page.text
     assert "Today's money" in page.text
     charts = _chart_data(page.text)
     assert charts[0]["series"][0]["name"] == "Net worth in today's money"
@@ -132,6 +143,50 @@ def test_the_basis_toggle_switches_the_table_and_chart_to_real_values(owner) -> 
     assert charts[0]["series"][0]["values"] != nominal[0]["series"][0]["values"]
     # The expenses-versus-gain chart stays nominal in both views.
     assert charts[1]["series"] == nominal[1]["series"]
+
+    # Viewers keep plain links (no form, no preview), and those links keep the open panel.
+    owner.set_admin_role("viewer")
+    viewer = owner.client.get(f"/fire/{scenario_id}?basis=real&edit=1")
+    assert viewer.status_code == 200
+    assert re.search(r'aria-current="true"[^>]*data-fire-basis="real"', viewer.text)
+    assert 'href="?basis=nominal&edit=1#fire-results"' in viewer.text
+    assert 'name="basis"' not in viewer.text
+
+
+def test_the_basis_control_is_part_of_the_form_not_a_navigation(owner) -> None:
+    scenario_id = _create(owner)
+    page = owner.client.get(f"/fire/{scenario_id}").text
+    form_start = page.index('<form id="fire-form"')
+    toggle = page.index("data-fire-basis-toggle")
+    form_end = page.index("</form>", form_start)
+    assert form_start < toggle < form_end
+    assert 'type="hidden" name="basis"' not in page
+    assert 'hx-preserve="true"' in page[toggle - 200 : toggle + 400]
+
+
+def test_a_preview_posts_the_chosen_basis_with_the_unsaved_values_and_writes_nothing(
+    owner,
+) -> None:
+    scenario_id = _create(owner)
+    before = _scenario_snapshot(owner, scenario_id)
+    saved_age = _fire_age(owner.client.get(f"/fire/{scenario_id}").text)
+    preview = owner.post(
+        f"/fire/{scenario_id}/preview",
+        _form(basis="real", expenses_manual="80000"),
+        token_from=f"/fire/{scenario_id}",
+    )
+    assert preview.status_code == 200
+    assert "data-fire-preview-note" in preview.text
+    assert 'data-fire-basis="real"' in preview.text
+    assert re.search(
+        r'<input[^>]*name="basis" value="real"[^>]*checked[^>]*data-fire-basis="real"',
+        preview.text,
+    )
+    assert _fire_age(preview.text) == "43"
+    assert _fire_age(preview.text) != saved_age
+    charts = _chart_data(preview.text)
+    assert charts[0]["series"][0]["name"] == "Net worth in today's money"
+    assert _scenario_snapshot(owner, scenario_id) == before
 
 
 def test_never_reached_and_depletion_states_are_explained(owner) -> None:
@@ -208,6 +263,43 @@ def test_a_blocked_projection_hides_results_and_returns_409_for_csv(owner) -> No
     assert csv.status_code == 409
 
 
+def test_a_blocked_plan_still_has_the_chart_scripts_a_preview_needs(owner) -> None:
+    scenario_id = _create(owner)
+    with owner.db() as session, session.begin():
+        row = session.get_one(FireScenario, scenario_id)
+        row.income_mode = "trailing_12m"
+        row.income_manual_minor = None
+    blocked = owner.client.get(f"/fire/{scenario_id}")
+    assert 'data-fire-blocked="missing_starting_value"' in blocked.text
+    assert "js/charts.js" in blocked.text
+    assert "vendor/echarts.min.js" in blocked.text
+
+    # Correcting the input in the preview brings the charts back even though the saved page had
+    # none when it loaded; the script bootstrap must already be there.
+    preview = owner.post(
+        f"/fire/{scenario_id}/preview",
+        _form(),
+        token_from=f"/fire/{scenario_id}",
+    )
+    assert preview.status_code == 200
+    assert "data-fire-charts" in preview.text
+    assert "data-chart-json" in preview.text
+
+
+def test_csv_is_readable_for_viewers_and_archived_scenarios(owner) -> None:
+    scenario_id = _create(owner)
+    owner.set_admin_role("viewer")
+    viewer = owner.client.get(f"/fire/{scenario_id}/results.csv")
+    assert viewer.status_code == 200
+    assert viewer.text.startswith("year,age,income,")
+
+    owner.set_admin_role("owner")
+    owner.post(f"/fire/{scenario_id}/archive", token_from=f"/fire/{scenario_id}")
+    archived = owner.client.get(f"/fire/{scenario_id}/results.csv")
+    assert archived.status_code == 200
+    assert archived.text.startswith("year,age,income,")
+
+
 def test_preview_returns_only_the_fragment_with_changed_metrics_and_no_writes(owner) -> None:
     scenario_id = _create(owner)
     page = owner.client.get(f"/fire/{scenario_id}").text
@@ -274,6 +366,9 @@ def test_viewers_and_archived_scenarios_are_read_only(owner) -> None:
     assert "data-fire-metrics" in viewer.text
     assert "hx-post" not in viewer.text
     assert "data-fire-form" not in viewer.text
+    assert "data-fire-save" not in viewer.text
+    assert 'name="basis"' not in viewer.text
+    assert 'href="?basis=real#fire-results"' in viewer.text
     assert "data-fire-edit" not in viewer.text
     assert "data-fire-archive" not in viewer.text
     assert "Your role can read this plan but not change it." in viewer.text
@@ -284,6 +379,11 @@ def test_viewers_and_archived_scenarios_are_read_only(owner) -> None:
     assert archived.status_code == 200
     assert "hx-post" not in archived.text
     assert "data-fire-form" not in archived.text
+    assert "data-fire-save" not in archived.text
+    assert 'name="basis"' not in archived.text
+    assert 'href="?basis=real#fire-results"' in archived.text
+    assert "data-fire-metrics" in archived.text
+    assert "data-fire-table" in archived.text
     assert "This scenario is archived and read-only" in archived.text
 
 

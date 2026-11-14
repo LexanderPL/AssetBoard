@@ -205,9 +205,9 @@ live recalculation via HTMX with debounce. The UI calls the service that calls p
   result costs three queries; the preview performs no queries and no writes. Archived scenarios
   still project but never preview; previews require an editor.
 - `services.fire_scenarios.validate_scenario_input` is public and takes `previous_rates`; preview
-  mode skips the unusual-rate save gate (the result reports `needs_extreme_confirmation`) and
-  name uniqueness stays a repository check, so another scenario's name cannot block a preview.
-  All F8.1 create/update behavior is preserved.
+  mode skips the unusual-rate save gate (the result reports `needs_extreme_confirmation` until the
+  confirmation box is ticked) and name uniqueness stays a repository check, so another scenario's
+  name cannot block a preview. All F8.1 create/update behavior is preserved.
 - Metrics show FIRE age/year, years to FIRE, the FIRE number, depletion/minimum-after-stop, and
   both progress definitions (sheet and today's money) with exact percentages and bars capped
   visually at 100%. The nominal/real table marks FIRE, income-stopped and depleted rows; the cash
@@ -218,11 +218,16 @@ live recalculation via HTMX with debounce. The UI calls the service that calls p
   net-worth chart follows the basis; expenses-versus-gain stays nominal. Chart JSON travels in a
   `data-chart-json` attribute, so HTMX swaps cannot strip it; `charts.js` reads it (existing
   script sources still work), redraws after swaps and disposes detached instances. The shared
-  nice-axis helper is `web.chart_axis`; loan charts use the same code unchanged.
+  nice-axis helper is `web.chart_axis`; loan charts use the same code unchanged. The results page
+  loads the chart scripts whenever it can show charts or preview, so a blocked saved plan can
+  draw the charts that a successful preview produces.
 - The live preview is enabled only for editors on active scenarios with `hx-post`, `hx-include`,
   debounced `hx-trigger`, `hx-target`/`hx-swap` and `hx-sync`; `fire.js` dispatches
-  `fire:changed` after row add/remove/paste and marks a preview-error field. The form is outside
-  the swapped fragment, so focus is preserved, and previews never save.
+  `fire:changed` after row add/remove/paste and marks a preview-error field. The form wraps the
+  results and the inputs, while only `#fire-results` is swapped: focus and unsaved values stay,
+  and previews never save. The nominal/real switch is a radio group in that form for editors, so
+  changing it previews in place instead of navigating; viewers and archived plans keep plain
+  links.
 - `plain_signed_amount` in `domain.ledger_csv` writes negative CSV amounts; the FIRE CSV uses it
   for every amount. No migration, model, dependency or ADR is added. Polish translations are
   complete with no fuzzy entries; the user guide is `docs/fire.md`.

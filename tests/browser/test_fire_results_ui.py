@@ -5,12 +5,14 @@ from __future__ import annotations
 import os
 from datetime import date
 from pathlib import Path
+from uuid import UUID
 
 import pytest
 from playwright.sync_api import Page, expect, sync_playwright
 
 from assetboard.app import create_app
 from assetboard.config import Settings
+from assetboard.db.models.fire import FireScenario
 from assetboard.services.auth import run_initial_setup
 from tests.conftest import live_server
 
@@ -112,24 +114,46 @@ def test_results_draw_preview_without_navigation_and_save(tmp_path: Path) -> Non
             page.reload(wait_until="networkidle")
             assert page.get_by_label("Annual expenses").input_value() == "30000.00"
 
-            # Saving persists the previewed amount.
+            # Type an unsaved change, then switch the basis. The basis control belongs to the
+            # form, so the preview keeps the typed value and never navigates; reloading still
+            # shows the saved amount (the preview wrote nothing).
             page.locator("#inputs summary").click()
-            page.get_by_label("Annual expenses").fill("80000")
+            expenses = page.get_by_label("Annual expenses")
+            expenses.fill("70000")
             expect(page.locator("[data-fire-preview-note]")).to_be_visible()
-            with page.expect_navigation(wait_until="networkidle"):
-                page.locator("[data-fire-save]").click()
-            expect(page.locator("[data-action-notice]")).to_be_visible()
-            page.reload(wait_until="networkidle")
-            assert page.get_by_label("Annual expenses").input_value() == "80000.00"
-
-            # The today's-money basis updates the table and the net-worth chart by navigation.
-            with page.expect_navigation(wait_until="networkidle"):
-                page.locator('[data-fire-basis="real"]').click()
-            assert "basis=real" in page.url
+            expect(page.locator("[data-fire-fire-age]")).to_have_attribute(
+                "data-fire-fire-age-value", "41"
+            )
+            page.locator('label:has([data-fire-basis="real"])').click()
+            assert page.url == results_url
             expect(page.locator("[data-fire-table]")).to_have_attribute("data-fire-basis", "real")
+            expect(page.locator("[data-fire-preview-note]")).to_be_visible()
+            assert page.get_by_label("Annual expenses").input_value() == "70000"
+            expect(page.locator("[data-fire-fire-age]")).to_have_attribute(
+                "data-fire-fire-age-value", "41"
+            )
             expect(
                 page.locator('[data-fire-chart="net-worth"] [data-chart="line"]')
             ).to_have_attribute("data-chart-ready", "true")
+            page.reload(wait_until="networkidle")
+            assert page.get_by_label("Annual expenses").input_value() == "30000.00"
+            expect(page.locator("[data-fire-table]")).to_have_attribute(
+                "data-fire-basis", "nominal"
+            )
+
+            # Saving persists the previewed amount and keeps the chosen basis in the redirect.
+            page.locator("#inputs summary").click()
+            page.get_by_label("Annual expenses").fill("80000")
+            expect(page.locator("[data-fire-preview-note]")).to_be_visible()
+            page.locator('label:has([data-fire-basis="real"])').click()
+            expect(page.locator("[data-fire-table]")).to_have_attribute("data-fire-basis", "real")
+            with page.expect_navigation(wait_until="networkidle"):
+                page.locator("[data-fire-save]").click()
+            expect(page.locator("[data-action-notice]")).to_be_visible()
+            assert "basis=real" in page.url
+            page.reload(wait_until="networkidle")
+            assert page.get_by_label("Annual expenses").input_value() == "80000.00"
+            expect(page.locator("[data-fire-table]")).to_have_attribute("data-fire-basis", "real")
 
             # A never-FIRE, depleted plan explains both states in the preview fragment.
             page.locator("#inputs summary").click()
@@ -143,6 +167,28 @@ def test_results_draw_preview_without_navigation_and_save(tmp_path: Path) -> Non
             expect(page.locator("[data-fire-never]")).to_be_visible()
             expect(page.locator("[data-fire-depletion]")).to_be_visible()
             assert "basis=real" in page.url
+
+            # A saved plan can be blocked (F8.4 linked values, or a defensive invalid plan).
+            # The page still boots the chart scripts so a later preview can draw the charts
+            # that were absent when the blocked page loaded.
+            scenario_id = UUID(page.url.split("/fire/", 1)[1].split("?")[0].split("#")[0])
+            with app.state.session_factory() as session, session.begin():
+                row = session.get_one(FireScenario, scenario_id)
+                row.income_mode = "trailing_12m"
+                row.income_manual_minor = None
+            page.reload(wait_until="networkidle")
+            expect(page.locator("[data-fire-blocked]")).to_be_visible()
+            assert page.locator("[data-chart]").count() == 0
+            assert page.locator("script[src*='charts.js']").count() == 1
+            page.locator("#inputs summary").click()
+            page.get_by_label("Annual income").fill("50000")
+            expect(
+                page.locator('[data-fire-chart="net-worth"] [data-chart="line"]')
+            ).to_have_attribute("data-chart-ready", "true")
+            expect(
+                page.locator('[data-fire-chart="expenses-gain"] [data-chart="line"]')
+            ).to_have_attribute("data-chart-ready", "true")
+
             assert page.evaluate("window.__cspViolations") == []
             _no_page_overflow(page)
             browser.close()

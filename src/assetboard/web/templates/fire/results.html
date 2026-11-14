@@ -53,14 +53,25 @@
   {% endif %}
 </section>
 
-<div id="fire-results" data-fire-results{% if can_preview %} hx-post="{{ scoped_url(request, 'fire_scenario_preview', scenario_id=s.id) }}" hx-trigger="change from:#fire-form delay:300ms, input from:#fire-form delay:600ms, fire:changed from:#fire-form delay:100ms" hx-include="#fire-form" hx-target="#fire-results" hx-swap="innerHTML" hx-sync="this:replace"{% endif %}>
+{% if can_preview %}
+{# The form wraps the results and the inputs: the basis radios and every input post together,
+   while the results fragment can be swapped without touching the typed values. #}
+<form id="fire-form" method="post" action="{{ action }}" class="space-y-6" data-fire-form data-start-year="{{ start_year }}" novalidate>
+  {{ csrf_input() }}
+  <div id="fire-results" data-fire-results hx-post="{{ scoped_url(request, 'fire_scenario_preview', scenario_id=s.id) }}" hx-trigger="change from:#fire-form delay:300ms, input from:#fire-form delay:600ms, fire:changed from:#fire-form delay:100ms" hx-include="#fire-form" hx-target="#fire-results" hx-swap="innerHTML" hx-sync="this:replace">
+    {% include "fire/_results.html" %}
+  </div>
+  {% include "fire/_inputs_panel.html" %}
+</form>
+{% else %}
+<div id="fire-results" data-fire-results>
   {% include "fire/_results.html" %}
 </div>
-
 {% include "fire/_inputs_panel.html" %}
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
-{% if charts %}{% include "macros/chart_scripts.html" %}{% endif %}
+{% if charts or can_preview %}{% include "macros/chart_scripts.html" %}{% endif %}
 <script defer src="{{ static_url(request, 'js/fire.js') }}" referrerpolicy="no-referrer"></script>
 {% endblock %}

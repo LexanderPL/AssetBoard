@@ -1,4 +1,3 @@
-{% from "macros/components.html" import csrf_input with context %}
 {% from "fire/_macros.html" import hint with context %}
 {% set editable = can_edit and not detail.scenario.archived %}
 <section class="mt-6" aria-labelledby="inputs-heading">
@@ -9,15 +8,13 @@
       {% if editable %}{{ hint(_("Changes preview automatically and are not saved until you press Save changes.")) }}{% endif %}
     </summary>
     {% if editable %}
-    <form id="fire-form" method="post" action="{{ action }}" class="mt-5 space-y-6" data-fire-form data-start-year="{{ start_year }}" novalidate>
-      {{ csrf_input() }}
-      <input type="hidden" name="basis" value="{{ basis }}">
+    <div class="mt-5 space-y-6">
       {% include "fire/_form_body.html" %}
       <div class="flex flex-wrap items-center gap-3">
         <button type="submit" class="btn-primary" data-fire-save>{{ _("Save changes") }}</button>
         <a href="{{ cancel_url }}" class="btn" data-fire-discard>{{ _("Discard changes") }}</a>
       </div>
-    </form>
+    </div>
     {% else %}
     <fieldset disabled class="mt-5 space-y-6">
       {% include "fire/_form_body.html" %}

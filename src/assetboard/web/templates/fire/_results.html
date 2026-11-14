@@ -13,11 +13,22 @@
 
 {% set active_basis_class = "rounded-lg px-3 py-1.5 text-sm font-medium bg-primary-soft text-primary-ink" %}
 {% set inactive_basis_class = "rounded-lg px-3 py-1.5 text-sm font-medium text-muted hover:bg-subtle" %}
+{% set basis_label_class = "cursor-pointer rounded-lg px-3 py-1.5 text-sm font-medium text-muted hover:bg-subtle has-[:checked]:bg-primary-soft has-[:checked]:text-primary-ink has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary/40" %}
 <div class="mb-4 flex flex-wrap items-center justify-between gap-3" data-fire-results-toolbar>
+  {% if can_preview %}
+  {# Editors switch the basis without leaving the page: the radios belong to #fire-form (the form
+     wraps the results), so they post with the preview and with Save. hx-preserve keeps the chosen
+     radio through the fragment swap. #}
+  <div id="fire-basis-toggle" class="inline-flex rounded-xl border border-line bg-surface p-1" role="radiogroup" aria-label="{{ _('Money basis') }}" data-fire-basis-toggle hx-preserve="true">
+    <label class="{{ basis_label_class }}"><input type="radio" name="basis" value="nominal" class="sr-only"{% if basis == 'nominal' %} checked{% endif %} data-fire-basis="nominal"><span>{{ _("Each year's money") }}</span></label>
+    <label class="{{ basis_label_class }}"><input type="radio" name="basis" value="real" class="sr-only"{% if basis == 'real' %} checked{% endif %} data-fire-basis="real"><span>{{ _("Today's money") }}</span></label>
+  </div>
+  {% else %}
   <div class="inline-flex rounded-xl border border-line bg-surface p-1" role="group" aria-label="{{ _('Money basis') }}" data-fire-basis-toggle>
     <a href="?basis=nominal{% if inputs_open %}&edit=1{% endif %}#fire-results" class="{{ active_basis_class if basis == 'nominal' else inactive_basis_class }}"{% if basis == 'nominal' %} aria-current="true"{% endif %} data-fire-basis="nominal">{{ _("Each year's money") }}</a>
     <a href="?basis=real{% if inputs_open %}&edit=1{% endif %}#fire-results" class="{{ active_basis_class if basis == 'real' else inactive_basis_class }}"{% if basis == 'real' %} aria-current="true"{% endif %} data-fire-basis="real">{{ _("Today's money") }}</a>
   </div>
+  {% endif %}
   <p class="text-xs text-muted">{{ _("A view preference; it is not saved with the scenario.") }}</p>
 </div>
 
