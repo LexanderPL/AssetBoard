@@ -94,6 +94,12 @@ def test_results_map_the_scenario_children_and_metrics(team: WorkspaceDb) -> Non
     assert projection.inputs.birth_year == 1985
     assert projection.inputs.start_year == 2026
     assert projection.inputs.horizon_age == 90
+    assert projection.inputs.stop_working_age == 55
+    assert projection.inputs.inflation_bp == 250
+    assert projection.inputs.real_return_bp == 500
+    assert projection.inputs.income_growth_bp == 300
+    assert projection.inputs.rule is Rule.RETURNS_COVER_EXPENSES
+    assert projection.inputs.swr_bp is None
     assert projection.inputs.start_income == _money(5_000_000)
     assert projection.inputs.start_expenses == _money(3_000_000)
     assert projection.inputs.start_portfolio == _money(100_000_000)
@@ -105,6 +111,16 @@ def test_results_map_the_scenario_children_and_metrics(team: WorkspaceDb) -> Non
     ]
     assert projection.fire_age is not None
     assert results.show_cash is False
+
+
+def test_results_map_the_withdrawal_rate_rule(team: WorkspaceDb) -> None:
+    scenario_id = _create(team, rule=Rule.SWR.value, swr_bp=400)
+    results = fire_projection.scenario_results(
+        team.factory, team.ctx("viewer", "viewer"), scenario_id
+    )
+    assert results.projection is not None
+    assert results.projection.inputs.rule is Rule.SWR
+    assert results.projection.inputs.swr_bp == 400
 
 
 def test_results_show_cash_only_when_a_cash_event_exists(team: WorkspaceDb) -> None:
@@ -213,6 +229,13 @@ def test_an_unusual_rate_warns_in_a_preview_and_blocks_a_save(team: WorkspaceDb)
         "extreme_rates_confirmed",
         "extreme_rate_confirmation_required",
     )
+    confirmed = fire_projection.preview_scenario_results(
+        team.ctx("editor", "editor"),
+        detail,
+        _input(inflation_bp=1_200, extreme_rates_confirmed=True),
+    )
+    assert confirmed.projection is not None
+    assert confirmed.needs_extreme_confirmation is False
 
 
 def test_viewers_read_and_editors_preview_but_archived_plans_never_preview(

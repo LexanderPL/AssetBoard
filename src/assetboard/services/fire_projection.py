@@ -219,7 +219,11 @@ def preview_scenario_results(
         detail=detail,
         projection=projection,
         preview=True,
-        needs_extreme_confirmation=validated.needs_extreme_confirmation,
+        # Once the box is ticked, saving is no longer blocked, so the preview should not keep
+        # telling the user to tick it.
+        needs_extreme_confirmation=(
+            validated.needs_extreme_confirmation and not scenario.extreme_rates_confirmed
+        ),
     )
 
 
