@@ -14,6 +14,7 @@ from assetboard.i18n.numbers import (
     CURRENCY_HOME_LOCALES,
     format_amount_input,
     format_money,
+    format_price,
     parse_amount,
 )
 
@@ -125,6 +126,34 @@ def test_every_home_locale_formats_its_currency(currency: str) -> None:
     text = format_money(Money(123456, currency), "en")
     assert re.search(r"\d", text) and not re.search(r"[A-Z]{3}[\d-]|\d[A-Z]{3}", text)
     assert format_money(Money(123456, currency), "pl") == text
+
+
+@pytest.mark.parametrize(
+    ("value", "currency", "locale", "expected"),
+    [
+        (Decimal("15645.359865"), "PLN", "en", "15645.36"),
+        (Decimal("15645.359865"), "PLN", "pl", "15645,36"),
+        (Decimal("15645.359865"), "JPY", "en", "15645"),
+        (Decimal("1.2345"), "KWD", "en", "1.235"),
+        # At or above one minor unit, the currency's minor unit wins.
+        (Decimal("12.345"), "EUR", "en", "12.35"),
+        # Sub-unit prices keep up to six decimals instead of rounding to zero.
+        (Decimal("0.000123"), "USD", "en", "0.000123"),
+        (Decimal("0.0099999"), "USD", "en", "0.01"),
+        (Decimal("0.5"), "JPY", "en", "0.5"),
+        (Decimal("0"), "EUR", "en", "0"),
+    ],
+)
+def test_format_price_rounds_money_but_keeps_sub_unit_precision(
+    value: Decimal, currency: str, locale: str, expected: str
+) -> None:
+    assert format_price(value, currency, locale) == expected
+
+
+def test_format_price_does_not_change_the_input_value() -> None:
+    value = Decimal("15645.359865")
+    assert format_price(value, "PLN", "en") == "15645.36"
+    assert value == Decimal("15645.359865")
 
 
 def test_inputs_keep_the_interface_locale() -> None:

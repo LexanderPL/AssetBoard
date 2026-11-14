@@ -13,7 +13,7 @@ from assetboard.domain.money import Money
 from assetboard.domain.months import InvalidMonth, YearMonth
 from assetboard.i18n import translations_for
 from assetboard.i18n.dates import format_time
-from assetboard.i18n.numbers import format_money
+from assetboard.i18n.numbers import format_money, format_price
 from assetboard.web.security import apply_new_csrf_cookie, csrf_token, web_session
 
 _TEMPLATE_DIR = Path(__file__).parent / "templates"
@@ -25,7 +25,7 @@ def templates_for(locale: str) -> Jinja2Templates:
     templates.env.add_extension("jinja2.ext.i18n")
     translations = translations_for(locale)
     cast(Any, templates.env).install_gettext_translations(translations, newstyle=True)
-    templates.env.globals.update(Money=Money, format_money=format_money)
+    templates.env.globals.update(Money=Money, format_money=format_money, format_price=format_price)
     templates.env.globals.update(
         static_url=static_url,
         scoped_url=scoped_url,

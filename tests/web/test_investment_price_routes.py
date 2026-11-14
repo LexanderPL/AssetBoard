@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -148,6 +149,25 @@ def test_create_a_manual_price_and_show_it_with_a_chart(owner: OwnerApp) -> None
     assert 'data-price-source="manual"' in page
     assert "data-price-chart" in page
     assert "<polyline" in page
+
+
+def test_price_display_rounds_but_the_edit_input_keeps_full_precision(
+    owner: OwnerApp,
+) -> None:
+    instrument = _instrument(owner, "World ETF")
+    _price(owner, instrument, date_value="2026-03-01", price="15645.359865")
+    page = owner.client.get(f"{INSTRUMENTS}/{instrument}").text
+    latest = re.search(r"data-price-latest.*?</div>", page, re.S)
+    assert latest is not None and "15645.36" in latest.group(0)
+    row = re.search(r"data-price-point=.*?</tr>", page, re.S)
+    assert row is not None
+    assert "15645.36" in row.group(0)
+    assert "15645.359865" not in row.group(0)
+
+    point = _point_id(owner, instrument)
+    edit = owner.client.get(f"{INSTRUMENTS}/{instrument}?edit_price={point}").text
+    assert 'name="price"' in edit
+    assert 'value="15645.359865"' in edit
 
 
 def test_saving_the_same_date_updates_the_manual_point(owner: OwnerApp) -> None:

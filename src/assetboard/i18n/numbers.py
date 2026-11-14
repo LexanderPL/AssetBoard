@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation, localcontext
 
 from babel import Locale
 from babel.core import UnknownLocaleError
@@ -13,11 +13,12 @@ from babel.numbers import (
     get_group_symbol,
 )
 
-from assetboard.domain.money import Money
+from assetboard.domain.money import Money, minor_unit_for
 from assetboard.i18n import gettext
 
 _MAX_AMOUNT_LENGTH = 64
 _SPACE_GROUPS = " \u00a0\u202f"
+PRICE_DISPLAY_DECIMALS = 6
 
 
 def _normalize_number_locale(locale: str) -> str:
@@ -205,6 +206,25 @@ def format_quantity_input(value: Decimal, locale: str) -> str:
     decimal_symbol = get_decimal_symbol(_normalize_number_locale(locale))
     text = format(value.normalize(), "f")
     return text.replace(".", decimal_symbol)
+
+
+def format_price(value: Decimal, currency: str, locale: str) -> str:
+    """A unit price in ``currency``, rounded for display.
+
+    At or above one minor unit, a price uses the currency's minor unit (``15645.36`` for PLN).
+    Smaller prices keep up to six decimals, so sub-unit crypto prices do not become zero. Stored
+    prices and input fields keep their full precision; only the display is rounded.
+    """
+    if not value.is_finite():
+        raise ValueError("price must be finite")
+    minor_unit = minor_unit_for(currency)
+    threshold = Decimal(1).scaleb(-minor_unit)
+    decimals = minor_unit if abs(value) >= threshold else PRICE_DISPLAY_DECIMALS
+    quantum = Decimal(1).scaleb(-decimals)
+    with localcontext() as context:
+        context.prec = max(context.prec, 80)
+        rounded = value.quantize(quantum, rounding=ROUND_HALF_UP)
+    return format_quantity_input(rounded, locale)
 
 
 def format_rate_tenths(tenths: int, locale: str) -> str:

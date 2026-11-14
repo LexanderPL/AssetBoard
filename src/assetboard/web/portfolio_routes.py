@@ -12,7 +12,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
-from decimal import ROUND_HALF_UP, Decimal, localcontext
+from decimal import Decimal
 from typing import Annotated
 from uuid import UUID
 
@@ -33,6 +33,7 @@ from assetboard.i18n import gettext
 from assetboard.i18n.dates import format_day
 from assetboard.i18n.numbers import (
     format_money,
+    format_price,
     format_quantity_input,
     format_rate_short,
     format_rate_tenths,
@@ -50,8 +51,6 @@ from assetboard.web.security import require_csrf
 
 router = APIRouter(dependencies=[Depends(require_csrf)])
 FormStr = Annotated[str, Form()]
-
-PRICE_DISPLAY_DECIMALS = 6  # a model or provider price can carry 18 decimals; show at most 6
 
 
 def _(message: str) -> str:
@@ -197,15 +196,6 @@ class PortfolioView:
         return bool(self.donut.slices)
 
 
-def _price_text(value: Decimal, locale: str) -> str:
-    exponent = value.as_tuple().exponent
-    if isinstance(exponent, int) and -exponent > PRICE_DISPLAY_DECIMALS:
-        with localcontext() as context:
-            context.prec = max(context.prec, 80)
-            value = value.quantize(Decimal(1).scaleb(-PRICE_DISPLAY_DECIMALS), ROUND_HALF_UP)
-    return format_quantity_input(value, locale)
-
-
 def _pct(tenths: int | None, locale: str) -> str | None:
     return format_rate_tenths(tenths, locale) if tenths is not None else None
 
@@ -326,7 +316,11 @@ def build_view(
                 quantity=format_quantity_input(row.quantity, locale),
                 unit_label=instrument.unit_label,
                 avg_cost=format_money(Money.from_decimal(row.avg_cost, page.currency), locale),
-                price=_price_text(row.price, locale) if row.price is not None else None,
+                price=(
+                    format_price(row.price, instrument.quote_currency, locale)
+                    if row.price is not None
+                    else None
+                ),
                 price_date=_day(price_at.as_of if price_at else None, locale),
                 price_stale=bool(price_at and price_at.stale and row.price is not None),
                 terms_missing=bool(price_at and price_at.terms_missing),

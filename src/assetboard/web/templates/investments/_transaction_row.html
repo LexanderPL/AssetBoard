@@ -20,14 +20,14 @@
   <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">—</td>
   <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">—</td>
   {% elif t.type == "dividend" %}
-  <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_quantity_input(t.unit_price, locale) }} {{ t.quote_currency }}</td>
+  <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_price(t.unit_price, t.quote_currency, locale) }} {{ t.quote_currency }}</td>
   <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(t.fee, locale) }}</td>
   {% elif t.settlement_fee %}
   {# F6.2a: entered in the base currency; the derived quote price and the rate sit beside it. #}
-  <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums" data-settled>{{ format_quantity_input(t.settlement_unit_price, locale) }} {{ t.settlement_fee.currency }}<span class="block text-xs text-muted" data-derived-quote>≈ {{ format_quantity_input(t.derived_price_display, locale) }} {{ t.quote_currency }} @ {{ format_quantity_input(t.fx_to_base, locale) }}</span></td>
+  <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums" data-settled>{{ format_price(t.settlement_unit_price, t.settlement_fee.currency, locale) }} {{ t.settlement_fee.currency }}<span class="block text-xs text-muted" data-derived-quote>≈ {{ format_price(t.derived_price_display, t.quote_currency, locale) }} {{ t.quote_currency }} @ {{ format_quantity_input(t.fx_to_base, locale) }}</span></td>
   <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(t.settlement_fee, locale) }}<span class="block text-xs text-muted">≈ {{ format_money(t.fee, locale) }}</span></td>
   {% else %}
-  <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_quantity_input(t.unit_price, locale) }} {{ t.quote_currency }}</td>
+  <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_price(t.unit_price, t.quote_currency, locale) }} {{ t.quote_currency }}</td>
   <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ format_money(t.fee, locale) }}</td>
   {% endif %}
   <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{% if t.type == "split" %}—{% else %}{{ format_quantity_input(t.fx_to_base, locale) }}{% endif %}</td>
