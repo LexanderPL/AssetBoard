@@ -748,6 +748,39 @@ def test_export_includes_fire_lineage_fallbacks_children_and_no_n_plus_one(
         assert audit.data["fire_expense_exclusions"] == 1
 
 
+def test_export_blanks_blocked_fire_fallbacks(team: WorkspaceDb) -> None:
+    ctx = team.ctx("editor", "editor")
+    with team.factory.begin() as session:
+        FireScenarioRepository(session, ctx).create(
+            name="Blocked plan",
+            name_key="blocked plan",
+            currency="EUR",
+            birth_year=1990,
+            start_year=2026,
+            inflation_bp=250,
+            real_return_bp=500,
+            income_growth_bp=300,
+            stop_working_age=55,
+            horizon_age=95,
+            rule="swr",
+            swr_bp=400,
+            income_mode="trailing_12m",
+            income_manual_minor=None,
+            expenses_mode="trailing_12m",
+            expenses_manual_minor=None,
+            portfolio_mode="linked_investable",
+            portfolio_manual_minor=None,
+            is_default=True,
+        )
+
+    parsed, errors = parse_archive(export_workspace(team.factory, ctx).content)
+    assert errors == () and parsed is not None
+    scenario = parsed.rows.fire_scenarios[0]
+    assert scenario.income_fallback == ""
+    assert scenario.expenses_fallback == ""
+    assert scenario.portfolio_fallback == ""
+
+
 def test_export_writes_header_only_fire_files(team: WorkspaceDb) -> None:
     import io
     import zipfile

@@ -22,11 +22,15 @@ from assetboard.domain.archive import (
     FILE_ORDER,
     FIRE_CSV_FILES,
     ArchiveRows,
+    AssetClassRow,
     CategoryRow,
     FireContributionRow,
     FireEventRow,
     FireExpenseExclusionRow,
     FireScenarioRow,
+    InstrumentAllocationRow,
+    InstrumentRow,
+    InvestmentTransactionRow,
     ItemValuationRow,
     LoanRow,
     NetWorthCategoryRow,
@@ -74,6 +78,10 @@ CONTRIBUTION = UUID("cccccccc-cccc-4ccc-8ccc-cccccccccccc")
 EVENT = UUID("dddddddd-dddd-4ddd-8ddd-dddddddddddd")
 EXCLUSION = UUID("eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee")
 LOAN = UUID("ffffffff-ffff-4fff-8fff-ffffffffffff")
+INSTRUMENT = UUID("12345678-1234-4234-8234-123456789012")
+INVESTMENT_TX = UUID("23456789-2345-4345-8345-234567890123")
+ASSET_CLASS = UUID("3456789a-3456-4456-8456-345678901234")
+ALLOCATION = UUID("456789ab-4567-4567-8567-456789012345")
 
 
 def _workspace() -> dict[str, object]:
@@ -153,17 +161,100 @@ def _linked_scenario(
     )
 
 
+def _archived_networth_item() -> NetWorthItemRow:
+    return NetWorthItemRow(
+        str(NW_BROKERAGE),
+        "asset",
+        "Assets",
+        str(NW_ASSETS),
+        "Brokerage",
+        "EUR",
+        "",
+        None,
+        "manual",
+        None,
+        None,
+        "true",
+        "true",
+        "2026-01-01T00:00:00Z",
+        "false",
+    )
+
+
+def _instrument() -> InstrumentRow:
+    return InstrumentRow(
+        str(INSTRUMENT),
+        "World ETF",
+        "ETF",
+        "etf",
+        "EUR",
+        "share",
+        "manual",
+        "",
+        "",
+        None,
+        "",
+        None,
+    )
+
+
+def _non_investable_class() -> AssetClassRow:
+    return AssetClassRow(str(ASSET_CLASS), "Other", "false", "#3b6ea8", 0, "", None)
+
+
+def _instrument_allocation() -> InstrumentAllocationRow:
+    return InstrumentAllocationRow(
+        str(ALLOCATION),
+        str(INSTRUMENT),
+        "World ETF",
+        str(ASSET_CLASS),
+        "Other",
+        10_000,
+    )
+
+
+def _investment_transaction(*, deleted: bool) -> InvestmentTransactionRow:
+    return InvestmentTransactionRow(
+        str(INVESTMENT_TX),
+        str(INSTRUMENT),
+        "World ETF",
+        "2026-01-10",
+        "buy",
+        "10",
+        "100.00",
+        "EUR",
+        "0.00",
+        "1",
+        "",
+        "",
+        "",
+        "",
+        "2026-01-11T00:00:00Z" if deleted else None,
+    )
+
+
 def _rows(
     *,
+    categories: tuple[CategoryRow, ...] | None = None,
     transactions: tuple[TransactionRow, ...] | None = None,
     networth_items: tuple[NetWorthItemRow, ...] | None = None,
     item_valuations: tuple[ItemValuationRow, ...] | None = None,
+    asset_classes: tuple[AssetClassRow, ...] = (),
+    instruments: tuple[InstrumentRow, ...] = (),
+    instrument_allocations: tuple[InstrumentAllocationRow, ...] = (),
+    investment_transactions: tuple[InvestmentTransactionRow, ...] = (),
     scenarios: tuple[FireScenarioRow, ...] | None = None,
     contributions: tuple[FireContributionRow, ...] | None = None,
     events: tuple[FireEventRow, ...] | None = None,
     exclusions: tuple[FireExpenseExclusionRow, ...] | None = None,
     loans: tuple[LoanRow, ...] = (),
 ) -> ArchiveRows:
+    if categories is None:
+        categories = (
+            CategoryRow(str(FOOD), "expense", "Food", "regular", "#4f9d69", 0, None),
+            CategoryRow(str(HOUSING), "expense", "Housing", "regular", "#3b6ea8", 1, None),
+            CategoryRow(str(SALARY), "income", "Salary", "regular", "#2f7f5f", 0, None),
+        )
     if transactions is None:
         transactions = (
             TransactionRow(
@@ -270,11 +361,7 @@ def _rows(
         )
     return ArchiveRows(
         workspace=_workspace(),
-        categories=(
-            CategoryRow(str(FOOD), "expense", "Food", "regular", "#4f9d69", 0, None),
-            CategoryRow(str(HOUSING), "expense", "Housing", "regular", "#3b6ea8", 1, None),
-            CategoryRow(str(SALARY), "income", "Salary", "regular", "#2f7f5f", 0, None),
-        ),
+        categories=categories,
         budget_lines=(),
         transactions=transactions,
         months=(),
@@ -283,6 +370,10 @@ def _rows(
         ),
         networth_items=networth_items,
         item_valuations=item_valuations,
+        asset_classes=asset_classes,
+        instruments=instruments,
+        instrument_allocations=instrument_allocations,
+        investment_transactions=investment_transactions,
         fire_scenarios=scenarios,
         fire_contributions=contributions,
         fire_events=events,
@@ -451,6 +542,187 @@ def test_missing_sources_fall_back_to_archived_values(db: WorkspaceDb, data_dir:
         assert scenario.portfolio_manual_minor == 5_000_000
 
 
+def test_archived_networth_item_is_not_a_portfolio_source(db: WorkspaceDb, data_dir: Path) -> None:
+    rows = _rows(
+        transactions=(),
+        networth_items=(_archived_networth_item(),),
+        scenarios=(_linked_scenario(),),
+        contributions=(),
+        events=(),
+        exclusions=(),
+    )
+    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
+    assert report["counts"]["fire_linked_fallbacks"] == 3
+    assert "fire_linked_fallback" in {warning["code"] for warning in report["warnings"]}
+    with db.factory() as session:
+        scenario = next(iter(FireScenarioRepository(session, ctx).list()))
+        assert scenario.portfolio_mode == "manual"
+        assert scenario.portfolio_manual_minor == 5_000_000
+
+
+def test_deleted_investment_transaction_is_not_a_portfolio_source(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    rows = _rows(
+        transactions=(),
+        networth_items=(),
+        item_valuations=(),
+        asset_classes=(_non_investable_class(),),
+        instruments=(_instrument(),),
+        instrument_allocations=(_instrument_allocation(),),
+        investment_transactions=(_investment_transaction(deleted=True),),
+        scenarios=(_linked_scenario(),),
+        contributions=(),
+        events=(),
+        exclusions=(),
+    )
+    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
+    assert report["counts"]["fire_linked_fallbacks"] == 3
+    assert "fire_linked_fallback" in {warning["code"] for warning in report["warnings"]}
+    with db.factory() as session:
+        scenario = next(iter(FireScenarioRepository(session, ctx).list()))
+        assert scenario.portfolio_mode == "manual"
+        assert scenario.portfolio_manual_minor == 5_000_000
+
+
+def test_live_investment_transaction_keeps_the_portfolio_linked(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    rows = _rows(
+        networth_items=(),
+        item_valuations=(),
+        asset_classes=(_non_investable_class(),),
+        instruments=(_instrument(),),
+        instrument_allocations=(_instrument_allocation(),),
+        investment_transactions=(_investment_transaction(deleted=False),),
+        scenarios=(_linked_scenario(is_default="true"),),
+        contributions=(),
+        events=(),
+        exclusions=(),
+    )
+    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
+    assert report["counts"]["fire_linked_fallbacks"] == 0
+    assert not [w for w in report["warnings"] if str(w["code"]).startswith("fire_")]
+    with db.factory() as session:
+        scenario = next(iter(FireScenarioRepository(session, ctx).list()))
+        assert scenario.portfolio_mode == "linked_investable"
+        assert scenario.portfolio_manual_minor is None
+
+
+@pytest.mark.parametrize(
+    ("kind", "treatment"),
+    [("expense", "savings"), ("income", "regular")],
+)
+def test_unusable_exclusion_is_skipped_and_forces_expense_fallback(
+    db: WorkspaceDb, data_dir: Path, kind: str, treatment: str
+) -> None:
+    food_direction = "income" if kind == "income" else "expense"
+    rows = _rows(
+        categories=(
+            CategoryRow(str(FOOD), kind, "Food", treatment, "#4f9d69", 0, None),
+            CategoryRow(str(HOUSING), "expense", "Housing", "regular", "#3b6ea8", 1, None),
+            CategoryRow(str(SALARY), "income", "Salary", "regular", "#2f7f5f", 0, None),
+        ),
+        transactions=(
+            TransactionRow(
+                "2026-01-10",
+                "income",
+                "3000.00",
+                "EUR",
+                "Salary",
+                "January",
+                str(SALARY),
+                str(INCOME_TX),
+                None,
+            ),
+            TransactionRow(
+                "2026-01-15",
+                food_direction,
+                "500.00",
+                "EUR",
+                "Food",
+                "Groceries",
+                str(FOOD),
+                str(FOOD_TX),
+                None,
+            ),
+            TransactionRow(
+                "2026-01-20",
+                "expense",
+                "700.00",
+                "EUR",
+                "Housing",
+                "Rent",
+                str(HOUSING),
+                str(HOUSING_TX),
+                None,
+            ),
+        ),
+    )
+    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
+    assert report["counts"]["fire_skipped_exclusions"] == 1
+    assert report["counts"]["fire_expense_exclusions_created"] == 0
+    assert report["counts"]["fire_linked_fallbacks"] == 1
+    assert "fire_exclusion_missing" in {warning["code"] for warning in report["warnings"]}
+    with db.factory() as session:
+        scenario = next(
+            row for row in FireScenarioRepository(session, ctx).list() if row.name == "Linked plan"
+        )
+        assert scenario.income_mode == "trailing_12m"
+        assert scenario.expenses_mode == "manual"
+        assert scenario.expenses_manual_minor == 840_000
+        assert scenario.portfolio_mode == "linked_investable"
+        assert FireExpenseExclusionRepository(session, ctx).list() == []
+
+
+def test_transactions_outside_the_trailing_window_do_not_keep_linked_inputs(
+    db: WorkspaceDb, data_dir: Path
+) -> None:
+    rows = _rows(
+        transactions=(
+            TransactionRow(
+                "2025-01-10",
+                "income",
+                "3000.00",
+                "EUR",
+                "Salary",
+                "Old salary",
+                str(SALARY),
+                str(INCOME_TX),
+                None,
+            ),
+            TransactionRow(
+                "2025-01-15",
+                "expense",
+                "500.00",
+                "EUR",
+                "Food",
+                "Old groceries",
+                str(FOOD),
+                str(FOOD_TX),
+                None,
+            ),
+        ),
+        networth_items=(),
+        item_valuations=(),
+        scenarios=(_linked_scenario(),),
+        contributions=(),
+        events=(),
+        exclusions=(),
+    )
+    _workspace_id, ctx, _batch_id, report, _counts = _restore(db, data_dir, rows)
+    assert report["counts"]["fire_linked_fallbacks"] == 3
+    assert "fire_linked_fallback" in {warning["code"] for warning in report["warnings"]}
+    with db.factory() as session:
+        scenario = next(iter(FireScenarioRepository(session, ctx).list()))
+        assert scenario.income_mode == "manual"
+        assert scenario.income_manual_minor == 3_600_000
+        assert scenario.expenses_mode == "manual"
+        assert scenario.expenses_manual_minor == 840_000
+        assert scenario.portfolio_mode == "manual"
+        assert scenario.portfolio_manual_minor == 5_000_000
+
+
 def test_missing_sources_without_fallbacks_restore_zero_with_warning(
     db: WorkspaceDb, data_dir: Path
 ) -> None:
@@ -604,13 +876,11 @@ def test_restore_rollback_removes_fire_before_loans(db: WorkspaceDb, data_dir: P
         event = next(iter(FireEventRepository(session, ctx).list()))
         assert event.source_loan_id is not None
     counts = rollback_import(db.factory, ctx, batch_id)
-    assert (
-        counts["fire_scenarios"]
-        + counts["fire_contributions"]
-        + counts["fire_events"]
-        + counts["fire_expense_exclusions"]
-        == 5
-    )
+    assert counts["fire_scenarios"] == 2
+    assert counts["fire_contributions"] == 1
+    assert counts["fire_events"] == 1
+    assert counts["fire_expense_exclusions"] == 1
+    assert counts["loans"] == 1
     with db.factory() as session:
         assert FireScenarioRepository(session, ctx).list() == []
         assert FireContributionRepository(session, ctx).list() == []

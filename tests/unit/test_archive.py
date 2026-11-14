@@ -799,6 +799,89 @@ def test_reader_validates_fire_rows(name: str, row: int, column: str, value: str
     _edit_csv(files, name, row, column, value)
     parsed, errors = parse_archive(_rewrite(files))
     assert parsed is None and errors, (name, column, value)
+    assert any(error.file == name for error in errors), (name, column, value)
+
+
+@pytest.mark.parametrize(
+    ("name", "row", "column", "value", "expected_column", "message"),
+    [
+        ("fire_scenarios.csv", 0, "income_manual", "", None, "missing manual FIRE amount"),
+        (
+            "fire_scenarios.csv",
+            0,
+            "income_fallback",
+            "1.00",
+            None,
+            "fallback for a manual FIRE input",
+        ),
+        (
+            "fire_scenarios.csv",
+            1,
+            "income_manual",
+            "1.00",
+            None,
+            "manual value for a linked FIRE input",
+        ),
+        ("fire_scenarios.csv", 0, "swr_bp", "", None, "invalid FIRE withdrawal rate"),
+        ("fire_scenarios.csv", 1, "swr_bp", "400", None, "invalid FIRE withdrawal rate"),
+        ("fire_scenarios.csv", 1, "is_default", "true", None, "archived default scenario"),
+        (
+            "fire_scenarios.csv",
+            0,
+            "stop_working_age",
+            "40",
+            None,
+            "invalid FIRE stop-working age",
+        ),
+        ("fire_scenarios.csv", 0, "horizon_age", "0", "horizon_age", "invalid age"),
+        ("fire_scenarios.csv", 0, "currency", "EURO", "currency", "invalid currency"),
+        (
+            "fire_contributions.csv",
+            0,
+            "year",
+            "2026",
+            None,
+            "FIRE contribution outside the plan window",
+        ),
+        ("fire_contributions.csv", 0, "net_amount", "12.345", "net_amount", "too many decimals"),
+        (
+            "fire_contributions.csv",
+            0,
+            "scenario",
+            "Different",
+            None,
+            "FIRE scenario reference mismatch",
+        ),
+        (
+            "fire_events.csv",
+            0,
+            "year",
+            "2025",
+            None,
+            "FIRE event outside the plan window",
+        ),
+        ("fire_events.csv", 0, "amount", "12.345", "amount", "too many decimals"),
+        ("fire_events.csv", 0, "label", "", "label", "required value missing"),
+        (
+            "fire_expense_exclusions.csv",
+            0,
+            "category",
+            "Different",
+            None,
+            "FIRE exclusion category mismatch",
+        ),
+    ],
+)
+def test_reader_reports_the_fire_file_column_and_message(
+    name: str, row: int, column: str, value: str, expected_column: str | None, message: str
+) -> None:
+    files = _files()
+    _edit_csv(files, name, row, column, value)
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    error = next(error for error in errors if error.message == message)
+    assert error.file == name
+    assert error.column == expected_column
 
 
 def test_reader_accepts_a_fire_scenario_currency_different_from_the_base() -> None:
@@ -807,6 +890,34 @@ def test_reader_accepts_a_fire_scenario_currency_different_from_the_base() -> No
     parsed, errors = parse_archive(_rewrite(files))
     assert errors == () and parsed is not None
     assert parsed.rows.fire_scenarios[0].currency == "USD"
+
+
+def test_reader_accepts_an_unusable_exclusion_category_for_restore_handling() -> None:
+    # A wrong-kind category is not an archive error: restore skips the exclusion with a warning
+    # and falls linked expenses back, as the reader cannot repair the user's data.
+    files = _files()
+    _edit_csv(files, "categories.csv", 0, "kind", "income")
+    _edit_csv(files, "transactions.csv", 0, "direction", "income")
+    _edit_csv(files, "budget_lines.csv", 0, "kind", "income")
+    parsed, errors = parse_archive(_rewrite(files))
+    assert errors == () and parsed is not None
+    assert parsed.rows.categories[0].kind == "income"
+
+    # A non-regular treatment is likewise accepted; only the companion name must match.
+    files = _files()
+    _edit_csv(files, "categories.csv", 0, "treatment", "savings")
+    parsed, errors = parse_archive(_rewrite(files))
+    assert errors == () and parsed is not None
+
+    files = _files()
+    _edit_csv(files, "fire_expense_exclusions.csv", 0, "category", "Different")
+    parsed, errors = parse_archive(_rewrite(files))
+    assert parsed is None
+    assert any(
+        error.file == "fire_expense_exclusions.csv"
+        and error.message == "FIRE exclusion category mismatch"
+        for error in errors
+    )
 
 
 def test_reader_rejects_duplicate_fire_ids_names_defaults_and_children() -> None:
