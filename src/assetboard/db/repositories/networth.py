@@ -218,7 +218,8 @@ class NetWorthItemRepository(ScopedRepository[NetWorthItem]):
 
 class ItemValuationRepository(ScopedRepository[ItemValuation]):
     model = ItemValuation
-    unsupported = frozenset({"update", "delete"})
+    # A correction updates the row in place; history entries are never deleted (F5.8).
+    unsupported = frozenset({"delete"})
 
     def create(
         self,
@@ -256,6 +257,14 @@ class ItemValuationRepository(ScopedRepository[ItemValuation]):
                 )
             )
         )
+
+    def get_for_item(self, item_id: UUID, valuation_id: UUID) -> ItemValuation | None:
+        """One valuation, only when it belongs to this item in this workspace."""
+        statement = self._scoped_select().where(
+            ItemValuation.item_id == item_id,
+            ItemValuation.id == valuation_id,
+        )
+        return self._session.scalars(statement).one_or_none()
 
     def for_items(self, item_ids: Collection[UUID]) -> list[ItemValuation]:
         ids = list(item_ids)

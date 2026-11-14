@@ -117,6 +117,7 @@ __all__ = [
     "unlink_item",
     "update_category",
     "update_item",
+    "update_valuation",
 ]
 
 # Every write locks the workspace row first (docs/architecture.md, lock order).
@@ -166,6 +167,7 @@ class BulkRejected(NetWorthError):
 @dataclass(frozen=True, slots=True)
 class ValuationView:
     id: UUID
+    item_id: UUID
     as_of: date
     value: Money
     note: str
@@ -326,6 +328,7 @@ def _valuation_views(
     views = tuple(
         ValuationView(
             id=point.id,
+            item_id=rows[point.id].item_id,
             as_of=point.as_of,
             value=Money(point.value_minor, rows[point.id].currency),
             note=rows[point.id].note,
@@ -1626,6 +1629,76 @@ def _add_valuation_in_session(
 
 def _amount_text(money: Money) -> str:
     return str(money.to_decimal())
+
+
+def update_valuation(
+    factory: sessionmaker[Session],
+    ctx: Context,
+    item_id: UUID,
+    valuation_id: UUID,
+    *,
+    locale: str,
+    value: str,
+    as_of: date | None,
+    note: str = "",
+) -> ItemView:
+    """Correct one manual valuation in place (F5.8); history rows are never deleted."""
+    require_role(ctx, Role.EDITOR)
+    parsed = _parse_decimal(value, locale)
+    clean_note = _valuation_note(note)
+    wanted_as_of = _date(as_of, "as_of")
+    if wanted_as_of is None:
+        raise InvalidNetWorth("as_of", "invalid_date")
+
+    def write(session: Session) -> ItemView:
+        require_role_now(session, ctx, Role.EDITOR)
+        _lock(session, ctx, exclusive=False)
+        workspace = CurrentWorkspaceRepository(session, ctx).get()
+        item = NetWorthItemRepository(session, ctx).get_or_raise(item_id)
+        if item.archived_at is not None:
+            raise ItemArchived
+        if item.valuation_mode != "manual":
+            raise InvalidNetWorth("valuation_mode", "linked_value_readonly")
+        repository = ItemValuationRepository(session, ctx)
+        valuation = repository.get_for_item(item.id, valuation_id)
+        if valuation is None:
+            raise NotFound
+        money = _money(parsed, item.currency)
+        changes: dict[str, object] = {}
+        if valuation.as_of != wanted_as_of:
+            changes["as_of"] = wanted_as_of
+        if valuation.value_minor != money.amount_minor:
+            changes["value_minor"] = money.amount_minor
+        if valuation.note != clean_note:
+            changes["note"] = clean_note
+        if changes:
+            previous_as_of = valuation.as_of.isoformat()
+            previous_amount = _amount_text(Money(valuation.value_minor, valuation.currency))
+            repository.update(valuation.id, **changes)
+            _audit(
+                session,
+                ctx,
+                "networth_item.valuation_updated",
+                "networth_item",
+                item.id,
+                {
+                    "as_of": wanted_as_of.isoformat(),
+                    "amount": _amount_text(money),
+                    "currency": item.currency,
+                    "previous_as_of": previous_as_of,
+                    "previous_amount": previous_amount,
+                    "fields": ",".join(sorted(changes)),
+                },
+            )
+        return _view_after_write(
+            session,
+            ctx,
+            item.id,
+            base_currency=workspace.base_currency,
+            today=ctx.clock.today(ctx.workspace.timezone),
+        )
+
+    return run_immediate(factory, write)
 
 
 # Bulk add
