@@ -12,6 +12,7 @@ or income series. The sign is the meaning, so the model keeps it.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass, replace
 from datetime import date
 from decimal import Decimal
@@ -51,6 +52,14 @@ ILLUSTRATIVE_INFLATION_BP = 250
 ILLUSTRATIVE_REAL_RETURN_BP = 500
 ILLUSTRATIVE_INCOME_GROWTH_BP = 300
 ILLUSTRATIVE_SWR_BP = 400
+
+# F8.5 sensitivity: the default axes are real return -2..+2 pp and expenses -20..+20% of the
+# saved plan, in one-step increments. A caller may pass other axes within these caps.
+MAX_SENSITIVITY_RETURN_DELTAS = 9
+MAX_SENSITIVITY_EXPENSE_FACTORS = 9
+MAX_SENSITIVITY_CELLS = 81
+DEFAULT_RETURN_DELTAS_BP = (-200, -100, 0, 100, 200)
+DEFAULT_EXPENSE_FACTORS_BP = (8000, 9000, 10000, 11000, 12000)
 
 
 class Rule(StrEnum):
@@ -248,6 +257,15 @@ class FireProjectionError(ValueError):
         self.code = code
 
 
+class SensitivityError(ValueError):
+    """Invalid sensitivity axes; ``field`` and ``code`` name the problem for the caller."""
+
+    def __init__(self, field: str, code: str) -> None:
+        super().__init__(code)
+        self.field = field
+        self.code = code
+
+
 @dataclass(frozen=True, slots=True)
 class ContributionOverride:
     """One plan year whose net line replaces ``income - expenses`` (signed nominal units)."""
@@ -340,6 +358,42 @@ class Projection:
     progress_today_bp: int | None
     depletion_age: int | None
     min_networth_after_stop: Money | None
+
+
+@dataclass(frozen=True, slots=True)
+class SensitivityCell:
+    """One return/expense combination and the FIRE age it reaches, if any."""
+
+    return_delta_bp: int
+    expense_factor_bp: int
+    effective_return_bp: int
+    fire_age: int | None
+    fire_year: int | None
+    is_base: bool
+
+
+@dataclass(frozen=True, slots=True)
+class SensitivityRow:
+    """One expense level across every return delta, in the axes' order."""
+
+    expense_factor_bp: int
+    cells: tuple[SensitivityCell, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class SensitivityGrid:
+    """A complete sensitivity table; never-fire cells keep ``None`` instead of an age.
+
+    ``min_fire_age`` and ``max_fire_age`` cover the reached cells only (``None`` when no cell
+    reaches FIRE). ``base_cell`` is the saved plan itself (delta 0, factor 10000).
+    """
+
+    return_deltas_bp: tuple[int, ...]
+    expense_factors_bp: tuple[int, ...]
+    rows: tuple[SensitivityRow, ...]
+    base_cell: SensitivityCell
+    min_fire_age: int | None
+    max_fire_age: int | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -668,4 +722,110 @@ def project(inputs: ProjectionInputs) -> Projection:
         min_networth_after_stop=(
             Money(min_after_stop, currency) if min_after_stop is not None else None
         ),
+    )
+
+
+def _sensitivity_axis(values: Iterable[int], field: str, limit: int) -> tuple[int, ...]:
+    """Validate one axis: a non-empty, unique tuple of exact integers within ``limit``."""
+    try:
+        items = tuple(values)
+    except TypeError:
+        raise SensitivityError(field, "invalid_value") from None
+    if not items:
+        raise SensitivityError(field, "empty_axis")
+    if len(items) > limit:
+        raise SensitivityError(field, "too_many_values")
+    seen: set[int] = set()
+    for value in items:
+        if type(value) is not int:
+            raise SensitivityError(field, "invalid_value")
+        if value in seen:
+            raise SensitivityError(field, "duplicate_value")
+        seen.add(value)
+    return items
+
+
+def sensitivity(
+    inputs: ProjectionInputs,
+    return_deltas_bp: Iterable[int],
+    expense_factors_bp: Iterable[int],
+) -> SensitivityGrid:
+    """Project the plan across return deltas and expense multipliers (F8.5).
+
+    Each cell changes only the real return (``base + delta``) and the starting expenses
+    (``base * factor / 10000``, rounded half away from zero once); contribution overrides, cash
+    events, income and the expense-change events keep their saved values. The axes must include
+    the base cell (delta 0 and factor 10000), are otherwise free, and are validated before any
+    projection: exact integers, unique, non-empty, at most nine values each and 81 cells, with
+    every effective return inside the projection's hard rate bounds and every scaled starting
+    expense inside the projection amount limit. Invalid axes raise :class:`SensitivityError`;
+    an invalid plan raises the projection's own :class:`FireProjectionError`. The function only
+    reads its arguments: it has no I/O, clock, database or mutation. A cell that never reaches
+    FIRE keeps ``None`` for its age and year.
+
+    A higher return cannot delay FIRE while the net-worth path stays non-negative (a negative
+    opening balance can be pushed further down); a higher expense level never accelerates it.
+    """
+    deltas = _sensitivity_axis(return_deltas_bp, "return_deltas_bp", MAX_SENSITIVITY_RETURN_DELTAS)
+    factors = _sensitivity_axis(
+        expense_factors_bp, "expense_factors_bp", MAX_SENSITIVITY_EXPENSE_FACTORS
+    )
+    if len(deltas) * len(factors) > MAX_SENSITIVITY_CELLS:
+        raise SensitivityError("expense_factors_bp", "too_many_cells")
+    if 0 not in deltas or 10_000 not in factors:
+        raise SensitivityError("return_deltas_bp", "missing_base")
+
+    base_return = inputs.real_return_bp
+    base_expenses = inputs.start_expenses.amount_minor
+    currency = inputs.start_expenses.currency
+    scaled_expenses: dict[int, int] = {}
+    for factor in factors:
+        if not 0 <= factor <= 100_000:
+            raise SensitivityError("expense_factors_bp", "expense_factor_out_of_range")
+        scaled = round_ratio(base_expenses * factor, 10_000)
+        if scaled > MAX_AMOUNT_MINOR:
+            raise SensitivityError("expense_factors_bp", "expense_too_large")
+        scaled_expenses[factor] = scaled
+    for delta in deltas:
+        if not RATE_HARD_MIN_BP <= base_return + delta <= RATE_HARD_MAX_BP:
+            raise SensitivityError("return_deltas_bp", "return_out_of_range")
+
+    rows: list[SensitivityRow] = []
+    base_cell: SensitivityCell | None = None
+    ages: list[int] = []
+    for factor in factors:
+        cells: list[SensitivityCell] = []
+        for delta in deltas:
+            effective_return = base_return + delta
+            is_base = delta == 0 and factor == 10_000
+            projection = project(
+                replace(
+                    inputs,
+                    real_return_bp=effective_return,
+                    start_expenses=Money(scaled_expenses[factor], currency),
+                )
+            )
+            cell = SensitivityCell(
+                return_delta_bp=delta,
+                expense_factor_bp=factor,
+                effective_return_bp=effective_return,
+                fire_age=projection.fire_age,
+                fire_year=projection.fire_year,
+                is_base=is_base,
+            )
+            cells.append(cell)
+            if is_base:
+                base_cell = cell
+            if cell.fire_age is not None:
+                ages.append(cell.fire_age)
+        rows.append(SensitivityRow(expense_factor_bp=factor, cells=tuple(cells)))
+
+    assert base_cell is not None  # the axes were checked to contain the base cell
+    return SensitivityGrid(
+        return_deltas_bp=deltas,
+        expense_factors_bp=factors,
+        rows=tuple(rows),
+        base_cell=base_cell,
+        min_fire_age=min(ages) if ages else None,
+        max_fire_age=max(ages) if ages else None,
     )
