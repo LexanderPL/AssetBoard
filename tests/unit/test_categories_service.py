@@ -367,6 +367,7 @@ def test_usage_sources_are_summed_and_shown(team: WorkspaceDb) -> None:
     listed = list_categories(team.factory, team.ctx("vic", "viewer"), usage_sources=sources)
     assert listed.expense[0].in_use and listed.expense[0].references == 5
     # F2.2 transactions, F2.3 budget lines, F3.1 recurring items, F3.4 income sources
+    from assetboard.services.fire_usage import category_usage as fire_usage
     from assetboard.services.income import category_usage as income_usage
     from assetboard.services.scheduled import category_usage as scheduled_usage
 
@@ -375,6 +376,7 @@ def test_usage_sources_are_summed_and_shown(team: WorkspaceDb) -> None:
         budget_line_usage,
         scheduled_usage,
         income_usage,
+        fire_usage,
     ] == service.USAGE_SOURCES
 
 

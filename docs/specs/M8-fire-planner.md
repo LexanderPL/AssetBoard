@@ -232,6 +232,75 @@ live recalculation via HTMX with debounce. The UI calls the service that calls p
   for every amount. No migration, model, dependency or ADR is added. Polish translations are
   complete with no fuzzy entries; the user guide is `docs/fire.md`.
 
+### As built (M8.F8.4)
+
+- `0060_f84_fire_expense_exclusions` adds `fire_expense_exclusions` (`workspace_id`,
+  `scenario_id`, `category_id`, timestamps; composite cascading foreign keys to the scenario and
+  category; unique per scenario/category). `FireExpenseExclusionRepository` only creates, lists
+  and counts them (no update); scenarios reconcile exclusions by category id, duplication copies
+  them, and archive/restore keeps them. The table is in `EMPTINESS_CHECKS` and excluded from the
+  archive format until F8.6 and from the demo; the auth workspace-table allowlist, tenant factory
+  and coverage, and migration upgrade/downgrade tests include it. The same revision adds
+  `fire_events.source_loan_id` (nullable, indexed, composite foreign key to
+  `loans(workspace_id, id)` with `RESTRICT` because a composite `SET NULL` would also clear the
+  non-null `workspace_id`, and loans are archived rather than hard-deleted).
+- `services.fire_linked` resolves linked inputs inside one request/session without per-row N+1.
+  The trailing window is the twelve complete months before the current month (the partial month
+  is excluded). Only non-deleted rows in regular expense/income categories count; savings and
+  transfers do not. Linked income is all regular income, including investment dividends and
+  interest (the ledger has no earned/passive flag). Distinct months with included rows drive the
+  annualization
+  (`total × 12 / months`, one half-up rounding), so gaps are not zero months. Zero months block
+  (`no_income_data` / `no_expense_data`); any other ledger currency blocks
+  (`ledger_currency_mismatch`). Warnings cover scaled months, data older than the window and a
+  plan start year before the current year. The per-category rows stay raw window totals; only
+  the annual total is scaled.
+- Expense exclusions accept regular expense categories, archived ones included, and reject
+  income/savings/transfer or another workspace's categories with an `expense_exclusions` field
+  error. Excluded rows leave both the totals and the set of months with data; their window
+  totals appear in a separate **Excluded categories** list. Excluding every category with data
+  blocks with `expenses_all_excluded`. `services.fire_usage` is a category usage source with
+  `requires_regular_expense`; a referenced category cannot be deleted (it archives) and cannot
+  change to a non-regular or income category (`kind_in_use` / `treatment_in_use`).
+- The linked portfolio uses the M6 current look-through for investable classes (archived
+  classes included), the unallocated bucket and manual M5 items that are assets, active,
+  investable and included in net worth. Only manual M5 items count; linked mirror items are
+  skipped and counted. Non-base M5 values use the latest FX on or before today with one half-up
+  conversion. Missing M6 prices/FX and missing M5 values/FX block with the source name; stale
+  prices/FX warn. No sources block (`no_linked_portfolio_data`); sources summing to zero warn
+  (`linked_portfolio_zero`). Source rows carry type, id, colour, as-of date and a page link. A
+  workspace base-currency change since the scenario was created blocks all linked modes
+  (`scenario_currency_mismatch`).
+- `services.fire_projection` selects manual or linked starting values, keeps a `blocked` property
+  for F8.3 callers while exposing all `blocks`, and adds `linked` and `loan_suggestions` to the
+  results. A linked block prevents projection instead of becoming zero. `scenario_results`
+  loads the saved detail, linked inputs and suggestions; the preview validates posted modes and
+  exclusions, resolves them read-only and never writes. Manual behaviour is unchanged.
+- Loan suggestions load every non-archived schedule loan in bulk (new
+  `load_loan_views_in_session` plus `for_loans`/`by_ids`/`for_rates` repository methods), build
+  the schedule and summarize it. The suggested annual amount is the next up to twelve
+  contractual rows after today using interest + principal + costs and excluding overpayments.
+  States are `available`, `already_paid_off`, `archived` (no card), `schedule_error`,
+  `out_of_window`, `currency_mismatch`, `amount_invalid` and `already_added`. One-click
+  `POST /fire/{id}/loan-payoff` is a full POST outside the preview form: CSRF, editor-only,
+  `require_role_now` under the workspace lock, archived refusal, and audited as
+  `fire_scenario.loan_payoff_event` with the loan name and year only. It creates
+  `expense_change` at the payoff year with the negative annual amount, the label
+  “Loan repaid: <name>” in the acting user's locale (or the workspace's) truncated to the
+  200-character event-label limit, and `source_loan_id`. Idempotency uses that loan lineage, not
+  the translated label; duplication and editing preserve it and deleting the event makes the
+  suggestion available again. The UI warns that unsaved Plan-input edits are discarded, and
+  notes that suggestions use the saved plan and loan schedules as of the page load.
+- The form enables the three source selects (Manual / Last 12 full months / Investable assets),
+  renders manual amounts as not required and disabled for linked modes (server-validated, with
+  `fire.js` as progressive enhancement), adds the exclusion checkbox list with colour and
+  archived badges, and keeps selected exclusions through error re-renders. Results show a
+  blocking panel for every block, a linked panel with breakdowns, totals, as-of dates, window,
+  months, warnings and source links, the excluded categories separately, and loan suggestion
+  cards outside the outer form. Viewers and archived scenarios see no write buttons. All new
+  strings are translated; Polish is complete with no fuzzy entries. The user guide is
+  `docs/fire.md`; no archive format change, new dependency or ADR is added.
+
 ---
 
 ## F8.4 Inputs linked to real data
@@ -239,7 +308,9 @@ live recalculation via HTMX with debounce. The UI calls the service that calls p
 **Acceptance**
 - `portfolio_mode=linked_investable`: starting portfolio = value of investable portfolio classes (M6, look-through) + net-worth items flagged `investable` (e.g., cash savings), in base currency, as of today. Shows the breakdown and a link to each source.
 - `expenses_mode=trailing_12m`: last 12 **full** months of expense transactions with `treatment=regular` (savings and transfers excluded), shown with per-category breakdown; one-off "unusual" transactions can be excluded by the user via a per-scenario exclusion list of categories.
-- `income_mode=trailing_12m`: earned income over the same window (regular treatment). Fewer than 12 months of data → use available months scaled, with a visible warning.
+- `income_mode=trailing_12m`: all regular income over the same window (including investment
+  dividends and interest; the ledger has no earned/passive flag). Fewer than 12 months of data →
+  use available months scaled, with a visible warning.
 - **Loan payoff suggestion:** for each loan (M7) show "Payoff in <year> frees <amount>/year (today's money)"; one click creates an `expense_change` event (negative expense change) for that year.
 - Linked values display "as of" timestamps and never silently fall back to zero: missing data → blocking message in the scenario header.
 
@@ -277,7 +348,8 @@ decision, 2026-10-18). A scenario from a spreadsheet is entered with the F8.1 fo
 **Acceptance**
 - New archive files (a minor format version per ADR-0016) with lineage `id` columns as in M4:
   `fire_scenarios.csv`, `fire_contributions.csv`, `fire_events.csv`; links to other modules'
-  data by lineage id.
+  data by lineage id. `fire_events.csv` also carries the optional `source_loan_id` lineage
+  (F8.4) so a restored one-click payoff event keeps its loan link and stays idempotent.
 - Restore only (no standalone import); a scenario whose linked data is missing is restored with
   manual values and listed.
 - The new models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them, and `project()`

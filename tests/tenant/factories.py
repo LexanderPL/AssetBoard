@@ -18,7 +18,12 @@ from uuid import UUID, uuid4
 
 from sqlalchemy.orm import Session
 
-from assetboard.db.models.fire import FireContribution, FireEvent, FireScenario
+from assetboard.db.models.fire import (
+    FireContribution,
+    FireEvent,
+    FireExpenseExclusion,
+    FireScenario,
+)
 from assetboard.db.models.identity import AuditEvent, Invitation, Membership, User
 from assetboard.db.models.import_batch import ImportBatch, ImportCategoryMapping
 from assetboard.db.models.income import IncomeSource, IncomeSourceTaxRule, WorkDay, WorkLog
@@ -730,6 +735,18 @@ def make_fire_event(session: Session, workspace_id: UUID) -> FireEvent:
     )
 
 
+def make_fire_expense_exclusion(session: Session, workspace_id: UUID) -> FireExpenseExclusion:
+    scenario = make_fire_scenario(session, workspace_id)
+    category = make_category(session, workspace_id)
+    session.add_all([scenario, category])
+    session.flush()
+    return FireExpenseExclusion(
+        workspace_id=workspace_id,
+        scenario_id=scenario.id,
+        category_id=category.id,
+    )
+
+
 def make_networth_item(session: Session, workspace_id: UUID) -> NetWorthItem:
     category = make_networth_category(session, workspace_id)
     session.add(category)
@@ -864,4 +881,8 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     FireScenario: TenantCase(make_fire_scenario, update_values={"name": "Updated FIRE plan"}),
     FireContribution: TenantCase(make_fire_contribution, update_values={"net_amount_minor": 1}),
     FireEvent: TenantCase(make_fire_event, update_values={"label": "Updated event"}),
+    FireExpenseExclusion: TenantCase(
+        make_fire_expense_exclusion,
+        unsupported=frozenset({"update"}),
+    ),
 }

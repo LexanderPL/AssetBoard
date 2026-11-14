@@ -165,12 +165,19 @@ def _resolve_scope(
     return default
 
 
-def current_portfolio_data_in_session(session: Session, ctx: Context) -> CurrentPortfolioData:
-    """The exact F6.6 current valuation, including undated legacy lots."""
+def current_portfolio_data_in_session(
+    session: Session, ctx: Context, *, today: date | None = None
+) -> CurrentPortfolioData:
+    """The exact F6.6 current valuation, including undated legacy lots.
+
+    ``today`` defaults to the workspace's clock. Callers that combine this valuation with other
+    as-of data (the FIRE linked inputs) pass their resolved day so every source shares one date.
+    """
     workspace = CurrentWorkspaceRepository(session, ctx).get()
     base = workspace.base_currency
     method = cost_basis_method(workspace)
-    today = ctx.clock.today(ctx.workspace.timezone)
+    if today is None:
+        today = ctx.clock.today(ctx.workspace.timezone)
     classes = tuple(AssetClassRepository(session, ctx).ordered())
     instrument_rows = tuple(InstrumentRepository(session, ctx).ordered())
     allocation_rows = InstrumentAllocationRepository(session, ctx).list()

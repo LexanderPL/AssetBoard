@@ -1321,6 +1321,28 @@ def test_transaction_queries_stay_in_their_workspace(
     assert in_b.recent_expenses() == []
     assert [r.id for r in in_a.by_ids([a_row.id])] == [a_row.id]
     assert in_b.by_ids([a_row.id]) == []
+    assert (
+        in_a.regular_window_totals(
+            direction="expense", start=date(2025, 10, 1), end=date(2026, 9, 30)
+        )
+        == []
+    )
+    assert (
+        in_b.regular_window_totals(
+            direction="expense", start=date(2025, 10, 1), end=date(2026, 9, 30)
+        )
+        == []
+    )
+    totals = in_a.regular_window_totals(
+        direction="expense", start=date(2026, 10, 1), end=date(2026, 10, 31)
+    )
+    assert [(row.category_id, row.amount_minor) for row in totals] == [(food_a.id, 1250)]
+    assert (
+        in_b.regular_window_totals(
+            direction="expense", start=date(2026, 10, 1), end=date(2026, 10, 31)
+        )
+        == []
+    )
     b_row = make(in_b, food_b.id, "Lidl")
     assert b_row.workspace_id == ctx_b.workspace.id
     assert [r.id for r in in_b.for_month(october)] == [b_row.id]
@@ -2553,6 +2575,8 @@ def test_loan_queries_stay_in_their_workspace(
     assert [row.id for row in changes_a.for_loan(loan_a.id)] == [change_a.id]
     assert changes_b.for_loan(loan_a.id) == []
     assert changes_b.get_for_loan(loan_a.id, change_a.id) is None
+    assert [row.id for row in changes_a.for_loans([loan_a.id, loan_b.id])] == [change_a.id]
+    assert changes_b.for_loans([loan_a.id]) == []
     assert changes_a.latest_on_or_before(loan_a.id, date(2025, 6, 1)) == change_a
     assert changes_b.latest_on_or_before(loan_a.id, date(2025, 6, 1)) is None
     assert changes_a.exists_on(loan_a.id, date(2025, 1, 1))
@@ -2561,11 +2585,15 @@ def test_loan_queries_stay_in_their_workspace(
     assert [row.id for row in rates_a.ordered()] == [rate_a.id]
     assert rates_b.by_name_key("wibor a") is None
     assert rates_a.by_name_key("wibor a") == rate_a
+    assert [row.id for row in rates_a.by_ids([rate_a.id])] == [rate_a.id]
+    assert rates_b.by_ids([rate_a.id]) == []
     assert not rates_b.used_by_loan(rate_a.id)
 
     assert [row.id for row in values_a.for_rate(rate_a.id)] == [value_a.id]
     assert values_b.for_rate(rate_a.id) == []
     assert values_b.get_for_rate(rate_a.id, value_a.id) is None
+    assert [row.id for row in values_a.for_rates([rate_a.id])] == [value_a.id]
+    assert values_b.for_rates([rate_a.id]) == []
     assert values_a.latest_on_or_before(rate_a.id, date(2025, 6, 1)) == value_a
     assert values_b.latest_on_or_before(rate_a.id, date(2025, 6, 1)) is None
     assert values_a.exists_on(rate_a.id, date(2025, 1, 1))
@@ -2574,12 +2602,20 @@ def test_loan_queries_stay_in_their_workspace(
     assert [row.id for row in costs_a.for_loan(loan_a.id)] == [cost_a.id]
     assert costs_b.for_loan(loan_a.id) == []
     assert costs_b.get_for_loan(loan_a.id, cost_a.id) is None
+    assert [row.id for row in costs_a.for_loans([loan_a.id, loan_b.id])] == [cost_a.id]
+    assert costs_b.for_loans([loan_a.id]) == []
     assert [row.id for row in overpayments_a.for_loan(loan_a.id)] == [overpayment_a.id]
     assert overpayments_b.for_loan(loan_a.id) == []
     assert overpayments_b.get_for_loan(loan_a.id, overpayment_a.id) is None
+    assert [row.id for row in overpayments_a.for_loans([loan_a.id, loan_b.id])] == [
+        overpayment_a.id
+    ]
+    assert overpayments_b.for_loans([loan_a.id]) == []
     assert [row.id for row in checkpoints_a.for_loan(loan_a.id)] == [checkpoint_a.id]
     assert checkpoints_b.for_loan(loan_a.id) == []
     assert checkpoints_b.get_for_loan(loan_a.id, checkpoint_a.id) is None
+    assert [row.id for row in checkpoints_a.for_loans([loan_a.id, loan_b.id])] == [checkpoint_a.id]
+    assert checkpoints_b.for_loans([loan_a.id]) == []
     assert checkpoints_b.latest_on_or_before(loan_a.id, date(2025, 6, 1)) is None
     assert checkpoints_a.exists_on(loan_a.id, date(2025, 1, 1))
     assert not checkpoints_b.exists_on(loan_a.id, date(2025, 1, 1))
@@ -2609,9 +2645,12 @@ def test_fire_queries_stay_in_their_workspace(
 ) -> None:
     from datetime import UTC, datetime
 
+    from assetboard.db.models.fire import FireExpenseExclusion
     from assetboard.db.repositories import (
+        CategoryRepository,
         FireContributionRepository,
         FireEventRepository,
+        FireExpenseExclusionRepository,
         FireScenarioRepository,
     )
 
@@ -2622,6 +2661,24 @@ def test_fire_queries_stay_in_their_workspace(
     contributions_b = FireContributionRepository(db_session, ctx_b)
     events_a = FireEventRepository(db_session, ctx_a)
     events_b = FireEventRepository(db_session, ctx_b)
+    exclusions_a = FireExpenseExclusionRepository(db_session, ctx_a)
+    exclusions_b = FireExpenseExclusionRepository(db_session, ctx_b)
+    category_a = CategoryRepository(db_session, ctx_a).create(
+        name="Unusual spending A",
+        name_key="unusual spending a",
+        kind="expense",
+        treatment="regular",
+        color="#16a34a",
+        sort_order=0,
+    )
+    category_b = CategoryRepository(db_session, ctx_b).create(
+        name="Unusual spending B",
+        name_key="unusual spending b",
+        kind="expense",
+        treatment="regular",
+        color="#16a34a",
+        sort_order=0,
+    )
 
     scenario_values = {
         "currency": "EUR",
@@ -2687,6 +2744,8 @@ def test_fire_queries_stay_in_their_workspace(
         amount_minor=200_000,
         label="Bonus",
     )
+    exclusion_a = exclusions_a.create(scenario_id=active_a.id, category_id=category_a.id)
+    exclusions_b.create(scenario_id=active_b.id, category_id=category_b.id)
 
     assert [row.id for row in scenarios_a.active()] == [active_a.id]
     assert [row.id for row in scenarios_a.archived()] == [old_a.id]
@@ -2707,6 +2766,10 @@ def test_fire_queries_stay_in_their_workspace(
     assert events_b.for_scenario(active_a.id) == []
     assert events_a.counts_by_scenario() == {active_a.id: 1}
     assert events_b.counts_by_scenario() == {active_b.id: 1}
+    assert [row.id for row in exclusions_a.for_scenario(active_a.id)] == [exclusion_a.id]
+    assert exclusions_b.for_scenario(active_a.id) == []
+    assert exclusions_a.counts_by_category() == {category_a.id: 1}
+    assert exclusions_b.counts_by_category() == {category_b.id: 1}
 
     with pytest.raises(ForeignWorkspace):
         scenarios_b.create(
@@ -2732,4 +2795,12 @@ def test_fire_queries_stay_in_their_workspace(
             kind="cash",
             amount_minor=1,
             label="Cross workspace",
+        )
+    with pytest.raises(ForeignWorkspace):
+        exclusions_b.add(
+            FireExpenseExclusion(
+                workspace_id=ctx_a.workspace.id,
+                scenario_id=active_a.id,
+                category_id=category_a.id,
+            )
         )

@@ -13,10 +13,12 @@ or income series. The sign is the meaning, so the model keeps it.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from datetime import date
 from decimal import Decimal
 from enum import StrEnum
 
 from assetboard.domain.money import Money, minor_unit_for
+from assetboard.domain.months import YearMonth
 from assetboard.domain.text import collapse_whitespace, has_rejected_characters, text_key
 from assetboard.domain.transactions import MAX_AMOUNT_MINOR, EntryError, amount_minor
 
@@ -98,6 +100,69 @@ def event_years(start_year: int, birth_year: int, horizon_age: int) -> range:
 
 def year_in_window(year: int, window: range) -> bool:
     return year in window
+
+
+@dataclass(frozen=True, slots=True)
+class TrailingWindow:
+    """Twelve complete calendar months ending before ``today``'s month.
+
+    The current, partial month is always excluded: ``end`` is the month before today and
+    ``start`` is eleven months before ``end``. ``first_day`` and ``last_day`` bound the window
+    inclusively.
+    """
+
+    start: YearMonth
+    end: YearMonth
+
+    @property
+    def months(self) -> int:
+        return 12
+
+    @property
+    def first_day(self) -> date:
+        return self.start.first_day
+
+    @property
+    def last_day(self) -> date:
+        return self.end.last_day
+
+    def contains(self, day: date) -> bool:
+        """Whether ``day`` falls inside the window (both bounds inclusive)."""
+        return self.first_day <= day <= self.last_day
+
+
+def trailing_window(today: date) -> TrailingWindow:
+    """The last twelve **full** calendar months before ``today``'s month."""
+    end = YearMonth.from_date(today).prev()
+    if end is None:
+        raise ValueError("today is before the first supported month")
+    start = end
+    for _ in range(11):
+        previous = start.prev()
+        if previous is None:
+            raise ValueError("the trailing window starts before the first supported month")
+        start = previous
+    return TrailingWindow(start=start, end=end)
+
+
+def round_ratio(numerator: int, denominator: int) -> int:
+    """``numerator / denominator`` rounded half away from zero, exactly and once."""
+    if denominator <= 0:
+        raise ValueError("denominator must be positive")
+    if numerator >= 0:
+        return (2 * numerator + denominator) // (2 * denominator)
+    return -((-2 * numerator + denominator) // (2 * denominator))
+
+
+def annualize_minor(total_minor: int, months: int) -> int:
+    """Scale a window total to a year from the months that have data.
+
+    ``total_minor * 12 / months`` is rounded half away from zero exactly once. Zero months is an
+    error: the caller must block instead of inventing a zero annual amount.
+    """
+    if months <= 0:
+        raise ValueError("at least one month with data is needed")
+    return round_ratio(total_minor * 12, months)
 
 
 def default_horizon_age(life_expectancy: int | None) -> int:
@@ -436,23 +501,14 @@ def _validate(inputs: ProjectionInputs) -> _ProjectionPlan:
     )
 
 
-def _round_ratio(numerator: int, denominator: int) -> int:
-    """``numerator / denominator`` rounded half away from zero, exactly and once."""
-    if denominator <= 0:
-        raise ValueError("denominator must be positive")
-    if numerator >= 0:
-        return (2 * numerator + denominator) // (2 * denominator)
-    return -((-2 * numerator + denominator) // (2 * denominator))
-
-
 def _inflate(value: int, rate_bp: int, years: int) -> int:
     """``value * (1 + rate) ** years`` with one half-up rounding at the end."""
-    return _round_ratio(value * (10_000 + rate_bp) ** years, 10_000**years)
+    return round_ratio(value * (10_000 + rate_bp) ** years, 10_000**years)
 
 
 def _deflate(value: int, inflation_bp: int, years: int) -> int:
     """``value / (1 + inflation) ** years`` with one half-up rounding at the end."""
-    return _round_ratio(value * 10_000**years, (10_000 + inflation_bp) ** years)
+    return round_ratio(value * 10_000**years, (10_000 + inflation_bp) ** years)
 
 
 def _active_changes(changes: dict[int, int], rate_bp: int, years: int, year: int) -> int:
@@ -525,7 +581,7 @@ def project(inputs: ProjectionInputs) -> Projection:
         )
         cash = plan.cash_by_year.get(year, 0)
         opening = plan.start_portfolio_minor if offset == 0 else previous_net_worth
-        gain = _round_ratio(opening * gain_bp, 10_000)
+        gain = round_ratio(opening * gain_bp, 10_000)
         net_worth = net + gain + cash if offset == 0 else opening + net + gain + cash
 
         is_fire = False
@@ -572,20 +628,20 @@ def project(inputs: ProjectionInputs) -> Projection:
         fire_number_today = Money(0, currency)
     elif plan.rule is Rule.SWR:
         assert plan.swr_bp is not None
-        fire_number_today = Money(_round_ratio(first_expenses * 10_000, plan.swr_bp), currency)
+        fire_number_today = Money(round_ratio(first_expenses * 10_000, plan.swr_bp), currency)
     elif gain_bp > 0:
-        fire_number_today = Money(_round_ratio(first_expenses * 10_000, gain_bp), currency)
+        fire_number_today = Money(round_ratio(first_expenses * 10_000, gain_bp), currency)
     else:
         fire_number_today = None
 
     progress_sheet_bp: int | None = None
     if fire_row is not None and fire_row.net_worth.amount_minor > 0:
-        progress_sheet_bp = _round_ratio(
+        progress_sheet_bp = round_ratio(
             rows[0].net_worth.amount_minor * 10_000, fire_row.net_worth.amount_minor
         )
     progress_today_bp: int | None = None
     if fire_number_today is not None and fire_number_today.amount_minor > 0:
-        progress_today_bp = _round_ratio(
+        progress_today_bp = round_ratio(
             plan.start_portfolio_minor * 10_000, fire_number_today.amount_minor
         )
 

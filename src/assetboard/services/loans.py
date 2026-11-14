@@ -8,7 +8,8 @@ is F7.2: only ``first_installment`` is used here to validate a target-total over
 
 from __future__ import annotations
 
-from collections.abc import Callable, Mapping, Sequence
+from collections import defaultdict
+from collections.abc import Callable, Collection, Mapping, Sequence
 from dataclasses import dataclass, replace
 from datetime import date
 from typing import Literal
@@ -826,6 +827,74 @@ def load_loan_view_in_session(
     """One loan view inside the caller's transaction; archived loans remain readable."""
     loan = LoanRepository(session, ctx).get_or_raise(loan_id)
     return _load_loan_view(session, ctx, loan, today)
+
+
+def load_loan_views_in_session(
+    session: Session,
+    ctx: WorkspaceScope,
+    *,
+    today: date,
+    include_archived: bool = True,
+    loan_ids: Collection[UUID] | None = None,
+) -> list[LoanView]:
+    """Every schedule loan's view in a bounded number of queries (no per-loan N+1).
+
+    Rates, cost components, overpayments, checkpoints and reference-rate values are loaded once
+    and grouped by loan (or reference rate). Installment plans are not schedule loans and are
+    omitted, matching ``list_loans``.
+    """
+    repository = LoanRepository(session, ctx)
+    requested = set(loan_ids) if loan_ids is not None else None
+    rows = [
+        row
+        for row in repository.ordered(include_archived=include_archived)
+        if row.kind != LoanKind.INSTALLMENT_PLAN.value
+        and (requested is None or row.id in requested)
+    ]
+    if not rows:
+        return []
+    ids = [row.id for row in rows]
+    changes_by_loan: dict[UUID, list[LoanRateChange]] = defaultdict(list)
+    for change in LoanRateChangeRepository(session, ctx).for_loans(ids):
+        changes_by_loan[change.loan_id].append(change)
+    costs_by_loan: dict[UUID, list[LoanCostComponent]] = defaultdict(list)
+    for cost in LoanCostComponentRepository(session, ctx).for_loans(ids):
+        costs_by_loan[cost.loan_id].append(cost)
+    overpayments_by_loan: dict[UUID, list[LoanOverpayment]] = defaultdict(list)
+    for overpayment in LoanOverpaymentRepository(session, ctx).for_loans(ids):
+        overpayments_by_loan[overpayment.loan_id].append(overpayment)
+    checkpoints_by_loan: dict[UUID, list[LoanBalanceCheckpoint]] = defaultdict(list)
+    for checkpoint in LoanBalanceCheckpointRepository(session, ctx).for_loans(ids):
+        checkpoints_by_loan[checkpoint.loan_id].append(checkpoint)
+
+    reference_ids: set[UUID] = set()
+    for row in rows:
+        if row.reference_rate_id is not None:
+            reference_ids.add(row.reference_rate_id)
+        reference_ids.update(
+            change.reference_rate_id
+            for change in changes_by_loan.get(row.id, ())
+            if change.reference_rate_id is not None
+        )
+    rate_rows = ReferenceRateRepository(session, ctx).by_ids(reference_ids)
+    rates = {row.id: row for row in rate_rows}
+    values_by_rate: dict[UUID, list[ReferenceRateValue]] = defaultdict(list)
+    for value in ReferenceRateValueRepository(session, ctx).for_rates(list(rates)):
+        values_by_rate[value.reference_rate_id].append(value)
+    reference_data = _ReferenceData(rates=rates, values=values_by_rate)
+
+    return [
+        _view(
+            row,
+            changes_by_loan.get(row.id, []),
+            costs_by_loan.get(row.id, []),
+            overpayments_by_loan.get(row.id, []),
+            checkpoints_by_loan.get(row.id, []),
+            reference_data,
+            today,
+        )
+        for row in rows
+    ]
 
 
 def _validated_terms(
@@ -2204,6 +2273,7 @@ __all__ = [
     "get_loan",
     "get_reference_rate",
     "list_loans",
+    "load_loan_views_in_session",
     "list_reference_rates",
     "preview_first_installment",
     "rate_timeline",

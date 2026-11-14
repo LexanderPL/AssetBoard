@@ -301,6 +301,7 @@ FIRE_ACTIONS = {
     "fire_scenario.archived",
     "fire_scenario.restored",
     "fire_scenario.default_changed",
+    "fire_scenario.loan_payoff_event",
 }
 
 

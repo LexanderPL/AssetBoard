@@ -47,6 +47,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "email_tokens",
         "fire_contributions",
         "fire_events",
+        "fire_expense_exclusions",
         "fire_scenarios",
         "import_batches",
         "import_category_mappings",
@@ -2066,6 +2067,62 @@ def test_0059_fire_scenarios_migration_is_reversible(tmp_path: Path) -> None:
         command.downgrade(alembic_config(settings), "0058_loan_mixed_rate_timeline")
         tables = set(inspect(engine).get_table_names())
         assert not {"fire_scenarios", "fire_contributions", "fire_events"} & tables
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0060_fire_expense_exclusions_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'fire_exclusions.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        columns = {column["name"] for column in inspector.get_columns("fire_expense_exclusions")}
+        assert columns >= {
+            "workspace_id",
+            "scenario_id",
+            "category_id",
+            "created_at",
+            "updated_at",
+        }
+        unique = {
+            constraint["name"]
+            for constraint in inspector.get_unique_constraints("fire_expense_exclusions")
+        }
+        assert "uq_fire_expense_exclusions_workspace_scenario_category" in unique
+        indexes = {index["name"] for index in inspector.get_indexes("fire_expense_exclusions")}
+        assert "ix_fire_expense_exclusions_workspace_scenario" in indexes
+        foreign_keys = {
+            (key["referred_table"], tuple(key["constrained_columns"]))
+            for key in inspector.get_foreign_keys("fire_expense_exclusions")
+        }
+        assert ("fire_scenarios", ("workspace_id", "scenario_id")) in foreign_keys
+        assert ("categories", ("workspace_id", "category_id")) in foreign_keys
+
+        event_columns = {column["name"] for column in inspector.get_columns("fire_events")}
+        assert "source_loan_id" in event_columns
+        event_indexes = {index["name"] for index in inspector.get_indexes("fire_events")}
+        assert "ix_fire_events_workspace_source_loan" in event_indexes
+        event_foreign_keys = {
+            (key["referred_table"], tuple(key["constrained_columns"]))
+            for key in inspector.get_foreign_keys("fire_events")
+        }
+        assert ("loans", ("workspace_id", "source_loan_id")) in event_foreign_keys
+
+        command.downgrade(alembic_config(settings), "0059_f81_fire_scenarios")
+        inspector = inspect(engine)
+        assert "fire_expense_exclusions" not in set(inspector.get_table_names())
+        downgraded_event_columns = {
+            column["name"] for column in inspector.get_columns("fire_events")
+        }
+        assert "source_loan_id" not in downgraded_event_columns
         upgrade_database(settings)
         assert database_is_at_head(settings)
         check_database_migrations(settings)

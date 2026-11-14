@@ -18,6 +18,7 @@ from assetboard.db.repositories.category import CategoryRepository
 from assetboard.db.repositories.fire import (
     FireContributionRepository,
     FireEventRepository,
+    FireExpenseExclusionRepository,
     FireScenarioRepository,
 )
 from assetboard.db.repositories.import_batch import ImportBatchRepository
@@ -79,6 +80,7 @@ from assetboard.db.repositories.tax import TaxRuleRepository, TaxRuleVersionRepo
 from assetboard.db.repositories.transaction import (
     CategoryCounts,
     DescriptionMatch,
+    RegularWindowTotal,
     TransactionRepository,
 )
 from assetboard.db.repositories.user_memberships import MembershipView, UserMembershipReader
@@ -94,6 +96,7 @@ __all__ = [
     "NotificationLogRepository",
     "FireContributionRepository",
     "FireEventRepository",
+    "FireExpenseExclusionRepository",
     "FireScenarioRepository",
     "FxRateRepository",
     "PricePointRepository",
@@ -137,6 +140,7 @@ __all__ = [
     "InstanceAuditReader",
     "CurrentWorkspaceRepository",
     "DescriptionMatch",
+    "RegularWindowTotal",
     "ForeignWorkspace",
     "InvitationLocation",
     "InvitationRepository",

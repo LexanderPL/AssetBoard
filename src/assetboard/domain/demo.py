@@ -53,6 +53,7 @@ DEMO_EXCLUDED_MODELS: MappingProxyType[str, str] = MappingProxyType(
         "FireScenario": "FIRE scenarios are user what-ifs, not sample data",
         "FireContribution": "contribution overrides belong to a user's FIRE scenario",
         "FireEvent": "FIRE events belong to a user's FIRE scenario",
+        "FireExpenseExclusion": "expense exclusions belong to a user's FIRE scenario",
     }
 )
 

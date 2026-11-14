@@ -168,9 +168,9 @@ def test_results_draw_preview_without_navigation_and_save(tmp_path: Path) -> Non
             expect(page.locator("[data-fire-depletion]")).to_be_visible()
             assert "basis=real" in page.url
 
-            # A saved plan can be blocked (F8.4 linked values, or a defensive invalid plan).
-            # The page still boots the chart scripts so a later preview can draw the charts
-            # that were absent when the blocked page loaded.
+            # A saved plan can be blocked (a linked value with no ledger data, or a defensive
+            # invalid plan). The page still boots the chart scripts so a later preview can draw
+            # the charts that were absent when the blocked page loaded.
             scenario_id = UUID(page.url.split("/fire/", 1)[1].split("?")[0].split("#")[0])
             with app.state.session_factory() as session, session.begin():
                 row = session.get_one(FireScenario, scenario_id)
@@ -181,6 +181,7 @@ def test_results_draw_preview_without_navigation_and_save(tmp_path: Path) -> Non
             assert page.locator("[data-chart]").count() == 0
             assert page.locator("script[src*='charts.js']").count() == 1
             page.locator("#inputs summary").click()
+            page.locator('select[name="income_mode"]').select_option("manual")
             page.get_by_label("Annual income").fill("50000")
             expect(
                 page.locator('[data-fire-chart="net-worth"] [data-chart="line"]')

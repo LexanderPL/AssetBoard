@@ -28,9 +28,9 @@ Archived scenarios stay visible under **Archived scenarios**.
   scenario without changing the profile. If it is missing, the form links to your profile.
 - **Horizon age** is the last age in the projection. It defaults from your profile's life
   expectancy (90 when the profile has none).
-- **Income stops at age** ends earned income; from then on the plan spends from the portfolio.
-  It cannot be before your age at the start. A stop age after the horizon is allowed and marked
-  with a warning.
+- **Income stops at age** ends the yearly income series; from then on the plan spends from the
+  portfolio. It cannot be before your age at the start. A stop age after the horizon is allowed
+  and marked with a warning.
 
 ## Rates
 
@@ -47,13 +47,64 @@ are illustrative examples, not recommendations.
 
 ## Starting amounts
 
-Annual income, annual expenses and the starting portfolio are entered manually in the plan
-currency and in today's money. The currency is snapshotted from the workspace base currency
-when the scenario is created. Amounts cannot be negative.
+Annual income, annual expenses and the starting portfolio can be entered manually in the plan
+currency and in today's money, or read from the app's own data. The currency is snapshotted
+from the workspace base currency when the scenario is created. Manual amounts cannot be
+negative; a linked mode stores no manual amount. Annual income is all **regular** income:
+earnings, dividends and interest, not only salary.
 
-The input modes for linking these values to the app's own data (trailing 12 months of
-transactions, the investable portfolio) are stored with the scenario but are not editable yet:
-F8.1 accepts manual values only.
+- **Income → Last 12 full months** sums every income transaction with the **regular** treatment
+  in the last twelve complete calendar months. Savings withdrawals and transfers are excluded.
+  It includes investment dividends and interest because the ledger has no earned/passive flag.
+- **Expenses → Last 12 full months** sums every expense transaction with the regular treatment
+  in the same window. Savings and transfers are excluded.
+- **Starting portfolio → Investable assets** adds the current M6 portfolio look-through for
+  every asset class marked **investable** (archived classes included), the portfolio's
+  unallocated bucket, and manual net-worth items with **investable** and **include in net
+  worth** enabled. Linked net-worth mirrors are skipped to avoid double counting.
+
+The current partial month is never used. The window is always the twelve full months before the
+current month; only months with included rows count. If fewer than twelve months have data, the
+window total is scaled to a year from the available months, and the linked panel says how many
+months were used and shows the window. A gap month is not treated as zero. If a plan starts in
+an earlier year, the panel warns that today's data is used; later months cannot be included
+until a new scenario is created. Amounts in another currency than the plan block the linked
+mode instead of being silently dropped.
+
+### Expense exclusions
+
+The **Expense exclusions** checkbox list leaves regular expense categories out of the linked
+trailing expenses, for example for unusual one-off spending. Exclusions are saved per scenario
+and have no effect on income. An excluded category's window total is shown separately for
+transparency. Income categories, savings and transfer categories cannot be excluded. A category
+used by an exclusion cannot be deleted (it is archived instead) or changed to a non-regular or
+income category while the scenario references it; archived categories remain valid and are
+shown with an **Archived** badge. Excluding every category with data blocks the linked expenses.
+
+## Linked portfolio breakdown
+
+When the starting portfolio is linked, the results page lists every source: its name, amount,
+valuation date and a link to the portfolio or net-worth item. The portfolio's as-of date is
+today. The panel notes non-investable classes that were left out and the linked net-worth items
+that were skipped. A missing price, FX rate, item value or any other missing source is a blocking
+message, never a zero. A portfolio whose sources sum to zero is allowed but marked with a
+warning. The portfolio currency must still equal the workspace base currency; otherwise the
+linked modes are blocked while manual values keep working.
+
+## Loan payoff suggestions
+
+For every active schedule loan in the plan currency, the results page suggests adding its payoff
+as an **annual expense change**: “Payoff in <year> frees <amount>/year (today's money).” The
+amount is the sum of the next up to twelve contractual payments (interest, principal and costs,
+without overpayments), not the next instalment multiplied by twelve. **Add payoff event** saves
+the event immediately, after a confirmation that unsaved changes in **Plan inputs** will be
+lost. The button needs an editor and an active scenario, is CSRF-protected, and is idempotent:
+the event remembers which loan it came from, so adding the same loan payoff again leaves one
+event in every interface language. The stored label is written in your interface language.
+Loans already paid off, in another currency, whose schedule cannot be calculated or whose payoff
+falls outside the plan window are shown with a short explanation instead of a button; archived
+loans are not suggested. Suggestions are read from the saved plan and loan schedules when the
+page loads; unsaved Plan-input changes do not update them.
 
 ## Contribution overrides
 
@@ -162,9 +213,14 @@ projected keeps the last saved results and explains which input needs fixing. A 
 unusual rate is allowed in the preview but warns that saving still needs the confirmation box.
 Viewers and archived scenarios are read-only and do not preview.
 
-A plan whose inputs cannot be projected (for example a linked starting value that is not
-available yet, or a saved plan outside the supported year range) shows an explanation instead
-of metrics or charts, and its CSV download returns a conflict rather than an empty file.
+A plan whose inputs cannot be projected shows every reason in a blocking panel instead of
+metrics or charts, and its CSV download returns a conflict rather than an empty file. A linked
+mode can be blocked by missing ledger data, a currency mismatch, missing prices, FX rates or
+net-worth values, an all-excluded expense list, or no investable portfolio sources. The panel
+says which input is affected and suggests switching it to **Manual** or fixing the linked data.
+The **Linked inputs** panel still shows the resolved breakdown, window, months with data, as-of
+dates, warnings and source links so the problem is visible. A preview resolves the posted linked
+modes and exclusions without writing anything.
 
 ## Validation
 

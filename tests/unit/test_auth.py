@@ -1317,6 +1317,7 @@ WORKSPACE_TABLES = {
     "fire_scenarios",
     "fire_contributions",
     "fire_events",
+    "fire_expense_exclusions",
 }
 
 

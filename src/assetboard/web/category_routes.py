@@ -63,6 +63,9 @@ ERRORS = {
     "invalid_treatment": _("Choose a treatment."),
     "invalid_color": _("Choose a colour."),
     "kind_in_use": _("The kind cannot change: this category is in use."),
+    "treatment_in_use": _(
+        "The treatment cannot change: a FIRE scenario excludes this category as a regular expense."
+    ),
     "archived": _("Restore the category before changing it."),
     "already_seeded": _("The suggested categories can only be added to an empty list."),
     "invalid_direction": _("The change could not be made. Reload the page and try again."),
