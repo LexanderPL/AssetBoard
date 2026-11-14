@@ -36,6 +36,8 @@
         {% endfor %}
       </div>
     </fieldset>
+    <label class="grid max-w-md gap-1 text-sm font-medium">{{ _("Interest-only months") }}<input name="interest_only_months" type="number" min="0" max="599" value="{{ values.get('interest_only_months', '0') }}" class="{{ input_class }} font-normal"><span class="text-xs text-muted">{{ _("Included in the term; 0 starts repaying principal immediately.") }}</span></label>
+    <p class="text-sm text-muted">{{ _("Payout: %(mode)s. Use Settings → Transfers for tranches.", mode=_("Full amount at origination") if values.get('drawdown_mode', 'full_at_origination') == 'full_at_origination' else _("Paid out in tranches")) }}</p>
     <label class="grid max-w-md gap-1 text-sm font-medium">{{ _("Interest calculation") }}<select name="day_count" class="form-select py-2 font-normal">
       <option value="monthly"{% if values.get('day_count', 'monthly') == 'monthly' %} selected{% endif %}>{{ _("Monthly (12 equal periods)") }}</option>
       <option value="actual_365"{% if values.get('day_count') == 'actual_365' %} selected{% endif %}>{{ _("Actual/365") }}</option>

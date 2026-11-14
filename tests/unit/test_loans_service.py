@@ -783,3 +783,145 @@ def test_day_count_defaults_and_updates(team: WorkspaceDb) -> None:
 
     actual = _original_loan(team, name="Actual loan", day_count="actual_365")
     assert loans.get_loan(team.factory, ctx, actual).day_count is DayCount.ACTUAL_365
+
+
+def test_tranched_loan_transfers_are_editable_and_capped_at_the_principal(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("owner", "owner")
+    loan_id = _original_loan(
+        team,
+        ctx,
+        principal_original=_money(30_000_000),
+        term_months=60,
+        first_payment_date=date(2026, 2, 1),
+        drawdown_mode="tranches",
+        interest_only_months=2,
+    )
+    view = loans.get_loan(team.factory, ctx, loan_id)
+    assert view.drawdown_mode.value == "tranches"
+    assert view.interest_only_months == 2
+    assert view.transfers == ()
+    row = next(row for row in loans.list_loans(team.factory, ctx).active if row.loan.id == loan_id)
+    assert row.status == "not_drawn"
+
+    loans.add_transfer(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 1, 15),
+        amount=_money(10_000_000),
+        note="First",
+    )
+    loans.add_transfer(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 3, 15),
+        amount=_money(5_000_000),
+        note="Future",
+    )
+    view = loans.get_loan(team.factory, ctx, loan_id)
+    assert [row.amount.amount_minor for row in view.transfers] == [10_000_000, 5_000_000]
+    assert [row.future for row in view.transfers] == [False, True]
+    row = next(row for row in loans.list_loans(team.factory, ctx).active if row.loan.id == loan_id)
+    assert row.figures is not None
+    assert row.figures.drawn_principal == _money(10_000_000)
+    assert row.figures.undrawn_principal == _money(20_000_000)
+    assert row.status == "active"
+
+    with pytest.raises(loans.LoanError) as error:
+        loans.add_transfer(
+            team.factory,
+            ctx,
+            loan_id,
+            date_value=date(2026, 4, 1),
+            amount=_money(20_000_001),
+        )
+    assert error.value.code == "drawdown_exceeds_principal"
+
+    first = view.transfers[0]
+    loans.update_transfer(
+        team.factory,
+        ctx,
+        loan_id,
+        first.id,
+        date_value=date(2026, 1, 10),
+        amount=_money(12_000_000),
+        note="Updated",
+    )
+    view = loans.get_loan(team.factory, ctx, loan_id)
+    assert view.transfers[0].amount == _money(12_000_000)
+    assert view.transfers[0].note == "Updated"
+
+    loans.delete_transfer(team.factory, ctx, loan_id, view.transfers[1].id)
+    view = loans.get_loan(team.factory, ctx, loan_id)
+    assert len(view.transfers) == 1
+
+
+def test_a_later_first_payment_is_flagged_after_the_first_transfer(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    loan_id = _original_loan(
+        team,
+        ctx,
+        first_payment_date=date(2026, 3, 1),
+        drawdown_mode="tranches",
+    )
+    loans.add_transfer(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 1, 10),
+        amount=_money(10_000_000),
+    )
+    view = loans.get_loan(team.factory, ctx, loan_id)
+    assert view.transfer_payment_gap is True
+
+
+def test_converting_a_full_loan_seeds_a_neutral_transfer(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    loan_id = _original_loan(team, ctx)
+    viewer = team.ctx("viewer", "viewer")
+    with pytest.raises(PermissionDenied):
+        loans.convert_loan_to_tranched(team.factory, viewer, loan_id)
+
+    loans.convert_loan_to_tranched(team.factory, ctx, loan_id)
+    view = loans.get_loan(team.factory, ctx, loan_id)
+    assert view.drawdown_mode.value == "tranches"
+    assert len(view.transfers) == 1
+    transfer = view.transfers[0]
+    assert transfer.date == date(2026, 1, 1)
+    assert transfer.amount == _money(30_000_000)
+    assert transfer.note == ""
+
+    with pytest.raises(loans.LoanError) as error:
+        loans.convert_loan_to_tranched(team.factory, ctx, loan_id)
+    assert error.value.code == "already_tranched"
+
+
+def test_a_transfer_after_the_last_scheduled_payment_is_refused(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    loan_id = _original_loan(
+        team,
+        ctx,
+        principal_original=_money(1_000_000),
+        term_months=2,
+        first_payment_date=date(2026, 2, 1),
+        drawdown_mode="tranches",
+    )
+    loans.add_transfer(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 1, 15),
+        amount=_money(500_000),
+    )
+    with pytest.raises(loans.LoanError) as error:
+        loans.add_transfer(
+            team.factory,
+            ctx,
+            loan_id,
+            date_value=date(2026, 4, 15),
+            amount=_money(500_000),
+        )
+    assert error.value.code == "transfer_after_final_payment"

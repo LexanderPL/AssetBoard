@@ -15,6 +15,7 @@ from assetboard.db.models.loans import (
     LoanPayment,
     LoanRateChange,
     LoanScenario,
+    LoanTransfer,
     ReferenceRate,
     ReferenceRateValue,
 )
@@ -92,6 +93,39 @@ class LoanRateChangeRepository(ScopedRepository[LoanRateChange]):
                 )
             )
         return bool(self._session.execute(statement).scalar_one())
+
+
+class LoanTransferRepository(ScopedRepository[LoanTransfer]):
+    model = LoanTransfer
+
+    def create(self, **values: object) -> LoanTransfer:
+        return self.add(LoanTransfer(**values))
+
+    def for_loan(self, loan_id: UUID) -> list[LoanTransfer]:
+        statement = self._scoped_select().where(LoanTransfer.loan_id == loan_id)
+        return list(
+            self._session.scalars(
+                statement.order_by(LoanTransfer.date, LoanTransfer.created_at, LoanTransfer.id)
+            )
+        )
+
+    def for_loans(self, loan_ids: Collection[UUID]) -> list[LoanTransfer]:
+        ids = list(loan_ids)
+        if not ids:
+            return []
+        statement = (
+            self._scoped_select()
+            .where(LoanTransfer.loan_id.in_(ids))
+            .order_by(LoanTransfer.loan_id, LoanTransfer.date, LoanTransfer.id)
+        )
+        return list(self._session.scalars(statement))
+
+    def get_for_loan(self, loan_id: UUID, transfer_id: UUID) -> LoanTransfer | None:
+        statement = self._scoped_select().where(
+            LoanTransfer.loan_id == loan_id,
+            LoanTransfer.id == transfer_id,
+        )
+        return self._session.scalars(statement).one_or_none()
 
 
 class ReferenceRateRepository(ScopedRepository[ReferenceRate]):

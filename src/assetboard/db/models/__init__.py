@@ -38,6 +38,7 @@ from assetboard.db.models.loans import (
     LoanPayment,
     LoanRateChange,
     LoanScenario,
+    LoanTransfer,
     ReferenceRate,
     ReferenceRateValue,
 )
@@ -88,6 +89,7 @@ __all__ = [
     "LoanPayment",
     "LoanRateChange",
     "LoanScenario",
+    "LoanTransfer",
     "ReferenceRate",
     "ReferenceRateValue",
     "NetWorthCategory",

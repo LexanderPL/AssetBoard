@@ -45,6 +45,7 @@ from assetboard.db.models.loans import (
     LoanPayment,
     LoanRateChange,
     LoanScenario,
+    LoanTransfer,
     ReferenceRate,
     ReferenceRateValue,
 )
@@ -600,6 +601,19 @@ def make_loan_rate_change(session: Session, workspace_id: UUID) -> LoanRateChang
     )
 
 
+def make_loan_transfer(session: Session, workspace_id: UUID) -> LoanTransfer:
+    loan = make_loan(session, workspace_id)
+    session.add(loan)
+    session.flush()
+    return LoanTransfer(
+        workspace_id=workspace_id,
+        loan_id=loan.id,
+        date=date(2026, 1, 15),
+        amount_minor=10_000,
+        note="",
+    )
+
+
 def make_loan_cost_component(session: Session, workspace_id: UUID) -> LoanCostComponent:
     loan = make_loan(session, workspace_id)
     session.add(loan)
@@ -873,6 +887,7 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     ReferenceRateValue: TenantCase(make_reference_rate_value, update_values={"value_bp": 600}),
     Loan: TenantCase(make_loan, update_values={"name": "Updated loan"}),
     LoanRateChange: TenantCase(make_loan_rate_change, update_values={"rate_bp": 600}),
+    LoanTransfer: TenantCase(make_loan_transfer, update_values={"amount_minor": 20_000}),
     LoanCostComponent: TenantCase(make_loan_cost_component, update_values={"name": "Updated cost"}),
     LoanOverpayment: TenantCase(make_loan_overpayment, update_values={"amount_minor": 20_000}),
     LoanBalanceCheckpoint: TenantCase(

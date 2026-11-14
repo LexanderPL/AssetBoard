@@ -111,6 +111,17 @@ ERRORS = {
     "invalid_entry_path": _("Choose how you want to enter the loan."),
     "invalid_currency": _("Enter the amount in the workspace currency."),
     "invalid_day_count": _("Choose a valid interest calculation."),
+    "invalid_drawdown_mode": _("Choose how the loan is paid out."),
+    "drawdown_requires_original": _(
+        "A tranched loan needs an original principal and original terms."
+    ),
+    "loan_not_tranched": _("This loan is not set up in tranches."),
+    "already_tranched": _("This loan already tracks tranches."),
+    "invalid_interest_only": _("The interest-only period must be shorter than the loan term."),
+    "drawdown_exceeds_principal": _("Transfers cannot exceed the loan principal."),
+    "drawdown_requires_principal": _("Set the loan principal before adding transfers."),
+    "transfer_before_start": _("A transfer cannot start before the loan starts."),
+    "transfer_after_final_payment": _("A transfer must be before the final scheduled payment."),
     "no_anchor": _("The loan has no starting balance to build a schedule from."),
     "duplicate_rate": _("Two rate changes start on the same date."),
     "negative_amortization": _(
@@ -165,6 +176,10 @@ NOTICES = {
     "loan_created": _("Loan saved. Add rate changes, costs or one-off overpayments below."),
     "loan_created_another": _("Loan saved. Add the next loan below."),
     "terms_saved": _("Loan terms saved."),
+    "transfer_created": _("Transfer added."),
+    "transfer_saved": _("Transfer saved."),
+    "transfer_deleted": _("Transfer deleted."),
+    "loan_tranched": _("Loan switched to tranches; the opening balance was kept."),
     "overpayment_saved": _("Regular overpayment settings saved."),
     "rate_saved": _("Rate change saved."),
     "rate_deleted": _("Rate change deleted."),
@@ -197,7 +212,7 @@ NOTICES = {
     "installment_plan_posted": _("Next installment posted."),
 }
 
-SETTINGS_FORMS = frozenset({"rate", "cost", "overpayment"})
+SETTINGS_FORMS = frozenset({"rate", "cost", "overpayment", "transfer"})
 ENTRY_PATHS = ("original", "current")
 WIZARD_STEPS = (
     _("The loan"),
@@ -238,6 +253,8 @@ WIZARD_FIELDS = (
     "overpayment_mode",
     "overpayment_amount",
     "overpayment_strategy",
+    "drawdown_mode",
+    "interest_only_months",
     *COST_COMPONENT_FIELDS,
 )
 STEP_FIELDS: dict[int, tuple[str, ...]] = {
@@ -250,6 +267,8 @@ STEP_FIELDS: dict[int, tuple[str, ...]] = {
         "first_payment_date",
         "term_months",
         "payment_day",
+        "drawdown_mode",
+        "interest_only_months",
     ),
     3: (
         "rate_mode",
@@ -379,6 +398,8 @@ def _wizard_values(raw: dict[str, str]) -> dict[str, str]:
         "rate_mode": "fixed",
         "overpayment_mode": "none",
         "overpayment_strategy": "reduce_term",
+        "drawdown_mode": "full_at_origination",
+        "interest_only_months": "0",
     }
     values = {key: raw.get(key, defaults.get(key, "")) for key in WIZARD_FIELDS}
     # The payment day is usually the first payment date's day. Leaving the field empty takes
@@ -533,6 +554,12 @@ def _wizard_review(
     principal = _money(values, "principal_original", locale, currency)
     balance = _money(values, "current_balance", locale, currency)
     term = _integer(values.get("term_months", ""), "term_months")
+    interest_only = _integer(values.get("interest_only_months", "0") or "0", "interest_only_months")
+    if interest_only < 0 or interest_only >= term:
+        raise loans.LoanError("interest_only_months", "invalid_interest_only")
+    drawdown_mode = values.get("drawdown_mode", "full_at_origination")
+    if drawdown_mode == "tranches" and entry != "original":
+        raise loans.LoanError("drawdown_mode", "drawdown_requires_original")
     first = _date(values.get("first_payment_date", ""), "first_payment_date")
     start = _wizard_start(values)
     if start is None:
@@ -586,6 +613,8 @@ def _wizard_review(
         "base": principal if entry == "original" else balance,
         "first_payment_date": first,
         "term_months": term,
+        "drawdown_mode": drawdown_mode,
+        "interest_only_months": interest_only,
         "rate_mode": mode,
         "fixed_rate_bp": fixed_rate,
         "reference_rate_name": reference_name,
@@ -623,8 +652,10 @@ def _loan_values_from_view(view: loans.LoanView, locale: str) -> dict[str, str]:
         "balance_date": view.balance_date.isoformat() if view.balance_date else "",
         "first_payment_date": view.first_payment_date.isoformat(),
         "term_months": str(view.term_months),
+        "interest_only_months": str(view.interest_only_months),
         "payment_day": str(view.payment_day),
         "day_count": view.day_count.value,
+        "drawdown_mode": view.drawdown_mode.value,
         "installment_override": amount(view.installment_override),
     }
 
@@ -822,6 +853,10 @@ async def loan_new_step(request: Request, ctx: CurrentContext) -> Response:
             ),
             overpayment_strategy=values["overpayment_strategy"],
             costs=_wizard_costs(values, request.state.locale, ctx.workspace.base_currency),
+            drawdown_mode=values.get("drawdown_mode", "full_at_origination"),
+            interest_only_months=_integer(
+                values.get("interest_only_months", "0") or "0", "interest_only_months"
+            ),
         )
     except (loans.LoanError, LoanValidationError) as exc:
         code = getattr(exc, "code", "failed")
@@ -923,6 +958,7 @@ def _detail_context(
 
 
 SETTINGS_FORM_FIELDS: dict[str, frozenset[str]] = {
+    "transfer": frozenset({"date", "amount", "note"}),
     "rate": frozenset(
         {"effective_from", "mode", "rate_percent", "reference_rate_id", "margin_percent"}
     ),
@@ -959,6 +995,7 @@ def _settings_context(
     form_values: dict[str, str] | None = None,
     open_form: str | None = None,
     edit_id: str | None = None,
+    transfer_edit: loans.LoanTransferView | None = None,
 ) -> dict[str, object]:
     """Everything the settings cards and dialogs need; the schedule is not built here."""
     factory = request.app.state.session_factory
@@ -975,6 +1012,8 @@ def _settings_context(
         "form_values": form_values or {},
         "open_form": open_form if open_form in SETTINGS_FORMS else None,
         "edit_id": edit_id,
+        "transfer_edit": transfer_edit,
+        "transfer_values": form_values or {},
         "today": today,
         "format_money": format_money,
         "format_day": format_day,
@@ -1926,6 +1965,12 @@ async def loan_settings_page(request: Request, ctx: CurrentContext, loan_id: UUI
             + f"#{anchor}",
             status_code=303,
         )
+    edit_transfer_id = request.query_params.get("edit_transfer")
+    transfer_edit = None
+    if edit_transfer_id:
+        transfer_edit = next(
+            (row for row in view.transfers if str(row.id) == edit_transfer_id), None
+        )
     context = await run_in_threadpool(
         _settings_context,
         request,
@@ -1936,6 +1981,7 @@ async def loan_settings_page(request: Request, ctx: CurrentContext, loan_id: UUI
         notice=_notice(request, request.query_params.get("notice")),
         open_form=requested_form,
         edit_id=request.query_params.get("edit"),
+        transfer_edit=transfer_edit,
     )
     return render_template(request, "loans/settings.html", context=context)
 
@@ -2515,6 +2561,9 @@ async def loan_update(request: Request, ctx: CurrentContext, loan_id: UUID) -> R
             margin_bp=_percent(values, "margin_percent", request.state.locale),
             high_rate_confirmed=values.get("high_rate_confirmed") == "1",
             day_count=values.get("day_count") or None,
+            interest_only_months=_integer(
+                values.get("interest_only_months", "0") or "0", "interest_only_months"
+            ),
         )
     except (loans.LoanError, LoanValidationError) as exc:
         code = getattr(exc, "code", "failed")
@@ -2694,6 +2743,130 @@ async def loan_rate_change_delete(
             request, loan_id, error=getattr(exc, "code", "failed"), anchor="rates"
         )
     return _redirect_settings(request, loan_id, notice="rate_deleted", anchor="rates")
+
+
+def _transfer_edit_from_view(view: loans.LoanView, transfer_id: str | None):
+    if not transfer_id:
+        return None
+    return next((row for row in view.transfers if str(row.id) == transfer_id), None)
+
+
+async def _render_transfer_error(
+    request: Request,
+    ctx: Context,
+    loan_id: UUID,
+    exc: Exception,
+    *,
+    values: dict[str, str],
+    transfer_id: str | None = None,
+) -> Response:
+    factory = request.app.state.session_factory
+    view = await run_in_threadpool(loans.get_loan, factory, ctx, loan_id)
+    context = await run_in_threadpool(
+        _settings_context,
+        request,
+        ctx,
+        loan_id,
+        error=_error(request, getattr(exc, "code", "failed")),
+        error_field=_settings_error_field(exc, "transfer", values),
+        form_values=values,
+        open_form="transfer",
+        edit_id=transfer_id,
+        transfer_edit=_transfer_edit_from_view(view, transfer_id),
+    )
+    return render_template(request, "loans/settings.html", status_code=400, context=context)
+
+
+@router.post("/loans/{loan_id}/transfers", name="loan_transfer_create")
+async def loan_transfer_create(request: Request, ctx: CurrentContext, loan_id: UUID) -> Response:
+    values = await _form_values(request)
+    view = await run_in_threadpool(loans.get_loan, request.app.state.session_factory, ctx, loan_id)
+    try:
+        amount = _money(values, "amount", request.state.locale, view.currency)
+        if amount is None:
+            raise loans.LoanError("amount", "invalid_amount")
+        await run_in_threadpool(
+            loans.add_transfer,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+            date_value=_date(values.get("date", ""), "date"),
+            amount=amount,
+            note=values.get("note", ""),
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        return await _render_transfer_error(request, ctx, loan_id, exc, values=values)
+    return _redirect_settings(request, loan_id, notice="transfer_created", anchor="transfers")
+
+
+@router.post("/loans/{loan_id}/transfers/{transfer_id}", name="loan_transfer_update")
+async def loan_transfer_update(
+    request: Request,
+    ctx: CurrentContext,
+    loan_id: UUID,
+    transfer_id: UUID,
+) -> Response:
+    values = await _form_values(request)
+    view = await run_in_threadpool(loans.get_loan, request.app.state.session_factory, ctx, loan_id)
+    try:
+        amount = _money(values, "amount", request.state.locale, view.currency)
+        if amount is None:
+            raise loans.LoanError("amount", "invalid_amount")
+        await run_in_threadpool(
+            loans.update_transfer,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+            transfer_id,
+            date_value=_date(values.get("date", ""), "date"),
+            amount=amount,
+            note=values.get("note", ""),
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        return await _render_transfer_error(
+            request, ctx, loan_id, exc, values=values, transfer_id=str(transfer_id)
+        )
+    return _redirect_settings(request, loan_id, notice="transfer_saved", anchor="transfers")
+
+
+@router.post(
+    "/loans/{loan_id}/transfers/{transfer_id}/delete",
+    name="loan_transfer_delete",
+)
+async def loan_transfer_delete(
+    request: Request, ctx: CurrentContext, loan_id: UUID, transfer_id: UUID
+) -> Response:
+    try:
+        await run_in_threadpool(
+            loans.delete_transfer,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+            transfer_id,
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        return _redirect_settings(
+            request, loan_id, error=getattr(exc, "code", "failed"), anchor="transfers"
+        )
+    return _redirect_settings(request, loan_id, notice="transfer_deleted", anchor="transfers")
+
+
+@router.post("/loans/{loan_id}/convert-to-tranched", name="loan_convert_to_tranched")
+async def loan_convert_to_tranched(
+    request: Request, ctx: CurrentContext, loan_id: UUID
+) -> Response:
+    try:
+        await run_in_threadpool(
+            loans.convert_loan_to_tranched,
+            request.app.state.session_factory,
+            ctx,
+            loan_id,
+        )
+    except (loans.LoanError, LoanValidationError) as exc:
+        return _redirect_settings(
+            request, loan_id, error=getattr(exc, "code", "failed"), anchor="transfers"
+        )
+    return _redirect_settings(request, loan_id, notice="loan_tranched", anchor="transfers")
 
 
 @router.post("/loans/{loan_id}/costs", name="loan_cost_create")

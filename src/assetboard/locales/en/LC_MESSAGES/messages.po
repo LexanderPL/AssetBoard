@@ -3507,6 +3507,33 @@ msgstr ""
 msgid "Choose a valid interest calculation."
 msgstr ""
 
+msgid "Choose how the loan is paid out."
+msgstr ""
+
+msgid "A tranched loan needs an original principal and original terms."
+msgstr ""
+
+msgid "This loan is not set up in tranches."
+msgstr ""
+
+msgid "This loan already tracks tranches."
+msgstr ""
+
+msgid "The interest-only period must be shorter than the loan term."
+msgstr ""
+
+msgid "Transfers cannot exceed the loan principal."
+msgstr ""
+
+msgid "Set the loan principal before adding transfers."
+msgstr ""
+
+msgid "A transfer cannot start before the loan starts."
+msgstr ""
+
+msgid "A transfer must be before the final scheduled payment."
+msgstr ""
+
 msgid "The loan has no starting balance to build a schedule from."
 msgstr ""
 
@@ -3652,6 +3679,18 @@ msgid "Loan saved. Add the next loan below."
 msgstr ""
 
 msgid "Loan terms saved."
+msgstr ""
+
+msgid "Transfer added."
+msgstr ""
+
+msgid "Transfer saved."
+msgstr ""
+
+msgid "Transfer deleted."
+msgstr ""
+
+msgid "Loan switched to tranches; the opening balance was kept."
 msgstr ""
 
 msgid "Regular overpayment settings saved."
@@ -8166,6 +8205,9 @@ msgstr ""
 msgid "Paid off"
 msgstr ""
 
+msgid "Not drawn"
+msgstr ""
+
 msgid "Repaid principal"
 msgstr ""
 
@@ -8226,7 +8268,15 @@ msgid "Starting balance %(amount)s"
 msgstr ""
 
 #, python-format
+msgid "Drawn %(drawn)s of %(approved)s · %(undrawn)s undrawn"
+msgstr ""
+
+#, python-format
 msgid "Payoff %(date)s"
+msgstr ""
+
+#, python-format
+msgid "Interest-only for the first %(months)d months."
 msgstr ""
 
 #, python-format
@@ -8398,6 +8448,9 @@ msgstr ""
 msgid "Opening"
 msgstr ""
 
+msgid "Loan transfer"
+msgstr ""
+
 msgid "Closing"
 msgstr ""
 
@@ -8567,6 +8620,22 @@ msgstr ""
 msgid "Loan type"
 msgstr ""
 
+msgid "Interest-only months"
+msgstr ""
+
+msgid "Included in the term; 0 starts repaying principal immediately."
+msgstr ""
+
+#, python-format
+msgid "Payout: %(mode)s. Use Settings → Transfers for tranches."
+msgstr ""
+
+msgid "Full amount at origination"
+msgstr ""
+
+msgid "Paid out in tranches"
+msgstr ""
+
 msgid "Interest calculation"
 msgstr ""
 
@@ -8719,7 +8788,16 @@ msgid ""
 " last day."
 msgstr ""
 
+msgid "0 starts repaying principal with the first payment."
+msgstr ""
+
 msgid "Only needed to show how much you have repaid."
+msgstr ""
+
+msgid "Payout"
+msgstr ""
+
+msgid "For tranches, add the first transfer in Settings after saving."
 msgstr ""
 
 msgid "Fixed rate"
@@ -8820,6 +8898,9 @@ msgstr ""
 msgid "Current balance"
 msgstr ""
 
+msgid "Interest-only"
+msgstr ""
+
 msgid "Cost components"
 msgstr ""
 
@@ -8832,6 +8913,9 @@ msgid "to %(to)s"
 msgstr ""
 
 msgid "Calculated first installment"
+msgstr ""
+
+msgid "Calculated after the first transfer."
 msgstr ""
 
 msgid "Save loan"
@@ -9314,6 +9398,67 @@ msgstr ""
 msgid "No rate changes yet."
 msgstr ""
 
+msgid "Transfers"
+msgstr ""
+
+msgid ""
+"Money paid out by the lender. Interest is calculated only on the "
+"transferred amount; the undrawn part is not a debt."
+msgstr ""
+
+msgid ""
+"This loan treats the full original principal as transferred at "
+"origination."
+msgstr ""
+
+msgid ""
+"Switch this loan to tranches? The current opening balance is kept as the "
+"first transfer."
+msgstr ""
+
+msgid "Track transfers"
+msgstr ""
+
+#, python-format
+msgid "Drawn %(drawn)s of %(approved)s"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(amount)s undrawn"
+msgstr ""
+
+#, python-format
+msgid "%(amount)s scheduled"
+msgstr ""
+
+msgid ""
+"The first payment falls after the next payment day, so its period covers "
+"the longer gap."
+msgstr ""
+
+msgid "Loan transfers"
+msgstr ""
+
+msgid "Note (optional)"
+msgstr ""
+
+msgid "future"
+msgstr ""
+
+#, python-format
+msgid "transfer from %(date)s"
+msgstr ""
+
+#, python-format
+msgid "Delete the transfer from %(date)s?"
+msgstr ""
+
+msgid "No transfers yet. Add the first one below."
+msgstr ""
+
+msgid "Add transfer"
+msgstr ""
+
 msgid ""
 "Charged every month while active. A percentage applies to the opening "
 "balance; several active costs are added together."
@@ -9414,9 +9559,6 @@ msgid "Save cost"
 msgstr ""
 
 msgid "Edit one-off overpayment"
-msgstr ""
-
-msgid "Note (optional)"
 msgstr ""
 
 msgid "This is a planned overpayment. Actual payments are recorded separately."
@@ -10059,9 +10201,6 @@ msgid "Value history"
 msgstr ""
 
 msgid "Estimates values between entries"
-msgstr ""
-
-msgid "future"
 msgstr ""
 
 msgid "Add a value"

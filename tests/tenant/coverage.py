@@ -360,6 +360,10 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         for method in ("create", "for_loan", "get_for_loan", "latest_on_or_before", "exists_on")
     },
     **{
+        ("LoanTransferRepository", method): "test_loan_queries_stay_in_their_workspace"
+        for method in ("create", "for_loan", "for_loans", "get_for_loan")
+    },
+    **{
         ("ReferenceRateRepository", method): "test_loan_queries_stay_in_their_workspace"
         for method in ("create", "ordered", "by_name_key", "used_by_loan")
     },
