@@ -1,4 +1,10 @@
-# M8 — FIRE planner
+# M8 — FIRE planner (v1 as built)
+
+> **Superseded for new work.** The user-facing FIRE planner is being reworked in
+> [M8-fire-planner-v2.md](M8-fire-planner-v2.md) (one plan, current-year start, manual inputs
+> with suggestions, view/edit modes, live loans, nominal money only). This file remains the
+> as-built record of F8.1–F8.6 and the source of historical decisions; do not add new
+> features here.
 
 **Goal:** a year-by-year financial-independence projection that mirrors your spreadsheet's model, then improves it: named scenarios, inputs linked to real data, one-off events, sustainability check, comparison and sensitivity.
 
