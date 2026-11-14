@@ -94,7 +94,7 @@ UUID primary keys (`Uuid` type). Dates are `DATE`; timestamps UTC. "Today" alway
 | M5 | NetWorthCategory, NetWorthItem, ItemValuation, NetWorthSnapshot |
 | M6 | AssetClass, Instrument, InstrumentAllocation, InvestmentTransaction, PricePoint, FxRate, PriceSourceConfig, BondTerms |
 | M7 | Loan, LoanRateChange, ReferenceRate, ReferenceRateValue, LoanCostComponent, LoanOverpayment, LoanPayment, LoanBalanceCheckpoint, LoanScenario, InstallmentPlan |
-| M8 | FireScenario, FireContribution, FireEvent |
+| M8 | FireScenario (one plan per workspace in v2), FireEvent; FireContribution is migrated into saving-override events and removed |
 | M9 | ApiToken, BackupRun, DashboardPreference |
 | M10 | none (reports read existing rows) |
 
@@ -115,7 +115,7 @@ Key fields for the shared entities:
 | M5 | Net worth: assets, debts, snapshots | M1 | v0.5 |
 | M6 | Investments | M5 | v0.6 |
 | M7 | Loans and mortgage | M5, M3 | v0.7 |
-| M8 | FIRE planner | M2, M6, M7 | v0.8 |
+| M8 | FIRE planner; v2 rework in [M8-fire-planner-v2.md](M8-fire-planner-v2.md) | M2, M6, M7 | v0.8 |
 | M9 | Dashboard, reports, export/backup, API, hardening | all | v1.0 |
 | M10 | Reports: income vs expenses, savings rate, expenses by category over the years; later net worth and portfolio value | Phase A: M2 (after F2.7); Phase B: M5, M6 | Phase A: any minor before v1.0; Phase B: with or after M6 |
 
@@ -124,6 +124,12 @@ F9.11 (demo data builder and demo mode) is pulled forward and lands before M7; e
 The number does not set the order: M10 Phase A (ledger reports) can ship as soon as M2 and F2.7 are done, before M5/M6. F2.7 (navigation restructure: Home, Month, Transactions, History) lands before F3.5.
 
 M3 and M5–M8 each end with an "archive extension" feature that adds the module's data to the workspace archive of M4 (export, restore, and standalone CSV import where it makes sense), following [ADR-0016](../adr/0016-workspace-archive-format.md).
+
+The FIRE planner v2 rework replaces the user-facing M8 v1 behaviour with one plan per
+workspace, a current-year anchor, manual inputs with explicit suggestions, view/edit modes,
+live loans and nominal-only results. It is specified in
+[M8-fire-planner-v2.md](M8-fire-planner-v2.md) as F8.8–F8.13. Each feature is a separate PR;
+the spec must be approved first. Archive format 2.0 is part of the rework.
 
 ## 6. Non-goals (v1)
 Bank sync/aggregation; receipt OCR; tax filing; advice of any kind; native mobile apps (a responsive PWA is enough); built-in country tax tables (tax rules are user-defined; labelled example templates may come later).
