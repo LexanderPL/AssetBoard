@@ -1,10 +1,10 @@
 """FIRE archive lineage
 
-Revision ID: 0061_f86_fire_archive
-Revises: 0060_f84_fire_expense_exclusions
+Revision ID: 0062_f86_fire_archive
+Revises: 0061_f710_loan_tranches
 Create Date: 2026-11-14
 
-F8.6. The four FIRE tables join the workspace archive (format 1.7). ``import_key`` keeps the
+F8.6. The four FIRE tables join the workspace archive (format 1.8). ``import_key`` keeps the
 archive lineage id across restore/export, following the ledger, net-worth and investment tables.
 The unique index is per workspace and ignores NULLs, so ordinary rows keep no key.
 """
@@ -15,8 +15,8 @@ import sqlalchemy as sa
 from alembic import op
 from sqlalchemy import text
 
-revision = "0061_f86_fire_archive"
-down_revision = "0060_f84_fire_expense_exclusions"
+revision = "0062_f86_fire_archive"
+down_revision = "0061_f710_loan_tranches"
 branch_labels = None
 depends_on = None
 

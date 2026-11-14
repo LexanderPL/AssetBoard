@@ -121,6 +121,16 @@ class Loan(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         CheckConstraint("rate_mode IN ('fixed', 'variable')", name="rate_mode_valid"),
         CheckConstraint("day_count IN ('monthly', 'actual_365')", name="day_count_valid"),
         CheckConstraint(
+            "drawdown_mode IN ('full_at_origination', 'tranches')",
+            name="drawdown_mode_valid",
+        ),
+        CheckConstraint(
+            "(kind = 'installment_plan' AND interest_only_months = 0) OR "
+            "(kind != 'installment_plan' AND interest_only_months >= 0 AND "
+            "interest_only_months < term_months)",
+            name="interest_only_valid",
+        ),
+        CheckConstraint(
             "overpayment_mode IN ('none', 'fixed_extra', 'target_total')",
             name="overpayment_mode_valid",
         ),
@@ -191,6 +201,15 @@ class Loan(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     day_count: Mapped[str] = mapped_column(
         String(16), nullable=False, default="monthly", server_default="monthly"
     )
+    drawdown_mode: Mapped[str] = mapped_column(
+        String(24),
+        nullable=False,
+        default="full_at_origination",
+        server_default="full_at_origination",
+    )
+    interest_only_months: Mapped[int] = mapped_column(
+        Integer(), nullable=False, default=0, server_default="0"
+    )
     margin_bp: Mapped[int | None] = mapped_column(Integer(), nullable=True)
     reference_rate_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
     property_item_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
@@ -204,6 +223,32 @@ class Loan(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         String(16), nullable=False, default="reduce_term"
     )
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+
+
+class LoanTransfer(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
+    """One transfer of loan money to the target account (a drawdown, not a repayment)."""
+
+    __tablename__ = "loan_transfers"
+    __table_args__ = (
+        UniqueConstraint("workspace_id", "id", name="uq_loan_transfers_workspace_id_id"),
+        ForeignKeyConstraint(
+            ["workspace_id", "loan_id"],
+            ["loans.workspace_id", "loans.id"],
+            name="fk_loan_transfers_workspace_loan",
+        ),
+        CheckConstraint(
+            f"amount_minor > 0 AND amount_minor <= {MAX_AMOUNT_MINOR}",
+            name="amount_valid",
+        ),
+        CheckConstraint(f"length(note) <= {MAX_NOTE_LENGTH}", name="note_length"),
+        _date_range("date"),
+        Index("ix_loan_transfers_workspace_loan_date", "workspace_id", "loan_id", "date"),
+    )
+
+    loan_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
+    date: Mapped[date] = mapped_column(Date(), nullable=False)
+    amount_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+    note: Mapped[str] = mapped_column(String(MAX_NOTE_LENGTH), nullable=False, default="")
 
 
 class LoanRateChange(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):

@@ -512,7 +512,7 @@ def test_linked_and_manual_round_trip_keep_projection_and_bytes(
     content = export_workspace(db.factory, ctx).content
     parsed, errors = parse_archive(content)
     assert errors == () and parsed is not None
-    assert parsed.manifest["format_version"] == "1.7"
+    assert parsed.manifest["format_version"] == "1.8"
     assert _data_files(original) == _data_files(content)
 
 
@@ -844,6 +844,8 @@ def test_restore_rollback_removes_fire_before_loans(db: WorkspaceDb, data_dir: P
         1,
         "fixed",
         "monthly",
+        "full_at_origination",
+        0,
         None,
         None,
         "",
@@ -988,10 +990,18 @@ def test_restore_uses_fresh_fire_ids_when_the_lineage_id_is_taken(
         assert other is not None and other.name == "Other plan"
 
 
-def test_v1_6_golden_restores_without_fire_rows_or_warnings(
-    db: WorkspaceDb, data_dir: Path
+@pytest.mark.parametrize(
+    ("fixture", "version"),
+    [("workspace-archive-v1.6.zip", "1.6"), ("workspace-archive-v1.7.zip", "1.7")],
+)
+def test_v1_6_and_v1_7_goldens_restore_without_fire_rows_or_warnings(
+    db: WorkspaceDb, data_dir: Path, fixture: str, version: str
 ) -> None:
-    content = (Path(__file__).parents[1] / "fixtures" / "workspace-archive-v1.6.zip").read_bytes()
+    content = (Path(__file__).parents[1] / "fixtures" / fixture).read_bytes()
+    parsed, errors = parse_archive(content)
+    assert errors == () and parsed is not None
+    assert parsed.manifest["format_version"] == version
+    assert parsed.rows.fire_scenarios == ()
     workspace_id, ctx = _target(db)
     batch_id = upload_import(
         db.factory,

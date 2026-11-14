@@ -59,6 +59,7 @@ from assetboard.db.repositories import (
     LoanOverpaymentRepository,
     LoanRateChangeRepository,
     LoanRepository,
+    LoanTransferRepository,
     MembershipRepository,
     MonthStateRepository,
     NetWorthCategoryRepository,
@@ -623,6 +624,8 @@ def _write_loan(session: Session, ctx: Context, demo: DemoLoan, rate_ids: dict[s
             demo.overpayment_amount.amount_minor if demo.overpayment_amount else None
         ),
         overpayment_strategy=demo.overpayment_strategy,
+        drawdown_mode=demo.drawdown_mode,
+        interest_only_months=demo.interest_only_months,
         archived_at=None,
     )
     if demo.entry_path == "current" and demo.current_balance is not None:
@@ -647,6 +650,13 @@ def _write_loan(session: Session, ctx: Context, demo: DemoLoan, rate_ids: dict[s
             basis=CostBasis.OPENING_BALANCE.value,
             effective_from=cost.effective_from,
             effective_to=cost.effective_to,
+        )
+    for transferred_on, amount, note in demo.transfers:
+        LoanTransferRepository(session, ctx).create(
+            loan_id=loan.id,
+            date=transferred_on,
+            amount_minor=amount.amount_minor,
+            note=note,
         )
     for paid_on, amount, note in demo.overpayments:
         LoanOverpaymentRepository(session, ctx).create(
@@ -933,6 +943,7 @@ _COUNT_REPOSITORIES: tuple[tuple[str, type[ScopedRepository[Any]]], ...] = (
     ("reference_rate_values", ReferenceRateValueRepository),
     ("loans", LoanRepository),
     ("loan_rate_changes", LoanRateChangeRepository),
+    ("loan_transfers", LoanTransferRepository),
     ("loan_cost_components", LoanCostComponentRepository),
     ("loan_overpayments", LoanOverpaymentRepository),
     ("loan_balance_checkpoints", LoanBalanceCheckpointRepository),

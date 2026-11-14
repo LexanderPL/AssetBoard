@@ -46,6 +46,7 @@ from assetboard.db.repositories import (
     LoanRateChangeRepository,
     LoanRepository,
     LoanScenarioRepository,
+    LoanTransferRepository,
     MonthStateRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
@@ -86,6 +87,7 @@ from assetboard.domain.archive import (
     LoanRateChangeRow,
     LoanRow,
     LoanScenarioRow,
+    LoanTransferRow,
     MonthRow,
     NetWorthCategoryRow,
     NetWorthItemRow,
@@ -135,6 +137,7 @@ ARCHIVE_INCLUDED_MODELS = frozenset(
         "ReferenceRateValue",
         "Loan",
         "LoanRateChange",
+        "LoanTransfer",
         "LoanCostComponent",
         "LoanOverpayment",
         "LoanPayment",
@@ -488,6 +491,10 @@ def _has_loan_rate_changes(session: Session, ctx: Context) -> bool:
     return LoanRateChangeRepository(session, ctx).any_exists()
 
 
+def _has_loan_transfers(session: Session, ctx: Context) -> bool:
+    return LoanTransferRepository(session, ctx).any_exists()
+
+
 def _has_loan_cost_components(session: Session, ctx: Context) -> bool:
     return LoanCostComponentRepository(session, ctx).any_exists()
 
@@ -565,6 +572,7 @@ EMPTINESS_CHECKS = (
     _has_reference_rate_values,
     _has_loans,
     _has_loan_rate_changes,
+    _has_loan_transfers,
     _has_loan_cost_components,
     _has_loan_overpayments,
     _has_loan_balance_checkpoints,
@@ -899,6 +907,8 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
                 payment_day=row.payment_day,
                 rate_mode=row.rate_mode,
                 day_count=row.day_count,
+                drawdown_mode=row.drawdown_mode,
+                interest_only_months=row.interest_only_months,
                 margin_bp=row.margin_bp,
                 reference_rate_id=(str(row.reference_rate_id) if row.reference_rate_id else None),
                 reference_rate=(
@@ -964,6 +974,26 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             )
             for row in rate_changes
         )
+        transfers = sorted(
+            (
+                transfer
+                for loan in loans
+                for transfer in LoanTransferRepository(session, ctx).for_loan(loan.id)
+            ),
+            key=lambda row: (loan_rank[row.loan_id], row.date, str(row.id)),
+        )
+        loan_transfer_rows = tuple(
+            LoanTransferRow(
+                id=str(row.id),
+                loan_id=str(loan_lineage[row.loan_id]),
+                loan=loans_by_id[row.loan_id].name,
+                date=row.date.isoformat(),
+                amount=plain_amount(row.amount_minor, loans_by_id[row.loan_id].currency),
+                note=row.note,
+            )
+            for row in transfers
+        )
+
         cost_components = sorted(
             (
                 component
@@ -1552,6 +1582,7 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             reference_rate_values=reference_rate_value_rows,
             loans=loan_rows,
             loan_rate_changes=loan_rate_change_rows,
+            loan_transfers=loan_transfer_rows,
             loan_cost_components=loan_cost_component_rows,
             loan_overpayments=loan_overpayment_rows,
             loan_payments=loan_payment_rows,
@@ -1584,6 +1615,7 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             "reference_rate_values": len(reference_rate_value_rows),
             "loans": len(loan_rows),
             "loan_rate_changes": len(loan_rate_change_rows),
+            "loan_transfers": len(loan_transfer_rows),
             "loan_cost_components": len(loan_cost_component_rows),
             "loan_overpayments": len(loan_overpayment_rows),
             "loan_payments": len(loan_payment_rows),

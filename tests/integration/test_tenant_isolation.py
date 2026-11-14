@@ -2401,6 +2401,7 @@ def test_loan_queries_stay_in_their_workspace(
         LoanRateChangeRepository,
         LoanRepository,
         LoanScenarioRepository,
+        LoanTransferRepository,
         ReferenceRateRepository,
         ReferenceRateValueRepository,
     )
@@ -2409,6 +2410,8 @@ def test_loan_queries_stay_in_their_workspace(
     loans_a, loans_b = LoanRepository(db_session, ctx_a), LoanRepository(db_session, ctx_b)
     changes_a = LoanRateChangeRepository(db_session, ctx_a)
     changes_b = LoanRateChangeRepository(db_session, ctx_b)
+    transfers_a = LoanTransferRepository(db_session, ctx_a)
+    transfers_b = LoanTransferRepository(db_session, ctx_b)
     rates_a, rates_b = (
         ReferenceRateRepository(db_session, ctx_a),
         ReferenceRateRepository(db_session, ctx_b),
@@ -2449,6 +2452,10 @@ def test_loan_queries_stay_in_their_workspace(
     loan_b = loans_b.create(name="Mortgage B", **loan_values)
     change_a = changes_a.create(loan_id=loan_a.id, effective_from=date(2025, 1, 1), rate_bp=500)
     changes_b.create(loan_id=loan_b.id, effective_from=date(2025, 1, 1), rate_bp=600)
+    transfer_a = transfers_a.create(
+        loan_id=loan_a.id, date=date(2025, 1, 1), amount_minor=50_000, note=""
+    )
+    transfers_b.create(loan_id=loan_b.id, date=date(2025, 1, 1), amount_minor=50_000, note="")
     rate_a = rates_a.create(name="WIBOR A", name_key="wibor a", notes="")
     rate_b = rates_b.create(name="WIBOR B", name_key="wibor b", notes="")
     value_a = values_a.create(
@@ -2585,6 +2592,11 @@ def test_loan_queries_stay_in_their_workspace(
     assert changes_b.latest_on_or_before(loan_a.id, date(2025, 6, 1)) is None
     assert changes_a.exists_on(loan_a.id, date(2025, 1, 1))
     assert not changes_b.exists_on(loan_a.id, date(2025, 1, 1))
+    assert [row.id for row in transfers_a.for_loan(loan_a.id)] == [transfer_a.id]
+    assert transfers_b.for_loan(loan_a.id) == []
+    assert transfers_b.get_for_loan(loan_a.id, transfer_a.id) is None
+    assert [row.id for row in transfers_a.for_loans([loan_a.id, loan_b.id])] == [transfer_a.id]
+    assert transfers_b.for_loans([loan_a.id]) == []
 
     assert [row.id for row in rates_a.ordered()] == [rate_a.id]
     assert rates_b.by_name_key("wibor a") is None

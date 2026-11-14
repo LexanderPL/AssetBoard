@@ -84,6 +84,40 @@ A balance checkpoint starts the schedule from the balance you owe on that date; 
 not invented. When a checkpoint is used, the remaining months must be entered as the loan's term
 or the schedule will be too long.
 
+## Partial transfers (tranches)
+
+A loan created with **Paid out in tranches** starts with no debt. Each **transfer** records
+money the lender has paid out: it increases what you owe by that amount and the undrawn part of
+the approved principal is not a debt. Add, edit and delete transfers in **Settings →
+Transfers**; the amount and date are editable and the total may not exceed the original
+principal. Transfers dated in the future are marked **future**: they appear in the schedule,
+charts, scenarios and projections, but only transfers on or before today change the current
+balance, the overview and net worth.
+
+A loan entered from the original terms can be switched to tranches with **Track transfers**.
+The switch is neutral: the app seeds one transfer at the latest balance checkpoint (or at
+origination when there is none) with the current balance. Existing full-at-origination loans
+keep their old behaviour until you switch them.
+
+**Interest-only months** are part of the loan term. Enter `0` to start repaying principal with
+the first payment, or a positive number to pay only interest until that phase ends. The phase
+counts from the first actual transfer, so a tranched loan with no transfers has no schedule and
+shows **Not drawn**. After the phase the annuity is recalculated over the remaining months so
+the fixed end date is kept. The first payment is the next nominal payment day after the first
+transfer; if the first payment date is later, Settings shows a warning and the first period
+(and its interest) covers the longer gap.
+
+For a tranched loan, interest is charged only on the drawn balance. Daily loans use actual/365.
+Monthly loans split each period at transfers, rate changes and month boundaries and charge
+`balance × annual rate / 12 × days / days in that calendar month`, rounded once per payment row.
+Percentage cost components follow the same drawn-balance timeline; fixed costs stay a fixed
+amount per payment row. Transfers must be dated before the final scheduled payment.
+
+The progress bar measures **actual repaid principal against the full approved principal**, so it
+only reaches 100% when both the drawn debt and the undrawn amount are zero. The overview shows
+the drawn amount and the undrawn amount separately. A balance checkpoint folds in every transfer
+on or before its date; later transfers add to it.
+
 ## The loan list
 
 **Loans** is a small portfolio view of the loans that are not archived.
@@ -100,9 +134,10 @@ or the schedule will be too long.
   principal today, **Progress** is the percentage repaid with a small progress bar, **Rate** is
   the current annual rate, and **Next payment** shows the next due date and its projected
   installment. A paid-off loan has no next payment and a 0.00 monthly installment.
-- **Status** is **Active**, **Paid off** (the projected remaining principal is zero) or
-  **Archived**. Archived loans stay in the separate **Archived loans** section with the same
-  columns and status badge.
+- **Status** is **Active**, **Paid off** (the projected remaining principal is zero and no
+  undrawn tranche is left), **Not drawn** (a tranched loan without transfers) or **Archived**.
+  Archived loans stay in the separate **Archived loans** section with the same columns and
+  status badge.
 
 ## The loan page
 
@@ -115,8 +150,10 @@ archive state happens in Settings. The schedule and charts live on their own Sch
   a large repaid-vs-remaining principal bar (paid amount, percentage, original principal and
   payoff date), the current rate (with the reference rate and margin for a variable loan), the
   next payment and its principal/interest/costs/overpayment breakdown, the percentage repaid,
-  the payoff date, the payments left, and remaining/lifetime interest and costs. The bar is
-  inline SVG; its text labels carry the same information so colour is not the only cue.
+  the payoff date, the payments left, and remaining/lifetime interest and costs. For a tranched
+  loan the bar also separates the drawn balance from the undrawn amount and the header shows
+  the interest-only phase. The bar is inline SVG; its text labels carry the same information so
+  colour is not the only cue.
 - **Plan vs actual**: the last recorded actual payment, the latest balance checkpoint and its
   variance, and a plain **Ahead**, **Behind** or **On track** line. Without actual payments or
   checkpoints the panel says that no actual payments are recorded yet.
@@ -358,10 +395,11 @@ brings it back. Loans are never hard-deleted.
 
 ## Backup and restore
 
-Loans are part of the workspace archive (format 1.6): reference rates and values, terms, fixed
-and variable rate segments, cost components, planned overpayments, actual payments, balance
-checkpoints, scenarios and installment plans. Generated schedules are not stored in the archive; a restore rebuilds
-them from the restored terms, so the schedule is identical. Property and ledger-payment links
+Loans are part of the workspace archive (format 1.7): reference rates and values, terms, payout
+mode and interest-only months, transfers, fixed and variable rate segments, cost components,
+planned overpayments, actual payments, balance checkpoints, scenarios and installment plans.
+Generated schedules are not stored in the archive; a restore rebuilds them from the restored
+terms, so the schedule is identical. Property and ledger-payment links
 are mapped to the restored net-worth items and transactions. Loan and reference-rate ids are
 preserved when the destination does not already use them, which keeps linked net-worth items
 and installment plans pointing at the same loans.

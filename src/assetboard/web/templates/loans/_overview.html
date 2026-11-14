@@ -22,13 +22,22 @@
       <rect x="0" y="0" width="1000" height="32" class="fill-subtle stroke-line-strong" stroke-width="1" vector-effect="non-scaling-stroke"></rect>
       {% if summary.paid_principal.amount_minor > 0 %}
       <rect x="0" y="0" width="{{ summary.percent_repaid_bp / 10 }}" height="32" class="fill-success stroke-surface" stroke-width="2" vector-effect="non-scaling-stroke" data-loan-progress-repaid></rect>
+      {% endif %}
+      {% if summary.remaining_principal.amount_minor > 0 %}
+      <rect x="{{ summary.percent_repaid_bp / 10 }}" y="0" width="{{ summary.percent_remaining_bp / 10 }}" height="32" class="fill-primary-soft" data-loan-progress-outstanding></rect>
+      {% endif %}
+      {% if summary.paid_principal.amount_minor > 0 %}
       <line x1="{{ summary.percent_repaid_bp / 10 }}" x2="{{ summary.percent_repaid_bp / 10 }}" y1="-4" y2="36" class="stroke-ink" stroke-width="3" vector-effect="non-scaling-stroke" data-loan-progress-marker></line>
       {% endif %}
     </svg>
     <div class="mt-1 flex flex-wrap items-baseline justify-between gap-2 text-xs text-muted">
       <span>{% if loan.entry_path == "original" %}{{ _("Original principal %(amount)s", amount=format_money(summary.original_principal, locale)) }}{% else %}{{ _("Starting balance %(amount)s", amount=format_money(summary.original_principal, locale)) }}{% endif %}</span>
+      {% if summary.undrawn_principal.amount_minor > 0 %}<span data-overview-undrawn>{{ _("Drawn %(drawn)s of %(approved)s · %(undrawn)s undrawn", drawn=format_money(summary.drawn_principal, locale), approved=format_money(summary.original_principal, locale), undrawn=format_money(summary.undrawn_principal, locale)) }}</span>{% endif %}
       {% if summary.payoff_date %}<span>{{ _("Payoff %(date)s", date=format_day(summary.payoff_date, locale)) }}</span>{% endif %}
     </div>
+    {% if loan.interest_only_months %}
+    <p class="mt-1 text-xs text-muted" data-overview-interest-only>{{ _("Interest-only for the first %(months)d months.", months=loan.interest_only_months) }}</p>
+    {% endif %}
     <p class="sr-only" data-loan-progress-summary>{{ _("Repaid %(paid)s of %(original)s (%(percent)s); %(remaining)s remains.", paid=format_money(summary.paid_principal, locale), original=format_money(summary.original_principal, locale), percent=format_rate_short(summary.percent_repaid_bp, locale), remaining=format_money(summary.remaining_principal, locale)) }}</p>
   </div>
   <dl class="mt-5 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">

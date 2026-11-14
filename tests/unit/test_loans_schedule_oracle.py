@@ -157,6 +157,7 @@ def _naive_schedule(
                 interest=Money(interest, currency),
                 principal=Money(principal, currency),
                 overpayment=Money(overpayment, currency),
+                transfer=Money(0, currency),
                 costs=Money(cost_total, currency),
                 installment_total=Money(interest + principal + overpayment + cost_total, currency),
                 closing=Money(closing, currency),

@@ -55,6 +55,7 @@ from assetboard.db.repositories import (
     LoanRateChangeRepository,
     LoanRepository,
     LoanScenarioRepository,
+    LoanTransferRepository,
     MonthStateRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
@@ -178,6 +179,7 @@ def _restore_counts(**values: int) -> dict[str, int]:
         "reference_rate_values_created": 0,
         "loans_created": 0,
         "loan_rate_changes_created": 0,
+        "loan_transfers_created": 0,
         "loan_cost_components_created": 0,
         "loan_overpayments_created": 0,
         "loan_payments_created": 0,
@@ -414,6 +416,7 @@ def _restore_counts_for(
         reference_rate_values_created=len(rows.reference_rate_values),
         loans_created=len(rows.loans),
         loan_rate_changes_created=len(rows.loan_rate_changes),
+        loan_transfers_created=len(rows.loan_transfers),
         loan_cost_components_created=len(rows.loan_cost_components),
         loan_overpayments_created=len(rows.loan_overpayments),
         loan_payments_created=len(rows.loan_payments),
@@ -2278,6 +2281,8 @@ def _restore_loans(
             payment_day=row.payment_day,
             rate_mode=row.rate_mode,
             day_count=row.day_count,
+            drawdown_mode=row.drawdown_mode,
+            interest_only_months=row.interest_only_months,
             margin_bp=row.margin_bp,
             reference_rate_id=reference_rate_id,
             property_item_id=property_item_id,
@@ -2324,6 +2329,25 @@ def _restore_loans(
         )
         change_ids.append(str(change_id))
     restored["loan_rate_changes"] = change_ids
+
+    transfers = LoanTransferRepository(session, ctx)
+    transfer_ids: list[str] = []
+    for index, row in enumerate(archive.rows.loan_transfers):
+        loan_id = _mapped_id(loan_ids, row.loan_id, label="loan")
+        currency = loans.get_or_raise(loan_id).currency
+        transfer_id = _create_preserving_id(
+            session,
+            transfers,
+            row.id,
+            loan_id=loan_id,
+            date=parse_date(row.date),
+            amount_minor=_money_minor(row.amount, currency, allow_zero=False),
+            note=row.note,
+            created_at=restore_now + timedelta(microseconds=index),
+            updated_at=restore_now,
+        )
+        transfer_ids.append(str(transfer_id))
+    restored["loan_transfers"] = transfer_ids
 
     costs = LoanCostComponentRepository(session, ctx)
     cost_ids: list[str] = []
@@ -2483,6 +2507,7 @@ def _restore_loans(
             "reference_rate_values_created": len(archive.rows.reference_rate_values),
             "loans_created": len(archive.rows.loans),
             "loan_rate_changes_created": len(archive.rows.loan_rate_changes),
+            "loan_transfers_created": len(archive.rows.loan_transfers),
             "loan_cost_components_created": len(archive.rows.loan_cost_components),
             "loan_overpayments_created": len(archive.rows.loan_overpayments),
             "loan_payments_created": len(archive.rows.loan_payments),
@@ -2933,6 +2958,7 @@ def _apply_restore(
             "reference_rate_values": len(archive.rows.reference_rate_values),
             "loans": len(archive.rows.loans),
             "loan_rate_changes": len(archive.rows.loan_rate_changes),
+            "loan_transfers": len(archive.rows.loan_transfers),
             "loan_cost_components": len(archive.rows.loan_cost_components),
             "loan_overpayments": len(archive.rows.loan_overpayments),
             "loan_payments": len(archive.rows.loan_payments),

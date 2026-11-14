@@ -32,6 +32,7 @@ from assetboard.db.repositories import (
     InstrumentRepository,
     InvestmentTransactionRepository,
     ItemValuationRepository,
+    LoanTransferRepository,
     MonthStateRepository,
     NetWorthCategoryRepository,
     NetWorthItemRepository,
@@ -61,6 +62,7 @@ from assetboard.domain.archive import (
     LoanRateChangeRow,
     LoanRow,
     LoanScenarioRow,
+    LoanTransferRow,
     MonthRow,
     NetWorthCategoryRow,
     NetWorthItemRow,
@@ -147,6 +149,7 @@ CAR_LOAN = UUID("b3b3b3b3-b3b3-4b3b-8b3b-b3b3b3b3b3b3")
 PLAN_LOAN = UUID("b4b4b4b4-b4b4-4b4b-8b4b-b4b4b4b4b4b4")
 RATE_CHANGE = UUID("b5b5b5b5-b5b5-4b5b-8b5b-b5b5b5b5b5b5")
 CAR_VARIABLE_CHANGE = UUID("c3c3c3c3-c3c3-4c3c-8c3c-c3c3c3c3c3c3")
+CAR_TRANSFER = UUID("c4c4c4c4-c4c4-4c4c-8c4c-c4c4c4c4c4c4")
 COST_PERCENT = UUID("b6b6b6b6-b6b6-4b6b-8b6b-b6b6b6b6b6b6")
 COST_FIXED = UUID("b7b7b7b7-b7b7-4b7b-8b7b-b7b7b7b7b7b7")
 LOAN_OVERPAYMENT = UUID("b8b8b8b8-b8b8-4b8b-8b8b-b8b8b8b8b8b8")
@@ -543,6 +546,8 @@ def _loan_rows(*, currency: str = "EUR") -> ArchiveRows:
                 1,
                 "variable",
                 "actual_365",
+                "full_at_origination",
+                0,
                 150,
                 str(RATE),
                 "WIBOR",
@@ -567,6 +572,8 @@ def _loan_rows(*, currency: str = "EUR") -> ArchiveRows:
                 15,
                 "fixed",
                 "monthly",
+                "tranches",
+                0,
                 None,
                 None,
                 "",
@@ -591,6 +598,8 @@ def _loan_rows(*, currency: str = "EUR") -> ArchiveRows:
                 5,
                 "fixed",
                 "monthly",
+                "full_at_origination",
+                0,
                 None,
                 None,
                 "",
@@ -602,6 +611,16 @@ def _loan_rows(*, currency: str = "EUR") -> ArchiveRows:
                 "",
                 "reduce_term",
                 None,
+            ),
+        ),
+        loan_transfers=(
+            LoanTransferRow(
+                str(CAR_TRANSFER),
+                str(CAR_LOAN),
+                "Car loan",
+                "2026-01-15",
+                "50000.00",
+                "First tranche",
             ),
         ),
         loan_rate_changes=(
@@ -711,6 +730,7 @@ def _loan_source_workspace(db: WorkspaceDb) -> None:
         LoanRateChangeRepository,
         LoanRepository,
         LoanScenarioRepository,
+        LoanTransferRepository,
         ReferenceRateRepository,
         ReferenceRateValueRepository,
     )
@@ -762,8 +782,17 @@ def _loan_source_workspace(db: WorkspaceDb) -> None:
             payment_day=15,
             rate_mode="fixed",
             day_count="monthly",
+            drawdown_mode="tranches",
+            interest_only_months=0,
             overpayment_mode="none",
             overpayment_strategy="reduce_term",
+        )
+        LoanTransferRepository(session, ctx).create(
+            id=CAR_TRANSFER,
+            loan_id=CAR_LOAN,
+            date=date(2026, 1, 15),
+            amount_minor=5_000_000,
+            note="First tranche",
         )
         plan_loan = LoanRepository(session, ctx).create(
             id=PLAN_LOAN,
@@ -1287,6 +1316,9 @@ def test_loan_restore_round_trip_maps_references_and_keeps_schedule(
     assert len(parsed.rows.reference_rate_values) == 1
     assert len(parsed.rows.loans) == 3
     assert len(parsed.rows.loan_rate_changes) == 2
+    assert len(parsed.rows.loan_transfers) == 1
+    assert parsed.rows.loan_transfers[0].amount == "50000.00"
+    assert {row.name: row.drawdown_mode for row in parsed.rows.loans}["Car loan"] == "tranches"
     assert [row.mode for row in parsed.rows.loan_rate_changes] == ["fixed", "variable"]
     assert len(parsed.rows.loan_cost_components) == 2
     assert len(parsed.rows.loan_overpayments) == 1
@@ -1302,6 +1334,7 @@ def test_loan_restore_round_trip_maps_references_and_keeps_schedule(
     report = _plan(db, data_dir, batch_id, ctx=target_ctx)
     assert report["counts"]["invalid"] == 0, report
     assert report["counts"]["loans_created"] == 3
+    assert report["counts"]["loan_transfers_created"] == 1
     _apply(db, data_dir, batch_id, ctx=target_ctx)
 
     with db.factory() as session:
@@ -1315,6 +1348,10 @@ def test_loan_restore_round_trip_maps_references_and_keeps_schedule(
         assert payment.transaction_id is not None
         transaction = TransactionRepository(session, target_ctx).get(payment.transaction_id)
         assert transaction is not None and transaction.import_key == f"id:{SOURCE}"
+        car = loans_by_name["Car loan"]
+        restored_transfer = LoanTransferRepository(session, target_ctx).for_loan(car.id)[0]
+        assert restored_transfer.amount_minor == 5_000_000
+        assert restored_transfer.note == "First tranche"
         plan = InstallmentPlanRepository(session, target_ctx).for_loan(plan_loan.id)
         assert plan is not None and plan.remaining_count == 3
         plan_category = CategoryRepository(session, target_ctx).get(plan.category_id)
@@ -1348,6 +1385,11 @@ def test_loan_restore_round_trip_maps_references_and_keeps_schedule(
         == parsed.rows.loan_payments[0].transaction_id
     )
     assert second_parsed.rows.loan_balance_checkpoints[0].remaining_principal == ("280000.00")
+    second_transfer = second_parsed.rows.loan_transfers[0]
+    assert second_transfer.date == parsed.rows.loan_transfers[0].date
+    assert second_transfer.amount == parsed.rows.loan_transfers[0].amount
+    assert second_transfer.note == parsed.rows.loan_transfers[0].note
+    assert second_transfer.loan == "Car loan"
     assert second_parsed.rows.installment_plans[0].category == "Food"
 
 
@@ -2862,6 +2904,7 @@ def test_restore_rollback_removes_the_restored_loan_rows(db: WorkspaceDb, data_d
         LoanRateChangeRepository,
         LoanRepository,
         LoanScenarioRepository,
+        LoanTransferRepository,
         ReferenceRateRepository,
         ReferenceRateValueRepository,
     )
@@ -2886,6 +2929,7 @@ def test_restore_rollback_removes_the_restored_loan_rows(db: WorkspaceDb, data_d
             LoanPaymentRepository,
             LoanBalanceCheckpointRepository,
             LoanScenarioRepository,
+            LoanTransferRepository,
             InstallmentPlanRepository,
         ):
             assert repository(session, ctx).list() == []

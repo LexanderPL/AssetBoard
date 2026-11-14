@@ -20,6 +20,8 @@ from assetboard.domain.loans import (
     BalanceCheckpoint,
     CostPeriod,
     DayCount,
+    Drawdown,
+    DrawdownMode,
     LoanPaymentKind,
     LoanScheduleSummary,
     LoanTerms,
@@ -90,6 +92,7 @@ class LoanScheduleInputs:
     as_of: date
     day_count: DayCount
     strategy: OverpaymentStrategy
+    drawdowns: list[Drawdown]
 
 
 def _terms(view: loans.LoanView) -> LoanTerms:
@@ -104,6 +107,8 @@ def _terms(view: loans.LoanView) -> LoanTerms:
         installment_override=view.installment_override,
         overpayment_mode=view.overpayment_mode,
         overpayment_amount=view.overpayment_amount,
+        drawdown_mode=view.drawdown_mode,
+        interest_only_months=view.interest_only_months,
     )
 
 
@@ -126,6 +131,10 @@ def _overpayments(view: loans.LoanView) -> list[OneOffOverpayment]:
     return [OneOffOverpayment(date=row.date, amount=row.amount) for row in view.overpayments]
 
 
+def _drawdowns(view: loans.LoanView) -> list[Drawdown]:
+    return [Drawdown(date=row.date, amount=row.amount) for row in view.transfers]
+
+
 def _checkpoints(view: loans.LoanView) -> list[BalanceCheckpoint]:
     return [
         BalanceCheckpoint(as_of=row.as_of, remaining_principal=row.remaining_principal)
@@ -135,7 +144,8 @@ def _checkpoints(view: loans.LoanView) -> list[BalanceCheckpoint]:
 
 def schedule_inputs_from_view(view: loans.LoanView, as_of: date) -> LoanScheduleInputs:
     terms = _terms(view)
-    anchor = select_anchor(terms, _checkpoints(view), as_of)
+    drawdowns = _drawdowns(view)
+    anchor = select_anchor(terms, _checkpoints(view), as_of, drawdowns)
     return LoanScheduleInputs(
         view=view,
         terms=terms,
@@ -146,6 +156,7 @@ def schedule_inputs_from_view(view: loans.LoanView, as_of: date) -> LoanSchedule
         as_of=as_of,
         day_count=view.day_count,
         strategy=view.overpayment_strategy,
+        drawdowns=drawdowns,
     )
 
 
@@ -169,11 +180,17 @@ def load_loan_schedule_inputs_in_session(
 
 
 def anchor_for_date(inputs: LoanScheduleInputs, day: date) -> ScheduleAnchor:
-    """The latest checkpoint at or before ``day``, otherwise the loan's origination."""
-    return select_anchor(inputs.terms, _checkpoints(inputs.view), day)
+    """The latest checkpoint at or before ``day``, else the first transfer or origination."""
+    return select_anchor(inputs.terms, _checkpoints(inputs.view), day, inputs.drawdowns)
 
 
 def _base_anchor(inputs: LoanScheduleInputs) -> ScheduleAnchor:
+    if DrawdownMode(inputs.terms.drawdown_mode) is DrawdownMode.TRANCHES:
+        if not inputs.drawdowns:
+            return ScheduleAnchor(inputs.as_of, Money(0, inputs.terms.currency))
+        first = min(row.date for row in inputs.drawdowns)
+        first_total = sum(row.amount.amount_minor for row in inputs.drawdowns if row.date == first)
+        return ScheduleAnchor(first, Money(first_total, inputs.terms.currency))
     if inputs.view.origination_date is not None and inputs.view.principal_original is not None:
         return ScheduleAnchor(
             date=inputs.view.origination_date,
@@ -228,6 +245,7 @@ def build_inputs_schedule(
         inputs.as_of,
         strategy if strategy is not None else inputs.strategy,
         inputs.day_count,
+        inputs.drawdowns,
     )
 
 
@@ -241,6 +259,8 @@ def list_figures(view: loans.LoanView, today: date) -> loans.LoanListFigures:
         return loans.LoanListFigures(
             currency=view.currency,
             remaining_principal=None,
+            drawn_principal=None,
+            undrawn_principal=None,
             monthly_installment=None,
             percent_repaid_bp=None,
             next_payment_date=None,
@@ -258,12 +278,17 @@ def list_figures(view: loans.LoanView, today: date) -> loans.LoanListFigures:
     return loans.LoanListFigures(
         currency=view.currency,
         remaining_principal=summary.remaining_principal,
+        drawn_principal=summary.drawn_principal,
+        undrawn_principal=summary.undrawn_principal,
         monthly_installment=summary.next_installment or Money(0, view.currency),
         percent_repaid_bp=max(0, min(10_000, summary.percent_repaid_bp)),
         next_payment_date=summary.next_payment_date,
         due_next_30_days=Money(due, view.currency),
         current_rate_bp=view.current_rate_bp,
-        paid_off=summary.remaining_principal.amount_minor == 0,
+        paid_off=(
+            summary.remaining_principal.amount_minor == 0
+            and summary.undrawn_principal.amount_minor == 0
+        ),
         schedule_error=None,
     )
 

@@ -51,6 +51,7 @@ from assetboard.db.repositories.loans import (
     LoanRateChangeRepository,
     LoanRepository,
     LoanScenarioRepository,
+    LoanTransferRepository,
     ReferenceRateRepository,
     ReferenceRateValueRepository,
 )
@@ -119,6 +120,7 @@ __all__ = [
     "LoanPaymentRepository",
     "LoanRateChangeRepository",
     "LoanScenarioRepository",
+    "LoanTransferRepository",
     "LoanRepository",
     "ReferenceRateRepository",
     "ReferenceRateValueRepository",

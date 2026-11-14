@@ -173,6 +173,38 @@ def test_loan_balance_from_origination_checkpoint_and_actuals(team: WorkspaceDb)
     assert checkpoint
 
 
+def test_loan_balance_counts_only_transfers_through_the_requested_date(
+    team: WorkspaceDb,
+) -> None:
+    loan_id = _create(team, drawdown_mode="tranches", term_months=12)
+    ctx = team.ctx("owner", "owner")
+    loans.add_transfer(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 1, 15),
+        amount=_money(10_000_000),
+    )
+    loans.add_transfer(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 4, 1),
+        amount=_money(5_000_000),
+    )
+    with team.factory() as session:
+        before_first = loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 1, 10))
+        after_first = loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 1, 20))
+        before_second = loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 3, 1))
+        after_second = loan_links.loan_balance_at(session, ctx, loan_id, date(2026, 4, 2))
+    assert before_first == _money(0)
+    assert after_first == _money(10_000_000)
+    assert not isinstance(before_second, Unavailable)
+    assert before_second.amount_minor < 10_000_000
+    assert not isinstance(after_second, Unavailable)
+    assert after_second.amount_minor > before_second.amount_minor
+
+
 def test_loan_balance_includes_an_installment_paid_before_its_due_date(
     team: WorkspaceDb,
 ) -> None:

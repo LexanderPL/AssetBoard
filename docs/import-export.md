@@ -134,7 +134,7 @@ A merge writes categories, transactions and planned values only. The archive's s
 closed months, net-worth files, investment files and loan files are listed for information but
 never applied; a 1.2+ archive lists its net-worth files once with a restore-only warning, a 1.4
 archive lists its investment files once with the same kind of warning, a 1.5+ archive lists
-its loan files once with `loan_restore_only`, and a 1.7+ archive lists its FIRE files once with
+its loan files once with `loan_restore_only`, and a 1.8+ archive lists its FIRE files once with
 `fire_restore_only`. The settings diff also
 reports the investment cost basis and risk targets when they differ. The archive's base currency
 must match the workspace's; otherwise the whole archive is refused. Existing net-worth,

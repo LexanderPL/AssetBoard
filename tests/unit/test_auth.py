@@ -1306,6 +1306,7 @@ WORKSPACE_TABLES = {
     "risk_target_policies",
     "loans",
     "loan_rate_changes",
+    "loan_transfers",
     "reference_rates",
     "reference_rate_values",
     "loan_cost_components",

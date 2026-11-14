@@ -27,7 +27,6 @@ from assetboard.domain.loans import (
     LoanPaymentKind,
     LoanValidationError,
     Money,
-    ScheduleAnchor,
     ScheduleError,
 )
 from assetboard.domain.networth import Side, Unavailable
@@ -96,16 +95,11 @@ def loan_balance_at(
 
         amount = plan_remaining_minor_in_session(session, ctx, loan_id)
         return UNAVAILABLE if amount is None else Money(amount, view.currency)
-    anchor: ScheduleAnchor | None = None
-    for checkpoint in view.checkpoints:
-        if checkpoint.as_of <= as_of and (anchor is None or checkpoint.as_of >= anchor.date):
-            anchor = ScheduleAnchor(date=checkpoint.as_of, balance=checkpoint.remaining_principal)
-    if anchor is None and view.origination_date is not None and view.principal_original is not None:
-        anchor = ScheduleAnchor(date=view.origination_date, balance=view.principal_original)
-    if anchor is None or as_of < anchor.date:
-        return UNAVAILABLE
     try:
         inputs = loan_schedule.load_loan_schedule_inputs_in_session(session, ctx, loan_id, as_of)
+        anchor = inputs.anchor
+        if as_of < anchor.date:
+            return UNAVAILABLE
         schedule = loan_schedule.schedule_from_anchor(inputs, anchor, as_of)
     except (ScheduleError, LoanValidationError):
         return UNAVAILABLE

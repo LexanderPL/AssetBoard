@@ -66,6 +66,7 @@ def test_alembic_upgrade_and_check_on_empty_sqlite_database(tmp_path: Path) -> N
         "loan_overpayments",
         "loan_payments",
         "loan_rate_changes",
+        "loan_transfers",
         "loan_scenarios",
         "loans",
         "login_tickets",
@@ -2074,7 +2075,7 @@ def test_0059_fire_scenarios_migration_is_reversible(tmp_path: Path) -> None:
         engine.dispose()
 
 
-def test_0061_fire_archive_migration_is_reversible(tmp_path: Path) -> None:
+def test_0062_fire_archive_migration_is_reversible(tmp_path: Path) -> None:
     settings = Settings(
         _env_file=None,
         data_dir=tmp_path,
@@ -2115,13 +2116,15 @@ def test_0061_fire_archive_migration_is_reversible(tmp_path: Path) -> None:
             assert "UNIQUE" in index_sql[index_name]
             assert "WHERE import_key IS NOT NULL" in index_sql[index_name]
 
-        command.downgrade(alembic_config(settings), "0060_f84_fire_expense_exclusions")
+        command.downgrade(alembic_config(settings), "0061_f710_loan_tranches")
         inspector = inspect(engine)
         for table, index_name in tables_and_indexes:
             columns = {column["name"] for column in inspector.get_columns(table)}
             assert "import_key" not in columns
             indexes = {index["name"] for index in inspector.get_indexes(table)}
             assert index_name not in indexes
+        loan_columns = {column["name"] for column in inspector.get_columns("loans")}
+        assert {"drawdown_mode", "interest_only_months"} <= loan_columns
 
         upgrade_database(settings)
         assert database_is_at_head(settings)
@@ -2179,6 +2182,61 @@ def test_0060_fire_expense_exclusions_migration_is_reversible(tmp_path: Path) ->
             column["name"] for column in inspector.get_columns("fire_events")
         }
         assert "source_loan_id" not in downgraded_event_columns
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0061_loan_tranches_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'loan_tranches.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    try:
+        inspector = inspect(engine)
+        loan_columns = {column["name"] for column in inspector.get_columns("loans")}
+        assert {"drawdown_mode", "interest_only_months"} <= loan_columns
+        checks = {check.get("sqltext") or "" for check in inspector.get_check_constraints("loans")}
+        assert any("drawdown_mode IN ('full_at_origination', 'tranches')" in sql for sql in checks)
+        assert any("interest_only_months" in sql for sql in checks)
+
+        transfer_columns = {column["name"] for column in inspector.get_columns("loan_transfers")}
+        assert transfer_columns >= {
+            "id",
+            "workspace_id",
+            "loan_id",
+            "date",
+            "amount_minor",
+            "note",
+            "created_at",
+            "updated_at",
+        }
+        indexes = {index["name"] for index in inspector.get_indexes("loan_transfers")}
+        assert "ix_loan_transfers_workspace_id" in indexes
+        assert "ix_loan_transfers_workspace_loan_date" in indexes
+        unique = {
+            constraint["name"] for constraint in inspector.get_unique_constraints("loan_transfers")
+        }
+        assert "uq_loan_transfers_workspace_id_id" in unique
+        foreign_keys = {
+            (key["referred_table"], tuple(key["constrained_columns"]))
+            for key in inspector.get_foreign_keys("loan_transfers")
+        }
+        assert ("workspaces", ("workspace_id",)) in foreign_keys
+        assert ("loans", ("workspace_id", "loan_id")) in foreign_keys
+
+        command.downgrade(alembic_config(settings), "0060_f84_fire_expense_exclusions")
+        inspector = inspect(engine)
+        assert "loan_transfers" not in set(inspector.get_table_names())
+        downgraded = {column["name"] for column in inspector.get_columns("loans")}
+        assert "drawdown_mode" not in downgraded
+        assert "interest_only_months" not in downgraded
+
         upgrade_database(settings)
         assert database_is_at_head(settings)
         check_database_migrations(settings)

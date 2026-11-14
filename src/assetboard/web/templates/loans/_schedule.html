@@ -28,6 +28,7 @@
           <th scope="col" class="px-3 py-2 font-medium sm:sticky sm:left-12 sm:z-30 sm:bg-subtle">{{ _("Due date") }}</th>
           <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Rate") }}</th>
           <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Opening") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Loan transfer") }}</th>
           <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Interest") }}</th>
           <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Principal") }}</th>
           <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Overpayment") }}</th>
@@ -45,7 +46,7 @@
         {% set year = schedule_page.year_headers.get(row.n) %}
         {% if year %}
         <tr class="border-t border-line bg-subtle" data-schedule-year="{{ year }}">
-          <th scope="colgroup" colspan="10" class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted">{{ year }}</th>
+          <th scope="colgroup" colspan="11" class="px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-muted">{{ year }}</th>
         </tr>
         {% endif %}
         <tr class="grid grid-cols-2 gap-x-3 gap-y-1 border-t border-line px-3 py-3 align-top {% if highlighted %}bg-primary-soft {% endif %}sm:table-row sm:p-0" data-schedule-row="{{ row.n }}">
@@ -60,6 +61,9 @@
           </td>
           <td class="hidden whitespace-nowrap px-0 py-0 text-right tabular-nums sm:table-cell sm:px-3 sm:py-2" data-schedule-rate>{{ format_rate_short(row.annual_rate_bp, locale) }}</td>
           <td class="hidden whitespace-nowrap px-0 py-0 text-right tabular-nums sm:table-cell sm:px-3 sm:py-2" data-schedule-opening>{{ format_money(row.opening, locale) }}</td>
+          <td class="whitespace-nowrap px-0 py-0 tabular-nums sm:px-3 sm:py-2 sm:text-right" data-schedule-transfer>
+            <span class="block text-xs text-muted sm:hidden">{{ _("Loan transfer") }}</span>{% if row.transfer.amount_minor %}{{ format_money(row.transfer, locale) }}{% else %}—{% endif %}
+          </td>
           <td class="whitespace-nowrap px-0 py-0 tabular-nums sm:px-3 sm:py-2 sm:text-right" data-schedule-interest>
             <span class="block text-xs text-muted sm:hidden">{{ _("Interest") }}</span>{{ format_money(actual.interest if actual else row.interest, locale) }}
           </td>
