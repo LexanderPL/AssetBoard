@@ -2504,6 +2504,14 @@ msgstr ""
 msgid "Investment gain"
 msgstr ""
 
+#, python-format
+msgid "%(name)s (archived)"
+msgstr ""
+
+#, python-format
+msgid "%(name)s: FIRE at age %(age)d"
+msgstr ""
+
 msgid "Enter a name of 1 to 200 characters."
 msgstr ""
 
@@ -2670,6 +2678,50 @@ msgstr ""
 msgid "The scenario could not be saved. Reload the page and try again."
 msgstr ""
 
+msgid "Compare at most three scenarios at a time."
+msgstr ""
+
+msgid ""
+"The selected scenarios use different currencies. Choose scenarios that "
+"share one currency; there is no currency conversion in the comparison."
+msgstr ""
+
+msgid "The sensitivity axes are empty."
+msgstr ""
+
+msgid "The sensitivity axes contain an invalid value."
+msgstr ""
+
+msgid "The sensitivity axes contain a duplicate value."
+msgstr ""
+
+msgid "The sensitivity axes have too many values."
+msgstr ""
+
+msgid "The sensitivity grid has too many cells."
+msgstr ""
+
+msgid "The sensitivity axes must include the saved plan."
+msgstr ""
+
+msgid ""
+"The real-return range would leave the supported -20 to 50 percent bounds."
+" Adjust the scenario's return and try again."
+msgstr ""
+
+msgid ""
+"The expense range is outside the supported 0 to 1000 percent of the saved"
+" plan."
+msgstr ""
+
+msgid ""
+"The expense range would exceed the supported amount. Reduce the starting "
+"expenses and try again."
+msgstr ""
+
+msgid "The sensitivity grid could not be calculated."
+msgstr ""
+
 msgid "Scenario created."
 msgstr ""
 
@@ -2713,6 +2765,36 @@ msgid "annual expenses"
 msgstr ""
 
 msgid "starting portfolio"
+msgstr ""
+
+#, python-format
+msgid "%(value)s pp"
+msgstr ""
+
+#, python-format
+msgid "Never before age %(horizon)d; real return %(rate)s; expenses %(factor)s"
+msgstr ""
+
+#, python-format
+msgid ""
+"No FIRE before age %(horizon)d with a real return of %(rate)s and "
+"expenses at %(factor)s of the saved plan."
+msgstr ""
+
+#, python-format
+msgid "Age %(age)d in %(year)d; real return %(rate)s; expenses %(factor)s"
+msgstr ""
+
+#, python-format
+msgid ""
+"Base case: FIRE at age %(age)d in %(year)d with a real return of %(rate)s"
+" and expenses at %(factor)s of the saved plan."
+msgstr ""
+
+#, python-format
+msgid ""
+"FIRE at age %(age)d in %(year)d with a real return of %(rate)s and "
+"expenses at %(factor)s of the saved plan."
 msgstr ""
 
 msgid "This request came from another site and was blocked."
@@ -3265,10 +3347,6 @@ msgid "Add an expense category first."
 msgstr ""
 
 msgid "Add an income category first."
-msgstr ""
-
-#, python-format
-msgid "%(name)s (archived)"
 msgstr ""
 
 #, python-format
@@ -6091,6 +6169,67 @@ msgid ""
 "assumes constant rates and no taxes; real life will differ."
 msgstr ""
 
+msgid "Based on the saved plan; unsaved changes are not included."
+msgstr ""
+
+msgid "The sensitivity grid is unavailable while the projection is blocked."
+msgstr ""
+
+msgid "Open plan inputs"
+msgstr ""
+
+msgid "Sensitivity grid"
+msgstr ""
+
+msgid "FIRE age by real return and expenses as a percentage of the saved plan"
+msgstr ""
+
+#, python-format
+msgid "Expenses (%% of saved plan)"
+msgstr ""
+
+msgid "base"
+msgstr ""
+
+msgid ""
+"Each cell shows the FIRE age. Better means earlier than the saved plan; "
+"worse means later. A dash means FIRE is never reached before the horizon."
+msgstr ""
+
+msgid "Earlier than the saved plan"
+msgstr ""
+
+msgid "Saved plan (base case)"
+msgstr ""
+
+msgid "Same age as the saved plan"
+msgstr ""
+
+msgid "Later than the saved plan"
+msgstr ""
+
+msgid "Never reaches FIRE before the horizon"
+msgstr ""
+
+msgid "Refresh grid"
+msgstr ""
+
+msgid ""
+"The grid always uses the saved inputs, including linked values and "
+"exclusions."
+msgstr ""
+
+msgid "Sensitivity"
+msgstr ""
+
+msgid ""
+"See how the FIRE age changes when the real return moves in one-"
+"percentage-point steps or expenses move in ten-percent steps."
+msgstr ""
+
+msgid "Show sensitivity grid"
+msgstr ""
+
 msgid "Year by year"
 msgstr ""
 
@@ -6132,7 +6271,108 @@ msgid ""
 "row is marked in red."
 msgstr ""
 
+#, fuzzy
+msgid "Compare scenarios"
+msgstr ""
+
 msgid "All scenarios"
+msgstr ""
+
+msgid ""
+"Choose up to three saved scenarios. Their FIRE metrics and net worth are "
+"shown side by side; archived scenarios can be compared too."
+msgstr ""
+
+msgid "Active scenarios"
+msgstr ""
+
+msgid "Default"
+msgstr ""
+
+msgid "Linked"
+msgstr ""
+
+#, python-format
+msgid "Age %(age)d in %(year)d"
+msgstr ""
+
+msgid "Archived scenarios"
+msgstr ""
+
+msgid "Compare selected"
+msgstr ""
+
+msgid "With nothing selected, the default scenario is shown."
+msgstr ""
+
+msgid "No scenarios to compare yet."
+msgstr ""
+
+msgid "Open the FIRE planner"
+msgstr ""
+
+msgid ""
+"These scenarios start in different years. Today's-money values are "
+"anchored to each scenario's start year, so compare them with care."
+msgstr ""
+
+msgid "Scenario comparison"
+msgstr ""
+
+#, fuzzy, python-format
+msgid "%(num)d scenario selected"
+msgid_plural "%(num)d scenarios selected"
+msgstr[0] ""
+msgstr[1] ""
+
+msgid "FIRE results by scenario"
+msgstr ""
+
+msgid "Scenario"
+msgstr ""
+
+msgid "Start"
+msgstr ""
+
+msgid "Net worth at FIRE (today's money)"
+msgstr ""
+
+msgid "Depletion age"
+msgstr ""
+
+msgid "Unavailable"
+msgstr ""
+
+#, python-format
+msgid "Never before age %(age)d"
+msgstr ""
+
+msgid "FIRE reached"
+msgstr ""
+
+#, python-format
+msgid "Age %(age)d"
+msgstr ""
+
+msgid ""
+"No years after income stops fall inside the horizon, so depletion was not"
+" checked."
+msgstr ""
+
+msgid ""
+"Net worth at FIRE is always in today's money. The chart follows the "
+"selected basis."
+msgstr ""
+
+msgid "Net worth over time by scenario"
+msgstr ""
+
+msgid "Plotted scenario net worth data"
+msgstr ""
+
+msgid ""
+"No selected scenario can be plotted. Fix the blocked plans or select "
+"another scenario."
 msgstr ""
 
 msgid "Open your profile"
@@ -6159,21 +6399,11 @@ msgid ""
 "validates the plan."
 msgstr ""
 
-msgid "Active scenarios"
-msgstr ""
-
 #, python-format
 msgid "%(num)d active scenario"
 msgid_plural "%(num)d active scenarios"
 msgstr[0] ""
 msgstr[1] ""
-
-msgid "Default"
-msgstr ""
-
-#, python-format
-msgid "Age %(age)d in %(year)d"
-msgstr ""
 
 msgid "Horizon"
 msgstr ""
@@ -6220,9 +6450,6 @@ msgstr ""
 msgid "An editor or owner of this workspace can add scenarios."
 msgstr ""
 
-msgid "Archived scenarios"
-msgstr ""
-
 msgid ""
 "Archived scenarios are read-only and keep their inputs. Restore one to "
 "edit it again."
@@ -6230,6 +6457,9 @@ msgstr ""
 
 #, python-format
 msgid "archived %(date)s"
+msgstr ""
+
+msgid "Compare"
 msgstr ""
 
 #, python-format
@@ -8862,12 +9092,6 @@ msgstr ""
 msgid ""
 "The comparison and chart are hidden until the loan's terms allow a "
 "schedule to be built."
-msgstr ""
-
-msgid "Scenario comparison"
-msgstr ""
-
-msgid "Scenario"
 msgstr ""
 
 msgid "Months saved vs baseline"
@@ -12171,5 +12395,18 @@ msgstr ""
 #~ msgstr ""
 
 #~ msgid "Earned income in the start year, before tax and other deductions."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The real-return range would leave "
+#~ "the supported -20% to 50% bounds. "
+#~ "Adjust the scenario's return and try "
+#~ "again."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The expense range is outside the "
+#~ "supported 0% to 1000% of the saved"
+#~ " plan."
 #~ msgstr ""
 

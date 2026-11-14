@@ -369,8 +369,9 @@ def test_viewers_and_archived_scenarios_are_read_only(owner) -> None:
     assert "data-fire-metrics" in viewer.text
     assert "hx-post" not in viewer.text
     assert "hx-trigger" not in viewer.text
-    assert "hx-target" not in viewer.text
     assert "hx-sync" not in viewer.text
+    assert f'hx-get="/fire/{scenario_id}/sensitivity"' in viewer.text
+    assert 'hx-target="#fire-sensitivity"' in viewer.text
     assert "data-fire-form" not in viewer.text
     assert "data-fire-save" not in viewer.text
     assert 'name="basis"' not in viewer.text

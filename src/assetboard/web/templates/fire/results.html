@@ -4,6 +4,7 @@
 {% block title %}{{ detail.scenario.name }} · {{ _("FIRE planner") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("FIRE planner") }}{% endblock %}
 {% block header_actions %}
+<a href="{{ scoped_url(request, 'fire_compare') }}?scenario={{ detail.scenario.id }}{% if basis == 'real' %}&amp;basis=real{% endif %}" class="btn" data-fire-compare>{{ _("Compare") }}</a>
 <a href="{{ scoped_url(request, 'fire_scenarios') }}" class="btn" data-fire-back>{{ _("All scenarios") }}</a>
 {% endblock %}
 
@@ -69,6 +70,8 @@
 </div>
 {% include "fire/_inputs_panel.html" %}
 {% endif %}
+
+{% include "fire/_sensitivity_panel.html" %}
 
 {% include "fire/_loan_suggestions.html" %}
 {% endblock %}

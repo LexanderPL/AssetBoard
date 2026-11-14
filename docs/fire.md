@@ -222,6 +222,52 @@ The **Linked inputs** panel still shows the resolved breakdown, window, months w
 dates, warnings and source links so the problem is visible. A preview resolves the posted linked
 modes and exclusions without writing anything.
 
+## Comparing scenarios
+
+**Compare scenarios** on the FIRE planner page opens a read-only comparison. Tick up to three
+saved scenarios and submit; with nothing ticked, the default active scenario is shown. The
+selection is part of the URL (`?scenario=…&scenario=…`), so a comparison can be bookmarked.
+Archived scenarios can be selected and are labelled **Archived**. The scenario order in the
+table and the chart is the order in the URL.
+
+The table shows each scenario's start age and year, status, FIRE age and year, years to FIRE,
+net worth at FIRE in today's money, and depletion age. A scenario name opens its results page
+with the sensitivity grid loaded. A plan that never reaches FIRE before its
+horizon says so. A blocked plan keeps its row and lists every reason with a link back to its
+**Plan inputs**; it is left out of the chart. When no year after income stops falls inside the
+horizon, depletion is shown as **—** with an explanation.
+
+The overlay chart shows net worth over the union of the scenarios' calendar years, so a series
+has a gap outside its own start year and horizon. It opens in each year's money and has a
+**Today's money** toggle. The table's net-worth-at-FIRE column is always in today's money.
+Scenarios can start in different years; a note explains that today's-money values are anchored
+to each scenario's own start year. Currencies are never converted: selecting scenarios with
+different currencies shows an error and no table or chart. Comparisons write nothing and are
+available to every role.
+
+## Sensitivity
+
+A scenario's results page has a **Sensitivity** panel below the plan inputs. **Show sensitivity
+grid** loads it on demand; without JavaScript the same link reloads the page with the grid
+shown. **Refresh grid** reloads it. The grid always uses the saved plan, including linked values
+and category exclusions; unsaved preview changes do not affect it.
+
+The default grid varies the real return by −2, −1, 0, +1 and +2 percentage points and the
+starting expenses by 80%, 90%, 100%, 110% and 120% of the saved plan; each expense row shows the
+level with its −20%, −10%, 0%, +10% or +20% difference. Only the starting expenses
+are scaled: contribution overrides, cash flows, income and expense-change events keep their saved
+values. Each cell shows the FIRE age, or **—** when FIRE is never reached before the horizon. The
+cell colours compare the age with the saved plan: earlier is better, the same age is neutral,
+later is worse, and the saved plan itself is the **Base** cell with a ring and badge. A legend
+explains the colours, and every cell has a title and a screen-reader sentence. The expense column
+stays visible while the table scrolls sideways on a narrow screen.
+
+The grid cannot be calculated when the selected real-return range would leave the supported
+hard bounds (for example a saved return near +50%) or when the scaled starting expenses exceed
+the supported amount; the panel explains the range instead of showing a partial grid. A blocked
+plan shows its blocking messages instead of a grid. Archived scenarios and viewers can use the
+panel.
+
 ## Validation
 
 The form refuses and explains:

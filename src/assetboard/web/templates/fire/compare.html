@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% from "fire/_macros.html" import badge with context %}
+{% block title %}{{ _("Compare scenarios") }} · {{ _("FIRE planner") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("FIRE planner") }}{% endblock %}
+{% block header_actions %}
+<a href="{{ scoped_url(request, 'fire_scenarios') }}" class="btn" data-fire-back>{{ _("All scenarios") }}</a>
+{% endblock %}
+{% block content %}
+<section class="panel mb-6 p-6 sm:p-7" aria-labelledby="fire-compare-heading" data-fire-compare-selector-section>
+  <h2 id="fire-compare-heading" class="text-base font-semibold">{{ _("Compare scenarios") }}</h2>
+  <p class="mt-1 text-sm text-muted">{{ _("Choose up to three saved scenarios. Their FIRE metrics and net worth are shown side by side; archived scenarios can be compared too.") }}</p>
+  {% if scenarios.active or scenarios.archived %}
+  <form method="get" action="{{ scoped_url(request, 'fire_compare') }}" class="mt-4" data-fire-compare-selector>
+    <input type="hidden" name="basis" value="{{ basis }}">
+    {% if scenarios.active %}
+    <fieldset class="border-t border-line pt-4" data-fire-compare-active>
+      <legend class="px-1 text-sm font-semibold">{{ _("Active scenarios") }}</legend>
+      <ul class="mt-2 grid gap-2 md:grid-cols-2">
+        {% for s in scenarios.active %}
+        <li>
+          <label class="flex flex-wrap items-center gap-2 text-sm">
+            <input type="checkbox" name="scenario" value="{{ s.id }}"{% if s.id in selected_ids %} checked{% endif %} data-fire-compare-option="{{ s.id }}">
+            <span class="font-medium">{{ s.name }}</span>
+            {% if s.is_default %}{{ badge(_("Default"), "primary") }}{% endif %}
+            {% if s.linked %}{{ badge(_("Linked"), "success") }}{% endif %}
+            <span class="text-xs text-muted">{{ _("Age %(age)d in %(year)d", age=s.age_at_start, year=s.start_year) }}</span>
+          </label>
+        </li>
+        {% endfor %}
+      </ul>
+    </fieldset>
+    {% endif %}
+    {% if scenarios.archived %}
+    <fieldset class="mt-4 border-t border-line pt-4" data-fire-compare-archived>
+      <legend class="px-1 text-sm font-semibold">{{ _("Archived scenarios") }}</legend>
+      <ul class="mt-2 grid gap-2 md:grid-cols-2">
+        {% for s in scenarios.archived %}
+        <li>
+          <label class="flex flex-wrap items-center gap-2 text-sm">
+            <input type="checkbox" name="scenario" value="{{ s.id }}"{% if s.id in selected_ids %} checked{% endif %} data-fire-compare-option="{{ s.id }}">
+            <span class="font-medium">{{ s.name }}</span>
+            {{ badge(_("Archived")) }}
+            {% if s.linked %}{{ badge(_("Linked"), "success") }}{% endif %}
+            <span class="text-xs text-muted">{{ _("Age %(age)d in %(year)d", age=s.age_at_start, year=s.start_year) }}</span>
+          </label>
+        </li>
+        {% endfor %}
+      </ul>
+    </fieldset>
+    {% endif %}
+    <div class="mt-4 flex flex-wrap items-center gap-3">
+      <button type="submit" class="btn-primary" data-fire-compare-submit>{{ _("Compare selected") }}</button>
+      <p class="text-xs text-muted">{{ _("With nothing selected, the default scenario is shown.") }}</p>
+    </div>
+  </form>
+  {% else %}
+  <div class="mt-4 border-t border-line pt-4" data-fire-compare-empty>
+    <p class="text-sm text-muted">{{ _("No scenarios to compare yet.") }}</p>
+    <a href="{{ scoped_url(request, 'fire_scenarios') }}" class="btn mt-3">{{ _("Open the FIRE planner") }}</a>
+  </div>
+  {% endif %}
+</section>
+
+{% if comparison_error %}
+<p role="alert" class="mb-6 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-fire-compare-error data-fire-compare-error-code="{{ comparison_error_code }}">{{ comparison_error }}</p>
+{% endif %}
+
+{% if comparison.mixed_start_years and comparison.rows and not comparison_error %}
+<p role="status" class="mb-6 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-mixed-start>{{ _("These scenarios start in different years. Today's-money values are anchored to each scenario's start year, so compare them with care.") }}</p>
+{% endif %}
+
+{% if comparison.rows and not comparison_error %}
+<section class="panel mb-6 p-6 sm:p-7" aria-labelledby="fire-comparison-table-heading" data-fire-comparison>
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 id="fire-comparison-table-heading" class="text-base font-semibold">{{ _("Scenario comparison") }}</h2>
+    <p class="text-sm text-muted">{{ ngettext("%(num)d scenario selected", "%(num)d scenarios selected", comparison.rows|length, num=comparison.rows|length) }}</p>
+  </div>
+  <div class="mt-4 overflow-x-auto" tabindex="0" role="region" aria-label="{{ _('Scenario comparison') }}" data-fire-comparison-scroll>
+    <table class="sheet w-full min-w-[72rem] text-sm" data-fire-comparison-table>
+      <caption class="sr-only">{{ _("FIRE results by scenario") }}</caption>
+      <thead>
+        <tr class="text-left text-xs text-muted">
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Scenario") }}</th>
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Start") }}</th>
+          <th scope="col" class="px-3 py-2 font-medium">{{ _("Status") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("FIRE age") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("FIRE year") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Years to FIRE") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Net worth at FIRE (today's money)") }}</th>
+          <th scope="col" class="px-3 py-2 text-right font-medium">{{ _("Depletion age") }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in comparison.rows %}
+        {% set s = row.scenario %}
+        <tr class="border-t border-line" data-fire-comparison-row="{{ s.id }}"{% if row.blocked %} data-fire-comparison-row-blocked{% endif %}{% if row.never %} data-fire-comparison-row-never{% endif %}>
+          <th scope="row" class="px-3 py-2 text-left font-medium">
+            <a href="{{ scoped_url(request, 'fire_scenario', scenario_id=s.id) }}?sensitivity=1#sensitivity" class="underline-offset-2 hover:underline" data-fire-comparison-link="{{ s.id }}">{{ s.name }}</a>
+            {% if s.is_default %}{{ badge(_("Default"), "primary") }}{% endif %}
+            {% if s.archived %}{{ badge(_("Archived")) }}{% endif %}
+            {% if s.linked %}{{ badge(_("Linked"), "success") }}{% endif %}
+          </th>
+          <td class="whitespace-nowrap px-3 py-2 text-muted">{{ _("Age %(age)d in %(year)d", age=s.age_at_start, year=s.start_year) }}</td>
+          <td class="px-3 py-2">
+            {% if row.blocked %}
+            <span class="font-medium text-danger-strong" data-fire-comparison-status="blocked">{{ _("Unavailable") }}</span>
+            {% elif row.never %}
+            <span class="font-medium text-warning-strong" data-fire-comparison-status="never">{{ _("Never before age %(age)d", age=s.horizon_age) }}</span>
+            {% else %}
+            <span class="font-medium text-success-strong" data-fire-comparison-status="fire">{{ _("FIRE reached") }}</span>
+            {% endif %}
+          </td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums" data-fire-comparison-fire-age>{% if row.fire_age is not none %}{{ row.fire_age }}{% else %}—{% endif %}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums" data-fire-comparison-fire-year>{% if row.fire_year is not none %}{{ row.fire_year }}{% else %}—{% endif %}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums" data-fire-comparison-years>{% if row.years_to_fire is not none %}{{ row.years_to_fire }}{% else %}—{% endif %}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums" data-fire-comparison-networth>{% if row.real_networth_at_fire is not none %}{{ format_money(row.real_networth_at_fire, locale) }}{% else %}—{% endif %}</td>
+          <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums" data-fire-comparison-depletion>
+            {% if row.blocked %}—
+            {% elif row.depletion_age is not none %}{{ _("Age %(age)d", age=row.depletion_age) }}
+            {% elif row.depletion_checked %}<span title="{{ _('The portfolio lasts to the horizon.') }}" data-fire-comparison-depletion-not-reached>—</span>
+            {% else %}<span title="{{ _('No years after income stops fall inside the horizon, so depletion was not checked.') }}" data-fire-comparison-depletion-unchecked>—</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% if row.blocked %}
+        <tr class="border-t border-line bg-danger-soft" data-fire-comparison-block-row="{{ s.id }}">
+          <td colspan="8" class="px-3 py-3">
+            <ul class="space-y-1 text-sm text-danger-strong">
+              {% for block in row.blocks %}
+              <li data-fire-comparison-block="{{ block.code }}" data-fire-comparison-block-field="{{ block.field }}">{{ block_messages.get(block.code, _("The linked input could not be resolved.")) }}{% if block.detail %} <span class="text-muted">({{ block.detail }})</span>{% endif %}</li>
+              {% endfor %}
+            </ul>
+            <a href="{{ scoped_url(request, 'fire_scenario', scenario_id=s.id) }}?edit=1#inputs" class="btn-sm mt-2">{{ _("Open plan inputs") }}</a>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="mt-3 text-sm text-muted">{{ _("Net worth at FIRE is always in today's money. The chart follows the selected basis.") }}</p>
+</section>
+
+<section class="panel mb-6 p-6 sm:p-7" aria-labelledby="fire-comparison-chart-heading" data-fire-comparison-chart>
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <h2 id="fire-comparison-chart-heading" class="text-base font-semibold">{{ _("Net worth over time by scenario") }}</h2>
+      <p class="mt-1 text-xs text-muted">{% if basis == "real" %}{{ _("In today's money.") }}{% else %}{{ _("In each year's money.") }}{% endif %}</p>
+    </div>
+    {% set active_basis_class = "rounded-lg px-3 py-1.5 text-sm font-medium bg-primary-soft text-primary-ink" %}
+    {% set inactive_basis_class = "rounded-lg px-3 py-1.5 text-sm font-medium text-muted hover:bg-subtle" %}
+    <div class="inline-flex rounded-xl border border-line bg-surface p-1" role="group" aria-label="{{ _('Money basis') }}" data-fire-comparison-basis>
+      <a href="{{ nominal_url }}" class="{{ active_basis_class if basis == 'nominal' else inactive_basis_class }}"{% if basis == 'nominal' %} aria-current="true"{% endif %} data-fire-comparison-basis-link="nominal">{{ _("Each year's money") }}</a>
+      <a href="{{ real_url }}" class="{{ active_basis_class if basis == 'real' else inactive_basis_class }}"{% if basis == 'real' %} aria-current="true"{% endif %} data-fire-comparison-basis-link="real">{{ _("Today's money") }}</a>
+    </div>
+  </div>
+  {% if chart and chart.data %}
+  <div class="mt-3" data-chart="line" data-chart-json='{{ chart.data|tojson }}'>
+    <div class="h-80 w-full" hidden aria-hidden="true" data-chart-canvas></div>
+  </div>
+  <details class="mt-3" data-fire-comparison-points>
+    <summary class="cursor-pointer text-sm font-medium text-muted">{{ _("Plotted data") }}</summary>
+    <div class="mt-3 overflow-x-auto">
+      <table class="sheet w-full text-sm">
+        <caption class="sr-only">{{ _("Plotted scenario net worth data") }}</caption>
+        <thead>
+          <tr class="text-left text-xs text-muted">
+            <th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Year") }}</th>
+            {% for series in chart.series %}<th scope="col" class="py-1.5 pr-3 text-right font-medium">{{ series.name }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for point in chart.points %}
+          <tr>
+            <th scope="row" class="py-1.5 pr-3 text-left font-normal tabular-nums">{{ point.year }}</th>
+            {% for value in point.values %}<td class="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{{ value }}</td>{% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </details>
+  {% else %}
+  <p class="mt-4 border border-line bg-subtle px-4 py-3 text-sm text-muted" data-fire-comparison-chart-empty>{{ _("No selected scenario can be plotted. Fix the blocked plans or select another scenario.") }}</p>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}
+{% block scripts %}
+{% if chart and chart.data %}{% include "macros/chart_scripts.html" %}{% endif %}
+{% endblock %}

@@ -4,6 +4,9 @@
 {% block title %}{{ _("FIRE planner") }} · {{ app_name }}{% endblock %}
 {% block heading %}{{ _("FIRE planner") }}{% endblock %}
 {% block header_actions %}
+{% if scenarios.active or scenarios.archived %}
+<a href="{{ scoped_url(request, 'fire_compare') }}" class="btn" data-fire-compare-link>{{ _("Compare scenarios") }}</a>
+{% endif %}
 {% if can_edit %}
 <a href="{{ scoped_url(request, 'fire_scenario_new') }}" class="btn-primary" data-fire-new>{{ _("New scenario") }}</a>
 {% endif %}

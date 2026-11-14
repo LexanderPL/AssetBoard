@@ -1,0 +1,14 @@
+<section id="sensitivity" class="mt-6" aria-labelledby="sensitivity-heading" data-fire-sensitivity>
+  <div class="panel p-6 sm:p-7">
+    <h2 id="sensitivity-heading" class="text-base font-semibold">{{ _("Sensitivity") }}</h2>
+    <p class="mt-1 text-sm text-muted">{{ _("See how the FIRE age changes when the real return moves in one-percentage-point steps or expenses move in ten-percent steps.") }}</p>
+    <div id="fire-sensitivity" data-fire-sensitivity-content>
+      {% if sensitivity_loaded %}
+      {% include "fire/_sensitivity.html" %}
+      {% else %}
+      <p class="mt-4 text-sm text-muted" data-fire-sensitivity-note>{{ _("Based on the saved plan; unsaved changes are not included.") }}</p>
+      <a href="{{ sensitivity_page_url }}" class="btn-primary mt-3" hx-get="{{ sensitivity_fragment_url }}" hx-target="#fire-sensitivity" hx-swap="innerHTML" data-fire-sensitivity-load>{{ _("Show sensitivity grid") }}</a>
+      {% endif %}
+    </div>
+  </div>
+</section>

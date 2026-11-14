@@ -2609,6 +2609,14 @@ msgstr "Wydatki"
 msgid "Investment gain"
 msgstr "Zysk z inwestycji"
 
+#, python-format
+msgid "%(name)s (archived)"
+msgstr "%(name)s (zarchiwizowana)"
+
+#, python-format
+msgid "%(name)s: FIRE at age %(age)d"
+msgstr "%(name)s: FIRE w wieku %(age)d"
+
 msgid "Enter a name of 1 to 200 characters."
 msgstr "Podaj nazwę o długości od 1 do 200 znaków."
 
@@ -2813,6 +2821,58 @@ msgstr ""
 msgid "The scenario could not be saved. Reload the page and try again."
 msgstr "Nie udało się zapisać scenariusza. Odśwież stronę i spróbuj ponownie."
 
+msgid "Compare at most three scenarios at a time."
+msgstr "Porównuj najwyżej trzy scenariusze jednocześnie."
+
+msgid ""
+"The selected scenarios use different currencies. Choose scenarios that "
+"share one currency; there is no currency conversion in the comparison."
+msgstr ""
+"Wybrane scenariusze używają różnych walut. Wybierz scenariusze o tej "
+"samej walucie; porównanie nie przelicza walut."
+
+msgid "The sensitivity axes are empty."
+msgstr "Osie analizy wrażliwości są puste."
+
+msgid "The sensitivity axes contain an invalid value."
+msgstr "Osie analizy wrażliwości zawierają nieprawidłową wartość."
+
+msgid "The sensitivity axes contain a duplicate value."
+msgstr "Osie analizy wrażliwości zawierają powtórzoną wartość."
+
+msgid "The sensitivity axes have too many values."
+msgstr "Osie analizy wrażliwości mają zbyt wiele wartości."
+
+msgid "The sensitivity grid has too many cells."
+msgstr "Siatka analizy wrażliwości ma zbyt wiele komórek."
+
+msgid "The sensitivity axes must include the saved plan."
+msgstr "Osie analizy wrażliwości muszą obejmować zapisany plan."
+
+msgid ""
+"The real-return range would leave the supported -20 to 50 percent bounds."
+" Adjust the scenario's return and try again."
+msgstr ""
+"Zakres realnej stopy zwrotu wykroczyłby poza obsługiwane granice od -20 "
+"do 50 procent. Zmień stopę zwrotu scenariusza i spróbuj ponownie."
+
+msgid ""
+"The expense range is outside the supported 0 to 1000 percent of the saved"
+" plan."
+msgstr ""
+"Zakres wydatków wykracza poza obsługiwane od 0 do 1000 procent zapisanego"
+" planu."
+
+msgid ""
+"The expense range would exceed the supported amount. Reduce the starting "
+"expenses and try again."
+msgstr ""
+"Zakres wydatków przekroczyłby obsługiwaną kwotę. Zmniejsz wydatki "
+"początkowe i spróbuj ponownie."
+
+msgid "The sensitivity grid could not be calculated."
+msgstr "Nie udało się obliczyć siatki analizy wrażliwości."
+
 msgid "Scenario created."
 msgstr "Utworzono scenariusz."
 
@@ -2857,6 +2917,44 @@ msgstr "roczne wydatki"
 
 msgid "starting portfolio"
 msgstr "portfel początkowy"
+
+#, python-format
+msgid "%(value)s pp"
+msgstr "%(value)s p.p."
+
+#, python-format
+msgid "Never before age %(horizon)d; real return %(rate)s; expenses %(factor)s"
+msgstr ""
+"Nigdy przed wiekiem %(horizon)d; realna stopa zwrotu %(rate)s; wydatki "
+"%(factor)s"
+
+#, python-format
+msgid ""
+"No FIRE before age %(horizon)d with a real return of %(rate)s and "
+"expenses at %(factor)s of the saved plan."
+msgstr ""
+"Brak FIRE przed wiekiem %(horizon)d przy realnej stopie zwrotu %(rate)s i"
+" wydatkach na poziomie %(factor)s zapisanego planu."
+
+#, python-format
+msgid "Age %(age)d in %(year)d; real return %(rate)s; expenses %(factor)s"
+msgstr "Wiek %(age)d w %(year)d; realna stopa zwrotu %(rate)s; wydatki %(factor)s"
+
+#, python-format
+msgid ""
+"Base case: FIRE at age %(age)d in %(year)d with a real return of %(rate)s"
+" and expenses at %(factor)s of the saved plan."
+msgstr ""
+"Przypadek bazowy: FIRE w wieku %(age)d w %(year)d przy realnej stopie "
+"zwrotu %(rate)s i wydatkach na poziomie %(factor)s zapisanego planu."
+
+#, python-format
+msgid ""
+"FIRE at age %(age)d in %(year)d with a real return of %(rate)s and "
+"expenses at %(factor)s of the saved plan."
+msgstr ""
+"FIRE w wieku %(age)d w %(year)d przy realnej stopie zwrotu %(rate)s i "
+"wydatkach na poziomie %(factor)s zapisanego planu."
 
 msgid "This request came from another site and was blocked."
 msgstr "To żądanie pochodziło z innej witryny i zostało zablokowane."
@@ -3466,10 +3564,6 @@ msgstr "Najpierw dodaj kategorię wydatków."
 
 msgid "Add an income category first."
 msgstr "Najpierw dodaj kategorię przychodów."
-
-#, python-format
-msgid "%(name)s (archived)"
-msgstr "%(name)s (zarchiwizowana)"
 
 #, python-format
 msgid "Rate change: %(rate)s"
@@ -6598,6 +6692,78 @@ msgstr ""
 "Prognozy mają charakter poglądowy i nie stanowią porady finansowej. "
 "Prognoza zakłada stałe stopy i brak podatków; rzeczywistość będzie inna."
 
+msgid "Based on the saved plan; unsaved changes are not included."
+msgstr "Na podstawie zapisanego planu; niezapisane zmiany nie są uwzględniane."
+
+msgid "The sensitivity grid is unavailable while the projection is blocked."
+msgstr ""
+"Siatka analizy wrażliwości jest niedostępna, dopóki prognoza jest "
+"zablokowana."
+
+msgid "Open plan inputs"
+msgstr "Otwórz dane planu"
+
+msgid "Sensitivity grid"
+msgstr "Siatka analizy wrażliwości"
+
+msgid "FIRE age by real return and expenses as a percentage of the saved plan"
+msgstr ""
+"Wiek FIRE według realnej stopy zwrotu i wydatków jako procentu zapisanego"
+" planu"
+
+#, python-format
+msgid "Expenses (%% of saved plan)"
+msgstr "Wydatki (%% zapisanego planu)"
+
+msgid "base"
+msgstr "baza"
+
+msgid ""
+"Each cell shows the FIRE age. Better means earlier than the saved plan; "
+"worse means later. A dash means FIRE is never reached before the horizon."
+msgstr ""
+"Każda komórka pokazuje wiek FIRE. Lepiej oznacza wcześniej niż w "
+"zapisanym planie, gorzej — później. Kreska oznacza, że FIRE nie zostanie "
+"osiągnięte przed horyzontem."
+
+msgid "Earlier than the saved plan"
+msgstr "Wcześniej niż w zapisanym planie"
+
+msgid "Saved plan (base case)"
+msgstr "Zapisany plan (przypadek bazowy)"
+
+msgid "Same age as the saved plan"
+msgstr "Ten sam wiek co w zapisanym planie"
+
+msgid "Later than the saved plan"
+msgstr "Później niż w zapisanym planie"
+
+msgid "Never reaches FIRE before the horizon"
+msgstr "Nie osiąga FIRE przed horyzontem"
+
+msgid "Refresh grid"
+msgstr "Odśwież siatkę"
+
+msgid ""
+"The grid always uses the saved inputs, including linked values and "
+"exclusions."
+msgstr ""
+"Siatka zawsze używa zapisanych danych, w tym wartości powiązanych i "
+"wykluczeń."
+
+msgid "Sensitivity"
+msgstr "Wrażliwość"
+
+msgid ""
+"See how the FIRE age changes when the real return moves in one-"
+"percentage-point steps or expenses move in ten-percent steps."
+msgstr ""
+"Zobacz, jak zmienia się wiek FIRE, gdy realna stopa zwrotu zmienia się o "
+"jeden punkt procentowy, a wydatki o dziesięć procent."
+
+msgid "Show sensitivity grid"
+msgstr "Pokaż siatkę analizy wrażliwości"
+
 msgid "Year by year"
 msgstr "Rok po roku"
 
@@ -6643,8 +6809,121 @@ msgstr ""
 "Wiersze FIRE są wyróżnione. Wiersze po zakończeniu dochodów są wyciszone;"
 " wyczerpany wiersz jest oznaczony na czerwono."
 
+msgid "Compare scenarios"
+msgstr "Porównaj scenariusze"
+
 msgid "All scenarios"
 msgstr "Wszystkie scenariusze"
+
+msgid ""
+"Choose up to three saved scenarios. Their FIRE metrics and net worth are "
+"shown side by side; archived scenarios can be compared too."
+msgstr ""
+"Wybierz do trzech zapisanych scenariuszy. Ich metryki FIRE i wartość "
+"netto są pokazane obok siebie; można porównywać także zarchiwizowane "
+"scenariusze."
+
+msgid "Active scenarios"
+msgstr "Aktywne scenariusze"
+
+msgid "Default"
+msgstr "Domyślny"
+
+msgid "Linked"
+msgstr "Powiązane"
+
+#, python-format
+msgid "Age %(age)d in %(year)d"
+msgstr "Wiek %(age)d w %(year)d"
+
+msgid "Archived scenarios"
+msgstr "Zarchiwizowane scenariusze"
+
+msgid "Compare selected"
+msgstr "Porównaj wybrane"
+
+msgid "With nothing selected, the default scenario is shown."
+msgstr "Gdy nic nie wybrano, pokazywany jest domyślny scenariusz."
+
+msgid "No scenarios to compare yet."
+msgstr "Nie ma jeszcze scenariuszy do porównania."
+
+msgid "Open the FIRE planner"
+msgstr "Otwórz planer FIRE"
+
+msgid ""
+"These scenarios start in different years. Today's-money values are "
+"anchored to each scenario's start year, so compare them with care."
+msgstr ""
+"Te scenariusze zaczynają się w różnych latach. Wartości w dzisiejszych "
+"pieniądzach są zakotwiczone w roku rozpoczęcia każdego scenariusza, więc "
+"porównuj je ostrożnie."
+
+msgid "Scenario comparison"
+msgstr "Porównanie scenariuszy"
+
+#, python-format
+msgid "%(num)d scenario selected"
+msgid_plural "%(num)d scenarios selected"
+msgstr[0] "%(num)d wybrany scenariusz"
+msgstr[1] "%(num)d wybrane scenariusze"
+msgstr[2] "%(num)d wybranych scenariuszy"
+
+msgid "FIRE results by scenario"
+msgstr "Wyniki FIRE według scenariuszy"
+
+msgid "Scenario"
+msgstr "Scenariusz"
+
+msgid "Start"
+msgstr "Początek"
+
+msgid "Net worth at FIRE (today's money)"
+msgstr "Wartość netto na FIRE (w dzisiejszych pieniądzach)"
+
+msgid "Depletion age"
+msgstr "Wiek wyczerpania"
+
+msgid "Unavailable"
+msgstr "Niedostępny"
+
+#, python-format
+msgid "Never before age %(age)d"
+msgstr "Nigdy przed wiekiem %(age)d"
+
+msgid "FIRE reached"
+msgstr "Osiągnięto FIRE"
+
+#, python-format
+msgid "Age %(age)d"
+msgstr "Wiek %(age)d"
+
+msgid ""
+"No years after income stops fall inside the horizon, so depletion was not"
+" checked."
+msgstr ""
+"Żadne lata po zakończeniu dochodów nie mieszczą się w horyzoncie, więc "
+"nie sprawdzono wyczerpania."
+
+msgid ""
+"Net worth at FIRE is always in today's money. The chart follows the "
+"selected basis."
+msgstr ""
+"Wartość netto na FIRE jest zawsze w dzisiejszych pieniądzach. Wykres "
+"podąża za wybranym sposobem prezentacji."
+
+msgid "Net worth over time by scenario"
+msgstr "Wartość netto w czasie według scenariuszy"
+
+msgid "Plotted scenario net worth data"
+msgstr "Dane wykresu wartości netto scenariuszy"
+
+msgid ""
+"No selected scenario can be plotted. Fix the blocked plans or select "
+"another scenario."
+msgstr ""
+"Żadnego z wybranych scenariuszy nie można narysować. Napraw zablokowane "
+"plany lub wybierz inny scenariusz."
 
 msgid "Open your profile"
 msgstr "Otwórz swój profil"
@@ -6676,22 +6955,12 @@ msgstr ""
 "prognozy pojawią się w późniejszej aktualizacji; teraz scenariusz "
 "zapisuje i sprawdza plan."
 
-msgid "Active scenarios"
-msgstr "Aktywne scenariusze"
-
 #, python-format
 msgid "%(num)d active scenario"
 msgid_plural "%(num)d active scenarios"
 msgstr[0] "%(num)d aktywny scenariusz"
 msgstr[1] "%(num)d aktywne scenariusze"
 msgstr[2] "%(num)d aktywnych scenariuszy"
-
-msgid "Default"
-msgstr "Domyślny"
-
-#, python-format
-msgid "Age %(age)d in %(year)d"
-msgstr "Wiek %(age)d w %(year)d"
 
 msgid "Horizon"
 msgstr "Horyzont"
@@ -6740,9 +7009,6 @@ msgstr "Utwórz scenariusz, aby zapisać założenia. Pierwszy stanie się domy�
 msgid "An editor or owner of this workspace can add scenarios."
 msgstr "Scenariusze może dodawać edytor lub właściciel tego obszaru roboczego."
 
-msgid "Archived scenarios"
-msgstr "Zarchiwizowane scenariusze"
-
 msgid ""
 "Archived scenarios are read-only and keep their inputs. Restore one to "
 "edit it again."
@@ -6753,6 +7019,9 @@ msgstr ""
 #, python-format
 msgid "archived %(date)s"
 msgstr "zarchiwizowano %(date)s"
+
+msgid "Compare"
+msgstr "Porównaj"
 
 #, python-format
 msgid "Start year %(year)d · age %(age)d at the start · currency %(currency)s"
@@ -9644,12 +9913,6 @@ msgid ""
 msgstr ""
 "Porównanie i wykres są ukryte, dopóki warunki kredytu nie pozwolą "
 "zbudować harmonogramu."
-
-msgid "Scenario comparison"
-msgstr "Porównanie scenariuszy"
-
-msgid "Scenario"
-msgstr "Scenariusz"
 
 msgid "Months saved vs baseline"
 msgstr "Zaoszczędzone miesiące wzgl. bazy"

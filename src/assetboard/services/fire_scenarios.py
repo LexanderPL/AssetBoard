@@ -20,7 +20,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session, sessionmaker
 
 from assetboard.db.engine import run_immediate
-from assetboard.db.models.fire import FireScenario
+from assetboard.db.models.fire import FireContribution, FireEvent, FireScenario
 from assetboard.db.models.identity import User
 from assetboard.db.repositories import (
     AuditEventRepository,
@@ -29,6 +29,7 @@ from assetboard.db.repositories import (
     FireEventRepository,
     FireExpenseExclusionRepository,
     FireScenarioRepository,
+    NotFound,
 )
 from assetboard.domain.fire import (
     DEFAULT_LIFE_EXPECTANCY,
@@ -187,6 +188,15 @@ class FireScenarioView:
     def stop_after_horizon(self) -> bool:
         """Work continues past the horizon: allowed, shown as a non-blocking warning."""
         return self.stop_working_age > self.horizon_age
+
+    @property
+    def linked(self) -> bool:
+        """Whether any starting value comes from the app's own data (F8.4)."""
+        return (
+            self.income_mode != "manual"
+            or self.expenses_mode != "manual"
+            or self.portfolio_mode != "manual"
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -689,40 +699,82 @@ def list_fire_scenarios(factory: sessionmaker[Session], ctx: Context) -> FireSce
     )
 
 
+def _detail(
+    row: FireScenario,
+    contributions: tuple[FireContribution, ...],
+    events: tuple[FireEvent, ...],
+    exclusion_category_ids: tuple[UUID, ...],
+) -> FireScenarioDetail:
+    currency = row.currency
+    return FireScenarioDetail(
+        scenario=_view(row, contribution_count=len(contributions), event_count=len(events)),
+        contributions=tuple(
+            ContributionView(
+                id=item.id,
+                year=item.year,
+                amount=Money(item.net_amount_minor, currency),
+            )
+            for item in contributions
+        ),
+        events=tuple(
+            EventView(
+                id=item.id,
+                year=item.year,
+                kind=item.kind,
+                amount=Money(item.amount_minor, currency),
+                label=item.label,
+                source_loan_id=item.source_loan_id,
+            )
+            for item in events
+        ),
+        expense_exclusion_ids=exclusion_category_ids,
+    )
+
+
+def details_in_session(
+    session: Session, ctx: Context, scenario_ids: tuple[UUID, ...]
+) -> tuple[FireScenarioDetail, ...]:
+    """Bulk-load details for several scenarios: four queries, ordered like ``scenario_ids``.
+
+    A missing id, including one from another workspace, raises :class:`NotFound` before any
+    detail is built. Child rows are loaded for all scenarios at once, so the query count does
+    not grow with the number of contribution or event rows (F8.5 comparison).
+    """
+    _require_viewer(ctx)
+    if not scenario_ids:
+        return ()
+    rows = {row.id: row for row in FireScenarioRepository(session, ctx).by_ids(scenario_ids)}
+    for scenario_id in scenario_ids:
+        if scenario_id not in rows:
+            raise NotFound
+
+    contributions: dict[UUID, list[FireContribution]] = {}
+    for row in FireContributionRepository(session, ctx).for_scenarios(scenario_ids):
+        contributions.setdefault(row.scenario_id, []).append(row)
+    events: dict[UUID, list[FireEvent]] = {}
+    for row in FireEventRepository(session, ctx).for_scenarios(scenario_ids):
+        events.setdefault(row.scenario_id, []).append(row)
+    exclusions: dict[UUID, list[UUID]] = {}
+    for row in FireExpenseExclusionRepository(session, ctx).for_scenarios(scenario_ids):
+        exclusions.setdefault(row.scenario_id, []).append(row.category_id)
+
+    return tuple(
+        _detail(
+            rows[scenario_id],
+            tuple(contributions.get(scenario_id, ())),
+            tuple(events.get(scenario_id, ())),
+            tuple(exclusions.get(scenario_id, ())),
+        )
+        for scenario_id in scenario_ids
+    )
+
+
 def get_fire_scenario(
     factory: sessionmaker[Session], ctx: Context, scenario_id: UUID
 ) -> FireScenarioDetail:
     """One scenario with its contribution overrides and events; viewers may read it."""
-    _require_viewer(ctx)
     with factory() as session:
-        row = FireScenarioRepository(session, ctx).get_or_raise(scenario_id)
-        contributions = FireContributionRepository(session, ctx).for_scenario(row.id)
-        events = FireEventRepository(session, ctx).for_scenario(row.id)
-        exclusions = FireExpenseExclusionRepository(session, ctx).for_scenario(row.id)
-        view = _view(row, contribution_count=len(contributions), event_count=len(events))
-        return FireScenarioDetail(
-            scenario=view,
-            contributions=tuple(
-                ContributionView(
-                    id=item.id,
-                    year=item.year,
-                    amount=Money(item.net_amount_minor, row.currency),
-                )
-                for item in contributions
-            ),
-            events=tuple(
-                EventView(
-                    id=item.id,
-                    year=item.year,
-                    kind=item.kind,
-                    amount=Money(item.amount_minor, row.currency),
-                    label=item.label,
-                    source_loan_id=item.source_loan_id,
-                )
-                for item in events
-            ),
-            expense_exclusion_ids=tuple(item.category_id for item in exclusions),
-        )
+        return details_in_session(session, ctx, (scenario_id,))[0]
 
 
 def create_fire_scenario(
@@ -930,6 +982,7 @@ __all__ = [
     "ValidatedScenario",
     "archive_fire_scenario",
     "create_fire_scenario",
+    "details_in_session",
     "duplicate_fire_scenario",
     "get_fire_scenario",
     "list_fire_scenarios",
