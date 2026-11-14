@@ -68,7 +68,8 @@ untouched, unused and seeded automatically, they are removed before the archive'
 categories are written. The suggested asset classes follow the same rule: untouched, unused and
 seeded automatically, they are removed before the archive's classes are written. Edited
 categories, items, values, snapshots or asset classes make the workspace non-empty. FIRE
-scenarios and their rows do too, because a 1.6 archive cannot carry them.
+scenarios and their rows do too: a restore replaces the workspace's data rather than merging
+it.
 
 Restore writes, all at once:
 
