@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.3](https://github.com/LexanderPL/AssetBoard/compare/v0.7.2...v0.7.3) (2026-11-14)
+
+
+### Features
+
+* **networth:** edit value-history entries ([#327](https://github.com/LexanderPL/AssetBoard/issues/327)) ([a8236a2](https://github.com/LexanderPL/AssetBoard/commit/a8236a2c6bbee0dea97ff3104b6a8dacd2ad181c))
+
 ## [0.7.2](https://github.com/LexanderPL/AssetBoard/compare/v0.7.1...v0.7.2) (2026-11-14)
 
 
