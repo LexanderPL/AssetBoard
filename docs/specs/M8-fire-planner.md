@@ -240,11 +240,16 @@ live recalculation via HTMX with debounce. The UI calls the service that calls p
   and counts them (no update); scenarios reconcile exclusions by category id, duplication copies
   them, and archive/restore keeps them. The table is in `EMPTINESS_CHECKS` and excluded from the
   archive format until F8.6 and from the demo; the auth workspace-table allowlist, tenant factory
-  and coverage, and migration upgrade/downgrade tests include it.
+  and coverage, and migration upgrade/downgrade tests include it. The same revision adds
+  `fire_events.source_loan_id` (nullable, indexed, composite foreign key to
+  `loans(workspace_id, id)` with `RESTRICT` because a composite `SET NULL` would also clear the
+  non-null `workspace_id`, and loans are archived rather than hard-deleted).
 - `services.fire_linked` resolves linked inputs inside one request/session without per-row N+1.
   The trailing window is the twelve complete months before the current month (the partial month
   is excluded). Only non-deleted rows in regular expense/income categories count; savings and
-  transfers do not. Distinct months with included rows drive the annualization
+  transfers do not. Linked income is all regular income, including investment dividends and
+  interest (the ledger has no earned/passive flag). Distinct months with included rows drive the
+  annualization
   (`total × 12 / months`, one half-up rounding), so gaps are not zero months. Zero months block
   (`no_income_data` / `no_expense_data`); any other ledger currency blocks
   (`ledger_currency_mismatch`). Warnings cover scaled months, data older than the window and a
@@ -278,10 +283,14 @@ live recalculation via HTMX with debounce. The UI calls the service that calls p
   States are `available`, `already_paid_off`, `archived` (no card), `schedule_error`,
   `out_of_window`, `currency_mismatch`, `amount_invalid` and `already_added`. One-click
   `POST /fire/{id}/loan-payoff` is a full POST outside the preview form: CSRF, editor-only,
-  `require_role_now` under the workspace lock, archived refusal, idempotent by year/kind/
-  generated label and audited as `fire_scenario.loan_payoff_event` with the loan name and year
-  only. It creates `expense_change` at the payoff year with the negative annual amount and the
-  label “Loan repaid: <name>”; the UI warns that unsaved Plan-input edits are discarded.
+  `require_role_now` under the workspace lock, archived refusal, and audited as
+  `fire_scenario.loan_payoff_event` with the loan name and year only. It creates
+  `expense_change` at the payoff year with the negative annual amount, the label
+  “Loan repaid: <name>” in the acting user's locale (or the workspace's) truncated to the
+  200-character event-label limit, and `source_loan_id`. Idempotency uses that loan lineage, not
+  the translated label; duplication and editing preserve it and deleting the event makes the
+  suggestion available again. The UI warns that unsaved Plan-input edits are discarded, and
+  notes that suggestions use the saved plan and loan schedules as of the page load.
 - The form enables the three source selects (Manual / Last 12 full months / Investable assets),
   renders manual amounts as not required and disabled for linked modes (server-validated, with
   `fire.js` as progressive enhancement), adds the exclusion checkbox list with colour and
@@ -299,7 +308,9 @@ live recalculation via HTMX with debounce. The UI calls the service that calls p
 **Acceptance**
 - `portfolio_mode=linked_investable`: starting portfolio = value of investable portfolio classes (M6, look-through) + net-worth items flagged `investable` (e.g., cash savings), in base currency, as of today. Shows the breakdown and a link to each source.
 - `expenses_mode=trailing_12m`: last 12 **full** months of expense transactions with `treatment=regular` (savings and transfers excluded), shown with per-category breakdown; one-off "unusual" transactions can be excluded by the user via a per-scenario exclusion list of categories.
-- `income_mode=trailing_12m`: earned income over the same window (regular treatment). Fewer than 12 months of data → use available months scaled, with a visible warning.
+- `income_mode=trailing_12m`: all regular income over the same window (including investment
+  dividends and interest; the ledger has no earned/passive flag). Fewer than 12 months of data →
+  use available months scaled, with a visible warning.
 - **Loan payoff suggestion:** for each loan (M7) show "Payoff in <year> frees <amount>/year (today's money)"; one click creates an `expense_change` event (negative expense change) for that year.
 - Linked values display "as of" timestamps and never silently fall back to zero: missing data → blocking message in the scenario header.
 
@@ -337,7 +348,8 @@ decision, 2026-10-18). A scenario from a spreadsheet is entered with the F8.1 fo
 **Acceptance**
 - New archive files (a minor format version per ADR-0016) with lineage `id` columns as in M4:
   `fire_scenarios.csv`, `fire_contributions.csv`, `fire_events.csv`; links to other modules'
-  data by lineage id.
+  data by lineage id. `fire_events.csv` also carries the optional `source_loan_id` lineage
+  (F8.4) so a restored one-click payoff event keeps its loan link and stays idempotent.
 - Restore only (no standalone import); a scenario whose linked data is missing is restored with
   manual values and listed.
 - The new models join `EMPTINESS_CHECKS`; the M4 round-trip test covers them, and `project()`

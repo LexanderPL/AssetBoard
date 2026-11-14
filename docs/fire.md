@@ -28,9 +28,9 @@ Archived scenarios stay visible under **Archived scenarios**.
   scenario without changing the profile. If it is missing, the form links to your profile.
 - **Horizon age** is the last age in the projection. It defaults from your profile's life
   expectancy (90 when the profile has none).
-- **Income stops at age** ends earned income; from then on the plan spends from the portfolio.
-  It cannot be before your age at the start. A stop age after the horizon is allowed and marked
-  with a warning.
+- **Income stops at age** ends the yearly income series; from then on the plan spends from the
+  portfolio. It cannot be before your age at the start. A stop age after the horizon is allowed
+  and marked with a warning.
 
 ## Rates
 
@@ -50,7 +50,8 @@ are illustrative examples, not recommendations.
 Annual income, annual expenses and the starting portfolio can be entered manually in the plan
 currency and in today's money, or read from the app's own data. The currency is snapshotted
 from the workspace base currency when the scenario is created. Manual amounts cannot be
-negative; a linked mode stores no manual amount.
+negative; a linked mode stores no manual amount. Annual income is all **regular** income:
+earnings, dividends and interest, not only salary.
 
 - **Income → Last 12 full months** sums every income transaction with the **regular** treatment
   in the last twelve complete calendar months. Savings withdrawals and transfers are excluded.
@@ -98,9 +99,12 @@ amount is the sum of the next up to twelve contractual payments (interest, princ
 without overpayments), not the next instalment multiplied by twelve. **Add payoff event** saves
 the event immediately, after a confirmation that unsaved changes in **Plan inputs** will be
 lost. The button needs an editor and an active scenario, is CSRF-protected, and is idempotent:
-adding the same loan payoff again leaves one event. Loans already paid off, in another currency,
-whose schedule cannot be calculated or whose payoff falls outside the plan window are shown with
-a short explanation instead of a button; archived loans are not suggested.
+the event remembers which loan it came from, so adding the same loan payoff again leaves one
+event in every interface language. The stored label is written in your interface language.
+Loans already paid off, in another currency, whose schedule cannot be calculated or whose payoff
+falls outside the plan window are shown with a short explanation instead of a button; archived
+loans are not suggested. Suggestions are read from the saved plan and loan schedules when the
+page loads; unsaved Plan-input changes do not update them.
 
 ## Contribution overrides
 
