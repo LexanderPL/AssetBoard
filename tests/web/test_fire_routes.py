@@ -120,15 +120,19 @@ def test_create_edit_duplicate_default_archive_and_restore(owner) -> None:
     assert "Mortgage repaid" in detail.text
     assert "data-fire-contributions" in detail.text and "12,000" in detail.text
 
-    edit = owner.client.get(f"/fire/{scenario_id}/edit")
-    assert edit.status_code == 200
-    assert 'value="Retire at 55"' in edit.text
-    assert 'value="12000' in edit.text
+    edit = owner.client.get(f"/fire/{scenario_id}/edit", follow_redirects=False)
+    assert edit.status_code == 303
+    assert edit.headers["location"] == f"/fire/{scenario_id}?edit=1#inputs"
+    combined = owner.client.get(edit.headers["location"])
+    assert combined.status_code == 200
+    assert "data-fire-results" in combined.text
+    assert 'value="Retire at 55"' in combined.text
+    assert 'value="12000' in combined.text
 
     response = owner.post(
         f"/fire/{scenario_id}",
         _form(name="Retire at 56", stop_working_age="56"),
-        token_from=f"/fire/{scenario_id}/edit",
+        token_from=f"/fire/{scenario_id}",
     )
     assert response.status_code == 303, response.text
     assert "Retire at 56" in owner.client.get(f"/fire/{scenario_id}").text
@@ -238,6 +242,7 @@ def test_editing_an_event_keeps_its_identity_and_another_scenario_id_is_refused(
     with owner.db() as session:
         event = session.scalars(select(FireEvent).where(FireEvent.scenario_id == scenario_id)).one()
     edit_page = owner.client.get(f"/fire/{scenario_id}/edit").text
+    assert "data-fire-results" in edit_page
     assert f'name="event_id_1" value="{event.id}"' in edit_page
 
     renamed = owner.post(
@@ -249,7 +254,7 @@ def test_editing_an_event_keeps_its_identity_and_another_scenario_id_is_refused(
             event_amount_1="100",
             event_label_1="Renamed",
         ),
-        token_from=f"/fire/{scenario_id}/edit",
+        token_from=f"/fire/{scenario_id}",
     )
     assert renamed.status_code == 303, renamed.text
     with owner.db() as session:
@@ -275,7 +280,7 @@ def test_editing_an_event_keeps_its_identity_and_another_scenario_id_is_refused(
             event_amount_1="100",
             event_label_1="Hijacked",
         ),
-        token_from=f"/fire/{scenario_id}/edit",
+        token_from=f"/fire/{scenario_id}",
     )
     assert refused.status_code == 400
     assert "no longer part of the scenario" in refused.text

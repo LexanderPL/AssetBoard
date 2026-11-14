@@ -126,8 +126,10 @@ def test_the_paste_editor_fills_bare_amounts_and_year_pairs(tmp_path: Path) -> N
                 errors = page.locator("[data-action-error]").all_text_contents()
                 assert not errors, errors
             assert page.url.startswith(f"{base}/fire/")
-            expect(page.locator("[data-fire-contributions]")).to_contain_text("500")
-            expect(page.locator("[data-fire-contributions]")).to_contain_text("2,500")
-            expect(page.locator("[data-fire-contributions] tbody tr")).to_have_count(2)
+            # The combined page shows the saved overrides in the plan-inputs editor, where input
+            # values are ungrouped; the editor keeps one empty row ready for a new contribution.
+            amounts = _values(page, "[data-contribution-rows] [data-contribution-amount]")
+            assert amounts[:2] == ["500.00", "2500.00"]
+            expect(page.locator("[data-contribution-rows] tr[data-editor-row]")).to_have_count(3)
             assert page.evaluate("window.__cspViolations") == []
             _no_page_overflow(page)
