@@ -13,6 +13,7 @@ from assetboard.domain.fire import Projection, ProjectionRow
 from assetboard.domain.money import Money
 from assetboard.i18n import gettext
 from assetboard.i18n.numbers import format_money
+from assetboard.services.fire_comparison import FireComparison, FireComparisonRow
 from assetboard.web.chart_axis import money_axis
 
 
@@ -44,7 +45,9 @@ class FireCharts:
     depletion_age: int | None
 
 
-def _amount(value: int, currency: str, locale: str) -> str:
+def _amount(value: int | None, currency: str, locale: str) -> str:
+    if value is None:
+        return "—"
     return format_money(Money(value, currency), locale)
 
 
@@ -227,6 +230,149 @@ def _expenses_gain_data(
     return data, points
 
 
+@dataclass(frozen=True, slots=True)
+class FireComparisonSeries:
+    name: str
+    color: str
+
+
+@dataclass(frozen=True, slots=True)
+class FireComparisonPoint:
+    year: str
+    values: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class FireComparisonChart:
+    data: dict[str, object] | None
+    series: tuple[FireComparisonSeries, ...]
+    points: tuple[FireComparisonPoint, ...]
+    basis: str
+    mixed_start_years: bool
+
+
+# Fixed tokens, one per selected scenario (the comparison is capped at three).
+COMPARISON_COLORS = ("primary-ink", "success", "warning-strong")
+
+
+def _comparison_label(row: FireComparisonRow, locale: str, used: set[str]) -> str:
+    """The scenario name with an archived suffix and a free duplicate suffix if needed."""
+    base = row.scenario.name
+    if row.scenario.archived:
+        base = gettext("%(name)s (archived)", locale) % {"name": base}
+    candidate = base
+    number = 2
+    while candidate in used:
+        candidate = f"{base} ({number})"
+        number += 1
+    used.add(candidate)
+    return candidate
+
+
+def build_fire_comparison_chart(
+    comparison: FireComparison, basis: str, locale: str
+) -> FireComparisonChart:
+    """Overlay the selected scenarios' net worth on the union of their calendar years.
+
+    Blocked plans are omitted (the page keeps them in the table). A series has ``None`` outside
+    its own start year and horizon, so the chart shows a gap rather than a zero. The tooltip for
+    a FIRE year names each scenario that reaches FIRE in that year. The nominal/real choice only
+    changes the plotted values; the accessible plotted-data rows carry the same formatted
+    amounts, and every label is translated and formatted here.
+    """
+    normalized = "real" if basis == "real" else "nominal"
+    entries = [row for row in comparison.rows if row.projection is not None and row.projection.rows]
+    if not entries:
+        return FireComparisonChart(
+            data=None,
+            series=(),
+            points=(),
+            basis=normalized,
+            mixed_start_years=comparison.mixed_start_years,
+        )
+    start_year = min(
+        entry.projection.inputs.start_year for entry in entries if entry.projection is not None
+    )
+    end_year = max(
+        entry.projection.rows[-1].year for entry in entries if entry.projection is not None
+    )
+    years = list(range(start_year, end_year + 1))
+    used: set[str] = set()
+    series: list[dict[str, object]] = []
+    series_meta: list[FireComparisonSeries] = []
+    amounts_by_index: list[list[str]] = [[] for _ in years]
+    all_values: list[int] = []
+    currency = entries[0].scenario.currency
+    for index, entry in enumerate(entries):
+        projection = entry.projection
+        assert projection is not None
+        name = _comparison_label(entry, locale, used)
+        color = COMPARISON_COLORS[index % len(COMPARISON_COLORS)]
+        by_year = {row.year: row for row in projection.rows}
+        values: list[int | None] = []
+        for year in years:
+            row = by_year.get(year)
+            if row is None:
+                values.append(None)
+                continue
+            values.append(
+                row.real_net_worth.amount_minor
+                if normalized == "real"
+                else row.net_worth.amount_minor
+            )
+        amounts = [_amount(value, currency, locale) for value in values]
+        for offset, amount in enumerate(amounts):
+            amounts_by_index[offset].append(amount)
+        all_values.extend(value for value in values if value is not None)
+        series.append(
+            {
+                "name": name,
+                "values": values,
+                "amounts": amounts,
+                "color": color,
+            }
+        )
+        series_meta.append(FireComparisonSeries(name=name, color=color))
+
+    tooltips: list[list[str]] = [[] for _ in years]
+    index_by_year = {year: index for index, year in enumerate(years)}
+    for series_index, entry in enumerate(entries):
+        projection = entry.projection
+        assert projection is not None
+        label = series_meta[series_index].name
+        if projection.fire_year is not None and projection.fire_age is not None:
+            tooltips[index_by_year[projection.fire_year]].append(
+                gettext("%(name)s: FIRE at age %(age)d", locale)
+                % {"name": label, "age": projection.fire_age}
+            )
+
+    low, high, step, axis_labels = money_axis(all_values, currency, locale)
+    data: dict[str, object] = {
+        "labels": [str(year) for year in years],
+        "series": series,
+        "y_min": low,
+        "y_max": high,
+        "y_interval": step,
+        "y_labels": axis_labels,
+        "tooltips": tooltips,
+        "markers": [],
+    }
+    points = tuple(
+        FireComparisonPoint(
+            year=str(years[index]),
+            values=tuple(amounts_by_index[index]),
+        )
+        for index in range(len(years))
+    )
+    return FireComparisonChart(
+        data=data,
+        series=tuple(series_meta),
+        points=points,
+        basis=normalized,
+        mixed_start_years=comparison.mixed_start_years,
+    )
+
+
 def build_fire_charts(projection: Projection | None, basis: str, locale: str) -> FireCharts:
     """Prepare both charts and their accessible tables for one projection."""
     if projection is None or not projection.rows:
@@ -258,8 +404,13 @@ def build_fire_charts(projection: Projection | None, basis: str, locale: str) ->
 
 
 __all__ = [
+    "COMPARISON_COLORS",
     "ExpensesGainPoint",
     "FireCharts",
+    "FireComparisonChart",
+    "FireComparisonPoint",
+    "FireComparisonSeries",
     "NetWorthPoint",
     "build_fire_charts",
+    "build_fire_comparison_chart",
 ]

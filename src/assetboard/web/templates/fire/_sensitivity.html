@@ -1,0 +1,75 @@
+{% set tone_class = {
+  "better": "bg-success-soft text-success-strong",
+  "same": "bg-subtle text-ink",
+  "base": "bg-primary-soft text-primary-ink ring-2 ring-inset ring-primary",
+  "worse": "bg-danger-soft text-danger-strong",
+  "never": "bg-surface text-muted"
+} %}
+{% set default_tone_class = "bg-surface text-ink" %}
+
+<p class="text-sm text-muted" data-fire-sensitivity-note>{{ _("Based on the saved plan; unsaved changes are not included.") }}</p>
+
+{% if sensitivity_blocks %}
+<div role="alert" class="mt-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-fire-sensitivity-blocked>
+  <p class="font-medium">{{ _("The sensitivity grid is unavailable while the projection is blocked.") }}</p>
+  <ul class="mt-2 space-y-1">
+    {% for block in sensitivity_blocks %}
+    <li data-fire-sensitivity-block="{{ block.code }}" data-fire-sensitivity-block-field="{{ block.field }}">{{ block_messages.get(block.code, _("The linked input could not be resolved.")) }}{% if block.detail %} <span class="text-muted">({{ block.detail }})</span>{% endif %}</li>
+    {% endfor %}
+  </ul>
+  <a href="{{ sensitivity_inputs_url }}" class="btn-sm mt-3">{{ _("Open plan inputs") }}</a>
+</div>
+{% elif sensitivity_error %}
+<p role="alert" class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-sensitivity-error data-fire-sensitivity-error-code="{{ sensitivity_error_code }}">{{ sensitivity_error }}</p>
+{% elif sensitivity %}
+<div class="mt-4 overflow-x-auto" tabindex="0" role="region" aria-label="{{ _('Sensitivity grid') }}" data-fire-sensitivity-scroll>
+  <table class="sheet w-full text-sm" aria-describedby="sensitivity-legend" data-fire-sensitivity-grid>
+    <caption class="sr-only">{{ _("FIRE age by real return and expenses as a percentage of the saved plan") }}</caption>
+    <thead>
+      <tr class="text-xs text-muted">
+        <th scope="col" class="sticky left-0 z-10 bg-surface px-3 py-2 text-left font-medium">{{ _("Expenses (%% of saved plan)") }}</th>
+        {% for header in sensitivity.headers %}
+        <th scope="col" class="whitespace-nowrap px-3 py-2 text-center font-medium" data-fire-sensitivity-return="{{ header.return_delta_bp }}">
+          <span class="block tabular-nums">{{ header.rate_label }}</span>
+          <span class="block font-normal">{{ header.delta_label }}{% if header.is_base %} · {{ _("base") }}{% endif %}</span>
+        </th>
+        {% endfor %}
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in sensitivity.rows %}
+      <tr class="border-t border-line">
+        <th scope="row" class="sticky left-0 z-10 bg-surface px-3 py-2 text-left font-medium">
+          <span class="block tabular-nums">{{ row.factor_label }}</span>
+          <span class="block text-xs font-normal text-muted">{{ row.factor_delta_label }}</span>
+        </th>
+        {% for cell in row.cells %}
+        <td class="whitespace-nowrap px-3 py-2 text-center tabular-nums {{ tone_class.get(cell.tone, default_tone_class) }}"{% if cell.is_base %} data-fire-sensitivity-base{% endif %} data-fire-sensitivity-cell data-fire-sensitivity-tone="{{ cell.tone }}" title="{{ cell.title }}">
+          <span class="sr-only">{{ cell.sr_text }}</span>
+          <span aria-hidden="true">{{ cell.age_label }}</span>
+          {% if cell.is_base %}<span class="ml-1 rounded-full bg-primary px-1.5 py-0.5 text-xs font-semibold text-on-primary" aria-hidden="true">{{ _("Base") }}</span>{% endif %}
+        </td>
+        {% endfor %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+<div id="sensitivity-legend" class="mt-3" data-fire-sensitivity-legend>
+  <p class="text-sm text-muted">{{ _("Each cell shows the FIRE age. Better means earlier than the saved plan; worse means later. A dash means FIRE is never reached before the horizon.") }}</p>
+  <ul class="mt-2 flex flex-wrap gap-x-4 gap-y-2 text-xs text-muted">
+    <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 border border-success-line bg-success-soft" aria-hidden="true"></span>{{ _("Earlier than the saved plan") }}</li>
+    <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 border border-primary bg-primary-soft" aria-hidden="true"></span>{{ _("Saved plan (base case)") }}</li>
+    <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 border border-line bg-subtle" aria-hidden="true"></span>{{ _("Same age as the saved plan") }}</li>
+    <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 border border-danger-line bg-danger-soft" aria-hidden="true"></span>{{ _("Later than the saved plan") }}</li>
+    <li class="flex items-center gap-2"><span class="inline-block h-3 w-3 border border-line bg-surface" aria-hidden="true"></span>{{ _("Never reaches FIRE before the horizon") }}</li>
+  </ul>
+</div>
+{% else %}
+<p class="mt-4 border border-line bg-subtle px-4 py-3 text-sm text-muted" data-fire-sensitivity-unavailable>{{ _("The sensitivity grid could not be calculated.") }}</p>
+{% endif %}
+
+<div class="mt-4 flex flex-wrap items-center gap-3">
+  <a href="{{ sensitivity_page_url }}" class="btn-sm" hx-get="{{ sensitivity_fragment_url }}" hx-target="#fire-sensitivity" hx-swap="innerHTML" data-fire-sensitivity-refresh>{{ _("Refresh grid") }}</a>
+  <p class="text-xs text-muted">{{ _("The grid always uses the saved inputs, including linked values and exclusions.") }}</p>
+</div>

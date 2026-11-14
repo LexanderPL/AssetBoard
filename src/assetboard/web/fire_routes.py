@@ -10,6 +10,7 @@ from __future__ import annotations
 import re
 from collections.abc import Sequence
 from decimal import Decimal
+from urllib.parse import urlencode
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -18,11 +19,15 @@ from starlette.responses import RedirectResponse, Response
 
 from assetboard.db.repositories import NotFound
 from assetboard.domain.fire import (
+    DEFAULT_EXPENSE_FACTORS_BP,
+    DEFAULT_RETURN_DELTAS_BP,
     EventKind,
     ExpensesMode,
     IncomeMode,
     PortfolioMode,
     Rule,
+    SensitivityError,
+    sensitivity,
     signed_amount_minor,
 )
 from assetboard.domain.money import Money
@@ -36,13 +41,15 @@ from assetboard.i18n.numbers import (
     format_rate_short,
     parse_amount,
 )
+from assetboard.services import fire_comparison as fire_comparison_service
 from assetboard.services import fire_linked as fire_linked_service
 from assetboard.services import fire_projection as fire_projection_service
 from assetboard.services import fire_scenarios as fire_service
 from assetboard.services.context import Context, Role, has_role, require_role
 from assetboard.web.context import CurrentContext
-from assetboard.web.fire_charts import build_fire_charts
+from assetboard.web.fire_charts import build_fire_charts, build_fire_comparison_chart
 from assetboard.web.fire_csv import fire_scenario_csv as render_fire_csv
+from assetboard.web.fire_sensitivity import build_sensitivity_view
 from assetboard.web.forms import InvalidPercentOrFixed, signed_percent_to_bp
 from assetboard.web.rendering import render_template
 from assetboard.web.security import require_csrf
@@ -151,6 +158,35 @@ RESULT_BLOCK_MESSAGES = {
 
 FALLBACK_ERROR = _("The scenario could not be saved. Reload the page and try again.")
 
+COMPARISON_ERRORS = {
+    "too_many_scenarios": _("Compare at most three scenarios at a time."),
+    "currency_mismatch": _(
+        "The selected scenarios use different currencies. Choose scenarios that share one "
+        "currency; there is no currency conversion in the comparison."
+    ),
+}
+
+SENSITIVITY_ERRORS = {
+    "empty_axis": _("The sensitivity axes are empty."),
+    "invalid_value": _("The sensitivity axes contain an invalid value."),
+    "duplicate_value": _("The sensitivity axes contain a duplicate value."),
+    "too_many_values": _("The sensitivity axes have too many values."),
+    "too_many_cells": _("The sensitivity grid has too many cells."),
+    "missing_base": _("The sensitivity axes must include the saved plan."),
+    "return_out_of_range": _(
+        "The real-return range would leave the supported -20 to 50 percent bounds. Adjust the "
+        "scenario's return and try again."
+    ),
+    "expense_factor_out_of_range": _(
+        "The expense range is outside the supported 0 to 1000 percent of the saved plan."
+    ),
+    "expense_too_large": _(
+        "The expense range would exceed the supported amount. Reduce the starting expenses and "
+        "try again."
+    ),
+}
+SENSITIVITY_FALLBACK = _("The sensitivity grid could not be calculated.")
+
 NOTICES = {
     "created": _("Scenario created."),
     "saved": _("Scenario saved."),
@@ -197,6 +233,100 @@ def _notice(request: Request, code: str | None) -> str | None:
         return None
     message = NOTICES.get(code)
     return _t(request, message) if message is not None else None
+
+
+def _compare_url(request: Request, scenario_ids: Sequence[UUID], basis: str) -> str:
+    query = [("scenario", str(scenario_id)) for scenario_id in scenario_ids]
+    if basis == "real":
+        query.append(("basis", "real"))
+    path = request.url_for("fire_compare").path
+    return f"{path}?{urlencode(query)}" if query else path
+
+
+def _preselected_ids(scenarios: fire_service.FireScenarioList) -> tuple[UUID, ...]:
+    """The default active scenario, else the first active one, else the first archived one."""
+    if scenarios.active:
+        default = next((row for row in scenarios.active if row.is_default), scenarios.active[0])
+        return (default.id,)
+    if scenarios.archived:
+        return (scenarios.archived[0].id,)
+    return ()
+
+
+def _compare_context(
+    request: Request,
+    comparison: fire_comparison_service.FireComparison,
+    scenarios: fire_service.FireScenarioList,
+    *,
+    basis: str,
+) -> dict[str, object]:
+    error_code = comparison.error_code
+    chart = (
+        build_fire_comparison_chart(comparison, basis, request.state.locale)
+        if error_code is None
+        else None
+    )
+    return {
+        "comparison": comparison,
+        "scenarios": scenarios,
+        "selected_ids": set(comparison.selected_ids),
+        "selected_order": comparison.selected_ids,
+        "comparison_error": _t(request, COMPARISON_ERRORS[error_code]) if error_code else None,
+        "comparison_error_code": error_code,
+        "chart": chart,
+        "basis": basis,
+        "nominal_url": _compare_url(request, comparison.selected_ids, "nominal"),
+        "real_url": _compare_url(request, comparison.selected_ids, "real"),
+        "block_messages": {
+            code: _t(request, message) for code, message in RESULT_BLOCK_MESSAGES.items()
+        },
+        "format_money": format_money,
+    }
+
+
+def _sensitivity_context(
+    request: Request, results: fire_projection_service.FireScenarioResults
+) -> dict[str, object]:
+    scenario = results.detail.scenario
+    fragment_url = request.url_for("fire_scenario_sensitivity", scenario_id=str(scenario.id)).path
+    page_url = (
+        request.url_for("fire_scenario", scenario_id=str(scenario.id)).path
+        + "?sensitivity=1#sensitivity"
+    )
+    context: dict[str, object] = {
+        "sensitivity": None,
+        "sensitivity_error": None,
+        "sensitivity_error_code": None,
+        "sensitivity_blocks": results.blocks,
+        "block_messages": {
+            code: _t(request, message) for code, message in RESULT_BLOCK_MESSAGES.items()
+        },
+        "sensitivity_fragment_url": fragment_url,
+        "sensitivity_page_url": page_url,
+        "sensitivity_inputs_url": (
+            request.url_for("fire_scenario", scenario_id=str(scenario.id)).path + "?edit=1#inputs"
+        ),
+    }
+    if results.projection is None:
+        return context
+    try:
+        grid = sensitivity(
+            results.projection.inputs,
+            DEFAULT_RETURN_DELTAS_BP,
+            DEFAULT_EXPENSE_FACTORS_BP,
+        )
+    except SensitivityError as exc:
+        context["sensitivity_error"] = _t(
+            request, SENSITIVITY_ERRORS.get(exc.code, SENSITIVITY_FALLBACK)
+        )
+        context["sensitivity_error_code"] = exc.code
+    else:
+        context["sensitivity"] = build_sensitivity_view(
+            grid,
+            horizon_age=results.projection.inputs.horizon_age,
+            locale=request.state.locale,
+        )
+    return context
 
 
 def _uuid(value: str) -> UUID:
@@ -682,6 +812,14 @@ def _results_context(
         "event_kind_labels": {
             code: _t(request, label) for code, label in EVENT_KIND_LABELS.items()
         },
+        "sensitivity_loaded": False,
+        "sensitivity_fragment_url": request.url_for(
+            "fire_scenario_sensitivity", scenario_id=str(results.detail.scenario.id)
+        ).path,
+        "sensitivity_page_url": (
+            request.url_for("fire_scenario", scenario_id=str(results.detail.scenario.id)).path
+            + "?sensitivity=1#sensitivity"
+        ),
     }
 
 
@@ -800,6 +938,33 @@ async def fire_scenario_new(request: Request, ctx: CurrentContext) -> Response:
     return render_template(request, "fire/form.html", context=context)
 
 
+@router.get("/fire/compare", name="fire_compare")
+async def fire_compare_page(request: Request, ctx: CurrentContext) -> Response:
+    """Compare up to three saved scenarios; a read-only GET page for every role."""
+    require_role(ctx, Role.VIEWER)
+    selected = tuple(_uuid(value) for value in request.query_params.getlist("scenario"))
+    scenarios = await run_in_threadpool(
+        fire_service.list_fire_scenarios, request.app.state.session_factory, ctx
+    )
+    if not selected:
+        selected = _preselected_ids(scenarios)
+    comparison = await run_in_threadpool(
+        fire_comparison_service.compare_fire_scenarios,
+        request.app.state.session_factory,
+        ctx,
+        selected,
+    )
+    basis = _basis(request.query_params.get("basis"))
+    context = await run_in_threadpool(
+        _compare_context,
+        request,
+        comparison,
+        scenarios,
+        basis=basis,
+    )
+    return render_template(request, "fire/compare.html", context=context)
+
+
 @router.post("/fire", name="fire_scenario_create")
 async def fire_scenario_create(request: Request, ctx: CurrentContext) -> Response:
     require_role(ctx, Role.EDITOR)
@@ -858,7 +1023,26 @@ async def fire_scenario_page(request: Request, ctx: CurrentContext, scenario_id:
         error=error,
         error_code=error_code,
     )
+    if request.query_params.get("sensitivity") == "1":
+        context.update(await run_in_threadpool(_sensitivity_context, request, results))
+        context["sensitivity_loaded"] = True
     return render_template(request, "fire/results.html", context=context)
+
+
+@router.get("/fire/{scenario_id}/sensitivity", name="fire_scenario_sensitivity")
+async def fire_scenario_sensitivity(
+    request: Request, ctx: CurrentContext, scenario_id: str
+) -> Response:
+    """The saved plan's sensitivity grid as an HTMX fragment; read-only for every role."""
+    require_role(ctx, Role.VIEWER)
+    results = await run_in_threadpool(
+        fire_projection_service.scenario_results,
+        request.app.state.session_factory,
+        ctx,
+        _uuid(scenario_id),
+    )
+    context = await run_in_threadpool(_sensitivity_context, request, results)
+    return render_template(request, "fire/_sensitivity.html", context=context)
 
 
 @router.get("/fire/{scenario_id}/edit", name="fire_scenario_edit")
