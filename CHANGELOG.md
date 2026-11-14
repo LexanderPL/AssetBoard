@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.7.4](https://github.com/LexanderPL/AssetBoard/compare/v0.7.3...v0.7.4) (2026-11-14)
+
+
+### Features
+
+* **fire:** add scenario comparison and sensitivity (F8.5) ([#329](https://github.com/LexanderPL/AssetBoard/issues/329)) ([f5b39ed](https://github.com/LexanderPL/AssetBoard/commit/f5b39edd62cb7cd0086f86fe98f6cd3a0aaeb3a9))
+* **loans:** partial transfers and the interest-only phase (F7.10) ([#331](https://github.com/LexanderPL/AssetBoard/issues/331)) ([1218974](https://github.com/LexanderPL/AssetBoard/commit/12189742bb556a90da257834ee51fe2b3c47d1ae))
+
 ## [0.7.3](https://github.com/LexanderPL/AssetBoard/compare/v0.7.2...v0.7.3) (2026-11-14)
 
 
