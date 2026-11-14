@@ -44,6 +44,7 @@ from assetboard.services.networth import (
     seed_categories,
     update_category,
     update_item,
+    update_valuation,
 )
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
@@ -621,6 +622,214 @@ def test_valuation_append_backdate_future_and_same_day_order(team: WorkspaceDb) 
     assert events[-1].data["currency"] == "EUR"
 
 
+def test_update_valuation_corrects_value_date_and_note_in_place(team: WorkspaceDb) -> None:
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx, "Vehicles")
+    item = _item(
+        team,
+        ctx,
+        category,
+        value="100",
+        as_of=date(2026, 3, 1),
+        valuation_note="First",
+    )
+    original = item.valuations[0]
+    changed = update_valuation(
+        team.factory,
+        ctx,
+        item.id,
+        original.id,
+        locale="en",
+        value="90",
+        as_of=date(2026, 1, 1),
+        note="Corrected",
+    )
+    assert len(changed.valuations) == 1
+    row = changed.valuations[0]
+    assert (row.id, row.as_of, row.value.amount_minor, row.note) == (
+        original.id,
+        date(2026, 1, 1),
+        9000,
+        "Corrected",
+    )
+    assert row.created_at == original.created_at
+    assert changed.current is not None and changed.current.amount_minor == 9000
+    events = [event for event in _events(team) if event.action == "networth_item.valuation_updated"]
+    assert len(events) == 1
+    assert events[0].entity_id == str(item.id)
+    assert events[0].data == {
+        "as_of": "2026-01-01",
+        "amount": "90.00",
+        "currency": "EUR",
+        "previous_as_of": "2026-03-01",
+        "previous_amount": "100.00",
+        "fields": "as_of,note,value_minor",
+    }
+
+
+def test_update_valuation_recomputes_current_value_and_future_flag(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx, "Vehicles")
+    item = _item(team, ctx, category, value="100", as_of=date(2026, 3, 1))
+    future = add_valuation(
+        team.factory,
+        ctx,
+        item.id,
+        locale="en",
+        value="200",
+        as_of=date(2026, 4, 1),
+    )
+    assert future.current is not None and future.current.amount_minor == 10000
+    future_row = next(row for row in future.valuations if row.as_of == date(2026, 4, 1))
+    assert future_row.future
+
+    corrected = update_valuation(
+        team.factory,
+        ctx,
+        item.id,
+        future_row.id,
+        locale="en",
+        value="200",
+        as_of=date(2026, 2, 1),
+        note="",
+    )
+    assert corrected.current is not None and corrected.current.amount_minor == 10000
+    assert not any(row.future for row in corrected.valuations)
+
+    before = corrected.sparkline
+    current_row = next(row for row in corrected.valuations if row.as_of == date(2026, 3, 1))
+    updated = update_valuation(
+        team.factory,
+        ctx,
+        item.id,
+        current_row.id,
+        locale="en",
+        value="300",
+        as_of=current_row.as_of,
+        note="",
+    )
+    assert updated.current is not None and updated.current.amount_minor == 30000
+    assert updated.sparkline != before
+
+
+def test_update_valuation_rejects_archived_linked_and_missing_rows(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx, "Vehicles")
+    item = _item(team, ctx, category)
+    row = item.valuations[0]
+
+    other = _item(team, ctx, category, name="Other car")
+    with pytest.raises(NotFound):
+        update_valuation(
+            team.factory,
+            ctx,
+            item.id,
+            other.valuations[0].id,
+            locale="en",
+            value="1",
+            as_of=date(2026, 3, 1),
+        )
+
+    with team.factory.begin() as session:
+        NetWorthItemRepository(session, ctx).update(
+            item.id,
+            valuation_mode="linked",
+            link_type="portfolio_asset_class",
+            link_id=uuid4(),
+        )
+    with pytest.raises(InvalidNetWorth) as linked:
+        update_valuation(
+            team.factory,
+            ctx,
+            item.id,
+            row.id,
+            locale="en",
+            value="1",
+            as_of=date(2026, 3, 1),
+        )
+    assert linked.value.code == "linked_value_readonly"
+
+    with team.factory.begin() as session:
+        NetWorthItemRepository(session, ctx).update(
+            item.id,
+            valuation_mode="manual",
+            link_type=None,
+            link_id=None,
+        )
+    archive_item(team.factory, ctx, item.id)
+    with pytest.raises(ItemArchived):
+        update_valuation(
+            team.factory,
+            ctx,
+            item.id,
+            row.id,
+            locale="en",
+            value="1",
+            as_of=date(2026, 3, 1),
+        )
+
+
+@pytest.mark.parametrize(
+    ("value", "as_of", "note", "code", "field"),
+    [
+        ("-1", date(2026, 3, 1), "", "value_negative", "value"),
+        ("1.001", date(2026, 3, 1), "", "too_many_decimals", "value"),
+        ("1", None, "", "invalid_date", "as_of"),
+        ("1", date(1899, 12, 31), "", "invalid_date", "as_of"),
+        ("1", date(2026, 3, 1), "x" * 201, "invalid_notes", "valuation_note"),
+    ],
+)
+def test_update_valuation_validates_its_inputs(
+    team: WorkspaceDb,
+    value: str,
+    as_of: date | None,
+    note: str,
+    code: str,
+    field: str,
+) -> None:
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx, "Vehicles")
+    item = _item(team, ctx, category)
+    with pytest.raises(InvalidNetWorth) as error:
+        update_valuation(
+            team.factory,
+            ctx,
+            item.id,
+            item.valuations[0].id,
+            locale="en",
+            value=value,
+            as_of=as_of,
+            note=note,
+        )
+    assert (error.value.code, error.value.field) == (code, field)
+
+
+def test_update_valuation_without_changes_writes_no_audit_event(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx, "Vehicles")
+    item = _item(team, ctx, category, value="100", as_of=date(2026, 3, 1))
+    row = item.valuations[0]
+    before = [event.id for event in _events(team)]
+    unchanged = update_valuation(
+        team.factory,
+        ctx,
+        item.id,
+        row.id,
+        locale="en",
+        value="100",
+        as_of=date(2026, 3, 1),
+        note="",
+    )
+    assert unchanged.current is not None and unchanged.current.amount_minor == 10000
+    assert [event.id for event in _events(team)] == before
+
+
 def test_a_future_only_item_has_no_current_value(team: WorkspaceDb) -> None:
     ctx = team.ctx("ed", "editor")
     category = _category(team, ctx, "Vehicles")
@@ -786,6 +995,15 @@ def _writes(db: WorkspaceDb, ctx: Context) -> dict[str, Callable[[], object]]:
         "add_valuation": lambda: add_valuation(
             db.factory, ctx, item.id, locale="en", value="2", as_of=date(2026, 3, 1)
         ),
+        "update_valuation": lambda: update_valuation(
+            db.factory,
+            ctx,
+            item.id,
+            item.valuations[0].id,
+            locale="en",
+            value="2",
+            as_of=date(2026, 3, 1),
+        ),
         "preview_bulk": lambda: preview_bulk(
             db.factory, ctx, side="asset", text="Car; 1; Vehicles", locale="en"
         ),
@@ -808,6 +1026,7 @@ WRITE_NAMES = (
     "archive_item",
     "restore_item",
     "add_valuation",
+    "update_valuation",
     "preview_bulk",
     "create_bulk",
 )

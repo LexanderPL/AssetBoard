@@ -1,4 +1,4 @@
-"""Net-worth categories, items and append-only valuations (F5.1)."""
+"""Net-worth categories, items and correctable valuations (F5.1, F5.8)."""
 
 from __future__ import annotations
 
@@ -305,7 +305,7 @@ class ItemValuationRepository(ScopedRepository[ItemValuation]):
         )
 
     def delete_for_import_batch(self, batch_id: UUID) -> int:
-        """Hard-delete a restore/merge batch's valuations; the append-only guard applies to ORM
+        """Hard-delete a restore/merge batch's valuations; the no-delete guard applies to ORM
         deletes only, and this is the one explicit rollback path (like workspace deletion)."""
         result = self._session.execute(
             delete(ItemValuation).where(

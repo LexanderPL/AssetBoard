@@ -1258,7 +1258,7 @@ class _RollbackPlan:
     categories_created: tuple[Category, ...]  # every category the batch created
     categories_to_delete: tuple[Category, ...]
     categories_to_archive: tuple[Category, ...]
-    valuations: tuple[ItemValuation, ...]  # append-only, removed by an explicit statement
+    valuations: tuple[ItemValuation, ...]  # history rows, removed by an explicit statement
     closed_months: tuple[str, ...]
 
     def counts(self) -> dict[str, int]:

@@ -434,13 +434,22 @@ async def networth_page(
     valuation_view: ValuationView | None = None
     category_view: CategoryView | None = None
     if edit_item and has_role(ctx, Role.EDITOR):
-        item_view = await run_in_threadpool(
+        loaded_item = await run_in_threadpool(
             get_item, request.app.state.session_factory, ctx, _parse_uuid(edit_item)
         )
-        if item_view.archived:
-            item_view = None
+        if loaded_item.archived:
+            loaded_item = None
         else:
-            selected = Side(item_view.side)
+            selected = Side(loaded_item.side)
+        if loaded_item is not None and edit_valuation:
+            valuation_id = _parse_uuid(edit_valuation)
+            valuation_view = next(
+                (row for row in loaded_item.valuations if row.id == valuation_id), None
+            )
+            if valuation_view is None:
+                raise NotFound
+        else:
+            item_view = loaded_item
     elif edit_category and has_role(ctx, Role.EDITOR):
         category_view = await run_in_threadpool(
             get_category,
@@ -452,11 +461,6 @@ async def networth_page(
             category_view = None
         else:
             selected = Side(category_view.side)
-    if edit_valuation and item_view is not None and has_role(ctx, Role.EDITOR):
-        valuation_id = _parse_uuid(edit_valuation)
-        valuation_view = next((row for row in item_view.valuations if row.id == valuation_id), None)
-        if valuation_view is None:
-            raise NotFound
     error_message = ERRORS.get(error) if error in ERRORS else None
     return await run_in_threadpool(
         lambda: _render(

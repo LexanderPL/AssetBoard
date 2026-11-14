@@ -309,8 +309,8 @@ shows what will be removed.
   previous workspace settings back, so the workspace is empty again and you can restore a
   corrected archive. It also removes the net-worth categories, items, valuations and snapshots
   and the investment classes, instruments, allocations, transactions, bond terms, prices, FX
-  rates, provider settings and risk targets it wrote; append-only valuations are removed only
-  through this explicit batch rollback. It is refused, with the reason, once anything changed
+  rates, provider settings and risk targets it wrote; valuations created by the batch are removed
+  only through this explicit batch rollback. It is refused, with the reason, once anything changed
   after the restore: a new or edited entry, category, planned value, net-worth or investment
   row, a closed or reopened month, a changed setting, or a new recurring item, income source,
   work log or tax rule. A monthly automatic net-worth snapshot taken after the restore also

@@ -1,4 +1,4 @@
-"""Net worth (F5.1): categories, items and append-only manual valuations.
+"""Net worth (F5.1): categories, items and correction-editable manual valuations.
 
 Everyone may read; writes need ``editor`` or ``owner``. Every write runs in one ``BEGIN
 IMMEDIATE`` transaction and re-reads the actor's role with ``require_role_now``. Category writes

@@ -267,6 +267,7 @@ EXTRA_METHOD_COVERAGE: dict[tuple[str, str], str] = {
         ("ItemValuationRepository", method): "test_networth_queries_stay_in_their_workspace"
         for method in (
             "create",
+            "get_for_item",
             "for_item",
             "for_items",
             "earliest_as_of",
