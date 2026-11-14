@@ -1,16 +1,18 @@
 # FIRE planner
 
-The FIRE planner stores plans for financial independence and early retirement. F8.1 covers the
-scenarios and their settings; the results page with charts and linked inputs arrives in later
-updates. The projection engine behind those results is implemented and documented below.
+The FIRE planner stores plans for financial independence and early retirement and shows their
+year-by-year results. A plan's page puts the results first and keeps the complete input form in
+a collapsible **Plan inputs** panel. The projection engine and the results page are documented
+below.
 
 ## Scenarios
 
 **FIRE projection → New scenario** creates a plan. Every field can be changed later except the
-start year and currency, which are fixed when the scenario is created. **Edit scenario** saves
-the changes. **Duplicate** copies the assumptions, contribution overrides and events under a
-free `(copy)` name. There is no hard delete: **Archive** makes a scenario read-only and keeps
-its inputs; **Restore** brings it back.
+start year and currency, which are fixed when the scenario is created. **Edit scenario** opens
+the plan's inputs on its results page. **Save changes** in the inputs panel persists the edits;
+changing an input before saving only previews the new results. **Duplicate** copies the
+assumptions, contribution overrides and events under a free `(copy)` name. There is no hard
+delete: **Archive** makes a scenario read-only and keeps its inputs; **Restore** brings it back.
 
 Active scenario names are unique ignoring case. Archiving a scenario lets its name be reused.
 Exactly one active scenario is the default while an active scenario exists: the first one
@@ -121,6 +123,46 @@ switch to FIRE.
 Money is rounded once per computed line, half away from zero; real values are deflated
 independently from each nominal line. The numeric and rounding rules are recorded in
 [ADR-0025](adr/0025-fire-projection-rounding.md). Projections are illustrative, not advice.
+
+## Results
+
+The results page opens with the key metrics:
+
+- **FIRE age** and its year, or **—** when the plan never reaches FIRE;
+- **Years to FIRE**, where the start year counts as year 0;
+- the **FIRE number** in today's money, or **—** when the rates leave it undefined;
+- a **sustainability** card with the depletion age and the lowest net worth after income stops,
+  or a note that the portfolio lasts to the horizon or was not checked;
+- **Sheet progress** (start net worth ÷ net worth at FIRE) and **Today's-money progress** (start
+  portfolio ÷ FIRE number), always shown together with their definitions. A bar stops visually
+  at 100%, while the exact percentage can be higher. An undefined progress is **—**, never 0%.
+
+The year-by-year table follows the spreadsheet: year, age, income, expenses, net saving, gain,
+cash and net worth. A cash column appears only when the plan has a non-zero cash flow. In the
+start year, net saving shows the starting portfolio and earns that year's gain. The **FIRE** row
+is highlighted, rows after income stops are muted and marked **No income**, and a depleted row
+is marked in red. **Each year's money** shows nominal values; **Today's money** deflates every
+amount by the plan's inflation. This is a view preference and is not saved with the scenario.
+
+The net-worth chart follows the same nominal/real choice. It marks the FIRE row with a line and
+a pinned point, the income stop and any depletion. The expenses-versus-gain chart is always
+nominal because the returns-cover-expenses rule compares nominal values. Both charts have a
+**Plotted data** table for keyboard and screen-reader access.
+
+**Download CSV** writes one row per plan year with both bases, independent of the table's
+toggle. The file is machine-readable: UTF-8 without a byte-order mark, comma-separated, CRLF
+line endings, plain dot decimals with the currency's usual digits and `1`/`0` flags. It contains
+no scenario name or metrics.
+
+Changing any input previews the result without saving it; the form keeps the focus and the
+results update in place. The preview never writes to the database. A preview that cannot be
+projected keeps the last saved results and explains which input needs fixing. A changed
+unusual rate is allowed in the preview but warns that saving still needs the confirmation box.
+Viewers and archived scenarios are read-only and do not preview.
+
+A plan whose inputs cannot be projected (for example a linked starting value that is not
+available yet, or a saved plan outside the supported year range) shows an explanation instead
+of metrics or charts, and its CSV download returns a conflict rather than an empty file.
 
 ## Validation
 
