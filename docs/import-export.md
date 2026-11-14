@@ -31,7 +31,9 @@ instruments, allocations, buy/sell transactions (undated lots included), bond te
 manual and provider prices, stored FX rates, and provider settings without their API keys,
 and the loan configuration: reference rates and their values, loans (including installment
 plans), fixed and variable rate segments, cost components, planned overpayments, actual payments, balance
-checkpoints and saved scenarios. Schedules are not archived; they are recomputed from those
+checkpoints and saved scenarios. The FIRE planner is included too: scenarios, contribution
+overrides, events and expense-category exclusions, with the linked starting values stored as
+resolved fallbacks. Schedules and projections are not archived; they are recomputed from those
 terms. Recurring items, income sources, work logs and calendars, and tax rules are not in this
 archive version yet. Notification channels and delivery logs are never exported, because channel URLs
 can contain secrets; provider API keys are not exported either.
@@ -65,7 +67,8 @@ carry them yet. The suggested net-worth categories follow the same rule as the l
 untouched, unused and seeded automatically, they are removed before the archive's net-worth
 categories are written. The suggested asset classes follow the same rule: untouched, unused and
 seeded automatically, they are removed before the archive's classes are written. Edited
-categories, items, values, snapshots or asset classes make the workspace non-empty.
+categories, items, values, snapshots or asset classes make the workspace non-empty. FIRE
+scenarios and their rows do too, because a 1.6 archive cannot carry them.
 
 Restore writes, all at once:
 
@@ -90,7 +93,19 @@ Restore writes, all at once:
    target is missing blocks the restore rather than being left dangling. Loan rows keep their
    archived ids when the target database does not already use them, so linked net-worth items
    and installment-plan references keep pointing at the right loan;
-9. the saved risk targets and the investment cost basis.
+9. the saved risk targets and the investment cost basis;
+10. FIRE scenarios, contribution overrides, events and expense exclusions. A linked starting
+    value stays linked only when the archive carries what it needs: regular income or expense
+    rows in the trailing window, every excluded category as a regular expense category, an
+    investable portfolio source, and the scenario's own currency. Otherwise it becomes a
+    manual value from the archived fallback; when that is blank too, it becomes 0 and the
+    report says so. A missing exclusion is skipped, and a missing source loan clears the event
+    link, both with a warning. The first active scenario becomes the default when the archive
+    has none.
+
+A plan's projection is not stored: after a restore it is recomputed from the same inputs and
+gives the same result. One-click payoff events keep their loan link, so adding the same payoff
+again remains idempotent.
 
 A net-worth item linked to a portfolio class or holding is linked to the restored row when the
 archive carries its target (1.4 archives do). A link whose target is not in the archive —
@@ -117,11 +132,12 @@ two workspaces. Owners and editors can merge; it is the default mode.
 A merge writes categories, transactions and planned values only. The archive's settings,
 closed months, net-worth files, investment files and loan files are listed for information but
 never applied; a 1.2+ archive lists its net-worth files once with a restore-only warning, a 1.4
-archive lists its investment files once with the same kind of warning, and a 1.5+ archive lists
-its loan files once with `loan_restore_only`. The settings diff also
+archive lists its investment files once with the same kind of warning, a 1.5+ archive lists
+its loan files once with `loan_restore_only`, and a 1.7+ archive lists its FIRE files once with
+`fire_restore_only`. The settings diff also
 reports the investment cost basis and risk targets when they differ. The archive's base currency
-must match the workspace's; otherwise the whole archive is refused. Existing net-worth and
-investment data is left untouched. To merge a valuation history, import its
+must match the workspace's; otherwise the whole archive is refused. Existing net-worth,
+investment and FIRE data is left untouched. To merge a valuation history, import its
 `item_valuations.csv` alone.
 
 Each category in the archive is a row in the [category mapping](#category-mapping) step, so an
@@ -162,8 +178,8 @@ digits; a file without `created_at` is stamped in row order from the import time
 A lone reference-rate-values file creates a series named by the file when it does not exist.
 For an existing series, the same series and effective date makes an identical value a duplicate
 (`already_imported`) and a different value a conflict (`reference_rate_value_differs`); the
-stored value is kept. The other loan archive files are restore-only: `loans.csv` and its
-companions have no standalone importer.
+stored value is kept. The other loan archive files and every FIRE archive file are restore-only:
+`loans.csv`, `fire_scenarios.csv` and their companions have no standalone importer.
 
 Investment transactions are matched by instrument name. A name that matches an active instrument
 is mapped automatically; an unknown name needs the **Instrument mapping** step: map it to an
@@ -310,7 +326,9 @@ shows what will be removed.
   corrected archive. It also removes the net-worth categories, items, valuations and snapshots
   and the investment classes, instruments, allocations, transactions, bond terms, prices, FX
   rates, provider settings and risk targets it wrote; valuations created by the batch are removed
-  only through this explicit batch rollback. It is refused, with the reason, once anything changed
+  only through this explicit batch rollback. It also removes the FIRE scenarios, contribution
+  overrides, events and expense exclusions it wrote, before the loans their events may link to.
+  It is refused, with the reason, once anything changed
   after the restore: a new or edited entry, category, planned value, net-worth or investment
   row, a closed or reopened month, a changed setting, or a new recurring item, income source,
   work log or tax rule. A monthly automatic net-worth snapshot taken after the restore also

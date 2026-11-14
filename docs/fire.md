@@ -284,6 +284,25 @@ Nothing is saved when validation fails; the rows you typed stay on the form. The
 refuses a plan whose last year is past the supported year range; with the start year fixed at
 creation, this is a guard for far-future plans.
 
+## Backup and restore
+
+FIRE scenarios are part of the workspace archive. **Download archive** includes every scenario,
+its contribution overrides, events and expense exclusions, plus the resolved value of each linked
+starting input as a fallback. The archive does not store projections, sensitivity grids or loan
+schedules: they are derived data and are recomputed after a restore from the same saved inputs,
+so the results are unchanged.
+
+A restore brings the scenarios back last, after the ledger, net worth, investments and loans they
+may depend on. A linked input stays linked only when the archive has the data it needs: regular
+income or expense rows in the last twelve full months, every excluded category as a regular
+expense category, at least one investable portfolio source, and the scenario's own currency.
+Otherwise the input becomes **Manual** with the archived fallback value; if the export could not
+resolve a fallback either, it becomes manual 0 and the restore report says so. This is never a
+silent zero. A missing expense exclusion is skipped with a warning, and a missing source loan
+clears the one-click payoff event's link while keeping the event. The first active scenario in
+an archive without a default is promoted and the report lists it. A merge ignores FIRE files and
+says they are restore-only; there is no standalone FIRE CSV import.
+
 ## Privacy and scope
 
 The FIRE planner is part of the workspace, so every member can read its scenarios and editors

@@ -451,6 +451,13 @@ Implement F4.5 from docs/specs/M4-ledger-export-import.md: docs/archive-format.m
 documented example rows with domain.archive and checks that every written column is documented.
 ```
 
+Archive extensions land in later milestones as minor versions per ADR-0016. As of M8 F8.6 the
+current format is 1.7: it adds the four FIRE files (`fire_scenarios.csv`,
+`fire_contributions.csv`, `fire_events.csv` and `fire_expense_exclusions.csv`) with lineage ids,
+restore-only merge handling and linked-input fallbacks; 1.6 archives read without them. The
+normative column reference and version history stay in
+[docs/archive-format.md](../archive-format.md).
+
 ---
 
 ## Format reference v1.1
