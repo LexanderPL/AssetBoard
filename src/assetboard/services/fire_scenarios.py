@@ -194,7 +194,9 @@ class FireScenarioList:
 
 
 @dataclass(frozen=True, slots=True)
-class _ValidatedScenario:
+class ValidatedScenario:
+    """A fully checked scenario, ready to save or project."""
+
     name: str
     name_key: str
     birth_year: int
@@ -213,6 +215,9 @@ class _ValidatedScenario:
     portfolio_manual_minor: int
     contributions: tuple[ContributionInput, ...]
     events: tuple[EventInput, ...]
+    # True when a changed rate is outside its ordinary range and the form should say so. A preview
+    # reports it without blocking; a save only continues when the confirmation box is ticked.
+    needs_extreme_confirmation: bool = False
 
 
 def _require_viewer(ctx: Context) -> None:
@@ -257,14 +262,26 @@ def _manual_minor(
     return amount.amount_minor
 
 
-def _validate(
+RateTuple = tuple[int, int, int, int | None]
+
+
+def validate_scenario_input(
     scenario: FireScenarioInput,
     *,
     start_year: int,
     currency: str,
     default_horizon: int,
-    previous: FireScenario | None,
-) -> _ValidatedScenario:
+    previous_rates: RateTuple | None = None,
+    preview: bool = False,
+) -> ValidatedScenario:
+    """Check every field, amount, row and rate of a scenario.
+
+    ``previous_rates`` is the saved ``(inflation, real return, income growth, withdrawal)`` tuple,
+    so only a rate the edit actually changed asks for confirmation again. ``preview`` validates
+    the same inputs without enforcing the unusual-rate confirmation (the result reports
+    ``needs_extreme_confirmation`` so the preview can warn); name uniqueness is a repository
+    check and never runs here, which is also what the preview needs.
+    """
     try:
         name = clean_scenario_name(scenario.name)
     except ValueError:
@@ -331,16 +348,9 @@ def _validate(
         real_return_bp=real_return_bp,
         income_growth_bp=income_growth_bp,
         swr_bp=swr_bp,
-        previous=None
-        if previous is None
-        else (
-            previous.inflation_bp,
-            previous.real_return_bp,
-            previous.income_growth_bp,
-            previous.swr_bp,
-        ),
+        previous=previous_rates,
     )
-    if needs_confirmation and not scenario.extreme_rates_confirmed:
+    if needs_confirmation and not scenario.extreme_rates_confirmed and not preview:
         raise FireError("extreme_rates_confirmed", "extreme_rate_confirmation_required")
 
     if len(scenario.contributions) > MAX_CONTRIBUTION_ROWS:
@@ -390,7 +400,7 @@ def _validate(
             )
         )
 
-    return _ValidatedScenario(
+    return ValidatedScenario(
         name=name,
         name_key=text_key(name),
         birth_year=birth_year,
@@ -409,6 +419,7 @@ def _validate(
         portfolio_manual_minor=portfolio_manual,
         contributions=tuple(contributions),
         events=tuple(events),
+        needs_extreme_confirmation=needs_confirmation,
     )
 
 
@@ -447,7 +458,7 @@ def _view(row: FireScenario, *, contribution_count: int, event_count: int) -> Fi
     )
 
 
-def _scenario_values(validated: _ValidatedScenario) -> dict[str, object]:
+def _scenario_values(validated: ValidatedScenario) -> dict[str, object]:
     return {
         "name": validated.name,
         "name_key": validated.name_key,
@@ -494,7 +505,7 @@ def _reconcile_rows(
     session: Session,
     ctx: Context,
     scenario_id: UUID,
-    validated: _ValidatedScenario,
+    validated: ValidatedScenario,
 ) -> None:
     """Make the saved child rows match the editor, keeping the identity of unchanged rows.
 
@@ -682,12 +693,11 @@ def create_fire_scenario(
         currency = workspace.get().base_currency
         start_year = ctx.clock.today(ctx.workspace.timezone).year
         _, profile_horizon = _profile(session, ctx)
-        validated = _validate(
+        validated = validate_scenario_input(
             scenario,
             start_year=start_year,
             currency=currency,
             default_horizon=profile_horizon,
-            previous=None,
         )
         repository = FireScenarioRepository(session, ctx)
         if repository.active_by_name_key(validated.name_key) is not None:
@@ -720,12 +730,17 @@ def update_fire_scenario(
         row = repository.get_or_raise(scenario_id)
         if row.archived_at is not None:
             raise FireError("scenario", "archived")
-        validated = _validate(
+        validated = validate_scenario_input(
             scenario,
             start_year=row.start_year,
             currency=row.currency,
             default_horizon=row.horizon_age,
-            previous=row,
+            previous_rates=(
+                row.inflation_bp,
+                row.real_return_bp,
+                row.income_growth_bp,
+                row.swr_bp,
+            ),
         )
         existing = repository.active_by_name_key(validated.name_key)
         if existing is not None and existing.id != row.id:
@@ -863,6 +878,8 @@ __all__ = [
     "FireScenarioInput",
     "FireScenarioList",
     "FireScenarioView",
+    "RateTuple",
+    "ValidatedScenario",
     "archive_fire_scenario",
     "create_fire_scenario",
     "duplicate_fire_scenario",
@@ -872,4 +889,5 @@ __all__ = [
     "scenario_defaults",
     "set_default_fire_scenario",
     "update_fire_scenario",
+    "validate_scenario_input",
 ]

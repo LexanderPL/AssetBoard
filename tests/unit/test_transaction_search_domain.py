@@ -21,6 +21,7 @@ from assetboard.domain.ledger_csv import (
     TransactionCsvRow,
     guard_formula,
     plain_amount,
+    plain_signed_amount,
     transactions_csv,
 )
 from assetboard.domain.transaction_search import (
@@ -216,6 +217,22 @@ def test_plain_amount_round_trips_through_decimal(minor: int) -> None:
     text = plain_amount(minor, "EUR")
     assert Decimal(text) * 100 == minor
     assert len(text.split(".")[1]) == 2
+
+
+@pytest.mark.parametrize(
+    ("minor", "currency", "text"),
+    [
+        (1250, "EUR", "12.50"),
+        (-1250, "EUR", "-12.50"),
+        (0, "EUR", "0.00"),
+        (1200, "JPY", "1200"),
+        (-1200, "JPY", "-1200"),
+        (-1234, "BHD", "-1.234"),
+    ],
+)
+def test_plain_signed_amount_keeps_the_sign(minor: int, currency: str, text: str) -> None:
+    assert plain_signed_amount(minor, currency) == text
+    assert Decimal(plain_signed_amount(minor, currency)) == Decimal(text)
 
 
 def test_the_formula_guard_is_off_by_default() -> None:

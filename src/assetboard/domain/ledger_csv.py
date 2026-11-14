@@ -96,6 +96,12 @@ def plain_amount(amount_minor: int, currency: str, *, decimal: str = "dot") -> s
     return text.replace(".", DECIMAL_SEPARATORS[decimal])
 
 
+def plain_signed_amount(amount_minor: int, currency: str, *, decimal: str = "dot") -> str:
+    """Like :func:`plain_amount`, but keeps the sign for a negative amount (``-12.50``)."""
+    magnitude = plain_amount(abs(amount_minor), currency, decimal=decimal)
+    return f"-{magnitude}" if amount_minor < 0 else magnitude
+
+
 def guard_formula(value: str) -> str:
     """``value`` with ``'`` put before anything a spreadsheet could run as a formula.
 
