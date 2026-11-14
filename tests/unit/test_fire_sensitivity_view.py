@@ -55,7 +55,13 @@ def test_the_default_view_has_five_by_five_headers_rows_and_a_marked_base_cell()
         "7%",
     ]
     assert view.rows[0].factor_label == "80%"
-    assert view.rows[0].factor_delta_label == "-20 pp"
+    assert [row.factor_delta_label for row in view.rows] == [
+        "-20%",
+        "-10%",
+        "0%",
+        "+10%",
+        "+20%",
+    ]
     base = view.rows[2].cells[2]
     assert base.is_base is True and base.tone == "base"
     assert base.age_label == str(grid.base_cell.fire_age)
@@ -113,6 +119,7 @@ def test_labels_follow_the_locale() -> None:
     grid = sensitivity(_inputs(), (0, 50), (10_000, 15_000))
     view = build_sensitivity_view(grid, horizon_age=90, locale="pl")
     assert view.headers[1].delta_label == "0,5 p.p."
-    assert view.rows[1].factor_delta_label == "50 p.p."
+    assert view.rows[1].factor_delta_label == "+50%"
+    assert view.rows[0].factor_delta_label == "0%"
     assert view.headers[0].rate_label == "5%"
     assert view.rows[1].factor_label == "150%"

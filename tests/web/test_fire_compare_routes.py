@@ -63,6 +63,16 @@ def _checked(html: str, scenario_id: UUID) -> bool:
     return " checked" in match.group(0)
 
 
+def _row(html: str, scenario_id: UUID) -> str:
+    match = re.search(
+        rf'<tr[^>]*data-fire-comparison-row="{scenario_id}"[^>]*>(.*?)</tr>',
+        html,
+        re.S,
+    )
+    assert match is not None
+    return match.group(1)
+
+
 def _archive(owner, scenario_id: UUID) -> None:
     response = owner.post(f"/fire/{scenario_id}/archive", token_from=f"/fire/{scenario_id}")
     assert response.status_code == 303
@@ -139,6 +149,8 @@ def test_the_selector_preselects_the_default_scenario_and_links_from_list_and_re
     assert not _checked(page.text, first)
     assert _rows(page.text) == [str(second)]
     assert 'method="get"' in page.text
+    chart = _chart(page.text)
+    assert [series["name"] for series in chart["series"]] == ["Second"]
     form = page.text.split("data-fire-compare-selector", 1)[1].split("</form>", 1)[0]
     assert "csrf_token" not in form
     assert "data-fire-compare-option" in page.text
@@ -222,6 +234,9 @@ def test_blocked_and_never_rows_keep_the_table_and_all_blocked_has_no_chart(owne
     page = owner.client.get(f"/fire/compare?scenario={blocked}&scenario={never}")
     assert page.status_code == 200
     assert _rows(page.text) == [str(blocked), str(never)]
+    blocked_row = _row(page.text, blocked)
+    assert ">Linked<" in blocked_row
+    assert ">Default<" in blocked_row
     assert 'data-fire-comparison-block="no_income_data"' in page.text
     assert "No regular income transactions" in page.text
     assert 'data-fire-comparison-status="never"' in page.text
@@ -248,7 +263,8 @@ def test_archived_viewers_basis_toggle_and_mixed_start_years(owner) -> None:
     assert "data-fire-mixed-start" in page.text
     assert 'aria-current="true"' in page.text
     assert 'data-fire-comparison-basis-link="real"' in page.text
-    assert "Archived" in page.text
+    assert ">Archived<" in _row(page.text, archived)
+    assert ">Default<" in _row(page.text, first)
     assert "data-fire-comparison-table" in page.text
     form = page.text.split("data-fire-compare-selector", 1)[1].split("</form>", 1)[0]
     assert "csrf_token" not in form

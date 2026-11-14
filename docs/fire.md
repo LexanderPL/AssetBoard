@@ -252,7 +252,8 @@ shown. **Refresh grid** reloads it. The grid always uses the saved plan, includi
 and category exclusions; unsaved preview changes do not affect it.
 
 The default grid varies the real return by −2, −1, 0, +1 and +2 percentage points and the
-starting expenses by 80%, 90%, 100%, 110% and 120% of the saved plan. Only the starting expenses
+starting expenses by 80%, 90%, 100%, 110% and 120% of the saved plan; each expense row shows the
+level with its −20%, −10%, 0%, +10% or +20% difference. Only the starting expenses
 are scaled: contribution overrides, cash flows, income and expense-change events keep their saved
 values. Each cell shows the FIRE age, or **—** when FIRE is never reached before the horizon. The
 cell colours compare the age with the saved plan: earlier is better, the same age is neutral,

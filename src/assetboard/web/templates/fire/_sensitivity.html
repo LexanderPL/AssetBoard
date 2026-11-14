@@ -39,7 +39,7 @@
     <tbody>
       {% for row in sensitivity.rows %}
       <tr class="border-t border-line">
-        <th scope="row" class="sticky left-0 z-10 bg-surface px-3 py-2 text-left font-medium">
+        <th scope="row" class="sticky left-0 z-10 bg-surface px-3 py-2 text-left font-medium" data-fire-sensitivity-expense-factor="{{ row.expense_factor_bp }}">
           <span class="block tabular-nums">{{ row.factor_label }}</span>
           <span class="block text-xs font-normal text-muted">{{ row.factor_delta_label }}</span>
         </th>

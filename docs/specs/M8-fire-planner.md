@@ -383,8 +383,9 @@ heat-map grid UI.
   `GET /fire/{id}?sensitivity=1#sensitivity`; **Refresh grid** reloads the same fragment. The
   fragment states that it uses the saved plan, not unsaved changes, and uses the saved linked
   values and exclusions. `web.fire_sensitivity` prepares the 5×5 headers (effective rate and
-  signed pp delta), expense row labels, ages, fixed tone codes, titles and screen-reader
-  sentences with `gettext` and `format_rate_short`. The template maps tones to Tailwind classes:
+  signed pp delta), expense row labels (percentage of the saved plan plus its signed percentage
+  difference), ages, fixed tone codes, titles and screen-reader sentences with `gettext` and
+  `format_rate_short`. The template maps tones to Tailwind classes:
   better/same/base/worse/never, with a visible base ring and badge, `—` for never, a caption,
   `aria-describedby` legend, mobile scroll and a sticky expense column. A blocked plan shows its
   block panel without a grid; an invalid sensitivity axis shows a translated range error;

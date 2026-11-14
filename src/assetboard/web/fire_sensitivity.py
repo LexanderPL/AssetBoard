@@ -35,6 +35,7 @@ class SensitivityCellView:
 
 @dataclass(frozen=True, slots=True)
 class SensitivityRowView:
+    expense_factor_bp: int
     factor_label: str
     factor_delta_label: str
     cells: tuple[SensitivityCellView, ...]
@@ -54,6 +55,12 @@ def _points_label(delta_bp: int, locale: str) -> str:
     """A signed percentage-point difference, e.g. ``−2 pp`` (Babel minus in the locale)."""
     value = format_quantity_input(Decimal(delta_bp).scaleb(-2), locale)
     return gettext("%(value)s pp", locale) % {"value": value}
+
+
+def _expense_delta_label(delta_bp: int, locale: str) -> str:
+    """A signed percentage of the saved expenses, e.g. ``−20%`` or ``+10%`` (not points)."""
+    label = format_rate_short(delta_bp, locale)
+    return f"+{label}" if delta_bp > 0 else label
 
 
 def _tone(cell: SensitivityCell, base_age: int | None) -> str:
@@ -162,8 +169,11 @@ def build_sensitivity_view(
         )
         rows.append(
             SensitivityRowView(
+                expense_factor_bp=grid_row.expense_factor_bp,
                 factor_label=factor_label,
-                factor_delta_label=_points_label(grid_row.expense_factor_bp - 10_000, locale),
+                factor_delta_label=_expense_delta_label(
+                    grid_row.expense_factor_bp - 10_000, locale
+                ),
                 cells=cells,
             )
         )

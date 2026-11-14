@@ -146,7 +146,25 @@ def test_sensitivity_fragment_is_a_five_by_five_heat_map_with_the_base_cell(owne
     assert "data-fire-sensitivity-grid" in fragment.text
     assert len(re.findall(r"data-fire-sensitivity-return=", fragment.text)) == 5
     assert len(re.findall(r"data-fire-sensitivity-cell(?:\s|>)", fragment.text)) == 25
+    expense_rows = re.findall(
+        r'<th scope="row"[^>]*data-fire-sensitivity-expense-factor="(-?\d+)"[^>]*>'
+        r"(.*?)</th>",
+        fragment.text,
+        re.S,
+    )
+    assert [factor for factor, _html in expense_rows] == [
+        "8000",
+        "9000",
+        "10000",
+        "11000",
+        "12000",
+    ]
+    # Expense changes are a percentage of the saved plan, not percentage points.
+    assert "-20%" in expense_rows[0][1]
+    assert "+20%" in expense_rows[-1][1]
+    assert all("pp" not in html for _factor, html in expense_rows)
     assert "data-fire-sensitivity-base" in fragment.text
+    assert ">Base<" in fragment.text
     assert "data-fire-sensitivity-tone=" in fragment.text
     assert "data-fire-sensitivity-legend" in fragment.text
     assert 'aria-describedby="sensitivity-legend"' in fragment.text
