@@ -1,4 +1,4 @@
-{% from "fire/_macros.html" import field_attrs, field_error, hint with context %}
+{% from "fire/_macros.html" import badge, field_attrs, field_error, hint with context %}
 {% set input_class = "form-control px-3 py-2" %}
 
 {% macro contribution_row(row) %}
@@ -51,18 +51,39 @@
     <p class="mt-1 text-sm text-muted">{{ _("All amounts are in %(currency)s and in today's money. Enter the yearly income and expenses at the start of the plan.", currency=currency) }}</p>
     <div class="mt-4 grid gap-4 sm:grid-cols-3">
       <div class="grid gap-2">
-        <label class="grid gap-1 text-sm font-medium">{{ _("Annual income") }} {{ hint(_("Earned income in the start year, before tax and other deductions.")) }}<input name="income_manual" value="{{ values.get('income_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "income_manual") }}>{{ field_error(error_field, "income_manual", error) }}</label>
-        <label class="grid gap-1 text-xs text-muted">{{ _("Source") }}<select name="income_mode" class="form-select py-2 font-normal"><option value="manual" selected>{{ _("Manual") }}</option><option value="trailing_12m" disabled>{{ _("From the app's data (coming later)") }}</option></select></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Annual income") }} {{ hint(_("Earned income in the start year, before tax and other deductions.")) }}<input name="income_manual" value="{{ values.get('income_manual', '') }}" inputmode="decimal"{% if values.get('income_mode') == 'manual' %} required{% else %} disabled{% endif %} class="{{ input_class }} font-normal" data-manual-field="income_manual"{{ field_attrs(error_field, "income_manual") }}>{{ field_error(error_field, "income_manual", error) }}</label>
+        <label class="grid gap-1 text-xs text-muted">{{ _("Source") }}<select name="income_mode" class="form-select py-2 font-normal" data-mode-select="income_mode"><option value="manual"{% if values.get('income_mode') != 'trailing_12m' %} selected{% endif %}>{{ _("Manual") }}</option><option value="trailing_12m"{% if values.get('income_mode') == 'trailing_12m' %} selected{% endif %}>{{ _("Last 12 full months") }}</option></select></label>
       </div>
       <div class="grid gap-2">
-        <label class="grid gap-1 text-sm font-medium">{{ _("Annual expenses") }} {{ hint(_("Regular yearly spending in the start year, excluding savings and transfers.")) }}<input name="expenses_manual" value="{{ values.get('expenses_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "expenses_manual") }}>{{ field_error(error_field, "expenses_manual", error) }}</label>
-        <label class="grid gap-1 text-xs text-muted">{{ _("Source") }}<select name="expenses_mode" class="form-select py-2 font-normal"><option value="manual" selected>{{ _("Manual") }}</option><option value="trailing_12m" disabled>{{ _("From the app's data (coming later)") }}</option></select></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Annual expenses") }} {{ hint(_("Regular yearly spending in the start year, excluding savings and transfers.")) }}<input name="expenses_manual" value="{{ values.get('expenses_manual', '') }}" inputmode="decimal"{% if values.get('expenses_mode') == 'manual' %} required{% else %} disabled{% endif %} class="{{ input_class }} font-normal" data-manual-field="expenses_manual"{{ field_attrs(error_field, "expenses_manual") }}>{{ field_error(error_field, "expenses_manual", error) }}</label>
+        <label class="grid gap-1 text-xs text-muted">{{ _("Source") }}<select name="expenses_mode" class="form-select py-2 font-normal" data-mode-select="expenses_mode"><option value="manual"{% if values.get('expenses_mode') != 'trailing_12m' %} selected{% endif %}>{{ _("Manual") }}</option><option value="trailing_12m"{% if values.get('expenses_mode') == 'trailing_12m' %} selected{% endif %}>{{ _("Last 12 full months") }}</option></select></label>
       </div>
       <div class="grid gap-2">
-        <label class="grid gap-1 text-sm font-medium">{{ _("Starting portfolio") }} {{ hint(_("Investable assets at the start: investments and cash savings, not your home.")) }}<input name="portfolio_manual" value="{{ values.get('portfolio_manual', '') }}" inputmode="decimal" required class="{{ input_class }} font-normal"{{ field_attrs(error_field, "portfolio_manual") }}>{{ field_error(error_field, "portfolio_manual", error) }}</label>
-        <label class="grid gap-1 text-xs text-muted">{{ _("Source") }}<select name="portfolio_mode" class="form-select py-2 font-normal"><option value="manual" selected>{{ _("Manual") }}</option><option value="linked_investable" disabled>{{ _("From the app's data (coming later)") }}</option></select></label>
+        <label class="grid gap-1 text-sm font-medium">{{ _("Starting portfolio") }} {{ hint(_("Investable assets at the start: investments and cash savings, not your home.")) }}<input name="portfolio_manual" value="{{ values.get('portfolio_manual', '') }}" inputmode="decimal"{% if values.get('portfolio_mode') == 'manual' %} required{% else %} disabled{% endif %} class="{{ input_class }} font-normal" data-manual-field="portfolio_manual"{{ field_attrs(error_field, "portfolio_manual") }}>{{ field_error(error_field, "portfolio_manual", error) }}</label>
+        <label class="grid gap-1 text-xs text-muted">{{ _("Source") }}<select name="portfolio_mode" class="form-select py-2 font-normal" data-mode-select="portfolio_mode"><option value="manual"{% if values.get('portfolio_mode') != 'linked_investable' %} selected{% endif %}>{{ _("Manual") }}</option><option value="linked_investable"{% if values.get('portfolio_mode') == 'linked_investable' %} selected{% endif %}>{{ _("Investable assets") }}</option></select></label>
       </div>
     </div>
+    <p class="mt-3 text-xs text-muted">{{ _("Linked sources use today's data in the scenario currency: the last 12 full months for income and expenses, and the current investable portfolio.") }}</p>
+  </section>
+
+  <section class="panel p-6 sm:p-7" aria-labelledby="exclusions-heading" data-fire-exclusions>
+    <h2 id="exclusions-heading" class="text-base font-semibold">{{ _("Expense exclusions") }} {{ hint(_("Choose regular expense categories to leave out of the linked trailing expenses, for example unusual one-off spending. Income is not affected.")) }}</h2>
+    <p class="mt-1 text-sm text-muted">{{ _("Only used when expenses are read from the app's data. The excluded categories' window totals are shown separately in the linked inputs panel.") }}</p>
+    {% if expense_exclusion_options %}
+    <ul class="mt-4 grid gap-2 sm:grid-cols-2">
+      {% for option in expense_exclusion_options %}
+      <li>
+        <label class="flex items-start gap-2 text-sm">
+          <input type="checkbox" name="expense_exclusion" value="{{ option.category_id }}"{% if option.selected %} checked{% endif %} class="mt-0.5 h-4 w-4 rounded border-line accent-primary" data-fire-exclusion="{{ option.category_id }}">
+          <span class="inline-flex min-w-0 items-center gap-2"><span class="h-3 w-3 shrink-0 rounded-full border border-line" style="background-color: {{ option.color }}" aria-hidden="true"></span><span class="min-w-0 break-words">{{ option.name }}</span>{% if option.archived %}{{ badge(_("Archived")) }}{% endif %}</span>
+        </label>
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="mt-3 text-sm text-muted" data-fire-exclusions-empty>{{ _("No regular expense categories are available yet.") }}</p>
+    {% endif %}
+    {{ field_error(error_field, "expense_exclusions", error) }}
   </section>
 
   <section class="panel p-6 sm:p-7" aria-labelledby="contributions-heading" data-fire-contributions>

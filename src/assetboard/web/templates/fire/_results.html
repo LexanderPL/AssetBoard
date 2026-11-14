@@ -32,16 +32,24 @@
   <p class="text-xs text-muted">{{ _("A view preference; it is not saved with the scenario.") }}</p>
 </div>
 
-{% if results.blocked %}
+{% if results.blocks %}
 <section class="panel p-6 sm:p-7" role="alert" data-fire-blocked="{{ results.blocked.code }}" data-fire-blocked-field="{{ results.blocked.field }}">
   <h2 class="text-base font-semibold">{{ _("The projection is unavailable") }}</h2>
-  {% if results.blocked.code == "missing_starting_value" %}
-  <p class="mt-2 text-sm text-ink">{{ _("The plan is missing a resolved starting value for %(field)s. Linked inputs arrive in a later update; enter the value manually in Plan inputs.", field=field_labels.get(results.blocked.field, results.blocked.field)) }}</p>
-  {% else %}
-  <p class="mt-2 text-sm text-ink">{{ _("The saved plan cannot be projected. Check the starting values and rates in Plan inputs, then preview the result.") }}</p>
-  {% endif %}
+  <ul class="mt-3 space-y-2 text-sm text-ink">
+    {% for block in results.blocks %}
+    <li data-fire-block="{{ block.code }}" data-fire-block-field="{{ block.field }}">
+      <span class="font-medium">{{ block_messages.get(block.code, _("The linked input could not be resolved.")) }}</span>
+      {% if block.detail %}<span class="text-muted"> ({{ block.detail }})</span>{% endif %}
+      <span class="mt-1 block text-xs text-muted">{{ _("Switch the affected input to Manual in Plan inputs, or fix the linked data.") }}</span>
+    </li>
+    {% endfor %}
+  </ul>
 </section>
-{% elif projection %}
+{% endif %}
+
+{% include "fire/_linked_inputs.html" %}
+
+{% if projection %}
   {% include "fire/_metrics.html" %}
   {% include "fire/_table.html" %}
   {% include "fire/_charts.html" %}

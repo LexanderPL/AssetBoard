@@ -806,6 +806,9 @@ msgstr ""
 msgid "FIRE default scenario changed"
 msgstr ""
 
+msgid "FIRE loan payoff added"
+msgstr ""
+
 msgid "Investment transaction added"
 msgstr ""
 
@@ -960,6 +963,12 @@ msgid "Transactions"
 msgstr ""
 
 msgid "Name"
+msgstr ""
+
+msgid "Loan"
+msgstr ""
+
+msgid "Year"
 msgstr ""
 
 msgid "Kind"
@@ -1452,6 +1461,10 @@ msgid "Demo mode"
 msgstr ""
 
 msgid "Demo"
+msgstr ""
+
+#, python-format
+msgid "Loan repaid: %(name)s"
 msgstr ""
 
 msgid "Invalid UTF-8 encoding."
@@ -2001,9 +2014,6 @@ msgstr ""
 msgid "Investment income: %(instrument)s"
 msgstr ""
 
-msgid "Loan"
-msgstr ""
-
 msgid "Baseline"
 msgstr ""
 
@@ -2357,6 +2367,11 @@ msgstr ""
 msgid "The kind cannot change: this category is in use."
 msgstr ""
 
+msgid ""
+"The treatment cannot change: a FIRE scenario excludes this category as a "
+"regular expense."
+msgstr ""
+
 msgid "Restore the category before changing it."
 msgstr ""
 
@@ -2523,8 +2538,13 @@ msgid "Choose how the starting portfolio is entered."
 msgstr ""
 
 msgid ""
-"Reading this input from the app's data arrives in a later update. Enter "
-"it manually."
+"This input can only be resolved while saving; preview the plan from its "
+"page."
+msgstr ""
+
+msgid ""
+"An excluded category is no longer a regular expense category of this "
+"workspace. Reload the page and try again."
 msgstr ""
 
 msgid "Enter a valid non-negative amount in the plan currency."
@@ -2577,6 +2597,70 @@ msgstr ""
 msgid "The saved plan cannot be projected."
 msgstr ""
 
+msgid "This loan payoff can no longer be added."
+msgstr ""
+
+msgid "This loan payoff is already in the plan."
+msgstr ""
+
+msgid "The plan is missing a resolved starting value."
+msgstr ""
+
+msgid ""
+"No regular income transactions fall in the last 12 full months, so linked"
+" income is unavailable. Add income to the ledger or switch this input to "
+"Manual."
+msgstr ""
+
+msgid ""
+"No regular expense transactions fall in the last 12 full months, so "
+"linked expenses are unavailable. Add expenses to the ledger or switch "
+"this input to Manual."
+msgstr ""
+
+msgid ""
+"Every regular expense category in the window is excluded, so linked "
+"expenses are unavailable. Clear an exclusion or switch this input to "
+"Manual."
+msgstr ""
+
+msgid ""
+"Some ledger rows in the window use another currency. Linked values need "
+"only the scenario currency; switch this input to Manual or review those "
+"rows."
+msgstr ""
+
+msgid ""
+"The workspace base currency no longer matches the scenario's currency, so"
+" linked values are unavailable. Create a new scenario or switch these "
+"inputs to Manual."
+msgstr ""
+
+msgid ""
+"No investable portfolio classes or investable manual net-worth items were"
+" found. Add data or switch the starting portfolio to Manual."
+msgstr ""
+
+msgid ""
+"An investable holding has no current price. Add a price or switch the "
+"starting portfolio to Manual."
+msgstr ""
+
+msgid ""
+"An investable holding has no FX rate to the scenario currency. Add a rate"
+" or switch the starting portfolio to Manual."
+msgstr ""
+
+msgid ""
+"An investable net-worth item has no value effective today. Add a "
+"valuation or switch the starting portfolio to Manual."
+msgstr ""
+
+msgid ""
+"An investable net-worth item has no FX rate to the scenario currency. Add"
+" a rate or switch the starting portfolio to Manual."
+msgstr ""
+
 msgid "The scenario could not be saved. Reload the page and try again."
 msgstr ""
 
@@ -2596,6 +2680,9 @@ msgid "Scenario restored."
 msgstr ""
 
 msgid "Default scenario changed."
+msgstr ""
+
+msgid "Loan payoff added to the plan."
 msgstr ""
 
 msgid "Returns cover expenses"
@@ -5441,9 +5528,6 @@ msgstr ""
 msgid "Plotted net worth data"
 msgstr ""
 
-msgid "Year"
-msgstr ""
-
 msgid "Age"
 msgstr ""
 
@@ -5587,7 +5671,7 @@ msgstr ""
 msgid "Earned income in the start year, before tax and other deductions."
 msgstr ""
 
-msgid "From the app's data (coming later)"
+msgid "Last 12 full months"
 msgstr ""
 
 msgid "Annual expenses"
@@ -5604,6 +5688,35 @@ msgstr ""
 msgid ""
 "Investable assets at the start: investments and cash savings, not your "
 "home."
+msgstr ""
+
+msgid "Investable assets"
+msgstr ""
+
+msgid ""
+"Linked sources use today's data in the scenario currency: the last 12 "
+"full months for income and expenses, and the current investable "
+"portfolio."
+msgstr ""
+
+msgid "Expense exclusions"
+msgstr ""
+
+msgid ""
+"Choose regular expense categories to leave out of the linked trailing "
+"expenses, for example unusual one-off spending. Income is not affected."
+msgstr ""
+
+msgid ""
+"Only used when expenses are read from the app's data. The excluded "
+"categories' window totals are shown separately in the linked inputs "
+"panel."
+msgstr ""
+
+msgid "Archived"
+msgstr ""
+
+msgid "No regular expense categories are available yet."
 msgstr ""
 
 msgid "Contribution overrides"
@@ -5699,6 +5812,155 @@ msgid "This scenario is archived and read-only. Restore it to change its inputs.
 msgstr ""
 
 msgid "Your role can read this plan but not change it."
+msgstr ""
+
+msgid "Linked inputs"
+msgstr ""
+
+#, python-format
+msgid "As of %(day)s"
+msgstr ""
+
+msgid ""
+"Values read from the app's own data. The projection still uses the "
+"scenario currency and start year; nothing is written by a preview."
+msgstr ""
+
+#, python-format
+msgid ""
+"Only %(months)d of the last 12 full months have data. The annual amount "
+"is scaled from those months."
+msgstr ""
+
+#, python-format
+msgid ""
+"The latest included data is from %(month)s, before the window ends on "
+"%(end)s."
+msgstr ""
+
+#, python-format
+msgid ""
+"The plan starts in %(start)d but the linked data is as of %(current)d. "
+"Later data cannot be included until the plan is recreated."
+msgstr ""
+
+#, python-format
+msgid "The latest price for %(name)s is stale."
+msgstr ""
+
+#, python-format
+msgid "The latest FX rate for %(name)s is stale."
+msgstr ""
+
+msgid ""
+"The linked portfolio has sources but sums to zero today. The plan "
+"continues with a zero starting portfolio."
+msgstr ""
+
+#, python-format
+msgid ""
+"%(count)s non-investable asset class is excluded from the linked "
+"portfolio."
+msgid_plural ""
+"%(count)s non-investable asset classes are excluded from the linked "
+"portfolio."
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid "%(count)s linked net-worth item is skipped to avoid double counting."
+msgid_plural "%(count)s linked net-worth items are skipped to avoid double counting."
+msgstr[0] ""
+msgstr[1] ""
+
+#, python-format
+msgid ""
+"As of %(day)s. Investable portfolio classes and manual net-worth items "
+"marked investable."
+msgstr ""
+
+msgid "Linked starting portfolio breakdown"
+msgstr ""
+
+msgid "Trailing income"
+msgstr ""
+
+msgid "Trailing expenses"
+msgstr ""
+
+msgid "per year"
+msgstr ""
+
+#, python-format
+msgid ""
+"Window %(start)s – %(end)s: %(months)d months with data; window total "
+"%(total)s."
+msgstr ""
+
+msgid "Linked trailing income by category"
+msgstr ""
+
+msgid "Linked trailing expenses by category"
+msgstr ""
+
+msgid "Window total"
+msgstr ""
+
+msgid "Excluded categories"
+msgstr ""
+
+#, python-format
+msgid ""
+"Left out of the linked expenses; shown for transparency. Window total "
+"%(total)s."
+msgstr ""
+
+msgid "Loan payoff suggestions"
+msgstr ""
+
+msgid ""
+"Paying a loan off frees its contractual instalments from the payoff year "
+"onward. The amount is the next up to 12 contractual payments (interest, "
+"principal and costs, without overpayments), in today's money."
+msgstr ""
+
+#, python-format
+msgid "Payoff in %(year)d frees %(amount)s/year (today's money)."
+msgstr ""
+
+#, python-format
+msgid "Based on the next %(months)d contractual instalments."
+msgstr ""
+
+msgid "Add this loan payoff event? Unsaved changes in Plan inputs will be lost."
+msgstr ""
+
+msgid "Add payoff event"
+msgstr ""
+
+msgid "Only editors can add a payoff event."
+msgstr ""
+
+msgid "This scenario is archived and read-only."
+msgstr ""
+
+msgid "This loan is already paid off, so there is nothing to add."
+msgstr ""
+
+msgid "A payoff event for this loan is already in the plan."
+msgstr ""
+
+msgid "The loan schedule cannot be calculated. Check the loan settings."
+msgstr ""
+
+msgid "The payoff year falls outside the plan window."
+msgstr ""
+
+#, fuzzy, python-format
+msgid "The loan is in another currency than the plan."
+msgstr ""
+
+msgid "No positive annual amount can be calculated for this loan."
 msgstr ""
 
 #, python-format
@@ -5799,15 +6061,12 @@ msgstr ""
 msgid "The projection is unavailable"
 msgstr ""
 
-#, python-format
-msgid ""
-"The plan is missing a resolved starting value for %(field)s. Linked "
-"inputs arrive in a later update; enter the value manually in Plan inputs."
+msgid "The linked input could not be resolved."
 msgstr ""
 
 msgid ""
-"The saved plan cannot be projected. Check the starting values and rates "
-"in Plan inputs, then preview the result."
+"Switch the affected input to Manual in Plan inputs, or fix the linked "
+"data."
 msgstr ""
 
 msgid ""
@@ -5954,9 +6213,6 @@ msgstr ""
 
 #, python-format
 msgid "archived %(date)s"
-msgstr ""
-
-msgid "Archived"
 msgstr ""
 
 #, python-format
@@ -11857,5 +12113,29 @@ msgstr ""
 #~ "financial advice. The projection engine "
 #~ "and linked inputs arrive in later "
 #~ "updates."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "Reading this input from the app's "
+#~ "data arrives in a later update. "
+#~ "Enter it manually."
+#~ msgstr ""
+
+#~ msgid "From the app's data (coming later)"
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The plan is missing a resolved "
+#~ "starting value for %(field)s. Linked "
+#~ "inputs arrive in a later update; "
+#~ "enter the value manually in Plan "
+#~ "inputs."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The saved plan cannot be projected. "
+#~ "Check the starting values and rates "
+#~ "in Plan inputs, then preview the "
+#~ "result."
 #~ msgstr ""
 

@@ -126,6 +126,30 @@
     }
   });
 
+  // A linked source disables its manual amount so a stale typed value is not posted; switching
+  // back to Manual restores the field. The server still validates every mode.
+  function syncManualFields() {
+    const form = document.querySelector("[data-fire-form]");
+    if (!(form instanceof HTMLFormElement)) return;
+    for (const select of form.querySelectorAll("[data-mode-select]")) {
+      if (!(select instanceof HTMLSelectElement)) continue;
+      const field = form.querySelector(
+        `[data-manual-field="${CSS.escape(select.name.replace("_mode", "_manual"))}"]`
+      );
+      if (!(field instanceof HTMLInputElement)) continue;
+      const linked = select.value !== "manual";
+      field.disabled = linked;
+      field.required = !linked;
+    }
+  }
+
+  document.addEventListener("change", (event) => {
+    const target = event.target;
+    if (target instanceof Element && target.closest("[data-mode-select]")) {
+      syncManualFields();
+    }
+  });
+
   // A preview error arrives with the results fragment, not a full page. Mark the named input
   // without moving focus, and clear the marker when a later preview succeeds.
   function syncPreviewError() {
@@ -150,4 +174,6 @@
   for (const eventName of ["htmx:afterSwap", "htmx:oobAfterSwap"]) {
     document.addEventListener(eventName, syncPreviewError);
   }
+  document.addEventListener("htmx:afterSwap", syncManualFields);
+  syncManualFields();
 })();

@@ -1,0 +1,118 @@
+{% from "fire/_macros.html" import badge with context %}
+{% set linked = results.linked %}
+{% if linked %}
+<section class="panel p-6 sm:p-7" aria-labelledby="linked-heading" data-fire-linked>
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 id="linked-heading" class="text-base font-semibold">{{ _("Linked inputs") }}</h2>
+    <p class="text-xs text-muted">{{ _("As of %(day)s", day=format_day(linked.as_of)) }}</p>
+  </div>
+  <p class="mt-1 text-sm text-muted">{{ _("Values read from the app's own data. The projection still uses the scenario currency and start year; nothing is written by a preview.") }}</p>
+
+  {% if linked.warnings %}
+  <ul class="mt-4 space-y-2 text-sm" data-fire-linked-warnings>
+    {% for warning in linked.warnings %}
+    <li class="border border-warning-line bg-warning-soft px-3 py-2 text-warning-strong" data-fire-warning="{{ warning.code }}">
+      {% if warning.code == "scaled_months" %}
+      {{ _("Only %(months)d of the last 12 full months have data. The annual amount is scaled from those months.", months=warning.months) }}
+      {% elif warning.code == "linked_data_older" %}
+      {{ _("The latest included data is from %(month)s, before the window ends on %(end)s.", month=format_day(warning.month), end=format_day(warning.window_end)) }}
+      {% elif warning.code == "start_year_not_current" %}
+      {{ _("The plan starts in %(start)d but the linked data is as of %(current)d. Later data cannot be included until the plan is recreated.", start=warning.start_year, current=warning.current_year) }}
+      {% elif warning.code == "stale_price" %}
+      {{ _("The latest price for %(name)s is stale.", name=warning.detail) }}
+      {% elif warning.code == "stale_fx" %}
+      {{ _("The latest FX rate for %(name)s is stale.", name=warning.detail) }}
+      {% elif warning.code == "linked_portfolio_zero" %}
+      {{ _("The linked portfolio has sources but sums to zero today. The plan continues with a zero starting portfolio.") }}
+      {% elif warning.code == "non_investable_classes" %}
+      {% trans count=warning.count %}{{ count }} non-investable asset class is excluded from the linked portfolio.{% pluralize %}{{ count }} non-investable asset classes are excluded from the linked portfolio.{% endtrans %}
+      {% elif warning.code == "linked_items_skipped" %}
+      {% trans count=warning.count %}{{ count }} linked net-worth item is skipped to avoid double counting.{% pluralize %}{{ count }} linked net-worth items are skipped to avoid double counting.{% endtrans %}
+      {% else %}
+      {{ warning.code }}
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if linked.portfolio %}
+  <div class="mt-6 border-t border-line pt-4" data-fire-linked-portfolio>
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h3 class="text-sm font-semibold">{{ _("Starting portfolio") }}</h3>
+      <p class="text-sm font-semibold">{{ format_money(linked.portfolio.total, locale) }}</p>
+    </div>
+    <p class="mt-1 text-xs text-muted">{{ _("As of %(day)s. Investable portfolio classes and manual net-worth items marked investable.", day=format_day(linked.portfolio.as_of)) }}</p>
+    <div class="mt-3 overflow-x-auto">
+      <table class="sheet w-full text-sm">
+        <caption class="sr-only">{{ _("Linked starting portfolio breakdown") }}</caption>
+        <thead><tr class="text-left text-xs text-muted"><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Source") }}</th><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Amount") }}</th><th scope="col" class="py-1.5 font-medium">{{ _("As of") }}</th></tr></thead>
+        <tbody>
+          {% for row in linked.portfolio.rows %}
+          <tr class="border-t border-line" data-fire-linked-source="{{ row.source_kind }}">
+            <th scope="row" class="py-2 pr-3 text-left font-normal">
+              {% if row.source_kind == "portfolio_class" %}
+              <a class="inline-flex min-w-0 items-center gap-2 text-primary-ink underline underline-offset-2" href="{{ scoped_url(request, 'investments_portfolio') }}?scope={{ row.source_id }}" data-fire-source-link>
+                <span class="h-3 w-3 shrink-0 rounded-full border border-line" style="background-color: {{ row.color or '#94a3b8' }}" aria-hidden="true"></span>
+                <span class="min-w-0 break-words">{{ row.name }}</span>
+              </a>
+              {% elif row.source_kind == "portfolio_unallocated" %}
+              <a class="text-primary-ink underline underline-offset-2" href="{{ scoped_url(request, 'investments_portfolio') }}" data-fire-source-link>{{ _("Unallocated") }}</a>
+              {% else %}
+              <a class="inline-flex min-w-0 items-center gap-2 text-primary-ink underline underline-offset-2" href="{{ scoped_url(request, 'networth') }}?side=asset&amp;edit_item={{ row.source_id }}" data-fire-source-link>
+                <span class="h-3 w-3 shrink-0 rounded-full border border-line" style="background-color: {{ row.color or '#94a3b8' }}" aria-hidden="true"></span>
+                <span class="min-w-0 break-words">{{ row.name }}</span>
+              </a>
+              {% endif %}
+            </th>
+            <td class="py-2 pr-3">{{ format_money(row.amount, locale) }}</td>
+            <td class="py-2 text-muted">{{ format_day(row.as_of) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
+  {% for series in (linked.income, linked.expenses) %}
+  {% if series %}
+  <div class="mt-6 border-t border-line pt-4" data-fire-linked-{{ series.direction }}>
+    <div class="flex flex-wrap items-baseline justify-between gap-2">
+      <h3 class="text-sm font-semibold">{{ _("Trailing income") if series.direction == "income" else _("Trailing expenses") }}</h3>
+      <p class="text-sm font-semibold">{{ format_money(series.annual_total, locale) }}<span class="text-xs font-normal text-muted"> {{ _("per year") }}</span></p>
+    </div>
+    <p class="mt-1 text-xs text-muted">{{ _("Window %(start)s – %(end)s: %(months)d months with data; window total %(total)s.", start=format_day(series.window.first_day), end=format_day(series.window.last_day), months=series.months_available, total=format_money(series.raw_total, locale)) }}</p>
+    <div class="mt-3 overflow-x-auto">
+      <table class="sheet w-full text-sm">
+        <caption class="sr-only">{{ _("Linked trailing income by category") if series.direction == "income" else _("Linked trailing expenses by category") }}</caption>
+        <thead><tr class="text-left text-xs text-muted"><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Category") }}</th><th scope="col" class="py-1.5 font-medium">{{ _("Window total") }}</th></tr></thead>
+        <tbody>
+          {% for row in series.categories %}
+          <tr class="border-t border-line">
+            <th scope="row" class="py-2 pr-3 text-left font-normal"><span class="inline-flex min-w-0 items-center gap-2"><span class="h-3 w-3 shrink-0 rounded-full border border-line" style="background-color: {{ row.color }}" aria-hidden="true"></span><span class="min-w-0 break-words">{{ row.name }}</span>{% if row.archived %}{{ badge(_("Archived")) }}{% endif %}</span></th>
+            <td class="py-2">{{ format_money(row.amount, locale) }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if series.direction == "expense" and series.excluded_categories %}
+    <div class="mt-4" data-fire-linked-excluded>
+      <h4 class="text-sm font-semibold">{{ _("Excluded categories") }}</h4>
+      <p class="mt-1 text-xs text-muted">{{ _("Left out of the linked expenses; shown for transparency. Window total %(total)s.", total=format_money(series.excluded_total, locale)) }}</p>
+      <ul class="mt-2 space-y-1 text-sm">
+        {% for row in series.excluded_categories %}
+        <li class="flex flex-wrap items-baseline justify-between gap-2" data-fire-excluded-category="{{ row.category_id }}">
+          <span class="inline-flex min-w-0 items-center gap-2"><span class="h-3 w-3 shrink-0 rounded-full border border-line" style="background-color: {{ row.color }}" aria-hidden="true"></span><span class="min-w-0 break-words">{{ row.name }}</span>{% if row.archived %}{{ badge(_("Archived")) }}{% endif %}</span>
+          <span>{{ format_money(row.amount, locale) }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endif %}
+  </div>
+  {% endif %}
+  {% endfor %}
+</section>
+{% endif %}

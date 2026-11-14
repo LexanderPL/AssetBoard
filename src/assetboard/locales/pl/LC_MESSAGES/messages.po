@@ -815,6 +815,9 @@ msgstr "Przywrócono scenariusz FIRE"
 msgid "FIRE default scenario changed"
 msgstr "Zmieniono domyślny scenariusz FIRE"
 
+msgid "FIRE loan payoff added"
+msgstr "Dodano spłatę kredytu do planu FIRE"
+
 msgid "Investment transaction added"
 msgstr "Dodano transakcję inwestycyjną"
 
@@ -970,6 +973,12 @@ msgstr "Transakcje"
 
 msgid "Name"
 msgstr "Nazwa"
+
+msgid "Loan"
+msgstr "Kredyt"
+
+msgid "Year"
+msgstr "Rok"
 
 msgid "Kind"
 msgstr "Rodzaj"
@@ -1462,6 +1471,10 @@ msgstr "Tryb demonstracyjny"
 
 msgid "Demo"
 msgstr "Demo"
+
+#, python-format
+msgid "Loan repaid: %(name)s"
+msgstr "Spłacono kredyt: %(name)s"
 
 msgid "Invalid UTF-8 encoding."
 msgstr "Nieprawidłowe kodowanie UTF-8."
@@ -2052,9 +2065,6 @@ msgstr "%(tax)s: %(source)s"
 msgid "Investment income: %(instrument)s"
 msgstr "Przychód z inwestycji: %(instrument)s"
 
-msgid "Loan"
-msgstr "Kredyt"
-
 msgid "Baseline"
 msgstr "Scenariusz bazowy"
 
@@ -2448,6 +2458,13 @@ msgstr "Wybierz kolor."
 msgid "The kind cannot change: this category is in use."
 msgstr "Nie można zmienić rodzaju: ta kategoria jest w użyciu."
 
+msgid ""
+"The treatment cannot change: a FIRE scenario excludes this category as a "
+"regular expense."
+msgstr ""
+"Nie można zmienić charakteru: scenariusz FIRE wyklucza tę kategorię jako "
+"zwykły wydatek."
+
 msgid "Restore the category before changing it."
 msgstr "Przywróć kategorię, zanim ją zmienisz."
 
@@ -2628,11 +2645,18 @@ msgid "Choose how the starting portfolio is entered."
 msgstr "Wybierz sposób wprowadzenia portfela początkowego."
 
 msgid ""
-"Reading this input from the app's data arrives in a later update. Enter "
-"it manually."
+"This input can only be resolved while saving; preview the plan from its "
+"page."
 msgstr ""
-"Odczyt tego pola z danych aplikacji pojawi się w późniejszej "
-"aktualizacji. Wprowadź je ręcznie."
+"Tę wartość można ustalić dopiero podczas zapisywania; uruchom podgląd na "
+"stronie planu."
+
+msgid ""
+"An excluded category is no longer a regular expense category of this "
+"workspace. Reload the page and try again."
+msgstr ""
+"Wykluczona kategoria nie jest już zwykłą kategorią wydatków w tym "
+"obszarze roboczym. Odśwież stronę i spróbuj ponownie."
 
 msgid "Enter a valid non-negative amount in the plan currency."
 msgstr "Podaj prawidłową nieujemną kwotę w walucie planu."
@@ -2692,6 +2716,94 @@ msgstr "W planie brakuje wartości początkowej."
 msgid "The saved plan cannot be projected."
 msgstr "Nie można wykonać prognozy zapisanego planu."
 
+msgid "This loan payoff can no longer be added."
+msgstr "Tej spłaty kredytu nie można już dodać."
+
+msgid "This loan payoff is already in the plan."
+msgstr "Ta spłata kredytu jest już w planie."
+
+msgid "The plan is missing a resolved starting value."
+msgstr "W planie brakuje ustalonej wartości początkowej."
+
+msgid ""
+"No regular income transactions fall in the last 12 full months, so linked"
+" income is unavailable. Add income to the ledger or switch this input to "
+"Manual."
+msgstr ""
+"W ostatnich 12 pełnych miesiącach nie ma zwykłych transakcji przychodów, "
+"więc połączony przychód jest niedostępny. Dodaj przychody do księgi lub "
+"przełącz to pole na ręczne."
+
+msgid ""
+"No regular expense transactions fall in the last 12 full months, so "
+"linked expenses are unavailable. Add expenses to the ledger or switch "
+"this input to Manual."
+msgstr ""
+"W ostatnich 12 pełnych miesiącach nie ma zwykłych transakcji wydatków, "
+"więc połączone wydatki są niedostępne. Dodaj wydatki do księgi lub "
+"przełącz to pole na ręczne."
+
+msgid ""
+"Every regular expense category in the window is excluded, so linked "
+"expenses are unavailable. Clear an exclusion or switch this input to "
+"Manual."
+msgstr ""
+"Wszystkie zwykłe kategorie wydatków w oknie są wykluczone, więc połączone"
+" wydatki są niedostępne. Usuń wykluczenie lub przełącz to pole na ręczne."
+
+msgid ""
+"Some ledger rows in the window use another currency. Linked values need "
+"only the scenario currency; switch this input to Manual or review those "
+"rows."
+msgstr ""
+"Niektóre wiersze księgi w oknie są w innej walucie. Połączone wartości "
+"wymagają wyłącznie waluty scenariusza; przełącz to pole na ręczne lub "
+"sprawdź te wiersze."
+
+msgid ""
+"The workspace base currency no longer matches the scenario's currency, so"
+" linked values are unavailable. Create a new scenario or switch these "
+"inputs to Manual."
+msgstr ""
+"Waluta bazowa obszaru roboczego nie pasuje już do waluty scenariusza, "
+"więc połączone wartości są niedostępne. Utwórz nowy scenariusz lub "
+"przełącz te pola na ręczne."
+
+msgid ""
+"No investable portfolio classes or investable manual net-worth items were"
+" found. Add data or switch the starting portfolio to Manual."
+msgstr ""
+"Nie znaleziono inwestycyjnych klas portfela ani inwestycyjnych ręcznych "
+"pozycji majątku. Dodaj dane lub przełącz portfel początkowy na ręczny."
+
+msgid ""
+"An investable holding has no current price. Add a price or switch the "
+"starting portfolio to Manual."
+msgstr ""
+"Inwestycyjne posiadanie nie ma bieżącej ceny. Dodaj cenę lub przełącz "
+"portfel początkowy na ręczny."
+
+msgid ""
+"An investable holding has no FX rate to the scenario currency. Add a rate"
+" or switch the starting portfolio to Manual."
+msgstr ""
+"Inwestycyjne posiadanie nie ma kursu walutowego do waluty scenariusza. "
+"Dodaj kurs lub przełącz portfel początkowy na ręczny."
+
+msgid ""
+"An investable net-worth item has no value effective today. Add a "
+"valuation or switch the starting portfolio to Manual."
+msgstr ""
+"Inwestycyjna pozycja majątku nie ma wartości obowiązującej dziś. Dodaj "
+"wycenę lub przełącz portfel początkowy na ręczny."
+
+msgid ""
+"An investable net-worth item has no FX rate to the scenario currency. Add"
+" a rate or switch the starting portfolio to Manual."
+msgstr ""
+"Inwestycyjna pozycja majątku nie ma kursu walutowego do waluty "
+"scenariusza. Dodaj kurs lub przełącz portfel początkowy na ręczny."
+
 msgid "The scenario could not be saved. Reload the page and try again."
 msgstr "Nie udało się zapisać scenariusza. Odśwież stronę i spróbuj ponownie."
 
@@ -2712,6 +2824,9 @@ msgstr "Przywrócono scenariusz."
 
 msgid "Default scenario changed."
 msgstr "Zmieniono domyślny scenariusz."
+
+msgid "Loan payoff added to the plan."
+msgstr "Dodano spłatę kredytu do planu."
 
 msgid "Returns cover expenses"
 msgstr "Zwrot pokrywa wydatki"
@@ -5807,9 +5922,6 @@ msgstr "Dane wykresu"
 msgid "Plotted net worth data"
 msgstr "Dane wykresu wartości netto"
 
-msgid "Year"
-msgstr "Rok"
-
 msgid "Age"
 msgstr "Wiek"
 
@@ -5974,8 +6086,8 @@ msgstr "Roczne dochody"
 msgid "Earned income in the start year, before tax and other deductions."
 msgstr "Dochody z pracy w roku rozpoczęcia, przed podatkiem i innymi potrąceniami."
 
-msgid "From the app's data (coming later)"
-msgstr "Z danych aplikacji (później)"
+msgid "Last 12 full months"
+msgstr "Ostatnie 12 pełnych miesięcy"
 
 msgid "Annual expenses"
 msgstr "Roczne wydatki"
@@ -5996,6 +6108,44 @@ msgid ""
 msgstr ""
 "Aktywa inwestycyjne na początku: inwestycje i oszczędności gotówkowe, bez"
 " domu."
+
+msgid "Investable assets"
+msgstr "Aktywa inwestycyjne"
+
+msgid ""
+"Linked sources use today's data in the scenario currency: the last 12 "
+"full months for income and expenses, and the current investable "
+"portfolio."
+msgstr ""
+"Połączone źródła używają dzisiejszych danych w walucie scenariusza: "
+"ostatnich 12 pełnych miesięcy dla przychodów i wydatków oraz bieżącego "
+"portfela inwestycyjnego."
+
+msgid "Expense exclusions"
+msgstr "Wykluczenia wydatków"
+
+msgid ""
+"Choose regular expense categories to leave out of the linked trailing "
+"expenses, for example unusual one-off spending. Income is not affected."
+msgstr ""
+"Wybierz zwykłe kategorie wydatków, które mają być pominięte w połączonych"
+" wydatkach z ostatnich 12 miesięcy, na przykład nietypowe jednorazowe "
+"wydatki. Przychody nie są objęte wykluczeniem."
+
+msgid ""
+"Only used when expenses are read from the app's data. The excluded "
+"categories' window totals are shown separately in the linked inputs "
+"panel."
+msgstr ""
+"Używane tylko wtedy, gdy wydatki są odczytywane z danych aplikacji. Sumy "
+"wykluczonych kategorii w oknie są pokazane osobno w panelu połączonych "
+"danych."
+
+msgid "Archived"
+msgstr "Zarchiwizowana"
+
+msgid "No regular expense categories are available yet."
+msgstr "Nie ma jeszcze zwykłych kategorii wydatków."
 
 msgid "Contribution overrides"
 msgstr "Nadpisania składek"
@@ -6113,6 +6263,190 @@ msgstr ""
 msgid "Your role can read this plan but not change it."
 msgstr "Twoja rola pozwala czytać ten plan, ale nie zmieniać go."
 
+msgid "Linked inputs"
+msgstr "Połączone dane"
+
+#, python-format
+msgid "As of %(day)s"
+msgstr "Na dzień %(day)s"
+
+msgid ""
+"Values read from the app's own data. The projection still uses the "
+"scenario currency and start year; nothing is written by a preview."
+msgstr ""
+"Wartości odczytane z danych aplikacji. Prognoza nadal używa waluty "
+"scenariusza i roku początkowego; podgląd niczego nie zapisuje."
+
+#, python-format
+msgid ""
+"Only %(months)d of the last 12 full months have data. The annual amount "
+"is scaled from those months."
+msgstr ""
+"Tylko %(months)d z ostatnich 12 pełnych miesięcy ma dane. Kwota roczna "
+"jest przeliczona z tych miesięcy."
+
+#, python-format
+msgid ""
+"The latest included data is from %(month)s, before the window ends on "
+"%(end)s."
+msgstr ""
+"Najnowsze uwzględnione dane pochodzą z %(month)s, przed końcem okna "
+"%(end)s."
+
+#, python-format
+msgid ""
+"The plan starts in %(start)d but the linked data is as of %(current)d. "
+"Later data cannot be included until the plan is recreated."
+msgstr ""
+"Plan zaczyna się w %(start)d, a połączone dane są na dzień %(current)d. "
+"Późniejsze dane nie mogą być uwzględnione, dopóki plan nie zostanie "
+"utworzony ponownie."
+
+#, python-format
+msgid "The latest price for %(name)s is stale."
+msgstr "Najnowsza cena dla %(name)s jest nieaktualna."
+
+#, python-format
+msgid "The latest FX rate for %(name)s is stale."
+msgstr "Najnowszy kurs walutowy dla %(name)s jest nieaktualny."
+
+msgid ""
+"The linked portfolio has sources but sums to zero today. The plan "
+"continues with a zero starting portfolio."
+msgstr ""
+"Połączony portfel ma źródła, ale dziś sumuje się do zera. Plan kontynuuje"
+" z zerowym portfelem początkowym."
+
+#, python-format
+msgid ""
+"%(count)s non-investable asset class is excluded from the linked "
+"portfolio."
+msgid_plural ""
+"%(count)s non-investable asset classes are excluded from the linked "
+"portfolio."
+msgstr[0] ""
+"%(count)s nieinwestycyjna klasa aktywów jest wyłączona z połączonego "
+"portfela."
+msgstr[1] ""
+"%(count)s nieinwestycyjne klasy aktywów są wyłączone z połączonego "
+"portfela."
+msgstr[2] ""
+"%(count)s nieinwestycyjnych klas aktywów jest wyłączonych z połączonego "
+"portfela."
+
+#, python-format
+msgid "%(count)s linked net-worth item is skipped to avoid double counting."
+msgid_plural "%(count)s linked net-worth items are skipped to avoid double counting."
+msgstr[0] ""
+"%(count)s połączona pozycja majątku jest pomijana, aby uniknąć podwójnego"
+" liczenia."
+msgstr[1] ""
+"%(count)s połączone pozycje majątku są pomijane, aby uniknąć podwójnego "
+"liczenia."
+msgstr[2] ""
+"%(count)s połączonych pozycji majątku jest pomijanych, aby uniknąć "
+"podwójnego liczenia."
+
+#, python-format
+msgid ""
+"As of %(day)s. Investable portfolio classes and manual net-worth items "
+"marked investable."
+msgstr ""
+"Na dzień %(day)s. Inwestycyjne klasy portfela i ręczne pozycje majątku "
+"oznaczone jako inwestycyjne."
+
+msgid "Linked starting portfolio breakdown"
+msgstr "Podział połączonego portfela początkowego"
+
+msgid "Trailing income"
+msgstr "Przychody z ostatnich 12 miesięcy"
+
+msgid "Trailing expenses"
+msgstr "Wydatki z ostatnich 12 miesięcy"
+
+msgid "per year"
+msgstr "rocznie"
+
+#, python-format
+msgid ""
+"Window %(start)s – %(end)s: %(months)d months with data; window total "
+"%(total)s."
+msgstr ""
+"Okno %(start)s – %(end)s: %(months)d miesięcy z danymi; suma w oknie "
+"%(total)s."
+
+msgid "Linked trailing income by category"
+msgstr "Połączone przychody z ostatnich 12 miesięcy według kategorii"
+
+msgid "Linked trailing expenses by category"
+msgstr "Połączone wydatki z ostatnich 12 miesięcy według kategorii"
+
+msgid "Window total"
+msgstr "Suma w oknie"
+
+msgid "Excluded categories"
+msgstr "Wykluczone kategorie"
+
+#, python-format
+msgid ""
+"Left out of the linked expenses; shown for transparency. Window total "
+"%(total)s."
+msgstr ""
+"Pominięte w połączonych wydatkach; pokazane dla przejrzystości. Suma w "
+"oknie %(total)s."
+
+msgid "Loan payoff suggestions"
+msgstr "Sugestie spłaty kredytów"
+
+msgid ""
+"Paying a loan off frees its contractual instalments from the payoff year "
+"onward. The amount is the next up to 12 contractual payments (interest, "
+"principal and costs, without overpayments), in today's money."
+msgstr ""
+"Spłata kredytu uwalnia jego umowne raty od roku spłaty. Kwota to następne"
+" maksymalnie 12 umownych płatności (odsetki, kapitał i koszty, bez "
+"nadpłat), w dzisiejszych pieniądzach."
+
+#, python-format
+msgid "Payoff in %(year)d frees %(amount)s/year (today's money)."
+msgstr "Spłata w %(year)d uwalnia %(amount)s/rok (w dzisiejszych pieniądzach)."
+
+#, python-format
+msgid "Based on the next %(months)d contractual instalments."
+msgstr "Na podstawie następnych %(months)d umownych rat."
+
+msgid "Add this loan payoff event? Unsaved changes in Plan inputs will be lost."
+msgstr ""
+"Dodać to zdarzenie spłaty kredytu? Niezapisane zmiany w danych planu "
+"zostaną utracone."
+
+msgid "Add payoff event"
+msgstr "Dodaj zdarzenie spłaty"
+
+msgid "Only editors can add a payoff event."
+msgstr "Tylko redaktorzy mogą dodać zdarzenie spłaty."
+
+msgid "This scenario is archived and read-only."
+msgstr "Ten scenariusz jest zarchiwizowany i tylko do odczytu."
+
+msgid "This loan is already paid off, so there is nothing to add."
+msgstr "Ten kredyt jest już spłacony, więc nie ma czego dodawać."
+
+msgid "A payoff event for this loan is already in the plan."
+msgstr "Zdarzenie spłaty tego kredytu jest już w planie."
+
+msgid "The loan schedule cannot be calculated. Check the loan settings."
+msgstr "Nie można obliczyć harmonogramu kredytu. Sprawdź ustawienia kredytu."
+
+msgid "The payoff year falls outside the plan window."
+msgstr "Rok spłaty wykracza poza okno planu."
+
+msgid "The loan is in another currency than the plan."
+msgstr "Kredyt jest w innej walucie niż plan."
+
+msgid "No positive annual amount can be calculated for this loan."
+msgstr "Nie można obliczyć dodatniej kwoty rocznej dla tego kredytu."
+
 #, python-format
 msgid "Bar capped at 100%%, exact value %(value)s"
 msgstr "Pasek ograniczony do 100%%, dokładna wartość %(value)s"
@@ -6225,21 +6559,15 @@ msgstr "Preferencja widoku; nie jest zapisywana ze scenariuszem."
 msgid "The projection is unavailable"
 msgstr "Prognoza jest niedostępna"
 
-#, python-format
-msgid ""
-"The plan is missing a resolved starting value for %(field)s. Linked "
-"inputs arrive in a later update; enter the value manually in Plan inputs."
-msgstr ""
-"W planie brakuje ustalonej wartości początkowej dla: %(field)s. Dane "
-"powiązane pojawią się w późniejszej aktualizacji; wpisz wartość ręcznie w"
-" danych planu."
+msgid "The linked input could not be resolved."
+msgstr "Nie udało się ustalić połączonej wartości."
 
 msgid ""
-"The saved plan cannot be projected. Check the starting values and rates "
-"in Plan inputs, then preview the result."
+"Switch the affected input to Manual in Plan inputs, or fix the linked "
+"data."
 msgstr ""
-"Nie można wykonać prognozy zapisanego planu. Sprawdź wartości początkowe "
-"i stopy w danych planu, a następnie wyświetl podgląd wyniku."
+"Przełącz odpowiednie pole na ręczne w danych planu lub popraw połączone "
+"dane."
 
 msgid ""
 "Projections are illustrative and not financial advice. The projection "
@@ -6403,9 +6731,6 @@ msgstr ""
 #, python-format
 msgid "archived %(date)s"
 msgstr "zarchiwizowano %(date)s"
-
-msgid "Archived"
-msgstr "Zarchiwizowana"
 
 #, python-format
 msgid "Start year %(year)d · age %(age)d at the start · currency %(currency)s"
@@ -12578,4 +12903,39 @@ msgstr "Usuń obszar roboczy…"
 #~ " stanowią porady finansowej. Silnik prognoz"
 #~ " i dane powiązane pojawią się w "
 #~ "późniejszych aktualizacjach."
+
+#~ msgid ""
+#~ "Reading this input from the app's "
+#~ "data arrives in a later update. "
+#~ "Enter it manually."
+#~ msgstr ""
+#~ "Odczyt tego pola z danych aplikacji "
+#~ "pojawi się w późniejszej aktualizacji. "
+#~ "Wprowadź je ręcznie."
+
+#~ msgid "From the app's data (coming later)"
+#~ msgstr "Z danych aplikacji (później)"
+
+#~ msgid ""
+#~ "The plan is missing a resolved "
+#~ "starting value for %(field)s. Linked "
+#~ "inputs arrive in a later update; "
+#~ "enter the value manually in Plan "
+#~ "inputs."
+#~ msgstr ""
+#~ "W planie brakuje ustalonej wartości "
+#~ "początkowej dla: %(field)s. Dane powiązane "
+#~ "pojawią się w późniejszej aktualizacji; "
+#~ "wpisz wartość ręcznie w danych planu."
+
+#~ msgid ""
+#~ "The saved plan cannot be projected. "
+#~ "Check the starting values and rates "
+#~ "in Plan inputs, then preview the "
+#~ "result."
+#~ msgstr ""
+#~ "Nie można wykonać prognozy zapisanego "
+#~ "planu. Sprawdź wartości początkowe i "
+#~ "stopy w danych planu, a następnie "
+#~ "wyświetl podgląd wyniku."
 

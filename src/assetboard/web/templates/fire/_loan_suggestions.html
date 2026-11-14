@@ -1,0 +1,45 @@
+{% from "macros/components.html" import csrf_input with context %}
+{% set suggestions = results.loan_suggestions %}
+{% if suggestions %}
+<section class="mt-6" aria-labelledby="loan-suggestions-heading" id="fire-loan-suggestions" data-fire-loan-suggestions>
+  <div class="panel p-6 sm:p-7">
+    <h2 id="loan-suggestions-heading" class="text-base font-semibold">{{ _("Loan payoff suggestions") }}</h2>
+    <p class="mt-1 text-sm text-muted">{{ _("Paying a loan off frees its contractual instalments from the payoff year onward. The amount is the next up to 12 contractual payments (interest, principal and costs, without overpayments), in today's money.") }}</p>
+    <ul class="mt-4 grid gap-3 lg:grid-cols-2">
+      {% for suggestion in suggestions %}
+      <li class="rounded-xl border border-line bg-surface p-4" data-fire-loan-suggestion="{{ suggestion.loan_id }}" data-fire-loan-state="{{ suggestion.state }}">
+        <div class="flex flex-wrap items-baseline justify-between gap-2">
+          <a class="font-semibold text-primary-ink underline underline-offset-2" href="{{ scoped_url(request, 'loan_detail', loan_id=suggestion.loan_id) }}" data-fire-loan-link>{{ suggestion.loan_name }}</a>
+          <span class="text-xs text-muted">{{ _("As of %(day)s", day=format_day(suggestion.as_of)) }}</span>
+        </div>
+        {% if suggestion.state == "available" %}
+        <p class="mt-2 text-sm">{{ _("Payoff in %(year)d frees %(amount)s/year (today's money).", year=suggestion.payoff_year, amount=format_money(suggestion.annual_amount, locale)) }}</p>
+        <p class="mt-1 text-xs text-muted">{{ _("Based on the next %(months)d contractual instalments.", months=suggestion.months_covered) }}</p>
+        {% if can_edit and not detail.scenario.archived %}
+        <form method="post" action="{{ scoped_url(request, 'fire_scenario_loan_payoff', scenario_id=detail.scenario.id) }}" class="mt-3" data-confirm="{{ _('Add this loan payoff event? Unsaved changes in Plan inputs will be lost.') }}">
+          {{ csrf_input() }}
+          <input type="hidden" name="loan_id" value="{{ suggestion.loan_id }}">
+          <button type="submit" class="btn-primary btn-sm" data-fire-loan-add>{{ _("Add payoff event") }}</button>
+        </form>
+        {% else %}
+        <p class="mt-2 text-xs text-muted">{{ _("Only editors can add a payoff event.") if not detail.scenario.archived else _("This scenario is archived and read-only.") }}</p>
+        {% endif %}
+        {% elif suggestion.state == "already_paid_off" %}
+        <p class="mt-2 text-sm text-muted">{{ _("This loan is already paid off, so there is nothing to add.") }}</p>
+        {% elif suggestion.state == "already_added" %}
+        <p class="mt-2 text-sm text-muted">{{ _("A payoff event for this loan is already in the plan.") }}</p>
+        {% elif suggestion.state == "schedule_error" %}
+        <p class="mt-2 text-sm text-muted">{{ _("The loan schedule cannot be calculated. Check the loan settings.") }}</p>
+        {% elif suggestion.state == "out_of_window" %}
+        <p class="mt-2 text-sm text-muted">{{ _("The payoff year falls outside the plan window.") }}</p>
+        {% elif suggestion.state == "currency_mismatch" %}
+        <p class="mt-2 text-sm text-muted">{{ _("The loan is in another currency than the plan.") }}</p>
+        {% else %}
+        <p class="mt-2 text-sm text-muted">{{ _("No positive annual amount can be calculated for this loan.") }}</p>
+        {% endif %}
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+{% endif %}

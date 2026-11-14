@@ -8,6 +8,7 @@ state-changing route is covered by the router-level ``require_csrf`` dependency.
 from __future__ import annotations
 
 import re
+from collections.abc import Sequence
 from decimal import Decimal
 from uuid import UUID
 
@@ -27,7 +28,7 @@ from assetboard.domain.fire import (
 from assetboard.domain.money import Money
 from assetboard.domain.transactions import EntryError, amount_minor
 from assetboard.i18n import gettext
-from assetboard.i18n.dates import format_day
+from assetboard.i18n.dates import format_day, format_month
 from assetboard.i18n.numbers import (
     format_amount_input,
     format_money,
@@ -35,6 +36,7 @@ from assetboard.i18n.numbers import (
     format_rate_short,
     parse_amount,
 )
+from assetboard.services import fire_linked as fire_linked_service
 from assetboard.services import fire_projection as fire_projection_service
 from assetboard.services import fire_scenarios as fire_service
 from assetboard.services.context import Context, Role, has_role, require_role
@@ -70,7 +72,11 @@ ERRORS = {
     "invalid_expenses_mode": _("Choose how starting expenses are entered."),
     "invalid_portfolio_mode": _("Choose how the starting portfolio is entered."),
     "linked_mode_unavailable": _(
-        "Reading this input from the app's data arrives in a later update. Enter it manually."
+        "This input can only be resolved while saving; preview the plan from its page."
+    ),
+    "invalid_expense_exclusion": _(
+        "An excluded category is no longer a regular expense category of this workspace. "
+        "Reload the page and try again."
     ),
     "invalid_amount": _("Enter a valid non-negative amount in the plan currency."),
     "duplicate_name": _("Another active scenario already has this name."),
@@ -94,6 +100,53 @@ ERRORS = {
     "invalid_extreme_rates": _("Tick the confirmation box only when you mean the unusual rates."),
     "missing_starting_value": _("The plan is missing a starting value."),
     "invalid_projection": _("The saved plan cannot be projected."),
+    "loan_payoff_unavailable": _("This loan payoff can no longer be added."),
+    "loan_event_exists": _("This loan payoff is already in the plan."),
+}
+
+RESULT_BLOCK_MESSAGES = {
+    "missing_starting_value": _("The plan is missing a resolved starting value."),
+    "invalid_projection": _("The saved plan cannot be projected."),
+    "no_income_data": _(
+        "No regular income transactions fall in the last 12 full months, so linked income is "
+        "unavailable. Add income to the ledger or switch this input to Manual."
+    ),
+    "no_expense_data": _(
+        "No regular expense transactions fall in the last 12 full months, so linked expenses are "
+        "unavailable. Add expenses to the ledger or switch this input to Manual."
+    ),
+    "expenses_all_excluded": _(
+        "Every regular expense category in the window is excluded, so linked expenses are "
+        "unavailable. Clear an exclusion or switch this input to Manual."
+    ),
+    "ledger_currency_mismatch": _(
+        "Some ledger rows in the window use another currency. Linked values need only the "
+        "scenario currency; switch this input to Manual or review those rows."
+    ),
+    "scenario_currency_mismatch": _(
+        "The workspace base currency no longer matches the scenario's currency, so linked "
+        "values are unavailable. Create a new scenario or switch these inputs to Manual."
+    ),
+    "no_linked_portfolio_data": _(
+        "No investable portfolio classes or investable manual net-worth items were found. Add "
+        "data or switch the starting portfolio to Manual."
+    ),
+    "portfolio_price_missing": _(
+        "An investable holding has no current price. Add a price or switch the starting "
+        "portfolio to Manual."
+    ),
+    "portfolio_fx_missing": _(
+        "An investable holding has no FX rate to the scenario currency. Add a rate or switch "
+        "the starting portfolio to Manual."
+    ),
+    "item_value_missing": _(
+        "An investable net-worth item has no value effective today. Add a valuation or switch "
+        "the starting portfolio to Manual."
+    ),
+    "item_fx_missing": _(
+        "An investable net-worth item has no FX rate to the scenario currency. Add a rate or "
+        "switch the starting portfolio to Manual."
+    ),
 }
 
 FALLBACK_ERROR = _("The scenario could not be saved. Reload the page and try again.")
@@ -105,6 +158,7 @@ NOTICES = {
     "archived": _("Scenario archived."),
     "restored": _("Scenario restored."),
     "default_changed": _("Default scenario changed."),
+    "loan_event_added": _("Loan payoff added to the plan."),
 }
 
 RULE_LABELS = {
@@ -305,8 +359,19 @@ def _event_inputs(
 
 
 def _scenario_input(
-    values: dict[str, str], locale: str, currency: str
+    values: dict[str, str],
+    locale: str,
+    currency: str,
+    exclusion_ids: Sequence[str] = (),
 ) -> fire_service.FireScenarioInput:
+    exclusions: list[UUID] = []
+    for value in exclusion_ids:
+        try:
+            exclusions.append(UUID(value))
+        except ValueError:
+            raise fire_service.FireError(
+                "expense_exclusions", "invalid_expense_exclusion"
+            ) from None
     return fire_service.FireScenarioInput(
         name=values.get("name", ""),
         birth_year=_optional_int(values, "birth_year", "invalid_birth_year"),
@@ -327,6 +392,7 @@ def _scenario_input(
         portfolio_manual=_scenario_money(
             values, "portfolio_manual", locale, currency, "portfolio_manual"
         ),
+        expense_exclusion_ids=tuple(exclusions),
         extreme_rates_confirmed=values.get("extreme_rates_confirmed") == "1",
         contributions=_contribution_inputs(values, locale, currency),
         events=_event_inputs(values, locale, currency),
@@ -459,6 +525,7 @@ def _form_context(
     values: dict[str, str] | None,
     contribution_rows: list[dict[str, str]] | None,
     event_rows: list[dict[str, str]] | None,
+    exclusion_ids: Sequence[str] | None = None,
     error: str | None = None,
     error_code: str | None = None,
     error_field: str | None = None,
@@ -486,6 +553,23 @@ def _form_context(
         contribution_rows = _contribution_rows(detail, locale) if detail is not None else []
     if event_rows is None:
         event_rows = _event_rows(detail, locale) if detail is not None else []
+    if exclusion_ids is None:
+        exclusion_ids = (
+            tuple(str(category_id) for category_id in detail.expense_exclusion_ids)
+            if detail is not None
+            else ()
+        )
+    selected_exclusions: set[UUID] = set()
+    for value in exclusion_ids:
+        try:
+            selected_exclusions.add(UUID(value))
+        except ValueError:
+            continue
+    exclusion_options = fire_linked_service.expense_exclusion_options(
+        request.app.state.session_factory,
+        ctx,
+        selected_ids=selected_exclusions,
+    )
     empty_contribution = _blank_row(_row_index(contribution_rows), _CONTRIBUTION_FIELDS)
     empty_event = _blank_row(_row_index(event_rows), _EVENT_FIELDS)
     window_end: int | None = None
@@ -521,6 +605,8 @@ def _form_context(
         "empty_contribution": empty_contribution,
         "event_rows": event_rows,
         "empty_event": empty_event,
+        "expense_exclusion_options": exclusion_options,
+        "selected_exclusion_ids": selected_exclusions,
         "rule_labels": {code: _t(request, label) for code, label in RULE_LABELS.items()},
         "event_kind_labels": {
             code: _t(request, label) for code, label in EVENT_KIND_LABELS.items()
@@ -584,8 +670,14 @@ def _results_context(
         "field_labels": {
             field: _t(request, label) for field, label in STARTING_FIELD_LABELS.items()
         },
+        "block_messages": {
+            code: _t(request, message) for code, message in RESULT_BLOCK_MESSAGES.items()
+        },
+        "linked": results.linked,
         "format_money": format_money,
         "format_rate_short": format_rate_short,
+        "format_day": lambda day: format_day(day, request.state.locale),
+        "format_month": lambda month: format_month(month, request.state.locale),
         "rule_labels": {code: _t(request, label) for code, label in RULE_LABELS.items()},
         "event_kind_labels": {
             code: _t(request, label) for code, label in EVENT_KIND_LABELS.items()
@@ -607,6 +699,7 @@ def _combined_context(
     values: dict[str, str] | None = None,
     contribution_rows: list[dict[str, str]] | None = None,
     event_rows: list[dict[str, str]] | None = None,
+    exclusion_ids: Sequence[str] | None = None,
 ) -> dict[str, object]:
     detail = results.detail
     context = _form_context(
@@ -617,6 +710,7 @@ def _combined_context(
         values=values,
         contribution_rows=contribution_rows,
         event_rows=event_rows,
+        exclusion_ids=exclusion_ids,
         error=error,
         error_code=error_code,
         error_field=error_field,
@@ -638,9 +732,16 @@ def _combined_context(
     return context
 
 
-async def _form_values(request: Request) -> dict[str, str]:
+async def _form_data(request: Request) -> tuple[dict[str, str], list[str]]:
+    """Text fields plus the repeated ``expense_exclusion`` checkbox values."""
     form = await request.form()
-    return {key: value for key, value in form.items() if isinstance(value, str)}
+    values = {key: value for key, value in form.items() if isinstance(value, str)}
+    exclusions = [
+        value
+        for value in form.getlist("expense_exclusion")
+        if isinstance(value, str) and value.strip()
+    ]
+    return values, exclusions
 
 
 def _redirect(
@@ -702,14 +803,14 @@ async def fire_scenario_new(request: Request, ctx: CurrentContext) -> Response:
 @router.post("/fire", name="fire_scenario_create")
 async def fire_scenario_create(request: Request, ctx: CurrentContext) -> Response:
     require_role(ctx, Role.EDITOR)
-    values = await _form_values(request)
+    values, exclusion_ids = await _form_data(request)
     rows = _editor_rows(values, _CONTRIBUTION_KEY, "contribution", _CONTRIBUTION_FIELDS)
     event_rows = _editor_rows(values, _EVENT_KEY, "event", _EVENT_FIELDS)
     defaults = await run_in_threadpool(
         fire_service.scenario_defaults, request.app.state.session_factory, ctx
     )
     try:
-        scenario = _scenario_input(values, request.state.locale, defaults.currency)
+        scenario = _scenario_input(values, request.state.locale, defaults.currency, exclusion_ids)
         scenario_id = await run_in_threadpool(
             fire_service.create_fire_scenario,
             request.app.state.session_factory,
@@ -726,6 +827,7 @@ async def fire_scenario_create(request: Request, ctx: CurrentContext) -> Respons
             values=values,
             contribution_rows=rows,
             event_rows=event_rows,
+            exclusion_ids=exclusion_ids,
             error=_error(request, exc.code),
             error_code=exc.code,
             error_field=exc.field,
@@ -785,7 +887,7 @@ async def fire_scenario_preview(
 ) -> Response:
     """Return only the results fragment for the posted inputs; never write anything."""
     require_role(ctx, Role.EDITOR)
-    values = await _form_values(request)
+    values, exclusion_ids = await _form_data(request)
     detail = await run_in_threadpool(
         fire_service.get_fire_scenario,
         request.app.state.session_factory,
@@ -794,17 +896,25 @@ async def fire_scenario_preview(
     )
     basis = _basis(values.get("basis"))
     try:
-        scenario = _scenario_input(values, request.state.locale, detail.scenario.currency)
+        scenario = _scenario_input(
+            values, request.state.locale, detail.scenario.currency, exclusion_ids
+        )
         results = await run_in_threadpool(
             fire_projection_service.preview_scenario_results,
             ctx,
             detail,
             scenario,
+            factory=request.app.state.session_factory,
         )
     except fire_service.FireError as exc:
         # The preview never replaces the saved result with a broken one: show what is saved and
         # explain the field the user needs to fix.
-        saved = fire_projection_service.results_from_detail(detail)
+        saved = await run_in_threadpool(
+            fire_projection_service.scenario_results,
+            request.app.state.session_factory,
+            ctx,
+            detail.scenario.id,
+        )
         context = await run_in_threadpool(
             _results_context,
             request,
@@ -854,7 +964,7 @@ async def fire_scenario_csv(request: Request, ctx: CurrentContext, scenario_id: 
 @router.post("/fire/{scenario_id}", name="fire_scenario_update")
 async def fire_scenario_update(request: Request, ctx: CurrentContext, scenario_id: str) -> Response:
     require_role(ctx, Role.EDITOR)
-    values = await _form_values(request)
+    values, exclusion_ids = await _form_data(request)
     rows = _editor_rows(values, _CONTRIBUTION_KEY, "contribution", _CONTRIBUTION_FIELDS)
     event_rows = _editor_rows(values, _EVENT_KEY, "event", _EVENT_FIELDS)
     detail = await run_in_threadpool(
@@ -864,7 +974,9 @@ async def fire_scenario_update(request: Request, ctx: CurrentContext, scenario_i
         _uuid(scenario_id),
     )
     try:
-        scenario = _scenario_input(values, request.state.locale, detail.scenario.currency)
+        scenario = _scenario_input(
+            values, request.state.locale, detail.scenario.currency, exclusion_ids
+        )
         saved_id = await run_in_threadpool(
             fire_service.update_fire_scenario,
             request.app.state.session_factory,
@@ -873,7 +985,12 @@ async def fire_scenario_update(request: Request, ctx: CurrentContext, scenario_i
             scenario,
         )
     except fire_service.FireError as exc:
-        saved = await run_in_threadpool(fire_projection_service.results_from_detail, detail)
+        saved = await run_in_threadpool(
+            fire_projection_service.scenario_results,
+            request.app.state.session_factory,
+            ctx,
+            detail.scenario.id,
+        )
         context = await run_in_threadpool(
             _combined_context,
             request,
@@ -887,6 +1004,7 @@ async def fire_scenario_update(request: Request, ctx: CurrentContext, scenario_i
             values=values,
             contribution_rows=rows,
             event_rows=event_rows,
+            exclusion_ids=exclusion_ids,
         )
         return render_template(request, "fire/results.html", status_code=400, context=context)
     return _redirect(
@@ -948,6 +1066,41 @@ async def fire_scenario_archive(
     except fire_service.FireError as exc:
         return _redirect(request, "fire_scenarios", error=exc.code)
     return _redirect(request, "fire_scenarios", notice="archived")
+
+
+@router.post("/fire/{scenario_id}/loan-payoff", name="fire_scenario_loan_payoff")
+async def fire_scenario_loan_payoff(
+    request: Request, ctx: CurrentContext, scenario_id: str
+) -> Response:
+    """One-click loan payoff event; a full POST outside the live-preview form."""
+    require_role(ctx, Role.EDITOR)
+    form = await request.form()
+    loan_value = form.get("loan_id")
+    try:
+        loan_id = _uuid(loan_value if isinstance(loan_value, str) else "")
+        outcome = await run_in_threadpool(
+            fire_linked_service.add_loan_payoff_event,
+            request.app.state.session_factory,
+            ctx,
+            _uuid(scenario_id),
+            loan_id,
+        )
+    except fire_linked_service.LinkedError as exc:
+        return _redirect(
+            request,
+            "fire_scenario",
+            error=exc.code,
+            anchor="fire-loan-suggestions",
+            scenario_id=str(_uuid(scenario_id)),
+        )
+    return _redirect(
+        request,
+        "fire_scenario",
+        notice="loan_event_added" if outcome == "added" else None,
+        error=None if outcome == "added" else "loan_event_exists",
+        anchor="fire-loan-suggestions",
+        scenario_id=str(_uuid(scenario_id)),
+    )
 
 
 @router.post("/fire/{scenario_id}/restore", name="fire_scenario_restore")
