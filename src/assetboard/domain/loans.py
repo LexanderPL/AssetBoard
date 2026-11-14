@@ -553,8 +553,12 @@ def _next_due_date(anchor: date, first_payment_date: date, payment_day: int) -> 
     return nominal_payment_after(anchor, payment_day)
 
 
-def _payment_dates(terms: LoanTerms, anchor_date: date) -> tuple[date, ...]:
+def _payment_dates(
+    terms: LoanTerms, anchor_date: date, first_draw_date: date | None = None
+) -> tuple[date, ...]:
     first = _next_due_date(anchor_date, terms.first_payment_date, terms.payment_day)
+    if first_draw_date is not None and first_draw_date >= first:
+        first = nominal_payment_after(first_draw_date, terms.payment_day)
     return tuple(
         [first]
         + [_add_months(first, index, terms.payment_day) for index in range(1, terms.term_months)]
@@ -576,8 +580,6 @@ def payment_delayed_after_transfer(
     first_transfer_date: date, first_payment_date: date, payment_day: int
 ) -> bool:
     """Whether the first payment is later than the next nominal day after the first transfer."""
-    if first_transfer_date >= first_payment_date:
-        return True
     return nominal_payment_after(first_transfer_date, payment_day) < first_payment_date
 
 
@@ -1067,7 +1069,8 @@ def build_schedule(
         )
 
     rates = _validate_rate_timeline(rate_timeline)
-    dates = _payment_dates(terms, anchor.date)
+    first_draw = future_draws[0].date if anchor.balance.amount_minor == 0 and future_draws else None
+    dates = _payment_dates(terms, anchor.date, first_draw)
     rows: list[ScheduleRow] = []
     balance = anchor.balance.amount_minor
     currency = terms.currency
@@ -1285,24 +1288,30 @@ def build_schedule(
     )
 
 
+def balance_on(schedule: Schedule, as_of: date) -> Money:
+    """The projected balance at ``as_of`` including transfers after the last payment row."""
+    valid_date(as_of, "as_of")
+    if as_of < schedule.anchor_date:
+        raise LoanValidationError("as_of", "invalid_date")
+    passed = [row for row in schedule.rows if row.date <= as_of]
+    last_date = passed[-1].date if passed else schedule.anchor_date
+    value = passed[-1].closing.amount_minor if passed else schedule.starting_balance.amount_minor
+    value += sum(
+        drawdown.amount.amount_minor
+        for drawdown in schedule.drawdowns
+        if last_date < drawdown.date <= as_of
+    )
+    return _money(value, schedule.currency)
+
+
 def summarize_schedule(schedule: Schedule, as_of: date) -> LoanScheduleSummary:
     """Lifetime and as-of totals for a built schedule (a payment on ``as_of`` is made)."""
     valid_date(as_of, "as_of")
     if as_of < schedule.anchor_date:
         raise LoanValidationError("as_of", "invalid_date")
     currency = schedule.currency
-    passed = [row for row in schedule.rows if row.date <= as_of]
     future = [row for row in schedule.rows if row.date > as_of]
-    last_date = passed[-1].date if passed else schedule.anchor_date
-    remaining_minor = (
-        passed[-1].closing.amount_minor if passed else schedule.starting_balance.amount_minor
-    )
-    remaining_minor += sum(
-        drawdown.amount.amount_minor
-        for drawdown in schedule.drawdowns
-        if last_date < drawdown.date <= as_of
-    )
-    remaining = _money(remaining_minor, schedule.currency)
+    remaining = balance_on(schedule, as_of)
     original = schedule.original_principal or schedule.starting_balance
     if schedule.drawdowns:
         drawn = _money(

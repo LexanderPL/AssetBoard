@@ -268,6 +268,9 @@ msgstr "Roczna premia"
 msgid "Car loan"
 msgstr "Kredyt samochodowy"
 
+msgid "Renovation loan"
+msgstr "Kredyt remontowy"
+
 msgid "Rent"
 msgstr "Czynsz"
 
@@ -9071,6 +9074,10 @@ msgid "Remaining"
 msgstr "Pozostało"
 
 #, python-format
+msgid "%(amount)s undrawn"
+msgstr "%(amount)s niewypłacone"
+
+#, python-format
 msgid "%% repaid"
 msgstr "%% spłacone"
 
@@ -9235,6 +9242,9 @@ msgstr "Pierwsza rata"
 
 msgid "override"
 msgstr "nadpisana"
+
+msgid "Calculated after the first transfer."
+msgstr "Obliczane po pierwszej transzy."
 
 msgid "Regular overpayment"
 msgstr "Regularna nadpłata"
@@ -9837,9 +9847,6 @@ msgstr "do %(to)s"
 msgid "Calculated first installment"
 msgstr "Obliczona pierwsza rata"
 
-msgid "Calculated after the first transfer."
-msgstr "Obliczane po pierwszej transzy."
-
 msgid "Save loan"
 msgstr "Zapisz kredyt"
 
@@ -10397,10 +10404,6 @@ msgstr "Śledź transze"
 #, python-format
 msgid "Drawn %(drawn)s of %(approved)s"
 msgstr "Wypłacono %(drawn)s z %(approved)s"
-
-#, python-format
-msgid "%(amount)s undrawn"
-msgstr "%(amount)s niewypłacone"
 
 #, python-format
 msgid "%(amount)s scheduled"

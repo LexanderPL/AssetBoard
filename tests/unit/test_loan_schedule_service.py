@@ -194,6 +194,36 @@ def test_a_tranched_loan_accrues_interest_only_on_drawn_money(
     assert data.summary.undrawn_principal.amount_minor == 30_000_000
 
 
+def test_a_future_first_transfer_does_not_create_zero_payment_rows(
+    team: WorkspaceDb,
+) -> None:
+    ctx = team.ctx("owner", "owner")
+    loan_id = _create(
+        team,
+        principal_original=_money(20_000_000),
+        first_payment_date=date(2026, 4, 1),
+        term_months=4,
+        drawdown_mode="tranches",
+    )
+    loans.add_transfer(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 6, 15),
+        amount=_money(20_000_000),
+    )
+    data = loan_schedule.loan_schedule(team.factory, ctx, loan_id)
+    assert data.schedule is not None and data.summary is not None
+    assert [row.date for row in data.schedule.rows] == [
+        date(2026, 7, 1),
+        date(2026, 8, 1),
+        date(2026, 9, 1),
+        date(2026, 10, 1),
+    ]
+    assert data.summary.next_payment_date == date(2026, 7, 1)
+    assert all(row.installment_total.amount_minor > 0 for row in data.schedule.rows)
+
+
 def test_a_schedule_error_returns_the_code_and_no_schedule(team: WorkspaceDb) -> None:
     ctx = team.ctx("owner", "owner")
     with team.factory.begin() as session:

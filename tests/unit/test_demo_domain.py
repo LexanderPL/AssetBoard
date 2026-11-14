@@ -163,9 +163,17 @@ def test_the_plan_contains_both_loan_entry_paths_and_a_reference_rate() -> None:
     plan = _plan(currency="PLN")
     assert len(plan.reference_rates) == 1
     assert plan.reference_rates[0].values[0][0] < plan.reference_rates[0].values[-1][0]
-    assert len(plan.loans) == 2
+    assert len(plan.loans) == 3
     assert {row.entry_path for row in plan.loans} == {"original", "current"}
     assert {row.rate_mode for row in plan.loans} == {"fixed", "variable"}
+    tranched = next(row for row in plan.loans if row.drawdown_mode == "tranches")
+    assert len(tranched.transfers) == 2
+    assert tranched.principal_original is not None
+    assert (
+        0
+        < sum(amount.amount_minor for _day, amount, _note in tranched.transfers)
+        < (tranched.principal_original.amount_minor)
+    )
     assert all(
         row.principal_original and row.principal_original.currency == "PLN" for row in plan.loans
     )

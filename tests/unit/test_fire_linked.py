@@ -866,6 +866,20 @@ def test_loan_payoff_states_for_archived_paid_off_currency_and_window(
     assert detail.scenario.start_year == 2026
 
 
+def test_a_future_tranche_is_not_already_paid_off(team: WorkspaceDb) -> None:
+    loan_id = _loan(team, name="Tranched", drawdown_mode="tranches")
+    loans.add_transfer(
+        team.factory,
+        _ctx(team),
+        loan_id,
+        date_value=date(2026, 6, 15),
+        amount=_money(24_000_000),
+    )
+    suggestions = _suggestions(team)
+    assert len(suggestions) == 1
+    assert suggestions[0].state == "available"
+
+
 def test_loan_payoff_states_for_a_broken_schedule_and_an_unusable_amount(
     team: WorkspaceDb, monkeypatch: pytest.MonkeyPatch
 ) -> None:

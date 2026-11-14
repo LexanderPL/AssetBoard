@@ -14,7 +14,7 @@ from assetboard.db.repositories import (
 )
 from assetboard.domain.loans import DayCount, LoanKind, LoanValidationError
 from assetboard.domain.money import Money
-from assetboard.services import loans
+from assetboard.services import loan_schedule, loans
 from assetboard.services.context import PermissionDenied
 from tests.tenant.workspace_db import WorkspaceDb, workspace_db
 
@@ -897,6 +897,81 @@ def test_converting_a_full_loan_seeds_a_neutral_transfer(team: WorkspaceDb) -> N
     with pytest.raises(loans.LoanError) as error:
         loans.convert_loan_to_tranched(team.factory, ctx, loan_id)
     assert error.value.code == "already_tranched"
+
+
+def test_conversion_keeps_a_checkpoint_and_the_interest_only_clock(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    loan_id = _original_loan(
+        team,
+        ctx,
+        term_months=60,
+        interest_only_months=24,
+        first_payment_date=date(2026, 2, 1),
+    )
+    with team.factory.begin() as session:
+        LoanBalanceCheckpointRepository(session, ctx).create(
+            loan_id=loan_id,
+            as_of=date(2026, 2, 15),
+            remaining_principal_minor=29_500_000,
+            note="",
+        )
+    before = loan_schedule.loan_schedule(team.factory, ctx, loan_id)
+    assert before.schedule is not None and before.summary is not None
+
+    loans.convert_loan_to_tranched(team.factory, ctx, loan_id)
+    view = loans.get_loan(team.factory, ctx, loan_id)
+    assert view.transfers[0].date == date(2026, 1, 1)
+    assert view.transfers[0].amount == _money(30_000_000)
+    after = loan_schedule.loan_schedule(team.factory, ctx, loan_id)
+    assert after.schedule is not None and after.summary is not None
+    assert after.summary.paid_principal == _money(500_000)
+    assert after.summary.undrawn_principal == _money(0)
+    first_amortizing = next(
+        row.date for row in after.schedule.rows if row.principal.amount_minor > 0
+    )
+    assert first_amortizing == date(2028, 2, 1)
+
+
+def test_shortening_the_term_cannot_strand_a_transfer(team: WorkspaceDb) -> None:
+    ctx = team.ctx("owner", "owner")
+    loan_id = _original_loan(
+        team,
+        ctx,
+        term_months=12,
+        drawdown_mode="tranches",
+    )
+    loans.add_transfer(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 1, 15),
+        amount=_money(1_000_000),
+    )
+    loans.add_transfer(
+        team.factory,
+        ctx,
+        loan_id,
+        date_value=date(2026, 10, 1),
+        amount=_money(1_000_000),
+    )
+    with pytest.raises(loans.LoanError) as error:
+        loans.update_loan_terms(
+            team.factory,
+            ctx,
+            loan_id,
+            name="Mortgage",
+            kind="annuity",
+            principal_original=_money(30_000_000),
+            current_balance=None,
+            balance_date=None,
+            origination_date=date(2026, 1, 1),
+            first_payment_date=date(2026, 2, 1),
+            term_months=6,
+            payment_day=1,
+            installment_override=None,
+        )
+    assert error.value.field == "term_months"
+    assert error.value.code == "transfer_after_final_payment"
 
 
 def test_a_transfer_after_the_last_scheduled_payment_is_refused(team: WorkspaceDb) -> None:

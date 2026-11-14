@@ -28,6 +28,7 @@ from assetboard.domain.loans import (
     LoanValidationError,
     Money,
     ScheduleError,
+    balance_on,
 )
 from assetboard.domain.networth import Side, Unavailable
 from assetboard.i18n import gettext
@@ -104,13 +105,7 @@ def loan_balance_at(
     except (ScheduleError, LoanValidationError):
         return UNAVAILABLE
 
-    projected = anchor.balance
-    for row in schedule.rows:
-        if row.date <= as_of:
-            projected = row.closing
-        else:
-            break
-
+    projected = balance_on(schedule, as_of)
     rows_by_date = {row.date: row for row in schedule.rows if row.date <= as_of}
     payments = LoanPaymentRepository(session, ctx).for_loan(loan_id)
     actual_by_row: dict[date, int] = {}

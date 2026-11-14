@@ -195,7 +195,7 @@ def test_csv_download_is_machine_readable(owner):
     assert response.headers["cache-control"] == "no-store"
     text = response.text
     assert text.startswith(
-        "n,date,rate,opening,interest,principal,overpayment,costs,total,closing,currency\r\n"
+        "n,date,rate,opening,transfer,interest,principal,overpayment,costs,total,closing,currency\r\n"
     )
     assert "\r\n" in text
     lines = text.split("\r\n")

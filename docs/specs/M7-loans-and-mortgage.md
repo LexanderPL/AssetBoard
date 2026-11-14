@@ -604,8 +604,9 @@ pay interest only on the money actually drawn; during the first years I may pay 
   and charts; only transfers through today affect the current balance, overview figures and net
   worth.
 - An existing or future full-at-origination loan can be switched to tranches. The switch is
-  neutral: seed one transfer at the latest checkpoint balance (or at origination for the
-  original principal). Reverse conversion is not offered.
+  neutral: an original-terms loan seeds one transfer at origination for the original principal
+  so the interest-only clock and the repaid-principal progress keep their real start; a
+  current-balance loan seeds one at its latest checkpoint. Reverse conversion is not offered.
 - The loan list and overview measure repaid principal against the **full approved principal**
   and show the drawn and undrawn amounts separately. Scenario rate shifts and overpayments keep
   the transfer timeline fixed.

@@ -725,16 +725,52 @@ def _loan_plan(
             ),
         ),
         overpayments=(),
+    )
+    renovation = DemoLoan(
+        name=translate(_("Renovation loan")),
+        kind="annuity",
+        entry_path="original",
+        principal_original=convert_amount(Decimal("120000"), currency, whole=True),
+        current_balance=None,
+        balance_date=None,
+        origination_date=_month_start(reference, -18),
+        first_payment_date=_month_start(reference, -17),
+        term_months=120,
+        payment_day=1,
+        rate_mode="fixed",
+        fixed_rate_bp=650,
+        reference_rate_name=None,
+        margin_bp=None,
+        installment_override=None,
+        overpayment_mode="none",
+        overpayment_amount=None,
+        overpayment_strategy="reduce_term",
+        rate_changes=(),
+        costs=(
+            DemoLoanCost(
+                name=translate(_("Bank fee")),
+                mode="fixed",
+                rate_bp=None,
+                fixed=convert_amount(Decimal("5"), currency, whole=True),
+                effective_from=_month_start(reference, -18),
+            ),
+        ),
+        overpayments=(),
         drawdown_mode="tranches",
         transfers=(
             (
-                _month_start(reference, -1),
-                convert_amount(Decimal("15000"), currency, whole=True),
+                _month_start(reference, -18),
+                convert_amount(Decimal("80000"), currency, whole=True),
+                "",
+            ),
+            (
+                _month_start(reference, -12),
+                convert_amount(Decimal("20000"), currency, whole=True),
                 "",
             ),
         ),
     )
-    return reference_rates, (mortgage, car)
+    return reference_rates, (mortgage, car, renovation)
 
 
 def _recurring_plan(reference: date, currency: str, translate: Translate) -> list[DemoRecurring]:

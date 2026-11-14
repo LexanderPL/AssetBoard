@@ -265,6 +265,9 @@ msgstr ""
 msgid "Car loan"
 msgstr ""
 
+msgid "Renovation loan"
+msgstr ""
+
 msgid "Rent"
 msgstr ""
 
@@ -8325,6 +8328,10 @@ msgstr ""
 msgid "Remaining"
 msgstr ""
 
+#, fuzzy, python-format
+msgid "%(amount)s undrawn"
+msgstr ""
+
 #, python-format
 msgid "%% repaid"
 msgstr ""
@@ -8485,6 +8492,9 @@ msgid "First installment"
 msgstr ""
 
 msgid "override"
+msgstr ""
+
+msgid "Calculated after the first transfer."
 msgstr ""
 
 msgid "Regular overpayment"
@@ -9026,9 +9036,6 @@ msgstr ""
 msgid "Calculated first installment"
 msgstr ""
 
-msgid "Calculated after the first transfer."
-msgstr ""
-
 msgid "Save loan"
 msgstr ""
 
@@ -9532,10 +9539,6 @@ msgstr ""
 
 #, python-format
 msgid "Drawn %(drawn)s of %(approved)s"
-msgstr ""
-
-#, fuzzy, python-format
-msgid "%(amount)s undrawn"
 msgstr ""
 
 #, python-format

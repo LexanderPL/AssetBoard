@@ -800,7 +800,10 @@ def loan_payoff_suggestions_in_session(
             row.interest.amount_minor + row.principal.amount_minor + row.costs.amount_minor
             for row in covered
         )
-        if summary.remaining_principal.amount_minor == 0:
+        if (
+            summary.remaining_principal.amount_minor == 0
+            and summary.undrawn_principal.amount_minor == 0
+        ):
             state: SuggestionState = "already_paid_off"
         elif payoff_year is None or annual <= 0 or annual > MAX_AMOUNT_MINOR:
             state = "amount_invalid"

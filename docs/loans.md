@@ -95,9 +95,11 @@ charts, scenarios and projections, but only transfers on or before today change 
 balance, the overview and net worth.
 
 A loan entered from the original terms can be switched to tranches with **Track transfers**.
-The switch is neutral: the app seeds one transfer at the latest balance checkpoint (or at
-origination when there is none) with the current balance. Existing full-at-origination loans
-keep their old behaviour until you switch them.
+The switch is neutral: the app seeds one transfer at origination for the original principal, so
+the interest-only clock and the repaid-principal progress keep their real start; later balance
+checkpoints still win when the schedule is read. A loan entered from a current balance has no
+origination history, so it seeds one transfer at the latest balance checkpoint. Existing
+full-at-origination loans keep their old behaviour until you switch them.
 
 **Interest-only months** are part of the loan term. Enter `0` to start repaying principal with
 the first payment, or a positive number to pay only interest until that phase ends. The phase
