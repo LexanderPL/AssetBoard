@@ -338,6 +338,67 @@ Implement F8.5 from docs/specs/M8-fire-planner.md: multi-scenario comparison pag
 heat-map grid UI.
 ```
 
+### As built (M8.F8.5)
+
+- `domain.fire.sensitivity(inputs, return_deltas_bp, expense_factors_bp)` returns a
+  `SensitivityGrid` of `SensitivityRow`/`SensitivityCell` values. The default axes are the
+  approved real-return deltas `(-200, -100, 0, 100, 200)` bp and expense factors
+  `(8000, 9000, 10000, 11000, 12000)`. Each cell changes only `real_return_bp` and
+  `start_expenses`, the latter scaled once with half-away-from-zero rounding
+  (`base × factor / 10000`); contributions, cash flows, income and expense-change events keep
+  their saved values. The base cell is delta 0/factor 10000. Never-FIRE cells keep `None`; the
+  grid never is `None` and `min_fire_age`/`max_fire_age` cover reached cells only.
+  `SensitivityError(field, code)` covers empty/duplicate/non-integer/oversized axes, a missing
+  base cell, effective returns outside the hard rate bounds, factors outside 0..100000 and scaled
+  expenses beyond the projection amount limit. Invalid plan inputs keep
+  `FireProjectionError`. The function has no I/O, clock or mutation; the property tests constrain
+  return monotonicity to non-negative net-worth paths and cover expenses as the opposite
+  direction, with `None` treated as infinity.
+- `services.fire_comparison.compare_fire_scenarios` deduplicates ids preserving order, caps the
+  selection at three (`too_many_scenarios` before loading), loads every detail and child row in
+  four scoped queries, resolves F8.4 linked inputs per selected scenario through the same
+  session, and projects with `results_from_detail` (loan suggestions are not loaded). Rows keep
+  blocked messages and expose `never`, FIRE age/year, years to FIRE, real net worth at FIRE,
+  depletion age and whether depletion was checked. Mixed currencies return `currency_mismatch`
+  with no rows (no FX conversion); mixed start years are allowed and flagged. The service is
+  viewer-accessible, read-only, and its query count does not grow with contribution/event rows.
+  New scoped repository methods `FireScenarioRepository.by_ids` and `for_scenarios` on the three
+  child repositories are covered by the tenant-isolation tests.
+- `GET /fire/compare` is declared before `/fire/{scenario_id}`. It takes repeated `scenario`
+  UUIDs and `basis=nominal|real`; an invalid UUID is 404, and no selection preselects the default
+  active scenario, else the first active, else the first archived. More than three or mixed
+  currencies return 200 with a translated alert and the selector still usable. The page shows a
+  GET checkbox selector (active then archived, hidden basis, max-three note), the comparison
+  table with Default/Archived/Linked badges and per-block messages with links to Plan inputs, a
+  nominal/real basis toggle, a mixed-start-year warning, and an ECharts overlay. The chart uses
+  the union of calendar years with gaps outside each series, fixed colour tokens, translated
+  series names (archived suffix and duplicate disambiguation), FIRE-year tooltips, formatted
+  axes and an accessible plotted-data table. Blocked rows stay in the table and are omitted from
+  the chart; an all-blocked selection shows an empty-chart state. There are no edit controls and
+  no CSV. The scenario list links **Compare scenarios**; the results page links **Compare** with
+  the current scenario.
+- The results page has a **Sensitivity** panel after the plan-input form, outside
+  `#fire-form`/`#fire-results`. **Show sensitivity grid** loads `GET /fire/{id}/sensitivity`
+  through HTMX (`hx-get`/`hx-target`/`hx-swap`) with the no-JS fallback
+  `GET /fire/{id}?sensitivity=1#sensitivity`; **Refresh grid** reloads the same fragment. The
+  fragment states that it uses the saved plan, not unsaved changes, and uses the saved linked
+  values and exclusions. `web.fire_sensitivity` prepares the 5×5 headers (effective rate and
+  signed pp delta), expense row labels, ages, fixed tone codes, titles and screen-reader
+  sentences with `gettext` and `format_rate_short`. The template maps tones to Tailwind classes:
+  better/same/base/worse/never, with a visible base ring and badge, `—` for never, a caption,
+  `aria-describedby` legend, mobile scroll and a sticky expense column. A blocked plan shows its
+  block panel without a grid; an invalid sensitivity axis shows a translated range error;
+  archived scenarios and viewers can load it. All routes are GETs and read-only.
+- Tests: domain grid/base/scaling/validation/determinism and two monotonicity properties; the
+  server label/tone builder; comparison service order, metrics, dedupe, limits, NotFound,
+  currencies, start years, blocks, never, archived/viewer, linked values/exclusions, no writes
+  and a query budget independent of child rows; comparison chart union/gaps/bases/labels/tooltips/
+  accessibility; web comparison selector/preselection/1-3 rows/4 limit/mixed currency/404/
+  blocked/never/all-blocked/badges/viewer/archived/basis/mixed-start/chart JSON and GET/no-CSRF;
+  web sensitivity HTMX/no-JS/fragment/5×5/base/tones/legend/aria/mobile/linked/blocked/axis
+  error/archived/viewer/preview independence. `docs/fire.md` documents both features; Polish is
+  complete with no fuzzy entries. No migration, model, dependency or ADR is added.
+
 ---
 
 ## F8.6 Archive extension: FIRE scenarios
