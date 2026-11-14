@@ -1717,6 +1717,119 @@ msgstr ""
 msgid "Loan files are restored only; they were ignored in this merge."
 msgstr ""
 
+msgid "FIRE files are restored only; they were ignored in this merge."
+msgstr ""
+
+#, python-format
+msgid ""
+"A linked FIRE input in %(scenario)s has no source data in this archive; "
+"it was restored as a manual value."
+msgstr ""
+
+#, python-format
+msgid ""
+"A linked FIRE input in %(scenario)s has no source data and no saved "
+"fallback; it was restored as 0."
+msgstr ""
+
+#, python-format
+msgid ""
+"A FIRE expense exclusion in %(scenario)s references a category that is "
+"not in this archive; it was skipped."
+msgstr ""
+
+#, python-format
+msgid ""
+"A FIRE event in %(scenario)s references a loan that is not in this "
+"archive; the link was cleared."
+msgstr ""
+
+#, python-format
+msgid ""
+"The archive had no active default FIRE scenario; %(scenario)s was made "
+"the default."
+msgstr ""
+
+msgid "A FIRE scenario id appears more than once."
+msgstr ""
+
+msgid "Two active FIRE scenarios have the same name."
+msgstr ""
+
+msgid "An archived FIRE scenario cannot be the default."
+msgstr ""
+
+msgid "More than one FIRE scenario is the default."
+msgstr ""
+
+msgid "The FIRE scenario's birth or start year is invalid."
+msgstr ""
+
+msgid "The FIRE scenario's horizon is not after its start age."
+msgstr ""
+
+msgid "The FIRE scenario's stop-working age is before its start age."
+msgstr ""
+
+msgid "A FIRE scenario with the withdrawal rule needs a valid withdrawal rate."
+msgstr ""
+
+msgid "A manual FIRE input has an invalid amount."
+msgstr ""
+
+msgid "A manual FIRE input needs an amount."
+msgstr ""
+
+msgid "Only a linked FIRE input can have a fallback value."
+msgstr ""
+
+msgid "A linked FIRE input cannot have a manual value."
+msgstr ""
+
+msgid "A FIRE row references an unknown or differently named scenario."
+msgstr ""
+
+msgid "A FIRE contribution id appears more than once."
+msgstr ""
+
+msgid "A FIRE scenario has two contributions for one year."
+msgstr ""
+
+msgid "A FIRE contribution year is outside the plan window."
+msgstr ""
+
+msgid "A FIRE event id appears more than once."
+msgstr ""
+
+msgid "A FIRE event year is outside the plan window."
+msgstr ""
+
+msgid "A FIRE expense exclusion id appears more than once."
+msgstr ""
+
+msgid "A FIRE scenario excludes the same expense category more than once."
+msgstr ""
+
+msgid ""
+"A FIRE expense exclusion references a category that is not a regular "
+"expense category."
+msgstr ""
+
+msgid "Enter a FIRE scenario name of 1 to 200 characters."
+msgstr ""
+
+msgid "Enter an event description of 1 to 200 characters."
+msgstr ""
+
+msgid "Enter a year between 1900 and 2199."
+msgstr ""
+
+msgid "Enter a valid age."
+msgstr ""
+
+msgid "Enter a withdrawal rate in basis points between 50 and 2000."
+msgstr ""
+
 msgid "A different value is already stored for this date; it is kept."
 msgstr ""
 
@@ -10929,6 +11042,33 @@ msgstr ""
 msgid "Risk targets restored"
 msgstr ""
 
+msgid "FIRE scenarios"
+msgstr ""
+
+msgid "FIRE contributions"
+msgstr ""
+
+msgid "FIRE events"
+msgstr ""
+
+msgid "FIRE expense exclusions"
+msgstr ""
+
+msgid "FIRE inputs restored as manual"
+msgstr ""
+
+msgid "FIRE inputs restored as zero"
+msgstr ""
+
+msgid "FIRE exclusions skipped"
+msgstr ""
+
+msgid "FIRE loan links cleared"
+msgstr ""
+
+msgid "FIRE default scenario promoted"
+msgstr ""
+
 msgid "Suggested categories to remove"
 msgstr ""
 
@@ -12408,5 +12548,35 @@ msgstr ""
 #~ "The expense range is outside the "
 #~ "supported 0% to 1000% of the saved"
 #~ " plan."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A linked FIRE input has no source"
+#~ " data in this archive; it was "
+#~ "restored as a manual value."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A linked FIRE input has no source"
+#~ " data and no saved fallback; it "
+#~ "was restored as 0."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A FIRE expense exclusion references a"
+#~ " category that is not in this "
+#~ "archive; it was skipped."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A FIRE event references a loan "
+#~ "that is not in this archive; the"
+#~ " link was cleared."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The archive had no active default "
+#~ "FIRE scenario; the first active one "
+#~ "was made the default."
 #~ msgstr ""
 

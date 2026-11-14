@@ -37,6 +37,10 @@ from assetboard.db.repositories import (
     BudgetLineRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
+    FireContributionRepository,
+    FireEventRepository,
+    FireExpenseExclusionRepository,
+    FireScenarioRepository,
     FxRateRepository,
     ImportCategoryMappingRepository,
     InstallmentPlanRepository,
@@ -63,18 +67,23 @@ from assetboard.db.repositories import (
     TransactionRepository,
 )
 from assetboard.domain.archive import (
+    FIRE_CSV_FILES,
     INVESTMENT_CSV_FILES,
     LOAN_CSV_FILES,
     NETWORTH_CSV_FILES,
     ArchiveRows,
     BudgetLineRow,
     CategoryRow,
+    FireEventRow,
+    FireExpenseExclusionRow,
+    FireScenarioRow,
     NetWorthItemRow,
     ParsedArchive,
     TransactionRow,
 )
 from assetboard.domain.categories import Kind, Treatment, clean_color, clean_name, name_key
 from assetboard.domain.category_mapping import CategorySnapshot, next_color
+from assetboard.domain.fire import trailing_window
 from assetboard.domain.import_csv import (
     parse_date,
     parse_month,
@@ -175,6 +184,15 @@ def _restore_counts(**values: int) -> dict[str, int]:
         "loan_balance_checkpoints_created": 0,
         "loan_scenarios_created": 0,
         "installment_plans_created": 0,
+        "fire_scenarios_created": 0,
+        "fire_contributions_created": 0,
+        "fire_events_created": 0,
+        "fire_expense_exclusions_created": 0,
+        "fire_linked_fallbacks": 0,
+        "fire_missing_fallbacks": 0,
+        "fire_skipped_exclusions": 0,
+        "fire_cleared_source_loans": 0,
+        "fire_default_promoted": 0,
         **values,
     }
 
@@ -364,6 +382,10 @@ def _restore_counts_for(
             + len(rows.loan_balance_checkpoints)
             + len(rows.loan_scenarios)
             + len(rows.installment_plans)
+            + len(rows.fire_scenarios)
+            + len(rows.fire_contributions)
+            + len(rows.fire_events)
+            + len(rows.fire_expense_exclusions)
             + (1 if rows.risk_target_policy is not None else 0)
         ),
         categories_created=len(rows.categories),
@@ -1433,6 +1455,8 @@ def _merge(
         warnings.append(_entry("investment_restore_only", file="archive"))
     if any(name in archive.files for name in LOAN_CSV_FILES):
         warnings.append(_entry("loan_restore_only", file="archive"))
+    if any(name in archive.files for name in FIRE_CSV_FILES):
+        warnings.append(_entry("fire_restore_only", file="archive"))
     report = _empty_report(
         counts=counts,
         months=months_report,
@@ -1457,6 +1481,361 @@ def _merge(
 
 
 # --- restore ----------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class _FireScenarioDecision:
+    row: FireScenarioRow
+    line: int
+    income_mode: str
+    income_manual_minor: int | None
+    expenses_mode: str
+    expenses_manual_minor: int | None
+    portfolio_mode: str
+    portfolio_manual_minor: int | None
+    excluded_category_ids: tuple[UUID, ...]
+    fallback_fields: tuple[str, ...]
+    missing_fallback_fields: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class _FireRestorePlan:
+    decisions: tuple[_FireScenarioDecision, ...]
+    skipped_exclusions: tuple[FireExpenseExclusionRow, ...]
+    cleared_source_loan_events: tuple[FireEventRow, ...]
+    promoted_default_id: str | None
+    warnings: tuple[dict[str, object], ...]
+
+    def counts(self, archive: ParsedArchive) -> dict[str, int]:
+        return {
+            "fire_scenarios_created": len(self.decisions),
+            "fire_contributions_created": len(archive.rows.fire_contributions),
+            "fire_events_created": len(archive.rows.fire_events),
+            "fire_expense_exclusions_created": (
+                len(archive.rows.fire_expense_exclusions) - len(self.skipped_exclusions)
+            ),
+            "fire_linked_fallbacks": sum(
+                len(decision.fallback_fields) for decision in self.decisions
+            ),
+            "fire_missing_fallbacks": sum(
+                len(decision.missing_fallback_fields) for decision in self.decisions
+            ),
+            "fire_skipped_exclusions": len(self.skipped_exclusions),
+            "fire_cleared_source_loans": len(self.cleared_source_loan_events),
+            "fire_default_promoted": 1 if self.promoted_default_id is not None else 0,
+        }
+
+
+def _fire_restore_plan(archive: ParsedArchive, today: date, base_currency: str) -> _FireRestorePlan:
+    """Decide which linked FIRE inputs the archive's own rows can still resolve.
+
+    One shared decision drives both the dry run and apply, so their counts and warnings match.
+    Missing exclusions never become a silent zero: linked expenses fall back, and a linked input
+    with no archived fallback becomes manual 0 with a warning.
+    """
+    categories = {UUID(row.id): row for row in archive.rows.categories}
+    loans = {UUID(row.id) for row in archive.rows.loans}
+    window = trailing_window(today)
+    warnings: list[dict[str, object]] = []
+    decisions: list[_FireScenarioDecision] = []
+    skipped_exclusions: list[FireExpenseExclusionRow] = []
+    cleared_events: list[FireEventRow] = []
+    promoted_default_id: str | None = None
+    active: list[FireScenarioRow] = []
+    linked_portfolio_source = (
+        any(row.investable == "true" for row in archive.rows.asset_classes)
+        or bool(archive.rows.instruments)
+        or bool(archive.rows.investment_transactions)
+        or any(
+            row.side == "asset"
+            and row.investable == "true"
+            and row.include_in_net_worth == "true"
+            and row.valuation_mode == "manual"
+            for row in archive.rows.networth_items
+        )
+    )
+
+    exclusions_by_scenario: dict[str, list[tuple[int, FireExpenseExclusionRow]]] = {}
+    for line, row in enumerate(archive.rows.fire_expense_exclusions, start=2):
+        exclusions_by_scenario.setdefault(row.scenario_id, []).append((line, row))
+
+    def in_window(row: TransactionRow) -> bool:
+        return bool(not row.deleted_at and window.contains(parse_date(row.date)))
+
+    def linked_series(scenario: FireScenarioRow, direction: str, excluded: set[UUID]) -> bool:
+        if scenario.currency != base_currency:
+            return False
+        for row in archive.rows.transactions:
+            if row.direction != direction or not in_window(row):
+                continue
+            category = categories.get(UUID(row.category_id))
+            if (
+                category is None
+                or category.treatment != "regular"
+                or row.currency != scenario.currency
+            ):
+                continue
+            if direction == "expense" and UUID(row.category_id) in excluded:
+                continue
+            return True
+        return False
+
+    for line, scenario in enumerate(archive.rows.fire_scenarios, start=2):
+        if not scenario.archived_at:
+            active.append(scenario)
+        scenario_exclusions = exclusions_by_scenario.get(scenario.id, ())
+        resolved_exclusions: list[UUID] = []
+        skipped_for_scenario: list[FireExpenseExclusionRow] = []
+        for exclusion_line, exclusion in scenario_exclusions:
+            category = categories.get(UUID(exclusion.category_id))
+            if (
+                category is None
+                or category.kind != "expense"
+                or category.treatment != "regular"
+                or category.name != exclusion.category
+            ):
+                skipped_exclusions.append(exclusion)
+                skipped_for_scenario.append(exclusion)
+                warning = _entry(
+                    "fire_exclusion_missing",
+                    file="fire_expense_exclusions.csv",
+                    line=exclusion_line,
+                    column="category_id",
+                )
+                warning["scenario"] = scenario.name
+                warnings.append(warning)
+                continue
+            resolved_exclusions.append(UUID(exclusion.category_id))
+        excluded = set(resolved_exclusions)
+        fallback_fields: list[str] = []
+        missing_fallback_fields: list[str] = []
+        decisions_for_modes: dict[str, tuple[str, int | None]] = {}
+        for direction, mode, manual_text, fallback_text, field in (
+            (
+                "income",
+                scenario.income_mode,
+                scenario.income_manual,
+                scenario.income_fallback,
+                "income_manual",
+            ),
+            (
+                "expense",
+                scenario.expenses_mode,
+                scenario.expenses_manual,
+                scenario.expenses_fallback,
+                "expenses_manual",
+            ),
+            (
+                "portfolio",
+                scenario.portfolio_mode,
+                scenario.portfolio_manual,
+                scenario.portfolio_fallback,
+                "portfolio_manual",
+            ),
+        ):
+            if mode == "manual":
+                decisions_for_modes[direction] = (
+                    "manual",
+                    _money_minor(manual_text, scenario.currency, allow_zero=True),
+                )
+                continue
+            if direction == "portfolio":
+                available = linked_portfolio_source and scenario.currency == base_currency
+            else:
+                available = linked_series(
+                    scenario,
+                    "income" if direction == "income" else "expense",
+                    excluded,
+                )
+            if direction == "expense" and skipped_for_scenario:
+                available = False
+            if available:
+                decisions_for_modes[direction] = (mode, None)
+                continue
+            fallback_fields.append(field)
+            warning = _entry(
+                "fire_linked_fallback",
+                file="fire_scenarios.csv",
+                line=line,
+                column=f"{direction}_mode" if direction != "expense" else "expenses_mode",
+            )
+            warning["scenario"] = scenario.name
+            warnings.append(warning)
+            if fallback_text:
+                fallback_minor: int | None = _money_minor(
+                    fallback_text, scenario.currency, allow_zero=True
+                )
+            else:
+                fallback_minor = 0
+                missing_fallback_fields.append(field)
+                warning = _entry(
+                    "fire_missing_fallback",
+                    file="fire_scenarios.csv",
+                    line=line,
+                    column=f"{direction}_fallback"
+                    if direction != "expense"
+                    else "expenses_fallback",
+                )
+                warning["scenario"] = scenario.name
+                warnings.append(warning)
+            decisions_for_modes[direction] = ("manual", fallback_minor)
+        decisions.append(
+            _FireScenarioDecision(
+                row=scenario,
+                line=line,
+                income_mode=decisions_for_modes["income"][0],
+                income_manual_minor=decisions_for_modes["income"][1],
+                expenses_mode=decisions_for_modes["expense"][0],
+                expenses_manual_minor=decisions_for_modes["expense"][1],
+                portfolio_mode=decisions_for_modes["portfolio"][0],
+                portfolio_manual_minor=decisions_for_modes["portfolio"][1],
+                excluded_category_ids=tuple(sorted(resolved_exclusions, key=str)),
+                fallback_fields=tuple(fallback_fields),
+                missing_fallback_fields=tuple(missing_fallback_fields),
+            )
+        )
+
+    if active and not any(row.is_default == "true" for row in active):
+        promoted_default_id = active[0].id
+        promoted_line = next(
+            line
+            for line, row in enumerate(archive.rows.fire_scenarios, start=2)
+            if row.id == promoted_default_id
+        )
+        warnings.append(
+            _entry(
+                "fire_default_promoted",
+                file="fire_scenarios.csv",
+                line=promoted_line,
+                column="is_default",
+            )
+        )
+        warnings[-1]["scenario"] = next(
+            row.name for row in archive.rows.fire_scenarios if row.id == promoted_default_id
+        )
+    for line, event in enumerate(archive.rows.fire_events, start=2):
+        if event.source_loan_id and UUID(event.source_loan_id) not in loans:
+            cleared_events.append(event)
+            warning = _entry(
+                "fire_source_loan_missing",
+                file="fire_events.csv",
+                line=line,
+                column="source_loan_id",
+            )
+            warning["scenario"] = event.scenario
+            warnings.append(warning)
+    return _FireRestorePlan(
+        decisions=tuple(decisions),
+        skipped_exclusions=tuple(skipped_exclusions),
+        cleared_source_loan_events=tuple(cleared_events),
+        promoted_default_id=promoted_default_id,
+        warnings=tuple(warnings),
+    )
+
+
+def _restore_fire(
+    session: Session,
+    ctx: Context,
+    batch: ImportBatch,
+    archive: ParsedArchive,
+    *,
+    restore_now: datetime,
+    category_ids: Mapping[UUID, UUID],
+    loan_ids: Mapping[UUID, UUID],
+    plan: _FireRestorePlan,
+) -> dict[str, int]:
+    """Recreate FIRE scenarios last, after every row their links point at exists."""
+    scenarios = FireScenarioRepository(session, ctx)
+    scenario_ids: dict[UUID, UUID] = {}
+    scenario_rows = {row.id: row for row in archive.rows.fire_scenarios}
+    for index, decision in enumerate(plan.decisions):
+        row = decision.row
+        is_default = row.is_default == "true" or row.id == plan.promoted_default_id
+        scenario = scenarios.create(
+            name=row.name,
+            name_key=name_key(row.name),
+            currency=row.currency,
+            birth_year=row.birth_year,
+            start_year=row.start_year,
+            inflation_bp=row.inflation_bp,
+            real_return_bp=row.real_return_bp,
+            income_growth_bp=row.income_growth_bp,
+            stop_working_age=row.stop_working_age,
+            horizon_age=row.horizon_age,
+            rule=row.rule,
+            swr_bp=row.swr_bp,
+            income_mode=decision.income_mode,
+            income_manual_minor=decision.income_manual_minor,
+            expenses_mode=decision.expenses_mode,
+            expenses_manual_minor=decision.expenses_manual_minor,
+            portfolio_mode=decision.portfolio_mode,
+            portfolio_manual_minor=decision.portfolio_manual_minor,
+            is_default=is_default,
+            archived_at=parse_timestamp(row.archived_at) if row.archived_at else None,
+            import_key=f"id:{row.id}",
+            created_at=restore_now + timedelta(microseconds=index),
+        )
+        scenario_ids[UUID(row.id)] = scenario.id
+
+    contributions = FireContributionRepository(session, ctx)
+    contribution_ids: list[str] = []
+    for index, row in enumerate(archive.rows.fire_contributions):
+        scenario = scenario_rows[row.scenario_id]
+        contribution = contributions.create(
+            scenario_id=scenario_ids[UUID(row.scenario_id)],
+            year=row.year,
+            net_amount_minor=_signed_money_minor(row.net_amount, scenario.currency),
+            import_key=f"id:{row.id}",
+            created_at=restore_now + timedelta(microseconds=index),
+        )
+        contribution_ids.append(str(contribution.id))
+
+    cleared = {row.id for row in plan.cleared_source_loan_events}
+    events = FireEventRepository(session, ctx)
+    event_ids: list[str] = []
+    for index, row in enumerate(archive.rows.fire_events):
+        scenario = scenario_rows[row.scenario_id]
+        source_loan_id = (
+            loan_ids.get(UUID(row.source_loan_id))
+            if row.source_loan_id and row.id not in cleared
+            else None
+        )
+        event = events.create(
+            scenario_id=scenario_ids[UUID(row.scenario_id)],
+            year=row.year,
+            kind=row.kind,
+            amount_minor=_signed_money_minor(row.amount, scenario.currency),
+            label=row.label,
+            source_loan_id=source_loan_id,
+            import_key=f"id:{row.id}",
+            created_at=restore_now + timedelta(microseconds=index),
+        )
+        event_ids.append(str(event.id))
+
+    skipped = {row.id for row in plan.skipped_exclusions}
+    exclusions = FireExpenseExclusionRepository(session, ctx)
+    exclusion_ids: list[str] = []
+    for row in archive.rows.fire_expense_exclusions:
+        category_id = category_ids.get(UUID(row.category_id))
+        if row.id in skipped or category_id is None:
+            continue
+        exclusion = exclusions.create(
+            scenario_id=scenario_ids[UUID(row.scenario_id)],
+            category_id=category_id,
+            import_key=f"id:{row.id}",
+        )
+        exclusion_ids.append(str(exclusion.id))
+
+    batch.report = {
+        **(batch.report or {}),
+        "restored_fire_ids": {
+            "fire_scenarios": [str(value) for value in scenario_ids.values()],
+            "fire_contributions": contribution_ids,
+            "fire_events": event_ids,
+            "fire_expense_exclusions": exclusion_ids,
+        },
+    }
+    return plan.counts(archive)
 
 
 def _restore_report(
@@ -1484,6 +1863,13 @@ def _restore_report(
         removed_networth=len(removed_networth),
         removed_assets=len(removed_assets),
     )
+    fire_plan = _fire_restore_plan(
+        archive,
+        ctx.clock.today(ctx.workspace.timezone),
+        str(archive.rows.workspace["base_currency"]),
+    )
+    counts.update(fire_plan.counts(archive))
+    counts["to_create"] -= len(fire_plan.skipped_exclusions)
     counts["invalid"] = len(errors)
     asset_class_ids, instrument_ids = _archived_link_targets(archive)
     warnings = [
@@ -1496,6 +1882,7 @@ def _restore_report(
         for line, row in enumerate(archive.rows.networth_items, start=2)
         if _link_target_missing(row, asset_class_ids, instrument_ids)
     ]
+    warnings.extend(fire_plan.warnings)
     warnings.extend(
         _provider_key_warning(row.provider_key, line)
         for line, row in enumerate(archive.rows.price_source_configs, start=2)
@@ -1587,6 +1974,10 @@ def _plan_restore(
         archive.rows.loan_balance_checkpoints,
         archive.rows.loan_scenarios,
         archive.rows.installment_plans,
+        archive.rows.fire_scenarios,
+        archive.rows.fire_contributions,
+        archive.rows.fire_events,
+        archive.rows.fire_expense_exclusions,
     ):
         for number, _row in enumerate(rows, start=1):
             if number % DEADLINE_CHECK_ROWS == 0 and out_of_time():
@@ -2108,6 +2499,18 @@ def _money_minor(value: str, currency: str, *, allow_zero: bool) -> int:
     return result
 
 
+def _signed_money_minor(value: str, currency: str) -> int:
+    """A signed FIRE amount; the archive reader already validated sign and precision."""
+    number = Decimal(value or "0")
+    minor = number.scaleb(minor_unit_for(currency))
+    if minor != minor.to_integral_value():
+        raise ImportServiceError("the archive has an amount with too many decimals")
+    result = int(minor)
+    if abs(result) > 10**15 - 1:
+        raise ImportServiceError("the archive has an amount that is too large")
+    return result
+
+
 def _restore_investments(
     session: Session,
     ctx: Context,
@@ -2481,6 +2884,17 @@ def _apply_restore(
         instrument_ids,
         loan_ids,
     )
+    fire_plan = _fire_restore_plan(archive, ctx.clock.today(ctx.workspace.timezone), currency)
+    fire_counts = _restore_fire(
+        session,
+        ctx,
+        batch,
+        archive,
+        restore_now=restore_now,
+        category_ids=category_ids,
+        loan_ids=loan_ids,
+        plan=fire_plan,
+    )
     session.flush()
     AuditEventRepository(session, ctx).record(
         actor_user_id=ctx.user.id,
@@ -2517,6 +2931,15 @@ def _apply_restore(
             "loan_balance_checkpoints": len(archive.rows.loan_balance_checkpoints),
             "loan_scenarios": len(archive.rows.loan_scenarios),
             "installment_plans": len(archive.rows.installment_plans),
+            "fire_scenarios": len(archive.rows.fire_scenarios),
+            "fire_contributions": len(archive.rows.fire_contributions),
+            "fire_events": len(archive.rows.fire_events),
+            "fire_expense_exclusions": len(archive.rows.fire_expense_exclusions),
+            "fire_linked_fallbacks": fire_counts["fire_linked_fallbacks"],
+            "fire_missing_fallbacks": fire_counts["fire_missing_fallbacks"],
+            "fire_skipped_exclusions": fire_counts["fire_skipped_exclusions"],
+            "fire_cleared_source_loans": fire_counts["fire_cleared_source_loans"],
+            "fire_default_promoted": fire_counts["fire_default_promoted"],
             "risk_policy": archive.rows.risk_target_policy is not None,
             "settings_fields": ",".join(settings_diff),
             "suggested_categories_removed": len(removed),
@@ -2544,6 +2967,7 @@ def _apply_restore(
         "linked_items_unlinked": linked_items,
         **loan_counts,
         **investment_counts,
+        **fire_counts,
     }
 
 

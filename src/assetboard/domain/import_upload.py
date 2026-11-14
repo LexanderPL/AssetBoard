@@ -101,6 +101,15 @@ def parse_upload(
         return None, (ArchiveError("upload.csv", "invalid CSV", line=reader.line_num or 1),)
     if not header or len(header) > MAX_IMPORT_COLUMNS:
         return None, (ArchiveError("upload.csv", "invalid column count", line=1),)
+    if {"scenario_id", "scenario"} <= set(header) or {
+        "id",
+        "name",
+        "currency",
+        "income_mode",
+    } <= set(header):
+        # The FIRE archive files have no standalone importer: their rows reference scenarios,
+        # ledger categories and loans that a lone CSV import cannot carry.
+        return None, (ArchiveError("upload.csv", "only part of a full restore", line=1),)
     try:
         classification = classify_header(tuple(header))
     except HeaderError as error:
