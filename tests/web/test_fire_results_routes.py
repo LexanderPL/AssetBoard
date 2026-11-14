@@ -99,6 +99,8 @@ def test_the_combined_page_shows_results_first_then_the_collapsible_inputs(owner
     assert f'hx-post="/fire/{scenario_id}/preview"' in page.text
     assert 'hx-trigger="change from:#fire-form delay:300ms' in page.text
     assert 'hx-include="#fire-form"' in page.text and 'hx-sync="this:replace"' in page.text
+    assert 'hx-target="#fire-results"' in page.text
+    assert 'hx-swap="innerHTML"' in page.text
     assert "data-fire-metrics" in page.text
     assert 'data-fire-progress="sheet"' in page.text
     assert 'data-fire-progress="today"' in page.text
@@ -365,6 +367,9 @@ def test_viewers_and_archived_scenarios_are_read_only(owner) -> None:
     assert "data-fire-results" in viewer.text
     assert "data-fire-metrics" in viewer.text
     assert "hx-post" not in viewer.text
+    assert "hx-trigger" not in viewer.text
+    assert "hx-target" not in viewer.text
+    assert "hx-sync" not in viewer.text
     assert "data-fire-form" not in viewer.text
     assert "data-fire-save" not in viewer.text
     assert 'name="basis"' not in viewer.text
