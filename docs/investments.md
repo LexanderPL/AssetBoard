@@ -364,6 +364,9 @@ workspace base currency. It is read-only.
   follow the usual priority (manual, provider, transaction; the newest date wins). Bond-model
   instruments use the model value; without bond terms they fall back to the last transaction
   price and show *Bond terms needed*. A currency instrument is priced at 1.
+- **Prices** are displayed at the quote currency's minor unit (PLN and EUR two decimals, JPY
+  none); a price below one minor unit keeps up to six decimals so small crypto prices are not
+  rounded to zero. Stored prices, edit fields and the archive keep the full precision.
 - **Stale data**: a price or FX rate older than five days is still used, with a *Stale price* or
   *Stale FX rate* badge.
 - **Missing data**: an instrument with no price, or whose currency has no FX rate, stays in the
