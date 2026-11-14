@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.7.1](https://github.com/LexanderPL/AssetBoard/compare/v0.7.0...v0.7.1) (2026-11-14)
+
+
+### Features
+
+* **fire:** add FIRE planner scenarios and settings (F8.1) ([#317](https://github.com/LexanderPL/AssetBoard/issues/317)) ([b612394](https://github.com/LexanderPL/AssetBoard/commit/b61239424ba998ad5db3793b97a561b6b5176666))
+* **fire:** add the pure FIRE projection engine (F8.2) ([#319](https://github.com/LexanderPL/AssetBoard/issues/319)) ([77b8c3e](https://github.com/LexanderPL/AssetBoard/commit/77b8c3e0921d9c3a69592f014023414272a0c013))
+* **fire:** add the scenario results page, charts and CSV (F8.3) ([#320](https://github.com/LexanderPL/AssetBoard/issues/320)) ([7b1addf](https://github.com/LexanderPL/AssetBoard/commit/7b1addff0da44941cb9b656be7661cdf08f6c8dd))
+* **fire:** link FIRE inputs to real data and add loan payoff events (F8.4) ([#324](https://github.com/LexanderPL/AssetBoard/issues/324)) ([d312db2](https://github.com/LexanderPL/AssetBoard/commit/d312db247d59fb2e82949454b1bbbb5593f1dc86))
+
 ## [0.7.0](https://github.com/LexanderPL/AssetBoard/compare/v0.6.7...v0.7.0) (2026-11-13)
 
 
