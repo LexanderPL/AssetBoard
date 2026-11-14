@@ -2753,6 +2753,11 @@ def test_fire_queries_stay_in_their_workspace(
 
     assert [row.id for row in scenarios_a.active()] == [active_a.id]
     assert [row.id for row in scenarios_a.archived()] == [old_a.id]
+    assert {row.id for row in scenarios_a.by_ids([active_a.id, old_a.id])} == {
+        active_a.id,
+        old_a.id,
+    }
+    assert scenarios_b.by_ids([active_a.id, old_a.id]) == []
     assert scenarios_b.active_by_name_key("retire at 55") is None
     assert scenarios_a.active_by_name_key("retire at 55") == active_a
     assert scenarios_b.active_default() is active_b
@@ -2764,14 +2769,20 @@ def test_fire_queries_stay_in_their_workspace(
     assert scenarios_b.active_name_keys() == {"retire at 60"}
     assert [row.id for row in contributions_a.for_scenario(active_a.id)] == [contribution_a.id]
     assert contributions_b.for_scenario(active_a.id) == []
+    assert [row.id for row in contributions_a.for_scenarios([active_a.id])] == [contribution_a.id]
+    assert contributions_b.for_scenarios([active_a.id]) == []
     assert contributions_a.counts_by_scenario() == {active_a.id: 1}
     assert contributions_b.counts_by_scenario() == {active_b.id: 1}
     assert [row.id for row in events_a.for_scenario(active_a.id)] == [event_a.id]
     assert events_b.for_scenario(active_a.id) == []
+    assert [row.id for row in events_a.for_scenarios([active_a.id])] == [event_a.id]
+    assert events_b.for_scenarios([active_a.id]) == []
     assert events_a.counts_by_scenario() == {active_a.id: 1}
     assert events_b.counts_by_scenario() == {active_b.id: 1}
     assert [row.id for row in exclusions_a.for_scenario(active_a.id)] == [exclusion_a.id]
     assert exclusions_b.for_scenario(active_a.id) == []
+    assert [row.id for row in exclusions_a.for_scenarios([active_a.id])] == [exclusion_a.id]
+    assert exclusions_b.for_scenarios([active_a.id]) == []
     assert exclusions_a.counts_by_category() == {category_a.id: 1}
     assert exclusions_b.counts_by_category() == {category_b.id: 1}
 
