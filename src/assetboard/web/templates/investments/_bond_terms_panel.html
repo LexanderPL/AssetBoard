@@ -23,7 +23,7 @@
         {% if bond.quantity > 0 %} · {{ format_quantity_input(bond.quantity, locale) }} {{ instrument.unit_label }}{% endif %}
       </p>
       {% if bond.unit_price is not none and bond.quantity > 0 %}
-      <p class="mt-1 text-sm text-muted">{{ _("Per unit: %(price)s %(currency)s", price=format_quantity_input(bond.unit_price, locale), currency=instrument.quote_currency) }}</p>
+      <p class="mt-1 text-sm text-muted">{{ _("Per unit: %(price)s %(currency)s", price=format_price(bond.unit_price, instrument.quote_currency, locale), currency=instrument.quote_currency) }}</p>
       {% endif %}
       <dl class="mt-4 grid gap-2 text-sm sm:grid-cols-2">
         <div>

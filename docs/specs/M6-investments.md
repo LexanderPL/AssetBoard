@@ -347,6 +347,7 @@ and property tests (value monotonic in time for non-negative rates; tax never ne
     - Slice colours come from the categorical palette by position. Class colours stay on the class table.
   - Default scope: the active class whose name key matches the seed name of Stocks in any supported language (en "Stocks", pl "Akcje"). If there is none, or nothing is held in it, the whole portfolio. An unknown scope falls back to that default.
   - The domain function takes the base currency as a keyword: `value_portfolio(holdings, prices, fx, allocations, as_of, *, base_currency)`.
+  - Display prices use the quote currency's minor unit; prices below one minor unit keep up to six decimals. Stored prices, edit fields and the archive keep full precision. The shared `i18n.numbers.format_price` helper is used by the portfolio, prices panel, transaction history, bulk preview and bond panel; the provider test lookup keeps the provider's raw quote precision for diagnostics.
 
 **Agent prompt**
 ```

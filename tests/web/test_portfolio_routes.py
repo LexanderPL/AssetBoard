@@ -182,6 +182,28 @@ def test_holdings_totals_classes_and_the_default_stocks_chart(owner: OwnerApp) -
     assert "100.0%" in page  # the row's share of the portfolio
 
 
+def test_holding_price_is_rounded_to_the_quote_currency_minor_unit(
+    owner: OwnerApp,
+) -> None:
+    fund, _classes_by_name = _fund(owner)
+    with owner.db() as session, session.begin():
+        session.add(
+            PricePoint(
+                workspace_id=owner.home_id,
+                instrument_id=fund,
+                date=date(2026, 3, 10),
+                price=Decimal("15645.359865"),
+                source="manual",
+            )
+        )
+
+    page = owner.client.get(PORTFOLIO).text
+    row = re.search(rf'data-portfolio-row="{fund}".*?</tr>', page, re.S)
+    assert row is not None
+    assert "15645.36" in row.group(0)
+    assert "15645.359865" not in row.group(0)
+
+
 def test_gain_and_loss_colours_follow_one_convention(owner: OwnerApp) -> None:
     fund, _classes_by_name = _fund(owner)
     with owner.db() as session, session.begin():

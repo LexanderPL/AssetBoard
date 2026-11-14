@@ -76,7 +76,7 @@
               <td class="break-words">{{ line.instrument_name }}</td>
               <td>{% if line.type == "buy" %}{{ _("Buy") }}{% else %}{{ _("Sell") }}{% endif %}</td>
               <td class="whitespace-nowrap text-right tabular-nums">{{ format_quantity_input(line.quantity, locale) }}</td>
-              <td class="whitespace-nowrap text-right tabular-nums">{{ format_quantity_input(line.unit_price, locale) }} {{ line.entry_currency }}</td>
+              <td class="whitespace-nowrap text-right tabular-nums">{{ format_price(line.unit_price, line.entry_currency, locale) }} {{ line.entry_currency }}</td>
               <td class="whitespace-nowrap text-right tabular-nums">{{ format_money(line.fee, locale) }}</td>
               <td class="whitespace-nowrap text-right tabular-nums">{{ format_quantity_input(line.fx_to_base, locale) }}{% if line.fx_stored %}<span class="block text-muted" data-bulk-fx-source>{{ _("Stored rate for %(date)s", date=format_day(line.day, locale)) }}</span>{% endif %}</td>
               <td class="whitespace-nowrap text-right tabular-nums">{% if line.total %}{{ format_money(line.total, locale) }}{% endif %}</td>
