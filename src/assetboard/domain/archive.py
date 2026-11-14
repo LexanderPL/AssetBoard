@@ -24,6 +24,25 @@ from assetboard.domain.bonds import (
     validate_rate_schedule,
 )
 from assetboard.domain.categories import Kind, Treatment, name_key
+from assetboard.domain.fire import (
+    MAX_HORIZON_AGE,
+    MAX_STOP_WORKING_AGE,
+    MAX_YEAR,
+    MIN_YEAR,
+    RATE_HARD_MAX_BP,
+    RATE_HARD_MIN_BP,
+    SWR_HARD_MAX_BP,
+    SWR_HARD_MIN_BP,
+    EventKind,
+    ExpensesMode,
+    IncomeMode,
+    PortfolioMode,
+    Rule,
+    clean_event_label,
+    clean_scenario_name,
+    contribution_years,
+    event_years,
+)
 from assetboard.domain.holdings import MAX_NOTE_LENGTH, InvestmentTransactionType
 from assetboard.domain.instruments import (
     MAX_ASSET_CLASS_NAME_LENGTH,
@@ -47,9 +66,10 @@ from assetboard.domain.loans import (
 )
 from assetboard.domain.money import minor_unit_for
 from assetboard.domain.networth import MAX_ITEM_NAME_LENGTH, MAX_NOTES_LENGTH, Side
+from assetboard.domain.transactions import MAX_AMOUNT_MINOR
 
 FORMAT = "workspace-archive"
-FORMAT_VERSION = "1.7"
+FORMAT_VERSION = "1.8"
 # Bounds of the optional ``upcoming_days`` key (1.1); mirror ``config.MIN/MAX_UPCOMING_DAYS``.
 MIN_UPCOMING_DAYS = 1
 MAX_UPCOMING_DAYS = 365
@@ -298,6 +318,55 @@ CSV_COLUMNS = {
         "end_date",
         "closed_at",
     ),
+    "fire_scenarios.csv": (
+        "id",
+        "name",
+        "currency",
+        "birth_year",
+        "start_year",
+        "inflation_bp",
+        "real_return_bp",
+        "income_growth_bp",
+        "stop_working_age",
+        "horizon_age",
+        "rule",
+        "swr_bp",
+        "income_mode",
+        "income_manual",
+        "income_fallback",
+        "expenses_mode",
+        "expenses_manual",
+        "expenses_fallback",
+        "portfolio_mode",
+        "portfolio_manual",
+        "portfolio_fallback",
+        "is_default",
+        "archived_at",
+    ),
+    "fire_contributions.csv": (
+        "id",
+        "scenario_id",
+        "scenario",
+        "year",
+        "net_amount",
+    ),
+    "fire_events.csv": (
+        "id",
+        "scenario_id",
+        "scenario",
+        "year",
+        "kind",
+        "amount",
+        "label",
+        "source_loan_id",
+    ),
+    "fire_expense_exclusions.csv": (
+        "id",
+        "scenario_id",
+        "scenario",
+        "category_id",
+        "category",
+    ),
 }
 BASE_CSV_FILES = ("categories.csv", "budget_lines.csv", "transactions.csv", "months.csv")
 NETWORTH_CSV_FILES = (
@@ -328,6 +397,12 @@ LOAN_CSV_FILES = (
     "loan_scenarios.csv",
     "installment_plans.csv",
 )
+FIRE_CSV_FILES = (
+    "fire_scenarios.csv",
+    "fire_contributions.csv",
+    "fire_events.csv",
+    "fire_expense_exclusions.csv",
+)
 LOAN_TRANSFER_CSV_FILES = ("loan_transfers.csv",)
 FILE_ORDER = ("workspace.json", *CSV_COLUMNS)
 REQUIRED_FILES = ("manifest.json", *FILE_ORDER)
@@ -343,6 +418,7 @@ RATIO_EXEMPT_BYTES = 1024 * 1024
 MAX_DATA_ROWS = 1_000_000
 MAX_COLUMNS = 64
 MAX_ERRORS = 1000
+MAX_DECIMAL_MAJOR = Decimal(MAX_AMOUNT_MINOR)
 
 
 def required_files(version: str) -> tuple[str, ...]:
@@ -357,6 +433,8 @@ def required_files(version: str) -> tuple[str, ...]:
         csv_files += LOAN_CSV_FILES
     if minor >= 7:
         csv_files += LOAN_TRANSFER_CSV_FILES
+    if minor >= 8:
+        csv_files += FIRE_CSV_FILES
     return ("manifest.json", "workspace.json", *csv_files)
 
 
@@ -712,6 +790,63 @@ class InstallmentPlanRow:
 
 
 @dataclass(frozen=True, slots=True)
+class FireScenarioRow:
+    id: str
+    name: str
+    currency: str
+    birth_year: int
+    start_year: int
+    inflation_bp: int
+    real_return_bp: int
+    income_growth_bp: int
+    stop_working_age: int
+    horizon_age: int
+    rule: str
+    swr_bp: int | None
+    income_mode: str
+    income_manual: str
+    income_fallback: str
+    expenses_mode: str
+    expenses_manual: str
+    expenses_fallback: str
+    portfolio_mode: str
+    portfolio_manual: str
+    portfolio_fallback: str
+    is_default: str
+    archived_at: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class FireContributionRow:
+    id: str
+    scenario_id: str
+    scenario: str
+    year: int
+    net_amount: str
+
+
+@dataclass(frozen=True, slots=True)
+class FireEventRow:
+    id: str
+    scenario_id: str
+    scenario: str
+    year: int
+    kind: str
+    amount: str
+    label: str
+    source_loan_id: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class FireExpenseExclusionRow:
+    id: str
+    scenario_id: str
+    scenario: str
+    category_id: str
+    category: str
+
+
+@dataclass(frozen=True, slots=True)
 class ArchiveRows:
     workspace: dict[str, object]
     categories: tuple[CategoryRow, ...]
@@ -742,6 +877,10 @@ class ArchiveRows:
     loan_balance_checkpoints: tuple[LoanBalanceCheckpointRow, ...] = ()
     loan_scenarios: tuple[LoanScenarioRow, ...] = ()
     installment_plans: tuple[InstallmentPlanRow, ...] = ()
+    fire_scenarios: tuple[FireScenarioRow, ...] = ()
+    fire_contributions: tuple[FireContributionRow, ...] = ()
+    fire_events: tuple[FireEventRow, ...] = ()
+    fire_expense_exclusions: tuple[FireExpenseExclusionRow, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -843,6 +982,12 @@ def build_files(rows: ArchiveRows) -> dict[str, bytes]:
         ),
         "loan_scenarios.csv": csv_bytes("loan_scenarios.csv", rows.loan_scenarios),
         "installment_plans.csv": csv_bytes("installment_plans.csv", rows.installment_plans),
+        "fire_scenarios.csv": csv_bytes("fire_scenarios.csv", rows.fire_scenarios),
+        "fire_contributions.csv": csv_bytes("fire_contributions.csv", rows.fire_contributions),
+        "fire_events.csv": csv_bytes("fire_events.csv", rows.fire_events),
+        "fire_expense_exclusions.csv": csv_bytes(
+            "fire_expense_exclusions.csv", rows.fire_expense_exclusions
+        ),
     }
 
 
@@ -1238,6 +1383,32 @@ def _money_minor(value: str, currency: str, *, allow_zero: bool) -> int:
     return result
 
 
+def _signed_money_minor(value: str, currency: str) -> int:
+    """A signed currency amount with at most the currency's minor digits, in minor units."""
+    text = value or "0"
+    try:
+        number = Decimal(text)
+    except InvalidOperation:
+        raise ValueError("invalid decimal") from None
+    if not number.is_finite():
+        raise ValueError("invalid decimal")
+    minor = number.scaleb(minor_unit_for(currency))
+    if minor != minor.to_integral_value():
+        raise ValueError("too many decimals")
+    result = int(minor)
+    if abs(result) > MAX_AMOUNT_MINOR:
+        raise ValueError("amount too large")
+    return result
+
+
+def _nonnegative_money_minor(value: str, currency: str) -> int:
+    """A non-negative currency amount within the shared amount limit, in minor units."""
+    result = _money_minor(value, currency, allow_zero=True)
+    if result > MAX_AMOUNT_MINOR:
+        raise ValueError("amount too large")
+    return result
+
+
 def _valid_currency(value: str) -> str:
     code = value.upper()
     if not code:
@@ -1319,6 +1490,7 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         "loan_id",
         "property_item_id",
         "transaction_id",
+        "source_loan_id",
     ):
         return str(UUID(value)) if value else ""
     if column == "kind":
@@ -1326,6 +1498,8 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
             return LoanKind(value).value if value else ""
         if file == "loan_payments.csv":
             return LoanPaymentKind(value).value if value else ""
+        if file == "fire_events.csv":
+            return EventKind(value).value
         return Kind(value).value if value else ""
     if column == "direction":
         return Kind(value).value if value else ""
@@ -1335,6 +1509,46 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         return Treatment(value or "regular").value
     if column == "rate_mode":
         return RateMode(value).value
+    if column == "rule":
+        return Rule(value).value
+    if column == "income_mode":
+        return IncomeMode(value).value
+    if column == "expenses_mode":
+        return ExpensesMode(value).value
+    if column == "portfolio_mode":
+        return PortfolioMode(value).value
+    if column in ("birth_year", "start_year"):
+        if not re.fullmatch(r"[0-9]{4}", value):
+            raise ValueError("invalid year")
+        number = int(value)
+        if not MIN_YEAR <= number <= MAX_YEAR:
+            raise ValueError("invalid year")
+        return str(number)
+    if column in ("stop_working_age", "horizon_age"):
+        if not re.fullmatch(r"[0-9]{1,3}", value):
+            raise ValueError("invalid age")
+        number = int(value)
+        if not 0 <= number <= MAX_STOP_WORKING_AGE:
+            raise ValueError("invalid age")
+        if column == "horizon_age" and not 1 <= number <= MAX_HORIZON_AGE:
+            raise ValueError("invalid age")
+        return str(number)
+    if column in ("inflation_bp", "real_return_bp", "income_growth_bp"):
+        if not re.fullmatch(r"-?[0-9]{1,5}", value):
+            raise ValueError("invalid rate")
+        number = int(value)
+        if not RATE_HARD_MIN_BP <= number <= RATE_HARD_MAX_BP:
+            raise ValueError("invalid rate")
+        return str(number)
+    if column == "swr_bp":
+        if not value:
+            return ""
+        if not re.fullmatch(r"[0-9]{1,4}", value):
+            raise ValueError("invalid swr")
+        number = int(value)
+        if not SWR_HARD_MIN_BP <= number <= SWR_HARD_MAX_BP:
+            raise ValueError("invalid swr")
+        return str(number)
     if column == "day_count":
         return DayCount(value).value
     if column == "overpayment_mode":
@@ -1362,6 +1576,11 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
         else:
             default = "false"
         chosen = value or default
+        if chosen not in {"true", "false"}:
+            raise ValueError("invalid boolean")
+        return chosen
+    if column == "is_default":
+        chosen = value or "false"
         if chosen not in {"true", "false"}:
             raise ValueError("invalid boolean")
         return chosen
@@ -1408,6 +1627,40 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
             date.fromisoformat(value + "-01" if column == "month" else value)
         except ValueError:
             raise ValueError("invalid date or month") from None
+    if column == "year":
+        if not re.fullmatch(r"[0-9]{4}", value):
+            raise ValueError("invalid year")
+        number = int(value)
+        if not MIN_YEAR <= number <= MAX_YEAR:
+            raise ValueError("invalid year")
+        return str(number)
+    if column in (
+        "income_manual",
+        "income_fallback",
+        "expenses_manual",
+        "expenses_fallback",
+        "portfolio_manual",
+        "portfolio_fallback",
+    ):
+        if not value:
+            return ""
+        return _plain_decimal(value, allow_zero=True)
+    if file in {"fire_contributions.csv", "fire_events.csv"} and column in {
+        "net_amount",
+        "amount",
+    }:
+        if not re.fullmatch(r"-?[0-9]+(?:\.[0-9]+)?", value):
+            raise ValueError("invalid signed decimal")
+        try:
+            number = Decimal(value)
+        except InvalidOperation:
+            raise ValueError("invalid signed decimal") from None
+        if not number.is_finite() or abs(number) > MAX_DECIMAL_MAJOR:
+            raise ValueError("invalid signed decimal")
+        exponent = number.as_tuple().exponent
+        if not isinstance(exponent, int) or max(-exponent, 0) > 18:
+            raise ValueError("invalid signed decimal")
+        return value
     if column in ("amount", "planned", "value", "assets", "liabilities"):
         if column == "planned" and not value:
             return "0"
@@ -1479,7 +1732,12 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
             raise ValueError("invalid cost mode")
         return value
     if column == "currency":
-        if file in {"networth_items.csv", "item_valuations.csv", "networth_snapshots.csv"}:
+        if file in {
+            "networth_items.csv",
+            "item_valuations.csv",
+            "networth_snapshots.csv",
+            "fire_scenarios.csv",
+        }:
             return _valid_currency(value)
         if value and value != currency:
             raise ValueError("currency differs from workspace")
@@ -1552,6 +1810,16 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
     if column == "category":
         if not 1 <= len(value) <= 80:
             raise ValueError("invalid category name")
+    elif column == "scenario":
+        try:
+            clean_scenario_name(value)
+        except ValueError:
+            raise ValueError("invalid scenario name") from None
+    elif column == "label":
+        try:
+            return clean_event_label(value)
+        except ValueError:
+            raise ValueError("invalid event label") from None
     elif column in ("reference_rate", "property_item"):
         if not value:
             return ""
@@ -1565,6 +1833,11 @@ def _validate_cell(file: str, column: str, value: str, currency: str) -> str:
             maximum = MAX_ASSET_CLASS_NAME_LENGTH
         elif column == "loan":
             maximum = MAX_LOAN_NAME_LENGTH
+        elif file == "fire_scenarios.csv":
+            try:
+                return clean_scenario_name(value)
+            except ValueError:
+                raise ValueError("invalid scenario name") from None
         elif file == "networth_items.csv":
             maximum = MAX_ITEM_NAME_LENGTH
         elif file == "instruments.csv":
@@ -1762,6 +2035,31 @@ _REQUIRED_COLUMNS = {
         "installment",
         "remaining_count",
         "end_date",
+    },
+    "fire_scenarios.csv": {
+        "id",
+        "name",
+        "currency",
+        "birth_year",
+        "start_year",
+        "inflation_bp",
+        "real_return_bp",
+        "income_growth_bp",
+        "stop_working_age",
+        "horizon_age",
+        "rule",
+        "income_mode",
+        "expenses_mode",
+        "portfolio_mode",
+    },
+    "fire_contributions.csv": {"id", "scenario_id", "scenario", "year", "net_amount"},
+    "fire_events.csv": {"id", "scenario_id", "scenario", "year", "kind", "amount", "label"},
+    "fire_expense_exclusions.csv": {
+        "id",
+        "scenario_id",
+        "scenario",
+        "category_id",
+        "category",
     },
 }
 
@@ -2520,6 +2818,166 @@ def _read_rows(
                 ArchiveError("installment_plans.csv", "installment plan category mismatch")
             )
 
+    fire_scenarios = tables["fire_scenarios.csv"]
+    fire_scenarios_by_id: dict[str, dict[str, str]] = {}
+    active_fire_names: set[str] = set()
+    active_fire_defaults = 0
+    for row in fire_scenarios:
+        scenario_id = row["id"]
+        if scenario_id in fire_scenarios_by_id:
+            errors.append(ArchiveError("fire_scenarios.csv", "duplicate FIRE scenario id"))
+        fire_scenarios_by_id[scenario_id] = row
+        key = name_key(row["name"])
+        if not row["archived_at"]:
+            if key in active_fire_names:
+                errors.append(
+                    ArchiveError("fire_scenarios.csv", "duplicate active FIRE scenario name")
+                )
+            active_fire_names.add(key)
+        if row["is_default"] == "true":
+            if row["archived_at"]:
+                errors.append(ArchiveError("fire_scenarios.csv", "archived default scenario"))
+            else:
+                active_fire_defaults += 1
+                if active_fire_defaults > 1:
+                    errors.append(ArchiveError("fire_scenarios.csv", "duplicate default scenario"))
+        birth_year = int(row["birth_year"])
+        start_year = int(row["start_year"])
+        horizon_age = int(row["horizon_age"])
+        stop_working_age = int(row["stop_working_age"])
+        age = start_year - birth_year
+        if birth_year > start_year:
+            errors.append(ArchiveError("fire_scenarios.csv", "invalid FIRE scenario years"))
+        if horizon_age <= age or birth_year + horizon_age > MAX_YEAR:
+            errors.append(ArchiveError("fire_scenarios.csv", "invalid FIRE scenario horizon"))
+        if stop_working_age < age:
+            errors.append(ArchiveError("fire_scenarios.csv", "invalid FIRE stop-working age"))
+        if row["rule"] == "swr":
+            if not row["swr_bp"]:
+                errors.append(ArchiveError("fire_scenarios.csv", "invalid FIRE withdrawal rate"))
+        elif row["swr_bp"]:
+            errors.append(ArchiveError("fire_scenarios.csv", "invalid FIRE withdrawal rate"))
+        currency = row["currency"]
+        for mode_column, manual_column, fallback_column in (
+            ("income_mode", "income_manual", "income_fallback"),
+            ("expenses_mode", "expenses_manual", "expenses_fallback"),
+            ("portfolio_mode", "portfolio_manual", "portfolio_fallback"),
+        ):
+            mode = row[mode_column]
+            manual = row[manual_column]
+            fallback = row[fallback_column]
+            if mode == "manual":
+                if not manual:
+                    errors.append(ArchiveError("fire_scenarios.csv", "missing manual FIRE amount"))
+                else:
+                    try:
+                        _nonnegative_money_minor(manual, currency)
+                    except ValueError as exc:
+                        errors.append(
+                            ArchiveError("fire_scenarios.csv", str(exc), column=manual_column)
+                        )
+                if fallback:
+                    errors.append(
+                        ArchiveError("fire_scenarios.csv", "fallback for a manual FIRE input")
+                    )
+            else:
+                if manual:
+                    errors.append(
+                        ArchiveError("fire_scenarios.csv", "manual value for a linked FIRE input")
+                    )
+                if fallback:
+                    try:
+                        _nonnegative_money_minor(fallback, currency)
+                    except ValueError as exc:
+                        errors.append(
+                            ArchiveError("fire_scenarios.csv", str(exc), column=fallback_column)
+                        )
+
+    contributions = tables["fire_contributions.csv"]
+    contribution_ids: set[str] = set()
+    contribution_keys: set[tuple[str, str]] = set()
+    for row in contributions:
+        scenario = fire_scenarios_by_id.get(row["scenario_id"])
+        if scenario is None or row["scenario"] != scenario["name"]:
+            errors.append(
+                ArchiveError("fire_contributions.csv", "FIRE scenario reference mismatch")
+            )
+            continue
+        if row["id"] in contribution_ids:
+            errors.append(ArchiveError("fire_contributions.csv", "duplicate FIRE contribution id"))
+        contribution_ids.add(row["id"])
+        key = (row["scenario_id"], row["year"])
+        if key in contribution_keys:
+            errors.append(
+                ArchiveError("fire_contributions.csv", "duplicate FIRE contribution year")
+            )
+        contribution_keys.add(key)
+        year = int(row["year"])
+        window = contribution_years(
+            int(scenario["start_year"]),
+            int(scenario["birth_year"]),
+            int(scenario["horizon_age"]),
+        )
+        if year not in window:
+            errors.append(
+                ArchiveError("fire_contributions.csv", "FIRE contribution outside the plan window")
+            )
+        try:
+            _signed_money_minor(row["net_amount"], scenario["currency"])
+        except ValueError as exc:
+            errors.append(ArchiveError("fire_contributions.csv", str(exc), column="net_amount"))
+
+    events = tables["fire_events.csv"]
+    event_ids: set[str] = set()
+    for row in events:
+        scenario = fire_scenarios_by_id.get(row["scenario_id"])
+        if scenario is None or row["scenario"] != scenario["name"]:
+            errors.append(ArchiveError("fire_events.csv", "FIRE scenario reference mismatch"))
+            continue
+        if row["id"] in event_ids:
+            errors.append(ArchiveError("fire_events.csv", "duplicate FIRE event id"))
+        event_ids.add(row["id"])
+        year = int(row["year"])
+        window = event_years(
+            int(scenario["start_year"]),
+            int(scenario["birth_year"]),
+            int(scenario["horizon_age"]),
+        )
+        if year not in window:
+            errors.append(ArchiveError("fire_events.csv", "FIRE event outside the plan window"))
+        try:
+            _signed_money_minor(row["amount"], scenario["currency"])
+        except ValueError as exc:
+            errors.append(ArchiveError("fire_events.csv", str(exc), column="amount"))
+
+    exclusions = tables["fire_expense_exclusions.csv"]
+    exclusion_ids: set[str] = set()
+    exclusion_keys: set[tuple[str, str]] = set()
+    for row in exclusions:
+        scenario = fire_scenarios_by_id.get(row["scenario_id"])
+        if scenario is None or row["scenario"] != scenario["name"]:
+            errors.append(
+                ArchiveError("fire_expense_exclusions.csv", "FIRE scenario reference mismatch")
+            )
+            continue
+        if row["id"] in exclusion_ids:
+            errors.append(
+                ArchiveError("fire_expense_exclusions.csv", "duplicate FIRE exclusion id")
+            )
+        exclusion_ids.add(row["id"])
+        key = (row["scenario_id"], row["category_id"])
+        if key in exclusion_keys:
+            errors.append(ArchiveError("fire_expense_exclusions.csv", "duplicate FIRE exclusion"))
+        exclusion_keys.add(key)
+        category = by_id.get(row["category_id"])
+        # A wrong-kind or non-regular category is not an archive error: the restore skips the
+        # exclusion with a warning and falls linked expenses back to their archived amount.
+        # Only a present category with a different companion name is a cross-file mismatch.
+        if category is not None and row["category"] != category["name"]:
+            errors.append(
+                ArchiveError("fire_expense_exclusions.csv", "FIRE exclusion category mismatch")
+            )
+
     return ArchiveRows(
         workspace=workspace,
         categories=tuple(
@@ -2874,5 +3332,66 @@ def _read_rows(
                 row["closed_at"] or None,
             )
             for row in plans
+        ),
+        fire_scenarios=tuple(
+            FireScenarioRow(
+                row["id"],
+                row["name"],
+                row["currency"],
+                int(row["birth_year"]),
+                int(row["start_year"]),
+                int(row["inflation_bp"]),
+                int(row["real_return_bp"]),
+                int(row["income_growth_bp"]),
+                int(row["stop_working_age"]),
+                int(row["horizon_age"]),
+                row["rule"],
+                int(row["swr_bp"]) if row["swr_bp"] else None,
+                row["income_mode"],
+                row["income_manual"],
+                row["income_fallback"],
+                row["expenses_mode"],
+                row["expenses_manual"],
+                row["expenses_fallback"],
+                row["portfolio_mode"],
+                row["portfolio_manual"],
+                row["portfolio_fallback"],
+                row["is_default"],
+                row["archived_at"] or None,
+            )
+            for row in fire_scenarios
+        ),
+        fire_contributions=tuple(
+            FireContributionRow(
+                row["id"],
+                row["scenario_id"],
+                row["scenario"],
+                int(row["year"]),
+                row["net_amount"],
+            )
+            for row in contributions
+        ),
+        fire_events=tuple(
+            FireEventRow(
+                row["id"],
+                row["scenario_id"],
+                row["scenario"],
+                int(row["year"]),
+                row["kind"],
+                row["amount"],
+                row["label"],
+                row["source_loan_id"] or None,
+            )
+            for row in events
+        ),
+        fire_expense_exclusions=tuple(
+            FireExpenseExclusionRow(
+                row["id"],
+                row["scenario_id"],
+                row["scenario"],
+                row["category_id"],
+                row["category"],
+            )
+            for row in exclusions
         ),
     )

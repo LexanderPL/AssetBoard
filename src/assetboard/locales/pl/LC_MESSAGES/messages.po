@@ -1740,6 +1740,133 @@ msgstr ""
 "Pliki kredytów służą tylko do przywracania; zostały pominięte w tym "
 "scalaniu."
 
+msgid "FIRE files are restored only; they were ignored in this merge."
+msgstr ""
+"Pliki FIRE służą tylko do przywracania; zostały pominięte podczas tego "
+"scalania."
+
+#, python-format
+msgid ""
+"A linked FIRE input in %(scenario)s has no source data in this archive; "
+"it was restored as a manual value."
+msgstr ""
+"Powiązana wartość FIRE w scenariuszu %(scenario)s nie ma danych "
+"źródłowych w tym archiwum; przywrócono ją jako wartość ręczną."
+
+#, python-format
+msgid ""
+"A linked FIRE input in %(scenario)s has no source data and no saved "
+"fallback; it was restored as 0."
+msgstr ""
+"Powiązana wartość FIRE w scenariuszu %(scenario)s nie ma danych "
+"źródłowych ani zapisanej wartości zastępczej; przywrócono 0."
+
+#, python-format
+msgid ""
+"A FIRE expense exclusion in %(scenario)s references a category this "
+"archive cannot use; it was skipped."
+msgstr ""
+"Wykluczenie wydatków FIRE w scenariuszu %(scenario)s odwołuje się do "
+"kategorii, której to archiwum nie może użyć; zostało pominięte."
+
+#, python-format
+msgid ""
+"A FIRE event in %(scenario)s references a loan that is not in this "
+"archive; the link was cleared."
+msgstr ""
+"Zdarzenie FIRE w scenariuszu %(scenario)s odwołuje się do kredytu, "
+"którego nie ma w tym archiwum; powiązanie zostało usunięte."
+
+#, python-format
+msgid ""
+"The archive had no active default FIRE scenario; %(scenario)s was made "
+"the default."
+msgstr ""
+"Archiwum nie miało aktywnego domyślnego scenariusza FIRE; scenariusz "
+"%(scenario)s został ustawiony jako domyślny."
+
+msgid "A FIRE scenario id appears more than once."
+msgstr "Identyfikator scenariusza FIRE występuje więcej niż raz."
+
+msgid "Two active FIRE scenarios have the same name."
+msgstr "Dwa aktywne scenariusze FIRE mają tę samą nazwę."
+
+msgid "An archived FIRE scenario cannot be the default."
+msgstr "Zarchiwizowany scenariusz FIRE nie może być domyślny."
+
+msgid "More than one FIRE scenario is the default."
+msgstr "Więcej niż jeden scenariusz FIRE jest domyślny."
+
+msgid "The FIRE scenario's birth or start year is invalid."
+msgstr "Rok urodzenia lub rok początkowy scenariusza FIRE jest nieprawidłowy."
+
+msgid "The FIRE scenario's horizon is not after its start age."
+msgstr "Horyzont scenariusza FIRE nie jest późniejszy niż wiek początkowy."
+
+msgid "The FIRE scenario's stop-working age is before its start age."
+msgstr ""
+"Wiek zakończenia pracy w scenariuszu FIRE jest wcześniejszy niż wiek "
+"początkowy."
+
+msgid "A FIRE scenario with the withdrawal rule needs a valid withdrawal rate."
+msgstr "Scenariusz FIRE z regułą wypłat wymaga prawidłowej stopy wypłat."
+
+msgid "A manual FIRE input has an invalid amount."
+msgstr "Ręczna wartość FIRE ma nieprawidłową kwotę."
+
+msgid "A manual FIRE input needs an amount."
+msgstr "Ręczna wartość FIRE wymaga kwoty."
+
+msgid "Only a linked FIRE input can have a fallback value."
+msgstr "Tylko powiązana wartość FIRE może mieć wartość zastępczą."
+
+msgid "A linked FIRE input cannot have a manual value."
+msgstr "Powiązana wartość FIRE nie może mieć wartości ręcznej."
+
+msgid "A FIRE row references an unknown or differently named scenario."
+msgstr "Wiersz FIRE odwołuje się do nieznanego lub inaczej nazwanego scenariusza."
+
+msgid "A FIRE contribution id appears more than once."
+msgstr "Identyfikator składki FIRE występuje więcej niż raz."
+
+msgid "A FIRE scenario has two contributions for one year."
+msgstr "Scenariusz FIRE ma dwie składki w jednym roku."
+
+msgid "A FIRE contribution year is outside the plan window."
+msgstr "Rok składki FIRE jest poza oknem planu."
+
+msgid "A FIRE event id appears more than once."
+msgstr "Identyfikator zdarzenia FIRE występuje więcej niż raz."
+
+msgid "A FIRE event year is outside the plan window."
+msgstr "Rok zdarzenia FIRE jest poza oknem planu."
+
+msgid "A FIRE expense exclusion id appears more than once."
+msgstr "Identyfikator wykluczenia wydatków FIRE występuje więcej niż raz."
+
+msgid "A FIRE scenario excludes the same expense category more than once."
+msgstr "Scenariusz FIRE wyklucza tę samą kategorię wydatków więcej niż raz."
+
+msgid "A FIRE expense exclusion's category name does not match its category id."
+msgstr ""
+"Nazwa kategorii wykluczenia wydatków FIRE nie pasuje do identyfikatora "
+"kategorii."
+
+msgid "Enter a FIRE scenario name of 1 to 200 characters."
+msgstr "Podaj nazwę scenariusza FIRE o długości od 1 do 200 znaków."
+
+msgid "Enter an event description of 1 to 200 characters."
+msgstr "Podaj opis zdarzenia o długości od 1 do 200 znaków."
+
+msgid "Enter a year between 1900 and 2199."
+msgstr "Podaj rok z zakresu od 1900 do 2199."
+
+msgid "Enter a valid age."
+msgstr "Podaj prawidłowy wiek."
+
+msgid "Enter a withdrawal rate in basis points between 50 and 2000."
+msgstr "Podaj stopę wypłat w punktach bazowych od 50 do 2000."
+
 msgid "A different value is already stored for this date; it is kept."
 msgstr "Dla tej daty jest już zapisana inna wartość; pozostaje bez zmian."
 
@@ -12074,6 +12201,33 @@ msgstr "Ustawienia dostawcy"
 
 msgid "Risk targets restored"
 msgstr "Przywrócone cele ryzyka"
+
+msgid "FIRE scenarios"
+msgstr "Scenariusze FIRE"
+
+msgid "FIRE contributions"
+msgstr "Składki FIRE"
+
+msgid "FIRE events"
+msgstr "Zdarzenia FIRE"
+
+msgid "FIRE expense exclusions"
+msgstr "Wykluczenia wydatków FIRE"
+
+msgid "FIRE inputs restored as manual"
+msgstr "Wartości FIRE przywrócone jako ręczne"
+
+msgid "FIRE inputs restored as zero"
+msgstr "Wartości FIRE przywrócone jako zero"
+
+msgid "FIRE exclusions skipped"
+msgstr "Pominięte wykluczenia FIRE"
+
+msgid "FIRE loan links cleared"
+msgstr "Wyczyszczone powiązania kredytów FIRE"
+
+msgid "FIRE default scenario promoted"
+msgstr "Awansowano domyślny scenariusz FIRE"
 
 msgid "Suggested categories to remove"
 msgstr "Proponowane kategorie do usunięcia"

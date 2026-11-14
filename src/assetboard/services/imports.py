@@ -64,6 +64,10 @@ from assetboard.db.repositories import (
     BudgetLineRepository,
     CategoryRepository,
     CurrentWorkspaceRepository,
+    FireContributionRepository,
+    FireEventRepository,
+    FireExpenseExclusionRepository,
+    FireScenarioRepository,
     FxRateRepository,
     ImportBatchRepository,
     ImportCategoryMappingRepository,
@@ -238,6 +242,58 @@ REPORT_MESSAGES: dict[str, str] = {
         "Investment files are restored only; they were ignored in this merge."
     ),
     "loan_restore_only": _("Loan files are restored only; they were ignored in this merge."),
+    "fire_restore_only": _("FIRE files are restored only; they were ignored in this merge."),
+    "fire_linked_fallback": _(
+        "A linked FIRE input in %(scenario)s has no source data in this archive; it was "
+        "restored as a manual value."
+    ),
+    "fire_missing_fallback": _(
+        "A linked FIRE input in %(scenario)s has no source data and no saved fallback; it was "
+        "restored as 0."
+    ),
+    "fire_exclusion_missing": _(
+        "A FIRE expense exclusion in %(scenario)s references a category this archive cannot "
+        "use; it was skipped."
+    ),
+    "fire_source_loan_missing": _(
+        "A FIRE event in %(scenario)s references a loan that is not in this archive; the link "
+        "was cleared."
+    ),
+    "fire_default_promoted": _(
+        "The archive had no active default FIRE scenario; %(scenario)s was made the default."
+    ),
+    "duplicate_fire_scenario": _("A FIRE scenario id appears more than once."),
+    "duplicate_fire_scenario_name": _("Two active FIRE scenarios have the same name."),
+    "archived_default_scenario": _("An archived FIRE scenario cannot be the default."),
+    "duplicate_default_scenario": _("More than one FIRE scenario is the default."),
+    "invalid_fire_years": _("The FIRE scenario's birth or start year is invalid."),
+    "invalid_fire_horizon": _("The FIRE scenario's horizon is not after its start age."),
+    "invalid_fire_stop_age": _("The FIRE scenario's stop-working age is before its start age."),
+    "invalid_fire_swr": _(
+        "A FIRE scenario with the withdrawal rule needs a valid withdrawal rate."
+    ),
+    "invalid_fire_manual": _("A manual FIRE input has an invalid amount."),
+    "missing_fire_manual": _("A manual FIRE input needs an amount."),
+    "fire_fallback_for_manual": _("Only a linked FIRE input can have a fallback value."),
+    "fire_manual_for_linked": _("A linked FIRE input cannot have a manual value."),
+    "fire_scenario_reference": _("A FIRE row references an unknown or differently named scenario."),
+    "duplicate_fire_contribution": _("A FIRE contribution id appears more than once."),
+    "duplicate_fire_contribution_year": _("A FIRE scenario has two contributions for one year."),
+    "fire_contribution_window": _("A FIRE contribution year is outside the plan window."),
+    "duplicate_fire_event": _("A FIRE event id appears more than once."),
+    "fire_event_window": _("A FIRE event year is outside the plan window."),
+    "duplicate_fire_exclusion": _("A FIRE expense exclusion id appears more than once."),
+    "duplicate_fire_exclusion_row": _(
+        "A FIRE scenario excludes the same expense category more than once."
+    ),
+    "fire_exclusion_category": _(
+        "A FIRE expense exclusion's category name does not match its category id."
+    ),
+    "invalid_fire_scenario_name": _("Enter a FIRE scenario name of 1 to 200 characters."),
+    "invalid_event_label": _("Enter an event description of 1 to 200 characters."),
+    "invalid_year": _("Enter a year between 1900 and 2199."),
+    "invalid_age": _("Enter a valid age."),
+    "invalid_swr": _("Enter a withdrawal rate in basis points between 50 and 2000."),
     "reference_rate_value_differs": _(
         "A different value is already stored for this date; it is kept."
     ),
@@ -479,6 +535,34 @@ _PARSER_CODES: dict[str, str] = {
     "split is not allowed for this instrument": "split_not_allowed",
     "income link is only for dividends": "income_link_only_dividend",
     "withholding exceeds the gross amount": "withholding_exceeds_gross",
+    # FIRE archive rows (F8.6).
+    "duplicate FIRE scenario id": "duplicate_fire_scenario",
+    "duplicate active FIRE scenario name": "duplicate_fire_scenario_name",
+    "archived default scenario": "archived_default_scenario",
+    "duplicate default scenario": "duplicate_default_scenario",
+    "invalid FIRE scenario years": "invalid_fire_years",
+    "invalid FIRE scenario horizon": "invalid_fire_horizon",
+    "invalid FIRE stop-working age": "invalid_fire_stop_age",
+    "invalid FIRE withdrawal rate": "invalid_fire_swr",
+    "invalid signed decimal": "invalid_decimal",
+    "amount too large": "amount_too_large",
+    "invalid scenario name": "invalid_fire_scenario_name",
+    "invalid event label": "invalid_event_label",
+    "invalid year": "invalid_year",
+    "invalid age": "invalid_age",
+    "invalid swr": "invalid_swr",
+    "missing manual FIRE amount": "missing_fire_manual",
+    "fallback for a manual FIRE input": "fire_fallback_for_manual",
+    "manual value for a linked FIRE input": "fire_manual_for_linked",
+    "FIRE scenario reference mismatch": "fire_scenario_reference",
+    "duplicate FIRE contribution id": "duplicate_fire_contribution",
+    "duplicate FIRE contribution year": "duplicate_fire_contribution_year",
+    "FIRE contribution outside the plan window": "fire_contribution_window",
+    "duplicate FIRE event id": "duplicate_fire_event",
+    "FIRE event outside the plan window": "fire_event_window",
+    "duplicate FIRE exclusion id": "duplicate_fire_exclusion",
+    "duplicate FIRE exclusion": "duplicate_fire_exclusion_row",
+    "FIRE exclusion category mismatch": "fire_exclusion_category",
 }
 
 
@@ -1342,6 +1426,7 @@ class _RestoreRollbackPlan:
     risk_policies: tuple[RiskTargetPolicy, ...]
     previous_risk_policy: dict[str, object] | None
     loan_rows: dict[str, tuple[Any, ...]]
+    fire_rows: dict[str, tuple[Any, ...]]
     reasons: tuple[str, ...]
     settings: dict[str, object]
 
@@ -1365,6 +1450,7 @@ class _RestoreRollbackPlan:
             "price_source_configs": len(self.provider_configs),
             "risk_policies": len(self.risk_policies),
             **{key: len(rows) for key, rows in self.loan_rows.items()},
+            **{key: len(rows) for key, rows in self.fire_rows.items()},
         }
 
 
@@ -1390,6 +1476,12 @@ _LOAN_RESTORE_REPOSITORIES: dict[str, Any] = {
     "loan_balance_checkpoints": LoanBalanceCheckpointRepository,
     "loan_scenarios": LoanScenarioRepository,
     "installment_plans": InstallmentPlanRepository,
+}
+_FIRE_RESTORE_REPOSITORIES: dict[str, Any] = {
+    "fire_scenarios": FireScenarioRepository,
+    "fire_contributions": FireContributionRepository,
+    "fire_events": FireEventRepository,
+    "fire_expense_exclusions": FireExpenseExclusionRepository,
 }
 _M3_REFERENCE_ATTRIBUTES = (
     "category_id",
@@ -1464,6 +1556,25 @@ def _restore_rollback_plan(
         if any(row.updated_at > applied_at for row in rows):
             reasons.add("restore_rows_changed")
         loan_rows[key] = rows
+    raw_fire_ids = (batch.report or {}).get("restored_fire_ids")
+    restored_fire_ids: Mapping[str, object] = (
+        cast("Mapping[str, object]", raw_fire_ids) if isinstance(raw_fire_ids, dict) else {}
+    )
+    fire_rows: dict[str, tuple[Any, ...]] = {}
+    for key, repository_class in _FIRE_RESTORE_REPOSITORIES.items():
+        all_rows = repository_class(session, ctx).list()
+        raw_ids = restored_fire_ids.get(key)
+        expected: set[UUID] = set()
+        if isinstance(raw_ids, list):
+            for value in cast("list[object]", raw_ids):
+                with contextlib.suppress(ValueError, AttributeError):
+                    expected.add(UUID(str(value)))
+        rows = tuple(row for row in all_rows if row.id in expected)
+        if len(all_rows) != len(expected) or len(rows) != len(expected):
+            reasons.add("restore_rows_added")
+        if any(row.updated_at > applied_at for row in rows):
+            reasons.add("restore_rows_changed")
+        fire_rows[key] = rows
     if (
         len(all_transactions) != len(transactions)
         or any(row.import_batch_id != batch.id for row in all_transactions)
@@ -1582,6 +1693,7 @@ def _restore_rollback_plan(
         risk_policies=tuple(risk_policies),
         previous_risk_policy=previous_policy,
         loan_rows=loan_rows,
+        fire_rows=fire_rows,
         reasons=tuple(sorted(reasons)),
         settings=workspace_settings,
     )
@@ -1592,6 +1704,17 @@ def _rollback_restore(
 ) -> dict[str, int]:
     if plan.reasons:
         raise ImportRestoreRollbackBlocked(plan.reasons)
+    # FIRE events reference loans with RESTRICT, so every FIRE row goes before the loan rows.
+    for key in (
+        "fire_events",
+        "fire_expense_exclusions",
+        "fire_contributions",
+        "fire_scenarios",
+    ):
+        repository = _FIRE_RESTORE_REPOSITORIES[key](session, ctx)
+        for row in plan.fire_rows.get(key, ()):
+            repository.delete(row)
+    session.flush()
     for key in reversed(tuple(_LOAN_RESTORE_REPOSITORIES)):
         repository = _LOAN_RESTORE_REPOSITORIES[key](session, ctx)
         for row in plan.loan_rows.get(key, ()):
@@ -1685,6 +1808,13 @@ def _rollback_restore(
             "risk_policies_deleted": len(plan.risk_policies),
             "loans_deleted": len(plan.loan_rows.get("loans", ())),
             "loan_rows_deleted": sum(len(rows) for rows in plan.loan_rows.values()),
+            "fire_scenarios_deleted": len(plan.fire_rows.get("fire_scenarios", ())),
+            "fire_contributions_deleted": len(plan.fire_rows.get("fire_contributions", ())),
+            "fire_events_deleted": len(plan.fire_rows.get("fire_events", ())),
+            "fire_expense_exclusions_deleted": len(
+                plan.fire_rows.get("fire_expense_exclusions", ())
+            ),
+            "fire_rows_deleted": sum(len(rows) for rows in plan.fire_rows.values()),
             "settings_restored": ",".join(
                 sorted(
                     {

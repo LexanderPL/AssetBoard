@@ -136,6 +136,15 @@
       <div><dt class="text-muted">{{ _("FX rates") }}</dt><dd>{{ selected_batch.report.counts.fx_rates_created|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Provider settings") }}</dt><dd>{{ selected_batch.report.counts.price_source_configs_created|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Risk targets restored") }}</dt><dd>{{ selected_batch.report.counts.risk_policy_restored|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("FIRE scenarios") }}</dt><dd>{{ selected_batch.report.counts.fire_scenarios_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("FIRE contributions") }}</dt><dd>{{ selected_batch.report.counts.fire_contributions_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("FIRE events") }}</dt><dd>{{ selected_batch.report.counts.fire_events_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("FIRE expense exclusions") }}</dt><dd>{{ selected_batch.report.counts.fire_expense_exclusions_created|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("FIRE inputs restored as manual") }}</dt><dd>{{ selected_batch.report.counts.fire_linked_fallbacks|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("FIRE inputs restored as zero") }}</dt><dd>{{ selected_batch.report.counts.fire_missing_fallbacks|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("FIRE exclusions skipped") }}</dt><dd>{{ selected_batch.report.counts.fire_skipped_exclusions|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("FIRE loan links cleared") }}</dt><dd>{{ selected_batch.report.counts.fire_cleared_source_loans|default(0) }}</dd></div>
+      <div><dt class="text-muted">{{ _("FIRE default scenario promoted") }}</dt><dd>{{ selected_batch.report.counts.fire_default_promoted|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Linked items restored as manual") }}</dt><dd>{{ selected_batch.report.counts.linked_items_unlinked|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Suggested categories to remove") }}</dt><dd>{{ selected_batch.report.counts.suggested_categories_removed|default(0) }}</dd></div>
       <div><dt class="text-muted">{{ _("Suggested net-worth categories to remove") }}</dt><dd>{{ selected_batch.report.counts.suggested_networth_categories_removed|default(0) }}</dd></div>

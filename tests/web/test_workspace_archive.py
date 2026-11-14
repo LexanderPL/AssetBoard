@@ -301,6 +301,10 @@ def test_editor_can_download_and_audit_workspace_archive(owner: OwnerApp) -> Non
             "loan_balance_checkpoints.csv",
             "loan_scenarios.csv",
             "installment_plans.csv",
+            "fire_scenarios.csv",
+            "fire_contributions.csv",
+            "fire_events.csv",
+            "fire_expense_exclusions.csv",
         ]
     with owner.db() as session:
         event = session.scalars(
@@ -335,6 +339,10 @@ def test_editor_can_download_and_audit_workspace_archive(owner: OwnerApp) -> Non
             "loan_balance_checkpoints",
             "loan_scenarios",
             "installment_plans",
+            "fire_scenarios",
+            "fire_contributions",
+            "fire_events",
+            "fire_expense_exclusions",
         }
         assert "amount" not in event.data
 

@@ -9,7 +9,7 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from importlib.metadata import version
-from typing import cast
+from typing import Any, cast
 from uuid import UUID
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -70,6 +70,10 @@ from assetboard.domain.archive import (
     BondTermsRow,
     BudgetLineRow,
     CategoryRow,
+    FireContributionRow,
+    FireEventRow,
+    FireExpenseExclusionRow,
+    FireScenarioRow,
     FxRateRow,
     InstallmentPlanRow,
     InstrumentAllocationRow,
@@ -101,13 +105,14 @@ from assetboard.domain.archive import (
 )
 from assetboard.domain.categories import SEED, clean_name
 from assetboard.domain.instruments import ASSET_CLASS_SEEDS, SeedAssetClass
-from assetboard.domain.ledger_csv import plain_amount
+from assetboard.domain.ledger_csv import plain_amount, plain_signed_amount
 from assetboard.domain.networth import ASSET_SEEDS as NETWORTH_ASSET_SEEDS
 from assetboard.domain.networth import LIABILITY_SEED as NETWORTH_LIABILITY_SEED
 from assetboard.i18n import gettext
 from assetboard.i18n.locale import SUPPORTED_LOCALES
 from assetboard.services.categories import usage_by_category
 from assetboard.services.context import Context, Role, require_role, require_role_now
+from assetboard.services.fire_linked import LinkedInputs, linked_inputs_in_session
 
 ARCHIVE_INCLUDED_MODELS = frozenset(
     {
@@ -139,16 +144,16 @@ ARCHIVE_INCLUDED_MODELS = frozenset(
         "LoanBalanceCheckpoint",
         "LoanScenario",
         "InstallmentPlan",
+        "FireScenario",
+        "FireContribution",
+        "FireEvent",
+        "FireExpenseExclusion",
     }
 )
 ARCHIVE_EXCLUDED_MODELS = {
     "Membership": "workspace membership is instance access control",
     "Invitation": "invitations are not financial workspace data",
     "AuditEvent": "audit history is intentionally not portable",
-    "FireContribution": "FIRE scenarios require the F8.6 archive extension",
-    "FireEvent": "FIRE scenarios require the F8.6 archive extension",
-    "FireExpenseExclusion": "FIRE scenarios require the F8.6 archive extension",
-    "FireScenario": "FIRE scenarios require the F8.6 archive extension",
     "ImportBatch": "temporary import state and user reports are not portable",
     "ImportCategoryMapping": (
         "remembered import choices are workspace import preferences, not ledger data"
@@ -1143,6 +1148,189 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             )
             for row in plans
         )
+        fire_scenarios = sorted(
+            FireScenarioRepository(session, ctx).list(),
+            key=lambda row: (
+                row.archived_at is not None,
+                row.name_key,
+                str(lineage_id(row.id, row.import_key)),
+            ),
+        )
+        fire_scenario_rank = {row.id: index for index, row in enumerate(fire_scenarios)}
+        fire_scenario_lineage = {
+            row.id: lineage_id(row.id, row.import_key) for row in fire_scenarios
+        }
+        fire_scenarios_by_id = {row.id: row for row in fire_scenarios}
+        fire_contributions = sorted(
+            FireContributionRepository(session, ctx).for_scenarios(list(fire_scenario_rank)),
+            key=lambda row: (
+                fire_scenario_rank[row.scenario_id],
+                row.year,
+                str(lineage_id(row.id, row.import_key)),
+            ),
+        )
+        fire_events = sorted(
+            FireEventRepository(session, ctx).for_scenarios(list(fire_scenario_rank)),
+            key=lambda row: (
+                fire_scenario_rank[row.scenario_id],
+                row.year,
+                str(lineage_id(row.id, row.import_key)),
+            ),
+        )
+        fire_exclusions = sorted(
+            FireExpenseExclusionRepository(session, ctx).for_scenarios(list(fire_scenario_rank)),
+            key=lambda row: (
+                fire_scenario_rank[row.scenario_id],
+                category_rank.get(row.category_id, len(category_rank)),
+                str(lineage_id(row.id, row.import_key)),
+            ),
+        )
+        exclusion_ids_by_scenario: dict[UUID, list[UUID]] = {}
+        for row in fire_exclusions:
+            exclusion_ids_by_scenario.setdefault(row.scenario_id, []).append(row.category_id)
+        linked_cache: dict[tuple[object, ...], LinkedInputs] = {}
+        fire_linked: dict[UUID, LinkedInputs | None] = {}
+        for row in fire_scenarios:
+            if (
+                row.income_mode == "manual"
+                and row.expenses_mode == "manual"
+                and row.portfolio_mode == "manual"
+            ):
+                fire_linked[row.id] = None
+                continue
+            key = (
+                row.currency,
+                row.start_year,
+                row.income_mode,
+                row.expenses_mode,
+                row.portfolio_mode,
+                tuple(sorted(exclusion_ids_by_scenario.get(row.id, ()))),
+            )
+            linked = linked_cache.get(key)
+            if linked is None:
+                linked = linked_inputs_in_session(
+                    session,
+                    ctx,
+                    currency=row.currency,
+                    start_year=row.start_year,
+                    income_mode=row.income_mode,
+                    expenses_mode=row.expenses_mode,
+                    portfolio_mode=row.portfolio_mode,
+                    expense_exclusion_ids=exclusion_ids_by_scenario.get(row.id, ()),
+                )
+                linked_cache[key] = linked
+            fire_linked[row.id] = linked
+
+        def fire_fallback(row: Any, field: str, direction: str) -> str:
+            linked = fire_linked[row.id]
+            if linked is None or any(block.field == field for block in linked.blocks):
+                return ""
+            if direction == "portfolio":
+                total = linked.portfolio.total if linked.portfolio is not None else None
+            else:
+                series = linked.income if direction == "income" else linked.expenses
+                total = series.annual_total if series is not None else None
+            return plain_amount(total.amount_minor, row.currency) if total is not None else ""
+
+        fire_scenario_rows = tuple(
+            FireScenarioRow(
+                id=str(fire_scenario_lineage[row.id]),
+                name=row.name,
+                currency=row.currency,
+                birth_year=row.birth_year,
+                start_year=row.start_year,
+                inflation_bp=row.inflation_bp,
+                real_return_bp=row.real_return_bp,
+                income_growth_bp=row.income_growth_bp,
+                stop_working_age=row.stop_working_age,
+                horizon_age=row.horizon_age,
+                rule=row.rule,
+                swr_bp=row.swr_bp,
+                income_mode=row.income_mode,
+                income_manual=(
+                    plain_amount(row.income_manual_minor, row.currency)
+                    if row.income_manual_minor is not None
+                    else ""
+                ),
+                income_fallback=(
+                    fire_fallback(row, "income_manual", "income")
+                    if row.income_mode != "manual"
+                    else ""
+                ),
+                expenses_mode=row.expenses_mode,
+                expenses_manual=(
+                    plain_amount(row.expenses_manual_minor, row.currency)
+                    if row.expenses_manual_minor is not None
+                    else ""
+                ),
+                expenses_fallback=(
+                    fire_fallback(row, "expenses_manual", "expenses")
+                    if row.expenses_mode != "manual"
+                    else ""
+                ),
+                portfolio_mode=row.portfolio_mode,
+                portfolio_manual=(
+                    plain_amount(row.portfolio_manual_minor, row.currency)
+                    if row.portfolio_manual_minor is not None
+                    else ""
+                ),
+                portfolio_fallback=(
+                    fire_fallback(row, "portfolio_manual", "portfolio")
+                    if row.portfolio_mode != "manual"
+                    else ""
+                ),
+                is_default="true" if row.is_default else "false",
+                archived_at=timestamp_text(row.archived_at),
+            )
+            for row in fire_scenarios
+        )
+        fire_contribution_rows = tuple(
+            FireContributionRow(
+                id=str(lineage_id(row.id, row.import_key)),
+                scenario_id=str(fire_scenario_lineage[row.scenario_id]),
+                scenario=fire_scenarios_by_id[row.scenario_id].name,
+                year=row.year,
+                net_amount=plain_signed_amount(
+                    row.net_amount_minor,
+                    fire_scenarios_by_id[row.scenario_id].currency,
+                ),
+            )
+            for row in fire_contributions
+        )
+        fire_event_rows = tuple(
+            FireEventRow(
+                id=str(lineage_id(row.id, row.import_key)),
+                scenario_id=str(fire_scenario_lineage[row.scenario_id]),
+                scenario=fire_scenarios_by_id[row.scenario_id].name,
+                year=row.year,
+                kind=row.kind,
+                amount=plain_signed_amount(
+                    row.amount_minor, fire_scenarios_by_id[row.scenario_id].currency
+                ),
+                label=row.label,
+                source_loan_id=(
+                    str(loan_lineage.get(row.source_loan_id, row.source_loan_id))
+                    if row.source_loan_id is not None
+                    else None
+                ),
+            )
+            for row in fire_events
+        )
+        fire_exclusion_rows = tuple(
+            FireExpenseExclusionRow(
+                id=str(lineage_id(row.id, row.import_key)),
+                scenario_id=str(fire_scenario_lineage[row.scenario_id]),
+                scenario=fire_scenarios_by_id[row.scenario_id].name,
+                category_id=str(
+                    lineage_id(
+                        categories_by_id[row.category_id].id,
+                        categories_by_id[row.category_id].import_key,
+                    )
+                ),
+                category=categories_by_id[row.category_id].name,
+            )
+            for row in fire_exclusions
+        )
         asset_class_rows = tuple(
             AssetClassRow(
                 id=str(asset_class_lineage[row.id]),
@@ -1401,6 +1589,10 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             loan_balance_checkpoints=loan_balance_checkpoint_rows,
             loan_scenarios=loan_scenario_rows,
             installment_plans=installment_plan_rows,
+            fire_scenarios=fire_scenario_rows,
+            fire_contributions=fire_contribution_rows,
+            fire_events=fire_event_rows,
+            fire_expense_exclusions=fire_exclusion_rows,
         )
         counts = {
             "categories": len(category_rows),
@@ -1430,6 +1622,10 @@ def export_workspace(factory: sessionmaker[Session], ctx: Context) -> WorkspaceA
             "loan_balance_checkpoints": len(loan_balance_checkpoint_rows),
             "loan_scenarios": len(loan_scenario_rows),
             "installment_plans": len(installment_plan_rows),
+            "fire_scenarios": len(fire_scenario_rows),
+            "fire_contributions": len(fire_contribution_rows),
+            "fire_events": len(fire_event_rows),
+            "fire_expense_exclusions": len(fire_exclusion_rows),
         }
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,

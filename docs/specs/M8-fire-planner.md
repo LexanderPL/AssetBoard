@@ -426,6 +426,38 @@ ADR-0016): the new files with lineage ids, export, restore, emptiness checks, ex
 projections after restore.
 ```
 
+### As built (M8.F8.6)
+
+- Archive format 1.8 adds `fire_scenarios.csv`, `fire_contributions.csv`, `fire_events.csv` and
+  `fire_expense_exclusions.csv` (exact columns in
+  [docs/archive-format.md](../archive-format.md)). All four are required in a 1.8 archive and
+  header-only when empty; a 1.7 archive reads with empty FIRE tuples and no FIRE warning. The
+  four FIRE models gain nullable `import_key` (unique per workspace) and leave
+  `ARCHIVE_EXCLUDED_MODELS`; they stay in `EMPTINESS_CHECKS` and the demo exclusions.
+- Export reads each FIRE table once, orders scenarios active before archived by name key and
+  lineage id, children by scenario, year and lineage id, and exclusions by scenario, category
+  order and lineage id. Lineage ids come from `import_key`; `source_loan_id` and categories map
+  through the exported loan/category lineage. Linked inputs are resolved only for linked
+  scenarios, cached by identical configuration, and written as `*_fallback` (blank when that
+  field is blocked). The audit event gains the four FIRE counts and no amounts or labels.
+- Restore runs FIRE last, after categories, ledger, net worth, investments, loans and
+  `_resolve_networth_links`. Fresh UUIDs keep lineage in `import_key="id:<archive id>"`. A
+  shared `_fire_restore_plan` decides per linked input whether the archive still has its source
+  data (regular trailing-window rows in the scenario currency, all exclusions as regular expense
+  categories with at least one included row, an investable portfolio source, matching currency);
+  otherwise it becomes manual with the archived fallback, or manual 0 with a warning when there
+  is none. Missing or unusable exclusions are skipped, missing source loans are cleared, and the
+  first active scenario is promoted when no active default exists; every case is reported and
+  translated.
+  Restore rollback removes FIRE rows before loans (the event's `source_loan_id` is RESTRICT).
+- Merge writes no FIRE rows and lists the files once with `fire_restore_only`. There is no
+  standalone FIRE importer: a lone FIRE CSV is refused as part of a full restore only.
+- Tests: golden 1.8 fixture, determinism and 1.7 compatibility; every column and cross-file
+  validation; export ordering/lineage/fallbacks/query counts; manual and linked round trips with
+  identical projections and byte-identical data files; each fallback path; 1.7 restore, merge,
+  standalone refusal, emptiness/tenant coverage, restore rollback order and docs/i18n. No new
+  models beyond the lineage column, no UI beyond report counts/warnings, no dependency or ADR.
+
 ---
 
 ## F8.7 (stretch) Monte Carlo and Coast FIRE

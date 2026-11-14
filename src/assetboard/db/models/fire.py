@@ -20,6 +20,10 @@ NULL for ordinary events and drives exact idempotency (never the translated labe
 foreign key keeps the loan in the same workspace. ``ON DELETE RESTRICT`` is deliberate: loans are
 archived, never hard-deleted, and a composite ``SET NULL`` would also try to clear the non-null
 ``workspace_id`` column.
+
+F8.6 adds the archive lineage column ``import_key`` to every FIRE model, following the ledger
+tables. A restore writes ``import_key = "id:<archive id>"`` so a later export keeps the original
+lineage id; the partial unique index is per workspace.
 """
 
 from __future__ import annotations
@@ -163,6 +167,14 @@ class FireScenario(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             sqlite_where=text("is_default AND archived_at IS NULL"),
             postgresql_where=text("is_default AND archived_at IS NULL"),
         ),
+        Index(
+            "uq_fire_scenarios_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
         Index("ix_fire_scenarios_workspace_name", "workspace_id", "name"),
     )
 
@@ -188,6 +200,7 @@ class FireScenario(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         Boolean(), nullable=False, default=False, server_default=false()
     )
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
 
 
 class FireContribution(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
@@ -212,11 +225,20 @@ class FireContribution(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             f"net_amount_minor BETWEEN -{MAX_AMOUNT_MINOR} AND {MAX_AMOUNT_MINOR}",
             name="net_amount_valid",
         ),
+        Index(
+            "uq_fire_contributions_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
     )
 
     scenario_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
     year: Mapped[int] = mapped_column(Integer(), nullable=False)
     net_amount_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
 
 
 class FireExpenseExclusion(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
@@ -252,10 +274,19 @@ class FireExpenseExclusion(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             "workspace_id",
             "scenario_id",
         ),
+        Index(
+            "uq_fire_expense_exclusions_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
     )
 
     scenario_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
     category_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)
 
 
 class FireEvent(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
@@ -290,6 +321,14 @@ class FireEvent(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
         ),
         Index("ix_fire_events_workspace_scenario_year", "workspace_id", "scenario_id", "year"),
         Index("ix_fire_events_workspace_source_loan", "workspace_id", "source_loan_id"),
+        Index(
+            "uq_fire_events_import_key",
+            "workspace_id",
+            "import_key",
+            unique=True,
+            sqlite_where=text("import_key IS NOT NULL"),
+            postgresql_where=text("import_key IS NOT NULL"),
+        ),
     )
 
     scenario_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
@@ -298,3 +337,4 @@ class FireEvent(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     amount_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
     label: Mapped[str] = mapped_column(String(MAX_LABEL_LENGTH), nullable=False)
     source_loan_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)
+    import_key: Mapped[str | None] = mapped_column(String(67), nullable=True)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Collection
+from datetime import datetime
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -112,8 +113,22 @@ class FireExpenseExclusionRepository(ScopedRepository[FireExpenseExclusion]):
     model = FireExpenseExclusion
     unsupported = frozenset({"update"})
 
-    def create(self, *, scenario_id: UUID, category_id: UUID) -> FireExpenseExclusion:
-        return self.add(FireExpenseExclusion(scenario_id=scenario_id, category_id=category_id))
+    def create(
+        self,
+        *,
+        scenario_id: UUID,
+        category_id: UUID,
+        import_key: str | None = None,
+        created_at: datetime | None = None,
+    ) -> FireExpenseExclusion:
+        return self.add(
+            FireExpenseExclusion(
+                scenario_id=scenario_id,
+                category_id=category_id,
+                import_key=import_key,
+                created_at=created_at,
+            )
+        )
 
     def for_scenario(self, scenario_id: UUID) -> list[FireExpenseExclusion]:
         statement = (

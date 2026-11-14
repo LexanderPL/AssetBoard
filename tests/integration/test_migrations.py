@@ -6,7 +6,7 @@ import pytest
 from alembic import command
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import Connection, inspect
+from sqlalchemy import Connection, String, inspect
 from sqlalchemy.exc import IntegrityError
 
 from assetboard.config import Settings
@@ -2068,6 +2068,64 @@ def test_0059_fire_scenarios_migration_is_reversible(tmp_path: Path) -> None:
         command.downgrade(alembic_config(settings), "0058_loan_mixed_rate_timeline")
         tables = set(inspect(engine).get_table_names())
         assert not {"fire_scenarios", "fire_contributions", "fire_events"} & tables
+        upgrade_database(settings)
+        assert database_is_at_head(settings)
+        check_database_migrations(settings)
+    finally:
+        engine.dispose()
+
+
+def test_0062_fire_archive_migration_is_reversible(tmp_path: Path) -> None:
+    settings = Settings(
+        _env_file=None,
+        data_dir=tmp_path,
+        database_url=f"sqlite:///{tmp_path / 'fire_archive.db'}",
+    )
+    upgrade_database(settings)
+    engine = create_database_engine(settings.database_url or "")
+    tables_and_indexes = (
+        ("fire_scenarios", "uq_fire_scenarios_import_key"),
+        ("fire_contributions", "uq_fire_contributions_import_key"),
+        ("fire_events", "uq_fire_events_import_key"),
+        ("fire_expense_exclusions", "uq_fire_expense_exclusions_import_key"),
+    )
+    try:
+        inspector = inspect(engine)
+        for table, index_name in tables_and_indexes:
+            column = next(
+                column for column in inspector.get_columns(table) if column["name"] == "import_key"
+            )
+            assert column["nullable"] is True
+            assert isinstance(column["type"], String)
+            assert column["type"].length == 67
+            index = next(
+                index for index in inspector.get_indexes(table) if index["name"] == index_name
+            )
+            assert index["unique"]
+            assert index["column_names"] == ["workspace_id", "import_key"]
+
+        with engine.connect() as connection:
+            index_sql = dict(
+                connection.exec_driver_sql(
+                    "SELECT name, sql FROM sqlite_master WHERE type = 'index' AND tbl_name IN "
+                    "('fire_scenarios', 'fire_contributions', 'fire_events', "
+                    "'fire_expense_exclusions')"
+                ).all()
+            )
+        for _table, index_name in tables_and_indexes:
+            assert "UNIQUE" in index_sql[index_name]
+            assert "WHERE import_key IS NOT NULL" in index_sql[index_name]
+
+        command.downgrade(alembic_config(settings), "0061_f710_loan_tranches")
+        inspector = inspect(engine)
+        for table, index_name in tables_and_indexes:
+            columns = {column["name"] for column in inspector.get_columns(table)}
+            assert "import_key" not in columns
+            indexes = {index["name"] for index in inspector.get_indexes(table)}
+            assert index_name not in indexes
+        loan_columns = {column["name"] for column in inspector.get_columns("loans")}
+        assert {"drawdown_mode", "interest_only_months"} <= loan_columns
+
         upgrade_database(settings)
         assert database_is_at_head(settings)
         check_database_migrations(settings)
