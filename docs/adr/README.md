@@ -31,6 +31,7 @@ The decisions below are accepted unless noted otherwise.
 | [0022](0022-tax-kinds-and-payment-schedule.md) | Tax kinds and payment schedule | Accepted |
 | [0023](0023-opt-in-update-check.md) | Opt-in update check | Accepted |
 | [0024](0024-price-providers.md) | Price and FX providers | Accepted |
+| [0025](0025-fire-projection-rounding.md) | FIRE projection numeric representation and rounding | Accepted |
 
 New records should use [the ADR template](template.md), the next available number, and include
 Context, Decision, and Consequences sections.
