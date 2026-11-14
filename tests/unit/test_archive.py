@@ -1122,7 +1122,7 @@ def test_investment_and_loan_models_are_archived_in_1_5() -> None:
     assert "ProviderError" in ARCHIVE_EXCLUDED_MODELS
 
 
-def test_fire_models_are_archived_in_1_7() -> None:
+def test_fire_models_are_archived() -> None:
     for model in (
         "FireScenario",
         "FireContribution",
