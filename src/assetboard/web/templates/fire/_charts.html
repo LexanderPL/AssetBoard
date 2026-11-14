@@ -1,0 +1,52 @@
+{% if charts and charts.net_worth %}
+<section class="panel mb-6 p-6 sm:p-7" aria-labelledby="fire-charts-heading" data-fire-charts>
+  <h2 id="fire-charts-heading" class="text-base font-semibold">{{ _("Charts") }}</h2>
+  <p class="mt-1 text-sm text-muted">{{ _("Dashed lines mark FIRE, the income stop and depletion. The FIRE point is pinned.") }}</p>
+
+  <section class="mt-5" aria-labelledby="fire-net-worth-chart-heading" data-fire-chart="net-worth">
+    <h3 id="fire-net-worth-chart-heading" class="text-sm font-semibold">{{ _("Net worth over time") }}</h3>
+    <p class="mt-1 text-xs text-muted">{% if charts.basis == "real" %}{{ _("In today's money.") }}{% else %}{{ _("In each year's money.") }}{% endif %}</p>
+    <div class="mt-3" data-chart="line" data-chart-json='{{ charts.net_worth|tojson }}'>
+      <div class="h-80 w-full" hidden aria-hidden="true" data-chart-canvas></div>
+    </div>
+    <details class="mt-3" data-fire-net-worth-points>
+      <summary class="cursor-pointer text-sm font-medium text-muted">{{ _("Plotted data") }}</summary>
+      <div class="mt-3 max-h-64 overflow-auto">
+        <table class="sheet w-full text-sm">
+          <caption class="sr-only">{{ _("Plotted net worth data") }}</caption>
+          <thead><tr class="text-left text-xs text-muted"><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Year") }}</th><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Age") }}</th><th scope="col" class="py-1.5 text-right font-medium">{{ _("Net worth") }}</th></tr></thead>
+          <tbody>
+            {% for point in charts.net_worth_points %}
+            <tr><th scope="row" class="py-1.5 pr-3 text-left font-normal tabular-nums">{{ point.year }}</th><td class="py-1.5 pr-3 tabular-nums">{{ point.age }}</td><td class="whitespace-nowrap py-1.5 text-right tabular-nums">{{ point.net_worth }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+
+  {% if charts.expenses_gain %}
+  <section class="mt-8" aria-labelledby="fire-expenses-chart-heading" data-fire-chart="expenses-gain">
+    <h3 id="fire-expenses-chart-heading" class="text-sm font-semibold">{{ _("Expenses versus investment gain") }}</h3>
+    <p class="mt-1 text-xs text-muted">{{ _("Both lines are in each year's money, because the independence rule compares nominal values.") }}</p>
+    <div class="mt-3" data-chart="line" data-chart-json='{{ charts.expenses_gain|tojson }}'>
+      <div class="h-80 w-full" hidden aria-hidden="true" data-chart-canvas></div>
+    </div>
+    <details class="mt-3" data-fire-expenses-gain-points>
+      <summary class="cursor-pointer text-sm font-medium text-muted">{{ _("Plotted data") }}</summary>
+      <div class="mt-3 max-h-64 overflow-auto">
+        <table class="sheet w-full text-sm">
+          <caption class="sr-only">{{ _("Plotted expenses and gain data") }}</caption>
+          <thead><tr class="text-left text-xs text-muted"><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Year") }}</th><th scope="col" class="py-1.5 pr-3 font-medium">{{ _("Age") }}</th><th scope="col" class="py-1.5 pr-3 text-right font-medium">{{ _("Expenses") }}</th><th scope="col" class="py-1.5 text-right font-medium">{{ _("Investment gain") }}</th></tr></thead>
+          <tbody>
+            {% for point in charts.expenses_gain_points %}
+            <tr><th scope="row" class="py-1.5 pr-3 text-left font-normal tabular-nums">{{ point.year }}</th><td class="py-1.5 pr-3 tabular-nums">{{ point.age }}</td><td class="whitespace-nowrap py-1.5 pr-3 text-right tabular-nums">{{ point.expenses }}</td><td class="whitespace-nowrap py-1.5 text-right tabular-nums">{{ point.gain }}</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </details>
+  </section>
+  {% endif %}
+</section>
+{% endif %}

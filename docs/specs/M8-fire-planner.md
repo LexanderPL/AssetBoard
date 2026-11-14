@@ -189,6 +189,49 @@ Implement F8.3 from docs/specs/M8-fire-planner.md: scenario results page with ke
 live recalculation via HTMX with debounce. The UI calls the service that calls project(); no math in templates or JS.
 ```
 
+### As built (M8.F8.3)
+
+- `GET /fire/{id}` is the scenario's combined page: results first, then a collapsible
+  **Plan inputs** panel with the complete F8.1 form. `GET /fire/{id}/edit` is a 303 to
+  `?edit=1#inputs` (archived: `?error=archived`). `POST /fire/{id}/preview` validates and
+  projects the posted form without writing and returns only the results fragment; an invalid
+  preview keeps the saved results and names the field. `GET /fire/{id}/results.csv` writes both
+  bases with the fixed header, CRLF, plain dot decimals, no BOM and `1`/`0` flags. The existing
+  create, duplicate, default, archive and restore actions are unchanged; saving preserves the
+  nominal/real basis in the redirect.
+- `services.fire_projection` maps a saved scenario and its child rows to `ProjectionInputs`,
+  reports a missing linked starting value or an invalid saved plan as a `ResultsBlock` instead of
+  zero or a server error, and offers `inputs_from_validated` for the save-free preview. A saved
+  result costs three queries; the preview performs no queries and no writes. Archived scenarios
+  still project but never preview; previews require an editor.
+- `services.fire_scenarios.validate_scenario_input` is public and takes `previous_rates`; preview
+  mode skips the unusual-rate save gate (the result reports `needs_extreme_confirmation` until the
+  confirmation box is ticked) and name uniqueness stays a repository check, so another scenario's
+  name cannot block a preview. All F8.1 create/update behavior is preserved.
+- Metrics show FIRE age/year, years to FIRE, the FIRE number, depletion/minimum-after-stop, and
+  both progress definitions (sheet and today's money) with exact percentages and bars capped
+  visually at 100%. The nominal/real table marks FIRE, income-stopped and depleted rows; the cash
+  column appears only when it has a value; the `t = 0` net column footnote is present. Never,
+  depletion and blocked states are explained; undefined values are `—`, never 0.
+- `web.fire_charts` prepares both ECharts series, localized axes/tooltips/series names, FIRE
+  markLine/markPoint, income-stop/depletion markers, and the accessible plotted-data rows. The
+  net-worth chart follows the basis; expenses-versus-gain stays nominal. Chart JSON travels in a
+  `data-chart-json` attribute, so HTMX swaps cannot strip it; `charts.js` reads it (existing
+  script sources still work), redraws after swaps and disposes detached instances. The shared
+  nice-axis helper is `web.chart_axis`; loan charts use the same code unchanged. The results page
+  loads the chart scripts whenever it can show charts or preview, so a blocked saved plan can
+  draw the charts that a successful preview produces.
+- The live preview is enabled only for editors on active scenarios with `hx-post`, `hx-include`,
+  debounced `hx-trigger`, `hx-target`/`hx-swap` and `hx-sync`; `fire.js` dispatches
+  `fire:changed` after row add/remove/paste and marks a preview-error field. The form wraps the
+  results and the inputs, while only `#fire-results` is swapped: focus and unsaved values stay,
+  and previews never save. The nominal/real switch is a radio group in that form for editors, so
+  changing it previews in place instead of navigating; viewers and archived plans keep plain
+  links.
+- `plain_signed_amount` in `domain.ledger_csv` writes negative CSV amounts; the FIRE CSV uses it
+  for every amount. No migration, model, dependency or ADR is added. Polish translations are
+  complete with no fuzzy entries; the user guide is `docs/fire.md`.
+
 ---
 
 ## F8.4 Inputs linked to real data

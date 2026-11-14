@@ -5,6 +5,13 @@
 
   const PAIR = /^\s*(\d{4})\s*[,\t]\s*(.+?)\s*$/;
 
+  function notifyChange() {
+    const form = document.querySelector("[data-fire-form]");
+    if (form instanceof HTMLElement) {
+      form.dispatchEvent(new CustomEvent("fire:changed", { bubbles: true }));
+    }
+  }
+
   function rowsFor(kind) {
     return document.querySelector(`[data-${kind}-rows]`);
   }
@@ -98,18 +105,49 @@
 
     if (target.closest("[data-add-contribution]")) {
       addRow("contribution");
+      notifyChange();
       return;
     }
     if (target.closest("[data-add-event]")) {
       addRow("event");
+      notifyChange();
       return;
     }
     const remove = target.closest("[data-remove-row]");
     if (remove) {
       remove.closest("[data-editor-row]")?.remove();
+      notifyChange();
       return;
     }
     const paste = target.closest("[data-paste-contributions]");
-    if (paste instanceof HTMLElement) fillContributions(paste);
+    if (paste instanceof HTMLElement) {
+      fillContributions(paste);
+      notifyChange();
+    }
   });
+
+  // A preview error arrives with the results fragment, not a full page. Mark the named input
+  // without moving focus, and clear the marker when a later preview succeeds.
+  function syncPreviewError() {
+    const form = document.querySelector("[data-fire-form]");
+    if (!(form instanceof HTMLFormElement)) return;
+    form.querySelectorAll("[aria-invalid='true']").forEach((field) => {
+      field.removeAttribute("aria-invalid");
+    });
+    const alert = document.querySelector("[data-fire-preview-error]");
+    const name = alert instanceof HTMLElement ? alert.dataset.firePreviewErrorField : "";
+    if (!name) return;
+    let field = form.querySelector(`[name="${CSS.escape(name)}"]`);
+    if (!field && name === "contributions") {
+      field = form.querySelector("[data-contribution-table]");
+    }
+    if (!field && name === "events") {
+      field = form.querySelector("[data-event-table]");
+    }
+    if (field instanceof HTMLElement) field.setAttribute("aria-invalid", "true");
+  }
+
+  for (const eventName of ["htmx:afterSwap", "htmx:oobAfterSwap"]) {
+    document.addEventListener(eventName, syncPreviewError);
+  }
 })();

@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% from "macros/components.html" import csrf_input with context %}
+{% from "fire/_macros.html" import badge with context %}
+{% block title %}{{ detail.scenario.name }} · {{ _("FIRE planner") }} · {{ app_name }}{% endblock %}
+{% block heading %}{{ _("FIRE planner") }}{% endblock %}
+{% block header_actions %}
+<a href="{{ scoped_url(request, 'fire_scenarios') }}" class="btn" data-fire-back>{{ _("All scenarios") }}</a>
+{% endblock %}
+
+{% block content %}
+{% set s = detail.scenario %}
+{% if notice %}<p role="status" class="mb-4 border border-success-line bg-success-soft px-4 py-3 text-sm text-success-strong" data-action-notice>{{ notice }}</p>{% endif %}
+{% if error %}<p role="alert" class="mb-4 border border-danger-line bg-danger-soft px-4 py-3 text-sm text-danger-strong" data-action-error>{{ error }}{% if error_code == 'birth_year_required' %} <a href="{{ profile_url }}" class="font-semibold underline underline-offset-2" data-fire-profile-link>{{ _("Open your profile") }}</a>{% endif %}</p>{% endif %}
+
+<section class="panel mb-6 p-6 sm:p-7" aria-labelledby="scenario-heading" data-fire-overview="{{ s.id }}">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="min-w-0">
+      <h2 id="scenario-heading" class="text-xl font-semibold">{{ s.name }}{% if s.is_default %}{{ badge(_("Default"), "primary") }}{% endif %}{% if s.archived %}{{ badge(_("Archived")) }}{% endif %}</h2>
+      <p class="mt-1 text-sm text-muted">{{ _("Start year %(year)d · age %(age)d at the start · currency %(currency)s", year=s.start_year, age=s.age_at_start, currency=s.currency) }}</p>
+    </div>
+    {% if can_edit %}
+    <div class="flex flex-wrap gap-2">
+      {% if not s.archived %}
+      <a href="{{ scoped_url(request, 'fire_scenario_edit', scenario_id=s.id) }}" class="btn-primary" data-fire-edit>{{ _("Edit scenario") }}</a>
+      {% if not s.is_default %}
+      <form method="post" action="{{ scoped_url(request, 'fire_scenario_default', scenario_id=s.id) }}">
+        {{ csrf_input() }}
+        <button type="submit" class="btn" data-fire-set-default>{{ _("Make default") }}</button>
+      </form>
+      {% endif %}
+      <form method="post" action="{{ scoped_url(request, 'fire_scenario_archive', scenario_id=s.id) }}" data-confirm="{{ _('Archive the scenario %(name)s?', name=s.name) }}" data-confirm-tone="danger">
+        {{ csrf_input() }}
+        <button type="submit" class="btn btn-danger" data-fire-archive>{{ _("Archive") }}</button>
+      </form>
+      {% else %}
+      <form method="post" action="{{ scoped_url(request, 'fire_scenario_restore', scenario_id=s.id) }}">
+        {{ csrf_input() }}
+        <button type="submit" class="btn" data-fire-restore>{{ _("Restore") }}</button>
+      </form>
+      {% endif %}
+      <form method="post" action="{{ scoped_url(request, 'fire_scenario_duplicate', scenario_id=s.id) }}">
+        {{ csrf_input() }}
+        <button type="submit" class="btn" data-fire-duplicate>{{ _("Duplicate") }}</button>
+      </form>
+    </div>
+    {% endif %}
+  </div>
+  {% if s.archived %}
+  <p class="mt-4 border-t border-line pt-3 text-sm text-muted" data-fire-readonly>{{ _("This scenario is archived and read-only. Restore it to change its inputs.") }}</p>
+  {% endif %}
+  {% if s.stop_after_horizon %}
+  <p role="status" class="mt-4 border border-warning-line bg-warning-soft px-4 py-3 text-sm text-warning-strong" data-fire-horizon-warning>{{ _("Income stops after the plan's horizon. The plan is saved, but the projection will have no working years beyond age %(horizon)d.", horizon=s.horizon_age) }}</p>
+  {% endif %}
+</section>
+
+{% if can_preview %}
+{# The form wraps the results and the inputs: the basis radios and every input post together,
+   while the results fragment can be swapped without touching the typed values. #}
+<form id="fire-form" method="post" action="{{ action }}" class="space-y-6" data-fire-form data-start-year="{{ start_year }}" novalidate>
+  {{ csrf_input() }}
+  <div id="fire-results" data-fire-results hx-post="{{ scoped_url(request, 'fire_scenario_preview', scenario_id=s.id) }}" hx-trigger="change from:#fire-form delay:300ms, input from:#fire-form delay:600ms, fire:changed from:#fire-form delay:100ms" hx-include="#fire-form" hx-target="#fire-results" hx-swap="innerHTML" hx-sync="this:replace">
+    {% include "fire/_results.html" %}
+  </div>
+  {% include "fire/_inputs_panel.html" %}
+</form>
+{% else %}
+<div id="fire-results" data-fire-results>
+  {% include "fire/_results.html" %}
+</div>
+{% include "fire/_inputs_panel.html" %}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if charts or can_preview %}{% include "macros/chart_scripts.html" %}{% endif %}
+<script defer src="{{ static_url(request, 'js/fire.js') }}" referrerpolicy="no-referrer"></script>
+{% endblock %}
