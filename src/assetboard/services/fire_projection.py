@@ -315,7 +315,9 @@ def scenario_results(
             currency=scenario.currency,
             start_year=scenario.start_year,
             last_year=scenario.birth_year + scenario.horizon_age,
-            existing_events=tuple((event.year, event.kind, event.label) for event in detail.events),
+            added_loan_ids=tuple(
+                event.source_loan_id for event in detail.events if event.source_loan_id is not None
+            ),
         )
     return results_from_detail(detail, linked=linked, loan_suggestions=suggestions)
 

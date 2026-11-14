@@ -149,6 +149,8 @@ class EventView:
     kind: str
     amount: Money
     label: str
+    # The loan a one-click payoff event came from; NULL for an ordinary event (F8.4).
+    source_loan_id: UUID | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -576,6 +578,8 @@ def _reconcile_rows(
             current.amount_minor,
             current.label,
         ) != (row.year, row.kind, row.amount_minor, row.label):
+            # source_loan_id is not an editor field: a one-click payoff event keeps its loan
+            # link when the label, year, kind or amount is edited.
             events.update(
                 current.id,
                 year=row.year,
@@ -611,6 +615,7 @@ def _copy_rows(session: Session, ctx: Context, source: UUID, target: UUID) -> No
             kind=row.kind,
             amount_minor=row.amount_minor,
             label=row.label,
+            source_loan_id=row.source_loan_id,
         )
     exclusions = FireExpenseExclusionRepository(session, ctx)
     for row in exclusions.for_scenario(source):
@@ -712,6 +717,7 @@ def get_fire_scenario(
                     kind=item.kind,
                     amount=Money(item.amount_minor, row.currency),
                     label=item.label,
+                    source_loan_id=item.source_loan_id,
                 )
                 for item in events
             ),

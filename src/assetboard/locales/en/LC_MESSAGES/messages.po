@@ -5597,8 +5597,8 @@ msgid "Income stops at age"
 msgstr ""
 
 msgid ""
-"The age at which earned income stops; from then on the plan spends from "
-"the portfolio."
+"The age at which income stops; from then on the plan spends from the "
+"portfolio."
 msgstr ""
 
 msgid "Assumptions"
@@ -5624,7 +5624,7 @@ msgstr ""
 msgid "Income growth (%%)"
 msgstr ""
 
-msgid "How much your earned income grows each year until it stops."
+msgid "How much your income grows each year until it stops."
 msgstr ""
 
 msgid "Independence rule"
@@ -5668,7 +5668,10 @@ msgstr ""
 msgid "Annual income"
 msgstr ""
 
-msgid "Earned income in the start year, before tax and other deductions."
+msgid ""
+"Regular income in the start year: earnings, dividends and interest, "
+"before tax and other deductions. Linked income sums every regular income "
+"transaction."
 msgstr ""
 
 msgid "Last 12 full months"
@@ -5924,6 +5927,11 @@ msgid ""
 "principal and costs, without overpayments), in today's money."
 msgstr ""
 
+msgid ""
+"Suggestions use the saved plan and the loan schedules as of this page "
+"load; unsaved Plan-input changes do not update them."
+msgstr ""
+
 #, python-format
 msgid "Payoff in %(year)d frees %(amount)s/year (today's money)."
 msgstr ""
@@ -5956,7 +5964,7 @@ msgstr ""
 msgid "The payoff year falls outside the plan window."
 msgstr ""
 
-#, fuzzy, python-format
+#, fuzzy
 msgid "The loan is in another currency than the plan."
 msgstr ""
 
@@ -12137,5 +12145,17 @@ msgstr ""
 #~ "Check the starting values and rates "
 #~ "in Plan inputs, then preview the "
 #~ "result."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "The age at which earned income "
+#~ "stops; from then on the plan "
+#~ "spends from the portfolio."
+#~ msgstr ""
+
+#~ msgid "How much your earned income grows each year until it stops."
+#~ msgstr ""
+
+#~ msgid "Earned income in the start year, before tax and other deductions."
 #~ msgstr ""
 

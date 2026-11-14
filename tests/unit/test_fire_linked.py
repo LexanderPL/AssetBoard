@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import date
 from decimal import Decimal
 from typing import Any
@@ -21,13 +22,15 @@ from assetboard.db.repositories import (
     TransactionRepository,
 )
 from assetboard.domain.fire import (
+    MAX_LABEL_LENGTH,
     annualize_minor,
     trailing_window,
 )
 from assetboard.domain.money import Money
 from assetboard.services import fire_linked, fire_projection, fire_scenarios, loans
-from assetboard.services.context import PermissionDenied
+from assetboard.services.context import Context, PermissionDenied
 from assetboard.services.fire_scenarios import (
+    EventInput,
     FireError,
     FireScenarioInput,
 )
@@ -51,6 +54,17 @@ def team(tmp_path):
 
 def _ctx(team: WorkspaceDb):
     return team.ctx("owner", "owner")
+
+
+def _localized_ctx(
+    team: WorkspaceDb, *, user_locale: str | None, workspace_locale: str = "en"
+) -> Context:
+    ctx = _ctx(team)
+    return replace(
+        ctx,
+        user=replace(ctx.user, locale=user_locale),
+        workspace=replace(ctx.workspace, locale=workspace_locale),
+    )
 
 
 def _money(minor: int, currency: str = "EUR") -> Money:
@@ -295,6 +309,9 @@ def test_annualization_rounds_half_up_once_and_refuses_zero_months() -> None:
     assert annualize_minor(1_000_000, 5) == 2_400_000
     assert annualize_minor(100_000, 7) == 171_429
     assert annualize_minor(1, 2) == 6
+    # One exact half-up step: 12 / 8 = 1.5 -> 2 and 36 / 8 = 4.5 -> 5.
+    assert annualize_minor(1, 8) == 2
+    assert annualize_minor(3, 8) == 5
     with pytest.raises(ValueError):
         annualize_minor(1_000, 0)
 
@@ -371,6 +388,57 @@ def test_trailing_series_warns_when_the_latest_data_is_older_than_the_window(
         "scaled_months",
         "linked_data_older",
     }
+
+
+def test_archived_categories_still_count_in_the_trailing_window(team: WorkspaceDb) -> None:
+    from assetboard.services.categories import archive_category
+
+    food = _category(team, "Food")
+    _transaction(team, food, date(2026, 1, 10), 100_000)
+    archive_category(team.factory, _ctx(team), food)
+    linked = _series(team, expenses_mode="trailing_12m")
+    assert linked.blocks == ()
+    assert linked.expenses is not None
+    assert linked.expenses.months_available == 1
+    assert linked.expenses.raw_total == _money(100_000)
+    assert linked.expenses.annual_total == _money(1_200_000)
+    assert [(row.category_id, row.archived) for row in linked.expenses.categories] == [(food, True)]
+
+
+def test_exclusions_remove_rows_and_the_months_they_covered(team: WorkspaceDb) -> None:
+    food = _category(team, "Food")
+    unusual = _category(team, "Unusual")
+    for month in (12, 1, 2):
+        year = 2025 if month == 12 else 2026
+        _transaction(team, food, date(year, month, 10), 100_000)
+    for month in (10, 11):
+        _transaction(team, unusual, date(2025, month, 10), 900_000)
+
+    full = _series(team, expenses_mode="trailing_12m")
+    assert full.expenses is not None
+    assert full.expenses.months_available == 5
+    assert full.expenses.raw_total == _money(2_100_000)
+
+    without_unusual = _series(
+        team,
+        expenses_mode="trailing_12m",
+        expense_exclusion_ids=(unusual,),
+    )
+    assert without_unusual.expenses is not None
+    assert without_unusual.expenses.months_available == 3
+    assert without_unusual.expenses.raw_total == _money(300_000)
+    assert without_unusual.expenses.annual_total == _money(1_200_000)
+    assert without_unusual.expenses.excluded_total == _money(1_800_000)
+    assert [row.category_id for row in without_unusual.expenses.categories] == [food]
+
+    without_all = _series(
+        team,
+        expenses_mode="trailing_12m",
+        expense_exclusion_ids=(food, unusual),
+    )
+    assert without_all.expenses is not None
+    assert without_all.expenses.months_available == 0
+    assert [block.code for block in without_all.blocks] == ["expenses_all_excluded"]
 
 
 # Portfolio
@@ -503,7 +571,7 @@ def test_linked_portfolio_blocks_a_missing_holding_price_or_fx(
         valuation=SimpleNamespace(rows=(row,), classes=()),
     )
     monkeypatch.setattr(
-        fire_linked, "current_portfolio_data_in_session", lambda _session, _ctx: data
+        fire_linked, "current_portfolio_data_in_session", lambda _session, _ctx, *, today=None: data
     )
     linked = _portfolio_inputs(team)
     assert [block.code for block in linked.blocks] == [code]
@@ -704,6 +772,18 @@ def test_preview_reports_every_block_for_fully_linked_plan(team: WorkspaceDb) ->
     }
 
 
+def test_a_linked_mode_without_resolved_inputs_blocks_instead_of_using_zero(
+    team: WorkspaceDb,
+) -> None:
+    scenario_id = _create_scenario(team, income_mode="trailing_12m")
+    detail = fire_scenarios.get_fire_scenario(team.factory, _ctx(team), scenario_id)
+    results = fire_projection.results_from_detail(detail)
+    assert results.projection is None
+    assert [(block.code, block.field) for block in results.blocks] == [
+        ("missing_starting_value", "income_manual")
+    ]
+
+
 # Loan payoff suggestions and one-click events
 
 
@@ -715,17 +795,25 @@ def _set_base_currency(team: WorkspaceDb, currency: str) -> None:
         workspace.base_currency = currency
 
 
-def _suggestions(team: WorkspaceDb, scenario_id: UUID | None = None):
+def _suggestions(
+    team: WorkspaceDb,
+    scenario_id: UUID | None = None,
+    *,
+    ctx: Context | None = None,
+):
+    ctx = ctx or _ctx(team)
     scenario_id = scenario_id or _create_scenario(team)
-    detail = fire_scenarios.get_fire_scenario(team.factory, _ctx(team), scenario_id)
+    detail = fire_scenarios.get_fire_scenario(team.factory, ctx, scenario_id)
     with team.factory() as session:
         return fire_linked.loan_payoff_suggestions_in_session(
             session,
-            _ctx(team),
+            ctx,
             currency="EUR",
             start_year=detail.scenario.start_year,
             last_year=detail.scenario.birth_year + detail.scenario.horizon_age,
-            existing_events=tuple((event.year, event.kind, event.label) for event in detail.events),
+            added_loan_ids=tuple(
+                event.source_loan_id for event in detail.events if event.source_loan_id is not None
+            ),
         )
 
 
@@ -772,7 +860,7 @@ def test_loan_payoff_states_for_archived_paid_off_currency_and_window(
             currency="EUR",
             start_year=2026,
             last_year=2026,
-            existing_events=(),
+            added_loan_ids=(),
         )
     assert {item.state for item in windowed if item.loan_name == "Long loan"} == {"out_of_window"}
     assert detail.scenario.start_year == 2026
@@ -797,7 +885,7 @@ def test_loan_payoff_states_for_a_broken_schedule_and_an_unusable_amount(
                 currency="EUR",
                 start_year=detail.scenario.start_year,
                 last_year=detail.scenario.birth_year + detail.scenario.horizon_age,
-                existing_events=(),
+                added_loan_ids=(),
             )
 
     def broken(_inputs):
@@ -837,6 +925,7 @@ def test_one_click_creates_the_event_and_audit_without_the_amount(
         event = session.scalars(select(FireEvent).where(FireEvent.scenario_id == scenario_id)).one()
         assert (event.year, event.kind, event.amount_minor) == (2028, "expense_change", -12_000_000)
         assert event.label == "Loan repaid: Mortgage"
+        assert event.source_loan_id == loan_id
         audit = session.scalars(
             select(AuditEvent).where(AuditEvent.action == "fire_scenario.loan_payoff_event")
         ).one()
@@ -854,6 +943,173 @@ def test_one_click_creates_the_event_and_audit_without_the_amount(
     row = next(row for row in results.projection.rows if row.year == 2028)
     # 3,000,000.00 inflated by 2.5% for two years, less the event inflated the same way.
     assert row.expenses.amount_minor == 3_151_875 - 12_607_500
+
+
+@pytest.mark.parametrize(
+    ("locale", "expected_label"),
+    [
+        ("en", "Loan repaid: Mortgage"),
+        ("pl", "Spłacono kredyt: Mortgage"),
+    ],
+)
+def test_two_clicks_use_the_user_locale_and_are_idempotent(
+    team: WorkspaceDb, locale: str, expected_label: str
+) -> None:
+    loan_id = _loan(team)
+    scenario_id = _create_scenario(team)
+    ctx = _localized_ctx(team, user_locale=locale)
+
+    assert fire_linked.add_loan_payoff_event(team.factory, ctx, scenario_id, loan_id) == "added"
+    with team.factory() as session:
+        event = session.scalars(select(FireEvent).where(FireEvent.scenario_id == scenario_id)).one()
+        assert event.label == expected_label
+        assert event.source_loan_id == loan_id
+        assert session.scalars(
+            select(FireEvent).where(FireEvent.scenario_id == scenario_id)
+        ).all() == [event]
+
+    assert fire_linked.add_loan_payoff_event(team.factory, ctx, scenario_id, loan_id) == "exists"
+    with team.factory() as session:
+        assert (
+            len(
+                session.scalars(select(FireEvent).where(FireEvent.scenario_id == scenario_id)).all()
+            )
+            == 1
+        )
+    suggestion = _suggestions(team, scenario_id, ctx=ctx)[0]
+    assert suggestion.state == "already_added"
+    assert suggestion.label == expected_label
+
+
+def test_payoff_label_falls_back_to_the_workspace_locale(team: WorkspaceDb) -> None:
+    loan_id = _loan(team)
+    scenario_id = _create_scenario(team)
+    ctx = _localized_ctx(team, user_locale=None, workspace_locale="pl")
+
+    assert fire_linked.add_loan_payoff_event(team.factory, ctx, scenario_id, loan_id) == "added"
+    with team.factory() as session:
+        event = session.scalars(select(FireEvent).where(FireEvent.scenario_id == scenario_id)).one()
+        assert event.label == "Spłacono kredyt: Mortgage"
+        assert event.source_loan_id == loan_id
+    assert fire_linked.add_loan_payoff_event(team.factory, ctx, scenario_id, loan_id) == "exists"
+
+
+def test_a_200_character_loan_name_produces_a_capped_label(team: WorkspaceDb) -> None:
+    loan_name = "L" * 200
+    loan_id = _loan(team, name=loan_name)
+    scenario_id = _create_scenario(team)
+
+    assert (
+        fire_linked.add_loan_payoff_event(team.factory, _ctx(team), scenario_id, loan_id) == "added"
+    )
+    with team.factory() as session:
+        event = session.scalars(select(FireEvent).where(FireEvent.scenario_id == scenario_id)).one()
+        assert event.source_loan_id == loan_id
+        assert len(event.label) == MAX_LABEL_LENGTH
+        assert event.label.startswith("Loan repaid: ")
+        assert event.label.endswith("…")
+    assert _suggestions(team, scenario_id)[0].state == "already_added"
+    assert (
+        fire_linked.add_loan_payoff_event(team.factory, _ctx(team), scenario_id, loan_id)
+        == "exists"
+    )
+
+
+def test_duplicating_a_scenario_copies_the_loan_link(team: WorkspaceDb) -> None:
+    loan_id = _loan(team)
+    scenario_id = _create_scenario(team)
+    assert (
+        fire_linked.add_loan_payoff_event(team.factory, _ctx(team), scenario_id, loan_id) == "added"
+    )
+    duplicate = fire_scenarios.duplicate_fire_scenario(team.factory, _ctx(team), scenario_id)
+    copied = fire_scenarios.get_fire_scenario(team.factory, _ctx(team), duplicate)
+    assert [(event.source_loan_id, event.label) for event in copied.events] == [
+        (loan_id, "Loan repaid: Mortgage")
+    ]
+    assert _suggestions(team, duplicate)[0].state == "already_added"
+
+
+def test_editing_a_payoff_event_keeps_the_loan_link(team: WorkspaceDb) -> None:
+    loan_id = _loan(team)
+    scenario_id = _create_scenario(team)
+    assert (
+        fire_linked.add_loan_payoff_event(team.factory, _ctx(team), scenario_id, loan_id) == "added"
+    )
+    detail = fire_scenarios.get_fire_scenario(team.factory, _ctx(team), scenario_id)
+    event = detail.events[0]
+    fire_scenarios.update_fire_scenario(
+        team.factory,
+        _ctx(team),
+        scenario_id,
+        _scenario_input(
+            events=(
+                EventInput(
+                    id=event.id,
+                    year=event.year,
+                    kind=event.kind,
+                    amount_minor=event.amount.amount_minor + 1_000,
+                    label="Edited payoff",
+                ),
+            )
+        ),
+    )
+    edited = fire_scenarios.get_fire_scenario(team.factory, _ctx(team), scenario_id)
+    assert [(row.source_loan_id, row.label, row.amount.amount_minor) for row in edited.events] == [
+        (loan_id, "Edited payoff", -11_999_000)
+    ]
+    assert _suggestions(team, scenario_id)[0].state == "already_added"
+
+
+def test_deleting_a_payoff_event_makes_the_suggestion_available_again(
+    team: WorkspaceDb,
+) -> None:
+    loan_id = _loan(team)
+    scenario_id = _create_scenario(team)
+    assert (
+        fire_linked.add_loan_payoff_event(team.factory, _ctx(team), scenario_id, loan_id) == "added"
+    )
+    fire_scenarios.update_fire_scenario(
+        team.factory, _ctx(team), scenario_id, _scenario_input(events=())
+    )
+    with team.factory() as session:
+        assert (
+            session.scalars(select(FireEvent).where(FireEvent.scenario_id == scenario_id)).all()
+            == []
+        )
+    assert _suggestions(team, scenario_id)[0].state == "available"
+    assert (
+        fire_linked.add_loan_payoff_event(team.factory, _ctx(team), scenario_id, loan_id) == "added"
+    )
+
+
+def test_loan_payoff_amount_excludes_scheduled_overpayments(team: WorkspaceDb) -> None:
+    from assetboard.services.loan_schedule import build_inputs_schedule, schedule_inputs_from_view
+
+    loan_id = _loan(team, term_months=24, principal_original=_money(24_000_000))
+    loans.add_overpayment(
+        team.factory,
+        _ctx(team),
+        loan_id,
+        date_value=date(2026, 6, 1),
+        amount=_money(5_000_000),
+        note="",
+    )
+    suggestion = _suggestions(team)[0]
+    assert suggestion.state == "available"
+    assert suggestion.annual_amount is not None
+    with team.factory() as session:
+        view = loans.load_loan_views_in_session(
+            session, _ctx(team), today=date(2026, 3, 1), loan_ids=[loan_id]
+        )[0]
+        schedule = build_inputs_schedule(schedule_inputs_from_view(view, date(2026, 3, 1)))
+    future = [row for row in schedule.rows if row.date > date(2026, 3, 1)][:12]
+    regular = sum(
+        row.interest.amount_minor + row.principal.amount_minor + row.costs.amount_minor
+        for row in future
+    )
+    assert any(row.overpayment.amount_minor > 0 for row in future)
+    assert suggestion.annual_amount.amount_minor == regular
+    assert regular < sum(row.installment_total.amount_minor for row in future)
 
 
 def test_loan_suggestion_queries_do_not_grow_with_the_loan_count(team: WorkspaceDb) -> None:
@@ -888,7 +1144,7 @@ def test_loan_suggestion_queries_do_not_grow_with_the_loan_count(team: Workspace
                 currency="EUR",
                 start_year=detail.scenario.start_year,
                 last_year=detail.scenario.birth_year + detail.scenario.horizon_age,
-                existing_events=(),
+                added_loan_ids=(),
             )
 
     with_one = statements(run)
@@ -941,6 +1197,8 @@ def test_archived_and_investable_category_checks_keep_exclusions_valid(
     food = _category(team, "Food")
     _create_scenario(team, expenses_mode="trailing_12m", expense_exclusion_ids=(food,))
     assert categories.delete_category(team.factory, _ctx(team), food) == "archived"
+    # A referenced category is still only archived, never hard-deleted.
+    assert categories.delete_category(team.factory, _ctx(team), food) == "archived"
     categories.restore_category(team.factory, _ctx(team), food)
     with pytest.raises(categories.TreatmentChangeBlocked):
         categories.update_category(
@@ -950,6 +1208,16 @@ def test_archived_and_investable_category_checks_keep_exclusions_valid(
             name="Food",
             kind="expense",
             treatment="savings",
+            color="#16a34a",
+        )
+    with pytest.raises(categories.TreatmentChangeBlocked):
+        categories.update_category(
+            team.factory,
+            _ctx(team),
+            food,
+            name="Food",
+            kind="expense",
+            treatment="transfer",
             color="#16a34a",
         )
     with pytest.raises(categories.KindChangeBlocked):

@@ -2106,8 +2106,23 @@ def test_0060_fire_expense_exclusions_migration_is_reversible(tmp_path: Path) ->
         assert ("fire_scenarios", ("workspace_id", "scenario_id")) in foreign_keys
         assert ("categories", ("workspace_id", "category_id")) in foreign_keys
 
+        event_columns = {column["name"] for column in inspector.get_columns("fire_events")}
+        assert "source_loan_id" in event_columns
+        event_indexes = {index["name"] for index in inspector.get_indexes("fire_events")}
+        assert "ix_fire_events_workspace_source_loan" in event_indexes
+        event_foreign_keys = {
+            (key["referred_table"], tuple(key["constrained_columns"]))
+            for key in inspector.get_foreign_keys("fire_events")
+        }
+        assert ("loans", ("workspace_id", "source_loan_id")) in event_foreign_keys
+
         command.downgrade(alembic_config(settings), "0059_f81_fire_scenarios")
-        assert "fire_expense_exclusions" not in set(inspect(engine).get_table_names())
+        inspector = inspect(engine)
+        assert "fire_expense_exclusions" not in set(inspector.get_table_names())
+        downgraded_event_columns = {
+            column["name"] for column in inspector.get_columns("fire_events")
+        }
+        assert "source_loan_id" not in downgraded_event_columns
         upgrade_database(settings)
         assert database_is_at_head(settings)
         check_database_migrations(settings)

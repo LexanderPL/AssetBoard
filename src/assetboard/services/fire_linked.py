@@ -41,6 +41,7 @@ from assetboard.db.repositories import (
 )
 from assetboard.domain.fire import (
     MAX_AMOUNT_MINOR,
+    MAX_LABEL_LENGTH,
     TrailingWindow,
     annualize_minor,
     trailing_window,
@@ -88,10 +89,6 @@ class ExpenseExclusionError(ValueError):
 
     field = "expense_exclusions"
     code = "invalid_expense_exclusion"
-
-
-# (year, kind, label) of an existing event, for the duplicate-payoff check.
-EventKey = tuple[int, str, str]
 
 
 @dataclass(frozen=True, slots=True)
@@ -207,15 +204,26 @@ class LoanPayoffSuggestion:
     annual_amount: Money | None
     months_covered: int
     as_of: date
+    # Stored event label in the user's/request locale, already capped at MAX_LABEL_LENGTH.
+    label: str
     schedule_error: str | None = None
 
     @property
     def can_add(self) -> bool:
         return self.state == "available"
 
-    @property
-    def label(self) -> str:
-        return f"Loan repaid: {self.loan_name}"
+
+def _label_locale(ctx: Context) -> str:
+    """The label is written in the acting user's locale, else the workspace's."""
+    return ctx.user.locale or ctx.workspace.locale
+
+
+def payoff_label(name: str, locale: str) -> str:
+    """The stored payoff-event label, translated and capped to the event-label limit."""
+    label = gettext("Loan repaid: %(name)s", locale) % {"name": name}
+    if len(label) <= MAX_LABEL_LENGTH:
+        return label
+    return label[: MAX_LABEL_LENGTH - 1].rstrip() + "…"
 
 
 def _require_viewer(ctx: Context) -> None:
@@ -349,7 +357,9 @@ def _portfolio(
 ) -> tuple[LinkedPortfolio | None, list[ResultsBlock], list[LinkedWarning]]:
     blocks: list[ResultsBlock] = []
     warnings: list[LinkedWarning] = []
-    data = current_portfolio_data_in_session(session, ctx)
+    # Pass the caller's date explicitly so the portfolio, its prices/FX and the ledger window
+    # all share one as-of day even if the clock crosses midnight between reads.
+    data = current_portfolio_data_in_session(session, ctx, today=today)
     if data.currency != currency:
         # Defensive: the caller blocks a scenario currency mismatch before this point.
         blocks.append(ResultsBlock("scenario_currency_mismatch", "portfolio_manual", currency))
@@ -732,14 +742,22 @@ def loan_payoff_suggestions_in_session(
     currency: str,
     start_year: int,
     last_year: int,
-    existing_events: Sequence[EventKey] = (),
+    added_loan_ids: Collection[UUID] = (),
 ) -> tuple[LoanPayoffSuggestion, ...]:
-    """One suggestion per non-archived schedule loan, in a bounded number of queries."""
+    """One suggestion per non-archived schedule loan, in a bounded number of queries.
+
+    ``added_loan_ids`` are the source loans of events already in the plan; the state is
+    ``already_added`` when the loan appears there, never when a translated label happens to
+    match. Labels are generated in the acting user's locale (or the workspace's) and capped.
+    """
     _require_viewer(ctx)
     today = ctx.clock.today(ctx.workspace.timezone)
+    locale = _label_locale(ctx)
+    added = set(added_loan_ids)
     views = load_loan_views_in_session(session, ctx, today=today, include_archived=False)
     suggestions: list[LoanPayoffSuggestion] = []
     for view in views:
+        label = payoff_label(view.name, locale)
         if view.currency != currency:
             suggestions.append(
                 LoanPayoffSuggestion(
@@ -751,6 +769,7 @@ def loan_payoff_suggestions_in_session(
                     annual_amount=None,
                     months_covered=0,
                     as_of=today,
+                    label=label,
                 )
             )
             continue
@@ -769,6 +788,7 @@ def loan_payoff_suggestions_in_session(
                     annual_amount=None,
                     months_covered=0,
                     as_of=today,
+                    label=label,
                     schedule_error=exc.code,
                 )
             )
@@ -786,29 +806,23 @@ def loan_payoff_suggestions_in_session(
             state = "amount_invalid"
         elif payoff_year < start_year or payoff_year > last_year:
             state = "out_of_window"
+        elif view.id in added:
+            state = "already_added"
         else:
             state = "available"
-        if state == "available":
-            label = gettext("Loan repaid: %(name)s", ctx.workspace.locale) % {"name": view.name}
-            if any(
-                event_year == payoff_year
-                and event_kind == "expense_change"
-                and event_label == label
-                for event_year, event_kind, event_label in existing_events
-            ):
-                state = "already_added"
-        suggestion = LoanPayoffSuggestion(
-            loan_id=view.id,
-            loan_name=view.name,
-            currency=view.currency,
-            state=state,
-            payoff_year=payoff_year,
-            annual_amount=Money(annual, currency) if annual > 0 else None,
-            months_covered=len(covered),
-            as_of=today,
-            schedule_error=None,
+        suggestions.append(
+            LoanPayoffSuggestion(
+                loan_id=view.id,
+                loan_name=view.name,
+                currency=view.currency,
+                state=state,
+                payoff_year=payoff_year,
+                annual_amount=Money(annual, currency) if annual > 0 else None,
+                months_covered=len(covered),
+                as_of=today,
+                label=label,
+            )
         )
-        suggestions.append(suggestion)
     return tuple(suggestions)
 
 
@@ -819,7 +833,7 @@ def loan_payoff_suggestions(
     currency: str,
     start_year: int,
     last_year: int,
-    existing_events: Sequence[EventKey] = (),
+    added_loan_ids: Collection[UUID] = (),
 ) -> tuple[LoanPayoffSuggestion, ...]:
     _require_viewer(ctx)
     with factory() as session:
@@ -829,7 +843,7 @@ def loan_payoff_suggestions(
             currency=currency,
             start_year=start_year,
             last_year=last_year,
-            existing_events=existing_events,
+            added_loan_ids=added_loan_ids,
         )
 
 
@@ -846,13 +860,16 @@ def add_loan_payoff_event(
         if scenario.archived_at is not None:
             raise LinkedError("scenario", "archived")
         existing = FireEventRepository(session, ctx).for_scenario(scenario.id)
+        added_loan_ids = {
+            event.source_loan_id for event in existing if event.source_loan_id is not None
+        }
         suggestions = loan_payoff_suggestions_in_session(
             session,
             ctx,
             currency=scenario.currency,
             start_year=scenario.start_year,
             last_year=scenario.birth_year + scenario.horizon_age,
-            existing_events=tuple((event.year, event.kind, event.label) for event in existing),
+            added_loan_ids=added_loan_ids,
         )
         suggestion = next((item for item in suggestions if item.loan_id == loan_id), None)
         if suggestion is None:
@@ -869,6 +886,7 @@ def add_loan_payoff_event(
             kind="expense_change",
             amount_minor=-suggestion.annual_amount.amount_minor,
             label=suggestion.label,
+            source_loan_id=loan_id,
         )
         AuditEventRepository(session, ctx).record(
             actor_user_id=ctx.user.id,

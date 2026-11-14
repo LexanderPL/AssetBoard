@@ -5,6 +5,7 @@
   <div class="panel p-6 sm:p-7">
     <h2 id="loan-suggestions-heading" class="text-base font-semibold">{{ _("Loan payoff suggestions") }}</h2>
     <p class="mt-1 text-sm text-muted">{{ _("Paying a loan off frees its contractual instalments from the payoff year onward. The amount is the next up to 12 contractual payments (interest, principal and costs, without overpayments), in today's money.") }}</p>
+    <p class="mt-1 text-xs text-muted" data-fire-loan-as-of-note>{{ _("Suggestions use the saved plan and the loan schedules as of this page load; unsaved Plan-input changes do not update them.") }}</p>
     <ul class="mt-4 grid gap-3 lg:grid-cols-2">
       {% for suggestion in suggestions %}
       <li class="rounded-xl border border-line bg-surface p-4" data-fire-loan-suggestion="{{ suggestion.loan_id }}" data-fire-loan-state="{{ suggestion.state }}">

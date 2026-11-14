@@ -14,6 +14,12 @@ ignoring case; another keeps at most one active default per workspace.
 
 F8.4 adds ``fire_expense_exclusions``: regular expense categories left out of a scenario's
 linked trailing expenses. The category must stay a regular expense category while referenced.
+
+F8.4 also adds ``FireEvent.source_loan_id``: the loan a one-click payoff event came from. It is
+NULL for ordinary events and drives exact idempotency (never the translated label). The composite
+foreign key keeps the loan in the same workspace. ``ON DELETE RESTRICT`` is deliberate: loans are
+archived, never hard-deleted, and a composite ``SET NULL`` would also try to clear the non-null
+``workspace_id`` column.
 """
 
 from __future__ import annotations
@@ -276,7 +282,14 @@ class FireEvent(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
             f"length(label) > 0 AND length(label) <= {MAX_LABEL_LENGTH}",
             name="label_valid",
         ),
+        ForeignKeyConstraint(
+            ["workspace_id", "source_loan_id"],
+            ["loans.workspace_id", "loans.id"],
+            name="fk_fire_events_workspace_source_loan",
+            ondelete="RESTRICT",
+        ),
         Index("ix_fire_events_workspace_scenario_year", "workspace_id", "scenario_id", "year"),
+        Index("ix_fire_events_workspace_source_loan", "workspace_id", "source_loan_id"),
     )
 
     scenario_id: Mapped[UUID] = mapped_column(Uuid(), nullable=False)
@@ -284,3 +297,4 @@ class FireEvent(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     kind: Mapped[str] = mapped_column(String(16), nullable=False)
     amount_minor: Mapped[int] = mapped_column(BigInteger(), nullable=False)
     label: Mapped[str] = mapped_column(String(MAX_LABEL_LENGTH), nullable=False)
+    source_loan_id: Mapped[UUID | None] = mapped_column(Uuid(), nullable=True)

@@ -90,7 +90,9 @@ def test_the_nav_link_the_empty_list_and_the_new_form(owner) -> None:
     assert "readonly" in form.text
     assert "not financial advice" in form.text
     assert "The yearly rise in prices" in form.text
-    assert "The age at which earned income stops" in form.text
+    assert "The age at which income stops" in form.text
+    assert "Regular income in the start year" in form.text
+    assert "Linked income sums every regular income transaction" in form.text
 
 
 def test_the_new_form_prefills_the_profile_birth_year_and_life_expectancy(owner) -> None:

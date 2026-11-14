@@ -9,7 +9,7 @@ import pytest
 from sqlalchemy import select
 
 from assetboard.db.models.fire import FireEvent
-from assetboard.db.models.identity import User, Workspace
+from assetboard.db.models.identity import AuditEvent, User, Workspace
 from assetboard.db.repositories import (
     CategoryRepository,
     ItemValuationRepository,
@@ -19,7 +19,7 @@ from assetboard.db.repositories import (
 )
 from assetboard.domain.money import Money
 from assetboard.domain.months import YearMonth
-from assetboard.services import loans
+from assetboard.services import fire_projection, loans
 from assetboard.services.context import Context, Role, UserRef, WorkspaceRef
 from tests.conftest import OwnerApp
 
@@ -302,6 +302,12 @@ def test_loan_suggestion_card_and_one_click_event(owner: OwnerApp) -> None:
     assert 'data-fire-loan-state="available"' in page.text
     assert "data-fire-loan-add" in page.text
     assert "Unsaved changes in Plan inputs will be lost." in page.text
+    assert "data-fire-loan-as-of-note" in page.text
+    assert "as of this page load" in page.text
+    before = fire_projection.scenario_results(
+        owner.app.state.session_factory, _context(owner), scenario_id
+    )
+    assert before.projection is not None
     added = owner.post(
         f"/fire/{scenario_id}/loan-payoff",
         {"loan_id": str(loan_id)},
@@ -313,6 +319,22 @@ def test_loan_suggestion_card_and_one_click_event(owner: OwnerApp) -> None:
         event = session.scalars(select(FireEvent).where(FireEvent.scenario_id == scenario_id)).one()
         assert event.kind == "expense_change" and event.amount_minor < 0
         assert event.label == "Loan repaid: Mortgage"
+        assert event.source_loan_id == loan_id
+        audit = session.scalars(
+            select(AuditEvent).where(AuditEvent.action == "fire_scenario.loan_payoff_event")
+        ).one()
+        assert audit.data == {"loan": "Mortgage", "year": event.year}
+        assert "amount" not in audit.data
+        payoff_year = event.year
+
+    after = fire_projection.scenario_results(
+        owner.app.state.session_factory, _context(owner), scenario_id
+    )
+    assert after.projection is not None
+    before_row = next(row for row in before.projection.rows if row.year == payoff_year)
+    after_row = next(row for row in after.projection.rows if row.year == payoff_year)
+    # The one-click event really changes the projection, not just the HTTP response.
+    assert after_row.expenses.amount_minor < before_row.expenses.amount_minor
 
     repeated = owner.post(
         f"/fire/{scenario_id}/loan-payoff",
@@ -324,6 +346,63 @@ def test_loan_suggestion_card_and_one_click_event(owner: OwnerApp) -> None:
     page = owner.client.get(f"/fire/{scenario_id}?error=loan_event_exists")
     assert 'data-fire-loan-state="already_added"' in page.text
     assert "data-fire-loan-add" not in page.text
+
+
+def test_blocking_panel_lists_every_linked_block(owner: OwnerApp) -> None:
+    scenario_id = _create(
+        owner,
+        income_mode="trailing_12m",
+        expenses_mode="trailing_12m",
+        portfolio_mode="linked_investable",
+    )
+    page = owner.client.get(f"/fire/{scenario_id}")
+    assert page.status_code == 200
+    for code in ("no_income_data", "no_expense_data", "no_linked_portfolio_data"):
+        assert f'data-fire-block="{code}"' in page.text
+    assert "No regular income transactions" in page.text
+    assert "No regular expense transactions" in page.text
+    assert "No investable portfolio classes" in page.text
+    assert "data-fire-metrics" not in page.text
+
+
+def test_every_results_block_code_has_a_message() -> None:
+    from assetboard.web.fire_routes import RESULT_BLOCK_MESSAGES
+
+    assert set(RESULT_BLOCK_MESSAGES) == {
+        "missing_starting_value",
+        "invalid_projection",
+        "no_income_data",
+        "no_expense_data",
+        "expenses_all_excluded",
+        "ledger_currency_mismatch",
+        "scenario_currency_mismatch",
+        "no_linked_portfolio_data",
+        "portfolio_price_missing",
+        "portfolio_fx_missing",
+        "item_value_missing",
+        "item_fx_missing",
+    }
+    assert all(message.strip() for message in RESULT_BLOCK_MESSAGES.values())
+
+
+def test_loan_payoff_form_is_outside_the_outer_plan_form(owner: OwnerApp) -> None:
+    loan_id = _create_loan(owner)
+    scenario_id = _create(owner)
+    html = owner.client.get(f"/fire/{scenario_id}").text
+    outer_start = html.index('id="fire-form"')
+    outer_end = html.index("</form>", outer_start)
+    assert html.index("data-fire-loan-add") > outer_end
+    assert f'name="loan_id" value="{loan_id}"' in html
+
+    preview = owner.post(
+        f"/fire/{scenario_id}/preview",
+        _form(),
+        token_from=f"/fire/{scenario_id}",
+    )
+    assert preview.status_code == 200
+    # The one-click form is a real POST with its own CSRF token; the preview never includes it.
+    assert "data-fire-loan-suggestions" not in preview.text
+    assert "data-fire-loan-add" not in preview.text
 
 
 def test_loan_suggestion_is_csrf_protected_and_hidden_for_viewers_and_archives(
