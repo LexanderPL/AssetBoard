@@ -34,6 +34,7 @@ from assetboard.services.networth import (
     InvalidNetWorth,
     ItemView,
     NetWorthError,
+    ValuationView,
     add_valuation,
     archive_category,
     archive_item,
@@ -53,6 +54,7 @@ from assetboard.services.networth import (
     unlink_item,
     update_category,
     update_item,
+    update_valuation,
 )
 from assetboard.services.networth_links import LinkOption
 from assetboard.services.networth_summary import networth_summary
@@ -121,6 +123,7 @@ NOTICES = {
     "item_unlinked": _("Item unlinked; its value was kept as a manual value."),
     "item_unlinked_no_value": _("Item unlinked; no value was available, so it now has none."),
     "valuation_added": _("Value added."),
+    "valuation_saved": _("Value saved."),
     "bulk_created": _("Items added."),
     "portfolio_links_created": _("Net-worth items created from asset classes."),
     "portfolio_links_none": _("No asset classes with a value need linking."),
@@ -236,6 +239,16 @@ def _create_item_values(base_currency: str, today: str, side: Side) -> dict[str,
     }
 
 
+def _valuation_edit_values(valuation: ValuationView | None, locale: str) -> dict[str, str]:
+    if valuation is None:
+        return {"value": "", "as_of": "", "note": ""}
+    return {
+        "value": format_amount_input(valuation.value, locale),
+        "as_of": valuation.as_of.isoformat(),
+        "note": valuation.note,
+    }
+
+
 def _category_values(category: CategoryView | None = None) -> dict[str, str]:
     if category is None:
         return {"name": "", "color": DEFAULT_COLOR}
@@ -259,6 +272,9 @@ def _body_context(
     valuation_item_id: UUID | None = None,
     valuation_values: dict[str, str] | None = None,
     valuation_errors: dict[str, str] | None = None,
+    edit_valuation: ValuationView | None = None,
+    valuation_edit_values: dict[str, str] | None = None,
+    valuation_edit_errors: dict[str, str] | None = None,
     create_category_values: dict[str, str] | None = None,
     create_category_errors: dict[str, str] | None = None,
     edit_category: CategoryView | None = None,
@@ -300,6 +316,12 @@ def _body_context(
         "valuation_values": valuation_values or {"value": "", "as_of": today, "note": ""},
         "valuation_errors": {
             field: _t(request, message) for field, message in (valuation_errors or {}).items()
+        },
+        "edit_valuation": edit_valuation,
+        "valuation_edit_values": valuation_edit_values
+        or _valuation_edit_values(edit_valuation, locale),
+        "valuation_edit_errors": {
+            field: _t(request, message) for field, message in (valuation_edit_errors or {}).items()
         },
         "create_category_values": create_category_values or _category_values(),
         "create_category_errors": {
@@ -403,20 +425,31 @@ async def networth_page(
     error: str = "",
     side: str = "asset",
     edit_item: str = "",
+    edit_valuation: str = "",
     edit_category: str = "",
     categories: str = "",
 ) -> Response:
     selected = _selected_side(side)
     item_view: ItemView | None = None
+    valuation_view: ValuationView | None = None
     category_view: CategoryView | None = None
     if edit_item and has_role(ctx, Role.EDITOR):
-        item_view = await run_in_threadpool(
+        loaded_item = await run_in_threadpool(
             get_item, request.app.state.session_factory, ctx, _parse_uuid(edit_item)
         )
-        if item_view.archived:
-            item_view = None
+        if loaded_item.archived:
+            loaded_item = None
         else:
-            selected = Side(item_view.side)
+            selected = Side(loaded_item.side)
+        if loaded_item is not None and edit_valuation:
+            valuation_id = _parse_uuid(edit_valuation)
+            valuation_view = next(
+                (row for row in loaded_item.valuations if row.id == valuation_id), None
+            )
+            if valuation_view is None:
+                raise NotFound
+        else:
+            item_view = loaded_item
     elif edit_category and has_role(ctx, Role.EDITOR):
         category_view = await run_in_threadpool(
             get_category,
@@ -437,6 +470,7 @@ async def networth_page(
             notice=notice or None,
             error=error_message,
             edit_item=item_view,
+            edit_valuation=valuation_view,
             edit_category=category_view,
             categories_open=categories == "open",
         )
@@ -876,6 +910,96 @@ async def networth_item_valuation(
             )
         )
     return await run_in_threadpool(lambda: _done(request, ctx, "valuation_added", Side(item.side)))
+
+
+@router.get(
+    "/net-worth/items/{item_id}/valuations/{valuation_id}/edit",
+    name="networth_item_valuation_edit",
+)
+async def networth_item_valuation_edit(
+    request: Request, ctx: CurrentContext, item_id: str, valuation_id: str
+) -> Response:
+    target = _parse_uuid(item_id)
+    valuation_target = _parse_uuid(valuation_id)
+    item = await run_in_threadpool(get_item, request.app.state.session_factory, ctx, target)
+    valuation = next((row for row in item.valuations if row.id == valuation_target), None)
+    if valuation is None:
+        raise NotFound
+    selected = Side(item.side)
+    if not is_htmx_fragment_request(request):
+        return RedirectResponse(
+            request.url_for("networth").path
+            + f"?side={selected.value}&edit_item={target}&edit_valuation={valuation.id}",
+            status_code=303,
+        )
+    return await run_in_threadpool(
+        lambda: _render(
+            request,
+            ctx,
+            side=selected,
+            edit_valuation=None if item.archived else valuation,
+        )
+    )
+
+
+@router.post(
+    "/net-worth/items/{item_id}/valuations/{valuation_id}",
+    name="networth_item_valuation_update",
+)
+async def networth_item_valuation_update(
+    request: Request,
+    ctx: CurrentContext,
+    item_id: str,
+    valuation_id: str,
+    value: FormStr = "",
+    as_of: FormStr = "",
+    note: FormStr = "",
+) -> Response:
+    target = _parse_uuid(item_id)
+    valuation_target = _parse_uuid(valuation_id)
+    factory = request.app.state.session_factory
+    locale = request.state.locale
+    values = {"value": value, "as_of": as_of, "note": note}
+    try:
+        item = await run_in_threadpool(
+            lambda: update_valuation(
+                factory,
+                ctx,
+                target,
+                valuation_target,
+                locale=locale,
+                value=value,
+                as_of=_parse_date(as_of, "as_of"),
+                note=note,
+            )
+        )
+    except NetWorthError as exc:
+        code = exc.code
+        field = exc.field or ""
+        if field == "valuation_note":
+            field = "note"
+        item = await run_in_threadpool(get_item, factory, ctx, target)
+        valuation = next((row for row in item.valuations if row.id == valuation_target), None)
+        if valuation is None:
+            raise NotFound from None
+        kwargs: dict[str, object] = {
+            "edit_valuation": valuation,
+            "valuation_edit_values": values,
+        }
+        if field in {"value", "as_of", "note"}:
+            kwargs["valuation_edit_errors"] = {field: ERRORS.get(code, FALLBACK_ERROR)}
+        else:
+            kwargs["error"] = ERRORS.get(code, FALLBACK_ERROR)
+        return await run_in_threadpool(
+            lambda: _render(
+                request,
+                ctx,
+                side=Side(item.side),
+                status_code=400,
+                **kwargs,
+            )
+        )
+    return await run_in_threadpool(lambda: _done(request, ctx, "valuation_saved", Side(item.side)))
 
 
 @router.get("/net-worth/items/{item_id}/edit", name="networth_item_edit")

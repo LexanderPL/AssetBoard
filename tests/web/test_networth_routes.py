@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 from typing import Any
 from uuid import UUID
 
@@ -66,6 +67,17 @@ def _create_item(
                 NetWorthItem.name == name,
             )
         ).one()
+
+
+def _valuation_id(owner: OwnerApp, item: UUID) -> UUID:
+    with owner.db() as session:
+        value = session.scalars(
+            select(ItemValuation.id)
+            .where(ItemValuation.item_id == item)
+            .order_by(ItemValuation.created_at)
+        ).first()
+        assert value is not None
+        return value
 
 
 def _htmx(owner: OwnerApp, path: str, data: dict[str, str] | None = None) -> Any:
@@ -218,6 +230,78 @@ def test_add_a_backdated_value_and_see_it_in_the_history(owner: OwnerApp) -> Non
             len(session.scalars(select(ItemValuation).where(ItemValuation.item_id == item)).all())
             == 2
         )
+
+
+def test_edit_a_valuation_from_the_history(owner: OwnerApp) -> None:
+    item = _create_item(owner, value="12000")
+    valuation = _valuation_id(owner, item)
+    edit = owner.client.get(
+        f"/net-worth/items/{item}/valuations/{valuation}/edit",
+        headers={"HX-Request": "true"},
+    )
+    assert edit.status_code == 200
+    assert f'data-valuation-edit="{valuation}"' in edit.text
+    assert 'value="12000.00"' in edit.text
+
+    response = owner.post(
+        f"/net-worth/items/{item}/valuations/{valuation}",
+        {"value": "11000", "as_of": "2020-01-01", "note": "Fixed"},
+        token_from="/net-worth",
+    )
+    assert response.status_code == 303
+    assert response.headers["location"].endswith("/net-worth?side=asset&notice=valuation_saved")
+    page = owner.client.get(response.headers["location"]).text
+    assert "Value saved." in page
+    assert "Fixed" in page
+    with owner.db() as session:
+        row = session.get(ItemValuation, valuation)
+        assert row is not None
+        assert row.value_minor == 1_100_000
+        assert row.as_of == date(2020, 1, 1)
+        assert row.note == "Fixed"
+
+
+def test_invalid_valuation_edit_keeps_the_form_open(owner: OwnerApp) -> None:
+    item = _create_item(owner)
+    valuation = _valuation_id(owner, item)
+    response = owner.post(
+        f"/net-worth/items/{item}/valuations/{valuation}",
+        {"value": "-1", "as_of": "2020-01-01", "note": "Bad"},
+        token_from="/net-worth",
+    )
+    assert response.status_code == 400
+    assert "Values cannot be negative." in response.text
+    assert f'data-valuation-edit="{valuation}"' in response.text
+    assert 'value="-1"' in response.text
+
+
+def test_valuation_edit_get_redirects_without_htmx(owner: OwnerApp) -> None:
+    item = _create_item(owner)
+    valuation = _valuation_id(owner, item)
+    response = owner.client.get(
+        f"/net-worth/items/{item}/valuations/{valuation}/edit",
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
+    assert response.headers["location"].endswith(
+        f"/net-worth?side=asset&edit_item={item}&edit_valuation={valuation}"
+    )
+    page = owner.client.get(
+        f"/net-worth?side=asset&edit_item={item}&edit_valuation={valuation}"
+    ).text
+    assert f'data-valuation-edit="{valuation}"' in page
+
+
+def test_archived_item_has_no_valuation_edit_action(owner: OwnerApp) -> None:
+    item = _create_item(owner)
+    owner.post(
+        f"/net-worth/items/{item}/archive",
+        {"side": "asset"},
+        token_from="/net-worth",
+    )
+    page = owner.client.get("/net-worth").text
+    assert "data-archived-items" in page
+    assert "data-edit-valuation" not in page
 
 
 def test_edit_item_is_inline_and_does_not_append_a_valuation(owner: OwnerApp) -> None:
@@ -447,7 +531,14 @@ def test_viewers_see_no_controls_and_cannot_write(owner: OwnerApp) -> None:
     owner.set_admin_role("viewer")
     page = owner.client.get("/net-worth").text
     assert "Car" in page
-    for marker in ("data-add-item", "data-bulk", "data-edit", "data-archive", "data-delete"):
+    for marker in (
+        "data-add-item",
+        "data-bulk",
+        "data-edit",
+        "data-edit-valuation",
+        "data-archive",
+        "data-delete",
+    ):
         assert marker not in page
     response = owner.post(
         f"/net-worth/items/{item}/archive",

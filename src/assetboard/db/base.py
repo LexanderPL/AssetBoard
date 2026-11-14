@@ -61,8 +61,17 @@ class AppendOnly:
     """Marker for rows that are written once and never changed or deleted through the ORM."""
 
 
+class NoDelete:
+    """Marker for rows that may be corrected but never deleted through the ORM.
+
+    Item valuations use this: an editor can fix a value, date or note, but the history cannot
+    lose an entry. A batch rollback may still remove the rows that batch created through its
+    explicit bulk-delete path.
+    """
+
+
 class AppendOnlyViolationError(RuntimeError):
-    """An append-only row was modified or deleted."""
+    """An append-only row was modified, or a history row was deleted."""
 
 
 class WorkspaceReassignmentError(RuntimeError):
@@ -76,7 +85,7 @@ def reject_forbidden_changes(
     _instances: object,
 ) -> None:
     for obj in session.deleted:
-        if isinstance(obj, AppendOnly):
+        if isinstance(obj, (AppendOnly, NoDelete)):
             raise AppendOnlyViolationError(f"{type(obj).__name__} rows cannot be deleted")
     for obj in session.dirty:
         if isinstance(obj, WorkspaceOwned):

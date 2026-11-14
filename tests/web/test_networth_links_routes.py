@@ -207,6 +207,7 @@ def test_viewers_see_no_link_controls_and_cannot_unlink(
     page = owner.client.get("/net-worth").text
     assert "Link to…" not in page
     assert "data-unlink" not in page
+    assert "data-edit-valuation" not in page
     response = owner.post(
         f"/net-worth/items/{item_id}/unlink",
         {"side": "asset"},

@@ -23,6 +23,7 @@ from assetboard.services.networth import (
     create_item,
     restore_item,
     update_item,
+    update_valuation,
 )
 from assetboard.services.networth_snapshots import (
     SnapshotDateInFuture,
@@ -287,6 +288,37 @@ def test_backfill_covers_each_month_end_and_recalculates_only_backfill(
     event = _events(team, "networth_snapshot.backfilled")[-1]
     assert event.data == {"from": "2026-01-31", "to": "2026-02-28", "count": 2}
     assert event.actor_user_id == team.users["ed"]
+
+
+def test_backfill_uses_a_corrected_valuation(team: WorkspaceDb) -> None:
+    _at(team, "2026-03-15T12:00:00+00:00")
+    ctx = team.ctx("ed", "editor")
+    category = _category(team, ctx)
+    item = _item(team, ctx, category, value="100", as_of=date(2026, 1, 1))
+    february = add_valuation(
+        team.factory,
+        ctx,
+        item.id,
+        locale="en",
+        value="200",
+        as_of=date(2026, 2, 10),
+    )
+    backfill_snapshots(team.factory, ctx)
+    assert [row.assets_minor for row in _rows(team)] == [10000, 20000]
+
+    row = next(value for value in february.valuations if value.as_of == date(2026, 2, 10))
+    update_valuation(
+        team.factory,
+        ctx,
+        item.id,
+        row.id,
+        locale="en",
+        value="250",
+        as_of=date(2026, 2, 10),
+        note="Corrected",
+    )
+    backfill_snapshots(team.factory, ctx)
+    assert [row.assets_minor for row in _rows(team)] == [10000, 25000]
 
 
 def test_backfill_and_a_single_snapshot_at_the_same_date_agree(

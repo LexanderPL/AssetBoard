@@ -9,7 +9,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 **Data model (sketch)**
 - `NetWorthCategory(id, workspace_id, side[asset|liability], name, color, sort_order, archived_at)`
 - `NetWorthItem(id, workspace_id, side, category_id, name, currency, notes, valuation_mode[manual|linked], link_type?, link_id?, include_in_net_worth bool default true, investable bool default false, estimate_between bool (F5.6), acquired_on?, archived_at)` — `currency` is the item's source of truth.
-- `ItemValuation(id, workspace_id, item_id, as_of date, value_minor, currency, note)` — append-only; "current manual value" = latest `as_of ≤ today`. Every valuation uses its item's currency.
+- `ItemValuation(id, workspace_id, item_id, as_of date, value_minor, currency, note)` — correctable in place (F5.8) but never deleted; "current manual value" = latest `as_of ≤ today`. Every valuation uses its item's currency.
 - `NetWorthSnapshot(id, workspace_id, as_of date, assets_minor, liabilities_minor, net_minor, currency, breakdown JSON[{category_id, side, total_minor}], source[auto|manual|backfill])`; unique `(workspace_id, as_of, source)`.
 - `link_type` values reserved now: `portfolio_asset_class`, `portfolio_holding`, `loan_balance`. Until the owning module exists, the UI does not offer linked mode.
 
@@ -55,7 +55,7 @@ Every agent prompt starts with: *"Follow the standard workflow in docs/specs/00-
 ```
 Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
 Implement F5.1 from docs/specs/M5-net-worth.md: NetWorthCategory, NetWorthItem, ItemValuation models + migration, workspace-scoped repositories/services,
-grouped lists with subtotals and inline editing (HTMX), append-only valuation history, bulk-paste add with preview, seed categories (en/pl).
+grouped lists with subtotals and inline editing (HTMX), correction-editable valuation history, bulk-paste add with preview, seed categories (en/pl).
 Money is Money only. Tests: valuation append semantics, back-dated valuations, current value resolution, archive, role checks.
 ```
 
@@ -254,7 +254,7 @@ decision, 2026-10-18).
 - Linked items restore as manual with the link cleared and no value, listed as
   `link_target_missing`; export still writes `link_type`/`link_id` for the M6/M7 extensions.
 - All four models have `import_key`/`import_batch_id` with partial unique indexes on SQLite and
-  PostgreSQL. Restore removes a batch's append-only valuations through an explicit
+  PostgreSQL. Restore removes a batch's valuations through an explicit
   workspace-and-batch-scoped SQL delete; repository `update`/`delete` stay unsupported.
 - Untouched suggested net-worth categories use the ledger rule (the current seed or the seed before F5.7, without Real estate, both count): automatic
   `networth_category.seeded`, exact suggested set, unedited, unused, within five seconds. A
@@ -451,4 +451,69 @@ Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait 
 Implement F5.7 from docs/specs/M5-net-worth.md together with its M6 seed changes: the Real estate net-worth seed (en/pl),
 the empty-side-only suggested-category seed, the new M6 asset-class seed (no Real estate / Primary residence, Other investable),
 the "not counted in FIRE" badge on the portfolio class table, and restore emptiness accepting old and new seed sets.
+```
+
+
+---
+
+## F5.8 Correct a value-history entry
+
+**Story:** I entered a wrong value or the wrong date in an item's value history. I want to correct
+that entry without deleting the item, leaving a duplicate, or losing the rest of the history.
+
+**Acceptance**
+- Every manual value-history row has an **Edit** action for editors and owners on both the Assets
+  and Liabilities tabs. Viewers see the history but no edit action.
+- The inline form edits the **value**, **as-of date** and **note**. The item and its currency are
+  unchanged; a valuation always uses the item's currency.
+- Saving updates the row in place. The current value, "as of" date, sparkline, category subtotal
+  and summary totals refresh immediately. `created_at` is kept, so several values on one date
+  still resolve in original entry order.
+- Archived and linked items stay read-only; restore or unlink first. The service refuses both
+  cases even through a direct request.
+- History rows are never deleted. A correction changes an existing row; adding a value still
+  appends a new one.
+- The change is audited as `networth_item.valuation_updated` with the previous and new date,
+  amount and currency plus the changed fields. Saving identical values writes no event.
+- Stored snapshots are not rewritten. **Backfill from history** uses the corrected values when it
+  is run again; manual snapshots stay as recorded.
+- Archive export and restore preserve the corrected row. The archive format does not change.
+
+**Implementation notes (F5.8)**
+- `ItemValuation` uses the `NoDelete` marker instead of `AppendOnly`: a row may be updated through
+  its repository/service, but a direct ORM delete is still refused. The repository keeps `delete`
+  unsupported; its explicit `delete_for_import_batch` rollback path is unchanged.
+- `ItemValuationRepository.get_for_item(item_id, valuation_id)` scopes the lookup to both the item
+  and the workspace. `services.networth.update_valuation` parses the locale value, cleans the
+  note and validates the date before the transaction; inside it locks the workspace, checks the
+  item is active and manual, updates only the changed fields, audits and returns the refreshed
+  item view.
+- The web layer adds a GET edit fragment and a POST update route, an inline edit row in the
+  value-history table, and a non-JavaScript fallback through
+  `?edit_item=<item>&edit_valuation=<valuation>`. The history disclosure stays open while the
+  form is shown; `data-keep-visible` keeps the item row at the same viewport position.
+- Linked items never enter this path (their history is not manual), and archived items are
+  refused by the service and hide the action.
+
+**Tests**
+- Service: value/date/note update in place; `created_at` unchanged; current value and sparkline
+  recompute; future date and future-to-past correction; audit payload; no event for an unchanged
+  save; viewer and stale-editor refusal; archived, linked, wrong-item and wrong-workspace
+  refusal; invalid amount/date/note.
+- Tenant isolation: `get_for_item` is workspace-scoped; update is isolated while delete stays
+  unsupported.
+- Archive: an edited valuation survives export/restore byte-identically; the restore rollback
+  still removes batch-created rows.
+- Snapshots: a backfill rerun uses the corrected value.
+- Web: edit action only for active manual items and editors; GET fragment opens the row; POST
+  saves with the redirect notice; invalid input returns 400 with the field error and retained
+  values; archived/viewer/linked views have no action.
+
+**Agent prompt**
+```
+Follow the standard workflow in docs/specs/00-overview.md §8 (plan first, wait for my go).
+Implement F5.8 from docs/specs/M5-net-worth.md: edit a manual ItemValuation in place (value, as_of, note),
+keep delete unavailable, audit the correction, expose it from the value-history table with an HTMX form and
+a no-JS fallback, and cover service, tenant, archive, snapshot-backfill and web tests. Update the M5/overview
+append-only wording and docs/net-worth.md.
 ```

@@ -1150,6 +1150,10 @@ def test_networth_queries_stay_in_their_workspace(
     assert [row.id for row in valuations_b.for_item(b_item.id)] == [b_value.id]
     assert [row.id for row in valuations_a.for_items([a_item.id, b_item.id])] == [a_value.id]
     assert [row.id for row in valuations_b.for_items([a_item.id, b_item.id])] == [b_value.id]
+    assert valuations_a.get_for_item(a_item.id, a_value.id) == a_value
+    assert valuations_a.get_for_item(b_item.id, b_value.id) is None
+    assert valuations_b.get_for_item(a_item.id, a_value.id) is None
+    assert valuations_b.get_for_item(b_item.id, b_value.id) == b_value
     assert valuations_a.earliest_as_of() == date(2026, 10, 7)
     assert valuations_b.earliest_as_of() == date(2026, 10, 7)
 

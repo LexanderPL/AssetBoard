@@ -23,13 +23,45 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
 {% if item.unavailable %}<span class="rounded-full bg-warning-soft px-2 py-0.5 text-xs text-warning-strong" data-unavailable>{{ _("Value unavailable") }}</span>{% endif %}
 {%- endmacro %}
 
+{% macro valuation_edit_row(valuation, item, side_value) -%}
+{% set row_id = item.id|string %}
+<tr data-valuation-edit="{{ valuation.id }}" class="align-top">
+  <td colspan="4" class="px-2 py-3 sm:px-4">
+    <form {{ htmx_form(scoped_url(request, 'networth_item_valuation_update', item_id=row_id, valuation_id=valuation.id), keep_visible=row_id) }} class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] sm:items-start" novalidate>
+      {{ csrf_input() }}
+      <div class="space-y-1">
+        <label for="valuation-edit-value-{{ row_id }}" class="block text-xs text-muted">{{ _("Value") }}</label>
+        <input id="valuation-edit-value-{{ row_id }}" name="value" type="text" inputmode="decimal" required maxlength="64" value="{{ valuation_edit_values.value }}" class="form-control px-2 py-1.5 w-full"{% if valuation_edit_errors.get("value") %} aria-invalid="true" aria-describedby="valuation-edit-value-{{ row_id }}-error"{% endif %}>
+        {% if valuation_edit_errors.get("value") %}<p id="valuation-edit-value-{{ row_id }}-error" class="text-xs text-danger">{{ valuation_edit_errors.get("value") }}</p>{% endif %}
+      </div>
+      <div class="space-y-1">
+        <label for="valuation-edit-date-{{ row_id }}" class="block text-xs text-muted">{{ _("As of") }}</label>
+        <input id="valuation-edit-date-{{ row_id }}" name="as_of" type="date" required value="{{ valuation_edit_values.as_of }}" class="form-control px-2 py-1.5 w-full"{% if valuation_edit_errors.get("as_of") %} aria-invalid="true" aria-describedby="valuation-edit-date-{{ row_id }}-error"{% endif %}>
+        {% if valuation_edit_errors.get("as_of") %}<p id="valuation-edit-date-{{ row_id }}-error" class="text-xs text-danger">{{ valuation_edit_errors.get("as_of") }}</p>{% endif %}
+      </div>
+      <div class="space-y-1">
+        <label for="valuation-edit-note-{{ row_id }}" class="block text-xs text-muted">{{ _("Note (optional)") }}</label>
+        <input id="valuation-edit-note-{{ row_id }}" name="note" type="text" maxlength="{{ max_notes_length }}" value="{{ valuation_edit_values.note }}" class="form-control px-2 py-1.5 w-full"{% if valuation_edit_errors.get("note") %} aria-invalid="true" aria-describedby="valuation-edit-note-{{ row_id }}-error"{% endif %}>
+        {% if valuation_edit_errors.get("note") %}<p id="valuation-edit-note-{{ row_id }}-error" class="text-xs text-danger">{{ valuation_edit_errors.get("note") }}</p>{% endif %}
+      </div>
+      <div class="flex flex-wrap items-center gap-2 sm:pt-5">
+        <button type="submit" class="btn-primary px-3 py-1.5 text-xs">{{ _("Save") }}</button>
+        <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}" hx-get="{{ scoped_url(request, 'networth_item_row', item_id=row_id) }}" hx-target="#networth-body" hx-swap="outerHTML" data-keep-visible="#item-{{ row_id }}" class="btn px-3 py-1.5 text-xs">{{ _("Cancel") }}</a>
+      </div>
+      <p class="text-xs text-muted sm:col-span-4">{{ _("Stored snapshots are not recalculated. Re-run Backfill from history after correcting a past value.") }}</p>
+    </form>
+  </td>
+</tr>
+{%- endmacro %}
+
 {% macro valuation_block(item, side_value) -%}
 {% set row_id = item.id|string %}
+{% set editing_valuation = edit_valuation if can_edit and not item.archived else none %}
 {% if item.valuation_mode == "linked" %}
 <p class="mt-2 text-xs text-muted" data-linked-readonly>{{ _("This value comes from the linked source and is read-only.") }}</p>
 {% else %}
 {% if item.valuations %}
-<details class="mt-2" data-valuations>
+<details class="mt-2" data-valuations{% if editing_valuation and editing_valuation.item_id == item.id %} open{% endif %}>
   <summary class="cursor-pointer text-xs font-medium text-muted">{{ _("Value history") }} <span class="font-normal">({{ item.valuations|length }})</span></summary>
   {% if item.estimate_between %}
   <p class="mt-2 text-xs text-muted" data-estimate-between>{{ _("Estimates values between entries") }}</p>
@@ -43,14 +75,23 @@ method="post" action="{{ action }}" hx-post="{{ action }}" hx-target="#networth-
   </div>
   <div class="mt-2 overflow-x-auto">
     <table class="sheet w-full text-xs">
-      <thead><tr class="text-left text-muted"><th scope="col">{{ _("As of") }}</th><th scope="col" class="text-right">{{ _("Value") }}</th><th scope="col">{{ _("Note") }}</th></tr></thead>
+      <thead><tr class="text-left text-muted"><th scope="col">{{ _("As of") }}</th><th scope="col" class="text-right">{{ _("Value") }}</th><th scope="col">{{ _("Note") }}</th>{% if can_edit and not item.archived %}<th scope="col"><span class="sr-only">{{ _("Actions") }}</span></th>{% endif %}</tr></thead>
       <tbody>
         {% for valuation in item.valuations %}
+        {% if editing_valuation and editing_valuation.id == valuation.id %}
+        {{ valuation_edit_row(valuation, item, side_value) }}
+        {% else %}
         <tr data-valuation="{{ valuation.id }}">
           <td class="whitespace-nowrap">{{ format_day(valuation.as_of) }}{% if valuation.future %} <span class="text-warning-strong">{{ _("future") }}</span>{% endif %}</td>
           <td class="whitespace-nowrap text-right tabular-nums">{{ format_money(valuation.value) }}</td>
           <td class="break-words">{{ valuation.note }}</td>
+          {% if can_edit and not item.archived %}
+          <td class="whitespace-nowrap px-2 py-2 text-right">
+            <a href="{{ scoped_url(request, 'networth') }}?side={{ side_value }}&edit_item={{ row_id }}&edit_valuation={{ valuation.id }}" hx-get="{{ scoped_url(request, 'networth_item_valuation_edit', item_id=row_id, valuation_id=valuation.id) }}" hx-target="#networth-body" hx-swap="outerHTML" data-keep-visible="#item-{{ row_id }}" class="font-medium text-primary-ink underline" data-edit-valuation>{{ _("Edit") }}<span class="sr-only"> {{ _("value from %(date)s", date=format_day(valuation.as_of)) }}</span></a>
+          </td>
+          {% endif %}
         </tr>
+        {% endif %}
         {% endfor %}
       </tbody>
     </table>

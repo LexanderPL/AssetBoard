@@ -25,9 +25,9 @@ from sqlalchemy import (
 from sqlalchemy.orm import Mapped, mapped_column
 
 from assetboard.db.base import (
-    AppendOnly,
     Base,
     IdMixin,
+    NoDelete,
     TimestampMixin,
     WorkspaceScopedMixin,
 )
@@ -190,13 +190,14 @@ class NetWorthItem(IdMixin, TimestampMixin, WorkspaceScopedMixin, Base):
     archived_at: Mapped[datetime | None] = mapped_column(UtcDateTime(), nullable=True)
 
 
-class ItemValuation(IdMixin, TimestampMixin, WorkspaceScopedMixin, AppendOnly, Base):
-    """One manual value of an item, appended and never changed or deleted (F5.1).
+class ItemValuation(IdMixin, TimestampMixin, WorkspaceScopedMixin, NoDelete, Base):
+    """One manual value of an item; editable but never deleted (F5.1, F5.8).
 
     The amount is positive minor units in the item's currency. ``as_of`` may be back-dated or
     future-dated; "current" is the latest row whose ``as_of <= today``. Several rows may share
-    a date; the latest ``created_at``, then ``id``, wins. The composite foreign key keeps the
-    currency equal to the item's currency.
+    a date; the latest ``created_at``, then ``id``, wins. An editor may correct the value, date
+    or note in place; the original ``created_at`` stays, so same-date ordering does not change.
+    The composite foreign key keeps the currency equal to the item's currency.
     """
 
     __tablename__ = "item_valuations"

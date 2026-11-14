@@ -221,8 +221,8 @@ Archive the duplicate item or unlink it if you want only one of the two values i
 ## Value history
 
 Adding an item records its first value. Every later value change is appended to the item's
-history, with the date it applies to and an optional note. Nothing in the history is edited or
-deleted.
+history, with the date it applies to and an optional note. A wrong entry can be corrected in
+place; history entries are never deleted.
 
 - **Current value** is the latest value whose **as of** date is today or earlier. A future-dated
   value is kept in the history but does not become current until that date.
@@ -235,10 +235,15 @@ deleted.
 Each item's **Value history** shows a small table and a sparkline. The sparkline uses the latest
 value per date up to today.
 
-Because history is append-only, a wrong amount can be corrected by adding a newer value for the
-same date. A wrong **date** cannot be removed; the note should explain the correction. The
-backfill in a later version will use the stored dates, so this is a known follow-up for the
-owner.
+Each history row has an **Edit** action for editors and owners on manual, active items. The
+inline form changes the **value**, **as-of date** and **note**; the item and currency stay the
+same. Saving updates the row and refreshes the current value, sparkline, subtotal and summary
+immediately. The original entry time is kept, so several values on one date still resolve in the
+order they were entered. Archived and linked items are read-only; restore or unlink them first.
+
+History entries cannot be deleted. A wrong amount or date is corrected in place. Stored snapshots
+are not rewritten by an edit: run **Backfill from history** on the History tab to rebuild past
+month-ends from the corrected values. Manual snapshots stay exactly as recorded.
 
 ## Bulk add
 

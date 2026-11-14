@@ -740,6 +740,9 @@ msgstr "Przywrócono pozycję majątku"
 msgid "Net-worth value added"
 msgstr "Dodano wartość majątku"
 
+msgid "Net-worth value corrected"
+msgstr "Poprawiono wartość majątku"
+
 msgid "Net-worth items added in bulk"
 msgstr "Dodano pozycje majątku zbiorczo"
 
@@ -1069,6 +1072,9 @@ msgstr "Data"
 
 msgid "Previous date"
 msgstr "Poprzednia data"
+
+msgid "Previously as of"
+msgstr "Wcześniejsza data"
 
 msgid "Direction"
 msgstr "Kierunek"
@@ -4118,6 +4124,9 @@ msgstr "Pozycja odłączona; wartość nie była dostępna, więc teraz jej nie 
 
 msgid "Value added."
 msgstr "Dodano wartość."
+
+msgid "Value saved."
+msgstr "Wartość zapisana."
 
 msgid "Items added."
 msgstr "Dodano pozycje."
@@ -10710,6 +10719,13 @@ msgstr "niedostępnym źródłem"
 
 msgid "Value unavailable"
 msgstr "Wartość niedostępna"
+
+msgid ""
+"Stored snapshots are not recalculated. Re-run Backfill from history after"
+" correcting a past value."
+msgstr ""
+"Zapisane migawki nie są przeliczane. Po poprawieniu wcześniejszej "
+"wartości uruchom ponownie Uzupełnianie z historii."
 
 msgid "This value comes from the linked source and is read-only."
 msgstr "Ta wartość pochodzi z powiązanego źródła i jest tylko do odczytu."

@@ -825,7 +825,11 @@ TENANT_CASES: dict[type[Any], TenantCase] = {
     NetWorthCategory: TenantCase(make_networth_category, update_values={"color": "#e11d48"}),
     NetWorthItem: TenantCase(make_networth_item, update_values={"name": "Updated item"}),
     # Valuations are append-only.
-    ItemValuation: TenantCase(make_item_valuation, unsupported=frozenset({"update", "delete"})),
+    ItemValuation: TenantCase(
+        make_item_valuation,
+        update_values={"value_minor": 130000},
+        unsupported=frozenset({"delete"}),
+    ),
     # Snapshots are replaced as a whole (delete and recreate), never edited.
     NetWorthSnapshot: TenantCase(
         make_networth_snapshot,

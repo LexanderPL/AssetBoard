@@ -731,6 +731,9 @@ msgstr ""
 msgid "Net-worth value added"
 msgstr ""
 
+msgid "Net-worth value corrected"
+msgstr ""
+
 msgid "Net-worth items added in bulk"
 msgstr ""
 
@@ -1059,6 +1062,9 @@ msgid "Date"
 msgstr ""
 
 msgid "Previous date"
+msgstr ""
+
+msgid "Previously as of"
 msgstr ""
 
 msgid "Direction"
@@ -3895,6 +3901,9 @@ msgid "Item unlinked; no value was available, so it now has none."
 msgstr ""
 
 msgid "Value added."
+msgstr ""
+
+msgid "Value saved."
 msgstr ""
 
 msgid "Items added."
@@ -9812,6 +9821,11 @@ msgid "an unavailable source"
 msgstr ""
 
 msgid "Value unavailable"
+msgstr ""
+
+msgid ""
+"Stored snapshots are not recalculated. Re-run Backfill from history after"
+" correcting a past value."
 msgstr ""
 
 msgid "This value comes from the linked source and is read-only."

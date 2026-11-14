@@ -75,7 +75,9 @@ toast).
 - `delete(obj)` re-reads the object through the scope before deleting it.
 - A repository can declare `unsupported` operations. Audit events, for example, are
   append-only: no update, no delete. Models marked `AppendOnly` are also guarded at flush:
-  changing or deleting a loaded row raises `AppendOnlyViolationError`.
+  changing or deleting a loaded row raises `AppendOnlyViolationError`. Models marked
+  `NoDelete` may be corrected through their service/repository, but a delete at flush is
+  refused; net-worth item valuations use this marker.
 - A row's `workspace_id` never changes. A `before_flush` guard raises
   `WorkspaceReassignmentError` if code changes it, including from `NULL` to a value. Bulk
   `update()` and `delete()` statements are not used for workspace data.

@@ -73,7 +73,7 @@ Used by tax rules, loan cost components and similar. `mode: percent | fixed`; `p
 A net-worth item is either `manual` (user enters value; every change is appended to a valuation history) or `linked` (value computed from another module: asset class in portfolio, a single holding, a loan's remaining principal). Links are by `(link_type, link_id)`; resolution lives in the owning module's service.
 
 ### 3.8 History and snapshots
-Anything the user will want a trend of is stored historically: manual valuations (append-only), price points, FX rates, net-worth snapshots (monthly job + manual "take snapshot"), loan balance checkpoints.
+Anything the user will want a trend of is stored historically: manual valuations (correctable, never deleted), price points, FX rates, net-worth snapshots (monthly job + manual "take snapshot"), loan balance checkpoints.
 
 ### 3.9 Audit and deletion
 - Soft delete (`deleted_at`) for user-entered financial rows; UI offers undo for ~10 s and a trash view later.

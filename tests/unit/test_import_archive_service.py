@@ -1189,7 +1189,18 @@ def _target(db: WorkspaceDb) -> UUID:
 
 def test_restore_round_trip_is_byte_identical(db: WorkspaceDb, data_dir: Path) -> None:
     _source_workspace(db)
-    first = export_workspace(db.factory, db.ctx("own", "owner")).content
+    source_ctx = db.ctx("own", "owner")
+    with db.factory.begin() as session:
+        car = next(
+            item
+            for item in NetWorthItemRepository(session, source_ctx).ordered()
+            if item.name == "Car"
+        )
+        values = ItemValuationRepository(session, source_ctx).for_item(car.id)
+        ItemValuationRepository(session, source_ctx).update(
+            values[-1].id, value_minor=1210000, note="Corrected"
+        )
+    first = export_workspace(db.factory, source_ctx).content
     target = _target(db)
     target_ctx = db.ctx("own", "owner", workspace_id=target)
     batch_id = _upload(db, data_dir, first, ctx=target_ctx)
@@ -1233,6 +1244,17 @@ def test_restore_round_trip_is_byte_identical(db: WorkspaceDb, data_dir: Path) -
     ):
         assert first_parsed.files[name] == second_parsed.files[name]
     assert first_parsed.manifest["files"] == second_parsed.manifest["files"]
+    with db.factory() as session:
+        car = next(
+            item
+            for item in NetWorthItemRepository(session, target_ctx).ordered()
+            if item.name == "Car"
+        )
+        values = ItemValuationRepository(session, target_ctx).for_item(car.id)
+        assert [(row.value_minor, row.note) for row in values] == [
+            (1200000, "Bought"),
+            (1210000, "Corrected"),
+        ]
 
 
 def test_loan_restore_round_trip_maps_references_and_keeps_schedule(
