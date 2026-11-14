@@ -2873,11 +2873,10 @@ def _read_rows(
             errors.append(ArchiveError("fire_expense_exclusions.csv", "duplicate FIRE exclusion"))
         exclusion_keys.add(key)
         category = by_id.get(row["category_id"])
-        if category is not None and (
-            row["category"] != category["name"]
-            or category["kind"] != "expense"
-            or category["treatment"] != "regular"
-        ):
+        # A wrong-kind or non-regular category is not an archive error: the restore skips the
+        # exclusion with a warning and falls linked expenses back to their archived amount.
+        # Only a present category with a different companion name is a cross-file mismatch.
+        if category is not None and row["category"] != category["name"]:
             errors.append(
                 ArchiveError("fire_expense_exclusions.csv", "FIRE exclusion category mismatch")
             )

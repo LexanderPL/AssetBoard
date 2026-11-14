@@ -1763,11 +1763,11 @@ msgstr ""
 
 #, python-format
 msgid ""
-"A FIRE expense exclusion in %(scenario)s references a category that is "
-"not in this archive; it was skipped."
+"A FIRE expense exclusion in %(scenario)s references a category this "
+"archive cannot use; it was skipped."
 msgstr ""
 "Wykluczenie wydatków FIRE w scenariuszu %(scenario)s odwołuje się do "
-"kategorii, której nie ma w tym archiwum; zostało pominięte."
+"kategorii, której to archiwum nie może użyć; zostało pominięte."
 
 #, python-format
 msgid ""
@@ -1847,12 +1847,10 @@ msgstr "Identyfikator wykluczenia wydatków FIRE występuje więcej niż raz."
 msgid "A FIRE scenario excludes the same expense category more than once."
 msgstr "Scenariusz FIRE wyklucza tę samą kategorię wydatków więcej niż raz."
 
-msgid ""
-"A FIRE expense exclusion references a category that is not a regular "
-"expense category."
+msgid "A FIRE expense exclusion's category name does not match its category id."
 msgstr ""
-"Wykluczenie wydatków FIRE odwołuje się do kategorii, która nie jest "
-"zwykłą kategorią wydatków."
+"Nazwa kategorii wykluczenia wydatków FIRE nie pasuje do identyfikatora "
+"kategorii."
 
 msgid "Enter a FIRE scenario name of 1 to 200 characters."
 msgstr "Podaj nazwę scenariusza FIRE o długości od 1 do 200 znaków."

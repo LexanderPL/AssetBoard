@@ -251,8 +251,8 @@ REPORT_MESSAGES: dict[str, str] = {
         "restored as 0."
     ),
     "fire_exclusion_missing": _(
-        "A FIRE expense exclusion in %(scenario)s references a category that is not in this "
-        "archive; it was skipped."
+        "A FIRE expense exclusion in %(scenario)s references a category this archive cannot "
+        "use; it was skipped."
     ),
     "fire_source_loan_missing": _(
         "A FIRE event in %(scenario)s references a loan that is not in this archive; the link "
@@ -286,7 +286,7 @@ REPORT_MESSAGES: dict[str, str] = {
         "A FIRE scenario excludes the same expense category more than once."
     ),
     "fire_exclusion_category": _(
-        "A FIRE expense exclusion references a category that is not a regular expense category."
+        "A FIRE expense exclusion's category name does not match its category id."
     ),
     "invalid_fire_scenario_name": _("Enter a FIRE scenario name of 1 to 200 characters."),
     "invalid_event_label": _("Enter an event description of 1 to 200 characters."),

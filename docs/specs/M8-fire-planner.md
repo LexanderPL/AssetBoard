@@ -446,8 +446,9 @@ projections after restore.
   data (regular trailing-window rows in the scenario currency, all exclusions as regular expense
   categories with at least one included row, an investable portfolio source, matching currency);
   otherwise it becomes manual with the archived fallback, or manual 0 with a warning when there
-  is none. Missing exclusions are skipped, missing source loans are cleared, and the first active
-  scenario is promoted when no active default exists; every case is reported and translated.
+  is none. Missing or unusable exclusions are skipped, missing source loans are cleared, and the
+  first active scenario is promoted when no active default exists; every case is reported and
+  translated.
   Restore rollback removes FIRE rows before loans (the event's `source_loan_id` is RESTRICT).
 - Merge writes no FIRE rows and lists the files once with `fire_restore_only`. There is no
   standalone FIRE importer: a lone FIRE CSV is refused as part of a full restore only.

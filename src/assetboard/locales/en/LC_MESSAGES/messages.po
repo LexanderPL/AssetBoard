@@ -1734,8 +1734,8 @@ msgstr ""
 
 #, python-format
 msgid ""
-"A FIRE expense exclusion in %(scenario)s references a category that is "
-"not in this archive; it was skipped."
+"A FIRE expense exclusion in %(scenario)s references a category this "
+"archive cannot use; it was skipped."
 msgstr ""
 
 #, python-format
@@ -1810,9 +1810,7 @@ msgstr ""
 msgid "A FIRE scenario excludes the same expense category more than once."
 msgstr ""
 
-msgid ""
-"A FIRE expense exclusion references a category that is not a regular "
-"expense category."
+msgid "A FIRE expense exclusion's category name does not match its category id."
 msgstr ""
 
 msgid "Enter a FIRE scenario name of 1 to 200 characters."
@@ -12578,5 +12576,17 @@ msgstr ""
 #~ "The archive had no active default "
 #~ "FIRE scenario; the first active one "
 #~ "was made the default."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A FIRE expense exclusion references a"
+#~ " category that is not a regular "
+#~ "expense category."
+#~ msgstr ""
+
+#~ msgid ""
+#~ "A FIRE expense exclusion in %(scenario)s"
+#~ " references a category that is not"
+#~ " in this archive; it was skipped."
 #~ msgstr ""
 

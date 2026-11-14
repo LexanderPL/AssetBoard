@@ -930,13 +930,14 @@ Regular expense categories left out of a scenario's linked trailing expenses.
 | `id` | yes | UUID (lineage id) |
 | `scenario_id` | yes | UUID from `fire_scenarios.csv` |
 | `scenario` | yes | the scenario name (must match `scenario_id`) |
-| `category_id` | yes | UUID from `categories.csv`; must be a regular expense category when present |
+| `category_id` | yes | UUID from `categories.csv`; a missing, wrong-kind or non-regular category skips the exclusion on restore |
 | `category` | yes | the category name (must match `category_id` when it is present) |
 
 Export order: scenario order, category order, lineage id. A scenario excludes a category at
-most once. A category missing from the archive is skipped with a warning; if the scenario's
-expenses are linked, the missing exclusion makes them fall back to the archived manual amount
-rather than silently changing the total.
+most once. A category missing from the archive, or one that is not a regular expense category,
+is skipped with a warning; a present category whose name differs from the `category` companion
+is an archive error. If the scenario's expenses are linked, the skipped exclusion makes them
+fall back to the archived manual amount rather than silently changing the total.
 
 ```csv
 id,scenario_id,scenario,category_id,category

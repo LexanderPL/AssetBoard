@@ -1542,15 +1542,23 @@ def _fire_restore_plan(archive: ParsedArchive, today: date, base_currency: str) 
     cleared_events: list[FireEventRow] = []
     promoted_default_id: str | None = None
     active: list[FireScenarioRow] = []
+    # A holding needs a live investment transaction; a deleted one (and an instrument that is
+    # never traded) is not a portfolio source for the F8.4 look-through. The archived manual
+    # item must still be active: an archived M5 item is skipped by the linked resolution.
+    live_investment_instruments = {
+        UUID(row.instrument_id)
+        for row in archive.rows.investment_transactions
+        if not row.deleted_at
+    }
     linked_portfolio_source = (
         any(row.investable == "true" for row in archive.rows.asset_classes)
-        or bool(archive.rows.instruments)
-        or bool(archive.rows.investment_transactions)
+        or bool(live_investment_instruments)
         or any(
             row.side == "asset"
             and row.investable == "true"
             and row.include_in_net_worth == "true"
             and row.valuation_mode == "manual"
+            and not row.archived_at
             for row in archive.rows.networth_items
         )
     )
