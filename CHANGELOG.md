@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.2](https://github.com/LexanderPL/AssetBoard/compare/v0.7.1...v0.7.2) (2026-11-14)
+
+
+### Bug Fixes
+
+* **investments:** round displayed prices to the quote currency ([#325](https://github.com/LexanderPL/AssetBoard/issues/325)) ([12df38e](https://github.com/LexanderPL/AssetBoard/commit/12df38ed56e7dba430b716ad1d5392c05d65e8ad))
+
 ## [0.7.1](https://github.com/LexanderPL/AssetBoard/compare/v0.7.0...v0.7.1) (2026-11-14)
 
 
