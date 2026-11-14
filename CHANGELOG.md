@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.7.5](https://github.com/LexanderPL/AssetBoard/compare/v0.7.4...v0.7.5) (2026-11-14)
+
+
+### Features
+
+* **archive:** add FIRE scenarios to the workspace archive (F8.6) ([#333](https://github.com/LexanderPL/AssetBoard/issues/333)) ([4974106](https://github.com/LexanderPL/AssetBoard/commit/49741062e7cbd0efdca238b40559861d7cf78841))
+
+
+### Bug Fixes
+
+* **loans:** correct tranche balances, conversion and UI after review (F7.10) ([#332](https://github.com/LexanderPL/AssetBoard/issues/332)) ([b6a8077](https://github.com/LexanderPL/AssetBoard/commit/b6a807727d7151b9cf902cf8db75ee64d75478e7))
+
 ## [0.7.4](https://github.com/LexanderPL/AssetBoard/compare/v0.7.3...v0.7.4) (2026-11-14)
 
 
