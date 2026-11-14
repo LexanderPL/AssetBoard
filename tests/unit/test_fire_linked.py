@@ -778,6 +778,54 @@ def test_loan_payoff_states_for_archived_paid_off_currency_and_window(
     assert detail.scenario.start_year == 2026
 
 
+def test_loan_payoff_states_for_a_broken_schedule_and_an_unusable_amount(
+    team: WorkspaceDb, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from types import SimpleNamespace
+
+    from assetboard.domain.loans import ScheduleError
+
+    _loan(team, name="Broken")
+    scenario_id = _create_scenario(team)
+    detail = fire_scenarios.get_fire_scenario(team.factory, _ctx(team), scenario_id)
+
+    def suggestions():
+        with team.factory() as session:
+            return fire_linked.loan_payoff_suggestions_in_session(
+                session,
+                _ctx(team),
+                currency="EUR",
+                start_year=detail.scenario.start_year,
+                last_year=detail.scenario.birth_year + detail.scenario.horizon_age,
+                existing_events=(),
+            )
+
+    def broken(_inputs):
+        raise ScheduleError("invalid_terms")
+
+    monkeypatch.setattr(fire_linked, "build_inputs_schedule", broken)
+    assert suggestions()[0].state == "schedule_error"
+    assert suggestions()[0].schedule_error == "invalid_terms"
+
+    row = SimpleNamespace(
+        date=date(2026, 4, 1),
+        interest=Money(0, "EUR"),
+        principal=Money(0, "EUR"),
+        costs=Money(0, "EUR"),
+    )
+    summary = SimpleNamespace(
+        remaining_principal=Money(1_000_000, "EUR"),
+        payoff_date=date(2028, 1, 1),
+    )
+    monkeypatch.setattr(
+        fire_linked,
+        "build_inputs_schedule",
+        lambda _inputs: SimpleNamespace(rows=(row,)),
+    )
+    monkeypatch.setattr(fire_linked, "summarize_schedule", lambda _schedule, _today: summary)
+    assert suggestions()[0].state == "amount_invalid"
+
+
 def test_one_click_creates_the_event_and_audit_without_the_amount(
     team: WorkspaceDb,
 ) -> None:
